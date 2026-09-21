@@ -7,6 +7,7 @@ import { audit, notifyMany } from "@/lib/audit";
 import { parseCsv } from "@/lib/csv";
 import { handlerFor, summariseDiff, canDecide, canSubmit, type DiffLine } from "@/lib/controlled/registry";
 import "@/lib/controlled/handlers";
+import { holdersOf } from "@/lib/permissions";
 
 export type ControlledState = {
   error?: string;
@@ -39,7 +40,7 @@ export async function uploadControlledVersionAction(
 
   const handler = handlerFor(kind);
   if (!handler) return { error: "Unknown kind of controlled configuration." };
-  if (!ctx.can("CONFIGURE") && !ctx.can("CONTROL")) {
+  if (!ctx.can("CONFIGURE") && !ctx.can("CONTROL") && !(handler.ownerVerb && ctx.can(handler.ownerVerb))) {
     return { error: ctx.why("CONFIGURE") };
   }
   if (!versionLabel) return { error: "Give this version a label — it is how the change is referred to afterwards." };
@@ -116,7 +117,7 @@ export async function submitControlledVersionAction(
   const handler = handlerFor(version.set.kind);
   if (!handler) return { error: "Unknown kind of controlled configuration." };
 
-  const allowed = canSubmit({ state: version.state, mayChange: ctx.can("CONFIGURE") || ctx.can("CONTROL") });
+  const allowed = canSubmit({ state: version.state, mayChange: ctx.can("CONFIGURE") || ctx.can("CONTROL") || (!!handler.ownerVerb && ctx.can(handler.ownerVerb)) });
   if (!allowed.ok) return { error: allowed.error };
 
   await db.controlledVersion.update({
@@ -125,12 +126,9 @@ export async function submitControlledVersionAction(
   });
 
   // Whoever may approve this needs to know it is waiting.
-  const approvers = await db.projectMembership.findMany({
-    where: { projectId: ctx.projectId, active: true, function: { active: true, legacyRole: { in: ["ADMIN", "CONTROLLER"] } } },
-    select: { userId: true },
-  });
+  const approvers = await holdersOf(ctx, handler.ownerApproves ? "CONTROL" : "CONFIGURE");
   await notifyMany(
-    approvers.map((a) => a.userId).filter((id) => id !== user.id),
+    approvers.map((a) => a.id).filter((id) => id !== user.id),
     "CONTROLLED_SUBMITTED",
     `${handler.title} ${version.versionLabel} awaits approval`,
     `${user.name} submitted a change of ${version.rowCount} row(s).`,
@@ -182,7 +180,7 @@ export async function decideControlledVersionAction(
     userId: user.id,
     mayConfigure: ctx.can("CONFIGURE"),
     ownerApproves: handler.ownerApproves,
-    mayControl: ctx.can("CONTROL"),
+    mayControl: ctx.can("CONTROL") || (!!handler.ownerVerb && ctx.can(handler.ownerVerb)),
   });
   if (!allowed.ok) return { error: allowed.error };
 
@@ -265,7 +263,8 @@ export async function discardControlledVersionAction(
   if (version.state !== "DRAFT") {
     return { error: "Only a draft can be discarded. A submitted version is decided, and a decided one is kept." };
   }
-  if (!ctx.can("CONFIGURE") && !ctx.can("CONTROL")) return { error: ctx.why("CONFIGURE") };
+  const owner = handlerFor(version.set.kind)?.ownerVerb;
+  if (!ctx.can("CONFIGURE") && !ctx.can("CONTROL") && !(owner && ctx.can(owner))) return { error: ctx.why("CONFIGURE") };
 
   await db.controlledVersion.delete({ where: { id: versionId } });
   await audit({

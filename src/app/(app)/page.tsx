@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { requireScope } from "@/lib/scope";
 import { ButtonLink, Chip } from "@/components/ui";
-import { requiredApprovalRole, ROLE_RANK } from "@/lib/lifecycle";
 import { isController, isAdmin } from "@/lib/auth";
 import { fmtDate } from "@/lib/utils";
 import { supplierRows, WITH_SUPPLIER, STATE_LABEL } from "@/lib/supplier";
@@ -9,6 +8,7 @@ import { parseSteps } from "@/lib/workflow";
 import { departmentsOf, businessDaysBefore, DEFAULT_LEAD_BUSINESS_DAYS } from "@/lib/schedule";
 import { departmentRows, senderRows, isDepartmentSender } from "@/lib/requirements-process";
 import { ArrowRight, CheckCircle2, FilePlus2, ShieldCheck } from "lucide-react";
+import { hasVerb } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +20,7 @@ export const dynamic = "force-dynamic";
 export default async function HomePage() {
   const ctx = await requireScope();
   const { user, db } = ctx;
-  const canDecide = ["APPROVER", "ADMIN", "CONTROLLER", "REVIEWER"].includes(user.role);
+  const canDecide = hasVerb(user, "APPROVE") || hasVerb(user, "REVIEW");
   const controller = isController(user) || isAdmin(user);
 
   const [reviews, approvalCandidates, returned, incoming, drafts, actions, lastRun, criticalDefects] = await Promise.all([
@@ -73,7 +73,7 @@ export default async function HomePage() {
     const me = await db.projectMembership.findFirst({ where: { projectId: ctx.projectId, userId: user.id, active: true } });
     const control = ctx.can("CONTROL");
     const untagged = actions.filter((a) => !departmentsOf(a).length).length;
-    if (control && untagged) planning.push({ key: "tag", href: "/actions/requirements", label: `${untagged} activit${untagged === 1 ? "y" : "ies"} without departments`, sub: "The project manager's departments list", cta: "Open →" });
+    if ((control || ctx.can("PLAN")) && untagged) planning.push({ key: "tag", href: "/actions/requirements", label: `${untagged} activit${untagged === 1 ? "y" : "ies"} without departments`, sub: "The project manager's departments list", cta: "Open →" });
     if (control || me?.department) {
       for (const d of await departmentRows(ctx)) {
         if (control && d.notIssued.length) planning.push({ key: `ask-${d.department}`, href: "/actions/requirements", label: `Ask ${d.department} for its documents`, sub: `${d.notIssued.length} activit${d.notIssued.length === 1 ? "y" : "ies"} not asked yet`, cta: "Issue →" });
@@ -97,8 +97,7 @@ export default async function HomePage() {
 
   const approvals = [];
   for (const rev of approvalCandidates) {
-    const req = await requiredApprovalRole(ctx, rev.document);
-    if (req && (ROLE_RANK[user.role] ?? 0) >= (ROLE_RANK[req.minRole] ?? 99)) approvals.push(rev);
+    if (ctx.can("APPROVE", rev.document)) approvals.push(rev);
   }
   const activeRuns = await db.workflowRun.findMany({ where: { status: "ACTIVE" }, include: { revision: { include: { document: true } } } });
   for (const run of activeRuns) {

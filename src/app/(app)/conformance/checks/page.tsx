@@ -5,6 +5,7 @@ import { CATALOG, FAMILY_TITLES } from "@/lib/checks/catalog";
 import { latestResults } from "@/lib/checks/engine";
 import { cn } from "@/lib/utils";
 import { FAMILIES } from "@/lib/checks/catalog";
+import { AssuranceTabs } from "@/app/(app)/conformance/tabs";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Check catalogue" };
@@ -36,8 +37,8 @@ export default async function ChecksPage({ searchParams }: { searchParams: Promi
       <PageHeader
         title="Control check catalogue"
         subtitle="Browse every automated and manual control check, its severity, evidence source and latest result."
-        actions={<ButtonLink href="/conformance" variant="secondary">Back to assurance</ButtonLink>}
       />
+      <AssuranceTabs current="/conformance/checks" />
 
       <div className="flex flex-wrap gap-1.5">
         <Link href="/conformance/checks" className={cn("rounded-full px-3 py-1.5 text-xs font-medium", !family ? "bg-[#1e3a5f] text-white" : "bg-slate-100 text-slate-600")}>All</Link>

@@ -37,7 +37,9 @@ export default async function AdminDistributionPage({ searchParams }: { searchPa
   const sp = await searchParams;
   const ctx = await requireScope();
   const { user: me, db } = ctx;
-  if (!isAdmin(me)) return <PageHeader title="Distribution matrix" subtitle={ctx.why("CONFIGURE")} />;
+  // Reading the matrix is grantable (Read matrix); changing it stays a controlled upload.
+  if (!ctx.can("MATRIX")) return <PageHeader title="Distribution matrix" subtitle={ctx.why("MATRIX")} />;
+  const mayEdit = isAdmin(me);
 
   const [rules, deliverables, confs, docTypes, disciplines, users, functions, inRegister] = await Promise.all([
     db.distributionRule.findMany({ orderBy: [{ deliverableType: "asc" }, { confidentiality: "asc" }] }),
@@ -89,7 +91,7 @@ export default async function AdminDistributionPage({ searchParams }: { searchPa
       />
       <p className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
         Rows are document types, columns are functions; the letter says what that function does with it.
-        <Link href="/admin/controlled" className="font-semibold text-[#315f83] hover:underline">Change it by upload →</Link>
+        {mayEdit ? <Link href="/admin/controlled" className="font-semibold text-[#315f83] hover:underline">Change it by upload →</Link> : <span className="text-slate-400">Read only — changes are made by an administrator.</span>}
       </p>
 
       <Card
@@ -197,10 +199,10 @@ export default async function AdminDistributionPage({ searchParams }: { searchPa
                       <Td className="text-xs">{ids.map(nameOf).join(", ") || "—"}</Td>
                       <Td className="text-xs">{parties.join(", ") || "—"}</Td>
                       <Td>
-                        <form action={deleteDistributionRuleAction}>
+                        {mayEdit ? <form action={deleteDistributionRuleAction}>
                           <input type="hidden" name="id" value={r.id} />
                           <button className="text-xs text-slate-400 hover:text-red-600">remove</button>
-                        </form>
+                        </form> : null}
                       </Td>
                     </tr>
                   );
@@ -209,7 +211,7 @@ export default async function AdminDistributionPage({ searchParams }: { searchPa
             )}
           </div>
 
-          <details className="max-w-xl">
+          {mayEdit ? <details className="max-w-xl">
             <summary className="cursor-pointer text-xs font-semibold text-[#315f83]">+ Add an external party</summary>
             <div className="mt-3">
             <ActionForm action={saveDistributionRuleAction} submitLabel="Add" size="sm">
@@ -234,7 +236,7 @@ export default async function AdminDistributionPage({ searchParams }: { searchPa
               </Field>
             </ActionForm>
             </div>
-          </details>
+          </details> : null}
         </div>
       </Card>
     </div>

@@ -7,6 +7,9 @@ import { UPLOAD_ROOT, readStored, saveBuffer } from "./files";
 import type { SessionUser } from "./auth";
 import { outcomeConsequences, requestChangesOutcomeCode } from "./config-props";
 import { getActiveSet } from "./config";
+import { isAdmin } from "@/lib/auth";
+import { holdersOf } from "./permissions";
+import { hasVerb } from "./auth";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -52,17 +55,12 @@ async function revisionLabel(t: Tenant, revisionId: string) {
  * the picklist behind "Send for approval" (§8.2 authority matrix).
  */
 export async function eligibleApprovers(t: Tenant, document: { discipline: string; docType: string; criticality: string | null }) {
-  const { db, projectId } = t;
-  const req = await requiredApprovalRole(t, document);
-  const users = await db.user.findMany({
-    where: { active: true, role: { in: ["APPROVER", "REVIEWER", "CONTROLLER", "ADMIN"] } },
-    orderBy: { name: "asc" },
-  });
-  const minRank = req ? ROLE_RANK[req.minRole] ?? 0 : 0;
-  const eligible = users
-    .filter((u) => (ROLE_RANK[u.role] ?? 0) >= minRank)
-    .map((u) => ({ id: u.id, name: u.name, role: u.role, suitable: (ROLE_RANK[u.role] ?? 0) >= (ROLE_RANK.APPROVER) }));
-  return { eligible, minRole: req?.minRole ?? null, matrixVersion: req?.version ?? null };
+  const approvers = await holdersOf(t, "APPROVE", document);
+  const reviewers = await holdersOf(t, "REVIEW", document);
+  const byId = new Map<string, { id: string; name: string; role: string; suitable: boolean }>();
+  for (const p of reviewers) byId.set(p.id, { id: p.id, name: p.name, role: p.functionName, suitable: false });
+  for (const p of approvers) byId.set(p.id, { id: p.id, name: p.name, role: p.functionName, suitable: true });
+  return { eligible: [...byId.values()].sort((a, b) => Number(b.suitable) - Number(a.suitable) || a.name.localeCompare(b.name)), minRole: null, matrixVersion: null };
 }
 
 // ── Review cycle custody points (§9.1) ───────────────────────────────────────
@@ -192,7 +190,7 @@ export async function recordReviewOutcome(
     detail: `${cons.label}. ${blockingOpen ? "Progression-preventing comments remain open — work shall not proceed (§9.6)." : ""}`,
   });
   // Notify the control function that the review has returned
-  const controllers = await db.user.findMany({ where: { role: { in: ["CONTROLLER", "ADMIN"] }, active: true } });
+  const controllers = await holdersOf(t, "CONTROL");
   await notifyMany(
     controllers.map((c) => c.id),
     "REVIEW_RETURNED",
@@ -271,31 +269,36 @@ export async function requiredApprovalRole(t: Tenant, document: { discipline: st
   return { minRole: candidates[0].r.minRole, version: candidates[0].r.version };
 }
 
-export const ROLE_RANK: Record<string, number> = { VIEWER: 0, AUTHOR: 1, REVIEWER: 2, APPROVER: 3, CONTROLLER: 3, ADMIN: 5 };
+/**
+ * The version of the distribution matrix an approval was given under: 1 for
+ * the matrix as first published, plus one for each approved change to it.
+ */
+async function matrixVersionInForce(t: Tenant): Promise<number> {
+  return 1 + (await t.db.controlledVersion.count({ where: { state: { in: ["APPROVED", "SUPERSEDED"] }, set: { kind: "DISTRIBUTION_MATRIX", orgId: t.orgId } } }));
+}
 
 export async function recordApproval(t: Tenant, revisionId: string, user: SessionUser, note?: string) {
   const { db, projectId } = t;
   const { rev, label } = await revisionLabel(t, revisionId);
   if (rev.state !== "IN_REVIEW") throw new Error("Approvals are recorded against a revision in review.");
-  const req = await requiredApprovalRole(t, rev.document);
-  if (!req) throw new Error("No approval authority is published for this document class — approval blocked (§8.2).");
-  if ((ROLE_RANK[user.role] ?? -1) < (ROLE_RANK[req.minRole] ?? 99)) {
-    throw new Error(`${user.name} does not hold the authority required for this class (${req.minRole}) — approval rejected (§8.3).`);
-  }
-  // delegation check (§8.5)
+  // §8.2 — authority for a class is the Approve grant in the distribution
+  // matrix for that class. Without it, only a live delegation lets someone act (§8.5).
+  const scoped = t as Tenant & { can?: (verb: "APPROVE", target: typeof rev.document) => boolean };
+  const holds = scoped.can ? scoped.can("APPROVE", rev.document) : hasVerb(user, "APPROVE");
   let viaDelegation = false;
-  if (user.role !== req.minRole && user.role !== "ADMIN") {
+  if (!holds) {
     const del = await db.delegation.findFirst({ where: { toUserId: user.id, endDate: { gte: new Date() } } });
-    if (!del) throw new Error("Approval under an expired or absent delegation is not permitted (§8.5).");
+    if (!del) throw new Error(`${user.name} does not hold Approve for this class in the distribution matrix, and no delegation is in force (§8.2, §8.5).`);
     viaDelegation = true;
   }
+  const matrixVersion = await matrixVersionInForce(t);
   const approval = await db.approval.create({
     data: { projectId,
       revisionId,
       approverId: user.id,
       approverName: user.name,
-      approverRole: req.minRole + (viaDelegation ? " (by delegation)" : ""),
-      matrixVersion: req.version,
+      approverRole: (user.functionName ?? user.role) + (viaDelegation ? " (by delegation)" : ""),
+      matrixVersion,
       note: note ?? null,
     },
   });
@@ -306,7 +309,7 @@ export async function recordApproval(t: Tenant, revisionId: string, user: Sessio
     entityType: "Revision",
     entityId: revisionId,
     entityLabel: label,
-    detail: `Approved under matrix v${req.version}${viaDelegation ? " via delegation" : ""}.`,
+    detail: `Approved as ${user.functionName ?? user.role} under distribution matrix v${matrixVersion}${viaDelegation ? " via delegation" : ""}.`,
   });
   await notify(rev.document.createdById, "APPROVAL", `Approval recorded: ${label}`, `${user.name} approved this revision.`, `/documents/${rev.documentId}`);
   return approval;
@@ -443,7 +446,7 @@ export async function voidRevision(t: Tenant, revisionId: string, user: SessionU
   if (rev.state !== "RELEASED") throw new Error("Only a released revision can be voided.");
   // void by decision of the authority that approved it (§7.2)
   const approval = await db.approval.findFirst({ where: { revisionId }, orderBy: { decidedAt: "desc" } });
-  const allowed = user.role === "ADMIN" || (approval && approval.approverId === user.id);
+  const allowed = isAdmin(user) || (approval && approval.approverId === user.id);
   if (!allowed) throw new Error("Voiding is decided by the authority that approved the revision (§7.2).");
   const now = new Date();
   await db.revision.update({ where: { id: revisionId }, data: { state: "VOID", voidedAt: now, voidReason: reason, voidAuthority: user.name, voidReassessment: reassessment ?? null } });

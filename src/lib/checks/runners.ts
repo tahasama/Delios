@@ -37,6 +37,11 @@ const rev = (r: { id: string; value: string; documentId: string; document?: { do
   entityLabel: `${r.document?.docNumber ?? ""} rev ${r.value}`, description: extra,
 });
 const cfg = (description: string): Failure => ({ entityKey: "config", entityType: "Config", entityLabel: "Configuration", description });
+/** Rules of the distribution matrix that grant Approve — the approval authority (§8.2). */
+async function approveRules(ctx: Ctx) {
+  const rules = await ctx.db.permissionRule.findMany({ select: { verbs: true, criticality: true, docType: true, discipline: true } });
+  return rules.filter((r) => r.verbs.includes('"APPROVE"') || r.verbs.includes('"CONFIGURE"'));
+}
 const spine = (key: string, description: string): Failure => ({ entityKey: `spine:${key}`, entityType: "Spine", entityLabel: "Traceability Spine", description });
 const org = (description: string): Failure => ({ entityKey: "config", entityType: "Organization", entityLabel: "Organization", description });
 
@@ -306,7 +311,8 @@ export const RUNNERS: Runners = {
     return docs.map((d) => doc(d, "Criticality absent where classification is in use (§5.6)."));
   },
   "CL-12": async (ctx) => {
-    const [crits, rows] = await Promise.all([ctx.db.configValue.findMany({ where: { setKey: "CRITICALITY" } }), ctx.db.authorityRow.findMany({ where: { active: true } })]);
+    // §8.2 — authority is the Approve grant in the distribution matrix.
+    const [crits, rows] = await Promise.all([ctx.db.configValue.findMany({ where: { setKey: "CRITICALITY" } }), approveRules(ctx)]);
     const failures: Failure[] = [];
     for (const c of crits) {
       const covered = rows.some((r) => r.criticality === c.code) || rows.some((r) => r.criticality == null);
@@ -484,26 +490,27 @@ export const RUNNERS: Runners = {
     return revs.map((r) => rev(r, "Released with no approval — structural contradiction (§8.1 / AP-01 ▲)."));
   },
   "AP-02": async (ctx) => {
-    const n = await ctx.db.authorityRow.count({ where: { active: true } });
-    return n === 0 ? [cfg("Approval authority matrix not published (§8.2).")] : [];
+    const n = (await approveRules(ctx)).length;
+    return n === 0 ? [cfg("No function holds Approve in the distribution matrix — approval authority not published (§8.2).")] : [];
   },
   "AP-03": async (ctx) => {
     const approvals = await ctx.db.approval.findMany({ where: { matrixVersion: { lte: 0 } }, include: { revision: { include: { document: { select: { docNumber: true } } } } } });
     return approvals.map((a) => rev(a.revision, "Approval recorded against an unversioned authority matrix (§8.2)."));
   },
   "AP-05": async (ctx) => {
-    const rank: Record<string, number> = { VIEWER: 0, AUTHOR: 1, REVIEWER: 2, APPROVER: 3, CONTROLLER: 3, ADMIN: 5 };
+    // Did the approver's function hold Approve for this class? Delegated approvals are checked under §8.5.
+    const { loadActor, can } = await import("../permissions");
     const approvals = await ctx.db.approval.findMany({ include: { revision: { include: { document: true } } } });
+    const members = await ctx.db.projectMembership.findMany({ where: { projectId: ctx.projectId } });
+    const actors = new Map<string, Awaited<ReturnType<typeof loadActor>>>();
     const failures: Failure[] = [];
     for (const a of approvals) {
-      const d = a.revision.document;
-      // the version in force AT THE APPROVAL DATE (§8.2 / AP-03), not today's matrix
-      const rows = await ctx.db.authorityRow.findMany({ where: { version: a.matrixVersion } });
-      const match = rows
-        .filter((r) => (r.docType == null || r.docType === d.docType) && (r.discipline == null || r.discipline === d.discipline) && (r.criticality == null || r.criticality === d.criticality))
-        .sort((x, y) => (y.docType ? 4 : 0) + (y.discipline ? 2 : 0) + (y.criticality ? 1 : 0) - ((x.docType ? 4 : 0) + (x.discipline ? 2 : 0) + (x.criticality ? 1 : 0)))[0];
-      if (match && (rank[a.approverRole.split(" ")[0].replace("(", "").replace(")", "")] ?? rank[a.approverRole] ?? -1) < (rank[match.minRole] ?? 99)) {
-        failures.push(rev(a.revision, `Approver "${a.approverName}" (${a.approverRole}) held no authority for this class — requires ${match.minRole} (§8.3 / AP-05 ▲).`));
+      if (a.approverRole.includes("delegation")) continue;
+      const m = members.find((x) => x.userId === a.approverId);
+      if (!m) continue;
+      if (!actors.has(m.functionId)) actors.set(m.functionId, await loadActor(ctx as never, m.functionId));
+      if (!can(actors.get(m.functionId) ?? null, "APPROVE", a.revision.document)) {
+        failures.push(rev(a.revision, `Approver "${a.approverName}" (${a.approverRole}) does not hold Approve for this class in the distribution matrix (§8.3 / AP-05 ▲).`));
       }
     }
     return failures;
@@ -901,10 +908,10 @@ export const RUNNERS: Runners = {
   "SC-03": async (ctx) => {
     const required = ["DELIVERABLE_TYPES", "DOCUMENT_TYPES", "DISCIPLINES", "STATUSES", "REVIEW_OUTCOMES", "CRITICALITY", "CONFIDENTIALITY", "RETENTION_CLASSES", "REASONS_FOR_ISSUE"];
     const missing = required.filter((k) => (ctx.allSets.get(k)?.size ?? 0) === 0);
-    const [schemes, routing, matrix] = await Promise.all([ctx.db.scheme.count(), ctx.db.schemeRouting.count(), ctx.db.authorityRow.count({ where: { active: true } })]);
+    const [schemes, routing, matrix] = await Promise.all([ctx.db.scheme.count(), ctx.db.schemeRouting.count(), approveRules(ctx).then((r) => r.length)]);
     if (schemes === 0) missing.push("NUMBERING_SCHEMES");
     if (routing === 0) missing.push("SCHEME_ROUTING");
-    if (matrix === 0) missing.push("AUTHORITY_MATRIX");
+    if (matrix === 0) missing.push("APPROVE_IN_DISTRIBUTION_MATRIX");
     return missing.length ? [cfg(`Local configuration incomplete — not published: ${missing.join(", ")} (§1.3 / SC-03).`)] : [];
   },
   "SC-09": async (ctx) => {

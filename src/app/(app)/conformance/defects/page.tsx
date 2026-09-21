@@ -6,6 +6,7 @@ import { ActionForm } from "@/components/form";
 import { CHECK_BY_ID } from "@/lib/checks/catalog";
 import { acceptDefectAction, closeDefectAction } from "@/lib/actions/conformance";
 import { fmtDate, timeAgo } from "@/lib/utils";
+import { AssuranceTabs } from "@/app/(app)/conformance/tabs";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Defects" };
@@ -32,10 +33,11 @@ export default async function DefectsPage({ searchParams }: { searchParams: Prom
   return (
     <div className="space-y-4">
       <PageHeader
-        title="Defects"
-        subtitle="Closed only when the check no longer finds it. Accepted defects still count."
-        actions={<><a href="/api/export/defects" className="text-xs font-medium text-[#2d5480] hover:underline">Export ↓</a><ButtonLink href="/conformance" variant="secondary">← Conformance</ButtonLink></>}
+        title="Problems"
+        subtitle="What the checks found, who must fix it. A problem closes only when the check no longer finds it; an accepted one still counts."
+        actions={<a href="/api/export/defects" className="text-xs font-medium text-[#2d5480] hover:underline">Export ↓</a>}
       />
+      <AssuranceTabs current="/conformance/defects" />
 
       <div className="flex flex-wrap gap-1.5">
         {["OPEN", "ACCEPTED", "CLOSED", "ALL"].map((s) => (

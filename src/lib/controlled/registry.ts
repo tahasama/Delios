@@ -54,6 +54,8 @@ export type Handler = {
   /** The owner of this list uploads and approves it himself — no second person.
    *  Document Control or an administrator may then decide their own upload. */
   ownerApproves?: boolean;
+  /** A verb that lets its holder upload and decide this kind besides Control and Configure — PLAN for the project manager's list. */
+  ownerVerb?: "PLAN";
   /** Rows for "In force" when the payload fields do not map one-to-one onto columns. */
   exportRows?(t: Tenant, key: string): Promise<string[][]>;
 
@@ -161,6 +163,8 @@ export function canDecide(input: {
   mayConfigure: boolean;
   /** For a list its owner approves: Control is enough, and self-approval is allowed. */
   ownerApproves?: boolean;
+  /** A verb that lets its holder upload and decide this kind besides Control and Configure — PLAN for the project manager's list. */
+  ownerVerb?: "PLAN";
   mayControl?: boolean;
 }): { ok: true } | { ok: false; error: string } {
   if (input.state !== "SUBMITTED") {

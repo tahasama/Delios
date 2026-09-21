@@ -119,7 +119,7 @@ export function WorkflowTemplateBuilder({ id, name = "", description = "", class
                 </select>
               </Field>
               <div>
-                <p className="text-xs font-medium text-slate-700">Functions <span className="font-normal text-slate-400">— whoever holds these on the project, and is allowed by the distribution matrix, is proposed when sending</span></p>
+                <p className="text-xs font-medium text-slate-700">Functions <span className="font-normal text-slate-400">— whoever holds these on the project, and is allowed by the distribution matrix, is proposed when sending. Name nobody to assign by the document's discipline.</span></p>
                 <div className="mt-1.5 flex flex-wrap gap-1.5">
                   {functions.map((f) => {
                     const on = (step.functionIds ?? []).includes(f.id);

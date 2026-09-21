@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getScope } from "@/lib/scope";
 import { getSessionUser } from "@/lib/auth";
 import { audit, notifyMany } from "@/lib/audit";
+import { holdersOf } from "@/lib/permissions";
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const user = await getSessionUser();
@@ -47,10 +48,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       entityLabel: recipient.transmittal.number,
       detail: `${recipient.name} opened the issued transmittal. Authenticated read evidence recorded.`,
     });
-    const controllers = await db.user.findMany({
-      where: { active: true, role: { in: ["CONTROLLER", "ADMIN"] } },
-      select: { id: true },
-    });
+    const controllers = await holdersOf(ctx, "CONTROL");
     await notifyMany(
       [recipient.transmittal.createdById, ...controllers.map((controller) => controller.id)].filter((id) => id !== user.id),
       "TRANSMITTAL_OPENED",

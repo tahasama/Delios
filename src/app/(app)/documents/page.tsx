@@ -4,6 +4,7 @@ import { PageHeader, ButtonLink } from "@/components/ui";
 import { DOC_STATES, DOC_STATE_LABEL } from "@/lib/standard";
 import { getSet } from "@/lib/config";
 import { DocumentRegister } from "./document-register";
+import { isReadOnly } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Documents" };
@@ -106,7 +107,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
 
   return <div className="space-y-5">
     <PageHeader title="Documents" actions={<ButtonLink href="/documents/new">Create document</ButtonLink>} />
-    <DocumentRegister rows={rows} total={total} userCanAct={user.role !== "VIEWER"} filters={{ q, state, discipline, docType, view }} filterOptions={{ states: DOC_STATES.map((code) => ({ code, label: DOC_STATE_LABEL[code] ?? code })), disciplines: disciplines.filter((item) => usedDisciplines.has(item.code)).map((item) => ({ code: item.code, label: item.label })), types: types.filter((item) => usedTypes.has(item.code)).map((item) => ({ code: item.code, label: item.label })) }} exportHref={`/api/register/export${query.size ? `?${query.toString()}` : ""}`} />
+    <DocumentRegister rows={rows} total={total} userCanAct={!isReadOnly(user)} filters={{ q, state, discipline, docType, view }} filterOptions={{ states: DOC_STATES.map((code) => ({ code, label: DOC_STATE_LABEL[code] ?? code })), disciplines: disciplines.filter((item) => usedDisciplines.has(item.code)).map((item) => ({ code: item.code, label: item.label })), types: types.filter((item) => usedTypes.has(item.code)).map((item) => ({ code: item.code, label: item.label })) }} exportHref={`/api/register/export${query.size ? `?${query.toString()}` : ""}`} />
   </div>;
 }
 

@@ -1,6 +1,7 @@
 import type { Tenant } from "./tenant";
 import { audit, notifyMany } from "./audit";
 import type { SessionUser } from "./auth";
+import { holdersOf } from "./permissions";
 
 // Configuration-first workflow engine. A WorkflowTemplate is a list of steps:
 //   { act: REVIEW | APPROVAL, mode: ANY_OF | ALL_CONSOLIDATOR | SERIAL, participantIds: [], outcomeSetKey? }
@@ -103,7 +104,7 @@ export async function startWorkflowRun(t: Tenant, revisionId: string, templateId
   const steps: WfRuntimeStep[] = baseSteps.map((s, i) => ({
     ...s,
     outcomeSetKey: s.act === "REVIEW" ? (s.outcomeSetKey ?? template.outcomeSetKey ?? "REVIEW_OUTCOMES") : s.outcomeSetKey,
-    participantIds: overrideParticipantIds?.[i]?.length ? overrideParticipantIds[i] : proposed[i],
+    participantIds: overrideParticipantIds?.[i]?.length ? overrideParticipantIds[i] : proposed[i].map((p) => p.id),
     status: i === 0 ? "active" : "pending",
     decidedBy: [],
   }));
@@ -159,7 +160,7 @@ async function advance(t: Tenant, runId: string, user: SessionUser) {
     await audit({ tenant: t, actor: user, action: "WORKFLOW_COMPLETED", entityType: "WorkflowRun", entityId: runId, entityLabel: `${rev.document.docNumber} rev ${rev.value}`, detail: "All steps complete — ready for release by the control function." });
     const contributorIds = await contributorRecipients(t, rev.document.createdById, rev.document.originator);
     await notifyMany(contributorIds, "WORKFLOW_DONE", `Workflow complete: ${rev.document.docNumber} rev ${rev.value}`, "All steps are done. The control function can now release it.", `/documents/${rev.documentId}`, t);
-    const controllers = await db.user.findMany({ where: { role: { in: ["CONTROLLER", "ADMIN"] }, active: true } });
+    const controllers = await holdersOf(t, "CONTROL");
     await notifyMany(controllers.map((c) => c.id), "RELEASE_READY", `Ready to release: ${rev.document.docNumber} rev ${rev.value}`, `Workflow "${run.templateName}" completed.`, `/documents/${rev.documentId}`, t);
     return;
   }
@@ -402,16 +403,34 @@ export async function eligiblePeople(t: Tenant, docs: DocClass[], act: "REVIEW" 
   return out.sort((a, b) => a.name.localeCompare(b.name));
 }
 
+export type Proposal = { id: string; why: string };
+
 /**
- * The people a step proposes: the template's named people plus the holders of
- * its named functions — kept only where the matrix allows them for every
- * document being sent.
+ * Who a step proposes, and why — the initiator can then add or remove anyone
+ * the matrix allows.
+ *
+ *   1. The route names people or functions: those, where the matrix allows them.
+ *   2. Otherwise, auto-assign by the documents' discipline: holders of a grant
+ *      the matrix narrows to that discipline (e.g. Lead Electrical Engineer
+ *      approves EL), then people whose department is that discipline.
  */
-export async function proposeForStep(t: Tenant, docs: DocClass[], step: { act: "REVIEW" | "APPROVAL"; participantIds: string[]; functionIds?: string[] }): Promise<string[]> {
+export async function proposeForStep(t: Tenant, docs: DocClass[], step: { act: "REVIEW" | "APPROVAL"; participantIds: string[]; functionIds?: string[] }): Promise<Proposal[]> {
   const eligible = await eligiblePeople(t, docs, step.act);
-  const ids = new Set<string>();
-  for (const p of eligible) {
-    if (step.participantIds.includes(p.id) || (step.functionIds ?? []).includes(p.functionId)) ids.add(p.id);
-  }
-  return [...ids];
+  const named = eligible
+    .filter((p) => step.participantIds.includes(p.id) || (step.functionIds ?? []).includes(p.functionId))
+    .map((p) => ({ id: p.id, why: step.participantIds.includes(p.id) ? "named in the route" : `${p.functionName} (route)` }));
+  if (named.length || step.participantIds.length || (step.functionIds ?? []).length) return named;
+
+  const disciplines = [...new Set(docs.map((d) => d.discipline).filter(Boolean))] as string[];
+  if (!disciplines.length) return [];
+  const verb = step.act === "APPROVAL" ? "APPROVE" : "REVIEW";
+  const rules = await t.db.permissionRule.findMany({ where: { discipline: { in: disciplines } }, select: { functionId: true, verbs: true, discipline: true } });
+  const byGrant = eligible
+    .filter((p) => rules.some((r) => r.functionId === p.functionId && r.verbs.includes(`"${verb}"`)))
+    .map((p) => ({ id: p.id, why: `${disciplines.join("/")} ${verb === "APPROVE" ? "approver" : "reviewer"} in the matrix` }));
+  if (byGrant.length) return byGrant;
+  const members = await t.db.projectMembership.findMany({ where: { projectId: t.projectId, active: true, department: { in: disciplines } }, select: { userId: true, department: true } });
+  return eligible
+    .filter((p) => members.some((m) => m.userId === p.id))
+    .map((p) => ({ id: p.id, why: `${members.find((m) => m.userId === p.id)!.department} department` }));
 }

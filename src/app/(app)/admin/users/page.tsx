@@ -2,9 +2,8 @@ import { isAdmin } from "@/lib/auth";
 import { requireScope } from "@/lib/scope";
 import { PageHeader, DataTable, Th, Td, Chip, Card, Field, inputCls } from "@/components/ui";
 import { ActionForm } from "@/components/form";
-import { createUserAction, updateUserAction } from "@/lib/actions/admin";
-import { setUserPartyAction } from "@/lib/actions/workflow";
-import { inviteGuestAction, createVisitorAction, removeFromProjectAction } from "@/lib/actions/guests";
+import { createUserAction, savePersonAction } from "@/lib/actions/admin";
+import { inviteGuestAction, createVisitorAction } from "@/lib/actions/guests";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "People & access" };
@@ -43,6 +42,7 @@ export default async function AdminUsersPage() {
     }),
   ]);
   const externalParties = parties.filter((p) => !p.isInternal);
+  const deptLabel = (code: string) => disciplines.find((d) => d.code === code)?.label ?? code;
 
   const functionOptions = functions.map((f) => <option key={f.id} value={f.id}>{f.name}</option>);
   const projectPicker = (
@@ -67,7 +67,7 @@ export default async function AdminUsersPage() {
                 <Field label="Works for" required>
                   <select name="partyId" required className={inputCls} defaultValue="">
                     <option value="" disabled>Choose…</option>
-                    {parties.map((party) => <option key={party.id} value={party.id}>{party.name}</option>)}
+                    {parties.filter((party) => party.active).map((party) => <option key={party.id} value={party.id}>{party.name}</option>)}
                   </select>
                 </Field>
                 <Field label="Function" required><select name="functionId" required className={inputCls} defaultValue=""><option value="" disabled>Choose…</option>{functionOptions}</select></Field>
@@ -98,7 +98,7 @@ export default async function AdminUsersPage() {
                   <Field label="Works for" required>
                     <select name="partyId" required className={inputCls} defaultValue="">
                       <option value="" disabled>Choose…</option>
-                      {externalParties.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                      {externalParties.filter((p) => p.active).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
                     </select>
                   </Field>
                   <Field label="Function" required><select name="functionId" required className={inputCls} defaultValue=""><option value="" disabled>Choose…</option>{functionOptions}</select></Field>
@@ -111,65 +111,89 @@ export default async function AdminUsersPage() {
         </div>
       </Card>
 
-      <Card title={`Our people · ${users.length}`}>
-        <DataTable head={<tr><Th>Name</Th><Th>Works for</Th><Th>Projects</Th><Th></Th></tr>}>
-          {users.map((u) => (
-            <tr key={u.id} className={u.active ? "" : "opacity-50"}>
-              <Td>
-                <span className="font-medium text-slate-800">{u.name}</span>{u.id === me.id ? <span className="ml-1 text-xs text-slate-400">(you)</span> : null}
-                <span className="block text-[11px] text-slate-400">{u.email}</span>
-              </Td>
-              <Td className="text-xs">{u.party?.name ?? u.organization ?? "—"}</Td>
-              <Td className="text-xs">
-                {u.memberships.length ? (
-                  <span className="flex flex-wrap gap-1">
-                    {u.memberships.map((m) => <Chip key={m.id} title={m.project.name}>{m.project.code} · {m.function.name}{m.department ? ` · ${m.department}` : ""}</Chip>)}
-                  </span>
-                ) : <span className="text-amber-700">no project</span>}
-                {!u.active ? <span className="ml-1 text-slate-500">· switched off</span> : null}
-              </Td>
-              <Td>
-                <details>
-                  <summary className="cursor-pointer text-xs font-semibold text-[#315f83]">Change</summary>
-                  <div className="mt-2">
-                    <ActionForm action={updateUserAction} submitLabel="Save" size="sm" hidden={{ userId: u.id }} className="flex flex-wrap items-center gap-2 space-y-0">
-                      <select name="functionId" defaultValue={u.memberships.find((m) => m.projectId === projectId)?.functionId ?? ""} className="rounded-md border border-slate-300 px-1.5 py-1 text-xs" title={`Function on ${project.code}`}>
-                        <option value="">Function on {project.code}: unchanged</option>
-                        {functionOptions}
-                      </select>
-                      {u.memberships.some((m) => m.projectId === projectId) ? (
-                        <select name="department" defaultValue={u.memberships.find((m) => m.projectId === projectId)?.department ?? ""} className="rounded-md border border-slate-300 px-1.5 py-1 text-xs" title="Department this person answers for">
-                          <option value="">Department: none</option>
-                          {disciplines.map((d) => <option key={d.code} value={d.code}>{d.label}</option>)}
-                        </select>
-                      ) : null}
-                      <label className="flex items-center gap-1 text-xs text-slate-600"><input type="checkbox" name="active" defaultChecked={u.active} /> can sign in</label>
-                    </ActionForm>
-                    <ActionForm action={setUserPartyAction} submitLabel="Save" size="sm" hidden={{ userId: u.id }} className="mt-2 flex flex-wrap items-center gap-2 space-y-0">
-                      <select name="partyId" defaultValue={u.partyId ?? ""} className="rounded-md border border-slate-300 px-1.5 py-1 text-xs" title="Works for">
-                        <option value="">Works for: —</option>
-                        {parties.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                      </select>
-                    </ActionForm>
-                  </div>
-                </details>
-              </Td>
-            </tr>
-          ))}
+      <Card title={`Our people · ${users.length}`} description={`Job and department shown for ${project.code}. What a job may do is set in Functions and the distribution matrix.`}>
+        <DataTable head={<tr><Th>Person</Th><Th>Company</Th><Th>Job on {project.code}</Th><Th>Department</Th><Th>Other projects</Th><Th></Th></tr>}>
+          {users.map((u) => {
+            const here = u.memberships.find((m) => m.projectId === projectId);
+            const elsewhere = u.memberships.filter((m) => m.projectId !== projectId);
+            return (
+              <tr key={u.id} className={u.active ? "align-top" : "align-top opacity-50"}>
+                <Td>
+                  <span className="font-medium text-slate-800">{u.name}</span>{u.id === me.id ? <span className="ml-1 text-xs text-slate-400">(you)</span> : null}
+                  <span className="block text-[11px] text-slate-400">{u.email}{u.active ? "" : " · switched off"}</span>
+                </Td>
+                <Td className="text-xs">{u.party?.name ?? u.organization ?? "—"}</Td>
+                <Td className="text-xs">{here ? here.function.name : <span className="text-amber-700">not on {project.code}</span>}</Td>
+                <Td className="text-xs">{here?.department ? deptLabel(here.department) : "—"}</Td>
+                <Td className="text-xs">{elsewhere.length ? elsewhere.map((m) => `${m.project.code} · ${m.function.name}`).join(", ") : "—"}</Td>
+                <Td>
+                  <details>
+                    <summary className="cursor-pointer text-xs font-semibold text-[#315f83]">Edit</summary>
+                    <div className="mt-2 w-[min(90vw,34rem)]">
+                      <ActionForm action={savePersonAction} submitLabel="Save" size="sm" hidden={{ userId: u.id }}>
+                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                          <Field label="Name" required><input name="name" required defaultValue={u.name} className={inputCls} /></Field>
+                          <Field label="Email" required><input type="email" name="email" required defaultValue={u.email} className={inputCls} /></Field>
+                          <Field label="Works for">
+                            <select name="partyId" defaultValue={u.partyId ?? ""} className={inputCls}>
+                              <option value="">—</option>
+                              {parties.filter((p) => p.active || p.id === u.partyId).map((p) => <option key={p.id} value={p.id}>{p.name}{p.active ? "" : " (revoked)"}</option>)}
+                            </select>
+                          </Field>
+                          <Field label={`Job on ${project.code}`} required={!here}>
+                            <select name="functionId" defaultValue={here?.functionId ?? ""} className={inputCls}>
+                              <option value="">{here ? "unchanged" : "Choose… (adds them to the project)"}</option>
+                              {functionOptions}
+                            </select>
+                          </Field>
+                          <Field label="Department" hint="receives its requirements calls, confirms readiness">
+                            <select name="department" defaultValue={here?.department ?? ""} className={inputCls}>
+                              <option value="">None</option>
+                              {disciplines.map((d) => <option key={d.code} value={d.code}>{d.label}</option>)}
+                            </select>
+                          </Field>
+                          <label className="flex items-center gap-2 self-end pb-2 text-xs text-slate-600"><input type="checkbox" name="active" defaultChecked={u.active} /> Can sign in</label>
+                        </div>
+                      </ActionForm>
+                    </div>
+                  </details>
+                </Td>
+              </tr>
+            );
+          })}
         </DataTable>
       </Card>
 
       {guests.length ? (
-        <Card title={`From other organizations · ${guests.length}`} description="Their accounts belong to their company; you only control what they do here.">
-          <DataTable head={<tr><Th>Name</Th><Th>Company</Th><Th>Project</Th><Th></Th></tr>}>
+        <Card title={`From other organizations · ${guests.length}`} description="Their accounts belong to their company; you decide their job and department here, and can end their access.">
+          <DataTable head={<tr><Th>Person</Th><Th>Company</Th><Th>Project · job</Th><Th>Department</Th><Th></Th></tr>}>
             {guests.map((g) => (
-              <tr key={g.id}>
+              <tr key={g.id} className="align-top">
                 <Td>{g.user.name}<span className="block text-[11px] text-slate-400">{g.user.email}</span></Td>
                 <Td className="text-xs">{g.user.org.name}</Td>
                 <Td className="text-xs">{g.project.code} · {g.function.name}</Td>
+                <Td className="text-xs">{g.department ? deptLabel(g.department) : "—"}</Td>
                 <Td>
                   {g.projectId === projectId ? (
-                    <ActionForm action={removeFromProjectAction} submitLabel="Remove" variant="secondary" size="sm" hidden={{ userId: g.user.id }} confirmText={`Remove ${g.user.name} from ${g.project.code}? Their own account is untouched.`} className="space-y-0" />
+                    <details>
+                      <summary className="cursor-pointer text-xs font-semibold text-[#315f83]">Edit</summary>
+                      <div className="mt-2 w-[min(90vw,30rem)]">
+                        <ActionForm action={savePersonAction} submitLabel="Save" size="sm" hidden={{ userId: g.user.id }}>
+                          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                            <Field label={`Job on ${project.code}`}>
+                              <select name="functionId" defaultValue={g.functionId} className={inputCls}>{functionOptions}</select>
+                            </Field>
+                            <Field label="Department">
+                              <select name="department" defaultValue={g.department ?? ""} className={inputCls}>
+                                <option value="">None</option>
+                                {disciplines.map((d) => <option key={d.code} value={d.code}>{d.label}</option>)}
+                              </select>
+                            </Field>
+                            <label className="flex items-center gap-2 text-xs text-slate-600"><input type="checkbox" name="active" defaultChecked /> Keeps access to {project.code}</label>
+                          </div>
+                        </ActionForm>
+                      </div>
+                    </details>
                   ) : <span className="text-[11px] text-slate-400">switch to {g.project.code} to change</span>}
                 </Td>
               </tr>

@@ -3,7 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { requireAdminScope, requireScope } from "@/lib/scope";
 import { isAdmin } from "@/lib/auth";
+import type { SessionUser } from "@/lib/auth";
 import { audit } from "@/lib/audit";
+import { isController } from "@/lib/auth";
 
 // ── §11.8 / C.8.1 Distribution rules ─────────────────────────────────────────
 
@@ -85,6 +87,6 @@ export async function disposeDocumentAction(_prev: { error?: string } | undefine
   }
 }
 
-function isControllerOrAbove(user: { role: string }) {
-  return user.role === "CONTROLLER" || user.role === "ADMIN";
+function isControllerOrAbove(user: SessionUser) {
+  return isController(user);
 }

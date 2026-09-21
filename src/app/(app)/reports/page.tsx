@@ -3,30 +3,34 @@ import { requireScope } from "@/lib/scope";
 import { PageHeader, Card, DataTable, Th, Td, Chip, EmptyState, inputCls, btn } from "@/components/ui";
 import { fmtDate } from "@/lib/utils";
 import { getSet } from "@/lib/config";
+import { buildReport, REPORT_IDS, type ReportId } from "@/lib/reports";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Register reports" };
+export const metadata = { title: "Reports" };
 
-// §16.4 — the eight questions the register shall answer without manual reconstruction.
+const REPORT_TITLES: Record<ReportId, string> = {
+  register: "Register status",
+  deliveries: "Deliveries",
+  reviews: "Reviews",
+  transmittals: "Transmittals",
+  readiness: "Readiness",
+};
+
+// Reports a project team reads, plus the look-ups the register must answer directly (§16.4).
 export default async function ReportsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q1?: string; q5?: string; asOf?: string }>;
+  searchParams: Promise<{ r?: string; q1?: string; q5?: string; asOf?: string }>;
 }) {
-  const { db } = await requireScope();
+  const ctx = await requireScope();
+  const { db } = ctx;
   const sp = await searchParams;
-
-  const [statuses, assets, assetCounts, openCycles, notReady, pkgShort] = await Promise.all([
+  const current: ReportId = REPORT_IDS.includes(sp.r as ReportId) ? (sp.r as ReportId) : "register";
+  const [report, statuses, assets, assetCounts] = await Promise.all([
+    buildReport(ctx, current),
     getSet("STATUSES"),
     db.assetItem.findMany({ orderBy: { code: "asc" } }),
     db.relationship.groupBy({ by: ["toId"], _count: true, where: { kind: "DOC_ASSET" } }),
-    db.reviewCycle.count({ where: { status: "OPEN" } }),
-    db.baselineEntry.findMany({
-      where: {},
-      include: { document: { include: { revisions: { where: { state: "RELEASED" }, orderBy: { releasedAt: "desc" }, take: 1 } } }, action: true },
-      take: 100,
-    }).then((rows) => rows.filter((r) => r.document.revisions[0]?.statusCode !== r.requiredStatus)),
-    db.package.findMany({ where: { closedAt: null }, include: { members: true } }).then((rows) => rows.filter((p) => p.members.some((m) => !m.completionDate && m.requiredStatus))),
   ]);
 
   // Q1 — current revision & status
@@ -60,61 +64,55 @@ export default async function ReportsPage({
         })
     : [];
 
-  // Q9 — planned against arrived. This was a page of its own; it is one more
-  // register question, so it lives with the others.
-  const planned = await db.document.findMany({
-    where: { state: { in: ["PLANNED", "ACTIVE"] } },
-    include: {
-      revisions: { orderBy: { createdAt: "desc" }, include: { cycles: { orderBy: { sequence: "desc" }, take: 1 } } },
-      baselineEntries: { include: { action: true } },
-    },
-  });
-  const submissionRows = planned.map((d) => {
-    const plannedDate =
-      d.revisions.find((r) => r.plannedSubmissionDate)?.plannedSubmissionDate ??
-      d.baselineEntries.sort((a, b) => +new Date(a.requiredBy) - +new Date(b.requiredBy))[0]?.requiredBy ??
-      null;
-    const lastCycle = d.revisions[0]?.cycles[0] ?? null;
-    const arrived = !!lastCycle || d.revisions.some((r) => r.state !== "IN_PREPARATION") || d.state === "ACTIVE";
-    const resubmission = d.revisions.some((r) =>
-      r.cycles.some((c) => c.outcome && ["REVISE_AND_RESUBMIT", "C3", "C4", "REJECTED"].includes(c.outcome)),
-    );
-    const late =
-      arrived && plannedDate && lastCycle?.submittedAt
-        ? new Date(lastCycle.submittedAt) > new Date(plannedDate)
-        : !arrived && plannedDate
-          ? new Date() > new Date(plannedDate)
-          : false;
-    return { doc: d, plannedDate, arrived, late, resubmission };
-  });
-  const lateSubmissions = submissionRows.filter((r) => r.late);
-  const notArrived = submissionRows.filter((r) => !r.arrived);
-
   return (
     <div className="space-y-5">
       <PageHeader
-        title="Register reports"
-        subtitle="Standard questions about the register, answered from live data."
+        title="Reports"
+        subtitle="Counted from the register when you open them. Each one downloads as CSV."
         actions={
-          <a href="/api/register/export" className={btn("secondary", "sm")} title="CSV extract — carries a generation timestamp">
-            Export register (CSV)
+          <a href="/api/register/export" className={btn("secondary", "sm")} title="The whole register as CSV">
+            Export register
           </a>
         }
       />
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <MiniQA n="Q1" q="Current revision & status?" href="#q1" />
-        <MiniQA n="Q2" q="Documents describing an asset?" href="#q2" count={assetCounts.length} />
-        <MiniQA n="Q3" q="What does this action need — is it ready?" href="/actions" count={notReady.length} warn={(v) => v > 0} />
-        <MiniQA n="Q4" q="Package members & completeness?" href="/packages" count={pkgShort.length} warn={(v) => v > 0} />
-        <MiniQA n="Q5" q="Who was issued this revision, when?" href="#q5" />
-        <MiniQA n="Q6" q="Open review cycles — with whom?" href="/reviews" count={openCycles} warn={(v) => v > 0} />
-        <MiniQA n="Q7" q="What is affected by each exposure?" href="/exposures" />
-        <MiniQA n="Q8" q="Current revision on a given date?" href="#q8" />
-      </div>
+      <nav className="flex flex-wrap gap-1 rounded-xl bg-slate-100 p-1 sm:w-fit" aria-label="Reports">
+        {REPORT_IDS.map((id) => (
+          <Link key={id} href={`/reports?r=${id}`} aria-current={current === id ? "page" : undefined}
+            className={`rounded-lg px-3 py-2 text-xs font-semibold ${current === id ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-800"}`}>
+            {REPORT_TITLES[id]}
+          </Link>
+        ))}
+      </nav>
+
+      <Card
+        title={report.title}
+        description={report.question}
+        actions={<a href={`/api/reports/${report.id}`} className={btn("secondary", "sm")}>Download CSV</a>}
+      >
+        <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          {report.figures.map((f) => (
+            <div key={f.label} className="rounded-xl border border-slate-200 px-3 py-2.5">
+              <p className="text-[11px] font-semibold text-slate-500">{f.label}</p>
+              <p className={`text-xl font-semibold tabular-nums ${f.tone === "bad" ? "text-red-700" : f.tone === "warn" ? "text-amber-700" : f.tone === "good" ? "text-emerald-700" : "text-slate-900"}`}>{f.value}</p>
+            </div>
+          ))}
+        </div>
+        {report.rows.length ? (
+          <DataTable head={<tr>{report.columns.map((c, n) => <Th key={c} className={n ? "text-right" : undefined}>{c}</Th>)}</tr>}>
+            {report.rows.map((row, r) => (
+              <tr key={r}>
+                {row.map((cell, n) => <Td key={n} className={n ? "text-right text-xs tabular-nums" : "text-xs font-medium text-slate-800"}>{cell}</Td>)}
+              </tr>
+            ))}
+          </DataTable>
+        ) : <p className="text-xs text-slate-400">{report.empty}</p>}
+      </Card>
+
+      <h2 className="pt-2 text-sm font-semibold text-slate-700">Look up</h2>
 
       {/* Q1 */}
-      <Card id="q1" title="What is the current revision of this document, and at what status?" description="Answers from the register directly — no manual reconstruction">
+      <Card id="q1" title="Current revision of a document">
         <form className="mb-3 flex gap-2">
           <input name="q1" defaultValue={q1 ?? ""} placeholder="Document number or title…" className={`${inputCls} max-w-sm`} />
           <button className={btn("secondary", "sm")}>Look up</button>
@@ -139,7 +137,7 @@ export default async function ReportsPage({
       </Card>
 
       {/* Q2 */}
-      <Card id="q2" title="Which documents describe this equipment, system or area?" description="Object association, many-to-many">
+      <Card id="q2" title="Documents by equipment, system or area">
         {assets.length ? (
           <div className="flex flex-wrap gap-2">
             {assets.map((a) => {
@@ -159,7 +157,7 @@ export default async function ReportsPage({
       </Card>
 
       {/* Q5 */}
-      <Card id="q5" title="Who was issued this revision, and when?" description="From the transmittal register">
+      <Card id="q5" title="Who received a document, and when">
         <form className="mb-3 flex gap-2">
           <input name="q5" defaultValue={q5 ?? ""} placeholder="Document number…" className={`${inputCls} max-w-sm`} />
           <button className={btn("secondary", "sm")}>Trace issues</button>
@@ -184,7 +182,7 @@ export default async function ReportsPage({
       </Card>
 
       {/* Q8 */}
-      <Card id="q8" title="What was the current revision of each document on a given date?" description="Historical state reconstructed from the transition record">
+      <Card id="q8" title="The register as it stood on a date">
         <form className="mb-3 flex gap-2">
           <input type="date" name="asOf" defaultValue={sp.asOf ?? ""} className={`${inputCls} max-w-48`} />
           <button className={btn("secondary", "sm")}>Reconstruct</button>
@@ -209,58 +207,6 @@ export default async function ReportsPage({
         )}
       </Card>
 
-      <Card
-        id="q9"
-        title="What was due, what has arrived, and what is late?"
-        description={`${submissionRows.length} planned or active · ${notArrived.length} not arrived · ${lateSubmissions.length} late. Planned date is the revision's planned submission, or the earliest baseline required-by.`}
-      >
-        {submissionRows.length === 0 ? (
-          <p className="text-xs text-slate-400">Nothing is planned yet.</p>
-        ) : (
-          <DataTable head={<tr><Th>Document</Th><Th>Title</Th><Th>Planned</Th><Th>Path</Th><Th>Resubmission</Th></tr>}>
-            {submissionRows
-              .slice()
-              .sort((a, b) => Number(b.late) - Number(a.late) || Number(!a.arrived) - Number(!b.arrived))
-              .map(({ doc, plannedDate, arrived, late, resubmission }) => (
-                <tr key={doc.id} className="hover:bg-slate-50/70">
-                  <Td>
-                    <Link href={`/documents/${doc.id}`} className="font-mono text-[13px] font-semibold text-[#1e3a5f] hover:underline">
-                      {doc.docNumber}
-                    </Link>
-                  </Td>
-                  <Td className="max-w-64"><span className="line-clamp-1 text-xs">{doc.title}</span></Td>
-                  <Td className="whitespace-nowrap text-xs">{plannedDate ? fmtDate(plannedDate) : <span className="text-slate-300">no date</span>}</Td>
-                  <Td>
-                    {!arrived ? (
-                      <Chip className={late ? "bg-red-100 text-red-800 ring-red-300" : "bg-orange-100 text-orange-800 ring-orange-300"}>
-                        {late ? "not arrived — late" : "not arrived"}
-                      </Chip>
-                    ) : late ? (
-                      <Chip className="bg-red-100 text-red-800 ring-red-300">arrived late</Chip>
-                    ) : (
-                      <Chip className="bg-emerald-100 text-emerald-800 ring-emerald-300">arrived on time</Chip>
-                    )}
-                  </Td>
-                  <Td>{resubmission ? <Chip className="bg-violet-100 text-violet-800 ring-violet-300">re-entered from rework</Chip> : "—"}</Td>
-                </tr>
-              ))}
-          </DataTable>
-        )}
-      </Card>
     </div>
-  );
-}
-
-function MiniQA({ n, q, href, count, warn }: { n: string; q: string; href: string; count?: number; warn?: (v: number) => boolean }) {
-  return (
-    <Link href={href} className="rounded-xl border border-slate-200 bg-white p-3.5 shadow-sm transition hover:border-[#2d5480]/40 hover:shadow">
-      <div className="flex items-center justify-between">
-        <span className="rounded bg-[#1e3a5f] px-1.5 py-0.5 text-[10px] font-bold text-white">{n}</span>
-        {count !== undefined ? (
-          <Chip className={warn && warn(count) ? "bg-amber-100 text-amber-800 ring-amber-300" : "bg-emerald-100 text-emerald-800 ring-emerald-300"}>{count}</Chip>
-        ) : null}
-      </div>
-      <p className="mt-2 text-xs leading-snug text-slate-600">{q}</p>
-    </Link>
   );
 }

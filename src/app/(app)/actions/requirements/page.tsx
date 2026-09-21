@@ -27,6 +27,7 @@ export default async function RequirementsPage() {
   const ctx = await requireScope();
   const { db, user } = ctx;
   const control = ctx.can("CONTROL");
+  const plan = ctx.can("PLAN") || control;
 
   const [actions, depts, senders, disciplines, parties, pendingSets, me] = await Promise.all([
     db.action.findMany({ orderBy: [{ scheduledDate: "asc" }, { code: "asc" }], include: { confirmations: true } }),
@@ -73,7 +74,7 @@ export default async function RequirementsPage() {
         actions={
           <div className="flex gap-2">
             <a href="/api/controlled/current/ACTION_DEPARTMENTS" className={btn("secondary", "sm")}><Download className="h-4 w-4" /> Download list</a>
-            {control ? <Link href="/admin/controlled/ACTION_DEPARTMENTS" className={btn(tagged < actions.length ? "primary" : "secondary", "sm")}><Upload className="h-4 w-4" /> Upload</Link> : null}
+            {plan ? <Link href="/admin/controlled/ACTION_DEPARTMENTS" className={btn(tagged < actions.length ? "primary" : "secondary", "sm")}><Upload className="h-4 w-4" /> Upload</Link> : null}
           </div>
         }
       >

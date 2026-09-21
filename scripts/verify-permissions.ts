@@ -3,7 +3,7 @@
 import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
 import { tenantFor, scopedClient } from "../src/lib/tenant";
-import { loadActor, can, canSee, verbsFor, visibleConfidentiality } from "../src/lib/permissions";
+import { loadActor, can, canSee, verbsFor, visibleConfidentiality, holdersOf } from "../src/lib/permissions";
 import { recipientsFor, offDistribution } from "../src/lib/distribution";
 
 const db = new PrismaClient();
@@ -117,6 +117,31 @@ async function main() {
   check("cannot create", !can(emptyActor, "CREATE", elecDrawing));
   check("is on nobody's distribution", !(await recipientsFor(t, elecDrawing)).some((r) => r.functionName === empty.name));
   await db.function.delete({ where: { id: empty.id } });
+
+  console.log("\nThe matrix decides, not a rank on the account\n");
+  // One job that originates, reviews and approves — a Mechanical Engineering Manager.
+  const manager = await db.function.create({ data: { orgId: org.id, code: `MEM_${Date.now()}`, name: "Mechanical Engineering Manager", clearance: 3, legacyRole: "AUTHOR" } });
+  await db.permissionRule.create({ data: { orgId: org.id, functionId: manager.id, discipline: "ME", verbs: JSON.stringify(["READ", "CREATE", "REVISE", "REVIEW", "APPROVE"]) } });
+  const mem = await loadActor(t, manager.id);
+  const mechCalc = { discipline: "ME", docType: "CAL", confidentiality: "INTERNAL" };
+  check("one function may create, review and approve", can(mem, "CREATE", mechCalc) && can(mem, "REVIEW", mechCalc) && can(mem, "APPROVE", mechCalc));
+  check("…only for the discipline the matrix names", !can(mem, "APPROVE", elecDrawing));
+  await db.permissionRule.deleteMany({ where: { functionId: manager.id } });
+  await db.function.delete({ where: { id: manager.id } });
+
+  console.log("\nSettings verbs an administrator can grant\n");
+  check("an administrator holds Plan, Review routes and Read matrix through Configure", can(admin, "PLAN") && can(admin, "ROUTES") && can(admin, "MATRIX"));
+  const dc = await byCode("CONTROLLER");
+  check("Document Control holds none of them until granted", !!dc && !can(dc, "MATRIX") && !can(dc, "ROUTES"));
+  const grant = await db.permissionRule.create({ data: { orgId: org.id, functionId: dc!.functionId, verbs: JSON.stringify(["MATRIX", "ROUTES"]) } });
+  const dc2 = await loadActor(t, dc!.functionId);
+  check("…and holds them once granted", can(dc2, "MATRIX") && can(dc2, "ROUTES") && !can(dc2, "CONFIGURE"));
+  await db.permissionRule.delete({ where: { id: grant.id } });
+  const pm = await byCode("PROJECT_MANAGER");
+  check("the project manager plans and approves nothing", !!pm && can(pm, "PLAN") && !can(pm, "APPROVE", elecDrawing));
+
+  const approvers = await holdersOf(t, "APPROVE", elecDrawing);
+  check("who may approve an electrical drawing is read off the matrix", approvers.some((p) => p.functionName === "Lead Electrical Engineer") && !approvers.some((p) => p.functionName === "Electrical Technician"), approvers.map((p) => p.functionName).join(", "));
 
   console.log(failures === 0 ? "\nAll permission checks passed.\n" : `\n${failures} check(s) FAILED.\n`);
   await db.$disconnect();

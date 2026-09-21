@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { mayCreateDocument } from "@/lib/auth";
 import { Chip } from "@/components/ui";
+import { isAdmin, isController } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Explore DELIOS" };
@@ -48,8 +49,8 @@ const SETUP: CapabilityItem[] = [
 
 export default async function GuidePage() {
   const { user, db } = await requireScope();
-  const canControl = user.role === "ADMIN" || user.role === "CONTROLLER";
-  const canConfigure = user.role === "ADMIN";
+  const canControl = isController(user);
+  const canConfigure = isAdmin(user);
   const [documents, reviews, actions, transmittals] = await Promise.all([
     db.document.count(),
     db.reviewCycle.count({ where: { status: "OPEN" } }),

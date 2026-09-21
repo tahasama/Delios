@@ -7,6 +7,7 @@ import { departmentRows, departmentMembers, senderRecipients, senderRows, isDepa
 import { departmentsOf, businessDaysBefore, DEFAULT_LEAD_BUSINESS_DAYS } from "@/lib/schedule";
 import { parseDate } from "@/lib/controlled/registry";
 import { fmtDate } from "@/lib/utils";
+import { holdersOf } from "@/lib/permissions";
 
 type State = { error?: string; ok?: string };
 
@@ -151,8 +152,8 @@ export async function confirmReadinessAction(_prev: State | undefined, formData:
     update: { available, note, confirmedById: user.id, confirmedByName: user.name, confirmedAt: new Date() },
   });
   if (!available) {
-    const controllers = await db.projectMembership.findMany({ where: { projectId: ctx.projectId, active: true, function: { legacyRole: "CONTROLLER" } }, select: { userId: true } });
-    await notifyMany(controllers.map((c) => c.userId), "READINESS_SHORT",
+    const controllers = await holdersOf(ctx, "CONTROL");
+    await notifyMany(controllers.map((c) => c.id), "READINESS_SHORT",
       `${action.code}: ${department} documents not available`, note ?? undefined, `/actions/${action.code}`);
   }
   await audit({ actor: user, action: available ? "READINESS_CONFIRMED" : "READINESS_SHORT", entityType: "Action", entityId: action.id, entityLabel: `${action.code} · ${department}`, detail: note ?? (available ? "Documents available" : "") });

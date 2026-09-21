@@ -10,6 +10,7 @@ import { Send, CheckCircle2, Rocket } from "lucide-react";
 import { getRunForRevision, type WfRuntimeStep } from "@/lib/workflow";
 import { confirmRecordAction, correctRecordAction } from "@/lib/actions/governance";
 import { SendForReview } from "@/components/send-for-review-panel";
+import { isController } from "@/lib/auth";
 
 type DocLite = {
   id: string;
@@ -44,7 +45,7 @@ export async function WorkflowPanel({ doc, user, lead, extra: after }: { doc: Do
   const run = revs[0] ? await getRunForRevision(ctx, revs[0].id) : null;
   const inPrep = revs.find((r) => r.state === "IN_PREPARATION");
   const released = revs.find((r) => r.state === "RELEASED");
-  const controller = user.role === "CONTROLLER" || user.role === "ADMIN";
+  const controller = isController(user);
 
   if (run && run.status === "ACTIVE") return <RunActivePanel run={run} user={user} extra={extra} />;
   if (run && run.status === "DONE") {
@@ -100,9 +101,9 @@ export async function WorkflowPanel({ doc, user, lead, extra: after }: { doc: Do
 async function SendPanel({ doc, revId, value, hasFiles, user, lead, extra }: { doc: DocLite; revId: string; value: string; hasFiles: boolean; user: SessionUser; lead?: React.ReactNode; extra?: React.ReactNode }) {
   // Who sends: the author for internal work; Document Control always, and
   // only Document Control for what a supplier or other party produced.
-  const isController = user.role === "CONTROLLER" || user.role === "ADMIN";
+  const isControl = isController(user);
   const external = !!doc.originator;
-  const canSend = mayContributeToDocument(user, doc) && (isController || (!external && user.id === doc.createdById));
+  const canSend = mayContributeToDocument(user, doc) && (isControl || (!external && user.id === doc.createdById));
   if (!canSend) {
     return (
       <Card title={`Rev ${value} is being prepared`}>

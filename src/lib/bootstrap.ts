@@ -108,6 +108,13 @@ export const DEFAULT_FUNCTIONS = [
     verbs: ["READ"],
   },
   {
+    // Tags the departments each scheduled activity concerns (the departments
+    // list), and reads what the project needs; approves no document.
+    code: "PROJECT_MANAGER", name: "Project manager", legacyRole: "VIEWER", clearance: 3, sort: 5,
+    description: "Owns the departments-per-activity list and follows readiness.",
+    verbs: ["READ", "RECEIVE", "PLAN"],
+  },
+  {
     // For people from outside: a contractor's engineer, a client reviewer, a
     // certifying body. Starts at PUBLIC only, because the safe default for an
     // outsider is to see nothing until somebody decides what they should see —

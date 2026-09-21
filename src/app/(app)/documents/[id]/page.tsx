@@ -20,6 +20,7 @@ import { getRunForRevision } from "@/lib/workflow";
 import { WorkflowPanel, Action } from "./workflow-panel";
 import { DocTabs } from "./doc-tabs";
 import { ArrowLeft, ChevronRight, Download, ExternalLink, FileText, Send } from "lucide-react";
+import { hasVerb } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -145,7 +146,7 @@ export default async function DocumentDetailPage({
 
   const extra = (
     <div className="mt-1 flex flex-wrap items-start gap-x-2 empty:hidden">
-      {inReview && !run && ["APPROVER", "ADMIN", "CONTROLLER", "REVIEWER"].includes(user.role) ? (
+      {inReview && !run && (hasVerb(user, "APPROVE") || hasVerb(user, "REVIEW")) ? (
         <Step title={`Approve rev ${inReview.value}`} open>
           <Guarded result={await preflight("APPROVE", { revisionId: inReview.id }, ctx)}>
             <ActionForm action={approveRevisionAction} submitLabel="Approve" size="sm" hidden={{ revisionId: inReview.id }}>

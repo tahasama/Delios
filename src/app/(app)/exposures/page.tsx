@@ -6,6 +6,7 @@ import { ActionForm } from "@/components/form";
 import { EXPOSURES } from "@/lib/standard";
 import { recordVoidReassessmentAction } from "@/lib/actions/revisions";
 import { copyActionUpdateAction } from "@/lib/actions/transmittals";
+import { AssuranceTabs } from "@/app/(app)/conformance/tabs";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Exposures" };
@@ -44,6 +45,7 @@ export default async function ExposuresPage() {
         subtitle="Replaced or withdrawn information that may still be in use, and who must act."
         actions={<Chip className={total > 0 ? "bg-amber-100 text-amber-800 ring-amber-300" : "bg-emerald-100 text-emerald-800 ring-emerald-300"}>{total} open</Chip>}
       />
+      <AssuranceTabs current="/exposures" />
 
       {total === 0 ? <Banner tone="good" title="No exposures">No unpropagated supersessions, uncontrolled copies, blocked work, orphaned withdrawals or unresolved voids.</Banner> : null}
 

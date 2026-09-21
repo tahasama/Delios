@@ -47,9 +47,11 @@ function main() {
     "/conformance/defects",
     "/conformance/statement",
     "/conformance/traceability",
+    "/exposures",
     "/actions/schedules",
     "/actions/requirements",
     "/reviews/send",
+    "/packages/add",
     "/notifications",
     "/guide",
   ]);

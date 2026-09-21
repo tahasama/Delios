@@ -1233,6 +1233,9 @@ model Party {
   code       String
   name       String
   isInternal Boolean      @default(false)
+  // Revoking a party ends its people's access without deleting anything:
+  // they cannot sign in, and the party is no longer offered in pickers.
+  active     Boolean      @default(true)
   users      User[]
 
   @@unique([orgId, code])

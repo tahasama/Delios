@@ -12,6 +12,20 @@ function readVerbs(formData: FormData): Verb[] {
   return VERBS.filter((v) => picked.includes(v));
 }
 
+/**
+ * The account-level role that stands in before a project is chosen — derived
+ * from what the function may do, never chosen separately. Inside a project the
+ * matrix decides everything.
+ */
+function roleFromVerbs(verbs: string[]): string {
+  if (verbs.includes("CONFIGURE")) return "ADMIN";
+  if (verbs.includes("CONTROL")) return "CONTROLLER";
+  if (verbs.includes("APPROVE")) return "APPROVER";
+  if (verbs.includes("REVIEW")) return "REVIEWER";
+  if (verbs.includes("CREATE") || verbs.includes("REVISE")) return "AUTHOR";
+  return "VIEWER";
+}
+
 /** Publish a function the organization actually uses (§1.4). */
 export async function createFunctionAction(
   _prev: { error?: string; ok?: string } | undefined,
@@ -24,7 +38,8 @@ export async function createFunctionAction(
   const name = String(formData.get("name") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim() || null;
   const clearance = Number(formData.get("clearance") ?? 1);
-  const legacyRole = String(formData.get("legacyRole") ?? "AUTHOR");
+  const verbs = readVerbs(formData);
+  const legacyRole = roleFromVerbs(verbs);
 
   if (!name) return { error: "Give the function the name people actually use for it." };
   if (!CODE.test(code)) return { error: "The code is short and uppercase, e.g. ELEC_TECH." };
@@ -40,7 +55,6 @@ export async function createFunctionAction(
   });
   // A function with no rule can do nothing, which is a confusing place to
   // leave an administrator — start it with whatever verbs they ticked.
-  const verbs = readVerbs(formData);
   if (verbs.length) {
     await db.permissionRule.create({
       data: { orgId, functionId: fn.id, verbs: JSON.stringify(verbs), note: "Created with the function." },

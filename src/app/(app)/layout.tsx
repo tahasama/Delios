@@ -22,7 +22,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     canRead: ctx.can("READ"),
     canTransmit: ctx.can("TRANSMIT"),
     canControl: ctx.can("CONTROL"),
-    canConfigure: ctx.can("CONFIGURE"),
+    // Settings opens for administrators and for anyone granted a settings verb.
+    canConfigure: ctx.can("CONFIGURE") || ctx.can("MATRIX") || ctx.can("ROUTES"),
     canCreate: ctx.can("CREATE") && mayCreateDocument(user),
   };
 
@@ -36,6 +37,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             current={project}
             available={available}
             role={role}
+            functionName={user.functionName ?? null}
             organizationName={scope?.organizationName ?? user.organization ?? "Organization"}
           />
           <SearchBox className="hidden max-w-xl flex-1 md:block" />
@@ -54,7 +56,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <details className="group relative ml-1">
               <summary className="flex cursor-pointer list-none items-center gap-3 rounded-xl border border-slate-200 bg-white px-2 py-1.5 sm:px-3 sm:py-2 outline-none transition hover:border-slate-300 focus-visible:ring-3 focus-visible:ring-[#315f83]/15">
                 <span className="grid h-8 w-8 place-items-center rounded-full bg-[#e9f1f7] text-xs font-bold text-[#17324d]">{user.name.slice(0, 1).toUpperCase()}</span>
-                <span className="hidden min-w-[112px] sm:block"><span className="block text-xs font-semibold leading-tight text-slate-800">{user.name}</span><span className="mt-0.5 block text-[11px] leading-tight text-slate-400">{ROLE_LABEL[user.role as Role] ?? user.role}</span></span>
+                <span className="hidden min-w-[112px] sm:block"><span className="block text-xs font-semibold leading-tight text-slate-800">{user.name}</span><span className="mt-0.5 block text-[11px] leading-tight text-slate-400">{user.functionName ?? ROLE_LABEL[user.role as Role] ?? user.role}</span></span>
                 <ChevronDown className="hidden h-3.5 w-3.5 text-slate-400 transition group-open:rotate-180 sm:block" />
               </summary>
               <div className="absolute right-0 top-12 z-30 w-64 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">

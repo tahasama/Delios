@@ -70,8 +70,9 @@ export default async function ControlledKindPage({ params }: { params: Promise<{
 
   const ctx = await requireScope();
   const { db, user } = ctx;
-  const mayChange = ctx.can("CONFIGURE") || ctx.can("CONTROL");
-  const mayApprove = ctx.can("CONFIGURE") || (!!handler.ownerApproves && ctx.can("CONTROL"));
+  const mayOwn = !!handler.ownerVerb && ctx.can(handler.ownerVerb);
+  const mayChange = ctx.can("CONFIGURE") || ctx.can("CONTROL") || mayOwn;
+  const mayApprove = ctx.can("CONFIGURE") || (!!handler.ownerApproves && (ctx.can("CONTROL") || mayOwn));
   if (!mayChange && !mayApprove) return <PageHeader title={handler.title} subtitle={ctx.why("CONFIGURE")} />;
 
   const projectId = handler.level === "PROJECT" ? ctx.projectId : null;

@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireAdminScope, requireScope, type Tenant } from "@/lib/scope";
+import { requireAdminScope, requireScope, crossProject, type Tenant } from "@/lib/scope";
 import { redirect } from "next/navigation";
 import { isAdmin, hashPassword } from "@/lib/auth";
 import { audit } from "@/lib/audit";
@@ -239,33 +239,6 @@ export async function setScopeAction(_prev: { error?: string } | undefined, form
   }
 }
 
-/** Publish a new version of the approval authority matrix (§8.2 — versioned). */
-export async function addAuthorityRowAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
-  try {
-    const ctx = await requireAdminScope();
-  const { user: admin, db, projectId, orgId } = ctx;
-    const discipline = String(formData.get("discipline") ?? "") || null;
-    const docType = String(formData.get("docType") ?? "") || null;
-    const criticality = String(formData.get("criticality") ?? "") || null;
-    const minRole = String(formData.get("minRole") ?? "APPROVER");
-    const rows = await db.authorityRow.findMany({ where: { active: true } });
-    const version = rows.length ? Math.max(...rows.map((r) => r.version)) : 1;
-    // new row lands in a NEW version — the version in force at approval stays identifiable
-    await db.authorityRow.updateMany({ where: { active: true, version }, data: { active: false } });
-    await db.authorityRow.createMany({
-      data: [
-        ...rows.filter((r) => r.version === version).map((r) => ({ orgId, version: version + 1, discipline: r.discipline, docType: r.docType, criticality: r.criticality, minRole: r.minRole, active: true })),
-        { orgId, version: version + 1, discipline, docType, criticality, minRole, active: true },
-      ],
-    });
-    await audit({ actor: admin, action: "AUTHORITY_PUBLISHED", entityType: "AuthorityMatrix", entityId: `v${version + 1}`, detail: `Matrix v${version + 1} published — approvals record the version in force (§8.2).` });
-    revalidatePath("/admin/authority");
-    return {};
-  } catch (e) {
-    return { error: e instanceof Error ? e.message : "Failed." };
-  }
-}
-
 export async function addAssetAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
   try {
     const ctx = await requireAdminScope();
@@ -445,13 +418,16 @@ export async function saveSchemeRoutingAction(_prev: { error?: string; ok?: stri
   const { user: admin, db, projectId, orgId } = ctx;
     const deliverableType = String(formData.get("deliverableType") ?? "").trim();
     const schemeName = String(formData.get("schemeName") ?? "").trim();
+    // Rows edited in place send "status"; a new routing is always active.
+    const status = formData.has("status") ? (formData.get("active") === "on" ? "ACTIVE" : "INACTIVE") : "ACTIVE";
     if (!deliverableType || !schemeName) return { error: "Choose a deliverable type and a scheme." };
     const scheme = await db.scheme.findFirst({ where: { name: schemeName } });
     if (!scheme || !scheme.active) return { error: "That numbering scheme is not active." };
-    await db.schemeRouting.upsert({ where: { orgId_deliverableType: { orgId, deliverableType } }, update: { schemeName, status: "ACTIVE" }, create: { orgId, deliverableType, schemeName, status: "ACTIVE" } });
-    await audit({ actor: admin, action: "SCHEME_ROUTED", entityType: "SchemeRouting", entityId: deliverableType, entityLabel: deliverableType, newValue: schemeName });
+    const before = await db.schemeRouting.findFirst({ where: { deliverableType } });
+    await db.schemeRouting.upsert({ where: { orgId_deliverableType: { orgId, deliverableType } }, update: { schemeName, status }, create: { orgId, deliverableType, schemeName, status } });
+    await audit({ actor: admin, action: "SCHEME_ROUTED", entityType: "SchemeRouting", entityId: deliverableType, entityLabel: deliverableType, oldValue: before ? `${before.schemeName} (${before.status.toLowerCase()})` : undefined, newValue: `${schemeName} (${status.toLowerCase()})`, detail: before && before.schemeName !== schemeName ? "Numbers already issued keep the scheme they were issued under (§3.8)." : undefined });
     revalidatePath("/admin/numbering");
-    return { ok: `${deliverableType} now uses ${schemeName}.` };
+    return { ok: status === "ACTIVE" ? `${deliverableType} now uses ${schemeName}.` : `Numbering for ${deliverableType} switched off — no new numbers of this type.` };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Could not publish the routing rule." };
   }
@@ -476,7 +452,7 @@ export async function deleteValueAction(formData: FormData) {
   try {
     const ctx = await requireScope();
   const { user: admin, db, projectId, orgId } = ctx;
-    if (admin.role !== "ADMIN") return;
+    if (!isAdmin(admin)) return;
     const valueId = String(formData.get("valueId") ?? "");
     const value = await db.configValue.findUniqueOrThrow({ where: { id: valueId } });
     if (await configValueIsUsed(ctx, value.setKey, value.code)) {
@@ -499,7 +475,7 @@ export async function deleteSetAction(formData: FormData) {
   try {
     const ctx = await requireScope();
   const { user: admin, db, projectId, orgId } = ctx;
-    if (admin.role !== "ADMIN") return;
+    if (!isAdmin(admin)) return;
     const key = String(formData.get("key") ?? "");
     if (["STATUSES", "REVIEW_OUTCOMES", "REASONS_FOR_ISSUE", "COMMENT_CLASSES", "CRITICALITY", "CONFIDENTIALITY", "RETENTION_CLASSES"].includes(key)) {
       return; // the Standard's operational sets cannot be deleted, only edited
@@ -514,4 +490,77 @@ export async function deleteSetAction(formData: FormData) {
   } catch {
     // ignore
   }
+}
+
+/**
+ * One form for a person: who they are, who they work for, the job they hold on
+ * this project and the department they answer for — and whether they may sign
+ * in. What the job lets them do is the matrix's business, not the person's:
+ * one function may create, review and approve.
+ *
+ * Someone whose account belongs to another organization keeps their account
+ * details; only what they do on this project is changed here.
+ */
+export async function savePersonAction(_prev: { error?: string; ok?: string } | undefined, formData: FormData): Promise<{ error?: string; ok?: string }> {
+  const ctx = await requireAdminScope();
+  const { db, projectId, orgId, user: admin } = ctx;
+  const userId = String(formData.get("userId") ?? "");
+  const target = await crossProject().user.findUnique({ where: { id: userId } });
+  if (!target) return { error: "That person no longer exists." };
+  const ours = target.orgId === orgId;
+
+  const name = String(formData.get("name") ?? "").trim();
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const partyId = String(formData.get("partyId") ?? "") || null;
+  const functionId = String(formData.get("functionId") ?? "");
+  const department = String(formData.get("department") ?? "").trim() || null;
+  const active = formData.get("active") === "on";
+
+  const fn = functionId ? await db.function.findFirst({ where: { id: functionId, active: true } }) : null;
+  if (functionId && !fn) return { error: "That function is not published in your organization." };
+  const membership = await crossProject().projectMembership.findUnique({ where: { projectId_userId: { projectId, userId } }, include: { function: true } });
+  if (!membership && !fn) return { error: `Choose the function ${target.name} holds on ${ctx.project.code}.` };
+
+  // An organization with nobody able to configure it cannot recover.
+  if (target.id === admin.id && (!active || (fn && !(await functionConfigures(ctx, fn.id))))) {
+    return { error: "You cannot remove your own administration rights." };
+  }
+
+  const changes: string[] = [];
+  if (ours) {
+    if (!name) return { error: "A person needs a name." };
+    if (!/^\S+@\S+\.\S+$/.test(email)) return { error: "Give a valid email address." };
+    if (email !== target.email && (await db.user.findFirst({ where: { email, id: { not: userId } } }))) {
+      return { error: `${email} is already used by someone in your organization.` };
+    }
+    if (partyId && !(await db.party.findFirst({ where: { id: partyId } }))) return { error: "Choose one of your parties." };
+    await db.user.update({ where: { id: userId }, data: { name, email, partyId, active, ...(fn ? { role: fn.legacyRole } : {}) } });
+    if (name !== target.name) changes.push(`name → ${name}`);
+    if (email !== target.email) changes.push(`email → ${email}`);
+    if (partyId !== target.partyId) changes.push("company changed");
+    if (active !== target.active) changes.push(active ? "may sign in" : "switched off");
+  }
+
+  if (membership) {
+    const data: { functionId?: string; department?: string | null; active?: boolean } = {};
+    if (fn && fn.id !== membership.functionId) { data.functionId = fn.id; changes.push(`${membership.function.name} → ${fn.name}`); }
+    if (department !== membership.department) { data.department = department; changes.push(`department → ${department ?? "none"}`); }
+    // An outsider is switched off here by ending their place on this project.
+    if (!ours && !active) { data.active = false; changes.push(`removed from ${ctx.project.code}`); }
+    if (Object.keys(data).length) await crossProject().projectMembership.update({ where: { id: membership.id }, data });
+  } else if (fn) {
+    await crossProject().projectMembership.create({ data: { projectId, userId, functionId: fn.id, department } });
+    changes.push(`added to ${ctx.project.code} as ${fn.name}`);
+  }
+
+  if (changes.length) {
+    await audit({ actor: admin, action: "PERSON_UPDATED", entityType: "User", entityId: target.email, entityLabel: target.name, detail: changes.join("; ") });
+  }
+  revalidatePath("/admin/users");
+  return { ok: changes.length ? `${name || target.name}: ${changes.join("; ")}.` : "Nothing changed." };
+}
+
+async function functionConfigures(t: Tenant, functionId: string) {
+  const rules = await t.db.permissionRule.findMany({ where: { functionId }, select: { verbs: true } });
+  return rules.some((r) => r.verbs.includes('"CONFIGURE"'));
 }

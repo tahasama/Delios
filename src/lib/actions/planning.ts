@@ -5,6 +5,7 @@ import { requireScope } from "@/lib/scope";
 import { revalidatePath } from "next/cache";
 import { isController, isAdmin } from "@/lib/auth";
 import { audit, notify } from "@/lib/audit";
+import { isReadOnly } from "@/lib/auth";
 
 // ── Actions & deliverable baseline (Part 14) ─────────────────────────────────
 
@@ -16,7 +17,7 @@ import { audit, notify } from "@/lib/audit";
 export async function createPackageAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
   const ctx = await requireScope();
   const { user, db, projectId, orgId } = ctx;
-  if (user.role === "VIEWER") return { error: "Viewers cannot create packages." };
+  if (isReadOnly(user)) return { error: "Viewers cannot create packages." };
   const identifier = String(formData.get("identifier") ?? "").trim();
   const purpose = String(formData.get("purpose") ?? "");
   const type = String(formData.get("type") ?? "");
@@ -57,7 +58,7 @@ export async function createPackageAction(_prev: { error?: string } | undefined,
 export async function addPackageMemberAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
   const ctx = await requireScope();
   const { user, db, projectId } = ctx;
-  if (user.role === "VIEWER") return { error: "Viewers cannot change composition." };
+  if (isReadOnly(user)) return { error: "Viewers cannot change composition." };
   const packageId = String(formData.get("packageId") ?? "");
   const documentIds = formData.getAll("documentId").map(String).filter(Boolean);
   const requiredStatus = String(formData.get("requiredStatus") ?? "");
@@ -74,6 +75,8 @@ export async function addPackageMemberAction(_prev: { error?: string } | undefin
   await db.packageMember.createMany({ data: fresh.map((documentId) => ({ projectId, packageId, documentId, requiredStatus })) });
   await audit({ actor: user, action: "PACKAGE_MEMBER", entityType: "Package", entityId: pkg.identifier, entityLabel: pkg.identifier, detail: `${fresh.length} document(s) added (§15.4).` });
   revalidatePath(`/packages/${pkg.identifier}`);
+  // From the register's "Add to package": land on the package, where the result is.
+  if (formData.get("redirect")) redirect(`/packages/${pkg.identifier}?added=${fresh.length}`);
   return {};
 }
 
@@ -81,7 +84,7 @@ export async function addPackageMemberAction(_prev: { error?: string } | undefin
 export async function assessPackageAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
   const ctx = await requireScope();
   const { user, db, projectId, orgId } = ctx;
-  if (user.role === "VIEWER") return { error: "Viewers cannot assess packages." };
+  if (isReadOnly(user)) return { error: "Viewers cannot assess packages." };
   const packageId = String(formData.get("packageId") ?? "");
   const pkg = await db.package.findUniqueOrThrow({ where: { id: packageId }, include: { members: { include: { document: { include: { revisions: { where: { state: "RELEASED" }, orderBy: { releasedAt: "desc" }, take: 1 } } } } } } });
   if (pkg.closedAt) return { error: "Package already closed." };
@@ -135,7 +138,7 @@ export async function issueShortfallAction(_prev: { error?: string } | undefined
 export async function closePackageAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
   const ctx = await requireScope();
   const { user, db, projectId, orgId } = ctx;
-  if (user.role === "VIEWER") return { error: "Viewers cannot close packages." };
+  if (isReadOnly(user)) return { error: "Viewers cannot close packages." };
   const packageId = String(formData.get("packageId") ?? "");
   const ruleCeased = formData.get("ruleCeased") === "on";
   const closureNote = String(formData.get("closureNote") ?? "").trim() || null;

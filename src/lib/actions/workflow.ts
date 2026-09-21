@@ -5,6 +5,8 @@ import { requireScope } from "@/lib/scope";
 import { mayContributeToDocument } from "@/lib/auth";
 import { audit } from "@/lib/audit";
 import { startWorkflowRun, recordStepOutcome, recordStepApproval } from "@/lib/workflow";
+import { isReadOnly } from "@/lib/auth";
+import { hasVerb, isAdmin, isController } from "@/lib/auth";
 
 // ── Workflow templates (organization-defined routing) ────────────────────────
 
@@ -12,7 +14,7 @@ export async function saveTemplateAction(_prev: { error?: string } | undefined, 
   try {
     const ctx = await requireScope();
   const { user: admin, db, projectId, orgId } = ctx;
-    if (admin.role !== "ADMIN") return { error: "Administrators only." };
+    if (!hasVerb(admin, "ROUTES")) return { error: "Maintaining review routes needs the Review routes permission — an administrator grants it in the distribution matrix." };
     const id = String(formData.get("id") ?? "").trim();
     const name = String(formData.get("name") ?? "").trim();
     const description = String(formData.get("description") ?? "").trim() || null;
@@ -37,9 +39,8 @@ export async function saveTemplateAction(_prev: { error?: string } | undefined, 
     for (const st of steps as Record<string, unknown>[]) {
       if (!["REVIEW", "APPROVAL"].includes(String(st.act))) return { error: "Each step is REVIEW or APPROVAL." };
       if (!["ANY_OF", "ALL_CONSOLIDATOR", "SERIAL", "ALL"].includes(String(st.mode))) return { error: "Choose how each step decides." };
-      const people = Array.isArray(st.participantIds) ? (st.participantIds as string[]) : [];
-      const functions = Array.isArray(st.functionIds) ? (st.functionIds as string[]) : [];
-      if (!people.length && !functions.length) return { error: "Every step needs a function or a person." };
+      // A step that names nobody is fine: when sent, it is assigned from the
+      // distribution matrix by the documents' discipline, and the sender adjusts.
     }
 
     if (isDefault) await db.workflowTemplate.updateMany({ where: { classes, ...(id ? { NOT: { id } } : {}) }, data: { isDefault: false } });
@@ -60,7 +61,7 @@ export async function deleteTemplateAction(formData: FormData) {
   try {
     const ctx = await requireScope();
   const { user: admin, db, projectId, orgId } = ctx;
-    if (admin.role !== "ADMIN") return;
+    if (!hasVerb(admin, "ROUTES")) return;
     const id = String(formData.get("id") ?? "");
     await db.workflowTemplate.update({ where: { id }, data: { active: false } }).catch(async () => {
       await db.workflowTemplate.delete({ where: { id } }).catch(() => undefined);
@@ -83,7 +84,7 @@ export async function deleteTemplateAction(formData: FormData) {
 export async function sendForReviewAction(_prev: { error?: string; ok?: string } | undefined, formData: FormData): Promise<{ error?: string; ok?: string }> {
   const ctx = await requireScope();
   const { user, db } = ctx;
-  if (user.role === "VIEWER") return { error: "Viewers cannot send documents for review." };
+  if (isReadOnly(user)) return { error: "Viewers cannot send documents for review." };
   const revisionIds = formData.getAll("revisionIds").map(String).filter(Boolean);
   const templateId = String(formData.get("templateId") ?? "");
   if (!revisionIds.length) return { error: "Nothing to send." };
@@ -98,7 +99,7 @@ export async function sendForReviewAction(_prev: { error?: string; ok?: string }
 
   const sent: string[] = [];
   const failed: string[] = [];
-  const isStaff = user.role === "CONTROLLER" || user.role === "ADMIN";
+  const isStaff = isController(user);
   for (const rid of revisionIds) {
     const rev = await db.revision.findUnique({ where: { id: rid }, include: { document: true } });
     if (!rev) continue;
@@ -165,15 +166,28 @@ export async function savePartyAction(_prev: { error?: string } | undefined, for
   try {
     const ctx = await requireScope();
   const { user: admin, db, projectId, orgId } = ctx;
-    if (admin.role !== "ADMIN") return { error: "Administrators only." };
+    if (!isAdmin(admin)) return { error: "Administrators only." };
     const id = String(formData.get("id") ?? "").trim();
     const code = String(formData.get("code") ?? "").trim().toUpperCase();
     const name = String(formData.get("name") ?? "").trim();
     const isInternal = formData.get("isInternal") === "on";
-    if (!code || !name) return { error: "Code and name are required." };
-    if (id) await db.party.update({ where: { id }, data: { code, name, isInternal } });
-    else await db.party.create({ data: { orgId, code, name, isInternal } });
+    if (id) {
+      // The code is fixed once issued: document numbers and originators carry it.
+      const party = await db.party.findFirst({ where: { id } });
+      if (!party) return { error: "That party no longer exists." };
+      const active = formData.get("active") === "on";
+      if (!name) return { error: "A party needs a name." };
+      if (party.isInternal && !active) return { error: "Your own organization cannot be switched off." };
+      await db.party.update({ where: { id }, data: { name, active } });
+      if (party.active !== active || party.name !== name) {
+        await audit({ actor: admin, action: active ? "PARTY_UPDATED" : "PARTY_REVOKED", entityType: "Party", entityId: party.code, entityLabel: name, oldValue: `${party.name}${party.active ? "" : " (revoked)"}`, newValue: `${name}${active ? "" : " (revoked)"}`, detail: active ? undefined : "Access revoked: its people can no longer sign in." });
+      }
+    } else {
+      if (!code || !name) return { error: "Code and name are required." };
+      await db.party.create({ data: { orgId, code, name, isInternal } });
+    }
     revalidatePath("/admin/parties");
+    revalidatePath("/admin/users");
     return {};
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Failed." };
@@ -184,7 +198,7 @@ export async function setUserPartyAction(_prev: { error?: string } | undefined, 
   try {
     const ctx = await requireScope();
   const { user: admin, db, projectId, orgId } = ctx;
-    if (admin.role !== "ADMIN") return { error: "Administrators only." };
+    if (!isAdmin(admin)) return { error: "Administrators only." };
     const userId = String(formData.get("userId") ?? "");
     const partyId = String(formData.get("partyId") ?? "") || null;
     const user = await db.user.findUniqueOrThrow({ where: { id: userId }, include: { party: true } });

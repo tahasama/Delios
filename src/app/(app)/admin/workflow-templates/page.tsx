@@ -3,6 +3,7 @@ import { requireScope } from "@/lib/scope";
 import { deleteTemplateAction } from "@/lib/actions/workflow";
 import { getSets } from "@/lib/config";
 import { WorkflowTemplateBuilder, type WorkflowBuilderStep } from "./workflow-template-builder";
+import { hasVerb } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Workflow templates" };
@@ -11,7 +12,7 @@ type Step = WorkflowBuilderStep;
 
 export default async function WorkflowTemplatesPage() {
   const { user: me, db } = await requireScope();
-  const admin = me.role === "ADMIN";
+  const admin = hasVerb(me, "ROUTES");
   const [templates, sets, users, classValues, functions] = await Promise.all([
     db.workflowTemplate.findMany({ where: { active: true }, orderBy: { createdAt: "asc" } }),
     getSets(),

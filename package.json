@@ -16,7 +16,7 @@
     "defects-report": "tsx scripts/defects-report.ts",
     "history:backfill": "tsx scripts/backfill-document-snapshots.ts",
     "import-workbook": "tsx prisma/import-workbook-cli.ts",
-    "spine:adopt": "tsx scripts/adopt-spine.ts",
+    "upgrade": "tsx scripts/upgrade.ts",
     "verify:tenancy": "tsx scripts/verify-tenancy.ts",
     "verify:permissions": "tsx scripts/verify-permissions.ts",
     "verify": "tsx scripts/verify-tenancy.ts && tsx scripts/verify-permissions.ts && tsx scripts/verify-controlled.ts && tsx scripts/verify-preflight.ts && tsx scripts/verify-workflow.ts && tsx scripts/verify-spine.ts && tsx scripts/verify-rollout.ts && tsx scripts/verify-shell.ts",

@@ -5,7 +5,6 @@ import bcrypt from "bcryptjs";
 import { SignJWT, jwtVerify } from "jose";
 import { db } from "./db";
 import type { Role } from "./standard";
-import { ROLE_RANK } from "./standard";
 
 const COOKIE = "edms_session";
 const secret = new TextEncoder().encode(process.env.SESSION_SECRET ?? "dev-secret");
@@ -49,7 +48,35 @@ export type SessionUser = {
   partyCode: string | null;
   partyName: string | null;
   isInternal: boolean;
+  /** Verbs the function held on the current project grants anywhere in the matrix. Set by the scope. */
+  verbs?: string[];
+  /** The function held on the current project — the person's job, e.g. "Construction manager". */
+  functionName?: string | null;
+  /** The department this person answers for on the current project. */
+  department?: string | null;
 };
+
+/**
+ * Before a project is chosen there is no function to read, so the account's
+ * standing role stands in. Everywhere inside a project the matrix decides.
+ */
+const ROLE_FALLBACK: Record<Role, string[]> = {
+  ADMIN: ["READ", "CREATE", "REVISE", "REVIEW", "APPROVE", "TRANSMIT", "RECEIVE", "ACCEPT", "CONTROL", "CONFIGURE"],
+  CONTROLLER: ["READ", "CREATE", "REVISE", "TRANSMIT", "RECEIVE", "ACCEPT", "CONTROL"],
+  APPROVER: ["READ", "REVIEW", "APPROVE", "RECEIVE"],
+  REVIEWER: ["READ", "REVIEW", "RECEIVE"],
+  AUTHOR: ["READ", "CREATE", "REVISE", "RECEIVE"],
+  VIEWER: ["READ"],
+};
+
+const ORG_VERBS = ["PLAN", "ROUTES", "MATRIX"];
+
+/** Does this person hold `verb` anywhere on the current project? */
+export function hasVerb(user: SessionUser | null | undefined, verb: string): boolean {
+  if (!user) return false;
+  const held = user.verbs ?? ROLE_FALLBACK[user.role] ?? [];
+  return held.includes(verb) || (ORG_VERBS.includes(verb) && held.includes("CONFIGURE"));
+}
 
 export const getCurrentUser = cache(async (): Promise<SessionUser | null> => {
   const jar = await cookies();
@@ -59,7 +86,8 @@ export const getCurrentUser = cache(async (): Promise<SessionUser | null> => {
     const { payload } = await jwtVerify(token, secret);
     const uid = payload.uid as string;
     const user = await db.user.findUnique({ where: { id: uid }, include: { party: true } });
-    if (!user || !user.active) return null;
+    // A revoked party ends an open session too, not just the next sign-in.
+    if (!user || !user.active || (user.party && !user.party.active)) return null;
     return {
       id: user.id,
       orgId: user.orgId,
@@ -83,37 +111,54 @@ export async function requireUser(): Promise<SessionUser> {
   return user;
 }
 
+/** The verb each old role name stood for, so `requireRole` reads the matrix. */
+const ROLE_VERB: Record<Role, string> = {
+  VIEWER: "READ",
+  AUTHOR: "CREATE",
+  REVIEWER: "REVIEW",
+  APPROVER: "APPROVE",
+  CONTROLLER: "CONTROL",
+  ADMIN: "CONFIGURE",
+};
+
 export async function requireRole(roles: Role[]): Promise<SessionUser> {
   const user = await requireUser();
-  if (!roles.includes(user.role)) redirect("/?denied=1");
+  if (!roles.some((r) => hasVerb(user, ROLE_VERB[r]))) redirect("/?denied=1");
   return user;
 }
 
 export async function requireAdmin(): Promise<SessionUser> {
   const user = await requireUser();
-  if (user.role !== "ADMIN") redirect("/?denied=1");
+  if (!hasVerb(user, "CONFIGURE")) redirect("/?denied=1");
   return user;
 }
 
+/** Holds the verb the named role stood for. */
 export function atLeast(user: SessionUser | null, role: Role): boolean {
-  if (!user) return false;
-  return ROLE_RANK[user.role] >= ROLE_RANK[role];
+  return hasVerb(user, ROLE_VERB[role]);
 }
 
+/** The control function: Control, or Configure. */
 export function isController(user: SessionUser | null): boolean {
-  return !!user && (user.role === "CONTROLLER" || user.role === "ADMIN");
+  return hasVerb(user, "CONTROL") || hasVerb(user, "CONFIGURE");
 }
 
+/** An administrator: publishes configuration, people and the matrix. */
 export function isAdmin(user: SessionUser | null): boolean {
-  return !!user && user.role === "ADMIN";
+  return hasVerb(user, "CONFIGURE");
+}
+
+/** Contributes nothing: may only read. */
+export function isReadOnly(user: SessionUser | null): boolean {
+  return !["CREATE", "REVISE", "REVIEW", "APPROVE", "CONTROL", "CONFIGURE"].some((v) => hasVerb(user, v));
 }
 
 export function mayCreateDocument(user: SessionUser | null): boolean {
-  return !!user && user.role !== "VIEWER" && user.isInternal;
+  return !!user && hasVerb(user, "CREATE") && user.isInternal;
 }
 
 export function mayContributeToDocument(user: SessionUser | null, document: { originator: string | null; createdById: string }): boolean {
-  if (!user || user.role === "VIEWER") return false;
+  if (!user || !(hasVerb(user, "CREATE") || hasVerb(user, "REVISE"))) return false;
   if (user.isInternal) return true;
   return !!user.partyCode && document.originator === user.partyCode;
 }

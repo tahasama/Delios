@@ -4,6 +4,7 @@ import { PageHeader, ButtonLink } from "@/components/ui";
 import { fmtDate, fmtDateTime } from "@/lib/utils";
 import { PrintButton } from "./print-button";
 import { effectiveSpine } from "@/lib/spine";
+import { AssuranceTabs } from "@/app/(app)/conformance/tabs";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Conformance statement" };
@@ -34,9 +35,9 @@ export default async function StatementPage() {
         <PageHeader title="Conformance assessment statement" subtitle="A formal, printable summary of the organization’s declared scope and measured control evidence." />
         <div className="flex gap-2">
           <PrintButton />
-          <ButtonLink href="/conformance" variant="secondary">← Conformance</ButtonLink>
         </div>
       </div>
+      <div className="no-print"><AssuranceTabs current="/conformance/statement" /></div>
 
       <article className="rounded-xl border border-slate-300 bg-white p-8 shadow-sm print:shadow-none">
         <header className="border-b border-slate-200 pb-4 text-center">

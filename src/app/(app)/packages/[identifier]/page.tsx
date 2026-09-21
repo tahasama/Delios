@@ -8,6 +8,7 @@ import { getActiveSet } from "@/lib/config";
 import { fmtDate, fmtDateTime } from "@/lib/utils";
 import { ArrowLeft } from "lucide-react";
 import { SupplierPackage } from "./supplier-package";
+import { isReadOnly } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -32,7 +33,7 @@ export default async function PackageDetailPage({ params }: { params: Promise<{ 
   const nextAction = pkg.closedAt ? "Closed. Nothing more to do." : shortfall && pkg.shortfallIssuedAt && !pkg.shortfallAcceptedBy ? `Waiting for ${pkg.acceptanceAuthorityName} to accept what is missing.` : shortfall && !pkg.shortfallIssuedAt ? `Some documents are not ready. Send the shortfall to ${pkg.acceptanceAuthorityName}.` : pkg.assessedAt && !shortfall ? "Everything is ready. Close the package when it is delivered." : "Get every document to its required status, then check readiness.";
 
   const shortfallFor = new Map((shortfall ?? []).map((s) => [s.docNumber, s]));
-  const canAct = user.role !== "VIEWER" && !pkg.closedAt;
+  const canAct = !isReadOnly(user) && !pkg.closedAt;
 
   return (
     <div className="space-y-5">

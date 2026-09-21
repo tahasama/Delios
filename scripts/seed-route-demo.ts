@@ -40,6 +40,16 @@ async function main() {
   if (existing) await db.workflowTemplate.update({ where: { id: existing.id }, data: { steps: JSON.stringify(steps), active: true } });
   else await db.workflowTemplate.create({ data: { orgId: org.id, name: "3 inputs, then lead", description: "Three specialists give input in any order, then their lead approves.", classes: "*", steps: JSON.stringify(steps), active: true, isDefault: false } as never });
 
+  // A route that names nobody: each step is assigned from the distribution
+  // matrix by the document's discipline when it is sent.
+  const byDiscipline = [
+    { act: "REVIEW", mode: "ALL", title: "Discipline review", participantIds: [] },
+    { act: "APPROVAL", mode: "ANY_OF", title: "Discipline approval", participantIds: [] },
+  ];
+  const auto = await db.workflowTemplate.findFirst({ where: { orgId: org.id, name: "By discipline — review, then approval" } });
+  if (auto) await db.workflowTemplate.update({ where: { id: auto.id }, data: { steps: JSON.stringify(byDiscipline), active: true } });
+  else await db.workflowTemplate.create({ data: { orgId: org.id, name: "By discipline — review, then approval", description: "Reviewers and approver assigned from the distribution matrix by the document's discipline; adjust before sending.", classes: "*", steps: JSON.stringify(byDiscipline), active: true, isDefault: false } as never });
+
   // "Single approval" names functions, not a person: the matrix decides who.
   const approverFn = await db.function.findFirstOrThrow({ where: { orgId: org.id, code: "APPROVER" } });
   const leadElecFn = await db.function.findFirst({ where: { orgId: org.id, code: "LEAD_ELEC_ENG" } });

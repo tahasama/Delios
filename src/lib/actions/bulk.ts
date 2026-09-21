@@ -5,6 +5,7 @@ import { requireScope } from "@/lib/scope";
 import { parseCsv, toObjects } from "@/lib/csv";
 import { allocateNumber, validateNumber } from "@/lib/numbering";
 import { getActiveSet } from "@/lib/config";
+import { isReadOnly } from "@/lib/auth";
 
 // Bulk in/out — document controllers live in spreadsheets. Templates, preview,
 // then execute. No one fills a form per line.
@@ -30,7 +31,7 @@ const GET = (o: Record<string, string>, k: string) => (o[k] ?? "").trim();
 export async function importBulkAction(_prev: BulkResult | undefined, formData: FormData): Promise<BulkResult> {
   const ctx = await requireScope();
   const { user, db, projectId, orgId } = ctx;
-  if (user.role === "VIEWER") return { error: "Viewers cannot import." };
+  if (isReadOnly(user)) return { error: "Viewers cannot import." };
   const kind = String(formData.get("kind") ?? "");
   const dryRun = formData.get("dryRun") === "on";
   const objects = await readUpload(formData);

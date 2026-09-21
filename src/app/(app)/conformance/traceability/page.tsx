@@ -6,6 +6,7 @@ import { effectiveSpine, ALIGNMENT_LABEL, type Alignment } from "@/lib/spine";
 import { resolveSpineLinksAction, releaseSpineBaselineAction } from "@/lib/actions/spine";
 import { STANDARD_VERSION } from "@/lib/standard";
 import { cn, fmtDate } from "@/lib/utils";
+import { AssuranceTabs } from "@/app/(app)/conformance/tabs";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Traceability" };
@@ -79,8 +80,8 @@ export default async function TraceabilityPage({ searchParams }: { searchParams:
       <PageHeader
         title="Traceability"
         subtitle={`Rules ↔ Routes ↔ Checks of Standard v${STANDARD_VERSION}: every Rule verified by a Check, applied by a Route step or recorded as needing none, and reviewed whenever either side changes.`}
-        actions={<ButtonLink href="/conformance" variant="secondary">Back to assurance</ButtonLink>}
       />
+      <AssuranceTabs current="/conformance/traceability" />
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
         {(["REVIEW_REQUIRED", "GAP", "ALIGNED", "NOT_APPLICABLE", "WITHDRAWN"] as Alignment[]).map((a) => (

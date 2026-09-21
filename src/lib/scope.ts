@@ -3,7 +3,7 @@ import { cache } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { db } from "./db";
-import { getCurrentUser, type SessionUser } from "./auth";
+import { getCurrentUser, atLeast, type SessionUser } from "./auth";
 import type { Role } from "./standard";
 import { scopedClient, type ScopedDb, type Tenant } from "./tenant";
 import { loadActor, can, canSee, verbsFor, explain, visibleConfidentiality, type Actor, type Verb, type DocumentClass } from "./permissions";
@@ -110,8 +110,9 @@ export const getScope = cache(async (): Promise<Scope | null> => {
   // one project and control another (§1.4 — ownership is by role).
   const role = actor.legacyRole as Role;
 
+  const verbs = [...new Set(actor.rules.flatMap((r) => r.verbs))];
   return {
-    user: { ...user, role },
+    user: { ...user, role, verbs, functionName: actor.functionName, department: chosen.department ?? null },
     orgId: hostOrgId,
     projectId: chosen.projectId,
     project: chosen.project,
@@ -145,13 +146,14 @@ export async function requireScope(): Promise<Scope> {
 
 export async function requireScopeRole(roles: Role[]): Promise<Scope> {
   const scope = await requireScope();
-  if (!roles.includes(scope.role)) redirect("/?denied=1");
+  if (!roles.some((r) => atLeast(scope.user, r))) redirect("/?denied=1");
   return scope;
 }
 
+/** Configure — the administrator's verb, read from the matrix. */
 export async function requireAdminScope(): Promise<Scope> {
   const scope = await requireScope();
-  if (scope.role !== "ADMIN") redirect("/?denied=1");
+  if (!scope.can("CONFIGURE")) redirect("/?denied=1");
   return scope;
 }
 

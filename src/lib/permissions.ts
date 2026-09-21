@@ -23,6 +23,9 @@ export const VERBS = [
   "ACCEPT",
   "CONTROL",
   "CONFIGURE",
+  "PLAN",
+  "ROUTES",
+  "MATRIX",
 ] as const;
 export type Verb = (typeof VERBS)[number];
 
@@ -37,6 +40,9 @@ export const VERB_LABEL: Record<Verb, string> = {
   ACCEPT: "Accept",
   CONTROL: "Control",
   CONFIGURE: "Configure",
+  PLAN: "Plan",
+  ROUTES: "Review routes",
+  MATRIX: "Read matrix",
 };
 
 export const VERB_BLURB: Record<Verb, string> = {
@@ -50,7 +56,22 @@ export const VERB_BLURB: Record<Verb, string> = {
   ACCEPT: "Run the acceptance check on an incoming transmittal (§11.9).",
   CONTROL: "Act as the control function: release, supersede, withdraw.",
   CONFIGURE: "Publish value sets, schemes, people and this matrix.",
+  PLAN: "Project manager: tag the departments each scheduled activity concerns.",
+  ROUTES: "Create and edit review routes (workflow templates).",
+  MATRIX: "Read this distribution matrix without being able to change it.",
 };
+
+/**
+ * Verbs about the organization's own set-up rather than a document class. An
+ * administrator (Configure) holds them all; anyone else holds one only where
+ * the matrix grants it — which is how an administrator authorizes Document
+ * Control to read the matrix or maintain review routes.
+ */
+export const ORGANIZATION_VERBS: Verb[] = ["PLAN", "ROUTES", "MATRIX"];
+
+export function implies(held: readonly string[], verb: Verb): boolean {
+  return held.includes(verb) || (ORGANIZATION_VERBS.includes(verb) && held.includes("CONFIGURE"));
+}
 
 /**
  * §5.7 — confidentiality as an ordered scale. The organization's own levels
@@ -188,7 +209,7 @@ export function can(actor: Actor | null, verb: Verb, target?: DocumentClass | nu
   if (!actor) return false;
   if (target && !canSee(actor, target.confidentiality)) return false;
   const applicable = target ? actor.rules.filter((r) => matches(r, target)) : actor.rules;
-  return applicable.some((r) => r.verbs.includes(verb));
+  return applicable.some((r) => implies(r.verbs, verb));
 }
 
 /** §5.7 — clearance gate, independent of any verb. */
@@ -227,4 +248,28 @@ export function explain(actor: Actor | null, verb: Verb, target?: DocumentClass 
   }
   if (can(actor, verb, target)) return `${actor.functionName} may ${VERB_LABEL[verb].toLowerCase()} this.`;
   return `${actor.functionName} does not hold "${VERB_LABEL[verb]}" for this classification. The permission matrix decides this, not the document (§11.8).`;
+}
+
+/**
+ * Everyone on this project whose function grants `verb` — optionally for one
+ * document class. The replacement for "every user whose role is X": who may
+ * act is read from the matrix, not from a rank on the account.
+ */
+export async function holdersOf(
+  t: Tenant,
+  verb: Verb,
+  target?: DocumentClass | null,
+): Promise<{ id: string; name: string; functionName: string; department: string | null }[]> {
+  const members = await t.db.projectMembership.findMany({
+    where: { projectId: t.projectId, active: true, user: { active: true } },
+    include: { user: { select: { id: true, name: true } } },
+  });
+  const actors = new Map<string, Actor | null>();
+  const out: { id: string; name: string; functionName: string; department: string | null }[] = [];
+  for (const m of members) {
+    if (!actors.has(m.functionId)) actors.set(m.functionId, await loadActor(t, m.functionId));
+    const actor = actors.get(m.functionId)!;
+    if (can(actor, verb, target)) out.push({ id: m.user.id, name: m.user.name, functionName: actor!.functionName, department: m.department });
+  }
+  return out.sort((a, b) => a.name.localeCompare(b.name));
 }

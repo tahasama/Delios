@@ -4,13 +4,14 @@ import { revalidatePath } from "next/cache";
 import { requireScope } from "@/lib/scope";
 import { isController, isAdmin } from "@/lib/auth";
 import { audit, notify } from "@/lib/audit";
+import { isReadOnly } from "@/lib/auth";
 
 // ── §2.2–2.4 Records: confirmed, fixed, never revised; corrections are new records ──
 
 export async function confirmRecordAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
   const ctx = await requireScope();
   const { user, db, projectId, orgId } = ctx;
-  if (user.role === "VIEWER") return { error: "Viewers cannot confirm records." };
+  if (isReadOnly(user)) return { error: "Viewers cannot confirm records." };
   const documentId = String(formData.get("documentId") ?? "");
   const doc = await db.document.findUniqueOrThrow({ where: { id: documentId } });
   if (doc.kind !== "RECORD") return { error: "Only a record is confirmed (§2.2)." };
@@ -25,7 +26,7 @@ export async function confirmRecordAction(_prev: { error?: string } | undefined,
 export async function correctRecordAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
   const ctx = await requireScope();
   const { user, db, projectId, orgId } = ctx;
-  if (user.role === "VIEWER") return { error: "Viewers cannot issue corrections." };
+  if (isReadOnly(user)) return { error: "Viewers cannot issue corrections." };
   const originalId = String(formData.get("documentId") ?? "");
   const title = String(formData.get("title") ?? "").trim();
   if (!title) return { error: "The correction needs its own descriptive title." };
@@ -100,7 +101,7 @@ export async function withdrawApprovalAction(_prev: { error?: string } | undefin
 export async function reclassifyCommentAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
   const ctx = await requireScope();
   const { user, db, projectId, orgId } = ctx;
-  if (user.role === "VIEWER") return { error: "Viewers cannot reclassify." };
+  if (isReadOnly(user)) return { error: "Viewers cannot reclassify." };
   const commentId = String(formData.get("commentId") ?? "");
   const cycleId = String(formData.get("cycleId") ?? "");
   const prevent = formData.get("prevent") === "on";

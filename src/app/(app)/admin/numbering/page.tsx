@@ -56,15 +56,22 @@ export default async function AdminNumberingPage() {
       </details>
 
       <Card title="Which scheme each deliverable type uses">
-        <DataTable head={<tr><Th>Deliverable type</Th><Th>Scheme</Th><Th>Status</Th></tr>}>
+        <DataTable head={<tr><Th>Deliverable type</Th><Th>Scheme · in use</Th><Th></Th></tr>}>
           {routing.map((r) => (
-            <tr key={r.id}>
-              <Td className="font-mono text-xs font-semibold">{r.deliverableType}</Td>
-              <Td>{r.schemeName}</Td>
-              <Td><Chip className={r.status === "ACTIVE" ? "bg-emerald-100 text-emerald-800 ring-emerald-300" : "bg-slate-100 text-slate-500 ring-slate-300"}>{r.status.toLowerCase()}</Chip></Td>
+            <tr key={r.id} className={r.status === "ACTIVE" ? "" : "opacity-60"}>
+              <Td className="font-mono text-xs font-semibold">{r.deliverableType}<span className="block font-sans text-[11px] font-normal text-slate-400">{deliverables.find((d) => d.code === r.deliverableType)?.label}</span></Td>
+              <Td colSpan={2}>
+                <ActionForm action={saveSchemeRoutingAction} submitLabel="Save" size="sm" hidden={{ deliverableType: r.deliverableType, status: "1" }} className="flex flex-wrap items-center gap-3 space-y-0">
+                  <select name="schemeName" defaultValue={r.schemeName} className="rounded-md border border-slate-300 px-2 py-1 text-xs">
+                    {schemes.filter((sc) => sc.active || sc.name === r.schemeName).map((sc) => <option key={sc.id} value={sc.name}>{sc.name}</option>)}
+                  </select>
+                  <label className="flex items-center gap-1.5 text-xs text-slate-600"><input type="checkbox" name="active" defaultChecked={r.status === "ACTIVE"} /> In use</label>
+                </ActionForm>
+              </Td>
             </tr>
           ))}
         </DataTable>
+        <p className="mt-2 text-[11px] text-slate-400">Switching a type off stops new numbers of that type; numbers already issued keep their scheme.</p>
         <details className="mt-4 border-t border-slate-100 pt-3"><summary className="cursor-pointer text-xs font-semibold text-[#315f83]">+ Route a deliverable type</summary><div className="mt-3"><ActionForm action={saveSchemeRoutingAction} submitLabel="Publish routing" size="sm"><div className="grid grid-cols-1 gap-3 sm:grid-cols-2"><Field label="Deliverable type" required><select name="deliverableType" className={inputCls} required defaultValue=""><option value="" disabled>Select…</option>{deliverables.map((item) => <option key={item.code} value={item.code}>{item.code} — {item.label}</option>)}</select></Field><Field label="Numbering scheme" required><select name="schemeName" className={inputCls} required defaultValue=""><option value="" disabled>Select…</option>{schemes.map((scheme) => <option key={scheme.id} value={scheme.name}>{scheme.name}</option>)}</select></Field></div></ActionForm></div></details>
       </Card>
 

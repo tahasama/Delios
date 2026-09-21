@@ -43,7 +43,7 @@ export async function SendForReview({ revisionIds }: { revisionIds: string[] }) 
         title: s.title || (s.act === "APPROVAL" ? "Approval" : `Review ${i + 1}`),
         act: s.act,
         mode: s.mode,
-        proposedIds: await proposeForStep(ctx, docs, s),
+        proposed: await proposeForStep(ctx, docs, s),
         fromFunctions: (s.functionIds ?? []).map((id) => fnName.get(id) ?? "?"),
       }))),
     });

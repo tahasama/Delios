@@ -17,7 +17,7 @@ projects start, and how to back out. Commands assume the repository root.
 npm install
 npx prisma migrate deploy    # applies every migration not yet applied
 npx prisma generate
-npm run spine:adopt          # gives any organization without one the reference Traceability Spine
+npm run upgrade              # adds new default functions and the reference Traceability Spine where missing
 npm run verify               # eight suites; all must pass
 ```
 
@@ -28,7 +28,7 @@ What the recent migrations do, and what they need from you:
 | `supplier_packages` | Packages gain a category and a supplier party code. | Create one supplier package per supplier under Packages → From suppliers. |
 | `schedule_requirements` | Requirements gain department, sender, approver and a needed-by rule; existing dates are kept as fixed dates. | None. Re-issue the requirements list when convenient so dates follow the 5-working-day rule. |
 | `requirements_process` | Department calls, sender issues, readiness confirmations; people gain a department. | Set each person's **department** on Settings → People. Without it nobody receives the department's call or can confirm its readiness. |
-| `traceability_spine` | The spine is rebuilt per relationship; the old per-check rows are removed. | Run `npm run spine:adopt`, then review what it flags on Conformance → Traceability. |
+| `traceability_spine` | The spine is rebuilt per relationship; the old per-check rows are removed. | Run `npm run upgrade`, then review what it flags on Conformance → Traceability. |
 
 The schedule upload no longer carries departments. Departments come only from
 the project manager's **Departments per activity** list (Schedule & actions →

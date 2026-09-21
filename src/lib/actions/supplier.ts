@@ -9,6 +9,7 @@ import { saveUpload } from "@/lib/files";
 import { nextRevisionValue } from "@/lib/numbering";
 import { executionSeriesStarted } from "@/lib/lifecycle";
 import { getActiveSet } from "@/lib/config";
+import { holdersOf } from "@/lib/permissions";
 
 /**
  * A supplier package holds everything one supplier owes us: every register
@@ -109,7 +110,7 @@ export async function submitSupplierPackageAction(_prev: { error?: string; ok?: 
   // One incoming transmittal carries the whole submission to Document Control.
   const reasons = await getActiveSet("REASONS_FOR_ISSUE");
   const reason = reasons.find((r) => r.props.reviewCycle === true && /APPROV/i.test(r.code)) ?? reasons.find((r) => r.props.reviewCycle === true) ?? reasons[0];
-  const controllers = await db.user.findMany({ where: { active: true, role: { in: ["CONTROLLER", "ADMIN"] }, memberships: { some: { projectId, active: true } } } });
+  const controllers = await holdersOf(ctx, "CONTROL");
   const number = await db.$transaction(async (tx) => {
     const c = await tx.numberCounter.findUnique({ where: { projectId_prefix: { projectId, prefix: "TR" } } });
     if (c) { await tx.numberCounter.update({ where: { id: c.id }, data: { next: { increment: 1 } } }); return `TR-${String(c.next).padStart(4, "0")}`; }

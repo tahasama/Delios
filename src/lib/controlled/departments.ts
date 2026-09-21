@@ -29,6 +29,7 @@ const departments: Handler = {
   sample: ["A00001", "Pump house — MCC energisation", "2026-10-20", "EL, ME"],
   approverHint: "the project manager who uploads it",
   ownerApproves: true,
+  ownerVerb: "PLAN",
 
   async parse(t, rows): Promise<ParseResult> {
     const { index, missing } = headerIndex(rows, ["Action Code", "Departments"]);

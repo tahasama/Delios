@@ -37,6 +37,8 @@ export async function loginAction(_prev: LoginState | undefined, formData: FormD
       email,
       active: true,
       org: { active: true, ...(orgSlug ? { slug: orgSlug } : {}) },
+      // Someone whose company's access was revoked cannot sign in.
+      OR: [{ partyId: null }, { party: { active: true } }],
     },
     include: { party: true, org: true },
   });

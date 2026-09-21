@@ -12,6 +12,8 @@ export type SetupPage = {
   title: string;
   text: string;
   group: "Organization" | "Classification" | "Access" | "Change & evidence";
+  /** The verb that opens this page. Configure (administrators) unless stated. */
+  verb?: "MATRIX" | "ROUTES";
 };
 
 export const SETUP_PAGES: SetupPage[] = [
@@ -68,14 +70,9 @@ export const SETUP_PAGES: SetupPage[] = [
   {
     href: "/admin/distribution",
     title: "Distribution matrix",
-    text: "Who receives which information, settled before any transmittal.",
+    text: "Who reviews, approves and receives each class of document — the approval authority included.",
     group: "Access",
-  },
-  {
-    href: "/admin/authority",
-    title: "Approval authority",
-    text: "Which authority a document class needs before it can be approved.",
-    group: "Access",
+    verb: "MATRIX",
   },
 
   {
@@ -89,6 +86,7 @@ export const SETUP_PAGES: SetupPage[] = [
     title: "Review routes",
     text: "Reviewer sequences — parallel, serial, consolidated.",
     group: "Change & evidence",
+    verb: "ROUTES",
   },
   {
     href: "/admin/audit",

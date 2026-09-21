@@ -152,20 +152,7 @@ const approveAuthority: Gate = {
       return block(ctx.why("APPROVE", rev.document), "The permission matrix decides this (§11.8).");
     }
 
-    const req = await authorityFor(ctx, rev.document);
-    if (!req) {
-      return block(
-        "No approval authority is published for this document class.",
-        "Publish the authority matrix in Admin — until then, nothing in this class can be approved (§8.2).",
-      );
-    }
-    const held = ROLE_RANK[ctx.user.role] ?? 0;
-    const needed = ROLE_RANK[req.minRole as keyof typeof ROLE_RANK] ?? 99;
-    if (held >= needed) return ok(`Your function meets the ${req.minRole.toLowerCase()} authority for this class.`);
-    return block(
-      `This class needs ${req.minRole.toLowerCase()} authority; you hold ${ctx.user.role.toLowerCase()}.`,
-      "Ask someone with that authority, or have it delegated with an end date (§8.5).",
-    );
+    return ok(`${ctx.user.functionName ?? "Your function"} holds Approve for this class in the distribution matrix.`);
   },
 };
 

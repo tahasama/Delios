@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { ArrowLeftRight, Download, GitPullRequestArrow, Search, X } from "lucide-react";
+import { ArrowLeftRight, Download, GitPullRequestArrow, PackagePlus, Search, X } from "lucide-react";
 
 type RegisterRow = {
   id: string; docNumber: string; title: string; deliverableType: string; docType: string; discipline: string;
@@ -69,6 +69,7 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
       <span className="px-2 text-sm font-semibold">{selected.length} selected</span>
       {userCanAct ? (selectedRevisionIds.length ? <Link href={`/reviews/send?revisions=${encodeURIComponent(selectedRevisionIds.join(","))}`} className="inline-flex items-center gap-1.5 rounded-xl bg-[#d9a441] px-3 py-2 text-xs font-bold text-[#17324d]"><GitPullRequestArrow className="h-4 w-4" /> Send for review ({selectedRevisionIds.length})</Link> : <span className="inline-flex items-center gap-1.5 rounded-xl bg-white/5 px-3 py-2 text-xs font-semibold text-slate-400" title="Only documents with a revision being prepared can be sent"><GitPullRequestArrow className="h-4 w-4" /> Nothing ready to send</span>) : null}
       {transmittableRows.length ? <Link href={transmittalHref} className="inline-flex items-center gap-1.5 rounded-xl bg-white/10 px-3 py-2 text-xs font-semibold hover:bg-white/15"><ArrowLeftRight className="h-4 w-4" /> Create transmittal ({transmittableRows.length})</Link> : <span className="inline-flex items-center gap-1.5 rounded-xl bg-white/5 px-3 py-2 text-xs font-semibold text-slate-400" title="Only current released revisions may be sent on an outgoing transmittal"><ArrowLeftRight className="h-4 w-4" /> No released revision to transmit</span>}
+      {userCanAct ? <Link href={`/packages/add?docs=${encodeURIComponent(selected.join(","))}`} className="inline-flex items-center gap-1.5 rounded-xl bg-white/10 px-3 py-2 text-xs font-semibold hover:bg-white/15"><PackagePlus className="h-4 w-4" /> Add to package</Link> : null}
       <a href={selectedExportHref} className="inline-flex items-center gap-1.5 rounded-xl bg-white/10 px-3 py-2 text-xs font-semibold hover:bg-white/15"><Download className="h-4 w-4" /> Export selected</a>
       <button onClick={() => setSelected([])} className="ml-auto rounded-lg p-2 text-slate-300 hover:bg-white/10 hover:text-white" aria-label="Clear selection"><X className="h-4 w-4" /></button>
     </div> : null}

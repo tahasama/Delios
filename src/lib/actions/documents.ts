@@ -9,6 +9,7 @@ import { audit } from "@/lib/audit";
 import { allocateNumber } from "@/lib/numbering";
 import { getActiveSet } from "@/lib/config";
 import { saveUpload } from "@/lib/files";
+import { isReadOnly } from "@/lib/auth";
 
 // G.1 — Creating a new document. "No controlled information shall be produced
 // without a register entry" (§3.9). Number is system-generated (§3.7).
@@ -182,7 +183,7 @@ const EDITABLE_FIELDS = [
 export async function updateDocumentAction(_prev: { error?: string; ok?: string } | undefined, formData: FormData): Promise<{ error?: string; ok?: string }> {
   const ctx = await requireScope();
   const { user, db, projectId, orgId } = ctx;
-  if (user.role === "VIEWER") return { error: "Viewers cannot edit metadata." };
+  if (isReadOnly(user)) return { error: "Viewers cannot edit metadata." };
   const id = String(formData.get("id") ?? "");
   const doc = await db.document.findUnique({ where: { id } });
   if (!doc) return { error: "Document not found." };

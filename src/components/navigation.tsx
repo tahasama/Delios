@@ -89,7 +89,6 @@ function moreNav(p: NavPermissions): NavItem[] {
       { href: "/assets", label: "Assets & tags", icon: Boxes },
       { href: "/reports", label: "Reports", icon: ListChecks, when: p.canControl },
       { href: "/conformance", label: "Assurance", icon: ShieldCheck, when: p.canControl },
-      { href: "/exposures", label: "Out-of-date risks", icon: Network, when: p.canControl },
       { href: "/import", label: "Import & export", icon: Import, when: p.canCreate || p.canControl },
     ] as NavItem[]
   ).filter((i) => i.when !== false);

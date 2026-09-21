@@ -13,11 +13,14 @@ export function ProjectSwitcher({
   current,
   available,
   role,
+  functionName,
   organizationName,
 }: {
   current: ProjectSummary;
   available: ProjectSummary[];
   role: Role;
+  /** The job held on this project; the old role name only when there is none. */
+  functionName?: string | null;
   organizationName: string;
 }) {
   const single = available.length <= 1;
@@ -27,7 +30,7 @@ export function ProjectSwitcher({
       <div className="min-w-0 flex-1 border-slate-200 sm:min-w-[210px] sm:flex-none sm:border-r sm:pr-5">
         <p className="truncate text-sm font-semibold text-slate-800">{current.name}</p>
         <p className="truncate text-xs text-slate-400">
-          {organizationName} · {ROLE_LABEL[role] ?? role}
+          {organizationName} · {functionName ?? ROLE_LABEL[role] ?? role}
         </p>
       </div>
     );
@@ -42,7 +45,7 @@ export function ProjectSwitcher({
         <span className="min-w-0 flex-1 text-left">
           <span className="block truncate text-sm font-semibold leading-tight text-slate-800">{current.name}</span>
           <span className="block truncate text-[11px] leading-tight text-slate-400">
-            {current.code} · {ROLE_LABEL[role] ?? role}
+            {current.code} · {functionName ?? ROLE_LABEL[role] ?? role}
           </span>
         </span>
         <ChevronDown className="h-3.5 w-3.5 shrink-0 text-slate-400 transition group-open:rotate-180" />

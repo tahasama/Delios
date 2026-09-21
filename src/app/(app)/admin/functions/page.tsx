@@ -10,7 +10,6 @@ import {
   deletePermissionRuleAction,
 } from "@/lib/actions/functions";
 import { VERBS, VERB_LABEL, VERB_BLURB, type Verb } from "@/lib/permissions";
-import { ROLES, ROLE_LABEL, type Role } from "@/lib/standard";
 import { Check, Minus } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -78,7 +77,7 @@ export default async function FunctionsPage() {
     <div className="space-y-4">
       <PageHeader
         title="Functions & permissions"
-        subtitle="What each job may do. The same rules decide who receives a document when it is issued."
+        subtitle="Functions are the jobs people hold — Construction manager, HVAC technician, Project manager. What each may do comes from its rules here and in the distribution matrix; one function can create, review and approve."
       />
 
       <Card title="Who may do what">
@@ -192,10 +191,9 @@ export default async function FunctionsPage() {
           <div className="mt-3 max-w-2xl">
             <ActionForm action={createFunctionAction} submitLabel="Create function" size="sm">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <Field label="Name" required hint="as your organization names the job"><input name="name" required className={inputCls} placeholder="Electrical Technician" /></Field>
+                <Field label="Name" required hint="as your organization names the job"><input name="name" required className={inputCls} placeholder="Construction manager, HVAC technician…" /></Field>
                 <Field label="Short code" required><input name="code" required className={`${inputCls} uppercase`} placeholder="ELEC_TECH" /></Field>
                 <Field label="Sees confidentiality up to level" required><input name="clearance" type="number" min={1} max={9} defaultValue={2} className={inputCls} /></Field>
-                <Field label="Closest standard role"><select name="legacyRole" className={inputCls} defaultValue="AUTHOR">{ROLES.map((r) => <option key={r} value={r}>{ROLE_LABEL[r as Role]}</option>)}</select></Field>
               </div>
               <Field label="May">
                 <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">

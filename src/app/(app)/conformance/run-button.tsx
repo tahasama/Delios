@@ -22,7 +22,7 @@ export function RunChecksButton() {
       }
     >
       <ShieldCheck className="h-4 w-4" />
-      {pending ? "Applying the catalogue…" : "Run the checks (§17.1)"}
+      {pending ? "Checking…" : "Run the checks"}
     </button>
   );
 }

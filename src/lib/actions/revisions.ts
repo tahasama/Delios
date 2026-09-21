@@ -11,6 +11,8 @@ import { executionSeriesStarted, openReviewCycle, recordReviewOutcome, returnToO
 import { enforce } from "@/lib/rules/preflight";
 import { nextRevisionValue } from "@/lib/numbering";
 import { getActiveSet } from "@/lib/config";
+import { isReadOnly } from "@/lib/auth";
+import { holdersOf } from "@/lib/permissions";
 
 // G.3 steps 1–5 — establish a revision: authorization first (§6.5), one in
 // preparation at a time (§6.3), next value in the applicable series (§6.2).
@@ -134,7 +136,7 @@ export async function prepareRevisionAction(_prev: { error?: string } | undefine
 export async function uploadRevisionFilesAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
   const ctx = await requireScope();
   const { user, db, projectId, orgId } = ctx;
-  if (user.role === "VIEWER") return { error: "Viewers cannot upload files." };
+  if (isReadOnly(user)) return { error: "Viewers cannot upload files." };
   const revisionId = String(formData.get("revisionId") ?? "");
   const native = formData.get("nativeFile") as File | null;
   const rendition = formData.get("renditionFile") as File | null;
@@ -411,8 +413,8 @@ export async function quickDecisionAction(_prev: { error?: string; ok?: string }
           data: { projectId, cycleId: cycleIdToUse, authorId: user.id, authorName: user.name, text: note, classification: "BLOCKING", progressionPreventing: true, status: "OPEN" },
         });
         // route back through the control function so the author receives outcome + authorization (§9.8)
-        const controllers = await db.user.findMany({ where: { role: { in: ["CONTROLLER", "ADMIN"] }, active: true } });
-        const canReturn = user.role === "CONTROLLER" || user.role === "ADMIN";
+        const controllers = await holdersOf(ctx, "CONTROL");
+        const canReturn = isController(user);
         if (canReturn) {
           await returnToOriginator(ctx, cycleIdToUse, user);
         } else {
@@ -438,7 +440,7 @@ export async function quickDecisionAction(_prev: { error?: string; ok?: string }
 export async function bulkSendAction(_prev: { error?: string; ok?: string } | undefined, formData: FormData): Promise<{ error?: string; ok?: string }> {
   const ctx = await requireScope();
   const { user, db, projectId, orgId } = ctx;
-  if (user.role === "VIEWER") return { error: "Viewers cannot submit revisions." };
+  if (isReadOnly(user)) return { error: "Viewers cannot submit revisions." };
   const revisionIds = formData.getAll("revisionIds").map(String).filter(Boolean);
   const reviewerIds = formData.getAll("reviewerIds").map(String).filter(Boolean);
   const mode = String(formData.get("mode") ?? "PARALLEL") as "PARALLEL" | "SERIAL";

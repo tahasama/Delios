@@ -2,7 +2,7 @@ import "server-only";
 import { cache } from "react";
 import { redirect } from "next/navigation";
 import { db } from "./db";
-import { getCurrentUser, type SessionUser } from "./auth";
+import { getCurrentUser, isAdmin, type SessionUser } from "./auth";
 import { scopedClient, type ScopedDb } from "./tenant";
 
 /**
@@ -61,7 +61,7 @@ export const getOrgScope = cache(async (): Promise<OrgScope | null> => {
 export async function requireOrgAdmin(): Promise<OrgScope> {
   const scope = await getOrgScope();
   if (!scope) redirect("/login");
-  if (scope.user.role !== "ADMIN") redirect("/?denied=1");
+  if (!isAdmin(scope.user)) redirect("/?denied=1");
   return scope;
 }
 
