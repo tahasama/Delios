@@ -1,0 +1,288 @@
+"use server";
+
+import { startWorkflowRun } from "@/lib/workflow";
+import { redirect } from "next/navigation";
+import { requireScope } from "@/lib/scope";
+import { revalidatePath } from "next/cache";
+import { isController, isAdmin, mayCreateDocument, mayContributeToDocument } from "@/lib/auth";
+import { audit } from "@/lib/audit";
+import { allocateNumber } from "@/lib/numbering";
+import { getActiveSet } from "@/lib/config";
+import { saveUpload } from "@/lib/files";
+
+// G.1 — Creating a new document. "No controlled information shall be produced
+// without a register entry" (§3.9). Number is system-generated (§3.7).
+
+export async function createDocumentAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
+  const ctx = await requireScope();
+  const { user, db, projectId, orgId } = ctx;
+  if (!mayCreateDocument(user)) return { error: user.isInternal ? "Read-only users cannot create documents." : "External parties cannot create register entries. Document Control must issue a placeholder to your organization first." };
+
+  const title = String(formData.get("title") ?? "").trim();
+  const deliverableType = String(formData.get("deliverableType") ?? "");
+  const docType = String(formData.get("docType") ?? "");
+  const discipline = String(formData.get("discipline") ?? "");
+  const originator = String(formData.get("originator") ?? "") || null;
+  const subProject = String(formData.get("subProject") ?? "") || null;
+  const contractRef = String(formData.get("contractRef") ?? "") || null;
+  const criticality = String(formData.get("criticality") ?? "") || null;
+  const confidentiality = String(formData.get("confidentiality") ?? "") || null;
+  const retentionClass = String(formData.get("retentionClass") ?? "") || null;
+  const receivedDate = String(formData.get("receivedDate") ?? "") || null;
+  const kind = String(formData.get("kind") ?? "DOCUMENT") === "RECORD" ? "RECORD" : "DOCUMENT";
+
+  if (!title) return { error: "A descriptive title is required — generic titles are non-conformant (§4.3)." };
+  if (/^(report|drawing|layout|document|spec)$/i.test(title)) return { error: `"${title}" is a generic, non-descriptive title (§4.3). Describe the content.` };
+  if (!deliverableType) return { error: "Deliverable type is required — it drives the numbering scheme (§5.2)." };
+  if (!docType) return { error: "Document type is required (§5.3)." };
+  if (!discipline) return { error: "Discipline is required — exactly one (§5.4)." };
+
+  const schemeSets: Record<string, string> = {
+    "Project code": "PROJECT_CODES",
+    Subproject: "SUBPROJECTS",
+    "Supplier code": "SUPPLIER_CODES",
+    "Purchase order": "PURCHASE_ORDERS",
+    Discipline: "DISCIPLINES",
+    "Document type": "DOCUMENT_TYPES",
+  };
+  const fieldValues: Record<string, string> = {
+    "Project code": String(formData.get("projectCode") ?? ""),
+    Subproject: subProject ?? "",
+    "Supplier code": originator ?? "",
+    "Purchase order": contractRef ?? "",
+    Discipline: discipline,
+    "Document type": docType,
+  };
+  for (const [label, value] of Object.entries(fieldValues)) {
+    const setKey = schemeSets[label];
+    if (!setKey || !value) continue;
+    const active = await getActiveSet(setKey);
+    if (!active.some((v) => v.code === value)) {
+      return { error: `"${label}" value "${value}" is not in the published active set (§4.7).` };
+    }
+  }
+
+  let docNumber: string;
+  try {
+    const res = await allocateNumber(ctx, deliverableType, fieldValues);
+    docNumber = res.docNumber;
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Could not allocate a document number." };
+  }
+
+  // C.3.3 — the published type-to-field matrix decides which conditional fields this type requires
+  const matrixRows = await db.configValue.findMany({ where: { setKey: "DELIVERABLE_TYPE_FIELDS" } });
+  const matrix = matrixRows.find((m) => m.code === deliverableType);
+  const req = (f: string): "required" | "optional" | "na" => {
+    if (!matrix) return externalList().includes(deliverableType) ? (f === "originator" || f === "receivedDate" ? "required" : "optional") : "optional";
+    const props = matrix.props ? (JSON.parse(matrix.props) as Record<string, string>) : {};
+    return (props[f] as "required" | "optional" | "na") ?? "optional";
+  };
+  function externalList() {
+    return ["CTR", "VND", "TPY", "CLT"];
+  }
+  const missingConditional: string[] = [];
+  const enforceNow = externalList().includes(deliverableType); // §A.2.1 — supplier metadata complete at submission; internal placeholders may stay empty (§16.8)
+  if (enforceNow && req("originator") === "required" && !originator) missingConditional.push("supplier / originator");
+  if (enforceNow && req("po") === "required" && !contractRef) missingConditional.push("contract / PO");
+  if (enforceNow && req("receivedDate") === "required" && !receivedDate) missingConditional.push("date received");
+  if (missingConditional.length) {
+    return { error: `The type-to-field matrix requires ${missingConditional.join(", ")} for this deliverable type (§4.4 / C.3.3).` };
+  }
+  const external = req("receivedDate") !== "na";
+  const doc = await db.document.create({
+    data: {
+      projectId,
+      docNumber,
+      title,
+      deliverableType,
+      docType,
+      discipline,
+      originator,
+      subProject,
+      contractRef,
+      criticality,
+      confidentiality: confidentiality ?? "INTERNAL",
+      retentionClass,
+      state: "PLANNED",
+      kind,
+      isPlaceholder: true,
+      createdById: user.id,
+      createdByName: user.name,
+      receivedDate: external && receivedDate ? new Date(receivedDate) : null,
+    },
+  });
+  await audit({
+    actor: user,
+    action: "REGISTER_ENTRY",
+    entityType: "Document",
+    entityId: doc.id,
+    entityLabel: docNumber,
+    detail: `Register entry created (${kind === "RECORD" ? "RECORD — fixed evidence, never revised (§2.2)" : "document, placeholder"}; state Planned — §16.8). Number ${docNumber} allocated by the system (§3.7).`,
+  });
+
+  // An initial file creates the first revision immediately. A PDF is the
+  // viewable copy (rendition); anything else is the editable source.
+  const upload = kind === "DOCUMENT" ? (formData.get("nativeFile") as File | null) : null;
+  let sent: "yes" | "no" | string = "no";
+  if (upload && upload.size > 0) {
+    try {
+      const isPdf = upload.type === "application/pdf" || upload.name.toLowerCase().endsWith(".pdf");
+      const fileKind = isPdf ? "RENDITION" : "NATIVE";
+      const saved = await saveUpload(ctx, upload, docNumber, fileKind, "A");
+      const file = await db.storedFile.create({
+        data: { projectId, path: saved.relPath, name: saved.name, size: saved.size, mime: saved.mime, sha256: saved.sha256, kind: fileKind, uploadedById: user.id, uploadedByName: user.name },
+      });
+      const rev = await db.revision.create({
+        data: { projectId,
+          documentId: doc.id,
+          value: "A",
+          series: "DESIGN",
+          state: "IN_PREPARATION",
+          reasonForRevision: "First issue",
+          changeDescription: "Initial content",
+          authorizationReason: "Placeholder register entry (§16.8) — authorization for the first revision.",
+          authorizedById: user.id,
+          authorizedByName: user.name,
+          authorizedAt: new Date(),
+          ...(isPdf ? { renditionFileId: file.id } : { nativeFileId: file.id }),
+        },
+      });
+      await db.storedFile.update({ where: { id: file.id }, data: { revisionId: rev.id } });
+      await db.document.update({ where: { id: doc.id }, data: { isPlaceholder: false, appVersion: null } });
+      await audit({
+        actor: user,
+        action: "REVISION_ESTABLISHED",
+        entityType: "Revision",
+        entityId: rev.id,
+        entityLabel: `${docNumber} rev A`,
+        detail: "First revision established with the initial file (placeholder authorization §16.8).",
+      });
+
+      // "Register & send": start the chosen review route straight away.
+      const templateId = String(formData.get("sendTemplateId") ?? "");
+      if (templateId) {
+        const res = await startWorkflowRun(ctx, rev.id, templateId, user);
+        sent = res.ok ? "yes" : res.error;
+      }
+    } catch {
+      // file failure must not lose the register entry — the author can attach from the page
+    }
+  }
+  const q = sent === "yes" ? "sent=1" : sent === "no" ? "created=1" : `created=1&sendError=${encodeURIComponent(sent)}`;
+  redirect(`/documents/${doc.id}?${q}`);
+}
+
+const EDITABLE_FIELDS = [
+  "title", "docType", "discipline", "originator", "subProject", "contractRef",
+  "criticality", "confidentiality", "retentionClass", "receivedDate", "appVersion", "previousId", "legacyScheme",
+] as const;
+
+/** Metadata change — every change logged with field, previous value, date, person (§4.9). */
+export async function updateDocumentAction(_prev: { error?: string; ok?: string } | undefined, formData: FormData): Promise<{ error?: string; ok?: string }> {
+  const ctx = await requireScope();
+  const { user, db, projectId, orgId } = ctx;
+  if (user.role === "VIEWER") return { error: "Viewers cannot edit metadata." };
+  const id = String(formData.get("id") ?? "");
+  const doc = await db.document.findUnique({ where: { id } });
+  if (!doc) return { error: "Document not found." };
+  if (!mayContributeToDocument(user, doc)) return { error: "You may update only documents assigned to your organization through their originator code." };
+
+  const changes: { field: string; oldValue: string | null; newValue: string | null }[] = [];
+  const data: Record<string, unknown> = {};
+  for (const field of EDITABLE_FIELDS) {
+    if (!formData.has(field)) continue; // only fields actually submitted — absent fields are left untouched
+    const raw = String(formData.get(field) ?? "");
+    let next: string | Date | null = raw || null;
+    if (field === "receivedDate" && raw) next = new Date(raw);
+    if (field === "confidentiality" && !raw) next = "INTERNAL";
+    const current = (doc as unknown as Record<string, unknown>)[field];
+    const currentStr = current instanceof Date ? current.toISOString().slice(0, 10) : current == null ? null : String(current);
+    const nextStr = next instanceof Date ? next.toISOString().slice(0, 10) : next;
+    if (currentStr !== nextStr) {
+      changes.push({ field, oldValue: currentStr, newValue: nextStr });
+      data[field] = next;
+    }
+  }
+  if (!changes.length) return { ok: "No changes to record." };
+  if ("title" in data && typeof data.title === "string" && /^(report|drawing|layout|document|spec)$/i.test(data.title.trim())) {
+    return { error: "Generic titles are non-conformant (§4.3)." };
+  }
+  await db.document.update({ where: { id }, data });
+  for (const c of changes) {
+    await audit({
+      actor: user,
+      action: "METADATA_CHANGE",
+      entityType: "Document",
+      entityId: id,
+      entityLabel: doc.docNumber,
+      field: c.field,
+      oldValue: c.oldValue,
+      newValue: c.newValue,
+    });
+  }
+  revalidatePath(`/documents/${id}`);
+  return { ok: `Saved — ${changes.length} metadata change${changes.length > 1 ? "s" : ""} logged (§4.9).` };
+}
+
+/** Associate the document with the asset it describes (§5.8, many-to-many). */
+export async function linkAssetAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
+  const ctx = await requireScope();
+  const { user, db, projectId, orgId } = ctx;
+  const documentId = String(formData.get("documentId") ?? "");
+  const assetCode = String(formData.get("assetCode") ?? "").trim();
+  if (!assetCode) return { error: "Enter an asset code." };
+  const asset = await db.assetItem.findFirst({ where: { code: assetCode } });
+  if (!asset) return { error: `Asset "${assetCode}" is not in the asset breakdown (C.4.7).` };
+  const doc = await db.document.findUnique({ where: { id: documentId } });
+  if (!doc) return { error: "Document not found." };
+  if (!mayContributeToDocument(user, doc)) return { error: "You may change relationships only for documents assigned to your organization." };
+  const dup = await db.relationship.findFirst({ where: { kind: "DOC_ASSET", fromId: documentId, toId: asset.id } });
+  if (dup) return { error: "Already associated with this asset." };
+  await db.relationship.create({ data: { projectId, kind: "DOC_ASSET", fromType: "Document", fromId: documentId, toType: "AssetItem", toId: asset.id, createdById: user.id } });
+  await audit({
+    actor: user,
+    action: "RELATIONSHIP",
+    entityType: "Document",
+    entityId: documentId,
+    entityLabel: doc.docNumber,
+    detail: `Associated with asset ${asset.code} — ${asset.name} (§5.8).`,
+  });
+  revalidatePath(`/documents/${documentId}`);
+  return {};
+}
+
+export async function unlinkRelationshipAction(formData: FormData) {
+  const ctx = await requireScope();
+  const { user, db, projectId, orgId } = ctx;
+  const relId = String(formData.get("relationshipId") ?? "");
+  const documentId = String(formData.get("documentId") ?? "");
+  const rel = await db.relationship.findUnique({ where: { id: relId } });
+  const doc = await db.document.findUnique({ where: { id: documentId } });
+  if (!doc || !mayContributeToDocument(user, doc)) return;
+  if (rel && rel.fromType === "Document" && rel.fromId === documentId) {
+    await db.relationship.delete({ where: { id: relId } });
+    await audit({ actor: user, action: "RELATIONSHIP", entityType: "Document", entityId: documentId, entityLabel: doc.docNumber, detail: `Relationship ${rel.kind} removed.` });
+  }
+  revalidatePath(`/documents/${documentId}`);
+}
+
+// End states (Part 12) — recorded with date and responsible authority (§12.1)
+export async function endDocumentStateAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
+  const ctx = await requireScope();
+  const { user, db, projectId, orgId } = ctx;
+  if (!isController(user) && !isAdmin(user)) return { error: "Only the control function may take a document out of use (Part 12)." };
+  const documentId = String(formData.get("documentId") ?? "");
+  const kind = String(formData.get("kind") ?? "") as "WITHDRAWN" | "CANCELLED" | "ARCHIVED";
+  const reason = String(formData.get("reason") ?? "").trim();
+  if (!reason) return { error: "A reason is required — each end state is recorded with date and authority (§12.1)." };
+
+  const { endDocumentState } = await import("@/lib/lifecycle");
+  try {
+    await endDocumentState(ctx, documentId, user, kind, reason);
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Could not change state." };
+  }
+  revalidatePath(`/documents/${documentId}`);
+  redirect(`/documents/${documentId}`);
+}

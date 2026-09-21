@@ -1,0 +1,1261 @@
+// DELIOS EDMS — data model implementing Document Management Standard v1
+// The register (§16.3) holds seven linked record types with independent identity:
+//   Document · Revision · ReviewCycle · Transmittal · BaselineEntry · Package · Relationship
+// Strings are used for coded values (SQLite has no enums); valid values come from
+// published ConfigSets (Annex C), versioned, never deleted while in use (§4.7).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ── Tenancy (Phase 1) ─────────────────────────────────────────────────────────
+// Two axes. The Organization owns everything published once and reused:
+// value sets, numbering schemes, people, parties, workflow templates (Annex C —
+// "the configuration gateway", §1.3). The Project owns the register itself —
+// every controlled item, its revisions, and every record raised about it.
+// Nothing transactional exists outside a Project; nothing configurable exists
+// outside an Organization. Uniqueness that the Standard calls global (§3.1
+// document number, §11.1 transmittal number, §14.2 action code) is global
+// *within its Project*, which is the scope the Standard actually means.
+
+model Organization {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  name      String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  projects          Project[]
+  users             User[]
+  parties           Party[]
+  configSets        ConfigSet[]
+  configValues      ConfigValue[]
+  schemes           Scheme[]
+  schemeRoutings    SchemeRouting[]
+  authorityRows     AuthorityRow[]
+  workflowTemplates WorkflowTemplate[]
+  spineLinks        SpineLink[]
+  spineBaselines         SpineBaseline[]
+  functions         Function[]
+  permissionRules   PermissionRule[]
+  controlledSets    ControlledSet[]
+}
+
+model Project {
+  id        String       @id @default(cuid())
+  orgId     String
+  org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  code      String // short project code, unique within the organization
+  name      String
+  // Project type drives the seed profile only — never behaviour. The Standard
+  // is domain-neutral (§1.2) and so is this column.
+  kind      String       @default("GENERIC") // GENERIC | INDUSTRIAL | ENERGY | CONSTRUCTION
+  status    String       @default("ACTIVE") // ACTIVE | ARCHIVED
+  startDate DateTime?
+  createdAt DateTime     @default(now())
+
+  members               ProjectMembership[]
+  delegations           Delegation[]
+  numberCounters        NumberCounter[]
+  documents             Document[]
+  revisions             Revision[]
+  documentSnapshots     DocumentSnapshot[]
+  approvals             Approval[]
+  reviewCycles          ReviewCycle[]
+  reviewAssignments     ReviewAssignment[]
+  reviewComments        ReviewComment[]
+  transmittals          Transmittal[]
+  transmittalItems      TransmittalItem[]
+  transmittalRecipients TransmittalRecipient[]
+  registeredCopies      RegisteredCopy[]
+  actions               Action[]
+  baselineEntries       BaselineEntry[]
+  scheduleVersions      ScheduleVersion[]
+  scheduleActivities    ScheduleActivity[]
+  packages              Package[]
+  packageMembers        PackageMember[]
+  relationships         Relationship[]
+  assetItems            AssetItem[]
+  storedFiles           StoredFile[]
+  auditEvents           AuditEvent[]
+  defects               Defect[]
+  checkRuns             CheckRun[]
+  checkRunItems         CheckRunItem[]
+  notifications         Notification[]
+  obsolescenceRecords   ObsolescenceRecord[]
+  exceptionEntries      ExceptionEntry[]
+  distributionRules     DistributionRule[]
+  numberRanges          NumberRange[]
+  workflowRuns          WorkflowRun[]
+  scopeConfigs          ScopeConfig[]
+  controlledSets        ControlledSet[]
+  requirementCalls      RequirementCall[]
+  senderIssues          SenderIssue[]
+  readinessConfirmations ReadinessConfirmation[]
+
+  @@unique([orgId, code])
+  @@index([orgId])
+}
+
+// What someone does on a project. One function per person per project: an
+// organization that needs a combined role publishes a combined function, which
+// keeps the matrix readable and the UI honest about who does what.
+model ProjectMembership {
+  id         String   @id @default(cuid())
+  projectId  String
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  functionId String
+  function   Function @relation(fields: [functionId], references: [id])
+  // The department (discipline code) this person answers for on the project —
+  // who receives the department's requirements call and confirms readiness.
+  department String?
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+
+  @@unique([projectId, userId])
+  @@index([userId])
+  @@index([functionId])
+}
+
+// ── Functions and the permission matrix (§1.4, §11.8) ────────────────────────
+// §1.4: "Ownership is by role, not by individual." A Function is that role as
+// the organization actually names it — Lead Electrical Engineer, Electrical
+// Technician, Document Control — published at organization level and held by
+// people on projects.
+
+model Function {
+  id          String       @id @default(cuid())
+  orgId       String
+  org         Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  code        String
+  name        String
+  description String?
+  // §5.7 — the highest confidentiality level this function may see. A document
+  // above it is not listed, not searchable and not openable.
+  clearance   Int          @default(1)
+  // The pre-Phase-2 vocabulary, kept so the six role names still mean something
+  // in the UI and in the checks that have not moved to verbs yet.
+  legacyRole  String       @default("AUTHOR")
+  active      Boolean      @default(true)
+  sort        Int          @default(0)
+  createdAt   DateTime     @default(now())
+
+  rules       PermissionRule[]
+  memberships ProjectMembership[]
+
+  @@unique([orgId, code])
+  @@index([orgId])
+}
+
+// §11.8 — "Distribution shall be defined by classification and recipient role,
+// not decided per transmittal." One table answers both "who may approve this?"
+// and "who receives it on issue?", because they are the same question asked of
+// a different verb. A null selector field means "any".
+model PermissionRule {
+  id              String       @id @default(cuid())
+  orgId           String
+  org             Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  functionId      String
+  function        Function     @relation(fields: [functionId], references: [id], onDelete: Cascade)
+  deliverableType String?
+  docType         String?
+  discipline      String?
+  criticality     String?
+  confidentiality String?
+  verbs           String // JSON array: READ CREATE REVISE REVIEW APPROVE TRANSMIT RECEIVE ACCEPT CONTROL CONFIGURE
+  note            String?
+  sort            Int          @default(0)
+  updatedAt       DateTime     @updatedAt
+
+  @@index([orgId])
+  @@index([functionId])
+}
+
+// ── Controlled configuration (Phase 3) ───────────────────────────────────────
+// Before this, four things that change by upload — the schedule, value sets,
+// numbering schemes and workflow templates — each had their own idea of what a
+// version was and who could bless it. One of them had no approval step at all.
+//
+// This is the single envelope: a ControlledSet is a thing under change control,
+// a ControlledVersion is one proposed state of it. Versions move
+// DRAFT → SUBMITTED → APPROVED, and only an APPROVED version is applied to the
+// live tables. The domain models stay exactly where they are and remain the
+// live state; what is centralised here is the change control around them
+// (§14.6 formal issue of schedule change, §14.7 approved baseline change,
+// §4.7 published value sets, §11.8 distribution defined before issue).
+
+model ControlledSet {
+  id        String       @id @default(cuid())
+  orgId     String
+  org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  // Null for organization-level configuration (value sets, numbering, the
+  // permission matrix); set for anything belonging to one project's register.
+  projectId String?
+  project   Project?     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  kind      String // DISTRIBUTION_MATRIX | SCHEDULE | VALUE_SET | NUMBERING_SCHEME | WORKFLOW_TEMPLATE | BASELINE
+  // Distinguishes several sets of the same kind — a value set's key, a
+  // schedule's source name. "default" where there is only ever one.
+  key       String       @default("default")
+  title     String
+  createdAt DateTime     @default(now())
+
+  versions ControlledVersion[]
+
+  @@unique([orgId, projectId, kind, key])
+  @@index([orgId])
+  @@index([projectId])
+}
+
+model ControlledVersion {
+  id           String        @id @default(cuid())
+  setId        String
+  set          ControlledSet @relation(fields: [setId], references: [id], onDelete: Cascade)
+  versionLabel String // assigned once, never reused
+  state        String        @default("DRAFT") // DRAFT | SUBMITTED | APPROVED | REJECTED | SUPERSEDED
+
+  payload  String // JSON — the proposed state, as parsed from the upload
+  diff     String? // JSON — what this changes about the version in force, computed at upload
+  rowCount Int     @default(0)
+
+  // Where it came from (§10.5 — verifiable as unaltered).
+  sourceName String?
+  sourceSize Int?
+  sourceHash String?
+  notes      String?
+
+  submittedById   String?
+  submittedByName String?
+  submittedAt     DateTime?
+
+  // §14.7 — "approved by the authority defined for that purpose, and recorded
+  // with the date and reason". The decision is a record, not a button press.
+  decidedById    String?
+  decidedByName  String?
+  decidedAt      DateTime?
+  decisionReason String?
+
+  appliedAt    DateTime?
+  supersededAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@unique([setId, versionLabel])
+  @@index([setId, state])
+}
+
+// ── People & authority ────────────────────────────────────────────────────────
+
+model User {
+  id             String              @id @default(cuid())
+  orgId          String
+  org            Organization        @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  email          String
+  passwordHash   String
+  name           String
+  role           String // ADMIN | CONTROLLER | APPROVER | REVIEWER | AUTHOR | VIEWER
+  organization   String? // legacy free-text (kept for existing rows)
+  partyId        String?
+  party          Party?              @relation(fields: [partyId], references: [id])
+  active         Boolean             @default(true)
+  createdAt      DateTime            @default(now())
+  approvals      Approval[]
+  delegationsOut Delegation[]        @relation("DelegationFrom")
+  delegationsIn  Delegation[]        @relation("DelegationTo")
+  memberships    ProjectMembership[]
+
+  @@unique([orgId, email])
+  @@index([orgId])
+  @@index([email])
+}
+
+model Delegation {
+  id         String   @id @default(cuid())
+  projectId  String
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  fromUserId String
+  fromUser   User     @relation("DelegationFrom", fields: [fromUserId], references: [id])
+  toUserId   String
+  toUser     User     @relation("DelegationTo", fields: [toUserId], references: [id])
+  scope      String? // document class scope note (§8.5)
+  endDate    DateTime // no delegation without an end date (§8.5)
+  createdAt  DateTime @default(now())
+
+  @@index([projectId])
+}
+
+// Approval authority matrix (§8.2) — versioned; most specific matching row governs.
+// Null field = wildcard. minRole: REVIEWER | APPROVER | ADMIN.
+model AuthorityRow {
+  id          String       @id @default(cuid())
+  orgId       String
+  org         Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  version     Int
+  discipline  String?
+  docType     String?
+  criticality String?
+  minRole     String
+  active      Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+
+  @@index([orgId])
+}
+
+// ── Configuration (Annex C — published before use; versioned value sets) ─────
+
+model ConfigSet {
+  id          String        @id @default(cuid())
+  orgId       String
+  org         Organization  @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  key         String
+  title       String
+  description String?
+  version     Int           @default(1)
+  values      ConfigValue[]
+
+  @@unique([orgId, key])
+  @@index([orgId])
+}
+
+model ConfigValue {
+  id     String       @id @default(cuid())
+  orgId  String
+  org    Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  setKey String
+  code   String
+  label  String
+  sort   Int          @default(0)
+  status String       @default("ACTIVE") // ACTIVE | RETIRED (in-use values retired, never deleted §4.7)
+  props  String? // JSON: executionFlag, mayProceed, requiresResubmission, period days, default flags…
+  set    ConfigSet    @relation(fields: [orgId, setKey], references: [orgId, key])
+
+  @@unique([orgId, setKey, code])
+  @@index([orgId, setKey])
+}
+
+// Numbering schemes (§3.2, per Standard-Numbering-Config.xlsx)
+model Scheme {
+  id        String        @id @default(cuid())
+  orgId     String
+  org       Organization  @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  name      String
+  delimiter String        @default("-") // single, consistent delimiter (§3.2)
+  active    Boolean       @default(true)
+  notes     String?
+  fields    SchemeField[]
+
+  @@unique([orgId, name])
+  @@index([orgId])
+}
+
+model SchemeField {
+  id          String  @id @default(cuid())
+  schemeId    String
+  scheme      Scheme  @relation(fields: [schemeId], references: [id])
+  position    Int
+  label       String
+  valueSetKey String? // ConfigSet key the field validates against
+  rule        String? // "COUNTER:DIGITS(5)" for the sequence field
+
+  @@unique([schemeId, position])
+}
+
+// Routes a deliverable type to its numbering scheme (Scheme Routing tab)
+model SchemeRouting {
+  id              String       @id @default(cuid())
+  orgId           String
+  org             Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  deliverableType String
+  schemeName      String
+  status          String       @default("ACTIVE")
+
+  @@unique([orgId, deliverableType])
+  @@index([orgId])
+}
+
+// One counter per field prefix; sequence restarts when any earlier field changes
+model NumberCounter {
+  id        String  @id @default(cuid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  prefix    String
+  next      Int     @default(1)
+
+  @@unique([projectId, prefix])
+  @@index([projectId])
+}
+
+// ── Record type 1 · Document (Parts 3–5) ─────────────────────────────────────
+
+model Document {
+  id              String             @id @default(cuid())
+  projectId       String
+  project         Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  docNumber       String // assigned once, never reused (§3.1)
+  title           String
+  deliverableType String // where it came from (§5.2) — set at creation, immutable
+  docType         String // what kind (§5.3)
+  discipline      String // who owns content (§5.4)
+  originator      String? // supplier/party code when external
+  subProject      String?
+  contractRef     String? // contract / purchase order
+  criticality     String? // §5.6
+  confidentiality String? // §5.7 — drives access
+  retentionClass  String? // §13.2
+  state           String             @default("PLANNED") // PLANNED ACTIVE WITHDRAWN CANCELLED ARCHIVED (§7.3)
+  kind            String             @default("DOCUMENT") // DOCUMENT | RECORD (§2.2 — a record is fixed, never revised)
+  confirmedAt     DateTime? // record confirmation (§2.2)
+  confirmedByName String?
+  disposedAt      DateTime? // §13.5 — disposal authorized and recorded; entry retained
+  disposedBy      String?
+  disposalBasis   String?
+  legalHold       Boolean            @default(false) // §13.5 — overrides disposal
+  isPlaceholder   Boolean            @default(false) // register entry before first revision (§16.8)
+  previousId      String? // previous identifier of a renumbered item (§3.8)
+  legacyScheme    String? // identification of pre-existing schemes (§3.8)
+  createdDate     DateTime           @default(now()) // date created (§4.5)
+  receivedDate    DateTime? // date received from external party (§4.5)
+  appVersion      String? // authoring application+version for proprietary natives (§10.1)
+  createdById     String
+  createdByName   String
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  revisions       Revision[]
+  baselineEntries BaselineEntry[]
+  packageMembers  PackageMember[]
+  defects         Defect[] // entityKey references this document (defect.documentRef)
+  snapshots       DocumentSnapshot[]
+
+  @@unique([projectId, docNumber])
+  @@index([state])
+  @@index([discipline])
+  @@index([docType])
+  @@index([projectId])
+}
+
+// ── Record type 2 · Revision (Parts 6–10) ────────────────────────────────────
+
+model Revision {
+  id                    String            @id @default(cuid())
+  projectId             String
+  project               Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  documentId            String
+  document              Document          @relation(fields: [documentId], references: [id])
+  value                 String // revision value, never reused (§6.3), never in the number (§3.5)
+  series                String            @default("DESIGN") // DESIGN | EXECUTION (§6.2)
+  state                 String            @default("IN_PREPARATION") // IN_PREPARATION IN_REVIEW RELEASED SUPERSEDED VOID (§7.2)
+  statusCode            String? // what a released revision may be used for (§7.6)
+  phase                 String? // held at revision level (§5.5)
+  reasonForRevision     String? // §6.6
+  changeDescription     String? // §6.6 — describes what changed
+  plannedSubmissionDate DateTime? // §4.5
+  issueDate             DateTime? // when the revision left the originator (§4.5)
+  nativeFileId          String?
+  renditionFileId       String? // fixed viewable form (§10.2)
+  appVersion            String?
+  // authorization to revise (§6.5) — outcome requiring resubmission IS authorization
+  authorizationReason   String?
+  authorizedById        String?
+  authorizedByName      String?
+  authorizedAt          DateTime?
+  releasedAt            DateTime?
+  releasedById          String?
+  releasedByName        String?
+  supersededAt          DateTime?
+  supersededById        String?
+  voidedAt              DateTime?
+  voidReason            String?
+  voidAuthority         String?
+  voidReassessment      String? // §12.6 unresolved-void exposure
+  // Arrival of a supplier submission through its package. Compared with
+  // plannedSubmissionDate it gives arrived / not arrived and on time / late.
+  // Acceptance is the review outcome, not a separate gate.
+  submittedAt           DateTime?
+  submittedById         String?
+  submittedByName       String?
+  createdAt             DateTime          @default(now())
+  cycles                ReviewCycle[]
+  approvals             Approval[]
+  workflowRuns          WorkflowRun[]
+  transmittalItems      TransmittalItem[]
+  copies                RegisteredCopy[]
+  files                 StoredFile[]
+
+  @@unique([projectId, documentId, value])
+  @@index([state])
+  @@index([projectId])
+}
+
+// Immutable point-in-time materializations taken at lifecycle and control
+// events. The JSON payload preserves the complete reconstruction context while
+// indexed columns keep the history navigator fast and understandable.
+model DocumentSnapshot {
+  id           String   @id @default(cuid())
+  projectId    String
+  project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  documentId   String
+  document     Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  revisionId   String?
+  auditEventId String?
+  eventType    String
+  eventLabel   String?
+  actorName    String
+  capturedAt   DateTime @default(now())
+  payload      String
+
+  @@index([documentId, capturedAt])
+  @@index([revisionId])
+  @@index([auditEventId])
+  @@index([projectId])
+}
+
+// ── Approval (Part 8) ────────────────────────────────────────────────────────
+
+model Approval {
+  id              String    @id @default(cuid())
+  projectId       String
+  project         Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  revisionId      String
+  revision        Revision  @relation(fields: [revisionId], references: [id])
+  approverId      String
+  approver        User      @relation(fields: [approverId], references: [id])
+  approverName    String
+  approverRole    String // the authority under which they approved (§8.3)
+  matrixVersion   Int // version of the authority matrix in force (§8.2)
+  decidedAt       DateTime  @default(now())
+  note            String?
+  withdrawnAt     DateTime? // §8.7 — withdrawal recorded; the original approval is retained
+  withdrawnBy     String?
+  withdrawnReason String?
+
+  @@index([revisionId])
+  @@index([projectId])
+}
+
+// ── Record type 3 · Review cycle (Part 9) ────────────────────────────────────
+
+model ReviewCycle {
+  id                     String             @id @default(cuid())
+  projectId              String
+  project                Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  revisionId             String
+  revision               Revision           @relation(fields: [revisionId], references: [id])
+  mode                   String             @default("PARALLEL") // PARALLEL | SERIAL (§9.7)
+  sequence               Int                @default(1) // cycle number within the revision
+  status                 String             @default("OPEN") // OPEN | CLOSED
+  openedById             String
+  openedByName           String
+  transmittalId          String? // originating transmittal when external (§11.11)
+  transmittal            Transmittal?       @relation(fields: [transmittalId], references: [id])
+  // five custody points (§9.1), each closes an interval and names the holder
+  submittedAt            DateTime           @default(now()) // originator
+  receivedAt             DateTime? // control function
+  issuedToReviewAt       DateTime? // control function
+  returnedFromReviewAt   DateTime? // reviewer
+  returnedToOriginatorAt DateTime? // control function
+  outcome                String? // exactly one per cycle, immutable once recorded (§9.4)
+  outcomeSetKey          String? // the published set this cycle's outcome must come from
+  outcomeAt              DateTime?
+  outcomeByName          String?
+  outcomeNote            String?
+  createdAt              DateTime           @default(now())
+  comments               ReviewComment[]
+  assignments            ReviewAssignment[]
+
+  @@index([status])
+  @@index([revisionId])
+  @@index([projectId])
+}
+
+model ReviewAssignment {
+  id          String      @id @default(cuid())
+  projectId   String
+  project     Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  cycleId     String
+  cycle       ReviewCycle @relation(fields: [cycleId], references: [id])
+  userId      String
+  userName    String
+  order       Int         @default(1)
+  completedAt DateTime?
+
+  @@index([projectId])
+}
+
+model ReviewComment {
+  id                            String      @id @default(cuid())
+  projectId                     String
+  project                       Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  cycleId                       String
+  cycle                         ReviewCycle @relation(fields: [cycleId], references: [id])
+  authorId                      String
+  authorName                    String
+  text                          String
+  classification                String // comment classification (D.10)
+  progressionPreventing         Boolean     @default(false) // §9.6
+  status                        String      @default("OPEN") // OPEN | CLOSED
+  resolution                    String?
+  closedAt                      DateTime?
+  reclassifiedAt                DateTime? // §9.6 — executing party may force reclassification
+  reclassifiedByName            String?
+  originalProgressionPreventing Boolean?
+  createdAt                     DateTime    @default(now())
+
+  @@index([cycleId])
+  @@index([status])
+  @@index([projectId])
+}
+
+// ── Record type 4 · Transmittal (Part 11) ────────────────────────────────────
+
+model Transmittal {
+  id                  String                 @id @default(cuid())
+  projectId           String
+  project             Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  number              String // unique, never reused (§11.1)
+  direction           String // OUTGOING | INCOMING
+  reasonForIssue      String // from the §2.6 set
+  dateOfIssue         DateTime
+  issuingParty        String
+  responseRequired    Boolean                @default(false)
+  responsePeriodDays  Int?
+  responseDueDate     DateTime?
+  status              String                 @default("DRAFT") // DRAFT ISSUED ACCEPTED REJECTED CLOSED
+  conditionsResult    String? // JSON of the 11.9 a–e acceptance check
+  checkedByName       String?
+  acceptanceCheckedAt DateTime?
+  rejectionReason     String?
+  receivedDate        DateTime?
+  receivedByParty     String?
+  acceptanceNotes     String?
+  createdById         String
+  createdByName       String
+  createdAt           DateTime               @default(now())
+  items               TransmittalItem[]
+  recipients          TransmittalRecipient[]
+  cycles              ReviewCycle[]
+
+  @@unique([projectId, number])
+  @@index([direction])
+  @@index([status])
+  @@index([projectId])
+}
+
+model TransmittalItem {
+  id               String      @id @default(cuid())
+  projectId        String
+  project          Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  transmittalId    String
+  transmittal      Transmittal @relation(fields: [transmittalId], references: [id])
+  revisionId       String
+  revision         Revision    @relation(fields: [revisionId], references: [id])
+  markedSuperseded Boolean     @default(false) // historical issue of a superseded rev (§11.3)
+
+  @@index([transmittalId])
+  @@index([revisionId])
+  @@index([projectId])
+}
+
+model TransmittalRecipient {
+  id             String      @id @default(cuid())
+  projectId      String
+  project        Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  transmittalId  String
+  transmittal    Transmittal @relation(fields: [transmittalId], references: [id])
+  name           String // recipients recorded individually (§11.4)
+  organization   String?
+  userId         String?
+  notifiedAt     DateTime? // in-system delivery notification issued
+  openedAt       DateTime? // first authenticated opening — read evidence
+  lastViewedAt   DateTime? // most recent authenticated opening
+  viewCount      Int         @default(0)
+  acknowledgedAt DateTime? // explicit formal receipt acknowledgement
+
+  @@index([transmittalId])
+  @@index([userId])
+  @@index([projectId])
+}
+
+// Controlled copies outside the system (§11.6)
+model RegisteredCopy {
+  id           String    @id @default(cuid())
+  projectId    String
+  project      Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  revisionId   String
+  revision     Revision  @relation(fields: [revisionId], references: [id])
+  holder       String
+  location     String
+  status       String    @default("ACTIVE") // ACTIVE RECALLED REPLACED MARKED_OBSOLETE
+  actionRecord String?
+  actionDate   DateTime?
+  createdAt    DateTime  @default(now())
+
+  @@index([revisionId])
+  @@index([projectId])
+}
+
+// ── Record type 5 · Baseline (Part 14) ───────────────────────────────────────
+
+model Action {
+  id                 String             @id @default(cuid())
+  projectId          String
+  project            Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  code               String // unique, never reused (§14.2)
+  name               String
+  scheduledDate      DateTime?
+  ownerName          String?
+  scheduleRef        String?
+  leadTimeDays       Int? // C.9.3 — required-by = action date - lead time
+  // Departments (discipline codes, comma-separated) the project manager tagged
+  // as concerned by this activity; their reps list the documents it needs.
+  departments        String?
+  createdAt          DateTime           @default(now())
+  entries            BaselineEntry[]
+  scheduleActivities ScheduleActivity[]
+  confirmations      ReadinessConfirmation[]
+
+  @@unique([projectId, code])
+  @@index([projectId])
+}
+
+model BaselineEntry {
+  id             String   @id @default(cuid())
+  projectId      String
+  project        Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  actionId       String
+  action         Action   @relation(fields: [actionId], references: [id])
+  documentId     String
+  document       Document @relation(fields: [documentId], references: [id])
+  requiredStatus String // required status, not revision (§14.3)
+  requiredBy     DateTime
+  // Who owns the requirement, who delivers the document and who approves it.
+  department     String?
+  submittedBy    String? // party code, or our organization
+  approvedBy     String? // function or party that approves it
+  // Needed-by rule: this many business days before the action date (default
+  // 25 = five working weeks). Null leadBusinessDays with manualDate = a fixed date.
+  leadBusinessDays Int?
+  manualDate     Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @default(now()) @updatedAt
+  createdByName  String?
+
+  @@unique([projectId, actionId, documentId])
+  @@index([documentId])
+  @@index([projectId])
+}
+
+// Document Control asks each department concerned by the schedule for the
+// documents its activities need. One call covers the actions tagged with that
+// department that no earlier call covered; it is answered when the department's
+// part of the requirements list is approved.
+model RequirementCall {
+  id             String    @id @default(cuid())
+  projectId      String
+  project        Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  department     String
+  actionCodes    String // comma-separated, as issued
+  dueAt          DateTime
+  issuedAt       DateTime  @default(now())
+  issuedById     String
+  issuedByName   String
+  reminders      Int       @default(0)
+  lastRemindedAt DateTime?
+  answeredAt     DateTime?
+  answerNote     String?
+
+  @@index([projectId, department])
+}
+
+// The approved requirements, issued to whoever sends the documents — a supplier
+// by its party code, or one of our departments as "DEPT:<code>" — so they
+// baseline their deliveries on the needed-by dates.
+model SenderIssue {
+  id           String   @id @default(cuid())
+  projectId    String
+  project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  sender       String
+  entryCount   Int
+  issuedAt     DateTime @default(now())
+  issuedById   String
+  issuedByName String
+
+  @@index([projectId, sender])
+}
+
+// Before the activity, each concerned department confirms its documents are
+// available. The latest confirmation per department stands; history is audited.
+model ReadinessConfirmation {
+  id              String   @id @default(cuid())
+  projectId       String
+  project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  actionId        String
+  action          Action   @relation(fields: [actionId], references: [id], onDelete: Cascade)
+  department      String
+  available       Boolean
+  note            String?
+  confirmedById   String
+  confirmedByName String
+  confirmedAt     DateTime @default(now())
+
+  @@unique([actionId, department])
+  @@index([projectId])
+}
+
+// Controlled schedule imports. A version is reviewed as a draft before its
+// activity dates are published into the live Action register.
+model ScheduleVersion {
+  id              String             @id @default(cuid())
+  projectId       String
+  project         Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  sourceName      String
+  versionLabel    String
+  status          String             @default("DRAFT") // DRAFT | PUBLISHED | SUPERSEDED
+  notes           String?
+  importedById    String
+  importedByName  String
+  importedAt      DateTime           @default(now())
+  publishedAt     DateTime?
+  publishedByName String?
+  supersededAt    DateTime?
+  activities      ScheduleActivity[]
+
+  @@unique([projectId, sourceName, versionLabel])
+  @@index([status, importedAt])
+  @@index([projectId])
+}
+
+model ScheduleActivity {
+  id                String          @id @default(cuid())
+  projectId         String
+  project           Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  scheduleVersionId String
+  scheduleVersion   ScheduleVersion @relation(fields: [scheduleVersionId], references: [id], onDelete: Cascade)
+  externalId        String
+  actionCode        String
+  name              String
+  baselineDate      DateTime?
+  forecastDate      DateTime?
+  responsibleParty  String?
+  actionId          String?
+  action            Action?         @relation(fields: [actionId], references: [id])
+
+  @@unique([projectId, scheduleVersionId, externalId])
+  @@index([actionCode])
+  @@index([actionId])
+  @@index([projectId])
+}
+
+// ── Record type 6 · Package (Part 15) ────────────────────────────────────────
+
+model Package {
+  id                      String          @id @default(cuid())
+  projectId               String
+  project                 Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  identifier              String
+  // SUPPLIER: everything a supplier owes us — its documents are every register
+  // entry whose originator is partyCode, submitted by the supplier in-system.
+  // DELIVERY: a set we deliver to a recipient (§15).
+  category                String          @default("DELIVERY")
+  partyCode               String?
+  purpose                 String // reason for issue (§2.6)
+  type                    String // DEFINED | ACCUMULATED (§15.1)
+  membershipRule          String? // stated rule for accumulated packages
+  recipientName           String
+  completionDate          DateTime // triggers assessment, not closure (§15.6)
+  requiredStatus          String
+  compositionOwnerId      String
+  compositionOwnerName    String
+  acceptanceAuthorityId   String // shall not be the composition owner (§15.5)
+  acceptanceAuthorityName String
+  closedAt                DateTime?
+  closureNote             String?
+  ruleCeasedAt            DateTime? // accumulated: rule ceased to admit members (§15.8)
+  assessedAt              DateTime?
+  shortfall               String? // JSON - per-member status, reason, expected date (15.7)
+  shortfallIssuedAt       DateTime? // issued to the acceptance authority (15.7)
+  shortfallAcceptedBy     String? // acceptance recorded with its authority (15.8)
+  createdAt               DateTime        @default(now())
+  members                 PackageMember[]
+
+  @@unique([projectId, identifier])
+  @@index([type])
+  @@index([projectId])
+}
+
+model PackageMember {
+  id             String    @id @default(cuid())
+  projectId      String
+  project        Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  packageId      String
+  package        Package   @relation(fields: [packageId], references: [id])
+  documentId     String
+  document       Document  @relation(fields: [documentId], references: [id])
+  requiredStatus String
+  completionDate DateTime?
+
+  @@unique([projectId, packageId, documentId])
+  @@index([documentId])
+  @@index([projectId])
+}
+
+// ── Record type 7 · Relationships (§4.6, §5.8, §2.3) ─────────────────────────
+
+model Relationship {
+  id          String   @id @default(cuid())
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  kind        String // DOC_ASSET | RECORD_CORRECTION | REFERENCE
+  fromType    String
+  fromId      String // polymorphic reference — Document or AssetItem id
+  toType      String
+  toId        String
+  note        String?
+  createdById String
+  createdAt   DateTime @default(now())
+
+  @@index([kind, toId])
+  @@index([fromId])
+  @@index([projectId])
+}
+
+// Asset breakdown for object association (§5.8)
+model AssetItem {
+  id        String  @id @default(cuid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  code      String
+  name      String
+  area      String?
+  system    String?
+  unit      String?
+
+  @@unique([projectId, code])
+  @@index([projectId])
+}
+
+// ── Files (Part 10) ──────────────────────────────────────────────────────────
+
+model StoredFile {
+  id             String    @id @default(cuid())
+  projectId      String
+  project        Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name           String
+  path           String // relative to ./uploads
+  size           Int
+  mime           String
+  sha256         String // integrity: verifiable as unaltered (§10.5)
+  kind           String // NATIVE | RENDITION
+  revisionId     String?
+  revision       Revision? @relation(fields: [revisionId], references: [id])
+  uploadedById   String?
+  uploadedByName String?
+  createdAt      DateTime  @default(now())
+
+  @@index([projectId])
+}
+
+// ── Audit trail (§4.9, §7.9) — transitions + metadata changes + access ───────
+
+model AuditEvent {
+  id          String   @id @default(cuid())
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  ts          DateTime @default(now())
+  actorId     String?
+  actorName   String
+  action      String // STATE_TRANSITION METADATA_CHANGE APPROVAL RELEASE ISSUE DOWNLOAD CHECK_RUN LOGIN…
+  entityType  String?
+  entityId    String?
+  entityLabel String?
+  field       String?
+  oldValue    String?
+  newValue    String?
+  detail      String?
+
+  @@index([entityType, entityId])
+  @@index([ts])
+  @@index([projectId])
+}
+
+// ── Conformance (Part 17, Annex H) ───────────────────────────────────────────
+
+model Defect {
+  id             String    @id @default(cuid())
+  projectId      String
+  project        Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  checkId        String
+  severity       String // CRITICAL MAJOR MINOR ADVISORY — fixed by the Annex (§17.2)
+  entityKey      String // "Document:<id>" | "Revision:<id>" | "config" — one defect per check+entity
+  entityType     String?
+  entityId       String?
+  documentId     String? // link for the integrity figure (§17.4)
+  entityLabel    String?
+  documentRef    Document? @relation(fields: [documentId], references: [id])
+  description    String
+  ownerRole      String // CF OR RV OG (§17.5)
+  status         String    @default("OPEN") // OPEN ACCEPTED CLOSED
+  firstSeenAt    DateTime  @default(now())
+  lastSeenAt     DateTime  @default(now())
+  acceptedByName String?
+  acceptedReason String?
+  acceptedAt     DateTime?
+  reviewDate     DateTime?
+  closedAt       DateTime?
+
+  @@unique([projectId, checkId, entityKey])
+  @@index([status])
+  @@index([documentId])
+  @@index([projectId])
+}
+
+model CheckRun {
+  id            String         @id @default(cuid())
+  projectId     String
+  project       Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  ranAt         DateTime       @default(now())
+  ranByName     String?
+  totalChecks   Int
+  executed      Int
+  passed        Int
+  failed        Int
+  notChecked    Int
+  notExecutable Int
+  integrity     Float // §17.4
+  coverage      Float // check execution coverage %
+  openCritical  Int
+  durationMs    Int?
+  items         CheckRunItem[]
+
+  @@index([projectId])
+}
+
+model CheckRunItem {
+  id           String   @id @default(cuid())
+  projectId    String
+  project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  runId        String
+  run          CheckRun @relation(fields: [runId], references: [id])
+  checkId      String
+  result       String // PASS FAIL NOT_CHECKED NOT_EXECUTABLE NOT_APPLICABLE
+  failingCount Int      @default(0)
+  ms           Int?
+
+  @@index([runId])
+  @@index([projectId])
+}
+
+// ── Notifications (in-app) ───────────────────────────────────────────────────
+
+model Notification {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  userId    String
+  type      String
+  title     String
+  body      String?
+  link      String?
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId, read])
+  @@index([projectId])
+}
+
+// ── Obsolescence records (Part 12) ───────────────────────────────────────────
+
+model ObsolescenceRecord {
+  id            String   @id @default(cuid())
+  projectId     String
+  project       Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  kind          String // SUPERSEDED WITHDRAWN CANCELLED VOID
+  documentId    String?
+  revisionId    String?
+  reason        String
+  authorityName String
+  effectiveDate DateTime @default(now())
+  createdById   String
+  createdAt     DateTime @default(now())
+
+  @@index([projectId])
+}
+
+// Exceptions register (§1.10)
+model ExceptionEntry {
+  id          String    @id @default(cuid())
+  projectId   String
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  item        String
+  clauses     String
+  reason      String
+  authority   String
+  startDate   DateTime
+  reviewPoint DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([projectId])
+}
+
+// §11.8 / C.8.1 — distribution defined by classification and recipient role,
+// before any issue; off-distribution issue requires a recorded reason.
+model DistributionRule {
+  id              String   @id @default(cuid())
+  projectId       String
+  project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  deliverableType String
+  confidentiality String   @default("INTERNAL")
+  userIds         String // JSON array of internal recipients
+  partyNames      String? // JSON array of external party names
+  updatedAt       DateTime @updatedAt
+
+  @@unique([projectId, deliverableType, confidentiality])
+  @@index([projectId])
+}
+
+// §3.7 / B.1.7 — number ranges issued to and drawn down by a named party.
+model NumberRange {
+  id         String   @id @default(cuid())
+  projectId  String
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  prefix     String // the field combination the range covers
+  from       Int
+  to         Int
+  lastIssued Int      @default(-1) // last issued sequence; from-1 in code before first draw
+  issuedTo   String // named party (§3.7)
+  status     String   @default("OPEN") // OPEN | EXHAUSTED | CLOSED
+  createdAt  DateTime @default(now())
+
+  @@index([prefix])
+  @@index([projectId])
+}
+
+// Annex F — traceability spine: Rule ↔ Check ↔ Route linkage with synchronization
+// states; a Rule change puts its links into review (F.4/F.5).
+// Annex F — the Traceability Spine: one row per relationship between a Rule
+// and the Check that verifies it or the Route step that applies it (F.2, F.3).
+// A row records the versions it was last reviewed against; when a linked
+// item's current version differs, the relationship is Review required (F.4).
+model SpineLink {
+  id             String       @id @default(cuid())
+  orgId          String
+  org            Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  ruleId         String // clause reference, e.g. "§3.1" or "F.5"
+  kind           String // CHECK | ROUTE
+  target         String // check ID ("ID-01"), route step ("G.3/4"), or "" for a Rule no Route applies
+  alignment      String       @default("ALIGNED") // ALIGNED | REVIEW_REQUIRED | GAP | NOT_APPLICABLE | WITHDRAWN
+  reason         String?
+  owner          String? // accountable review owner (Annex H owner code or function)
+  ruleVersion    String?
+  targetVersion  String?
+  reviewedAt     DateTime?
+  reviewedByName String?
+  changeRef      String?
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([orgId, ruleId, kind, target])
+  @@index([orgId])
+}
+
+// A released synchronized baseline of the spine (F.5 rule 5): recorded only
+// when no Gap or Review required remained, with the counts it was released at.
+model SpineBaseline {
+  id              String       @id @default(cuid())
+  orgId           String
+  org             Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  label           String
+  standardVersion String
+  links           Int
+  aligned         Int
+  notApplicable   Int
+  withdrawn       Int
+  unresolved      Int          @default(0)
+  note            String?
+  releasedAt      DateTime     @default(now())
+  releasedById    String
+  releasedByName  String
+
+  @@unique([orgId, label])
+  @@index([orgId])
+}
+
+// ── Configuration-first workflow: templates the organization defines ─────────
+
+model WorkflowTemplate {
+  id            String       @id @default(cuid())
+  orgId         String
+  org           Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  name          String
+  description   String?
+  classes       String       @default("*") // JSON: [{docType?, discipline?, criticality?}] patterns; "*" = applies to all
+  steps         String // JSON: [{ act: REVIEW|APPROVAL, mode: ANY_OF|ALL_CONSOLIDATOR|SERIAL, participantIds: [], outcomeSetKey? }]
+  outcomeSetKey String? // the review-outcome set bound to this template's review steps
+  isDefault     Boolean      @default(false)
+  active        Boolean      @default(true)
+  createdByName String?
+  createdAt     DateTime     @default(now())
+
+  @@index([orgId])
+}
+
+// One execution of a template against one revision
+model WorkflowRun {
+  id            String   @id @default(cuid())
+  projectId     String
+  project       Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  revisionId    String
+  revision      Revision @relation(fields: [revisionId], references: [id])
+  templateId    String
+  templateName  String
+  steps         String // runtime copy: [{ ...template step, status: pending|active|done|returned, cycleId?, approvals? }]
+  currentStep   Int      @default(0)
+  status        String   @default("ACTIVE") // ACTIVE | DONE | RETURNED
+  startedById   String
+  startedByName String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([revisionId])
+  @@index([status])
+  @@index([projectId])
+}
+
+// §0.3 — parties: our organization and external organizations
+model Party {
+  id         String       @id @default(cuid())
+  orgId      String
+  org        Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  code       String
+  name       String
+  isInternal Boolean      @default(false)
+  users      User[]
+
+  @@unique([orgId, code])
+  @@index([orgId])
+}
+
+// Scope & conformance statement (C.1, §1.6)
+model ScopeConfig {
+  id                      String   @id @default(cuid())
+  projectId               String
+  project                 Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  organizationName        String
+  scopeStatement          String
+  assessmentLevel         String // "Core: identity and control" | "Full"
+  standardVersion         String
+  effectiveDate           DateTime
+  integrityThreshold      Float    @default(95)
+  measurementIntervalDays Int      @default(30)
+  controlFunctionName     String   @default("Document Control")
+  defectAcceptanceRole    String   @default("CONTROLLER") // C.11.5 — authority to accept an uncorrectable defect
+  submitRoles             String   @default("[\"AUTHOR\",\"CONTROLLER\",\"ADMIN\"]") // who may send a document into a workflow
+  externalInitiation      Boolean  @default(false) // external parties may raise transmittals themselves
+  executionSeriesStart    Int      @default(0) // C.5.2 — declared starting value of the numeric execution series
+
+  @@index([projectId])
+}

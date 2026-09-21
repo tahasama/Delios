@@ -1,0 +1,27 @@
+{
+  "id": "industrial",
+  "projectKind": "INDUSTRIAL",
+  "name": "Industrial / process plant",
+  "description": "Process and manufacturing plants: equipment-heavy engineering, P&IDs, line lists, HAZOP, pre-commissioning and start-up.",
+  "sets": [
+    { "key": "DISCIPLINES", "values": [
+      { "code": "RE", "label": "Rotating equipment" },
+      { "code": "VS", "label": "Static equipment and vessels" },
+      { "code": "FG", "label": "Fire and gas" },
+      { "code": "CR", "label": "Corrosion and materials" }
+    ] },
+    { "key": "DOCUMENT_TYPES", "values": [
+      { "code": "PID", "label": "Piping and instrumentation diagram" },
+      { "code": "PFD", "label": "Process flow diagram" },
+      { "code": "ISO", "label": "Isometric" },
+      { "code": "LNL", "label": "Line list" },
+      { "code": "IDX", "label": "Instrument index" },
+      { "code": "CEM", "label": "Cause and effect matrix" },
+      { "code": "HAZ", "label": "HAZOP / HAZID report" }
+    ] },
+    { "key": "PHASES", "values": [
+      { "code": "PRECOMMISSIONING", "label": "Pre-commissioning" },
+      { "code": "STARTUP", "label": "Start-up" }
+    ] }
+  ]
+}

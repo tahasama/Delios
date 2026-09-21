@@ -1,0 +1,28 @@
+{
+  "id": "construction",
+  "projectKind": "CONSTRUCTION",
+  "name": "Construction / buildings",
+  "description": "Buildings and infrastructure: submittals, RFIs, shop drawings, inspection and test plans, handover and defects liability.",
+  "sets": [
+    { "key": "DISCIPLINES", "values": [
+      { "code": "FP", "label": "Fire protection" },
+      { "code": "PB", "label": "Plumbing and drainage" },
+      { "code": "LS", "label": "Landscape" },
+      { "code": "IN", "label": "Interiors" },
+      { "code": "BM", "label": "BIM coordination" }
+    ] },
+    { "key": "DOCUMENT_TYPES", "values": [
+      { "code": "RFI", "label": "Request for information" },
+      { "code": "SUB", "label": "Submittal" },
+      { "code": "SHD", "label": "Shop drawing" },
+      { "code": "ITP", "label": "Inspection and test plan" },
+      { "code": "NCR", "label": "Non-conformance report" },
+      { "code": "ASB", "label": "As-built drawing" }
+    ] },
+    { "key": "PHASES", "values": [
+      { "code": "TENDER", "label": "Tender" },
+      { "code": "HANDOVER", "label": "Handover" },
+      { "code": "DLP", "label": "Defects liability" }
+    ] }
+  ]
+}

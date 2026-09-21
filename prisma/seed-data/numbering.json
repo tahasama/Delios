@@ -1,0 +1,3396 @@
+{
+ "disciplines": [
+  [
+   "AD",
+   "Administration",
+   "Active"
+  ],
+  [
+   "AC",
+   "Advanced Controls",
+   "Active"
+  ],
+  [
+   "AR",
+   "Architectural",
+   "Active"
+  ],
+  [
+   "AI",
+   "Asset Integrity",
+   "Active"
+  ],
+  [
+   "AM",
+   "Asset Management",
+   "Active"
+  ],
+  [
+   "BD",
+   "Business Development/Strategic Marketing",
+   "Active"
+  ],
+  [
+   "CI",
+   "Civil",
+   "Active"
+  ],
+  [
+   "CS",
+   "Coastal",
+   "Active"
+  ],
+  [
+   "CO",
+   "Completions",
+   "Active"
+  ],
+  [
+   "CB",
+   "Constructability",
+   "Active"
+  ],
+  [
+   "CM",
+   "Construction/Construction Management",
+   "Active"
+  ],
+  [
+   "CA",
+   "Contaminated Sites",
+   "Active"
+  ],
+  [
+   "PS",
+   "Contracts Management",
+   "Active"
+  ],
+  [
+   "DR",
+   "Drilling",
+   "Active"
+  ],
+  [
+   "EW",
+   "Earth Works",
+   "Active"
+  ],
+  [
+   "EL",
+   "Electrical",
+   "Active"
+  ],
+  [
+   "DS",
+   "Engineering Design Systems",
+   "Active"
+  ],
+  [
+   "EM",
+   "Engineering Management",
+   "Active"
+  ],
+  [
+   "EN",
+   "Environmental",
+   "Active"
+  ],
+  [
+   "EI",
+   "Environmental Impact Assessments",
+   "Active"
+  ],
+  [
+   "ES",
+   "Estimating",
+   "Active"
+  ],
+  [
+   "EX",
+   "Expediting",
+   "Active"
+  ],
+  [
+   "FA",
+   "Fabrication",
+   "Active"
+  ],
+  [
+   "FI",
+   "Finance",
+   "Active"
+  ],
+  [
+   "FG",
+   "Fire and Gas",
+   "Active"
+  ],
+  [
+   "GE",
+   "General",
+   "Active"
+  ],
+  [
+   "HS",
+   "Health and Safety",
+   "Active"
+  ],
+  [
+   "HT",
+   "Heat Transfer",
+   "Active"
+  ],
+  [
+   "HR",
+   "Human Resources",
+   "Active"
+  ],
+  [
+   "HV",
+   "HVAC",
+   "Active"
+  ],
+  [
+   "HH",
+   "Hydrology, Hydraulic",
+   "Active"
+  ],
+  [
+   "IS",
+   "Information Systems/information Management (iM)",
+   "Active"
+  ],
+  [
+   "IF",
+   "Infrastructure including roads, traffic",
+   "Active"
+  ],
+  [
+   "IX",
+   "Inspection Services",
+   "Active"
+  ],
+  [
+   "IC",
+   "Instrumentation and Control",
+   "Active"
+  ],
+  [
+   "LM",
+   "Logistics and Transportation",
+   "Active"
+  ],
+  [
+   "MT",
+   "Maintenance",
+   "Active"
+  ],
+  [
+   "MA",
+   "Marine",
+   "Active"
+  ],
+  [
+   "MX",
+   "Marine Pipelines",
+   "Active"
+  ],
+  [
+   "MP",
+   "Master Planning",
+   "Active"
+  ],
+  [
+   "MH",
+   "Materials Handling",
+   "Active"
+  ],
+  [
+   "MM",
+   "Materials Management",
+   "Active"
+  ],
+  [
+   "ML",
+   "Materials/Metallurgy",
+   "Active"
+  ],
+  [
+   "ME",
+   "Mechanical",
+   "Active"
+  ],
+  [
+   "MU",
+   "Mechanical Utilities",
+   "Active"
+  ],
+  [
+   "MG",
+   "Mining",
+   "Active"
+  ],
+  [
+   "NA",
+   "Naval Architecture",
+   "Active"
+  ],
+  [
+   "PL",
+   "Onshore Pipelines",
+   "Active"
+  ],
+  [
+   "OP",
+   "Operations",
+   "Active"
+  ],
+  [
+   "PE",
+   "Piping Engineering",
+   "Active"
+  ],
+  [
+   "PI",
+   "Piping/Layouts",
+   "Active"
+  ],
+  [
+   "PR",
+   "Process",
+   "Active"
+  ],
+  [
+   "PC",
+   "Project Controls \u2013 Cost/Schedule",
+   "Active"
+  ],
+  [
+   "DM",
+   "Project Data Management",
+   "Active"
+  ],
+  [
+   "PM",
+   "Project Management",
+   "Active"
+  ],
+  [
+   "RM",
+   "Project/Enterprise Risk Management",
+   "Active"
+  ],
+  [
+   "PP",
+   "Purchasing",
+   "Active"
+  ],
+  [
+   "PU",
+   "Pursuit (proposal)",
+   "Active"
+  ],
+  [
+   "QA",
+   "QA/QC",
+   "Active"
+  ],
+  [
+   "RL",
+   "Rail",
+   "Active"
+  ],
+  [
+   "RA",
+   "Reliability/Availability",
+   "Active"
+  ],
+  [
+   "RS",
+   "Reservoir/Petroleum",
+   "Active"
+  ],
+  [
+   "RE",
+   "Rotating Equipment",
+   "Active"
+  ],
+  [
+   "SR",
+   "Safety and Risk",
+   "Active"
+  ],
+  [
+   "ST",
+   "Structural",
+   "Active"
+  ],
+  [
+   "SU",
+   "Subsea Production Systems",
+   "Active"
+  ],
+  [
+   "SS",
+   "Subsurface/Geosciences",
+   "Active"
+  ],
+  [
+   "SQ",
+   "Supplier Quality Surveillance",
+   "Active"
+  ],
+  [
+   "SY",
+   "Systems Engineering",
+   "Active"
+  ],
+  [
+   "TE",
+   "Telecommunications",
+   "Active"
+  ],
+  [
+   "TP",
+   "Topography",
+   "Active"
+  ],
+  [
+   "VD",
+   "Vendor Documents",
+   "Active"
+  ],
+  [
+   "VS",
+   "Vessels",
+   "Active"
+  ],
+  [
+   "WW",
+   "Water/Waste Water",
+   "Active"
+  ],
+  [
+   "Organisation list. Ships with DELIOS. Same on every project."
+  ]
+ ],
+ "documentTypes": [
+  [
+   "A101",
+   "A101_Supplier Document Schedule (SDS)",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "A102",
+   "A102_Supplier Data Requirements List (SDRL)",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "A103",
+   "A103_Fuel Consumption On Site",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "A104",
+   "A104_Health Safety and Environmental Statistics",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "A105",
+   "A105_Health Safety & Environmental Management Plan",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "A106",
+   "A106_Personnel Grievances and Disputes",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "A107",
+   "A107_Personnel Hours Worked",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "A108",
+   "A108_Personnel Labor Force",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "A109",
+   "A109_Program - 3 Week Look-ahead",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "A110",
+   "A110_Progress Reports",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "A111",
+   "A111_Project Schedule",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "A112",
+   "A112_Project Status",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "A113",
+   "A113_Sub-Suppliers List",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "A114",
+   "A114_Sub-Suppliers List (Major Sub-Orders)",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "A115",
+   "A115_Supplier Contract Organization Chart",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "A116",
+   "A116_Supplier Previous Experience and History",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "A117",
+   "A117_Working Time Lost",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "A118",
+   "A118_Sub Order Schedule (Detailing Sub-Suppliers)",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "A999",
+   "A999_Misc.Supplier Mgmt & Contract Execution Docs",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "AAN",
+   "AAN_Action Advice Notice",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "ACL",
+   "ACL_Audit Checklist",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "ADD",
+   "ADD_Tender/Bid Addendum",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "AEL",
+   "AEL_Authorized Engineers List",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "AGC",
+   "AGC_Agreement/Contract",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "AGD",
+   "AGD_Agenda",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "AUD",
+   "AUD_Audit Report",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "B101",
+   "B101_Alarm and Trip Schedule",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "B102",
+   "B102_Cable Schedule",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "B103",
+   "B103_Electrical Equipment List",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "B104",
+   "B104_Electrical Load/Motor/Power Consumption List",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "B105",
+   "B105_Equipment List",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "B106",
+   "B106_Hazardous Area Dossier",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "B107",
+   "B107_Input / Output Schedule",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "B108",
+   "B108_Instrument Equipment List",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "B109",
+   "B109_Instrument Index",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "B110",
+   "B110_Instrument Set Point Schedule",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "B111",
+   "B111_Junction Box Schedule",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "B112",
+   "B112_Bill of Materials",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "B113",
+   "B113_Materials Selection Table",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "B114",
+   "B114_Piping Line List",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "B115",
+   "B115_Tie-In List",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "B999",
+   "B999_Miscellaneous Engineering Lists and Schedules",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "BCH",
+   "BCH_Back Charge",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "BCL",
+   "BCL_Bid Clarification",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "BOD",
+   "BOD_Basis of Design",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "BOM",
+   "BOM_Bill of Materials",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "BOR",
+   "BOR_Blanket Order",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "BOT",
+   "BOT_Bowtie Diagram",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "BUL",
+   "BUL_Tender/Bid Bulletin",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "C101",
+   "C101_Civil Calculations",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "C102",
+   "C102_Electrical Calculations",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "C103",
+   "C103_Heat Emission Calculations",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "C104",
+   "C104_Instrumentation Calculations",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "C105",
+   "C105_Instrumentation - Intrinsic Safety Calc",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "C106",
+   "C106_Inst - Microwave Path Performance Calc",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "C107",
+   "C107_Lifting Analysis / Calculations",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "C108",
+   "C108_Mechanical Calculations",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "C109",
+   "C109_Mech - Pressure Vessel/Tank Design Calc",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "C110",
+   "C110_Mech - Rotor Dynamic Lat/Torsional Analysis",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "C111",
+   "C111_Mech - Bearing Loading Sizing and Life Calc",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "C112",
+   "C112_Mechanical - Coupling Selection Calculations",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "C113",
+   "C113_Mech - Lube and Seal Oil System Sizing Calc",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "C114",
+   "C114_Noise level and Attenuation Calculations",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "C115",
+   "C115_Piping Calculations",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "C116",
+   "C116_Piping Stress Calculations / Analysis",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "C117",
+   "C117_Pressure Drop / Flow Calculations",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "C118",
+   "C118_Process / Utility Calc Heat / Mass Balance",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "C119",
+   "C119_Process - Heat Exchanger Thermal Calculations",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "C120",
+   "C120_Structural Calculations",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "C121",
+   "C121_Valve Size AntiSurge ESD Relief Rup Disc Calc",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "C122",
+   "C122_Ventilation and Air Conditioning Calc/Sizing",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "C123",
+   "C123_SIL Calculations",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "C999",
+   "C999_Miscellaneous Calculations and Sizing",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "CAL",
+   "CAL_Calculation",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "CAR",
+   "CAR_Corrective Action Request",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "CBE",
+   "CBE_Commercial Bid Evaluation",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "CDR",
+   "CDR_Daily Report",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "CHK",
+   "CHK_Checklist/Promptlist",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "CIR",
+   "CIR_Construction Inspection Report",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "CLN",
+   "CLN_Customer Supplied Document",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "CLR",
+   "CLR_Clarification",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "CMM",
+   "CMM_Commissioning Method Statement",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "CMS",
+   "CMS_Commissioning Management System Generated Doc",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "CNT",
+   "CNT_Contract",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "COE",
+   "COE_Close-out Evaluation",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "COS",
+   "COS_Construction Strategy",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "CPK",
+   "CPK_Construction Work Pack",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "CPL",
+   "CPL_Punch List",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "CRL",
+   "CRL_Claim Release Letter",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "CRT",
+   "CRT_Design Criteria",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "CSR",
+   "CSR_Contract Status Report",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "CST",
+   "CST_Cost Report",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "CTC",
+   "CTC_Contract Terms and Conditions",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "CTP",
+   "CTP_Commissioning Test Procedure",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "CTR",
+   "CTR_Contract Requirements",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "CWP",
+   "CWP_Commissioning/Completions Work Pack",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "D101",
+   "D101_Architectural Drawings",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "D102",
+   "D102_Assembly Detail Drawings",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "D103",
+   "D103_Building / Shelter Drawings",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "D104",
+   "D104_CAD Model",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "D105",
+   "D105_Civil Drawings - GA/Layouts and Details",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "D106",
+   "D106_Civil Drawings - Miscellaneous",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "D107",
+   "D107_Communication Network Schematic / Drawing",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "D108",
+   "D108_Control Drawings - Cause and Effect Diagrams",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "D109",
+   "D109_Control Drawings - CS Int Block Dwg",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "D110",
+   "D110_Control Drawings - Logic",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "D111",
+   "D111_Control Drawings - Schematics",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "D112",
+   "D112_Electrical Drawings - Cable Block",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "D113",
+   "D113_Electrical Drawings - Earthing Layout/Details",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "D114",
+   "D114_Elect Dwgs-Equip't Details/Parts/Cross Sec",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "D115",
+   "D115_Electrical Drawings - Equipment Item GA",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "D116",
+   "D116_Electrical Drawings - GAs/Layouts",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "D117",
+   "D117_Electrical Drawings - Interconnection",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "D118",
+   "D118_Electrical Drawings-Interface Location&Detail",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "D119",
+   "D119_Electrical Drawings - Miscellaneous",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "D120",
+   "D120_Electrical Drawings - Panel GA/Layouts",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "D121",
+   "D121_Electrical Drawings - Schematics",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "D122",
+   "D122_Electrical Drawings - Single Line",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "D123",
+   "D123_Electrical Drawings - Termination",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "D124",
+   "D124_Electrical Drawings - Wiring Drawings",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "D125",
+   "D125_Instrumentation Drawings - Cable Block",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "D126",
+   "D126_Instrumentation Drawings-Earth Layout/Detail",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "D127",
+   "D127_Inst Dwg-Equip't Dtl's/Parts/A408Mat'ls/Xsec",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "D128",
+   "D128_Instrumentation Drawings - Equipment Item GA",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "D129",
+   "D129_Instrumentation Drawings - GA/Layouts",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "D130",
+   "D130_Instrumentation Drawings - Hook-Up",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "D131",
+   "D131_Instrumentation Drawings - Interconnection",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "D132",
+   "D132_Inst Dwg-Interface Location and Details",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "D133",
+   "D133_Instrumentation Drawings - Loop",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "D134",
+   "D134_Instrumentation Drawings - Miscellaneous",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "D135",
+   "D135_Instrumentation Drawings - Panel GA/Layouts",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "D136",
+   "D136_Instrumentation Drawings - Schematic (Wiring)",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "D137",
+   "D137_Instrumentation Drawings - Termination",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "D138",
+   "D138_Instrumentation Drawings - Wiring Drawings",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "D139",
+   "D139_Lifting Drawings",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "D140",
+   "D140_Mech Dwg-Equip't Details/Parts/Mat/Cross Sect",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "D141",
+   "D141_Mechanical Drawings - Equipment Item GA",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "D142",
+   "D142_Mechanical Drawings - GAs/Layouts",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "D143",
+   "D143_Mechanical Drawings - Hydraulic Schematics",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "D144",
+   "D144_Mechanical Drawings-Interface Location&Detail",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "D145",
+   "D145_Mechanical Drawings - Miscellaneous",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "D146",
+   "D146_Mechanical Seal Drawings",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "D147",
+   "D147_Nameplate Drawings",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "D148",
+   "D148_Piping Dwg-Equip Dtl/Parts/Mat'ls/Cross Sect",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "D149",
+   "D149_Piping Drawings - Equipment Item GA",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "D150",
+   "D150_Piping Drawings -Interface Location & Details",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "D152",
+   "D152_Piping Drawings - Isometric",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "D153",
+   "D153_Piping Drawings - Miscellaneous",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "D154",
+   "D154_Process Drawings - Miscellaneous",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "D155",
+   "D155_Process Flow Diagrams",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "D156",
+   "D156_Process-Piping and Instrumentation Diagrams",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "D157",
+   "D157_Shop Fabrication Drawings",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "D158",
+   "D158_Structural Drawings - GA/Layouts and Details",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "D159",
+   "D159_Structural Dwg-Interface Location and Details",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "D160",
+   "D160_Structural Drawings - Miscellaneous",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "D161",
+   "D161_Support/Foundation Loading-Anchor Bolt Detail",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "D162",
+   "D162_Trace Heating",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "D999",
+   "D999_Miscellaneous Drawings",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "DAG",
+   "DAG_Alignment Sheet/Route Map Book",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "DAL",
+   "DAL_Layout",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "DAS",
+   "DAS_Datasheet",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "DAT",
+   "DAT_Data Files",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "DBD",
+   "DBD_Block Diagram",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "DCC",
+   "DCC_Cycle Chart",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "DCD",
+   "DCD_Connection Diagram",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "DCE",
+   "DCE_Cause and Effect Diagram/Matrix",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "DCN",
+   "DCN_Concrete",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "DCP",
+   "DCP_Cathodic Protection",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "DCS",
+   "DCS_Cable Schedule",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "DDR",
+   "DDR_Drainage",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "DEG",
+   "DEG_Design Guide",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "DEL",
+   "DEL_Elevation",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "DER",
+   "DER_External Reference",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "DES",
+   "DES_Earthing/Grounding System",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "DEV",
+   "DEV_Supplier Concession/Deviation Request",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "DFN",
+   "DFN_Foundation Drawings",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "DGA",
+   "DGA_General Arrangement",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "DGP",
+   "DGP_Grating and Plating",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "DHU",
+   "DHU_Hook Up Diagram",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "DHZ",
+   "DHZ_Hazardous Area Classification",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "DIC",
+   "DIC_Interconnection Diagram",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "DID",
+   "DID_Installation Detail",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "DIO",
+   "DIO_I/O Schedule and Index",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "DKP",
+   "DKP_Key Plan",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "DLB",
+   "DLB_Label",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "DLD",
+   "DLD_Loop Diagram",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "DLG",
+   "DLG_Logic Diagram",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "DLP",
+   "DLP_Location Plan/Site Plan/Area Plan",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "DLS",
+   "DLS_Light and Small Power",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "DMX",
+   "DMX_Document Distribution Matrix",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "DOCR",
+   "DOCR_Document Control Request",
+   "Unclassified",
+   "Active"
+  ],
+  [
+   "DOM",
+   "DOM_Overview Map",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "DOS",
+   "DOS_Commissioning Dossier",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "DPP",
+   "DPP_Plot Plan",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "DPR",
+   "DPR_Profile",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "DPS",
+   "DPS_Pipe Support",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "DRD",
+   "DRD_Detail",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "DRS",
+   "DRS_Drawing Schedule",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "DSD",
+   "DSD_Schematic Diagram",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "DSE",
+   "DSE_Section",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "DSK",
+   "DSK_Sketch",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "DSL",
+   "DSL_Single Line Diagram",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "DSP",
+   "DSP_Decision Support Package",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "DST",
+   "DST_Standard DST",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "DSW",
+   "DSW_Site Work Drawing",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "DTD",
+   "DTD_Termination Diagram",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "DTE",
+   "DTE_Steelwork",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "DTR",
+   "DTR_Heat Tracing (Steam - Elec - Glycol)",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "DUD",
+   "DUD_Umbilical Drawing",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "DUS",
+   "DUS_Underground Services",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "DWD",
+   "DWD_Wiring Diagram",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "DWP",
+   "DWP_Design Work Package",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "DXG",
+   "DXG_Crossing",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "E101",
+   "E101_Catalogue Data Sheets Manufacturer's Std",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "E102",
+   "E102_Control System Hardware Documentation",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "E103",
+   "E103_Elect Motor Perf Curves at 80%&100% Rated Vol",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "E104",
+   "E104_Electrical Equipment Data Sheets",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "E105",
+   "E105_Electrical Equipment Performance Curves &Data",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "E106",
+   "E106_Electrical Protection Curves Data and Rating",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "E107",
+   "E107_Electrical - Lighting Performance Data",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "E108",
+   "E108_Electrical - Power System Analysis Data",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "E109",
+   "E109_Emission Data Atmospheric",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "E110",
+   "E110_Instrument Data Sheets",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "E111",
+   "E111_Instrumentation Performance Curves and Data",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "E112",
+   "E112_Mechanical / Process Equipment Data Sheets",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "E113",
+   "E113_Mech/Process Equipment Performance Curve Data",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "E114",
+   "E114_Mechanical - Coupling Details",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "E115",
+   "E115_Mechanical - Engine Performance Curves",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "E116",
+   "E116_Noise Level Data Sheets",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "E117",
+   "E117_Nozzle Loads (Acceptable Loads)",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "E118",
+   "E118_Torque/Speed Starting Curves Equipment&Driver",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "E119",
+   "E119_Waste/Production Estimate/Recycle Information",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "E120",
+   "E120_Weight and Center of Gravity Data Sheet",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "E999",
+   "E999_Miscellaneous Performance and General Data",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "ECL",
+   "ECL_Evaluation Clarification",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "EML",
+   "EML_Email",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "EOI",
+   "EOI_Expression of Interest",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "EST",
+   "EST_Cost Estimate",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "EWP",
+   "EWP_Engineering Work Package",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "EXS",
+   "EXS_Execution Specification",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "F101",
+   "F101_Communications Address Map",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "F102",
+   "F102_Computer System Documentation",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "F103",
+   "F103_Control Philosophy / Functional Specification",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "F104",
+   "F104_Control System Configuration",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "F105",
+   "F105_Control System Data Files",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "F106",
+   "F106_Control System Display and Graphics",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "F107",
+   "F107_NACE Requirements",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "F108",
+   "F108_Radio Telemetry Technical Analysis Report",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "F109",
+   "F109_Reliability and Availability",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "F110",
+   "F110_Software Listing",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "F111",
+   "F111_Surface Preparation & Painting Specification",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "F999",
+   "F999_Misc.Specs Design Report & Technical Data",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "FAT",
+   "FAT_Factory Acceptance Testing Docs",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "FAX",
+   "FAX_Facsimile",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "FCN",
+   "FCN_Field Change Notice",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "FIF",
+   "FIF_Field Instruction Form",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "FIG",
+   "FIG_Figure",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "FIR",
+   "FIR_Field Inspection Report",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "FLC",
+   "FLC_Flowchart",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "FQY",
+   "FQY_Field Query (answered at site)",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "FRA",
+   "FRA_Frame Agreement",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "FRM",
+   "FRM_Form",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "FSP",
+   "FSP_Functional Specification",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "FTC",
+   "FTC_Function Test Certificate",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "FWP",
+   "FWP_Fabrication Work Package",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "G101",
+   "G101_Certificate of Compliance - Sub-Supplier",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "G102",
+   "G102_Certificate of Compliance - Supplier",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "G103",
+   "G103_Certify Authority Certif Release Notes-Waiver",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "G104",
+   "G104_Civil Insp & Test Certificates/Result/Report",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "G105",
+   "G105_Civil Inspection and Test Procedures",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "G106",
+   "G106_Cleanliness Certification",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "G107",
+   "G107_Control/Functional Test Certificates/Report",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "G108",
+   "G108_Control / Functional Test Procedures",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "G109",
+   "G109_Design Verification / Third Party Validation",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "G110",
+   "G110_Dimensional Report",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "G111",
+   "G111_Elect Equipment/Elect Installation Certif",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "G112",
+   "G112_Elect Inspection & Test Certif/Result/Report",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "G113",
+   "G113_Electrical Inspection and Test Procedures",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "G114",
+   "G114_Electrical Type Test Certificates / Results",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "G115",
+   "G115_Fire Test Certificates",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "G116",
+   "G116_Flushing Procedure",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "G117",
+   "G117_Hazardous Area Certification",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "G118",
+   "G118_Heat Treatment Certificates / Results/Report",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "G119",
+   "G119_Heat Treatment Procedures",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "G120",
+   "G120_Inspection and Test Plan (ITP)",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "G121",
+   "G121_Inspection and Test Plan (ITP) Sub-Supplier",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "G122",
+   "G122_Instrumentation Calibration Certifi & Records",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "G123",
+   "G123_Instrumentation Certification",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "G124",
+   "G124_Inst Inspection&Test Certificate/Result/Rpt",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "G125",
+   "G125_Instrumentation Inspection&Test Procedures",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "G126",
+   "G126_ISO 9000 Certification",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "G127",
+   "G127_Lifting Equipment Certificates",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "G128",
+   "G128_Lifting Proof Load Certification",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "G129",
+   "G129_Manufacturer's Data Report/Record Book MRB",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "G130",
+   "G130_Manufacturer's Data Report /Record Book Index",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "G131",
+   "G131_Manufacturing / Fabrication Procedures",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "G132",
+   "G132_Materials Traceability Records",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "G133",
+   "G133_Materials Certification",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "G134",
+   "G134_Material Inspection Test Certif/Result/Report",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "G135",
+   "G135_Materials Inspection and Test Procedures",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "G136",
+   "G136_Supplier Declaration Material Supplied",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "G137",
+   "G137_Mech Inspection & Test Certificates/Result",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "G138",
+   "G138_Mechanical Inspection and Test Procedures",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "G139",
+   "G139_Name Plate Rubbing / Photographs",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "G140",
+   "G140_Noise Test Certificates / Results / Report",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "G141",
+   "G141_Noise Test Procedures",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "G142",
+   "G142_Non-Conformance Reports / Concession Requests",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "G143",
+   "G143_Non-Destructive Exam NDE Operator Qualif",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "G144",
+   "G144_Non-Destructive Examination (NDE) Procedures",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "G145",
+   "G145_Non-Destructive Examination (NDE) Reports",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "G146",
+   "G146_Performance Guarantee",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "G147",
+   "G147_Performance Test / FAT / SAT Procedures",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "G148",
+   "G148_Performance Test /FAT/SAT/ Result and Report",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "G149",
+   "G149_Pressure Test Certificates / Results / Report",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "G150",
+   "G150_Pressure Test Procedures",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "G151",
+   "G151_Quality Manual",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "G152",
+   "G152_Quality Plan",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "G153",
+   "G153_Release Cert from Purchaser Insp Note &Waiver",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "G154",
+   "G154_Surface Protection&Painting Cert ofCompliance",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "G155",
+   "G155_Surface Protection Painting Insp Test Result",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "G156",
+   "G156_Surface Protection Painting Insp & Test Pro",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "G157",
+   "G157_Weight Certif&Weight Reconciliation Statement",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "G158",
+   "G158_Weight Control / Weighing Procedure",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "G159",
+   "G159_Weld and NDE Traceability / Location Plan/Map",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "G160",
+   "G160_Weld Procedure Qualification Records (WPQR)",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "G161",
+   "G161_Weld Procedure Specifications (WPS)",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "G162",
+   "G162_Welder Qualification Certificates",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "G163",
+   "G163_Welder Qualification Register",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "G164",
+   "G164_PMI Test Procedure",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "G999",
+   "G999_Misc. Quality Assurance Inspection & Testing",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "GIDDCR",
+   "GIDDCR_GID Document Control Report",
+   "Unclassified",
+   "Active"
+  ],
+  [
+   "H101",
+   "H101_Hazardous Material Shipping Certificates",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "H102",
+   "H102_Long Term Storage and Preservation Procedure",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "H103",
+   "H103_Shipping Prep Packing Handling & Storage Proc",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "H104",
+   "H104_Shipping Packing and Import Certificates",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "H999",
+   "H999_Misc Packing Shipping and Preservation Data",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "HDD",
+   "HDD_Handover Dossier",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "HMS",
+   "HMS_Hazardous Material Schedule",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "IAI",
+   "IAI_Inspection Assessment Instruction",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "IDX",
+   "IDX_Drawing/Document Index",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "IRC",
+   "IRC_Inspection Release Certificate",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "ISO",
+   "ISO_Isometric",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "IST",
+   "IST_Instruction",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "ITP",
+   "ITP_Inspection and Test Plan",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "ITR",
+   "ITR_Inspection and Test Report",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "ITT",
+   "ITT_Invitation to Tender",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "J101",
+   "J101_Commissioning / Pre-Commissioning Procedures",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "J102",
+   "J102_Erection Drawings",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "J103",
+   "J103_Erection Fastener Schedule",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "J104",
+   "J104_Installation Operating&Maintenance Manual IOM",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "J105",
+   "J105_Lube Oil Operating Fluid&Utility Requirements",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "J106",
+   "J106_Material Safety Data Sheets (MSDS)",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "J107",
+   "J107_Spare Parts and Interchangeability Record",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "J108",
+   "J108_Spare Parts Lists - Commissioning Operating",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "J109",
+   "J109_Spare Parts Lists - Insurance",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "J110",
+   "J110_Special Tools and Lifting Devices List",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "J111",
+   "J111_Unpacking Handling Lifting Erec & Inst Proc",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "J112",
+   "J112_Inst Operating&Maintenance Manual IOM Index",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "J113",
+   "J113_Misc. Installation Operating&Maintenance Data",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "J999",
+   "J999_Erection Drawings",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "JOB",
+   "JOB_Job Book/Design Package",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "JSA",
+   "JSA_Job Safety Analysis",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "KDC",
+   "KDC_Key Document Change Notice",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "LET",
+   "LET_Letter",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "LOG",
+   "LOG_Conversation Log",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "LRL",
+   "LRL_Lien Release Letter",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "LST",
+   "LST_List (incl. Schedules e.g. Equipment)",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "MAN",
+   "MAN_Manual",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "MAP",
+   "MAP_Maps",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "MEM",
+   "MEM_Memorandum",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "MOM",
+   "MOM_Meeting Record",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "MRR",
+   "MRR_Materials Receiving Report",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "MSC",
+   "MSC_Milestone Certificate",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "MSD",
+   "MSD_Material Selection Diagram",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "MTO",
+   "MTO_Material Take-off",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "MTR",
+   "MTR_Material Test Reports",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "NCR",
+   "NCR_Non-Conformance Report",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "NOA",
+   "NOA_Notice of Award",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "NOE",
+   "NOE_Notice of Energization",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "NTF",
+   "NTF_Notice to File",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "ORG",
+   "ORG_Organizational Chart",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "OSD",
+   "OSD_Overage - Shortage - Damage Report",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "OTP",
+   "OTP_Operation Test Procedure",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "PAC",
+   "PAC_Payment Certificate",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "PCR",
+   "PCR_Project Change Request",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "PFD",
+   "PFD_Process Flow Diagram/Heat and Material Balance",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "PHL",
+   "PHL_Philosophy",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "PHT",
+   "PHT_Photo",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "PID",
+   "PID_Piping and Instrument Diagram",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "PIM",
+   "PIM_Pre-Inspection Meeting",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "PLN",
+   "PLN_Plan",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "PMT",
+   "PMT_Permit",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "POB",
+   "POB_Persons on Site Register",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "POD",
+   "POD_Purchase Order/PO Amendment",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "POL",
+   "POL_Policy",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "PQS",
+   "PQS_Supplier Pre-Qualification",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "PRE",
+   "PRE_Presentations",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "PRO",
+   "PRO_Procedure",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "PRP",
+   "PRP_Proposal/Tender",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "PSR",
+   "PSR_Purchasing Status Report",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "PTC",
+   "PTC_Purchasing Terms and Conditions",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "QAN",
+   "QAN_Quality Alert Notice",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "QSS",
+   "QSS_Quality Shop Survey",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "QTE",
+   "QTE_Supplier Quotation",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "RCA",
+   "RCA_Root Cause Analysis",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "REF",
+   "REF_Reference",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "REFS",
+   "REFS_References",
+   "Unclassified",
+   "Active"
+  ],
+  [
+   "REG",
+   "REG_Register",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "REP",
+   "REP_Report",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "REQ",
+   "REQ_Requisition",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "RFA",
+   "RFA_Recommendation for Award",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "RFQ",
+   "RFQ_Request for Quotation",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "RIN",
+   "RIN_Request for Inspection Notice",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "ROD",
+   "ROD_Release Order",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "RPT",
+   "RPT_Progress Report (Monthly - Weekly)",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "RVP",
+   "RVP_Request to Vary Purchase Order",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "SCH",
+   "SCH_Schedule (Project)",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "SDC",
+   "SDC_Supplier Document",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "SFD",
+   "SFD_System Function Diagram",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "SOW",
+   "SOW_Scope of Work",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "SPC",
+   "SPC_Specification",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "SPD",
+   "SPD_Safety Philosophy Diagram",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "SPL",
+   "SPL_Spares List",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "SPQ",
+   "SPQ_Supplier Query",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "SQY",
+   "SQY_Site Query",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "SRN",
+   "SRN_Squad Check Doc Release Notice",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "STD",
+   "STD_Standard STD",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "SWO",
+   "SWO_Stop Work Order",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "TAB",
+   "TAB_Tables",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "TBE",
+   "TBE_Technical Bid Evaluation",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "TDP",
+   "TDP_Technical Deviation Proposal/ Concession Req",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "TEN",
+   "TEN_Technical Note/Study",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "TMP",
+   "TMP_Template",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "TPD",
+   "TPD_Third Party Supplied Document",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "TQY",
+   "TQY_Technical Query",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "TRE",
+   "TRE_Transmittal - external",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "TRI",
+   "TRI_Transmittal - internal",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "TRN",
+   "TRN_Training Documents",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "TRP",
+   "TRP_Trip/Site Report",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "UFD",
+   "UFD_Utility Flow Diagram",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "VAC",
+   "VAC_Variance Request/Claim",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "VAR",
+   "VAR_Variance",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "VIP",
+   "VIP_Value Improvements",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "WIN",
+   "WIN_Work Instruction",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "WRP",
+   "WRP_Work Release Package",
+   "Non-supplier",
+   "Active"
+  ],
+  [
+   "Y101",
+   "Y101_Packaged Equipment Register / Template",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "Y102",
+   "Y102_Architectural Equipment Register / Template",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "Y103",
+   "Y103_Bulk Material Handling Equipment Register",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "Y104",
+   "Y104_Civil /Structural Equipment Register/Template",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "Y105",
+   "Y105_Drilling & Well Completion Equipment Register",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "Y106",
+   "Y106_HVAC Equipment Register / Template",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "Y107",
+   "Y107_Instrument Equipment Register / Template",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "Y108",
+   "Y108_Marine Equipment Register / Template",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "Y109",
+   "Y109_Mechanical Equipment Register / Template",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "Y110",
+   "Y110_Mechanical Handling Equipment Register",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "Y111",
+   "Y111_Safety and Rescue Equipment Register/Template",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "Y112",
+   "Y112_Solids Processing Equipment Register/Template",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "Y113",
+   "Y113_Subsea Equipment Register / Template",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "Y115",
+   "Y115_Lighting & Small Power Equipment Register",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "Y116",
+   "Y116_Electrical Equipment Register / Template",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "Y117",
+   "Y117_Subsea Instrument Equipment Register/Template",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "Y118",
+   "Y118_Telecommunication Equipment Register/Template",
+   "Supplier",
+   "Active"
+  ],
+  [
+   "Organisation list. Ships with DELIOS. Same on every project."
+  ],
+  [
+   "Applies to is derived from the code shape: A101 = Supplier, SPC = Non-supplier."
+  ],
+  [
+   "DOCR, GIDDCR and REFS match neither shape and are marked Unclassified - probably typos."
+  ]
+ ],
+ "projectCodes": [
+  [
+   "Q6637021",
+   "Main project",
+   "Active"
+  ],
+  [
+   "THE YELLOW ROWS ARE EXAMPLES. Delete them and enter your own."
+  ],
+  [
+   "Usually one row. The project code that opens every document number."
+  ],
+  [
+   "Code is what appears inside the document number. Value is the human name."
+  ],
+  [
+   "Status is Active or Retired. Retired codes stay on existing documents but cannot be reused."
+  ],
+  [
+   "Project list. Starts empty on a new project. Until it is filled, checks on this field"
+  ],
+  [
+   "return \"Not executable\" rather than Fail."
+  ]
+ ],
+ "subprojects": [
+  [
+   "71",
+   "Earth work",
+   "Active"
+  ],
+  [
+   "70",
+   "General 70",
+   "Active"
+  ],
+  [
+   "74",
+   "NON-Process Building 74",
+   "Active"
+  ],
+  [
+   "76",
+   "ONEE pipe deviation 76",
+   "Active"
+  ],
+  [
+   "73",
+   "Site protection 73",
+   "Active"
+  ],
+  [
+   "72",
+   "VRD 72",
+   "Active"
+  ],
+  [
+   "75",
+   "Water Tower 75",
+   "Active"
+  ],
+  [
+   "THE YELLOW ROWS ARE EXAMPLES. Delete them and enter your own."
+  ],
+  [
+   "One row per subproject on this project."
+  ],
+  [
+   "Code is what appears inside the document number. Value is the human name."
+  ],
+  [
+   "Status is Active or Retired. Retired codes stay on existing documents but cannot be reused."
+  ],
+  [
+   "Project list. Starts empty on a new project. Until it is filled, checks on this field"
+  ],
+  [
+   "return \"Not executable\" rather than Fail."
+  ]
+ ],
+ "supplierCodes": [
+  [
+   "MAD",
+   "MADASUD",
+   "Active"
+  ],
+  [
+   "ECG",
+   "ECGS",
+   "Active"
+  ],
+  [
+   "ENT",
+   "ENTSB",
+   "Active"
+  ],
+  [
+   "FAS",
+   "FASOFT",
+   "Active"
+  ],
+  [
+   "PHOSBOUCRA",
+   "not yet defined",
+   "Active"
+  ],
+  [
+   "ELH",
+   "STE ELHAGE",
+   "Active"
+  ],
+  [
+   "UNI",
+   "UNIVERS SAHARA",
+   "Active"
+  ],
+  [
+   "THE YELLOW ROWS ARE EXAMPLES. Delete them and enter your own."
+  ],
+  [
+   "One row per supplier. The code is what appears in the document number."
+  ],
+  [
+   "Code is what appears inside the document number. Value is the human name."
+  ],
+  [
+   "Status is Active or Retired. Retired codes stay on existing documents but cannot be reused."
+  ],
+  [
+   "Project list. Starts empty on a new project. Until it is filled, checks on this field"
+  ],
+  [
+   "return \"Not executable\" rather than Fail."
+  ]
+ ],
+ "purchaseOrders": [
+  [
+   "JESA601P22",
+   "ECGS",
+   "Active"
+  ],
+  [
+   "JESA593P22",
+   "MADASUD",
+   "Active"
+  ],
+  [
+   "3960018034",
+   "3960018034-MADASUD-74",
+   "Active"
+  ],
+  [
+   "3960018378",
+   "3960018378-FASOFT-74",
+   "Active"
+  ],
+  [
+   "JESA601P22",
+   "ECGS",
+   "Active"
+  ],
+  [
+   "JESA592P22",
+   "ENTSB",
+   "Active"
+  ],
+  [
+   "JESA593P22",
+   "MADASUD",
+   "Active"
+  ],
+  [
+   "3960018377",
+   "STE ELHAGE",
+   "Active"
+  ],
+  [
+   "JESA594P22",
+   "UNIVERS SAHARA",
+   "Active"
+  ],
+  [
+   "THE YELLOW ROWS ARE EXAMPLES. Delete them and enter your own."
+  ],
+  [
+   "One row per purchase order. A PO belongs to one project only."
+  ],
+  [
+   "Code is what appears inside the document number. Value is the human name."
+  ],
+  [
+   "Status is Active or Retired. Retired codes stay on existing documents but cannot be reused."
+  ],
+  [
+   "Project list. Starts empty on a new project. Until it is filled, checks on this field"
+  ],
+  [
+   "return \"Not executable\" rather than Fail."
+  ]
+ ],
+ "schemeRouting": [
+  [
+   "Docs Type value",
+   "Scheme",
+   "Status",
+   "Notes",
+   "Treatment"
+  ],
+  [
+   "Supplier Data",
+   "Supplier",
+   "Active",
+   "Confirmed in the register export",
+   ""
+  ],
+  [
+   "Engineering Document",
+   "Non-supplier",
+   "Active",
+   "ADD the Type values using the 5-field scheme",
+   ""
+  ],
+  [
+   "Template",
+   "Template",
+   "Active",
+   "ADD the Type value for MS- templates, if any",
+   "Exception"
+  ],
+  [
+   "Type in Docs is both the deliverable type and the scheme router."
+  ],
+  [
+   "A Type not listed here yields \"No scheme matched\" - never a Pass, never a Fail."
+  ]
+ ]
+}

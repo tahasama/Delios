@@ -1,0 +1,767 @@
+{
+  "id": "reference",
+  "name": "Reference configuration",
+  "description": "Annex D reference sets every organization starts from. Starter profiles add to these; they never remove.",
+  "sets": [
+    {
+      "key": "DELIVERABLE_TYPES",
+      "title": "Deliverable types",
+      "description": "D.1 — where the information came from; set at creation, never changes (§5.2).",
+      "values": [
+        {
+          "code": "ENG",
+          "label": "Internal engineering",
+          "props": {
+            "scheme": "Internal"
+          }
+        },
+        {
+          "code": "CTR",
+          "label": "Contractor",
+          "props": {
+            "scheme": "Supplier"
+          }
+        },
+        {
+          "code": "VND",
+          "label": "Vendor / supplier",
+          "props": {
+            "scheme": "Supplier"
+          }
+        },
+        {
+          "code": "TPY",
+          "label": "Third party",
+          "props": {
+            "scheme": "Internal"
+          }
+        },
+        {
+          "code": "CLT",
+          "label": "Client",
+          "props": {
+            "scheme": "Internal"
+          }
+        }
+      ]
+    },
+    {
+      "key": "DOCUMENT_TYPES",
+      "title": "Document types",
+      "description": "D.2 reference set — the organization publishes its own (add/import in Admin).",
+      "values": [
+        {
+          "code": "DWG",
+          "label": "Drawing"
+        },
+        {
+          "code": "DIA",
+          "label": "Diagram"
+        },
+        {
+          "code": "MDL",
+          "label": "Model"
+        },
+        {
+          "code": "DAT",
+          "label": "Datasheet"
+        },
+        {
+          "code": "SPC",
+          "label": "Specification"
+        },
+        {
+          "code": "CAL",
+          "label": "Calculation"
+        },
+        {
+          "code": "SCH",
+          "label": "Schedule"
+        },
+        {
+          "code": "LST",
+          "label": "List"
+        },
+        {
+          "code": "RPT",
+          "label": "Report"
+        },
+        {
+          "code": "STD",
+          "label": "Study"
+        },
+        {
+          "code": "PRO",
+          "label": "Procedure"
+        },
+        {
+          "code": "MST",
+          "label": "Method statement"
+        },
+        {
+          "code": "PLN",
+          "label": "Plan"
+        },
+        {
+          "code": "MAN",
+          "label": "Manual"
+        },
+        {
+          "code": "CER",
+          "label": "Certificate"
+        },
+        {
+          "code": "TST",
+          "label": "Test record"
+        },
+        {
+          "code": "INS",
+          "label": "Inspection record"
+        },
+        {
+          "code": "SUR",
+          "label": "Survey"
+        },
+        {
+          "code": "FRM",
+          "label": "Form"
+        },
+        {
+          "code": "MTX",
+          "label": "Matrix"
+        },
+        {
+          "code": "REG",
+          "label": "Register"
+        },
+        {
+          "code": "COR",
+          "label": "Correspondence"
+        },
+        {
+          "code": "MIN",
+          "label": "Minutes"
+        }
+      ]
+    },
+    {
+      "key": "DISCIPLINES",
+      "title": "Disciplines",
+      "description": "D.3-style reference list — exactly one per document (§5.4). Replace with your own.",
+      "values": [
+        {
+          "code": "CI",
+          "label": "Civil"
+        },
+        {
+          "code": "ST",
+          "label": "Structural"
+        },
+        {
+          "code": "AR",
+          "label": "Architectural"
+        },
+        {
+          "code": "ME",
+          "label": "Mechanical"
+        },
+        {
+          "code": "EL",
+          "label": "Electrical"
+        },
+        {
+          "code": "IC",
+          "label": "Instrumentation & Control"
+        },
+        {
+          "code": "PI",
+          "label": "Piping"
+        },
+        {
+          "code": "PR",
+          "label": "Process"
+        },
+        {
+          "code": "HV",
+          "label": "HVAC"
+        },
+        {
+          "code": "SA",
+          "label": "Safety"
+        },
+        {
+          "code": "TE",
+          "label": "Telecommunications"
+        },
+        {
+          "code": "GE",
+          "label": "Geotechnical"
+        },
+        {
+          "code": "EN",
+          "label": "Environmental"
+        },
+        {
+          "code": "QA",
+          "label": "QA/QC"
+        },
+        {
+          "code": "PM",
+          "label": "Project Management"
+        }
+      ]
+    },
+    {
+      "key": "PROJECT_CODES",
+      "title": "Project codes",
+      "description": "C.2.3 — the scope within which numbers are unique. Replace with your projects.",
+      "values": [
+        {
+          "code": "ORG",
+          "label": "Main organization"
+        }
+      ]
+    },
+    {
+      "key": "SUBPROJECTS",
+      "title": "Sub-projects",
+      "description": "C.2.5 — publish your own breakdown (§4.4).",
+      "values": []
+    },
+    {
+      "key": "SUPPLIER_CODES",
+      "title": "Supplier / party codes",
+      "description": "C.2.4 — originator codes for external information (§3.3).",
+      "values": []
+    },
+    {
+      "key": "PURCHASE_ORDERS",
+      "title": "Purchase orders",
+      "description": "Contract / PO codes (§4.4).",
+      "values": []
+    },
+    {
+      "key": "STATUSES",
+      "title": "Statuses",
+      "description": "D.5 — what a released revision may be used for; executionFlag permits physical execution (§7.8).",
+      "values": [
+        {
+          "code": "IFI",
+          "label": "Issued for information",
+          "props": {
+            "executionFlag": false,
+            "may": "Awareness; planning around what is coming",
+            "mayNot": "Any decision or work that depends on it being correct"
+          }
+        },
+        {
+          "code": "IFR",
+          "label": "Issued for review",
+          "props": {
+            "executionFlag": false,
+            "may": "Comment by the recipient",
+            "mayNot": "Work of any kind"
+          }
+        },
+        {
+          "code": "IFA",
+          "label": "Issued for approval",
+          "props": {
+            "executionFlag": false,
+            "may": "A formal decision by the approving party",
+            "mayNot": "Work of any kind"
+          }
+        },
+        {
+          "code": "IFQ",
+          "label": "Issued for tender / quotation",
+          "props": {
+            "executionFlag": false,
+            "may": "Pricing a defined scope",
+            "mayNot": "Manufacture, procurement or construction"
+          }
+        },
+        {
+          "code": "IFP",
+          "label": "Issued for purchase",
+          "props": {
+            "executionFlag": true,
+            "may": "Placing an order against it",
+            "mayNot": "Construction, unless separately released"
+          }
+        },
+        {
+          "code": "IFC",
+          "label": "Issued for construction",
+          "props": {
+            "executionFlag": true,
+            "may": "Building, installing, fabricating exactly what it shows",
+            "mayNot": "Nothing excluded"
+          }
+        },
+        {
+          "code": "IFF",
+          "label": "Issued for fabrication",
+          "props": {
+            "executionFlag": true,
+            "may": "Fabrication of the item shown",
+            "mayNot": "—"
+          }
+        },
+        {
+          "code": "AFC",
+          "label": "Approved for construction",
+          "props": {
+            "executionFlag": true,
+            "may": "Construction after approval",
+            "mayNot": "—"
+          }
+        },
+        {
+          "code": "AB",
+          "label": "As-built",
+          "props": {
+            "executionFlag": true,
+            "may": "Recording what exists; operating, maintaining, modifying",
+            "mayNot": "New construction, unless separately released"
+          }
+        }
+      ]
+    },
+    {
+      "key": "REVIEW_OUTCOMES",
+      "title": "Review outcomes",
+      "description": "D.7 — the result of a review with its consequences (§9.3). Code 1/2/3/4 or A/B/C/D labelings are equivalent.",
+      "values": [
+        {
+          "code": "C1",
+          "label": "Approved (Code 1)",
+          "props": {
+            "proceed": true,
+            "resubmit": false
+          }
+        },
+        {
+          "code": "C2",
+          "label": "Approved with comments (Code 2)",
+          "props": {
+            "proceed": true,
+            "resubmit": true
+          }
+        },
+        {
+          "code": "C3",
+          "label": "Revise and resubmit (Code 3)",
+          "props": {
+            "proceed": false,
+            "resubmit": true
+          }
+        },
+        {
+          "code": "C4",
+          "label": "Rejected (Code 4)",
+          "props": {
+            "proceed": false,
+            "resubmit": true
+          }
+        }
+      ]
+    },
+    {
+      "key": "CRITICALITY",
+      "title": "Criticality",
+      "description": "D.8 — what consequence arises if the information is wrong (§5.6).",
+      "values": [
+        {
+          "code": "SAFETY",
+          "label": "Safety-critical",
+          "props": {
+            "approval": "ADMIN",
+            "retention": "ASSET_LIFE",
+            "format": "Preservation format from first issue"
+          }
+        },
+        {
+          "code": "REGULATORY",
+          "label": "Regulatory-critical",
+          "props": {
+            "approval": "ADMIN",
+            "retention": "STATUTORY",
+            "format": "Preservation format from first issue"
+          }
+        },
+        {
+          "code": "QUALITY",
+          "label": "Quality-critical",
+          "props": {
+            "approval": "APPROVER",
+            "retention": "ASSET_LIFE",
+            "format": "Preservation format at handover"
+          }
+        },
+        {
+          "code": "ROUTINE",
+          "label": "Routine",
+          "props": {
+            "approval": "REVIEWER",
+            "retention": "PROJECT_DURATION",
+            "format": "Ordinary rendition"
+          }
+        }
+      ]
+    },
+    {
+      "key": "CONFIDENTIALITY",
+      "title": "Confidentiality",
+      "description": "C.4.6 — who may see it; default published (§5.7).",
+      "values": [
+        {
+          "code": "PUBLIC",
+          "label": "Public",
+          "props": {
+            "level": 1
+          }
+        },
+        {
+          "code": "INTERNAL",
+          "label": "Internal — all staff",
+          "props": {
+            "level": 2,
+            "default": true
+          }
+        },
+        {
+          "code": "RESTRICTED",
+          "label": "Restricted — named roles",
+          "props": {
+            "level": 3
+          }
+        },
+        {
+          "code": "CONFIDENTIAL",
+          "label": "Confidential — named individuals",
+          "props": {
+            "level": 4
+          }
+        }
+      ]
+    },
+    {
+      "key": "RETENTION_CLASSES",
+      "title": "Retention classes",
+      "description": "D.9 — how long, from which event (§13.1–13.3).",
+      "values": [
+        {
+          "code": "ASSET_LIFE",
+          "label": "Asset life",
+          "props": {
+            "startsFrom": "Asset handover",
+            "basis": "Operation, maintenance or modification depends on it"
+          }
+        },
+        {
+          "code": "STATUTORY",
+          "label": "Statutory",
+          "props": {
+            "startsFrom": "As the instrument specifies",
+            "basis": "Law or regulation requires it"
+          }
+        },
+        {
+          "code": "CONTRACTUAL",
+          "label": "Contractual",
+          "props": {
+            "startsFrom": "Contract completion",
+            "basis": "Liability, warranty or claim periods"
+          }
+        },
+        {
+          "code": "PROJECT_DURATION",
+          "label": "Project duration",
+          "props": {
+            "startsFrom": "Commercial close-out",
+            "basis": "Needed only until completion"
+          }
+        },
+        {
+          "code": "PERMANENT",
+          "label": "Permanent",
+          "props": {
+            "startsFrom": "Not applicable",
+            "basis": "Historical, legal or corporate significance"
+          }
+        }
+      ]
+    },
+    {
+      "key": "REASONS_FOR_ISSUE",
+      "title": "Reasons for issue",
+      "description": "§2.6 — what the recipient is expected to do, with periods (§11.12).",
+      "values": [
+        {
+          "code": "INFORMATION",
+          "label": "Information",
+          "props": {
+            "maturity": "Whatever exists",
+            "reviewCycle": false,
+            "response": false,
+            "acceptancePeriodDays": 5
+          }
+        },
+        {
+          "code": "REVIEW",
+          "label": "Review",
+          "props": {
+            "maturity": "Sufficient to be understood",
+            "reviewCycle": true,
+            "response": true,
+            "acceptancePeriodDays": 5,
+            "responsePeriodDays": 14
+          }
+        },
+        {
+          "code": "APPROVAL",
+          "label": "Approval",
+          "props": {
+            "maturity": "Complete and internally consistent",
+            "reviewCycle": true,
+            "response": true,
+            "acceptancePeriodDays": 5,
+            "responsePeriodDays": 14
+          }
+        },
+        {
+          "code": "PRICING",
+          "label": "Pricing",
+          "props": {
+            "maturity": "Scope fully defined",
+            "reviewCycle": false,
+            "response": true,
+            "acceptancePeriodDays": 5,
+            "responsePeriodDays": 21
+          }
+        },
+        {
+          "code": "EXECUTION",
+          "label": "Execution",
+          "props": {
+            "maturity": "Approved and current",
+            "reviewCycle": false,
+            "response": false,
+            "acceptancePeriodDays": 5
+          }
+        },
+        {
+          "code": "RECORD",
+          "label": "Record",
+          "props": {
+            "maturity": "Final; reflects what was done",
+            "reviewCycle": false,
+            "response": false,
+            "acceptancePeriodDays": 5
+          }
+        }
+      ]
+    },
+    {
+      "key": "ISSUE_CODES",
+      "title": "Issue codes",
+      "description": "D.4 — organization codes mapped to the defined reasons (C.5.6).",
+      "values": [
+        {
+          "code": "IFI",
+          "label": "Issued for information",
+          "props": {
+            "reason": "INFORMATION"
+          }
+        },
+        {
+          "code": "IFR",
+          "label": "Issued for review",
+          "props": {
+            "reason": "REVIEW"
+          }
+        },
+        {
+          "code": "IFA",
+          "label": "Issued for approval",
+          "props": {
+            "reason": "APPROVAL"
+          }
+        },
+        {
+          "code": "IFC",
+          "label": "Issued for construction",
+          "props": {
+            "reason": "EXECUTION"
+          }
+        },
+        {
+          "code": "AB",
+          "label": "As-built",
+          "props": {
+            "reason": "RECORD"
+          }
+        }
+      ]
+    },
+    {
+      "key": "PHASES",
+      "title": "Phases",
+      "description": "C.4.4 — recorded against the revision (§5.5).",
+      "values": [
+        {
+          "code": "FEED",
+          "label": "FEED"
+        },
+        {
+          "code": "DETAIL",
+          "label": "Detailed design"
+        },
+        {
+          "code": "PROCUREMENT",
+          "label": "Procurement"
+        },
+        {
+          "code": "CONSTRUCTION",
+          "label": "Construction"
+        },
+        {
+          "code": "COMMISSIONING",
+          "label": "Commissioning"
+        },
+        {
+          "code": "OPERATION",
+          "label": "Operation"
+        }
+      ]
+    },
+    {
+      "key": "COMMENT_CLASSES",
+      "title": "Comment classifications",
+      "description": "D.10 — every comment carries a progression consequence (§9.6).",
+      "values": [
+        {
+          "code": "BLOCKING",
+          "label": "Blocking (Class 1)",
+          "props": {
+            "progressionPreventing": true
+          }
+        },
+        {
+          "code": "NON_BLOCKING",
+          "label": "Non-blocking (Class 2/3)",
+          "props": {
+            "progressionPreventing": false
+          }
+        }
+      ]
+    },
+    {
+      "key": "NATIVE_FORMATS",
+      "title": "Accepted native formats",
+      "description": "C.7.1 (§10.1).",
+      "values": [
+        {
+          "code": "pdf",
+          "label": "PDF"
+        },
+        {
+          "code": "docx",
+          "label": "Word"
+        },
+        {
+          "code": "xlsx",
+          "label": "Excel"
+        },
+        {
+          "code": "dwg",
+          "label": "CAD"
+        },
+        {
+          "code": "png",
+          "label": "PNG"
+        }
+      ]
+    },
+    {
+      "key": "RENDITION_FORMATS",
+      "title": "Accepted rendition formats",
+      "description": "C.7.2 (§10.2).",
+      "values": [
+        {
+          "code": "pdf",
+          "label": "PDF"
+        }
+      ]
+    },
+    {
+      "key": "PRESERVATION_FORMATS",
+      "title": "Preservation formats",
+      "description": "C.7.3 (§10.4).",
+      "values": [
+        {
+          "code": "pdf",
+          "label": "PDF/A-ready PDF"
+        }
+      ]
+    },
+    {
+      "key": "DELIVERABLE_TYPE_FIELDS",
+      "title": "Type-to-field matrix",
+      "description": "C.3.3 — which conditional fields each deliverable type requires (§4.4).",
+      "values": [
+        {
+          "code": "ENG",
+          "label": "Engineering",
+          "props": {
+            "originator": "na",
+            "po": "na",
+            "receivedDate": "na",
+            "subProject": "optional"
+          }
+        },
+        {
+          "code": "CTR",
+          "label": "Contractor",
+          "props": {
+            "originator": "required",
+            "po": "required",
+            "receivedDate": "required",
+            "subProject": "optional"
+          }
+        },
+        {
+          "code": "VND",
+          "label": "Vendor",
+          "props": {
+            "originator": "required",
+            "po": "required",
+            "receivedDate": "required",
+            "subProject": "optional"
+          }
+        },
+        {
+          "code": "TPY",
+          "label": "Third party",
+          "props": {
+            "originator": "required",
+            "po": "optional",
+            "receivedDate": "required",
+            "subProject": "optional"
+          }
+        },
+        {
+          "code": "CLT",
+          "label": "Client",
+          "props": {
+            "originator": "na",
+            "po": "optional",
+            "receivedDate": "required",
+            "subProject": "optional"
+          }
+        }
+      ]
+    }
+  ]
+}

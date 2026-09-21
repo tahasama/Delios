@@ -1,0 +1,27 @@
+{
+  "id": "energy",
+  "projectKind": "ENERGY",
+  "name": "Energy / power",
+  "description": "Generation, transmission and renewables: single-line diagrams, protection settings, grid studies, energization.",
+  "sets": [
+    { "key": "DISCIPLINES", "values": [
+      { "code": "PW", "label": "Power systems" },
+      { "code": "PT", "label": "Protection and control" },
+      { "code": "SB", "label": "Substations" },
+      { "code": "RN", "label": "Renewables" },
+      { "code": "GC", "label": "Grid connection" }
+    ] },
+    { "key": "DOCUMENT_TYPES", "values": [
+      { "code": "SLD", "label": "Single-line diagram" },
+      { "code": "CAB", "label": "Cable schedule" },
+      { "code": "PRS", "label": "Protection settings" },
+      { "code": "LFS", "label": "Load-flow / short-circuit study" },
+      { "code": "ERS", "label": "Earthing study" },
+      { "code": "GRC", "label": "Grid code compliance report" }
+    ] },
+    { "key": "PHASES", "values": [
+      { "code": "ENERGIZATION", "label": "Energization" },
+      { "code": "GRID_TESTING", "label": "Grid compliance testing" }
+    ] }
+  ]
+}
