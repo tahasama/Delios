@@ -239,21 +239,77 @@ export async function setScopeAction(_prev: { error?: string } | undefined, form
   }
 }
 
-export async function addAssetAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
+/**
+ * The asset breakdown is project data Document Control keeps (§5.8): the
+ * equipment, systems and areas documents describe. Kept on the Assets page,
+ * by whoever holds Control.
+ */
+async function requireAssetKeeper() {
+  const ctx = await requireScope();
+  if (!ctx.can("CONTROL") && !ctx.can("CONFIGURE")) throw new Error("Document Control keeps the asset list.");
+  return ctx;
+}
+
+export async function addAssetAction(_prev: { error?: string; ok?: string } | undefined, formData: FormData): Promise<{ error?: string; ok?: string }> {
   try {
-    const ctx = await requireAdminScope();
-    const { user: admin, db, projectId, orgId } = ctx;
-    const code = String(formData.get("code") ?? "").trim();
+    const ctx = await requireAssetKeeper();
+    const { user, db, projectId } = ctx;
+    const code = String(formData.get("code") ?? "").trim().toUpperCase();
     const name = String(formData.get("name") ?? "").trim();
     const area = String(formData.get("area") ?? "").trim() || null;
     const system = String(formData.get("system") ?? "").trim() || null;
-    if (!code || !name) return { error: "Code and name are required." };
-    const dup = await db.assetItem.findFirst({ where: { code } });
-    if (dup) return { error: "Asset code already exists." };
-    await db.assetItem.create({ data: { projectId, code, name, area, system } });
+    const unit = String(formData.get("unit") ?? "").trim() || null;
+    if (!code || !name) return { error: "A tag and a name are required." };
+    if (await db.assetItem.findFirst({ where: { code } })) return { error: `${code} is already in the list.` };
+    const asset = await db.assetItem.create({ data: { projectId, code, name, area, system, unit } });
+    await audit({ actor: user, action: "ASSET_ADDED", entityType: "AssetItem", entityId: asset.id, entityLabel: code, detail: name });
     revalidatePath("/assets");
-    revalidatePath("/admin/assets");
-    return {};
+    return { ok: `${code} added.` };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Failed." };
+  }
+}
+
+export async function updateAssetAction(_prev: { error?: string; ok?: string } | undefined, formData: FormData): Promise<{ error?: string; ok?: string }> {
+  try {
+    const ctx = await requireAssetKeeper();
+    const { user, db } = ctx;
+    const id = String(formData.get("id") ?? "");
+    const asset = await db.assetItem.findFirst({ where: { id } });
+    if (!asset) return { error: "That asset no longer exists." };
+    const name = String(formData.get("name") ?? "").trim();
+    if (!name) return { error: "An asset needs a name." };
+    const data = {
+      name,
+      area: String(formData.get("area") ?? "").trim() || null,
+      system: String(formData.get("system") ?? "").trim() || null,
+      unit: String(formData.get("unit") ?? "").trim() || null,
+    };
+    await db.assetItem.update({ where: { id }, data });
+    // The tag itself does not change: documents and drawings cite it.
+    await audit({ actor: user, action: "ASSET_UPDATED", entityType: "AssetItem", entityId: id, entityLabel: asset.code, oldValue: asset.name, newValue: name });
+    revalidatePath("/assets");
+    revalidatePath(`/assets/${id}`);
+    return { ok: `${asset.code} saved.` };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Failed." };
+  }
+}
+
+/** Only an asset nothing is linked to can be removed; otherwise the links would dangle. */
+export async function removeAssetAction(_prev: { error?: string; ok?: string } | undefined, formData: FormData): Promise<{ error?: string; ok?: string }> {
+  try {
+    const ctx = await requireAssetKeeper();
+    const { user, db } = ctx;
+    const id = String(formData.get("id") ?? "");
+    const asset = await db.assetItem.findFirst({ where: { id } });
+    if (!asset) return { error: "That asset no longer exists." };
+    const links = await db.relationship.count({ where: { kind: "DOC_ASSET", OR: [{ toId: id }, { fromId: id }] } });
+    if (links) return { error: `${asset.code} describes ${links} document${links === 1 ? "" : "s"}; unlink them first.` };
+    await db.assetItem.delete({ where: { id } });
+    await audit({ actor: user, action: "ASSET_REMOVED", entityType: "AssetItem", entityId: id, entityLabel: asset.code, detail: "Removed while unused." });
+    revalidatePath("/assets");
+    return { ok: `${asset.code} removed.` };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Failed." };
   }

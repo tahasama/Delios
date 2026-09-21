@@ -4,7 +4,7 @@ import { hasVerb } from "@/lib/auth";
 import { PageHeader, Banner } from "@/components/ui";
 import { SETUP_PAGES, SETUP_GROUPS, type SetupPage } from "./setup-pages";
 import {
-  FolderKanban, Building2, Gauge, Tags, FileDigit, Boxes, BadgeCheck, Users, Grid3x3, FileUp, Workflow, ScrollText, ArrowRight,
+  FolderKanban, Building2, Gauge, Tags, FileDigit, BadgeCheck, Users, Grid3x3, FileUp, Workflow, ScrollText, ArrowRight,
   type LucideIcon,
 } from "lucide-react";
 
@@ -17,7 +17,6 @@ const ICON: Record<string, LucideIcon> = {
   "/admin/dmp": Gauge,
   "/admin/config": Tags,
   "/admin/numbering": FileDigit,
-  "/admin/assets": Boxes,
   "/admin/functions": BadgeCheck,
   "/admin/users": Users,
   "/admin/distribution": Grid3x3,
@@ -48,12 +47,11 @@ export default async function AdminPage() {
   }
 
   // One live figure per card, so the hub says what is there, not just where to go.
-  const [projects, parties, sets, schemes, assets, functions, people, rules, pending, routes, events] = await Promise.all([
+  const [projects, parties, sets, schemes, functions, people, rules, pending, routes, events] = await Promise.all([
     db.project.count({ where: { orgId: ctx.orgId, status: "ACTIVE" } }),
     db.party.count({ where: { active: true } }),
     db.configSet.count(),
     db.scheme.count({ where: { active: true } }),
-    db.assetItem.count(),
     db.function.count({ where: { active: true } }),
     db.projectMembership.count({ where: { projectId: ctx.projectId, active: true } }),
     db.permissionRule.count(),
@@ -68,7 +66,6 @@ export default async function AdminPage() {
     "/admin/dmp": { text: "readiness checklist" },
     "/admin/config": { text: plural(sets, "value set") },
     "/admin/numbering": { text: plural(schemes, "scheme") },
-    "/admin/assets": { text: plural(assets, "item") },
     "/admin/functions": { text: plural(functions, "function") },
     "/admin/users": { text: `${plural(people, "person", "people")} on ${ctx.project.code}` },
     "/admin/distribution": { text: plural(rules, "rule") },

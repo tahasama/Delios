@@ -1,14 +1,26 @@
 import Link from "next/link";
 import { requireScope } from "@/lib/scope";
-import { PageHeader, EmptyState, ButtonLink } from "@/components/ui";
+import { PageHeader, EmptyState, Card, Field, inputCls } from "@/components/ui";
+import { ActionForm } from "@/components/form";
+import { addAssetAction, updateAssetAction, removeAssetAction } from "@/lib/actions/admin";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Assets & tags" };
 
-export default async function AssetsPage() {
-  const { db } = await requireScope();
+/**
+ * The project's physical breakdown — equipment, systems, areas — and the
+ * documents that describe each one. Document Control keeps the list here.
+ */
+export default async function AssetsPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
+  const ctx = await requireScope();
+  const { db } = ctx;
+  const keeper = ctx.can("CONTROL") || ctx.can("CONFIGURE");
+  const q = ((await searchParams).q ?? "").trim();
   const [assets, counts] = await Promise.all([
-    db.assetItem.findMany({ orderBy: { code: "asc" } }),
+    db.assetItem.findMany({
+      where: q ? { OR: [{ code: { contains: q } }, { name: { contains: q } }, { system: { contains: q } }, { area: { contains: q } }] } : {},
+      orderBy: { code: "asc" },
+    }),
     db.relationship.groupBy({ by: ["toId"], _count: true, where: { kind: "DOC_ASSET" } }),
   ]);
   const countFor = (id: string) => counts.find((c) => c.toId === id)?._count ?? 0;
@@ -17,20 +29,61 @@ export default async function AssetsPage() {
     <div className="space-y-4">
       <PageHeader
         title="Assets & tags"
-        subtitle="Browse equipment, systems and areas, then open one to see every controlled document associated with it."
-        actions={<ButtonLink href="/reports" variant="secondary">Open reports</ButtonLink>}
+        subtitle="Equipment, systems and areas, and every controlled document that describes each one. Link a document to a tag from the document's Details."
       />
+
+      {keeper ? (
+        <details className="rounded-2xl border border-slate-200 bg-white px-5 py-3 shadow-sm" open={!assets.length && !q}>
+          <summary className="cursor-pointer text-sm font-semibold text-[#1e3a5f]">+ Add an asset</summary>
+          <div className="mt-3 max-w-3xl">
+            <ActionForm action={addAssetAction} submitLabel="Add asset" size="sm">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <Field label="Tag" required hint="as on the drawings, e.g. P-101"><input name="code" required className={`${inputCls} uppercase`} placeholder="P-101" /></Field>
+                <Field label="Name" required className="sm:col-span-2"><input name="name" required className={inputCls} placeholder="Feed pump" /></Field>
+                <Field label="Area"><input name="area" className={inputCls} placeholder="71" /></Field>
+                <Field label="System"><input name="system" className={inputCls} placeholder="Raw water feed" /></Field>
+                <Field label="Unit"><input name="unit" className={inputCls} placeholder="U-100" /></Field>
+              </div>
+            </ActionForm>
+          </div>
+        </details>
+      ) : null}
+
+      <form className="flex gap-2">
+        <input name="q" defaultValue={q} placeholder="Find a tag, name, system or area…" className={`${inputCls} max-w-sm`} />
+      </form>
+
       {assets.length === 0 ? (
-        <EmptyState title="No assets" body="Assets are managed by the administrator." />
+        <EmptyState title={q ? `Nothing matches “${q}”` : "No assets yet"} body={keeper ? "Add the first one above." : "Document Control keeps the asset list."} />
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {assets.map((a) => (
-            <Link key={a.id} href={`/assets/${a.id}`} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-[#2d5480]/40 hover:shadow">
-              <p className="font-mono text-sm font-bold text-[#1e3a5f]">{a.code}</p>
-              <p className="mt-0.5 text-sm text-slate-700">{a.name}</p>
-              <p className="mt-1 text-xs text-slate-400">{[a.area && `area ${a.area}`, a.system, a.unit].filter(Boolean).join(" · ")}</p>
-              <p className="mt-2 text-xs font-medium text-slate-500">{countFor(a.id)} associated document{countFor(a.id) === 1 ? "" : "s"}</p>
-            </Link>
+            <Card key={a.id} className="p-0">
+              <Link href={`/assets/${a.id}`} className="block rounded-xl transition hover:bg-slate-50/70">
+                <p className="font-mono text-sm font-bold text-[#1e3a5f]">{a.code}</p>
+                <p className="mt-0.5 text-sm text-slate-700">{a.name}</p>
+                <p className="mt-1 text-xs text-slate-400">{[a.area && `area ${a.area}`, a.system, a.unit].filter(Boolean).join(" · ") || "—"}</p>
+                <p className="mt-2 text-xs font-medium text-slate-500">{countFor(a.id)} document{countFor(a.id) === 1 ? "" : "s"}</p>
+              </Link>
+              {keeper ? (
+                <details className="mt-2 border-t border-slate-100 pt-2">
+                  <summary className="cursor-pointer text-xs font-semibold text-[#315f83]">Edit</summary>
+                  <div className="mt-2 space-y-2">
+                    <ActionForm action={updateAssetAction} submitLabel="Save" size="sm" hidden={{ id: a.id }}>
+                      <Field label="Name" required><input name="name" required defaultValue={a.name} className={inputCls} /></Field>
+                      <div className="grid grid-cols-3 gap-2">
+                        <Field label="Area"><input name="area" defaultValue={a.area ?? ""} className={inputCls} /></Field>
+                        <Field label="System"><input name="system" defaultValue={a.system ?? ""} className={inputCls} /></Field>
+                        <Field label="Unit"><input name="unit" defaultValue={a.unit ?? ""} className={inputCls} /></Field>
+                      </div>
+                    </ActionForm>
+                    {countFor(a.id) === 0 ? (
+                      <ActionForm action={removeAssetAction} submitLabel="Remove" variant="danger" size="sm" hidden={{ id: a.id }} confirmText={`Remove ${a.code}? Nothing is linked to it.`} className="space-y-0" />
+                    ) : <p className="text-[11px] text-slate-400">The tag stays fixed; it can be removed once no document is linked.</p>}
+                  </div>
+                </details>
+              ) : null}
+            </Card>
           ))}
         </div>
       )}

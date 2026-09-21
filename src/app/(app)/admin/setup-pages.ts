@@ -48,12 +48,6 @@ export const SETUP_PAGES: SetupPage[] = [
     text: "How document numbers are built, and which deliverable type uses which scheme.",
     group: "Classification",
   },
-  {
-    href: "/admin/assets",
-    title: "Assets & tags",
-    text: "The asset breakdown documents are associated with.",
-    group: "Classification",
-  },
 
   {
     href: "/admin/functions",

@@ -55,9 +55,10 @@ export default async function FunctionsPage() {
   });
 
   const selectors = [
+    // Discipline first: most grants are "this job, for this discipline".
+    { name: "discipline", label: "Discipline", values: disciplines },
     { name: "deliverableType", label: "Deliverable type", values: deliverableTypes },
     { name: "docType", label: "Document type", values: docTypes },
-    { name: "discipline", label: "Discipline", values: disciplines },
     { name: "criticality", label: "Criticality", values: criticalities },
     { name: "confidentiality", label: "Confidentiality", values: confidentialities },
   ];

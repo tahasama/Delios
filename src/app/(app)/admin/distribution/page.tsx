@@ -31,7 +31,7 @@ function codeFor(verbs: Verb[]): (typeof CODE)[number] | null {
   return null;
 }
 
-type Search = { discipline?: string; all?: string };
+type Search = { type?: string; all?: string };
 
 export default async function AdminDistributionPage({ searchParams }: { searchParams: Promise<Search> }) {
   const sp = await searchParams;
@@ -58,20 +58,20 @@ export default async function AdminDistributionPage({ searchParams }: { searchPa
   for (const r of await db.permissionRule.findMany({ where: { discipline: { not: null } }, select: { discipline: true } })) if (r.discipline) usedDisciplines.add(r.discipline);
   const nameOf = (id: string) => users.find((u) => u.id === id)?.name ?? id;
 
-  const used = new Set(inRegister.map((r) => r.docType));
+  // Rows are disciplines: that is how an engineering organization distributes
+  // (the electrical lead approves electrical documents). Disciplines in use —
+  // documents or rules — by default; every published one on request.
   const showAll = sp.all === "1";
-  const rowTypes = showAll ? docTypes : docTypes.filter((t) => used.has(t.code));
+  const rows = showAll ? disciplines : disciplines.filter((d) => usedDisciplines.has(d.code));
 
-  // A rule narrowed to a discipline is invisible unless the question names
-  // one, so the matrix asks about a discipline rather than pretending the
-  // answer is discipline-free.
-  const discipline = sp.discipline && disciplines.some((d) => d.code === sp.discipline) ? sp.discipline : null;
+  // A rule narrowed to a document type still shows when that type is asked about.
+  const docType = sp.type && docTypes.some((t) => t.code === sp.type) ? sp.type : null;
 
   const actors = await Promise.all(functions.map((f) => loadActor(ctx, f.id)));
-  const grid = rowTypes.map((type) => ({
-    type,
+  const grid = rows.map((row) => ({
+    type: row,
     cells: actors.map((actor) =>
-      codeFor(verbsFor(actor, { docType: type.code, discipline, confidentiality: "INTERNAL" })),
+      codeFor(verbsFor(actor, { discipline: row.code, docType, confidentiality: "INTERNAL" })),
     ),
   }));
 
@@ -90,25 +90,25 @@ export default async function AdminDistributionPage({ searchParams }: { searchPa
         subtitle="Who receives which information, and in what capacity — settled before any transmittal is raised."
       />
       <p className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
-        Rows are document types, columns are functions; the letter says what that function does with it.
+        Rows are disciplines, columns are functions; the letter says what that function does with that discipline's documents.
         {mayEdit ? <Link href="/admin/controlled" className="font-semibold text-[#315f83] hover:underline">Change it by upload →</Link> : <span className="text-slate-400">Read only — changes are made by an administrator.</span>}
       </p>
 
       <Card
         title="Who gets what"
-        description={`${rowTypes.length} document type${rowTypes.length === 1 ? "" : "s"} × ${functions.length} functions · internal classification`}
+        description={`${rows.length} discipline${rows.length === 1 ? "" : "s"} × ${functions.length} functions · ${docType ? `document type ${docType}` : "any document type"} · internal classification`}
       >
         <form method="get" className="mb-4 flex flex-wrap items-end gap-3 rounded-xl bg-slate-50 px-3 py-3">
           <label className="text-xs">
-            <span className="mb-1 block font-medium text-slate-700">Discipline</span>
-            <select name="discipline" defaultValue={discipline ?? ""} className={`${inputCls} py-1.5 text-xs`}>
-              <option value="">Any discipline</option>
-              {disciplines.filter((d) => usedDisciplines.has(d.code) || d.code === discipline).map((d) => <option key={d.code} value={d.code}>{d.label}</option>)}
+            <span className="mb-1 block font-medium text-slate-700">Document type</span>
+            <select name="type" defaultValue={docType ?? ""} className={`${inputCls} py-1.5 text-xs`}>
+              <option value="">Any type</option>
+              {docTypes.map((t) => <option key={t.code} value={t.code}>{t.code} — {t.label}</option>)}
             </select>
           </label>
           <label className="flex items-center gap-2 pb-2 text-xs text-slate-600">
             <input type="checkbox" name="all" value="1" defaultChecked={showAll} />
-            Show every published type ({docTypes.length})
+            Show every published discipline ({disciplines.length})
           </label>
           <button type="submit" className={btn("secondary", "sm")}>Apply</button>
         </form>
@@ -131,7 +131,7 @@ export default async function AdminDistributionPage({ searchParams }: { searchPa
             <thead>
               <tr>
                 <th className="sticky left-0 z-10 border-b border-slate-200 bg-white px-3 py-2 text-left font-semibold uppercase tracking-wide text-slate-400">
-                  Document type
+                  Discipline
                 </th>
                 {functions.map((f) => (
                   <th key={f.id} className="border-b border-slate-200 px-1.5 py-2 text-center align-bottom">
@@ -169,10 +169,9 @@ export default async function AdminDistributionPage({ searchParams }: { searchPa
             </tbody>
           </table>
         </div>
-        {rowTypes.length === 0 ? (
+        {rows.length === 0 ? (
           <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
-            This project holds no documents yet, so there is nothing to show. Tick “Show every published type”
-            to see the matrix against your whole type list.
+            No discipline is in use yet. Tick “Show every published discipline” to see the matrix against the whole list.
           </p>
         ) : null}
       </Card>
