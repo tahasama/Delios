@@ -3,30 +3,36 @@ import { requireScope } from "@/lib/scope";
 import { isController, isAdmin } from "@/lib/auth";
 import { PageHeader, Card } from "@/components/ui";
 import { fmtDate, fmtDateTime } from "@/lib/utils";
-import { CATALOG, FAMILY_TITLES } from "@/lib/checks/catalog";
-import { latestResults } from "@/lib/checks/engine";
 import { effectiveSpine } from "@/lib/spine";
 import { RunChecksButton } from "./run-button";
 import { AssuranceTabs } from "./tabs";
+import { problemDocuments } from "@/lib/problems";
 import { ArrowRight } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Assurance" };
 
 const OWNERS: Record<string, string> = { CF: "Document Control", OR: "Originators", RV: "Reviewers", OG: "The organization" };
+const SEVERITY: Record<string, string> = {
+  CRITICAL: "bg-red-100 text-red-800",
+  MAJOR: "bg-amber-100 text-amber-800",
+  MINOR: "bg-slate-100 text-slate-600",
+  ADVISORY: "bg-slate-100 text-slate-500",
+};
 
 /**
  * Can the register be trusted? One sentence, then what needs doing and by
  * whom. The Standard's vocabulary stays on the tabs behind it.
  */
-export default async function AssurancePage() {
+export default async function AssurancePage({ searchParams }: { searchParams: Promise<{ owner?: string }> }) {
+  const ownerFilter = (await searchParams).owner;
+  const owner = ownerFilter && OWNERS[ownerFilter] ? ownerFilter : undefined;
   const ctx = await requireScope();
   const { user, db } = ctx;
   const controller = isController(user) || isAdmin(user);
 
-  const [runs, results, scope, spine, byOwner, risks] = await Promise.all([
+  const [runs, scope, spine, byOwner, risks, work] = await Promise.all([
     db.checkRun.findMany({ orderBy: { ranAt: "desc" }, take: 8 }),
-    latestResults(ctx),
     db.scopeConfig.findFirst(),
     effectiveSpine(ctx),
     db.defect.groupBy({ by: ["ownerRole", "severity", "status"], _count: true }),
@@ -37,6 +43,7 @@ export default async function AssurancePage() {
       db.baselineEntry.count({ where: { document: { state: "WITHDRAWN" } } }),
       db.revision.count({ where: { state: "VOID", voidReassessment: null } }),
     ]).then((n) => n.reduce((a, b) => a + b, 0)),
+    problemDocuments(ctx, owner),
   ]);
   const last = runs[0] ?? null;
   const threshold = scope?.integrityThreshold ?? 95;
@@ -44,14 +51,6 @@ export default async function AssurancePage() {
   const serious = count((d) => d.status === "OPEN" && (d.severity === "CRITICAL" || d.severity === "MAJOR"));
   const critical = count((d) => d.status === "OPEN" && d.severity === "CRITICAL");
   const below = last ? last.integrity < threshold || last.openCritical > 0 : false;
-
-  // Problem areas: only the ones where something was found.
-  const areas = Object.keys(FAMILY_TITLES).map((fam) => {
-    const checks = CATALOG.filter((c) => c.id.startsWith(`${fam}-`));
-    const failing = checks.filter((c) => results.get(c.id)?.result === "FAIL");
-    return { fam, name: FAMILY_TITLES[fam].replace(/^H\.\d+\s/, ""), failing: failing.length, items: failing.reduce((n, c) => n + (results.get(c.id)?.failingCount ?? 0), 0) };
-  });
-  const troubled = areas.filter((a) => a.failing).sort((a, b) => b.items - a.items);
 
   return (
     <div className="space-y-4">
@@ -85,7 +84,7 @@ export default async function AssurancePage() {
 
       {/* What to look at */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Tile href="/conformance/defects" label="Serious problems" value={serious} tone={serious ? "bad" : "good"} hint="critical or major, still open" />
+        <Tile href="#documents" label="Serious problems" value={serious} tone={serious ? "bad" : "good"} hint="critical or major, still open" />
         <Tile href="/exposures" label="Out-of-date risks" value={risks} tone={risks ? "warn" : "good"} hint="replaced or withdrawn, maybe still in use" />
         <Tile href="/conformance/checks" label="Checked" value={last ? `${last.executed}/${last.totalChecks}` : "—"} tone={last && last.executed < last.totalChecks ? "warn" : undefined} hint={last ? "checks that could run on this data" : "no run yet"} />
         <Tile href="/conformance/traceability" label="Traceability" value={spine.counts.REVIEW_REQUIRED + spine.counts.GAP} tone={spine.releasable ? "good" : "warn"} hint={spine.releasable ? "rules, routes and checks agree" : "links to review"} />
@@ -100,7 +99,7 @@ export default async function AssurancePage() {
                 const n = (st: string, sev?: string) => count((d) => d.ownerRole === code && d.status === st && (!sev || d.severity === sev));
                 return (
                   <tr key={code}>
-                    <td className="py-1.5"><Link href={`/conformance/defects?owner=${code}`} className="text-slate-700 hover:underline">{label}</Link></td>
+                    <td className="py-1.5"><Link href={`/conformance?owner=${code}#documents`} className="text-slate-700 hover:underline">{label}</Link></td>
                     <td className={`py-1.5 text-right tabular-nums ${n("OPEN", "CRITICAL") ? "font-semibold text-red-700" : "text-slate-400"}`}>{n("OPEN", "CRITICAL")}</td>
                     <td className={`py-1.5 text-right tabular-nums ${n("OPEN", "MAJOR") ? "font-semibold text-amber-700" : "text-slate-400"}`}>{n("OPEN", "MAJOR")}</td>
                     <td className="py-1.5 text-right tabular-nums text-slate-700">{n("OPEN")}</td>
@@ -128,22 +127,55 @@ export default async function AssurancePage() {
         </Card>
       </div>
 
-      <Card title="Where the problems are" description={troubled.length ? `${troubled.length} area${troubled.length === 1 ? "" : "s"} with problems; ${areas.length - troubled.length} with nothing found` : "Nothing found in any area."}>
-        {troubled.length ? (
-          <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            {troubled.map((a) => (
-              <li key={a.fam}>
-                <Link href={`/conformance/checks?family=${a.fam}&result=FAIL`} className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-xs transition hover:border-[#2d5480]/40 hover:shadow-sm">
-                  <span className="font-semibold text-slate-700">{a.name}</span>
-                  <span className="text-red-700">{a.items} item{a.items === 1 ? "" : "s"} · {a.failing} check{a.failing === 1 ? "" : "s"}</span>
-                </Link>
+      <Card
+        id="documents"
+        title={`Documents with problems · ${work.documents.length}`}
+        description="Each line is something wrong on that document, and where to put it right. Fixed problems disappear at the next check run."
+      >
+        <div className="mb-3 flex flex-wrap gap-1.5 text-xs">
+          <Link href="/conformance#documents" className={`rounded-full px-2.5 py-1 ${!owner ? "bg-[#1e3a5f] text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>Everyone</Link>
+          {Object.entries(OWNERS).map(([code, label]) => (
+            <Link key={code} href={`/conformance?owner=${code}#documents`} className={`rounded-full px-2.5 py-1 ${owner === code ? "bg-[#1e3a5f] text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>{label} to fix</Link>
+          ))}
+        </div>
+        {work.documents.length ? (
+          <ul className="divide-y divide-slate-100">
+            {work.documents.slice(0, 60).map((d) => (
+              <li key={d.id} className="py-3">
+                <div className="flex flex-wrap items-baseline gap-x-2">
+                  <Link href={`/documents/${d.id}`} className="font-mono text-[13px] font-semibold text-[#1e3a5f] hover:underline">{d.docNumber}</Link>
+                  <span className="min-w-0 truncate text-xs text-slate-500">{d.title}</span>
+                </div>
+                <ul className="mt-1.5 space-y-1">
+                  {d.problems.map((p) => (
+                    <li key={p.id} className="flex flex-wrap items-start gap-2 text-xs">
+                      <span className={`mt-0.5 shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold ${SEVERITY[p.severity] ?? SEVERITY.MINOR}`}>{p.severity.toLowerCase()}</span>
+                      <span className="min-w-0 flex-1 text-slate-700">{p.text}<span className="text-slate-400"> · {p.owner}</span></span>
+                      <Link href={p.fix.href} className="shrink-0 font-semibold text-[#315f83] hover:underline">{p.fix.label} →</Link>
+                    </li>
+                  ))}
+                </ul>
               </li>
             ))}
           </ul>
+        ) : <p className="text-xs text-emerald-700">No document has an open problem{owner ? ` for ${OWNERS[owner]}` : ""}.</p>}
+        {work.documents.length > 60 ? <p className="mt-2 text-[11px] text-slate-400">First 60 shown, worst first. Filter by who fixes them to narrow the list.</p> : null}
+
+        {work.general.length ? (
+          <div className="mt-4 rounded-xl bg-slate-50 p-3">
+            <p className="mb-1.5 text-xs font-semibold text-slate-700">Not tied to one document · {work.general.length}</p>
+            <ul className="space-y-1">
+              {work.general.map((p) => (
+                <li key={p.id} className="flex flex-wrap items-start gap-2 text-xs">
+                  <span className={`mt-0.5 shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold ${SEVERITY[p.severity] ?? SEVERITY.MINOR}`}>{p.severity.toLowerCase()}</span>
+                  <span className="min-w-0 flex-1 text-slate-700">{p.text}<span className="text-slate-400"> · {p.owner}</span></span>
+                  <Link href={p.fix.href} className="shrink-0 font-semibold text-[#315f83] hover:underline">{p.fix.label} →</Link>
+                </li>
+              ))}
+            </ul>
+          </div>
         ) : null}
-        <p className="mt-3 text-[11px] text-slate-400">
-          Measured against Document Management Standard v{scope?.standardVersion ?? "1.0"}. The percentage counts documents free of critical and major problems; accepted problems still count until fixed.
-        </p>
+        <p className="mt-3 text-[11px] text-slate-400">Measured against Document Management Standard v{scope?.standardVersion ?? "1.0"}. Problem-free share counts documents with no critical or major problem.</p>
       </Card>
     </div>
   );

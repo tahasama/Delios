@@ -3,7 +3,7 @@ import { requireScope } from "@/lib/scope";
 import { PageHeader, Card, DataTable, Th, Td, Chip, EmptyState, inputCls, btn } from "@/components/ui";
 import { fmtDate } from "@/lib/utils";
 import { getSet } from "@/lib/config";
-import { buildReport, REPORT_IDS, type ReportId } from "@/lib/reports";
+import { buildReport, filterRows, REPORT_IDS, type ReportId, type Cell, type Segment, type Bar } from "@/lib/reports";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Reports" };
@@ -20,18 +20,20 @@ const REPORT_TITLES: Record<ReportId, string> = {
 export default async function ReportsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ r?: string; q1?: string; q5?: string; asOf?: string }>;
+  searchParams: Promise<{ r?: string; rq?: string; q1?: string; q5?: string; asOf?: string }>;
 }) {
   const ctx = await requireScope();
   const { db } = ctx;
   const sp = await searchParams;
   const current: ReportId = REPORT_IDS.includes(sp.r as ReportId) ? (sp.r as ReportId) : "register";
+  const q = (sp.rq ?? "").trim();
   const [report, statuses, assets, assetCounts] = await Promise.all([
     buildReport(ctx, current),
     getSet("STATUSES"),
     db.assetItem.findMany({ orderBy: { code: "asc" } }),
     db.relationship.groupBy({ by: ["toId"], _count: true, where: { kind: "DOC_ASSET" } }),
   ]);
+  const rows = filterRows(report.rows, q);
 
   // Q1 — current revision & status
   const q1 = sp.q1?.trim();
@@ -68,7 +70,7 @@ export default async function ReportsPage({
     <div className="space-y-5">
       <PageHeader
         title="Reports"
-        subtitle="Counted from the register when you open them. Each one downloads as CSV."
+        subtitle="Each report answers one question: a chart to see it at a glance, then the documents behind it. Counted when you open it; downloads as CSV."
         actions={
           <a href="/api/register/export" className={btn("secondary", "sm")} title="The whole register as CSV">
             Export register
@@ -87,26 +89,37 @@ export default async function ReportsPage({
 
       <Card
         title={report.title}
-        description={report.question}
-        actions={<a href={`/api/reports/${report.id}`} className={btn("secondary", "sm")}>Download CSV</a>}
+        description={`${report.question} ${report.audience}`}
+        actions={<a href={`/api/reports/${report.id}${q ? `?rq=${encodeURIComponent(q)}` : ""}`} className={btn("secondary", "sm")}>Download CSV</a>}
       >
-        <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <div className="mb-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
           {report.figures.map((f) => (
             <div key={f.label} className="rounded-xl border border-slate-200 px-3 py-2.5">
               <p className="text-[11px] font-semibold text-slate-500">{f.label}</p>
-              <p className={`text-xl font-semibold tabular-nums ${f.tone === "bad" ? "text-red-700" : f.tone === "warn" ? "text-amber-700" : f.tone === "good" ? "text-emerald-700" : "text-slate-900"}`}>{f.value}</p>
+              <p className={`text-xl font-semibold tabular-nums ${TEXT[f.tone ?? ""] ?? "text-slate-900"}`}>{f.value}</p>
             </div>
           ))}
         </div>
-        {report.rows.length ? (
-          <DataTable head={<tr>{report.columns.map((c, n) => <Th key={c} className={n ? "text-right" : undefined}>{c}</Th>)}</tr>}>
-            {report.rows.map((row, r) => (
-              <tr key={r}>
-                {row.map((cell, n) => <Td key={n} className={n ? "text-right text-xs tabular-nums" : "text-xs font-medium text-slate-800"}>{cell}</Td>)}
+
+        <BarChart title={report.chart.title} segments={report.chart.segments} bars={report.chart.bars} />
+
+        <div className="mb-3 mt-6 flex flex-wrap items-center justify-between gap-2">
+          <p className="text-sm font-semibold text-slate-800">The detail · {rows.length}{q ? ` of ${report.rows.length}` : ""}</p>
+          <form className="flex gap-2">
+            <input type="hidden" name="r" value={current} />
+            <input name="rq" defaultValue={q} placeholder="Filter: document, sender, reviewer…" className={`${inputCls} w-64 py-1.5 text-xs`} />
+          </form>
+        </div>
+        {rows.length ? (
+          <DataTable head={<tr>{report.columns.map((c) => <Th key={c}>{c}</Th>)}</tr>}>
+            {rows.slice(0, 200).map((row, r) => (
+              <tr key={r} className="hover:bg-slate-50/70">
+                {row.map((cell, n) => <Td key={n} className="text-xs">{renderCell(cell)}</Td>)}
               </tr>
             ))}
           </DataTable>
-        ) : <p className="text-xs text-slate-400">{report.empty}</p>}
+        ) : <p className="text-xs text-slate-400">{q ? `Nothing matches “${q}”.` : report.empty}</p>}
+        {rows.length > 200 ? <p className="mt-2 text-[11px] text-slate-400">First 200 shown; the CSV has all {rows.length}.</p> : null}
       </Card>
 
       <h2 className="pt-2 text-sm font-semibold text-slate-700">Look up</h2>
@@ -208,5 +221,51 @@ export default async function ReportsPage({
       </Card>
 
     </div>
+  );
+}
+
+const TEXT: Record<string, string> = { good: "text-emerald-700", warn: "text-amber-700", bad: "text-red-700" };
+const FILL: Record<Segment["tone"], string> = { good: "bg-emerald-500", info: "bg-sky-500", warn: "bg-amber-400", bad: "bg-red-500", muted: "bg-slate-300" };
+const CHIP: Record<string, string> = { good: "bg-emerald-100 text-emerald-800", warn: "bg-amber-100 text-amber-800", bad: "bg-red-100 text-red-800" };
+
+function renderCell(cell: Cell) {
+  if (typeof cell !== "object") return cell;
+  if (cell.href) return <Link href={cell.href} className="font-mono font-semibold text-[#1e3a5f] hover:underline">{cell.text}</Link>;
+  if (cell.tone) return <span className={`whitespace-nowrap rounded px-1.5 py-0.5 text-[11px] font-semibold ${CHIP[cell.tone]}`}>{cell.text}</span>;
+  return cell.text;
+}
+
+/** Horizontal bars, one per row, stacked by state; the numbers are printed on the bar. */
+function BarChart({ title, segments, bars }: { title: string; segments: Segment[]; bars: Bar[] }) {
+  const total = (b: Bar) => segments.reduce((n, s) => n + (b.values[s.key] ?? 0), 0);
+  const max = Math.max(1, ...bars.map(total));
+  if (!bars.length) return null;
+  return (
+    <figure>
+      <figcaption className="mb-2 flex flex-wrap items-center gap-x-4 gap-y-1">
+        <span className="text-sm font-semibold text-slate-800">{title}</span>
+        {segments.map((s) => (
+          <span key={s.key} className="inline-flex items-center gap-1.5 text-[11px] text-slate-500"><span className={`h-2.5 w-2.5 rounded-sm ${FILL[s.tone]}`} />{s.label}</span>
+        ))}
+      </figcaption>
+      <ul className="space-y-1.5">
+        {bars.map((b) => (
+          <li key={b.label} className="flex items-center gap-2 text-xs">
+            <span className="w-28 shrink-0 truncate text-right text-slate-600" title={b.label}>{b.label}</span>
+            <span className="flex h-5 flex-1 overflow-hidden rounded bg-slate-50">
+              <span className="flex h-full" style={{ width: `${(total(b) / max) * 100}%` }}>
+                {segments.map((s) => {
+                  const v = b.values[s.key] ?? 0;
+                  return v ? (
+                    <span key={s.key} title={`${s.label}: ${v}`} className={`flex h-full items-center justify-center text-[10px] font-semibold text-white ${FILL[s.tone]}`} style={{ width: `${(v / total(b)) * 100}%` }}>{v}</span>
+                  ) : null;
+                })}
+              </span>
+            </span>
+            <span className="w-8 shrink-0 tabular-nums text-slate-500">{total(b)}</span>
+          </li>
+        ))}
+      </ul>
+    </figure>
   );
 }
