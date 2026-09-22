@@ -51,18 +51,3 @@ export async function applySetUploadAction(_prev: SetUploadState | undefined, fo
   revalidatePath("/admin/config");
   return { ok: `${setKey} updated from ${fileName}: ${summary}` };
 }
-
-/** Which register document is this project's DMP. */
-export async function setDmpDocumentAction(_prev: { error?: string; ok?: string } | undefined, formData: FormData): Promise<{ error?: string; ok?: string }> {
-  const ctx = await requireScope();
-  if (!ctx.can("CONFIGURE")) return { error: ctx.why("CONFIGURE") };
-  const documentId = String(formData.get("documentId") ?? "") || null;
-  if (documentId && !(await ctx.db.document.findUnique({ where: { id: documentId }, select: { id: true } }))) return { error: "That document is not in this project's register." };
-  const scope = await ctx.db.scopeConfig.findFirst({ select: { id: true } });
-  if (!scope) return { error: "Set up the project scope first (Scope & readiness)." };
-  await ctx.db.scopeConfig.update({ where: { id: scope.id }, data: { dmpDocumentId: documentId } });
-  await audit({ actor: ctx.user, action: "DMP_LINKED", entityType: "ScopeConfig", entityId: scope.id, detail: documentId ? `DMP document set` : "DMP document cleared" });
-  revalidatePath("/admin/config");
-  revalidatePath("/conformance");
-  return { ok: documentId ? "DMP linked." : "DMP link cleared." };
-}

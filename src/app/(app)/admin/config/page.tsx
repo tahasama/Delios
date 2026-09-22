@@ -7,9 +7,6 @@ import { addConfigValueAction, retireConfigValueAction, createConfigSetAction, u
 import { getSets } from "@/lib/config";
 import { SET_PROP_FIELDS, parseProps, type PropField } from "@/lib/config-props";
 import { SetUpload } from "./set-upload";
-import { dmpSetsState } from "@/lib/dmp-sets";
-import { setDmpDocumentAction } from "@/lib/actions/sets";
-import { fmtDate } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Published value sets" };
@@ -26,53 +23,14 @@ export default async function AdminConfigPage({ searchParams }: { searchParams: 
     db.configValue.findMany({ where: { setKey: currentKey }, orderBy: [{ sort: "asc" }, { code: "asc" }] }),
   ]);
   const propFields = SET_PROP_FIELDS[currentKey];
-  const [dmp, dmpCandidates] = await Promise.all([
-    dmpSetsState(ctx),
-    db.document.findMany({ where: { state: { in: ["PLANNED", "ACTIVE"] } }, orderBy: { docNumber: "asc" }, select: { id: true, docNumber: true, title: true } }),
-  ]);
-  const looksLikeDmp = (d: { title: string }) => /management plan|\bdmp\b/i.test(d.title);
-  const candidates = [...dmpCandidates.filter(looksLikeDmp), ...dmpCandidates.filter((d) => !looksLikeDmp(d))];
 
   return (
     <div className="space-y-4">
       <PageHeader
         title="Disciplines, types & controlled lists"
-        subtitle="The codes and choices your organization uses, set up at the start of a project and written into the DMP. Change them here by hand or from a spreadsheet. A code already used is retired, never deleted, so older documents keep it and stay findable."
+        subtitle="The codes and choices your organization uses. All sets are listed and approved in the Document Management Plan. Change them here by hand or from a spreadsheet; a code already used is retired, never deleted, so older documents keep it and stay findable."
       />
 
-      {/* The sets are agreed in the DMP; the DMP is approved like any other document. */}
-      <Card
-        title="Agreed in the DMP"
-        description="Nobody approves a list change here: the lists are written into the Document Management Plan, and the DMP is reviewed and approved like any other document. When a list changes after the DMP was released, this reminds you to revise it."
-        actions={<a href="/api/config/dmp-export" className="text-xs font-semibold text-link hover:underline">Export all lists for the DMP ↓</a>}
-      >
-        {dmp.dmp ? (
-          dmp.revision ? (
-            dmp.changed.length ? (
-              <div className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900 ring-1 ring-amber-200">
-                <p className="font-semibold">Lists changed since {dmp.dmp.docNumber} rev {dmp.revision.value} was released on {fmtDate(dmp.revision.releasedAt)} — revise the DMP.</p>
-                <ul className="mt-1 space-y-0.5">{dmp.changed.map((c) => <li key={c.setKey}><a href={`/admin/config?set=${c.setKey}`} className="font-semibold hover:underline">{c.setTitle}</a>: {c.codes.slice(0, 8).join(", ")}{c.codes.length > 8 ? ` +${c.codes.length - 8}` : ""}</li>)}</ul>
-              </div>
-            ) : (
-              <p className="rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-800">The lists match <strong>{dmp.dmp.docNumber} rev {dmp.revision.value}</strong>, released {fmtDate(dmp.revision.releasedAt)}.</p>
-            )
-          ) : (
-            <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600"><strong>{dmp.dmp.docNumber}</strong> has no released revision yet. Once it is approved and released, changes after that date show here.</p>
-          )
-        ) : (
-          <p className="text-xs text-slate-500">No DMP document is linked yet.</p>
-        )}
-        <div className="mt-3 max-w-2xl">
-          <ActionForm action={setDmpDocumentAction} submitLabel="Link" size="sm" variant="secondary">
-            <Field label="Which register document is the DMP?" hint="documents titled “management plan” are listed first">
-              <select name="documentId" defaultValue={dmp.dmp?.id ?? ""} className={inputCls}>
-                <option value="">— not linked —</option>
-                {candidates.map((d) => <option key={d.id} value={d.id}>{d.docNumber} — {d.title}</option>)}
-              </select>
-            </Field>
-          </ActionForm>
-        </div>
-      </Card>
 
       <div className="flex flex-wrap items-center gap-1.5">
         {sets.map((s) => (
