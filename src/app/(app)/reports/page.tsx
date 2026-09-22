@@ -16,38 +16,19 @@ const REPORT_TITLES: Record<ReportId, string> = {
   readiness: "Readiness",
 };
 
-// Reports a project team reads, plus the look-ups the register must answer directly (§16.4).
+// Reports a project team reads, and the register as it stood on a past date (§16.4).
 export default async function ReportsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ r?: string; rq?: string; q1?: string; q5?: string; asOf?: string }>;
+  searchParams: Promise<{ r?: string; rq?: string; asOf?: string }>;
 }) {
   const ctx = await requireScope();
   const { db } = ctx;
   const sp = await searchParams;
   const current: ReportId = REPORT_IDS.includes(sp.r as ReportId) ? (sp.r as ReportId) : "register";
   const q = (sp.rq ?? "").trim();
-  const [report, statuses, assets, assetCounts] = await Promise.all([
-    buildReport(ctx, current),
-    getSet("STATUSES"),
-    db.assetItem.findMany({ orderBy: { code: "asc" } }),
-    db.relationship.groupBy({ by: ["toId"], _count: true, where: { kind: "DOC_ASSET" } }),
-  ]);
+  const report = await buildReport(ctx, current);
   const rows = filterRows(report.rows, q);
-
-  // Q1 — current revision & status
-  const q1 = sp.q1?.trim();
-  const q1Doc = q1 ? await db.document.findFirst({
-    where: { OR: [{ docNumber: { contains: q1 } }, { title: { contains: q1 } }] },
-    include: { revisions: { orderBy: { createdAt: "desc" }, include: { files: true } } },
-  }) : null;
-
-  // Q5 — who was issued this revision, and when
-  const q5 = sp.q5?.trim();
-  const q5Doc = q5 ? await db.document.findFirst({
-    where: { docNumber: { contains: q5 } },
-    include: { revisions: { orderBy: { createdAt: "desc" }, include: { transmittalItems: { include: { transmittal: { include: { recipients: true } } } } } } },
-  }) : null;
 
   // Q8 — what was the current revision on a given date
   const asOf = sp.asOf ? new Date(sp.asOf) : null;
@@ -122,81 +103,10 @@ export default async function ReportsPage({
         {rows.length > 200 ? <p className="mt-2 text-[11px] text-slate-400">First 200 shown; the CSV has all {rows.length}.</p> : null}
       </Card>
 
-      <h2 className="pt-2 text-sm font-semibold text-slate-700">Look up</h2>
-
-      {/* Q1 */}
-      <Card id="q1" title="Current revision of a document">
-        <form className="mb-3 flex gap-2">
-          <input name="q1" defaultValue={q1 ?? ""} placeholder="Document number or title…" className={`${inputCls} max-w-sm`} />
-          <button className={btn("secondary", "sm")}>Look up</button>
-        </form>
-        {q1 && !q1Doc ? <p className="text-sm text-slate-400">No document matches “{q1}”.</p> : null}
-        {q1Doc ? (
-          <div className="space-y-2">
-            {q1Doc.revisions.filter((r) => ["RELEASED", "SUPERSEDED", "VOID"].includes(r.state)).slice(0, 3).map((r) => (
-              <p key={r.id} className="flex flex-wrap items-center gap-2 text-sm">
-                <span className="font-mono font-semibold">{q1Doc.docNumber}</span>
-                <span className="font-mono text-xs">rev {r.value}</span>
-                <Chip className={r.state === "RELEASED" ? "bg-emerald-100 text-emerald-800 ring-emerald-300" : r.state === "SUPERSEDED" ? "bg-violet-100 text-violet-800 ring-violet-300" : "bg-red-100 text-red-800 ring-red-300"}>{r.state.toLowerCase()}</Chip>
-                {r.statusCode ? <Chip>{statuses.find((s) => s.code === r.statusCode)?.label ?? r.statusCode}</Chip> : null}
-                <span className="text-xs text-slate-400">released {fmtDate(r.releasedAt)}</span>
-              </p>
-            ))}
-            {q1Doc.revisions.every((r) => r.state !== "RELEASED") ? (
-              <p className="text-sm text-amber-700">No current revision — the document shall not be used.</p>
-            ) : null}
-          </div>
-        ) : null}
-      </Card>
-
-      {/* Q2 */}
-      <Card id="q2" title="Documents by equipment, system or area">
-        {assets.length ? (
-          <div className="flex flex-wrap gap-2">
-            {assets.map((a) => {
-              const n = assetCounts.find((c) => c.toId === a.id)?._count ?? 0;
-              return (
-                <Link key={a.id} href={`/assets/${a.id}`} className="rounded-lg border border-slate-200 px-3 py-2 text-sm transition hover:border-[#2d5480]/40 hover:shadow-sm">
-                  <span className="font-mono font-semibold text-[#1e3a5f]">{a.code}</span>
-                  <span className="ml-2 text-slate-500">{a.name}</span>
-                  <Chip className="ml-2">{n} doc{n === 1 ? "" : "s"}</Chip>
-                </Link>
-              );
-            })}
-          </div>
-        ) : (
-          <p className="text-xs text-slate-400">No assets in the breakdown.</p>
-        )}
-      </Card>
-
-      {/* Q5 */}
-      <Card id="q5" title="Who received a document, and when">
-        <form className="mb-3 flex gap-2">
-          <input name="q5" defaultValue={q5 ?? ""} placeholder="Document number…" className={`${inputCls} max-w-sm`} />
-          <button className={btn("secondary", "sm")}>Trace issues</button>
-        </form>
-        {q5 && q5Doc ? (
-          <DataTable head={<tr><Th>Revision</Th><Th>Transmittal</Th><Th>Date</Th><Th>Reason</Th><Th>Recipients</Th></tr>}>
-            {q5Doc.revisions.flatMap((r) =>
-              r.transmittalItems.map((item) => (
-                <tr key={item.id}>
-                  <Td className="font-mono text-xs">rev {r.value}</Td>
-                  <Td><Link href={`/transmittals/${item.transmittalId}`} className="font-mono text-[13px] text-[#1e3a5f] hover:underline">{item.transmittal.number}</Link></Td>
-                  <Td className="whitespace-nowrap text-xs">{fmtDate(item.transmittal.dateOfIssue)}</Td>
-                  <Td className="text-xs">{item.transmittal.reasonForIssue}</Td>
-                  <Td className="text-xs">{item.transmittal.recipients.map((rec) => rec.name).filter((n) => n && n !== "—").join(", ") || "—"}</Td>
-                </tr>
-              ))
-            )}
-          </DataTable>
-        ) : q5 ? (
-          <p className="text-sm text-slate-400">No document matches.</p>
-        ) : null}
-      </Card>
-
-      {/* Q8 */}
-      <Card id="q8" title="The register as it stood on a date">
-        <form className="mb-3 flex gap-2">
+      {/* The one look-up nothing else answers: history. */}
+      <Card id="as-of" title="Register on a past date" description="Which revision of each document was current on a given day — for audits, claims and 'what did we build from?'">
+        <form action="/reports#as-of" className="mb-3 flex gap-2">
+          <input type="hidden" name="r" value={current} />
           <input type="date" name="asOf" defaultValue={sp.asOf ?? ""} className={`${inputCls} max-w-48`} />
           <button className={btn("secondary", "sm")}>Reconstruct</button>
         </form>
