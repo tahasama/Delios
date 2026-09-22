@@ -113,6 +113,33 @@ export function ButtonLink({
   );
 }
 
+/**
+ * A block of a form: what this part is about on the left, the fields on the
+ * right. Long forms read as a few short sections instead of one column of
+ * boxes.
+ */
+export function FormSection({ title, help, children, className }: { title: string; help?: string; children: React.ReactNode; className?: string }) {
+  return (
+    <section className={cn("grid grid-cols-1 gap-x-8 gap-y-4 border-t border-slate-100 py-6 first:border-t-0 first:pt-0 md:grid-cols-[220px_minmax(0,1fr)]", className)}>
+      <div>
+        <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
+        {help ? <p className="mt-1 text-xs leading-5 text-slate-500">{help}</p> : null}
+      </div>
+      <div className="space-y-4">{children}</div>
+    </section>
+  );
+}
+
+/** The bar that closes a form: what happens next on the left, the buttons on the right. */
+export function FormActions({ children, note }: { children: React.ReactNode; note?: React.ReactNode }) {
+  return (
+    <div className="sticky bottom-0 -mx-6 mt-2 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 bg-surface/95 px-6 py-3 backdrop-blur">
+      <p className="min-w-0 text-xs text-slate-500">{note}</p>
+      <div className="flex items-center gap-2">{children}</div>
+    </div>
+  );
+}
+
 export function Field({
   label,
   hint,
@@ -128,12 +155,12 @@ export function Field({
 }) {
   return (
     <label className={cn("block", className)}>
-      <span className="mb-1 flex items-baseline justify-between gap-2">
-        <span className="text-xs font-semibold text-slate-700">
+      <span className="mb-1.5 block">
+        <span className="block text-[13px] font-semibold text-slate-800">
           {label}
-          {required ? <span className="ml-0.5 text-red-500">*</span> : null}
+          {required ? <span className="ml-1 text-[11px] font-medium text-red-600">required</span> : null}
         </span>
-        {hint ? <span className="max-w-[60%] text-right text-[11px] leading-4 text-slate-400">{hint}</span> : null}
+        {hint ? <span className="mt-0.5 block text-[11px] leading-4 text-slate-500">{hint}</span> : null}
       </span>
       {children}
     </label>
