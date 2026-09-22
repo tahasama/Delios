@@ -6,7 +6,7 @@ import { ActionForm } from "@/components/form";
 import { EXPOSURES } from "@/lib/standard";
 import { recordVoidReassessmentAction } from "@/lib/actions/revisions";
 import { copyActionUpdateAction } from "@/lib/actions/transmittals";
-import { sendCurrentRevisionAction, recordToldAction } from "@/lib/actions/supersession";
+import { sendCurrentRevisionAction } from "@/lib/actions/supersession";
 import { untoldRecipients } from "@/lib/supersession";
 import { AssuranceTabs } from "@/app/(app)/conformance/tabs";
 
@@ -70,14 +70,6 @@ export default async function ExposuresPage() {
                     ) : u.current ? (
                       <ActionForm action={sendCurrentRevisionAction} submitLabel={`Send rev ${u.current.value} to them`} size="sm" hidden={{ revisionId: u.old.id }} className="space-y-0" />
                     ) : <span className="text-xs text-amber-700">No released revision to send yet.</span>}
-                    <details className="text-xs">
-                      <summary className="cursor-pointer py-1.5 font-semibold text-[#315f83]">They were told another way</summary>
-                      <div className="mt-2 w-80">
-                        <ActionForm action={recordToldAction} submitLabel="Record" size="sm" hidden={{ revisionId: u.old.id }}>
-                          <input name="note" required className={inputCls} placeholder="How — e.g. site meeting 22 Sept, minutes MIN-014" />
-                        </ActionForm>
-                      </div>
-                    </details>
                   </div>
                 ) : null}
               </li>

@@ -6,8 +6,9 @@ import type { Tenant } from "./tenant";
  * Who received it is read from the issued transmittals that carried it. A
  * recipient counts as told when:
  *   - they have an account here: the release notified them in the app;
- *   - they were sent the current revision (or anything later) by transmittal;
- *   - Document Control recorded that they were told another way.
+ *   - they were sent the current revision (or anything later) by transmittal.
+ * Nothing said outside the system counts: controlled information and its
+ * replacement travel only through it.
  * Whoever is left is who still holds an out-of-date revision without knowing.
  */
 export type Recipient = { key: string; name: string; organization: string | null; userId: string | null; via: string };
@@ -41,9 +42,6 @@ export async function untoldRecipients(t: Pick<Tenant, "db">): Promise<Untold[]>
   for (const old of superseded) {
     const issued = old.transmittalItems.map((i) => i.transmittal).filter((x) => x.direction === "OUTGOING" && SENT.includes(x.status));
     if (!issued.length) continue;
-
-    const record = await t.db.obsolescenceRecord.findFirst({ where: { kind: "SUPERSEDED", revisionId: old.id }, orderBy: { createdAt: "desc" } });
-    if (record?.toldAt) continue;
 
     // Everything released after the old revision, and who it went to.
     const later = await t.db.revision.findMany({

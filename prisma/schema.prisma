@@ -1082,11 +1082,6 @@ model ObsolescenceRecord {
   effectiveDate DateTime @default(now())
   createdById   String
   createdAt     DateTime @default(now())
-  // §12.3 — the recipients of the replaced revision were told some way other
-  // than by receiving the new one (a meeting, a letter); how is recorded here.
-  toldAt        DateTime?
-  toldByName    String?
-  toldNote      String?
 
   @@index([projectId])
 }

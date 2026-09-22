@@ -94,7 +94,7 @@ export const REASONS_WITH_RESPONSE: ReasonForIssue[] = ["REVIEW", "APPROVAL", "P
 // §12.6 — the five exposure conditions
 export const EXPOSURES = [
   { key: "UNPROPAGATED_SUPERSESSION", label: "Replaced, but recipients not told", detail: "A newer revision exists; people who got the old one were never informed.", who: "Document Control" },
-  { key: "UNCONTROLLED_CURRENT_USE", label: "Old copy still in use", detail: "A paper or offline copy carries a revision that is no longer valid.", who: "Copy holder" },
+  { key: "UNCONTROLLED_CURRENT_USE", label: "Registered copy out of date", detail: "Document Control registered a controlled copy (a printed set, a site shelf) of a revision that has since been replaced.", who: "Copy holder" },
   { key: "BLOCKED_WORK", label: "Work blocked by a comment", detail: "A released revision still has an open blocking comment.", who: "Reviewer and executing party" },
   { key: "ORPHANED_WITHDRAWAL", label: "Withdrawn but still needed", detail: "A schedule action or package still requires a withdrawn document.", who: "Package or action owner" },
   { key: "UNRESOLVED_VOID", label: "Voided — impact not checked", detail: "A revision was voided and nobody has recorded what was built from it.", who: "The party that performed the work" },
