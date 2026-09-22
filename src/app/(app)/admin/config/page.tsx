@@ -106,21 +106,9 @@ export default async function AdminConfigPage({ searchParams }: { searchParams: 
         subtitle="The codes and choices your organization uses. All sets are listed and approved in the Document Management Plan. A code already used is retired, never deleted, so older documents keep it and stay findable."
       />
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[250px_minmax(0,1fr)]">
-        <aside className="h-fit space-y-4 rounded-2xl border border-slate-200 bg-surface p-3 shadow-sm lg:sticky lg:top-[88px]">
-          <SetNav groups={groups} current={currentKey} />
-          <details className="border-t border-slate-100 pt-3">
-            <summary className="cursor-pointer px-2 text-xs font-semibold text-link">+ New set</summary>
-            <div className="mt-2 px-1">
-              <ActionForm action={createConfigSetAction} submitLabel="Create set" size="sm">
-                <Field label="Title" required><input name="title" required className={inputCls} placeholder="Areas" /></Field>
-                <Field label="Key" required hint="UPPER_SNAKE"><input name="key" required className={inputCls} placeholder="AREAS" /></Field>
-                <Field label="Description"><input name="description" className={inputCls} placeholder="What the set is for" /></Field>
-              </ActionForm>
-            </div>
-          </details>
-        </aside>
+      <SetNav groups={groups} current={currentKey} />
 
+      <div>
         {set ? (
           <section className="min-w-0 space-y-3">
             <div className="flex flex-wrap items-start justify-between gap-3">
@@ -132,6 +120,7 @@ export default async function AdminConfigPage({ searchParams }: { searchParams: 
                 <Link href={here({ panel: sp.panel === "add" ? undefined : "add", edit: undefined })} className={btn("primary", "sm")}><Plus className="h-3.5 w-3.5" /> Add value</Link>
                 <Link href={here({ panel: sp.panel === "upload" ? undefined : "upload", edit: undefined })} className={btn("secondary", "sm")}><Upload className="h-3.5 w-3.5" /> Replace from a spreadsheet</Link>
                 <Link href={here({ panel: sp.panel === "details" ? undefined : "details", edit: undefined })} className={btn("ghost", "sm")}>Set details</Link>
+                <Link href={here({ panel: sp.panel === "new" ? undefined : "new", edit: undefined })} className={btn("ghost", "sm")}>+ New set</Link>
               </div>
             </div>
 
@@ -142,6 +131,17 @@ export default async function AdminConfigPage({ searchParams }: { searchParams: 
                     <Field label="Code" required hint="what appears in numbers and lists"><input name="code" required maxLength={24} className={inputCls} /></Field>
                     <Field label="Label" required><input name="label" required className={inputCls} /></Field>
                     {propFields?.map((f) => <PropInput key={f.key} field={f} value={undefined} />)}
+                  </div>
+                </ActionForm>
+              </Card>
+            ) : null}
+            {sp.panel === "new" ? (
+              <Card title="New set" description="A list your organization needs that the starter sets do not cover — areas, systems, anything." actions={<Link href={here({ panel: undefined })} aria-label="Close" className="text-slate-400 hover:text-slate-700"><X className="h-4 w-4" /></Link>}>
+                <ActionForm action={createConfigSetAction} submitLabel="Create set" size="sm">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    <Field label="Title" required><input name="title" required className={inputCls} placeholder="Areas" /></Field>
+                    <Field label="Key" required hint="UPPER_SNAKE"><input name="key" required className={inputCls} placeholder="AREAS" /></Field>
+                    <Field label="Description"><input name="description" className={inputCls} placeholder="What the set is for" /></Field>
                   </div>
                 </ActionForm>
               </Card>
