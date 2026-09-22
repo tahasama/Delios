@@ -22,13 +22,28 @@ The system **is** the Standard:
 
 ## Running it
 
+The same commands work in PowerShell, cmd and bash.
+
 ```bash
-npm install
-npx prisma migrate dev        # create/update the database
-npm run db:seed               # publish the neutral Annex C starter configuration
-SEED_DEMO=1 npm run db:seed   # optional: add the full Q6637021 review project
-npm run dev -- -p 4173        # http://localhost:4173
+npm install                   # also generates the Prisma client
 ```
+
+Copy the settings file once — `.env` is not in git:
+
+```bash
+cp .env.example .env          # PowerShell: Copy-Item .env.example .env
+```
+
+```bash
+npx prisma migrate deploy     # create or update the database
+npm run db:seed               # the neutral Annex C starter configuration
+npm run demo                  # optional: the full Q6637021 demo project, upgraded, with the checks run
+npm run dev                   # http://localhost:3000 (add -- -p 4173 for another port)
+```
+
+After pulling new changes, run `npx prisma migrate deploy` and `npm run upgrade`.
+If the app reports "@prisma/client did not initialize yet", run `npx prisma generate`
+with the dev server stopped.
 
 Demo passwords are all `demo1234`:
 

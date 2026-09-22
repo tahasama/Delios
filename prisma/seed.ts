@@ -5,7 +5,7 @@
  * reference sets), the example workflow templates, parties and users. The
  * organization defines everything else in the app (or imports it).
  *
- *   SEED_DEMO=1 npm run db:seed   → additionally imports the private workbook
+ *   npm run db:seed:demo          → additionally imports the private workbook
  *                                   lists (Q6637021 numbering) and the demo project.
  *
  * Idempotent — safe to re-run.
@@ -35,7 +35,8 @@ async function set(key: string, title: string, description: string, values: { co
 }
 
 async function main() {
-  const demo = process.env.SEED_DEMO === "1";
+  // `--demo` works in every shell; SEED_DEMO=1 is kept for bash users.
+  const demo = process.env.SEED_DEMO === "1" || process.argv.includes("--demo");
   console.log(demo ? "· Seeding STANDARD-GENERIC + DEMO configuration…" : "· Seeding standard-generic configuration only…");
 
   // ── Tenancy: one organization, one starter project ────────────────────────
