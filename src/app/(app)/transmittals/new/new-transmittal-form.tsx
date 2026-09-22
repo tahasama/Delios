@@ -93,13 +93,7 @@ export function NewTransmittalForm({
           </Field>
         </div>
 
-        {needsReview ? (
-          <Field label="Reviewers" hint="this reason starts a review of each document">
-            <select name="reviewerIds" multiple className={`${inputCls} h-24`} defaultValue={[]}>
-              {reviewers.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
-            </select>
-          </Field>
-        ) : null}
+        {needsReview && direction === "INCOMING" ? <p className="text-[11px] text-slate-500">Once accepted, each document is sent down a review route, whose last step gives the binding verdict.</p> : null}
 
         {direction === "INCOMING" ? <p className="text-[11px] text-slate-500">You will check and accept it on the next screen; any reply period starts from acceptance.</p> : null}
       </ActionForm>

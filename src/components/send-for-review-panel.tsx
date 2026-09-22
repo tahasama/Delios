@@ -1,5 +1,5 @@
 import { requireScope } from "@/lib/scope";
-import { eligiblePeople, proposeForStep, type WfStep } from "@/lib/workflow";
+import { eligiblePeople, proposeForStep, normalizeRoute, type WfStep } from "@/lib/workflow";
 import { SendForReviewForm, type SendRoute } from "./send-for-review";
 
 /**
@@ -33,14 +33,15 @@ export async function SendForReview({ revisionIds }: { revisionIds: string[] }) 
 
   const routes: SendRoute[] = [];
   for (const t of templates.filter((x) => applies(x.classes))) {
-    const steps = JSON.parse(t.steps) as (WfStep & { title?: string })[];
+    // The last step decides; earlier steps advise.
+    const steps = normalizeRoute(JSON.parse(t.steps) as (WfStep & { title?: string })[]);
     routes.push({
       id: t.id,
       name: t.name,
       description: t.description,
       isDefault: t.isDefault,
       steps: await Promise.all(steps.map(async (s, i) => ({
-        title: s.title || (s.act === "APPROVAL" ? "Approval" : `Review ${i + 1}`),
+        title: s.title || (s.act === "APPROVAL" ? "Decision" : `Review ${i + 1}`),
         act: s.act,
         mode: s.mode,
         proposed: await proposeForStep(ctx, docs, s),

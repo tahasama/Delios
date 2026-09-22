@@ -68,7 +68,7 @@ function StepCard({ index, step, pool, many }: { index: number; step: SendStep; 
   return (
     <fieldset className={`flex w-60 shrink-0 flex-col rounded-xl border p-2.5 ${approval ? "border-brand-line/30 bg-tint-soft" : "border-slate-200 bg-surface"}`}>
       <legend className="sr-only">Step {index + 1}</legend>
-      <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Step {index + 1} · {approval ? "Approve" : "Review"}</p>
+      <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400" title={approval ? "This step's verdict binds; a verdict that proceeds is the release approval" : "Advice for the decider"}>Step {index + 1} · {approval ? "Decides" : "Advises"}</p>
       <p className="text-sm font-semibold text-slate-800">{step.title}</p>
       <p className="mb-2 text-[11px] text-slate-500">{MODE[step.mode] ?? step.mode}</p>
 

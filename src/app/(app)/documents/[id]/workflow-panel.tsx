@@ -4,7 +4,7 @@ import { mayContributeToDocument, type SessionUser } from "@/lib/auth";
 import { Chip, Field, inputCls } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { ActionForm } from "@/components/form";
-import { recordStepOutcomeAction, recordStepApprovalAction } from "@/lib/actions/workflow";
+import { recordStepOutcomeAction } from "@/lib/actions/workflow";
 import { getActiveSet } from "@/lib/config";
 import { Send, CheckCircle2, Rocket } from "lucide-react";
 import { getRunForRevision, type WfRuntimeStep } from "@/lib/workflow";
@@ -139,6 +139,13 @@ async function RunActivePanel({ run, user, extra }: { run: { id: string; templat
   const serialNext = step?.mode === "SERIAL" ? nextSerialParticipant(step) : null;
   const alreadyGave = !!step && step.mode === "ALL" && (step.decidedBy ?? []).includes(user.id);
   const iDecide = !!step && mine && !alreadyGave && (step.mode !== "SERIAL" || serialNext === user.id);
+  // The last step decides; the earlier steps' verdicts are advice shown to the decider.
+  const deciding = run.currentStep === run.steps.length - 1;
+  const adviceCycleIds = run.steps.slice(0, run.currentStep).map((s) => s.cycleId).filter((id): id is string => !!id);
+  const advice = deciding && adviceCycleIds.length
+    ? await db.reviewCycle.findMany({ where: { id: { in: adviceCycleIds } }, select: { id: true, outcome: true, outcomeByName: true, outcomeNote: true } })
+    : [];
+  const outcomeLabel = new Map(outcomes.map((o) => [o.code, o.label]));
 
   return (
     <Card title={iDecide ? "Next step: your decision" : "In review"} description={`${run.templateName} · step ${run.currentStep + 1} of ${run.steps.length}`} className="border-brand-line/30 bg-tint-soft">
@@ -150,7 +157,7 @@ async function RunActivePanel({ run, user, extra }: { run: { id: string; templat
               <span className={`grid h-5 w-5 place-items-center rounded-full text-[10px] font-bold ${s.status === "done" ? "bg-emerald-500 text-white" : s.status === "active" ? "bg-amber-500 text-white" : s.status === "declined" ? "bg-red-500 text-white" : "bg-slate-200 text-slate-500"}`}>
                 {s.status === "done" ? "✓" : i + 1}
               </span>
-              <Chip className={s.act === "APPROVAL" ? "bg-emerald-100 text-emerald-800 ring-emerald-300" : "bg-sky-100 text-sky-800 ring-sky-300"}>{s.act}</Chip>
+              <Chip className={i === run.steps.length - 1 ? "bg-emerald-100 text-emerald-800 ring-emerald-300" : "bg-sky-100 text-sky-800 ring-sky-300"}>{i === run.steps.length - 1 ? "decision" : "advice"}</Chip>
               <span className="text-xs text-slate-500">{names}</span>
               {s.status === "active" ? <Chip className="bg-amber-100 text-amber-800 ring-amber-300">waiting</Chip> : null}
               {s.status === "declined" ? <Chip className="bg-red-100 text-red-800 ring-red-300">declined</Chip> : null}
@@ -161,9 +168,17 @@ async function RunActivePanel({ run, user, extra }: { run: { id: string; templat
 
       {step && step.status === "active" ? (
         iDecide ? (
-          <Action label={step.act === "REVIEW" ? "Record your review" : "Record your decision"}>
-            <ActionForm action={step.act === "REVIEW" ? recordStepOutcomeAction : recordStepApprovalAction} submitLabel="Record" size="sm" hidden={{ runId: run.id }}>
-              <Field label="Outcome" required>
+          <Action label={deciding ? "Give the binding verdict" : "Give your advice"}>
+            {advice.some((a) => a.outcome) ? (
+              <div className="mb-3 rounded-lg bg-surface p-2.5 text-xs ring-1 ring-slate-200">
+                <p className="mb-1 font-semibold text-slate-700">Advice from the earlier steps</p>
+                <ul className="space-y-0.5 text-slate-600">
+                  {advice.filter((a) => a.outcome).map((a) => <li key={a.id}><span className="font-mono font-semibold">{a.outcome}</span> {outcomeLabel.get(a.outcome!) ?? ""} — {a.outcomeByName}{a.outcomeNote ? `: “${a.outcomeNote}”` : ""}</li>)}
+                </ul>
+              </div>
+            ) : null}
+            <ActionForm action={recordStepOutcomeAction} submitLabel={deciding ? "Record verdict" : "Record advice"} size="sm" hidden={{ runId: run.id }}>
+              <Field label={deciding ? "Verdict" : "Your verdict"} required hint={deciding ? "binding — a verdict that proceeds is the release approval" : "advice for the decider"}>
                 <select name="outcome" required className={inputCls} defaultValue="">
                   <option value="" disabled>Choose…</option>
                   {outcomes.map((o) => <option key={o.code} value={o.code}>{o.label}</option>)}
@@ -173,7 +188,7 @@ async function RunActivePanel({ run, user, extra }: { run: { id: string; templat
                 <textarea name="note" rows={2} className={inputCls} placeholder="what you checked / what must change" />
               </Field>
             </ActionForm>
-            <p className="mt-2 text-[11px] text-slate-400">Recorded under your name. Outcomes come from your organization&apos;s list (Settings → Review outcomes).</p>
+            <p className="mt-2 text-[11px] text-slate-400">Recorded under your name. Verdicts come from your organization&apos;s list — <Link href="/guide/codes#outcome" className="underline">what each one means</Link>.</p>
           </Action>
         ) : (
           <p className="text-sm text-slate-600">

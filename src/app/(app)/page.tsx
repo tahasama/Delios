@@ -23,20 +23,12 @@ export default async function HomePage() {
   const canDecide = hasVerb(user, "APPROVE") || hasVerb(user, "REVIEW");
   const controller = isController(user) || isAdmin(user);
 
-  const [reviews, approvalCandidates, returned, incoming, drafts, actions, lastRun, criticalDefects] = await Promise.all([
+  const [assigned, returned, incoming, drafts, actions, lastRun, criticalDefects] = await Promise.all([
     db.reviewAssignment.findMany({
       where: { userId: user.id, completedAt: null, cycle: { status: "OPEN", issuedToReviewAt: { not: null } } },
       include: { cycle: { include: { revision: { include: { document: true } }, comments: true } } },
       take: 50,
     }),
-    canDecide
-      ? db.revision.findMany({
-          where: { state: "IN_REVIEW", approvals: { none: {} }, workflowRuns: { none: { status: "ACTIVE" } }, document: { state: { in: ["PLANNED", "ACTIVE"] } } },
-          include: { document: true },
-          orderBy: { createdAt: "asc" },
-          take: 50,
-        })
-      : Promise.resolve([]),
     db.reviewCycle.findMany({
       where: { status: "CLOSED", outcome: { in: ["REVISE_AND_RESUBMIT", "APPROVED_WITH_COMMENTS", "REJECTED"] }, revision: { document: { createdById: user.id } }, returnedToOriginatorAt: { not: null } },
       include: { revision: { include: { document: true } }, comments: { where: { progressionPreventing: true, status: "OPEN" } } },
@@ -64,8 +56,6 @@ export default async function HomePage() {
     ? await db.transmittal.findMany({ where: { direction: "INCOMING", status: { in: ["ACCEPTED", "CLOSED"] }, items: { some: { revision: { state: "IN_PREPARATION" } } } }, orderBy: { dateOfIssue: "asc" }, take: 20 })
     : [];
 
-  // Approvals are yours when a route's current step is an approval naming you,
-  // or (outside any route) when your authority covers a revision under review.
   // The requirements process: what is waiting on Document Control, and what
   // is waiting on the department this person answers for.
   const planning: { key: string; href: string; label: string; sub: string; cta: string; late?: boolean }[] = [];
@@ -95,15 +85,10 @@ export default async function HomePage() {
     }
   }
 
-  const approvals = [];
-  for (const rev of approvalCandidates) {
-    if (ctx.can("APPROVE", rev.document)) approvals.push(rev);
-  }
-  const activeRuns = await db.workflowRun.findMany({ where: { status: "ACTIVE" }, include: { revision: { include: { document: true } } } });
-  for (const run of activeRuns) {
-    const step = parseSteps(run.steps)[run.currentStep];
-    if (step?.act === "APPROVAL" && step.participantIds.includes(user.id) && !(step.decidedBy ?? []).includes(user.id)) approvals.push(run.revision);
-  }
+  // One list per kind of ask: advice on a route's earlier step, or the
+  // binding verdict — the one decision, which is also the release approval.
+  const verdicts = assigned.filter((a) => a.cycle.binding);
+  const reviews = assigned.filter((a) => !a.cycle.binding);
 
   // Schedule actions whose documents will not be ready in time.
   const atRisk = actions
@@ -116,7 +101,7 @@ export default async function HomePage() {
     .filter((a) => a.total > 0 && a.ready < a.total && a.scheduledDate);
 
   const owedCount = owed.reduce((n, o) => n + o.rows.length, 0);
-  const waiting = planning.length + reviews.length + approvals.length + returned.length + incoming.length + drafts.length + toRoute.length + owedCount;
+  const waiting = planning.length + reviews.length + verdicts.length + returned.length + incoming.length + drafts.length + toRoute.length + owedCount;
 
   return (
     <div className="space-y-6">
@@ -133,20 +118,21 @@ export default async function HomePage() {
           {waiting === 0 ? (
             <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-surface px-5 py-6 shadow-sm">
               <CheckCircle2 className="h-6 w-6 text-emerald-500" />
-              <p className="text-sm text-slate-600">You are clear. New reviews, approvals and returned work appear here.</p>
+              <p className="text-sm text-slate-600">You are clear. New reviews, verdicts to give and returned work appear here.</p>
             </div>
           ) : null}
 
-          <Group title="Review" count={reviews.length}>
-            {reviews.map((a) => (
-              <Row key={a.id} href={`/reviews/${a.cycleId}`} doc={a.cycle.revision.document} rev={a.cycle.revision.value} cta="Review"
+          <Group title="Give the verdict" count={verdicts.length}>
+            {verdicts.map((a) => (
+              <Row key={a.id} href={`/reviews/${a.cycleId}`} doc={a.cycle.revision.document} rev={a.cycle.revision.value} cta="Decide"
                 note={a.cycle.comments.some((c) => c.progressionPreventing && c.status === "OPEN") ? <Chip className="bg-red-100 text-red-700 ring-red-300">blocking comments</Chip> : null} />
             ))}
           </Group>
 
-          <Group title="Approve" count={approvals.length}>
-            {approvals.map((rev) => (
-              <Row key={rev.id} href={`/documents/${rev.documentId}#workflow`} doc={rev.document} rev={rev.value} cta="Decide" />
+          <Group title="Review — your advice" count={reviews.length}>
+            {reviews.map((a) => (
+              <Row key={a.id} href={`/reviews/${a.cycleId}`} doc={a.cycle.revision.document} rev={a.cycle.revision.value} cta="Review"
+                note={a.cycle.comments.some((c) => c.progressionPreventing && c.status === "OPEN") ? <Chip className="bg-red-100 text-red-700 ring-red-300">blocking comments</Chip> : null} />
             ))}
           </Group>
 

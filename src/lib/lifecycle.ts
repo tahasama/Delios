@@ -5,11 +5,12 @@ import { audit, notify, notifyMany } from "./audit";
 import { stampPdf } from "./stamp";
 import { UPLOAD_ROOT, readStored, saveBuffer } from "./files";
 import type { SessionUser } from "./auth";
-import { outcomeConsequences, requestChangesOutcomeCode } from "./config-props";
+import { verdictMeaning, assertMayGiveBindingVerdict, recordApproval } from "./verdict";
 import { getActiveSet } from "./config";
 import { isAdmin } from "@/lib/auth";
 import { holdersOf } from "./permissions";
-import { hasVerb } from "./auth";
+
+export { verdictMeaning, assertMayGiveBindingVerdict, recordApproval } from "./verdict";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -170,15 +171,18 @@ export async function recordReviewOutcome(
     }
   }
   if (cycle.outcome) throw new Error("This cycle already carries a recorded outcome — it is immutable (§9.4).");
-  if (cycle.issuedToReviewAt) await db.reviewCycle.update({ where: { id: cycleId }, data: { returnedFromReviewAt: new Date() } });
-  const cons = (await outcomeConsequences())[outcome];
+  const cons = await verdictMeaning(t, cycle.outcomeSetKey, outcome);
   if (!cons) throw new Error("Outcome is not in the published set (§9.2).");
+  const approves = cycle.binding && cons.proceed && cycle.revision.state === "IN_REVIEW";
+  if (approves) await assertMayGiveBindingVerdict(t, cycle.revisionId, user);
+  if (cycle.issuedToReviewAt) await db.reviewCycle.update({ where: { id: cycleId }, data: { returnedFromReviewAt: new Date() } });
   const blockingOpen = cycle.comments.some((c) => c.progressionPreventing && c.status === "OPEN");
   await db.reviewCycle.update({
     where: { id: cycleId },
     data: { outcome, outcomeAt: new Date(), outcomeByName: user.name, outcomeNote: note ?? null, returnedFromReviewAt: cycle.returnedFromReviewAt ?? new Date() },
   });
   await db.reviewAssignment.updateMany({ where: { cycleId, userId: user.id }, data: { completedAt: new Date() } });
+  if (approves) await recordApproval(t, cycle.revisionId, user, `Binding verdict ${cons.code} — ${cons.label}${note ? `: ${note}` : ""}`);
   await audit({
     tenant: t,
     actor: user,
@@ -209,7 +213,7 @@ export async function returnToOriginator(t: Tenant, cycleId: string, user: Sessi
   });
   if (!cycle.outcome) throw new Error("No outcome recorded for this cycle.");
   if (cycle.returnedToOriginatorAt) throw new Error("Cycle already returned to originator.");
-  const cons = (await outcomeConsequences())[cycle.outcome] ?? { proceed: false, resubmit: false, label: cycle.outcome };
+  const cons = (await verdictMeaning(t, cycle.outcomeSetKey, cycle.outcome)) ?? { proceed: false, resubmit: false, label: cycle.outcome };
   await db.reviewCycle.update({ where: { id: cycleId }, data: { returnedToOriginatorAt: new Date(), status: "CLOSED" } });
   // A resubmission-required outcome IS the authorization for the next revision (§6.5, §9.3)
   let authorization = false;
@@ -267,52 +271,6 @@ export async function requiredApprovalRole(t: Tenant, document: { discipline: st
     .sort((a, b) => b.s - a.s);
   if (!candidates.length) return null;
   return { minRole: candidates[0].r.minRole, version: candidates[0].r.version };
-}
-
-/**
- * The version of the distribution matrix an approval was given under: 1 for
- * the matrix as first published, plus one for each approved change to it.
- */
-async function matrixVersionInForce(t: Tenant): Promise<number> {
-  return 1 + (await t.db.controlledVersion.count({ where: { state: { in: ["APPROVED", "SUPERSEDED"] }, set: { kind: "DISTRIBUTION_MATRIX", orgId: t.orgId } } }));
-}
-
-export async function recordApproval(t: Tenant, revisionId: string, user: SessionUser, note?: string) {
-  const { db, projectId } = t;
-  const { rev, label } = await revisionLabel(t, revisionId);
-  if (rev.state !== "IN_REVIEW") throw new Error("Approvals are recorded against a revision in review.");
-  // §8.2 — authority for a class is the Approve grant in the distribution
-  // matrix for that class. Without it, only a live delegation lets someone act (§8.5).
-  const scoped = t as Tenant & { can?: (verb: "APPROVE", target: typeof rev.document) => boolean };
-  const holds = scoped.can ? scoped.can("APPROVE", rev.document) : hasVerb(user, "APPROVE");
-  let viaDelegation = false;
-  if (!holds) {
-    const del = await db.delegation.findFirst({ where: { toUserId: user.id, endDate: { gte: new Date() } } });
-    if (!del) throw new Error(`${user.name} does not hold Approve for this class in the distribution matrix, and no delegation is in force (§8.2, §8.5).`);
-    viaDelegation = true;
-  }
-  const matrixVersion = await matrixVersionInForce(t);
-  const approval = await db.approval.create({
-    data: { projectId,
-      revisionId,
-      approverId: user.id,
-      approverName: user.name,
-      approverRole: (user.functionName ?? user.role) + (viaDelegation ? " (by delegation)" : ""),
-      matrixVersion,
-      note: note ?? null,
-    },
-  });
-  await audit({
-    tenant: t,
-    actor: user,
-    action: "APPROVAL",
-    entityType: "Revision",
-    entityId: revisionId,
-    entityLabel: label,
-    detail: `Approved as ${user.functionName ?? user.role} under distribution matrix v${matrixVersion}${viaDelegation ? " via delegation" : ""}.`,
-  });
-  await notify(rev.document.createdById, "APPROVAL", `Approval recorded: ${label}`, `${user.name} approved this revision.`, `/documents/${rev.documentId}`);
-  return approval;
 }
 
 /** Release a revision at a stated status (§7.5–7.6). Supersedes the current revision (§7.5, §12.1). */

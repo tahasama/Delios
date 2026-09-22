@@ -45,7 +45,6 @@ export async function createTransmittalAction(_prev: { error?: string } | undefi
     });
   const recipientNames = outsiders.map((o) => o.name);
   const recipientUsers = formData.getAll("recipientUsers").map(String).filter(Boolean);
-  const reviewers = formData.getAll("reviewerIds").map(String).filter(Boolean);
 
   if (!reasonForIssue) return { error: "Every transmittal states its reason for issue (§11.2)." };
   if (!dateOfIssue) return { error: "Date of issue is required (§11.1)." };
@@ -121,18 +120,8 @@ export async function createTransmittalAction(_prev: { error?: string } | undefi
     entityLabel: t.number,
     detail: `${direction.toLowerCase()} · reason: ${reason.label} · ${revisionIds.length} item(s) · ${recipientUsers.length + recipientNames.length} recipient(s) (§11.1).`,
   });
-  if (direction === "INCOMING") {
-    // G.5 step 5–8: acceptance check follows; open cycles when the reason requires review
-    if (reason.props.reviewCycle === true && reviewers.length) {
-      for (const rid of revisionIds) {
-        try {
-          await openReviewCycle(ctx, rid, user, { mode: "PARALLEL", reviewerIds: reviewers, transmittalId: t.id, note: `Opened on acceptance of ${t.number} (§11.11)` });
-        } catch {
-          // revision may already carry an open cycle — visible in the register (IS-25/RO checks)
-        }
-      }
-    }
-  }
+  // Incoming documents are reviewed through a route once accepted (§11.11):
+  // Document Control sends them from the transmittal, like any other review.
   redirect(`/transmittals/${t.id}`);
 }
 
@@ -184,7 +173,6 @@ export async function acceptanceCheckAction(_prev: { error?: string } | undefine
   }
   const conditions = ["a", "b", "c", "d", "e"].map((k) => ({ key: k, pass: formData.get(`cond_${k}`) === "on" }));
   const notes = String(formData.get("notes") ?? "").trim();
-  const reviewerIds = formData.getAll("reviewerIds").map(String).filter(Boolean);
   const t = await db.transmittal.findUniqueOrThrow({ where: { id }, include: { items: true, recipients: true } });
   if (t.status !== "ISSUED") return { error: "Only an issued transmittal can be accepted or rejected." };
 
@@ -232,22 +220,8 @@ export async function acceptanceCheckAction(_prev: { error?: string } | undefine
   if (allPass && (reasonRow?.props as Record<string, unknown> | undefined)?.reviewCycle !== true) {
     await db.transmittal.update({ where: { id }, data: { status: "CLOSED" } });
   }
-  // §11.11 — where the reason requires review, one cycle per revision carried
-  const reason = reasonRow;
-  // Reviewers named at the check open cycles directly; otherwise Document
-  // Control sends the accepted documents down a review route.
-  if (allPass && reason?.props.reviewCycle === true && reviewerIds.length) {
-    for (const item of t.items) {
-      const open = await db.reviewCycle.findFirst({ where: { revisionId: item.revisionId, status: "OPEN" } });
-      if (!open) {
-        try {
-          await openReviewCycle(ctx, item.revisionId, user, { mode: "PARALLEL", reviewerIds, transmittalId: t.id, note: `Review opened on acceptance of ${t.number} (§11.11).` });
-        } catch {
-          // revision not in a reviewable state — flagged by checks
-        }
-      }
-    }
-  }
+  // §11.11 — where the reason requires review, Document Control sends the
+  // accepted documents down a review route from the transmittal page.
   revalidatePath(`/transmittals/${id}`);
   return {};
 }

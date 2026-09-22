@@ -5,7 +5,9 @@
 //  - flag the document types that describe equipment (§5.8) and the default
 //    retention class, where the organization has not set them itself;
 //  - give every document without a retention class the one its criticality
-//    maps to (§13.2, §5.6).
+//    maps to (§13.2, §5.6);
+//  - mark the review cycles of a route's earlier steps as advice: only the
+//    last step's verdict binds.
 import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
 import { publishFunctionCatalogue } from "../src/lib/bootstrap";
@@ -44,7 +46,15 @@ async function main() {
         if (cls) { await db.document.update({ where: { id: d.id }, data: { retentionClass: cls } }); retained++; }
       }
     }
-    console.log(`${o.slug}: ${added} function(s) added${spine ? `, ${spine} spine links adopted` : ""}${flagged ? `, ${flagged} value(s) flagged` : ""}${retained ? `, ${retained} retention class(es) set` : ""}`);
+    // Earlier route steps advise; only the last step's cycle binds.
+    let advisory = 0;
+    for (const run of await db.workflowRun.findMany({ where: { project: { orgId: o.id } }, select: { steps: true } })) {
+      let steps: { cycleId?: string }[] = [];
+      try { steps = JSON.parse(run.steps); } catch { continue; }
+      const ids = steps.slice(0, -1).map((s) => s.cycleId).filter((id): id is string => !!id);
+      if (ids.length) advisory += (await db.reviewCycle.updateMany({ where: { id: { in: ids }, binding: true }, data: { binding: false } })).count;
+    }
+    console.log(`${o.slug}: ${added} function(s) added${spine ? `, ${spine} spine links adopted` : ""}${flagged ? `, ${flagged} value(s) flagged` : ""}${retained ? `, ${retained} retention class(es) set` : ""}${advisory ? `, ${advisory} route cycle(s) marked as advice` : ""}`);
   }
 }
 

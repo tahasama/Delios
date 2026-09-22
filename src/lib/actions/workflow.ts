@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireScope } from "@/lib/scope";
 import { mayContributeToDocument } from "@/lib/auth";
 import { audit } from "@/lib/audit";
-import { startWorkflowRun, recordStepOutcome, recordStepApproval } from "@/lib/workflow";
+import { startWorkflowRun, recordStepOutcome, recordStepApproval, normalizeRoute, type WfStep } from "@/lib/workflow";
 import { isReadOnly } from "@/lib/auth";
 import { hasVerb, isAdmin, isController } from "@/lib/auth";
 
@@ -42,6 +42,8 @@ export async function saveTemplateAction(_prev: { error?: string } | undefined, 
       // A step that names nobody is fine: when sent, it is assigned from the
       // distribution matrix by the documents' discipline, and the sender adjusts.
     }
+    // The last step decides; every earlier step advises.
+    steps = normalizeRoute(steps as WfStep[]);
 
     if (isDefault) await db.workflowTemplate.updateMany({ where: { classes, ...(id ? { NOT: { id } } : {}) }, data: { isDefault: false } });
     if (id) {

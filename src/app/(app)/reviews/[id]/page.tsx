@@ -29,7 +29,8 @@ export default async function ReviewCyclePage({ params }: { params: Promise<{ id
   });
   if (!cycle) notFound();
 
-  const [outcomes, commentClasses] = await Promise.all([getActiveSet("REVIEW_OUTCOMES"), getActiveSet("COMMENT_CLASSES")]);
+  const [outcomes, commentClasses] = await Promise.all([getActiveSet(cycle.outcomeSetKey ?? "REVIEW_OUTCOMES"), getActiveSet("COMMENT_CLASSES")]);
+  const verdictLabel = (code: string) => outcomes.find((o) => o.code === code)?.label ?? OUTCOME_CONSEQUENCES[code]?.label ?? code;
   const controller = isController(user) || isAdmin(user);
   const assigned = cycle.assignments.some((assignment) => assignment.userId === user.id);
   const rev = cycle.revision;
@@ -84,8 +85,8 @@ export default async function ReviewCyclePage({ params }: { params: Promise<{ id
         </div>
 
         <aside className="space-y-4">
-          <Card title="Decision">
-            {cycle.outcome ? <div><p className="text-sm font-semibold text-slate-900">{OUTCOME_CONSEQUENCES[cycle.outcome]?.label ?? cycle.outcome}</p><p className="mt-1 text-xs leading-5 text-slate-500">{OUTCOME_CONSEQUENCES[cycle.outcome]?.blurb}</p><p className="mt-3 text-xs text-slate-500">{cycle.outcomeByName}, {fmtDateTime(cycle.outcomeAt)}</p>{canReturn ? <div className="mt-4 border-t border-slate-100 pt-4"><ActionForm action={returnToOriginatorAction} submitLabel="Return to author" size="sm" hidden={{ cycleId: cycle.id }}/></div> : null}</div> : <Guarded result={await preflight("RECORD_OUTCOME", { cycleId: cycle.id })}><ActionForm action={recordOutcomeAction} submitLabel="Record decision" hidden={{ cycleId: cycle.id }}><Field label="Outcome" required><select name="outcome" className={inputCls} required defaultValue=""><option value="" disabled>Choose…</option>{outcomes.map((outcome) => <option key={outcome.code} value={outcome.code}>{outcome.label}</option>)}</select></Field><Field label="Note"><textarea name="outcomeNote" rows={3} className={inputCls} placeholder="optional"/></Field></ActionForm></Guarded>}
+          <Card title={cycle.binding ? "Binding verdict" : "Advice"} description={cycle.binding ? "The one decision on this revision. A verdict that proceeds is its release approval, so only someone who may approve the document can give it." : "Input for the route's decider; it does not decide on its own."}>
+            {cycle.outcome ? <div><p className="text-sm font-semibold text-slate-900"><span className="font-mono">{cycle.outcome}</span> · {verdictLabel(cycle.outcome)}</p><p className="mt-1 text-xs leading-5 text-slate-500">{OUTCOME_CONSEQUENCES[cycle.outcome]?.blurb}</p><p className="mt-3 text-xs text-slate-500">{cycle.outcomeByName}, {fmtDateTime(cycle.outcomeAt)}</p>{canReturn ? <div className="mt-4 border-t border-slate-100 pt-4"><ActionForm action={returnToOriginatorAction} submitLabel="Return to author" size="sm" hidden={{ cycleId: cycle.id }}/></div> : null}</div> : <Guarded result={await preflight("RECORD_OUTCOME", { cycleId: cycle.id })}><ActionForm action={recordOutcomeAction} submitLabel={cycle.binding ? "Record verdict" : "Record advice"} hidden={{ cycleId: cycle.id }}><Field label="Verdict" required><select name="outcome" className={inputCls} required defaultValue=""><option value="" disabled>Choose…</option>{outcomes.map((outcome) => <option key={outcome.code} value={outcome.code}>{outcome.label}</option>)}</select></Field><Field label="Note"><textarea name="outcomeNote" rows={3} className={inputCls} placeholder="optional"/></Field></ActionForm></Guarded>}
             {cycle.outcome ? null : <p className="mt-2 text-xs leading-5 text-slate-500">{!cycle.issuedToReviewAt ? "Document Control sends it to the reviewers first." : ""}</p>}
           </Card>
 

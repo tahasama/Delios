@@ -48,15 +48,15 @@ export default async function CodesPage() {
       <Link href="/guide" className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-slate-800"><ArrowLeft className="h-3.5 w-3.5" /> Help & orientation</Link>
       <PageHeader
         title="States and codes"
-        subtitle="Four different things are often all called “status”. Each describes something different and is decided by someone different."
+        subtitle="Four different things are often all called “status”. Each answers a different question, and only one of them is a decision: the review verdict."
       />
 
       {/* The four, side by side */}
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
         <Layer n="1" href="#document" title="Document state" about="the document number as a whole" examples="Planned · Active · Withdrawn" who="The system, and Document Control to end it" list="Fixed by the Standard" />
         <Layer n="2" href="#revision" title="Revision state" about="one revision — A, B, C…" examples="In preparation · In review · Released" who="Moves as the work moves: author, then Document Control" list="Fixed by the Standard" />
-        <Layer n="3" href="#status" title="Status code" about="what a released revision may be used for" examples="IFC · AFC · IFI · AB" who="Document Control, when releasing" list="Your organization's list" />
-        <Layer n="4" href="#outcome" title="Review outcome" about="a reviewer's verdict on a submitted revision" examples="C1 Approved … C4 Rejected" who="The reviewer" list="Your organization's list" />
+        <Layer n="3" href="#outcome" title="Review verdict" about="the decision on a revision in review" examples="C1 · C2 · C3 · C4" who="The route's last step — someone who may approve" list="Your organization's list" />
+        <Layer n="4" href="#status" title="Released for" about="what a released revision may be used for" examples="IFC · AFC · IFI · AB" who="Document Control, when releasing" list="Your organization's list" />
       </div>
 
       {/* How they connect */}
@@ -64,15 +64,15 @@ export default async function CodesPage() {
         <ol className="grid grid-cols-1 gap-2 lg:grid-cols-6">
           <FlowStep n="1" title="Create" who="Author" body="Number reserved." chips={[["1", "Planned"]]} />
           <FlowStep n="2" title="Write rev A" who="Author" body="Content being prepared." chips={[["2", "In preparation"]]} />
-          <FlowStep n="3" title="Send for review" who="Author" body="Reviewers get it." chips={[["2", "In review"]]} />
-          <FlowStep n="4" title="Review" who="Reviewer" body="Records the verdict." chips={[["4", "C1 / C2 / C3 / C4"]]} />
-          <FlowStep n="5" title="Approve" who="Approver" body="Signs it off. Needed before release." chips={[]} />
-          <FlowStep n="6" title="Release" who="Document Control" body="Chooses what it may be used for." chips={[["2", "Released"], ["3", "IFC"], ["1", "Active"]]} last />
+          <FlowStep n="3" title="Send down a route" who="Author or Document Control" body="The route names who advises and who decides." chips={[["2", "In review"]]} />
+          <FlowStep n="4" title="Advise" who="Reviewers" body="Comments and a suggested verdict." chips={[]} />
+          <FlowStep n="5" title="Decide" who="Last step · an approver" body="The one binding verdict. If it proceeds, it is the approval." chips={[["3", "C1 / C2 / C3 / C4"]]} />
+          <FlowStep n="6" title="Release" who="Document Control" body="Carries out the verdict; sets what it is released for." chips={[["2", "Released"], ["4", "IFC"], ["1", "Active"]]} last />
         </ol>
         <div className="mt-4 grid grid-cols-1 gap-3 text-xs leading-5 text-slate-600 md:grid-cols-3">
-          <p className="rounded-xl bg-tint-soft p-3"><strong className="text-slate-800">If the verdict is C3 or C4</strong>, rev A is never released. The author prepares rev B — the verdict itself authorizes it — and the path starts again at step 3.</p>
+          <p className="rounded-xl bg-tint-soft p-3"><strong className="text-slate-800">One decision.</strong> Only the route&apos;s last step decides, and only people the distribution matrix lets approve the document can be on it. There is no separate approval to agree or disagree with it.</p>
+          <p className="rounded-xl bg-tint-soft p-3"><strong className="text-slate-800">If the verdict is C3 or C4</strong>, rev A is never released. The author prepares rev B — the verdict itself authorizes it — and it goes down the route again.</p>
           <p className="rounded-xl bg-tint-soft p-3"><strong className="text-slate-800">When rev B is released</strong>, rev A becomes Superseded on its own, and everyone who received rev A must be sent rev B.</p>
-          <p className="rounded-xl bg-tint-soft p-3"><strong className="text-slate-800">A review verdict is not the approval.</strong> C1 says the content is fit; the approval is a separate sign-off by someone the distribution matrix allows to approve that discipline.</p>
         </div>
       </Card>
 
@@ -100,10 +100,22 @@ export default async function CodesPage() {
         </DataTable>
       </Card>
 
+      <Card id="outcome" title="3 · Review verdict — the one decision" description="Given at the last step of a review route by someone who may approve the document. A verdict that proceeds is the release approval. Earlier steps give the same codes as advice. Some projects write them as A / B / C / D or Code 1–4.">
+        <DataTable id="codes-outcomes" toolbar={false} head={<tr><Th>Code</Th><Th>Meaning</Th><Th>What happens next</Th></tr>}>
+          {outcomes.map((o) => (
+            <tr key={o.code}>
+              <Td className="font-mono text-sm font-bold text-slate-900">{o.code}</Td>
+              <Td className="whitespace-nowrap font-medium text-slate-800">{o.label}</Td>
+              <Td className="text-xs">{CONSEQUENCE[`${o.props.proceed === true}/${o.props.resubmit === true}`]}</Td>
+            </tr>
+          ))}
+        </DataTable>
+      </Card>
+
       <Card
         id="status"
-        title="3 · Status code — what a released revision may be used for"
-        description="Chosen by Document Control at release, and printed on the document and the transmittal. A transmittal sent for execution only accepts codes that allow work."
+        title="4 · Released for — what a released revision may be used for"
+        description="The status. Chosen by Document Control when it releases the revision, and printed on the document and the transmittal. A transmittal sent for execution only accepts codes that allow work."
       >
         <DataTable id="codes-statuses" toolbar={false} head={<tr><Th>Code</Th><Th>Meaning</Th><Th>Allows work</Th><Th>You may</Th><Th>You may not</Th></tr>}>
           {statuses.map((s) => (
@@ -126,25 +138,13 @@ export default async function CodesPage() {
         </div>
       </Card>
 
-      <Card id="outcome" title="4 · Review outcome — the reviewer's verdict" description="Each code your organization uses maps to one of four fixed consequences. Some projects write them as A / B / C / D or Code 1–4; they mean the same.">
-        <DataTable id="codes-outcomes" toolbar={false} head={<tr><Th>Code</Th><Th>Meaning</Th><Th>What happens next</Th></tr>}>
-          {outcomes.map((o) => (
-            <tr key={o.code}>
-              <Td className="font-mono text-sm font-bold text-slate-900">{o.code}</Td>
-              <Td className="whitespace-nowrap font-medium text-slate-800">{o.label}</Td>
-              <Td className="text-xs">{CONSEQUENCE[`${o.props.proceed === true}/${o.props.resubmit === true}`]}</Td>
-            </tr>
-          ))}
-        </DataTable>
-      </Card>
-
       <Card title="Who decides these lists">
         <div className="space-y-2 text-sm leading-6 text-slate-600">
           <p>
-            <strong className="text-slate-800">Layers 1 and 2 are fixed.</strong> They are the rules of control — a released revision can only move forward, and a document that was released can be withdrawn but never cancelled. No organization changes them.
+            <strong className="text-slate-800">Document and revision states are fixed.</strong> They are the rules of control — a released revision can only move forward, and a document that was released can be withdrawn but never cancelled. No organization changes them.
           </p>
           <p>
-            <strong className="text-slate-800">Layers 3 and 4 are yours.</strong> There is no single international list. IFI, IFR, IFC, AFC and As-built are common industry practice, but every client and contract words them differently —
+            <strong className="text-slate-800">The verdict and released-for lists are yours.</strong> There is no single international list. IFI, IFR, IFC, AFC and As-built are common industry practice, but every client and contract words them differently —
             and some use other schemes altogether, such as the S1–S4 / A1–A3 suitability codes of ISO 19650. Your organization publishes its own lists, started from a profile at set-up; every project uses them, and a change goes through the same review and approval as any other controlled setting.
           </p>
           {canEdit ? (

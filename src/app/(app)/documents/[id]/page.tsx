@@ -12,7 +12,7 @@ import { fmtDate, timeAgo, plain } from "@/lib/utils";
 import { getActiveSet, getSet, getValue } from "@/lib/config";
 import { updateDocumentAction, linkAssetAction, unlinkRelationshipAction, endDocumentStateAction } from "@/lib/actions/documents";
 import {
-  prepareRevisionAction, uploadRevisionFilesAction, approveRevisionAction, releaseRevisionAction, voidRevisionAction,
+  prepareRevisionAction, uploadRevisionFilesAction, releaseRevisionAction, voidRevisionAction,
 } from "@/lib/actions/revisions";
 import { withdrawApprovalAction } from "@/lib/actions/governance";
 import { setLegalHoldAction, disposeDocumentAction } from "@/lib/actions/retention";
@@ -143,16 +143,14 @@ export default async function DocumentDetailPage({
     </div>
   ) : null;
 
+  const openCycle = inReview && !run ? await db.reviewCycle.findFirst({ where: { revisionId: inReview.id, status: "OPEN" }, orderBy: { sequence: "desc" }, select: { id: true } }) : null;
   const extra = (
     <div className="mt-1 flex flex-wrap items-start gap-x-2 empty:hidden">
-      {inReview && !run && (hasVerb(user, "APPROVE") || hasVerb(user, "REVIEW")) ? (
-        <Step title={`Approve rev ${inReview.value}`} open>
-          <Guarded result={await preflight("APPROVE", { revisionId: inReview.id }, ctx)}>
-            <ActionForm action={approveRevisionAction} submitLabel="Approve" size="sm" hidden={{ revisionId: inReview.id }}>
-              <input name="note" className={inputCls} placeholder="Note (optional)" />
-            </ActionForm>
-          </Guarded>
-        </Step>
+      {/* No separate approval: the review's binding verdict is the decision. */}
+      {openCycle ? (
+        <Link href={`/reviews/${openCycle.id}`} className="mt-3 inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-surface px-3.5 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+          Review of rev {inReview?.value} — comments and verdict →
+        </Link>
       ) : null}
 
       {controller && working ? (

@@ -2,6 +2,7 @@ import type { Tenant } from "./tenant";
 import { audit, notifyMany } from "./audit";
 import type { SessionUser } from "./auth";
 import { holdersOf } from "./permissions";
+import { verdictMeaning, assertMayGiveBindingVerdict, recordApproval } from "./verdict";
 
 // Configuration-first workflow engine. A WorkflowTemplate is a list of steps:
 //   { act: REVIEW | APPROVAL, mode: ANY_OF | ALL_CONSOLIDATOR | SERIAL, participantIds: [], outcomeSetKey? }
@@ -16,6 +17,12 @@ import { holdersOf } from "./permissions";
 //   APPROVAL → the approval act (Part 8) by the step participant (authority matrix still applies).
 // Declining anywhere returns the workflow to the author: the revision keeps its
 // outcome, and the next revision is a new submission (§7.5 — replaced, not corrected).
+//
+// One decision per route. Earlier steps give advice: their verdicts are recorded
+// and passed on, but never end the route. The LAST step gives the binding
+// verdict, and only people who may approve the document take it. A binding
+// verdict that permits release is recorded as the release approval; one that
+// does not returns the route to the author. There is no separate approval act.
 
 export type WfStep = {
   act: "REVIEW" | "APPROVAL";
@@ -43,6 +50,17 @@ export type RunData = {
   currentStep: number;
   status: string;
 };
+
+/** Whose verdict binds on the deciding step: the last person of a serial or consolidated step, or everyone. */
+export function bindsOnStep(step: { mode?: string; participantIds: string[] }, userId: string): boolean {
+  if (step.mode === "SERIAL" || step.mode === "ALL_CONSOLIDATOR") return step.participantIds[step.participantIds.length - 1] === userId;
+  return true;
+}
+
+/** Every route ends in its decision: the last step binds (Approve), the rest advise (Review). */
+export function normalizeRoute<S extends { act: "REVIEW" | "APPROVAL" }>(steps: S[]): S[] {
+  return steps.map((s, i) => ({ ...s, act: i === steps.length - 1 ? "APPROVAL" : "REVIEW" }));
+}
 
 export function parseSteps(json: string): WfRuntimeStep[] {
   try {
@@ -77,6 +95,7 @@ async function spawnCycleForStep(t: Tenant, revisionId: string, step: WfRuntimeS
       receivedAt: new Date(),
       issuedToReviewAt: new Date(),
       outcomeSetKey: step.outcomeSetKey ?? null,
+      binding: step.act === "APPROVAL",
     },
   });
   const participants = await db.user.findMany({ where: { id: { in: step.participantIds } } });
@@ -84,7 +103,7 @@ async function spawnCycleForStep(t: Tenant, revisionId: string, step: WfRuntimeS
     data: participants.map((p, i) => ({ projectId, cycleId: cycle.id, userId: p.id, userName: p.name, order: i + 1 })),
   });
   const revision = await db.revision.findUniqueOrThrow({ where: { id: revisionId }, select: { documentId: true } });
-  await notifyMany(step.participantIds, "REVIEW_REQUEST", `Workflow step ${seq}: ${label}`, step.act === "APPROVAL" ? "Your approval is requested." : "Your review is requested.", `/documents/${revision.documentId}`, t);
+  await notifyMany(step.participantIds, "REVIEW_REQUEST", `Workflow step ${seq}: ${label}`, step.act === "APPROVAL" ? "Your binding verdict is requested." : "Your review is requested.", `/documents/${revision.documentId}`, t);
   return cycle;
 }
 
@@ -97,13 +116,13 @@ export async function startWorkflowRun(t: Tenant, revisionId: string, templateId
   if (active) return { ok: false, error: "A workflow is already running for this revision." };
 
   const template = await db.workflowTemplate.findUniqueOrThrow({ where: { id: templateId } });
-  const baseSteps = JSON.parse(template.steps) as WfStep[];
+  const baseSteps = normalizeRoute(JSON.parse(template.steps) as WfStep[]);
   if (!baseSteps.length) return { ok: false, error: "The template has no steps." };
 
   const proposed = await Promise.all(baseSteps.map((s) => proposeForStep(t, [rev.document], s)));
   const steps: WfRuntimeStep[] = baseSteps.map((s, i) => ({
     ...s,
-    outcomeSetKey: s.act === "REVIEW" ? (s.outcomeSetKey ?? template.outcomeSetKey ?? "REVIEW_OUTCOMES") : s.outcomeSetKey,
+    outcomeSetKey: s.outcomeSetKey ?? template.outcomeSetKey ?? "REVIEW_OUTCOMES",
     participantIds: overrideParticipantIds?.[i]?.length ? overrideParticipantIds[i] : proposed[i].map((p) => p.id),
     status: i === 0 ? "active" : "pending",
     decidedBy: [],
@@ -126,14 +145,9 @@ export async function startWorkflowRun(t: Tenant, revisionId: string, templateId
   });
 
   const label = `${rev.document.docNumber} rev ${rev.value}`;
-  const first = steps[0];
-  if (first.act === "REVIEW") {
-    const cycle = await spawnCycleForStep(t, revisionId, first, user, 1, label);
-    steps[0].cycleId = cycle.id;
-    await db.workflowRun.update({ where: { id: run.id }, data: { steps: JSON.stringify(steps) } });
-  } else {
-    await notifyMany(first.participantIds, "APPROVAL_REQUEST", `Approval requested: ${label}`, "Your approval is requested (workflow step 1).", `/documents/${rev.documentId}`, t);
-  }
+  const cycle = await spawnCycleForStep(t, revisionId, steps[0], user, 1, label);
+  steps[0].cycleId = cycle.id;
+  await db.workflowRun.update({ where: { id: run.id }, data: { steps: JSON.stringify(steps) } });
   await db.revision.update({ where: { id: revisionId }, data: { state: "IN_REVIEW" } });
   await audit({
     tenant: t,
@@ -157,7 +171,7 @@ async function advance(t: Tenant, runId: string, user: SessionUser) {
   if (next >= steps.length) {
     await db.workflowRun.update({ where: { id: runId }, data: { steps: JSON.stringify(steps), status: "DONE" } });
     const rev = await db.revision.findUniqueOrThrow({ where: { id: run.revisionId }, include: { document: true } });
-    await audit({ tenant: t, actor: user, action: "WORKFLOW_COMPLETED", entityType: "WorkflowRun", entityId: runId, entityLabel: `${rev.document.docNumber} rev ${rev.value}`, detail: "All steps complete — ready for release by the control function." });
+    await audit({ tenant: t, actor: user, action: "WORKFLOW_COMPLETED", entityType: "WorkflowRun", entityId: runId, entityLabel: `${rev.document.docNumber} rev ${rev.value}`, detail: "Binding verdict permits release — ready for release by the control function." });
     const contributorIds = await contributorRecipients(t, rev.document.createdById, rev.document.originator);
     await notifyMany(contributorIds, "WORKFLOW_DONE", `Workflow complete: ${rev.document.docNumber} rev ${rev.value}`, "All steps are done. The control function can now release it.", `/documents/${rev.documentId}`, t);
     const controllers = await holdersOf(t, "CONTROL");
@@ -168,15 +182,9 @@ async function advance(t: Tenant, runId: string, user: SessionUser) {
   const nextRevision = await db.revision.findUniqueOrThrow({ where: { id: run.revisionId }, include: { document: true } });
   const label = `${nextRevision.document.docNumber} rev ${nextRevision.value}`;
   await db.workflowRun.update({ where: { id: runId }, data: { steps: JSON.stringify(steps), currentStep: next } });
-  const step = steps[next];
-  if (step.act === "REVIEW") {
-    const seq = next + 1;
-    const cycle = await spawnCycleForStep(t, run.revisionId, step, user, seq, label);
-    steps[next].cycleId = cycle.id;
-    await db.workflowRun.update({ where: { id: runId }, data: { steps: JSON.stringify(steps) } });
-  } else {
-    await notifyMany(step.participantIds, "APPROVAL_REQUEST", `Approval requested (step ${next + 1}): ${label}`, "Your approval is requested.", `/documents/${nextRevision.documentId}`, t);
-  }
+  const cycle = await spawnCycleForStep(t, run.revisionId, steps[next], user, next + 1, label);
+  steps[next].cycleId = cycle.id;
+  await db.workflowRun.update({ where: { id: runId }, data: { steps: JSON.stringify(steps) } });
 }
 
 /** Return the workflow to the author (a decline anywhere). §7.5 — replaced, not corrected. */
@@ -215,7 +223,8 @@ async function contributorRecipients(t: Tenant, createdById: string, originator:
 }
 
 /**
- * Record a decision on the active REVIEW step.
+ * Record a verdict on the active step. On an advisory step it is input for
+ * the decider; on the last step it is the binding verdict.
  * ANY_OF: the first participant's outcome closes the step.
  * SERIAL: participants decide in order; the last one's outcome is binding (§9.7).
  * ALL_CONSOLIDATOR: everyone records; the last-named participant records the binding outcome.
@@ -227,21 +236,37 @@ export async function recordStepOutcome(t: Tenant, runId: string, user: SessionU
   const steps = parseSteps(run.steps);
   const step = steps[run.currentStep];
   if (!step || step.status !== "active") return { ok: false, error: "No active step to decide on." };
-  if (step.act !== "REVIEW") return { ok: false, error: "The active step is an approval — record the approval instead." };
-  if (!step.participantIds.includes(user.id)) return { ok: false, error: "Only a participant of this step records its outcome." };
+  if (!step.participantIds.includes(user.id)) return { ok: false, error: "Only a participant of this step records its verdict." };
 
   const rev = await db.revision.findUniqueOrThrow({ where: { id: run.revisionId }, include: { document: true } });
   const label = `${rev.document.docNumber} rev ${rev.value}`;
   const outcomeSetKey = step.outcomeSetKey ?? "REVIEW_OUTCOMES";
-  const outcomeValue = await db.configValue.findFirst({ where: { setKey: outcomeSetKey, code: outcomeCode } });
-  if (!outcomeValue || outcomeValue.status !== "ACTIVE") return { ok: false, error: `Choose an active outcome from ${outcomeSetKey}.` };
-  let consequences: { proceed?: boolean; resubmit?: boolean } = {};
-  try { consequences = outcomeValue.props ? JSON.parse(outcomeValue.props) : {}; } catch { consequences = {}; }
-  const returnsToAuthor = consequences.proceed === false || consequences.resubmit === true;
+
+  const verdict = await verdictMeaning(t, outcomeSetKey, outcomeCode);
+  if (!verdict) return { ok: false, error: `Choose an active verdict from ${outcomeSetKey}.` };
+  // The last step decides; every earlier step advises.
+  const decides = run.currentStep === steps.length - 1;
+  const returnsToAuthor = !verdict.proceed;
+  // Within the deciding step, whose verdict binds depends on how it decides:
+  // serial and consolidated steps bind on their last person; the others on everyone.
+  const binds = decides && bindsOnStep(step, user.id);
+  if (binds && returnsToAuthor && !note) return { ok: false, error: `${verdict.label} goes back to the author — say what must change.` };
+  if (binds && !returnsToAuthor) {
+    try { await assertMayGiveBindingVerdict(t, rev.id, user); } catch (e) { return { ok: false, error: e instanceof Error ? e.message : "Not permitted." }; }
+  }
+  // A route started before every step had its own cycle: give this one its cycle now.
+  if (!step.cycleId) {
+    const cycle = await spawnCycleForStep(t, run.revisionId, step, user, run.currentStep + 1, label);
+    step.cycleId = cycle.id;
+    await db.workflowRun.update({ where: { id: runId }, data: { steps: JSON.stringify(steps) } });
+  }
+  if (!decides) await db.reviewCycle.update({ where: { id: step.cycleId }, data: { binding: false } });
 
   const finishBindingDecision = async () => {
-    if (returnsToAuthor) await returnWorkflow(t, runId, user, `${outcomeValue.label}${note ? ` — ${note}` : ""}`);
-    else await advance(t, runId, user);
+    if (!decides) return advance(t, runId, user);
+    if (returnsToAuthor) return returnWorkflow(t, runId, user, `${verdict.label}${note ? ` — ${note}` : ""}`);
+    await recordApproval(t, rev.id, user, `Binding verdict ${verdict.code} — ${verdict.label}${note ? `: ${note}` : ""}`);
+    return advance(t, runId, user);
   };
 
   if (step.cycleId) {
@@ -282,10 +307,10 @@ export async function recordStepOutcome(t: Tenant, runId: string, user: SessionU
     if (!allDone) return { ok: true, message: "Input recorded — waiting for the others on this step." };
     const worst = step.inputs.find((i) => i.returns) ?? step.inputs[step.inputs.length - 1];
     await db.reviewCycle.update({ where: { id: step.cycleId }, data: { outcome: worst.code, outcomeAt: new Date(), outcomeByName: user.name, outcomeNote: note ?? null, returnedFromReviewAt: new Date(), returnedToOriginatorAt: new Date(), status: "CLOSED" } });
-    const isLastStep = run.currentStep === steps.length - 1;
-    if (isLastStep && worst.returns) await returnWorkflow(t, runId, user, "A reviewer asked for changes.");
+    if (decides && worst.returns) await returnWorkflow(t, runId, user, "The deciders asked for changes.");
+    else if (decides) { await recordApproval(t, rev.id, user, `Binding verdict ${worst.code}`); await advance(t, runId, user); }
     else await advance(t, runId, user);
-    return { ok: true, message: isLastStep ? `All inputs in — ${label} decided.` : `All inputs in — ${label} moves to the next step.` };
+    return { ok: true, message: decides ? `All verdicts in — ${label} decided.` : `All inputs in — ${label} moves to the decider.` };
   }
 
   // ALL_CONSOLIDATOR
@@ -301,46 +326,24 @@ export async function recordStepOutcome(t: Tenant, runId: string, user: SessionU
   return { ok: true, message: `Recorded — the consolidator closes this step once everyone has decided.` };
 }
 
-/** Record the approval act on an active APPROVAL step (Part 8). Declining returns the workflow. */
+/**
+ * Kept for callers that still say "approve" or "decline": both are a verdict on
+ * the active step now. Approve picks the set's plain proceed code; decline its
+ * request-changes code, unless a code is given.
+ */
 export async function recordStepApproval(t: Tenant, runId: string, user: SessionUser, approve: boolean, note?: string, outcomeCode?: string): Promise<{ ok: boolean; error?: string; message?: string }> {
-  const { db, projectId } = t;
-  const run = await db.workflowRun.findUniqueOrThrow({ where: { id: runId } });
-  if (run.status !== "ACTIVE") return { ok: false, error: "This workflow is not active." };
-  const steps = parseSteps(run.steps);
-  const step = steps[run.currentStep];
-  if (!step || step.status !== "active") return { ok: false, error: "No active step." };
-  if (step.act !== "APPROVAL") return { ok: false, error: "The active step is a review — record the outcome instead." };
-  if (!step.participantIds.includes(user.id)) return { ok: false, error: "Only a participant of this step records the approval." };
-  if (approve && !note && false) return { ok: false, error: "" };
-
-  const rev = await db.revision.findUniqueOrThrow({ where: { id: await runIdToRevision(t, runId) }, include: { document: true } });
-  const label = `${rev.document.docNumber} rev ${rev.value}`;
-
-  if (!approve) {
-    if (!note) return { ok: false, error: "Declining requires a reason for the author." };
-    const declineCode = outcomeCode ?? (await db.configValue.findFirst({ where: { setKey: "REVIEW_OUTCOMES", status: "ACTIVE" } }))?.code ?? "REVISE_AND_RESUBMIT";
-    if (step.cycleId) {
-      await db.reviewCycle.update({ where: { id: step.cycleId }, data: { outcome: declineCode, outcomeAt: new Date(), outcomeByName: user.name, outcomeNote: note, status: "CLOSED", returnedFromReviewAt: new Date(), returnedToOriginatorAt: new Date() } });
-    }
-    await audit({ tenant: t, actor: user, action: "REVIEW_OUTCOME", entityType: "WorkflowRun", entityId: runId, entityLabel: label, newValue: declineCode, detail: note });
-    await returnWorkflow(t, runId, user, note);
-    return { ok: true, message: `Declined — returned to the author with your reason.` };
+  const run = await t.db.workflowRun.findUniqueOrThrow({ where: { id: runId } });
+  const step = parseSteps(run.steps)[run.currentStep];
+  const setKey = step?.outcomeSetKey ?? "REVIEW_OUTCOMES";
+  let code = outcomeCode;
+  if (!code) {
+    const values = await t.db.configValue.findMany({ where: { setKey, status: "ACTIVE" } });
+    const props = (v: { props: string | null }) => { try { return v.props ? JSON.parse(v.props) : {}; } catch { return {}; } };
+    const pick = values.find((v) => (approve ? props(v).proceed === true && props(v).resubmit !== true : props(v).proceed !== true && props(v).resubmit === true));
+    code = pick?.code;
   }
-
-  // authority matrix still applies to the approval act (§8.3)
-  const { recordApproval } = await import("./lifecycle");
-  try {
-    await recordApproval(t, rev.id, user, note);
-  } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Approval rejected." };
-  }
-  if (step.cycleId) {
-    await db.reviewCycle.update({ where: { id: step.cycleId }, data: { status: "CLOSED", outcome: outcomeCode ?? undefined, outcomeAt: new Date(), outcomeByName: user.name, outcomeNote: note ?? null, returnedFromReviewAt: new Date(), returnedToOriginatorAt: new Date() } });
-  }
-  step.decidedBy = [...(step.decidedBy ?? []), user.id];
-  await db.workflowRun.update({ where: { id: runId }, data: { steps: JSON.stringify(steps) } });
-  await advance(t, runId, user);
-  return { ok: true, message: `Approved ${label}.` };
+  if (!code) return { ok: false, error: `No ${approve ? "approving" : "request-changes"} verdict is published in ${setKey}.` };
+  return recordStepOutcome(t, runId, user, code, note);
 }
 
 async function runIdToRevision(t: Tenant, runId: string): Promise<string> {
@@ -358,7 +361,7 @@ async function runIdToRevision(t: Tenant, runId: string): Promise<string> {
 export async function offMatrixParticipants(
   t: Tenant,
   doc: { deliverableType: string; docType: string; discipline: string; criticality: string | null; confidentiality: string | null },
-  steps: { act: "REVIEW" | "APPROVAL"; participantIds: string[] }[],
+  steps: { act: "REVIEW" | "APPROVAL"; mode?: string; participantIds: string[] }[],
 ): Promise<string[]> {
   const { loadActor, can } = await import("./permissions");
   const ids = [...new Set(steps.flatMap((s) => s.participantIds))];
@@ -369,8 +372,9 @@ export async function offMatrixParticipants(
   const actors = new Map<string, Awaited<ReturnType<typeof loadActor>>>();
   const problems: string[] = [];
   for (const step of steps) {
-    const verb = step.act === "APPROVAL" ? "APPROVE" : "REVIEW";
     for (const id of step.participantIds) {
+      // On the deciding step only those whose verdict binds need Approve; the rest advise.
+      const verb = step.act === "APPROVAL" && bindsOnStep(step, id) ? "APPROVE" : "REVIEW";
       const m = memberships.find((x) => x.userId === id);
       if (!m) { problems.push(`${id} is not on this project`); continue; }
       if (!actors.has(m.functionId)) actors.set(m.functionId, await loadActor(t, m.functionId));
@@ -414,11 +418,18 @@ export type Proposal = { id: string; why: string };
  *      the matrix narrows to that discipline (e.g. Lead Electrical Engineer
  *      approves EL), then people whose department is that discipline.
  */
-export async function proposeForStep(t: Tenant, docs: DocClass[], step: { act: "REVIEW" | "APPROVAL"; participantIds: string[]; functionIds?: string[] }): Promise<Proposal[]> {
-  const eligible = await eligiblePeople(t, docs, step.act);
-  const named = eligible
-    .filter((p) => step.participantIds.includes(p.id) || (step.functionIds ?? []).includes(p.functionId))
-    .map((p) => ({ id: p.id, why: step.participantIds.includes(p.id) ? "named in the route" : `${p.functionName} (route)` }));
+export async function proposeForStep(t: Tenant, docs: DocClass[], step: { act: "REVIEW" | "APPROVAL"; mode?: string; participantIds: string[]; functionIds?: string[] }): Promise<Proposal[]> {
+  // A serial or consolidated deciding step also seats advisers; only its last
+  // person must be able to approve, which is checked when the route starts.
+  const seatsAdvisers = step.act === "APPROVAL" && (step.mode === "SERIAL" || step.mode === "ALL_CONSOLIDATOR") && step.participantIds.length > 1;
+  const eligible = await eligiblePeople(t, docs, seatsAdvisers ? "REVIEW" : step.act);
+  // Named people keep the route's order — in serial and consolidated steps the order decides who binds.
+  const named = [
+    ...step.participantIds.filter((id) => eligible.some((p) => p.id === id)).map((id) => ({ id, why: "named in the route" })),
+    ...eligible
+      .filter((p) => !step.participantIds.includes(p.id) && (step.functionIds ?? []).includes(p.functionId))
+      .map((p) => ({ id: p.id, why: `${p.functionName} (route)` })),
+  ];
   if (named.length || step.participantIds.length || (step.functionIds ?? []).length) return named;
 
   const disciplines = [...new Set(docs.map((d) => d.discipline).filter(Boolean))] as string[];

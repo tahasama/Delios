@@ -32,7 +32,7 @@ export default async function WorkflowTemplatesPage() {
     <div className="space-y-4">
       <PageHeader
         title="Review routes"
-        subtitle="The routes authors pick from when they send a document for review or approval."
+        subtitle="The routes a document is sent down for review. Earlier steps advise; the last step gives the one binding verdict, which is also the release approval."
       />
 
       {templates.length === 0 ? (
@@ -58,7 +58,7 @@ export default async function WorkflowTemplatesPage() {
                   {steps.map((s, i) => (
                     <li key={i} className="flex flex-wrap items-center gap-2 text-sm">
                       <span className="grid h-5 w-5 place-items-center rounded bg-slate-100 font-mono text-[10px] font-bold text-slate-500">{i + 1}</span>
-                      <Chip className={s.act === "APPROVAL" ? "bg-emerald-100 text-emerald-800 ring-emerald-300" : "bg-sky-100 text-sky-800 ring-sky-300"}>{s.act === "APPROVAL" ? "approve" : "review"}</Chip>
+                      <Chip className={i === steps.length - 1 ? "bg-emerald-100 text-emerald-800 ring-emerald-300" : "bg-sky-100 text-sky-800 ring-sky-300"}>{i === steps.length - 1 ? "decides" : "advises"}</Chip>
                       <Chip>{s.mode === "ANY_OF" ? "any one decides" : s.mode === "SERIAL" ? "one after another" : s.mode === "ALL" ? "all give input, any order" : "all respond, last one decides"}</Chip>
                       <span className="text-xs text-slate-500">{[...(s.functionIds ?? []).map((fid) => functions.find((f) => f.id === fid)?.name ?? "?").map((n) => `any ${n}`), ...s.participantIds.map(nameOf)].join(", ")}</span>
                     </li>

@@ -1,7 +1,8 @@
 // Review routes: the shapes people actually use, run through the real engine.
 //   "Three specialists give input in parallel, any order — then their lead."
-// and the rule behind it: Document Control can only send to people the
-// distribution matrix names for that document.
+// and the rules behind it: Document Control can only send to people the
+// distribution matrix names for that document, and a route has exactly one
+// decision — its last step's binding verdict, which is the release approval.
 import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
 import { tenantFor } from "../src/lib/tenant";
@@ -32,7 +33,8 @@ async function main() {
   const proceed = (await db.configValue.findMany({ where: { setKey: "REVIEW_OUTCOMES", status: "ACTIVE" } }))
     .map((v) => ({ code: v.code, props: v.props ? (JSON.parse(v.props) as { proceed?: boolean; resubmit?: boolean }) : {} }));
   const ok = proceed.find((v) => v.props.proceed === true && !v.props.resubmit)!;
-  const back = proceed.find((v) => v.props.proceed === false || v.props.resubmit === true)!;
+  // A verdict that stops release; "approved with comments" proceeds.
+  const back = proceed.find((v) => v.props.proceed === false)!;
 
   const stamp = Date.now().toString(36);
   const made: { docs: string[]; templates: string[] } = { docs: [], templates: [] };
@@ -61,9 +63,12 @@ async function main() {
     ]);
 
     console.log("\nOnly the distribution matrix decides who can be sent a document\n");
-    const offMatrix = await template("Includes a technician", [{ act: "REVIEW", mode: "ALL", participantIds: [r1.id, tech.id] }]);
+    const offMatrix = await template("Includes a technician", [
+      { act: "REVIEW", mode: "ALL", participantIds: [r1.id, tech.id] },
+      { act: "REVIEW", mode: "ANY_OF", participantIds: [lead.id] },
+    ]);
     const rev0 = await freshRevision("MATRIX");
-    const refused = await startWorkflowRun(t, rev0.id, offMatrix, admin, [[r1.id, tech.id]]);
+    const refused = await startWorkflowRun(t, rev0.id, offMatrix, admin, [[r1.id, tech.id], [lead.id]]);
     check("choosing someone the matrix does not name is refused", !refused.ok && /distribution matrix/.test(refused.error), refused.ok ? "started" : refused.error);
     const rev0b = await freshRevision("MATRIX2");
     const trimmed = await startWorkflowRun(t, rev0b.id, offMatrix, admin);
@@ -73,7 +78,10 @@ async function main() {
     console.log("\nA step can name functions; the matrix decides who\n");
     const reviewerFn = await db.function.findFirstOrThrow({ where: { orgId: org.id, code: "REVIEWER" } });
     const techFn = await db.function.findFirstOrThrow({ where: { orgId: org.id, code: "ELEC_TECH" } });
-    const byFunction = await template("By function", [{ act: "REVIEW", mode: "ALL", participantIds: [], functionIds: [reviewerFn.id, techFn.id] }]);
+    const byFunction = await template("By function", [
+      { act: "REVIEW", mode: "ALL", participantIds: [], functionIds: [reviewerFn.id, techFn.id] },
+      { act: "REVIEW", mode: "ANY_OF", participantIds: [lead.id] },
+    ]);
     const rev3 = await freshRevision("FN");
     const s3 = await startWorkflowRun(t, rev3.id, byFunction, admin);
     const run3 = await getRunForRevision(t, rev3.id);
@@ -103,16 +111,43 @@ async function main() {
     const decided = await recordStepOutcome(t, runId, lead, ok.code, "agreed");
     run = await getRunForRevision(t, rev.id);
     check("the lead's decision completes the route", decided.ok && run?.status === "DONE", decided.error ?? "");
+    const approvals = await t.db.approval.findMany({ where: { revisionId: rev.id, withdrawnAt: null } });
+    check("the binding verdict is the release approval, recorded once under the lead's name", approvals.length === 1 && approvals[0].approverId === lead.id, `${approvals.length} approval(s)`);
+    const cycles = await t.db.reviewCycle.findMany({ where: { revisionId: rev.id }, orderBy: { sequence: "asc" } });
+    check("the specialists' step is advice, the lead's step binds", cycles.length === 2 && !cycles[0].binding && cycles[1].binding);
 
-    console.log("\nWhen inputs are the last word, the most severe one binds\n");
-    const inputsOnly = await template("Inputs only", [{ act: "REVIEW", mode: "ALL", participantIds: [r1.id, r2.id] }]);
+    console.log("\nOnly someone who may approve takes the deciding step\n");
+    const reviewerDecides = await template("Reviewer decides", [{ act: "REVIEW", mode: "ANY_OF", participantIds: [r1.id] }]);
+    const rev4 = await freshRevision("DECIDER");
+    const s4 = await startWorkflowRun(t, rev4.id, reviewerDecides, admin, [[r1.id]]);
+    check("a reviewer cannot be put on the deciding step", !s4.ok && /may not approve/.test(s4.error), s4.ok ? "started" : s4.error);
+
+    console.log("\nA consolidated step: reviewers advise, the last person decides\n");
+    const consolidated = await template("Consolidated", [{ act: "REVIEW", mode: "ALL_CONSOLIDATOR", participantIds: [r1.id, r2.id, lead.id] }]);
+    const rev5 = await freshRevision("CONS");
+    const s5 = await startWorkflowRun(t, rev5.id, consolidated, admin);
+    check("reviewers may sit on the deciding step when only the consolidator binds", s5.ok, s5.ok ? "" : s5.error);
+    const id5 = s5.ok ? s5.runId : "";
+    const in1 = await recordStepOutcome(t, id5, r1, ok.code, "fine");
+    const in2 = await recordStepOutcome(t, id5, r2, ok.code, "fine");
+    check("their verdicts are taken as input", in1.ok && in2.ok, in1.error ?? in2.error ?? "");
+    check("and approve nothing", (await t.db.approval.count({ where: { revisionId: rev5.id } })) === 0);
+    await recordStepOutcome(t, id5, lead, ok.code, "consolidated");
+    const run5 = await getRunForRevision(t, rev5.id);
+    const appr5 = await t.db.approval.findMany({ where: { revisionId: rev5.id } });
+    check("the consolidator's verdict decides and is the approval", run5?.status === "DONE" && appr5.length === 1 && appr5[0].approverId === lead.id);
+
+    console.log("\nWhen several decide together, the most severe verdict binds\n");
+    const inputsOnly = await template("Deciders together", [{ act: "REVIEW", mode: "ALL", participantIds: [lead.id, admin.id] }]);
     const rev2 = await freshRevision("LAST");
     const s2 = await startWorkflowRun(t, rev2.id, inputsOnly, admin);
     const id2 = s2.ok ? s2.runId : "";
-    await recordStepOutcome(t, id2, r1, ok.code);
-    await recordStepOutcome(t, id2, r2, back.code, "rework section 3");
+    check("deciders start", s2.ok, s2.ok ? "" : s2.error);
+    await recordStepOutcome(t, id2, lead, ok.code);
+    await recordStepOutcome(t, id2, admin, back.code, "rework section 3");
     const run2 = await getRunForRevision(t, rev2.id);
     check("one request for changes returns it to the author", run2?.status === "RETURNED", run2?.status);
+    check("and nothing is approved", (await t.db.approval.count({ where: { revisionId: rev2.id } })) === 0);
   } finally {
     // Leave the register as it was.
     const revs = await db.revision.findMany({ where: { documentId: { in: made.docs } }, select: { id: true } });

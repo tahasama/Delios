@@ -564,6 +564,9 @@ model ReviewCycle {
   outcomeAt              DateTime?
   outcomeByName          String?
   outcomeNote            String?
+  // A route's earlier steps give advice; only its last step's verdict binds —
+  // and a binding verdict that permits release is the release approval.
+  binding                Boolean            @default(true)
   createdAt              DateTime           @default(now())
   comments               ReviewComment[]
   assignments            ReviewAssignment[]

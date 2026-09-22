@@ -193,19 +193,20 @@ const releaseState: Gate = {
 const releaseApproval: Gate = {
   id: "REL-APPROVAL",
   intent: "RELEASE",
-  title: "Approval is recorded",
+  title: "The binding verdict permits release",
   clause: "§7.5 · §8.1",
   preventsCheck: "AP-01",
   async evaluate(ctx, subject) {
     if (!subject.revisionId) return block("No revision selected.");
+    // A binding verdict that proceeds is recorded as the approval — one decision.
     const approval = await ctx.db.approval.findFirst({
       where: { revisionId: subject.revisionId, withdrawnAt: null },
       orderBy: { decidedAt: "desc" },
     });
-    if (approval) return ok(`Approved by ${approval.approverName}.`);
+    if (approval) return ok(`Decided by ${approval.approverName}.`);
     return block(
-      "No approval is recorded for this revision.",
-      "Nothing is released without one (§8.1). Record the approval first.",
+      "No binding verdict lets this revision proceed yet.",
+      "Nothing is released until the review's deciding step gives a verdict that proceeds (§8.1).",
     );
   },
 };

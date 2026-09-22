@@ -1,80 +1,125 @@
 import Link from "next/link";
 import { requireScope } from "@/lib/scope";
+import { getSet } from "@/lib/config";
 import { PageHeader, DataTable, Th, Td, Chip, EmptyState } from "@/components/ui";
-import { fmtDateTime } from "@/lib/utils";
+import { fmtDate } from "@/lib/utils";
+import { OUTCOME_CONSEQUENCES } from "@/lib/standard";
 import { ArrowRight } from "lucide-react";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Review cycles" };
+export const metadata = { title: "Reviews" };
 
-// §16.4 Q6 — which review cycles are open, and with whom.
-export default async function ReviewsPage({ searchParams }: { searchParams: Promise<{ status?: string }> }) {
+const VIEWS = [
+  { id: "ALL", label: "All" },
+  { id: "OPEN", label: "Open" },
+  { id: "CLOSED", label: "Closed" },
+] as const;
+
+/**
+ * Every review ever made, one row per review — a document appears once for
+ * each time it was reviewed. The deciding review of a route carries the
+ * binding verdict; earlier steps are advice to it.
+ */
+export default async function ReviewsPage({ searchParams }: { searchParams: Promise<{ status?: string; q?: string }> }) {
   const { db } = await requireScope();
   const sp = await searchParams;
-  const status = sp.status ?? "OPEN";
-  const [cycles, blockingCount] = await Promise.all([
+  const status = VIEWS.some((v) => v.id === sp.status) ? sp.status! : "ALL";
+  const q = (sp.q ?? "").trim();
+  const [cycles, counts, verdicts] = await Promise.all([
     db.reviewCycle.findMany({
-      where: status === "ALL" ? {} : { status },
+      where: {
+        ...(status === "ALL" ? {} : { status }),
+        ...(q ? { revision: { document: { OR: [{ docNumber: { contains: q } }, { title: { contains: q } }] } } } : {}),
+      },
       orderBy: { submittedAt: "desc" },
-      take: 100,
+      take: 500,
       include: {
-        revision: { include: { document: { select: { docNumber: true, title: true } } } },
-        assignments: true,
+        revision: { select: { value: true, state: true, releasedAt: true, document: { select: { id: true, docNumber: true, title: true } } } },
+        assignments: { orderBy: { order: "asc" } },
         comments: { where: { progressionPreventing: true, status: "OPEN" }, select: { id: true } },
       },
     }),
-    db.reviewCycle.count({ where: { status: "OPEN", comments: { some: { progressionPreventing: true, status: "OPEN" } } } }),
+    db.reviewCycle.groupBy({ by: ["status"], _count: true }),
+    getSet("REVIEW_OUTCOMES"),
   ]);
+  const count = (s: string) => (s === "ALL" ? counts.reduce((n, c) => n + c._count, 0) : counts.find((c) => c.status === s)?._count ?? 0);
+  // Codes from the organization's list; older records may carry the Standard's
+  // own consequence names (APPROVED, REVISE_AND_RESUBMIT…).
+  const verdictLabel = new Map<string, string>([...Object.entries(OUTCOME_CONSEQUENCES).map(([k, v]) => [k, v.label] as [string, string]), ...verdicts.map((v) => [v.code, v.label] as [string, string])]);
+  const proceeds = new Map<string, boolean>([...Object.entries(OUTCOME_CONSEQUENCES).map(([k, v]) => [k, v.proceed] as [string, boolean]), ...verdicts.map((v) => [v.code, v.props.proceed === true] as [string, boolean])]);
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Reviews"
-      />
+    <div className="space-y-5">
+      <PageHeader title="Reviews" subtitle="Every review ever made — a document appears once for each time it was reviewed. The deciding review gives the binding verdict; earlier steps of a route are advice to it." />
 
-
-      <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-surface px-4 py-3 shadow-sm">
-        <p className="text-xs text-slate-500">{cycles.length} {status === "ALL" ? "" : status.toLowerCase() + " "}review{cycles.length === 1 ? "" : "s"}{blockingCount && status !== "CLOSED" ? ` · ${blockingCount} with blocking comments` : ""}</p>
-        <nav className="flex gap-1 rounded-xl bg-slate-100 p-1" aria-label="Review status">
-          {["OPEN", "CLOSED", "ALL"].map((s) => <Link key={s} href={`/reviews?status=${s}`} aria-current={status === s ? "page" : undefined} className={`rounded-lg px-3 py-2 text-xs font-semibold ${status === s ? "bg-surface text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-800"}`}>{s === "ALL" ? "All" : s.charAt(0) + s.slice(1).toLowerCase()}</Link>)}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <nav className="flex gap-1 rounded-xl bg-slate-100 p-1" aria-label="Which reviews">
+          {VIEWS.map((v) => (
+            <Link key={v.id} href={`/reviews?status=${v.id}${q ? `&q=${encodeURIComponent(q)}` : ""}`} aria-current={status === v.id ? "page" : undefined} className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${status === v.id ? "bg-surface text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-800"}`}>
+              {v.label} <span className="font-normal text-slate-400">{count(v.id)}</span>
+            </Link>
+          ))}
         </nav>
+        <form className="flex gap-2">
+          <input type="hidden" name="status" value={status} />
+          <input name="q" defaultValue={q} placeholder="Document number or title" className="h-9 w-64 rounded-xl border border-slate-200 bg-surface px-3 text-xs outline-none focus:border-brand-line" />
+        </form>
       </div>
 
       {cycles.length === 0 ? (
-        <EmptyState title={status === "OPEN" ? "No open review cycles" : "No cycles"} body="Cycles open when a revision is submitted for review or approval." />
+        <EmptyState title={status === "OPEN" ? "No review is open" : "No reviews"} body="A review starts when a revision is sent down a review route." />
       ) : (
         <DataTable
+          id="reviews"
+          defaultHidden={["Opened by", "Closed"]}
           head={
             <tr>
               <Th>Document</Th>
-              <Th>Cycle</Th>
-              <Th>Mode</Th>
-              <Th>Submitted</Th>
-              <Th>With</Th>
-              <Th>Custody point</Th>
+              <Th>Rev</Th>
+              <Th>Kind</Th>
+              <Th>Verdict</Th>
+              <Th>Reviewers</Th>
+              <Th>When</Th>
+              <Th>Opened</Th>
+              <Th>Opened by</Th>
+              <Th>Closed</Th>
               <Th>Blocking</Th>
-              <Th></Th>
+              <Th />
             </tr>
           }
         >
           {cycles.map((c) => {
-            const point = !c.issuedToReviewAt ? "Received by control function" : !c.returnedFromReviewAt ? "With reviewer" : !c.returnedToOriginatorAt ? "With control function" : "Complete";
+            // A review that starts after its revision was released is the recipient's, not ours.
+            const postRelease = !!c.revision.releasedAt && c.submittedAt > c.revision.releasedAt;
+            const done = c.assignments.filter((a) => a.completedAt).length;
             return (
               <tr key={c.id}>
-                <Td>
-                  <Link href={`/reviews/${c.id}`} className="font-mono text-[13px] font-semibold text-brand-ink hover:underline">
-                    {c.revision.document.docNumber}
-                  </Link>
-                  <span className="ml-1.5 font-mono text-xs text-slate-500">rev {c.revision.value}</span>
-                  <span className="block max-w-64 truncate text-xs text-slate-400">{c.revision.document.title}</span>
+                <Td className="min-w-[240px]">
+                  <Link href={`/documents/${c.revision.document.id}`} className="font-mono text-xs font-bold text-link hover:underline">{c.revision.document.docNumber}</Link>
+                  <span className="block max-w-72 truncate text-xs text-slate-500" title={c.revision.document.title}>{c.revision.document.title}</span>
                 </Td>
-                <Td>#{c.sequence}</Td>
-                <Td className="text-xs">{c.mode.toLowerCase()}</Td>
-                <Td className="whitespace-nowrap text-xs text-slate-500">{fmtDateTime(c.submittedAt)}</Td>
-                <Td className="text-xs">{c.assignments.map((a) => a.userName).join(", ") || <span className="text-slate-400">unassigned</span>}</Td>
-                <Td><Chip className={c.status === "OPEN" ? "bg-amber-100 text-amber-800 ring-amber-300" : "bg-slate-100 text-slate-600 ring-slate-300"}>{point}</Chip></Td>
+                <Td className="font-mono text-xs font-semibold text-slate-800">{c.revision.value}</Td>
+                <Td className="whitespace-nowrap">
+                  <Chip className={c.binding ? "bg-emerald-100 text-emerald-800 ring-emerald-300" : "bg-sky-100 text-sky-800 ring-sky-300"}>{c.binding ? "decision" : "advice"}</Chip>
+                </Td>
+                <Td className="whitespace-nowrap text-xs">
+                  {c.outcome ? (
+                    <span className={c.binding ? (proceeds.get(c.outcome) ? "text-emerald-700" : "text-red-700") : "text-slate-600"}>
+                      {verdictLabel.get(c.outcome) && verdictLabel.get(c.outcome) !== c.outcome && !(c.outcome in OUTCOME_CONSEQUENCES) ? <><span className="font-mono font-bold">{c.outcome}</span> {verdictLabel.get(c.outcome)}</> : <span className="font-semibold">{verdictLabel.get(c.outcome) ?? c.outcome}</span>}
+                      {c.outcomeByName ? <span className="block text-[11px] text-slate-400">{c.outcomeByName}</span> : null}
+                    </span>
+                  ) : c.status === "OPEN" ? <span className="text-amber-700">waiting</span> : <span className="text-slate-300">—</span>}
+                </Td>
+                <Td className="text-xs">
+                  {c.assignments.length ? <span title={c.assignments.map((a) => `${a.completedAt ? "✓" : "○"} ${a.userName}`).join("\n")}>{c.assignments.map((a) => a.userName).join(", ")}</span> : <span className="text-slate-400">unassigned</span>}
+                  {c.status === "OPEN" && c.assignments.length > 1 ? <span className="block text-[11px] text-slate-400">{done} of {c.assignments.length} done</span> : null}
+                </Td>
+                <Td className="whitespace-nowrap text-xs text-slate-500">{postRelease ? "after release" : "before release"}</Td>
+                <Td className="whitespace-nowrap text-xs tabular-nums text-slate-500">{fmtDate(c.submittedAt)}</Td>
+                <Td className="whitespace-nowrap text-xs text-slate-500">{c.openedByName}</Td>
+                <Td className="whitespace-nowrap text-xs tabular-nums text-slate-500">{c.outcomeAt ? fmtDate(c.outcomeAt) : "—"}</Td>
                 <Td>{c.comments.length ? <Chip className="bg-red-100 text-red-800 ring-red-300">{c.comments.length} open</Chip> : <span className="text-xs text-slate-300">—</span>}</Td>
-                <Td className="text-right"><Link href={`/reviews/${c.id}`} className="inline-flex items-center gap-1 text-xs font-semibold text-link">Open <ArrowRight className="h-3.5 w-3.5"/></Link></Td>
+                <Td className="text-right"><Link href={`/reviews/${c.id}`} className="inline-flex items-center gap-1 whitespace-nowrap text-xs font-semibold text-link">Open <ArrowRight className="h-3.5 w-3.5" /></Link></Td>
               </tr>
             );
           })}
@@ -83,4 +128,3 @@ export default async function ReviewsPage({ searchParams }: { searchParams: Prom
     </div>
   );
 }
-

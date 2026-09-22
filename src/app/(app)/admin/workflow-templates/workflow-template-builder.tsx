@@ -31,7 +31,10 @@ export function WorkflowTemplateBuilder({ id, name = "", description = "", class
   outcomeSets: string[];
   classOptions: ClassOptions;
 }) {
-  const [steps, setSteps] = useState<WorkflowBuilderStep[]>(initialSteps?.length ? initialSteps : [{ act: "REVIEW", mode: "ANY_OF", participantIds: [], title: "Technical review" }]);
+  const [draft, setSteps] = useState<WorkflowBuilderStep[]>(initialSteps?.length ? initialSteps : [{ act: "REVIEW", mode: "ANY_OF", participantIds: [], title: "Technical review" }, { act: "APPROVAL", mode: "ANY_OF", participantIds: [], title: "Decision" }]);
+  // The last step is always the decision: its verdict binds and is the release
+  // approval. Every earlier step gives advice. The builder shows it that way.
+  const steps = useMemo(() => draft.map((s, i) => ({ ...s, act: (i === draft.length - 1 ? "APPROVAL" : "REVIEW") as WorkflowBuilderStep["act"] })), [draft]);
   const initialScope = parseScope(classes);
   const [allClasses, setAllClasses] = useState(classes === "*");
   const [scope, setScope] = useState(initialScope);
@@ -74,7 +77,7 @@ export function WorkflowTemplateBuilder({ id, name = "", description = "", class
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Field label="Schema name" required><input name="name" required defaultValue={name} className={inputCls} placeholder="e.g. Engineering review then approval" /></Field>
         <Field label="What this schema is for" className="sm:col-span-2"><input name="description" defaultValue={description} className={inputCls} placeholder="Explain when authors should choose this route" /></Field>
-        <Field label="Review outcome set" hint="The codes reviewers will choose"><select name="outcomeSetKey" defaultValue={outcomeSetKey} className={inputCls}>{(outcomeSets.length ? outcomeSets : ["REVIEW_OUTCOMES"]).map((key) => <option key={key} value={key}>{key.replaceAll("_", " ").toLowerCase()}</option>)}</select></Field>
+        <Field label="Verdict set" hint="The codes reviewers and the decider choose from"><select name="outcomeSetKey" defaultValue={outcomeSetKey} className={inputCls}>{(outcomeSets.length ? outcomeSets : ["REVIEW_OUTCOMES"]).map((key) => <option key={key} value={key}>{key.replaceAll("_", " ").toLowerCase()}</option>)}</select></Field>
         <label className="flex items-center gap-2 self-end pb-2 text-xs font-medium text-slate-700"><input type="checkbox" name="isDefault" defaultChecked={isDefault} /> Default schema for this document class</label>
       </div>
 
@@ -89,11 +92,8 @@ export function WorkflowTemplateBuilder({ id, name = "", description = "", class
 
       <div className="space-y-3">
         <div className="flex items-end justify-between gap-4">
-          <div><p className="text-sm font-semibold text-slate-800">Route steps</p><p className="mt-0.5 text-xs text-slate-500">People see these steps in order. No codes or JSON are required.</p></div>
-          <div className="flex gap-2">
-            <button type="button" onClick={() => setSteps((value) => [...value, { act: "REVIEW", mode: "ANY_OF", participantIds: [], title: "Review" }])} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"><Plus className="h-3.5 w-3.5" /> Review</button>
-            <button type="button" onClick={() => setSteps((value) => [...value, { act: "APPROVAL", mode: "ANY_OF", participantIds: [], title: "Approval" }])} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"><Plus className="h-3.5 w-3.5" /> Approval</button>
-          </div>
+          <div><p className="text-sm font-semibold text-slate-800">Route steps</p><p className="mt-0.5 max-w-2xl text-xs text-slate-500">Steps run in order. Earlier steps give advice to the decider. The <strong>last step decides</strong>: its verdict is binding, and a verdict that lets the document proceed is its release approval — so only people who may approve the document can be on it.</p></div>
+          <button type="button" onClick={() => setSteps((value) => [...value.slice(0, -1), { act: "REVIEW", mode: "ALL", participantIds: [], title: "Review" }, ...value.slice(-1)])} className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"><Plus className="h-3.5 w-3.5" /> Add a review step</button>
         </div>
 
         {steps.map((step, index) => (
@@ -101,7 +101,7 @@ export function WorkflowTemplateBuilder({ id, name = "", description = "", class
             <div className="flex items-center gap-3">
               <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-brand-strong text-xs font-bold text-white">{index + 1}</span>
               <input value={step.title ?? ""} onChange={(event) => update(index, { title: event.target.value })} className={`${inputCls} max-w-sm bg-surface font-semibold`} aria-label={`Step ${index + 1} title`} placeholder="Name this step" />
-              <Chip className={step.act === "APPROVAL" ? "bg-emerald-100 text-emerald-800 ring-emerald-200" : "bg-sky-100 text-sky-800 ring-sky-200"}>{step.act === "APPROVAL" ? "Approval act" : "Review"}</Chip>
+              <Chip className={step.act === "APPROVAL" ? "bg-emerald-100 text-emerald-800 ring-emerald-200" : "bg-sky-100 text-sky-800 ring-sky-200"}>{step.act === "APPROVAL" ? "Decision — binding verdict" : "Review — advice"}</Chip>
               <div className="ml-auto flex gap-1">
                 <button type="button" onClick={() => move(index, -1)} disabled={index === 0} className="rounded-lg p-2 text-slate-400 hover:bg-surface hover:text-slate-700 disabled:opacity-20" title="Move earlier"><ArrowUp className="h-4 w-4" /></button>
                 <button type="button" onClick={() => move(index, 1)} disabled={index === steps.length - 1} className="rounded-lg p-2 text-slate-400 hover:bg-surface hover:text-slate-700 disabled:opacity-20" title="Move later"><ArrowDown className="h-4 w-4" /></button>
@@ -110,9 +110,9 @@ export function WorkflowTemplateBuilder({ id, name = "", description = "", class
             </div>
 
             <div className="mt-4 grid gap-4 xl:grid-cols-[280px_1fr]">
-              <Field label="How participants decide" hint={step.act === "APPROVAL" ? "Usually first authorized approver" : undefined}>
+              <Field label="How participants decide" hint={step.act === "APPROVAL" ? "Usually one approver" : undefined}>
                 <select value={step.mode} onChange={(event) => update(index, { mode: event.target.value as WorkflowBuilderStep["mode"] })} className={inputCls}>
-                  <option value="ALL">All give input, any order — then the next step</option>
+                  <option value="ALL">{step.act === "APPROVAL" ? "All decide — the most severe verdict binds" : "All give input, any order — then the next step"}</option>
                   <option value="ANY_OF">Any one — first decision closes</option>
                   <option value="SERIAL">Serial — decide in listed order</option>
                   <option value="ALL_CONSOLIDATOR">All review, final person consolidates</option>
