@@ -770,6 +770,14 @@ export const RUNNERS: Runners = {
     }
     return failures;
   },
+  "OB-07": async (ctx) => {
+    const { untoldRecipients } = await import("../supersession");
+    return (await untoldRecipients(ctx)).map((u) => ({
+      entityKey: `Revision:${u.old.id}`, entityType: "Revision", entityId: u.old.id, documentId: u.document.id,
+      entityLabel: `${u.document.docNumber} rev ${u.old.value}`,
+      description: `Rev ${u.old.value} was replaced but ${u.recipients.map((r) => r.name).join(", ")} ${u.recipients.length === 1 ? "was" : "were"} never told.`,
+    }));
+  },
   "OB-08": async (ctx) => {
     const copies = await ctx.db.registeredCopy.findMany({
       where: { status: "ACTIVE", revision: { state: { in: ["SUPERSEDED", "VOID"] } } },

@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { requireScope } from "@/lib/scope";
 import { isController, isAdmin } from "@/lib/auth";
-import { PageHeader, Card, Chip, Banner } from "@/components/ui";
+import { PageHeader, Card, Chip, Banner, inputCls } from "@/components/ui";
 import { ActionForm } from "@/components/form";
 import { EXPOSURES } from "@/lib/standard";
 import { recordVoidReassessmentAction } from "@/lib/actions/revisions";
 import { copyActionUpdateAction } from "@/lib/actions/transmittals";
+import { sendCurrentRevisionAction, recordToldAction } from "@/lib/actions/supersession";
+import { untoldRecipients } from "@/lib/supersession";
 import { AssuranceTabs } from "@/app/(app)/conformance/tabs";
 
 export const dynamic = "force-dynamic";
@@ -14,16 +16,13 @@ export const metadata = { title: "Exposures" };
 // §12.6 — five exposure conditions, each identifiable at any time, reported to
 // the party responsible for ending it.
 export default async function ExposuresPage() {
-  const { user, db } = await requireScope();
+  const ctx = await requireScope();
+  const { user, db } = ctx;
   const controller = isController(user) || isAdmin(user);
 
   const [unpropagated, staleCopies, blocked, orphaned, unresolvedVoid] = await Promise.all([
-    db.revision.findMany({
-      where: { state: "SUPERSEDED", document: { state: "ACTIVE" } },
-      include: { document: true },
-      take: 20,
-      orderBy: { supersededAt: "desc" },
-    }),
+    // Only revisions someone received and was never told about (§12.3).
+    untoldRecipients(ctx),
     db.registeredCopy.findMany({
       where: { status: "ACTIVE", revision: { state: { in: ["SUPERSEDED", "VOID"] } } },
       include: { revision: { include: { document: true } } },
@@ -51,15 +50,36 @@ export default async function ExposuresPage() {
 
       {/* 1 — Unpropagated supersession */}
       <Card title={`${EXPOSURES[0].label} (${unpropagated.length})`} description={`${EXPOSURES[0].detail} · ${EXPOSURES[0].who} acts`}>
-        {unpropagated.length === 0 ? <p className="text-xs text-emerald-700">✓ None.</p> : (
+        {unpropagated.length === 0 ? <p className="text-xs text-emerald-700">✓ Everyone who received a replaced revision has been told.</p> : (
           <ul className="divide-y divide-slate-100">
-            {unpropagated.map((r) => (
-              <li key={r.id} className="flex items-center justify-between gap-3 py-2">
-                <span className="text-sm">
-                  <Link href={`/documents/${r.documentId}`} className="font-mono font-semibold text-[#1e3a5f] hover:underline">{r.document.docNumber}</Link>
-                  <span className="ml-1.5 font-mono text-xs">rev {r.value}</span>
-                  <span className="block text-xs text-slate-400">tell the people who received it, or replace their copy</span>
-                </span>
+            {unpropagated.map((u) => (
+              <li key={u.old.id} className="py-3">
+                <p className="text-sm">
+                  <Link href={`/documents/${u.document.id}`} className="font-mono font-semibold text-[#1e3a5f] hover:underline">{u.document.docNumber}</Link>
+                  <span className="ml-1.5 text-xs text-slate-600">rev {u.old.value} was replaced{u.current ? ` by rev ${u.current.value}` : ""}</span>
+                </p>
+                <p className="mt-1 text-xs text-slate-600">
+                  Still holding rev {u.old.value}: {u.recipients.map((r, n) => (
+                    <span key={r.key}>{n ? ", " : ""}<span className="font-medium text-slate-800">{r.name}</span>{r.organization ? ` (${r.organization})` : ""}<span className="text-slate-400"> · got it on {r.via}</span></span>
+                  ))}
+                </p>
+                {controller ? (
+                  <div className="mt-2 flex flex-wrap items-start gap-3">
+                    {u.draft ? (
+                      <Link href={`/transmittals/${u.draft.id}`} className="rounded-lg bg-amber-100 px-3 py-1.5 text-xs font-semibold text-amber-900 hover:bg-amber-200">{u.draft.number} is ready — issue it →</Link>
+                    ) : u.current ? (
+                      <ActionForm action={sendCurrentRevisionAction} submitLabel={`Send rev ${u.current.value} to them`} size="sm" hidden={{ revisionId: u.old.id }} className="space-y-0" />
+                    ) : <span className="text-xs text-amber-700">No released revision to send yet.</span>}
+                    <details className="text-xs">
+                      <summary className="cursor-pointer py-1.5 font-semibold text-[#315f83]">They were told another way</summary>
+                      <div className="mt-2 w-80">
+                        <ActionForm action={recordToldAction} submitLabel="Record" size="sm" hidden={{ revisionId: u.old.id }}>
+                          <input name="note" required className={inputCls} placeholder="How — e.g. site meeting 22 Sept, minutes MIN-014" />
+                        </ActionForm>
+                      </div>
+                    </details>
+                  </div>
+                ) : null}
               </li>
             ))}
           </ul>

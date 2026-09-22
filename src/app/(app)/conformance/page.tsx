@@ -6,6 +6,7 @@ import { fmtDateTime } from "@/lib/utils";
 import { RunChecksButton } from "./run-button";
 import { AssuranceTabs } from "./tabs";
 import { problemDocuments } from "@/lib/problems";
+import { untoldRecipients } from "@/lib/supersession";
 import { ArrowRight } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -35,7 +36,7 @@ export default async function AssurancePage({ searchParams }: { searchParams: Pr
     db.scopeConfig.findFirst(),
     db.defect.groupBy({ by: ["ownerRole", "severity", "status"], _count: true }),
     Promise.all([
-      db.revision.count({ where: { state: "SUPERSEDED", document: { state: "ACTIVE" } } }),
+      untoldRecipients(ctx).then((u) => u.length),
       db.registeredCopy.count({ where: { status: "ACTIVE", revision: { state: { in: ["SUPERSEDED", "VOID"] } } } }),
       db.revision.count({ where: { state: "RELEASED", cycles: { some: { comments: { some: { progressionPreventing: true, status: "OPEN" } } } } } }),
       db.baselineEntry.count({ where: { document: { state: "WITHDRAWN" } } }),
