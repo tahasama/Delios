@@ -15,7 +15,7 @@ type RegisterRow = {
   confidentiality: string | null; retentionClass: string | null; state: string; placeholder: boolean;
   createdDate: string; receivedDate: string | null; updatedAt: string; currentRevision: string | null;
   docTypeLabel: string; disciplineLabel: string;
-  currentStatus: string | null; currentStatusLabel: string | null; latestRevision: string | null;
+  currentStatus: string | null; currentStatusLabel: string | null; currentStatusUse: string | null; latestRevision: string | null;
   latestRevisionState: string | null; plannedSubmissionDate: string | null; issueDate: string | null;
   releasedAt: string | null; workflowStage: string; workflowOwner: string; blockingComments: number;
   reviewRevisionId: string | null; baselineCount: number; packageCount: number; approval: string | null;
@@ -57,7 +57,7 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
       {rows.length ? <DataTable id="register" className="rounded-none rounded-b-2xl border-0 shadow-none" defaultHidden={OPTIONAL} head={<tr>
         <Th className="sticky left-0 z-[4] w-10"><input aria-label="Select all visible documents" type="checkbox" checked={allSelected} onChange={() => setSelected(allSelected ? [] : rows.map((row) => row.id))} /></Th>
         <Th className="sticky left-10 z-[4] min-w-[280px]">Document</Th>
-        <Th>Rev</Th><Th>Status</Th><Th>Where it is</Th><Th>Discipline</Th><Th>Type</Th>
+        <Th>Rev</Th><Th>Status</Th><Th>Discipline</Th><Th>Type</Th>
         <Th>Originator</Th><Th>Sub-project</Th><Th>Contract</Th><Th>Criticality</Th><Th>Confidentiality</Th>
         <Th>Planned submission</Th><Th>Issued</Th><Th>Released</Th><Th>Approval</Th><Th>In packages</Th>
         <Th>Updated</Th>
@@ -72,8 +72,10 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
           {row.placeholder ? <div className="mt-1"><Tag tone="blue">number reserved</Tag></div> : row.state !== "ACTIVE" && row.state !== "PLANNED" ? <div className="mt-1"><Tag>{row.state.toLowerCase()}</Tag></div> : null}
         </Td>
         <Td className="font-mono text-xs font-semibold text-slate-800">{row.currentRevision ?? row.latestRevision ?? "—"}</Td>
-        <Td className="whitespace-nowrap text-xs">{row.currentStatus ? <span title={row.currentStatusLabel ?? undefined}><span className="font-mono font-semibold text-slate-800">{row.currentStatus}</span> <span className="text-slate-500">{row.currentStatusLabel ?? ""}</span></span> : <Muted />}</Td>
-        <Td className="whitespace-nowrap"><Tag tone={row.workflowStage === "Released" ? "green" : row.workflowStage === "Draft" ? "amber" : "blue"}>{row.workflowStage}</Tag>{row.workflowOwner !== "—" ? <p className="mt-1 max-w-48 truncate text-[11px] text-slate-500">with {row.workflowOwner}</p> : null}{row.blockingComments ? <p className="mt-1 text-[11px] font-semibold text-red-600">{row.blockingComments} blocking comment{row.blockingComments === 1 ? "" : "s"}</p> : null}</Td>
+        <Td className="whitespace-nowrap"><div className="flex items-center gap-1.5"><Tag tone={row.workflowStage === "Released" ? "green" : row.workflowStage === "Draft" ? "amber" : "blue"}>{row.workflowStage}</Tag>{row.currentStatus ? <Link href="/guide/codes" className="font-mono text-[11px] font-bold text-slate-700 underline decoration-slate-300 decoration-dotted underline-offset-2 hover:text-link" title={`${row.currentStatus} — ${row.currentStatusLabel ?? ""}${row.currentStatusUse ? `
+${row.currentStatusUse}` : ""}
+
+What the codes mean →`}>{row.currentStatus}</Link> : null}</div>{row.workflowStage !== "Released" && row.currentStatus ? <p className="mt-1 text-[11px] text-slate-400">current rev {row.currentRevision} is {row.currentStatus}</p> : null}{row.workflowOwner !== "—" ? <p className="mt-1 max-w-48 truncate text-[11px] text-slate-500">with {row.workflowOwner}</p> : null}{row.blockingComments ? <p className="mt-1 text-[11px] font-semibold text-red-600">{row.blockingComments} blocking comment{row.blockingComments === 1 ? "" : "s"}</p> : null}</Td>
         <Td className="whitespace-nowrap text-xs">{row.disciplineLabel}</Td>
         <Td className="max-w-48 truncate text-xs" >{row.docTypeLabel}</Td>
         <Td className="whitespace-nowrap text-xs">{row.originator ?? <Muted />}</Td>

@@ -66,6 +66,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
   const typeLabel = new Map(types.map((t) => [t.code, t.label]));
   const personById = new Map(people.map((person) => [person.id, person.name]));
   const statusLabel = new Map(statuses.map((item) => [item.code, item.label]));
+  const statusUse = new Map(statuses.map((item) => [item.code, [item.props.may ? `May: ${item.props.may}` : "", item.props.mayNot ? `May not: ${item.props.mayNot}` : ""].filter(Boolean).join("\n")]));
 
   const rows = docs.map((doc) => {
     const latest = doc.revisions[0] ?? null;
@@ -93,6 +94,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
       createdDate: doc.createdDate.toISOString(), receivedDate: doc.receivedDate?.toISOString() ?? null,
       updatedAt: doc.updatedAt.toISOString(), currentRevision: current?.value ?? null,
       currentStatus: current?.statusCode ?? null, currentStatusLabel: current?.statusCode ? statusLabel.get(current.statusCode) ?? current.statusCode : null,
+      currentStatusUse: current?.statusCode ? statusUse.get(current.statusCode) ?? null : null,
       latestRevision: latest?.value ?? null, latestRevisionState: latest?.state ?? null,
       plannedSubmissionDate: working?.plannedSubmissionDate?.toISOString() ?? latest?.plannedSubmissionDate?.toISOString() ?? null,
       issueDate: current?.issueDate?.toISOString() ?? null, releasedAt: current?.releasedAt?.toISOString() ?? null,

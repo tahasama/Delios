@@ -7,13 +7,14 @@ type Theme = "light" | "dark" | "system";
 const ORDER: Theme[] = ["light", "dark", "system"];
 const LABEL: Record<Theme, string> = { light: "Light", dark: "Dark", system: "Same as device" };
 
-/** Applies the theme to <html>. The same logic runs inline before first paint (see THEME_SCRIPT). */
+/** Applies the theme to <html>. The same logic runs inline before first paint (THEME_SCRIPT),
+ * which also restores the sidebar width (SIDEBAR in navigation.tsx). */
 function apply(theme: Theme) {
   const dark = theme === "dark" || (theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
   document.documentElement.classList.toggle("dark", dark);
 }
 
-export const THEME_SCRIPT = `(function(){try{var t=localStorage.getItem("theme");var d=t==="dark"||((!t||t==="system")&&matchMedia("(prefers-color-scheme: dark)").matches);document.documentElement.classList.toggle("dark",d)}catch(e){}})()`;
+export const THEME_SCRIPT = `(function(){try{var t=localStorage.getItem("theme");var d=t==="dark"||((!t||t==="system")&&matchMedia("(prefers-color-scheme: dark)").matches);document.documentElement.classList.toggle("dark",d);var w=parseInt(localStorage.getItem("sidebar")||"",10);if(w>=76&&w<=360){document.documentElement.style.setProperty("--sidebar-w",w+"px");if(w<180)document.documentElement.dataset.sidebar="rail"}}catch(e){}})()`;
 
 export function ThemeToggle() {
   const [theme, setTheme] = useState<Theme>("system");

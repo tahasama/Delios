@@ -31,7 +31,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <div className="min-h-screen bg-canvas">
       <Sidebar perms={perms} />
-      <div className="lg:pl-[268px]">
+      <div className="lg:pl-[268px] lg:pl-[var(--sidebar-w)]">
         <header className="no-print sticky top-0 z-10 flex h-[72px] items-center gap-3 border-b border-slate-200/80 bg-surface/94 px-4 backdrop-blur sm:gap-5 sm:px-6 lg:px-8">
           <MobileNav perms={perms} />
           <ProjectSwitcher

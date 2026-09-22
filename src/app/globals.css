@@ -2,6 +2,12 @@
 @import "./theme.css";
 
 @custom-variant dark (&:where(.dark, .dark *));
+/* The desktop sidebar collapsed to icons (SIDEBAR in navigation.tsx). */
+@custom-variant rail (&:where([data-sidebar="rail"] .sidebar-desktop, [data-sidebar="rail"] .sidebar-desktop *));
+
+:root {
+  --sidebar-w: 268px;
+}
 
 @theme inline {
   --color-accent: #1e3a5f;
@@ -100,13 +106,15 @@ summary::-webkit-details-marker {
   /* Codes and document numbers never break in the middle. */
   .dt-td .font-mono { white-space: nowrap; }
 
-  /* The column edge you drag. */
+  /* The column edge you drag. It sits fully inside its own header cell: sticky
+     headers each form a stacking context, so a handle that overhangs into the
+     next cell would be covered by it. */
   .dt-resizer {
     position: absolute;
     top: 0;
-    right: -4px;
+    right: 0;
     z-index: 3;
-    width: 8px;
+    width: 10px;
     height: 100%;
     cursor: col-resize;
     touch-action: none;
@@ -114,16 +122,16 @@ summary::-webkit-details-marker {
   .dt-resizer::after {
     content: "";
     position: absolute;
-    top: 25%;
-    bottom: 25%;
-    left: 3.5px;
+    top: 22%;
+    bottom: 22%;
+    right: 0;
     width: 1px;
-    background: var(--color-slate-200);
-    transition: background-color 120ms;
+    background: var(--color-slate-300);
+    transition: background-color 120ms, top 120ms, bottom 120ms;
   }
-  .dt-th:last-child .dt-resizer { right: 0; }
   .dt-th:last-child .dt-resizer::after { display: none; }
-  .dt-resizer:hover::after, .dt-resizing .dt-resizer::after { top: 0; bottom: 0; width: 2px; background: var(--color-link); }
+  .dt-th:hover .dt-resizer::after { background: var(--color-slate-400); }
+  .dt-resizer:hover::after, .dt-resizer:active::after { top: 0; bottom: 0; width: 3px; background: var(--color-link); }
   .dt-resizing { cursor: col-resize; user-select: none; }
 
   .dt-tool {
