@@ -622,6 +622,10 @@ model Transmittal {
   reasonForIssue      String // from the §2.6 set
   dateOfIssue         DateTime
   issuingParty        String
+  // What it is about, and the cover message to the recipients — as a letter
+  // or an email would carry them. The documents are the enclosures.
+  subject             String?
+  message             String?
   responseRequired    Boolean                @default(false)
   responsePeriodDays  Int?
   responseDueDate     DateTime?

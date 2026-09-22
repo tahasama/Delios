@@ -56,7 +56,7 @@ export default async function TransmittalsPage({ searchParams }: { searchParams:
               : t.issuingParty;
             return (
               <tr key={t.id} className="hover:bg-slate-50/70">
-                <Td><Link href={`/transmittals/${t.id}`} className="font-mono text-[13px] font-semibold text-[#1e3a5f] hover:underline">{t.number}</Link></Td>
+                <Td><Link href={`/transmittals/${t.id}`} className="font-mono text-[13px] font-semibold text-[#1e3a5f] hover:underline">{t.number}</Link>{t.subject ? <span className="block max-w-72 truncate text-xs text-slate-500">{t.subject}</span> : null}</Td>
                 <Td className="text-xs"><span className="text-slate-400">{t.direction === "OUTGOING" ? "to" : "from"}</span> {party}</Td>
                 <Td className="text-xs">{REASON_LABEL[t.reasonForIssue as ReasonForIssue] ?? t.reasonForIssue}</Td>
                 <Td className="whitespace-nowrap text-xs">{fmtDate(t.dateOfIssue)}</Td>

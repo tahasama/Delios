@@ -37,7 +37,6 @@ export default async function AssurancePage({ searchParams }: { searchParams: Pr
     db.defect.groupBy({ by: ["ownerRole", "severity", "status"], _count: true }),
     Promise.all([
       untoldRecipients(ctx).then((u) => u.length),
-      db.registeredCopy.count({ where: { status: "ACTIVE", revision: { state: { in: ["SUPERSEDED", "VOID"] } } } }),
       db.revision.count({ where: { state: "RELEASED", cycles: { some: { comments: { some: { progressionPreventing: true, status: "OPEN" } } } } } }),
       db.baselineEntry.count({ where: { document: { state: "WITHDRAWN" } } }),
       db.revision.count({ where: { state: "VOID", voidReassessment: null } }),

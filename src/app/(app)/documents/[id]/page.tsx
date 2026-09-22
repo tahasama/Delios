@@ -59,7 +59,7 @@ export default async function DocumentDetailPage({
   });
   if (!doc) notFound();
 
-  const [rels, assets, disciplines, types, criticalities, confidentialities, retentions, phases, statuses, subprojects, suppliers, pos, auditEvents, transmittalItems, registeredCopies] = await Promise.all([
+  const [rels, assets, disciplines, types, criticalities, confidentialities, retentions, phases, statuses, subprojects, suppliers, pos, auditEvents, transmittalItems] = await Promise.all([
     db.relationship.findMany({ where: { OR: [{ kind: "DOC_ASSET", fromId: id }, { kind: "DOC_ASSET", toId: id }] } }),
     db.assetItem.findMany({ orderBy: { code: "asc" } }),
     getSet("DISCIPLINES"), getSet("DOCUMENT_TYPES"), getActiveSet("CRITICALITY"), getSet("CONFIDENTIALITY"),
@@ -79,7 +79,6 @@ export default async function DocumentDetailPage({
       take: 12,
     }),
     db.transmittalItem.findMany({ where: { revision: { documentId: id } }, orderBy: { transmittal: { dateOfIssue: "desc" } }, include: { revision: true, transmittal: { include: { recipients: true } } } }),
-    db.registeredCopy.findMany({ where: { revision: { documentId: id } }, orderBy: { createdAt: "desc" }, include: { revision: true } }),
   ]);
   const deliverable = await getValue("DELIVERABLE_TYPES", doc.deliverableType);
   const label = (rows: { code: string; label: string }[], code: string | null) => (code ? rows.find((r) => r.code === code)?.label ?? code : null);
@@ -380,12 +379,6 @@ export default async function DocumentDetailPage({
                     })}
                   </ul>
                 ) : <Empty>Not sent to anyone yet.</Empty>}
-                {registeredCopies.length ? (
-                  <div className="border-t border-slate-100 px-5 py-3">
-                    <p className="mb-1 text-[11px] font-bold uppercase tracking-wide text-slate-400">Paper / offline copies</p>
-                    {registeredCopies.map((c) => <p key={c.id} className="text-xs text-slate-600">Rev {c.revision.value} · {c.holder}, {c.location} · {prettyState(c.status)}</p>)}
-                  </div>
-                ) : null}
               </>
             ),
           },

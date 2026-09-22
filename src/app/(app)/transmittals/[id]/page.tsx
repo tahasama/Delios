@@ -45,7 +45,7 @@ export default async function TransmittalDetailPage({ params }: { params: Promis
     <div className="space-y-5">
       {currentRecipient && t.status !== "DRAFT" ? <ReceiptTracker transmittalId={t.id} /> : null}
       <PageHeader
-        title={t.number}
+        title={t.subject ? `${t.number} — ${t.subject}` : t.number}
         subtitle={[
           t.direction === "OUTGOING" ? `To ${t.recipients.map((r) => r.organization ?? r.name).filter((v, i, all) => all.indexOf(v) === i).join(", ") || "—"}` : `From ${t.issuingParty}`,
           REASON_LABEL[t.reasonForIssue as ReasonForIssue] ?? t.reasonForIssue,
@@ -63,6 +63,12 @@ export default async function TransmittalDetailPage({ params }: { params: Promis
           ) : null}
         </>}
       />
+
+      {t.message ? (
+        <Card title="Message">
+          <p className="whitespace-pre-line text-sm leading-relaxed text-slate-700">{t.message}</p>
+        </Card>
+      ) : null}
 
       {t.direction === "INCOMING" && t.status === "ISSUED" && t.receivedDate ? (
         (() => {
@@ -192,7 +198,7 @@ export default async function TransmittalDetailPage({ params }: { params: Promis
                           ? `Opened ${fmtDateTime(r.openedAt)}`
                           : r.notifiedAt
                             ? `Notified ${fmtDateTime(r.notifiedAt)}`
-                            : r.userId ? "Not yet issued" : "External — confirms outside the system"}
+                            : r.userId ? "Not yet issued" : "Outside recipient — no account here yet"}
                     </span>
                     {!r.acknowledgedAt && r.userId === user.id ? (
                       <form action={acknowledgeReceiptAction}>

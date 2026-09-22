@@ -1,13 +1,11 @@
 import Link from "next/link";
 import { requireScope } from "@/lib/scope";
 import { isController, isAdmin } from "@/lib/auth";
-import { PageHeader, Card, Chip, Banner, inputCls } from "@/components/ui";
+import { PageHeader, Card, Chip, Banner, inputCls, btn } from "@/components/ui";
 import { ActionForm } from "@/components/form";
 import { EXPOSURES } from "@/lib/standard";
 import { recordVoidReassessmentAction } from "@/lib/actions/revisions";
-import { copyActionUpdateAction } from "@/lib/actions/transmittals";
-import { sendCurrentRevisionAction } from "@/lib/actions/supersession";
-import { untoldRecipients } from "@/lib/supersession";
+import { untoldRecipients, sendCurrentLink } from "@/lib/supersession";
 import { AssuranceTabs } from "@/app/(app)/conformance/tabs";
 
 export const dynamic = "force-dynamic";
@@ -15,18 +13,16 @@ export const metadata = { title: "Exposures" };
 
 // §12.6 — five exposure conditions, each identifiable at any time, reported to
 // the party responsible for ending it.
+const exposure = (key: (typeof EXPOSURES)[number]["key"]) => EXPOSURES.find((e) => e.key === key)!;
+
 export default async function ExposuresPage() {
   const ctx = await requireScope();
   const { user, db } = ctx;
   const controller = isController(user) || isAdmin(user);
 
-  const [unpropagated, staleCopies, blocked, orphaned, unresolvedVoid] = await Promise.all([
+  const [unpropagated, blocked, orphaned, unresolvedVoid] = await Promise.all([
     // Only revisions someone received and was never told about (§12.3).
     untoldRecipients(ctx),
-    db.registeredCopy.findMany({
-      where: { status: "ACTIVE", revision: { state: { in: ["SUPERSEDED", "VOID"] } } },
-      include: { revision: { include: { document: true } } },
-    }),
     db.revision.findMany({
       where: { state: "RELEASED", cycles: { some: { comments: { some: { progressionPreventing: true, status: "OPEN" } } } } },
       include: { document: true, cycles: { include: { comments: { where: { progressionPreventing: true, status: "OPEN" } } } } },
@@ -35,7 +31,7 @@ export default async function ExposuresPage() {
     db.revision.findMany({ where: { state: "VOID", voidReassessment: null }, include: { document: true } }),
   ]);
 
-  const total = unpropagated.length + staleCopies.length + blocked.length + orphaned.length + unresolvedVoid.length;
+  const total = unpropagated.length + blocked.length + orphaned.length + unresolvedVoid.length;
 
   return (
     <div className="space-y-5">
@@ -46,10 +42,10 @@ export default async function ExposuresPage() {
       />
       <AssuranceTabs current="/exposures" />
 
-      {total === 0 ? <Banner tone="good" title="No exposures">No unpropagated supersessions, uncontrolled copies, blocked work, orphaned withdrawals or unresolved voids.</Banner> : null}
+      {total === 0 ? <Banner tone="good" title="No exposures">Nobody holds a replaced revision without knowing, no work is blocked, and nothing withdrawn or voided is still relied on.</Banner> : null}
 
       {/* 1 — Unpropagated supersession */}
-      <Card title={`${EXPOSURES[0].label} (${unpropagated.length})`} description={`${EXPOSURES[0].detail} · ${EXPOSURES[0].who} acts`}>
+      <Card title={`${exposure("UNPROPAGATED_SUPERSESSION").label} (${unpropagated.length})`} description={`${exposure("UNPROPAGATED_SUPERSESSION").detail} · ${exposure("UNPROPAGATED_SUPERSESSION").who} acts`}>
         {unpropagated.length === 0 ? <p className="text-xs text-emerald-700">✓ Everyone who received a replaced revision has been told.</p> : (
           <ul className="divide-y divide-slate-100">
             {unpropagated.map((u) => (
@@ -68,7 +64,7 @@ export default async function ExposuresPage() {
                     {u.draft ? (
                       <Link href={`/transmittals/${u.draft.id}`} className="rounded-lg bg-amber-100 px-3 py-1.5 text-xs font-semibold text-amber-900 hover:bg-amber-200">{u.draft.number} is ready — issue it →</Link>
                     ) : u.current ? (
-                      <ActionForm action={sendCurrentRevisionAction} submitLabel={`Send rev ${u.current.value} to them`} size="sm" hidden={{ revisionId: u.old.id }} className="space-y-0" />
+                      <Link href={sendCurrentLink(u)!} className={btn("primary", "sm")}>Send rev {u.current.value} to them</Link>
                     ) : <span className="text-xs text-amber-700">No released revision to send yet.</span>}
                   </div>
                 ) : null}
@@ -78,42 +74,8 @@ export default async function ExposuresPage() {
         )}
       </Card>
 
-      {/* 2 — Uncontrolled current use */}
-      <Card title={`${EXPOSURES[1].label} (${staleCopies.length})`} description={`${EXPOSURES[1].detail} · ${EXPOSURES[1].who} acts`}>
-        {staleCopies.length === 0 ? <p className="text-xs text-emerald-700">✓ None.</p> : (
-          <ul className="divide-y divide-slate-100">
-            {staleCopies.map((c) => (
-              <li key={c.id} className="py-2.5">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="text-sm">
-                    <Link href={`/documents/${c.revision.documentId}`} className="font-mono font-semibold text-[#1e3a5f] hover:underline">{c.revision.document.docNumber}</Link>
-                    <span className="ml-1.5 font-mono text-xs">rev {c.revision.value}</span>
-                    <span className="text-slate-400"> · copy with {c.holder} at {c.location}</span>
-                  </span>
-                  <span className="text-xs text-slate-400">registered copy carries an invalid revision</span>
-                </div>
-                {controller ? (
-                  <div className="mt-2 max-w-md">
-                    <ActionForm action={copyActionUpdateAction} submitLabel="Record copy action" size="sm" hidden={{ copyId: c.id }}>
-                      <div className="flex items-end gap-2">
-                        <select name="copyAction" className="flex-1 rounded-lg border border-slate-300 px-2 py-1.5 text-xs" defaultValue="RECALLED">
-                          <option value="RECALLED">Recalled</option>
-                          <option value="REPLACED">Replaced</option>
-                          <option value="MARKED_OBSOLETE">Marked obsolete at its location</option>
-                        </select>
-                        <input name="actionRecord" className="flex-1 rounded-lg border border-slate-300 px-2 py-1.5 text-xs" placeholder="Action taken" />
-                      </div>
-                    </ActionForm>
-                  </div>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        )}
-      </Card>
-
       {/* 3 — Blocked work */}
-      <Card title={`${EXPOSURES[2].label} (${blocked.length})`} description={`${EXPOSURES[2].detail} · ${EXPOSURES[2].who} acts`}>
+      <Card title={`${exposure("BLOCKED_WORK").label} (${blocked.length})`} description={`${exposure("BLOCKED_WORK").detail} · ${exposure("BLOCKED_WORK").who} acts`}>
         {blocked.length === 0 ? <p className="text-xs text-emerald-700">✓ None.</p> : (
           <ul className="divide-y divide-slate-100">
             {blocked.map((r) => (
@@ -130,7 +92,7 @@ export default async function ExposuresPage() {
       </Card>
 
       {/* 4 — Orphaned withdrawal */}
-      <Card title={`${EXPOSURES[3].label} (${orphaned.length})`} description={`${EXPOSURES[3].detail} · ${EXPOSURES[3].who} acts`}>
+      <Card title={`${exposure("ORPHANED_WITHDRAWAL").label} (${orphaned.length})`} description={`${exposure("ORPHANED_WITHDRAWAL").detail} · ${exposure("ORPHANED_WITHDRAWAL").who} acts`}>
         {orphaned.length === 0 ? <p className="text-xs text-emerald-700">✓ None.</p> : (
           <ul className="divide-y divide-slate-100">
             {orphaned.map((e) => (
@@ -146,7 +108,7 @@ export default async function ExposuresPage() {
       </Card>
 
       {/* 5 — Unresolved void */}
-      <Card title={`${EXPOSURES[4].label} (${unresolvedVoid.length})`} description={`${EXPOSURES[4].detail} · ${EXPOSURES[4].who} acts`}>
+      <Card title={`${exposure("UNRESOLVED_VOID").label} (${unresolvedVoid.length})`} description={`${exposure("UNRESOLVED_VOID").detail} · ${exposure("UNRESOLVED_VOID").who} acts`}>
         {unresolvedVoid.length === 0 ? <p className="text-xs text-emerald-700">✓ None.</p> : (
           <ul className="divide-y divide-slate-100">
             {unresolvedVoid.map((r) => (

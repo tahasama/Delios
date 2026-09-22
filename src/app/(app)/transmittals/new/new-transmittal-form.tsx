@@ -8,6 +8,8 @@ import { createTransmittalAction } from "@/lib/actions/transmittals";
 type Opt = { code: string; label: string; props: Record<string, unknown> };
 type RevOpt = { id: string; label: string; released: boolean };
 type UserOpt = { id: string; name: string; role: string };
+/** Anything the form can start filled in with — from a link such as "Send rev B to them". */
+export type Prefill = { revisionIds?: string[]; userIds?: string[]; outsiders?: string; reason?: string; party?: string; subject?: string; message?: string };
 
 /**
  * One column, in the order a person thinks: which way, why, what, to whom.
@@ -16,7 +18,7 @@ type UserOpt = { id: string; name: string; role: string };
  * starts a review.
  */
 export function NewTransmittalForm({
-  reasons, revisions, users, reviewers, defaultDirection, preselectedRevisionIds,
+  reasons, revisions, users, reviewers, defaultDirection, preselectedRevisionIds, prefill,
 }: {
   reasons: Opt[];
   revisions: RevOpt[];
@@ -24,9 +26,10 @@ export function NewTransmittalForm({
   reviewers: UserOpt[];
   defaultDirection: "OUTGOING" | "INCOMING";
   preselectedRevisionIds?: string[];
+  prefill?: Prefill;
 }) {
   const [direction, setDirection] = useState(defaultDirection);
-  const [reasonCode, setReasonCode] = useState("");
+  const [reasonCode, setReasonCode] = useState(prefill?.reason && reasons.some((r) => r.code === prefill.reason) ? prefill.reason : "");
   const needsReview = reasons.find((r) => r.code === reasonCode)?.props.reviewCycle === true;
   const choices = direction === "OUTGOING" ? revisions.filter((r) => r.released) : revisions;
 
@@ -44,7 +47,7 @@ export function NewTransmittalForm({
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label={direction === "OUTGOING" ? "Sent to" : "Received from"} required>
-            <input name="issuingParty" required className={inputCls} placeholder="Company name" defaultValue={direction === "INCOMING" ? "" : ""} />
+            <input name="issuingParty" required className={inputCls} placeholder="Company name" defaultValue={prefill?.party ?? ""} />
           </Field>
           <Field label="Why" required hint="what the recipient should do with it">
             <select name="reasonForIssue" required className={inputCls} value={reasonCode} onChange={(e) => setReasonCode(e.target.value)}>
@@ -55,25 +58,38 @@ export function NewTransmittalForm({
           <Field label={direction === "OUTGOING" ? "Date sent" : "Date received"} required>
             <input type="date" name="dateOfIssue" required className={inputCls} defaultValue={new Date().toISOString().slice(0, 10)} />
           </Field>
-          <Field label="Note">
-            <input name="notes" className={inputCls} placeholder="optional" />
-          </Field>
+          {direction === "INCOMING" ? (
+            <Field label="Note">
+              <input name="notes" className={inputCls} placeholder="optional" />
+            </Field>
+          ) : null}
         </div>
 
+        {direction === "OUTGOING" ? (
+          <>
+            <Field label="Subject" required hint="what the recipient reads first">
+              <input name="subject" required className={inputCls} defaultValue={prefill?.subject ?? ""} placeholder="Pump house — ventilation layout, rev B for construction" />
+            </Field>
+            <Field label="Message" hint="optional — anything the recipients should know about these documents">
+              <textarea name="message" rows={4} className={inputCls} defaultValue={prefill?.message ?? ""} placeholder="Please find enclosed…" />
+            </Field>
+          </>
+        ) : null}
+
         <Field label="Documents" required hint={direction === "OUTGOING" ? "only released revisions can be sent — Ctrl/Cmd-click for several" : "Ctrl/Cmd-click for several"}>
-          <select name="revisionIds" multiple className={`${inputCls} h-40`} defaultValue={preselectedRevisionIds ?? []}>
+          <select name="revisionIds" multiple className={`${inputCls} h-40`} defaultValue={[...(preselectedRevisionIds ?? []), ...(prefill?.revisionIds ?? [])]}>
             {choices.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}
           </select>
         </Field>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="People here who get a copy">
-            <select name="recipientUsers" multiple className={`${inputCls} h-28`} defaultValue={[]}>
+            <select name="recipientUsers" multiple className={`${inputCls} h-28`} defaultValue={prefill?.userIds ?? []}>
               {users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
             </select>
           </Field>
           <Field label="Outside recipients" hint="one per line: name (company)">
-            <textarea name="recipientNames" rows={4} className={inputCls} placeholder={"John Doe (MADASUD)\nA. Smith (ECGS)"} />
+            <textarea name="recipientNames" rows={4} className={inputCls} defaultValue={prefill?.outsiders ?? ""} placeholder={"John Doe (MADASUD)\nA. Smith (ECGS)"} />
           </Field>
         </div>
 

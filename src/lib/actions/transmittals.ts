@@ -34,8 +34,16 @@ export async function createTransmittalAction(_prev: { error?: string } | undefi
   const dateOfIssue = String(formData.get("dateOfIssue") ?? "");
   const issuingParty = String(formData.get("issuingParty") ?? "").trim() || user.organization || "DELIOS";
   const notes = String(formData.get("notes") ?? "").trim();
+  const subject = String(formData.get("subject") ?? "").trim() || null;
+  const message = String(formData.get("message") ?? "").trim() || null;
   const revisionIds = formData.getAll("revisionIds").map(String).filter(Boolean);
-  const recipientNames = formData.getAll("recipientNames").map((v) => String(v).trim()).filter(Boolean);
+  // One outside recipient per line, written "Name (Company)" — the company is kept apart.
+  const outsiders = formData.getAll("recipientNames").flatMap((v) => String(v).split(/\r?\n/)).map((v) => v.trim()).filter(Boolean)
+    .map((line) => {
+      const m = line.match(/^(.*\S)\s*\(([^()]+)\)\s*$/);
+      return m ? { name: m[1].trim(), organization: m[2].trim() } : { name: line, organization: null as string | null };
+    });
+  const recipientNames = outsiders.map((o) => o.name);
   const recipientUsers = formData.getAll("recipientUsers").map(String).filter(Boolean);
   const reviewers = formData.getAll("reviewerIds").map(String).filter(Boolean);
 
@@ -43,6 +51,7 @@ export async function createTransmittalAction(_prev: { error?: string } | undefi
   if (!dateOfIssue) return { error: "Date of issue is required (§11.1)." };
   if (!revisionIds.length) return { error: "List the documents and revisions enclosed (§11.9a)." };
   if (!recipientNames.length && !recipientUsers.length) return { error: "Recipients are identified individually by name (§11.4)." };
+  if (direction === "OUTGOING" && !subject) return { error: "Give the transmittal a subject — it is the first thing the recipient reads." };
 
   const reasons = await getActiveSet("REASONS_FOR_ISSUE");
   const reason = reasons.find((r) => r.code === reasonForIssue);
@@ -83,14 +92,16 @@ export async function createTransmittalAction(_prev: { error?: string } | undefi
       status: direction === "OUTGOING" ? "DRAFT" : "ISSUED",
       receivedDate: direction === "INCOMING" ? base : null,
       receivedByParty: direction === "INCOMING" ? user.organization ?? "DELIOS" : null,
-      acceptanceNotes: notes || null,
+      subject,
+      message,
+      acceptanceNotes: direction === "INCOMING" ? notes || null : null,
       createdById: user.id,
       createdByName: user.name,
       items: { create: revisionIds.map((rid) => ({ projectId, revisionId: rid })) },
       recipients: {
         create: [
           ...recipientUsers.map((uid) => ({ projectId, userId: uid, name: "—", organization: issuingParty })),
-          ...recipientNames.map((n) => ({ projectId, name: n })),
+          ...outsiders.map((o) => ({ projectId, name: o.name, organization: o.organization })),
         ],
       },
     },
@@ -263,32 +274,3 @@ export async function acknowledgeReceiptAction(formData: FormData) {
   revalidatePath(`/transmittals/${transmittalId}`);
 }
 
-// §11.6 / §12.4 — registered copies outside the system
-export async function registerCopyAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
-  const ctx = await requireScope();
-  const { user, db, projectId, orgId } = ctx;
-  if (!isController(user) && !isAdmin(user)) return { error: "The control function maintains the copy register (§11.6)." };
-  const revisionId = String(formData.get("revisionId") ?? "");
-  const holder = String(formData.get("holder") ?? "").trim();
-  const location = String(formData.get("location") ?? "").trim();
-  if (!holder || !location) return { error: "A registered copy carries holder and location (IS-13)." };
-  await db.registeredCopy.create({ data: { projectId, revisionId, holder, location } });
-  const rev = await db.revision.findUniqueOrThrow({ where: { id: revisionId }, include: { document: true } });
-  await audit({ actor: user, action: "COPY_REGISTERED", entityType: "Revision", entityId: revisionId, entityLabel: `${rev.document.docNumber} rev ${rev.value}`, detail: `Copy registered to ${holder} at ${location} (§11.6).` });
-  revalidatePath(`/documents/${rev.documentId}`);
-  return {};
-}
-
-export async function copyActionUpdateAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
-  const ctx = await requireScope();
-  const { user, db, projectId, orgId } = ctx;
-  if (!isController(user) && !isAdmin(user)) return { error: "Only the control function updates the copy register." };
-  const copyId = String(formData.get("copyId") ?? "");
-  const action = String(formData.get("copyAction") ?? ""); // RECALLED | REPLACED | MARKED_OBSOLETE
-  const record = String(formData.get("actionRecord") ?? "").trim();
-  if (!record) return { error: "The action taken is recorded against the copy register entry (§12.4)." };
-  await db.registeredCopy.update({ where: { id: copyId }, data: { status: action, actionRecord: record, actionDate: new Date() } });
-  await audit({ actor: user, action: "COPY_ACTION", entityType: "RegisteredCopy", entityId: copyId, newValue: action, detail: record });
-  revalidatePath("/exposures");
-  return {};
-}
