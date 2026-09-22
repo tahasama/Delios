@@ -31,7 +31,7 @@ export default async function AddToPackagePage({ searchParams }: { searchParams:
       <Card className="max-w-3xl">
         <ul className="mb-4 space-y-1 text-xs">
           {docs.map((d) => (
-            <li key={d.id}><Link href={`/documents/${d.id}`} className="font-mono font-semibold text-[#1e3a5f] hover:underline">{d.docNumber}</Link> <span className="text-slate-500">{d.title}</span></li>
+            <li key={d.id}><Link href={`/documents/${d.id}`} className="font-mono font-semibold text-brand-ink hover:underline">{d.docNumber}</Link> <span className="text-slate-500">{d.title}</span></li>
           ))}
         </ul>
         {!docs.length ? (

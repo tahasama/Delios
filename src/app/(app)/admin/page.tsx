@@ -26,7 +26,7 @@ const ICON: Record<string, LucideIcon> = {
 };
 
 const TONE: Record<SetupPage["group"], string> = {
-  Organization: "bg-[#eef3f9] text-[#1e3a5f]",
+  Organization: "bg-tint text-brand-ink",
   Classification: "bg-violet-50 text-violet-700",
   Access: "bg-emerald-50 text-emerald-700",
   "Change & evidence": "bg-amber-50 text-amber-700",
@@ -89,12 +89,12 @@ export default async function AdminPage() {
                   const Icon = ICON[page.href] ?? Tags;
                   const f = figure[page.href];
                   return (
-                    <Link key={page.href} href={page.href} className="group flex gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-[#2d5480]/40 hover:shadow-md">
+                    <Link key={page.href} href={page.href} className="group flex gap-3 rounded-xl border border-slate-200 bg-surface p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-brand-line/40 hover:shadow-md">
                       <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${TONE[group]}`}><Icon className="h-5 w-5" /></span>
                       <span className="min-w-0 flex-1">
                         <span className="flex items-center justify-between gap-2">
                           <span className="text-sm font-semibold text-slate-800">{page.title}</span>
-                          <ArrowRight className="h-4 w-4 shrink-0 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-[#315f83]" />
+                          <ArrowRight className="h-4 w-4 shrink-0 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-link" />
                         </span>
                         <span className="mt-0.5 block text-xs leading-relaxed text-slate-500">{page.text}</span>
                         {f ? <span className={`mt-2 inline-block rounded-full px-2 py-0.5 text-[11px] font-semibold ${f.attention ? "bg-amber-100 text-amber-800" : "bg-slate-100 text-slate-600"}`}>{f.text}</span> : null}

@@ -50,7 +50,7 @@ export default async function PackageDetailPage({ params }: { params: Promise<{ 
 
       {overdue ? <Banner tone="danger" title="Past its completion date">This package should have been checked on {fmtDate(pkg.completionDate)}.</Banner> : null}
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <section className="rounded-2xl border border-slate-200 bg-surface p-5 shadow-sm">
         <p className="text-sm font-semibold text-slate-900">{nextAction}</p>
         <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100"><div className={`h-full rounded-full ${readinessPercent === 100 && pkg.members.length ? "bg-emerald-500" : "bg-[#d9a441]"}`} style={{ width: `${readinessPercent}%` }}/></div>
         <p className="mt-1.5 text-xs text-slate-500">{readyCount} of {pkg.members.length} documents ready</p>
@@ -61,7 +61,7 @@ export default async function PackageDetailPage({ params }: { params: Promise<{ 
             {shortfall && pkg.shortfallIssuedAt && !pkg.shortfallAcceptedBy && isAcceptor ? <ActionForm action={acceptShortfallAction} submitLabel="Accept the shortfall" size="sm" hidden={{ packageId: pkg.id }} /> : null}
             {pkg.assessedAt ? (
               <details className="min-w-64">
-                <summary className="cursor-pointer text-xs font-semibold text-[#315f83]">Close the package…</summary>
+                <summary className="cursor-pointer text-xs font-semibold text-link">Close the package…</summary>
                 <div className="mt-2">
                   <ActionForm action={closePackageAction} submitLabel="Close package" size="sm" variant="secondary" hidden={{ packageId: pkg.id }}>
                     {pkg.type === "ACCUMULATED" ? <label className="flex items-center gap-2 text-xs text-slate-600"><input type="checkbox" name="ruleCeased" /> No more documents will be added</label> : null}
@@ -84,7 +84,7 @@ export default async function PackageDetailPage({ params }: { params: Promise<{ 
               const ok = cur?.statusCode === m.requiredStatus;
               return (
                 <tr key={m.id}>
-                  <Td><Link href={`/documents/${m.documentId}`} className="font-mono text-[13px] font-semibold text-[#1e3a5f] hover:underline">{m.document.docNumber}</Link><span className="block max-w-72 truncate text-xs text-slate-400">{m.document.title}</span></Td>
+                  <Td><Link href={`/documents/${m.documentId}`} className="font-mono text-[13px] font-semibold text-brand-ink hover:underline">{m.document.docNumber}</Link><span className="block max-w-72 truncate text-xs text-slate-400">{m.document.title}</span></Td>
                   <Td className="text-xs">{m.requiredStatus}</Td>
                   <Td className="text-xs">{cur ? `rev ${cur.value} · ${cur.statusCode}` : "not released"}</Td>
                   <Td>{ok ? <Chip className="bg-emerald-100 text-emerald-800 ring-emerald-300">yes</Chip> : <Chip className="bg-amber-100 text-amber-800 ring-amber-300">no</Chip>}</Td>
@@ -98,7 +98,7 @@ export default async function PackageDetailPage({ params }: { params: Promise<{ 
         )}
         {canAct ? (
           <details className="mt-4 border-t border-slate-100 pt-3">
-            <summary className="cursor-pointer text-xs font-semibold text-[#315f83]">+ Add documents</summary>
+            <summary className="cursor-pointer text-xs font-semibold text-link">+ Add documents</summary>
             <div className="mt-3">
               <ActionForm action={addPackageMemberAction} submitLabel="Add" size="sm" hidden={{ packageId: pkg.id }}>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_160px]">

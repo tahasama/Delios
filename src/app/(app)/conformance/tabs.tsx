@@ -20,7 +20,7 @@ export function AssuranceTabs({ current }: { current: string }) {
     <nav className="scroll-thin -mx-1 flex gap-1 overflow-x-auto px-1" aria-label="Assurance">
       {TABS.map((t) => (
         <Link key={t.href} href={t.href} aria-current={active === t.href ? "page" : undefined}
-          className={`whitespace-nowrap rounded-lg px-3 py-2 text-xs font-semibold ${active === t.href ? "bg-[#1e3a5f] text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>
+          className={`whitespace-nowrap rounded-lg px-3 py-2 text-xs font-semibold ${active === t.href ? "bg-brand text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>
           {t.label}
         </Link>
       ))}

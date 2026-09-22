@@ -25,9 +25,9 @@ export default async function NoProjectPage() {
   });
 
   return (
-    <div className="grid min-h-screen place-items-center bg-[#f6f7f9] px-6">
-      <div className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
-        <span className="grid h-12 w-12 place-items-center rounded-xl bg-[#e9f1f7] text-[#17324d]">
+    <div className="grid min-h-screen place-items-center bg-canvas px-6">
+      <div className="w-full max-w-lg rounded-2xl border border-slate-200 bg-surface p-8 shadow-sm">
+        <span className="grid h-12 w-12 place-items-center rounded-xl bg-tint text-brand-ink">
           <FolderOpen className="h-6 w-6" />
         </span>
         <h1 className="mt-5 text-xl font-semibold text-slate-800">You are not on a project yet</h1>

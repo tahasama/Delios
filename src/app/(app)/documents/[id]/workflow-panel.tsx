@@ -82,14 +82,14 @@ export async function WorkflowPanel({ doc, user, lead, extra: after }: { doc: Do
   }
   if (revs.length > 0) {
     return (
-      <Card title={revs[0].state === "IN_REVIEW" ? "In review" : "Not in use"} className={revs[0].state === "IN_REVIEW" ? "border-[#2d5480]/30 bg-[#f7fafc]" : undefined}>
+      <Card title={revs[0].state === "IN_REVIEW" ? "In review" : "Not in use"} className={revs[0].state === "IN_REVIEW" ? "border-brand-line/30 bg-tint-soft" : undefined}>
         <p className="text-sm text-slate-700">{revs[0].state === "IN_REVIEW" ? <>Rev {revs[0].value} is with its reviewers.</> : <>The latest revision (rev {revs[0].value}) is <strong>{revs[0].state.replaceAll("_", " ").toLowerCase()}</strong>.</>}</p>
         {extra}
       </Card>
     );
   }
   return (
-    <Card title="Next step: first revision" className="border-[#2d5480]/30 bg-[#f7fafc]">
+    <Card title="Next step: first revision" className="border-brand-line/30 bg-tint-soft">
       <p className="text-sm text-slate-700">The number is reserved. There is no content yet.</p>
       {mayContributeToDocument(user, doc) ? extra : <p className="mt-2 text-xs text-slate-500">Document Control or the author prepares it.</p>}
     </Card>
@@ -114,7 +114,7 @@ async function SendPanel({ doc, revId, value, hasFiles, user, lead, extra }: { d
     );
   }
   return (
-    <Card title="Next step: send for review" className="border-[#2d5480]/30 bg-[#f7fafc]">
+    <Card title="Next step: send for review" className="border-brand-line/30 bg-tint-soft">
       <p className="text-sm text-slate-700"><strong>Rev {value}</strong> is being prepared{hasFiles ? " and has its file" : " — no file yet (a PDF is needed before release)"}.</p>
       {lead}
       <Action label={<><Send className="h-4 w-4" /> Send for review / approval</>}>
@@ -141,7 +141,7 @@ async function RunActivePanel({ run, user, extra }: { run: { id: string; templat
   const iDecide = !!step && mine && !alreadyGave && (step.mode !== "SERIAL" || serialNext === user.id);
 
   return (
-    <Card title={iDecide ? "Next step: your decision" : "In review"} description={`${run.templateName} · step ${run.currentStep + 1} of ${run.steps.length}`} className="border-[#2d5480]/30 bg-[#f7fafc]">
+    <Card title={iDecide ? "Next step: your decision" : "In review"} description={`${run.templateName} · step ${run.currentStep + 1} of ${run.steps.length}`} className="border-brand-line/30 bg-tint-soft">
       <ol className="mb-4 space-y-1.5">
         {run.steps.map((s, i) => {
           const names = participants.filter((p) => s.participantIds.includes(p.id)).map((p) => p.name).join(", ");
@@ -182,7 +182,7 @@ async function RunActivePanel({ run, user, extra }: { run: { id: string; templat
           </p>
         )
       ) : null}
-      {step?.cycleId ? <Link href={`/reviews/${step.cycleId}`} className="mt-3 inline-block text-xs font-medium text-[#2d5480] hover:underline">Comments and markups →</Link> : null}
+      {step?.cycleId ? <Link href={`/reviews/${step.cycleId}`} className="mt-3 inline-block text-xs font-medium text-brand-ink hover:underline">Comments and markups →</Link> : null}
       {extra}
     </Card>
   );
@@ -208,7 +208,7 @@ function RecordPanel({ doc, extra }: { doc: DocLite; extra?: React.ReactNode }) 
       )}
       <div className="mt-3">
         {confirmed ? (
-          <details className="rounded-lg border border-violet-200 bg-white">
+          <details className="rounded-lg border border-violet-200 bg-surface">
             <summary className="cursor-pointer px-3.5 py-2.5 text-sm font-medium text-violet-800">Issue a correction of this record</summary>
             <div className="border-t border-slate-100 p-3.5">
               <ActionForm action={correctRecordAction} submitLabel="Create correction record" size="sm" hidden={{ documentId: doc.id }}>
@@ -230,7 +230,7 @@ function RecordPanel({ doc, extra }: { doc: DocLite; extra?: React.ReactNode }) 
 /** The Next step block: one compact box, title and context on one line. */
 function Card({ title, description, className, children }: { title: string; description?: string; className?: string; children: React.ReactNode }) {
   return (
-    <section className={cn("rounded-2xl border border-slate-200 bg-white px-5 py-3.5 shadow-sm", className)}>
+    <section className={cn("rounded-2xl border border-slate-200 bg-surface px-5 py-3.5 shadow-sm", className)}>
       <p className="text-sm font-semibold text-slate-900">
         {title}
         {description ? <span className="ml-2 text-xs font-normal text-slate-500">{description}</span> : null}
@@ -247,10 +247,10 @@ function Card({ title, description, className, children }: { title: string; desc
 export function Action({ label, secondary, children }: { label: React.ReactNode; secondary?: boolean; children: React.ReactNode }) {
   return (
     <details className="group mt-2 open:w-full">
-      <summary className={`inline-flex cursor-pointer list-none items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-semibold transition ${secondary ? "border border-slate-300 bg-white text-slate-700 hover:bg-slate-50" : "bg-[#1e3a5f] text-white hover:bg-[#2d5480]"}`}>
+      <summary className={`inline-flex cursor-pointer list-none items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-semibold transition ${secondary ? "border border-slate-300 bg-surface text-slate-700 hover:bg-slate-50" : "bg-brand text-white hover:bg-brand-hover"}`}>
         {label}
       </summary>
-      <div className="mt-2 rounded-lg border border-slate-200 bg-white p-3.5">{children}</div>
+      <div className="mt-2 rounded-lg border border-slate-200 bg-surface p-3.5">{children}</div>
     </details>
   );
 }

@@ -50,8 +50,8 @@ export default async function AdminNumberingPage() {
         ))}
       </div>
 
-      <details className="rounded-2xl border border-slate-200 bg-white px-5 py-3 shadow-sm">
-        <summary className="cursor-pointer text-sm font-semibold text-[#1e3a5f]">+ New numbering scheme</summary>
+      <details className="rounded-2xl border border-slate-200 bg-surface px-5 py-3 shadow-sm">
+        <summary className="cursor-pointer text-sm font-semibold text-brand-ink">+ New numbering scheme</summary>
         <div className="mt-3"><NumberingSchemeBuilder sets={sets.map((set) => ({ key: set.key, title: set.title }))} /></div>
       </details>
 
@@ -72,7 +72,7 @@ export default async function AdminNumberingPage() {
           ))}
         </DataTable>
         <p className="mt-2 text-[11px] text-slate-400">Switching a type off stops new numbers of that type; numbers already issued keep their scheme.</p>
-        <details className="mt-4 border-t border-slate-100 pt-3"><summary className="cursor-pointer text-xs font-semibold text-[#315f83]">+ Route a deliverable type</summary><div className="mt-3"><ActionForm action={saveSchemeRoutingAction} submitLabel="Publish routing" size="sm"><div className="grid grid-cols-1 gap-3 sm:grid-cols-2"><Field label="Deliverable type" required><select name="deliverableType" className={inputCls} required defaultValue=""><option value="" disabled>Select…</option>{deliverables.map((item) => <option key={item.code} value={item.code}>{item.code} — {item.label}</option>)}</select></Field><Field label="Numbering scheme" required><select name="schemeName" className={inputCls} required defaultValue=""><option value="" disabled>Select…</option>{schemes.map((scheme) => <option key={scheme.id} value={scheme.name}>{scheme.name}</option>)}</select></Field></div></ActionForm></div></details>
+        <details className="mt-4 border-t border-slate-100 pt-3"><summary className="cursor-pointer text-xs font-semibold text-link">+ Route a deliverable type</summary><div className="mt-3"><ActionForm action={saveSchemeRoutingAction} submitLabel="Publish routing" size="sm"><div className="grid grid-cols-1 gap-3 sm:grid-cols-2"><Field label="Deliverable type" required><select name="deliverableType" className={inputCls} required defaultValue=""><option value="" disabled>Select…</option>{deliverables.map((item) => <option key={item.code} value={item.code}>{item.code} — {item.label}</option>)}</select></Field><Field label="Numbering scheme" required><select name="schemeName" className={inputCls} required defaultValue=""><option value="" disabled>Select…</option>{schemes.map((scheme) => <option key={scheme.id} value={scheme.name}>{scheme.name}</option>)}</select></Field></div></ActionForm></div></details>
       </Card>
 
       <Card title="Number ranges given to other parties" description="Used first for that party; everything else comes from the system counter.">
@@ -89,7 +89,7 @@ export default async function AdminNumberingPage() {
           {ranges.length === 0 ? <tr><Td colSpan={5}><span className="text-xs text-slate-400">No ranges issued — the system counter allocates everything.</span></Td></tr> : null}
         </DataTable>
         <details className="mt-4 border-t border-slate-100 pt-3">
-          <summary className="cursor-pointer text-xs font-semibold text-[#315f83]">+ Give a range</summary>
+          <summary className="cursor-pointer text-xs font-semibold text-link">+ Give a range</summary>
           <div className="mt-3">
           <ActionForm action={issueNumberRangeAction} submitLabel="Issue range" size="sm">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">

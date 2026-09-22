@@ -31,7 +31,7 @@ export default async function AdminPartiesPage() {
                   <Td className="tabular-nums text-xs">{p._count.users}{p.active ? "" : <span className="block text-[11px] font-semibold text-red-700">access revoked</span>}</Td>
                   <Td>
                     <details>
-                      <summary className="cursor-pointer text-xs font-semibold text-[#315f83]">Edit</summary>
+                      <summary className="cursor-pointer text-xs font-semibold text-link">Edit</summary>
                       <div className="mt-2 w-64">
                         <ActionForm action={savePartyAction} submitLabel="Save" size="sm" hidden={{ id: p.id, code: p.code }}>
                           <Field label="Name" required><input name="name" required defaultValue={p.name} className={inputCls} /></Field>
@@ -48,7 +48,7 @@ export default async function AdminPartiesPage() {
             </DataTable>
           </Card>
         </div>
-        <details className="rounded-2xl border border-slate-200 bg-white px-5 py-3 shadow-sm"><summary className="cursor-pointer text-sm font-semibold text-[#1e3a5f]">+ Add a party</summary><div className="mt-3 max-w-2xl">
+        <details className="rounded-2xl border border-slate-200 bg-surface px-5 py-3 shadow-sm"><summary className="cursor-pointer text-sm font-semibold text-brand-ink">+ Add a party</summary><div className="mt-3 max-w-2xl">
           <ActionForm action={savePartyAction} submitLabel="Add party" size="sm">
             <Field label="Code" required hint="short, unique — e.g. MADASUD">
               <input name="code" required maxLength={20} className={inputCls} />

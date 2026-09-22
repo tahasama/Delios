@@ -128,7 +128,7 @@ export default async function AdminUsersPage() {
                 <Td className="text-xs">{elsewhere.length ? elsewhere.map((m) => `${m.project.code} · ${m.function.name}`).join(", ") : "—"}</Td>
                 <Td>
                   <details>
-                    <summary className="cursor-pointer text-xs font-semibold text-[#315f83]">Edit</summary>
+                    <summary className="cursor-pointer text-xs font-semibold text-link">Edit</summary>
                     <div className="mt-2 w-[min(90vw,34rem)]">
                       <ActionForm action={savePersonAction} submitLabel="Save" size="sm" hidden={{ userId: u.id }}>
                         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -176,7 +176,7 @@ export default async function AdminUsersPage() {
                 <Td>
                   {g.projectId === projectId ? (
                     <details>
-                      <summary className="cursor-pointer text-xs font-semibold text-[#315f83]">Edit</summary>
+                      <summary className="cursor-pointer text-xs font-semibold text-link">Edit</summary>
                       <div className="mt-2 w-[min(90vw,30rem)]">
                         <ActionForm action={savePersonAction} submitLabel="Save" size="sm" hidden={{ userId: g.user.id }}>
                           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -209,7 +209,7 @@ function AddWay({ title, hint, children }: { title: string; hint: string; childr
   return (
     <details className="py-2.5">
       <summary className="cursor-pointer list-none">
-        <span className="text-sm font-semibold text-[#1e3a5f]">+ {title}</span>
+        <span className="text-sm font-semibold text-brand-ink">+ {title}</span>
         <span className="ml-2 text-xs text-slate-500">{hint}</span>
       </summary>
       <div className="mt-3 max-w-3xl">{children}</div>

@@ -67,7 +67,7 @@ export default async function DmpReadinessPage() {
   return (
     <div className="space-y-6">
       <PageHeader title="Scope & readiness" subtitle="The Annex C decisions that make a project operable, in the order they are made. Each is read from what is actually configured — you do not need a finished Document Management Plan first." />
-      <section className="overflow-hidden rounded-2xl bg-[#17324d] p-6 text-white shadow-sm">
+      <section className="overflow-hidden rounded-2xl bg-brand-strong p-6 text-white shadow-sm">
         <div className="flex flex-wrap items-end justify-between gap-5">
           <div><p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#9fb8cc]">Implementation readiness</p><p className="mt-2 text-3xl font-semibold">{percentage}%</p><p className="mt-1 text-sm text-[#c7d7e5]">{completed} of {steps.length} decisions are in place.</p></div>
           {next ? <Link href={next.href} className="inline-flex items-center gap-2 rounded-xl bg-[#d9a441] px-4 py-2.5 text-sm font-bold text-[#102a43]">Continue with {next.title.toLowerCase()} <ArrowRight className="h-4 w-4" /></Link> : <Chip className="bg-emerald-100 text-emerald-800 ring-emerald-300">baseline ready</Chip>}
@@ -78,10 +78,10 @@ export default async function DmpReadinessPage() {
       {percentage === 100 ? <Banner tone="good" title="You have a working DMP baseline">The starter configuration is operational. Review each item with your organization, replace what does not fit, then run Assurance to find gaps in real project data.</Banner> : <Banner tone="warn" title="Your next missing decision">{next?.text}</Banner>}
 
       <ol className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        {steps.map((step, index) => <li key={step.title} className={`rounded-2xl border bg-white p-5 shadow-sm ${step.done ? "border-emerald-200" : "border-amber-200"}`}>
+        {steps.map((step, index) => <li key={step.title} className={`rounded-2xl border bg-surface p-5 shadow-sm ${step.done ? "border-emerald-200" : "border-amber-200"}`}>
           <div className="flex items-start gap-4">
             <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${step.done ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}><step.icon className="h-5 w-5" /></span>
-            <div className="min-w-0 flex-1"><div className="flex items-center gap-2"><span className="text-xs font-bold text-slate-400">{index + 1}</span><h2 className="text-sm font-semibold text-slate-900">{step.title}</h2>{step.done ? <CheckCircle2 className="ml-auto h-4 w-4 text-emerald-600" /> : <CircleDashed className="ml-auto h-4 w-4 text-amber-600" />}</div><p className="mt-2 text-xs leading-5 text-slate-500">{step.text}</p><p className="mt-3 text-[11px] font-medium text-slate-400">Evidence: {step.evidence}</p><Link href={step.href} className="mt-4 inline-flex items-center gap-1.5 text-xs font-bold text-[#315f83]">{step.action}<ArrowRight className="h-3.5 w-3.5" /></Link></div>
+            <div className="min-w-0 flex-1"><div className="flex items-center gap-2"><span className="text-xs font-bold text-slate-400">{index + 1}</span><h2 className="text-sm font-semibold text-slate-900">{step.title}</h2>{step.done ? <CheckCircle2 className="ml-auto h-4 w-4 text-emerald-600" /> : <CircleDashed className="ml-auto h-4 w-4 text-amber-600" />}</div><p className="mt-2 text-xs leading-5 text-slate-500">{step.text}</p><p className="mt-3 text-[11px] font-medium text-slate-400">Evidence: {step.evidence}</p><Link href={step.href} className="mt-4 inline-flex items-center gap-1.5 text-xs font-bold text-link">{step.action}<ArrowRight className="h-3.5 w-3.5" /></Link></div>
           </div>
         </li>)}
       </ol>
@@ -142,7 +142,7 @@ export default async function DmpReadinessPage() {
         ) : (
           <p className="mb-4 text-xs text-slate-400">No exceptions recorded.</p>
         )}
-        <details><summary className="cursor-pointer text-xs font-semibold text-[#315f83]">+ Record an exception</summary><div className="mt-3"><ActionForm action={addExceptionAction} submitLabel="Record exception" size="sm">
+        <details><summary className="cursor-pointer text-xs font-semibold text-link">+ Record an exception</summary><div className="mt-3"><ActionForm action={addExceptionAction} submitLabel="Record exception" size="sm">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Field label="What is exempt" required><input name="item" className={inputCls} /></Field>
             <Field label="Clauses exempted" required><input name="clauses" className={inputCls} /></Field>

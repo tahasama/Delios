@@ -33,10 +33,10 @@ export default async function SetupPage() {
   const labelFor = (role: string) => functions.find((f) => f.legacyRole === role)?.name ?? role;
 
   return (
-    <div className="min-h-screen bg-[#f6f7f9]">
-      <header className="border-b border-slate-200 bg-white">
+    <div className="min-h-screen bg-canvas">
+      <header className="border-b border-slate-200 bg-surface">
         <div className="mx-auto flex max-w-4xl items-center gap-3 px-6 py-4">
-          <span className="grid h-10 w-10 place-items-center rounded-xl bg-[#1e3a5f] text-sm font-black text-white">D</span>
+          <span className="grid h-10 w-10 place-items-center rounded-xl bg-brand text-sm font-black text-white">D</span>
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-bold text-slate-900">{organization.name}</p>
             <p className="text-[11px] text-slate-400">Setting up · {user.name}</p>
@@ -63,9 +63,9 @@ export default async function SetupPage() {
 
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
           {/* People first: they join the project automatically when it opens. */}
-          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <section className="rounded-2xl border border-slate-200 bg-surface p-5 shadow-sm">
             <div className="flex items-start gap-3">
-              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#e9f1f7] text-[#17324d]">
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-tint text-brand-ink">
                 <UserPlus className="h-5 w-5" />
               </span>
               <div>
@@ -110,9 +110,9 @@ export default async function SetupPage() {
           </section>
 
           {/* The project: the step that turns setup into the working app. */}
-          <section className="rounded-2xl border border-[#2d5480]/40 bg-white p-5 shadow-sm">
+          <section className="rounded-2xl border border-brand-line/40 bg-surface p-5 shadow-sm">
             <div className="flex items-start gap-3">
-              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#1e3a5f] text-white">
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-brand text-white">
                 <FolderPlus className="h-5 w-5" />
               </span>
               <div>
@@ -150,7 +150,7 @@ export default async function SetupPage() {
         </div>
 
         <p className="text-center text-[11px] text-slate-400">
-          Prefer to look around first? <Link href="/admin/config" className="font-semibold text-[#315f83] hover:underline">Review the published configuration</Link>{" "}
+          Prefer to look around first? <Link href="/admin/config" className="font-semibold text-link hover:underline">Review the published configuration</Link>{" "}
           — though most of the app needs a project before it has anything to show.
         </p>
       </main>

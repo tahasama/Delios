@@ -41,9 +41,9 @@ export default async function ChecksPage({ searchParams }: { searchParams: Promi
       <AssuranceTabs current="/conformance/checks" />
 
       <div className="flex flex-wrap gap-1.5">
-        <Link href="/conformance/checks" className={cn("rounded-full px-3 py-1.5 text-xs font-medium", !family ? "bg-[#1e3a5f] text-white" : "bg-slate-100 text-slate-600")}>All</Link>
+        <Link href="/conformance/checks" className={cn("rounded-full px-3 py-1.5 text-xs font-medium", !family ? "bg-brand text-white" : "bg-slate-100 text-slate-600")}>All</Link>
         {FAMILIES.map((f) => (
-          <Link key={f} href={`/conformance/checks?family=${f}`} className={cn("rounded-full px-3 py-1.5 text-xs font-medium", family === f ? "bg-[#1e3a5f] text-white" : "bg-slate-100 text-slate-600")}>
+          <Link key={f} href={`/conformance/checks?family=${f}`} className={cn("rounded-full px-3 py-1.5 text-xs font-medium", family === f ? "bg-brand text-white" : "bg-slate-100 text-slate-600")}>
             {FAMILY_TITLES[f]?.replace(/^H\.\d+\s/, "") ?? f}
           </Link>
         ))}
@@ -55,7 +55,7 @@ export default async function ChecksPage({ searchParams }: { searchParams: Promi
         {rows.map((c) => {
           const r = results.get(c.id);
           return (
-            <tr key={c.id} className="hover:bg-slate-50/70">
+            <tr key={c.id}>
               <Td className="whitespace-nowrap font-mono text-xs font-semibold">
                 {c.id}{c.contradiction ? <span className="ml-1 text-red-500" title="Structural contradiction">▲</span> : null}
               </Td>

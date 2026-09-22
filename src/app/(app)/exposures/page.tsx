@@ -51,7 +51,7 @@ export default async function ExposuresPage() {
             {unpropagated.map((u) => (
               <li key={u.old.id} className="py-3">
                 <p className="text-sm">
-                  <Link href={`/documents/${u.document.id}`} className="font-mono font-semibold text-[#1e3a5f] hover:underline">{u.document.docNumber}</Link>
+                  <Link href={`/documents/${u.document.id}`} className="font-mono font-semibold text-brand-ink hover:underline">{u.document.docNumber}</Link>
                   <span className="ml-1.5 text-xs text-slate-600">rev {u.old.value} was replaced{u.current ? ` by rev ${u.current.value}` : ""}</span>
                 </p>
                 <p className="mt-1 text-xs text-slate-600">
@@ -81,7 +81,7 @@ export default async function ExposuresPage() {
             {blocked.map((r) => (
               <li key={r.id} className="flex items-center justify-between gap-3 py-2">
                 <span className="text-sm">
-                  <Link href={`/documents/${r.documentId}`} className="font-mono font-semibold text-[#1e3a5f] hover:underline">{r.document.docNumber}</Link>
+                  <Link href={`/documents/${r.documentId}`} className="font-mono font-semibold text-brand-ink hover:underline">{r.document.docNumber}</Link>
                   <span className="ml-1.5 font-mono text-xs">rev {r.value}</span>
                   <span className="block text-xs text-slate-400">{r.cycles.reduce((a, c) => a + c.comments.length, 0)} blocking comment(s) open — do not work from it</span>
                 </span>
@@ -98,7 +98,7 @@ export default async function ExposuresPage() {
             {orphaned.map((e) => (
               <li key={e.id} className="flex items-center justify-between gap-3 py-2">
                 <span className="text-sm">
-                  <Link href={`/documents/${e.documentId}`} className="font-mono font-semibold text-[#1e3a5f] hover:underline">{e.document.docNumber}</Link>
+                  <Link href={`/documents/${e.documentId}`} className="font-mono font-semibold text-brand-ink hover:underline">{e.document.docNumber}</Link>
                   <span className="block text-xs text-slate-400">action {e.action.code} — {e.action.name} still requires it</span>
                 </span>
               </li>
@@ -115,7 +115,7 @@ export default async function ExposuresPage() {
               <li key={r.id} className="py-2.5">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <span className="text-sm">
-                    <Link href={`/documents/${r.documentId}`} className="font-mono font-semibold text-[#1e3a5f] hover:underline">{r.document.docNumber}</Link>
+                    <Link href={`/documents/${r.documentId}`} className="font-mono font-semibold text-brand-ink hover:underline">{r.document.docNumber}</Link>
                     <span className="ml-1.5 font-mono text-xs">rev {r.value}</span>
                     <span className="text-slate-400"> · voided “{r.voidReason ?? ""}”</span>
                   </span>

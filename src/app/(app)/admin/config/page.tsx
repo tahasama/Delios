@@ -32,13 +32,13 @@ export default async function AdminConfigPage({ searchParams }: { searchParams: 
       <div className="flex flex-wrap items-center gap-1.5">
         {sets.map((s) => (
           <a key={s.key} href={`/admin/config?set=${s.key}`}
-            className={`rounded-full px-3 py-1.5 text-xs font-medium ${currentKey === s.key ? "bg-[#1e3a5f] text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>
+            className={`rounded-full px-3 py-1.5 text-xs font-medium ${currentKey === s.key ? "bg-brand text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>
             {s.title}
           </a>
         ))}
       </div>
 
-      <details className="rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
+      <details className="rounded-xl border border-slate-200 bg-surface px-5 py-4 shadow-sm">
         <summary className="cursor-pointer text-sm font-medium text-slate-700">+ Define a new set</summary>
         <div className="mt-3 max-w-xl">
           <ActionForm action={createConfigSetAction} submitLabel="Create set" size="sm">
@@ -60,7 +60,7 @@ export default async function AdminConfigPage({ searchParams }: { searchParams: 
       {set ? (
         <Card title={`${set.title} — v${set.version}`} description={set.description ?? ""} actions={
           <div className="flex items-center gap-3">
-            <a href={`/api/export/config-set?set=${encodeURIComponent(set.key)}`} className="text-xs font-medium text-[#315f83] hover:underline">export CSV ↓</a>
+            <a href={`/api/export/config-set?set=${encodeURIComponent(set.key)}`} className="text-xs font-medium text-link hover:underline">export CSV ↓</a>
             <form action={deleteSetAction}>
               <input type="hidden" name="key" value={set.key} />
               <button className="text-xs text-slate-400 hover:text-red-600" title="Delete the whole set (only when unused and not an operational set)">delete set</button>
@@ -83,7 +83,7 @@ export default async function AdminConfigPage({ searchParams }: { searchParams: 
                   A whole-set upload is a controlled change: you see what it would alter, and someone else approves it
                   before it takes effect. Values left out are retired, never deleted.
                 </p>
-                <Link href="/admin/controlled" className="mt-2 inline-block text-xs font-semibold text-[#315f83] hover:underline">
+                <Link href="/admin/controlled" className="mt-2 inline-block text-xs font-semibold text-link hover:underline">
                   Open controlled changes →
                 </Link>
               </div>

@@ -93,7 +93,7 @@ export default async function ControlledKindPage({ params }: { params: Promise<{
         title={handler.title}
         subtitle={handler.blurb}
         actions={
-          <Link href="/admin/controlled" className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#315f83] hover:underline">
+          <Link href="/admin/controlled" className="inline-flex items-center gap-1.5 text-sm font-semibold text-link hover:underline">
             <ArrowLeft className="h-4 w-4" /> All controlled changes
           </Link>
         }

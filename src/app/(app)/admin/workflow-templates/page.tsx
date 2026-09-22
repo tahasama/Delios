@@ -80,8 +80,8 @@ export default async function WorkflowTemplatesPage() {
       )}
 
       {admin ? (
-        <details className="rounded-2xl border border-slate-200 bg-white px-5 py-3 shadow-sm">
-          <summary className="cursor-pointer text-sm font-semibold text-[#1e3a5f]">+ New review route</summary>
+        <details className="rounded-2xl border border-slate-200 bg-surface px-5 py-3 shadow-sm">
+          <summary className="cursor-pointer text-sm font-semibold text-brand-ink">+ New review route</summary>
           <div className="mt-3"><WorkflowTemplateBuilder functions={functions} users={users} outcomeSets={outcomeSets.map((s) => s.key)} classOptions={classOptions} /></div>
         </details>
       ) : null}

@@ -49,10 +49,10 @@ export function NewDocumentForm({
                 onClick={() => setStep(i + 1)}
                 className={cn(
                   "flex items-center gap-2 rounded-full px-3.5 py-1.5 text-xs font-medium transition",
-                  step === i + 1 ? "bg-[#1e3a5f] text-white" : step > i + 1 ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-500"
+                  step === i + 1 ? "bg-brand text-white" : step > i + 1 ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-500"
                 )}
               >
-                <span className={cn("grid h-5 w-5 place-items-center rounded-full text-[10px] font-bold", step === i + 1 ? "bg-white/20" : step > i + 1 ? "bg-emerald-500 text-white" : "bg-white")}>
+                <span className={cn("grid h-5 w-5 place-items-center rounded-full text-[10px] font-bold", step === i + 1 ? "bg-white/20" : step > i + 1 ? "bg-emerald-500 text-white" : "bg-surface")}>
                   {step > i + 1 ? "✓" : i + 1}
                 </span>
                 {label}
@@ -107,7 +107,7 @@ export function NewDocumentForm({
               </div>
             ) : null}
             <button type="button" onClick={() => setStep(2)} disabled={!producer || !docType || !discipline} hidden={received}
-              className="rounded-lg bg-[#1e3a5f] px-4 py-2 text-sm font-medium text-white disabled:opacity-40">
+              className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white disabled:opacity-40">
               Continue
             </button>
           </div>
@@ -182,7 +182,7 @@ export function NewDocumentForm({
             </Field>
             <div className="flex gap-2">
               {received ? null : <button type="button" onClick={() => setStep(1)} className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-600">Back</button>}
-              <button type="submit" className="rounded-lg bg-[#1e3a5f] px-4 py-2 text-sm font-medium text-white">{sendTo ? "Register & send for approval" : received ? "Register it" : "Create & get number"}</button>
+              <button type="submit" className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white">{sendTo ? "Register & send for approval" : received ? "Register it" : "Create & get number"}</button>
             </div>
           </div>
 

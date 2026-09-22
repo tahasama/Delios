@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requireScope } from "@/lib/scope";
-import { Chip } from "@/components/ui";
+import { Chip, DataTable, Th, Td } from "@/components/ui";
 import { departmentsOf } from "@/lib/schedule";
 import { clearance } from "@/lib/requirements-process";
 import { fmtDate } from "@/lib/utils";
@@ -71,10 +71,10 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <a href="/api/export/baseline" className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700"><Download className="h-4 w-4" /> Export</a>
-          {mayChange ? <Link href="/admin/controlled/SCHEDULE" className="inline-flex items-center gap-1.5 rounded-xl bg-[#17324d] px-3.5 py-2 text-sm font-semibold text-white"><Upload className="h-4 w-4" /> Update schedule</Link> : null}
-          <Link href="/actions/requirements" className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700">Requirements</Link>
-          <Link href="/actions/schedules" className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700">Versions</Link>
+          <a href="/api/export/baseline" className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-surface px-3.5 py-2 text-sm font-semibold text-slate-700"><Download className="h-4 w-4" /> Export</a>
+          {mayChange ? <Link href="/admin/controlled/SCHEDULE" className="inline-flex items-center gap-1.5 rounded-xl bg-brand-strong px-3.5 py-2 text-sm font-semibold text-white"><Upload className="h-4 w-4" /> Update schedule</Link> : null}
+          <Link href="/actions/requirements" className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-surface px-3.5 py-2 text-sm font-semibold text-slate-700">Requirements</Link>
+          <Link href="/actions/schedules" className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-surface px-3.5 py-2 text-sm font-semibold text-slate-700">Versions</Link>
         </div>
       </div>
 
@@ -83,7 +83,7 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
           const n = v ? counts[v] : rows.length;
           return (
             <Link key={v ?? "all"} href={qs({ view: v })} aria-current={activeView === v ? "page" : undefined}
-              className={`rounded-lg px-3 py-2 text-xs font-semibold ${activeView === v ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-800"}`}>
+              className={`rounded-lg px-3 py-2 text-xs font-semibold ${activeView === v ? "bg-surface text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-800"}`}>
               {v ? readinessLabel(v) : "All"}
               {n ? <span className={`ml-1.5 rounded px-1.5 text-[10px] ${v === "NOT_READY" ? "bg-red-200 text-red-900" : v === "AT_RISK" ? "bg-amber-200 text-amber-900" : "bg-slate-200 text-slate-600"}`}>{n}</span> : null}
             </Link>
@@ -93,35 +93,40 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
 
       <div className="flex flex-wrap items-center gap-1.5 text-xs">
         <span className="mr-1 font-semibold text-slate-500">Department</span>
-        <Link href={qs({ dept: null })} className={`rounded-full px-2.5 py-1 ${!dept ? "bg-[#1e3a5f] text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>All</Link>
+        <Link href={qs({ dept: null })} className={`rounded-full px-2.5 py-1 ${!dept ? "bg-brand text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>All</Link>
         {usedDepts.map((d) => (
-          <Link key={d} href={qs({ dept: d })} className={`rounded-full px-2.5 py-1 ${dept === d ? "bg-[#1e3a5f] text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`} title={deptLabel.get(d)}>{deptLabel.get(d) ?? d}</Link>
+          <Link key={d} href={qs({ dept: d })} className={`rounded-full px-2.5 py-1 ${dept === d ? "bg-brand text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`} title={deptLabel.get(d)}>{deptLabel.get(d) ?? d}</Link>
         ))}
         {untagged ? <Link href={qs({ dept: "NONE" })} className={`rounded-full px-2.5 py-1 ${dept === "NONE" ? "bg-amber-600 text-white" : "bg-amber-100 text-amber-800 hover:bg-amber-200"}`}>Needs departments ({untagged})</Link> : null}
       </div>
 
-      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <section>
         {filtered.length ? (
-          <div className="scroll-thin overflow-x-auto">
-            <table className="min-w-full divide-y divide-slate-100">
-              <thead className="bg-slate-50"><tr><TableHead>Action</TableHead><TableHead>Departments</TableHead><TableHead>Status</TableHead><TableHead>Date</TableHead><TableHead>Documents ready</TableHead><TableHead>Still missing</TableHead><TableHead>Confirmed</TableHead></tr></thead>
-              <tbody className="divide-y divide-slate-100">
+          <DataTable id="actions" head={<tr><Th>Action</Th><Th>Departments</Th><Th>Status</Th><Th>Date</Th><Th label="Documents ready" className="text-right">Ready</Th><Th>Still missing</Th><Th>Confirmed</Th></tr>}>
                 {filtered.map((action) => (
-                  <tr key={action.id} className="transition hover:bg-slate-50/70">
-                    <td className="max-w-sm px-4 py-4"><Link href={`/actions/${action.code}`} className="font-mono text-xs font-bold text-[#315f83] hover:underline">{action.code}</Link><p className="mt-1 truncate text-sm font-semibold text-slate-800">{action.name}</p><p className="mt-1 text-[11px] text-slate-400">{action.ownerName ?? "Responsible party not assigned"}</p></td>
-                    <td className="px-4 py-4 text-xs">{departmentsOf(action).length ? departmentsOf(action).map((d) => deptLabel.get(d) ?? d).join(", ") : <span className="font-semibold text-amber-700">needs departments</span>}</td>
-                    <td className="px-4 py-4"><ReadinessChip state={action.readiness} /></td>
-                    <td className="whitespace-nowrap px-4 py-4"><p className="text-sm font-medium text-slate-800">{fmtDate(action.scheduledDate)}</p><p className={`mt-1 text-[11px] ${action.daysUntil !== null && action.daysUntil < 0 ? "text-red-600" : "text-slate-400"}`}>{datePhrase(action.daysUntil)}</p></td>
-                    <td className="px-4 py-4"><p className="text-sm font-semibold tabular-nums text-slate-800">{action.ready} / {action.total}</p></td>
-                    <td className="max-w-md px-4 py-4">{action.missing.length ? <p className="text-xs leading-5 text-slate-600">{action.missing.slice(0, 2).map((entry) => `${entry.document.docNumber} needs ${entry.requiredStatus}`).join(" · ")}{action.missing.length > 2 ? ` · +${action.missing.length - 2} more` : ""}</p> : action.total === 0 ? <p className="text-xs text-slate-400">Document requirements have not been agreed yet.</p> : <p className="text-xs font-medium text-emerald-700">No document blockers</p>}</td>
-                    <td className="whitespace-nowrap px-4 py-4 text-xs">{(() => { const c = clearance(action); return !c.depts.length ? <span className="text-slate-400">—</span> : c.cleared ? <span className="font-semibold text-emerald-700">Cleared</span> : <span className={c.short.length ? "font-semibold text-red-700" : "text-slate-500"}>{c.confirmed.length} of {c.depts.length}{c.short.length ? ` · ${c.short.join(", ")} short` : ""}</span>; })()}</td>
+                  <tr key={action.id}>
+                    <Td className="min-w-[260px] max-w-sm"><Link href={`/actions/${action.code}`} className="font-mono text-xs font-bold text-link hover:underline">{action.code}</Link><p className="mt-0.5 truncate text-sm font-semibold text-slate-800" title={action.name}>{action.name}</p><p className="mt-0.5 text-[11px] text-slate-400">{action.ownerName ?? "Responsible party not assigned"}</p></Td>
+                    <Td>{departmentsOf(action).length ? <div className="flex max-w-56 flex-wrap gap-1">{departmentsOf(action).map((d) => <span key={d} className="whitespace-nowrap rounded-md bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-600">{deptLabel.get(d) ?? d}</span>)}</div> : <span className="text-xs font-semibold text-amber-700">needs departments</span>}</Td>
+                    <Td className="whitespace-nowrap"><ReadinessChip state={action.readiness} /></Td>
+                    <Td className="whitespace-nowrap"><p className="text-sm font-medium tabular-nums text-slate-800">{fmtDate(action.scheduledDate)}</p><p className={`mt-0.5 text-[11px] ${action.daysUntil !== null && action.daysUntil < 0 ? "font-semibold text-red-600" : "text-slate-400"}`}>{datePhrase(action.daysUntil)}</p></Td>
+                    <Td className="whitespace-nowrap text-right"><ReadyBar ready={action.ready} total={action.total} /></Td>
+                    <Td className="min-w-[240px]">{action.missing.length ? (
+                      <ul className="space-y-1">
+                        {action.missing.slice(0, 3).map((entry) => (
+                          <li key={entry.document.docNumber} className="flex flex-wrap items-center gap-1.5 text-xs">
+                            <span className="whitespace-nowrap font-mono text-[11px] font-semibold text-slate-700">{entry.document.docNumber}</span>
+                            <span className="whitespace-nowrap rounded bg-amber-100 px-1 py-px text-[10px] font-bold text-amber-800" title={`Needs status ${entry.requiredStatus}`}>needs {entry.requiredStatus}</span>
+                          </li>
+                        ))}
+                        {action.missing.length > 3 ? <li><Link href={`/actions/${action.code}`} className="text-[11px] font-semibold text-link hover:underline">+{action.missing.length - 3} more</Link></li> : null}
+                      </ul>
+                    ) : action.total === 0 ? <p className="text-xs text-slate-400">No document requirements agreed yet</p> : <p className="text-xs font-medium text-emerald-700">Nothing missing</p>}</Td>
+                    <Td className="whitespace-nowrap text-xs">{(() => { const c = clearance(action); return !c.depts.length ? <span className="text-slate-300">—</span> : c.cleared ? <span className="font-semibold text-emerald-700">Cleared</span> : <span className={c.short.length ? "font-semibold text-red-700" : "text-slate-500"}>{c.confirmed.length} of {c.depts.length}{c.short.length ? ` · ${c.short.join(", ")} short` : ""}</span>; })()}</Td>
                   </tr>
                 ))}
-              </tbody>
-            </table>
-          </div>
+          </DataTable>
         ) : (
-          <div className="px-6 py-14 text-center"><p className="text-sm font-semibold text-slate-700">{actions.length ? `No ${activeView ? readinessLabel(activeView).toLowerCase() : "matching"} actions` : "No actions planned yet"}</p><p className="mt-1 text-xs text-slate-400">{actions.length ? "Choose another readiness view." : "Load the schedule to begin — activities come only from it."}</p></div>
+          <div className="rounded-2xl border border-slate-200 bg-surface px-6 py-14 text-center shadow-sm"><p className="text-sm font-semibold text-slate-700">{actions.length ? `No ${activeView ? readinessLabel(activeView).toLowerCase() : "matching"} actions` : "No actions planned yet"}</p><p className="mt-1 text-xs text-slate-400">{actions.length ? "Choose another readiness view." : "Load the schedule to begin — activities come only from it."}</p></div>
         )}
       </section>
 
@@ -145,4 +150,14 @@ function ReadinessChip({ state }: { state: Readiness }) {
   return <Chip className={classes[state]}>{readinessLabel(state)}</Chip>;
 }
 
-function TableHead({ children }: { children?: React.ReactNode }) { return <th className="whitespace-nowrap px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wide text-slate-500">{children}</th>; }
+/** "3 / 5" with a thin bar, so a column of them reads at a glance. */
+function ReadyBar({ ready, total }: { ready: number; total: number }) {
+  if (!total) return <span className="text-xs text-slate-300">—</span>;
+  const pct = Math.round((ready / total) * 100);
+  return (
+    <div className="inline-flex flex-col items-end gap-1">
+      <span className="text-sm font-semibold tabular-nums text-slate-800">{ready}<span className="font-normal text-slate-400"> / {total}</span></span>
+      <span className="h-1 w-14 overflow-hidden rounded-full bg-slate-100"><span className={`block h-full rounded-full ${pct === 100 ? "bg-emerald-500" : pct ? "bg-amber-500" : "bg-red-400"}`} style={{ width: `${Math.max(pct, 4)}%` }} /></span>
+    </div>
+  );
+}

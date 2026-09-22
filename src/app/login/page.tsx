@@ -20,7 +20,7 @@ function LoginForm() {
   return (
     <div className="flex min-h-screen">
       {/* Brand panel */}
-      <div className="relative hidden flex-1 flex-col justify-between bg-[#1e3a5f] p-10 text-white lg:flex">
+      <div className="relative hidden flex-1 flex-col justify-between bg-brand p-10 text-white lg:flex">
         <div>
           <div className="flex items-center gap-2 text-lg font-semibold tracking-wide">
             <span className="grid h-9 w-9 place-items-center rounded-lg bg-white/10 font-bold">D</span>
@@ -46,8 +46,8 @@ function LoginForm() {
       <div className="flex flex-1 items-center justify-center bg-slate-50 px-6">
         <div className="w-full max-w-sm">
           <div className="mb-8 lg:hidden">
-            <div className="flex items-center gap-2 text-lg font-semibold text-[#1e3a5f]">
-              <span className="grid h-9 w-9 place-items-center rounded-lg bg-[#1e3a5f] font-bold text-white">D</span>
+            <div className="flex items-center gap-2 text-lg font-semibold text-brand-ink">
+              <span className="grid h-9 w-9 place-items-center rounded-lg bg-brand font-bold text-white">D</span>
               DELIOS · EDMS
             </div>
           </div>
@@ -91,16 +91,16 @@ function LoginForm() {
             ) : null}
             <MissingSummary missing={missing} />
             {state?.error ? <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{state.error}</p> : null}
-            <button type="submit" disabled={pending} className="w-full rounded-lg bg-[#1e3a5f] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[#2d5480] disabled:opacity-50">
+            <button type="submit" disabled={pending} className="w-full rounded-lg bg-brand px-4 py-2.5 text-sm font-medium text-white transition hover:bg-brand-hover disabled:opacity-50">
               {pending ? "Signing in…" : "Sign in"}
             </button>
           </form>
           <p className="mt-6 text-center text-xs text-slate-500">
             Setting up a new organization?{" "}
-            <Link href="/signup" className="font-semibold text-[#1e3a5f] hover:underline">Register one</Link>
+            <Link href="/signup" className="font-semibold text-brand-ink hover:underline">Register one</Link>
           </p>
 
-          <div className="mt-8 rounded-xl border border-slate-200 bg-white p-4 text-xs text-slate-500 shadow-sm">
+          <div className="mt-8 rounded-xl border border-slate-200 bg-surface p-4 text-xs text-slate-500 shadow-sm">
             <p className="font-medium text-slate-700">Seeded organizations</p>
             <p className="mt-1 text-[11px] leading-relaxed">
               The same address exists in all three — the password decides which one you enter.

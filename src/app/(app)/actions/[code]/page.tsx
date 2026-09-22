@@ -60,10 +60,10 @@ export default async function ActionDetailPage({ params, searchParams }: { param
 
       <Card
         title="Departments concerned"
-        actions={control ? <Link href="/actions/requirements" className="text-xs font-semibold text-[#315f83] hover:underline">Requirements →</Link> : undefined}
+        actions={control ? <Link href="/actions/requirements" className="text-xs font-semibold text-link hover:underline">Requirements →</Link> : undefined}
       >
         {depts.length ? (
-          <div className="flex flex-wrap gap-1.5">{depts.map((d) => <Chip key={d} className="bg-[#eef3f9] text-[#1e3a5f] ring-[#2d5480]/30">{deptLabel(d)}</Chip>)}</div>
+          <div className="flex flex-wrap gap-1.5">{depts.map((d) => <Chip key={d} className="bg-tint text-brand-ink ring-link/30">{deptLabel(d)}</Chip>)}</div>
         ) : (
           <Banner tone="warn" title="Needs departments">The project manager tags this activity in the departments list. Until then its documents cannot be asked for.</Banner>
         )}
@@ -72,12 +72,12 @@ export default async function ActionDetailPage({ params, searchParams }: { param
       {/* Steps 3–5 — the approved requirements, by department */}
       <Card
         title={`Documents needed · ${action.entries.length}`}
-        actions={control && depts.length ? <Link href="/actions/requirements" className="text-xs font-semibold text-[#315f83] hover:underline">Requirements →</Link> : undefined}
+        actions={control && depts.length ? <Link href="/actions/requirements" className="text-xs font-semibold text-link hover:underline">Requirements →</Link> : undefined}
       >
         {depts.length > 1 ? (
           <div className="mb-3 flex flex-wrap gap-1.5 text-xs">
-            <Link href={`/actions/${action.code}`} className={`rounded-full px-2.5 py-1 ${!dept ? "bg-[#1e3a5f] text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>All</Link>
-            {depts.map((d) => <Link key={d} href={`/actions/${action.code}?dept=${d}`} className={`rounded-full px-2.5 py-1 ${dept === d ? "bg-[#1e3a5f] text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>{deptLabel(d)} ({action.entries.filter((e) => e.department === d).length})</Link>)}
+            <Link href={`/actions/${action.code}`} className={`rounded-full px-2.5 py-1 ${!dept ? "bg-brand text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>All</Link>
+            {depts.map((d) => <Link key={d} href={`/actions/${action.code}?dept=${d}`} className={`rounded-full px-2.5 py-1 ${dept === d ? "bg-brand text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>{deptLabel(d)} ({action.entries.filter((e) => e.department === d).length})</Link>)}
           </div>
         ) : null}
         {entries.length ? (
@@ -88,7 +88,7 @@ export default async function ActionDetailPage({ params, searchParams }: { param
               const late = !ready && e.requiredBy < new Date();
               return (
                 <tr key={e.id}>
-                  <Td><Link href={`/documents/${e.documentId}`} className="font-mono text-[13px] font-semibold text-[#1e3a5f] hover:underline">{e.document.docNumber}</Link><span className="block max-w-64 truncate text-xs text-slate-400">{e.document.title}</span></Td>
+                  <Td><Link href={`/documents/${e.documentId}`} className="font-mono text-[13px] font-semibold text-brand-ink hover:underline">{e.document.docNumber}</Link><span className="block max-w-64 truncate text-xs text-slate-400">{e.document.title}</span></Td>
                   <Td className="text-xs">{deptLabel(e.department)}</Td>
                   <Td className="text-xs">{partyLabel(e.submittedBy ?? e.document.originator)}</Td>
                   <Td className="text-xs">{fnLabel(e.approvedBy)}</Td>
@@ -134,7 +134,7 @@ export default async function ActionDetailPage({ params, searchParams }: { param
                   </div>
                   {mine && (!confirmOpens || confirmOpens.getTime() <= Date.now()) ? (
                     <details className="text-xs" open={!c && me?.department === d}>
-                      <summary className="cursor-pointer text-xs font-semibold text-[#315f83]">{c ? "Confirm again" : "Confirm"}</summary>
+                      <summary className="cursor-pointer text-xs font-semibold text-link">{c ? "Confirm again" : "Confirm"}</summary>
                       <div className="mt-2 w-72">
                         <ActionForm action={confirmReadinessAction} submitLabel="Record" size="sm" hidden={{ actionId: action.id, department: d }}>
                           <label className="flex items-center gap-2"><input type="radio" name="available" value="yes" defaultChecked={!missing.length} /> Documents available</label>

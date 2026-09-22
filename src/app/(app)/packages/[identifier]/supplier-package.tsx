@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireScope } from "@/lib/scope";
 import { isController, isAdmin } from "@/lib/auth";
-import { PageHeader, Chip, Banner } from "@/components/ui";
+import { PageHeader, Chip, Banner, DataTable, Th, Td } from "@/components/ui";
 import { ActionForm } from "@/components/form";
 import { submitSupplierPackageAction } from "@/lib/actions/supplier";
 import { supplierRows, supplierFigures, STATE_LABEL, WITH_SUPPLIER, type SupplierState } from "@/lib/supplier";
@@ -33,35 +33,31 @@ export async function SupplierPackage({ pkg }: { pkg: { id: string; identifier: 
   const canSendRow = (s: SupplierState) => isSupplier && WITH_SUPPLIER.includes(s);
 
   const table = (
-    <div className="scroll-thin overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
-      <table className="min-w-full divide-y divide-slate-100 text-sm">
-        <thead className="bg-slate-50 text-left text-[11px] font-bold uppercase tracking-wide text-slate-500">
-          <tr><th className="px-4 py-2.5">Document</th><th className="px-4 py-2.5">Submit by</th><th className="px-4 py-2.5">Status</th><th className="px-4 py-2.5">{isSupplier ? "Your file" : "Next"}</th></tr>
-        </thead>
-        <tbody className="divide-y divide-slate-100">
+    <div>
+      <DataTable id={isSupplier ? "supplier-package-own" : "supplier-package"} head={<tr><Th>Document</Th><Th>Submit by</Th><Th>Status</Th><Th>{isSupplier ? "Your file" : "Next"}</Th></tr>}>
           {rows.map((r) => (
-            <tr key={r.doc.id} className="align-top">
-              <td className="px-4 py-3">
-                <Link href={`/documents/${r.doc.id}`} className="font-mono text-[13px] font-semibold text-[#1e3a5f] hover:underline">{r.doc.docNumber}</Link>
+            <tr key={r.doc.id}>
+              <Td>
+                <Link href={`/documents/${r.doc.id}`} className="font-mono text-[13px] font-semibold text-brand-ink hover:underline">{r.doc.docNumber}</Link>
                 {r.revision ? <span className="ml-1.5 font-mono text-xs text-slate-400">rev {r.revision.value}</span> : null}
                 <span className="block max-w-80 truncate text-xs text-slate-500">{r.doc.title}</span>
-              </td>
-              <td className="whitespace-nowrap px-4 py-3 text-xs">
+              </Td>
+              <Td className="whitespace-nowrap text-xs">
                 {fmtDate(r.due)}
                 {r.revision?.submittedAt ? <span className={`block text-[11px] ${r.arrivedOnTime ? "text-emerald-700" : "text-red-700"}`}>sent {fmtDate(r.revision.submittedAt)}{r.arrivedOnTime ? "" : " — late"}</span>
                   : r.late ? <span className="block text-[11px] text-red-700">overdue</span> : null}
-              </td>
-              <td className="px-4 py-3">
+              </Td>
+              <Td>
                 <Chip className={TONE[r.state]}>{STATE_LABEL[r.state]}{r.state === "RETURNED" && r.outcome ? ` · ${r.outcome}` : ""}</Chip>
                 {r.reason ? <p className="mt-1 max-w-72 text-[11px] text-slate-600">“{r.reason}”</p> : null}
-              </td>
-              <td className="px-4 py-3 text-xs">
+              </Td>
+              <Td className="text-xs">
                 {canSendRow(r.state) ? (
                   <input type="file" name={`file_${r.doc.id}`} className="block w-56 text-xs" />
                 ) : staff && r.state === "AWAITING_CHECK" && r.transmittal ? (
-                  <Link href={`/transmittals/${r.transmittal.id}`} className="font-semibold text-[#315f83] hover:underline">Check {r.transmittal.number} →</Link>
+                  <Link href={`/transmittals/${r.transmittal.id}`} className="font-semibold text-link hover:underline">Check {r.transmittal.number} →</Link>
                 ) : staff && r.state === "TO_ROUTE" && r.transmittal ? (
-                  <Link href={`/transmittals/${r.transmittal.id}`} className="font-semibold text-[#315f83] hover:underline">Send for review →</Link>
+                  <Link href={`/transmittals/${r.transmittal.id}`} className="font-semibold text-link hover:underline">Send for review →</Link>
                 ) : r.state === "APPROVED" ? (
                   <span className="text-emerald-700">done{r.revision?.statusCode ? ` · ${r.revision.statusCode}` : ""}</span>
                 ) : WITH_SUPPLIER.includes(r.state) ? (
@@ -69,12 +65,11 @@ export async function SupplierPackage({ pkg }: { pkg: { id: string; identifier: 
                 ) : (
                   <span className="text-slate-400">with {org}</span>
                 )}
-              </td>
+              </Td>
             </tr>
           ))}
-        </tbody>
-      </table>
-      {!rows.length ? <p className="px-5 py-8 text-center text-sm text-slate-400">No documents are expected from {pkg.recipientName} yet. Create placeholders with {pkg.recipientName} as the supplier and they appear here.</p> : null}
+      </DataTable>
+      {!rows.length ? <p className="mt-2 rounded-2xl border border-dashed border-slate-300 px-5 py-8 text-center text-sm text-slate-400">No documents are expected from {pkg.recipientName} yet. Create placeholders with {pkg.recipientName} as the supplier and they appear here.</p> : null}
     </div>
   );
 
@@ -83,7 +78,7 @@ export async function SupplierPackage({ pkg }: { pkg: { id: string; identifier: 
       <PageHeader
         title={`${pkg.recipientName} — documents`}
         subtitle={`${pkg.identifier} · everything due by ${fmtDate(pkg.completionDate)} · needed at ${pkg.requiredStatus}`}
-        actions={<>{pkg.partyCode ? <a href={`/api/requirements/sheet?sender=${encodeURIComponent(pkg.partyCode)}`} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"><Download className="h-4 w-4" /> Delivery list</a> : null}<Link href="/packages" className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-semibold text-slate-500 hover:bg-slate-100"><ArrowLeft className="h-4 w-4" /> Packages</Link></>}
+        actions={<>{pkg.partyCode ? <a href={`/api/requirements/sheet?sender=${encodeURIComponent(pkg.partyCode)}`} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-surface px-2.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"><Download className="h-4 w-4" /> Delivery list</a> : null}<Link href="/packages" className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-semibold text-slate-500 hover:bg-slate-100"><ArrowLeft className="h-4 w-4" /> Packages</Link></>}
       />
 
       <section className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-slate-200 bg-slate-200 shadow-sm sm:grid-cols-4">
@@ -107,7 +102,7 @@ export async function SupplierPackage({ pkg }: { pkg: { id: string; identifier: 
 
 function Figure({ label, value, hint }: { label: string; value: string; hint: string }) {
   return (
-    <div className="bg-white px-4 py-3">
+    <div className="bg-surface px-4 py-3">
       <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{label}</p>
       <p className="mt-1 text-lg font-semibold text-slate-900">{value}</p>
       <p className="text-[11px] text-slate-500">{hint}</p>

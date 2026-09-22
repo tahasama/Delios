@@ -96,14 +96,14 @@ export default async function RequirementsPage() {
         {list.pending ? <p className="mb-3 text-xs font-semibold text-amber-700">Requirements {list.pending.versionLabel} is {list.pending.state === "DRAFT" ? "uploaded, not yet submitted" : "waiting for approval"}.</p> : null}
 
         {control && toAsk.length ? (
-          <div className="mb-4 rounded-xl border border-[#2d5480]/20 bg-[#f4f7fb] p-3">
+          <div className="mb-4 rounded-xl border border-brand-line/20 bg-tint-soft p-3">
             <ActionForm action={issueCallsAction} submitLabel="Issue to departments" size="sm">
               <div className="flex flex-wrap items-end gap-4">
                 <div>
                   <p className="mb-1.5 text-xs font-semibold text-slate-600">To ask</p>
                   <div className="flex flex-wrap gap-2">
                     {toAsk.map((d) => (
-                      <label key={d.department} className="flex items-center gap-1.5 rounded-lg bg-white px-2 py-1 text-xs ring-1 ring-slate-200">
+                      <label key={d.department} className="flex items-center gap-1.5 rounded-lg bg-surface px-2 py-1 text-xs ring-1 ring-slate-200">
                         <input type="checkbox" name="department" value={d.department} defaultChecked /> {deptName(d.department)} <span className="text-slate-400">· {d.notIssued.length} new</span>
                       </label>
                     ))}
@@ -118,10 +118,10 @@ export default async function RequirementsPage() {
         {depts.length ? (
           <DataTable head={<tr><Th>Department</Th><Th>Activities</Th><Th>Documents listed</Th><Th>Call</Th><Th /></tr>}>
             {depts.map((d) => (
-              <tr key={d.department} className={myDept === d.department ? "bg-[#f4f7fb]" : undefined}>
+              <tr key={d.department} className={myDept === d.department ? "bg-tint-soft" : undefined}>
                 <Td>
                   <span className="text-sm font-semibold text-slate-800">{deptName(d.department)}</span>
-                  {myDept === d.department ? <span className="ml-1.5 text-[10px] font-semibold text-[#315f83]">your department</span> : null}
+                  {myDept === d.department ? <span className="ml-1.5 text-[10px] font-semibold text-link">your department</span> : null}
                   <span className={`block text-[11px] ${d.members ? "text-slate-400" : "font-semibold text-red-700"}`}>{d.members ? `${d.members} ${d.members === 1 ? "person" : "people"}` : "nobody assigned"}</span>
                 </Td>
                 <Td className="text-xs">{d.actions.map((a) => a.code).join(", ")}{d.notIssued.length && d.call ? <span className="block text-[11px] text-amber-700">{d.notIssued.length} not asked yet</span> : null}</Td>
@@ -180,11 +180,11 @@ export default async function RequirementsPage() {
               ))}
             </DataTable>
             {control && senders.some((s) => !s.lastIssue || s.changedSinceIssue) ? (
-              <div className="mt-3 rounded-xl border border-[#2d5480]/20 bg-[#f4f7fb] p-3">
+              <div className="mt-3 rounded-xl border border-brand-line/20 bg-tint-soft p-3">
                 <ActionForm action={issueToSendersAction} submitLabel="Issue" size="sm">
                   <div className="flex flex-wrap gap-2">
                     {senders.filter((s) => !s.lastIssue || s.changedSinceIssue).map((s) => (
-                      <label key={s.sender} className="flex items-center gap-1.5 rounded-lg bg-white px-2 py-1 text-xs ring-1 ring-slate-200">
+                      <label key={s.sender} className="flex items-center gap-1.5 rounded-lg bg-surface px-2 py-1 text-xs ring-1 ring-slate-200">
                         <input type="checkbox" name="sender" value={s.sender} defaultChecked /> {senderName(s.sender)}
                       </label>
                     ))}
@@ -206,7 +206,7 @@ export default async function RequirementsPage() {
               const c = clearance(a);
               return (
                 <tr key={a.id}>
-                  <Td><Link href={`/actions/${a.code}#confirm`} className="font-mono text-xs font-bold text-[#315f83] hover:underline">{a.code}</Link><span className="block max-w-72 truncate text-xs text-slate-500">{a.name}</span></Td>
+                  <Td><Link href={`/actions/${a.code}#confirm`} className="font-mono text-xs font-bold text-link hover:underline">{a.code}</Link><span className="block max-w-72 truncate text-xs text-slate-500">{a.name}</span></Td>
                   <Td className={`whitespace-nowrap text-xs ${a.scheduledDate && a.scheduledDate.getTime() < Date.now() ? "font-semibold text-red-700" : ""}`}>{fmtDate(a.scheduledDate)}</Td>
                   <Td>
                     <div className="flex flex-wrap gap-1">

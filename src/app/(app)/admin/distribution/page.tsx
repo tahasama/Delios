@@ -17,7 +17,7 @@ export const metadata = { title: "Distribution matrix" };
  * underlying data is the permission matrix rather than a separate list.
  */
 const CODE: { verb: Verb; letter: string; label: string; tone: string }[] = [
-  { verb: "APPROVE", letter: "A", label: "Approves", tone: "bg-[#1e3a5f] text-white" },
+  { verb: "APPROVE", letter: "A", label: "Approves", tone: "bg-brand text-white" },
   { verb: "REVIEW", letter: "R", label: "Reviews", tone: "bg-[#3d6b99] text-white" },
   { verb: "CONTROL", letter: "C", label: "Controls (custody, release)", tone: "bg-violet-600 text-white" },
   { verb: "TRANSMIT", letter: "T", label: "Issues to other parties", tone: "bg-amber-500 text-white" },
@@ -91,7 +91,7 @@ export default async function AdminDistributionPage({ searchParams }: { searchPa
       />
       <p className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
         Rows are disciplines, columns are functions; the letter says what that function does with that discipline's documents.
-        {mayEdit ? <Link href="/admin/controlled" className="font-semibold text-[#315f83] hover:underline">Change it by upload →</Link> : <span className="text-slate-400">Read only — changes are made by an administrator.</span>}
+        {mayEdit ? <Link href="/admin/controlled" className="font-semibold text-link hover:underline">Change it by upload →</Link> : <span className="text-slate-400">Read only — changes are made by an administrator.</span>}
       </p>
 
       <Card
@@ -121,54 +121,45 @@ export default async function AdminDistributionPage({ searchParams }: { searchPa
             </span>
           ))}
           <span className="inline-flex items-center gap-1.5 text-[11px] text-slate-400">
-            <span className="grid h-5 w-5 place-items-center rounded bg-white ring-1 ring-slate-200">—</span>
+            <span className="grid h-5 w-5 place-items-center rounded bg-surface ring-1 ring-slate-200">—</span>
             Not distributed
           </span>
         </div>
 
-        <div className="scroll-thin overflow-x-auto">
-          <table className="min-w-full border-separate border-spacing-0 text-xs">
-            <thead>
-              <tr>
-                <th className="sticky left-0 z-10 border-b border-slate-200 bg-white px-3 py-2 text-left font-semibold uppercase tracking-wide text-slate-400">
-                  Discipline
-                </th>
-                {functions.map((f) => (
-                  <th key={f.id} className="border-b border-slate-200 px-1.5 py-2 text-center align-bottom">
-                    <span className="block whitespace-nowrap [writing-mode:vertical-rl] [text-orientation:mixed] rotate-180 pb-1 font-semibold text-slate-600">
-                      {f.name}
-                    </span>
-                    <span className="block text-[10px] font-normal text-slate-400">{holderCount.get(f.id) ?? 0}</span>
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {grid.map(({ type, cells }) => (
-                <tr key={type.code} className="hover:bg-slate-50/60">
-                  <td className="sticky left-0 z-10 border-b border-slate-100 bg-white px-3 py-1.5">
-                    <span className="font-mono text-[11px] font-semibold text-slate-700">{type.code}</span>{" "}
-                    <span className="text-slate-500">{type.label}</span>
-                  </td>
-                  {cells.map((cell, i) => (
-                    <td key={functions[i].id} className="border-b border-slate-100 px-1.5 py-1.5 text-center">
-                      {cell ? (
-                        <span
-                          title={`${functions[i].name} — ${cell.label} (${type.label})`}
-                          className={`inline-grid h-5 w-5 place-items-center rounded text-[11px] font-bold ${cell.tone}`}
-                        >
-                          {cell.letter}
-                        </span>
-                      ) : (
-                        <span className="text-slate-200">—</span>
-                      )}
-                    </td>
-                  ))}
-                </tr>
+        <DataTable
+          id="distribution-matrix"
+          head={
+            <tr>
+              <Th className="sticky left-0 z-[4] min-w-[220px] align-bottom">Discipline</Th>
+              {functions.map((f) => (
+                <Th key={f.id} label={f.name} className="px-1.5 text-center align-bottom normal-case tracking-normal">
+                  <span className="mx-auto block whitespace-nowrap pb-1 text-[11px] font-semibold text-slate-600 [text-orientation:mixed] [writing-mode:vertical-rl] rotate-180">{f.name}</span>
+                  <span className="block text-[10px] font-normal text-slate-400" title="people holding this function">{holderCount.get(f.id) ?? 0}</span>
+                </Th>
               ))}
-            </tbody>
-          </table>
-        </div>
+            </tr>
+          }
+        >
+          {grid.map(({ type, cells }) => (
+            <tr key={type.code}>
+              <Td className="sticky left-0 z-[1] whitespace-nowrap bg-surface py-1.5 text-xs">
+                <span className="font-mono text-[11px] font-semibold text-slate-700">{type.code}</span>{" "}
+                <span className="text-slate-500">{type.label}</span>
+              </Td>
+              {cells.map((cell, i) => (
+                <Td key={functions[i].id} className="px-1.5 py-1.5 text-center">
+                  {cell ? (
+                    <span title={`${functions[i].name} — ${cell.label} (${type.label})`} className={`inline-grid h-6 w-6 place-items-center rounded-md text-[11px] font-bold ${cell.tone}`}>
+                      {cell.letter}
+                    </span>
+                  ) : (
+                    <span className="text-slate-200">·</span>
+                  )}
+                </Td>
+              ))}
+            </tr>
+          ))}
+        </DataTable>
         {rows.length === 0 ? (
           <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
             No discipline is in use yet. Tick “Show every published discipline” to see the matrix against the whole list.
@@ -211,7 +202,7 @@ export default async function AdminDistributionPage({ searchParams }: { searchPa
           </div>
 
           {mayEdit ? <details className="max-w-xl">
-            <summary className="cursor-pointer text-xs font-semibold text-[#315f83]">+ Add an external party</summary>
+            <summary className="cursor-pointer text-xs font-semibold text-link">+ Add an external party</summary>
             <div className="mt-3">
             <ActionForm action={saveDistributionRuleAction} submitLabel="Add" size="sm">
               <Field label="Deliverable type" required>

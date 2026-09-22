@@ -35,14 +35,14 @@ export default async function DefectsPage({ searchParams }: { searchParams: Prom
       <PageHeader
         title="Problems"
         subtitle="What the checks found, who must fix it. A problem closes only when the check no longer finds it; an accepted one still counts."
-        actions={<a href="/api/export/defects" className="text-xs font-medium text-[#2d5480] hover:underline">Export ↓</a>}
+        actions={<a href="/api/export/defects" className="text-xs font-medium text-brand-ink hover:underline">Export ↓</a>}
       />
       <AssuranceTabs current="/conformance/defects" />
 
       <div className="flex flex-wrap gap-1.5">
         {["OPEN", "ACCEPTED", "CLOSED", "ALL"].map((s) => (
           <Link key={s} href={`/conformance/defects?status=${s}${sp.severity ? `&severity=${sp.severity}` : ""}${sp.owner ? `&owner=${sp.owner}` : ""}`}
-            className={`rounded-full px-3 py-1.5 text-xs font-medium ${(sp.status ?? "OPEN") === s ? "bg-[#1e3a5f] text-white" : "bg-slate-100 text-slate-600"}`}>
+            className={`rounded-full px-3 py-1.5 text-xs font-medium ${(sp.status ?? "OPEN") === s ? "bg-brand text-white" : "bg-slate-100 text-slate-600"}`}>
             {s}
           </Link>
         ))}
@@ -62,7 +62,7 @@ export default async function DefectsPage({ searchParams }: { searchParams: Prom
           {defects.map((d) => {
             const meta = CHECK_BY_ID.get(d.checkId);
             return (
-              <article key={d.id} className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+              <article key={d.id} className="rounded-xl border border-slate-200 bg-surface px-4 py-3 shadow-sm">
                 <div className="flex flex-wrap items-center gap-2">
                   <SeverityChip severity={d.severity} />
                   {d.status !== "OPEN" ? <Chip className={STATUS_STYLE[d.status] ?? ""}>{d.status.toLowerCase()}</Chip> : null}
@@ -71,7 +71,7 @@ export default async function DefectsPage({ searchParams }: { searchParams: Prom
                 </div>
                 <p className="mt-1 text-xs text-slate-500">
                   {d.entityType === "Document" && d.documentId
-                    ? <Link href={`/documents/${d.documentId}`} className="font-mono font-semibold text-[#2d5480] hover:underline">{d.entityLabel ?? "open document"}</Link>
+                    ? <Link href={`/documents/${d.documentId}`} className="font-mono font-semibold text-brand-ink hover:underline">{d.entityLabel ?? "open document"}</Link>
                     : d.entityLabel ? <span className="font-mono">{d.entityLabel}</span> : null}
                   <Link href={`/conformance/checks?family=${d.checkId.split("-")[0]}`} className="ml-2 font-mono text-slate-400 hover:underline">{d.checkId}</Link>
                 </p>
@@ -82,7 +82,7 @@ export default async function DefectsPage({ searchParams }: { searchParams: Prom
                 ) : null}
                 {controller && d.status === "OPEN" ? (
                   <details className="mt-2">
-                    <summary className="cursor-pointer text-xs font-semibold text-[#315f83]">Resolve…</summary>
+                    <summary className="cursor-pointer text-xs font-semibold text-link">Resolve…</summary>
                     <div className="mt-2 grid gap-3 sm:grid-cols-2">
                       <ActionForm action={closeDefectAction} submitLabel="It is fixed — re-check" size="sm" variant="secondary" hidden={{ defectId: d.id }} />
                       <ActionForm action={acceptDefectAction} submitLabel="Accept it" size="sm" hidden={{ defectId: d.id }}>

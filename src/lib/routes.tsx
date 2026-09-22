@@ -139,7 +139,7 @@ export function RouteChecklist({
             <li key={step.id} className={`flex items-start gap-2.5 px-4 ${compact ? "py-1.5" : "py-2"}`}>
               <span
                 className={`mt-0.5 grid h-4.5 w-4.5 shrink-0 place-items-center rounded-full text-[10px] font-bold ${
-                  done ? "bg-emerald-500 text-white" : "bg-white text-emerald-700 ring-1 ring-emerald-300"
+                  done ? "bg-emerald-500 text-white" : "bg-surface text-emerald-700 ring-1 ring-emerald-300"
                 }`}
               >
                 {done ? "✓" : step.id}

@@ -92,11 +92,11 @@ export default async function AssurancePage({ searchParams }: { searchParams: Pr
         description="Each line is something wrong on that document, and where to put it right. Fixed problems disappear at the next check run."
       >
         <div className="mb-3 flex flex-wrap gap-1.5 text-xs">
-          <Link href="/conformance#documents" className={`rounded-full px-2.5 py-1 ${!owner ? "bg-[#1e3a5f] text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>Everyone</Link>
+          <Link href="/conformance#documents" className={`rounded-full px-2.5 py-1 ${!owner ? "bg-brand text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>Everyone</Link>
           {Object.entries(OWNERS).map(([code, label]) => {
             const n = count((d) => d.ownerRole === code && d.status === "OPEN");
             return n ? (
-              <Link key={code} href={`/conformance?owner=${code}#documents`} className={`rounded-full px-2.5 py-1 ${owner === code ? "bg-[#1e3a5f] text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>{label} · {n}</Link>
+              <Link key={code} href={`/conformance?owner=${code}#documents`} className={`rounded-full px-2.5 py-1 ${owner === code ? "bg-brand text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>{label} · {n}</Link>
             ) : null;
           })}
         </div>
@@ -105,7 +105,7 @@ export default async function AssurancePage({ searchParams }: { searchParams: Pr
             {work.documents.slice(0, 60).map((d) => (
               <li key={d.id} className="py-3">
                 <div className="flex flex-wrap items-baseline gap-x-2">
-                  <Link href={`/documents/${d.id}`} className="font-mono text-[13px] font-semibold text-[#1e3a5f] hover:underline">{d.docNumber}</Link>
+                  <Link href={`/documents/${d.id}`} className="font-mono text-[13px] font-semibold text-brand-ink hover:underline">{d.docNumber}</Link>
                   <span className="min-w-0 truncate text-xs text-slate-500">{d.title}</span>
                 </div>
                 <ul className="mt-1.5 space-y-1">
@@ -113,7 +113,7 @@ export default async function AssurancePage({ searchParams }: { searchParams: Pr
                     <li key={p.id} className="flex flex-wrap items-start gap-2 text-xs">
                       <span className={`mt-0.5 shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold ${SEVERITY[p.severity] ?? SEVERITY.MINOR}`}>{p.severity.toLowerCase()}</span>
                       <span className="min-w-0 flex-1 text-slate-700">{p.text}<span className="text-slate-400"> · {p.owner}</span></span>
-                      <Link href={p.fix.href} className="shrink-0 font-semibold text-[#315f83] hover:underline">{p.fix.label} →</Link>
+                      <Link href={p.fix.href} className="shrink-0 font-semibold text-link hover:underline">{p.fix.label} →</Link>
                     </li>
                   ))}
                 </ul>
@@ -131,7 +131,7 @@ export default async function AssurancePage({ searchParams }: { searchParams: Pr
                 <li key={p.id} className="flex flex-wrap items-start gap-2 text-xs">
                   <span className={`mt-0.5 shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold ${SEVERITY[p.severity] ?? SEVERITY.MINOR}`}>{p.severity.toLowerCase()}</span>
                   <span className="min-w-0 flex-1 text-slate-700">{p.text}<span className="text-slate-400"> · {p.owner}</span></span>
-                  <Link href={p.fix.href} className="shrink-0 font-semibold text-[#315f83] hover:underline">{p.fix.label} →</Link>
+                  <Link href={p.fix.href} className="shrink-0 font-semibold text-link hover:underline">{p.fix.label} →</Link>
                 </li>
               ))}
             </ul>
@@ -145,8 +145,8 @@ export default async function AssurancePage({ searchParams }: { searchParams: Pr
 
 function Tile({ href, label, value, hint, tone }: { href: string; label: string; value: string | number; hint: string; tone?: "good" | "warn" | "bad" }) {
   return (
-    <Link href={href} className="group rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-[#2d5480]/40 hover:shadow">
-      <p className="flex items-center justify-between text-xs font-semibold text-slate-500">{label}<ArrowRight className="h-3.5 w-3.5 text-slate-300 group-hover:text-[#315f83]" /></p>
+    <Link href={href} className="group rounded-2xl border border-slate-200 bg-surface p-4 shadow-sm transition hover:border-brand-line/40 hover:shadow">
+      <p className="flex items-center justify-between text-xs font-semibold text-slate-500">{label}<ArrowRight className="h-3.5 w-3.5 text-slate-300 group-hover:text-link" /></p>
       <p className={`mt-1 text-2xl font-semibold tabular-nums ${tone === "bad" ? "text-red-700" : tone === "warn" ? "text-amber-700" : tone === "good" ? "text-emerald-700" : "text-slate-900"}`}>{value}</p>
       <p className="text-[11px] text-slate-400">{hint}</p>
     </Link>

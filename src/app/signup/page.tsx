@@ -18,7 +18,7 @@ export default function SignupPage() {
 
   return (
     <div className="flex min-h-screen">
-      <div className="relative hidden flex-1 flex-col justify-between bg-[#1e3a5f] p-10 text-white lg:flex">
+      <div className="relative hidden flex-1 flex-col justify-between bg-brand p-10 text-white lg:flex">
         <div>
           <div className="flex items-center gap-2 text-lg font-semibold tracking-wide">
             <span className="grid h-9 w-9 place-items-center rounded-lg bg-white/10 font-bold">D</span>
@@ -43,8 +43,8 @@ export default function SignupPage() {
       <div className="flex flex-1 items-center justify-center bg-slate-50 px-6 py-10">
         <div className="w-full max-w-md">
           <div className="mb-8 lg:hidden">
-            <div className="flex items-center gap-2 text-lg font-semibold text-[#1e3a5f]">
-              <span className="grid h-9 w-9 place-items-center rounded-lg bg-[#1e3a5f] font-bold text-white">D</span>
+            <div className="flex items-center gap-2 text-lg font-semibold text-brand-ink">
+              <span className="grid h-9 w-9 place-items-center rounded-lg bg-brand font-bold text-white">D</span>
               DELIOS · EDMS
             </div>
           </div>
@@ -125,14 +125,14 @@ export default function SignupPage() {
             <MissingSummary missing={missing} />
             {state?.error ? <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{state.error}</p> : null}
 
-            <button type="submit" disabled={pending} className="w-full rounded-lg bg-[#1e3a5f] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[#2d5480] disabled:opacity-50">
+            <button type="submit" disabled={pending} className="w-full rounded-lg bg-brand px-4 py-2.5 text-sm font-medium text-white transition hover:bg-brand-hover disabled:opacity-50">
               {pending ? "Creating your organization…" : "Create organization"}
             </button>
           </form>
 
           <p className="mt-6 text-center text-xs text-slate-500">
             Already have an account?{" "}
-            <Link href="/login" className="font-semibold text-[#1e3a5f] hover:underline">Sign in</Link>
+            <Link href="/login" className="font-semibold text-brand-ink hover:underline">Sign in</Link>
           </p>
         </div>
       </div>

@@ -96,7 +96,7 @@ export default async function ProjectsPage() {
         </DataTable>
       </Card>
 
-      <details className="rounded-2xl border border-slate-200 bg-white px-5 py-3 shadow-sm"><summary className="cursor-pointer text-sm font-semibold text-[#1e3a5f]">+ Open a new project</summary><div className="mt-3 max-w-2xl">
+      <details className="rounded-2xl border border-slate-200 bg-surface px-5 py-3 shadow-sm"><summary className="cursor-pointer text-sm font-semibold text-brand-ink">+ Open a new project</summary><div className="mt-3 max-w-2xl">
         <ActionForm action={createProjectAction} submitLabel="Open project" resetOnSuccess>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_150px]">
             <Field label="Project name" required>

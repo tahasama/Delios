@@ -1,4 +1,7 @@
 @import "tailwindcss";
+@import "./theme.css";
+
+@custom-variant dark (&:where(.dark, .dark *));
 
 @theme inline {
   --color-accent: #1e3a5f;
@@ -11,7 +14,7 @@ html {
 }
 
 body {
-  @apply bg-[#f6f7f9] text-slate-900;
+  @apply bg-canvas text-slate-900;
 }
 
 button,
@@ -50,12 +53,94 @@ summary::-webkit-details-marker {
   width: 8px;
 }
 .scroll-thin::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: var(--color-slate-300);
   border-radius: 4px;
+}
+.scroll-thin::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 @media print {
   .no-print {
     display: none !important;
   }
+}
+
+/* ── Tables ────────────────────────────────────────────────────────────────
+   Base cell styles live in the components layer so a page can still adjust a
+   single cell with utilities (text-right, font-mono, a narrower padding). */
+@layer components {
+  .dt-th {
+    position: relative;
+    padding: 0.7rem 1rem;
+    text-align: left;
+    white-space: nowrap;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--color-slate-500);
+    background: var(--color-slate-50);
+    border-bottom: 1px solid var(--color-slate-200);
+  }
+  .dt-td {
+    padding: 0.8rem 1rem;
+    vertical-align: top;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    color: var(--color-slate-700);
+    border-bottom: 1px solid var(--color-slate-100);
+  }
+  [data-density="compact"] .dt-th { padding-block: 0.45rem; }
+  [data-density="compact"] .dt-td { padding-block: 0.4rem; font-size: 0.8125rem; }
+  .dt tbody > tr:last-child > .dt-td { border-bottom: 0; }
+  .dt tbody > tr { transition: background-color 120ms; }
+  .dt tbody > tr:hover > .dt-td { background: var(--color-slate-50); }
+  .dt-sticky .dt-th { position: sticky; top: 0; z-index: 2; }
+  /* Codes and document numbers never break in the middle. */
+  .dt-td .font-mono { white-space: nowrap; }
+
+  /* The column edge you drag. */
+  .dt-resizer {
+    position: absolute;
+    top: 0;
+    right: -4px;
+    z-index: 3;
+    width: 8px;
+    height: 100%;
+    cursor: col-resize;
+    touch-action: none;
+  }
+  .dt-resizer::after {
+    content: "";
+    position: absolute;
+    top: 25%;
+    bottom: 25%;
+    left: 3.5px;
+    width: 1px;
+    background: var(--color-slate-200);
+    transition: background-color 120ms;
+  }
+  .dt-th:last-child .dt-resizer { right: 0; }
+  .dt-th:last-child .dt-resizer::after { display: none; }
+  .dt-resizer:hover::after, .dt-resizing .dt-resizer::after { top: 0; bottom: 0; width: 2px; background: var(--color-link); }
+  .dt-resizing { cursor: col-resize; user-select: none; }
+
+  .dt-tool {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    border-radius: 0.5rem;
+    padding: 0.3rem 0.55rem;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--color-slate-500);
+    transition: background-color 120ms, color 120ms;
+  }
+  .dt-tool:hover, .dt-tool[aria-expanded="true"], .dt-tool[aria-pressed="true"] { background: var(--color-slate-100); color: var(--color-slate-800); }
+}
+
+@media print {
+  .dt-resizer { display: none; }
+  .dt-sticky { max-height: none !important; overflow: visible !important; }
 }

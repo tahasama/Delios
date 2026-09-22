@@ -60,7 +60,7 @@ export default async function GuidePage() {
 
   return (
     <div className="space-y-8">
-      <section className="overflow-hidden rounded-3xl bg-[#17324d] text-white shadow-[0_24px_70px_-35px_rgba(15,42,67,0.8)]">
+      <section className="overflow-hidden rounded-3xl bg-brand-strong text-white shadow-[0_24px_70px_-35px_rgba(15,42,67,0.8)]">
         <div className="grid grid-cols-[minmax(0,1fr)_340px]">
           <div className="p-8">
             <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.16em] text-[#9fb8cc]"><Search className="h-4 w-4" /> Product map</div>
@@ -96,7 +96,7 @@ function CapabilitySection({ title, description, items }: { title: string; descr
 }
 
 function CapabilityCard({ href, title, text, icon: Icon, action }: { href: string; title: string; text: string; icon: React.ComponentType<{ className?: string }>; action?: string }) {
-  return <Link href={href} className="group flex min-h-44 flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-[#315f83]/40 hover:shadow-md"><span className="grid h-10 w-10 place-items-center rounded-xl bg-[#e9f1f7] text-[#17324d]"><Icon className="h-5 w-5" /></span><h3 className="mt-4 text-sm font-semibold text-slate-900">{title}</h3><p className="mt-1.5 flex-1 text-xs leading-5 text-slate-500">{text}</p><span className="mt-4 inline-flex items-center gap-1.5 text-xs font-bold text-[#315f83]">{action ?? "Open this area"}<ArrowRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" /></span></Link>;
+  return <Link href={href} className="group flex min-h-44 flex-col rounded-2xl border border-slate-200 bg-surface p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-brand-line/40 hover:shadow-md"><span className="grid h-10 w-10 place-items-center rounded-xl bg-tint text-brand-ink"><Icon className="h-5 w-5" /></span><h3 className="mt-4 text-sm font-semibold text-slate-900">{title}</h3><p className="mt-1.5 flex-1 text-xs leading-5 text-slate-500">{text}</p><span className="mt-4 inline-flex items-center gap-1.5 text-xs font-bold text-link">{action ?? "Open this area"}<ArrowRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" /></span></Link>;
 }
 
 function Metric({ label, value }: { label: string; value: number }) {

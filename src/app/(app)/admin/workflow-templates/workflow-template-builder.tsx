@@ -84,7 +84,7 @@ export function WorkflowTemplateBuilder({ id, name = "", description = "", class
           <Field label="Document type"><select className={inputCls} value={scope.docType ?? ""} onChange={(event) => setScope((value) => ({ ...value, docType: event.target.value || undefined }))}><option value="">Any type</option>{classOptions.documentTypes.map((item) => <option key={item.code} value={item.code}>{item.code} — {item.label}</option>)}</select></Field>
           <Field label="Discipline"><select className={inputCls} value={scope.discipline ?? ""} onChange={(event) => setScope((value) => ({ ...value, discipline: event.target.value || undefined }))}><option value="">Any discipline</option>{classOptions.disciplines.map((item) => <option key={item.code} value={item.code}>{item.code} — {item.label}</option>)}</select></Field>
           <Field label="Criticality"><select className={inputCls} value={scope.criticality ?? ""} onChange={(event) => setScope((value) => ({ ...value, criticality: event.target.value || undefined }))}><option value="">Any criticality</option>{classOptions.criticalities.map((item) => <option key={item.code} value={item.code}>{item.code} — {item.label}</option>)}</select></Field>
-        </div> : <p className="mt-3 rounded-lg bg-white px-3 py-2 text-xs text-slate-600">This schema appears for every document class. Mark it as default when it is the organization-wide fallback.</p>}
+        </div> : <p className="mt-3 rounded-lg bg-surface px-3 py-2 text-xs text-slate-600">This schema appears for every document class. Mark it as default when it is the organization-wide fallback.</p>}
       </section>
 
       <div className="space-y-3">
@@ -99,12 +99,12 @@ export function WorkflowTemplateBuilder({ id, name = "", description = "", class
         {steps.map((step, index) => (
           <section key={`${index}-${step.act}`} className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
             <div className="flex items-center gap-3">
-              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-[#17324d] text-xs font-bold text-white">{index + 1}</span>
-              <input value={step.title ?? ""} onChange={(event) => update(index, { title: event.target.value })} className={`${inputCls} max-w-sm bg-white font-semibold`} aria-label={`Step ${index + 1} title`} placeholder="Name this step" />
+              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-brand-strong text-xs font-bold text-white">{index + 1}</span>
+              <input value={step.title ?? ""} onChange={(event) => update(index, { title: event.target.value })} className={`${inputCls} max-w-sm bg-surface font-semibold`} aria-label={`Step ${index + 1} title`} placeholder="Name this step" />
               <Chip className={step.act === "APPROVAL" ? "bg-emerald-100 text-emerald-800 ring-emerald-200" : "bg-sky-100 text-sky-800 ring-sky-200"}>{step.act === "APPROVAL" ? "Approval act" : "Review"}</Chip>
               <div className="ml-auto flex gap-1">
-                <button type="button" onClick={() => move(index, -1)} disabled={index === 0} className="rounded-lg p-2 text-slate-400 hover:bg-white hover:text-slate-700 disabled:opacity-20" title="Move earlier"><ArrowUp className="h-4 w-4" /></button>
-                <button type="button" onClick={() => move(index, 1)} disabled={index === steps.length - 1} className="rounded-lg p-2 text-slate-400 hover:bg-white hover:text-slate-700 disabled:opacity-20" title="Move later"><ArrowDown className="h-4 w-4" /></button>
+                <button type="button" onClick={() => move(index, -1)} disabled={index === 0} className="rounded-lg p-2 text-slate-400 hover:bg-surface hover:text-slate-700 disabled:opacity-20" title="Move earlier"><ArrowUp className="h-4 w-4" /></button>
+                <button type="button" onClick={() => move(index, 1)} disabled={index === steps.length - 1} className="rounded-lg p-2 text-slate-400 hover:bg-surface hover:text-slate-700 disabled:opacity-20" title="Move later"><ArrowDown className="h-4 w-4" /></button>
                 <button type="button" onClick={() => setSteps((value) => value.filter((_, i) => i !== index))} disabled={steps.length === 1} className="rounded-lg p-2 text-slate-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-20" title="Remove step"><Trash2 className="h-4 w-4" /></button>
               </div>
             </div>
@@ -123,12 +123,12 @@ export function WorkflowTemplateBuilder({ id, name = "", description = "", class
                 <div className="mt-1.5 flex flex-wrap gap-1.5">
                   {functions.map((f) => {
                     const on = (step.functionIds ?? []).includes(f.id);
-                    return <button key={f.id} type="button" onClick={() => toggleFunction(index, f.id)} className={`rounded-full border px-2.5 py-1 text-xs ${on ? "border-[#315f83] bg-[#e9f1f7] font-semibold text-[#17324d]" : "border-slate-300 bg-white text-slate-600 hover:bg-slate-50"}`}>{on ? "✓ " : ""}{f.name}</button>;
+                    return <button key={f.id} type="button" onClick={() => toggleFunction(index, f.id)} className={`rounded-full border px-2.5 py-1 text-xs ${on ? "border-brand-line bg-tint font-semibold text-brand-ink" : "border-slate-300 bg-surface text-slate-600 hover:bg-slate-50"}`}>{on ? "✓ " : ""}{f.name}</button>;
                   })}
                 </div>
                 <div className="mt-3 flex items-center justify-between"><p className="text-xs font-medium text-slate-700">…and/or specific people</p><span className="text-[11px] text-slate-400">{step.participantIds.length} selected</span></div>
-                <div className="mt-1.5 max-h-48 overflow-y-auto rounded-xl border border-slate-200 bg-white p-2">
-                  {parties.map(([party, people]) => <div key={party} className="mb-2 last:mb-0"><p className="px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">{party}</p><div className="grid grid-cols-1 gap-1 sm:grid-cols-2">{people.map((person) => { const selected = step.participantIds.includes(person.id); return <button key={person.id} type="button" onClick={() => togglePerson(index, person.id)} className={`flex items-center gap-2 rounded-lg border px-2.5 py-2 text-left text-xs transition ${selected ? "border-[#315f83] bg-[#e9f1f7] text-[#17324d]" : "border-transparent text-slate-600 hover:bg-slate-50"}`}><span className={`grid h-5 w-5 place-items-center rounded-md ${selected ? "bg-[#315f83] text-white" : "border border-slate-300"}`}>{selected ? <Check className="h-3 w-3" /> : null}</span><span className="min-w-0"><span className="block truncate font-semibold">{person.name}</span><span className="block text-[10px] text-slate-400">{person.role.toLowerCase()}</span></span></button>; })}</div></div>)}
+                <div className="mt-1.5 max-h-48 overflow-y-auto rounded-xl border border-slate-200 bg-surface p-2">
+                  {parties.map(([party, people]) => <div key={party} className="mb-2 last:mb-0"><p className="px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">{party}</p><div className="grid grid-cols-1 gap-1 sm:grid-cols-2">{people.map((person) => { const selected = step.participantIds.includes(person.id); return <button key={person.id} type="button" onClick={() => togglePerson(index, person.id)} className={`flex items-center gap-2 rounded-lg border px-2.5 py-2 text-left text-xs transition ${selected ? "border-brand-line bg-tint text-brand-ink" : "border-transparent text-slate-600 hover:bg-slate-50"}`}><span className={`grid h-5 w-5 place-items-center rounded-md ${selected ? "bg-[#315f83] text-white" : "border border-slate-300"}`}>{selected ? <Check className="h-3 w-3" /> : null}</span><span className="min-w-0"><span className="block truncate font-semibold">{person.name}</span><span className="block text-[10px] text-slate-400">{person.role.toLowerCase()}</span></span></button>; })}</div></div>)}
                 </div>
                 {step.mode === "ALL_CONSOLIDATOR" && step.participantIds.length ? <p className="mt-1.5 flex items-center gap-1.5 text-[11px] text-amber-700"><UserRoundCheck className="h-3.5 w-3.5" /> The last selected participant records the consolidated outcome.</p> : null}
               </div>

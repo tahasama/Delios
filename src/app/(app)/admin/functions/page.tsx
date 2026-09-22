@@ -1,6 +1,6 @@
 import { requireScope } from "@/lib/scope";
 import { isAdmin } from "@/lib/auth";
-import { PageHeader, Card, Chip, Field, inputCls } from "@/components/ui";
+import { PageHeader, Card, Chip, DataTable, Field, Th, Td, inputCls } from "@/components/ui";
 import { ActionForm } from "@/components/form";
 import { getActiveSet } from "@/lib/config";
 import {
@@ -82,40 +82,39 @@ export default async function FunctionsPage() {
       />
 
       <Card title="Who may do what">
-        <div className="scroll-thin overflow-x-auto">
-          <table className="min-w-full text-xs">
-            <thead>
-              <tr className="border-b border-slate-200">
-                <th className="sticky left-0 z-10 bg-white px-3 py-2 text-left font-semibold uppercase tracking-wide text-slate-400">Function</th>
+        <DataTable
+          id="functions-grid"
+          className="shadow-none"
+          head={
+            <tr>
+              <Th className="sticky left-0 z-[4] min-w-[220px] align-bottom">Function</Th>
+              {VERBS.map((v) => (
+                <Th key={v} label={VERB_LABEL[v]} className="px-2 text-center align-bottom normal-case tracking-normal">
+                  <span title={VERB_BLURB[v]} className="mx-auto block whitespace-nowrap text-[11px] font-semibold text-slate-600 [text-orientation:mixed] [writing-mode:vertical-rl] rotate-180">{VERB_LABEL[v]}</span>
+                </Th>
+              ))}
+              <Th className="text-right align-bottom">People</Th>
+            </tr>
+          }
+        >
+          {grid.map(({ fn, held }) => {
+            const narrowed = fn.rules.map(scopeText).filter(Boolean);
+            return (
+              <tr key={fn.id} className={fn.active ? "" : "opacity-45"}>
+                <Td className="sticky left-0 z-[1] bg-surface py-2 text-xs">
+                  <p className="font-semibold text-slate-800">{fn.name}</p>
+                  {narrowed.length ? <p className="text-[10px] text-slate-500">only for {narrowed.join("; ")}</p> : null}
+                </Td>
                 {VERBS.map((v) => (
-                  <th key={v} className="px-2 py-2 text-center font-semibold text-slate-500" title={VERB_BLURB[v]}>
-                    <span className="[writing-mode:vertical-rl] [text-orientation:mixed] rotate-180 whitespace-nowrap">{VERB_LABEL[v]}</span>
-                  </th>
+                  <Td key={v} className="px-2 py-2 text-center">
+                    {held.has(v) ? <Check className="mx-auto h-4 w-4 text-emerald-600" aria-label={`${fn.name} may ${VERB_LABEL[v]}`} /> : <Minus className="mx-auto h-3 w-3 text-slate-200" aria-label="not held" />}
+                  </Td>
                 ))}
-                <th className="px-2 py-2 text-right font-semibold uppercase tracking-wide text-slate-400">People</th>
+                <Td className="py-2 text-right text-xs tabular-nums text-slate-500">{fn._count.memberships}</Td>
               </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {grid.map(({ fn, held }) => {
-                const narrowed = fn.rules.map(scopeText).filter(Boolean);
-                return (
-                  <tr key={fn.id} className={fn.active ? "" : "opacity-45"}>
-                    <td className="sticky left-0 z-10 bg-white px-3 py-2">
-                      <p className="font-semibold text-slate-800">{fn.name}</p>
-                      {narrowed.length ? <p className="text-[10px] text-slate-500">only for {narrowed.join("; ")}</p> : null}
-                    </td>
-                    {VERBS.map((v) => (
-                      <td key={v} className="px-2 py-2 text-center">
-                        {held.has(v) ? <Check className="mx-auto h-4 w-4 text-emerald-600" aria-label={`${fn.name} may ${VERB_LABEL[v]}`} /> : <Minus className="mx-auto h-3 w-3 text-slate-200" aria-label="not held" />}
-                      </td>
-                    ))}
-                    <td className="px-2 py-2 text-right tabular-nums text-slate-500">{fn._count.memberships}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+            );
+          })}
+        </DataTable>
       </Card>
 
       <Card title="Change a function" description="Open one to edit its rules, clearance or retire it. Rules only add permissions; nothing takes them away.">
@@ -146,7 +145,7 @@ export default async function FunctionsPage() {
 
                   {fn.active ? (
                     <details>
-                      <summary className="cursor-pointer text-xs font-semibold text-[#315f83]">+ Add a rule</summary>
+                      <summary className="cursor-pointer text-xs font-semibold text-link">+ Add a rule</summary>
                       <div className="mt-3 max-w-2xl">
                         <ActionForm action={savePermissionRuleAction} submitLabel="Add rule" size="sm" hidden={{ functionId: fn.id }}>
                           <Field label="May" required>
@@ -188,7 +187,7 @@ export default async function FunctionsPage() {
         </ul>
 
         <details className="mt-3 border-t border-slate-100 pt-3">
-          <summary className="cursor-pointer text-xs font-semibold text-[#315f83]">+ New function</summary>
+          <summary className="cursor-pointer text-xs font-semibold text-link">+ New function</summary>
           <div className="mt-3 max-w-2xl">
             <ActionForm action={createFunctionAction} submitLabel="Create function" size="sm">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

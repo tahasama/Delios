@@ -78,10 +78,10 @@ export default async function ControlledPage() {
             <Link
               key={handler.kind}
               href={`/admin/controlled/${handler.kind}`}
-              className="group flex flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm outline-none transition hover:border-[#2d5480]/45 hover:shadow-md focus-visible:ring-3 focus-visible:ring-[#315f83]/20"
+              className="group flex flex-col rounded-2xl border border-slate-200 bg-surface p-5 shadow-sm outline-none transition hover:border-brand-line/45 hover:shadow-md focus-visible:ring-3 focus-visible:ring-link/20"
             >
               <div className="flex items-start gap-3">
-                <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[#e9f1f7] text-[#17324d] transition group-hover:bg-[#1e3a5f] group-hover:text-white">
+                <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-tint text-brand-ink transition group-hover:bg-brand group-hover:text-white">
                   <Icon className="h-5 w-5" />
                 </span>
                 <div className="min-w-0 flex-1">
@@ -91,7 +91,7 @@ export default async function ControlledPage() {
                     {handler.level === "PROJECT" ? ctx.project.code : "Organization-wide"}
                   </p>
                 </div>
-                <ArrowRight className="h-4 w-4 shrink-0 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-[#2d5480]" />
+                <ArrowRight className="h-4 w-4 shrink-0 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-brand-ink" />
               </div>
 
               <p className="mt-3 flex-1 text-xs leading-relaxed text-slate-500">{handler.blurb}</p>

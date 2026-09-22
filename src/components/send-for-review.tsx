@@ -66,7 +66,7 @@ function StepCard({ index, step, pool, many }: { index: number; step: SendStep; 
   const approval = step.act === "APPROVAL";
 
   return (
-    <fieldset className={`flex w-60 shrink-0 flex-col rounded-xl border p-2.5 ${approval ? "border-[#1e3a5f]/30 bg-[#f4f7fb]" : "border-slate-200 bg-white"}`}>
+    <fieldset className={`flex w-60 shrink-0 flex-col rounded-xl border p-2.5 ${approval ? "border-brand-line/30 bg-tint-soft" : "border-slate-200 bg-surface"}`}>
       <legend className="sr-only">Step {index + 1}</legend>
       <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Step {index + 1} · {approval ? "Approve" : "Review"}</p>
       <p className="text-sm font-semibold text-slate-800">{step.title}</p>
@@ -79,7 +79,7 @@ function StepCard({ index, step, pool, many }: { index: number; step: SendStep; 
           return (
             <li key={id} className="text-xs">
               <input type="hidden" name={`participants_${index}`} value={id} />
-              <span className="inline-flex w-full items-start justify-between gap-1 rounded-md bg-white px-2 py-1 ring-1 ring-slate-200">
+              <span className="inline-flex w-full items-start justify-between gap-1 rounded-md bg-surface px-2 py-1 ring-1 ring-slate-200">
                 <span className="min-w-0">
                   <span className="block truncate font-medium text-slate-800">{p.name}</span>
                   <span className="block truncate text-[10px] text-slate-400">{why.get(id) ?? p.functionName}</span>
@@ -97,7 +97,7 @@ function StepCard({ index, step, pool, many }: { index: number; step: SendStep; 
       {addable.length ? (
         <select
           aria-label={`Add to step ${index + 1}`}
-          className="mt-2 w-full rounded-md border border-dashed border-slate-300 bg-white px-2 py-1 text-xs text-slate-600"
+          className="mt-2 w-full rounded-md border border-dashed border-slate-300 bg-surface px-2 py-1 text-xs text-slate-600"
           value=""
           onChange={(e) => e.target.value && setChosen([...chosen, e.target.value])}
         >

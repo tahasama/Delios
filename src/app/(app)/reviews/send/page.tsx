@@ -23,7 +23,7 @@ export default async function SendForReviewPage({ searchParams }: { searchParams
       <Card className="max-w-3xl">
         <ul className="mb-4 space-y-1 text-xs">
           {revisions.map((r) => (
-            <li key={r.id}><Link href={`/documents/${r.documentId}`} className="font-mono font-semibold text-[#1e3a5f] hover:underline">{r.document.docNumber}</Link> <span className="text-slate-500">rev {r.value} — {r.document.title}</span></li>
+            <li key={r.id}><Link href={`/documents/${r.documentId}`} className="font-mono font-semibold text-brand-ink hover:underline">{r.document.docNumber}</Link> <span className="text-slate-500">rev {r.value} — {r.document.title}</span></li>
           ))}
         </ul>
         {revisions.length ? <SendForReview revisionIds={revisions.map((r) => r.id)} /> : <p className="text-sm text-slate-500">None of the selected documents has a revision ready to send.</p>}

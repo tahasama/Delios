@@ -97,7 +97,7 @@ export default async function TransmittalDetailPage({ params }: { params: Promis
               {t.items.map((item) => (
                 <tr key={item.id}>
                   <Td>
-                    <Link href={`/documents/${item.revision.documentId}`} className="font-mono text-[13px] font-semibold text-[#1e3a5f] hover:underline">
+                    <Link href={`/documents/${item.revision.documentId}`} className="font-mono text-[13px] font-semibold text-brand-ink hover:underline">
                       {item.revision.document.docNumber}
                     </Link>
                     <span className="block max-w-64 truncate text-xs text-slate-400">{item.revision.document.title}</span>
@@ -108,7 +108,7 @@ export default async function TransmittalDetailPage({ params }: { params: Promis
                   <Td className="text-xs">
                     {(() => {
                       const cycle = t.cycles.find((c) => c.revisionId === item.revisionId);
-                      return cycle ? <Link href={`/reviews/${cycle.id}`} className="font-semibold text-[#2d5480] hover:underline">{cycle.status === "OPEN" ? "in review" : "reviewed"} →</Link> : <span className="text-slate-300">—</span>;
+                      return cycle ? <Link href={`/reviews/${cycle.id}`} className="font-semibold text-brand-ink hover:underline">{cycle.status === "OPEN" ? "in review" : "reviewed"} →</Link> : <span className="text-slate-300">—</span>;
                     })()}
                   </Td>
                   ) : null}
@@ -158,7 +158,7 @@ export default async function TransmittalDetailPage({ params }: { params: Promis
           ) : null}
 
           {conditions.length ? (
-            <details className="rounded-2xl border border-slate-200 bg-white px-5 py-3 shadow-sm">
+            <details className="rounded-2xl border border-slate-200 bg-surface px-5 py-3 shadow-sm">
               <summary className="cursor-pointer list-none text-sm text-slate-700">
                 Checked by <strong>{t.checkedByName}</strong>, {fmtDate(t.acceptanceCheckedAt)} — {conditions.filter((c) => c.pass).length} of {conditions.length} checks passed
               </summary>
@@ -204,7 +204,7 @@ export default async function TransmittalDetailPage({ params }: { params: Promis
                       <form action={acknowledgeReceiptAction}>
                         <input type="hidden" name="recipientId" value={r.id} />
                         <input type="hidden" name="transmittalId" value={t.id} />
-                        <button className="font-semibold text-[#2d5480] hover:underline">Acknowledge receipt</button>
+                        <button className="font-semibold text-brand-ink hover:underline">Acknowledge receipt</button>
                       </form>
                     ) : null}
                   </div>

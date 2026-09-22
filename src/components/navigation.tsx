@@ -119,13 +119,13 @@ function NavLink({
       className={cn(
         "group flex rounded-xl outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[#d9a441]/70",
         compact ? "items-center gap-3 px-3 py-2" : "items-start gap-3 px-3 py-3",
-        active ? "bg-white text-[#17324d] shadow-sm" : "text-slate-300 hover:bg-white/7 hover:text-white",
+        active ? "bg-surface text-brand-ink shadow-sm" : "text-slate-300 hover:bg-white/7 hover:text-white",
       )}
     >
       <span
         className={cn(
           "mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg",
-          active ? "bg-[#e9f1f7] text-[#17324d]" : "bg-white/7 text-slate-300",
+          active ? "bg-tint text-brand-ink" : "bg-white/7 text-slate-300",
         )}
       >
         <item.icon className="h-4 w-4" />
@@ -225,7 +225,7 @@ function SidebarBody({ perms, onNavigate }: { perms: NavPermissions; onNavigate?
 
 export function Sidebar({ perms }: { perms: NavPermissions }) {
   return (
-    <aside className="no-print fixed inset-y-0 left-0 z-20 hidden w-[268px] flex-col border-r border-[#254663] bg-[#102a43] px-4 py-5 text-slate-200 lg:flex">
+    <aside className="palette-light no-print fixed inset-y-0 left-0 z-20 hidden w-[268px] flex-col border-r border-[#254663] bg-[#102a43] px-4 py-5 text-slate-200 lg:flex">
       <SidebarBody perms={perms} />
     </aside>
   );
@@ -248,7 +248,7 @@ export function MobileNav({ perms }: { perms: NavPermissions }) {
       {open ? (
         <div className="no-print fixed inset-0 z-40 lg:hidden">
           <button type="button" aria-label="Close navigation" onClick={() => setOpen(false)} className="absolute inset-0 bg-slate-900/50" />
-          <div className="absolute inset-y-0 left-0 flex w-[268px] max-w-[85vw] flex-col bg-[#102a43] px-4 py-5 text-slate-200 shadow-2xl">
+          <div className="palette-light absolute inset-y-0 left-0 flex w-[268px] max-w-[85vw] flex-col bg-[#102a43] px-4 py-5 text-slate-200 shadow-2xl">
             <button
               type="button"
               onClick={() => setOpen(false)}
@@ -273,7 +273,7 @@ export function SearchBox({ className }: { className?: string }) {
         name="q"
         aria-label="Search documents"
         placeholder="Search by number, title or tag"
-        className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 pl-9 pr-3 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-[#5e7f9d] focus:bg-white focus:ring-3 focus:ring-[#5e7f9d]/10"
+        className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 pl-9 pr-3 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-[#5e7f9d] focus:bg-surface focus:ring-3 focus:ring-[#5e7f9d]/10"
       />
     </form>
   );

@@ -34,16 +34,16 @@ export default async function ImportPage({ searchParams }: { searchParams: Promi
         <div className="space-y-4">
           <Card title="Templates" description="Download, fill the rows, keep the header.">
             <ul className="space-y-2 text-sm">
-              <li><a href="/api/export/template-deliverables" className="font-medium text-[#2d5480] hover:underline">Deliverable list template</a></li>
-              <li><a href="/api/export/template-baseline" className="font-medium text-[#2d5480] hover:underline">Baseline template</a></li>
-              <li><a href="/api/export/template-metadata" className="font-medium text-[#2d5480] hover:underline">Metadata update template</a></li>
+              <li><a href="/api/export/template-deliverables" className="font-medium text-brand-ink hover:underline">Deliverable list template</a></li>
+              <li><a href="/api/export/template-baseline" className="font-medium text-brand-ink hover:underline">Baseline template</a></li>
+              <li><a href="/api/export/template-metadata" className="font-medium text-brand-ink hover:underline">Metadata update template</a></li>
             </ul>
           </Card>
           <Card title="Extract any view" description="Each file carries its generation timestamp.">
             <ul className="space-y-2 text-sm">
               {exports.map((e) => (
                 <li key={e.kind}>
-                  <a href={`/api/export/${e.kind}`} className="font-medium text-[#2d5480] hover:underline">{e.label} ↓</a>
+                  <a href={`/api/export/${e.kind}`} className="font-medium text-brand-ink hover:underline">{e.label} ↓</a>
                 </li>
               ))}
             </ul>

@@ -2,7 +2,7 @@
 
 import { useActionState } from "react";
 import { importBulkAction } from "@/lib/actions/bulk";
-import { Card, Chip, btn, inputCls } from "@/components/ui";
+import { Card, Chip, DataTable, Th, Td, btn, inputCls } from "@/components/ui";
 
 const KINDS = [
   {
@@ -38,7 +38,7 @@ export function BulkImportForm({ initialKind }: { initialKind: string }) {
           <span className="mb-1.5 block text-xs font-medium text-slate-700">What are you importing?</span>
           <div className="grid gap-2">
             {KINDS.map((k) => (
-              <label key={k.key} className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-slate-200 p-3 transition hover:border-[#2d5480]/40">
+              <label key={k.key} className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-slate-200 p-3 transition hover:border-brand-line/40">
                 <input type="radio" name="kind" value={k.key} defaultChecked={(initialKind || k.key) === k.key} className="mt-1" />
                 <span>
                   <span className="block text-sm font-medium text-slate-800">{k.title}</span>
@@ -72,30 +72,19 @@ export function BulkImportForm({ initialKind }: { initialKind: string }) {
               {state.rows.filter((r) => r.ok).length} ok · {state.rows.filter((r) => !r.ok).length} with problems
             </Chip>
           </p>
-          <div className="scroll-thin max-h-96 overflow-auto rounded-lg border border-slate-200">
-            <table className="min-w-full divide-y divide-slate-100 text-sm">
-              <thead className="sticky top-0 bg-slate-50">
-                <tr>
-                  <th className="px-3 py-2 text-left text-[11px] font-semibold uppercase text-slate-500">Line</th>
-                  <th className="px-3 py-2 text-left text-[11px] font-semibold uppercase text-slate-500">Status</th>
-                  <th className="px-3 py-2 text-left text-[11px] font-semibold uppercase text-slate-500">Detail</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {state.rows.map((r) => (
-                  <tr key={r.line} className={r.ok ? "" : "bg-red-50/40"}>
-                    <td className="px-3 py-1.5 text-xs text-slate-400">{r.line}</td>
-                    <td className="px-3 py-1.5">
-                      <Chip className={r.ok ? "bg-emerald-100 text-emerald-800 ring-emerald-300" : "bg-red-100 text-red-800 ring-red-300"}>
-                        {r.ok ? (state.dryRun ? "would import" : r.wrote === false ? "skipped" : "imported") : "problem"}
-                      </Chip>
-                    </td>
-                    <td className="px-3 py-1.5 text-xs text-slate-600">{r.message}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DataTable id="import-report" head={<tr><Th>Line</Th><Th>Status</Th><Th>Detail</Th></tr>}>
+            {state.rows.map((r) => (
+              <tr key={r.line} className={r.ok ? "" : "[&>td]:bg-red-50/60"}>
+                <Td className="py-1.5 text-xs tabular-nums text-slate-400">{r.line}</Td>
+                <Td className="whitespace-nowrap py-1.5">
+                  <Chip className={r.ok ? "bg-emerald-100 text-emerald-800 ring-emerald-300" : "bg-red-100 text-red-800 ring-red-300"}>
+                    {r.ok ? (state.dryRun ? "would import" : r.wrote === false ? "skipped" : "imported") : "problem"}
+                  </Chip>
+                </Td>
+                <Td className="py-1.5 text-xs text-slate-600">{r.message}</Td>
+              </tr>
+            ))}
+          </DataTable>
           {state.dryRun && !state.failed ? (
             <p className="mt-2 text-xs text-slate-500">Happy? Uncheck <strong>dry run</strong> and press <strong>Check file</strong> again to import for real.</p>
           ) : null}

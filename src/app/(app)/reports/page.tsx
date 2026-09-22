@@ -62,7 +62,7 @@ export default async function ReportsPage({
       <nav className="flex flex-wrap gap-1 rounded-xl bg-slate-100 p-1 sm:w-fit" aria-label="Reports">
         {REPORT_IDS.map((id) => (
           <Link key={id} href={`/reports?r=${id}`} aria-current={current === id ? "page" : undefined}
-            className={`rounded-lg px-3 py-2 text-xs font-semibold ${current === id ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-800"}`}>
+            className={`rounded-lg px-3 py-2 text-xs font-semibold ${current === id ? "bg-surface text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-800"}`}>
             {REPORT_TITLES[id]}
           </Link>
         ))}
@@ -92,9 +92,9 @@ export default async function ReportsPage({
           </form>
         </div>
         {rows.length ? (
-          <DataTable head={<tr>{report.columns.map((c) => <Th key={c}>{c}</Th>)}</tr>}>
+          <DataTable id={`report-${current}`} head={<tr>{report.columns.map((c) => <Th key={c}>{c}</Th>)}</tr>}>
             {rows.slice(0, 200).map((row, r) => (
-              <tr key={r} className="hover:bg-slate-50/70">
+              <tr key={r}>
                 {row.map((cell, n) => <Td key={n} className="text-xs">{renderCell(cell)}</Td>)}
               </tr>
             ))}
@@ -112,7 +112,7 @@ export default async function ReportsPage({
         </form>
         {asOf ? (
           historical.length ? (
-            <DataTable head={<tr><Th>Document</Th><Th>Current revision on {fmtDate(asOf)}</Th><Th>Status</Th><Th>Released</Th></tr>}>
+            <DataTable id="report-as-of" head={<tr><Th>Document</Th><Th label="Current revision">Current revision on {fmtDate(asOf)}</Th><Th>Status</Th><Th>Released</Th></tr>}>
               {historical.slice(0, 50).map((r) => (
                 <tr key={r.id}>
                   <Td className="font-mono text-[13px]">{r.document.docNumber}</Td>
@@ -140,7 +140,7 @@ const CHIP: Record<string, string> = { good: "bg-emerald-100 text-emerald-800", 
 
 function renderCell(cell: Cell) {
   if (typeof cell !== "object") return cell;
-  if (cell.href) return <Link href={cell.href} className="font-mono font-semibold text-[#1e3a5f] hover:underline">{cell.text}</Link>;
+  if (cell.href) return <Link href={cell.href} className="font-mono font-semibold text-brand-ink hover:underline">{cell.text}</Link>;
   if (cell.tone) return <span className={`whitespace-nowrap rounded px-1.5 py-0.5 text-[11px] font-semibold ${CHIP[cell.tone]}`}>{cell.text}</span>;
   return cell.text;
 }

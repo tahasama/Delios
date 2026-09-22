@@ -44,9 +44,9 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
       />
 
       <div className="flex flex-wrap gap-1.5">
-        <Link href="/admin/audit" className={`rounded-full px-3 py-1.5 text-xs font-medium ${!sp.action ? "bg-[#1e3a5f] text-white" : "bg-slate-100 text-slate-600"}`}>All</Link>
+        <Link href="/admin/audit" className={`rounded-full px-3 py-1.5 text-xs font-medium ${!sp.action ? "bg-brand text-white" : "bg-slate-100 text-slate-600"}`}>All</Link>
         {actions.sort((a, b) => b._count - a._count).map((a) => (
-          <Link key={a.action} href={`/admin/audit?action=${a.action}`} className={`rounded-full px-3 py-1.5 text-xs font-medium ${sp.action === a.action ? "bg-[#1e3a5f] text-white" : "bg-slate-100 text-slate-600"}`}>
+          <Link key={a.action} href={`/admin/audit?action=${a.action}`} className={`rounded-full px-3 py-1.5 text-xs font-medium ${sp.action === a.action ? "bg-brand text-white" : "bg-slate-100 text-slate-600"}`}>
             {a.action.replaceAll("_", " ").toLowerCase()} ({a._count})
           </Link>
         ))}
@@ -54,12 +54,12 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
 
       <form className="flex gap-2">
         <input name="q" defaultValue={sp.q ?? ""} placeholder="Search label, actor, detail…" className="max-w-sm flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm" />
-        <button className="rounded-lg bg-[#1e3a5f] px-4 py-2 text-sm font-medium text-white">Search</button>
+        <button className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white">Search</button>
       </form>
 
       <DataTable head={<tr><Th>When</Th><Th>Actor</Th><Th>Action</Th><Th>Entity</Th><Th>Change / detail</Th></tr>}>
         {events.map((e) => (
-          <tr key={e.id} className="hover:bg-slate-50/70">
+          <tr key={e.id}>
             <Td className="whitespace-nowrap text-xs text-slate-400">{fmtDateTime(e.ts)}</Td>
             <Td className="text-xs font-medium">{e.actorName}</Td>
             <Td><Chip className={ACTION_COLORS[e.action] ?? ""}>{e.action.replaceAll("_", " ").toLowerCase()}</Chip></Td>

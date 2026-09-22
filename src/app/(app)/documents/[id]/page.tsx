@@ -210,8 +210,8 @@ export default async function DocumentDetailPage({
       {sp.released ? <Banner tone="good" title={`Released${sp.superseded ? ` · rev ${sp.superseded} superseded` : ""}`}>This revision is now the one in use.</Banner> : null}
 
       {/* What is it */}
-      <header className="rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
-        <Link href="/documents" className="inline-flex items-center gap-1 text-xs font-semibold text-[#315f83] hover:underline"><ArrowLeft className="h-3.5 w-3.5" /> Documents</Link>
+      <header className="rounded-2xl border border-slate-200 bg-surface px-5 py-4 shadow-sm">
+        <Link href="/documents" className="inline-flex items-center gap-1 text-xs font-semibold text-link hover:underline"><ArrowLeft className="h-3.5 w-3.5" /> Documents</Link>
         <div className="mt-2 flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
             <p className="font-mono text-sm font-bold text-slate-500">{doc.docNumber}</p>
@@ -269,7 +269,7 @@ export default async function DocumentDetailPage({
                 </dl>
                 {canEdit ? (
                   <details className="mt-4">
-                    <summary className="cursor-pointer list-none text-xs font-semibold text-[#315f83]">Edit details</summary>
+                    <summary className="cursor-pointer list-none text-xs font-semibold text-link">Edit details</summary>
                     <div className="mt-3 max-w-2xl">
                       <ActionForm action={updateDocumentAction} submitLabel="Save" size="sm" hidden={{ id: doc.id }}>
                         <Field label="Title" required><input name="title" defaultValue={doc.title} className={inputCls} /></Field>
@@ -369,7 +369,7 @@ export default async function DocumentDetailPage({
                       return (
                         <li key={item.id}>
                           <Link href={`/transmittals/${t.id}`} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-5 py-3 hover:bg-slate-50">
-                            <span className="font-mono text-xs font-bold text-[#315f83]">{t.number}</span>
+                            <span className="font-mono text-xs font-bold text-link">{t.number}</span>
                             <span className="text-xs text-slate-500">rev {item.revision.value} · {prettyState(t.reasonForIssue)} · {fmtDate(t.dateOfIssue)}</span>
                             <span className="min-w-0 flex-1 truncate text-xs text-slate-700">{t.recipients.map((r) => r.name).join(", ") || "—"}</span>
                             <span className={`text-[11px] font-semibold ${acked === t.recipients.length && acked ? "text-emerald-700" : "text-slate-500"}`}>{acked}/{t.recipients.length} acknowledged</span>
@@ -413,7 +413,7 @@ export default async function DocumentDetailPage({
                 )}
                 {canEdit ? (
                   <details className="border-t border-slate-100 py-3">
-                    <summary className="cursor-pointer list-none text-xs font-semibold text-[#315f83]">+ Link an asset</summary>
+                    <summary className="cursor-pointer list-none text-xs font-semibold text-link">+ Link an asset</summary>
                     <div className="mt-2 max-w-md">
                       <ActionForm action={linkAssetAction} submitLabel="Link" size="sm" hidden={{ documentId: doc.id }}>
                         <select name="assetCode" className={inputCls} defaultValue="">
@@ -446,7 +446,7 @@ export default async function DocumentDetailPage({
                     ))}
                   </ul>
                 ) : <Empty>Nothing recorded yet.</Empty>}
-                {snapshotCount ? <Link href={`/documents/${doc.id}/history`} className="block border-t border-slate-100 px-5 py-3 text-xs font-semibold text-[#315f83] hover:underline">See the document as it was at each recorded point →</Link> : null}
+                {snapshotCount ? <Link href={`/documents/${doc.id}/history`} className="block border-t border-slate-100 px-5 py-3 text-xs font-semibold text-link hover:underline">See the document as it was at each recorded point →</Link> : null}
               </div>
             ),
           },
@@ -469,7 +469,7 @@ function UsedIn({ kind, href, code, text, children }: { kind: string; href: stri
     <li className="flex items-center justify-between gap-2 py-2.5">
       <div className="min-w-0">
         <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{kind}</p>
-        <Link href={href} className="font-mono text-xs font-bold text-[#315f83] hover:underline">{code}</Link>
+        <Link href={href} className="font-mono text-xs font-bold text-link hover:underline">{code}</Link>
         <p className="truncate text-xs text-slate-600">{text}</p>
       </div>
       {children}
@@ -523,8 +523,8 @@ function RevisionRow({ rev, statusLabel, controller, userId, userRole }: { rev: 
           </dl>
 
           <div className="flex flex-wrap gap-2 text-xs">
-            {pdf ? <a href={`/api/files/${pdf.id}`} target="_blank" className="font-semibold text-[#315f83] hover:underline">PDF</a> : <span className="text-slate-400">no PDF</span>}
-            {native ? <a href={`/api/files/${native.id}?dl=1`} className="font-semibold text-[#315f83] hover:underline">Source file</a> : null}
+            {pdf ? <a href={`/api/files/${pdf.id}`} target="_blank" className="font-semibold text-link hover:underline">PDF</a> : <span className="text-slate-400">no PDF</span>}
+            {native ? <a href={`/api/files/${native.id}?dl=1`} className="font-semibold text-link hover:underline">Source file</a> : null}
           </div>
 
 

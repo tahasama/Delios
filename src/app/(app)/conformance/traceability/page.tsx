@@ -83,7 +83,7 @@ export default async function TraceabilityPage({ searchParams }: { searchParams:
       />
       <AssuranceTabs current="/conformance/traceability" />
 
-      <div className="rounded-2xl bg-[#f4f7fb] p-4 text-xs leading-relaxed text-slate-700 ring-1 ring-[#2d5480]/15">
+      <div className="rounded-2xl bg-tint-soft p-4 text-xs leading-relaxed text-slate-700 ring-1 ring-link/15">
         <p className="font-semibold text-slate-900">What this page is for</p>
         <p className="mt-1">The app checks your register against the Document Management Standard. This page records which check covers which rule of the Standard, so that when the Standard is updated nothing is silently left unchecked.</p>
         <p className="mt-2"><span className="font-semibold">Day to day there is nothing to do here.</span> Only when a new edition of the Standard is installed: links whose rule or check changed show as <em>Review required</em>. Look at each, record it as still correct (Aligned) or no longer applicable, then <em>Release baseline</em> — that records, with your name and the date, that the app follows the new edition.</p>
@@ -91,7 +91,7 @@ export default async function TraceabilityPage({ searchParams }: { searchParams:
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
         {(["REVIEW_REQUIRED", "GAP", "ALIGNED", "NOT_APPLICABLE", "WITHDRAWN"] as Alignment[]).map((a) => (
-          <Link key={a} href={href({ state: a })} className={cn("rounded-xl border px-3 py-2.5 transition hover:shadow-sm", state === a ? "border-[#2d5480] bg-[#f4f7fb]" : "border-slate-200 bg-white")}>
+          <Link key={a} href={href({ state: a })} className={cn("rounded-xl border px-3 py-2.5 transition hover:shadow-sm", state === a ? "border-brand-line bg-tint-soft" : "border-slate-200 bg-surface")}>
             <p className="text-[11px] font-semibold text-slate-500">{ALIGNMENT_LABEL[a]}</p>
             <p className={cn("text-xl font-semibold tabular-nums", a === "GAP" && counts.GAP ? "text-red-700" : a === "REVIEW_REQUIRED" && counts.REVIEW_REQUIRED ? "text-amber-700" : "text-slate-900")}>{counts[a]}</p>
           </Link>
@@ -123,12 +123,12 @@ export default async function TraceabilityPage({ searchParams }: { searchParams:
       </Card>
 
       <div className="flex flex-wrap items-center gap-1.5 text-xs">
-        <Link href={href({ state: "OPEN" })} className={cn("rounded-full px-2.5 py-1", state === "OPEN" ? "bg-[#1e3a5f] text-white" : "bg-slate-100 text-slate-600")}>Needs attention</Link>
-        <Link href={href({ state: "ALL" })} className={cn("rounded-full px-2.5 py-1", state === ("ALL" as string) ? "bg-[#1e3a5f] text-white" : "bg-slate-100 text-slate-600")}>All</Link>
+        <Link href={href({ state: "OPEN" })} className={cn("rounded-full px-2.5 py-1", state === "OPEN" ? "bg-brand text-white" : "bg-slate-100 text-slate-600")}>Needs attention</Link>
+        <Link href={href({ state: "ALL" })} className={cn("rounded-full px-2.5 py-1", state === ("ALL" as string) ? "bg-brand text-white" : "bg-slate-100 text-slate-600")}>All</Link>
         <span className="mx-1 text-slate-300">|</span>
-        <Link href={href({ kind: undefined })} className={cn("rounded-full px-2.5 py-1", !sp.kind ? "bg-[#1e3a5f] text-white" : "bg-slate-100 text-slate-600")}>Checks and Routes</Link>
-        <Link href={href({ kind: "CHECK" })} className={cn("rounded-full px-2.5 py-1", sp.kind === "CHECK" ? "bg-[#1e3a5f] text-white" : "bg-slate-100 text-slate-600")}>Checks</Link>
-        <Link href={href({ kind: "ROUTE" })} className={cn("rounded-full px-2.5 py-1", sp.kind === "ROUTE" ? "bg-[#1e3a5f] text-white" : "bg-slate-100 text-slate-600")}>Routes</Link>
+        <Link href={href({ kind: undefined })} className={cn("rounded-full px-2.5 py-1", !sp.kind ? "bg-brand text-white" : "bg-slate-100 text-slate-600")}>Checks and Routes</Link>
+        <Link href={href({ kind: "CHECK" })} className={cn("rounded-full px-2.5 py-1", sp.kind === "CHECK" ? "bg-brand text-white" : "bg-slate-100 text-slate-600")}>Checks</Link>
+        <Link href={href({ kind: "ROUTE" })} className={cn("rounded-full px-2.5 py-1", sp.kind === "ROUTE" ? "bg-brand text-white" : "bg-slate-100 text-slate-600")}>Routes</Link>
         <form className="ml-auto" action="/conformance/traceability">
           {sp.state ? <input type="hidden" name="state" value={sp.state} /> : null}
           {sp.kind ? <input type="hidden" name="kind" value={sp.kind} /> : null}

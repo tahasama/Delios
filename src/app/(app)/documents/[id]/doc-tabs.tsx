@@ -29,7 +29,7 @@ export function DocTabs({ tabs }: { tabs: DocTab[] }) {
   };
 
   return (
-    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-surface shadow-sm">
       <nav role="tablist" aria-label="Document" className="scroll-thin flex gap-1 overflow-x-auto border-b border-slate-200 px-3">
         {tabs.map((t) => (
           <button
@@ -38,7 +38,7 @@ export function DocTabs({ tabs }: { tabs: DocTab[] }) {
             type="button"
             aria-selected={active === t.id}
             onClick={() => select(t.id)}
-            className={`-mb-px whitespace-nowrap border-b-2 px-3 py-3 text-xs font-semibold transition ${active === t.id ? "border-[#315f83] text-[#17324d]" : "border-transparent text-slate-500 hover:text-slate-800"}`}
+            className={`-mb-px whitespace-nowrap border-b-2 px-3 py-3 text-xs font-semibold transition ${active === t.id ? "border-brand-line text-brand-ink" : "border-transparent text-slate-500 hover:text-slate-800"}`}
           >
             {t.label}
             {t.count ? <span className="ml-1.5 rounded bg-slate-100 px-1.5 text-[10px] text-slate-600">{t.count}</span> : null}

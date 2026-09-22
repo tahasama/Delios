@@ -38,7 +38,7 @@ export function NewTransmittalForm({
       <ActionForm action={createTransmittalAction} submitLabel={direction === "OUTGOING" ? "Create transmittal" : "Record receipt"}>
         <div className="flex gap-2">
           {(["OUTGOING", "INCOMING"] as const).map((d) => (
-            <label key={d} className={`cursor-pointer rounded-lg border px-3 py-2 text-xs font-medium ${direction === d ? "border-[#1e3a5f] bg-[#eef3f9] text-[#1e3a5f]" : "border-slate-300 text-slate-500"}`}>
+            <label key={d} className={`cursor-pointer rounded-lg border px-3 py-2 text-xs font-medium ${direction === d ? "border-brand-line bg-tint text-brand-ink" : "border-slate-300 text-slate-500"}`}>
               <input type="radio" name="direction" value={d} checked={direction === d} onChange={() => setDirection(d)} className="mr-1.5" />
               {d === "OUTGOING" ? "We are sending" : "We received"}
             </label>

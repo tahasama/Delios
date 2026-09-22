@@ -33,8 +33,8 @@ export default async function AssetsPage({ searchParams }: { searchParams: Promi
       />
 
       {keeper ? (
-        <details className="rounded-2xl border border-slate-200 bg-white px-5 py-3 shadow-sm" open={!assets.length && !q}>
-          <summary className="cursor-pointer text-sm font-semibold text-[#1e3a5f]">+ Add an asset</summary>
+        <details className="rounded-2xl border border-slate-200 bg-surface px-5 py-3 shadow-sm" open={!assets.length && !q}>
+          <summary className="cursor-pointer text-sm font-semibold text-brand-ink">+ Add an asset</summary>
           <div className="mt-3 max-w-3xl">
             <ActionForm action={addAssetAction} submitLabel="Add asset" size="sm">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -60,14 +60,14 @@ export default async function AssetsPage({ searchParams }: { searchParams: Promi
           {assets.map((a) => (
             <Card key={a.id} className="p-0">
               <Link href={`/assets/${a.id}`} className="block rounded-xl transition hover:bg-slate-50/70">
-                <p className="font-mono text-sm font-bold text-[#1e3a5f]">{a.code}</p>
+                <p className="font-mono text-sm font-bold text-brand-ink">{a.code}</p>
                 <p className="mt-0.5 text-sm text-slate-700">{a.name}</p>
                 <p className="mt-1 text-xs text-slate-400">{[a.area && `area ${a.area}`, a.system, a.unit].filter(Boolean).join(" · ") || "—"}</p>
                 <p className="mt-2 text-xs font-medium text-slate-500">{countFor(a.id)} document{countFor(a.id) === 1 ? "" : "s"}</p>
               </Link>
               {keeper ? (
                 <details className="mt-2 border-t border-slate-100 pt-2">
-                  <summary className="cursor-pointer text-xs font-semibold text-[#315f83]">Edit</summary>
+                  <summary className="cursor-pointer text-xs font-semibold text-link">Edit</summary>
                   <div className="mt-2 space-y-2">
                     <ActionForm action={updateAssetAction} submitLabel="Save" size="sm" hidden={{ id: a.id }}>
                       <Field label="Name" required><input name="name" required defaultValue={a.name} className={inputCls} /></Field>

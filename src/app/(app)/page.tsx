@@ -131,7 +131,7 @@ export default async function HomePage() {
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
         <div className="space-y-4">
           {waiting === 0 ? (
-            <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-6 shadow-sm">
+            <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-surface px-5 py-6 shadow-sm">
               <CheckCircle2 className="h-6 w-6 text-emerald-500" />
               <p className="text-sm text-slate-600">You are clear. New reviews, approvals and returned work appear here.</p>
             </div>
@@ -163,7 +163,7 @@ export default async function HomePage() {
                 <Link href={`/transmittals/${t.id}`} className="flex items-center gap-3 px-5 py-3 hover:bg-slate-50">
                   <span className="font-mono text-[13px] font-semibold text-slate-900">{t.number}</span>
                   <span className="min-w-0 flex-1 truncate text-xs text-slate-500">from {t.issuingParty} · {fmtDate(t.dateOfIssue)}</span>
-                  <span className="text-xs font-semibold text-[#315f83]">Check →</span>
+                  <span className="text-xs font-semibold text-link">Check →</span>
                 </Link>
               </li>
             ))}
@@ -179,7 +179,7 @@ export default async function HomePage() {
                       <span className="block truncate text-xs text-slate-500">{r.doc.title}</span>
                     </span>
                     <span className={`text-xs ${r.state === "NOT_SENT" ? (r.late ? "text-red-700" : "text-slate-500") : "text-orange-700"}`}>{STATE_LABEL[r.state]}{r.late && r.state === "NOT_SENT" ? " · overdue" : ""}</span>
-                    <span className="shrink-0 text-xs font-semibold text-[#315f83]">Upload →</span>
+                    <span className="shrink-0 text-xs font-semibold text-link">Upload →</span>
                   </Link>
                 </li>
               ))}
@@ -194,7 +194,7 @@ export default async function HomePage() {
                     <span className={`text-[13px] font-semibold ${p.late ? "text-red-700" : "text-slate-900"}`}>{p.label}</span>
                     <span className="block truncate text-xs text-slate-500">{p.sub}</span>
                   </span>
-                  <span className="shrink-0 text-xs font-semibold text-[#315f83]">{p.cta}</span>
+                  <span className="shrink-0 text-xs font-semibold text-link">{p.cta}</span>
                 </a>
               </li>
             ))}
@@ -206,7 +206,7 @@ export default async function HomePage() {
                 <Link href={`/transmittals/${t.id}`} className="flex items-center gap-3 px-5 py-3 hover:bg-slate-50">
                   <span className="font-mono text-[13px] font-semibold text-slate-900">{t.number}</span>
                   <span className="min-w-0 flex-1 truncate text-xs text-slate-500">from {t.issuingParty} · {fmtDate(t.dateOfIssue)}</span>
-                  <span className="text-xs font-semibold text-[#315f83]">Route →</span>
+                  <span className="text-xs font-semibold text-link">Route →</span>
                 </Link>
               </li>
             ))}
@@ -221,10 +221,10 @@ export default async function HomePage() {
         </div>
 
         <aside className={user.isInternal ? "space-y-4" : "hidden"}>
-          <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <section className="overflow-hidden rounded-2xl border border-slate-200 bg-surface shadow-sm">
             <header className="flex items-center justify-between border-b border-slate-100 px-5 py-3">
               <h2 className="text-sm font-semibold text-slate-900">Schedule at risk</h2>
-              <Link href="/actions" className="text-xs font-semibold text-[#315f83] hover:underline">Schedule →</Link>
+              <Link href="/actions" className="text-xs font-semibold text-link hover:underline">Schedule →</Link>
             </header>
             {atRisk.length ? (
               <ul className="divide-y divide-slate-100">
@@ -232,7 +232,7 @@ export default async function HomePage() {
                   <li key={a.id}>
                     <Link href={`/actions/${a.code}`} className="block px-5 py-3 hover:bg-slate-50">
                       <div className="flex items-center justify-between gap-2">
-                        <span className="font-mono text-xs font-bold text-[#315f83]">{a.code}</span>
+                        <span className="font-mono text-xs font-bold text-link">{a.code}</span>
                         <span className={`text-[11px] font-semibold ${a.late ? "text-red-700" : "text-amber-700"}`}>{a.late ? "overdue" : fmtDate(a.scheduledDate)}</span>
                       </div>
                       <p className="mt-0.5 truncate text-xs text-slate-700">{a.name}</p>
@@ -247,7 +247,7 @@ export default async function HomePage() {
           </section>
 
           {controller ? (
-            <Link href="/conformance" className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm hover:bg-slate-50">
+            <Link href="/conformance" className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-surface px-5 py-4 shadow-sm hover:bg-slate-50">
               <ShieldCheck className={`h-5 w-5 ${lastRun && lastRun.integrity >= 95 && !criticalDefects ? "text-emerald-600" : "text-amber-600"}`} />
               <span className="min-w-0 flex-1">
                 <span className="block text-sm font-semibold text-slate-800">Register health</span>
@@ -265,7 +265,7 @@ export default async function HomePage() {
 function Group({ title, count, children }: { title: string; count: number; children: React.ReactNode }) {
   if (!count) return null;
   return (
-    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-surface shadow-sm">
       <header className="flex items-center gap-2 border-b border-slate-100 px-5 py-3">
         <h2 className="text-sm font-semibold text-slate-900">{title}</h2>
         <span className="rounded-full bg-slate-100 px-2 text-xs font-bold text-slate-600">{count}</span>
@@ -285,7 +285,7 @@ function Row({ href, doc, rev, cta, note }: { href: string; doc: { docNumber: st
           <span className="block truncate text-xs text-slate-500">{doc.title}</span>
         </span>
         {note}
-        <span className="shrink-0 text-xs font-semibold text-[#315f83]">{cta} →</span>
+        <span className="shrink-0 text-xs font-semibold text-link">{cta} →</span>
       </Link>
     </li>
   );

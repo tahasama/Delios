@@ -33,8 +33,8 @@ export default async function AssetDetailPage({ params }: { params: Promise<{ id
             {docs.map((d) => {
               const cur = d.revisions[0];
               return (
-                <tr key={d.id} className="hover:bg-slate-50/70">
-                  <Td><Link href={`/documents/${d.id}`} className="font-mono text-[13px] font-semibold text-[#1e3a5f] hover:underline">{d.docNumber}</Link></Td>
+                <tr key={d.id}>
+                  <Td><Link href={`/documents/${d.id}`} className="font-mono text-[13px] font-semibold text-brand-ink hover:underline">{d.docNumber}</Link></Td>
                   <Td className="max-w-72"><span className="line-clamp-1">{d.title}</span></Td>
                   <Td className="font-mono text-xs">{d.docType}</Td>
                   <Td className="font-mono text-xs">{d.discipline}</Td>

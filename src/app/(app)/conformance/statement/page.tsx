@@ -39,7 +39,7 @@ export default async function StatementPage() {
       </div>
       <div className="no-print"><AssuranceTabs current="/conformance/statement" /></div>
 
-      <article className="rounded-xl border border-slate-300 bg-white p-8 shadow-sm print:shadow-none">
+      <article className="rounded-xl border border-slate-300 bg-surface p-8 shadow-sm print:shadow-none">
         <header className="border-b border-slate-200 pb-4 text-center">
           <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">Conformance assessment statement</p>
           <h1 className="mt-2 text-xl font-semibold text-slate-900">{scope?.organizationName ?? "—"}</h1>
