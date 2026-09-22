@@ -181,8 +181,8 @@ export async function updateValuePropsAction(_prev: { error?: string } | undefin
     const setKey = String(formData.get("setKey") ?? "");
     const code = String(formData.get("code") ?? "").trim();
     const label = String(formData.get("label") ?? "").trim();
-    const props = buildProps(setKey, formData);
     const value = await db.configValue.findUniqueOrThrow({ where: { id: valueId } });
+    const props = buildProps(setKey, formData, value.props);
     if (code && code !== value.code) {
       if (await configValueIsUsed(ctx, value.setKey, value.code)) return { error: "This code is already in use. Retire it and publish a replacement so historical metadata stays interpretable." };
       const duplicate = await db.configValue.findFirst({ where: { setKey, code } });

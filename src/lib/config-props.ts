@@ -18,6 +18,10 @@ import { VERDICT_EFFECT, verdictEffect } from "./verdict-effect";
 export { VERDICT_EFFECT, verdictEffect, VERDICT_EFFECT_SHORT } from "./verdict-effect";
 
 export const SET_PROP_FIELDS: Record<string, PropField[]> = {
+  DOCUMENT_TYPES: [
+    { key: "appliesTo", label: "Who produces it", type: "select", options: ["Supplier", "Non-supplier", "Unclassified"], hint: "supplier documents carry the supplier fields in their number" },
+    { key: "describesAsset", label: "Describes equipment — link it to an asset", type: "bool", hint: "§5.8" },
+  ],
   STATUSES: [
     { key: "executionFlag", label: "Allows work on site or in the shop", type: "bool", hint: "building, fabricating, installing or ordering from it (§7.8)" },
     { key: "may", label: "May be used for", type: "text" },
@@ -53,14 +57,19 @@ export const SET_PROP_FIELDS: Record<string, PropField[]> = {
   ],
 };
 
-/** Build the JSON props blob from submitted form fields for a given set. */
-export function buildProps(setKey: string, formData: FormData): string | null {
+/**
+ * Build the JSON props blob from submitted form fields for a given set.
+ * Properties the form does not show are kept from `existing`, so saving a
+ * value never drops what another part of the app relies on (e.g. a
+ * deliverable type's numbering scheme).
+ */
+export function buildProps(setKey: string, formData: FormData, existing?: string | null): string | null {
   const fields = SET_PROP_FIELDS[setKey];
   if (!fields) {
     const raw = String(formData.get("propsJson") ?? "").trim();
     return raw || null;
   }
-  const props: Record<string, unknown> = {};
+  const props: Record<string, unknown> = { ...parseProps(existing ?? null) };
   for (const f of fields) {
     if (f.type === "choice") {
       const picked = f.options.find((o) => o.value === String(formData.get(`prop_${f.key}`) ?? ""));
