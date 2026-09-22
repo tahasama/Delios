@@ -56,6 +56,8 @@ export type Handler = {
   ownerApproves?: boolean;
   /** A verb that lets its holder upload and decide this kind besides Control and Configure — PLAN for the project manager's list. */
   ownerVerb?: "PLAN";
+  /** Changed directly on its own page, without approval (value sets: agreed in the DMP). Kept here for its parser and history. */
+  direct?: boolean;
   /** Rows for "In force" when the payload fields do not map one-to-one onto columns. */
   exportRows?(t: Tenant, key: string): Promise<string[][]>;
 

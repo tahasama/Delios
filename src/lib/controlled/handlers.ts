@@ -410,6 +410,7 @@ const valueSet: Handler = {
   columns: VALUE_COLUMNS,
   sample: ["EL", "Electrical", "ACTIVE", "1", ""],
   approverHint: "Administrator",
+  direct: true,
 
   async parse(_t, rows): Promise<ParseResult> {
     const { index, missing } = headerIndex(rows, ["Code", "Label"]);

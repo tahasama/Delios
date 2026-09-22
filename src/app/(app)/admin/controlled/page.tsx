@@ -34,7 +34,8 @@ export default async function ControlledPage() {
     return <PageHeader title="Controlled changes" subtitle={ctx.why("CONFIGURE")} />;
   }
 
-  const handlers = allHandlers();
+  // Value sets are set up on their own page and agreed in the DMP.
+  const handlers = allHandlers().filter((h) => !h.direct);
   const sets = await db.controlledSet.findMany({
     include: { versions: { orderBy: { createdAt: "desc" }, take: 20 } },
   });

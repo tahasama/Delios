@@ -337,6 +337,8 @@ model ConfigValue {
 
   @@unique([orgId, setKey, code])
   @@index([orgId, setKey])
+  // When the value last changed — compared with the approved DMP revision.
+  updatedAt DateTime @default(now()) @updatedAt
 }
 
 // Numbering schemes (§3.2, per Standard-Numbering-Config.xlsx)
@@ -1252,6 +1254,9 @@ model Party {
 // Scope & conformance statement (C.1, §1.6)
 model ScopeConfig {
   id                      String   @id @default(cuid())
+  // The register document that is this project's Document Management Plan;
+  // the published sets are expected to match its approved revision.
+  dmpDocumentId           String?
   projectId               String
   project                 Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   organizationName        String

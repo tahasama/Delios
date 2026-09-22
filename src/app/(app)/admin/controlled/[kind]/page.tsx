@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { requireScope } from "@/lib/scope";
 import { PageHeader, Card, Chip, Field, btn, inputCls } from "@/components/ui";
 import { ActionForm } from "@/components/form";
@@ -66,6 +66,7 @@ function DiffView({ lines }: { lines: DiffLine[] }) {
 export default async function ControlledKindPage({ params }: { params: Promise<{ kind: string }> }) {
   const { kind } = await params;
   const handler = handlerFor(kind);
+  if (handler?.direct) redirect("/admin/config");
   if (!handler) notFound();
 
   const ctx = await requireScope();

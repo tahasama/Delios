@@ -188,6 +188,8 @@ export async function updateValuePropsAction(_prev: { error?: string } | undefin
       const duplicate = await db.configValue.findFirst({ where: { setKey, code } });
       if (duplicate) return { error: "That code already exists in this set." };
     }
+    // Saving without a change must not look like a change (the DMP comparison reads updatedAt).
+    if ((code || value.code) === value.code && (label || value.label) === value.label && (props ?? null) === (value.props ?? null)) return {};
     await db.configValue.update({ where: { id: valueId }, data: { code: code || value.code, label: label || value.label, props } });
     await db.configSet.update({ where: { orgId_key: { orgId, key: setKey } }, data: { version: { increment: 1 } } });
     await audit({ actor: admin, action: "CONFIG_VALUE_UPDATED", entityType: "ConfigValue", entityId: `${setKey}.${value.code}`, newValue: props, detail: `Properties of ${value.code} changed; set version incremented (§4.7).` });

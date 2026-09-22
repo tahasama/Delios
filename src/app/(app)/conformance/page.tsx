@@ -8,6 +8,7 @@ import { AssuranceTabs } from "./tabs";
 import { problemDocuments } from "@/lib/problems";
 import { untoldRecipients } from "@/lib/supersession";
 import { ArrowRight } from "lucide-react";
+import { dmpSetsState } from "@/lib/dmp-sets";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Assurance" };
@@ -43,6 +44,8 @@ export default async function AssurancePage({ searchParams }: { searchParams: Pr
     ]).then((n) => n.reduce((a, b) => a + b, 0)),
     problemDocuments(ctx, owner),
   ]);
+  const dmp = await dmpSetsState(ctx);
+  const dmpDrift = dmp.dmp && dmp.revision && dmp.changed.length ? { doc: dmp.dmp.docNumber, rev: dmp.revision.value, sets: dmp.changed.map((c) => c.setTitle) } : null;
   const last = runs[0] ?? null;
   const threshold = scope?.integrityThreshold ?? 95;
   const count = (f: (d: (typeof byOwner)[number]) => boolean) => byOwner.filter(f).reduce((n, d) => n + d._count, 0);
@@ -79,6 +82,12 @@ export default async function AssurancePage({ searchParams }: { searchParams: Pr
           </>
         )}
       </section>
+
+      {dmpDrift ? (
+        <Link href="/admin/config" className="block rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 hover:border-amber-300">
+          <strong>Lists changed since the DMP was approved.</strong> {dmpDrift.sets.join(", ")} changed after {dmpDrift.doc} rev {dmpDrift.rev} was released — revise the DMP so it matches. →
+        </Link>
+      ) : null}
 
       {/* What to look at */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
