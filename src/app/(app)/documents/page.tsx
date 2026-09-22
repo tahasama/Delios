@@ -74,7 +74,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
     const working = doc.revisions.find((revision) => revision.state === "IN_PREPARATION") ?? null;
     const activeRun = doc.revisions.flatMap((revision) => revision.workflowRuns).find((run) => run.status === "ACTIVE") ?? null;
     let workflowOwner = "—";
-    let workflowStage = activeRun ? "In review" : working ? "Draft" : current ? "Released" : latest ? pretty(latest.state) : "No content yet";
+    let workflowStage = activeRun ? "In review" : working ? "In preparation" : current ? "Released" : latest ? pretty(latest.state) : "No revision yet";
     if (activeRun) {
       try {
         const steps = JSON.parse(activeRun.steps) as { participantIds?: string[]; act?: string }[];

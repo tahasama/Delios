@@ -42,7 +42,7 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
       <div className="flex flex-wrap items-end gap-3 border-b border-slate-100 p-4">
         <form action="/documents" className="flex min-w-0 flex-1 flex-wrap items-end gap-2">
           <label className="relative min-w-60 flex-1"><span className="sr-only">Search</span><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input name="q" defaultValue={filters.q} placeholder="Search number, title, supplier, PO or tag" className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 pl-9 pr-3 text-sm outline-none focus:border-brand-line focus:bg-surface" /></label>
-          <Filter name="state" value={filters.state} empty="Any state" options={filterOptions.states} />
+          <Filter name="state" value={filters.state} empty="Any document state" options={filterOptions.states} />
           <Filter name="discipline" value={filters.discipline} empty="Any discipline" options={filterOptions.disciplines} />
           <Filter name="docType" value={filters.docType} empty="Any type" options={filterOptions.types} />
           <input type="hidden" name="view" value={filters.view} />
@@ -57,7 +57,7 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
       {rows.length ? <DataTable id="register" className="rounded-none rounded-b-2xl border-0 shadow-none" defaultHidden={OPTIONAL} head={<tr>
         <Th className="sticky left-0 z-[4] w-10"><input aria-label="Select all visible documents" type="checkbox" checked={allSelected} onChange={() => setSelected(allSelected ? [] : rows.map((row) => row.id))} /></Th>
         <Th className="sticky left-10 z-[4] min-w-[280px]">Document</Th>
-        <Th>Rev</Th><Th>Status</Th><Th>Discipline</Th><Th>Type</Th>
+        <Th>Rev</Th><Th label="Revision state and status code">Revision state · code</Th><Th>Discipline</Th><Th>Type</Th>
         <Th>Originator</Th><Th>Sub-project</Th><Th>Contract</Th><Th>Criticality</Th><Th>Confidentiality</Th>
         <Th>Planned submission</Th><Th>Issued</Th><Th>Released</Th><Th>Approval</Th><Th>In packages</Th>
         <Th>Updated</Th>
@@ -72,7 +72,7 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
           {row.placeholder ? <div className="mt-1"><Tag tone="blue">number reserved</Tag></div> : row.state !== "ACTIVE" && row.state !== "PLANNED" ? <div className="mt-1"><Tag>{row.state.toLowerCase()}</Tag></div> : null}
         </Td>
         <Td className="font-mono text-xs font-semibold text-slate-800">{row.currentRevision ?? row.latestRevision ?? "—"}</Td>
-        <Td className="whitespace-nowrap"><div className="flex items-center gap-1.5"><Tag tone={row.workflowStage === "Released" ? "green" : row.workflowStage === "Draft" ? "amber" : "blue"}>{row.workflowStage}</Tag>{row.currentStatus ? <Link href="/guide/codes" className="font-mono text-[11px] font-bold text-slate-700 underline decoration-slate-300 decoration-dotted underline-offset-2 hover:text-link" title={`${row.currentStatus} — ${row.currentStatusLabel ?? ""}${row.currentStatusUse ? `
+        <Td className="whitespace-nowrap"><div className="flex items-center gap-1.5"><Tag tone={row.workflowStage === "Released" ? "green" : row.workflowStage === "In preparation" ? "amber" : "blue"}>{row.workflowStage}</Tag>{row.currentStatus ? <Link href="/guide/codes" className="font-mono text-[11px] font-bold text-slate-700 underline decoration-slate-300 decoration-dotted underline-offset-2 hover:text-link" title={`${row.currentStatus} — ${row.currentStatusLabel ?? ""}${row.currentStatusUse ? `
 ${row.currentStatusUse}` : ""}
 
 What the codes mean →`}>{row.currentStatus}</Link> : null}</div>{row.workflowStage !== "Released" && row.currentStatus ? <p className="mt-1 text-[11px] text-slate-400">current rev {row.currentRevision} is {row.currentStatus}</p> : null}{row.workflowOwner !== "—" ? <p className="mt-1 max-w-48 truncate text-[11px] text-slate-500">with {row.workflowOwner}</p> : null}{row.blockingComments ? <p className="mt-1 text-[11px] font-semibold text-red-600">{row.blockingComments} blocking comment{row.blockingComments === 1 ? "" : "s"}</p> : null}</Td>

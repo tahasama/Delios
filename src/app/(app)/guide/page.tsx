@@ -27,7 +27,7 @@ const DAILY: CapabilityItem[] = [
   { href: "/transmittals", title: "Issue and receive information", text: "Raise outgoing or incoming transmittals and follow notified, opened and acknowledged evidence.", icon: ArrowLeftRight, action: "Open transmittals" },
   { href: "/packages", title: "Assemble handover packages", text: "Define a package, track required status, assess shortfalls and close with evidence.", icon: FolderKanban, action: "Open packages" },
   { href: "/assets", title: "Retrieve by equipment or area", text: "See every document associated with an asset, system, equipment tag or project area.", icon: Boxes, action: "Open assets" },
-  { href: "/guide/codes", title: "What the codes mean", text: "IFC, AFC, Code 1 … — what each status code lets people do with a document, and what a review outcome decides.", icon: Tags, action: "Read the codes" },
+  { href: "/guide/codes", title: "States and codes explained", text: "Planned, Released, IFC, C1 … — the four kinds of \"status\", who decides each, and how one leads to the next.", icon: Tags, action: "Read the codes" },
 ];
 
 const CONTROL: CapabilityItem[] = [
