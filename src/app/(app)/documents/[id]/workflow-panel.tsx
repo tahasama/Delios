@@ -5,6 +5,7 @@ import { Chip, Field, inputCls } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { ActionForm } from "@/components/form";
 import { recordStepOutcomeAction } from "@/lib/actions/workflow";
+import { verdictEffect, VERDICT_EFFECT_SHORT } from "@/lib/verdict-effect";
 import { getActiveSet } from "@/lib/config";
 import { Send, CheckCircle2, Rocket } from "lucide-react";
 import { getRunForRevision, type WfRuntimeStep } from "@/lib/workflow";
@@ -181,7 +182,7 @@ async function RunActivePanel({ run, user, extra }: { run: { id: string; templat
               <Field label={deciding ? "Verdict" : "Your verdict"} required hint={deciding ? "binding — a verdict that proceeds is the release approval" : "advice for the decider"}>
                 <select name="outcome" required className={inputCls} defaultValue="">
                   <option value="" disabled>Choose…</option>
-                  {outcomes.map((o) => <option key={o.code} value={o.code}>{o.label}</option>)}
+                  {outcomes.map((o) => <option key={o.code} value={o.code}>{o.code} — {o.label} ({VERDICT_EFFECT_SHORT[verdictEffect(o.props)]})</option>)}
                 </select>
               </Field>
               <Field label="Comment" hint="required if it goes back to the author">

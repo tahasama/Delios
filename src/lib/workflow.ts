@@ -122,7 +122,8 @@ export async function startWorkflowRun(t: Tenant, revisionId: string, templateId
   const proposed = await Promise.all(baseSteps.map((s) => proposeForStep(t, [rev.document], s)));
   const steps: WfRuntimeStep[] = baseSteps.map((s, i) => ({
     ...s,
-    outcomeSetKey: s.outcomeSetKey ?? template.outcomeSetKey ?? "REVIEW_OUTCOMES",
+    // One verdict set per route, so every step answers from the same list.
+    outcomeSetKey: template.outcomeSetKey ?? s.outcomeSetKey ?? "REVIEW_OUTCOMES",
     participantIds: overrideParticipantIds?.[i]?.length ? overrideParticipantIds[i] : proposed[i].map((p) => p.id),
     status: i === 0 ? "active" : "pending",
     decidedBy: [],

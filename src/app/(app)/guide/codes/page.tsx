@@ -4,6 +4,7 @@ import { getActiveSet } from "@/lib/config";
 import { PageHeader, Card, DataTable, Th, Td, Chip } from "@/components/ui";
 import { DOC_STATES, DOC_STATE_LABEL, DOC_STATE_COLOR, REV_STATES, REV_STATE_LABEL, REV_STATE_COLOR, type DocState, type RevState } from "@/lib/standard";
 import { ArrowLeft, ArrowRight } from "lucide-react";
+import { VERDICT_EFFECT, verdictEffect } from "@/lib/verdict-effect";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "States and codes" };
@@ -30,12 +31,7 @@ const REV_MEANING: Record<RevState, { means: string; how: string }> = {
   VOID: { means: "Found to be wrong after release and cancelled.", how: "Document Control, with a reason and a check of what was built from it." },
 };
 
-const CONSEQUENCE: Record<string, string> = {
-  "true/false": "Proceed. Nothing more to do.",
-  "true/true": "Proceed, and fold the comments into the next revision.",
-  "false/true": "Stop. Fix the comments and submit a new revision.",
-  "false/false": "Stop. Start again with a fresh submission.",
-};
+const CONSEQUENCE = Object.fromEntries(VERDICT_EFFECT.map((e) => [e.value, e.label]));
 
 export default async function CodesPage() {
   const ctx = await requireScope();
@@ -106,7 +102,7 @@ export default async function CodesPage() {
             <tr key={o.code}>
               <Td className="font-mono text-sm font-bold text-slate-900">{o.code}</Td>
               <Td className="whitespace-nowrap font-medium text-slate-800">{o.label}</Td>
-              <Td className="text-xs">{CONSEQUENCE[`${o.props.proceed === true}/${o.props.resubmit === true}`]}</Td>
+              <Td className="text-xs">{CONSEQUENCE[verdictEffect(o.props)]}</Td>
             </tr>
           ))}
         </DataTable>

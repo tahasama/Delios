@@ -62,7 +62,7 @@ export default async function RequirementsPage() {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-slate-950">Document requirements</h1>
-          <p className="mt-1 text-sm text-slate-500">What each activity needs, asked of the departments, issued to the senders, confirmed before the work.</p>
+          <p className="mt-1 text-sm text-slate-500">What each activity needs, asked of the departments, sent to whoever delivers the documents, confirmed before the work.</p>
         </div>
         <Link href="/actions" className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-semibold text-slate-500 hover:bg-slate-100"><ArrowLeft className="h-4 w-4" /> Schedule</Link>
       </div>
@@ -162,7 +162,7 @@ export default async function RequirementsPage() {
       </Card>
 
       {/* 3 — issue the approved list to whoever sends the documents */}
-      <Card title="3 · Issue to senders" description="Each sender gets what they deliver and the submit-by dates to baseline on. Reviewers have the working days between submit-by and the activity.">
+      <Card title="3 · Tell each sender what to deliver" description="A sender is whoever submits the document: the contractor, the supplier, or our own department for documents we write. Each gets the list the departments returned in step 2, with the submit-by dates to plan on. Reviewers have the working days between submit-by and the activity.">
         {senders.length ? (
           <>
             <DataTable head={<tr><Th>Sender</Th><Th>Documents</Th><Th>First submit-by</Th><Th>Issued</Th><Th /></tr>}>

@@ -98,9 +98,13 @@ export default async function AdminConfigPage({ searchParams }: { searchParams: 
                     <span className="font-mono text-xs font-semibold">{v.code}</span>
                     <span className="text-slate-600">{v.label}</span>
                     <Chip className={v.status === "ACTIVE" ? "bg-emerald-100 text-emerald-800 ring-emerald-300" : "bg-slate-100 text-slate-500 ring-slate-300"}>{v.status.toLowerCase()}</Chip>
-                    {Object.entries(props).filter(([, pv]) => pv === true).map(([pk]) => (
-                      <Chip key={pk} className="bg-sky-100 text-sky-700 ring-sky-300">{pk}</Chip>
-                    ))}
+                    {(propFields ?? []).map((f) =>
+                      f.type === "choice" ? (
+                        <Chip key={f.key} className="bg-sky-100 text-sky-700 ring-sky-300">{f.options.find((o) => o.value === f.read(props))?.label.split(" — ")[0]}</Chip>
+                      ) : f.type === "bool" && props[f.key] === true ? (
+                        <Chip key={f.key} className="bg-sky-100 text-sky-700 ring-sky-300">{f.label.toLowerCase()}</Chip>
+                      ) : null,
+                    )}
                     {typeof props.acceptancePeriodDays === "number" ? <Chip className="bg-slate-100 text-slate-600 ring-slate-300">{props.acceptancePeriodDays}d acceptance</Chip> : null}
                     {typeof props.responsePeriodDays === "number" ? <Chip className="bg-slate-100 text-slate-600 ring-slate-300">{props.responsePeriodDays}d response</Chip> : null}
                     <span className="ml-auto flex items-center gap-1">
@@ -142,7 +146,7 @@ export default async function AdminConfigPage({ searchParams }: { searchParams: 
                           </Field>
                         )}
                         {propFields?.map((f) => (
-                          <PropInput key={f.key} field={f} value={props[f.key]} />
+                          <PropInput key={f.key} field={f} value={f.type === "choice" ? f.read(props) : props[f.key]} />
                         ))}
                       </div>
                     </ActionForm>
@@ -180,6 +184,21 @@ export default async function AdminConfigPage({ searchParams }: { searchParams: 
 }
 
 function PropInput({ field, value }: { field: PropField; value: unknown }) {
+  if (field.type === "choice") {
+    return (
+      <fieldset className="sm:col-span-2">
+        <legend className="mb-1 text-xs font-semibold text-slate-700">{field.label}</legend>
+        <div className="space-y-1.5">
+          {field.options.map((o, i) => (
+            <label key={o.value} className="flex items-start gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 has-[:checked]:border-brand-line has-[:checked]:bg-tint-soft">
+              <input type="radio" name={`prop_${field.key}`} value={o.value} defaultChecked={value ? value === o.value : i === 0} className="mt-0.5" />
+              <span><strong className="font-semibold">{o.label.split(" — ")[0]}</strong>{o.label.includes(" — ") ? <span className="text-slate-500"> — {o.label.split(" — ").slice(1).join(" — ")}</span> : null}</span>
+            </label>
+          ))}
+        </div>
+      </fieldset>
+    );
+  }
   if (field.type === "bool") {
     return (
       <label className="flex items-center gap-2 self-end pb-2 text-sm text-slate-700">

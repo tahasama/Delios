@@ -8,7 +8,7 @@ import { ArrowRight, X } from "lucide-react";
 
 export type SendPerson = { id: string; name: string; functionName: string };
 export type SendStep = { title: string; act: "REVIEW" | "APPROVAL"; mode: string; proposed: { id: string; why: string }[]; fromFunctions: string[] };
-export type SendRoute = { id: string; name: string; description: string | null; isDefault: boolean; steps: SendStep[] };
+export type SendRoute = { id: string; name: string; description: string | null; isDefault: boolean; steps: SendStep[]; verdicts: { title: string; values: { code: string; label: string; effectLabel: string }[] } | null };
 
 const MODE: Record<string, string> = {
   ALL: "all give input, any order",
@@ -45,6 +45,12 @@ export function SendForReviewForm({ revisionIds, routes, reviewers, approvers }:
         </select>
       </Field>
       {route?.description ? <p className="-mt-1 text-xs text-slate-500">{route.description}</p> : null}
+      {route?.verdicts ? (
+        <p className="text-[11px] text-slate-500">
+          Reviewers answer with <strong className="text-slate-700">{route.verdicts.title}</strong>:{" "}
+          {route.verdicts.values.map((v, i) => <span key={v.code} title={v.label}>{i ? " · " : ""}<span className="font-mono font-semibold">{v.code}</span> {v.effectLabel}</span>)}
+        </p>
+      ) : null}
 
       <div key={routeId} className="scroll-thin -mx-1 flex items-stretch gap-1 overflow-x-auto px-1 pb-1">
         {route?.steps.map((step, i) => (

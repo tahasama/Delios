@@ -8,30 +8,36 @@ export type PropField =
   | { key: string; label: string; type: "bool"; hint?: string }
   | { key: string; label: string; type: "int"; hint?: string }
   | { key: string; label: string; type: "text"; hint?: string }
-  | { key: string; label: string; type: "select"; options: string[]; hint?: string };
+  | { key: string; label: string; type: "select"; options: string[]; hint?: string }
+  /** One plain question whose answer sets several stored properties at once. */
+  | { key: string; label: string; type: "choice"; options: ChoiceOption[]; read: (props: Record<string, unknown>) => string; hint?: string };
+
+import type { ChoiceOption } from "./verdict-effect";
+
+import { VERDICT_EFFECT, verdictEffect } from "./verdict-effect";
+export { VERDICT_EFFECT, verdictEffect, VERDICT_EFFECT_SHORT } from "./verdict-effect";
 
 export const SET_PROP_FIELDS: Record<string, PropField[]> = {
   STATUSES: [
-    { key: "executionFlag", label: "Permits physical execution", type: "bool", hint: "§7.8 — construction, fabrication, installation, procurement commitment" },
+    { key: "executionFlag", label: "Allows work on site or in the shop", type: "bool", hint: "building, fabricating, installing or ordering from it (§7.8)" },
     { key: "may", label: "May be used for", type: "text" },
     { key: "mayNot", label: "May NOT be used for", type: "text" },
   ],
   REVIEW_OUTCOMES: [
-    { key: "proceed", label: "Work may proceed", type: "bool", hint: "§9.3" },
-    { key: "resubmit", label: "Resubmission required", type: "bool", hint: "§9.3 — this outcome authorizes the next revision (§6.5)" },
+    { key: "effect", label: "What this verdict does", type: "choice", options: VERDICT_EFFECT, read: verdictEffect, hint: "§9.3" },
   ],
   REASONS_FOR_ISSUE: [
     { key: "maturity", label: "Required maturity", type: "text", hint: "§2.6 — what state the revision must be in" },
-    { key: "reviewCycle", label: "Opens a review cycle", type: "bool", hint: "§11.11" },
-    { key: "response", label: "Response required", type: "bool" },
+    { key: "reviewCycle", label: "Needs a review", type: "bool", hint: "received documents go down a review route once accepted (§11.11)" },
+    { key: "response", label: "Needs a reply", type: "bool", hint: "the recipient must answer within the reply period" },
     { key: "acceptancePeriodDays", label: "Acceptance period (days)", type: "int", hint: "§11.12" },
     { key: "responsePeriodDays", label: "Response period (days)", type: "int", hint: "§11.12 — runs from acceptance" },
   ],
   COMMENT_CLASSES: [
-    { key: "progressionPreventing", label: "Prevents progression", type: "bool", hint: "§9.6 — work shall not proceed while open" },
+    { key: "progressionPreventing", label: "Blocks the work until it is closed", type: "bool", hint: "§9.6" },
   ],
   CONFIDENTIALITY: [
-    { key: "default", label: "Default classification", type: "bool", hint: "§5.7 — applied where unset" },
+    { key: "default", label: "Used when none is chosen", type: "bool", hint: "§5.7" },
   ],
   ISSUE_CODES: [
     { key: "reason", label: "Maps to reason for issue", type: "select", options: ["INFORMATION", "REVIEW", "APPROVAL", "PRICING", "EXECUTION", "RECORD"] },
@@ -56,7 +62,10 @@ export function buildProps(setKey: string, formData: FormData): string | null {
   }
   const props: Record<string, unknown> = {};
   for (const f of fields) {
-    if (f.type === "bool") props[f.key] = formData.get(`prop_${f.key}`) === "on";
+    if (f.type === "choice") {
+      const picked = f.options.find((o) => o.value === String(formData.get(`prop_${f.key}`) ?? ""));
+      if (picked) Object.assign(props, picked.sets);
+    } else if (f.type === "bool") props[f.key] = formData.get(`prop_${f.key}`) === "on";
     else if (f.type === "int") {
       const v = String(formData.get(`prop_${f.key}`) ?? "").trim();
       props[f.key] = v === "" ? undefined : Number(v);

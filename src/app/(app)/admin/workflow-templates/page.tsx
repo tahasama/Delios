@@ -4,6 +4,7 @@ import { deleteTemplateAction } from "@/lib/actions/workflow";
 import { getSets } from "@/lib/config";
 import { WorkflowTemplateBuilder, type WorkflowBuilderStep } from "./workflow-template-builder";
 import { hasVerb } from "@/lib/auth";
+import { verdictSets } from "@/lib/verdict-sets";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Workflow templates" };
@@ -27,6 +28,7 @@ export default async function WorkflowTemplatesPage() {
     criticalities: classValues.filter((value) => value.setKey === "CRITICALITY").map(({ code, label }) => ({ code, label })),
   };
   const nameOf = (id: string) => users.find((u) => u.id === id)?.name ?? id;
+  const setViews = await verdictSets({ db }, templates.map((t) => t.outcomeSetKey ?? "REVIEW_OUTCOMES"));
 
   return (
     <div className="space-y-4">
@@ -54,6 +56,17 @@ export default async function WorkflowTemplatesPage() {
                   ) : null}
                 </div>
               }>
+                {(() => {
+                  const v = setViews.get(t.outcomeSetKey ?? "REVIEW_OUTCOMES");
+                  return v ? (
+                    <div className="mb-3 rounded-lg bg-slate-50 px-3 py-2 text-xs">
+                      <span className="font-semibold text-slate-700">Verdicts: {v.title}</span>
+                      <span className="ml-2 inline-flex flex-wrap gap-1 align-middle">
+                        {v.values.map((x) => <span key={x.code} className="rounded bg-surface px-1.5 py-0.5 ring-1 ring-slate-200" title={`${x.label} — ${x.effectLabel}`}><span className="font-mono font-bold">{x.code}</span> <span className="text-slate-500">{x.effectLabel}</span></span>)}
+                      </span>
+                    </div>
+                  ) : null;
+                })()}
                 <ol className="space-y-1.5">
                   {steps.map((s, i) => (
                     <li key={i} className="flex flex-wrap items-center gap-2 text-sm">

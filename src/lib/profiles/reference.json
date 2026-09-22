@@ -367,11 +367,11 @@
     {
       "key": "REVIEW_OUTCOMES",
       "title": "Review outcomes",
-      "description": "D.7 — the result of a review with its consequences (§9.3). Code 1/2/3/4 or A/B/C/D labelings are equivalent.",
+      "description": "D.7 — the verdict on a submitted revision and what it does (§9.3). The last step of a review route gives it; a verdict that is final is the release approval.",
       "values": [
         {
           "code": "C1",
-          "label": "Approved (Code 1)",
+          "label": "Accepted",
           "props": {
             "proceed": true,
             "resubmit": false
@@ -379,7 +379,7 @@
         },
         {
           "code": "C2",
-          "label": "Approved with comments (Code 2)",
+          "label": "Accepted with comments",
           "props": {
             "proceed": true,
             "resubmit": true
@@ -387,7 +387,7 @@
         },
         {
           "code": "C3",
-          "label": "Revise and resubmit (Code 3)",
+          "label": "Rejected — revise and resubmit",
           "props": {
             "proceed": false,
             "resubmit": true
@@ -395,10 +395,10 @@
         },
         {
           "code": "C4",
-          "label": "Rejected (Code 4)",
+          "label": "For information only — no review needed",
           "props": {
-            "proceed": false,
-            "resubmit": true
+            "proceed": true,
+            "resubmit": false
           }
         }
       ]

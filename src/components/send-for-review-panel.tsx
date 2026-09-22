@@ -1,6 +1,7 @@
 import { requireScope } from "@/lib/scope";
 import { eligiblePeople, proposeForStep, normalizeRoute, type WfStep } from "@/lib/workflow";
 import { SendForReviewForm, type SendRoute } from "./send-for-review";
+import { verdictSets } from "@/lib/verdict-sets";
 
 /**
  * Loads what the Send form needs for these revisions: the routes that apply
@@ -31,8 +32,10 @@ export async function SendForReview({ revisionIds }: { revisionIds: string[] }) 
     }
   };
 
+  const applicable = templates.filter((x) => applies(x.classes));
+  const setViews = await verdictSets(ctx, applicable.map((x) => x.outcomeSetKey ?? "REVIEW_OUTCOMES"));
   const routes: SendRoute[] = [];
-  for (const t of templates.filter((x) => applies(x.classes))) {
+  for (const t of applicable) {
     // The last step decides; earlier steps advise.
     const steps = normalizeRoute(JSON.parse(t.steps) as (WfStep & { title?: string })[]);
     routes.push({
@@ -40,6 +43,7 @@ export async function SendForReview({ revisionIds }: { revisionIds: string[] }) 
       name: t.name,
       description: t.description,
       isDefault: t.isDefault,
+      verdicts: setViews.get(t.outcomeSetKey ?? "REVIEW_OUTCOMES") ?? null,
       steps: await Promise.all(steps.map(async (s, i) => ({
         title: s.title || (s.act === "APPROVAL" ? "Decision" : `Review ${i + 1}`),
         act: s.act,
