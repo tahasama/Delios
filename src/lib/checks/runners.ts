@@ -70,7 +70,7 @@ export const RUNNERS: Runners = {
   // ── Identity ──────────────────────────────────────────────────────────────
   "ID-01": async (ctx) => {
     const bad = await ctx.db.document.findMany({ where: { docNumber: "" }, select: { id: true, docNumber: true } });
-    return bad.map((d) => doc(d, "Document number absent (§3.1)."));
+ return bad.map((d) => doc(d, "Document number absent."));
   },
   "ID-02": async (ctx) => {
     const all = await ctx.db.document.findMany({ select: { id: true, docNumber: true } });
@@ -97,7 +97,7 @@ export const RUNNERS: Runners = {
       if (!scheme) { failures.push(doc(d, `No active numbering scheme routed for deliverable type "${d.deliverableType}".`)); continue; }
       const parts = partsOf(d.docNumber, scheme.delimiter);
       if (parts.length !== scheme.fields.length) {
-        failures.push(doc(d, `Field count ${parts.length} ≠ scheme "${scheme.name}" count ${scheme.fields.length} (§3.2).`));
+ failures.push(doc(d, `Field count ${parts.length} ≠ scheme "${scheme.name}" count ${scheme.fields.length}.`));
       }
     }
     return failures;
@@ -113,7 +113,7 @@ export const RUNNERS: Runners = {
       const scheme = schemes.find((s) => s.name === routing.find((r) => r.deliverableType === d.deliverableType)?.schemeName);
       if (!scheme) continue;
       const parts = partsOf(d.docNumber, scheme.delimiter);
-      if (parts.some((p) => p.trim() === "")) failures.push(doc(d, `Delimiter appears within/adjacent to a field (§3.2).`));
+ if (parts.some((p) => p.trim() === "")) failures.push(doc(d, `Delimiter appears within/adjacent to a field.`));
     }
     return failures;
   },
@@ -133,12 +133,12 @@ export const RUNNERS: Runners = {
         const f = scheme.fields[i];
         if (f.rule?.startsWith("COUNTER")) {
           const digits = Number(f.rule.match(/DIGITS\((\d+)\)/)?.[1] ?? 5);
-          if (!new RegExp(`^\\d{${digits}}$`).test(parts[i])) failures.push(doc(d, `Sequence "${parts[i]}" is not ${digits} digits (§3.2).`));
+ if (!new RegExp(`^\\d{${digits}}$`).test(parts[i])) failures.push(doc(d, `Sequence "${parts[i]}" is not ${digits} digits.`));
           continue;
         }
         if (!f.valueSetKey) continue;
         const set = ctx.allSets.get(f.valueSetKey);
-        if (set && !set.has(parts[i])) failures.push(doc(d, `Field "${f.label}" value "${parts[i]}" is not in the published set — retired or unknown (§3.2/§4.7).`));
+ if (set && !set.has(parts[i])) failures.push(doc(d, `Field "${f.label}" value "${parts[i]}" is not in the published set — retired or unknown.`));
       }
     }
     return failures;
@@ -158,7 +158,7 @@ export const RUNNERS: Runners = {
       const required = ["Project code", "Discipline", "Document type"];
       for (const req of required) {
         const idx = labels.findIndex((l) => l.toLowerCase().includes(req.toLowerCase()));
-        if (idx >= 0 && (!parts[idx] || parts[idx] === "")) failures.push(doc(d, `Required field "${req}" absent from the number (§3.3).`));
+ if (idx >= 0 && (!parts[idx] || parts[idx] === "")) failures.push(doc(d, `Required field "${req}" absent from the number.`));
       }
     }
     return failures;
@@ -167,17 +167,17 @@ export const RUNNERS: Runners = {
     const docs = await ctx.db.document.findMany({ select: { id: true, docNumber: true } });
     return docs
       .filter((d) => /rev|revision|\d{4}-\d{2}-\d{2}/i.test(d.docNumber))
-      .map((d) => doc(d, `Excluded value (revision/status/date) encoded in the number (§3.5).`));
+.map((d) => doc(d, `Excluded value (revision/status/date) encoded in the number.`));
   },
   "ID-09": async (ctx) => {
     const files = await ctx.db.storedFile.findMany({ include: { revision: { include: { document: { select: { docNumber: true } } } } } });
     return files
       .filter((f) => f.revision && !safeName(f.path).startsWith(f.revision.document.docNumber))
-      .map((f) => ({ entityKey: `StoredFile:${f.id}`, entityType: "StoredFile", entityId: f.id, documentId: f.revision?.documentId, entityLabel: safeName(f.path), description: "File name does not begin with the document number (§3.6)." }));
+.map((f) => ({ entityKey: `StoredFile:${f.id}`, entityType: "StoredFile", entityId: f.id, documentId: f.revision?.documentId, entityLabel: safeName(f.path), description: "File name does not begin with the document number." }));
   },
   "ID-10": async (ctx) => {
     const docs = await ctx.db.document.findMany({ where: { deliverableType: { in: ["CTR", "VND", "TPY", "CLT"] }, receivedDate: { not: null }, docNumber: "" }, select: { id: true, docNumber: true } });
-    return docs.map((d) => doc(d, "External item received without a number issued first (§3.7)."));
+ return docs.map((d) => doc(d, "External item received without a number issued first."));
   },
   "ID-11": async (ctx) => {
     const [docs, counters, schemes, routing] = await Promise.all([
@@ -194,35 +194,35 @@ export const RUNNERS: Runners = {
       const parts = partsOf(d.docNumber, scheme.delimiter);
       if (parts.length !== scheme.fields.length) continue;
       const prefix = parts.slice(0, -1).join(scheme.delimiter);
-      if (!prefixes.has(prefix)) failures.push(doc(d, `Number prefix "${prefix}" was never issued by the system — outside any issued range (§3.7 / ID-11 ▲).`));
+ if (!prefixes.has(prefix)) failures.push(doc(d, `Number prefix "${prefix}" was never issued by the system — outside any issued range.`));
     }
     return failures;
   },
   "ID-16": async (ctx) => {
     const docs = await ctx.db.document.findMany({ where: { legacyScheme: { not: null }, previousId: null }, select: { id: true, docNumber: true } });
-    return docs.map((d) => doc(d, "Renumbered legacy item with no previous identifier retained (§3.8)."));
+ return docs.map((d) => doc(d, "Renumbered legacy item with no previous identifier retained."));
   },
 
   // ── Description ───────────────────────────────────────────────────────────
   "MD-02": async (ctx) => {
     const scope = await ctx.db.scopeConfig.findFirst();
-    return scope ? [] : [cfg("No authoritative register/scope nominated (§4.1 / MD-02).")];
+ return scope ? []: [cfg("No authoritative register/scope nominated.")];
   },
   "MD-04": async (ctx) => {
     const revs = await ctx.db.revision.findMany({ where: { state: { in: ["RELEASED", "SUPERSEDED"] } }, include: { document: true } });
     return revs
       .filter((r) => !r.document.title || !r.document.docType || !r.document.discipline || !r.document.retentionClass || !r.document.criticality || !r.document.confidentiality)
-      .map((r) => rev(r, "Core document metadata empty on a released item (§4.3 / MD-04)."));
+.map((r) => rev(r, "Core document metadata empty on a released item."));
   },
   "MD-05": async (ctx) => {
     const revs = await ctx.db.revision.findMany({ where: { state: { in: ["RELEASED", "SUPERSEDED"] } } });
     return revs
       .filter((r) => !r.statusCode || !r.reasonForRevision || !r.changeDescription)
-      .map((r) => rev(r, "Core revision metadata empty on a released revision (§4.3 / MD-05)."));
+.map((r) => rev(r, "Core revision metadata empty on a released revision."));
   },
   "MD-06": async (ctx) => {
     const docs = await ctx.db.document.findMany({ select: { id: true, docNumber: true, title: true } });
-    return docs.filter((d) => /^(report|drawing|layout|document|spec|unc?itled|test)$/i.test(d.title.trim())).map((d) => doc(d, "Generic, non-descriptive title (§4.3)."));
+ return docs.filter((d) => /^(report|drawing|layout|document|spec|unc?itled|test)$/i.test(d.title.trim())).map((d) => doc(d, "Generic, non-descriptive title."));
   },
   "MD-07": async (ctx) => {
     const docs = await ctx.db.document.findMany({ where: { isPlaceholder: false } });
@@ -236,7 +236,7 @@ export const RUNNERS: Runners = {
       if (props.originator === "required" && !d.originator) missing.push("originator");
       if (props.po === "required" && !d.contractRef) missing.push("contract/PO");
       if (props.receivedDate === "required" && !d.receivedDate) missing.push("date received");
-      if (missing.length) failures.push(doc(d, `Conditional field empty where the type-to-field matrix requires it: ${missing.join(", ")} (§4.4).`));
+ if (missing.length) failures.push(doc(d, `Conditional field empty where the type-to-field matrix requires it: ${missing.join(", ")}.`));
     }
     return failures;
   },
@@ -245,11 +245,11 @@ export const RUNNERS: Runners = {
     const placeholderRe = /^(n\/?a|tbd|tbc|xxx|—|-)$/i;
     return docs
       .filter((d) => placeholderRe.test(d.originator ?? "") || placeholderRe.test(d.contractRef ?? "") || placeholderRe.test(d.subProject ?? ""))
-      .map((d) => doc(d, "Placeholder value in a non-applicable field (§4.4)."));
+.map((d) => doc(d, "Placeholder value in a non-applicable field."));
   },
   "MD-10": async (ctx) => {
     const docs = await ctx.db.document.findMany({ where: { deliverableType: { in: ["CTR", "VND", "TPY", "CLT"] }, receivedDate: null, isPlaceholder: false } });
-    return docs.map((d) => doc(d, "Date received absent on an external deliverable type (§4.5)."));
+ return docs.map((d) => doc(d, "Date received absent on an external deliverable type."));
   },
   "MD-13": async (ctx) => {
     const docs = await ctx.db.document.findMany({});
@@ -265,20 +265,20 @@ export const RUNNERS: Runners = {
       for (const [setKey, value, labelName] of checks) {
         if (!value) continue;
         const set = ctx.allSets.get(setKey);
-        if (set && !set.has(value)) failures.push(doc(d, `${labelName} "${value}" is not in the published set (§4.7).`));
+ if (set && !set.has(value)) failures.push(doc(d, `${labelName} "${value}" is not in the published set.`));
       }
     }
     return failures;
   },
   "MD-14": async (ctx) => {
     const sets = await ctx.db.configSet.findMany({ where: { version: { lte: 0 } } });
-    return sets.map((s) => cfg(`Value list "${s.key}" is unversioned (§4.7).`));
+ return sets.map((s) => cfg(`Value list "${s.key}" is unversioned.`));
   },
   "MD-17": async (ctx) => {
     // every metadata update writes an audit event by construction; verify docs whose updatedAt moved without a matching event
     const recent = await ctx.db.auditEvent.count({ where: { action: "METADATA_CHANGE" } });
     const changed = await ctx.db.auditEvent.count({ where: { action: "REGISTER_ENTRY" } });
-    return recent === 0 && changed === 0 ? [org("No metadata change log found (§4.9).")] : [];
+ return recent === 0 && changed === 0 ? [org("No metadata change log found.")]: [];
   },
 
   // ── Classification ────────────────────────────────────────────────────────
@@ -288,27 +288,27 @@ export const RUNNERS: Runners = {
     const disc = ctx.allSets.get("DISCIPLINES");
     const types = ctx.allSets.get("DOCUMENT_TYPES");
     for (const d of docs) {
-      if (disc?.has(d.docType) || types?.has(d.discipline)) failures.push(doc(d, "Value of one classification held in another classification's field (§5.1)."));
+ if (disc?.has(d.docType) || types?.has(d.discipline)) failures.push(doc(d, "Value of one classification held in another classification's field."));
     }
     return failures;
   },
   "CL-05": async (ctx) => {
     const deliverables = ctx.allSets.get("DELIVERABLE_TYPES");
-    if (!deliverables || deliverables.size === 0) return [cfg("Deliverable type set not published — type-to-field matrix missing (§5.2).")];
+ if (!deliverables || deliverables.size === 0) return [cfg("Deliverable type set not published — type-to-field matrix missing.")];
     return [];
   },
   "CL-06": async (ctx) => {
     const docs = await ctx.db.document.findMany({});
     const types = ctx.allSets.get("DOCUMENT_TYPES");
-    return docs.filter((d) => !d.docType || !types?.has(d.docType)).map((d) => doc(d, "Document type absent or not in the published set (§5.3)."));
+ return docs.filter((d) => !d.docType || !types?.has(d.docType)).map((d) => doc(d, "Document type absent or not in the published set."));
   },
   "CL-08": async (ctx) => {
     const docs = await ctx.db.document.findMany({ where: { discipline: "" } });
-    return docs.map((d) => doc(d, "Discipline absent (§5.4)."));
+ return docs.map((d) => doc(d, "Discipline absent."));
   },
   "CL-11": async (ctx) => {
     const docs = await ctx.db.document.findMany({ where: { criticality: null, isPlaceholder: false } });
-    return docs.map((d) => doc(d, "Criticality absent where classification is in use (§5.6)."));
+ return docs.map((d) => doc(d, "Criticality absent where classification is in use."));
   },
   "CL-12": async (ctx) => {
     // §8.2 — authority is the Approve grant in the distribution matrix.
@@ -316,7 +316,7 @@ export const RUNNERS: Runners = {
     const failures: Failure[] = [];
     for (const c of crits) {
       const covered = rows.some((r) => r.criticality === c.code) || rows.some((r) => r.criticality == null);
-      if (!covered) failures.push(cfg(`Criticality "${c.code}" does not drive any published approval authority (§5.6 / §8.2).`));
+ if (!covered) failures.push(cfg(`Criticality "${c.code}" does not drive any published approval authority.`));
     }
     return failures;
   },
@@ -325,7 +325,7 @@ export const RUNNERS: Runners = {
       ctx.db.configValue.findFirst({ where: { setKey: "CONFIDENTIALITY", props: { contains: "default" } } }),
       ctx.db.document.count({ where: { confidentiality: null } }),
     ]);
-    if (!defaults && missing > 0) return [cfg("Confidentiality absent on records and no default class published (§5.7).")];
+ if (!defaults && missing > 0) return [cfg("Confidentiality absent on records and no default class published.")];
     return [];
   },
   "CL-16": async (ctx) => {
@@ -345,19 +345,19 @@ export const RUNNERS: Runners = {
   // ── Revision ──────────────────────────────────────────────────────────────
   "RV-02": async (ctx) => {
     const n = await ctx.db.scheme.count();
-    return n === 0 ? [cfg("Revision/numbering scheme not published (§6.2).")] : [];
+ return n === 0 ? [cfg("Revision/numbering scheme not published.")]: [];
   },
   "RV-03": async (ctx) => {
     const revs = await ctx.db.revision.findMany({ include: { document: { select: { docNumber: true } } } });
     return revs
       .filter((r) => (r.series === "DESIGN" && !/^[A-Z]+$/.test(r.value)) || (r.series === "EXECUTION" && !/^\d+$/.test(r.value)))
-      .map((r) => rev(r, `Revision value "${r.value}" is not in the ${r.series.toLowerCase()} series convention (§6.2).`));
+.map((r) => rev(r, `Revision value "${r.value}" is not in the ${r.series.toLowerCase()} series convention.`));
   },
   "RV-04": async (ctx) => {
     const revs = await ctx.db.revision.findMany({ include: { document: { select: { docNumber: true } } } });
     return revs
       .filter((r) => EXCLUDED_REV_LETTERS.some((l) => r.value.toUpperCase().includes(l)))
-      .map((r) => rev(r, `Excluded character in revision value "${r.value}" — I O Q S X Z are misread as digits (§6.2).`));
+.map((r) => rev(r, `Excluded character in revision value "${r.value}" — I O Q S X Z are misread as digits.`));
   },
   "RV-06": async (ctx) => {
     const docs = await ctx.db.document.findMany({ include: { revisions: { orderBy: { createdAt: "asc" } } } });
@@ -366,7 +366,7 @@ export const RUNNERS: Runners = {
       const numeric = d.revisions.filter((r) => /^\d+$/.test(r.value));
       for (let i = 1; i < numeric.length; i++) {
         if (Number(numeric[i].value) <= Number(numeric[i - 1].value)) {
-          failures.push(rev(numeric[i], "Revision sequence moving backwards (§6.3 / RV-06 ▲)."));
+ failures.push(rev(numeric[i], "Revision sequence moving backwards."));
         }
       }
     }
@@ -379,7 +379,7 @@ export const RUNNERS: Runners = {
     for (const r of revs) {
       const key = `${r.documentId}:${r.value.toUpperCase()}`;
       seen.set(key, (seen.get(key) ?? 0) + 1);
-      if (seen.get(key)! > 1) failures.push(rev(r, "Revision value repeated within the document (§6.3 / RV-07 ▲)."));
+ if (seen.get(key)! > 1) failures.push(rev(r, "Revision value repeated within the document."));
     }
     return failures;
   },
@@ -387,89 +387,89 @@ export const RUNNERS: Runners = {
     const docs = await ctx.db.document.findMany({ include: { revisions: { where: { state: "IN_PREPARATION" } } } });
     return docs
       .filter((d) => d.revisions.length > 1)
-      .flatMap((d) => d.revisions.slice(1).map((r) => rev(r, "More than one revision in preparation (§6.3).")));
+.flatMap((d) => d.revisions.slice(1).map((r) => rev(r, "More than one revision in preparation.")));
   },
   "RV-10": async (ctx) => {
     const revs = await ctx.db.revision.findMany({ where: { authorizationReason: null }, include: { document: { select: { docNumber: true } } } });
-    return revs.map((r) => rev(r, "Revision established with no recorded authorization (§6.5 / RV-10 ▲)."));
+ return revs.map((r) => rev(r, "Revision established with no recorded authorization."));
   },
   "RV-11": async (ctx) => {
     const revs = await ctx.db.revision.findMany({ where: { OR: [{ authorizedByName: null }, { authorizedAt: null }], authorizationReason: { not: null } }, include: { document: { select: { docNumber: true } } } });
-    return revs.map((r) => rev(r, "Authorization missing reason, party or date (§6.5)."));
+ return revs.map((r) => rev(r, "Authorization missing reason, party or date."));
   },
   "RV-12": async (ctx) => {
     const revs = await ctx.db.revision.findMany({ where: { authorizationReason: null, cycles: { some: {} } }, include: { document: { select: { docNumber: true } } } });
-    return revs.map((r) => rev(r, "Revision submitted for review without authorization issued (§6.5)."));
+ return revs.map((r) => rev(r, "Revision submitted for review without authorization issued."));
   },
   "RV-13": async (ctx) => {
     const revs = await ctx.db.revision.findMany({ where: { reasonForRevision: null }, include: { document: { select: { docNumber: true } } } });
-    return revs.map((r) => rev(r, "Reason for revision absent (§6.6)."));
+ return revs.map((r) => rev(r, "Reason for revision absent."));
   },
   "RV-14": async (ctx) => {
     const revs = await ctx.db.revision.findMany({ include: { document: { select: { docNumber: true } } } });
     return revs
       .filter((r) => !r.changeDescription || r.changeDescription.trim().toLowerCase() === (r.reasonForRevision ?? "").trim().toLowerCase())
-      .map((r) => rev(r, "Description of change absent or restating the reason (§6.6)."));
+.map((r) => rev(r, "Description of change absent or restating the reason."));
   },
   "RV-15": async (ctx) => {
     const docs = await ctx.db.document.findMany({ include: { revisions: { where: { state: "RELEASED" } } } });
     return docs
       .filter((d) => d.revisions.length > 1)
-      .flatMap((d) => d.revisions.slice(1).map((r) => rev(r, "Two current revisions of one document — structural contradiction (§6.7 / RV-15 ▲).")));
+.flatMap((d) => d.revisions.slice(1).map((r) => rev(r, "Two current revisions of one document — structural contradiction.")));
   },
   "RV-16": async (ctx) => {
     const docs = await ctx.db.document.findMany({
       where: { state: "ACTIVE", revisions: { none: { state: "RELEASED" } } },
     });
-    return docs.map((d) => doc(d, "Document in use with no current revision — shall not be used (§6.7 / RV-16 ▲)."));
+ return docs.map((d) => doc(d, "Document in use with no current revision — shall not be used."));
   },
 
   // ── State & status ────────────────────────────────────────────────────────
   "ST-02": async (ctx) => {
     const revs = await ctx.db.revision.findMany({ where: { state: { notIn: [...REV_STATES] } }, include: { document: { select: { docNumber: true } } } });
-    return revs.map((r) => rev(r, `Revision state "${r.state}" not in the permitted set (§7.2).`));
+ return revs.map((r) => rev(r, `Revision state "${r.state}" not in the permitted set.`));
   },
   "ST-03": async (ctx) => {
     const docs = await ctx.db.document.findMany({ where: { state: { notIn: [...DOC_STATES] } } });
-    return docs.map((d) => doc(d, `Document state "${d.state}" not in the permitted set (§7.3).`));
+ return docs.map((d) => doc(d, `Document state "${d.state}" not in the permitted set.`));
   },
   "ST-05": async (ctx) => {
     const docs = await ctx.db.document.findMany({ where: { state: "" } }).catch(() => []);
-    return (docs as { id: string; docNumber: string }[]).map((d) => doc(d, "State absent (§7.4)."));
+ return (docs as { id: string; docNumber: string }[]).map((d) => doc(d, "State absent."));
   },
   "ST-06": async (ctx) => {
     const order: Record<string, number> = { IN_PREPARATION: 0, IN_REVIEW: 1, RELEASED: 2, SUPERSEDED: 3, VOID: 4 };
     const events = await ctx.db.auditEvent.findMany({ where: { action: "STATE_TRANSITION", entityType: "Revision", oldValue: { not: null }, newValue: { not: null } } });
     return events
       .filter((e) => order[e.oldValue!] !== undefined && order[e.newValue!] !== undefined && order[e.newValue!] < order[e.oldValue!])
-      .map((e) => ({ entityKey: `AuditEvent:${e.id}`, entityType: "Revision", entityId: e.entityId ?? undefined, documentId: null, entityLabel: e.entityLabel ?? "", description: "Backward state transition (§7.5 / ST-06 ▲)." }));
+.map((e) => ({ entityKey: `AuditEvent:${e.id}`, entityType: "Revision", entityId: e.entityId ?? undefined, documentId: null, entityLabel: e.entityLabel ?? "", description: "Backward state transition." }));
   },
   "ST-07": async (ctx) => {
     const revs = await ctx.db.revision.findMany({ where: { state: { in: ["RELEASED", "SUPERSEDED"] }, approvals: { none: {} } }, include: { document: { select: { docNumber: true } } } });
-    return revs.map((r) => rev(r, "Released with no recorded approval — structural contradiction (§7.5/§8.1 / ST-07 ▲)."));
+ return revs.map((r) => rev(r, "Released with no recorded approval — structural contradiction."));
   },
   "ST-08": async (ctx) => {
     const docs = await ctx.db.document.findMany({ include: { revisions: { where: { state: "RELEASED" }, orderBy: { releasedAt: "asc" } } } });
     return docs
       .filter((d) => d.revisions.length > 1)
-      .flatMap((d) => d.revisions.slice(0, -1).map((r) => rev(r, "Earlier revision still released after its successor (§7.5 / ST-08 ▲).")));
+.flatMap((d) => d.revisions.slice(0, -1).map((r) => rev(r, "Earlier revision still released after its successor.")));
   },
   "ST-09": async (ctx) => {
     const revs = await ctx.db.revision.findMany({ where: { state: { in: ["RELEASED", "SUPERSEDED"] }, statusCode: null }, include: { document: { select: { docNumber: true } } } });
-    return revs.map((r) => rev(r, "Released revision carrying no status (§7.6)."));
+ return revs.map((r) => rev(r, "Released revision carrying no status."));
   },
   "ST-10": async (ctx) => {
     const set = ctx.allSets.get("STATUSES");
-    return set && set.size > 0 ? [] : [cfg("Status set not published (§7.7).")];
+ return set && set.size > 0 ? []: [cfg("Status set not published.")];
   },
   "ST-11": async (ctx) => {
     const revs = await ctx.db.revision.findMany({ where: { statusCode: { not: null } }, include: { document: { select: { docNumber: true } } } });
     const set = ctx.allSets.get("STATUSES");
-    return revs.filter((r) => set && !set.has(r.statusCode!)).map((r) => rev(r, "Status not in the published set (§7.7)."));
+ return revs.filter((r) => set && !set.has(r.statusCode!)).map((r) => rev(r, "Status not in the published set."));
   },
   "ST-12": async (ctx) => {
     const rows = await ctx.db.configValue.findMany({ where: { setKey: "STATUSES", props: { contains: "true" } } });
-    return rows.length ? [] : [cfg("Execution statuses not identified — the set shall carry an execution flag per value (§7.8).")];
+ return rows.length ? []: [cfg("Execution statuses not identified — the set shall carry an execution flag per value.")];
   },
   "ST-13": async (ctx) => {
     const items = await ctx.db.transmittalItem.findMany({
@@ -479,14 +479,14 @@ export const RUNNERS: Runners = {
     const execStatuses = (await ctx.db.configValue.findMany({ where: { setKey: "STATUSES" } })).filter((s) => s.props?.includes("true")).map((s) => s.code);
     return items
       .filter((i) => i.revision.statusCode && !execStatuses.includes(i.revision.statusCode))
-      .map((i) => rev(i.revision, "Issued for execution at a status that does not permit physical execution (§7.8 / ST-13 ▲)."));
+.map((i) => rev(i.revision, "Issued for execution at a status that does not permit physical execution."));
   },
   "ST-14": async (ctx) => {
     const revs = await ctx.db.revision.findMany({ where: { state: { in: ["RELEASED", "SUPERSEDED"] } }, include: { document: { select: { docNumber: true } } } });
     const failures: Failure[] = [];
     for (const r of revs) {
       const logged = await ctx.db.auditEvent.findFirst({ where: { entityType: "Revision", entityId: r.id, action: { in: ["RELEASE", "STATE_TRANSITION"] } } });
-      if (!logged) failures.push(rev(r, "State transition not logged with actor and time (§7.9)."));
+ if (!logged) failures.push(rev(r, "State transition not logged with actor and time."));
     }
     return failures;
   },
@@ -494,15 +494,15 @@ export const RUNNERS: Runners = {
   // ── Approval ──────────────────────────────────────────────────────────────
   "AP-01": async (ctx) => {
     const revs = await ctx.db.revision.findMany({ where: { state: { in: ["RELEASED", "SUPERSEDED"] }, approvals: { none: {} } }, include: { document: { select: { docNumber: true } } } });
-    return revs.map((r) => rev(r, "Released with no approval — structural contradiction (§8.1 / AP-01 ▲)."));
+ return revs.map((r) => rev(r, "Released with no approval — structural contradiction."));
   },
   "AP-02": async (ctx) => {
     const n = (await approveRules(ctx)).length;
-    return n === 0 ? [cfg("No function holds Approve in the distribution matrix — approval authority not published (§8.2).")] : [];
+ return n === 0 ? [cfg("No function holds Approve in the distribution matrix — approval authority not published.")]: [];
   },
   "AP-03": async (ctx) => {
     const approvals = await ctx.db.approval.findMany({ where: { matrixVersion: { lte: 0 } }, include: { revision: { include: { document: { select: { docNumber: true } } } } } });
-    return approvals.map((a) => rev(a.revision, "Approval recorded against an unversioned authority matrix (§8.2)."));
+ return approvals.map((a) => rev(a.revision, "Approval recorded against an unversioned authority matrix."));
   },
   "AP-05": async (ctx) => {
     // Did the approver's function hold Approve for this class? Delegated approvals are checked under §8.5.
@@ -517,7 +517,7 @@ export const RUNNERS: Runners = {
       if (!m) continue;
       if (!actors.has(m.functionId)) actors.set(m.functionId, await loadActor(ctx as never, m.functionId));
       if (!can(actors.get(m.functionId) ?? null, "APPROVE", a.revision.document)) {
-        failures.push(rev(a.revision, `Approver "${a.approverName}" (${a.approverRole}) does not hold Approve for this class in the distribution matrix (§8.3 / AP-05 ▲).`));
+ failures.push(rev(a.revision, `Approver "${a.approverName}" (${a.approverRole}) does not hold Approve for this class in the distribution matrix.`));
       }
     }
     return failures;
@@ -527,7 +527,7 @@ export const RUNNERS: Runners = {
     const failures: Failure[] = [];
     for (const a of approvals) {
       const del = await ctx.db.delegation.findFirst({ where: { toUserId: a.approverId, endDate: { gte: a.decidedAt } } });
-      if (!del) failures.push(rev(a.revision, "Approval recorded under an expired or absent delegation (§8.5 / AP-09 ▲)."));
+ if (!del) failures.push(rev(a.revision, "Approval recorded under an expired or absent delegation."));
     }
     return failures;
   },
@@ -536,7 +536,7 @@ export const RUNNERS: Runners = {
     const failures: Failure[] = [];
     for (const del of delegations) {
       const onward = await ctx.db.delegation.findFirst({ where: { fromUserId: del.toUserId } });
-      if (onward) failures.push(org(`Onward delegation recorded: ${del.toUser.name} re-delegated ${onward.scope ?? "authority"} (§8.5).`));
+ if (onward) failures.push(org(`Onward delegation recorded: ${del.toUser.name} re-delegated ${onward.scope ?? "authority"}.`));
     }
     return failures;
   },
@@ -545,7 +545,7 @@ export const RUNNERS: Runners = {
     const approvals = await ctx.db.approval.findMany({ include: { revision: { include: { document: true } } } });
     return approvals
       .filter((a) => ["SAFETY", "REGULATORY"].includes(a.revision.document.criticality ?? "") && (rank[a.approverRole.split(" ")[0]] ?? -1) < rank.ADMIN)
-      .map((a) => rev(a.revision, "Criticality not reflected in the authority applied — safety/regulatory-critical requires the defined authority (§8.6)."));
+.map((a) => rev(a.revision, "Criticality not reflected in the authority applied — safety/regulatory-critical requires the defined authority."));
   },
 
   // ── Review ────────────────────────────────────────────────────────────────
@@ -553,24 +553,24 @@ export const RUNNERS: Runners = {
     const cycles = await ctx.db.reviewCycle.findMany({ where: { status: "CLOSED" }, include: { revision: { include: { document: { select: { docNumber: true } } } } } });
     return cycles
       .filter((c) => !c.submittedAt || !c.receivedAt || !c.issuedToReviewAt || !c.returnedFromReviewAt || !c.returnedToOriginatorAt)
-      .map((c) => ({ entityKey: `ReviewCycle:${c.id}`, entityType: "ReviewCycle", entityId: c.id, documentId: c.revision.documentId, entityLabel: `${c.revision.document.docNumber} rev ${c.revision.value} cycle ${c.sequence}`, description: "Custody point timestamp missing (§9.1)." }));
+.map((c) => ({ entityKey: `ReviewCycle:${c.id}`, entityType: "ReviewCycle", entityId: c.id, documentId: c.revision.documentId, entityLabel: `${c.revision.document.docNumber} rev ${c.revision.value} cycle ${c.sequence}`, description: "Custody point timestamp missing." }));
   },
   "RO-03": async (ctx) => {
     const set = ctx.allSets.get("REVIEW_OUTCOMES");
-    return set && set.size > 0 ? [] : [cfg("Review outcome set not published (§9.2).")];
+ return set && set.size > 0 ? []: [cfg("Review outcome set not published.")];
   },
   "RO-04": async (ctx) => {
     const cycles = await ctx.db.reviewCycle.findMany({ where: { outcome: { not: null } }, include: { revision: { include: { document: { select: { docNumber: true } } } } } });
     const set = ctx.allSets.get("REVIEW_OUTCOMES");
-    return cycles.filter((c) => set && !set.has(c.outcome!)).map((c) => ({ entityKey: `ReviewCycle:${c.id}`, entityType: "ReviewCycle", entityId: c.id, documentId: c.revision.documentId, entityLabel: `${c.revision.document.docNumber} rev ${c.revision.value}`, description: "Outcome not in the published set (§9.2)." }));
+ return cycles.filter((c) => set && !set.has(c.outcome!)).map((c) => ({ entityKey: `ReviewCycle:${c.id}`, entityType: "ReviewCycle", entityId: c.id, documentId: c.revision.documentId, entityLabel: `${c.revision.document.docNumber} rev ${c.revision.value}`, description: "Outcome not in the published set." }));
   },
   "RO-05": async (ctx) => {
     const outcomes = await ctx.db.configValue.findMany({ where: { setKey: "REVIEW_OUTCOMES" } });
-    return outcomes.filter((o) => !o.props || !o.props.includes("proceed")).map((o) => cfg(`Outcome "${o.code}" carries no proceed consequence (§9.3).`));
+ return outcomes.filter((o) => !o.props || !o.props.includes("proceed")).map((o) => cfg(`Outcome "${o.code}" carries no proceed consequence.`));
   },
   "RO-06": async (ctx) => {
     const outcomes = await ctx.db.configValue.findMany({ where: { setKey: "REVIEW_OUTCOMES" } });
-    return outcomes.filter((o) => !o.props || !o.props.includes("resubmit")).map((o) => cfg(`Outcome "${o.code}" carries no resubmission consequence (§9.3).`));
+ return outcomes.filter((o) => !o.props || !o.props.includes("resubmit")).map((o) => cfg(`Outcome "${o.code}" carries no resubmission consequence.`));
   },
   "RO-07": async (ctx) => {
     const cycles = await ctx.db.reviewCycle.findMany({
@@ -582,7 +582,7 @@ export const RUNNERS: Runners = {
       const later = c.revision.document.revisions.some(
         (r) => r.createdAt > (c.returnedToOriginatorAt ?? c.submittedAt) && r.authorizationReason
       );
-      if (!later) failures.push({ entityKey: `ReviewCycle:${c.id}`, entityType: "ReviewCycle", entityId: c.id, documentId: c.revision.documentId, entityLabel: `${c.revision.document.docNumber} rev ${c.revision.value}`, description: "Resubmission required but no revision authorized (§9.3 / RO-07 ▲)." });
+ if (!later) failures.push({ entityKey: `ReviewCycle:${c.id}`, entityType: "ReviewCycle", entityId: c.id, documentId: c.revision.documentId, entityLabel: `${c.revision.document.docNumber} rev ${c.revision.value}`, description: "Resubmission required but no revision authorized." });
     }
     return failures;
   },
@@ -590,50 +590,50 @@ export const RUNNERS: Runners = {
     const events = await ctx.db.auditEvent.findMany({ where: { action: "REVIEW_OUTCOME", entityId: { not: null } }, select: { entityId: true } });
     const seen = new Map<string, number>();
     for (const e of events) seen.set(e.entityId!, (seen.get(e.entityId!) ?? 0) + 1);
-    return [...seen.entries()].filter(([, n]) => n > 1).map(([entityId]) => ({ entityKey: `ReviewCycle:${entityId}`, entityType: "ReviewCycle", entityId, description: "Outcome altered after recording — more than one outcome event (§9.4)." }));
+ return [...seen.entries()].filter(([, n]) => n > 1).map(([entityId]) => ({ entityKey: `ReviewCycle:${entityId}`, entityType: "ReviewCycle", entityId, description: "Outcome altered after recording — more than one outcome event." }));
   },
   "RO-11": async (ctx) => {
     const comments = await ctx.db.reviewComment.findMany({ where: { classification: "" } });
-    return comments.map((cm) => ({ entityKey: `ReviewComment:${cm.id}`, entityType: "ReviewComment", entityId: cm.id, description: "Comment with no progression consequence recorded (§9.6)." }));
+ return comments.map((cm) => ({ entityKey: `ReviewComment:${cm.id}`, entityType: "ReviewComment", entityId: cm.id, description: "Comment with no progression consequence recorded." }));
   },
   "RO-13": async (ctx) => {
     const comments = await ctx.db.reviewComment.findMany({ where: { progressionPreventing: true, status: "CLOSED", resolution: null } });
-    return comments.map((cm) => ({ entityKey: `ReviewComment:${cm.id}`, entityType: "ReviewComment", entityId: cm.id, description: "Progression-preventing comment closed with no recorded response (§9.6)." }));
+ return comments.map((cm) => ({ entityKey: `ReviewComment:${cm.id}`, entityType: "ReviewComment", entityId: cm.id, description: "Progression-preventing comment closed with no recorded response." }));
   },
   "RO-14": async (ctx) => {
     const revs = await ctx.db.revision.findMany({
       where: { state: { in: ["RELEASED", "SUPERSEDED"] }, cycles: { some: { comments: { some: { progressionPreventing: true, status: "OPEN" } } } } },
       include: { document: { select: { docNumber: true } } },
     });
-    return revs.map((r) => rev(r, "Work proceeding on a revision with a progression-preventing comment open (§9.6 / RO-14 ▲)."));
+ return revs.map((r) => rev(r, "Work proceeding on a revision with a progression-preventing comment open."));
   },
   "RO-15": async (ctx) => {
     const cycles = await ctx.db.reviewCycle.findMany({ where: { mode: "SERIAL" }, include: { assignments: true } });
     return cycles
       .filter((c) => c.assignments.some((a) => a.order < 1) || new Set(c.assignments.map((a) => a.order)).size !== c.assignments.length)
-      .map((c) => ({ entityKey: `ReviewCycle:${c.id}`, entityType: "ReviewCycle", entityId: c.id, description: "Serial review sequence not set before the cycle began (§9.7)." }));
+.map((c) => ({ entityKey: `ReviewCycle:${c.id}`, entityType: "ReviewCycle", entityId: c.id, description: "Serial review sequence not set before the cycle began." }));
   },
   "RO-18": async (ctx) => {
     const cycles = await ctx.db.reviewCycle.findMany({ where: { status: "CLOSED", returnedToOriginatorAt: null }, include: { revision: { include: { document: { select: { docNumber: true } } } } } });
-    return cycles.map((c) => ({ entityKey: `ReviewCycle:${c.id}`, entityType: "ReviewCycle", entityId: c.id, documentId: c.revision.documentId, entityLabel: `${c.revision.document.docNumber} rev ${c.revision.value}`, description: "Cycle closed/returned outside the control function (§9.8)." }));
+ return cycles.map((c) => ({ entityKey: `ReviewCycle:${c.id}`, entityType: "ReviewCycle", entityId: c.id, documentId: c.revision.documentId, entityLabel: `${c.revision.document.docNumber} rev ${c.revision.value}`, description: "Cycle closed/returned outside the control function." }));
   },
 
   // ── Format ────────────────────────────────────────────────────────────────
   "FM-01": async (ctx) => {
     const revs = await ctx.db.revision.findMany({ where: { state: { in: ["RELEASED", "SUPERSEDED"] }, nativeFileId: null }, include: { document: { select: { docNumber: true } } } });
-    return revs.map((r) => rev(r, "Native form not retained (§10.1)."));
+ return revs.map((r) => rev(r, "Native form not retained."));
   },
   "FM-02": async (ctx) => {
     const files = await ctx.db.storedFile.findMany({ where: { kind: "NATIVE", mime: { notIn: ["application/pdf", "image/png", "image/jpeg"] }, revision: { appVersion: null } }, include: { revision: { include: { document: { select: { docNumber: true } } } } } });
-    return files.map((f) => rev(f.revision!, "Proprietary native format with no authoring application/version recorded (§10.1)."));
+ return files.map((f) => rev(f.revision!, "Proprietary native format with no authoring application/version recorded."));
   },
   "FM-03": async (ctx) => {
     const revs = await ctx.db.revision.findMany({ where: { state: { in: ["RELEASED", "SUPERSEDED"] }, renditionFileId: null }, include: { document: { select: { docNumber: true } } } });
-    return revs.map((r) => rev(r, "Released revision with no rendition — structural control failure (§10.2 / FM-03)."));
+ return revs.map((r) => rev(r, "Released revision with no rendition — structural control failure."));
   },
   "FM-04": async (ctx) => {
     const files = await ctx.db.storedFile.findMany({ where: { kind: "RENDITION", mime: { notIn: ["application/pdf"] } }, include: { revision: { include: { document: { select: { docNumber: true } } } } } });
-    return files.map((f) => rev(f.revision!, "Rendition is not a fixed, viewable format (PDF) (§10.2)."));
+ return files.map((f) => rev(f.revision!, "Rendition is not a fixed, viewable format (PDF)."));
   },
   "FM-08": async (ctx) => {
     const docs = await ctx.db.document.findMany({ where: { retentionClass: { in: ["ASSET_LIFE", "STATUTORY", "PERMANENT"] } } });
@@ -642,7 +642,7 @@ export const RUNNERS: Runners = {
       const revs = await ctx.db.revision.findMany({ where: { documentId: d.id, state: { in: ["RELEASED", "SUPERSEDED"] } }, include: { files: true } });
       for (const r of revs) {
         const rend = r.files.find((f) => f.kind === "RENDITION");
-        if (rend && rend.mime !== "application/pdf") failures.push(rev(r, "Long-term retention in a non-preservation format (§10.4)."));
+ if (rend && rend.mime !== "application/pdf") failures.push(rev(r, "Long-term retention in a non-preservation format."));
       }
     }
     return failures;
@@ -652,7 +652,7 @@ export const RUNNERS: Runners = {
     const failures: Failure[] = [];
     for (const f of files) {
       if (!existsSync(path.join(UPLOAD_ROOT, f.path))) {
-        failures.push({ entityKey: `StoredFile:${f.id}`, entityType: "StoredFile", entityId: f.id, documentId: f.revision?.documentId, entityLabel: f.name, description: "File missing from the repository (§10.5 / FM-10)." });
+ failures.push({ entityKey: `StoredFile:${f.id}`, entityType: "StoredFile", entityId: f.id, documentId: f.revision?.documentId, entityLabel: f.name, description: "File missing from the repository." });
       }
     }
     return failures;
@@ -664,7 +664,7 @@ export const RUNNERS: Runners = {
       try {
         const buf = await readFile(path.join(UPLOAD_ROOT, f.path));
         if (createHash("sha256").update(buf).digest("hex") !== f.sha256) {
-          failures.push({ entityKey: `StoredFile:${f.id}`, entityType: "StoredFile", entityId: f.id, documentId: f.revision?.documentId, entityLabel: f.name, description: "File altered since release — hash mismatch (§10.5 / FM-11)." });
+ failures.push({ entityKey: `StoredFile:${f.id}`, entityType: "StoredFile", entityId: f.id, documentId: f.revision?.documentId, entityLabel: f.name, description: "File altered since release — hash mismatch." });
         }
       } catch {
         // missing files are FM-10's finding
@@ -676,69 +676,69 @@ export const RUNNERS: Runners = {
   // ── Issue & distribution ──────────────────────────────────────────────────
   "IS-02": async (ctx) => {
     const bad = await ctx.db.transmittal.findMany({ where: { number: "" } }).catch(() => []);
-    return (bad as { id: string; number: string }[]).map((t) => ({ entityKey: `Transmittal:${t.id}`, entityType: "Transmittal", entityId: t.id, entityLabel: t.number, description: "Transmittal number absent (§11.1)." }));
+ return (bad as { id: string; number: string }[]).map((t) => ({ entityKey: `Transmittal:${t.id}`, entityType: "Transmittal", entityId: t.id, entityLabel: t.number, description: "Transmittal number absent." }));
   },
   "IS-03": async (ctx) => {
     const list = await ctx.db.transmittal.findMany({ include: { items: true, recipients: true } });
     return list
       .filter((t) => !t.dateOfIssue || !t.issuingParty || t.items.length === 0 || t.recipients.length === 0)
-      .map((t) => ({ entityKey: `Transmittal:${t.id}`, entityType: "Transmittal", entityId: t.id, entityLabel: t.number, description: "Transmittal missing a required element — date, party, items or recipients (§11.1)." }));
+.map((t) => ({ entityKey: `Transmittal:${t.id}`, entityType: "Transmittal", entityId: t.id, entityLabel: t.number, description: "Transmittal missing a required element — date, party, items or recipients." }));
   },
   "IS-04": async (ctx) => {
     const list = await ctx.db.transmittal.findMany({ where: { reasonForIssue: "" } });
-    return list.map((t) => ({ entityKey: `Transmittal:${t.id}`, entityType: "Transmittal", entityId: t.id, entityLabel: t.number, description: "Reason for issue absent (§11.2)." }));
+ return list.map((t) => ({ entityKey: `Transmittal:${t.id}`, entityType: "Transmittal", entityId: t.id, entityLabel: t.number, description: "Reason for issue absent." }));
   },
   "IS-05": async (ctx) => {
     const list = await ctx.db.transmittal.findMany({});
     const set = ctx.allSets.get("REASONS_FOR_ISSUE");
-    return list.filter((t) => set && !set.has(t.reasonForIssue)).map((t) => ({ entityKey: `Transmittal:${t.id}`, entityType: "Transmittal", entityId: t.id, entityLabel: t.number, description: "Reason for issue not in the defined set (§11.2)." }));
+ return list.filter((t) => set && !set.has(t.reasonForIssue)).map((t) => ({ entityKey: `Transmittal:${t.id}`, entityType: "Transmittal", entityId: t.id, entityLabel: t.number, description: "Reason for issue not in the defined set." }));
   },
   "IS-06": async (ctx) => {
     const items = await ctx.db.transmittalItem.findMany({
       where: { transmittal: { direction: "OUTGOING" }, revision: { state: { notIn: ["RELEASED", "SUPERSEDED"] } } },
       include: { revision: { include: { document: { select: { docNumber: true } } } }, transmittal: true },
     });
-    return items.map((i) => rev(i.revision, `Issued on ${i.transmittal.number} while not released — structural contradiction (§11.3 / IS-06 ▲).`));
+ return items.map((i) => rev(i.revision, `Issued on ${i.transmittal.number} while not released — structural contradiction.`));
   },
   "IS-08": async (ctx) => {
     const items = await ctx.db.transmittalItem.findMany({
       where: { markedSuperseded: false, revision: { state: "SUPERSEDED" }, transmittal: { direction: "OUTGOING" } },
       include: { revision: { include: { document: { select: { docNumber: true } } } } },
     });
-    return items.map((i) => rev(i.revision, "Superseded revision issued without being marked as such (§11.3)."));
+ return items.map((i) => rev(i.revision, "Superseded revision issued without being marked as such."));
   },
   "IS-09": async (ctx) => {
     const list = await ctx.db.transmittal.findMany({ include: { recipients: true } });
     return list
       .filter((t) => t.recipients.some((r) => !r.userId && (!r.name || r.name === "—")))
-      .map((t) => ({ entityKey: `Transmittal:${t.id}`, entityType: "Transmittal", entityId: t.id, entityLabel: t.number, description: "Recipients recorded only as a group or unnamed row (§11.4)." }));
+.map((t) => ({ entityKey: `Transmittal:${t.id}`, entityType: "Transmittal", entityId: t.id, entityLabel: t.number, description: "Recipients recorded only as a group or unnamed row." }));
   },
   "IS-11": async (ctx) => {
     const list = await ctx.db.transmittal.findMany({ where: { receivedDate: { not: null } } });
     return list
       .filter((t) => t.receivedDate && t.receivedDate < t.dateOfIssue)
-      .map((t) => ({ entityKey: `Transmittal:${t.id}`, entityType: "Transmittal", entityId: t.id, entityLabel: t.number, description: "Receipt date earlier than issue date (§11.5)." }));
+.map((t) => ({ entityKey: `Transmittal:${t.id}`, entityType: "Transmittal", entityId: t.id, entityLabel: t.number, description: "Receipt date earlier than issue date." }));
   },
   "IS-13": async (ctx) => {
     const copies = await ctx.db.registeredCopy.findMany({ where: { OR: [{ holder: "" }, { location: "" }] }, include: { revision: { include: { document: { select: { docNumber: true } } } } } });
-    return copies.map((cp) => ({ entityKey: `RegisteredCopy:${cp.id}`, entityType: "RegisteredCopy", entityId: cp.id, documentId: cp.revision.documentId, description: "Registered copy with no holder or location (§11.6)." }));
+ return copies.map((cp) => ({ entityKey: `RegisteredCopy:${cp.id}`, entityType: "RegisteredCopy", entityId: cp.id, documentId: cp.revision.documentId, description: "Registered copy with no holder or location." }));
   },
   "IS-20": async (ctx) => {
     const list = await ctx.db.transmittal.findMany({ where: { status: "REJECTED", rejectionReason: null } });
-    return list.map((t) => ({ entityKey: `Transmittal:${t.id}`, entityType: "Transmittal", entityId: t.id, entityLabel: t.number, description: "Rejection not recorded with a reason (§11.9)." }));
+ return list.map((t) => ({ entityKey: `Transmittal:${t.id}`, entityType: "Transmittal", entityId: t.id, entityLabel: t.number, description: "Rejection not recorded with a reason." }));
   },
   "IS-25": async (ctx) => {
     const list = await ctx.db.transmittal.findMany({ include: { items: true, cycles: true } });
     return list
       .filter((t) => t.items.length > 1 && t.cycles.length > 0)
       .filter((t) => new Set(t.cycles.map((c) => c.revisionId)).size < t.items.length)
-      .map((t) => ({ entityKey: `Transmittal:${t.id}`, entityType: "Transmittal", entityId: t.id, entityLabel: t.number, description: "Transmittal carrying several items held as one review cycle — one cycle per revision (§11.11)." }));
+.map((t) => ({ entityKey: `Transmittal:${t.id}`, entityType: "Transmittal", entityId: t.id, entityLabel: t.number, description: "Transmittal carrying several items held as one review cycle — one cycle per revision." }));
   },
   "IS-26": async (ctx) => {
     const reasons = await ctx.db.configValue.findMany({ where: { setKey: "REASONS_FOR_ISSUE" } });
     return reasons
       .filter((r) => !r.props || !r.props.includes("acceptancePeriodDays"))
-      .map((r) => cfg(`Acceptance period not published for reason "${r.code}" (§11.12).`));
+.map((r) => cfg(`Acceptance period not published for reason "${r.code}".`));
   },
   "IS-27": async (ctx) => {
     const reasons = await ctx.db.configValue.findMany({ where: { setKey: "REASONS_FOR_ISSUE" } });
@@ -747,7 +747,7 @@ export const RUNNERS: Runners = {
     for (const t of list) {
       const period = Number(reasons.find((r) => r.code === t.reasonForIssue)?.props ? JSON.parse(reasons.find((r) => r.code === t.reasonForIssue)!.props!).acceptancePeriodDays ?? 5 : 5);
       const deadline = new Date(t.receivedDate!.getTime() + period * 86400000);
-      if (deadline < new Date()) failures.push({ entityKey: `Transmittal:${t.id}`, entityType: "Transmittal", entityId: t.id, entityLabel: t.number, description: `Not checked within the ${period}-day acceptance period (§11.12) — treated as accepted only when the published rule says so (A.5.4).` });
+ if (deadline < new Date()) failures.push({ entityKey: `Transmittal:${t.id}`, entityType: "Transmittal", entityId: t.id, entityLabel: t.number, description: `Not checked within the ${period}-day acceptance period — treated as accepted only when the published rule says so (A.5.4).` });
     }
     return failures;
   },
@@ -755,18 +755,18 @@ export const RUNNERS: Runners = {
   // ── Obsolescence ──────────────────────────────────────────────────────────
   "OB-01": async (ctx) => {
     const records = await ctx.db.obsolescenceRecord.findMany({ where: { OR: [{ authorityName: "" }, { reason: "" }] } });
-    return records.map((r) => ({ entityKey: `ObsolescenceRecord:${r.id}`, entityType: "ObsolescenceRecord", entityId: r.id, documentId: r.documentId, description: "End state not recorded with date and authority (§12.1)." }));
+ return records.map((r) => ({ entityKey: `ObsolescenceRecord:${r.id}`, entityType: "ObsolescenceRecord", entityId: r.id, documentId: r.documentId, description: "End state not recorded with date and authority." }));
   },
   "OB-04": async (ctx) => {
     const entries = await ctx.db.baselineEntry.findMany({ where: { document: { state: { in: ["WITHDRAWN"] } } }, include: { document: true, action: true } });
-    return entries.map((e) => doc(e.document, `Withdrawn item still required by action ${e.action.code} — withdrawn/void item still in use (§12.2 / OB-04 ▲).`));
+ return entries.map((e) => doc(e.document, `Withdrawn item still required by action ${e.action.code} — withdrawn/void item still in use.`));
   },
   "OB-05": async (ctx) => {
     const superseded = await ctx.db.revision.findMany({ where: { state: "SUPERSEDED" }, include: { document: { select: { docNumber: true } } } });
     const failures: Failure[] = [];
     for (const r of superseded) {
       const notified = await ctx.db.notification.findFirst({ where: { type: "SUPERSEDED", link: `/documents/${r.documentId}` } });
-      if (!notified) failures.push(rev(r, "Supersession with no notification issued to recipients (§12.3 / OB-05 ▲)."));
+ if (!notified) failures.push(rev(r, "Supersession with no notification issued to recipients."));
     }
     return failures;
   },
@@ -783,29 +783,29 @@ export const RUNNERS: Runners = {
       where: { status: "ACTIVE", revision: { state: { in: ["SUPERSEDED", "VOID"] } } },
       include: { revision: { include: { document: { select: { docNumber: true } } } } },
     });
-    return copies.map((cp) => ({ entityKey: `RegisteredCopy:${cp.id}`, entityType: "RegisteredCopy", entityId: cp.id, documentId: cp.revision.documentId, entityLabel: `${cp.revision.document.docNumber} rev ${cp.revision.value} → ${cp.holder}`, description: "Registered copy carrying an invalid revision with no recorded action (§12.4 / OB-08 ▲)." }));
+ return copies.map((cp) => ({ entityKey: `RegisteredCopy:${cp.id}`, entityType: "RegisteredCopy", entityId: cp.id, documentId: cp.revision.documentId, entityLabel: `${cp.revision.document.docNumber} rev ${cp.revision.value} → ${cp.holder}`, description: "Registered copy carrying an invalid revision with no recorded action." }));
   },
   "OB-09": async (ctx) => {
     const copies = await ctx.db.registeredCopy.findMany({ where: { status: { not: "ACTIVE" }, actionRecord: null } });
-    return copies.map((cp) => ({ entityKey: `RegisteredCopy:${cp.id}`, entityType: "RegisteredCopy", entityId: cp.id, description: "Copy action taken but not recorded (§12.4)." }));
+ return copies.map((cp) => ({ entityKey: `RegisteredCopy:${cp.id}`, entityType: "RegisteredCopy", entityId: cp.id, description: "Copy action taken but not recorded." }));
   },
   "OB-13": async (ctx) => {
     const revs = await ctx.db.revision.findMany({ where: { state: "VOID", voidReassessment: null }, include: { document: { select: { docNumber: true } } } });
-    return revs.map((r) => rev(r, "Void revision with no reassessment of work performed (§12.6 / OB-13 ▲)."));
+ return revs.map((r) => rev(r, "Void revision with no reassessment of work performed."));
   },
   "OB-14": async (ctx) => {
     const entries = await ctx.db.baselineEntry.findMany({ where: { document: { state: "WITHDRAWN" } }, include: { document: true } });
-    return entries.map((e) => doc(e.document, "Item withdrawn while an open action requires it (§12.6 / OB-14 ▲)."));
+ return entries.map((e) => doc(e.document, "Item withdrawn while an open action requires it."));
   },
 
   // ── Retention ─────────────────────────────────────────────────────────────
   "RT-01": async (ctx) => {
     const set = ctx.allSets.get("RETENTION_CLASSES");
-    return set && set.size > 0 ? [] : [cfg("Retention schedule not published (§13.1).")];
+ return set && set.size > 0 ? []: [cfg("Retention schedule not published.")];
   },
   "RT-02": async (ctx) => {
     const classes = await ctx.db.configValue.findMany({ where: { setKey: "RETENTION_CLASSES" } });
-    return classes.filter((c) => !c.props || !c.props.includes("basis")).map((c) => cfg(`Retention class "${c.code}" states no basis (§13.1).`));
+ return classes.filter((c) => !c.props || !c.props.includes("basis")).map((c) => cfg(`Retention class "${c.code}" states no basis.`));
   },
   "RT-04": async (ctx) => {
     const docs = await ctx.db.document.findMany({ where: { retentionClass: null, isPlaceholder: false } });
@@ -815,37 +815,37 @@ export const RUNNERS: Runners = {
     const docs = await ctx.db.document.findMany({ where: { state: "ARCHIVED" }, include: { revisions: { where: { state: { in: ["RELEASED", "SUPERSEDED"] } }, include: { files: true } } } });
     return docs
       .filter((d) => !d.revisions.some((r) => r.files.some((f) => f.kind === "RENDITION")))
-      .map((d) => doc(d, "Archived information not retrievable in a fixed form (§13.4)."));
+.map((d) => doc(d, "Archived information not retrievable in a fixed form."));
   },
   "RT-09": async (ctx) => {
     const docs = await ctx.db.document.findMany({ where: { state: "ARCHIVED", OR: [{ retentionClass: null }, { title: "" }] } });
-    return docs.map((d) => doc(d, "Archived information without complete metadata or register entry (§13.4)."));
+ return docs.map((d) => doc(d, "Archived information without complete metadata or register entry."));
   },
 
   // ── Baseline ──────────────────────────────────────────────────────────────
   "DB-02": async (ctx) => {
     const actions = await ctx.db.action.findMany({ where: { code: "" } }).catch(() => []);
-    return (actions as { id: string; code: string }[]).map((a) => ({ entityKey: `Action:${a.id}`, entityType: "Action", entityId: a.id, entityLabel: a.code, description: "Action code absent (§14.2)." }));
+ return (actions as { id: string; code: string }[]).map((a) => ({ entityKey: `Action:${a.id}`, entityType: "Action", entityId: a.id, entityLabel: a.code, description: "Action code absent." }));
   },
   "DB-03": async (ctx) => {
     const actions = await ctx.db.action.findMany({ where: { scheduleRef: null } });
-    return actions.map((a) => ({ entityKey: `Action:${a.id}`, entityType: "Action", entityId: a.id, entityLabel: a.code, description: "Action not linked to the project schedule (§14.2)." }));
+ return actions.map((a) => ({ entityKey: `Action:${a.id}`, entityType: "Action", entityId: a.id, entityLabel: a.code, description: "Action not linked to the project schedule." }));
   },
   "DB-04": async (ctx) => {
     const entries = await ctx.db.baselineEntry.findMany({ where: { requiredStatus: "" }, include: { document: true, action: true } });
-    return entries.map((e) => doc(e.document, `Baseline entry for action ${e.action.code} missing required status (§14.3).`));
+ return entries.map((e) => doc(e.document, `Baseline entry for action ${e.action.code} missing required status.`));
   },
   "DB-06": async (ctx) => {
     const entries = await ctx.db.baselineEntry.findMany({ include: { action: true, document: true } });
     return entries
       .filter((e) => e.action.scheduledDate && new Date(e.requiredBy) > new Date(e.action.scheduledDate))
-      .map((e) => doc(e.document, `Required-by date is after action ${e.action.code}'s date — not derived from it minus lead time (§14.4).`));
+.map((e) => doc(e.document, `Required-by date is after action ${e.action.code}'s date — not derived from it minus lead time.`));
   },
   "DB-10": async (ctx) => {
     const entries = await ctx.db.baselineEntry.findMany({ include: { action: true, document: true } });
     return entries
       .filter((e) => e.action.scheduledDate && new Date(e.requiredBy) > new Date(e.action.scheduledDate))
-      .map((e) => doc(e.document, `Baseline date disagrees with the schedule date for ${e.action.code} (§14.6 / DB-10 ▲).`));
+.map((e) => doc(e.document, `Baseline date disagrees with the schedule date for ${e.action.code}.`));
   },
   "DB-13": async (ctx) => {
     const actions = await ctx.db.action.findMany({ where: { scheduledDate: { lt: new Date() } }, include: { entries: { include: { document: { include: { revisions: { where: { state: "RELEASED" } } } } } } } });
@@ -854,11 +854,11 @@ export const RUNNERS: Runners = {
       for (const e of a.entries) {
         const current = e.document.revisions[0];
         if (!current) {
-          failures.push(doc(e.document, `Action ${a.code} date passed with its required item never released (§14.8 / DB-13 ▲).`));
+ failures.push(doc(e.document, `Action ${a.code} date passed with its required item never released.`));
           continue;
         }
         if (e.requiredStatus && current.statusCode !== e.requiredStatus) {
-          failures.push(doc(e.document, `Action ${a.code} proceeded: item is at ${current.statusCode ?? "no status"}, required ${e.requiredStatus} (§14.8 / DB-13 ▲).`));
+ failures.push(doc(e.document, `Action ${a.code} proceeded: item is at ${current.statusCode ?? "no status"}, required ${e.requiredStatus}.`));
         }
       }
     }
@@ -868,57 +868,57 @@ export const RUNNERS: Runners = {
   // ── Packages ──────────────────────────────────────────────────────────────
   "PK-01": async (ctx) => {
     const pkgs = await ctx.db.package.findMany({ where: { type: "" } }).catch(() => []);
-    return (pkgs as { id: string; identifier: string }[]).map((p) => ({ entityKey: `Package:${p.id}`, entityType: "Package", entityId: p.id, entityLabel: p.identifier, description: "Package type not stated (§15.1)." }));
+ return (pkgs as { id: string; identifier: string }[]).map((p) => ({ entityKey: `Package:${p.id}`, entityType: "Package", entityId: p.id, entityLabel: p.identifier, description: "Package type not stated." }));
   },
   "PK-02": async (ctx) => {
     const pkgs = await ctx.db.package.findMany({ where: { type: "DEFINED" }, include: { members: true } });
-    return pkgs.filter((p) => p.members.length === 0).map((p) => ({ entityKey: `Package:${p.id}`, entityType: "Package", entityId: p.id, entityLabel: p.identifier, description: "Defined package with no agreed composition (§15.2)." }));
+ return pkgs.filter((p) => p.members.length === 0).map((p) => ({ entityKey: `Package:${p.id}`, entityType: "Package", entityId: p.id, entityLabel: p.identifier, description: "Defined package with no agreed composition." }));
   },
   "PK-03": async (ctx) => {
     const pkgs = await ctx.db.package.findMany({ where: { type: "ACCUMULATED", membershipRule: null } });
-    return pkgs.map((p) => ({ entityKey: `Package:${p.id}`, entityType: "Package", entityId: p.id, entityLabel: p.identifier, description: "Accumulated package with no membership rule stated (§15.2)." }));
+ return pkgs.map((p) => ({ entityKey: `Package:${p.id}`, entityType: "Package", entityId: p.id, entityLabel: p.identifier, description: "Accumulated package with no membership rule stated." }));
   },
   "PK-06": async (ctx) => {
     const pkgs = await ctx.db.package.findMany({ where: { compositionOwnerId: "" } }).catch(() => []);
-    return (pkgs as { id: string; identifier: string }[]).map((p) => ({ entityKey: `Package:${p.id}`, entityType: "Package", entityId: p.id, entityLabel: p.identifier, description: "Composition owner not assigned (§15.5)." }));
+ return (pkgs as { id: string; identifier: string }[]).map((p) => ({ entityKey: `Package:${p.id}`, entityType: "Package", entityId: p.id, entityLabel: p.identifier, description: "Composition owner not assigned." }));
   },
   "PK-07": async (ctx) => {
     const pkgs = await ctx.db.package.findMany({});
-    return pkgs.filter((p) => p.acceptanceAuthorityId && p.acceptanceAuthorityId === p.compositionOwnerId).map((p) => ({ entityKey: `Package:${p.id}`, entityType: "Package", entityId: p.id, entityLabel: p.identifier, description: "Acceptance authority is the same person as the composition owner (§15.5 / PK-07 ▲)." }));
+ return pkgs.filter((p) => p.acceptanceAuthorityId && p.acceptanceAuthorityId === p.compositionOwnerId).map((p) => ({ entityKey: `Package:${p.id}`, entityType: "Package", entityId: p.id, entityLabel: p.identifier, description: "Acceptance authority is the same person as the composition owner." }));
   },
   "PK-08": async (ctx) => {
     const pkgs = await ctx.db.package.findMany({ where: { completionDate: { lt: new Date() }, assessedAt: null } });
-    return pkgs.map((p) => ({ entityKey: `Package:${p.id}`, entityType: "Package", entityId: p.id, entityLabel: p.identifier, description: "Package not assessed at its completion date (§15.6)." }));
+ return pkgs.map((p) => ({ entityKey: `Package:${p.id}`, entityType: "Package", entityId: p.id, entityLabel: p.identifier, description: "Package not assessed at its completion date." }));
   },
   "PK-11": async (ctx) => {
     const pkgs = await ctx.db.package.findMany({ where: { closedAt: { not: null } }, include: { members: true } });
     return pkgs
       .filter((p) => p.members.some((m) => m.requiredStatus && !m.completionDate) && !p.shortfallAcceptedBy)
-      .map((p) => ({ entityKey: `Package:${p.id}`, entityType: "Package", entityId: p.id, entityLabel: p.identifier, description: "Package closed with an unresolved, unaccepted shortfall (§15.8 / PK-11 ▲)." }));
+.map((p) => ({ entityKey: `Package:${p.id}`, entityType: "Package", entityId: p.id, entityLabel: p.identifier, description: "Package closed with an unresolved, unaccepted shortfall." }));
   },
   "PK-12": async (ctx) => {
     const pkgs = await ctx.db.package.findMany({ where: { type: "ACCUMULATED", closedAt: { not: null }, ruleCeasedAt: null } });
-    return pkgs.map((p) => ({ entityKey: `Package:${p.id}`, entityType: "Package", entityId: p.id, entityLabel: p.identifier, description: "Accumulated package closed without stating the rule has ceased to admit members (§15.8)." }));
+ return pkgs.map((p) => ({ entityKey: `Package:${p.id}`, entityType: "Package", entityId: p.id, entityLabel: p.identifier, description: "Accumulated package closed without stating the rule has ceased to admit members." }));
   },
   "PK-14": async (ctx) => {
     const pkgs = await ctx.db.package.findMany({ where: { purpose: "" } });
-    return pkgs.map((p) => ({ entityKey: `Package:${p.id}`, entityType: "Package", entityId: p.id, entityLabel: p.identifier, description: "Reason for issue not stated for the package (§15.1)." }));
+ return pkgs.map((p) => ({ entityKey: `Package:${p.id}`, entityType: "Package", entityId: p.id, entityLabel: p.identifier, description: "Reason for issue not stated for the package." }));
   },
 
   // ── Register ──────────────────────────────────────────────────────────────
   "RG-09": async (ctx) => {
     const files = await ctx.db.storedFile.findMany({ where: { revisionId: null } });
-    return files.map((f) => ({ entityKey: `StoredFile:${f.id}`, entityType: "StoredFile", entityId: f.id, entityLabel: f.name, description: "File held with no register entry — structural contradiction (§16.5 / RG-09 ▲)." }));
+ return files.map((f) => ({ entityKey: `StoredFile:${f.id}`, entityType: "StoredFile", entityId: f.id, entityLabel: f.name, description: "File held with no register entry — structural contradiction." }));
   },
   "RG-16": async (ctx) => {
     const docs = await ctx.db.document.findMany({ where: { isPlaceholder: true, revisions: { some: {} } }, include: { revisions: { take: 1 } } });
-    return docs.flatMap((d) => d.revisions.map((r) => rev(r, "Placeholder register entry holding a revision (§16.8 / RG-16 ▲).")));
+ return docs.flatMap((d) => d.revisions.map((r) => rev(r, "Placeholder register entry holding a revision.")));
   },
 
   // ── Scope ─────────────────────────────────────────────────────────────────
   "SC-01": async (ctx) => {
     const scope = await ctx.db.scopeConfig.findFirst();
-    return scope && scope.scopeStatement ? [] : [cfg("Scope not stated (§1.2 / SC-01).")];
+ return scope && scope.scopeStatement ? []: [cfg("Scope not stated.")];
   },
   "SC-03": async (ctx) => {
     const required = ["DELIVERABLE_TYPES", "DOCUMENT_TYPES", "DISCIPLINES", "STATUSES", "REVIEW_OUTCOMES", "CRITICALITY", "CONFIDENTIALITY", "RETENTION_CLASSES", "REASONS_FOR_ISSUE"];
@@ -927,67 +927,67 @@ export const RUNNERS: Runners = {
     if (schemes === 0) missing.push("NUMBERING_SCHEMES");
     if (routing === 0) missing.push("SCHEME_ROUTING");
     if (matrix === 0) missing.push("APPROVE_IN_DISTRIBUTION_MATRIX");
-    return missing.length ? [cfg(`Local configuration incomplete — not published: ${missing.join(", ")} (§1.3 / SC-03).`)] : [];
+ return missing.length ? [cfg(`Local configuration incomplete — not published: ${missing.join(", ")}.`)]: [];
   },
   "SC-09": async (ctx) => {
     const scope = await ctx.db.scopeConfig.findFirst();
-    return scope?.effectiveDate ? [] : [cfg("Effective date not stated (§1.9 / SC-09).")];
+ return scope?.effectiveDate ? []: [cfg("Effective date not stated.")];
   },
 
   // ── Conformance ───────────────────────────────────────────────────────────
   "CF-13": async (ctx) => {
     const defects = await ctx.db.defect.findMany({ where: { status: "ACCEPTED", reviewDate: null } });
-    return defects.map((d) => ({ entityKey: `Defect:${d.id}`, entityType: "Defect", entityId: d.id, entityLabel: d.checkId, description: "Accepted defect with no review date (§17.6)." }));
+ return defects.map((d) => ({ entityKey: `Defect:${d.id}`, entityType: "Defect", entityId: d.id, entityLabel: d.checkId, description: "Accepted defect with no review date." }));
   },
   "CF-16": async (ctx) => {
     const [scope, lastRun] = await Promise.all([ctx.db.scopeConfig.findFirst(), ctx.db.checkRun.findFirst({ orderBy: { ranAt: "desc" } })]);
     const interval = scope?.measurementIntervalDays ?? 30;
-    if (!lastRun) return [org("Conformance has never been measured (§17.8).")];
+ if (!lastRun) return [org("Conformance has never been measured.")];
     const due = new Date(lastRun.ranAt.getTime() + interval * 86400000);
-    return due < new Date() ? [org(`Last measurement ${lastRun.ranAt.toLocaleDateString("en-GB")} — interval of ${interval} days exceeded (§17.8).`)] : [];
+ return due < new Date() ? [org(`Last measurement ${lastRun.ranAt.toLocaleDateString("en-GB")} — interval of ${interval} days exceeded.`)]: [];
   },
   // ── Records (§2.2–2.4) ──
   "IO-03": async (ctx) => {
     const bad = await ctx.db.document.findMany({ where: { kind: "RECORD", revisions: { some: {} } } });
-    return bad.map((d) => doc(d, "Record treated as a document — records carry no revision values (§2.2)."));
+ return bad.map((d) => doc(d, "Record treated as a document — records carry no revision values."));
   },
   "IO-04": async (ctx) => {
     const bad = await ctx.db.document.findMany({ where: { kind: "RECORD", revisions: { some: { state: "SUPERSEDED" } } } });
-    return bad.map((d) => doc(d, "Document treated as a record — superseded items cannot be records (§2.2)."));
+ return bad.map((d) => doc(d, "Document treated as a record — superseded items cannot be records."));
   },
   "IO-05": async (ctx) => {
     const events = await ctx.db.auditEvent.findMany({ where: { action: { in: ["METADATA_CHANGE", "STATE_TRANSITION"] }, entityType: "Document" } });
     const recordIds = new Set((await ctx.db.document.findMany({ where: { kind: "RECORD", confirmedAt: { not: null } }, select: { id: true } })).map((r) => r.id));
-    return events.filter((e) => e.entityId && recordIds.has(e.entityId) && new Date(e.ts) > new Date(0)).slice(0, 50).map((e) => ({ entityKey: `AuditEvent:${e.id}`, entityType: "Document", entityId: e.entityId!, documentId: e.entityId, entityLabel: e.entityLabel ?? "", description: "Confirmed record altered after confirmation — corrections are further records, never edits (§2.3)." }));
+ return events.filter((e) => e.entityId && recordIds.has(e.entityId) && new Date(e.ts) > new Date(0)).slice(0, 50).map((e) => ({ entityKey: `AuditEvent:${e.id}`, entityType: "Document", entityId: e.entityId!, documentId: e.entityId, entityLabel: e.entityLabel ?? "", description: "Confirmed record altered after confirmation — corrections are further records, never edits." }));
   },
   "IO-06": async (ctx) => {
     const corrections = await ctx.db.relationship.findMany({ where: { kind: "RECORD_CORRECTION" }, select: { fromId: true } });
     const correctedIds = new Set(corrections.map((c) => c.fromId));
     const docs = await ctx.db.document.findMany({ where: { title: { contains: "correction" } }, select: { id: true, docNumber: true } });
-    return docs.filter((d) => !correctedIds.has(d.id)).map((d) => doc(d, "Correction issued with no reference to the record corrected (§2.3)."));
+ return docs.filter((d) => !correctedIds.has(d.id)).map((d) => doc(d, "Correction issued with no reference to the record corrected."));
   },
 
   // ── Approval withdrawal (§8.7) ──
   "AP-12": async (ctx) => {
     const approvals = await ctx.db.approval.findMany({ where: { withdrawnAt: { not: null } }, include: { revision: { include: { document: { select: { docNumber: true } } } } } });
-    return approvals.filter((a) => !a.withdrawnReason || !a.withdrawnBy).map((a) => rev(a.revision, "Withdrawal not recorded with reason and authority (§8.7)."));
+ return approvals.filter((a) => !a.withdrawnReason || !a.withdrawnBy).map((a) => rev(a.revision, "Withdrawal not recorded with reason and authority."));
   },
   "AP-13": async (ctx) => {
     const approvals = await ctx.db.approval.findMany({ where: { withdrawnAt: { not: null } }, include: { revision: { include: { document: true } } } });
     return approvals
       .filter((a) => a.revision.document.state !== "WITHDRAWN")
-      .map((a) => rev(a.revision, "Approval withdrawn but the document is not withdrawn — structural contradiction (§8.7 / AP-13 ▲)."));
+.map((a) => rev(a.revision, "Approval withdrawn but the document is not withdrawn — structural contradiction."));
   },
 
   // ── Retention / disposal (§13.5) ──
   "RT-11": async (ctx) => "NOT_CHECKED" as const,
   "RT-12": async (ctx) => {
     const docs = await ctx.db.document.findMany({ where: { disposedAt: { not: null } } });
-    return docs.filter((d) => !d.disposedBy || !d.disposalBasis).map((d) => doc(d, "Disposal not authorized or not recorded with basis (§13.5)."));
+ return docs.filter((d) => !d.disposedBy || !d.disposalBasis).map((d) => doc(d, "Disposal not authorized or not recorded with basis."));
   },
   "RT-13": async (ctx) => {
     const docs = await ctx.db.document.findMany({ where: { disposedAt: { not: null }, legalHold: true } });
-    return docs.map((d) => doc(d, "Disposal of information under legal hold — structural contradiction (§13.5 / RT-13 ▲)."));
+ return docs.map((d) => doc(d, "Disposal of information under legal hold — structural contradiction."));
   },
 
   // ── Distribution (§11.8) ──
@@ -996,7 +996,7 @@ export const RUNNERS: Runners = {
     const typesInUse = await ctx.db.document.findMany({ where: { isPlaceholder: false }, select: { deliverableType: true }, distinct: ["deliverableType"] });
     const covered = new Set(rules.map((r) => r.deliverableType));
     const missing = typesInUse.filter((t) => !covered.has(t.deliverableType));
-    return missing.length ? [cfg(`Distribution rules not published for deliverable types in use: ${missing.map((m) => m.deliverableType).join(", ")} (§11.8).`)] : [];
+ return missing.length ? [cfg(`Distribution rules not published for deliverable types in use: ${missing.map((m) => m.deliverableType).join(", ")}.`)]: [];
   },
 
   // ── Spine (Annex F) ── automation reports synchronization; it decides nothing (F.6).
@@ -1032,7 +1032,7 @@ function safeName(relPath: string): string {
 export const CONFIG_CHECKS: Record<string, (ctx: Ctx) => Promise<RunResult>> = {
   "IO-09": async (ctx) => {
     const set = ctx.allSets.get("ISSUE_CODES");
-    return set && set.size > 0 ? [] : [cfg("Organization issue codes not mapped to the defined reasons (§2.6).")];
+ return set && set.size > 0 ? []: [cfg("Organization issue codes not mapped to the defined reasons.")];
   },
   "AP-12": async (ctx) => "NOT_CHECKED" as const,
 };

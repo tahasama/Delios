@@ -81,7 +81,7 @@ export async function recipientsFor(t: Tenant, target: DocumentClass): Promise<R
       name: m.user.name,
       email: m.user.email,
       functionName: m.function.name,
-      basis: `${m.function.name} receives this classification (§11.8)`,
+ basis: `${m.function.name} receives this classification`,
     });
   }
 
@@ -111,7 +111,7 @@ export async function offDistribution(
     name: u.name,
     email: u.email,
     functionName: "—",
-    basis: "Not on the defined distribution — a reason must be recorded (§11.8)",
+ basis: "Not on the defined distribution — a reason must be recorded",
   }));
 }
 

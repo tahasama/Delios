@@ -65,7 +65,7 @@ export async function createProjectAction(
       projectId: project.id,
       organizationName: organization.name,
       scopeStatement:
-        scopeStatement || `All controlled information produced or received for ${name}, in any medium (§1.2).`,
+ scopeStatement || `All controlled information produced or received for ${name}, in any medium.`,
       assessmentLevel: "Core: identity and control",
       standardVersion: STANDARD_VERSION,
       effectiveDate: new Date(),
@@ -144,7 +144,7 @@ export async function setProjectStatusAction(
     entityLabel: `${project.code} — ${project.name}`,
     oldValue: project.status,
     newValue: status,
-    detail: "Archiving hides a project from the picker; its register is kept in full (§13.4).",
+ detail: "Archiving hides a project from the picker; its register is kept in full.",
   });
   revalidatePath("/admin/projects", "layout");
   return { ok: `${project.code} is now ${status.toLowerCase()}.` };

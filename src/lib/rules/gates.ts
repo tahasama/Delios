@@ -79,7 +79,7 @@ const submitState: Gate = {
     if (rev.state === "IN_PREPARATION") return ok("In preparation.");
     return block(
       `This revision is ${rev.state.replace(/_/g, " ").toLowerCase()}, not in preparation.`,
-      "A revision moves forward, never back (§7.5). Start a new revision instead.",
+ "A revision moves forward, never back. Start a new revision instead.",
     );
   },
 };
@@ -115,7 +115,7 @@ const submitReason: Gate = {
       .join(" and ");
     return warn(
       `No ${missing} yet.`,
-      "Release will require it (§6.6). Easier to write now, while you remember what changed.",
+ "Release will require it. Easier to write now, while you remember what changed.",
     );
   },
 };
@@ -149,7 +149,7 @@ const approveAuthority: Gate = {
     if (!rev) return block("No revision selected.");
 
     if (!ctx.can("APPROVE", rev.document)) {
-      return block(ctx.why("APPROVE", rev.document), "The permission matrix decides this (§11.8).");
+ return block(ctx.why("APPROVE", rev.document), "The permission matrix decides this.");
     }
 
     return ok(`${ctx.user.functionName ?? "Your function"} holds Approve for this class in the distribution matrix.`);
@@ -167,7 +167,7 @@ const approveSelfReview: Gate = {
     if (rev.document.createdById !== ctx.user.id) return ok("Someone else raised this document.");
     return warn(
       "You raised this document yourself.",
-      "Approval attributed to the author carries less weight (§8.3). Consider passing it to another approver.",
+ "Approval attributed to the author carries less weight. Consider passing it to another approver.",
     );
   },
 };
@@ -185,7 +185,7 @@ const releaseState: Gate = {
     if (rev.state === "IN_REVIEW" || rev.state === "IN_PREPARATION") return ok("Ready to move to released.");
     return block(
       `A ${rev.state.replace(/_/g, " ").toLowerCase()} revision cannot be released.`,
-      "States move forward only (§7.5).",
+ "States move forward only.",
     );
   },
 };
@@ -206,7 +206,7 @@ const releaseApproval: Gate = {
     if (approval) return ok(`Decided by ${approval.approverName}.`);
     return block(
       "No binding verdict lets this revision proceed yet.",
-      "Nothing is released until the review's deciding step gives a verdict that proceeds (§8.1).",
+ "Nothing is released until the review's deciding step gives a verdict that proceeds.",
     );
   },
 };
@@ -218,14 +218,14 @@ const releaseStatus: Gate = {
   clause: "§7.7",
   async evaluate(ctx, subject) {
     if (!subject.statusCode) {
-      return warn("No status chosen yet.", "A released revision states what it may be used for (§7.6).");
+ return warn("No status chosen yet.", "A released revision states what it may be used for.");
     }
     const statuses = await activeValues(ctx, "STATUSES");
     const status = statuses.find((s) => s.code === subject.statusCode);
     if (status) return ok(`Releasing at “${status.label}”.`);
     return block(
       `“${subject.statusCode}” is not in the published status set.`,
-      "Choose a published status, or publish that one first (§7.7).",
+ "Choose a published status, or publish that one first.",
     );
   },
 };
@@ -249,11 +249,11 @@ const releaseMetadata: Gate = {
     if (!doc.confidentiality) missing.push("confidentiality");
     if (!rev.reasonForRevision) missing.push("reason for revision");
     if (!rev.changeDescription) missing.push("description of change");
-    if (!rev.renditionFileId) missing.push("a rendition (§10.2)");
+ if (!rev.renditionFileId) missing.push("a rendition");
     if (!missing.length) return ok("Everything the Standard requires is recorded.");
     return block(
       `Missing: ${missing.join(", ")}.`,
-      "Complete it on the document, then release (§4.8).",
+ "Complete it on the document, then release.",
     );
   },
 };
@@ -272,7 +272,7 @@ const releaseBlockingComments: Gate = {
     if (open === 0) return ok("No progression-preventing comment is open.");
     return block(
       `${open} progression-preventing comment${open === 1 ? "" : "s"} still open.`,
-      "Releasing over one is a structural contradiction (§17.3). Close or reclassify them first.",
+ "Releasing over one is a structural contradiction. Close or reclassify them first.",
     );
   },
 };
@@ -288,7 +288,7 @@ const issueItems: Gate = {
     if (!subject.transmittalId) return ok("Items are chosen as you build the transmittal.");
     const count = await ctx.db.transmittalItem.count({ where: { transmittalId: subject.transmittalId } });
     if (count > 0) return ok(`${count} item(s) listed.`);
-    return block("No items are listed on this transmittal.", "A transmittal issues something (§11.1).");
+ return block("No items are listed on this transmittal.", "A transmittal issues something.");
   },
 };
 
@@ -302,7 +302,7 @@ const issueRecipients: Gate = {
     if (!subject.transmittalId) return ok("Recipients are chosen as you build the transmittal.");
     const count = await ctx.db.transmittalRecipient.count({ where: { transmittalId: subject.transmittalId } });
     if (count > 0) return ok(`${count} recipient(s) named.`);
-    return block("Nobody is named as a recipient.", "Recipients are recorded individually (§11.4).");
+ return block("Nobody is named as a recipient.", "Recipients are recorded individually.");
   },
 };
 
@@ -337,7 +337,7 @@ const voidConsequence: Gate = {
     if (issued === 0) return ok("Never issued to anyone.");
     return warn(
       `This revision was issued on ${issued} transmittal${issued === 1 ? "" : "s"}.`,
-      "Voiding leaves an unresolved-void exposure until someone checks what was built from it (§12.6). Record the reassessment.",
+ "Voiding leaves an unresolved-void exposure until someone checks what was built from it. Record the reassessment.",
     );
   },
 };
@@ -360,7 +360,7 @@ const withdrawRequired: Gate = {
       .join(" and ");
     return warn(
       `Still required by ${parts}.`,
-      "Withdrawing leaves an orphaned-withdrawal exposure until those are dealt with (§12.6).",
+ "Withdrawing leaves an orphaned-withdrawal exposure until those are dealt with.",
     );
   },
 };
@@ -381,7 +381,7 @@ const createClassification: Gate = {
     const missing = [!types.length && "document types", !disciplines.length && "disciplines"].filter(Boolean).join(" and ");
     return block(
       `No ${missing} are published.`,
-      "The Standard is not implemented until the value sets are published (§1.3). Publish them in Admin.",
+ "The Standard is not implemented until the value sets are published. Publish them in Admin.",
     );
   },
 };
@@ -401,7 +401,7 @@ const outcomeCycleOpen: Gate = {
     if (cycle.outcome) {
       return block(
         `This cycle already carries the outcome “${cycle.outcome}”.`,
-        "One outcome per cycle, immutable once recorded (§9.4). Open a new cycle if the position has changed.",
+ "One outcome per cycle, immutable once recorded. Open a new cycle if the position has changed.",
       );
     }
     if (cycle.status !== "OPEN") return block("This cycle is closed.", "Only an open cycle takes an outcome.");
@@ -423,7 +423,7 @@ const outcomeAssigned: Gate = {
     if (ctx.can("CONTROL")) return ok("You act as the control function.");
     return block(
       "You are not assigned to this review.",
-      "The outcome is recorded by an assigned reviewer, or by the control function (§9.7).",
+ "The outcome is recorded by an assigned reviewer, or by the control function.",
     );
   },
 };
@@ -447,7 +447,7 @@ const outcomeSerialOrder: Gate = {
     if (!before.length) return ok("Everyone before you has finished.");
     return block(
       `${before.map((a) => a.userName).join(", ")} must finish before you.`,
-      "In a serial review each reviewer acts on the previous one's output (§9.7).",
+ "In a serial review each reviewer acts on the previous one's output.",
     );
   },
 };
@@ -458,7 +458,7 @@ const outcomePublished: Gate = {
   title: "Outcome is in the published set",
   clause: "§9.2",
   async evaluate(ctx, subject) {
-    if (!subject.outcomeCode) return warn("No outcome chosen yet.", "Every cycle ends with exactly one (§9.4).");
+ if (!subject.outcomeCode) return warn("No outcome chosen yet.", "Every cycle ends with exactly one.");
     const cycle = subject.cycleId
       ? await ctx.db.reviewCycle.findFirst({ where: { id: subject.cycleId }, select: { outcomeSetKey: true } })
       : null;
@@ -468,7 +468,7 @@ const outcomePublished: Gate = {
     if (match) return ok(`Recording “${match.label}”.`);
     return block(
       `“${subject.outcomeCode}” is not in the published set ${setKey}.`,
-      "Choose a published outcome (§9.2).",
+ "Choose a published outcome.",
     );
   },
 };
@@ -487,13 +487,13 @@ const reviseDocumentLive: Gate = {
     if (doc.state === "WITHDRAWN" || doc.state === "CANCELLED" || doc.state === "ARCHIVED") {
       return block(
         `This document is ${doc.state.toLowerCase()}.`,
-        "An end state is final; nothing is revised out of it (§12.1).",
+ "An end state is final; nothing is revised out of it.",
       );
     }
     if (doc.kind === "RECORD") {
       return block(
         "This is a record, not a document.",
-        "A record is fixed and never revised. Issue a correction instead (§2.3).",
+ "A record is fixed and never revised. Issue a correction instead.",
       );
     }
     return ok("Active, so it can be revised.");
@@ -513,7 +513,7 @@ const reviseNoOpenRevision: Gate = {
     if (!open) return ok("Nothing open.");
     return block(
       `Revision ${open.value} is already ${open.state.replace(/_/g, " ").toLowerCase()}.`,
-      "Finish or void it before starting another — two live revisions of one document cannot both be current (§6.7).",
+ "Finish or void it before starting another — two live revisions of one document cannot both be current.",
     );
   },
 };
@@ -535,7 +535,7 @@ const reviseAuthorised: Gate = {
     if (outcome) return ok(`Authorised by the outcome “${outcome}” on the released revision.`);
     return warn(
       "No review outcome requires this revision.",
-      "Record why it is being revised — authorisation to revise is part of the record (§6.5).",
+ "Record why it is being revised — authorisation to revise is part of the record.",
     );
   },
 };
@@ -554,7 +554,7 @@ const acceptIssued: Gate = {
     if (t.status === "ISSUED") return ok(`Issued on ${t.dateOfIssue.toISOString().slice(0, 10)}.`);
     return block(
       `This transmittal is ${t.status.toLowerCase()}, not issued.`,
-      "The acceptance check runs once on receipt, against what was issued (§11.9).",
+ "The acceptance check runs once on receipt, against what was issued.",
     );
   },
 };
@@ -566,10 +566,10 @@ const acceptConditionsPublished: Gate = {
   clause: "§11.9",
   async evaluate(ctx) {
     const scope = await ctx.db.scopeConfig.findFirst();
-    if (scope) return ok("The five minimum conditions apply (§11.9 a–e).");
+ if (scope) return ok("The five minimum conditions apply.");
     return warn(
       "No scope statement is published for this project.",
-      "The organization publishes the acceptance conditions a transmittal must satisfy (Annex C.8).",
+ "The organization publishes the acceptance conditions a transmittal must satisfy.",
     );
   },
 };

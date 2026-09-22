@@ -108,7 +108,7 @@ export async function signupAction(_prev: SignupState | undefined, formData: For
         data: {
           projectId: project.id,
           organizationName,
-          scopeStatement: `All controlled information produced or received for ${projectName}, in any medium (§1.2).`,
+ scopeStatement: `All controlled information produced or received for ${projectName}, in any medium.`,
           assessmentLevel: "Core: identity and control",
           standardVersion: STANDARD_VERSION,
           effectiveDate: new Date(),

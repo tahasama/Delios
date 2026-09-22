@@ -50,10 +50,10 @@ export const VERB_BLURB: Record<Verb, string> = {
   CREATE: "Raise a new register entry.",
   REVISE: "Start a new revision and submit it.",
   REVIEW: "Be assigned a review and record comments.",
-  APPROVE: "Record the approval decision (§8.2).",
-  TRANSMIT: "Issue it to another party (§11.1).",
-  RECEIVE: "Be named on the distribution for it (§11.8).",
-  ACCEPT: "Run the acceptance check on an incoming transmittal (§11.9).",
+ APPROVE: "Record the approval decision.",
+ TRANSMIT: "Issue it to another party.",
+ RECEIVE: "Be named on the distribution for it.",
+ ACCEPT: "Run the acceptance check on an incoming transmittal.",
   CONTROL: "Act as the control function: release, supersede, withdraw.",
   CONFIGURE: "Publish value sets, schemes, people and this matrix.",
   PLAN: "Project manager: tag the departments each scheduled activity concerns.",
@@ -244,10 +244,10 @@ export function visibleConfidentiality(actor: Actor | null, allCodes: string[]):
 export function explain(actor: Actor | null, verb: Verb, target?: DocumentClass | null): string {
   if (!actor) return "You hold no function on this project.";
   if (target && !canSee(actor, target.confidentiality)) {
-    return `${actor.functionName} is cleared to level ${actor.clearance}; this item is ${target.confidentiality ?? "unclassified"} (§5.7).`;
+ return `${actor.functionName} is cleared to level ${actor.clearance}; this item is ${target.confidentiality ?? "unclassified"}.`;
   }
   if (can(actor, verb, target)) return `${actor.functionName} may ${VERB_LABEL[verb].toLowerCase()} this.`;
-  return `${actor.functionName} does not hold "${VERB_LABEL[verb]}" for this classification. The permission matrix decides this, not the document (§11.8).`;
+ return `${actor.functionName} does not hold "${VERB_LABEL[verb]}" for this classification. The permission matrix decides this, not the document.`;
 }
 
 /**

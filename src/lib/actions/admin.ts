@@ -136,14 +136,14 @@ export async function addConfigValueAction(_prev: { error?: string } | undefined
     if (!set) return { error: "Unknown value set." };
     const dup = await db.configValue.findFirst({ where: { setKey, code } });
     if (dup) {
-      if (dup.status === "RETIRED") return { error: "That code exists but is retired — reactivate it instead (values in use are never deleted, §4.7)." };
+ if (dup.status === "RETIRED") return { error: "That code exists but is retired — reactivate it instead (values in use are never deleted,)." };
       return { error: "Code already exists in this set." };
     }
     const count = await db.configValue.count({ where: { setKey } });
     const props = buildProps(setKey, formData);
     await db.configValue.create({ data: { orgId, setKey, code, label, sort: count, props } });
     await db.configSet.update({ where: { orgId_key: { orgId, key: setKey } }, data: { version: { increment: 1 } } });
-    await audit({ actor: admin, action: "CONFIG_VALUE_ADDED", entityType: "ConfigValue", entityId: `${setKey}.${code}`, entityLabel: label, detail: `Set "${setKey}" — version incremented (§4.7).` });
+ await audit({ actor: admin, action: "CONFIG_VALUE_ADDED", entityType: "ConfigValue", entityId: `${setKey}.${code}`, entityLabel: label, detail: `Set "${setKey}" — version incremented.` });
     revalidatePath("/admin/config");
     return {};
   } catch (e) {
@@ -164,7 +164,7 @@ export async function createConfigSetAction(_prev: { error?: string } | undefine
     const dup = await db.configSet.findFirst({ where: { key } });
     if (dup) return { error: "A set with that key already exists." };
     await db.configSet.create({ data: { orgId, key, title, description, version: 1 } });
-    await audit({ actor: admin, action: "CONFIG_SET_CREATED", entityType: "ConfigSet", entityId: key, entityLabel: title, detail: "Organization-defined value set published (§4.7)." });
+ await audit({ actor: admin, action: "CONFIG_SET_CREATED", entityType: "ConfigSet", entityId: key, entityLabel: title, detail: "Organization-defined value set published." });
     revalidatePath("/admin/config");
     return {};
   } catch (e) {
@@ -192,7 +192,7 @@ export async function updateValuePropsAction(_prev: { error?: string } | undefin
     if ((code || value.code) === value.code && (label || value.label) === value.label && (props ?? null) === (value.props ?? null)) return {};
     await db.configValue.update({ where: { id: valueId }, data: { code: code || value.code, label: label || value.label, props } });
     await db.configSet.update({ where: { orgId_key: { orgId, key: setKey } }, data: { version: { increment: 1 } } });
-    await audit({ actor: admin, action: "CONFIG_VALUE_UPDATED", entityType: "ConfigValue", entityId: `${setKey}.${value.code}`, newValue: props, detail: `Properties of ${value.code} changed; set version incremented (§4.7).` });
+ await audit({ actor: admin, action: "CONFIG_VALUE_UPDATED", entityType: "ConfigValue", entityId: `${setKey}.${value.code}`, newValue: props, detail: `Properties of ${value.code} changed; set version incremented.` });
     revalidatePath("/admin/config");
     return {};
   } catch (e) {
@@ -226,14 +226,14 @@ export async function setScopeAction(_prev: { error?: string } | undefined, form
     const assessmentLevel = String(formData.get("assessmentLevel") ?? "Full");
     const integrityThreshold = Number(formData.get("integrityThreshold") ?? 95);
     const measurementIntervalDays = Number(formData.get("measurementIntervalDays") ?? 30);
-    if (!organizationName || !scopeStatement) return { error: "Organization and scope statement are required (§1.2 / SC-01)." };
+ if (!organizationName || !scopeStatement) return { error: "Organization and scope statement are required." };
     const existing = await db.scopeConfig.findFirst();
     if (existing) {
       await db.scopeConfig.update({ where: { id: existing.id }, data: { organizationName, scopeStatement, assessmentLevel, integrityThreshold, measurementIntervalDays } });
     } else {
       await db.scopeConfig.create({ data: { projectId, organizationName, scopeStatement, assessmentLevel, standardVersion: STANDARD_VERSION, effectiveDate: new Date(), integrityThreshold, measurementIntervalDays } });
     }
-    await audit({ actor: admin, action: "SCOPE_UPDATED", entityType: "ScopeConfig", entityId: "scope", detail: "Scope & conformance statement updated (§1.2, §1.6)." });
+ await audit({ actor: admin, action: "SCOPE_UPDATED", entityType: "ScopeConfig", entityId: "scope", detail: "Scope & conformance statement updated." });
     revalidatePath("/admin");
     return {};
   } catch (e) {
@@ -327,9 +327,9 @@ export async function addExceptionAction(_prev: { error?: string } | undefined, 
     const authority = String(formData.get("authority") ?? "").trim();
     const startDate = String(formData.get("startDate") ?? "");
     const reviewPoint = String(formData.get("reviewPoint") ?? "") || null;
-    if (!item || !clauses || !reason || !authority || !startDate) return { error: "An exception records what is exempt, clauses, reason, granting authority and dates (§1.10)." };
+ if (!item || !clauses || !reason || !authority || !startDate) return { error: "An exception records what is exempt, clauses, reason, granting authority and dates." };
     await db.exceptionEntry.create({ data: { projectId, item, clauses, reason, authority, startDate: new Date(startDate), reviewPoint: reviewPoint ? new Date(reviewPoint) : null } });
-    await audit({ actor: admin, action: "EXCEPTION_GRANTED", entityType: "ExceptionEntry", entityId: item, detail: `Clauses ${clauses} — ${authority} (§1.10). Unpublished exemptions are non-conformances.` });
+ await audit({ actor: admin, action: "EXCEPTION_GRANTED", entityType: "ExceptionEntry", entityId: item, detail: `Clauses ${clauses} — ${authority}. Unpublished exemptions are non-conformances.` });
     revalidatePath("/admin");
     return {};
   } catch (e) {
@@ -346,10 +346,10 @@ export async function issueNumberRangeAction(_prev: { error?: string } | undefin
     const from = Number(formData.get("from") ?? "");
     const to = Number(formData.get("to") ?? "");
     const issuedTo = String(formData.get("issuedTo") ?? "").trim();
-    if (!prefix || !issuedTo) return { error: "Prefix and the named party are required (§3.7)." };
+ if (!prefix || !issuedTo) return { error: "Prefix and the named party are required." };
     if (!Number.isFinite(from) || !Number.isFinite(to) || from < 1 || to < from) return { error: "The range must be from ≤ to, starting at 1." };
     await db.numberRange.create({ data: { projectId, prefix, from, to, lastIssued: from - 1, issuedTo } });
-    await audit({ actor: admin, action: "RANGE_ISSUED", entityType: "NumberRange", entityId: `${prefix} ${from}-${to}`, entityLabel: issuedTo, detail: "Range issued to a named party; numbers drawn down from it (§3.7)." });
+ await audit({ actor: admin, action: "RANGE_ISSUED", entityType: "NumberRange", entityId: `${prefix} ${from}-${to}`, entityLabel: issuedTo, detail: "Range issued to a named party; numbers drawn down from it." });
     revalidatePath("/admin/numbering");
     return {};
   } catch (e) {
@@ -426,7 +426,7 @@ export async function moveConfigValueAction(formData: FormData) {
       ...values.map((item, sort) => db.configValue.update({ where: { id: item.id }, data: { sort } })),
       db.configSet.update({ where: { orgId_key: { orgId, key: value.setKey } }, data: { version: { increment: 1 } } }),
     ]);
-    await audit({ actor: admin, action: "CONFIG_VALUE_REORDERED", entityType: "ConfigValue", entityId: `${value.setKey}.${value.code}`, entityLabel: value.label, detail: `Moved ${direction}; set version incremented (§4.7).` });
+ await audit({ actor: admin, action: "CONFIG_VALUE_REORDERED", entityType: "ConfigValue", entityId: `${value.setKey}.${value.code}`, entityLabel: value.label, detail: `Moved ${direction}; set version incremented.` });
     revalidatePath("/admin/config");
   } catch {
     // The configuration screen remains usable; ActionForm surfaces edits that need validation.
@@ -483,7 +483,7 @@ export async function saveSchemeRoutingAction(_prev: { error?: string; ok?: stri
     if (!scheme || !scheme.active) return { error: "That numbering scheme is not active." };
     const before = await db.schemeRouting.findFirst({ where: { deliverableType } });
     await db.schemeRouting.upsert({ where: { orgId_deliverableType: { orgId, deliverableType } }, update: { schemeName, status }, create: { orgId, deliverableType, schemeName, status } });
-    await audit({ actor: admin, action: "SCHEME_ROUTED", entityType: "SchemeRouting", entityId: deliverableType, entityLabel: deliverableType, oldValue: before ? `${before.schemeName} (${before.status.toLowerCase()})` : undefined, newValue: `${schemeName} (${status.toLowerCase()})`, detail: before && before.schemeName !== schemeName ? "Numbers already issued keep the scheme they were issued under (§3.8)." : undefined });
+ await audit({ actor: admin, action: "SCHEME_ROUTED", entityType: "SchemeRouting", entityId: deliverableType, entityLabel: deliverableType, oldValue: before ? `${before.schemeName} (${before.status.toLowerCase()})`: undefined, newValue: `${schemeName} (${status.toLowerCase()})`, detail: before && before.schemeName !== schemeName ? "Numbers already issued keep the scheme they were issued under.": undefined });
     revalidatePath("/admin/numbering");
     return { ok: status === "ACTIVE" ? `${deliverableType} now uses ${schemeName}.` : `Numbering for ${deliverableType} switched off — no new numbers of this type.` };
   } catch (e) {
@@ -516,7 +516,7 @@ export async function deleteValueAction(formData: FormData) {
     if (await configValueIsUsed(ctx, value.setKey, value.code)) {
       // in use — retire instead (§4.7)
       await db.configValue.update({ where: { id: valueId }, data: { status: "RETIRED" } });
-      await audit({ actor: admin, action: "CONFIG_VALUE_RETIRED", entityType: "ConfigValue", entityId: `${value.setKey}.${value.code}`, detail: "In use — retired rather than deleted (§4.7)." });
+ await audit({ actor: admin, action: "CONFIG_VALUE_RETIRED", entityType: "ConfigValue", entityId: `${value.setKey}.${value.code}`, detail: "In use — retired rather than deleted." });
     } else {
       await db.configValue.delete({ where: { id: valueId } });
       await audit({ actor: admin, action: "CONFIG_VALUE_DELETED", entityType: "ConfigValue", entityId: `${value.setKey}.${value.code}`, detail: "Never used — deleted." });

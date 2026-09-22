@@ -28,7 +28,7 @@ async function nextTransmittalNumber(t: Tenant): Promise<string> {
 export async function createTransmittalAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
   const ctx = await requireScope();
   const { user, db, projectId, orgId } = ctx;
-  if (!isController(user) && !isAdmin(user)) return { error: "Information shall not leave (or enter) control other than by a transmittal raised by the control function (§11.1, §11.13)." };
+ if (!isController(user) && !isAdmin(user)) return { error: "Information shall not leave (or enter) control other than by a transmittal raised by the control function." };
   const direction = String(formData.get("direction") ?? "OUTGOING");
   const reasonForIssue = String(formData.get("reasonForIssue") ?? "");
   const dateOfIssue = String(formData.get("dateOfIssue") ?? "");
@@ -46,15 +46,15 @@ export async function createTransmittalAction(_prev: { error?: string } | undefi
   const recipientNames = outsiders.map((o) => o.name);
   const recipientUsers = formData.getAll("recipientUsers").map(String).filter(Boolean);
 
-  if (!reasonForIssue) return { error: "Every transmittal states its reason for issue (§11.2)." };
-  if (!dateOfIssue) return { error: "Date of issue is required (§11.1)." };
-  if (!revisionIds.length) return { error: "List the documents and revisions enclosed (§11.9a)." };
-  if (!recipientNames.length && !recipientUsers.length) return { error: "Recipients are identified individually by name (§11.4)." };
+ if (!reasonForIssue) return { error: "Every transmittal states its reason for issue." };
+ if (!dateOfIssue) return { error: "Date of issue is required." };
+ if (!revisionIds.length) return { error: "List the documents and revisions enclosed." };
+ if (!recipientNames.length && !recipientUsers.length) return { error: "Recipients are identified individually by name." };
   if (direction === "OUTGOING" && !subject) return { error: "Give the transmittal a subject — it is the first thing the recipient reads." };
 
   const reasons = await getActiveSet("REASONS_FOR_ISSUE");
   const reason = reasons.find((r) => r.code === reasonForIssue);
-  if (!reason) return { error: "Reason for issue is not in the defined set (§2.6)." };
+ if (!reason) return { error: "Reason for issue is not in the defined set." };
 
   // §11.3 / B.8.2 — what may be issued
   const statuses = await getActiveSet("STATUSES");
@@ -67,7 +67,7 @@ export async function createTransmittalAction(_prev: { error?: string } | undefi
       if (err) return { error: `${rev.document.docNumber} rev ${rev.value}: ${err}` };
       // §7.8 — execution requires an execution-permitting status (blocked here, not just flagged by ST-13)
       if (reasonForIssue === "EXECUTION" && rev.statusCode && !execStatuses.has(rev.statusCode)) {
-        return { error: `${rev.document.docNumber} rev ${rev.value} is at ${rev.statusCode}, which does not permit physical execution (§7.8 / ST-13).` };
+ return { error: `${rev.document.docNumber} rev ${rev.value} is at ${rev.statusCode}, which does not permit physical execution.` };
       }
     }
   }
@@ -118,7 +118,7 @@ export async function createTransmittalAction(_prev: { error?: string } | undefi
     entityType: "Transmittal",
     entityId: t.id,
     entityLabel: t.number,
-    detail: `${direction.toLowerCase()} · reason: ${reason.label} · ${revisionIds.length} item(s) · ${recipientUsers.length + recipientNames.length} recipient(s) (§11.1).`,
+ detail: `${direction.toLowerCase()} · reason: ${reason.label} · ${revisionIds.length} item(s) · ${recipientUsers.length + recipientNames.length} recipient(s).`,
   });
   // Incoming documents are reviewed through a route once accepted (§11.11):
   // Document Control sends them from the transmittal, like any other review.
@@ -149,7 +149,7 @@ export async function issueTransmittalAction(_prev: { error?: string } | undefin
       data: { notifiedAt: issuedAt },
     }),
   ]);
-  await audit({ actor: user, action: "ISSUE", entityType: "Transmittal", entityId: id, entityLabel: t.number, detail: "Issued to recipients (§11.1)." });
+ await audit({ actor: user, action: "ISSUE", entityType: "Transmittal", entityId: id, entityLabel: t.number, detail: "Issued to recipients." });
   await notifyMany(
     t.recipients.map((r) => r.userId).filter((x): x is string => !!x),
     "TRANSMITTAL",
@@ -201,7 +201,7 @@ export async function acceptanceCheckAction(_prev: { error?: string } | undefine
     entityType: "Transmittal",
     entityId: id,
     entityLabel: t.number,
-    detail: allPass ? "All acceptance conditions satisfied (§11.9)." : `Rejected — conditions ${conditions.filter((c) => !c.pass).map((c) => c.key).join(", ")} failed; the published consequence applies (§11.10).`,
+ detail: allPass ? "All acceptance conditions satisfied.": `Rejected — conditions ${conditions.filter((c) => !c.pass).map((c) => c.key).join(", ")} failed; the published consequence applies.`,
   });
 
   // G.5 step 3 — the issuing party is notified of a rejection
@@ -240,7 +240,7 @@ export async function acknowledgeReceiptAction(formData: FormData) {
   }
   const t = await db.transmittal.findUnique({ where: { id: transmittalId } });
   if (!recipient.acknowledgedAt) {
-    await audit({ actor: user, action: "RECEIPT_RECORDED", entityType: "Transmittal", entityId: transmittalId, entityLabel: t?.number ?? transmittalId, detail: `Formal receipt acknowledged by ${recipient.name} (§11.5).` });
+ await audit({ actor: user, action: "RECEIPT_RECORDED", entityType: "Transmittal", entityId: transmittalId, entityLabel: t?.number ?? transmittalId, detail: `Formal receipt acknowledged by ${recipient.name}.` });
     if (t?.createdById && t.createdById !== user.id) {
       await notify(t.createdById, "TRANSMITTAL_ACKNOWLEDGED", `${recipient.name} acknowledged ${t.number}`, "Formal receipt evidence was recorded.", `/transmittals/${transmittalId}`);
     }

@@ -48,7 +48,7 @@ export async function openFirstProjectAction(
     data: {
       projectId: project.id,
       organizationName: organization.name,
-      scopeStatement: `All controlled information produced or received for ${name}, in any medium (§1.2).`,
+ scopeStatement: `All controlled information produced or received for ${name}, in any medium.`,
       assessmentLevel: "Core: identity and control",
       standardVersion: STANDARD_VERSION,
       effectiveDate: new Date(),

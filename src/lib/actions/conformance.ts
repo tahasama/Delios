@@ -27,7 +27,7 @@ export async function acceptDefectAction(_prev: { error?: string } | undefined, 
   const defectId = String(formData.get("defectId") ?? "");
   const reason = String(formData.get("reason") ?? "").trim();
   const reviewDate = String(formData.get("reviewDate") ?? "") || null;
-  if (!reason) return { error: "Acceptance requires a recorded reason (§17.6)." };
+ if (!reason) return { error: "Acceptance requires a recorded reason." };
   if (!reviewDate) return { error: "An accepted defect carries a review date (CF-13)." };
   const defect = await db.defect.findUniqueOrThrow({ where: { id: defectId } });
   await db.defect.update({
@@ -53,13 +53,13 @@ export async function closeDefectAction(_prev: { error?: string } | undefined, f
     const result = await runner(checkCtx);
     if (Array.isArray(result)) {
       const still = result.find((f) => f.entityKey === defect.entityKey);
-      if (still) return { error: `Closure refused — the check still returns this item (§17.6 / CF-11). Correct the controlled source, then re-run ${defect.checkId}.` };
+ if (still) return { error: `Closure refused — the check still returns this item. Correct the controlled source, then re-run ${defect.checkId}.` };
     }
   } else if (meta) {
-    return { error: `${defect.checkId} is not automated — closure requires evidence of the re-run check (§17.6).` };
+ return { error: `${defect.checkId} is not automated — closure requires evidence of the re-run check.` };
   }
   await db.defect.update({ where: { id: defectId }, data: { status: "CLOSED", closedAt: new Date() } });
-  await audit({ actor: user, action: "DEFECT_CLOSED", entityType: "Defect", entityId: defectId, entityLabel: defect.checkId, detail: "Re-run check no longer returns the item (§17.6)." });
+ await audit({ actor: user, action: "DEFECT_CLOSED", entityType: "Defect", entityId: defectId, entityLabel: defect.checkId, detail: "Re-run check no longer returns the item." });
   revalidatePath("/conformance/defects");
   return {};
 }

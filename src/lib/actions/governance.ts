@@ -14,10 +14,10 @@ export async function confirmRecordAction(_prev: { error?: string } | undefined,
   if (isReadOnly(user)) return { error: "Viewers cannot confirm records." };
   const documentId = String(formData.get("documentId") ?? "");
   const doc = await db.document.findUniqueOrThrow({ where: { id: documentId } });
-  if (doc.kind !== "RECORD") return { error: "Only a record is confirmed (§2.2)." };
+ if (doc.kind !== "RECORD") return { error: "Only a record is confirmed." };
   if (doc.state !== "PLANNED") return { error: "Already confirmed." };
   await db.document.update({ where: { id: documentId }, data: { state: "ACTIVE", confirmedAt: new Date(), confirmedByName: user.name } });
-  await audit({ actor: user, action: "RECORD_CONFIRMED", entityType: "Document", entityId: documentId, entityLabel: doc.docNumber, detail: "Record confirmed — fixed as evidence; never revised (§2.2). Corrections issue a further record referencing this one (§2.3)." });
+ await audit({ actor: user, action: "RECORD_CONFIRMED", entityType: "Document", entityId: documentId, entityLabel: doc.docNumber, detail: "Record confirmed — fixed as evidence; never revised. Corrections issue a further record referencing this one." });
   revalidatePath(`/documents/${documentId}`);
   return {};
 }
@@ -65,9 +65,9 @@ export async function correctRecordAction(_prev: { error?: string } | undefined,
     },
   });
   await db.relationship.create({
-    data: { projectId, kind: "RECORD_CORRECTION", fromType: "Document", fromId: correction.id, toType: "Document", toId: original.id, note: `Corrects ${original.docNumber} (§2.3)`, createdById: user.id },
+ data: { projectId, kind: "RECORD_CORRECTION", fromType: "Document", fromId: correction.id, toType: "Document", toId: original.id, note: `Corrects ${original.docNumber}`, createdById: user.id },
   });
-  await audit({ actor: user, action: "REGISTER_ENTRY", entityType: "Document", entityId: correction.id, entityLabel: docNumber, detail: `Correction of record ${original.docNumber} — both retained; the original is never altered (§2.3).` });
+ await audit({ actor: user, action: "REGISTER_ENTRY", entityType: "Document", entityId: correction.id, entityLabel: docNumber, detail: `Correction of record ${original.docNumber} — both retained; the original is never altered.` });
   revalidatePath(`/documents/${originalId}`);
   return {};
 }
@@ -79,18 +79,18 @@ export async function withdrawApprovalAction(_prev: { error?: string } | undefin
   const { user, db, projectId, orgId } = ctx;
   const revisionId = String(formData.get("revisionId") ?? "");
   const reason = String(formData.get("reason") ?? "").trim();
-  if (!reason) return { error: "A withdrawal is recorded with its reason (§8.7)." };
+ if (!reason) return { error: "A withdrawal is recorded with its reason." };
   const approval = await db.approval.findFirst({ where: { revisionId, withdrawnAt: null }, orderBy: { decidedAt: "desc" } });
   if (!approval) return { error: "No live approval to withdraw." };
   const allowed = isAdmin(user) || approval.approverId === user.id;
-  if (!allowed) return { error: "Only the approving authority (or an administrator) withdraws an approval (§8.7)." };
+ if (!allowed) return { error: "Only the approving authority (or an administrator) withdraws an approval." };
 
   const rev = await db.revision.findUniqueOrThrow({ where: { id: revisionId }, include: { document: true } });
   await db.approval.update({ where: { id: approval.id }, data: { withdrawnAt: new Date(), withdrawnBy: user.name, withdrawnReason: reason } });
   // the document enters Withdrawn until a replacement is released (§8.7)
   await db.document.update({ where: { id: rev.documentId }, data: { state: "WITHDRAWN" } });
   await db.obsolescenceRecord.create({ data: { projectId, kind: "WITHDRAWN", documentId: rev.documentId, revisionId, reason: `Approval withdrawn: ${reason}`, authorityName: user.name, createdById: user.id } });
-  await audit({ actor: user, action: "APPROVAL_WITHDRAWN", entityType: "Revision", entityId: revisionId, entityLabel: `${rev.document.docNumber} rev ${rev.value}`, detail: `${reason} — original approval retained; document withdrawn until a replacement is released (§8.7 / AP-13).` });
+ await audit({ actor: user, action: "APPROVAL_WITHDRAWN", entityType: "Revision", entityId: revisionId, entityLabel: `${rev.document.docNumber} rev ${rev.value}`, detail: `${reason} — original approval retained; document withdrawn until a replacement is released.` });
   await notify(rev.document.createdById, "WITHDRAWN", `Approval withdrawn: ${rev.document.docNumber} rev ${rev.value}`, reason, `/documents/${rev.documentId}`);
   revalidatePath(`/documents/${rev.documentId}`);
   return {};
@@ -124,7 +124,7 @@ export async function reclassifyCommentAction(_prev: { error?: string } | undefi
     entityId: commentId,
     oldValue: comment.progressionPreventing ? "prevents progression" : "non-preventing",
     newValue: prevent ? "prevents progression" : "non-preventing",
-    detail: note || `Reclassified by ${user.name} (§9.6 — the executing party may force reclassification).`,
+ detail: note || `Reclassified by ${user.name}.`,
   });
   revalidatePath(`/reviews/${cycleId}`);
   return {};

@@ -34,11 +34,11 @@ export async function createDocumentAction(_prev: { error?: string } | undefined
   const receivedDate = String(formData.get("receivedDate") ?? "") || null;
   const kind = String(formData.get("kind") ?? "DOCUMENT") === "RECORD" ? "RECORD" : "DOCUMENT";
 
-  if (!title) return { error: "A descriptive title is required — generic titles are non-conformant (§4.3)." };
-  if (/^(report|drawing|layout|document|spec)$/i.test(title)) return { error: `"${title}" is a generic, non-descriptive title (§4.3). Describe the content.` };
-  if (!deliverableType) return { error: "Deliverable type is required — it drives the numbering scheme (§5.2)." };
-  if (!docType) return { error: "Document type is required (§5.3)." };
-  if (!discipline) return { error: "Discipline is required — exactly one (§5.4)." };
+ if (!title) return { error: "A descriptive title is required — generic titles are non-conformant." };
+ if (/^(report|drawing|layout|document|spec)$/i.test(title)) return { error: `"${title}" is a generic, non-descriptive title. Describe the content.` };
+ if (!deliverableType) return { error: "Deliverable type is required — it drives the numbering scheme." };
+ if (!docType) return { error: "Document type is required." };
+ if (!discipline) return { error: "Discipline is required — exactly one." };
 
   const schemeSets: Record<string, string> = {
     "Project code": "PROJECT_CODES",
@@ -61,7 +61,7 @@ export async function createDocumentAction(_prev: { error?: string } | undefined
     if (!setKey || !value) continue;
     const active = await getActiveSet(setKey);
     if (!active.some((v) => v.code === value)) {
-      return { error: `"${label}" value "${value}" is not in the published active set (§4.7).` };
+ return { error: `"${label}" value "${value}" is not in the published active set.` };
     }
   }
 
@@ -85,12 +85,12 @@ export async function createDocumentAction(_prev: { error?: string } | undefined
     return ["CTR", "VND", "TPY", "CLT"];
   }
   const missingConditional: string[] = [];
-  const enforceNow = externalList().includes(deliverableType); // §A.2.1 — supplier metadata complete at submission; internal placeholders may stay empty (§16.8)
+ const enforceNow = externalList().includes(deliverableType); // supplier metadata complete at submission; internal placeholders may stay empty
   if (enforceNow && req("originator") === "required" && !originator) missingConditional.push("supplier / originator");
   if (enforceNow && req("po") === "required" && !contractRef) missingConditional.push("contract / PO");
   if (enforceNow && req("receivedDate") === "required" && !receivedDate) missingConditional.push("date received");
   if (missingConditional.length) {
-    return { error: `The type-to-field matrix requires ${missingConditional.join(", ")} for this deliverable type (§4.4 / C.3.3).` };
+ return { error: `The type-to-field matrix requires ${missingConditional.join(", ")} for this deliverable type.` };
   }
   const external = req("receivedDate") !== "na";
   const retentionClass = chosenRetention ?? (await retentionFor(ctx, criticality));
@@ -122,7 +122,7 @@ export async function createDocumentAction(_prev: { error?: string } | undefined
     entityType: "Document",
     entityId: doc.id,
     entityLabel: docNumber,
-    detail: `Register entry created (${kind === "RECORD" ? "RECORD — fixed evidence, never revised (§2.2)" : "document, placeholder"}; state Planned — §16.8). Number ${docNumber} allocated by the system (§3.7).`,
+ detail: `Register entry created (${kind === "RECORD" ? "RECORD — fixed evidence, never revised": "document, placeholder"}; state Planned.8). Number ${docNumber} allocated by the system.`,
   });
 
   // An initial file creates the first revision immediately. A PDF is the
@@ -145,7 +145,7 @@ export async function createDocumentAction(_prev: { error?: string } | undefined
           state: "IN_PREPARATION",
           reasonForRevision: "First issue",
           changeDescription: "Initial content",
-          authorizationReason: "Placeholder register entry (§16.8) — authorization for the first revision.",
+ authorizationReason: "Placeholder register entry — authorization for the first revision.",
           authorizedById: user.id,
           authorizedByName: user.name,
           authorizedAt: new Date(),
@@ -160,7 +160,7 @@ export async function createDocumentAction(_prev: { error?: string } | undefined
         entityType: "Revision",
         entityId: rev.id,
         entityLabel: `${docNumber} rev A`,
-        detail: "First revision established with the initial file (placeholder authorization §16.8).",
+ detail: "First revision established with the initial file (placeholder authorization).",
       });
 
       // "Register & send": start the chosen review route straight away.
@@ -210,7 +210,7 @@ export async function updateDocumentAction(_prev: { error?: string; ok?: string 
   }
   if (!changes.length) return { ok: "No changes to record." };
   if ("title" in data && typeof data.title === "string" && /^(report|drawing|layout|document|spec)$/i.test(data.title.trim())) {
-    return { error: "Generic titles are non-conformant (§4.3)." };
+ return { error: "Generic titles are non-conformant." };
   }
   await db.document.update({ where: { id }, data });
   for (const c of changes) {
@@ -226,7 +226,7 @@ export async function updateDocumentAction(_prev: { error?: string; ok?: string 
     });
   }
   revalidatePath(`/documents/${id}`);
-  return { ok: `Saved — ${changes.length} metadata change${changes.length > 1 ? "s" : ""} logged (§4.9).` };
+ return { ok: `Saved — ${changes.length} metadata change${changes.length > 1 ? "s": ""} logged.` };
 }
 
 /** Associate the document with the asset it describes (§5.8, many-to-many). */
@@ -250,7 +250,7 @@ export async function linkAssetAction(_prev: { error?: string } | undefined, for
     entityType: "Document",
     entityId: documentId,
     entityLabel: doc.docNumber,
-    detail: `Associated with asset ${asset.code} — ${asset.name} (§5.8).`,
+ detail: `Associated with asset ${asset.code} — ${asset.name}.`,
   });
   revalidatePath(`/documents/${documentId}`);
   return {};
@@ -279,7 +279,7 @@ export async function endDocumentStateAction(_prev: { error?: string } | undefin
   const documentId = String(formData.get("documentId") ?? "");
   const kind = String(formData.get("kind") ?? "") as "WITHDRAWN" | "CANCELLED" | "ARCHIVED";
   const reason = String(formData.get("reason") ?? "").trim();
-  if (!reason) return { error: "A reason is required — each end state is recorded with date and authority (§12.1)." };
+ if (!reason) return { error: "A reason is required — each end state is recorded with date and authority." };
 
   const { endDocumentState } = await import("@/lib/lifecycle");
   try {

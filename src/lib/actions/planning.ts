@@ -27,17 +27,17 @@ export async function createPackageAction(_prev: { error?: string } | undefined,
   const requiredStatus = String(formData.get("requiredStatus") ?? "");
   const compositionOwnerId = String(formData.get("compositionOwnerId") ?? "");
   const acceptanceAuthorityId = String(formData.get("acceptanceAuthorityId") ?? "");
-  if (!identifier) return { error: "A package identifier is required — unique, never reused (§15.3)." };
-  if (!purpose) return { error: "Every package states a reason for issue (§15.1)." };
-  if (!type) return { error: "Defined or accumulated — state the type (§15.1)." };
-  if (type === "ACCUMULATED" && !membershipRule) return { error: "An accumulated package states its membership rule (§15.2)." };
-  if (!recipientName) return { error: "The recipient is required (§15.3)." };
-  if (!completionDate) return { error: "The completion date is required — it triggers assessment (§15.6)." };
-  if (!requiredStatus) return { error: "State the status members shall have reached (§15.3)." };
-  if (!compositionOwnerId || !acceptanceAuthorityId) return { error: "Both owners are required (§15.3)." };
-  if (compositionOwnerId === acceptanceAuthorityId) return { error: "The two owners shall not be the same person (§15.5 / PK-07)." };
+ if (!identifier) return { error: "A package identifier is required — unique, never reused." };
+ if (!purpose) return { error: "Every package states a reason for issue." };
+ if (!type) return { error: "Defined or accumulated — state the type." };
+ if (type === "ACCUMULATED" && !membershipRule) return { error: "An accumulated package states its membership rule." };
+ if (!recipientName) return { error: "The recipient is required." };
+ if (!completionDate) return { error: "The completion date is required — it triggers assessment." };
+ if (!requiredStatus) return { error: "State the status members shall have reached." };
+ if (!compositionOwnerId || !acceptanceAuthorityId) return { error: "Both owners are required." };
+ if (compositionOwnerId === acceptanceAuthorityId) return { error: "The two owners shall not be the same person." };
   const dup = await db.package.findFirst({ where: { identifier } });
-  if (dup) return { error: "Identifier already used — never reused (§15.3)." };
+ if (dup) return { error: "Identifier already used — never reused." };
   const [owner, acceptor] = await Promise.all([
     db.user.findUniqueOrThrow({ where: { id: compositionOwnerId } }),
     db.user.findUniqueOrThrow({ where: { id: acceptanceAuthorityId } }),
@@ -51,7 +51,7 @@ export async function createPackageAction(_prev: { error?: string } | undefined,
       acceptanceAuthorityId, acceptanceAuthorityName: acceptor.name,
     },
   });
-  await audit({ actor: user, action: "PACKAGE_CREATED", entityType: "Package", entityId: identifier, entityLabel: identifier, detail: `${type.toLowerCase()} package — ${owner.name} composes, ${acceptor.name} accepts (§15.5).` });
+ await audit({ actor: user, action: "PACKAGE_CREATED", entityType: "Package", entityId: identifier, entityLabel: identifier, detail: `${type.toLowerCase()} package — ${owner.name} composes, ${acceptor.name} accepts.` });
   redirect(`/packages/${identifier}`);
 }
 
@@ -73,7 +73,7 @@ export async function addPackageMemberAction(_prev: { error?: string } | undefin
   const fresh = documentIds.filter((id) => !pkg.members.some((m) => m.documentId === id));
   if (!fresh.length) return { error: "Those documents are already in the package." };
   await db.packageMember.createMany({ data: fresh.map((documentId) => ({ projectId, packageId, documentId, requiredStatus })) });
-  await audit({ actor: user, action: "PACKAGE_MEMBER", entityType: "Package", entityId: pkg.identifier, entityLabel: pkg.identifier, detail: `${fresh.length} document(s) added (§15.4).` });
+ await audit({ actor: user, action: "PACKAGE_MEMBER", entityType: "Package", entityId: pkg.identifier, entityLabel: pkg.identifier, detail: `${fresh.length} document(s) added.` });
   revalidatePath(`/packages/${pkg.identifier}`);
   // From the register's "Add to package": land on the package, where the result is.
   if (formData.get("redirect")) redirect(`/packages/${pkg.identifier}?added=${fresh.length}`);
@@ -114,7 +114,7 @@ export async function assessPackageAction(_prev: { error?: string } | undefined,
     entityType: "Package",
     entityId: pkg.identifier,
     entityLabel: pkg.identifier,
-    detail: complete ? "Complete — every member at required status (§15.6)." : `Shortfall recorded for ${shortfall.length} member(s) (§15.7).`,
+ detail: complete ? "Complete — every member at required status.": `Shortfall recorded for ${shortfall.length} member(s).`,
   });
   revalidatePath(`/packages/${pkg.identifier}`);
   return {};
@@ -128,8 +128,8 @@ export async function issueShortfallAction(_prev: { error?: string } | undefined
   const pkg = await db.package.findUniqueOrThrow({ where: { id: packageId } });
   if (!pkg.shortfall) return { error: "No shortfall recorded for this package." };
   await db.package.update({ where: { id: packageId }, data: { shortfallIssuedAt: new Date() } });
-  await audit({ actor: user, action: "SHORTFALL_ISSUED", entityType: "Package", entityId: pkg.identifier, entityLabel: pkg.identifier, detail: `Shortfall issued to the acceptance authority (${pkg.acceptanceAuthorityName}) (§15.7).` });
-  await notify(pkg.acceptanceAuthorityId, "SHORTFALL", `Package shortfall: ${pkg.identifier}`, "A shortfall record has been issued to you as acceptance authority (§15.7).", `/packages/${pkg.identifier}`);
+ await audit({ actor: user, action: "SHORTFALL_ISSUED", entityType: "Package", entityId: pkg.identifier, entityLabel: pkg.identifier, detail: `Shortfall issued to the acceptance authority (${pkg.acceptanceAuthorityName}).` });
+ await notify(pkg.acceptanceAuthorityId, "SHORTFALL", `Package shortfall: ${pkg.identifier}`, "A shortfall record has been issued to you as acceptance authority.", `/packages/${pkg.identifier}`);
   revalidatePath(`/packages/${pkg.identifier}`);
   return {};
 }
@@ -152,12 +152,12 @@ export async function closePackageAction(_prev: { error?: string } | undefined, 
     return cur?.statusCode !== m.requiredStatus;
   });
   if (unresolved && !pkg.shortfallAcceptedBy) {
-    if (!pkg.shortfallIssuedAt) return { error: "A shortfall exists and has not been issued to the acceptance authority (§15.7)." };
-    return { error: "Closure blocked — an unresolved shortfall must first be accepted by the acceptance authority (§15.8)." };
+ if (!pkg.shortfallIssuedAt) return { error: "A shortfall exists and has not been issued to the acceptance authority." };
+ return { error: "Closure blocked — an unresolved shortfall must first be accepted by the acceptance authority." };
   }
-  if (pkg.type === "ACCUMULATED" && !ruleCeased) return { error: "State that the membership rule has ceased to admit members (§15.8)." };
+ if (pkg.type === "ACCUMULATED" && !ruleCeased) return { error: "State that the membership rule has ceased to admit members." };
   await db.package.update({ where: { id: packageId }, data: { closedAt: new Date(), closureNote, ruleCeasedAt: pkg.type === "ACCUMULATED" && ruleCeased ? new Date() : null } });
-  await audit({ actor: user, action: "PACKAGE_CLOSED", entityType: "Package", entityId: pkg.identifier, entityLabel: pkg.identifier, detail: "Closure declared (§15.8)." });
+ await audit({ actor: user, action: "PACKAGE_CLOSED", entityType: "Package", entityId: pkg.identifier, entityLabel: pkg.identifier, detail: "Closure declared." });
   revalidatePath(`/packages/${pkg.identifier}`);
   return {};
 }
@@ -168,9 +168,9 @@ export async function acceptShortfallAction(_prev: { error?: string } | undefine
   const { user, db, projectId, orgId } = ctx;
   const packageId = String(formData.get("packageId") ?? "");
   const pkg = await db.package.findUniqueOrThrow({ where: { id: packageId } });
-  if (user.id !== pkg.acceptanceAuthorityId && !isAdmin(user)) return { error: "Only the acceptance authority may accept the shortfall (§15.8)." };
+ if (user.id !== pkg.acceptanceAuthorityId && !isAdmin(user)) return { error: "Only the acceptance authority may accept the shortfall." };
   await db.package.update({ where: { id: packageId }, data: { shortfallAcceptedBy: user.name, shortfallIssuedAt: pkg.shortfallIssuedAt ?? new Date() } });
-  await audit({ actor: user, action: "SHORTFALL_ACCEPTED", entityType: "Package", entityId: pkg.identifier, entityLabel: pkg.identifier, detail: "Shortfall accepted by the acceptance authority (§15.8)." });
+ await audit({ actor: user, action: "SHORTFALL_ACCEPTED", entityType: "Package", entityId: pkg.identifier, entityLabel: pkg.identifier, detail: "Shortfall accepted by the acceptance authority." });
   revalidatePath(`/packages/${pkg.identifier}`);
   return {};
 }

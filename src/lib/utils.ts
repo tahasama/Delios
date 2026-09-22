@@ -32,5 +32,5 @@ export function timeAgo(d: Date | string | null | undefined): string {
  * record keeps them; people reading the screen do not need them.
  */
 export function plain(text: string | null | undefined): string {
-  return (text ?? "").replace(/\s*\((?:§|Part |FM-|G\.)[^)]*\)/g, "").replace(/\s*§\d+(?:\.\d+)*/g, "").trim();
+ return (text ?? "").replace(/\s*\((?:§|Part |FM-|G\.)[^)]*\)/g, "").replace(/\s*§\d+(?:\.\d+)*/g, "").trim();
 }

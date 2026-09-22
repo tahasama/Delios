@@ -176,12 +176,12 @@ export function canDecide(input: {
     return input.mayConfigure || input.mayControl ? { ok: true } : { ok: false, error: "Deciding this list needs Control or Configure." };
   }
   if (!input.mayConfigure) {
-    return { ok: false, error: "Deciding a controlled change needs the Configure permission (§14.7)." };
+ return { ok: false, error: "Deciding a controlled change needs the Configure permission." };
   }
   // §8.3 — attribution: the person who proposed a change is not the person who
   // blesses it. Without this, "approval" records nothing anyone can rely on.
   if (input.submittedById && input.submittedById === input.userId) {
-    return { ok: false, error: "You submitted this version. Someone else has to approve it (§8.3)." };
+ return { ok: false, error: "You submitted this version. Someone else has to approve it." };
   }
   return { ok: true };
 }

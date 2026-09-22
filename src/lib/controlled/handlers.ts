@@ -270,7 +270,7 @@ const schedule: Handler = {
       if (!externalId) errors.push("Activity ID is missing");
       else if (ids.has(externalId)) errors.push(`Activity ID ${externalId} is duplicated`);
       if (actionCode && !issued.has(actionCode)) errors.push(`Action Code ${actionCode} was never issued by the system — leave it empty for a new activity`);
-      else if (actionCode && codes.has(actionCode)) errors.push(`Action Code ${actionCode} is duplicated — an action code is assigned once (§14.2)`);
+ else if (actionCode && codes.has(actionCode)) errors.push(`Action Code ${actionCode} is duplicated — an action code is assigned once`);
       if (!name) errors.push("Activity Name is missing");
       if (!baselineRaw && !forecastRaw) errors.push("Baseline Date or Forecast Date is required");
       if (baselineRaw && !parseDate(baselineRaw)) errors.push("Baseline Date must be YYYY-MM-DD");
@@ -468,7 +468,7 @@ const valueSet: Handler = {
     // §4.7 — a value left out of the upload is not deleted, it is retired.
     return lines.map((l) =>
       l.change === "REMOVED"
-        ? { ...l, change: "CHANGED" as const, detail: `${l.detail}  →  retired (§4.7 — values in use are never deleted)` }
+ ? {...l, change: "CHANGED" as const, detail: `${l.detail} → retired` }
         : l,
     );
   },

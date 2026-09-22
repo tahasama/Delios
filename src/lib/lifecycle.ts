@@ -123,7 +123,7 @@ export async function openReviewCycle(
     entityType: "ReviewCycle",
     entityId: cycle.id,
     entityLabel: `${label} — cycle ${seq}`,
-    detail: "Submitted by originator; received by the control function (§9.1).",
+ detail: "Submitted by originator; received by the control function.",
   });
   return cycle;
 }
@@ -142,7 +142,7 @@ export async function issueToReview(t: Tenant, cycleId: string, user: SessionUse
     entityType: "ReviewCycle",
     entityId: cycleId,
     entityLabel: `${cycle.revision.document.docNumber} rev ${cycle.revision.value} — cycle ${cycle.sequence}`,
-    detail: `Issued to review (${cycle.mode.toLowerCase()}; holder: reviewer) (§9.1).`,
+ detail: `Issued to review (${cycle.mode.toLowerCase()}; holder: reviewer).`,
   });
 }
 
@@ -166,13 +166,13 @@ export async function recordReviewOutcome(
       const before = cycle.assignments.filter((a) => a.order < mine.order);
       const incomplete = before.filter((a) => !a.completedAt);
       if (incomplete.length) {
-        throw new Error(`Serial review: ${incomplete.map((a) => a.userName).join(", ")} must complete before you (§9.7).`);
+ throw new Error(`Serial review: ${incomplete.map((a) => a.userName).join(", ")} must complete before you.`);
       }
     }
   }
-  if (cycle.outcome) throw new Error("This cycle already carries a recorded outcome — it is immutable (§9.4).");
+ if (cycle.outcome) throw new Error("This cycle already carries a recorded outcome — it is immutable.");
   const cons = await verdictMeaning(t, cycle.outcomeSetKey, outcome);
-  if (!cons) throw new Error("Outcome is not in the published set (§9.2).");
+ if (!cons) throw new Error("Outcome is not in the published set.");
   const approves = cycle.binding && cons.proceed && cycle.revision.state === "IN_REVIEW";
   if (approves) await assertMayGiveBindingVerdict(t, cycle.revisionId, user);
   if (cycle.issuedToReviewAt) await db.reviewCycle.update({ where: { id: cycleId }, data: { returnedFromReviewAt: new Date() } });
@@ -191,7 +191,7 @@ export async function recordReviewOutcome(
     entityId: cycleId,
     entityLabel: `${cycle.revision.document.docNumber} rev ${cycle.revision.value} — cycle ${cycle.sequence}`,
     newValue: outcome,
-    detail: `${cons.label}. ${blockingOpen ? "Progression-preventing comments remain open — work shall not proceed (§9.6)." : ""}`,
+ detail: `${cons.label}. ${blockingOpen ? "Progression-preventing comments remain open — work shall not proceed.": ""}`,
   });
   // Notify the control function that the review has returned
   const controllers = await holdersOf(t, "CONTROL");
@@ -199,7 +199,7 @@ export async function recordReviewOutcome(
     controllers.map((c) => c.id),
     "REVIEW_RETURNED",
     `Review returned: ${cycle.revision.document.docNumber} rev ${cycle.revision.value}`,
-    `Outcome: ${cons.label}. Return to originator through the control function (§9.8).`,
+ `Outcome: ${cons.label}. Return to originator through the control function.`,
     `/reviews/${cycleId}`, t
   );
 }
@@ -236,7 +236,7 @@ export async function returnToOriginator(t: Tenant, cycleId: string, user: Sessi
     entityType: "ReviewCycle",
     entityId: cycleId,
     entityLabel: `${cycle.revision.document.docNumber} rev ${cycle.revision.value} — cycle ${cycle.sequence}`,
-    detail: `Returned to originator via control function; outcome "${cons.label}" issued${authorization ? " with revision authorization (§6.5)" : ""}.`,
+ detail: `Returned to originator via control function; outcome "${cons.label}" issued${authorization ? " with revision authorization": ""}.`,
   });
   await notify(
     cycle.revision.document.createdById,
@@ -280,10 +280,10 @@ export async function releaseRevision(t: Tenant, revisionId: string, user: Sessi
   if (rev.state !== "IN_REVIEW" && rev.state !== "IN_PREPARATION") throw new Error("Only an in-review revision can be released.");
   const statuses = await getActiveSet("STATUSES");
   const status = statuses.find((s) => s.code === statusCode);
-  if (!status) throw new Error("Status is not in the published set (§7.7).");
+ if (!status) throw new Error("Status is not in the published set.");
   // §8.1 — no release without recorded approval
   const approval = await db.approval.findFirst({ where: { revisionId }, orderBy: { decidedAt: "desc" } });
-  if (!approval) throw new Error("Release blocked: no approval is recorded for this revision (§7.5/§8.1).");
+ if (!approval) throw new Error("Release blocked: no approval is recorded for this revision.");
   // §4.8 — core metadata complete before release
   const doc = rev.document;
   const missing: string[] = [];
@@ -295,11 +295,11 @@ export async function releaseRevision(t: Tenant, revisionId: string, user: Sessi
   if (!doc.confidentiality) missing.push("confidentiality");
   if (!rev.reasonForRevision) missing.push("reason for revision");
   if (!rev.changeDescription) missing.push("description of change");
-  if (!rev.renditionFileId) missing.push("a rendition (§10.2)");
-  if (missing.length) throw new Error(`Release blocked — metadata incomplete: ${missing.join(", ")} (§4.8).`);
+ if (!rev.renditionFileId) missing.push("a rendition");
+ if (missing.length) throw new Error(`Release blocked — metadata incomplete: ${missing.join(", ")}.`);
   // blocking comments prevent use (§9.6) — but release itself is allowed? §17.3: "released revision with open progression-preventing comment" is a structural contradiction → block release while blocking comments open
   const openBlocking = await db.reviewComment.count({ where: { cycle: { revisionId }, progressionPreventing: true, status: "OPEN" } });
-  if (openBlocking > 0) throw new Error(`Release blocked: ${openBlocking} progression-preventing comment(s) still open (§9.6).`);
+ if (openBlocking > 0) throw new Error(`Release blocked: ${openBlocking} progression-preventing comment(s) still open.`);
   const execFlag = status.props.executionFlag === true;
   const now = new Date();
   let renditionId = rev.renditionFileId;
@@ -388,7 +388,7 @@ export async function releaseRevision(t: Tenant, revisionId: string, user: Sessi
       hist.userIds,
       "SUPERSEDED",
       `Superseded: ${doc.docNumber} rev ${current.value}`,
-      `A later revision (rev ${rev.value}) was released at ${status.label}. Stop use; recall or mark any controlled copies (§12.2–12.4).`,
+ `A later revision (rev ${rev.value}) was released at ${status.label}. Stop use; recall or mark any controlled copies.`,
       `/documents/${doc.id}`
     , t);
   }
@@ -405,7 +405,7 @@ export async function voidRevision(t: Tenant, revisionId: string, user: SessionU
   // void by decision of the authority that approved it (§7.2)
   const approval = await db.approval.findFirst({ where: { revisionId }, orderBy: { decidedAt: "desc" } });
   const allowed = isAdmin(user) || (approval && approval.approverId === user.id);
-  if (!allowed) throw new Error("Voiding is decided by the authority that approved the revision (§7.2).");
+ if (!allowed) throw new Error("Voiding is decided by the authority that approved the revision.");
   const now = new Date();
   await db.revision.update({ where: { id: revisionId }, data: { state: "VOID", voidedAt: now, voidReason: reason, voidAuthority: user.name, voidReassessment: reassessment ?? null } });
   try {
@@ -425,7 +425,7 @@ export async function voidRevision(t: Tenant, revisionId: string, user: SessionU
   await db.obsolescenceRecord.create({ data: { projectId, kind: "VOID", documentId: rev.documentId, revisionId, reason, authorityName: user.name, createdById: user.id } });
   await audit({ tenant: t, actor: user, action: "STATE_TRANSITION", entityType: "Revision", entityId: revisionId, entityLabel: label, oldValue: "Released", newValue: "Void", detail: reason });
   const hist = await historicalRecipientsOfRevision(t, revisionId);
-  await notifyMany(hist.userIds, "VOID", `Void: ${label}`, `Issued in error: ${reason}. Stop use and reassess work performed under it (§12.2/§12.6).`, `/documents/${rev.documentId}`, t);
+ await notifyMany(hist.userIds, "VOID", `Void: ${label}`, `Issued in error: ${reason}. Stop use and reassess work performed under it.`, `/documents/${rev.documentId}`, t);
 }
 
 export async function endDocumentState(t: Tenant, docId: string, user: SessionUser, kind: "WITHDRAWN" | "CANCELLED" | "ARCHIVED", reason: string) {
@@ -433,7 +433,7 @@ export async function endDocumentState(t: Tenant, docId: string, user: SessionUs
   const doc = await db.document.findUniqueOrThrow({ where: { id: docId } });
   if (doc.state === kind) throw new Error(`Document is already ${kind.toLowerCase()}.`);
   if (kind === "CANCELLED" && (await db.revision.count({ where: { documentId: docId, state: { in: ["RELEASED", "SUPERSEDED"] } } })) > 0) {
-    throw new Error("Cannot cancel: a revision was released. Withdraw it instead (§7.3).");
+ throw new Error("Cannot cancel: a revision was released. Withdraw it instead.");
   }
   await db.document.update({ where: { id: docId }, data: { state: kind } });
   await db.obsolescenceRecord.create({ data: { projectId, kind, documentId: docId, reason, authorityName: user.name, createdById: user.id } });
@@ -449,6 +449,6 @@ export async function endDocumentState(t: Tenant, docId: string, user: SessionUs
 /** What may be issued: only Released revisions; superseded only on historical request, marked as such. */
 export function issueGateError(revState: string, markedSuperseded: boolean): string | null {
   if (revState === "RELEASED") return null;
-  if (revState === "SUPERSEDED") return markedSuperseded ? null : "A superseded revision may only be issued on specific historical request and must be marked as superseded (§11.3).";
-  return "Only released revisions may be issued (§11.3).";
+ if (revState === "SUPERSEDED") return markedSuperseded ? null: "A superseded revision may only be issued on specific historical request and must be marked as superseded.";
+ return "Only released revisions may be issued.";
 }

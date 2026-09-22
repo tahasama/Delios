@@ -125,7 +125,7 @@ export async function runAllChecks(t: Tenant, user: SessionUser | null): Promise
     entityType: "CheckRun",
     entityId: run.id,
     entityLabel: `Run ${new Date().toLocaleString("en-GB")}`,
-    detail: `${outcomes.length} checks · integrity ${run.integrity}% · coverage ${run.coverage}% · ${openCritical} open Critical (§17.4).`,
+ detail: `${outcomes.length} checks · integrity ${run.integrity}% · coverage ${run.coverage}% · ${openCritical} open Critical.`,
   });
   return { runId: run.id, integrity: run.integrity, coverage: run.coverage, failed };
 }

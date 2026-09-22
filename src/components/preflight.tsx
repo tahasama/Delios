@@ -1,7 +1,6 @@
 import { Check, CircleAlert, CircleX, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Preflight, GateLine } from "@/lib/rules/registry";
-import { Clause } from "./ui";
 
 /**
  * The step check. Requirement 3: a person should always know whether what they
@@ -35,7 +34,7 @@ function Line({ line }: { line: GateLine }) {
         </span>
         {line.remedy ? <span className="mt-0.5 block text-[11px] leading-relaxed text-slate-500">{line.remedy}</span> : null}
         <span className="mt-0.5 block text-[10px] text-slate-400">
-          {line.title} · <Clause>{line.clause}</Clause>
+          {line.title}
         </span>
       </span>
     </li>

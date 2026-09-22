@@ -34,11 +34,11 @@ export async function prepareRevisionAction(_prev: { error?: string } | undefine
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Cannot start a revision." };
   }
-  if (!reasonForRevision) return { error: "Reason for revision is required (§6.6)." };
-  if (!changeDescription) return { error: "Description of change is required — it says what changed; it does not restate the reason (§6.6)." };
+ if (!reasonForRevision) return { error: "Reason for revision is required." };
+ if (!changeDescription) return { error: "Description of change is required — it says what changed; it does not restate the reason." };
 
   const inPrep = await db.revision.findFirst({ where: { documentId, state: "IN_PREPARATION" } });
-  if (inPrep) return { error: `Rev ${inPrep.value} is already in preparation — max one per document (§6.3).` };
+ if (inPrep) return { error: `Rev ${inPrep.value} is already in preparation — max one per document.` };
 
   const isPlaceholder = doc.isPlaceholder;
   const lastRev = await db.revision.findFirst({ where: { documentId }, orderBy: { createdAt: "desc" } });
@@ -50,7 +50,7 @@ export async function prepareRevisionAction(_prev: { error?: string } | undefine
 
   if (isPlaceholder) {
     // Placeholder creation IS the authorization for the first revision (§6.5).
-    authorizationReason = "Placeholder register entry (§16.8) — authorization for the first revision.";
+ authorizationReason = "Placeholder register entry — authorization for the first revision.";
     authorizedById = user.id;
     authorizedByName = user.name;
     authorizedAt = new Date();
@@ -63,20 +63,20 @@ export async function prepareRevisionAction(_prev: { error?: string } | undefine
         })
       : null;
     if (outcome) {
-      authorizationReason = `Review outcome "${outcome.outcome}" on cycle ${outcome.sequence} (§9.3)`;
+ authorizationReason = `Review outcome "${outcome.outcome}" on cycle ${outcome.sequence}`;
       authorizedById = user.id;
       authorizedByName = user.name;
       authorizedAt = new Date();
     } else if (explicitAuth) {
       if (!isController(user) && !isAdmin(user)) {
-        return { error: "Authorization to revise is issued by the designated control function — no party establishes a revision without it (§6.5)." };
+ return { error: "Authorization to revise is issued by the designated control function — no party establishes a revision without it." };
       }
       authorizationReason = explicitAuth;
       authorizedById = user.id;
       authorizedByName = user.name;
       authorizedAt = new Date();
     } else {
-      return { error: "No revision may be established without prior authorization (§6.5). The control function states the reason explicitly." };
+ return { error: "No revision may be established without prior authorization. The control function states the reason explicitly." };
     }
   }
 
@@ -151,13 +151,13 @@ export async function uploadRevisionFilesAction(_prev: { error?: string } | unde
       const saved = await saveUpload(ctx, native, rev.document.docNumber, "NATIVE", rev.value);
       const file = await db.storedFile.create({ data: { projectId, path: saved.relPath, name: saved.name, size: saved.size, mime: saved.mime, sha256: saved.sha256, kind: "NATIVE", revisionId, uploadedById: user.id, uploadedByName: user.name } });
       await db.revision.update({ where: { id: revisionId }, data: { nativeFileId: file.id, appVersion: appVersion ?? rev.appVersion } });
-      await audit({ actor: user, action: "FILE_UPLOADED", entityType: "Revision", entityId: revisionId, entityLabel: `${rev.document.docNumber} rev ${rev.value}`, newValue: saved.name, detail: "Native form retained (§10.1)." });
+ await audit({ actor: user, action: "FILE_UPLOADED", entityType: "Revision", entityId: revisionId, entityLabel: `${rev.document.docNumber} rev ${rev.value}`, newValue: saved.name, detail: "Native form retained." });
     }
     if (rendition && rendition.size > 0) {
       const saved = await saveUpload(ctx, rendition, rev.document.docNumber, "RENDITION", rev.value);
       const file = await db.storedFile.create({ data: { projectId, path: saved.relPath, name: saved.name, size: saved.size, mime: saved.mime, sha256: saved.sha256, kind: "RENDITION", revisionId, uploadedById: user.id, uploadedByName: user.name } });
       await db.revision.update({ where: { id: revisionId }, data: { renditionFileId: file.id } });
-      await audit({ actor: user, action: "FILE_UPLOADED", entityType: "Revision", entityId: revisionId, entityLabel: `${rev.document.docNumber} rev ${rev.value}`, newValue: saved.name, detail: "Rendition produced (§10.2)." });
+ await audit({ actor: user, action: "FILE_UPLOADED", entityType: "Revision", entityId: revisionId, entityLabel: `${rev.document.docNumber} rev ${rev.value}`, newValue: saved.name, detail: "Rendition produced." });
     }
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Upload failed." };
@@ -171,7 +171,7 @@ export async function uploadRevisionFilesAction(_prev: { error?: string } | unde
 export async function issueToReviewAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
   const ctx = await requireScope();
   const { user, db, projectId, orgId } = ctx;
-  if (!isController(user) && !isAdmin(user)) return { error: "The control function issues cycles to review (§9.1)." };
+ if (!isController(user) && !isAdmin(user)) return { error: "The control function issues cycles to review." };
   const cycleId = String(formData.get("cycleId") ?? "");
   try {
     await issueToReview(ctx, cycleId, user);
@@ -202,7 +202,7 @@ export async function addCommentAction(_prev: { error?: string } | undefined, fo
     action: "REVIEW_COMMENT",
     entityType: "ReviewCycle",
     entityId: cycleId,
-    detail: `${blocking ? "Progression-preventing" : "Non-preventing"} comment recorded (§9.6).`,
+ detail: `${blocking ? "Progression-preventing": "Non-preventing"} comment recorded.`,
   });
   revalidatePath(`/reviews/${cycleId}`);
   return {};
@@ -216,11 +216,11 @@ export async function closeCommentAction(_prev: { error?: string } | undefined, 
   const comment = await db.reviewComment.findUniqueOrThrow({ where: { id: commentId } });
   const assigned = await db.reviewAssignment.findFirst({ where: { cycleId: comment.cycleId, userId: user.id } });
   if (comment.authorId !== user.id && !assigned && !isController(user) && !isAdmin(user)) {
-    return { error: "Only the comment author, an assigned reviewer or the control function closes comments (§9.6)." };
+ return { error: "Only the comment author, an assigned reviewer or the control function closes comments." };
   }
   const cycleId = String(formData.get("cycleId") ?? "");
   const resolution = String(formData.get("resolution") ?? "").trim();
-  if (!resolution) return { error: "A progression-preventing comment is closed only with a recorded resolution (§9.6)." };
+ if (!resolution) return { error: "A progression-preventing comment is closed only with a recorded resolution." };
   await db.reviewComment.update({ where: { id: commentId }, data: { status: "CLOSED", resolution, closedAt: new Date() } });
   await audit({ actor: user, action: "COMMENT_CLOSED", entityType: "ReviewComment", entityId: commentId, newValue: resolution });
   revalidatePath(`/reviews/${cycleId}`);
@@ -259,7 +259,7 @@ export async function recordOutcomeAction(_prev: { error?: string } | undefined,
 export async function returnToOriginatorAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
   const ctx = await requireScope();
   const { user, db, projectId, orgId } = ctx;
-  if (!isController(user) && !isAdmin(user)) return { error: "An outcome shall not pass directly from reviewer to originator — the control function returns it (§9.8)." };
+ if (!isController(user) && !isAdmin(user)) return { error: "An outcome shall not pass directly from reviewer to originator — the control function returns it." };
   const cycleId = String(formData.get("cycleId") ?? "");
   try {
     await returnToOriginator(ctx, cycleId, user);
@@ -277,7 +277,7 @@ export async function releaseRevisionAction(_prev: { error?: string } | undefine
   const { user, db, projectId, orgId } = ctx;
   const revisionId = String(formData.get("revisionId") ?? "");
   const statusCode = String(formData.get("statusCode") ?? "");
-  if (!statusCode) return { error: "Choose the status the revision is released at (§7.6)." };
+ if (!statusCode) return { error: "Choose the status the revision is released at." };
   let result;
   try {
     await enforce("RELEASE", { revisionId, statusCode }, ctx);
@@ -297,7 +297,7 @@ export async function voidRevisionAction(_prev: { error?: string } | undefined, 
   const revisionId = String(formData.get("revisionId") ?? "");
   const reason = String(formData.get("voidReason") ?? "").trim();
   const reassessment = String(formData.get("reassessment") ?? "").trim() || undefined;
-  if (!reason) return { error: "Voiding is recorded with a reason (§12.1)." };
+ if (!reason) return { error: "Voiding is recorded with a reason." };
   try {
     await enforce("VOID", { revisionId }, ctx);
     await voidRevision(ctx, revisionId, user, reason, reassessment);
@@ -316,9 +316,9 @@ export async function recordVoidReassessmentAction(_prev: { error?: string } | u
   if (!isController(user) && !isAdmin(user)) return { error: "Only the control function records reassessment." };
   const revisionId = String(formData.get("revisionId") ?? "");
   const note = String(formData.get("note") ?? "").trim();
-  if (!note) return { error: "Describe the reassessment of work performed (§12.6)." };
+ if (!note) return { error: "Describe the reassessment of work performed." };
   await db.revision.update({ where: { id: revisionId }, data: { voidReassessment: note } });
-  await audit({ actor: user, action: "STATE_TRANSITION", entityType: "Revision", entityId: revisionId, detail: "Void reassessment recorded (§12.6)." });
+ await audit({ actor: user, action: "STATE_TRANSITION", entityType: "Revision", entityId: revisionId, detail: "Void reassessment recorded." });
   revalidatePath("/exposures");
   return {};
 }

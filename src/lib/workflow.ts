@@ -207,7 +207,7 @@ async function returnWorkflow(t: Tenant, runId: string, user: SessionUser, reaso
   });
   await audit({ tenant: t, actor: user, action: "WORKFLOW_RETURNED", entityType: "WorkflowRun", entityId: runId, entityLabel: `${rev.document.docNumber} rev ${rev.value}`, detail: reason });
   const contributorIds = await contributorRecipients(t, rev.document.createdById, rev.document.originator);
-  await notifyMany(contributorIds, "WORKFLOW_RETURNED", `Changes requested: ${rev.document.docNumber} rev ${rev.value}`, `${reason} — prepare the next revision (§7.5).`, `/documents/${rev.documentId}`, t);
+ await notifyMany(contributorIds, "WORKFLOW_RETURNED", `Changes requested: ${rev.document.docNumber} rev ${rev.value}`, `${reason} — prepare the next revision.`, `/documents/${rev.documentId}`, t);
 }
 
 async function contributorRecipients(t: Tenant, createdById: string, originator: string | null) {
@@ -288,7 +288,7 @@ export async function recordStepOutcome(t: Tenant, runId: string, user: SessionU
     const before = step.participantIds.slice(0, idx);
     const decidedSet = new Set(step.decidedBy);
     const pendingBefore = before.filter((p) => !decidedSet.has(p));
-    if (pendingBefore.length) return { ok: false, error: "Serial review: earlier reviewers decide first (§9.7)." };
+ if (pendingBefore.length) return { ok: false, error: "Serial review: earlier reviewers decide first." };
     const isLast = idx === step.participantIds.length - 1;
     if (isLast) {
       await db.reviewCycle.update({ where: { id: step.cycleId }, data: { outcome: outcomeCode, outcomeAt: new Date(), outcomeByName: user.name, outcomeNote: note ?? null, returnedFromReviewAt: new Date(), returnedToOriginatorAt: new Date(), status: "CLOSED" } });

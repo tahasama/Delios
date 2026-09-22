@@ -44,7 +44,7 @@ export async function createFunctionAction(
   if (!name) return { error: "Give the function the name people actually use for it." };
   if (!CODE.test(code)) return { error: "The code is short and uppercase, e.g. ELEC_TECH." };
   if (!Number.isInteger(clearance) || clearance < 1 || clearance > 9) {
-    return { error: "Clearance is a level from 1 upwards (§5.7)." };
+ return { error: "Clearance is a level from 1 upwards." };
   }
 
   const dup = await db.function.findFirst({ where: { code } });
@@ -63,7 +63,7 @@ export async function createFunctionAction(
 
   await audit({
     actor: admin, action: "FUNCTION_PUBLISHED", entityType: "Function", entityId: fn.id, entityLabel: name,
-    detail: `Clearance ${clearance}; ${verbs.length ? verbs.join(", ") : "no verbs yet"} (§1.4).`,
+ detail: `Clearance ${clearance}; ${verbs.length ? verbs.join(", "): "no verbs yet"}.`,
   });
   revalidatePath("/admin/functions");
   return { ok: `${name} published.` };
@@ -84,7 +84,7 @@ export async function updateFunctionAction(
   const fn = await db.function.findFirst({ where: { id } });
   if (!fn) return { error: "That function is not published in your organization." };
   if (!Number.isInteger(clearance) || clearance < 1 || clearance > 9) {
-    return { error: "Clearance is a level from 1 upwards (§5.7)." };
+ return { error: "Clearance is a level from 1 upwards." };
   }
 
   // Deactivating a function that people still hold would silently strip their
@@ -155,7 +155,7 @@ export async function savePermissionRuleAction(
   await audit({
     actor: admin, action: "PERMISSION_RULE_PUBLISHED", entityType: "Function", entityId: functionId, entityLabel: fn.name,
     newValue: verbs.join(", "),
-    detail: `${fn.name} — ${selector} (§11.8).`,
+ detail: `${fn.name} — ${selector}.`,
   });
   revalidatePath("/admin/functions");
   return { ok: "Rule published." };

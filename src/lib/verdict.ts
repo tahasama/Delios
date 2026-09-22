@@ -57,7 +57,7 @@ export async function recordApproval(t: Tenant, revisionId: string, user: Sessio
   let viaDelegation = false;
   if (!holds) {
     const del = await db.delegation.findFirst({ where: { toUserId: user.id, endDate: { gte: new Date() } } });
-    if (!del) throw new Error(`${user.name} does not hold Approve for this class in the distribution matrix, and no delegation is in force (§8.2, §8.5).`);
+ if (!del) throw new Error(`${user.name} does not hold Approve for this class in the distribution matrix, and no delegation is in force.`);
     viaDelegation = true;
   }
   const matrixVersion = await matrixVersionInForce(t);

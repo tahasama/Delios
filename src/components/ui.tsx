@@ -220,7 +220,6 @@ export function KeyValue({ items }: { items: { label: string; value: React.React
         <div key={it.label}>
           <dt className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
             {it.label}
-            {it.clause ? <span className="ml-1 font-mono normal-case text-slate-300">{it.clause}</span> : null}
           </dt>
           <dd className="mt-0.5 text-sm text-slate-800">{it.value}</dd>
         </div>

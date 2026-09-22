@@ -20,40 +20,40 @@ export { VERDICT_EFFECT, verdictEffect, VERDICT_EFFECT_SHORT } from "./verdict-e
 export const SET_PROP_FIELDS: Record<string, PropField[]> = {
   DOCUMENT_TYPES: [
     { key: "appliesTo", label: "Who produces it", type: "select", options: ["Supplier", "Non-supplier", "Unclassified"], hint: "supplier documents carry the supplier fields in their number" },
-    { key: "describesAsset", label: "Describes equipment — link it to an asset", type: "bool", hint: "§5.8" },
+ { key: "describesAsset", label: "Describes equipment — link it to an asset", type: "bool", hint: "" },
   ],
   STATUSES: [
-    { key: "executionFlag", label: "Allows work on site or in the shop", type: "bool", hint: "building, fabricating, installing or ordering from it (§7.8)" },
+ { key: "executionFlag", label: "Allows work on site or in the shop", type: "bool", hint: "building, fabricating, installing or ordering from it" },
     { key: "may", label: "May be used for", type: "text" },
     { key: "mayNot", label: "May NOT be used for", type: "text" },
   ],
   REVIEW_OUTCOMES: [
-    { key: "effect", label: "What this verdict does", type: "choice", options: VERDICT_EFFECT, read: verdictEffect, hint: "§9.3" },
+ { key: "effect", label: "What this verdict does", type: "choice", options: VERDICT_EFFECT, read: verdictEffect, hint: "" },
   ],
   REASONS_FOR_ISSUE: [
-    { key: "maturity", label: "Required maturity", type: "text", hint: "§2.6 — what state the revision must be in" },
-    { key: "reviewCycle", label: "Needs a review", type: "bool", hint: "received documents go down a review route once accepted (§11.11)" },
+ { key: "maturity", label: "Required maturity", type: "text", hint: "what state the revision must be in" },
+ { key: "reviewCycle", label: "Needs a review", type: "bool", hint: "received documents go down a review route once accepted" },
     { key: "response", label: "Needs a reply", type: "bool", hint: "the recipient must answer within the reply period" },
-    { key: "acceptancePeriodDays", label: "Acceptance period (days)", type: "int", hint: "§11.12" },
-    { key: "responsePeriodDays", label: "Response period (days)", type: "int", hint: "§11.12 — runs from acceptance" },
+ { key: "acceptancePeriodDays", label: "Acceptance period (days)", type: "int", hint: "" },
+ { key: "responsePeriodDays", label: "Response period (days)", type: "int", hint: "runs from acceptance" },
   ],
   COMMENT_CLASSES: [
-    { key: "progressionPreventing", label: "Blocks the work until it is closed", type: "bool", hint: "§9.6" },
+ { key: "progressionPreventing", label: "Blocks the work until it is closed", type: "bool", hint: "" },
   ],
   CONFIDENTIALITY: [
-    { key: "default", label: "Used when none is chosen", type: "bool", hint: "§5.7" },
+ { key: "default", label: "Used when none is chosen", type: "bool", hint: "" },
   ],
   ISSUE_CODES: [
     { key: "reason", label: "Maps to reason for issue", type: "select", options: ["INFORMATION", "REVIEW", "APPROVAL", "PRICING", "EXECUTION", "RECORD"] },
   ],
   CRITICALITY: [
-    { key: "approval", label: "Minimum approval role", type: "select", options: ["REVIEWER", "APPROVER", "CONTROLLER", "ADMIN"], hint: "§8.6" },
+ { key: "approval", label: "Minimum approval role", type: "select", options: ["REVIEWER", "APPROVER", "CONTROLLER", "ADMIN"], hint: "" },
     { key: "retention", label: "Suggested retention class", type: "text" },
-    { key: "format", label: "Format obligation", type: "text", hint: "§10.4" },
+ { key: "format", label: "Format obligation", type: "text", hint: "" },
   ],
   RETENTION_CLASSES: [
-    { key: "basis", label: "Kept because", type: "text", hint: "§13.1" },
-    { key: "startsFrom", label: "Period runs from", type: "text", hint: "§13.3" },
+ { key: "basis", label: "Kept because", type: "text", hint: "" },
+ { key: "startsFrom", label: "Period runs from", type: "text", hint: "" },
   ],
 };
 

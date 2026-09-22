@@ -25,7 +25,7 @@ export async function publishReferenceConfiguration(db: PrismaClient, orgId: str
   // ── Numbering schemes: neutral defaults, fully editable in Admin ────────────
   const schemeDefs = [
     { name: "Internal", notes: "Project · Document type · Discipline · Sequence(4). Edit freely.", fields: [["Project code", "PROJECT_CODES"], ["Document type", "DOCUMENT_TYPES"], ["Discipline", "DISCIPLINES"], ["Sequence", null, "COUNTER:DIGITS(4)"]] },
-    { name: "Supplier", notes: "Project · Party · PO · Document type · Discipline · Sequence(4). For external producers (§3.3).", fields: [["Project code", "PROJECT_CODES"], ["Supplier code", "SUPPLIER_CODES"], ["Purchase order", "PURCHASE_ORDERS"], ["Document type", "DOCUMENT_TYPES"], ["Discipline", "DISCIPLINES"], ["Sequence", null, "COUNTER:DIGITS(4)"]] },
+ { name: "Supplier", notes: "Project · Party · PO · Document type · Discipline · Sequence(4). For external producers.", fields: [["Project code", "PROJECT_CODES"], ["Supplier code", "SUPPLIER_CODES"], ["Purchase order", "PURCHASE_ORDERS"], ["Document type", "DOCUMENT_TYPES"], ["Discipline", "DISCIPLINES"], ["Sequence", null, "COUNTER:DIGITS(4)"]] },
   ];
   // Schemes are seeded once, never rewritten. A scheme defines how existing
   // document numbers decompose, so re-publishing the reference configuration
