@@ -55,6 +55,7 @@ function main() {
     "/packages/add",
     "/notifications",
     "/guide",
+    "/guide/codes",
   ]);
 
   console.log("\nEverything built is reachable\n");
