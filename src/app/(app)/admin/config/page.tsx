@@ -106,9 +106,7 @@ export default async function AdminConfigPage({ searchParams }: { searchParams: 
         subtitle="The codes and choices your organization uses. All sets are listed and approved in the Document Management Plan. A code already used is retired, never deleted, so older documents keep it and stay findable."
       />
 
-      <SetNav groups={groups} current={currentKey} />
-
-      <div>
+      <SetNav groups={groups} current={currentKey}>
         {set ? (
           <section className="min-w-0 space-y-3">
             <div className="flex flex-wrap items-start justify-between gap-3">
@@ -256,7 +254,7 @@ export default async function AdminConfigPage({ searchParams }: { searchParams: 
         ) : (
           <p className="text-sm text-slate-400">No sets published yet — run the seed or create one.</p>
         )}
-      </div>
+      </SetNav>
     </div>
   );
 }
