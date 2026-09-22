@@ -338,4 +338,5 @@ export const CATALOG: CheckDef[] = [
 ];
 
 export const CHECK_BY_ID = new Map(CATALOG.map((c) => [c.id, c]));
-export const FAMILIES = [...new Set(CATALOG.map((c) => c.id.split("-")[1]))];
+/** Check families in catalogue order — the letters before the dash (ID, MD, RV…). */
+export const FAMILIES = [...new Set(CATALOG.map((c) => c.id.split("-")[0]))];

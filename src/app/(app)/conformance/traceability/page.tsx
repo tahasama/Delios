@@ -79,9 +79,15 @@ export default async function TraceabilityPage({ searchParams }: { searchParams:
     <div className="space-y-4">
       <PageHeader
         title="Traceability"
-        subtitle={`Rules ↔ Routes ↔ Checks of Standard v${STANDARD_VERSION}: every Rule verified by a Check, applied by a Route step or recorded as needing none, and reviewed whenever either side changes.`}
+        subtitle={`How the app's checks cover the rules of the Document Management Standard v${STANDARD_VERSION}.`}
       />
       <AssuranceTabs current="/conformance/traceability" />
+
+      <div className="rounded-2xl bg-[#f4f7fb] p-4 text-xs leading-relaxed text-slate-700 ring-1 ring-[#2d5480]/15">
+        <p className="font-semibold text-slate-900">What this page is for</p>
+        <p className="mt-1">The app checks your register against the Document Management Standard. This page records which check covers which rule of the Standard, so that when the Standard is updated nothing is silently left unchecked.</p>
+        <p className="mt-2"><span className="font-semibold">Day to day there is nothing to do here.</span> Only when a new edition of the Standard is installed: links whose rule or check changed show as <em>Review required</em>. Look at each, record it as still correct (Aligned) or no longer applicable, then <em>Release baseline</em> — that records, with your name and the date, that the app follows the new edition.</p>
+      </div>
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
         {(["REVIEW_REQUIRED", "GAP", "ALIGNED", "NOT_APPLICABLE", "WITHDRAWN"] as Alignment[]).map((a) => (

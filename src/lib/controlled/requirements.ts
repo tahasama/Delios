@@ -1,6 +1,7 @@
 import { register, headerIndex, cell, parseDate, diffByKey, type Handler, type ParseIssue, type ParseResult } from "./registry";
 import { allocateNumber } from "../numbering";
 import { businessDaysBefore, DEFAULT_LEAD_BUSINESS_DAYS, departmentsOf } from "../schedule";
+import { retentionFor } from "../retention";
 
 /**
  * The document requirements list — what each department needs for each
@@ -200,6 +201,7 @@ const requirements: Handler = {
             projectId: t.projectId, docNumber, title: row.title ?? docNumber, deliverableType, docType: row.docType ?? "",
             discipline: row.department, originator: row.submittedBy, subProject: row.subProject, contractRef: row.po,
             state: "PLANNED", isPlaceholder: true, createdById: "requirements", createdByName: "Document requirements list",
+            retentionClass: await retentionFor(t, null),
           },
         });
         docId = doc.id;

@@ -160,9 +160,9 @@ export function NewDocumentForm({
                   {confidentialities.map((o) => <option key={o.code} value={o.code}>{o.label}</option>)}
                 </select>
               </Field>
-              <Field label="Keep for" required>
-                <select name="retentionClass" required className={inputCls} defaultValue="">
-                  <option value="" disabled>Choose…</option>
+              <Field label="Keep for" hint="optional — set from the criticality if left empty">
+                <select name="retentionClass" className={inputCls} defaultValue="">
+                  <option value="">Automatic</option>
                   {retentionClasses.map((o) => <option key={o.code} value={o.code}>{o.label}</option>)}
                 </select>
               </Field>

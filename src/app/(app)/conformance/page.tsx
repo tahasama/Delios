@@ -2,8 +2,7 @@ import Link from "next/link";
 import { requireScope } from "@/lib/scope";
 import { isController, isAdmin } from "@/lib/auth";
 import { PageHeader, Card } from "@/components/ui";
-import { fmtDate, fmtDateTime } from "@/lib/utils";
-import { effectiveSpine } from "@/lib/spine";
+import { fmtDateTime } from "@/lib/utils";
 import { RunChecksButton } from "./run-button";
 import { AssuranceTabs } from "./tabs";
 import { problemDocuments } from "@/lib/problems";
@@ -31,10 +30,9 @@ export default async function AssurancePage({ searchParams }: { searchParams: Pr
   const { user, db } = ctx;
   const controller = isController(user) || isAdmin(user);
 
-  const [runs, scope, spine, byOwner, risks, work] = await Promise.all([
-    db.checkRun.findMany({ orderBy: { ranAt: "desc" }, take: 8 }),
+  const [runs, scope, byOwner, risks, work] = await Promise.all([
+    db.checkRun.findMany({ orderBy: { ranAt: "desc" }, take: 1 }),
     db.scopeConfig.findFirst(),
-    effectiveSpine(ctx),
     db.defect.groupBy({ by: ["ownerRole", "severity", "status"], _count: true }),
     Promise.all([
       db.revision.count({ where: { state: "SUPERSEDED", document: { state: "ACTIVE" } } }),
@@ -56,7 +54,7 @@ export default async function AssurancePage({ searchParams }: { searchParams: Pr
     <div className="space-y-4">
       <PageHeader
         title="Assurance"
-        subtitle="Can the register be trusted? Every document is checked against the Document Management Standard; problems go to whoever must fix them."
+        subtitle="The checks look for mistakes in the register — a document released without approval, a missing date, a drawing not linked to its equipment. Here is what they found and who should fix it."
         actions={controller ? <RunChecksButton /> : undefined}
       />
       <AssuranceTabs current="/conformance" />
@@ -69,9 +67,9 @@ export default async function AssurancePage({ searchParams }: { searchParams: Pr
             <p className="mt-1 text-sm font-medium">of documents have no serious problem{critical ? `, and ${critical} critical problem${critical === 1 ? " is" : "s are"} open` : ""}.</p>
             <p className="mt-2 text-xs opacity-80">
               {below
-                ? `Below the ${threshold}% target. Any progress or readiness figure taken from the register must quote this percentage until it recovers.`
-                : `Within the ${threshold}% target.`}{" "}
-              Last checked {fmtDateTime(last.ranAt)}{last.ranByName ? ` by ${last.ranByName}` : ""}.
+                ? `The target is ${threshold}%. Until it is reached, quote this figure next to any progress or readiness number you report from the register — it tells the reader how far to trust it.`
+                : `At or above the ${threshold}% target.`}{" "}
+              Last checked {fmtDateTime(last.ranAt)}{last.ranByName ? ` by ${last.ranByName}` : ""}; fixed problems disappear at the next check.
             </p>
           </>
         ) : (
@@ -83,48 +81,9 @@ export default async function AssurancePage({ searchParams }: { searchParams: Pr
       </section>
 
       {/* What to look at */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Tile href="#documents" label="Serious problems" value={serious} tone={serious ? "bad" : "good"} hint="critical or major, still open" />
-        <Tile href="/exposures" label="Out-of-date risks" value={risks} tone={risks ? "warn" : "good"} hint="replaced or withdrawn, maybe still in use" />
-        <Tile href="/conformance/checks" label="Checked" value={last ? `${last.executed}/${last.totalChecks}` : "—"} tone={last && last.executed < last.totalChecks ? "warn" : undefined} hint={last ? "checks that could run on this data" : "no run yet"} />
-        <Tile href="/conformance/traceability" label="Traceability" value={spine.counts.REVIEW_REQUIRED + spine.counts.GAP} tone={spine.releasable ? "good" : "warn"} hint={spine.releasable ? "rules, routes and checks agree" : "links to review"} />
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <Card title="Who must fix what" description="Open problems by the party responsible for them">
-          <table className="w-full text-xs">
-            <thead><tr className="text-left text-[10px] uppercase tracking-wide text-slate-400"><th className="pb-1 font-semibold">Responsible</th><th className="pb-1 text-right font-semibold">Critical</th><th className="pb-1 text-right font-semibold">Major</th><th className="pb-1 text-right font-semibold">All open</th><th className="pb-1 text-right font-semibold">Accepted</th></tr></thead>
-            <tbody className="divide-y divide-slate-100">
-              {Object.entries(OWNERS).map(([code, label]) => {
-                const n = (st: string, sev?: string) => count((d) => d.ownerRole === code && d.status === st && (!sev || d.severity === sev));
-                return (
-                  <tr key={code}>
-                    <td className="py-1.5"><Link href={`/conformance?owner=${code}#documents`} className="text-slate-700 hover:underline">{label}</Link></td>
-                    <td className={`py-1.5 text-right tabular-nums ${n("OPEN", "CRITICAL") ? "font-semibold text-red-700" : "text-slate-400"}`}>{n("OPEN", "CRITICAL")}</td>
-                    <td className={`py-1.5 text-right tabular-nums ${n("OPEN", "MAJOR") ? "font-semibold text-amber-700" : "text-slate-400"}`}>{n("OPEN", "MAJOR")}</td>
-                    <td className="py-1.5 text-right tabular-nums text-slate-700">{n("OPEN")}</td>
-                    <td className="py-1.5 text-right tabular-nums text-slate-500">{n("ACCEPTED")}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </Card>
-
-        <Card title="Over time" description="Share of documents with no serious problem, run by run">
-          {runs.length ? (
-            <ul className="space-y-1.5">
-              {runs.map((r) => (
-                <li key={r.id} className="flex items-center gap-2 text-xs">
-                  <span className="w-20 shrink-0 text-slate-400">{fmtDate(r.ranAt)}</span>
-                  <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100"><span className={`block h-full ${r.integrity >= threshold ? "bg-emerald-400" : "bg-amber-400"}`} style={{ width: `${Math.max(2, r.integrity)}%` }} /></span>
-                  <span className="w-10 text-right tabular-nums text-slate-700">{r.integrity.toFixed(0)}%</span>
-                  <span className={`w-16 text-right tabular-nums ${r.openCritical ? "text-red-700" : "text-slate-400"}`}>{r.openCritical} critical</span>
-                </li>
-              ))}
-            </ul>
-          ) : <p className="text-xs text-slate-400">No run yet.</p>}
-        </Card>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <Tile href="#documents" label="Serious problems to fix" value={serious} tone={serious ? "bad" : "good"} hint="critical or major, on the documents listed below" />
+        <Tile href="/exposures" label="Out-of-date risks" value={risks} tone={risks ? "warn" : "good"} hint="replaced or withdrawn information that may still be in use" />
       </div>
 
       <Card
@@ -134,9 +93,12 @@ export default async function AssurancePage({ searchParams }: { searchParams: Pr
       >
         <div className="mb-3 flex flex-wrap gap-1.5 text-xs">
           <Link href="/conformance#documents" className={`rounded-full px-2.5 py-1 ${!owner ? "bg-[#1e3a5f] text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>Everyone</Link>
-          {Object.entries(OWNERS).map(([code, label]) => (
-            <Link key={code} href={`/conformance?owner=${code}#documents`} className={`rounded-full px-2.5 py-1 ${owner === code ? "bg-[#1e3a5f] text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>{label} to fix</Link>
-          ))}
+          {Object.entries(OWNERS).map(([code, label]) => {
+            const n = count((d) => d.ownerRole === code && d.status === "OPEN");
+            return n ? (
+              <Link key={code} href={`/conformance?owner=${code}#documents`} className={`rounded-full px-2.5 py-1 ${owner === code ? "bg-[#1e3a5f] text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>{label} · {n}</Link>
+            ) : null;
+          })}
         </div>
         {work.documents.length ? (
           <ul className="divide-y divide-slate-100">

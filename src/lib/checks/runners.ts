@@ -329,10 +329,17 @@ export const RUNNERS: Runners = {
     return [];
   },
   "CL-16": async (ctx) => {
-    const docs = await ctx.db.document.findMany({ where: { isPlaceholder: false }, select: { id: true, docNumber: true } });
+    // §5.8 applies "where the asset is broken down", and to documents that
+    // describe a part of it — a drawing or datasheet, not a procedure or a plan.
+    // The document types that do are flagged describesAsset in the published set.
+    if (!(await ctx.db.assetItem.count())) return "NOT_CHECKED" as const;
+    const types = await ctx.db.configValue.findMany({ where: { setKey: "DOCUMENT_TYPES", props: { contains: '"describesAsset":true' } }, select: { code: true } });
+    const describing = types.map((t) => t.code);
+    if (!describing.length) return "NOT_CHECKED" as const;
+    const docs = await ctx.db.document.findMany({ where: { isPlaceholder: false, docType: { in: describing }, state: { notIn: ["CANCELLED", "WITHDRAWN"] } }, select: { id: true, docNumber: true, docType: true } });
     const rels = await ctx.db.relationship.findMany({ where: { kind: "DOC_ASSET" }, select: { fromId: true } });
     const linked = new Set(rels.map((r) => r.fromId));
-    return docs.filter((d) => !linked.has(d.id)).map((d) => doc(d, "Item not associated with any asset item (§5.8 / CL-16)."));
+    return docs.filter((d) => !linked.has(d.id)).map((d) => doc(d, `This ${d.docType} describes equipment but is not linked to its asset tag.`));
   },
 
   // ── Revision ──────────────────────────────────────────────────────────────
@@ -794,7 +801,7 @@ export const RUNNERS: Runners = {
   },
   "RT-04": async (ctx) => {
     const docs = await ctx.db.document.findMany({ where: { retentionClass: null, isPlaceholder: false } });
-    return docs.map((d) => doc(d, "Retention class absent (§13.2)."));
+    return docs.map((d) => doc(d, "No retention class, and none could be set from its criticality."));
   },
   "RT-08": async (ctx) => {
     const docs = await ctx.db.document.findMany({ where: { state: "ARCHIVED" }, include: { revisions: { where: { state: { in: ["RELEASED", "SUPERSEDED"] } }, include: { files: true } } } });

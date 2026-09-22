@@ -52,35 +52,59 @@
       "values": [
         {
           "code": "DWG",
-          "label": "Drawing"
+          "label": "Drawing",
+          "props": {
+            "describesAsset": true
+          }
         },
         {
           "code": "DIA",
-          "label": "Diagram"
+          "label": "Diagram",
+          "props": {
+            "describesAsset": true
+          }
         },
         {
           "code": "MDL",
-          "label": "Model"
+          "label": "Model",
+          "props": {
+            "describesAsset": true
+          }
         },
         {
           "code": "DAT",
-          "label": "Datasheet"
+          "label": "Datasheet",
+          "props": {
+            "describesAsset": true
+          }
         },
         {
           "code": "SPC",
-          "label": "Specification"
+          "label": "Specification",
+          "props": {
+            "describesAsset": true
+          }
         },
         {
           "code": "CAL",
-          "label": "Calculation"
+          "label": "Calculation",
+          "props": {
+            "describesAsset": true
+          }
         },
         {
           "code": "SCH",
-          "label": "Schedule"
+          "label": "Schedule",
+          "props": {
+            "describesAsset": true
+          }
         },
         {
           "code": "LST",
-          "label": "List"
+          "label": "List",
+          "props": {
+            "describesAsset": true
+          }
         },
         {
           "code": "RPT",
@@ -104,19 +128,31 @@
         },
         {
           "code": "MAN",
-          "label": "Manual"
+          "label": "Manual",
+          "props": {
+            "describesAsset": true
+          }
         },
         {
           "code": "CER",
-          "label": "Certificate"
+          "label": "Certificate",
+          "props": {
+            "describesAsset": true
+          }
         },
         {
           "code": "TST",
-          "label": "Test record"
+          "label": "Test record",
+          "props": {
+            "describesAsset": true
+          }
         },
         {
           "code": "INS",
-          "label": "Inspection record"
+          "label": "Inspection record",
+          "props": {
+            "describesAsset": true
+          }
         },
         {
           "code": "SUR",
@@ -480,7 +516,8 @@
           "label": "Project duration",
           "props": {
             "startsFrom": "Commercial close-out",
-            "basis": "Needed only until completion"
+            "basis": "Needed only until completion",
+            "default": true
           }
         },
         {

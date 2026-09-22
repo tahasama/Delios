@@ -10,6 +10,7 @@ import { allocateNumber } from "@/lib/numbering";
 import { getActiveSet } from "@/lib/config";
 import { saveUpload } from "@/lib/files";
 import { isReadOnly } from "@/lib/auth";
+import { retentionFor } from "@/lib/retention";
 
 // G.1 — Creating a new document. "No controlled information shall be produced
 // without a register entry" (§3.9). Number is system-generated (§3.7).
@@ -28,7 +29,8 @@ export async function createDocumentAction(_prev: { error?: string } | undefined
   const contractRef = String(formData.get("contractRef") ?? "") || null;
   const criticality = String(formData.get("criticality") ?? "") || null;
   const confidentiality = String(formData.get("confidentiality") ?? "") || null;
-  const retentionClass = String(formData.get("retentionClass") ?? "") || null;
+  // Optional: when left empty it follows the criticality (§13.2, §5.6).
+  const chosenRetention = String(formData.get("retentionClass") ?? "") || null;
   const receivedDate = String(formData.get("receivedDate") ?? "") || null;
   const kind = String(formData.get("kind") ?? "DOCUMENT") === "RECORD" ? "RECORD" : "DOCUMENT";
 
@@ -91,6 +93,7 @@ export async function createDocumentAction(_prev: { error?: string } | undefined
     return { error: `The type-to-field matrix requires ${missingConditional.join(", ")} for this deliverable type (§4.4 / C.3.3).` };
   }
   const external = req("receivedDate") !== "na";
+  const retentionClass = chosenRetention ?? (await retentionFor(ctx, criticality));
   const doc = await db.document.create({
     data: {
       projectId,

@@ -44,7 +44,7 @@ export default async function ChecksPage({ searchParams }: { searchParams: Promi
         <Link href="/conformance/checks" className={cn("rounded-full px-3 py-1.5 text-xs font-medium", !family ? "bg-[#1e3a5f] text-white" : "bg-slate-100 text-slate-600")}>All</Link>
         {FAMILIES.map((f) => (
           <Link key={f} href={`/conformance/checks?family=${f}`} className={cn("rounded-full px-3 py-1.5 text-xs font-medium", family === f ? "bg-[#1e3a5f] text-white" : "bg-slate-100 text-slate-600")}>
-            {f}
+            {FAMILY_TITLES[f]?.replace(/^H\.\d+\s/, "") ?? f}
           </Link>
         ))}
       </div>

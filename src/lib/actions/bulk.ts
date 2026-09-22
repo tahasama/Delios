@@ -6,6 +6,7 @@ import { parseCsv, toObjects } from "@/lib/csv";
 import { allocateNumber, validateNumber } from "@/lib/numbering";
 import { getActiveSet } from "@/lib/config";
 import { isReadOnly } from "@/lib/auth";
+import { retentionFor } from "@/lib/retention";
 
 // Bulk in/out — document controllers live in spreadsheets. Templates, preview,
 // then execute. No one fills a form per line.
@@ -126,7 +127,7 @@ export async function importBulkAction(_prev: BulkResult | undefined, formData: 
             docNumber, title: GET(o, "Title"), deliverableType: producer, docType: GET(o, "Type"), discipline: GET(o, "Discipline"),
             originator: GET(o, "Supplier") || null, subProject: GET(o, "SubProject") || null, contractRef: GET(o, "PO") || null,
             criticality: GET(o, "Criticality") || null, confidentiality: GET(o, "Confidentiality") || "INTERNAL",
-            retentionClass: GET(o, "RetentionClass") || null, state: "PLANNED", isPlaceholder: true,
+            retentionClass: GET(o, "RetentionClass") || (await retentionFor(ctx, GET(o, "Criticality") || null)), state: "PLANNED", isPlaceholder: true,
             createdById: user.id, createdByName: user.name,
             receivedDate: GET(o, "ReceivedDate") ? new Date(GET(o, "ReceivedDate")) : null,
           },

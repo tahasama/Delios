@@ -47,6 +47,7 @@ function main() {
     "/conformance/defects",
     "/conformance/statement",
     "/conformance/traceability",
+    "/conformance/audit",
     "/exposures",
     "/actions/schedules",
     "/actions/requirements",
