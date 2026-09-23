@@ -111,7 +111,9 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
       owner, blockingComments: openCycle?.comments.length ?? 0,
       verdict: decided?.outcome ?? null, verdictLabel: decided?.outcome ? verdictLabel.get(decided.outcome) ?? decided.outcome : null,
       verdictBy: decided?.outcomeByName ?? null, verdictPending: pending,
-      releasedFor: released?.statusCode ?? null, releasedForLabel: released?.statusCode ? statusLabel.get(released.statusCode) ?? released.statusCode : null,
+      releasedFor: released?.statusCode ?? null,
+      // Decided by the reviewers, not yet released: shown as "to be IFC".
+      proposedFor: !released && latest?.proposedStatus ? latest.proposedStatus : null, releasedForLabel: released?.statusCode ? statusLabel.get(released.statusCode) ?? released.statusCode : null,
       releasedForUse: released?.statusCode ? statusUse.get(released.statusCode) ?? null : null,
       createdDate: doc.createdDate.toISOString(), updatedAt: doc.updatedAt.toISOString(),
       plannedSubmissionDate: working?.plannedSubmissionDate?.toISOString() ?? latest?.plannedSubmissionDate?.toISOString() ?? null,

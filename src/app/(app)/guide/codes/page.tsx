@@ -62,10 +62,11 @@ export default async function CodesPage() {
           <FlowStep n="2" title="Write rev A" who="Author" body="Content being prepared." chips={[["2", "In preparation"]]} />
           <FlowStep n="3" title="Send down a route" who="Author or Document Control" body="The route names who advises and who decides." chips={[["2", "In review"]]} />
           <FlowStep n="4" title="Advise" who="Reviewers" body="Comments and a suggested verdict." chips={[]} />
-          <FlowStep n="5" title="Decide" who="Last step · an approver" body="The one binding verdict. If it proceeds, it is the approval." chips={[["3", "C1 / C2 / C3 / C4"]]} />
-          <FlowStep n="6" title="Release" who="Document Control" body="Carries out the verdict; sets what it is released for." chips={[["2", "Released"], ["4", "IFC"], ["1", "Active"]]} last />
+          <FlowStep n="5" title="Decide" who="Last step · an approver" body="The binding verdict, and what it may be used for." chips={[["3", "C1 / C2 / C3 / C4"], ["4", "to be IFC"]]} />
+          <FlowStep n="6" title="Release" who="Document Control" body="Checks, then releases at the status decided — “to be” drops." chips={[["2", "Released"], ["4", "IFC"], ["1", "Active"]]} last />
         </ol>
         <div className="mt-4 grid grid-cols-1 gap-3 text-xs leading-5 text-slate-600 md:grid-cols-3">
+          <p className="rounded-xl bg-tint-soft p-3"><strong className="text-slate-800">Releasing is not sending.</strong> Release is internal: it makes that revision the current one and fixes what it may be used for. Issuing is a transmittal: telling a named party, for a stated reason. A revision can be released and issued to nobody, or issued many times after one release.</p>
           <p className="rounded-xl bg-tint-soft p-3"><strong className="text-slate-800">One decision.</strong> Only the route&apos;s last step decides, and only people the distribution matrix lets approve the document can be on it. There is no separate approval to agree or disagree with it.</p>
           <p className="rounded-xl bg-tint-soft p-3"><strong className="text-slate-800">If the verdict is C3 or C4</strong>, rev A is never released. The author prepares rev B — the verdict itself authorizes it — and it goes down the route again.</p>
           <p className="rounded-xl bg-tint-soft p-3"><strong className="text-slate-800">When rev B is released</strong>, rev A becomes Superseded on its own, and everyone who received rev A must be sent rev B.</p>
@@ -111,7 +112,7 @@ export default async function CodesPage() {
       <Card
         id="status"
         title="4 · Released for — what a released revision may be used for"
-        description="The status. Chosen by Document Control when it releases the revision, and printed on the document and the transmittal. A transmittal sent for execution only accepts codes that allow work."
+        description="The status. Chosen by whoever gives the binding verdict — it reads “to be IFC” until Document Control releases the revision at exactly that. It is printed on the document and on the transmittal, and a transmittal sent for execution only accepts codes that allow work."
       >
         <DataTable id="codes-statuses" toolbar={false} head={<tr><Th>Code</Th><Th>Meaning</Th><Th>Allows work</Th><Th>You may</Th><Th>You may not</Th></tr>}>
           {statuses.map((s) => (

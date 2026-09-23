@@ -230,7 +230,7 @@ async function contributorRecipients(t: Tenant, createdById: string, originator:
  * SERIAL: participants decide in order; the last one's outcome is binding (§9.7).
  * ALL_CONSOLIDATOR: everyone records; the last-named participant records the binding outcome.
  */
-export async function recordStepOutcome(t: Tenant, runId: string, user: SessionUser, outcomeCode: string, note?: string): Promise<{ ok: boolean; error?: string; message?: string }> {
+export async function recordStepOutcome(t: Tenant, runId: string, user: SessionUser, outcomeCode: string, note?: string, proposedStatus?: string): Promise<{ ok: boolean; error?: string; message?: string }> {
   const { db, projectId } = t;
   const run = await db.workflowRun.findUniqueOrThrow({ where: { id: runId } });
   if (run.status !== "ACTIVE") return { ok: false, error: "This workflow is not active." };
@@ -252,6 +252,14 @@ export async function recordStepOutcome(t: Tenant, runId: string, user: SessionU
   // serial and consolidated steps bind on their last person; the others on everyone.
   const binds = decides && bindsOnStep(step, user.id);
   if (binds && returnsToAuthor && !note) return { ok: false, error: `${verdict.label} goes back to the author — say what must change.` };
+  // The deciders say what the revision may be used for; the control function
+  // releases at exactly that and cannot change it.
+  if (binds && !returnsToAuthor) {
+    if (!proposedStatus) return { ok: false, error: "Say what this revision may be used for once released — “to be IFC”, for instance." };
+    const published = await t.db.configValue.findFirst({ where: { setKey: "STATUSES", code: proposedStatus, status: "ACTIVE" } });
+    if (!published) return { ok: false, error: `“${proposedStatus}” is not one of the published statuses.` };
+    await t.db.revision.update({ where: { id: rev.id }, data: { proposedStatus } });
+  }
   if (binds && !returnsToAuthor) {
     try { await assertMayGiveBindingVerdict(t, rev.id, user); } catch (e) { return { ok: false, error: e instanceof Error ? e.message : "Not permitted." }; }
   }
@@ -344,7 +352,7 @@ export async function recordStepApproval(t: Tenant, runId: string, user: Session
     code = pick?.code;
   }
   if (!code) return { ok: false, error: `No ${approve ? "approving" : "request-changes"} verdict is published in ${setKey}.` };
-  return recordStepOutcome(t, runId, user, code, note);
+  return recordStepOutcome(t, runId, user, code, note, outcomeCode ? undefined : undefined);
 }
 
 async function runIdToRevision(t: Tenant, runId: string): Promise<string> {

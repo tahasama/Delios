@@ -152,7 +152,8 @@ export async function recordReviewOutcome(
   cycleId: string,
   user: SessionUser,
   outcome: string,
-  note?: string
+  note?: string,
+  proposedStatus?: string,
 ) {
   const { db, projectId } = t;
   const cycle = await db.reviewCycle.findUniqueOrThrow({
@@ -174,7 +175,13 @@ export async function recordReviewOutcome(
   const cons = await verdictMeaning(t, cycle.outcomeSetKey, outcome);
  if (!cons) throw new Error("Outcome is not in the published set.");
   const approves = cycle.binding && cons.proceed && cycle.revision.state === "IN_REVIEW";
-  if (approves) await assertMayGiveBindingVerdict(t, cycle.revisionId, user);
+  if (approves) {
+    await assertMayGiveBindingVerdict(t, cycle.revisionId, user);
+    if (!proposedStatus) throw new Error("Say what this revision may be used for once released — “to be IFC”, for instance.");
+    const published = await db.configValue.findFirst({ where: { setKey: "STATUSES", code: proposedStatus, status: "ACTIVE" } });
+    if (!published) throw new Error(`“${proposedStatus}” is not one of the published statuses.`);
+    await db.revision.update({ where: { id: cycle.revisionId }, data: { proposedStatus } });
+  }
   if (cycle.issuedToReviewAt) await db.reviewCycle.update({ where: { id: cycleId }, data: { returnedFromReviewAt: new Date() } });
   const blockingOpen = cycle.comments.some((c) => c.progressionPreventing && c.status === "OPEN");
   await db.reviewCycle.update({
@@ -275,8 +282,10 @@ export async function requiredApprovalRole(t: Tenant, document: { discipline: st
 
 /** Release a revision at a stated status (§7.5–7.6). Supersedes the current revision (§7.5, §12.1). */
 export async function releaseRevision(t: Tenant, revisionId: string, user: SessionUser, statusCode: string) {
+  // Whatever the caller passes, the status the reviewers decided on wins.
   const { db, projectId } = t;
   const { rev, label } = await revisionLabel(t, revisionId);
+  if (rev.proposedStatus) statusCode = rev.proposedStatus;
   if (rev.state !== "IN_REVIEW" && rev.state !== "IN_PREPARATION") throw new Error("Only an in-review revision can be released.");
   const statuses = await getActiveSet("STATUSES");
   const status = statuses.find((s) => s.code === statusCode);

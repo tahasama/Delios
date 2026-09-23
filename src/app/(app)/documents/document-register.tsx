@@ -17,7 +17,7 @@ type RegisterRow = {
   docState: string; docStateLabel: string;
   revision: string | null; revState: string | null; revStateLabel: string; owner: string | null; blockingComments: number;
   verdict: string | null; verdictLabel: string | null; verdictBy: string | null; verdictPending: boolean;
-  releasedFor: string | null; releasedForLabel: string | null; releasedForUse: string | null;
+  releasedFor: string | null; releasedForLabel: string | null; releasedForUse: string | null; proposedFor: string | null;
   createdDate: string; updatedAt: string; plannedSubmissionDate: string | null; issueDate: string | null; releasedAt: string | null;
   decidedBy: string | null; packageCount: number; hasReleased: boolean; reviewRevisionId: string | null;
 };
@@ -89,7 +89,7 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
             : row.verdictPending ? <span className="text-amber-700">awaiting verdict</span> : <Muted />}
         </Td>
         <Td className="whitespace-nowrap text-xs">
-          {row.releasedFor ? <Link href="/guide/codes#status" className="hover:text-link" title={`${row.releasedFor} — ${row.releasedForLabel ?? ""}${row.releasedForUse ? `\n${row.releasedForUse}` : ""}\n\nWhat the codes mean →`}><span className="font-mono font-bold text-slate-800">{row.releasedFor}</span> <span className="text-slate-500 underline decoration-slate-300 decoration-dotted underline-offset-2">{row.releasedForLabel}</span></Link> : <Muted />}
+          {!row.releasedFor && row.proposedFor ? <span className="text-slate-500" title="Decided by the reviewers; it applies when Document Control releases the revision">to be <span className="font-mono font-bold text-slate-700">{row.proposedFor}</span></span> : row.releasedFor ? <Link href="/guide/codes#status" className="hover:text-link" title={`${row.releasedFor} — ${row.releasedForLabel ?? ""}${row.releasedForUse ? `\n${row.releasedForUse}` : ""}\n\nWhat the codes mean →`}><span className="font-mono font-bold text-slate-800">{row.releasedFor}</span> <span className="text-slate-500 underline decoration-slate-300 decoration-dotted underline-offset-2">{row.releasedForLabel}</span></Link> : <Muted />}
         </Td>
         <Td className="whitespace-nowrap text-xs">{row.disciplineLabel}</Td>
         <Td className="max-w-48 truncate text-xs" >{row.docTypeLabel}</Td>

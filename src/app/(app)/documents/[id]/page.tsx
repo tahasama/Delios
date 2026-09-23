@@ -156,14 +156,24 @@ export default async function DocumentDetailPage({
       {controller && working ? (
         <Step title={`Release rev ${working.value}`} open={run?.status === "DONE" || working.approvals.some((a) => !a.withdrawnAt)}>
           <PreflightPanel result={await preflight("RELEASE", { revisionId: working.id }, ctx)} className="mb-3" />
-          <ActionForm action={releaseRevisionAction} submitLabel="Release" size="sm" hidden={{ revisionId: working.id }}>
-            <Field label="Released as" required>
-              <select name="statusCode" className={inputCls} defaultValue="">
-                <option value="" disabled>Choose a status…</option>
-                {statuses.map((s) => <option key={s.code} value={s.code}>{s.code} — {s.label}</option>)}
-              </select>
-            </Field>
-          </ActionForm>
+          {working.proposedStatus ? (
+            <>
+              <p className="mb-3 rounded-xl bg-tint px-3.5 py-2.5 text-xs text-brand-ink">
+                The reviewers decided it may be used for <strong>{working.proposedStatus} — {label(statuses, working.proposedStatus)}</strong>.
+                Releasing makes that the current revision at that status. You do not choose it.
+              </p>
+              <ActionForm action={releaseRevisionAction} submitLabel={`Release as ${working.proposedStatus}`} size="sm" hidden={{ revisionId: working.id, statusCode: working.proposedStatus }} />
+            </>
+          ) : (
+            <ActionForm action={releaseRevisionAction} submitLabel="Release" size="sm" hidden={{ revisionId: working.id }}>
+              <Field label="Released as" required hint="older revisions have no decided status; newer ones carry the reviewers' choice">
+                <select name="statusCode" className={inputCls} defaultValue="">
+                  <option value="" disabled>Choose a status…</option>
+                  {statuses.map((s) => <option key={s.code} value={s.code}>{s.code} — {s.label}</option>)}
+                </select>
+              </Field>
+            </ActionForm>
+          )}
           {current ? <p className="mt-2 text-[11px] text-slate-500">Rev {current.value} will be marked superseded.</p> : null}
         </Step>
       ) : null}
@@ -217,7 +227,7 @@ export default async function DocumentDetailPage({
             <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-500">
               {shown ? <span className="rounded-md bg-slate-100 px-2 py-0.5 font-mono font-bold text-slate-700">Rev {shown.value}</span> : null}
               <StateChip label={stateLabel} color={stateColor} />
-              {shown?.statusCode ? <span>{shown.statusCode} · {label(statuses, shown.statusCode)}</span> : null}
+              {shown?.statusCode ? <span>{shown.statusCode} · {label(statuses, shown.statusCode)}</span> : shown?.proposedStatus ? <span className="text-slate-500">to be {shown.proposedStatus} once released</span> : null}
               {current && working ? <span className="text-amber-700">· rev {working.value} in progress</span> : null}
             </div>
           </div>

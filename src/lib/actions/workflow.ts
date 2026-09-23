@@ -127,9 +127,10 @@ export async function recordStepOutcomeAction(_prev: { error?: string; ok?: stri
   const runId = String(formData.get("runId") ?? "");
   const outcomeCode = String(formData.get("outcome") ?? "");
   const note = String(formData.get("note") ?? "").trim() || undefined;
-  if (!outcomeCode) return { error: "Choose the outcome from the set." };
+  const proposedStatus = String(formData.get("proposedStatus") ?? "").trim() || undefined;
+  if (!outcomeCode) return { error: "Choose the verdict." };
   try {
-    const res = await recordStepOutcome(ctx, runId, user, outcomeCode, note);
+    const res = await recordStepOutcome(ctx, runId, user, outcomeCode, note, proposedStatus);
     if (!res.ok) return { error: res.error };
     revalidatePath("/");
     return { ok: res.message };

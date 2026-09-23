@@ -36,6 +36,8 @@ async function main() {
   // A verdict that stops release; "approved with comments" proceeds.
   const back = proceed.find((v) => v.props.proceed === false)!;
 
+  // What a proceeding verdict says the revision may be used for.
+  const useFor = (await db.configValue.findFirstOrThrow({ where: { setKey: "STATUSES", status: "ACTIVE" } })).code;
   const stamp = Date.now().toString(36);
   const made: { docs: string[]; templates: string[] } = { docs: [], templates: [] };
 
@@ -108,13 +110,17 @@ async function main() {
 
     const notLead = await recordStepOutcome(t, runId, r1, ok.code);
     check("only the lead decides the lead step", !notLead.ok);
-    const decided = await recordStepOutcome(t, runId, lead, ok.code, "agreed");
+    const decided = await recordStepOutcome(t, runId, lead, ok.code, "agreed", useFor);
     run = await getRunForRevision(t, rev.id);
     check("the lead's decision completes the route", decided.ok && run?.status === "DONE", decided.error ?? "");
     const approvals = await t.db.approval.findMany({ where: { revisionId: rev.id, withdrawnAt: null } });
     check("the binding verdict is the release approval, recorded once under the lead's name", approvals.length === 1 && approvals[0].approverId === lead.id, `${approvals.length} approval(s)`);
     const cycles = await t.db.reviewCycle.findMany({ where: { revisionId: rev.id }, orderBy: { sequence: "asc" } });
     check("the specialists' step is advice, the lead's step binds", cycles.length === 2 && !cycles[0].binding && cycles[1].binding);
+    const decidedRev = await t.db.revision.findUniqueOrThrow({ where: { id: rev.id } });
+    check("the verdict carries what it may be used for", decidedRev.proposedStatus === useFor, decidedRev.proposedStatus ?? "none");
+    const noStatus = await recordStepOutcome(t, runId, lead, ok.code, "agreed");
+    check("a verdict that proceeds without a status is refused", !noStatus.ok);
 
     console.log("\nOnly someone who may approve takes the deciding step\n");
     const reviewerDecides = await template("Reviewer decides", [{ act: "REVIEW", mode: "ANY_OF", participantIds: [r1.id] }]);
@@ -132,7 +138,7 @@ async function main() {
     const in2 = await recordStepOutcome(t, id5, r2, ok.code, "fine");
     check("their verdicts are taken as input", in1.ok && in2.ok, in1.error ?? in2.error ?? "");
     check("and approve nothing", (await t.db.approval.count({ where: { revisionId: rev5.id } })) === 0);
-    await recordStepOutcome(t, id5, lead, ok.code, "consolidated");
+    await recordStepOutcome(t, id5, lead, ok.code, "consolidated", useFor);
     const run5 = await getRunForRevision(t, rev5.id);
     const appr5 = await t.db.approval.findMany({ where: { revisionId: rev5.id } });
     check("the consolidator's verdict decides and is the approval", run5?.status === "DONE" && appr5.length === 1 && appr5[0].approverId === lead.id);
@@ -143,7 +149,7 @@ async function main() {
     const s2 = await startWorkflowRun(t, rev2.id, inputsOnly, admin);
     const id2 = s2.ok ? s2.runId : "";
     check("deciders start", s2.ok, s2.ok ? "" : s2.error);
-    await recordStepOutcome(t, id2, lead, ok.code);
+    await recordStepOutcome(t, id2, lead, ok.code, undefined, useFor);
     await recordStepOutcome(t, id2, admin, back.code, "rework section 3");
     const run2 = await getRunForRevision(t, rev2.id);
     check("one request for changes returns it to the author", run2?.status === "RETURNED", run2?.status);

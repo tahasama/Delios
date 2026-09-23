@@ -233,6 +233,7 @@ export async function recordOutcomeAction(_prev: { error?: string } | undefined,
   const cycleId = String(formData.get("cycleId") ?? "");
   const outcome = String(formData.get("outcome") ?? "");
   const note = String(formData.get("outcomeNote") ?? "") || undefined;
+  const proposedStatus = String(formData.get("proposedStatus") ?? "").trim() || undefined;
   try {
     await enforce("RECORD_OUTCOME", { cycleId, outcomeCode: outcome }, ctx);
     // A cycle that belongs to a review route is decided through the route, so
@@ -243,10 +244,10 @@ export async function recordOutcomeAction(_prev: { error?: string } | undefined,
     if (run) {
       const current = parseSteps(run.steps)[run.currentStep];
       if (run.status !== "ACTIVE" || current?.cycleId !== cycleId) return { error: "This step of the review route is closed." };
-      const res = await recordStepOutcome(ctx, run.id, user, outcome, note);
+      const res = await recordStepOutcome(ctx, run.id, user, outcome, note, proposedStatus);
       if (!res.ok) return { error: res.error };
     } else {
-      await recordReviewOutcome(ctx, cycleId, user, outcome, note);
+      await recordReviewOutcome(ctx, cycleId, user, outcome, note, proposedStatus);
     }
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Could not record outcome." };

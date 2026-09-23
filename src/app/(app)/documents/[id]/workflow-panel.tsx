@@ -7,6 +7,7 @@ import { ActionForm } from "@/components/form";
 import { recordStepOutcomeAction } from "@/lib/actions/workflow";
 import { verdictEffect, VERDICT_EFFECT_SHORT } from "@/lib/verdict-effect";
 import { getActiveSet } from "@/lib/config";
+import { VerdictStatus } from "./verdict-status";
 import { Send, CheckCircle2, Rocket } from "lucide-react";
 import { getRunForRevision, type WfRuntimeStep } from "@/lib/workflow";
 import { confirmRecordAction, correctRecordAction } from "@/lib/actions/governance";
@@ -137,6 +138,7 @@ async function RunActivePanel({ run, user, extra }: { run: { id: string; templat
   const activeCycle = step?.cycleId ? await db.reviewCycle.findUnique({ where: { id: step.cycleId } }) : null;
   const outcomeSetKey = activeCycle?.outcomeSetKey ?? "REVIEW_OUTCOMES";
   const outcomes = await getActiveSet(outcomeSetKey);
+  const statuses = await getActiveSet("STATUSES");
   const serialNext = step?.mode === "SERIAL" ? nextSerialParticipant(step) : null;
   const alreadyGave = !!step && step.mode === "ALL" && (step.decidedBy ?? []).includes(user.id);
   const iDecide = !!step && mine && !alreadyGave && (step.mode !== "SERIAL" || serialNext === user.id);
@@ -185,6 +187,7 @@ async function RunActivePanel({ run, user, extra }: { run: { id: string; templat
                   {outcomes.map((o) => <option key={o.code} value={o.code}>{o.code} — {o.label} ({VERDICT_EFFECT_SHORT[verdictEffect(o.props)]})</option>)}
                 </select>
               </Field>
+              {deciding ? <VerdictStatus statuses={statuses.map((s) => ({ code: s.code, label: s.label, allowsWork: s.props.executionFlag === true }))} /> : null}
               <Field label="Comment" hint="required if it goes back to the author">
                 <textarea name="note" rows={2} className={inputCls} placeholder="what you checked / what must change" />
               </Field>

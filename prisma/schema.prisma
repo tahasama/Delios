@@ -458,6 +458,9 @@ model Revision {
   series                String            @default("DESIGN") // DESIGN | EXECUTION (§6.2)
   state                 String            @default("IN_PREPARATION") // IN_PREPARATION IN_REVIEW RELEASED SUPERSEDED VOID (§7.2)
   statusCode            String? // what a released revision may be used for (§7.6)
+  // What the reviewers decided it should be released as — "to be IFC". The
+  // control function releases at exactly this; it does not choose the status.
+  proposedStatus         String?
   phase                 String? // held at revision level (§5.5)
   reasonForRevision     String? // §6.6
   changeDescription     String? // §6.6 — describes what changed
