@@ -4,6 +4,7 @@ import { deleteTemplateAction } from "@/lib/actions/workflow";
 import { getSets } from "@/lib/config";
 import { WorkflowTemplateBuilder, type WorkflowBuilderStep } from "./workflow-template-builder";
 import { hasVerb } from "@/lib/auth";
+import { ArrowRight } from "lucide-react";
 import { verdictSets } from "@/lib/verdict-sets";
 
 export const dynamic = "force-dynamic";
@@ -67,16 +68,26 @@ export default async function WorkflowTemplatesPage() {
                     </div>
                   ) : null;
                 })()}
-                <ol className="space-y-1.5">
-                  {steps.map((s, i) => (
-                    <li key={i} className="flex flex-wrap items-center gap-2 text-sm">
-                      <span className="grid h-5 w-5 place-items-center rounded bg-slate-100 font-mono text-[10px] font-bold text-slate-500">{i + 1}</span>
-                      <Chip className={i === steps.length - 1 ? "bg-emerald-100 text-emerald-800 ring-emerald-300" : "bg-sky-100 text-sky-800 ring-sky-300"}>{i === steps.length - 1 ? "decides" : "advises"}</Chip>
-                      <Chip>{s.mode === "ANY_OF" ? "any one decides" : s.mode === "SERIAL" ? "one after another" : s.mode === "ALL" ? "all give input, any order" : "all respond, last one decides"}</Chip>
-                      <span className="text-xs text-slate-500">{[...(s.functionIds ?? []).map((fid) => functions.find((f) => f.id === fid)?.name ?? "?").map((n) => `any ${n}`), ...s.participantIds.map(nameOf)].join(", ")}</span>
-                    </li>
-                  ))}
-                </ol>
+                <div className="scroll-thin flex items-stretch gap-1 overflow-x-auto pb-1">
+                  {steps.map((s, i) => {
+                    const decides = i === steps.length - 1;
+                    const who = [...(s.functionIds ?? []).map((fid) => `any ${functions.find((f) => f.id === fid)?.name ?? "?"}`), ...s.participantIds.map(nameOf)];
+                    return (
+                      <div key={i} className="flex items-stretch gap-1">
+                        <div className={`w-48 shrink-0 rounded-xl border p-2.5 ${decides ? "border-emerald-300 bg-emerald-50/60" : "border-slate-200 bg-slate-50"}`}>
+                          <p className="flex items-center justify-between gap-2">
+                            <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Step {i + 1}</span>
+                            <Chip className={decides ? "bg-emerald-100 text-emerald-800 ring-emerald-300" : "bg-sky-100 text-sky-800 ring-sky-300"}>{decides ? "decides" : "advises"}</Chip>
+                          </p>
+                          <p className="mt-1 text-[13px] font-semibold text-slate-900">{s.title || (decides ? "Decision" : `Review ${i + 1}`)}</p>
+                          <p className="mt-1 text-[11px] leading-4 text-slate-600">{who.length ? who.join(", ") : <span className="text-amber-700">by discipline when sent</span>}</p>
+                          {who.length > 1 ? <p className="mt-1 text-[10px] text-slate-400">{s.mode === "ANY_OF" ? "whoever gets there first" : s.mode === "SERIAL" ? "one after another" : s.mode === "ALL" ? "all, any order" : "all, last one sums up"}</p> : null}
+                        </div>
+                        {i < steps.length - 1 ? <ArrowRight className="h-4 w-4 shrink-0 self-center text-slate-300" aria-hidden /> : null}
+                      </div>
+                    );
+                  })}
+                </div>
                 <p className="mt-2 text-[11px] text-slate-400">Used for: {t.classes === "*" ? "all documents" : "selected document classes"}</p>
                 {admin ? (
                   <details className="mt-3 rounded-lg border border-slate-200">
