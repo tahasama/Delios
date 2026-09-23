@@ -23,7 +23,8 @@ export default async function PackagesPage({ searchParams }: { searchParams: Pro
   // A supplier only ever sees its own package.
   const supplierOnly = !user.isInternal;
   const requested = (await searchParams).category;
-  const category = supplierOnly ? "SUPPLIER" : requested === "DELIVERY" ? "DELIVERY" : requested === "SCHEDULE" ? "SCHEDULE" : "SUPPLIER";
+  // Activities live in Schedule & actions now; a package is what we receive from a supplier, or what we hand over.
+  const category = supplierOnly ? "SUPPLIER" : requested === "DELIVERY" ? "DELIVERY" : "SUPPLIER";
   const [pkgs, reasons, statuses, users] = await Promise.all([
     db.package.findMany({ where: { category, ...(supplierOnly ? { partyCode: user.partyCode ?? "-" } : {}) }, orderBy: { completionDate: "asc" }, include: { members: { include: { document: { include: { revisions: { where: { state: "RELEASED" }, orderBy: { releasedAt: "desc" }, take: 1 } } } } } } }),
     getActiveSet("REASONS_FOR_ISSUE"), getActiveSet("STATUSES"),
@@ -33,18 +34,6 @@ export default async function PackagesPage({ searchParams }: { searchParams: Pro
   const supplierStats = new Map<string, ReturnType<typeof supplierFigures>>();
   if (category === "SUPPLIER") for (const p of pkgs) supplierStats.set(p.id, supplierFigures(await supplierRows(ctx, p)));
   // "For the schedule": each action's documents, read as a package.
-  const scheduleRows = category === "SCHEDULE"
-    ? (await db.action.findMany({ orderBy: [{ scheduledDate: "asc" }, { code: "asc" }], include: { entries: { include: { document: { include: { revisions: { where: { state: "RELEASED" }, orderBy: { releasedAt: "desc" }, take: 1 } } } } } } })).map((a) => {
-        const ready = a.entries.filter((e) => e.document.revisions[0]?.statusCode === e.requiredStatus);
-        const open = a.entries.filter((e) => !ready.includes(e));
-        return {
-          id: a.id, code: a.code, name: a.name, scheduledDate: a.scheduledDate, depts: departmentsOf(a).join(", "),
-          total: a.entries.length, ready: ready.length,
-          late: open.filter((e) => e.requiredBy < new Date()).length,
-          next: open.map((e) => e.requiredBy).sort((x, y) => +x - +y)[0] ?? null,
-        };
-      })
-    : [];
   const rows = pkgs.map((pkg) => {
     const ready = pkg.members.filter((member) => member.document.revisions[0]?.statusCode === member.requiredStatus).length;
     const total = pkg.members.length;
@@ -58,27 +47,13 @@ export default async function PackagesPage({ searchParams }: { searchParams: Pro
 
     {supplierOnly ? null : (
       <nav className="flex gap-1 rounded-xl bg-slate-100 p-1 sm:w-fit">
-        {(["SUPPLIER", "SCHEDULE", "DELIVERY"] as const).map((c) => (
-          <Link key={c} href={`/packages?category=${c}`} className={`rounded-lg px-3 py-2 text-xs font-semibold ${category === c ? "bg-surface text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-800"}`}>{c === "SUPPLIER" ? "From suppliers" : c === "SCHEDULE" ? "For the schedule" : "To deliver"}</Link>
+        {(["SUPPLIER", "DELIVERY"] as const).map((c) => (
+          <Link key={c} href={`/packages?category=${c}`} className={`rounded-lg px-3 py-2 text-xs font-semibold ${category === c ? "bg-surface text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-800"}`}>{c === "SUPPLIER" ? "From suppliers" : "To deliver"}</Link>
         ))}
       </nav>
     )}
 
-    {category === "SCHEDULE" ? (
-      scheduleRows.length ? (
-        <DataTable head={<tr><Th>Action</Th><Th>Departments</Th><Th>Documents ready</Th><Th>Next needed</Th><Th>Activity</Th></tr>}>
-          {scheduleRows.map((a) => (
-            <tr key={a.id}>
-              <Td><Link href={`/actions/${a.code}`} className="font-mono text-[13px] font-semibold text-brand-ink hover:underline">{a.code}</Link><span className="block max-w-72 truncate text-xs text-slate-500">{a.name}</span></Td>
-              <Td className="text-xs">{a.depts || <span className="text-amber-700">needs departments</span>}</Td>
-              <Td className="text-xs">{a.ready} of {a.total}{a.late ? <span className="ml-1 font-semibold text-red-700">· {a.late} late</span> : null}</Td>
-              <Td className="whitespace-nowrap text-xs">{a.next ? fmtDate(a.next) : "—"}</Td>
-              <Td className="whitespace-nowrap text-xs">{fmtDate(a.scheduledDate)}</Td>
-            </tr>
-          ))}
-        </DataTable>
-      ) : <EmptyState title="No scheduled actions yet" body="Actions come from the approved schedule; their documents from the approved requirements list." />
-    ) : category === "SUPPLIER" ? (
+    {category === "SUPPLIER" ? (
       rows.length ? (
         <DataTable head={<tr><Th>Supplier</Th><Th>Sent</Th><Th>Overdue</Th><Th>Waiting on</Th><Th>Due</Th></tr>}>
           {rows.map((pkg) => {

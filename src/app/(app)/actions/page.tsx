@@ -39,7 +39,9 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
     else if (total > 0 && daysUntil !== null && daysUntil < 0) readiness = "NOT_READY";
     else if (total > 0 && daysUntil !== null) readiness = "AT_RISK";
     const firstNeeded = action.entries.map((e) => e.requiredBy).filter(Boolean).sort((a, b) => a!.getTime() - b!.getTime())[0] ?? null;
-    return { ...action, total, ready, missing, daysUntil, readiness, firstNeeded };
+    // The next document still owed — what a controller chases first.
+    const nextNeeded = missing.map((e) => e.requiredBy).filter(Boolean).sort((a, b) => a!.getTime() - b!.getTime())[0] ?? null;
+    return { ...action, total, ready, missing, daysUntil, readiness, firstNeeded, nextNeeded };
   });
   const counts: Record<Readiness, number> = {
     READY: rows.filter((row) => row.readiness === "READY").length,
@@ -111,7 +113,7 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
 
       <section>
         {filtered.length ? (
-          <DataTable id="actions" head={<tr><Th>Action</Th><Th>Departments</Th><Th>Status</Th><Th>Date</Th><Th label="Documents ready" className="text-right">Ready</Th><Th>Still missing</Th><Th>Confirmed</Th></tr>}>
+          <DataTable id="actions" head={<tr><Th>Action</Th><Th>Departments</Th><Th>Status</Th><Th>Date</Th><Th label="Documents ready" className="text-right">Ready</Th><Th>Next due</Th><Th>Still missing</Th><Th>Confirmed</Th></tr>}>
                 {filtered.map((action) => (
                   <tr key={action.id}>
                     <Td className="min-w-[260px] max-w-sm"><Link href={`/actions/${action.code}`} className="font-mono text-xs font-bold text-link hover:underline">{action.code}</Link><p className="mt-0.5 truncate text-sm font-semibold text-slate-800" title={action.name}>{action.name}</p><p className="mt-0.5 text-[11px] text-slate-400">{action.ownerName ?? "Responsible party not assigned"}</p></Td>
@@ -124,6 +126,7 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
                     <Td className="whitespace-nowrap"><ReadinessChip state={action.readiness} /></Td>
                     <Td className="whitespace-nowrap"><p className="text-sm font-medium tabular-nums text-slate-800">{fmtDate(action.scheduledDate)}</p><p className={`mt-0.5 text-[11px] ${action.daysUntil !== null && action.daysUntil < 0 ? "font-semibold text-red-600" : "text-slate-400"}`}>{datePhrase(action.daysUntil)}</p></Td>
                     <Td className="whitespace-nowrap text-right"><ReadyBar ready={action.ready} total={action.total} /></Td>
+                    <Td className="whitespace-nowrap text-xs tabular-nums">{action.nextNeeded ? <span className={action.nextNeeded.getTime() < Date.now() ? "font-semibold text-red-600" : "text-slate-600"}>{fmtDate(action.nextNeeded)}</span> : <span className="text-slate-300">—</span>}</Td>
                     <Td className="min-w-[240px]">{action.missing.length ? (
                       <ul className="space-y-1">
                         {action.missing.slice(0, 3).map((entry) => (

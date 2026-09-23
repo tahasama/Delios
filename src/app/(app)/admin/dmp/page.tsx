@@ -52,7 +52,7 @@ export default async function DmpReadinessPage() {
   // Annex C in the order an organization actually makes the decisions.
   const steps = [
  { title: "State the scope", text: "What information is controlled, at which assessment level, and the integrity threshold it is measured against.", href: "#scope", action: "Publish scope", icon: Building2, done: Boolean(scope?.organizationName && scope?.scopeStatement), evidence: scope?.scopeStatement ? `Scope published · threshold ${scope.integrityThreshold}%`: "No scope statement" },
- { title: "Name the functions and people", text: "Who does what, by function rather than by name, and which department each person answers for — they receive requirements calls and confirm readiness.", href: "/admin/users", action: "People & functions", icon: Users, done: members > 1 && withDepartment > 0, evidence: `${members} on this project · ${withDepartment} with a department · ${externalParties} external part${externalParties === 1 ? "y": "ies"}` },
+ { title: "Name the functions and people", text: "Who does what, by function rather than by name, and which department each person answers for — they receive requirements calls and confirm readiness.", href: "/admin/users", action: "People & functions", icon: Users, done: members > 1 && withDepartment > 0, evidence: members <= 1 ? "Only you are on this project — add the people who write, review and approve" : withDepartment === 0 ? `${members} people on the project, but none says which department they answer for — departments receive the requirements calls` : `${members} on this project · ${withDepartment} with a department · ${externalParties} external part${externalParties === 1 ? "y": "ies"}` },
  { title: "Publish the project's vocabulary", text: "Disciplines, document types, statuses, outcomes, reasons and retention classes. Each project type's starter profile adds its own values.", href: "/admin/config", action: "Value sets", icon: Tags, done: requiredSets.length === REQUIRED.length && requiredSets.every((set) => set._count.values > 0) && profileGaps.length === 0, evidence: `${requiredSets.filter((s) => s._count.values > 0).length}/${REQUIRED.length} essential sets${profileGaps.length ? ` · ${profileGaps.map((g) => `${g.profile.name}: ${g.missing} starter value(s) not published`).join(" · ")}`: ""}` },
  { title: "Publish numbering", text: "Numbers are built from ordered fields and each deliverable type is routed to its scheme, so nobody invents a number.", href: "/admin/numbering", action: "Numbering", icon: FileDigit, done: schemes > 0 && routings > 0, evidence: `${schemes} scheme${schemes === 1 ? "": "s"} · ${routings} routing${routings === 1 ? "": "s"}` },
  { title: "Set the distribution matrix", text: "Which functions review, approve and receive each class of document. The Approve column is the approval authority.", href: "/distribution", action: "Distribution", icon: ShieldCheck, done: verbsGranted.has("REVIEW") && verbsGranted.has("APPROVE"), evidence: `${rules.length} rule${rules.length === 1 ? "": "s"} · ${verbsGranted.has("APPROVE") ? "approval granted": "nobody may approve"}` },
@@ -100,6 +100,16 @@ export default async function DmpReadinessPage() {
       ) : null}
 
       <Card id="scope" title="Scope statement" description="What the system covers and the quality bar it is measured against.">
+        {scope?.scopeStatement ? (
+          <div className="mb-4 rounded-xl bg-slate-50 p-3 text-xs leading-5 text-slate-600">
+            <p className="font-semibold text-slate-800">{scope.organizationName}</p>
+            <p className="mt-1">{scope.scopeStatement}</p>
+            <p className="mt-1 text-slate-500">{scope.assessmentLevel} assessment · trusted above {scope.integrityThreshold}% · measured every {scope.measurementIntervalDays} days</p>
+          </div>
+        ) : null}
+        <details open={!scope?.scopeStatement}>
+          <summary className="cursor-pointer text-xs font-semibold text-link">{scope?.scopeStatement ? "Change the scope statement" : "State the scope"}</summary>
+          <div className="mt-3">
         <ActionForm action={setScopeAction} submitLabel="Publish scope statement">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Field label="Organization" required>
@@ -122,6 +132,8 @@ export default async function DmpReadinessPage() {
             </Field>
           </div>
         </ActionForm>
+          </div>
+        </details>
         {scope ? (
           <p className="mt-3 text-xs text-slate-400">
             Standard version {scope.standardVersion} · effective {fmtDate(scope.effectiveDate)} · control function: {scope.controlFunctionName}
