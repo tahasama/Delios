@@ -9,7 +9,7 @@ import { isReadOnly } from "@/lib/auth";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Documents" };
 
-type Search = { q?: string; state?: string; rev?: string; status?: string; discipline?: string; docType?: string; view?: string };
+type Search = { q?: string; state?: string; rev?: string; status?: string; verdict?: string; supplier?: string; po?: string; discipline?: string; docType?: string; view?: string };
 
 export default async function DocumentsPage({ searchParams }: { searchParams: Promise<Search> }) {
   const { user, db } = await requireScope();
@@ -20,6 +20,9 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
   const docType = sp.docType ?? "";
   const revState = sp.rev ?? "";
   const statusCode = sp.status ?? "";
+  const verdictCode = sp.verdict ?? "";
+  const supplier = sp.supplier ?? "";
+  const po = sp.po ?? "";
   const view = sp.view === "all" ? "all" : "current";
 
   let assetDocIds: string[] = [];
@@ -40,12 +43,13 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
         ...(assetDocIds.length ? [{ id: { in: assetDocIds } }] : []),
       ] } : {},
       state ? { state } : {}, discipline ? { discipline } : {}, docType ? { docType } : {},
+      supplier ? { originator: supplier } : {}, po ? { contractRef: po } : {},
     ],
   };
 
-  const [docs, total, disciplines, types, statuses, verdictSet, templates, people] = await Promise.all([
+  const [docs, total, disciplines, types, statuses, verdictSet, supplierCodes, poCodes, templates, people] = await Promise.all([
     db.document.findMany({
-      where, orderBy: { updatedAt: "desc" }, take: revState || statusCode ? 2000 : 250,
+      where, orderBy: { updatedAt: "desc" }, take: revState || statusCode || verdictCode ? 2000 : 250,
       include: {
         revisions: { orderBy: { createdAt: "desc" }, include: {
           workflowRuns: { orderBy: { updatedAt: "desc" }, take: 1 },
@@ -56,7 +60,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
       },
     }),
     db.document.count({ where }),
-    getSet("DISCIPLINES"), getSet("DOCUMENT_TYPES"), getSet("STATUSES"), getSet("REVIEW_OUTCOMES"),
+    getSet("DISCIPLINES"), getSet("DOCUMENT_TYPES"), getSet("STATUSES"), getSet("REVIEW_OUTCOMES"), getSet("SUPPLIER_CODES"), getSet("PURCHASE_ORDERS"),
     db.workflowTemplate.findMany({ where: { active: true }, orderBy: [{ isDefault: "desc" }, { name: "asc" }] }),
     db.user.findMany({ where: { active: true }, select: { id: true, name: true } }),
   ]);
@@ -117,16 +121,19 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
       hasReleased: !!current, reviewRevisionId: working?.id ?? null,
     };
   });
-  const matching = all.filter((r) => (!revState || (revState === "NONE" ? !r.revState : r.revState === revState)) && (!statusCode || r.releasedFor === statusCode));
+  const matching = all.filter((r) =>
+    (!revState || (revState === "NONE" ? !r.revState : r.revState === revState)) &&
+    (!statusCode || r.releasedFor === statusCode) &&
+    (!verdictCode || (verdictCode === "WAITING" ? r.verdictPending && !r.verdict : r.verdict === verdictCode)));
   const rows = matching.slice(0, 250);
-  const shownTotal = revState || statusCode ? matching.length : total;
+  const shownTotal = revState || statusCode || verdictCode ? matching.length : total;
 
   const query = new URLSearchParams();
-  if (q) query.set("q", q); if (state) query.set("state", state); if (discipline) query.set("discipline", discipline); if (docType) query.set("docType", docType); if (revState) query.set("rev", revState); if (statusCode) query.set("status", statusCode); if (view === "all") query.set("view", "all");
+  if (q) query.set("q", q); if (state) query.set("state", state); if (discipline) query.set("discipline", discipline); if (docType) query.set("docType", docType); if (revState) query.set("rev", revState); if (statusCode) query.set("status", statusCode); if (verdictCode) query.set("verdict", verdictCode); if (supplier) query.set("supplier", supplier); if (po) query.set("po", po); if (view === "all") query.set("view", "all");
 
   return <div className="space-y-5">
     <PageHeader title="Documents" actions={<ButtonLink href="/documents/new">Create document</ButtonLink>} />
-    <DocumentRegister rows={rows} total={shownTotal} userCanAct={!isReadOnly(user)} filters={{ q, state, rev: revState, status: statusCode, discipline, docType, view }} filterOptions={{ states: DOC_STATES.map((code) => ({ code, label: DOC_STATE_LABEL[code] ?? code })), revStates: [...REV_STATES.map((code) => ({ code, label: REV_STATE_LABEL[code] })), { code: "NONE", label: "No revision yet" }], statuses: statuses.map((item) => ({ code: item.code, label: `${item.code} — ${item.label}` })), disciplines: disciplines.filter((item) => usedDisciplines.has(item.code)).map((item) => ({ code: item.code, label: item.status === "RETIRED" ? `${item.label} (retired)` : item.label })), types: types.filter((item) => usedTypes.has(item.code)).map((item) => ({ code: item.code, label: item.status === "RETIRED" ? `${item.label} (retired)` : item.label })) }} exportHref={`/api/register/export${query.size ? `?${query.toString()}` : ""}`} />
+    <DocumentRegister rows={rows} total={shownTotal} userCanAct={!isReadOnly(user)} filters={{ q, state, rev: revState, status: statusCode, verdict: verdictCode, supplier, po, discipline, docType, view }} filterOptions={{ states: DOC_STATES.map((code) => ({ code, label: DOC_STATE_LABEL[code] ?? code })), revStates: [...REV_STATES.map((code) => ({ code, label: REV_STATE_LABEL[code] })), { code: "NONE", label: "No revision yet" }], statuses: statuses.map((item) => ({ code: item.code, label: `${item.code} — ${item.label}` })), verdicts: [...verdictSet.map((item) => ({ code: item.code, label: `${item.code} — ${item.label}` })), { code: "WAITING", label: "Waiting for a verdict" }], suppliers: supplierCodes.map((item) => ({ code: item.code, label: item.label })), pos: poCodes.map((item) => ({ code: item.code, label: item.label })), disciplines: disciplines.filter((item) => usedDisciplines.has(item.code)).map((item) => ({ code: item.code, label: item.status === "RETIRED" ? `${item.label} (retired)` : item.label })), types: types.filter((item) => usedTypes.has(item.code)).map((item) => ({ code: item.code, label: item.status === "RETIRED" ? `${item.label} (retired)` : item.label })) }} exportHref={`/api/register/export${query.size ? `?${query.toString()}` : ""}`} />
   </div>;
 }
 

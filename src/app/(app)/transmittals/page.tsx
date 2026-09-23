@@ -10,8 +10,8 @@ export const metadata = { title: "Transmittals" };
 
 /** One list; the counts live on the filters instead of in a separate strip of tiles. */
 const VIEWS: { id: string; label: string; where: Prisma.TransmittalWhereInput }[] = [
+  { id: "check", label: "Check what arrived", where: { direction: "INCOMING", status: "ISSUED" } },
   { id: "all", label: "All", where: {} },
-  { id: "check", label: "To check", where: { direction: "INCOMING", status: "ISSUED" } },
   { id: "drafts", label: "Drafts", where: { status: "DRAFT" } },
   { id: "out", label: "Sent", where: { direction: "OUTGOING" } },
   { id: "in", label: "Received", where: { direction: "INCOMING" } },
@@ -21,13 +21,12 @@ export default async function TransmittalsPage({ searchParams }: { searchParams:
   const { db } = await requireScope();
   const sp = await searchParams;
   // Older links say ?direction=INCOMING.
-  const viewId = sp.view ?? (sp.direction === "INCOMING" ? "in" : sp.direction === "OUTGOING" ? "out" : "all");
-  const view = VIEWS.find((v) => v.id === viewId) ?? VIEWS[0];
-
-  const [list, counts] = await Promise.all([
-    db.transmittal.findMany({ where: view.where, orderBy: { createdAt: "desc" }, take: 100, include: { items: true, recipients: true } }),
-    Promise.all(VIEWS.map((v) => db.transmittal.count({ where: v.where }))),
-  ]);
+  const counts = await Promise.all(VIEWS.map((v) => db.transmittal.count({ where: v.where })));
+  // What arrived and needs checking comes first — it is the reader's own job.
+  // With nothing waiting, the list opens on everything instead of on emptiness.
+  const chosen = sp.view ?? (sp.direction === "INCOMING" ? "in" : sp.direction === "OUTGOING" ? "out" : counts[0] ? "check" : "all");
+  const view = VIEWS.find((v) => v.id === chosen) ?? VIEWS[0];
+  const list = await db.transmittal.findMany({ where: view.where, orderBy: { createdAt: "desc" }, take: 100, include: { items: true, recipients: true } });
 
   return (
     <div className="space-y-4">
@@ -47,7 +46,7 @@ export default async function TransmittalsPage({ searchParams }: { searchParams:
       </nav>
 
       {list.length === 0 ? (
-        <EmptyState title={view.id === "all" ? "No transmittals yet" : "Nothing here"} body="A transmittal is how documents are formally sent to, or received from, another party." action={view.id === "all" ? <ButtonLink href="/transmittals/new" variant="secondary">New transmittal</ButtonLink> : undefined} />
+        <EmptyState title={view.id === "check" ? "Nothing is waiting to be checked" : view.id === "all" ? "No transmittals yet" : "Nothing here"} body="A transmittal is how documents are formally sent to, or received from, another party." action={view.id === "all" ? <ButtonLink href="/transmittals/new" variant="secondary">New transmittal</ButtonLink> : undefined} />
       ) : (
         <DataTable head={<tr><Th>Number</Th><Th>To / from</Th><Th>Why</Th><Th>Date</Th><Th>Documents</Th><Th>Status</Th><Th>Reply due</Th></tr>}>
           {list.map((t) => {

@@ -47,12 +47,12 @@ export default async function TransmittalDetailPage({ params }: { params: Promis
       <PageHeader
         title={t.subject ? `${t.number} — ${t.subject}` : t.number}
         subtitle={[
-          t.direction === "OUTGOING" ? `To ${t.recipients.map((r) => r.organization ?? r.name).filter((v, i, all) => all.indexOf(v) === i).join(", ") || "—"}` : `From ${t.issuingParty}`,
-          REASON_LABEL[t.reasonForIssue as ReasonForIssue] ?? t.reasonForIssue,
-          fmtDate(t.dateOfIssue),
-          t.responseRequired ? `response due ${fmtDate(t.responseDueDate)}` : "no response needed",
-          t.receivedDate ? `received ${fmtDate(t.receivedDate)}` : null,
-        ].filter(Boolean).join(" · ")}
+          t.direction === "OUTGOING"
+            ? `Sent to ${t.recipients.map((r) => r.organization ?? r.name).filter((v, i, all) => all.indexOf(v) === i).join(", ") || "—"} on ${fmtDate(t.dateOfIssue)}`
+            : `${t.issuingParty} sent it on ${fmtDate(t.dateOfIssue)}${t.receivedDate ? `, and it arrived ${fmtDate(t.receivedDate)}` : ""}`,
+          `${t.direction === "OUTGOING" ? "They" : "We"} received it ${(REASON_LABEL[t.reasonForIssue as ReasonForIssue] ?? t.reasonForIssue).toLowerCase() === "information" ? "for information only" : `for ${(REASON_LABEL[t.reasonForIssue as ReasonForIssue] ?? t.reasonForIssue).toLowerCase()}`}`,
+          t.responseRequired ? `An answer is due by ${fmtDate(t.responseDueDate)}` : "No answer is needed",
+        ].filter(Boolean).join(". ") + "."}
         actions={<>
           <Link href="/transmittals" className="inline-flex min-h-9 items-center gap-1 rounded-xl px-3 text-xs font-semibold text-slate-500 hover:bg-slate-100"><ArrowLeft className="h-4 w-4"/> Transmittals</Link>
           <Chip className={statusColors[t.status] ?? ""}>{t.status.toLowerCase()}</Chip>

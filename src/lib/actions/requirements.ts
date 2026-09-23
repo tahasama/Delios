@@ -161,3 +161,51 @@ export async function confirmReadinessAction(_prev: State | undefined, formData:
   refresh();
   return { ok: available ? `${department} confirmed for ${action.code}.` : `Shortage recorded; Document Control alerted.` };
 }
+
+/**
+ * Tell every department an activity concerns where it stands, and name the
+ * ones that are short. Everybody sees the risk; the department that must act
+ * sees itself named, with what is still missing.
+ */
+export async function notifyDepartmentsAction(_prev: State | undefined, formData: FormData): Promise<State> {
+  const ctx = await requireScope();
+  const { db, user } = ctx;
+  if (!ctx.can("CONTROL") && !ctx.can("PLAN")) return { error: ctx.why("CONTROL") };
+  const actionId = String(formData.get("actionId") ?? "");
+  const action = await db.action.findUnique({
+    where: { id: actionId },
+    include: { entries: { include: { document: { include: { revisions: { where: { state: "RELEASED" }, orderBy: { releasedAt: "desc" }, take: 1 } } } } } },
+  });
+  if (!action) return { error: "Activity not found." };
+  const departments = (action.departments ?? "").split(",").map((d) => d.trim()).filter(Boolean);
+  if (!departments.length) return { error: "No department is tagged on this activity yet." };
+
+  // Who is short, and by how much.
+  const short = new Map<string, number>();
+  for (const e of action.entries) {
+    if (e.document.revisions[0]?.statusCode === e.requiredStatus) continue;
+    const dept = e.department ?? e.document.discipline;
+    short.set(dept, (short.get(dept) ?? 0) + 1);
+  }
+  const owed = (dept: string) => {
+    const missing = short.get(dept) ?? 0;
+    const total = action.entries.filter((e) => (e.department ?? e.document.discipline) === dept).length;
+    return { missing, total };
+  };
+  const late = [...short.entries()].filter(([d]) => departments.includes(d));
+  const headline = late.length
+    ? `${late.map(([d]) => `${d} ${owed(d).missing} of ${owed(d).total} missing`).join(", ")}`
+    : "everything listed is ready";
+
+  const recipients = new Set<string>();
+  for (const dept of departments) for (const id of await departmentMembers(ctx, dept)) recipients.add(id);
+  if (!recipients.size) return { error: `Nobody is on the ${departments.join(", ")} department${departments.length === 1 ? "" : "s"} yet — set it on People & access.` };
+
+  await notifyMany([...recipients], "ACTION_READINESS",
+    `${action.code} on ${fmtDate(action.scheduledDate)} — ${headline}`,
+    `${action.name}. Departments concerned: ${departments.join(", ")}.${late.length ? ` Still missing: ${late.map(([d]) => `${d} (${owed(d).missing})`).join(", ")}.` : ""}`,
+    `/actions/${action.code}`, ctx);
+  await audit({ actor: user, action: "REQUIREMENTS_REMINDER", entityType: "Action", entityId: action.id, entityLabel: action.code, detail: `Notified ${recipients.size} person(s) in ${departments.join(", ")}: ${headline}.` });
+  revalidatePath("/actions");
+  return { ok: `Told ${recipients.size} person(s) in ${departments.join(", ")}${late.length ? `; ${late.map(([d]) => d).join(", ")} named as short` : ""}.` };
+}

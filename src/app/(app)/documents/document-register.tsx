@@ -25,8 +25,8 @@ type Opt = { code: string; label: string };
 
 export function DocumentRegister({ rows, total, userCanAct, filters, filterOptions, exportHref }: {
   rows: RegisterRow[]; total: number; userCanAct: boolean;
-  filters: { q: string; state: string; rev: string; status: string; discipline: string; docType: string; view: string };
-  filterOptions: { states: Opt[]; revStates: Opt[]; statuses: Opt[]; disciplines: Opt[]; types: Opt[] };
+  filters: { q: string; state: string; rev: string; status: string; verdict: string; supplier: string; po: string; discipline: string; docType: string; view: string };
+  filterOptions: { states: Opt[]; revStates: Opt[]; statuses: Opt[]; verdicts: Opt[]; suppliers: Opt[]; pos: Opt[]; disciplines: Opt[]; types: Opt[] };
   exportHref: string;
 }) {
   const [selected, setSelected] = useState<string[]>([]);
@@ -46,11 +46,14 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
           <Filter name="state" value={filters.state} empty="Any document state" options={filterOptions.states} />
           <Filter name="rev" value={filters.rev} empty="Any revision state" options={filterOptions.revStates} />
           <Filter name="status" value={filters.status} empty="Released for: any" options={filterOptions.statuses} />
+          <Filter name="verdict" value={filters.verdict} empty="Any review verdict" options={filterOptions.verdicts} />
+          <Filter name="supplier" value={filters.supplier} empty="Any supplier" options={filterOptions.suppliers} />
+          <Filter name="po" value={filters.po} empty="Any contract / PO" options={filterOptions.pos} />
           <Filter name="discipline" value={filters.discipline} empty="Any discipline" options={filterOptions.disciplines} />
           <Filter name="docType" value={filters.docType} empty="Any type" options={filterOptions.types} />
           <input type="hidden" name="view" value={filters.view} />
           <button className="h-10 rounded-xl bg-brand-strong px-4 text-sm font-semibold text-white">Apply</button>
-          {(filters.q || filters.state || filters.rev || filters.status || filters.discipline || filters.docType) ? <Link href="/documents" className="px-2 py-2 text-xs font-semibold text-slate-500">Clear</Link> : null}
+          {(filters.q || filters.state || filters.rev || filters.status || filters.verdict || filters.supplier || filters.po || filters.discipline || filters.docType) ? <Link href="/documents" className="px-2 py-2 text-xs font-semibold text-slate-500">Clear</Link> : null}
         </form>
         <a href={exportHref} className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 px-3.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"><Download className="h-4 w-4" /> Export</a>
       </div>

@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { requireScope } from "@/lib/scope";
 import { Chip, DataTable, Th, Td } from "@/components/ui";
+import { ActionForm } from "@/components/form";
+import { notifyDepartmentsAction } from "@/lib/actions/requirements";
 import { departmentsOf } from "@/lib/schedule";
 import { clearance } from "@/lib/requirements-process";
 import { fmtDate } from "@/lib/utils";
@@ -113,7 +115,12 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
                 {filtered.map((action) => (
                   <tr key={action.id}>
                     <Td className="min-w-[260px] max-w-sm"><Link href={`/actions/${action.code}`} className="font-mono text-xs font-bold text-link hover:underline">{action.code}</Link><p className="mt-0.5 truncate text-sm font-semibold text-slate-800" title={action.name}>{action.name}</p><p className="mt-0.5 text-[11px] text-slate-400">{action.ownerName ?? "Responsible party not assigned"}</p></Td>
-                    <Td>{departmentsOf(action).length ? <div className="flex max-w-56 flex-wrap gap-1">{departmentsOf(action).map((d) => <span key={d} className="whitespace-nowrap rounded-md bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-600">{deptLabel.get(d) ?? d}</span>)}</div> : <span className="text-xs font-semibold text-amber-700">needs departments</span>}</Td>
+                    <Td>{departmentsOf(action).length ? (
+                      <>
+                        <div className="flex max-w-56 flex-wrap gap-1">{departmentsOf(action).map((d) => <span key={d} className="whitespace-nowrap rounded-md bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-600">{deptLabel.get(d) ?? d}</span>)}</div>
+                        {mayChange ? <div className="mt-1.5"><ActionForm action={notifyDepartmentsAction} submitLabel="Notify" size="sm" variant="secondary" hidden={{ actionId: action.id }} /></div> : null}
+                      </>
+                    ) : <span className="text-xs font-semibold text-amber-700">needs departments</span>}</Td>
                     <Td className="whitespace-nowrap"><ReadinessChip state={action.readiness} /></Td>
                     <Td className="whitespace-nowrap"><p className="text-sm font-medium tabular-nums text-slate-800">{fmtDate(action.scheduledDate)}</p><p className={`mt-0.5 text-[11px] ${action.daysUntil !== null && action.daysUntil < 0 ? "font-semibold text-red-600" : "text-slate-400"}`}>{datePhrase(action.daysUntil)}</p></Td>
                     <Td className="whitespace-nowrap text-right"><ReadyBar ready={action.ready} total={action.total} /></Td>
