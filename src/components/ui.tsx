@@ -158,7 +158,7 @@ export function Field({
       <span className="mb-1.5 block">
         <span className="block text-[13px] font-semibold text-slate-800">
           {label}
-          {required ? <span className="ml-1 text-[11px] font-medium text-red-600">required</span> : null}
+          {required ? <span className="ml-0.5 text-red-500">*</span> : null}
         </span>
         {hint ? <span className="mt-0.5 block text-[11px] leading-4 text-slate-500">{hint}</span> : null}
       </span>
