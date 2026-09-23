@@ -61,13 +61,6 @@ export const SETUP_PAGES: SetupPage[] = [
     text: "Who is on which project, and in what function. Invite outsiders or create visitors.",
     group: "Access",
   },
-  {
-    href: "/admin/distribution",
-    title: "Distribution matrix",
-    text: "Who reviews, approves and receives each class of document — the approval authority included.",
-    group: "Access",
-    verb: "MATRIX",
-  },
 
   {
     href: "/admin/controlled",

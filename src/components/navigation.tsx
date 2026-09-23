@@ -89,6 +89,7 @@ function moreNav(p: NavPermissions): NavItem[] {
       { href: "/reviews", label: "Reviews", icon: ClipboardCheck },
       { href: "/packages", label: "Packages", icon: FolderKanban },
       { href: "/assets", label: "Assets & tags", icon: Boxes },
+      { href: "/distribution", label: "Distribution matrix", icon: Network, when: p.canRead },
       { href: "/reports", label: "Reports", icon: ListChecks, when: p.canControl },
       { href: "/conformance", label: "Assurance", icon: ShieldCheck, when: p.canControl },
       { href: "/import", label: "Import & export", icon: Import, when: p.canCreate || p.canControl },

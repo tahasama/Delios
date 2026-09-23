@@ -1,5 +1,7 @@
 import { isAdmin } from "@/lib/auth";
 import { requireScope } from "@/lib/scope";
+import { saveDistributionRuleAction, deleteDistributionRuleAction } from "@/lib/actions/retention";
+import { getActiveSet } from "@/lib/config";
 import { PageHeader, Card, DataTable, Th, Td, Chip, Field, inputCls } from "@/components/ui";
 import { ActionForm } from "@/components/form";
 import { savePartyAction } from "@/lib/actions/workflow";
@@ -11,7 +13,15 @@ export const metadata = { title: "Parties & people" };
 export default async function AdminPartiesPage() {
   const { user: me, db } = await requireScope();
   if (!isAdmin(me)) return <PageHeader title="Parties" subtitle="Administrators only." />;
-  const parties = await db.party.findMany({ orderBy: [{ isInternal: "desc" }, { name: "asc" }], include: { _count: { select: { users: true } } } });
+  const [parties, rules, deliverables, confs] = await Promise.all([
+    db.party.findMany({ orderBy: [{ isInternal: "desc" }, { name: "asc" }], include: { _count: { select: { users: true } } } }),
+    db.distributionRule.findMany({ orderBy: [{ deliverableType: "asc" }, { confidentiality: "asc" }] }),
+    getActiveSet("DELIVERABLE_TYPES"),
+    getActiveSet("CONFIDENTIALITY"),
+  ]);
+  const users = await db.user.findMany({ where: { active: true }, orderBy: { name: "asc" }, select: { id: true, name: true } });
+  const nameOf = (id: string) => users.find((u) => u.id === id)?.name ?? id;
+  const mayEdit = true; // this page is administrators only
 
   return (
     <div className="space-y-4">
@@ -61,6 +71,68 @@ export default async function AdminPartiesPage() {
             </label>
           </ActionForm>
         </div></details>
+      <Card
+        title={`External parties (${rules.length})`}
+        description="Organizations with no account here that must still receive certain documents."
+      >
+        <div className="space-y-3">
+          <div>
+            {rules.length === 0 ? (
+              <p className="text-xs text-slate-400">
+                None.
+              </p>
+            ) : (
+              <DataTable head={<tr><Th>Deliverable type</Th><Th>Confidentiality</Th><Th>Internal</Th><Th>External parties</Th><Th></Th></tr>}>
+                {rules.map((r) => {
+                  const ids = JSON.parse(r.userIds) as string[];
+                  const parties = r.partyNames ? (JSON.parse(r.partyNames) as string[]) : [];
+                  return (
+                    <tr key={r.id}>
+                      <Td className="font-mono text-xs">{r.deliverableType}</Td>
+                      <Td><Chip>{r.confidentiality}</Chip></Td>
+                      <Td className="text-xs">{ids.map(nameOf).join(", ") || "—"}</Td>
+                      <Td className="text-xs">{parties.join(", ") || "—"}</Td>
+                      <Td>
+                        {mayEdit ? <form action={deleteDistributionRuleAction}>
+                          <input type="hidden" name="id" value={r.id} />
+                          <button className="text-xs text-slate-400 hover:text-red-600">remove</button>
+                        </form> : null}
+                      </Td>
+                    </tr>
+                  );
+                })}
+              </DataTable>
+            )}
+          </div>
+
+          {mayEdit ? <details className="max-w-xl">
+            <summary className="cursor-pointer text-xs font-semibold text-link">+ Add an external party</summary>
+            <div className="mt-3">
+            <ActionForm action={saveDistributionRuleAction} submitLabel="Add" size="sm">
+              <Field label="Deliverable type" required>
+                <select name="deliverableType" required className={inputCls} defaultValue="">
+                  <option value="" disabled>Choose…</option>
+                  {deliverables.map((d) => <option key={d.code} value={d.code}>{d.code} — {d.label}</option>)}
+                </select>
+              </Field>
+              <Field label="Confidentiality" required>
+                <select name="confidentiality" className={inputCls} defaultValue="INTERNAL">
+                  {confs.map((c) => <option key={c.code} value={c.code}>{c.label}</option>)}
+                </select>
+              </Field>
+              <Field label="External parties" hint="One per line — organizations without accounts here">
+                <textarea name="partyNames" rows={3} className={inputCls} placeholder={"Client engineering\nCertifying authority"} />
+              </Field>
+              <Field label="Also these people" hint="Only if someone needs it outside their function">
+                <select name="userIds" multiple size={4} className={`${inputCls} h-auto py-1.5`}>
+                  {users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+                </select>
+              </Field>
+            </ActionForm>
+            </div>
+          </details> : null}
+        </div>
+      </Card>
       </div>
     </div>
   );

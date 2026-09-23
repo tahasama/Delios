@@ -31,14 +31,15 @@ function codeFor(verbs: Verb[]): (typeof CODE)[number] | null {
   return null;
 }
 
-type Search = { type?: string; all?: string };
+type Search = { discipline?: string; type?: string; all?: string };
 
 export default async function AdminDistributionPage({ searchParams }: { searchParams: Promise<Search> }) {
   const sp = await searchParams;
   const ctx = await requireScope();
   const { user: me, db } = ctx;
-  // Reading the matrix is grantable (Read matrix); changing it stays a controlled upload.
-  if (!ctx.can("MATRIX")) return <PageHeader title="Distribution matrix" subtitle={ctx.why("MATRIX")} />;
+  // Everyone who may read the register may read the matrix: it says who reviews
+  // and approves their documents. Changing it stays with administrators.
+  if (!ctx.can("READ")) return <PageHeader title="Distribution matrix" subtitle={ctx.why("READ")} />;
   const mayEdit = isAdmin(me);
 
   const [rules, deliverables, confs, docTypes, disciplines, users, functions, inRegister] = await Promise.all([
@@ -62,7 +63,8 @@ export default async function AdminDistributionPage({ searchParams }: { searchPa
   // (the electrical lead approves electrical documents). Disciplines in use —
   // documents or rules — by default; every published one on request.
   const showAll = sp.all === "1";
-  const rows = showAll ? disciplines : disciplines.filter((d) => usedDisciplines.has(d.code));
+  const one = sp.discipline && disciplines.some((d) => d.code === sp.discipline) ? sp.discipline : null;
+  const rows = (one ? disciplines.filter((d) => d.code === one) : showAll ? disciplines : disciplines.filter((d) => usedDisciplines.has(d.code)));
 
   // A rule narrowed to a document type still shows when that type is asked about.
   const docType = sp.type && docTypes.some((t) => t.code === sp.type) ? sp.type : null;
@@ -87,11 +89,11 @@ export default async function AdminDistributionPage({ searchParams }: { searchPa
     <div className="space-y-4">
       <PageHeader
         title="Distribution matrix"
-        subtitle="Who receives which information, and in what capacity — settled before any transmittal is raised."
+        subtitle="Who reviews, approves and receives each discipline's documents. Agreed before any document is sent, so nobody has to ask."
       />
       <p className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
         Rows are disciplines, columns are functions; the letter says what that function does with that discipline's documents.
-        {mayEdit ? <Link href="/admin/controlled" className="font-semibold text-link hover:underline">Change it by upload →</Link> : <span className="text-slate-400">Read only — changes are made by an administrator.</span>}
+        {mayEdit ? <Link href="/admin/functions" className="font-semibold text-link hover:underline">Change who does what →</Link> : <span className="text-slate-400">Read only — an administrator changes it.</span>}
       </p>
 
       <Card
@@ -100,7 +102,14 @@ export default async function AdminDistributionPage({ searchParams }: { searchPa
       >
         <form method="get" className="mb-4 flex flex-wrap items-end gap-3 rounded-xl bg-slate-50 px-3 py-3">
           <label className="text-xs">
-            <span className="mb-1 block font-medium text-slate-700">Document type</span>
+            <span className="mb-1 block font-medium text-slate-700">Discipline</span>
+            <select name="discipline" defaultValue={one ?? ""} className={`${inputCls} py-1.5 text-xs`}>
+              <option value="">Every discipline</option>
+              {disciplines.map((d) => <option key={d.code} value={d.code}>{d.code} — {d.label}</option>)}
+            </select>
+          </label>
+          <label className="text-xs">
+            <span className="mb-1 block font-medium text-slate-700">Document type <span className="font-normal text-slate-400">— optional</span></span>
             <select name="type" defaultValue={docType ?? ""} className={`${inputCls} py-1.5 text-xs`}>
               <option value="">Any type</option>
               {docTypes.map((t) => <option key={t.code} value={t.code}>{t.code} — {t.label}</option>)}
@@ -167,68 +176,6 @@ export default async function AdminDistributionPage({ searchParams }: { searchPa
         ) : null}
       </Card>
 
-      <Card
-        title={`External parties (${rules.length})`}
-        description="Organizations with no account here that must still receive certain documents."
-      >
-        <div className="space-y-3">
-          <div>
-            {rules.length === 0 ? (
-              <p className="text-xs text-slate-400">
-                None.
-              </p>
-            ) : (
-              <DataTable head={<tr><Th>Deliverable type</Th><Th>Confidentiality</Th><Th>Internal</Th><Th>External parties</Th><Th></Th></tr>}>
-                {rules.map((r) => {
-                  const ids = JSON.parse(r.userIds) as string[];
-                  const parties = r.partyNames ? (JSON.parse(r.partyNames) as string[]) : [];
-                  return (
-                    <tr key={r.id}>
-                      <Td className="font-mono text-xs">{r.deliverableType}</Td>
-                      <Td><Chip>{r.confidentiality}</Chip></Td>
-                      <Td className="text-xs">{ids.map(nameOf).join(", ") || "—"}</Td>
-                      <Td className="text-xs">{parties.join(", ") || "—"}</Td>
-                      <Td>
-                        {mayEdit ? <form action={deleteDistributionRuleAction}>
-                          <input type="hidden" name="id" value={r.id} />
-                          <button className="text-xs text-slate-400 hover:text-red-600">remove</button>
-                        </form> : null}
-                      </Td>
-                    </tr>
-                  );
-                })}
-              </DataTable>
-            )}
-          </div>
-
-          {mayEdit ? <details className="max-w-xl">
-            <summary className="cursor-pointer text-xs font-semibold text-link">+ Add an external party</summary>
-            <div className="mt-3">
-            <ActionForm action={saveDistributionRuleAction} submitLabel="Add" size="sm">
-              <Field label="Deliverable type" required>
-                <select name="deliverableType" required className={inputCls} defaultValue="">
-                  <option value="" disabled>Choose…</option>
-                  {deliverables.map((d) => <option key={d.code} value={d.code}>{d.code} — {d.label}</option>)}
-                </select>
-              </Field>
-              <Field label="Confidentiality" required>
-                <select name="confidentiality" className={inputCls} defaultValue="INTERNAL">
-                  {confs.map((c) => <option key={c.code} value={c.code}>{c.label}</option>)}
-                </select>
-              </Field>
-              <Field label="External parties" hint="One per line — organizations without accounts here">
-                <textarea name="partyNames" rows={3} className={inputCls} placeholder={"Client engineering\nCertifying authority"} />
-              </Field>
-              <Field label="Also these people" hint="Only if someone needs it outside their function">
-                <select name="userIds" multiple size={4} className={`${inputCls} h-auto py-1.5`}>
-                  {users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
-                </select>
-              </Field>
-            </ActionForm>
-            </div>
-          </details> : null}
-        </div>
-      </Card>
     </div>
   );
 }
