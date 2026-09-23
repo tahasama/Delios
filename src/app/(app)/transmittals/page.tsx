@@ -10,8 +10,8 @@ export const metadata = { title: "Transmittals" };
 
 /** One list; the counts live on the filters instead of in a separate strip of tiles. */
 const VIEWS: { id: string; label: string; where: Prisma.TransmittalWhereInput }[] = [
-  { id: "check", label: "Check what arrived", where: { direction: "INCOMING", status: "ISSUED" } },
   { id: "all", label: "All", where: {} },
+  { id: "check", label: "Check what arrived", where: { direction: "INCOMING", status: "ISSUED" } },
   { id: "drafts", label: "Drafts", where: { status: "DRAFT" } },
   { id: "out", label: "Sent", where: { direction: "OUTGOING" } },
   { id: "in", label: "Received", where: { direction: "INCOMING" } },
@@ -24,7 +24,8 @@ export default async function TransmittalsPage({ searchParams }: { searchParams:
   const counts = await Promise.all(VIEWS.map((v) => db.transmittal.count({ where: v.where })));
   // What arrived and needs checking comes first — it is the reader's own job.
   // With nothing waiting, the list opens on everything instead of on emptiness.
-  const chosen = sp.view ?? (sp.direction === "INCOMING" ? "in" : sp.direction === "OUTGOING" ? "out" : counts[0] ? "check" : "all");
+  const checkCount = counts[VIEWS.findIndex((v) => v.id === "check")];
+  const chosen = sp.view ?? (sp.direction === "INCOMING" ? "in" : sp.direction === "OUTGOING" ? "out" : checkCount ? "check" : "all");
   const view = VIEWS.find((v) => v.id === chosen) ?? VIEWS[0];
   const list = await db.transmittal.findMany({ where: view.where, orderBy: { createdAt: "desc" }, take: 100, include: { items: true, recipients: true } });
 

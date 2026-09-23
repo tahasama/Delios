@@ -39,7 +39,7 @@ export default async function AuditToolsPage() {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="For auditors" subtitle="The Standard's own instruments. You do not need them to run the project — they prove, when asked, how the register is controlled." />
+      <PageHeader title="For auditors" subtitle="For an audit only. The rules behind the checks come from the Document Management Standard, the reference this app was built against. You do not need any of it to run the project — they prove, when asked, how the register is controlled." />
       <AssuranceTabs current="/conformance/audit" />
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         {tools.map((t) => (

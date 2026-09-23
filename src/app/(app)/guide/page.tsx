@@ -33,14 +33,14 @@ const DAILY: CapabilityItem[] = [
 const CONTROL: CapabilityItem[] = [
   { href: "/pipeline/submission", title: "Submission pipeline", text: "Planned versus arrived documents, lateness, resubmissions and supply backlog.", icon: ChartNoAxesCombined },
   { href: "/pipeline/review", title: "Review pipeline", text: "Our queue, pending contractor work, review timeliness, outcomes and revision rate.", icon: Workflow },
-  { href: "/conformance", title: "Assurance and defects", text: "Run the Standard's checks, inspect integrity and coverage, correct or accept findings.", icon: ShieldCheck },
+  { href: "/conformance", title: "Assurance and defects", text: "Run the checks, see how much of the register can be trusted, correct or accept what they find.", icon: ShieldCheck },
   { href: "/reports", title: "Evidence questions", text: "Answer who approved, who received, what changed, what is current and what work is exposed.", icon: ListChecks },
   { href: "/exposures", title: "Use and copy exposure", text: "Find obsolete copies, affected recipients and unresolved use consequences.", icon: Network },
   { href: "/import", title: "Bulk import and export", text: "Load deliverable lists and controlled data through dry-run validation and downloadable templates.", icon: Import },
 ];
 
 const SETUP: CapabilityItem[] = [
-  { href: "/admin/dmp", title: "DMP readiness guide", text: "Build a working baseline step by step even when the organization does not yet have a finished Document Management Plan.", icon: Settings },
+  { href: "/admin/dmp", title: "Set the project up", text: "Work through what a project needs — scope, people, lists, numbering, routes — in the order it is decided.", icon: Settings },
   { href: "/admin/config", title: "Disciplines, types and sets", text: "Define the codes and behavior that belong to your organization—not to the software vendor.", icon: Tags },
   { href: "/admin/workflow-templates", title: "Review routes", text: "Build review and approval routes, participant modes and applicable document classes.", icon: Workflow },
   { href: "/admin/numbering", title: "Numbering", text: "Define schemes, fields, routing and issued number ranges.", icon: FileText },
@@ -87,7 +87,7 @@ export default async function GuidePage() {
 
       <CapabilitySection title="Do the work" description="The areas every project participant uses to find, create, review, issue and assemble information." items={DAILY} />
       {canControl ? <CapabilitySection title="See the whole flow" description="Operational control, performance evidence and exceptions across the project." items={CONTROL} /> : null}
-      {canConfigure ? <CapabilitySection title="Adapt DELIOS to your DMP" description="These studios define your disciplines, types, sets, schemas, organizations and responsibilities." items={SETUP} /> : null}
+      {canConfigure ? <CapabilitySection title="Set it up your way" description="These pages define your disciplines, types, sets, schemas, organizations and responsibilities." items={SETUP} /> : null}
     </div>
   );
 }

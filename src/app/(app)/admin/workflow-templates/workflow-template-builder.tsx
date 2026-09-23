@@ -128,6 +128,18 @@ export function WorkflowTemplateBuilder({ id, name = "", description = "", class
             const empty = !people.length && !fns.length;
             return (
               <div key={index} className="flex items-stretch gap-1">
+                <div className="relative">
+                {steps.length > 1 ? (
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); remove(index); }}
+                    title="Remove this step"
+                    aria-label={`Remove step ${index + 1}`}
+                    className="absolute -right-1.5 -top-1.5 z-10 grid h-5 w-5 place-items-center rounded-full border border-slate-200 bg-surface text-slate-400 shadow-sm hover:border-red-200 hover:bg-red-50 hover:text-red-600"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   onClick={() => setOpen(open === index ? null : index)}
@@ -145,6 +157,7 @@ export function WorkflowTemplateBuilder({ id, name = "", description = "", class
                     <span className="mt-1.5 flex items-center gap-1 text-[10px] text-slate-400"><Users2 className="h-3 w-3" /> {HOW.find((h) => h.value === step.mode)?.label}</span>
                   ) : null}
                 </button>
+                </div>
                 {index < steps.length - 1 ? <ArrowRight className="h-4 w-4 shrink-0 self-center text-slate-300" aria-hidden /> : null}
                 <AddHere onClick={() => insert(index + 1)} />
               </div>

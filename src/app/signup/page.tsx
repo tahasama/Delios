@@ -29,7 +29,7 @@ export default function SignupPage() {
         <div className="max-w-md">
           <h1 className="text-3xl font-semibold leading-tight">Register your organization</h1>
           <p className="mt-4 text-sm leading-relaxed text-white/70">
-            You will be its administrator. We publish the reference configuration the Standard requires before use —
+            You will be its administrator. We publish a starter configuration you can change before use —
             document types, disciplines, statuses, review outcomes, numbering schemes — which you then replace with
             your own.
           </p>

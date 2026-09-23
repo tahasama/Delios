@@ -103,7 +103,7 @@ export default async function AdminConfigPage({ searchParams }: { searchParams: 
     <div className="space-y-4">
       <PageHeader
         title="Disciplines, types & sets"
-        subtitle="The codes and choices your organization uses. All sets are listed and approved in the Document Management Plan. A code already used is retired, never deleted, so older documents keep it and stay findable."
+        subtitle="The codes and choices your organization uses. All lists are written into the project's management plan and approved there. A code already used is retired, never deleted, so older documents keep it and stay findable."
       />
 
       <SetNav groups={groups} current={currentKey}>

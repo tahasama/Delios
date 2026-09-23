@@ -2,7 +2,7 @@ import { isAdmin } from "@/lib/auth";
 import { requireScope } from "@/lib/scope";
 import { PageHeader, Card, Chip, DataTable, Th, Td, Field, inputCls } from "@/components/ui";
 import { ActionForm } from "@/components/form";
-import { issueNumberRangeAction, removeNumberingSchemeAction, saveSchemeRoutingAction } from "@/lib/actions/admin";
+import { removeNumberingSchemeAction, saveSchemeRoutingAction } from "@/lib/actions/admin";
 import { NumberingSchemeBuilder } from "./numbering-scheme-builder";
 import { getSets, getActiveSet } from "@/lib/config";
 
@@ -12,11 +12,9 @@ export const metadata = { title: "Numbering schemes" };
 export default async function AdminNumberingPage() {
   const { user: me, db } = await requireScope();
   if (!isAdmin(me)) return <PageHeader title="Numbering schemes" subtitle="Administrators only." />;
-  const [schemes, routing, counters, ranges, sets, deliverables, sample] = await Promise.all([
+  const [schemes, routing, sets, deliverables, sample] = await Promise.all([
     db.scheme.findMany({ include: { fields: { orderBy: { position: "asc" } } }, orderBy: { name: "asc" } }),
     db.schemeRouting.findMany({ orderBy: { deliverableType: "asc" } }),
-    db.numberCounter.findMany({ orderBy: { prefix: "asc" }, take: 50 }),
-    db.numberRange.findMany({ orderBy: { createdAt: "desc" } }),
     getSets(),
     getActiveSet("DELIVERABLE_TYPES"),
     // A real code from each list, so the example below is a number people recognise.
@@ -86,45 +84,6 @@ export default async function AdminNumberingPage() {
         <details className="mt-4 border-t border-slate-100 pt-3"><summary className="cursor-pointer text-xs font-semibold text-link">+ Give a kind of document its scheme</summary><div className="mt-3"><ActionForm action={saveSchemeRoutingAction} submitLabel="Publish routing" size="sm"><div className="grid grid-cols-1 gap-3 sm:grid-cols-2"><Field label="Deliverable type" required><select name="deliverableType" className={inputCls} required defaultValue=""><option value="" disabled>Select…</option>{deliverables.map((item) => <option key={item.code} value={item.code}>{item.code} — {item.label}</option>)}</select></Field><Field label="Numbering scheme" required><select name="schemeName" className={inputCls} required defaultValue=""><option value="" disabled>Select…</option>{schemes.map((scheme) => <option key={scheme.id} value={scheme.name}>{scheme.name}</option>)}</select></Field></div></ActionForm></div></details>
       </Card>
 
-      <Card title="Numbers given away and numbers used" description="A range lets another party number their own documents; everything else is counted by the system.">
-        <DataTable head={<tr><Th>Prefix</Th><Th>Range</Th><Th>Issued to</Th><Th>Last issued</Th><Th>Status</Th></tr>}>
-          {ranges.map((r) => (
-            <tr key={r.id}>
-              <Td className="font-mono text-xs">{r.prefix}</Td>
-              <Td className="font-mono text-xs">{String(r.from).padStart(5, "0")}–{String(r.to).padStart(5, "0")}</Td>
-              <Td>{r.issuedTo}</Td>
-              <Td className="font-mono text-xs">{r.lastIssued >= r.from ? String(r.lastIssued).padStart(5, "0") : "—"}</Td>
-              <Td><Chip className={r.status === "OPEN" ? "bg-emerald-100 text-emerald-800 ring-emerald-300" : "bg-slate-100 text-slate-500 ring-slate-300"}>{r.status.toLowerCase()}</Chip></Td>
-            </tr>
-          ))}
-          {ranges.length === 0 ? <tr><Td colSpan={5}><span className="text-xs text-slate-400">No ranges issued — the system counter allocates everything.</span></Td></tr> : null}
-        </DataTable>
-        <details className="mt-4 border-t border-slate-100 pt-3">
-          <summary className="cursor-pointer text-xs font-semibold text-link">+ Give a range</summary>
-          <div className="mt-3">
-          <ActionForm action={issueNumberRangeAction} submitLabel="Issue range" size="sm">
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
-              <Field label="Prefix" required><input name="prefix" required className={inputCls} placeholder="Q6637021-74-MAD-JESA593P22-ME" /></Field>
-              <Field label="From" required><input type="number" name="from" required min={1} className={inputCls} /></Field>
-              <Field label="To" required><input type="number" name="to" required min={1} className={inputCls} /></Field>
-              <Field label="Issued to" required><input name="issuedTo" required className={inputCls} placeholder="MADASUD" /></Field>
-            </div>
-          </ActionForm>
-          </div>
-        </details>
-      </Card>
-
-      <Card title="Next number per prefix" description="What the system will allocate next. It cannot be edited.">
-        <DataTable head={<tr><Th>Prefix</Th><Th>Next sequence</Th></tr>}>
-          {counters.map((c) => (
-            <tr key={c.id}>
-              <Td className="font-mono text-xs">{c.prefix}</Td>
-              <Td className="font-mono text-xs">{String(c.next).padStart(5, "0")}</Td>
-            </tr>
-          ))}
-          {counters.length === 0 ? <tr><Td colSpan={2}><span className="text-xs text-slate-400">No numbers allocated yet.</span></Td></tr> : null}
-        </DataTable>
-      </Card>
     </div>
   );
 }

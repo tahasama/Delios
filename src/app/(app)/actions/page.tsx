@@ -7,6 +7,8 @@ import { departmentsOf } from "@/lib/schedule";
 import { clearance } from "@/lib/requirements-process";
 import { fmtDate } from "@/lib/utils";
 import { Download, Upload } from "lucide-react";
+import { after } from "next/server";
+import { warnOnceAtRisk } from "@/lib/risk-notice";
 import { PlanCards } from "./plan-cards";
 import { PlanTimeline } from "./plan-timeline";
 
@@ -43,6 +45,11 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
     const nextNeeded = missing.map((e) => e.requiredBy).filter(Boolean).sort((a, b) => a!.getTime() - b!.getTime())[0] ?? null;
     return { ...action, total, ready, missing, daysUntil, readiness, firstNeeded, nextNeeded };
   });
+  // The first time an activity shows as at risk, its departments are told once,
+  // by the system. Done after the page is served so nothing waits on it.
+  const newlyAtRisk = rows.filter((r) => (r.readiness === "AT_RISK" || r.readiness === "NOT_READY") && !r.riskNotifiedAt);
+  if (newlyAtRisk.length && ctx.can("CONTROL")) after(() => warnOnceAtRisk(ctx, newlyAtRisk));
+
   const counts: Record<Readiness, number> = {
     READY: rows.filter((row) => row.readiness === "READY").length,
     AT_RISK: rows.filter((row) => row.readiness === "AT_RISK").length,

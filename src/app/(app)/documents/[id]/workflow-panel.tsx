@@ -169,7 +169,7 @@ async function RunActivePanel({ run, user, extra }: { run: { id: string; templat
 
       {step && step.status === "active" ? (
         iDecide ? (
-          <Action label={deciding ? "Give the binding verdict" : "Give your advice"}>
+          <Action label={deciding ? "Your verdict decides this revision" : "Your advice goes to whoever decides"}>
             {advice.some((a) => a.outcome) ? (
               <div className="mb-3 rounded-lg bg-surface p-2.5 text-xs ring-1 ring-slate-200">
                 <p className="mb-1 font-semibold text-slate-700">Advice from the earlier steps</p>
@@ -178,7 +178,7 @@ async function RunActivePanel({ run, user, extra }: { run: { id: string; templat
                 </ul>
               </div>
             ) : null}
-            <ActionForm action={recordStepOutcomeAction} submitLabel={deciding ? "Record verdict" : "Record advice"} size="sm" hidden={{ runId: run.id }}>
+            <ActionForm action={recordStepOutcomeAction} submitLabel={deciding ? "Give my verdict" : "Give my advice"} size="sm" hidden={{ runId: run.id }}>
               <Field label={deciding ? "Verdict" : "Your verdict"} required hint={deciding ? "binding — a verdict that proceeds is the release approval" : "advice for the decider"}>
                 <select name="outcome" required className={inputCls} defaultValue="">
                   <option value="" disabled>Choose…</option>

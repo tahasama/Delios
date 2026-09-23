@@ -728,6 +728,9 @@ model Action {
   // Departments (discipline codes, comma-separated) the project manager tagged
   // as concerned by this activity; their reps list the documents it needs.
   departments        String?
+  // When the system first warned the departments that this activity was at
+  // risk. The warning goes out once, by itself; later ones are sent by hand.
+  riskNotifiedAt     DateTime?
   createdAt          DateTime           @default(now())
   entries            BaselineEntry[]
   scheduleActivities ScheduleActivity[]

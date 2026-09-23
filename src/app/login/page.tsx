@@ -31,7 +31,7 @@ function LoginForm() {
         <div className="max-w-md">
           <h1 className="text-3xl font-semibold leading-tight">Electronic Document Management System</h1>
           <p className="mt-4 text-sm leading-relaxed text-white/70">
-            Built on the Document Management Standard: identity, description, revision, state, approval, review, issue, obsolescence, retention and the register — synchronized through traceability.
+            One controlled register: identity, description, revision, state, approval, review, issue, obsolescence and retention — synchronized through traceability.
           </p>
           <div className="mt-6 flex gap-2 text-[11px] font-medium uppercase tracking-widest text-white/50">
             <span className="rounded-full bg-white/10 px-3 py-1">Layer I · Rules</span>

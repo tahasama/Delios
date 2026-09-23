@@ -137,7 +137,7 @@ export default async function AssurancePage({ searchParams }: { searchParams: Pr
             </ul>
           </div>
         ) : null}
-        <p className="mt-3 text-[11px] text-slate-400">Measured against Document Management Standard v{scope?.standardVersion ?? "1.0"}. Problem-free share counts documents with no critical or major problem.</p>
+        <p className="mt-3 text-[11px] text-slate-400">Measured against the project's rules, version {scope?.standardVersion ?? "1.0"}. Problem-free share counts documents with no critical or major problem.</p>
       </Card>
     </div>
   );

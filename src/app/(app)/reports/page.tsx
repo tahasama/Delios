@@ -88,10 +88,16 @@ export default async function ReportsPage({
           <p className="text-sm font-semibold text-slate-800">The detail · {rows.length}{q ? ` of ${report.rows.length}` : ""}</p>
           <form className="flex gap-2">
             <input type="hidden" name="r" value={current} />
-            <input name="rq" defaultValue={q} placeholder="Filter: document, sender, reviewer…" className={`${inputCls} w-64 py-1.5 text-xs`} />
+            <input name="rq" defaultValue={q} placeholder="Filter the chart and the CSV…" className={`${inputCls} w-64 py-1.5 text-xs`} />
           </form>
         </div>
-        {rows.length ? (
+        {report.seeAlso ? (
+          <p className="rounded-xl bg-slate-50 px-3.5 py-3 text-xs leading-5 text-slate-600">
+            The {rows.length} rows behind this chart are the same documents you work on elsewhere, so they are not repeated here.
+            <Link href={report.seeAlso.href} className="ml-1 font-semibold text-link hover:underline">{report.seeAlso.label} →</Link>
+            {" "}The CSV holds every row.
+          </p>
+        ) : rows.length ? (
           <DataTable id={`report-${current}`} head={<tr>{report.columns.map((c) => <Th key={c}>{c}</Th>)}</tr>}>
             {rows.slice(0, 200).map((row, r) => (
               <tr key={r}>
@@ -101,11 +107,7 @@ export default async function ReportsPage({
           </DataTable>
         ) : <p className="text-xs text-slate-400">{q ? `Nothing matches “${q}”.` : report.empty}</p>}
         {rows.length > 200 ? <p className="mt-2 text-[11px] text-slate-400">First 200 shown; the CSV has all {rows.length}.</p> : null}
-        {report.seeAlso ? (
-          <p className="mt-3 border-t border-slate-100 pt-3 text-xs">
-            <Link href={report.seeAlso.href} className="font-semibold text-link hover:underline">{report.seeAlso.label} →</Link>
-          </p>
-        ) : null}
+
       </Card>
 
       {/* The one look-up nothing else answers: history. */}

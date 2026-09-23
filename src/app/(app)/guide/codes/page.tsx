@@ -72,7 +72,7 @@ export default async function CodesPage() {
         </div>
       </Card>
 
-      <Card id="document" title="1 · Document state — the document number as a whole" description="Fixed by the Standard; the same in every organization.">
+      <Card id="document" title="1 · Document state — the document number as a whole" description="Fixed — the same in every organization, and not something a project changes.">
         <DataTable id="codes-doc-states" toolbar={false} head={<tr><Th>State</Th><Th>Means</Th><Th>How it gets there</Th></tr>}>
           {DOC_STATES.map((s) => (
             <tr key={s}>
@@ -84,7 +84,7 @@ export default async function CodesPage() {
         </DataTable>
       </Card>
 
-      <Card id="revision" title="2 · Revision state — one revision of the content" description="Fixed by the Standard. States only move forward. The register shows “No revision yet” for a document that has no revision at all.">
+      <Card id="revision" title="2 · Revision state — one revision of the content" description="Fixed. States only move forward. The register shows “No revision yet” for a document that has no revision at all.">
         <DataTable id="codes-rev-states" toolbar={false} head={<tr><Th>State</Th><Th>Means</Th><Th>How it gets there</Th></tr>}>
           {REV_STATES.map((s) => (
             <tr key={s}>

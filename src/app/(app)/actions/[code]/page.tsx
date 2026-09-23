@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { requireScope } from "@/lib/scope";
 import { notFound } from "next/navigation";
-import { PageHeader, Card, Chip, DataTable, Th, Td, Banner, inputCls } from "@/components/ui";
+import { PageHeader, Card, Chip, DataTable, Th, Td, Banner, inputCls, btn } from "@/components/ui";
 import { ActionForm } from "@/components/form";
 import { confirmReadinessAction } from "@/lib/actions/requirements";
 import { clearance } from "@/lib/requirements-process";
 import { departmentsOf, DEFAULT_LEAD_BUSINESS_DAYS, businessDaysBefore } from "@/lib/schedule";
+import { shortfall } from "@/lib/risk-notice";
 import { fmtDate } from "@/lib/utils";
 import { ArrowLeft } from "lucide-react";
 
@@ -49,6 +50,21 @@ export default async function ActionDetailPage({ params, searchParams }: { param
   const readyCount = action.entries.filter((e) => e.document.revisions[0]?.statusCode === e.requiredStatus).length;
   const overdue = action.scheduledDate && new Date(action.scheduledDate) < new Date();
   const readiness = action.entries.length === 0 ? "UNKNOWN" : readyCount === action.entries.length ? "READY" : overdue ? "NOT_READY" : "AT_RISK";
+  // Who is short, and the transmittal that tells them — the placeholder numbers
+  // are named in it, and the sender adds anyone else who should see it.
+  const short = shortfall(action).filter((s) => depts.includes(s.department));
+  const deptPeople = await db.projectMembership.findMany({ where: { projectId: ctx.projectId, active: true, department: { in: depts } }, select: { userId: true } });
+  const remindHref = `/transmittals/new?${new URLSearchParams({
+    reason: "INFORMATION",
+    users: deptPeople.map((m) => m.userId).join(","),
+    subject: `${action.code} on ${fmtDate(action.scheduledDate)} — ${readiness === "NOT_READY" ? "overdue" : "at risk"}: ${short.map((s) => `${s.department} ${s.missing} of ${s.total} missing`).join(", ")}`,
+    message: [
+      `${action.name} is planned for ${fmtDate(action.scheduledDate)}.`,
+      short.map((s) => `${deptLabel(s.department)} still owes ${s.missing} of ${s.total}: ${s.numbers.join(", ")}.`).join("\n"),
+      "Departments concerned: " + depts.map(deptLabel).join(", ") + ".",
+      "Send the documents, or say when they will arrive.",
+    ].join("\n\n"),
+  })}`;
 
   return (
     <div className="space-y-4">
@@ -63,7 +79,26 @@ export default async function ActionDetailPage({ params, searchParams }: { param
         actions={control ? <Link href="/actions/requirements" className="text-xs font-semibold text-link hover:underline">Requirements →</Link> : undefined}
       >
         {depts.length ? (
-          <div className="flex flex-wrap gap-1.5">{depts.map((d) => <Chip key={d} className="bg-tint text-brand-ink ring-link/30">{deptLabel(d)}</Chip>)}</div>
+          <>
+            <div className="flex flex-wrap gap-1.5">{depts.map((d) => <Chip key={d} className="bg-tint text-brand-ink ring-link/30">{deptLabel(d)}</Chip>)}</div>
+            {short.length ? (
+              <div className="mt-3 rounded-xl bg-amber-50 p-3 ring-1 ring-amber-200">
+                <p className="text-xs font-semibold text-amber-900">
+                  {readiness === "NOT_READY" ? "Overdue" : "At risk"} — {short.map((s) => `${deptLabel(s.department)} ${s.missing} of ${s.total} missing`).join(", ")}
+                </p>
+                <p className="mt-1 text-[11px] text-amber-900/80">
+                  {action.riskNotifiedAt
+                    ? `Everyone in ${depts.map(deptLabel).join(", ")} was warned automatically on ${fmtDate(action.riskNotifiedAt)}. Send the next reminder yourself, as a transmittal.`
+                    : "The first warning goes out on its own the next time this page is refreshed. You can also send one now."}
+                </p>
+                {control ? (
+                  <Link href={remindHref} className={`${btn("primary", "sm")} mt-2`}>
+                    Notify by transmittal
+                  </Link>
+                ) : null}
+              </div>
+            ) : null}
+          </>
         ) : (
           <Banner tone="warn" title="Needs departments">The project manager tags this activity in the departments list. Until then its documents cannot be asked for.</Banner>
         )}

@@ -12,7 +12,7 @@
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
     "db:seed:demo": "tsx prisma/seed.ts --demo",
-    "demo": "tsx prisma/seed.ts --demo && tsx scripts/upgrade.ts && tsx scripts/seed-supersession-demo.ts && tsx scripts/seed-requirements-demo.ts && tsx scripts/seed-dmp-demo.ts && tsx scripts/run-checks.ts",
+    "demo": "tsx prisma/seed.ts --demo && tsx scripts/upgrade.ts && tsx scripts/seed-supersession-demo.ts && tsx scripts/seed-requirements-demo.ts && tsx scripts/seed-dmp-demo.ts && tsx scripts/seed-review-demo.ts && tsx scripts/run-checks.ts",
     "db:studio": "prisma studio",
     "setup": "prisma migrate dev --name init && tsx prisma/seed.ts",
     "checks": "tsx scripts/run-checks.ts",

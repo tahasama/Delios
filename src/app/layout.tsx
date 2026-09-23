@@ -5,7 +5,7 @@ import { THEME_SCRIPT } from "@/components/theme-toggle";
 
 export const metadata: Metadata = {
   title: { default: APP_NAME, template: `%s · ${APP_NAME}` },
-  description: "Internal Electronic Document Management System implementing the Document Management Standard v1 — Rules · Routes · Checks.",
+  description: "Project information, controlled: one register, one review route per document, and checks that say how far it can be trusted.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
