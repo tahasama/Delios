@@ -5,6 +5,7 @@
   "description": "Internal EDMS implementing the Document Management Standard (Rules · Routes · Checks), multi-project",
   "scripts": {
     "postinstall": "prisma generate",
+    "predev": "prisma migrate deploy && prisma generate",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
