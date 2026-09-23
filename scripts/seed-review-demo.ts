@@ -1,6 +1,7 @@
 // Demo: a document sitting on the administrator's desk for the verdict.
 //
-// Q6637021-74-ME-CAL-09101 rev A is sent down a two-step route: Reviewer 1
+// A draft (Q6637021-74-ME-CAL-09101 where the demo numbered it that way) is
+// sent down a two-step route: Reviewer 1
 // advises first (done here, with a comment), then the administrator decides.
 // Sign in as admin@delios.local and it is waiting under "Give the verdict".
 //
@@ -25,16 +26,19 @@ async function main() {
   const admin = await person("admin@delios.local");
   const reviewer = await person("reviewer@delios.local");
 
-  const doc = await t.db.document.findFirst({ where: { docNumber: DOC }, include: { revisions: { orderBy: { createdAt: "desc" } } } });
-  if (!doc) throw new Error(`${DOC} is not in the register — run the demo seed first.`);
-  const rev = doc.revisions.find((r) => r.state === "IN_PREPARATION") ?? doc.revisions[0];
-  if (!rev) throw new Error(`${DOC} has no revision.`);
-  if (rev.state !== "IN_PREPARATION") {
-    console.log(`${DOC} rev ${rev.value} is ${rev.state.toLowerCase()} — nothing to send.`);
-    return;
-  }
+  // The named document when the demo produced it; otherwise any draft waiting
+  // to be sent, because numbering differs between installations.
+  const doc =
+    (await t.db.document.findFirst({ where: { docNumber: DOC, revisions: { some: { state: "IN_PREPARATION" } } }, include: { revisions: { orderBy: { createdAt: "desc" } } } })) ??
+    (await t.db.document.findFirst({
+      where: { revisions: { some: { state: "IN_PREPARATION", workflowRuns: { none: { status: "ACTIVE" } } } } },
+      orderBy: { docNumber: "asc" },
+      include: { revisions: { orderBy: { createdAt: "desc" } } },
+    }));
+  if (!doc) throw new Error("No document has a revision in preparation — run the demo seed first.");
+  const rev = doc.revisions.find((r) => r.state === "IN_PREPARATION")!;
   if (await t.db.workflowRun.findFirst({ where: { revisionId: rev.id, status: "ACTIVE" } })) {
-    console.log(`${DOC} rev ${rev.value} is already in review.`);
+    console.log(`${doc.docNumber} rev ${rev.value} is already in review.`);
     return;
   }
 
@@ -50,7 +54,7 @@ async function main() {
   const advice = await recordStepOutcome(t, started.runId, reviewer, withComments.code, "Duty point checked against the pump curve; note the margin on the discharge head.");
   if (!advice.ok) throw new Error(advice.error);
 
-  console.log(`${DOC} rev ${rev.value}: Reviewer 1 advised ${withComments.code}. Sign in as admin@delios.local — the verdict is yours, on Home under "Give the verdict".`);
+  console.log(`${doc.docNumber} rev ${rev.value}: Reviewer 1 advised ${withComments.code}. Sign in as admin@delios.local — the verdict is yours, on Home under "Give the verdict".`);
 }
 
 main().finally(() => db.$disconnect());
