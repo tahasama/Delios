@@ -64,8 +64,8 @@ export const SETUP_PAGES: SetupPage[] = [
 
   {
     href: "/admin/controlled",
-    title: "Controlled changes",
-    text: "Configuration that arrives as a file: uploaded, compared, approved.",
+    title: "Changes waiting for approval",
+    text: "The schedule, the departments per activity and the document requirements are changed from Schedule & actions; this is where they are decided and kept.",
     group: "Change & evidence",
   },
   {

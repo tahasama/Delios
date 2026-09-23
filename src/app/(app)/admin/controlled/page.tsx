@@ -57,8 +57,8 @@ export default async function ControlledPage() {
   return (
     <div className="space-y-5">
       <PageHeader
-        title="Controlled changes"
-        subtitle="Configuration that arrives as a file: uploaded, compared against what is in force, and approved by someone other than whoever sent it."
+        title="Changes waiting for approval"
+        subtitle="The schedule, the departments per activity and the document requirements are uploaded from Schedule & actions. Here they are compared with what is in force and decided."
       />
 
       {waiting > 0 ? (

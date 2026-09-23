@@ -5,6 +5,8 @@ import { departmentsOf } from "@/lib/schedule";
 import { clearance } from "@/lib/requirements-process";
 import { fmtDate } from "@/lib/utils";
 import { Download, Upload } from "lucide-react";
+import { PlanCards } from "./plan-cards";
+import { PlanTimeline } from "./plan-timeline";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Schedule & actions" };
@@ -34,7 +36,8 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
     if (total > 0 && missing.length === 0) readiness = "READY";
     else if (total > 0 && daysUntil !== null && daysUntil < 0) readiness = "NOT_READY";
     else if (total > 0 && daysUntil !== null) readiness = "AT_RISK";
-    return { ...action, total, ready, missing, daysUntil, readiness };
+    const firstNeeded = action.entries.map((e) => e.requiredBy).filter(Boolean).sort((a, b) => a!.getTime() - b!.getTime())[0] ?? null;
+    return { ...action, total, ready, missing, daysUntil, readiness, firstNeeded };
   });
   const counts: Record<Readiness, number> = {
     READY: rows.filter((row) => row.readiness === "READY").length,
@@ -90,6 +93,10 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
           );
         })}
       </nav>
+
+      <PlanCards />
+
+      <PlanTimeline rows={filtered.map((r) => ({ code: r.code, name: r.name, scheduledDate: r.scheduledDate, firstNeeded: r.firstNeeded, readiness: r.readiness, ready: r.ready, total: r.total }))} />
 
       <div className="flex flex-wrap items-center gap-1.5 text-xs">
         <span className="mr-1 font-semibold text-slate-500">Department</span>
