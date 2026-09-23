@@ -6,11 +6,20 @@ import { stampPdf } from "./stamp";
 import { UPLOAD_ROOT, readStored, saveBuffer } from "./files";
 import type { SessionUser } from "./auth";
 import { verdictMeaning, assertMayGiveBindingVerdict, recordApproval } from "./verdict";
-import { getActiveSet } from "./config";
 import { isAdmin } from "@/lib/auth";
 import { holdersOf } from "./permissions";
 
 export { verdictMeaning, assertMayGiveBindingVerdict, recordApproval } from "./verdict";
+
+/** The published statuses, read through the tenant so scripts can use this file too. */
+async function publishedStatuses(t: Pick<Tenant, "db">) {
+  const rows = await t.db.configValue.findMany({ where: { setKey: "STATUSES", status: "ACTIVE" }, orderBy: [{ sort: "asc" }, { code: "asc" }] });
+  return rows.map((r) => {
+    let props: Record<string, unknown> = {};
+    try { props = r.props ? JSON.parse(r.props) : {}; } catch { props = {}; }
+    return { code: r.code, label: r.label, props };
+  });
+}
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -21,7 +30,7 @@ export async function executionSeriesStarted(t: Tenant, documentId: string): Pro
   });
   if (!count) return false;
   // An execution-permitting status starts the execution series (§6.2/§7.8)
-  const statuses = await getActiveSet("STATUSES");
+  const statuses = await publishedStatuses(t);
   const execStatuses = new Set(statuses.filter((s) => s.props.executionFlag === true).map((s) => s.code));
   const revs = await db.revision.findMany({
     where: { documentId, state: { in: ["RELEASED", "SUPERSEDED"] }, statusCode: { not: null } },
@@ -287,7 +296,7 @@ export async function releaseRevision(t: Tenant, revisionId: string, user: Sessi
   const { rev, label } = await revisionLabel(t, revisionId);
   if (rev.proposedStatus) statusCode = rev.proposedStatus;
   if (rev.state !== "IN_REVIEW" && rev.state !== "IN_PREPARATION") throw new Error("Only an in-review revision can be released.");
-  const statuses = await getActiveSet("STATUSES");
+  const statuses = await publishedStatuses(t);
   const status = statuses.find((s) => s.code === statusCode);
  if (!status) throw new Error("Status is not in the published set.");
   // §8.1 — no release without recorded approval
@@ -401,7 +410,7 @@ export async function releaseRevision(t: Tenant, revisionId: string, user: Sessi
       `/documents/${doc.id}`
     , t);
   }
-  await notify(doc.createdById, "RELEASED", `Released: ${label}`, `Released at ${status.label}.`, `/documents/${doc.id}`);
+  await notify(doc.createdById, "RELEASED", `Released: ${label}`, `Released at ${status.label}.`, `/documents/${doc.id}`, t);
   return { superseded: current?.value ?? null, execution: execFlag };
 }
 
