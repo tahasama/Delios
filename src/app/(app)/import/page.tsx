@@ -24,7 +24,7 @@ export default async function ImportPage({ searchParams }: { searchParams: Promi
     <div className="space-y-5">
       <PageHeader
         title="Bulk import & export"
-        subtitle="Bring in deliverable lists, schedule baselines and metadata updates with validation before anything is committed."
+        subtitle="Bring in a deliverable list or correct many documents at once, with every row checked before anything is committed."
         actions={<ButtonLink href="/documents" variant="secondary">Back to register</ButtonLink>}
       />
 
@@ -35,7 +35,7 @@ export default async function ImportPage({ searchParams }: { searchParams: Promi
           <Card title="Templates" description="Download, fill the rows, keep the header.">
             <ul className="space-y-2 text-sm">
               <li><a href="/api/export/template-deliverables" className="font-medium text-brand-ink hover:underline">Deliverable list template</a></li>
-              <li><a href="/api/export/template-baseline" className="font-medium text-brand-ink hover:underline">Baseline template</a></li>
+              <li className="hidden"><a href="/api/export/template-baseline">Baseline template</a></li>
               <li><a href="/api/export/template-metadata" className="font-medium text-brand-ink hover:underline">Metadata update template</a></li>
             </ul>
           </Card>

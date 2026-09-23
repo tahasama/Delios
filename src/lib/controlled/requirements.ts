@@ -27,6 +27,8 @@ type RequirementRow = {
   projectCode: string | null; // only for a new placeholder's number
   subProject: string | null;
   po: string | null;
+  /** The equipment tag or material the document is about. */
+  assetCode: string | null;
 };
 
 const COLUMNS = [
@@ -42,6 +44,7 @@ const COLUMNS = [
   "Project Code",
   "Sub-project",
   "PO",
+  "Equipment or material",
 ];
 
 const OURS = ["", "OURS", "US", "INTERNAL"];
@@ -54,7 +57,7 @@ const requirements: Handler = {
   clause: "§14.1 · §14.3",
   level: "PROJECT",
   columns: COLUMNS,
-  sample: ["A00001", "EL", "Q6637021-74-EL-DSW-09102", "", "", "", "APPROVER", "AFC", "", "", "", ""],
+  sample: ["A00001", "EL", "Q6637021-74-EL-DSW-09102", "", "", "", "APPROVER", "AFC", "", "", "", "", "BL-301"],
   approverHint: "Document Control",
 
   async parse(t, rows): Promise<ParseResult> {
@@ -64,12 +67,20 @@ const requirements: Handler = {
 
     const [actions, docs, functions, values] = await Promise.all([
       t.db.action.findMany({ select: { code: true, departments: true } }),
-      t.db.document.findMany({ select: { docNumber: true } }),
+      t.db.document.findMany({ select: { docNumber: true, docType: true } }),
       t.db.function.findMany({ where: { active: true }, select: { code: true } }),
-      t.db.configValue.findMany({ where: { status: "ACTIVE", setKey: { in: ["DISCIPLINES", "DOCUMENT_TYPES", "STATUSES", "SUPPLIER_CODES", "PROJECT_CODES", "SUBPROJECTS", "PURCHASE_ORDERS"] } }, select: { setKey: true, code: true } }),
+      t.db.configValue.findMany({ where: { status: "ACTIVE", setKey: { in: ["DISCIPLINES", "DOCUMENT_TYPES", "STATUSES", "SUPPLIER_CODES", "PROJECT_CODES", "SUBPROJECTS", "PURCHASE_ORDERS"] } }, select: { setKey: true, code: true, props: true } }),
     ]);
     const actionByCode = new Map(actions.map((a) => [a.code, a]));
     const docNumbers = new Set(docs.map((d) => d.docNumber));
+    const typeOfDoc = new Map(docs.map((d) => [d.docNumber, d.docType]));
+    // Document types that describe a piece of equipment, from the published list.
+    const describesAsset = new Set(
+      values.filter((v) => {
+        if (v.setKey !== "DOCUMENT_TYPES") return false;
+        try { return v.props ? (JSON.parse(v.props) as { describesAsset?: boolean }).describesAsset === true : false; } catch { return false; }
+      }).map((v) => v.code),
+    );
     const fnCodes = new Set(functions.map((f) => f.code));
     const inSet = (key: string, code: string) => values.some((v) => v.setKey === key && v.code === code);
 
@@ -93,6 +104,9 @@ const requirements: Handler = {
       const projectCode = cell(row, index, "Project Code") || null;
       const subProject = cell(row, index, "Sub-project") || null;
       const po = cell(row, index, "PO") || null;
+      // What the document is about: the tag of the equipment, or the material.
+      // Without it nobody can find the document from the thing it describes.
+      const assetCode = cell(row, index, "Equipment or material").toUpperCase() || null;
       // A department sheet arrives with one line per activity; a line left
       // without a document means nothing is needed there.
       if (!docNumber && !title) continue;
@@ -111,6 +125,12 @@ const requirements: Handler = {
       if (!inSet("STATUSES", requiredStatus)) errors.push(`Required Status "${requiredStatus}" is not a published status`);
       if (neededRaw && !parseDate(neededRaw)) errors.push("Needed By must be YYYY-MM-DD");
 
+      // A drawing or datasheet of a thing must say which thing.
+      const typeForAsset = docType ?? (docNumber ? typeOfDoc.get(docNumber) ?? null : null);
+      if (!assetCode && typeForAsset && describesAsset.has(typeForAsset)) {
+        errors.push(`A ${typeForAsset} describes equipment — give its tag or material under "Equipment or material"`);
+      }
+
       if (docNumber) {
         if (!docNumbers.has(docNumber)) errors.push(`Document ${docNumber} is not in the register — leave the number empty to create it`);
       } else {
@@ -127,6 +147,7 @@ const requirements: Handler = {
 
       if (errors.length) { issues.push({ line, message: errors.join("; ") }); continue; }
       parsed.push({
+        assetCode,
         actionCode, department, docNumber, title, docType,
         submittedBy: external ? submitted : null, approvedBy, requiredStatus,
         neededBy: neededRaw || null, projectCode, subProject, po,
@@ -145,6 +166,9 @@ const requirements: Handler = {
       department: e.department ?? e.document.discipline,
       docNumber: e.document.docNumber,
       title: e.document.title,
+      // What is already in force says nothing about equipment; a sheet that
+      // adds one links it when it is applied.
+      assetCode: null,
       docType: e.document.docType,
       submittedBy: e.submittedBy ?? e.document.originator,
       approvedBy: e.approvedBy ?? "",
@@ -206,6 +230,16 @@ const requirements: Handler = {
         });
         docId = doc.id;
         created++;
+      }
+
+      // Tie the document to the thing it describes, so it can be found from the
+      // equipment as well as from the register. An unknown tag is registered.
+      if (row.assetCode) {
+        const asset =
+          (await t.db.assetItem.findFirst({ where: { code: row.assetCode } })) ??
+          (await t.db.assetItem.create({ data: { projectId: t.projectId, code: row.assetCode, name: row.assetCode } }));
+        const linked = await t.db.relationship.findFirst({ where: { kind: "DOC_ASSET", fromId: docId, toId: asset.id } });
+        if (!linked) await t.db.relationship.create({ data: { projectId: t.projectId, kind: "DOC_ASSET", fromType: "Document", fromId: docId, toType: "AssetItem", toId: asset.id, createdById: "requirements" } });
       }
 
       const manual = !!row.neededBy;

@@ -24,6 +24,12 @@ export type Report = {
   columns: string[];
   rows: Cell[][];
   empty: string;
+  /**
+   * Where the same rows live as a working list. A report that would only
+   * repeat the register, the reviews or the transmittals sends the reader
+   * there instead of printing them twice.
+   */
+  seeAlso?: { label: string; href: string };
 };
 export type ReportId = "register" | "deliveries" | "reviews" | "transmittals" | "readiness";
 
@@ -82,6 +88,7 @@ async function registerStatus(t: Tenant): Promise<Report> {
   const count = (s: string) => docs.filter((d) => stageOf(d) === s).length;
   return {
     id: "register", title: "Register status", question: "Where does every document stand?",
+    seeAlso: { label: "Open the register, where the same documents can be filtered and exported", href: "/documents?view=all" },
     audience: "The master document register — for the project manager or the client, weekly.",
     figures: [
       { label: "Documents", value: docs.length },
@@ -196,6 +203,7 @@ async function reviews(t: Tenant): Promise<Report> {
   const old = open.filter((a) => days(a.cycle.issuedToReviewAt!, now) > 14).length;
   return {
     id: "reviews", title: "Reviews waiting", question: "What is with reviewers, and for how long?",
+    seeAlso: { label: "Open the reviews list, where every review ever made is kept", href: "/reviews?status=OPEN" },
     audience: "Chasing reviewers — for the weekly engineering meeting.",
     figures: [
       { label: "With reviewers", value: rows.length, tone: rows.length ? "warn" : "good" },
@@ -253,6 +261,7 @@ async function transmittals(t: Tenant): Promise<Report> {
   const overdue = list.filter((x) => x.responseRequired && x.responseDueDate && x.responseDueDate < now && x.status !== "CLOSED").length;
   return {
     id: "transmittals", title: "Transmittal log", question: "What went out and came in, and what is still waiting?",
+    seeAlso: { label: "Open transmittals", href: "/transmittals?view=all" },
     audience: "The transmittal log — for the client or a supplier review.",
     figures: [
       { label: "Issued (6 months)", value: list.filter((x) => x.direction === "OUTGOING").length },
@@ -303,6 +312,7 @@ async function readiness(t: Tenant): Promise<Report> {
   const late = rows.filter((r) => cellText(r[7]) === "Late").length;
   return {
     id: "readiness", title: "Activity readiness", question: "Are the next 30 days of activities covered by their documents?",
+    seeAlso: { label: "Open Schedule & actions, where the same activities are worked on", href: "/actions" },
     audience: "Look-ahead — for the site coordination or planning meeting.",
     figures: [
       { label: "Activities", value: actions.length },

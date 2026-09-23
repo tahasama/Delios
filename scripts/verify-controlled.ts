@@ -217,8 +217,8 @@ async function main() {
 
     const r1 = toCsv([
       reqs.columns,
-      [civil.code, "CI", "VP1-CI-DWG-0001", "", "", "", "APPROVER", "AFC", "", "", "", ""],
-      [civil.code, "CI", "", "Pour sequence method statement", dt, "", "REVIEWER", "IFC", "2026-10-15", pc, sp, ""],
+      [civil.code, "CI", "VP1-CI-DWG-0001", "", "", "", "APPROVER", "AFC", "", "", "", "", "TK-201"],
+      [civil.code, "CI", "", "Pour sequence method statement", dt, "", "REVIEWER", "IFC", "2026-10-15", pc, sp, "", "TK-201"],
     ]);
     const q1 = await reqs.parse(t, parseCsv(r1), "default");
     check("a requirements list parses", q1.ok, q1.ok ? `${q1.rowCount} rows` : q1.issues[0]?.message);
@@ -232,14 +232,19 @@ async function main() {
     check("a given date is kept as given", fixed?.requiredBy.toISOString().slice(0, 10) === "2026-10-15");
     check("who submits and who approves are recorded", byRule.approvedBy === "APPROVER" && byRule.department === "CI");
 
-    const noTag = toCsv([reqs.columns, [untagged.code, "CI", "VP1-CI-DWG-0001", "", "", "", "APPROVER", "AFC", "", "", "", ""]]);
+    const noTag = toCsv([reqs.columns, [untagged.code, "CI", "VP1-CI-DWG-0001", "", "", "", "APPROVER", "AFC", "", "", "", "", "TK-201"]]);
     const noTagResult = await reqs.parse(t, parseCsv(noTag), "default");
     check("refuses an action the project manager has not tagged", !noTagResult.ok && /no departments/.test(noTagResult.issues[0].message));
-    const wrongDept = toCsv([reqs.columns, [electrical.code, "CI", "VP1-CI-DWG-0001", "", "", "", "APPROVER", "AFC", "", "", "", ""]]);
+    const wrongDept = toCsv([reqs.columns, [electrical.code, "CI", "VP1-CI-DWG-0001", "", "", "", "APPROVER", "AFC", "", "", "", "", "TK-201"]]);
     check("refuses a department the action is not tagged with", !(await reqs.parse(t, parseCsv(wrongDept), "default")).ok);
 
+    const noAsset = toCsv([reqs.columns, [civil.code, "CI", "VP1-CI-DWG-0001", "", "", "", "APPROVER", "AFC", "", "", "", "", ""]]);
+    const noAssetResult = await reqs.parse(t, parseCsv(noAsset), "default");
+    check("a drawing must say which equipment or material it is about", !noAssetResult.ok && /Equipment or material/.test(noAssetResult.issues[0].message), noAssetResult.ok ? "accepted" : noAssetResult.issues[0].message);
+    check("the tag became a piece of equipment in the register", !!(await t.db.assetItem.findFirst({ where: { code: "TK-201" } })));
+
     // The department lists only one of its two documents now.
-    const r2 = toCsv([reqs.columns, [civil.code, "CI", "VP1-CI-DWG-0001", "", "", "", "APPROVER", "AFC", "", "", "", ""]]);
+    const r2 = toCsv([reqs.columns, [civil.code, "CI", "VP1-CI-DWG-0001", "", "", "", "APPROVER", "AFC", "", "", "", "", "TK-201"]]);
     const q2 = await reqs.parse(t, parseCsv(r2), "default");
     if (!q2.ok) throw new Error("second requirements parse failed");
     await reqs.apply(t, q2.payload, "default", "Rev 02");

@@ -101,6 +101,11 @@ export default async function ReportsPage({
           </DataTable>
         ) : <p className="text-xs text-slate-400">{q ? `Nothing matches “${q}”.` : report.empty}</p>}
         {rows.length > 200 ? <p className="mt-2 text-[11px] text-slate-400">First 200 shown; the CSV has all {rows.length}.</p> : null}
+        {report.seeAlso ? (
+          <p className="mt-3 border-t border-slate-100 pt-3 text-xs">
+            <Link href={report.seeAlso.href} className="font-semibold text-link hover:underline">{report.seeAlso.label} →</Link>
+          </p>
+        ) : null}
       </Card>
 
       {/* The one look-up nothing else answers: history. */}

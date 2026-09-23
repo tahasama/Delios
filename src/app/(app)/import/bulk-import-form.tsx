@@ -4,6 +4,8 @@ import { useActionState } from "react";
 import { importBulkAction } from "@/lib/actions/bulk";
 import { Card, Chip, DataTable, Th, Td, btn, inputCls } from "@/components/ui";
 
+// What each activity needs is agreed through Schedule & actions — the
+// departments list it, and Document Control issues it. It is not imported here.
 const KINDS = [
   {
     key: "deliverables",
@@ -11,13 +13,6 @@ const KINDS = [
     blurb: "Paste a whole deliverable list: one row per document. Each row becomes a register entry (placeholder) with its number allocated.",
     columns: "Title, Producer (ENG/CTR/VND/TPY/CLT), Type, Discipline, Project, SubProject, Supplier, PO, Criticality, Confidentiality, RetentionClass, AssetCode, ReceivedDate",
     template: "/api/export/template-deliverables",
-  },
-  {
-    key: "baseline",
-    title: "Baseline → actions & required-by entries",
-    blurb: "Load the agreed baseline: what each action needs, at what status, by when. Actions are created if the code is new; entries link to existing documents.",
-    columns: "Action Code, Action Name, Action Date, Document Number, Required Status, Required By",
-    template: "/api/export/template-baseline",
   },
   {
     key: "metadata",

@@ -20,6 +20,7 @@ import { businessDaysBefore, departmentsOf, DEFAULT_LEAD_BUSINESS_DAYS } from ".
 export const REQUIREMENT_COLUMNS = [
   "Action Code", "Department", "Document Number", "Title", "Document Type", "Submitted By",
   "Approved By", "Required Status", "Needed By", "Project Code", "Sub-project", "PO",
+  "Equipment or material",
 ];
 
 /** A sender key: a supplier's party code, or one of our departments. */
@@ -132,15 +133,24 @@ export async function departmentSheet(t: Tenant, department: string): Promise<st
     orderBy: [{ scheduledDate: "asc" }, { code: "asc" }],
     include: { entries: { where: { department }, include: { document: true }, orderBy: { requiredBy: "asc" } } },
   });
+  // The equipment or material each listed document is already tied to, so the
+  // sheet comes back with the column filled rather than asking for it twice.
+  const docIds = actions.flatMap((a) => a.entries.map((e) => e.documentId));
+  const links = docIds.length ? await t.db.relationship.findMany({ where: { kind: "DOC_ASSET", fromId: { in: docIds } }, select: { fromId: true, toId: true } }) : [];
+  const assets = links.length ? await t.db.assetItem.findMany({ where: { id: { in: links.map((l) => l.toId) } }, select: { id: true, code: true } }) : [];
+  const tagOf = (documentId: string) => {
+    const link = links.find((l) => l.fromId === documentId);
+    return link ? assets.find((a) => a.id === link.toId)?.code ?? "" : "";
+  };
   const header = [...REQUIREMENT_COLUMNS, "Activity Name", "Activity Date", "Default Needed By"];
   const rows: string[][] = [header];
   for (const a of actions.filter((x) => departmentsOf(x).includes(department))) {
     const info = [a.name, iso(a.scheduledDate), a.scheduledDate ? iso(businessDaysBefore(a.scheduledDate, DEFAULT_LEAD_BUSINESS_DAYS)) : ""];
-    if (!a.entries.length) rows.push([a.code, department, "", "", "", "", "", "", "", "", "", "", ...info]);
+    if (!a.entries.length) rows.push([a.code, department, "", "", "", "", "", "", "", "", "", "", "", ...info]);
     for (const e of a.entries) {
       rows.push([
         a.code, department, e.document.docNumber, e.document.title, e.document.docType, e.submittedBy ?? "",
-        e.approvedBy ?? "", e.requiredStatus, e.manualDate ? iso(e.requiredBy) : "", "", "", "", ...info,
+        e.approvedBy ?? "", e.requiredStatus, e.manualDate ? iso(e.requiredBy) : "", "", "", "", tagOf(e.documentId), ...info,
       ]);
     }
   }
