@@ -7,7 +7,7 @@ import { ActionForm } from "@/components/form";
 import { recordStepOutcomeAction } from "@/lib/actions/workflow";
 import { verdictEffect, VERDICT_EFFECT_SHORT } from "@/lib/verdict-effect";
 import { getActiveSet } from "@/lib/config";
-import { VerdictStatus } from "./verdict-status";
+import { VerdictDecision } from "./verdict-status";
 import { Send, CheckCircle2, Rocket } from "lucide-react";
 import { getRunForRevision, type WfRuntimeStep } from "@/lib/workflow";
 import { confirmRecordAction, correctRecordAction } from "@/lib/actions/governance";
@@ -181,16 +181,11 @@ async function RunActivePanel({ run, user, extra }: { run: { id: string; templat
               </div>
             ) : null}
             <ActionForm action={recordStepOutcomeAction} submitLabel={deciding ? "Give my verdict" : "Give my advice"} size="sm" hidden={{ runId: run.id }}>
-              <Field label={deciding ? "Verdict" : "Your verdict"} required hint={deciding ? "binding — a verdict that proceeds is the release approval" : "advice for the decider"}>
-                <select name="outcome" required className={inputCls} defaultValue="">
-                  <option value="" disabled>Choose…</option>
-                  {outcomes.map((o) => <option key={o.code} value={o.code}>{o.code} — {o.label} ({VERDICT_EFFECT_SHORT[verdictEffect(o.props)]})</option>)}
-                </select>
-              </Field>
-              {deciding ? <VerdictStatus statuses={statuses.map((s) => ({ code: s.code, label: s.label, allowsWork: s.props.executionFlag === true }))} /> : null}
-              <Field label="Comment" hint="required if it goes back to the author">
-                <textarea name="note" rows={2} className={inputCls} placeholder="what you checked / what must change" />
-              </Field>
+              <VerdictDecision
+                deciding={deciding}
+                verdicts={outcomes.map((o) => ({ code: o.code, label: o.label, effect: VERDICT_EFFECT_SHORT[verdictEffect(o.props)], proceeds: verdictEffect(o.props) !== "RETURN" }))}
+                statuses={statuses.map((st) => ({ code: st.code, label: st.label, allowsWork: st.props.executionFlag === true }))}
+              />
             </ActionForm>
             <p className="mt-2 text-[11px] text-slate-400">Recorded under your name. Verdicts come from your organization&apos;s list — <Link href="/guide/codes#outcome" className="underline">what each one means</Link>.</p>
           </Action>

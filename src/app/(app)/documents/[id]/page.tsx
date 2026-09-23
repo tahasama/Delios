@@ -215,7 +215,12 @@ export default async function DocumentDetailPage({
     <div className="space-y-4">
       {sp.sent ? <Banner tone="good" title="Registered and sent for approval">It is now with the people shown below. You will be notified when they decide.</Banner> : null}
       {sp.sendError ? <Banner tone="warn" title="Registered, but not sent">{sp.sendError} Send it from the step below.</Banner> : null}
-      {sp.released ? <Banner tone="good" title={`Released${sp.superseded ? ` · rev ${sp.superseded} superseded` : ""}`}>This revision is now the one in use.</Banner> : null}
+      {sp.released ? (
+        <Banner tone="good" title={`Released${sp.superseded ? ` · rev ${sp.superseded} superseded` : ""}`}>
+          This revision is now the one in use. Releasing does not tell anyone: send it on a transmittal, where you choose who receives it and why.
+          {current ? <Link href={`/transmittals/new?revisions=${current.id}`} className="ml-1 font-semibold text-emerald-900 underline">Issue it now →</Link> : null}
+        </Banner>
+      ) : null}
 
       {/* What is it */}
       <header className="rounded-2xl border border-slate-200 bg-surface px-5 py-4 shadow-sm">

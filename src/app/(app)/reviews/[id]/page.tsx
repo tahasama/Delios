@@ -8,6 +8,7 @@ import { OUTCOME_CONSEQUENCES } from "@/lib/standard";
 import { fmtDateTime } from "@/lib/utils";
 import { getActiveSet } from "@/lib/config";
 import { verdictEffect, VERDICT_EFFECT_SHORT } from "@/lib/verdict-effect";
+import { VerdictDecision } from "@/app/(app)/documents/[id]/verdict-status";
 import { preflight } from "@/lib/rules/preflight";
 import { Guarded } from "@/components/preflight";
 import { issueToReviewAction, addCommentAction, closeCommentAction, recordOutcomeAction, returnToOriginatorAction } from "@/lib/actions/revisions";
@@ -87,7 +88,11 @@ export default async function ReviewCyclePage({ params }: { params: Promise<{ id
 
         <aside className="space-y-4">
           <Card title={cycle.binding ? "Binding verdict" : "Advice"} description={cycle.binding ? "The one decision on this revision. A verdict that proceeds is its release approval, so only someone who may approve the document can give it." : "Input for the route's decider; it does not decide on its own."}>
-            {cycle.outcome ? <div><p className="text-sm font-semibold text-slate-900"><span className="font-mono">{cycle.outcome}</span> · {verdictLabel(cycle.outcome)}</p><p className="mt-1 text-xs leading-5 text-slate-500">{OUTCOME_CONSEQUENCES[cycle.outcome]?.blurb}</p><p className="mt-3 text-xs text-slate-500">{cycle.outcomeByName}, {fmtDateTime(cycle.outcomeAt)}</p>{canReturn ? <div className="mt-4 border-t border-slate-100 pt-4"><ActionForm action={returnToOriginatorAction} submitLabel="Return to author" size="sm" hidden={{ cycleId: cycle.id }}/></div> : null}</div> : <Guarded result={await preflight("RECORD_OUTCOME", { cycleId: cycle.id })}><ActionForm action={recordOutcomeAction} submitLabel={cycle.binding ? "Give my verdict" : "Give my advice"} hidden={{ cycleId: cycle.id }}><Field label="Verdict" required><select name="outcome" className={inputCls} required defaultValue=""><option value="" disabled>Choose…</option>{outcomes.map((outcome) => <option key={outcome.code} value={outcome.code}>{outcome.code} — {outcome.label} ({VERDICT_EFFECT_SHORT[verdictEffect(outcome.props)]})</option>)}</select></Field>{cycle.binding ? <Field label="If it proceeds, it may be used for" hint="you decide this, not the control function"><select name="proposedStatus" className={inputCls} defaultValue=""><option value="">Choose…</option>{statuses.map((st) => <option key={st.code} value={st.code}>to be {st.code} — {st.label}</option>)}</select></Field> : null}<Field label="Note"><textarea name="outcomeNote" rows={3} className={inputCls} placeholder="optional"/></Field></ActionForm></Guarded>}
+            {cycle.outcome ? <div><p className="text-sm font-semibold text-slate-900"><span className="font-mono">{cycle.outcome}</span> · {verdictLabel(cycle.outcome)}</p><p className="mt-1 text-xs leading-5 text-slate-500">{OUTCOME_CONSEQUENCES[cycle.outcome]?.blurb}</p><p className="mt-3 text-xs text-slate-500">{cycle.outcomeByName}, {fmtDateTime(cycle.outcomeAt)}</p>{canReturn ? <div className="mt-4 border-t border-slate-100 pt-4"><ActionForm action={returnToOriginatorAction} submitLabel="Return to author" size="sm" hidden={{ cycleId: cycle.id }}/></div> : null}</div> : <Guarded result={await preflight("RECORD_OUTCOME", { cycleId: cycle.id })}><ActionForm action={recordOutcomeAction} submitLabel={cycle.binding ? "Give my verdict" : "Give my advice"} hidden={{ cycleId: cycle.id }}><VerdictDecision
+                deciding={cycle.binding}
+                verdicts={outcomes.map((o) => ({ code: o.code, label: o.label, effect: VERDICT_EFFECT_SHORT[verdictEffect(o.props)], proceeds: verdictEffect(o.props) !== "RETURN" }))}
+                statuses={statuses.map((st) => ({ code: st.code, label: st.label, allowsWork: st.props.executionFlag === true }))}
+              /></ActionForm></Guarded>}
             {cycle.outcome ? null : <p className="mt-2 text-xs leading-5 text-slate-500">{!cycle.issuedToReviewAt ? "Document Control sends it to the reviewers first." : ""}</p>}
           </Card>
 

@@ -214,15 +214,20 @@ const releaseApproval: Gate = {
 const releaseStatus: Gate = {
   id: "REL-STATUS",
   intent: "RELEASE",
-  title: "Status is published",
+  title: "What it may be used for",
   clause: "§7.7",
   async evaluate(ctx, subject) {
-    if (!subject.statusCode) {
- return warn("No status chosen yet.", "A released revision states what it may be used for.");
+    const rev = await revisionOf(ctx, subject);
+    const code = subject.statusCode ?? rev?.proposedStatus ?? null;
+    if (!code) {
+      return warn(
+        "The reviewers have not said what it may be used for.",
+        "The verdict that lets a revision proceed also says its status. Ask for it on the deciding step.",
+      );
     }
     const statuses = await activeValues(ctx, "STATUSES");
-    const status = statuses.find((s) => s.code === subject.statusCode);
-    if (status) return ok(`Releasing at “${status.label}”.`);
+    const status = statuses.find((s) => s.code === code);
+    if (status) return ok(`Decided by the reviewers: ${status.code} — ${status.label}.`);
     return block(
       `“${subject.statusCode}” is not in the published status set.`,
  "Choose a published status, or publish that one first.",
