@@ -142,6 +142,9 @@ model Function {
   clearance   Int          @default(1)
   // The pre-Phase-2 vocabulary, kept so the six role names still mean something
   // in the UI and in the checks that have not moved to verbs yet.
+  // The department this job sits in, when it has one (Mechanical, Civil…).
+  // Informational: what a function may do still comes from its rules.
+  department  String?
   legacyRole  String       @default("AUTHOR")
   active      Boolean      @default(true)
   sort        Int          @default(0)
@@ -273,6 +276,8 @@ model User {
   @@unique([orgId, email])
   @@index([orgId])
   @@index([email])
+  contactFor    Party[]  @relation("PartyContact")
+  backupFor     Party[]  @relation("PartyBackup")
 }
 
 model Delegation {
@@ -1246,6 +1251,12 @@ model Party {
   // they cannot sign in, and the party is no longer offered in pickers.
   active     Boolean      @default(true)
   users      User[]
+  // Who answers for this party. The contact is required for an outside party;
+  // the backup is whoever stands in when the contact is away.
+  contactId  String?
+  contact    User?        @relation("PartyContact", fields: [contactId], references: [id])
+  backupId   String?
+  backup     User?        @relation("PartyBackup", fields: [backupId], references: [id])
 
   @@unique([orgId, code])
   @@index([orgId])

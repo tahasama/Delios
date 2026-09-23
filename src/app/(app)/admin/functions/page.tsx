@@ -8,6 +8,7 @@ import {
   updateFunctionAction,
   savePermissionRuleAction,
   deletePermissionRuleAction,
+  toggleFunctionVerb,
 } from "@/lib/actions/functions";
 import { VERBS, VERB_LABEL, VERB_BLURB, type Verb } from "@/lib/permissions";
 import { Check, Minus } from "lucide-react";
@@ -44,6 +45,9 @@ export default async function FunctionsPage() {
     getActiveSet("CRITICALITY"),
     getActiveSet("CONFIDENTIALITY"),
   ]);
+  // This page is administrators only, so every tick box is editable here.
+  const admin = true;
+  const deptLabel = new Map(disciplines.map((d) => [d.code, d.label]));
 
   // The grid answers "what can this function do anywhere?" — the union of its
   // rules. A rule narrowed to one discipline still shows here, with its
@@ -81,13 +85,14 @@ export default async function FunctionsPage() {
         subtitle="Functions are the jobs people hold — Construction manager, HVAC technician, Project manager. What each may do comes from its rules here and in the distribution matrix; one function can create, review and approve."
       />
 
-      <Card title="Who may do what">
+      <Card title="Who may do what" description={admin ? "Tick a box to grant a permission for every document, untick it to take it away. A half-filled box means the permission is granted for certain documents only — narrow it below." : undefined}>
         <DataTable
           id="functions-grid"
           className="shadow-none"
           head={
             <tr>
               <Th className="sticky left-0 z-[4] min-w-[220px] align-bottom">Function</Th>
+              <Th className="align-bottom">Department</Th>
               {VERBS.map((v) => (
                 <Th key={v} label={VERB_LABEL[v]} className="px-2 text-center align-bottom normal-case tracking-normal">
                   <span title={VERB_BLURB[v]} className="mx-auto block whitespace-nowrap text-[11px] font-semibold text-slate-600 [text-orientation:mixed] [writing-mode:vertical-rl] rotate-180">{VERB_LABEL[v]}</span>
@@ -105,11 +110,29 @@ export default async function FunctionsPage() {
                   <p className="font-semibold text-slate-800">{fn.name}</p>
                   {narrowed.length ? <p className="text-[10px] text-slate-500">only for {narrowed.join("; ")}</p> : null}
                 </Td>
-                {VERBS.map((v) => (
-                  <Td key={v} className="px-2 py-2 text-center">
-                    {held.has(v) ? <Check className="mx-auto h-4 w-4 text-emerald-600" aria-label={`${fn.name} may ${VERB_LABEL[v]}`} /> : <Minus className="mx-auto h-3 w-3 text-slate-200" aria-label="not held" />}
-                  </Td>
-                ))}
+                <Td className="whitespace-nowrap py-2 text-xs text-slate-500">{fn.department ? deptLabel.get(fn.department) ?? fn.department : <span className="text-slate-300">—</span>}</Td>
+                    {VERBS.map((v) => {
+                      const on = held.has(v);
+                      const narrowed = fn.rules.some((r) => (r.deliverableType || r.docType || r.discipline || r.criticality || r.confidentiality) && r.verbs.includes(`"${v}"`));
+                      return (
+                        <Td key={v} className="px-2 py-1 text-center">
+                          {admin ? (
+                            <form action={toggleFunctionVerb}>
+                              <input type="hidden" name="functionId" value={fn.id} />
+                              <input type="hidden" name="verb" value={v} />
+                              <button
+                                type="submit"
+                                title={`${on ? "Remove" : "Grant"} ${VERB_LABEL[v]} for ${fn.name}${narrowed ? " — it is also granted for certain documents only, which is changed below" : ""}`}
+                                aria-label={`${on ? "Remove" : "Grant"} ${VERB_LABEL[v]} for ${fn.name}`}
+                                className={`mx-auto grid h-6 w-6 place-items-center rounded-md border transition ${on ? "border-emerald-300 bg-emerald-100 text-emerald-700 hover:bg-emerald-200" : narrowed ? "border-amber-200 bg-amber-50 text-amber-600 hover:bg-amber-100" : "border-transparent text-slate-200 hover:border-slate-300 hover:text-slate-400"}`}
+                              >
+                                {on ? <Check className="h-3.5 w-3.5" /> : narrowed ? <span className="text-[10px] font-bold">◐</span> : <Minus className="h-3 w-3" />}
+                              </button>
+                            </form>
+                          ) : on ? <Check className="mx-auto h-4 w-4 text-emerald-600" /> : <Minus className="mx-auto h-3 w-3 text-slate-200" />}
+                        </Td>
+                      );
+                    })}
                 <Td className="py-2 text-right text-xs tabular-nums text-slate-500">{fn._count.memberships}</Td>
               </tr>
             );
@@ -177,6 +200,10 @@ export default async function FunctionsPage() {
                     <label className="flex items-center gap-2 text-xs text-slate-600">
                       Sees confidentiality up to level
                       <input name="clearance" type="number" min={1} max={9} defaultValue={fn.clearance} className="w-16 rounded-md border border-slate-300 px-1.5 py-1 text-xs" />
+                      <select name="department" defaultValue={fn.department ?? ""} className="rounded-md border border-slate-300 px-1.5 py-1 text-xs" title="The department this job sits in — optional">
+                        <option value="">no department</option>
+                        {disciplines.map((d) => <option key={d.code} value={d.code}>{d.label}</option>)}
+                      </select>
                     </label>
                     <label className="flex items-center gap-1 text-xs text-slate-600"><input type="checkbox" name="active" defaultChecked={fn.active} /> in use</label>
                   </ActionForm>
@@ -194,6 +221,12 @@ export default async function FunctionsPage() {
                 <Field label="Name" required hint="as your organization names the job"><input name="name" required className={inputCls} placeholder="Construction manager, HVAC technician…" /></Field>
                 <Field label="Short code" required><input name="code" required className={`${inputCls} uppercase`} placeholder="ELEC_TECH" /></Field>
                 <Field label="Sees confidentiality up to level" required><input name="clearance" type="number" min={1} max={9} defaultValue={2} className={inputCls} /></Field>
+                <Field label="Department" hint="optional — the department this job sits in">
+                  <select name="department" defaultValue="" className={inputCls}>
+                    <option value="">No department</option>
+                    {disciplines.map((d) => <option key={d.code} value={d.code}>{d.label}</option>)}
+                  </select>
+                </Field>
               </div>
               <Field label="May">
                 <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">

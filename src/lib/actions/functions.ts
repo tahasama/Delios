@@ -51,7 +51,7 @@ export async function createFunctionAction(
   if (dup) return { error: `A function with code ${code} is already published.` };
 
   const fn = await db.function.create({
-    data: { orgId, code, name, description, clearance, legacyRole, sort: 100 },
+    data: { orgId, code, name, description, clearance, legacyRole, department: String(formData.get("department") ?? "") || null, sort: 100 },
   });
   // A function with no rule can do nothing, which is a confusing place to
   // leave an administrator — start it with whatever verbs they ticked.
@@ -99,7 +99,7 @@ export async function updateFunctionAction(
 
   await db.function.update({
     where: { id },
-    data: { name: name || fn.name, clearance, active },
+    data: { name: name || fn.name, clearance, active , department: String(formData.get("department") ?? "") || null },
   });
   await audit({
     actor: admin, action: "FUNCTION_UPDATED", entityType: "Function", entityId: id, entityLabel: fn.name,
@@ -179,4 +179,54 @@ export async function deletePermissionRuleAction(
   });
   revalidatePath("/admin/functions");
   return { ok: "Rule withdrawn." };
+}
+
+
+/**
+ * Tick or untick one verb for one function, straight in the matrix.
+ * It edits the function's unscoped rule — the one that applies to every
+ * document. A verb granted only for certain documents is left alone: that is
+ * a narrowing, and it is removed where it was made.
+ */
+export async function toggleFunctionVerbAction(_prev: { error?: string; ok?: string } | undefined, formData: FormData): Promise<{ error?: string; ok?: string }> {
+  const ctx = await requireAdminScope();
+  const { db, orgId, user: admin } = ctx;
+  const functionId = String(formData.get("functionId") ?? "");
+  const verb = String(formData.get("verb") ?? "");
+  const fn = await db.function.findFirst({ where: { id: functionId }, include: { rules: true } });
+  if (!fn) return { error: "That function no longer exists." };
+  if (!VERBS.includes(verb as Verb)) return { error: "Unknown permission." };
+
+  const open = fn.rules.find((r) => !r.deliverableType && !r.docType && !r.discipline && !r.criticality && !r.confidentiality);
+  const held = open ? (JSON.parse(open.verbs) as string[]) : [];
+  const has = held.includes(verb);
+  const next = has ? held.filter((v) => v !== verb) : [...held, verb];
+
+  if (!open) {
+    await db.permissionRule.create({ data: { orgId, functionId, sort: 100, verbs: JSON.stringify(next) } });
+  } else if (next.length) {
+    await db.permissionRule.update({ where: { id: open.id }, data: { verbs: JSON.stringify(next) } });
+  } else {
+    await db.permissionRule.delete({ where: { id: open.id } });
+  }
+  await audit({
+    actor: admin, action: "PERMISSION_RULE_PUBLISHED", entityType: "Function", entityId: functionId, entityLabel: fn.name,
+    newValue: next.join(", "), detail: `${has ? "Removed" : "Granted"} ${verb} for every document.`,
+  });
+  revalidatePath("/admin/functions");
+  revalidatePath("/distribution");
+  return { ok: `${fn.name}: ${has ? "removed" : "granted"} ${verb.toLowerCase()}.` };
+}
+
+
+/**
+ * Tick or untick one verb for one function, straight in the matrix.
+ * It edits the function's unscoped rule — the one that applies to every
+ * document. A verb granted only for certain documents is left alone: that is
+ * a narrowing, and it is removed where it was made.
+ */
+
+/** The same toggle as a plain form action, for the tick boxes in the matrix. */
+export async function toggleFunctionVerb(formData: FormData): Promise<void> {
+  await toggleFunctionVerbAction(undefined, formData);
 }

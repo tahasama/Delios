@@ -173,6 +173,9 @@ export async function savePartyAction(_prev: { error?: string } | undefined, for
     const code = String(formData.get("code") ?? "").trim().toUpperCase();
     const name = String(formData.get("name") ?? "").trim();
     const isInternal = formData.get("isInternal") === "on";
+    const contactId = String(formData.get("contactId") ?? "") || null;
+    const backupId = String(formData.get("backupId") ?? "") || null;
+    if (contactId && backupId && contactId === backupId) return { error: "The backup has to be someone other than the contact." };
     if (id) {
       // The code is fixed once issued: document numbers and originators carry it.
       const party = await db.party.findFirst({ where: { id } });
@@ -180,13 +183,16 @@ export async function savePartyAction(_prev: { error?: string } | undefined, for
       const active = formData.get("active") === "on";
       if (!name) return { error: "A party needs a name." };
       if (party.isInternal && !active) return { error: "Your own organization cannot be switched off." };
-      await db.party.update({ where: { id }, data: { name, active } });
+      // Somebody has to answer for a party we exchange documents with.
+      if (!party.isInternal && active && !contactId) return { error: `Name the person who answers for ${name}. The backup is optional.` };
+      await db.party.update({ where: { id }, data: { name, active, contactId, backupId } });
       if (party.active !== active || party.name !== name) {
         await audit({ actor: admin, action: active ? "PARTY_UPDATED" : "PARTY_REVOKED", entityType: "Party", entityId: party.code, entityLabel: name, oldValue: `${party.name}${party.active ? "" : " (revoked)"}`, newValue: `${name}${active ? "" : " (revoked)"}`, detail: active ? undefined : "Access revoked: its people can no longer sign in." });
       }
     } else {
       if (!code || !name) return { error: "Code and name are required." };
-      await db.party.create({ data: { orgId, code, name, isInternal } });
+      if (!isInternal && !contactId) return { error: "Name the person who answers for this party." };
+      await db.party.create({ data: { orgId, code, name, isInternal, contactId, backupId } });
     }
     revalidatePath("/admin/parties");
     revalidatePath("/admin/users");

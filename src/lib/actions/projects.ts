@@ -157,3 +157,34 @@ export async function openProjectAction(formData: FormData): Promise<void> {
   await setActiveProject(projectId, ctx.user.id);
   revalidatePath("/", "layout");
 }
+
+/**
+ * Rename a project, or change its code. The code appears inside every document
+ * number already allocated, so those numbers do not change: the code only
+ * decides what new numbers look like. Saying so out loud is the point of the
+ * warning on the form.
+ */
+export async function renameProjectAction(_prev: ProjectState | undefined, formData: FormData): Promise<ProjectState> {
+  const ctx = await requireAdminScope();
+  const { db, user } = ctx;
+  const projectId = String(formData.get("projectId") ?? "");
+  const name = String(formData.get("name") ?? "").trim();
+  const code = String(formData.get("code") ?? "").trim().toUpperCase();
+  if (!name) return { error: "A project needs a name." };
+  if (!CODE.test(code)) return { error: "A code is letters, digits and hyphens — up to 16 characters, e.g. NP1." };
+  const project = await db.project.findUnique({ where: { id: projectId } });
+  if (!project) return { error: "Project not found." };
+  if (code !== project.code) {
+    const clash = await db.project.findFirst({ where: { orgId: ctx.orgId, code, NOT: { id: projectId } } });
+    if (clash) return { error: `${code} is already used by another project.` };
+  }
+  await db.project.update({ where: { id: projectId }, data: { name, code } });
+  await audit({
+    actor: user, action: "PROJECT_RENAMED", entityType: "Project", entityId: projectId, entityLabel: code,
+    oldValue: `${project.code} — ${project.name}`, newValue: `${code} — ${name}`,
+    detail: code !== project.code ? "Numbers already allocated keep the old code; new numbers use the new one." : "Name changed.",
+  });
+  revalidatePath("/admin/projects");
+  revalidatePath("/");
+  return { ok: code !== project.code ? `Renamed. New numbers will use ${code}; documents already numbered keep ${project.code}.` : "Renamed." };
+}

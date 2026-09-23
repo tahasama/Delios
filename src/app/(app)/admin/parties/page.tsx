@@ -14,12 +14,13 @@ export default async function AdminPartiesPage() {
   const { user: me, db } = await requireScope();
   if (!isAdmin(me)) return <PageHeader title="Parties" subtitle="Administrators only." />;
   const [parties, rules, deliverables, confs] = await Promise.all([
-    db.party.findMany({ orderBy: [{ isInternal: "desc" }, { name: "asc" }], include: { _count: { select: { users: true } } } }),
+    db.party.findMany({ orderBy: [{ isInternal: "desc" }, { name: "asc" }], include: { _count: { select: { users: true } }, contact: { select: { id: true, name: true, email: true } }, backup: { select: { id: true, name: true } } } }),
     db.distributionRule.findMany({ orderBy: [{ deliverableType: "asc" }, { confidentiality: "asc" }] }),
     getActiveSet("DELIVERABLE_TYPES"),
     getActiveSet("CONFIDENTIALITY"),
   ]);
-  const users = await db.user.findMany({ where: { active: true }, orderBy: { name: "asc" }, select: { id: true, name: true } });
+  const people = await db.user.findMany({ where: { active: true }, orderBy: { name: "asc" }, select: { id: true, name: true, email: true, partyId: true } });
+  const users = people;
   const nameOf = (id: string) => users.find((u) => u.id === id)?.name ?? id;
   const mayEdit = true; // this page is administrators only
 
@@ -32,19 +33,39 @@ export default async function AdminPartiesPage() {
       <div className="space-y-4">
         <div className="space-y-4">
           <Card title={`Parties (${parties.length})`}>
-            <DataTable head={<tr><Th>Code</Th><Th>Name</Th><Th>Type</Th><Th>People</Th><Th></Th></tr>}>
+            <DataTable head={<tr><Th>Code</Th><Th>Name</Th><Th>Type</Th><Th>Who answers for it</Th><Th>People</Th><Th></Th></tr>}>
               {parties.map((p) => (
                 <tr key={p.id} className={p.active ? "align-top" : "align-top opacity-60"}>
                   <Td className="font-mono text-xs font-semibold">{p.code}</Td>
                   <Td>{p.name}</Td>
                   <Td><Chip className={p.isInternal ? "bg-sky-100 text-sky-800 ring-sky-300" : "bg-violet-100 text-violet-800 ring-violet-300"}>{p.isInternal ? "our organization" : "external"}</Chip></Td>
+                  <Td className="text-xs">
+                    {p.contact ? (
+                      <>
+                        <a href={`/admin/users#${p.contact.id}`} className="font-semibold text-link hover:underline">{p.contact.name}</a>
+                        {p.backup ? <span className="block text-[11px] text-slate-500">backup: {p.backup.name}</span> : <span className="block text-[11px] text-slate-400">no backup</span>}
+                      </>
+                    ) : p.isInternal ? <span className="text-slate-400">—</span> : <span className="font-semibold text-amber-700">nobody named</span>}
+                  </Td>
                   <Td className="tabular-nums text-xs">{p._count.users}{p.active ? "" : <span className="block text-[11px] font-semibold text-red-700">access revoked</span>}</Td>
                   <Td>
                     <details>
                       <summary className="cursor-pointer text-xs font-semibold text-link">Edit</summary>
-                      <div className="mt-2 w-64">
+                      <div className="mt-2 w-80">
                         <ActionForm action={savePartyAction} submitLabel="Save" size="sm" hidden={{ id: p.id, code: p.code }}>
                           <Field label="Name" required><input name="name" required defaultValue={p.name} className={inputCls} /></Field>
+                          <Field label="Who answers for it" required={!p.isInternal} hint="the person we write to about their documents">
+                            <select name="contactId" defaultValue={p.contactId ?? ""} className={inputCls}>
+                              <option value="">— nobody —</option>
+                              {people.filter((u) => u.partyId === p.id || u.partyId === null).map((u) => <option key={u.id} value={u.id}>{u.name}{u.email ? ` · ${u.email}` : ""}</option>)}
+                            </select>
+                          </Field>
+                          <Field label="Backup" hint="optional — who stands in when the contact is away">
+                            <select name="backupId" defaultValue={p.backupId ?? ""} className={inputCls}>
+                              <option value="">— none —</option>
+                              {people.filter((u) => u.partyId === p.id || u.partyId === null).map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+                            </select>
+                          </Field>
                           {p.isInternal ? null : (
                             <label className="flex items-center gap-2 text-xs text-slate-600"><input type="checkbox" name="active" defaultChecked={p.active} /> Has access — untick to revoke; its {p._count.users} {p._count.users === 1 ? "person" : "people"} can no longer sign in</label>
                           )}
@@ -60,11 +81,24 @@ export default async function AdminPartiesPage() {
         </div>
         <details className="rounded-2xl border border-slate-200 bg-surface px-5 py-3 shadow-sm"><summary className="cursor-pointer text-sm font-semibold text-brand-ink">+ Add a party</summary><div className="mt-3 max-w-2xl">
           <ActionForm action={savePartyAction} submitLabel="Add party" size="sm">
+            <p className="text-xs text-slate-500">Add the people first in <a href="/admin/users" className="font-semibold text-link hover:underline">People &amp; access</a>, then name one of them here as the contact.</p>
             <Field label="Code" required hint="short, unique — e.g. MADASUD">
               <input name="code" required maxLength={20} className={inputCls} />
             </Field>
             <Field label="Name" required>
               <input name="name" required className={inputCls} />
+            </Field>
+            <Field label="Who answers for it" hint="required for an outside party">
+              <select name="contactId" defaultValue="" className={inputCls}>
+                <option value="">— nobody yet —</option>
+                {people.map((u) => <option key={u.id} value={u.id}>{u.name}{u.email ? ` · ${u.email}` : ""}</option>)}
+              </select>
+            </Field>
+            <Field label="Backup" hint="optional">
+              <select name="backupId" defaultValue="" className={inputCls}>
+                <option value="">— none —</option>
+                {people.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+              </select>
             </Field>
             <label className="flex items-center gap-2 text-sm text-slate-700">
               <input type="checkbox" name="isInternal" /> This is our organization (internal)

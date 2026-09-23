@@ -2,7 +2,7 @@ import { requireScope } from "@/lib/scope";
 import { isAdmin } from "@/lib/auth";
 import { PageHeader, Card, Chip, DataTable, Th, Td, Field, btn, inputCls } from "@/components/ui";
 import { ActionForm } from "@/components/form";
-import { createProjectAction, setProjectStatusAction, openProjectAction } from "@/lib/actions/projects";
+import { createProjectAction, renameProjectAction, setProjectStatusAction, openProjectAction } from "@/lib/actions/projects";
 import { fmtDate } from "@/lib/utils";
 import { FolderOpen, ArrowRight } from "lucide-react";
 import { PROJECT_KINDS } from "@/lib/profiles/kinds";
@@ -76,6 +76,22 @@ export default async function ProjectsPage() {
                       </button>
                     </form>
                   ) : null}
+                  <details className="w-full">
+                    <summary className="cursor-pointer text-xs font-semibold text-link">Rename</summary>
+                    <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50/70 p-3">
+                      <p className="mb-2 text-[11px] leading-4 text-amber-800">
+                        The code is part of every number already given out. Changing it does not renumber anything:
+                        documents keep the code they were created with, and only new numbers use the new one. Reports and
+                        saved searches that name the old code keep working.
+                      </p>
+                      <ActionForm action={renameProjectAction} submitLabel="Save" size="sm" hidden={{ projectId: p.id }}>
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_120px]">
+                          <Field label="Project name" required><input name="name" required defaultValue={p.name} className={inputCls} /></Field>
+                          <Field label="Code" required><input name="code" required defaultValue={p.code} className={`${inputCls} uppercase`} /></Field>
+                        </div>
+                      </ActionForm>
+                    </div>
+                  </details>
                   <ActionForm
                     action={setProjectStatusAction}
                     submitLabel={p.status === "ACTIVE" ? "Archive" : "Reopen"}

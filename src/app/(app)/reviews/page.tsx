@@ -50,7 +50,7 @@ export default async function ReviewsPage({ searchParams }: { searchParams: Prom
 
   return (
     <div className="space-y-5">
-      <PageHeader title="Reviews" subtitle="Every review ever made — a document appears once for each time it was reviewed. The deciding review gives the binding verdict; earlier steps of a route are advice to it." />
+      <PageHeader title="Reviews" subtitle="Every review ever made — a document appears once for each time it was reviewed. A decision releases the revision or sends it back; advice is input to that decision; a client review happens after we released it, and is answered by a new revision." />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <nav className="flex gap-1 rounded-xl bg-slate-100 p-1" aria-label="Which reviews">
@@ -79,7 +79,6 @@ export default async function ReviewsPage({ searchParams }: { searchParams: Prom
               <Th>Kind</Th>
               <Th>Verdict</Th>
               <Th>Reviewers</Th>
-              <Th>When</Th>
               <Th>Opened</Th>
               <Th>Opened by</Th>
               <Th>Closed</Th>
@@ -100,7 +99,10 @@ export default async function ReviewsPage({ searchParams }: { searchParams: Prom
                 </Td>
                 <Td className="font-mono text-xs font-semibold text-slate-800">{c.revision.value}</Td>
                 <Td className="whitespace-nowrap">
-                  <Chip className={c.binding ? "bg-emerald-100 text-emerald-800 ring-emerald-300" : "bg-sky-100 text-sky-800 ring-sky-300"}>{c.binding ? "decision" : "advice"}</Chip>
+                  <Chip className={postRelease ? "bg-violet-100 text-violet-800 ring-violet-300" : c.binding ? "bg-emerald-100 text-emerald-800 ring-emerald-300" : "bg-sky-100 text-sky-800 ring-sky-300"}
+                    title={postRelease ? "The recipient reviewed a revision we had already released. Their verdict never changes it; a new revision answers it." : c.binding ? "The last step of the route. Its verdict releases the revision, or sends it back." : "An earlier step of the route. Input for whoever decides."}>
+                    {postRelease ? "client review" : c.binding ? "decision" : "advice"}
+                  </Chip>
                 </Td>
                 <Td className="whitespace-nowrap text-xs">
                   {c.outcome ? (
@@ -114,7 +116,6 @@ export default async function ReviewsPage({ searchParams }: { searchParams: Prom
                   {c.assignments.length ? <span title={c.assignments.map((a) => `${a.completedAt ? "✓" : "○"} ${a.userName}`).join("\n")}>{c.assignments.map((a) => a.userName).join(", ")}</span> : <span className="text-slate-400">unassigned</span>}
                   {c.status === "OPEN" && c.assignments.length > 1 ? <span className="block text-[11px] text-slate-400">{done} of {c.assignments.length} done</span> : null}
                 </Td>
-                <Td className="whitespace-nowrap text-xs text-slate-500">{postRelease ? "after release" : "before release"}</Td>
                 <Td className="whitespace-nowrap text-xs tabular-nums text-slate-500">{fmtDate(c.submittedAt)}</Td>
                 <Td className="whitespace-nowrap text-xs text-slate-500">{c.openedByName}</Td>
                 <Td className="whitespace-nowrap text-xs tabular-nums text-slate-500">{c.outcomeAt ? fmtDate(c.outcomeAt) : "—"}</Td>
