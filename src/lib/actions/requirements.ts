@@ -112,6 +112,7 @@ export async function issueToSendersAction(_prev: State | undefined, formData: F
       `${r.documents} document${r.documents === 1 ? "" : "s"} to deliver — first due ${fmtDate(r.firstNeeded)}`,
       "Base your delivery baseline on these submit-by dates. Reviewers need the working days between submit-by and the activity.",
       isDepartmentSender(r.sender) ? PAGE : "/packages");
+    if (!isDepartmentSender(r.sender)) await supplierPackageFor(ctx, r.sender, r, user);
     await audit({ actor: user, action: "REQUIREMENTS_ISSUED", entityType: "SenderIssue", entityId: r.sender, entityLabel: name, detail: `${r.documents} document(s), first due ${fmtDate(r.firstNeeded)}` });
   }
   refresh();
@@ -208,4 +209,51 @@ export async function notifyDepartmentsAction(_prev: State | undefined, formData
   await audit({ actor: user, action: "REQUIREMENTS_REMINDER", entityType: "Action", entityId: action.id, entityLabel: action.code, detail: `Notified ${recipients.size} person(s) in ${departments.join(", ")}: ${headline}.` });
   revalidatePath("/actions");
   return { ok: `Told ${recipients.size} person(s) in ${departments.join(", ")}${late.length ? `; ${late.map(([d]) => d).join(", ")} named as short` : ""}.` };
+}
+
+
+/**
+ * One source for what a supplier owes us. Issuing the requirements to an
+ * outside sender opens — or updates — that supplier's package, so the tracking
+ * page is fed by the same list the departments produced. Nothing is uploaded
+ * twice, and the due date follows the earliest document.
+ */
+async function supplierPackageFor(
+  ctx: Awaited<ReturnType<typeof requireScope>>,
+  partyCode: string,
+  row: { documents: number; firstNeeded: Date | null },
+  user: { id: string; name: string },
+) {
+  const { db, projectId } = ctx;
+  const party = await db.party.findFirst({ where: { code: partyCode } });
+  if (!party) return;
+  const identifier = `SP-${partyCode}`;
+  const due = row.firstNeeded ?? new Date();
+  const existing = await db.package.findFirst({ where: { identifier } });
+  // The status the package is measured against: the earliest one asked of this sender.
+  const entry = await db.baselineEntry.findFirst({
+    where: { OR: [{ submittedBy: partyCode }, { submittedBy: null, document: { originator: partyCode } }] },
+    orderBy: { requiredBy: "asc" },
+  });
+  const requiredStatus = entry?.requiredStatus ?? existing?.requiredStatus ?? "IFR";
+  if (existing) {
+    if (existing.completionDate.getTime() !== due.getTime() || existing.requiredStatus !== requiredStatus) {
+      await db.package.update({ where: { id: existing.id }, data: { completionDate: due, requiredStatus } });
+    }
+    return;
+  }
+  await db.package.create({
+    data: {
+      projectId, identifier, category: "SUPPLIER", partyCode,
+      purpose: "SUPPLIER_DELIVERABLES", type: "ACCUMULATED",
+      membershipRule: `Every document the requirements list asks of ${party.name}`,
+      recipientName: party.name, completionDate: due, requiredStatus,
+      compositionOwnerId: user.id, compositionOwnerName: user.name,
+      acceptanceAuthorityId: user.id, acceptanceAuthorityName: user.name,
+    },
+  });
+  await audit({
+    actor: user as never, action: "PACKAGE_CREATED", entityType: "Package", entityId: identifier, entityLabel: identifier,
+    detail: `Opened from the requirements list: ${row.documents} document(s) from ${party.name}.`,
+  });
 }
