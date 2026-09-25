@@ -62,7 +62,10 @@ export default async function RequirementsPage() {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-slate-950">Document requirements</h1>
-          <p className="mt-1 text-sm text-slate-500">What each activity needs, asked of the departments, sent to whoever delivers the documents, confirmed before the work.</p>
+          <p className="mt-1 text-sm text-slate-500">
+            Four steps, in order: tag each activity with the departments it concerns, ask those departments what documents
+            they need, tell whoever delivers them, and confirm before the work happens. Each step says the ways it can be done.
+          </p>
         </div>
         <Link href="/actions" className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-semibold text-slate-500 hover:bg-slate-100"><ArrowLeft className="h-4 w-4" /> Schedule</Link>
       </div>
@@ -78,6 +81,11 @@ export default async function RequirementsPage() {
           </div>
         }
       >
+        <p className="mb-2 text-[11px] leading-5 text-slate-500">
+          <strong className="font-semibold text-slate-600">Two ways.</strong> Download the list, tag every activity in the
+          spreadsheet and upload it back — one pass for the whole schedule, and it goes through approval. Or tag one activity on
+          its own page, which is right for a single correction.
+        </p>
         <p className="text-xs text-slate-500">
           {tagging.pending
             ? <span className="font-semibold text-amber-700">{tagging.pending.versionLabel} is {tagging.pending.state === "DRAFT" ? "uploaded, not yet submitted" : "waiting for approval"}.</span>
@@ -93,6 +101,11 @@ export default async function RequirementsPage() {
         description="Each department fills its sheet — documents needed, from whom, by when (5 working days before the activity unless it says otherwise)"
         actions={control ? <Link href="/admin/controlled/DOCUMENT_REQUIREMENTS" className={btn("secondary", "sm")}><Upload className="h-4 w-4" /> Upload filled list</Link> : undefined}
       >
+        <p className="mb-2 text-[11px] leading-5 text-slate-500">
+          <strong className="font-semibold text-slate-600">Two ways.</strong> Ask the departments here: each is issued its own
+          sheet with a date to answer by, and the ask, the date and the answer are all recorded. Or, where a department sent its
+          list some other way, upload the filled list yourself — quicker, but the ask leaves no trace and nothing chases it.
+        </p>
         {list.pending ? <p className="mb-3 text-xs font-semibold text-amber-700">Requirements {list.pending.versionLabel} is {list.pending.state === "DRAFT" ? "uploaded, not yet submitted" : "waiting for approval"}.</p> : null}
 
         {control && toAsk.length ? (
@@ -163,6 +176,11 @@ export default async function RequirementsPage() {
 
       {/* 3 — issue the approved list to whoever sends the documents */}
       <Card title="3 · Tell each sender what to deliver" description="A sender is whoever submits the document: the contractor, the supplier, or our own department for documents we write. Each gets the list the departments returned in step 2, with the submit-by dates to plan on. Reviewers have the working days between submit-by and the activity.">
+        <p className="mb-2 text-[11px] leading-5 text-slate-500">
+          <strong className="font-semibold text-slate-600">Two ways.</strong> Issue the list here, which records what each sender
+          was told and when, and warns you when the list has changed since. Or download a sender’s list and send it yourself,
+          on a transmittal — use that when it has to travel with other paperwork.
+        </p>
         {senders.length ? (
           <>
             <DataTable head={<tr><Th>Sender</Th><Th>Documents</Th><Th>First submit-by</Th><Th>Issued</Th><Th /></tr>}>
@@ -199,7 +217,7 @@ export default async function RequirementsPage() {
       </Card>
 
       {/* 4 — before the activity */}
-      <Card title="4 · Confirm before the activity" description="Each concerned department confirms its documents are available. The activity is cleared when all have.">
+      <Card title="4 · Confirm before the activity" description="Each concerned department confirms its documents are available, on the activity itself. The activity is cleared when all of them have. One way only: a department confirms for itself, and nobody confirms on its behalf — that is the whole value of the step.">
         {upcoming.length ? (
           <DataTable head={<tr><Th>Activity</Th><Th>Date</Th><Th>Departments</Th></tr>}>
             {upcoming.map((a) => {

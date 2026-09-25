@@ -92,9 +92,13 @@ export default async function ActionDetailPage({ params, searchParams }: { param
                     : "The first warning goes out on its own the next time this page is refreshed. You can also send one now."}
                 </p>
                 {control ? (
-                  <Link href={remindHref} className={`${btn("primary", "sm")} mt-2`}>
-                    Notify by transmittal
-                  </Link>
+                  <p className="mt-2 flex flex-wrap items-center gap-3">
+                    <Link href={remindHref} className={btn("primary", "sm")}>Notify by transmittal</Link>
+                    {/* Where the proof lives: every warning sent is an audit event. */}
+                    <Link href={`/admin/audit?q=${encodeURIComponent(action.code)}`} className="text-[11px] font-semibold text-amber-900 underline">
+                      Every notice sent for {action.code} →
+                    </Link>
+                  </p>
                 ) : null}
               </div>
             ) : null}

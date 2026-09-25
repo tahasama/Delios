@@ -60,7 +60,10 @@ export function PlanTimeline({ rows }: { rows: PlanRow[] }) {
               <span className="absolute -top-0.5 left-1 text-[10px] text-slate-400">{t.label}</span>
             </div>
           ))}
-          <div className="absolute top-0 h-full border-l-2 border-red-400/70" style={{ left: `${at(now)}%` }} />
+          {/* Today, with its date — a bare line leaves people counting months. */}
+          <div className="absolute top-0 h-full border-l-2 border-red-400/70" style={{ left: `${at(now)}%` }}>
+            <span className="absolute -top-0.5 left-1 whitespace-nowrap rounded bg-red-500 px-1 text-[10px] font-semibold text-white">today · {fmtDate(new Date(now))}</span>
+          </div>
         </div>
         <ul className="relative space-y-1.5 pt-4">
           {dated.map((r) => {

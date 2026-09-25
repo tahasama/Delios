@@ -6,7 +6,7 @@ import { notifyDepartmentsAction } from "@/lib/actions/requirements";
 import { departmentsOf } from "@/lib/schedule";
 import { clearance } from "@/lib/requirements-process";
 import { fmtDate } from "@/lib/utils";
-import { Download, Upload } from "lucide-react";
+import { Download } from "lucide-react";
 import { after } from "next/server";
 import { warnOnceAtRisk } from "@/lib/risk-notice";
 import { PlanCards } from "./plan-cards";
@@ -86,9 +86,6 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
         </div>
         <div className="flex items-center gap-2">
           <a href="/api/export/baseline" className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-surface px-3.5 py-2 text-sm font-semibold text-slate-700"><Download className="h-4 w-4" /> Export</a>
-          {mayChange ? <Link href="/admin/controlled/SCHEDULE" className="inline-flex items-center gap-1.5 rounded-xl bg-brand-strong px-3.5 py-2 text-sm font-semibold text-white"><Upload className="h-4 w-4" /> Update schedule</Link> : null}
-          <Link href="/actions/requirements" className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-surface px-3.5 py-2 text-sm font-semibold text-slate-700">Requirements</Link>
-          <Link href="/actions/schedules" className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-surface px-3.5 py-2 text-sm font-semibold text-slate-700">Versions</Link>
         </div>
       </div>
 
