@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireScope } from "@/lib/scope";
 import { notFound } from "next/navigation";
-import { PageHeader, Card, Chip, DataTable, Th, Td, Field, inputCls, Banner } from "@/components/ui";
+import { PageHeader, Card, Chip, Info, DataTable, Th, Td, Field, inputCls, Banner } from "@/components/ui";
 import { ActionForm } from "@/components/form";
 import { addPackageMemberAction, assessPackageAction, issueShortfallAction, closePackageAction, acceptShortfallAction } from "@/lib/actions/planning";
 import { getActiveSet } from "@/lib/config";
@@ -33,13 +33,17 @@ export default async function PackageDetailPage({ params }: { params: Promise<{ 
   const nextAction = pkg.closedAt ? "Closed. Nothing more to do." : shortfall && pkg.shortfallIssuedAt && !pkg.shortfallAcceptedBy ? `Waiting for ${pkg.acceptanceAuthorityName} to accept what is missing.` : shortfall && !pkg.shortfallIssuedAt ? `Some documents are not ready. Send the shortfall to ${pkg.acceptanceAuthorityName}.` : pkg.assessedAt && !shortfall ? "Everything is ready. Close the package when it is delivered." : "Get every document to its required status, then check readiness.";
 
   const shortfallFor = new Map((shortfall ?? []).map((s) => [s.docNumber, s]));
+  // A code says nothing on its own: AB is as-built, IFC is for construction.
+  const statusName = new Map(statuses.map((x) => [x.code, x.label]));
+  const statusMeaning = new Map(statuses.map((x) => [x.code, typeof x.props.may === "string" ? `${x.label}: ${x.props.may}` : x.label]));
+  const spell = (code: string) => `${code}${statusName.get(code) ? ` (${statusName.get(code)!.toLowerCase()})` : ""}`;
   const canAct = !isReadOnly(user) && !pkg.closedAt;
 
   return (
     <div className="space-y-5">
       <PageHeader
         title={pkg.identifier}
-        subtitle={`${pkg.recipientName} · ${pkg.purpose.toLowerCase()} · every document at ${pkg.requiredStatus} by ${fmtDate(pkg.completionDate)} · accepted by ${pkg.acceptanceAuthorityName}`}
+        subtitle={`${pkg.recipientName} · ${pkg.purpose.toLowerCase()} · every document released at ${spell(pkg.requiredStatus)} by ${fmtDate(pkg.completionDate)} · accepted by ${pkg.acceptanceAuthorityName}`}
         actions={
           <><Link href="/packages" className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-semibold text-slate-500 hover:bg-slate-100"><ArrowLeft className="h-4 w-4"/> Packages</Link>{pkg.closedAt ? <Chip className="bg-slate-100 text-slate-600 ring-slate-300">closed</Chip>
           : pkg.shortfall ? <Chip className="bg-amber-100 text-amber-800 ring-amber-300">shortfall</Chip>
@@ -78,14 +82,14 @@ export default async function PackageDetailPage({ params }: { params: Promise<{ 
 
       <Card title={`Documents · ${pkg.members.length}`}>
         {pkg.members.length ? (
-          <DataTable head={<tr><Th>Document</Th><Th>Needs</Th><Th>Has</Th><Th>Ready</Th>{shortfall ? <Th>Why not</Th> : null}</tr>}>
+          <DataTable head={<tr><Th>Document</Th><Th>Needs</Th><Th>Has</Th><Th>Ready <Info>Ready: the current released revision carries the status this package asks for. Not ready means never released, released at another status, or replaced by a newer revision.</Info></Th>{shortfall ? <Th>Why not</Th> : null}</tr>}>
             {pkg.members.map((m) => {
               const cur = m.document.revisions[0];
               const ok = cur?.statusCode === m.requiredStatus;
               return (
                 <tr key={m.id}>
                   <Td><Link href={`/documents/${m.documentId}`} className="font-mono text-[13px] font-semibold text-brand-ink hover:underline">{m.document.docNumber}</Link><span className="block max-w-72 truncate text-xs text-slate-400">{m.document.title}</span></Td>
-                  <Td className="text-xs">{m.requiredStatus}</Td>
+                  <Td className="text-xs" title={statusMeaning.get(m.requiredStatus) ?? undefined}>{spell(m.requiredStatus)}</Td>
                   <Td className="text-xs">{cur ? `rev ${cur.value} · ${cur.statusCode}` : "not released"}</Td>
                   <Td>{ok ? <Chip className="bg-emerald-100 text-emerald-800 ring-emerald-300">yes</Chip> : <Chip className="bg-amber-100 text-amber-800 ring-amber-300">no</Chip>}</Td>
                   {shortfall ? <Td className="text-xs text-slate-500">{shortfallFor.get(m.document.docNumber)?.reason ?? ""}</Td> : null}

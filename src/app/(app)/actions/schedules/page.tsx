@@ -17,7 +17,7 @@ export default async function ScheduleVersionsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Schedule versions"
-        subtitle="Every schedule that has been in force, and what each one changed. New versions arrive through Controlled changes."
+        subtitle="Every schedule that has been in use, and what each one changed. New versions arrive through Controlled changes."
         actions={<Link href="/actions" className="inline-flex items-center gap-1.5 text-sm font-semibold text-link"><ArrowLeft className="h-4 w-4" /> Schedule & actions</Link>}
       />
 

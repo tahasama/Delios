@@ -189,7 +189,20 @@ async function advance(t: Tenant, runId: string, user: SessionUser) {
     await audit({ tenant: t, actor: user, action: "WORKFLOW_COMPLETED", entityType: "WorkflowRun", entityId: runId, entityLabel: `${rev.document.docNumber} rev ${rev.value}`, detail: "Binding verdict permits release — ready for release by the control function." });
     const contributorIds = await contributorRecipients(t, rev.document.createdById, rev.document.originator);
     await notifyMany(contributorIds, "WORKFLOW_DONE", `Workflow complete: ${rev.document.docNumber} rev ${rev.value}`, "All steps are done. The control function can now release it.", `/documents/${rev.documentId}`, t);
+    // Release is a step like any other, and an organization that has no control
+    // function does not have it. Where nobody holds Control, the binding verdict
+    // releases the revision at the status it decided on.
     const controllers = await holdersOf(t, "CONTROL");
+    if (!controllers.length) {
+      const { releaseRevision } = await import("./lifecycle");
+      try {
+        await releaseRevision(t, run.revisionId, user, rev.proposedStatus ?? "");
+        await audit({ tenant: t, actor: user, action: "RELEASE", entityType: "Revision", entityId: run.revisionId, entityLabel: `${rev.document.docNumber} rev ${rev.value}`, detail: "Released on the binding verdict: this organization publishes no control function." });
+      } catch (e) {
+        await notifyMany(contributorIds, "RELEASE_BLOCKED", `Not released: ${rev.document.docNumber} rev ${rev.value}`, e instanceof Error ? e.message : "Release failed.", `/documents/${rev.documentId}`, t);
+      }
+      return;
+    }
     await notifyMany(controllers.map((c) => c.id), "RELEASE_READY", `Ready to release: ${rev.document.docNumber} rev ${rev.value}`, `Workflow "${run.templateName}" completed.`, `/documents/${rev.documentId}`, t);
     return;
   }

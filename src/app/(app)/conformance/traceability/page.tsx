@@ -103,7 +103,7 @@ export default async function TraceabilityPage({ searchParams }: { searchParams:
 
       <Card
         title="Synchronized baseline"
-        description={last ? `In force: ${last.label} — released ${fmtDate(last.releasedAt)} by ${last.releasedByName}, Standard v${last.standardVersion}` : "No baseline released yet"}
+        description={last ? `In use now: ${last.label} — released ${fmtDate(last.releasedAt)} by ${last.releasedByName}, Standard v${last.standardVersion}` : "No baseline released yet"}
       >
         {releasable ? (
           mayRelease ? (

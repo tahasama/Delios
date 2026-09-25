@@ -35,7 +35,9 @@ const CONSEQUENCE = Object.fromEntries(VERDICT_EFFECT.map((e) => [e.value, e.lab
 
 export default async function CodesPage() {
   const ctx = await requireScope();
-  const [statuses, outcomes] = await Promise.all([getActiveSet("STATUSES"), getActiveSet("REVIEW_OUTCOMES")]);
+  const [statuses, outcomes, advice, commentClasses] = await Promise.all([
+    getActiveSet("STATUSES"), getActiveSet("REVIEW_OUTCOMES"), getActiveSet("REVIEW_ADVICE"), getActiveSet("COMMENT_CLASSES"),
+  ]);
   const canEdit = ctx.can("CONFIGURE");
   const text = (v: unknown) => (typeof v === "string" && v !== "—" ? v : null);
 
@@ -97,13 +99,35 @@ export default async function CodesPage() {
         </DataTable>
       </Card>
 
-      <Card id="outcome" title="3 · Review verdict — the one decision" description="Given at the last step of a review route by someone who may approve the document. A verdict that proceeds is the release approval. Earlier steps give the same codes as advice. Some projects write them as A / B / C / D or Code 1–4.">
+      <Card id="outcome" title="3 · Review verdict — the one decision" description="Given at the last step of a review route by someone who may approve the document. A verdict that proceeds is the release approval. Only that step gives a verdict; the steps before it give advice, from the list below. Some projects write them as A / B / C / D or Code 1–4.">
         <DataTable id="codes-outcomes" toolbar={false} head={<tr><Th>Code</Th><Th>Meaning</Th><Th>What happens next</Th></tr>}>
           {outcomes.map((o) => (
             <tr key={o.code}>
               <Td className="font-mono text-sm font-bold text-slate-900">{o.code}</Td>
               <Td className="whitespace-nowrap font-medium text-slate-800">{o.label}</Td>
               <Td className="text-xs">{CONSEQUENCE[verdictEffect(o.props)]}</Td>
+            </tr>
+          ))}
+        </DataTable>
+      </Card>
+
+      <Card id="advice" title="3b · Review advice — what an earlier step says" description="Every step of a route except the last gives advice. It is read by whoever decides and never returns the document by itself. The advice has to match the comments the adviser left, so what their comments amount to is said once.">
+        <DataTable id="codes-advice" toolbar={false} head={<tr><Th>Advice</Th><Th>What it means</Th></tr>}>
+          {advice.map((a) => (
+            <tr key={a.code}>
+              <Td className="whitespace-nowrap font-medium text-slate-800">{a.label}</Td>
+              <Td className="text-xs">{typeof a.props.meaning === "string" ? a.props.meaning : "—"}</Td>
+            </tr>
+          ))}
+        </DataTable>
+      </Card>
+
+      <Card id="comments" title="3c · Comment classes — which comments stop release" description="Every comment is one of two things. This is a separate list from verdicts and advice: a comment says what is wrong, a verdict says what happens to the revision. If they disagree, the comment wins — a revision with an open blocking comment cannot be released, so the decider either settles it, with a reason, or sends the revision back.">
+        <DataTable id="codes-comment-classes" toolbar={false} head={<tr><Th>Class</Th><Th>What it means</Th></tr>}>
+          {commentClasses.map((c) => (
+            <tr key={c.code}>
+              <Td className="whitespace-nowrap font-medium text-slate-800">{c.label}</Td>
+              <Td className="text-xs">{typeof c.props.meaning === "string" ? c.props.meaning : c.props.progressionPreventing === true ? "Must be settled before release." : "Recorded, and answered in the next revision."}</Td>
             </tr>
           ))}
         </DataTable>

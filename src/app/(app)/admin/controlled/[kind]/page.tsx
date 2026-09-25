@@ -44,7 +44,7 @@ function parseDiff(json: string | null): DiffLine[] {
 
 function DiffView({ lines }: { lines: DiffLine[] }) {
   const material = lines.filter((l) => l.change !== "UNCHANGED");
-  if (!material.length) return <p className="text-xs text-slate-500">Nothing differs from the version in force.</p>;
+  if (!material.length) return <p className="text-xs text-slate-500">Nothing differs from the version in use now.</p>;
   return (
     <ul className="scroll-thin max-h-80 space-y-1 overflow-y-auto pr-1">
       {material.map((line, i) => (
@@ -107,11 +107,11 @@ export default async function ControlledKindPage({ params }: { params: Promise<{
 
       {/* ── Upload ───────────────────────────────────────────────────────── */}
       {mayChange ? (
-        <Card title="Propose a change" description="Start from what is in force — download, edit, upload back">
+        <Card title="Propose a change" description="Start from what is in use now — download, edit, upload back">
           <div className="mb-4 flex flex-wrap gap-2">
             {keys.map((key) => (
               <a key={key} href={`/api/controlled/current/${handler.kind}?key=${encodeURIComponent(key)}`} className={btn("primary", "sm")}>
-                <Download className="h-4 w-4" /> In force{keys.length > 1 ? `: ${key}` : ""}
+                <Download className="h-4 w-4" /> In use now{keys.length > 1 ? `: ${key}` : ""}
               </a>
             ))}
             <a href={`/api/controlled/template/${handler.kind}`} className={btn("secondary", "sm")}>
@@ -149,7 +149,7 @@ export default async function ControlledKindPage({ params }: { params: Promise<{
                 {handler.kind === "DISTRIBUTION_MATRIX" ? (
                   <span className="mt-1 block font-medium text-amber-800">
                     This file replaces the whole matrix. Every rule you want to keep must be in it — which is why
-                    starting from “In force” is the safe route.
+                    starting from “In use now” is the safe route.
                   </span>
                 ) : null}
               </span>
@@ -162,7 +162,7 @@ export default async function ControlledKindPage({ params }: { params: Promise<{
       {sets.length === 0 ? (
         <Card title="Nothing uploaded yet">
           <p className="text-xs text-slate-500">
-            What is in force came from the configuration published when your organization was created. Upload a file
+            What is in use now came from the configuration published when your organization was created. Upload a file
             above to change it.
           </p>
         </Card>
@@ -179,7 +179,7 @@ export default async function ControlledKindPage({ params }: { params: Promise<{
             title={set.title}
             description={
               inForce
-                ? `In force: ${inForce.versionLabel} — approved by ${inForce.decidedByName} on ${fmtDate(inForce.decidedAt)}`
+                ? `In use now: ${inForce.versionLabel} — approved by ${inForce.decidedByName} on ${fmtDate(inForce.decidedAt)}`
                 : "No approved version yet"
             }
           >
@@ -211,12 +211,12 @@ export default async function ControlledKindPage({ params }: { params: Promise<{
                   {pending.state === "DRAFT" && handler.ownerApproves && mayApprove ? (
                     <>
                       <ActionForm action={decideControlledVersionAction} submitLabel="Approve and apply" size="sm" hidden={{ versionId: pending.id, decision: "APPROVE" }} className="space-y-0" />
-                      <ActionForm action={discardControlledVersionAction} submitLabel="Discard draft" variant="secondary" size="sm" hidden={{ versionId: pending.id }} confirmText="Discard this draft? Nothing in force changes." className="space-y-0" />
+                      <ActionForm action={discardControlledVersionAction} submitLabel="Discard draft" variant="secondary" size="sm" hidden={{ versionId: pending.id }} confirmText="Discard this draft? Nothing in use changes." className="space-y-0" />
                     </>
                   ) : pending.state === "DRAFT" && mayChange ? (
                     <>
                       <ActionForm action={submitControlledVersionAction} submitLabel="Submit for approval" size="sm" hidden={{ versionId: pending.id }} className="space-y-0" />
-                      <ActionForm action={discardControlledVersionAction} submitLabel="Discard draft" variant="secondary" size="sm" hidden={{ versionId: pending.id }} confirmText="Discard this draft? Nothing in force changes." className="space-y-0" />
+                      <ActionForm action={discardControlledVersionAction} submitLabel="Discard draft" variant="secondary" size="sm" hidden={{ versionId: pending.id }} confirmText="Discard this draft? Nothing in use changes." className="space-y-0" />
                     </>
                   ) : null}
 

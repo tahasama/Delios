@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requireScope } from "@/lib/scope";
-import { PageHeader, Field, inputCls, DataTable, Th, Td, EmptyState } from "@/components/ui";
+import { PageHeader, Field, inputCls, DataTable, Th, Td, EmptyState, Info } from "@/components/ui";
 import { ActionForm } from "@/components/form";
 import { createPackageAction } from "@/lib/actions/planning";
 import { createSupplierPackageAction } from "@/lib/actions/supplier";
@@ -30,6 +30,8 @@ export default async function PackagesPage({ searchParams }: { searchParams: Pro
     getActiveSet("REASONS_FOR_ISSUE"), getActiveSet("STATUSES"),
     holdersOf(ctx, "REVIEW"),
   ]);
+  // A status code on its own says nothing to a newcomer: AB is "as-built".
+  const statusMeaning = new Map(statuses.map((s) => [s.code, typeof s.props.may === "string" ? `${s.label}: ${s.props.may}` : s.label]));
   const parties = staff ? await db.party.findMany({ where: { isInternal: false }, orderBy: { name: "asc" } }) : [];
   const supplierStats = new Map<string, ReturnType<typeof supplierFigures>>();
   if (category === "SUPPLIER") for (const p of pkgs) supplierStats.set(p.id, supplierFigures(await supplierRows(ctx, p)));
@@ -71,14 +73,14 @@ export default async function PackagesPage({ searchParams }: { searchParams: Pro
         </DataTable>
       ) : <EmptyState title={supplierOnly ? "Nothing is expected from you yet" : "No supplier packages yet"} body={supplierOnly ? "When documents are requested from your company they appear here." : "A supplier package lists every document you expect from one supplier. They upload and send from it."} />
     ) : rows.length ? (
-      <DataTable head={<tr><Th>Package</Th><Th>Status</Th><Th>Documents ready</Th><Th>Due</Th><Th>Accepted by</Th></tr>}>
+      <DataTable head={<tr><Th>Package</Th><Th>Status</Th><Th title="Ready means the document's current released revision carries the status the package asks for, released on or before the package date.">Documents ready <Info>Ready: the document&apos;s current released revision carries the status the package asks for. Not ready means it was never released, it is at another status, or a newer revision has replaced it.</Info></Th><Th>Due</Th><Th>Accepted by</Th></tr>}>
         {rows.map((pkg) => {
           const percent = pkg.total ? Math.round(pkg.ready / pkg.total * 100) : 0;
           return (
             <tr key={pkg.id}>
               <Td><Link href={`/packages/${pkg.identifier}`} className="font-mono text-[13px] font-semibold text-brand-ink hover:underline">{pkg.identifier}</Link><span className="block max-w-72 truncate text-xs text-slate-500">{pkg.recipientName}</span></Td>
               <Td><Status state={pkg.state}/></Td>
-              <Td><div className="flex items-center gap-2"><div className="h-1.5 w-20 overflow-hidden rounded-full bg-slate-100"><div className={`h-full rounded-full ${percent === 100 ? "bg-emerald-500" : "bg-[#d9a441]"}`} style={{ width: `${percent}%` }}/></div><span className="text-xs text-slate-600">{pkg.ready} of {pkg.total} at {pkg.requiredStatus}</span></div></Td>
+              <Td><div className="flex items-center gap-2"><div className="h-1.5 w-20 overflow-hidden rounded-full bg-slate-100"><div className={`h-full rounded-full ${percent === 100 ? "bg-emerald-500" : "bg-[#d9a441]"}`} style={{ width: `${percent}%` }}/></div><span className="text-xs text-slate-600">{pkg.ready} of {pkg.total} at {pkg.requiredStatus}{statusMeaning.get(pkg.requiredStatus) ? <Info>{`${pkg.requiredStatus} — ${statusMeaning.get(pkg.requiredStatus)}`}</Info> : null}</span></div></Td>
               <Td className="whitespace-nowrap text-xs">{fmtDate(pkg.completionDate)}{!pkg.closedAt ? <span className={`block text-[11px] ${pkg.days < 0 ? "text-red-700" : "text-slate-400"}`}>{pkg.days < 0 ? `${Math.abs(pkg.days)} days late` : `in ${pkg.days} days`}</span> : null}</Td>
               <Td className="text-xs">{pkg.acceptanceAuthorityName}</Td>
             </tr>

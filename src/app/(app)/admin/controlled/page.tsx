@@ -58,7 +58,7 @@ export default async function ControlledPage() {
     <div className="space-y-5">
       <PageHeader
         title="Uploaded lists to decide"
-        subtitle="The schedule, the departments per activity and the document requirements are uploaded from Schedule & actions. Here they are compared with what is in force and decided."
+        subtitle="The schedule, the departments per activity and the document requirements are uploaded from Schedule & actions. Here they are compared with what is in use now and decided."
       />
 
       {waiting > 0 ? (
@@ -113,7 +113,7 @@ export default async function ControlledPage() {
                 {inForce ? (
                   <p className="flex items-center gap-1.5 text-[11px] text-slate-500">
                     <CircleCheck className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
-                    In force: {inForce.versionLabel} · {fmtDate(inForce.decidedAt)}
+                    In use now: {inForce.versionLabel} · {fmtDate(inForce.decidedAt)}
                   </p>
                 ) : (
                   <p className="text-[11px] text-slate-400">

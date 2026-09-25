@@ -191,6 +191,7 @@ async function RunActivePanel({ run, user, extra }: { run: { id: string; templat
               <span className={`grid h-5 w-5 place-items-center rounded-full text-[10px] font-bold ${s.status === "done" ? "bg-emerald-500 text-white" : s.status === "active" ? "bg-amber-500 text-white" : s.status === "declined" ? "bg-red-500 text-white" : "bg-slate-200 text-slate-500"}`}>
                 {s.status === "done" ? "✓" : i + 1}
               </span>
+              <span className="font-medium text-slate-800">{s.title || (i === run.steps.length - 1 ? "Decision" : `Review ${i + 1}`)}</span>
               <Chip className={i === run.steps.length - 1 ? "bg-emerald-100 text-emerald-800 ring-emerald-300" : "bg-sky-100 text-sky-800 ring-sky-300"}>{i === run.steps.length - 1 ? "decision" : "advice"}</Chip>
               <span className="text-xs text-slate-500">{names}</span>
               {s.status === "active" ? <Chip className="bg-amber-100 text-amber-800 ring-amber-300">waiting</Chip> : null}

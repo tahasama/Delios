@@ -44,7 +44,7 @@ export async function PlanCards() {
               {waiting.length ? (
                 <span className="font-semibold text-amber-700">{waiting.length} change{waiting.length === 1 ? "" : "s"} waiting on a decision</span>
               ) : inForce ? (
-                <span className="text-slate-500">In force: <strong className="font-semibold text-slate-700">{inForce.versionLabel}</strong>{inForce.decidedAt ? ` · ${fmtDate(inForce.decidedAt)}` : ""}</span>
+                <span className="text-slate-500">In use now: <strong className="font-semibold text-slate-700">{inForce.versionLabel}</strong>{inForce.decidedAt ? ` · ${fmtDate(inForce.decidedAt)}` : ""}</span>
               ) : (
                 <span className="text-slate-400">Nothing uploaded yet</span>
               )}
