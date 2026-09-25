@@ -1,4 +1,6 @@
+import Link from "next/link";
 import { isAdmin } from "@/lib/auth";
+import { SETUP_PAGES, maySetup } from "../setup-pages";
 import { requireScope } from "@/lib/scope";
 import { PageHeader, DataTable, Th, Td, Chip, Card, Field, inputCls } from "@/components/ui";
 import { ActionForm } from "@/components/form";
@@ -10,8 +12,8 @@ export const metadata = { title: "People & access" };
 
 export default async function AdminUsersPage() {
   const { user: me, db, projectId, project } = await requireScope();
-  if (!isAdmin(me)) {
-    return <PageHeader title="People & access" subtitle="Administrators only." />;
+  if (!maySetup(me, SETUP_PAGES.find((p) => p.href === "/admin/users")!)) {
+    return <PageHeader title="People & access" subtitle="Administrators and the control function." />;
   }
   // Scoped to this administrator's organization: they can see and add people
   // here and nowhere else.
@@ -55,7 +57,11 @@ export default async function AdminUsersPage() {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="People & access" subtitle={`Access is per project. Functions shown are for ${project.code} unless marked.`} />
+      <PageHeader
+        title="People & access"
+        subtitle={`Access is per project. Functions shown are for ${project.code} unless marked.`}
+        actions={<Link href="/import?kind=people" className="inline-flex min-h-10 items-center rounded-xl border border-slate-300 bg-surface px-4 text-xs font-semibold text-slate-700 hover:bg-slate-50">Add a whole team from a spreadsheet</Link>}
+      />
 
       <Card title="Add someone">
         <div className="divide-y divide-slate-100">

@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireAdminScope } from "@/lib/scope";
+import { requireAccessScope, requireAdminScope } from "@/lib/scope";
 import { audit } from "@/lib/audit";
 import { VERBS, type Verb } from "@/lib/permissions";
 
@@ -17,6 +17,19 @@ function readVerbs(formData: FormData): Verb[] {
  * from what the function may do, never chosen separately. Inside a project the
  * matrix decides everything.
  */
+/**
+ * An administrator's function is the one that can grant anything, including
+ * Configure itself. The control function maintains the matrix, but cannot
+ * change that function — or it could give itself the rest.
+ */
+function adminFunctionGuard(ctx: { can: (verb: "CONFIGURE") => boolean }, fn: { name: string; rules: { verbs: string }[] }): string | null {
+  if (ctx.can("CONFIGURE")) return null;
+  const isAdminFunction = fn.rules.some((r) => {
+    try { return (JSON.parse(r.verbs) as string[]).includes("CONFIGURE"); } catch { return false; }
+  });
+  return isAdminFunction ? `${fn.name} can change the permissions themselves, so only an administrator changes it.` : null;
+}
+
 function roleFromVerbs(verbs: string[]): string {
   if (verbs.includes("CONFIGURE")) return "ADMIN";
   if (verbs.includes("CONTROL")) return "CONTROLLER";
@@ -73,7 +86,7 @@ export async function updateFunctionAction(
   _prev: { error?: string; ok?: string } | undefined,
   formData: FormData,
 ): Promise<{ error?: string; ok?: string }> {
-  const ctx = await requireAdminScope();
+  const ctx = await requireAccessScope();
   const { db, user: admin } = ctx;
 
   const id = String(formData.get("functionId") ?? "");
@@ -81,8 +94,10 @@ export async function updateFunctionAction(
   const clearance = Number(formData.get("clearance") ?? 1);
   const active = formData.get("active") === "on";
 
-  const fn = await db.function.findFirst({ where: { id } });
+  const fn = await db.function.findFirst({ where: { id }, include: { rules: true } });
   if (!fn) return { error: "That function is not published in your organization." };
+  const guardUpdate = adminFunctionGuard(ctx, fn);
+  if (guardUpdate) return { error: guardUpdate };
   if (!Number.isInteger(clearance) || clearance < 1 || clearance > 9) {
  return { error: "Clearance is a level from 1 upwards." };
   }
@@ -119,15 +134,20 @@ export async function savePermissionRuleAction(
   _prev: { error?: string; ok?: string } | undefined,
   formData: FormData,
 ): Promise<{ error?: string; ok?: string }> {
-  const ctx = await requireAdminScope();
+  const ctx = await requireAccessScope();
   const { db, orgId, user: admin } = ctx;
 
   const ruleId = String(formData.get("ruleId") ?? "").trim();
   const functionId = String(formData.get("functionId") ?? "").trim();
   const blank = (key: string) => String(formData.get(key) ?? "").trim() || null;
 
-  const fn = await db.function.findFirst({ where: { id: functionId } });
+  const fn = await db.function.findFirst({ where: { id: functionId }, include: { rules: true } });
   if (!fn) return { error: "Choose a function." };
+  const guardRule = adminFunctionGuard(ctx, fn);
+  if (guardRule) return { error: guardRule };
+  if (!ctx.can("CONFIGURE") && readVerbs(formData).includes("CONFIGURE")) {
+    return { error: "Only an administrator grants Configure — it is the permission that grants every other." };
+  }
 
   const verbs = readVerbs(formData);
   if (!verbs.length) return { error: "A rule with no verbs grants nothing — delete it instead." };
@@ -165,12 +185,14 @@ export async function deletePermissionRuleAction(
   _prev: { error?: string; ok?: string } | undefined,
   formData: FormData,
 ): Promise<{ error?: string; ok?: string }> {
-  const ctx = await requireAdminScope();
+  const ctx = await requireAccessScope();
   const { db, user: admin } = ctx;
   const ruleId = String(formData.get("ruleId") ?? "");
 
-  const rule = await db.permissionRule.findFirst({ where: { id: ruleId }, include: { function: true } });
+  const rule = await db.permissionRule.findFirst({ where: { id: ruleId }, include: { function: { include: { rules: true } } } });
   if (!rule) return { error: "That rule no longer exists." };
+  const guardDelete = adminFunctionGuard(ctx, rule.function);
+  if (guardDelete) return { error: guardDelete };
 
   await db.permissionRule.delete({ where: { id: ruleId } });
   await audit({
@@ -189,13 +211,18 @@ export async function deletePermissionRuleAction(
  * a narrowing, and it is removed where it was made.
  */
 export async function toggleFunctionVerbAction(_prev: { error?: string; ok?: string } | undefined, formData: FormData): Promise<{ error?: string; ok?: string }> {
-  const ctx = await requireAdminScope();
+  const ctx = await requireAccessScope();
   const { db, orgId, user: admin } = ctx;
   const functionId = String(formData.get("functionId") ?? "");
   const verb = String(formData.get("verb") ?? "");
   const fn = await db.function.findFirst({ where: { id: functionId }, include: { rules: true } });
   if (!fn) return { error: "That function no longer exists." };
   if (!VERBS.includes(verb as Verb)) return { error: "Unknown permission." };
+  const guard = adminFunctionGuard(ctx, fn);
+  if (guard) return { error: guard };
+  if (!ctx.can("CONFIGURE") && verb === "CONFIGURE") {
+    return { error: "Only an administrator grants Configure — it is the permission that grants every other." };
+  }
 
   const open = fn.rules.find((r) => !r.deliverableType && !r.docType && !r.discipline && !r.criticality && !r.confidentiality);
   const held = open ? (JSON.parse(open.verbs) as string[]) : [];

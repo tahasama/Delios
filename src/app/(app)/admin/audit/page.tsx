@@ -20,8 +20,8 @@ const ACTION_COLORS: Record<string, string> = {
 
 export default async function AuditPage({ searchParams }: { searchParams: Promise<{ q?: string; action?: string }> }) {
   const { user, db } = await requireScope();
-  if (!isAdmin(user) && !isController(user)) {
-    return <PageHeader title="Audit trail" subtitle="The control function and administrators only." />;
+  if (!isAdmin(user)) {
+    return <PageHeader title="Audit trail" subtitle="Administrators only. The evidence for a single act is shown on the thing it happened to — a document, an activity, a transmittal." />;
   }
   const sp = await searchParams;
   const events = await db.auditEvent.findMany({

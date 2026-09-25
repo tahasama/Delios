@@ -86,6 +86,16 @@ export async function withdrawApprovalAction(_prev: { error?: string } | undefin
  if (!allowed) return { error: "Only the approving authority (or an administrator) withdraws an approval." };
 
   const rev = await db.revision.findUniqueOrThrow({ where: { id: revisionId }, include: { document: true } });
+  // An approval only governs the revision it was given on, and a newer revision
+  // has already replaced it. Withdrawing the old one would withdraw a document
+  // nobody is working from, and put the document into Withdrawn although its
+  // current revision stands. Withdraw the current revision's approval instead.
+  const newer = await db.revision.findFirst({
+    where: { documentId: rev.documentId, createdAt: { gt: rev.createdAt }, state: { in: ["IN_REVIEW", "RELEASED", "SUPERSEDED"] } },
+    orderBy: { createdAt: "desc" },
+    select: { value: true },
+  });
+  if (newer) return { error: `Rev ${rev.value} has already been replaced by rev ${newer.value}. Withdraw the approval on rev ${newer.value}, or supersede it — an approval on a replaced revision changes nothing.` };
   await db.approval.update({ where: { id: approval.id }, data: { withdrawnAt: new Date(), withdrawnBy: user.name, withdrawnReason: reason } });
   // the document enters Withdrawn until a replacement is released (§8.7)
   await db.document.update({ where: { id: rev.documentId }, data: { state: "WITHDRAWN" } });

@@ -7,6 +7,7 @@ import { allocateNumber, validateNumber } from "@/lib/numbering";
 import { getActiveSet } from "@/lib/config";
 import { isReadOnly } from "@/lib/auth";
 import { retentionFor } from "@/lib/retention";
+import { hashPassword } from "@/lib/auth";
 
 // Bulk in/out — document controllers live in spreadsheets. Templates, preview,
 // then execute. No one fills a form per line.
@@ -98,6 +99,36 @@ export async function importBulkAction(_prev: BulkResult | undefined, formData: 
       if (!fields.length) rows.push({ line, ok: false, message: "No fields to update (fill at least one column)" });
       else { valid++; rows.push({ line, ok: true, message: `Update ${number}: ${fields.join(", ")}` }); }
     }
+  } else if (kind === "people") {
+    // A whole team arrives at once, in a spreadsheet, like everything else here.
+    if (!ctx.can("CONFIGURE") && !ctx.can("CONTROL")) return { error: "Adding people needs Configure or Control." };
+    const [functions, parties, existing] = await Promise.all([
+      db.function.findMany({ where: { active: true }, select: { id: true, name: true, legacyRole: true } }),
+      db.party.findMany({ select: { id: true, code: true, name: true } }),
+      db.user.findMany({ select: { email: true } }),
+    ]);
+    const emails = new Set(existing.map((u) => u.email.toLowerCase()));
+    const seen = new Set<string>();
+    for (let i = 0; i < objects.length; i++) {
+      const o = objects[i];
+      const line = i + 2;
+      const name = GET(o, "Name");
+      const email = GET(o, "Email").toLowerCase();
+      const company = GET(o, "Company");
+      const fnName = GET(o, "Function");
+      const problems: string[] = [];
+      if (!name) problems.push("no name");
+      if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) problems.push("the email is not an address");
+      if (emails.has(email)) problems.push("someone already uses that email");
+      if (seen.has(email)) problems.push("the same email appears twice in this file");
+      if (!functions.some((f) => f.name.toLowerCase() === fnName.toLowerCase())) problems.push(`no published function called "${fnName || "(empty)"}"`);
+      if (company && !parties.some((x) => x.code.toLowerCase() === company.toLowerCase() || x.name.toLowerCase() === company.toLowerCase())) {
+        problems.push(`no party called "${company}"`);
+      }
+      seen.add(email);
+      if (problems.length) rows.push({ line, ok: false, message: problems.join("; ") });
+      else { valid++; rows.push({ line, ok: true, message: `${name} <${email}> as ${fnName}${company ? ` at ${company}` : ""}` }); }
+    }
   } else {
     return { error: "Unknown import kind." };
   }
@@ -150,6 +181,29 @@ export async function importBulkAction(_prev: BulkResult | undefined, formData: 
           await db.baselineEntry.create({ data: { projectId, actionId: action.id, documentId: doc.id, requiredStatus: GET(o, "Required Status"), requiredBy: new Date(GET(o, "Required By")), createdByName: user.name } });
           await audit({ actor: user, action: "BASELINE_ENTRY", entityType: "Action", entityId: action.id, entityLabel: action.code, newValue: doc.docNumber + " -> " + GET(o, "Required Status"), detail: "Bulk import (14.3)." });
         }
+        done++;
+      } else if (kind === "people") {
+        const fn = await db.function.findFirstOrThrow({ where: { name: GET(o, "Function"), active: true } });
+        const company = GET(o, "Company");
+        const party = company
+          ? await db.party.findFirst({ where: { OR: [{ code: company }, { name: company }] } })
+          : null;
+        // A one-time password, written into the report so whoever imported can
+        // hand it over; the person changes it when they first sign in.
+        const password = `delios-${Math.random().toString(36).slice(2, 8)}`;
+        const created = await db.user.create({
+          data: {
+            orgId, email: GET(o, "Email").toLowerCase(), name: GET(o, "Name"), role: fn.legacyRole,
+            organization: party?.name ?? null, partyId: party?.id ?? null,
+            passwordHash: await hashPassword(password), active: true,
+          },
+        });
+        await db.projectMembership.create({
+          data: { projectId, userId: created.id, functionId: fn.id, department: GET(o, "Department") || null },
+        });
+        await audit({ actor: user, action: "USER_CREATED", entityType: "User", entityId: created.email, entityLabel: created.name, newValue: fn.name, detail: `Bulk import of people: added to this project as ${fn.name}.` });
+        const report2 = rows.find((r) => r.line === line);
+        if (report2) report2.message = `${created.name} added as ${fn.name} \u2014 first password: ${password}`;
         done++;
       } else if (kind === "metadata") {
         const doc = await db.document.findFirstOrThrow({ where: { docNumber: GET(o, "Document Number") } });

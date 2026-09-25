@@ -1,5 +1,6 @@
 import { requireScope } from "@/lib/scope";
 import { isAdmin } from "@/lib/auth";
+import { SETUP_PAGES, maySetup } from "../setup-pages";
 import { PageHeader, Card, Chip, DataTable, Field, Th, Td, inputCls } from "@/components/ui";
 import { ActionForm } from "@/components/form";
 import { getActiveSet } from "@/lib/config";
@@ -27,9 +28,12 @@ function parseVerbs(json: string): Verb[] {
 
 export default async function FunctionsPage() {
   const { user: me, db } = await requireScope();
-  if (!isAdmin(me)) {
-    return <PageHeader title="Functions & permissions" subtitle="Administrators only." />;
+  if (!maySetup(me, SETUP_PAGES.find((p) => p.href === "/admin/functions")!)) {
+    return <PageHeader title="Functions & permissions" subtitle="Administrators and the control function." />;
   }
+  // Document Control maintains the matrix, but not the authority that could
+  // give itself more: an administrator's own function stays with administrators.
+  const mayChangeAdminFunctions = isAdmin(me);
 
   const [functions, disciplines, docTypes, deliverableTypes, criticalities, confidentialities] = await Promise.all([
     db.function.findMany({

@@ -37,6 +37,7 @@ export default async function ImportPage({ searchParams }: { searchParams: Promi
               <li><a href="/api/export/template-deliverables" className="font-medium text-brand-ink hover:underline">Deliverable list template</a></li>
               <li className="hidden"><a href="/api/export/template-baseline">Baseline template</a></li>
               <li><a href="/api/export/template-metadata" className="font-medium text-brand-ink hover:underline">Metadata update template</a></li>
+              <li><a href="/api/export/template-people" className="font-medium text-brand-ink hover:underline">People template</a></li>
             </ul>
           </Card>
           <Card title="Extract any view" description="Each file carries its generation timestamp.">

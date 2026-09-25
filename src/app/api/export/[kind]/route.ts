@@ -104,6 +104,13 @@ export async function GET(req: Request, { params }: { params: Promise<{ kind: st
       ["SCH-1015", "A0048", "Mechanical completion - unit 73", "2026-10-18", "2026-10-18", "Commissioning"],
     ];
     name = "template-schedule-version";
+  } else if (kind === "template-people") {
+    rows = [
+      ["Name", "Email", "Company", "Function", "Department"],
+      ["A. Benali", "a.benali@example.com", "", "Reviewer", "ME"],
+      ["J. Doe", "j.doe@madasud.example", "MAD", "Supplier contact", ""],
+    ];
+    name = "template-people";
   } else if (kind === "template-metadata") {
     rows = [
       ["Document Number", "Title", "DocType", "Discipline", "Criticality", "Confidentiality", "RetentionClass", "SubProject", "ContractRef"],

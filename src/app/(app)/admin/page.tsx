@@ -2,7 +2,7 @@ import Link from "next/link";
 import { requireScope } from "@/lib/scope";
 import { hasVerb } from "@/lib/auth";
 import { PageHeader, Banner } from "@/components/ui";
-import { SETUP_PAGES, SETUP_GROUPS, type SetupPage } from "./setup-pages";
+import { SETUP_PAGES, SETUP_GROUPS, maySetup, type SetupPage } from "./setup-pages";
 import {
   FolderKanban, Building2, Gauge, Tags, FileDigit, BadgeCheck, Users, Grid3x3, FileUp, Workflow, ScrollText, ArrowRight,
   type LucideIcon,
@@ -35,7 +35,7 @@ export default async function AdminPage() {
   const ctx = await requireScope();
   const { user, db } = ctx;
   // Administrators see every page; someone granted a single verb sees the page it opens.
-  const open = SETUP_PAGES.filter((p) => hasVerb(user, p.verb ?? "CONFIGURE"));
+  const open = SETUP_PAGES.filter((p) => maySetup(user, p));
   if (!open.length) {
     return (
       <div>

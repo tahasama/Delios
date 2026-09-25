@@ -42,6 +42,8 @@ export default async function ActionDetailPage({ params, searchParams }: { param
 
   const depts = departmentsOf(action);
   const control = ctx.can("CONTROL");
+  // Only administrators read the audit trail, so only they are sent to it.
+  const admin = ctx.can("CONFIGURE");
   const me = await db.projectMembership.findFirst({ where: { projectId: ctx.projectId, userId: ctx.user.id, active: true } });
   const clear = clearance(action);
   // Confirmation opens with the review window: from submit-by to the activity.
@@ -95,9 +97,11 @@ export default async function ActionDetailPage({ params, searchParams }: { param
                   <p className="mt-2 flex flex-wrap items-center gap-3">
                     <Link href={remindHref} className={btn("primary", "sm")}>Notify by transmittal</Link>
                     {/* Where the proof lives: every warning sent is an audit event. */}
-                    <Link href={`/admin/audit?q=${encodeURIComponent(action.code)}`} className="text-[11px] font-semibold text-amber-900 underline">
-                      Every notice sent for {action.code} →
-                    </Link>
+                    {admin ? (
+                      <Link href={`/admin/audit?q=${encodeURIComponent(action.code)}`} className="text-[11px] font-semibold text-amber-900 underline">
+                        Every notice sent for {action.code} →
+                      </Link>
+                    ) : null}
                   </p>
                 ) : null}
               </div>

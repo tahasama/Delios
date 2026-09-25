@@ -1,4 +1,5 @@
 import { isAdmin } from "@/lib/auth";
+import { SETUP_PAGES, maySetup } from "../setup-pages";
 import { requireScope } from "@/lib/scope";
 import { saveDistributionRuleAction, deleteDistributionRuleAction } from "@/lib/actions/retention";
 import { getActiveSet } from "@/lib/config";
@@ -12,7 +13,7 @@ export const metadata = { title: "Parties & people" };
 // §0.3 — our organization and the external parties it exchanges information with.
 export default async function AdminPartiesPage() {
   const { user: me, db } = await requireScope();
-  if (!isAdmin(me)) return <PageHeader title="Parties" subtitle="Administrators only." />;
+  if (!maySetup(me, SETUP_PAGES.find((p) => p.href === "/admin/parties")!)) return <PageHeader title="Parties" subtitle="Administrators and the control function." />;
   const [parties, rules, deliverables, confs] = await Promise.all([
     db.party.findMany({ orderBy: [{ isInternal: "desc" }, { name: "asc" }], include: { _count: { select: { users: true } }, contact: { select: { id: true, name: true, email: true } }, backup: { select: { id: true, name: true } } } }),
     db.distributionRule.findMany({ orderBy: [{ deliverableType: "asc" }, { confidentiality: "asc" }] }),

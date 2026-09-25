@@ -15,6 +15,13 @@ const KINDS = [
     template: "/api/export/template-deliverables",
   },
   {
+    key: "people",
+    title: "People \u2192 accounts on this project",
+    blurb: "A whole team at once: one row per person. Each becomes an account on this project, in the function named, with a first password shown in the report for you to hand over.",
+    columns: "Name, Email, Company (a party code or name; leave empty for our own staff), Function (as published in Functions & permissions), Department",
+    template: "/api/export/template-people",
+  },
+  {
     key: "metadata",
     title: "Metadata update in bulk",
     blurb: "Correct many documents at once. Only the columns you fill are changed — every change is logged field-by-field.",

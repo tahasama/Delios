@@ -1,4 +1,5 @@
 import { isAdmin } from "@/lib/auth";
+import { SETUP_PAGES, maySetup } from "../setup-pages";
 import { requireScope } from "@/lib/scope";
 import { PageHeader, Card, Chip, DataTable, Th, Td, Field, inputCls } from "@/components/ui";
 import { ActionForm } from "@/components/form";
@@ -11,7 +12,7 @@ export const metadata = { title: "Numbering schemes" };
 
 export default async function AdminNumberingPage() {
   const { user: me, db } = await requireScope();
-  if (!isAdmin(me)) return <PageHeader title="Numbering schemes" subtitle="Administrators only." />;
+  if (!maySetup(me, SETUP_PAGES.find((p) => p.href === "/admin/numbering")!)) return <PageHeader title="Numbering schemes" subtitle="Administrators and the control function." />;
   const [schemes, routing, sets, deliverables, sample] = await Promise.all([
     db.scheme.findMany({ include: { fields: { orderBy: { position: "asc" } } }, orderBy: { name: "asc" } }),
     db.schemeRouting.findMany({ orderBy: { deliverableType: "asc" } }),

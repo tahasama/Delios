@@ -165,6 +165,17 @@ export async function requireAdminScope(): Promise<Scope> {
 }
 
 /**
+ * The access lists the control function keeps day to day: functions, people,
+ * parties, numbering, routes. It may not touch an administrator's own function,
+ * which is checked where the change is made, not here.
+ */
+export async function requireAccessScope(): Promise<Scope> {
+  const scope = await requireScope();
+  if (!scope.can("CONFIGURE") && !scope.can("CONTROL")) redirect("/?denied=1");
+  return scope;
+}
+
+/**
  * Deliberate escape hatch for the few surfaces that are genuinely cross-project
  * (org administration, the project picker itself, login). Every call site is
  * meant to be reviewable: `grep -rn crossProject src`.
