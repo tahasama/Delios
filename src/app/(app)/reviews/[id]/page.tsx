@@ -7,6 +7,7 @@ import { ActionForm } from "@/components/form";
 import { OUTCOME_CONSEQUENCES } from "@/lib/standard";
 import { fmtDate, fmtDateTime } from "@/lib/utils";
 import { dueState } from "@/lib/workflow";
+import { Timeline } from "@/components/timeline";
 import { getActiveSet } from "@/lib/config";
 import { decisionOptions, statusOptions } from "@/lib/decision-options";
 import { VerdictDecision } from "@/app/(app)/documents/[id]/verdict-status";
@@ -102,21 +103,19 @@ export default async function ReviewCyclePage({ params }: { params: Promise<{ id
           {!cycle.issuedToReviewAt ? <Card title="Send to reviewers">{controller ? <ActionForm action={issueToReviewAction} submitLabel="Send to reviewers" hidden={{ cycleId: cycle.id }}/> : <p className="text-xs text-slate-500">Waiting for Document Control.</p>}</Card> : null}
 
           <Card title="Progress">
-            <ol className="relative ml-2 space-y-4 border-l border-slate-200 pl-5">
-              {custody.map((point) => (
-                <li key={point.label} className="relative">
-                  <span className={`absolute -left-[27px] top-1 h-3 w-3 rounded-full ${point.at ? "bg-emerald-500" : "border-2 border-slate-300 bg-surface"}`}/>
-                  <p className="text-xs font-semibold text-slate-800">{point.label}</p>
-                  <p className="mt-0.5 text-[11px] text-slate-400">{point.at ? fmtDateTime(point.at) : "not yet"}{point.label !== "With reviewers" ? ` · ${point.holder}` : ""}</p>
-                  {point.label === "With reviewers" ? (
-                    <ul className="mt-1 space-y-0.5">
-                      {cycle.assignments.map((a) => <li key={a.id} className="text-[11px] text-slate-600">{a.completedAt ? "✓" : "○"} {a.userName}</li>)}
-                      {!cycle.assignments.length ? <li className="text-[11px] text-slate-400">nobody assigned</li> : null}
-                    </ul>
-                  ) : null}
-                </li>
-              ))}
-            </ol>
+            <Timeline
+              points={custody.map((point) => ({
+                label: point.label,
+                at: point.at,
+                holder: point.label === "With reviewers" ? null : point.holder,
+                detail: point.label === "With reviewers" ? (
+                  <ul className="space-y-0.5">
+                    {cycle.assignments.map((a) => <li key={a.id}>{a.completedAt ? "\u2713" : "\u25cb"} {a.userName}</li>)}
+                    {!cycle.assignments.length ? <li className="text-slate-400">nobody assigned</li> : null}
+                  </ul>
+                ) : null,
+              }))}
+            />
           </Card>
         </aside>
       </div>

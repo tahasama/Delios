@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requireScope } from "@/lib/scope";
 import { notFound } from "next/navigation";
+import { Timeline } from "@/components/timeline";
 import { PageHeader, Card, Chip, Info, DataTable, Th, Td, Field, inputCls, Banner } from "@/components/ui";
 import { ActionForm } from "@/components/form";
 import { addPackageMemberAction, assessPackageAction, issueShortfallAction, closePackageAction, acceptShortfallAction } from "@/lib/actions/planning";
@@ -79,6 +80,19 @@ export default async function PackageDetailPage({ params }: { params: Promise<{ 
         {pkg.shortfallAcceptedBy ? <p className="mt-3 text-xs text-slate-500">Shortfall accepted by {pkg.shortfallAcceptedBy}.</p> : null}
         {pkg.closedAt ? <p className="mt-3 text-xs text-slate-500">Closed {fmtDateTime(pkg.closedAt)}.</p> : null}
       </section>
+
+      <Card title="Progress">
+        <Timeline
+          points={[
+            { label: "Package opened", at: pkg.createdAt, holder: pkg.compositionOwnerName ?? null },
+            { label: `Every document released at ${spell(pkg.requiredStatus)}`, at: readyCount === pkg.members.length && pkg.members.length ? pkg.assessedAt ?? pkg.completionDate : null, holder: `${readyCount} of ${pkg.members.length} ready` },
+            { label: "Readiness checked", at: pkg.assessedAt, holder: pkg.compositionOwnerName },
+            { label: "What is missing sent to the acceptor", at: pkg.shortfallIssuedAt, holder: pkg.acceptanceAuthorityName, skipped: !!pkg.assessedAt && !shortfall },
+            { label: "Missing documents accepted", at: pkg.shortfallAcceptedBy ? pkg.shortfallIssuedAt : null, holder: pkg.shortfallAcceptedBy ?? null, skipped: !!pkg.assessedAt && !shortfall },
+            { label: "Delivered and closed", at: pkg.closedAt, holder: pkg.acceptanceAuthorityName },
+          ]}
+        />
+      </Card>
 
       <Card title={`Documents · ${pkg.members.length}`}>
         {pkg.members.length ? (

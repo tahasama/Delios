@@ -7,6 +7,7 @@ import { confirmReadinessAction } from "@/lib/actions/requirements";
 import { clearance } from "@/lib/requirements-process";
 import { departmentsOf, DEFAULT_LEAD_BUSINESS_DAYS, businessDaysBefore } from "@/lib/schedule";
 import { shortfall } from "@/lib/risk-notice";
+import { Timeline } from "@/components/timeline";
 import { fmtDate } from "@/lib/utils";
 import { ArrowLeft } from "lucide-react";
 
@@ -51,6 +52,8 @@ export default async function ActionDetailPage({ params, searchParams }: { param
   const entries = dept ? action.entries.filter((e) => e.department === dept) : action.entries;
   const readyCount = action.entries.filter((e) => e.document.revisions[0]?.statusCode === e.requiredStatus).length;
   const overdue = action.scheduledDate && new Date(action.scheduledDate) < new Date();
+  // The earliest date a document is owed: where the activity's own clock starts.
+  const firstDue = action.entries.map((e) => e.requiredBy).filter(Boolean).sort((a, b) => a.getTime() - b.getTime())[0] ?? null;
   const readiness = action.entries.length === 0 ? "UNKNOWN" : readyCount === action.entries.length ? "READY" : overdue ? "NOT_READY" : "AT_RISK";
   // Who is short, and the transmittal that tells them — the placeholder numbers
   // are named in it, and the sender adds anyone else who should see it.
@@ -110,6 +113,21 @@ export default async function ActionDetailPage({ params, searchParams }: { param
         ) : (
           <Banner tone="warn" title="Needs departments">The project manager tags this activity in the departments list. Until then its documents cannot be asked for.</Banner>
         )}
+      </Card>
+
+      {/* The same progress line as a review: what has happened, and what is next. */}
+      <Card title="Progress">
+        <Timeline
+          points={[
+            { label: "Departments tagged", at: depts.length ? action.createdAt : null, holder: depts.length ? depts.map(deptLabel).join(", ") : "nobody yet" },
+            { label: "Documents listed", at: action.entries.length ? action.entries[0].createdAt : null, holder: action.entries.length ? `${action.entries.length} document${action.entries.length === 1 ? "" : "s"}` : "none listed" },
+            { label: "First document due", at: firstDue, holder: firstDue && firstDue < new Date() ? "that date has passed" : null },
+            ...(action.riskNotifiedAt ? [{ label: "Departments warned automatically", at: action.riskNotifiedAt, holder: depts.map(deptLabel).join(", ") }] : []),
+            { label: "Every document ready", at: action.entries.length && readyCount === action.entries.length ? action.scheduledDate : null, holder: `${readyCount} of ${action.entries.length} ready` },
+            { label: "Departments confirmed", at: clear.cleared ? action.confirmations.map((c) => c.confirmedAt).filter(Boolean).sort((x, y) => y!.getTime() - x!.getTime())[0] ?? null : null, holder: `${clear.confirmed.length} of ${clear.depts.length}` },
+            { label: "The work happens", at: null, holder: action.scheduledDate ? fmtDate(action.scheduledDate) : "no date" },
+          ]}
+        />
       </Card>
 
       {/* Steps 3–5 — the approved requirements, by department */}

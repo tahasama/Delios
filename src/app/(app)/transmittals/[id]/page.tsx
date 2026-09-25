@@ -10,6 +10,7 @@ import { issueTransmittalAction, acceptanceCheckAction } from "@/lib/actions/tra
 import { preflight } from "@/lib/rules/preflight";
 import { PreflightPanel, Guarded } from "@/components/preflight";
 import { ReceiptTracker } from "./receipt-tracker";
+import { Timeline } from "@/components/timeline";
 import { Action } from "../../documents/[id]/workflow-panel";
 import { SendForReview } from "@/components/send-for-review-panel";
 import { ArrowLeft } from "lucide-react";
@@ -192,6 +193,26 @@ export default async function TransmittalDetailPage({ params, searchParams }: { 
         </div>
 
         <div className="space-y-4">
+
+          <Card title="Progress">
+            <Timeline
+              points={t.direction === "OUTGOING" ? [
+                { label: "Raised", at: t.createdAt, holder: t.createdByName },
+                { label: "Issued — the recipients were told", at: t.status === "DRAFT" ? null : t.dateOfIssue, holder: t.status === "DRAFT" ? "nothing has been sent yet" : t.createdByName },
+                {
+                  label: "Seen", at: t.recipients.map((r) => r.openedAt).filter(Boolean).sort((x, y) => x!.getTime() - y!.getTime())[0] ?? null,
+                  holder: `${t.recipients.filter((r) => r.openedAt).length} of ${t.recipients.length}`,
+                },
+                ...(t.responseRequired ? [{ label: "A reply is due", at: null, holder: t.responseDueDate ? fmtDate(t.responseDueDate) : "no date" }] : []),
+              ] : [
+                { label: "They sent it", at: t.dateOfIssue, holder: t.issuingParty },
+                { label: "It arrived", at: t.receivedDate, holder: t.receivedByParty ?? null },
+                { label: "Checked on arrival", at: t.acceptanceCheckedAt, holder: t.checkedByName ?? null, detail: t.status === "REJECTED" ? t.rejectionReason : null },
+                { label: "Sent for review", at: t.cycles[0]?.submittedAt ?? null, holder: t.cycles.length ? `${t.cycles.length} review${t.cycles.length === 1 ? "" : "s"}` : null, skipped: ["CLOSED"].includes(t.status) && !t.cycles.length },
+                { label: "Closed", at: t.status === "CLOSED" ? t.acceptanceCheckedAt : null },
+              ]}
+            />
+          </Card>
 
           <Card title={`Recipients · ${t.recipients.length}`} description="Everyone named here can open this transmittal and the documents it carries. Opening it while signed in is recorded as receipt — there is nothing for them to confirm.">
             <ul className="divide-y divide-slate-100">
