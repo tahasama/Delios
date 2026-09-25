@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { cn } from "@/lib/utils";
-import { AlertTriangle, CheckCircle2, Info } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Info as InfoIcon } from "lucide-react";
 
 // Shared, server-safe UI primitives. Buttons are plain <button>/<Link> so forms
 // work without client JavaScript.
@@ -181,18 +181,37 @@ export function EmptyState({ title, body, action }: { title: string; body?: stri
 }
 
 /** A column header. Carries the resize handle that DataTable listens for. */
-export function Th({ children, className, label }: { children?: React.ReactNode; className?: string; label?: string }) {
+/**
+ * A word that needs one sentence of explanation, without spending a paragraph on
+ * it: the sentence is on hover and on focus, so the screen stays short and
+ * nobody has to guess what "retention" or "AB" means.
+ */
+export function Info({ children, className }: { children: string; className?: string }) {
   return (
-    <th scope="col" data-label={label} className={cn("dt-th", className)}>
+    <span
+      tabIndex={0}
+      role="note"
+      title={children}
+      aria-label={children}
+      className={cn("ml-1 inline-grid h-[14px] w-[14px] cursor-help place-items-center rounded-full bg-slate-200 text-[9px] font-bold text-slate-600 align-[1px] hover:bg-slate-300", className)}
+    >
+      i
+    </span>
+  );
+}
+
+export function Th({ children, className, label, title }: { children?: React.ReactNode; className?: string; label?: string; title?: string }) {
+  return (
+    <th scope="col" data-label={label} title={title} className={cn("dt-th", className)}>
       {children}
       <span data-col-resizer aria-hidden className="dt-resizer" />
     </th>
   );
 }
 
-export function Td({ children, className, colSpan }: { children?: React.ReactNode; className?: string; colSpan?: number }) {
+export function Td({ children, className, colSpan, title }: { children?: React.ReactNode; className?: string; colSpan?: number; title?: string }) {
   return (
-    <td colSpan={colSpan} className={cn("dt-td", className)}>
+    <td colSpan={colSpan} title={title} className={cn("dt-td", className)}>
       {children}
     </td>
   );
@@ -224,7 +243,7 @@ export function Banner({ tone = "info", title, children }: { tone?: "info" | "wa
     danger: "border-red-300 bg-red-50 text-red-900",
     good: "border-emerald-300 bg-emerald-50 text-emerald-900",
   };
-  const Icon = tone === "good" ? CheckCircle2 : tone === "info" ? Info : AlertTriangle;
+  const Icon = tone === "good" ? CheckCircle2 : tone === "info" ? InfoIcon : AlertTriangle;
   return (
     <div className={cn("flex items-start gap-3 rounded-2xl border px-4 py-3.5 text-sm", tones[tone])} role={tone === "danger" ? "alert" : "status"}>
       <Icon className="mt-0.5 h-4.5 w-4.5 shrink-0" />

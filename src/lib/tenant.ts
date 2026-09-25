@@ -124,6 +124,47 @@ function injectData(data: unknown, key: string, value: string): unknown {
  */
 const CONFIDENTIAL_MODELS = new Set(["Document"]);
 
+/**
+ * Someone from another party reading our register. They are not staff: they see
+ * what their own party produced, and what was issued to them on a transmittal.
+ * Nothing else exists for them — in the register, in search, in exports.
+ */
+export type ExternalReader = { partyCode: string | null; userId: string; organization: string | null };
+
+function externalDocumentFilter(reader: ExternalReader) {
+  const addressedToThem = {
+    OR: [
+      { userId: reader.userId },
+      ...(reader.organization ? [{ organization: reader.organization }] : []),
+      ...(reader.partyCode ? [{ organization: reader.partyCode }] : []),
+    ],
+  };
+  return {
+    OR: [
+      ...(reader.partyCode ? [{ originator: reader.partyCode }] : []),
+      { revisions: { some: { transmittalItems: { some: { transmittal: { status: "ISSUED", recipients: { some: addressedToThem } } } } } } },
+    ],
+  };
+}
+
+/**
+ * The same rule, said once per model that carries documents: a reader from
+ * another party reaches a row only through a document they may see, a
+ * transmittal they are on, or one they wrote themselves.
+ */
+const EXTERNAL_MODELS: Record<string, (reader: ExternalReader) => Record<string, unknown>> = {
+  Document: externalDocumentFilter,
+  Revision: (reader) => ({ document: externalDocumentFilter(reader) }),
+  ReviewCycle: (reader) => ({ revision: { document: externalDocumentFilter(reader) } }),
+  Transmittal: (reader) => ({
+    OR: [
+      { recipients: { some: { OR: [{ userId: reader.userId }, ...(reader.organization ? [{ organization: reader.organization }] : [])] } } },
+      { createdById: reader.userId },
+      ...(reader.organization ? [{ issuingParty: reader.organization }] : []),
+    ],
+  }),
+};
+
 export function scopedClient(
   orgId: string,
   projectId: string,
@@ -133,6 +174,8 @@ export function scopedClient(
    * which measure the register rather than read it on someone's behalf.
    */
   allowedConfidentiality: string[] | null = null,
+  /** Set when the reader belongs to another party; null for our own staff. */
+  external: ExternalReader | null = null,
 ) {
   return db.$extends({
     query: {
@@ -151,17 +194,19 @@ export function scopedClient(
           if (READ_OPS.has(operation)) {
             const where = (a.where ?? {}) as Record<string, unknown>;
             const scopedWhere: Record<string, unknown> = { ...where, [key]: value };
+            const extra: unknown[] = [];
+            if (external && model && EXTERNAL_MODELS[model]) extra.push(EXTERNAL_MODELS[model](external));
             if (allowedConfidentiality && model && CONFIDENTIAL_MODELS.has(model)) {
               // An unclassified item is readable by anyone who can reach the
               // project; a classified one needs the clearance for its level.
-              const clearance = {
-                OR: [{ confidentiality: null }, { confidentiality: { in: allowedConfidentiality } }],
-              };
+              extra.push({ OR: [{ confidentiality: null }, { confidentiality: { in: allowedConfidentiality } }] });
+            }
+            if (extra.length) {
               scopedWhere.AND = Array.isArray(where.AND)
-                ? [...(where.AND as unknown[]), clearance]
+                ? [...(where.AND as unknown[]), ...extra]
                 : where.AND
-                  ? [where.AND, clearance]
-                  : [clearance];
+                  ? [where.AND, ...extra]
+                  : extra;
             }
             return run({ ...a, where: scopedWhere });
           }

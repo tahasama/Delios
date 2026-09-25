@@ -378,14 +378,14 @@ export default async function DocumentDetailPage({
                   <ul className="divide-y divide-slate-100">
                     {transmittalItems.map((item) => {
                       const t = item.transmittal;
-                      const acked = t.recipients.filter((r) => r.acknowledgedAt).length;
+                      const seen = t.recipients.filter((r) => r.openedAt).length;
                       return (
                         <li key={item.id}>
                           <Link href={`/transmittals/${t.id}`} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-5 py-3 hover:bg-slate-50">
                             <span className="font-mono text-xs font-bold text-link">{t.number}</span>
                             <span className="text-xs text-slate-500">rev {item.revision.value} · {prettyState(t.reasonForIssue)} · {fmtDate(t.dateOfIssue)}</span>
                             <span className="min-w-0 flex-1 truncate text-xs text-slate-700">{t.recipients.map((r) => r.name).join(", ") || "—"}</span>
-                            <span className={`text-[11px] font-semibold ${acked === t.recipients.length && acked ? "text-emerald-700" : "text-slate-500"}`}>{acked}/{t.recipients.length} acknowledged</span>
+                            <span className={`text-[11px] font-semibold ${seen === t.recipients.length && seen ? "text-emerald-700" : "text-slate-500"}`}>{seen}/{t.recipients.length} have seen it</span>
                           </Link>
                         </li>
                       );

@@ -46,14 +46,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       entityType: "Transmittal",
       entityId: id,
       entityLabel: recipient.transmittal.number,
-      detail: `${recipient.name} opened the issued transmittal. Authenticated read evidence recorded.`,
+      detail: `${recipient.name} saw ${recipient.transmittal.number}. Opening it while signed in is the receipt evidence.`,
     });
     const controllers = await holdersOf(ctx, "CONTROL");
     await notifyMany(
       [recipient.transmittal.createdById, ...controllers.map((controller) => controller.id)].filter((id) => id !== user.id),
       "TRANSMITTAL_OPENED",
-      `${recipient.name} opened ${recipient.transmittal.number}`,
-      "Authenticated read evidence was recorded. Formal acknowledgement may still be pending.",
+      `${recipient.name} saw ${recipient.transmittal.number}`,
+      "They opened it while signed in, which is recorded as receipt.",
       `/transmittals/${id}`,
     );
   }

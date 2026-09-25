@@ -2,7 +2,7 @@
 // and the scoped client never returns one project's rows to the other.
 import "dotenv/config";
 import { PrismaClient, Prisma } from "@prisma/client";
-import { tenantFor, ORG_SCOPED, PROJECT_SCOPED } from "../src/lib/tenant";
+import { scopedClient, tenantFor, ORG_SCOPED, PROJECT_SCOPED } from "../src/lib/tenant";
 
 const db = new PrismaClient();
 let failures = 0;
@@ -179,6 +179,59 @@ async function main() {
     check("a write cannot be redirected to another tenant", redirected.projectId === p1.id,
       redirected.projectId === p1.id ? "clamped to P1" : "LEAKED");
     await db.assetItem.delete({ where: { id: redirected.id } });
+  }
+
+  // ── Another party's people see only their own work and what we issued them ──
+  console.log("\nAn outside party's register\n");
+  {
+    const stamp = Date.now().toString(36);
+    const party = await db.party.upsert({
+      where: { orgId_code: { orgId: org.id, code: "VFY" } },
+      update: {},
+      create: { orgId: org.id, code: "VFY", name: `Verify Supplier ${stamp}`, isInternal: false },
+    });
+    const staff = await t1.db.document.findFirstOrThrow({ where: { originator: null } });
+    const theirs = await t1.db.document.create({
+      data: {
+        projectId: p1.id, docNumber: `VFY-OWN-${stamp}`, title: "Their own document", deliverableType: "VND",
+        docType: "DAS", discipline: "ME", originator: party.code, createdById: "verify", createdByName: "verify",
+      },
+    });
+    const issued = await t1.db.document.create({
+      data: {
+        projectId: p1.id, docNumber: `VFY-ISSUED-${stamp}`, title: "Issued to them", deliverableType: "ENG",
+        docType: "DRW", discipline: "ME", createdById: "verify", createdByName: "verify",
+      },
+    });
+    const issuedRev = await t1.db.revision.create({
+      data: { projectId: p1.id, documentId: issued.id, value: "A", state: "RELEASED" },
+    });
+    const person = await db.user.upsert({
+      where: { orgId_email: { orgId: org.id, email: `verify.supplier.${stamp}@example.test` } },
+      update: {},
+      create: { orgId: org.id, email: `verify.supplier.${stamp}@example.test`, name: "Verify Supplier person", passwordHash: "x", role: "VIEWER", partyId: party.id },
+    });
+    const transmittal = await t1.db.transmittal.create({
+      data: {
+        projectId: p1.id, number: `TR-VFY-${stamp}`, direction: "OUTGOING", status: "ISSUED", reasonForIssue: "INFORMATION",
+        issuingParty: "Us", dateOfIssue: new Date(), subject: "For your files", createdById: "verify", createdByName: "verify",
+        items: { create: [{ projectId: p1.id, revisionId: issuedRev.id }] },
+        recipients: { create: [{ projectId: p1.id, userId: person.id, name: person.name, organization: party.name }] },
+      },
+    });
+    const outside = scopedClient(org.id, p1.id, null, { partyCode: party.code, userId: person.id, organization: party.name });
+    const visible = await outside.document.findMany({ select: { id: true, docNumber: true } });
+    const ids = new Set(visible.map((d) => d.id));
+    check("they see what their own party produced", ids.has(theirs.id));
+    check("they see what was issued to them", ids.has(issued.id));
+    check("they do not see our other documents", !ids.has(staff.id), `${visible.length} visible`);
+    check("and cannot reach one by id either", (await outside.document.findFirst({ where: { id: staff.id } })) === null);
+
+    await db.transmittalItem.deleteMany({ where: { transmittalId: transmittal.id } });
+    await db.transmittalRecipient.deleteMany({ where: { transmittalId: transmittal.id } });
+    await db.transmittal.delete({ where: { id: transmittal.id } });
+    await db.revision.delete({ where: { id: issuedRev.id } });
+    await db.document.deleteMany({ where: { id: { in: [theirs.id, issued.id] } } });
   }
 
   console.log(failures === 0 ? "\nAll tenancy checks passed.\n" : `\n${failures} check(s) FAILED.\n`);

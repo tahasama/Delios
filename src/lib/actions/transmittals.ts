@@ -32,24 +32,22 @@ export async function createTransmittalAction(_prev: { error?: string } | undefi
   const direction = String(formData.get("direction") ?? "OUTGOING");
   const reasonForIssue = String(formData.get("reasonForIssue") ?? "");
   const dateOfIssue = String(formData.get("dateOfIssue") ?? "");
-  const issuingParty = String(formData.get("issuingParty") ?? "").trim() || user.organization || "DELIOS";
+  // Who issued it. For what we send that is us; for what arrives it is them.
+  const ourParty = await db.party.findFirst({ where: { isInternal: true }, select: { name: true } });
+  const issuingParty = direction === "INCOMING"
+    ? String(formData.get("issuingParty") ?? "").trim() || "Unnamed party"
+    : ourParty?.name ?? user.organization ?? "Our organization";
   const notes = String(formData.get("notes") ?? "").trim();
   const subject = String(formData.get("subject") ?? "").trim() || null;
   const message = String(formData.get("message") ?? "").trim() || null;
   const revisionIds = formData.getAll("revisionIds").map(String).filter(Boolean);
-  // One outside recipient per line, written "Name (Company)" — the company is kept apart.
-  const outsiders = formData.getAll("recipientNames").flatMap((v) => String(v).split(/\r?\n/)).map((v) => v.trim()).filter(Boolean)
-    .map((line) => {
-      const m = line.match(/^(.*\S)\s*\(([^()]+)\)\s*$/);
-      return m ? { name: m[1].trim(), organization: m[2].trim() } : { name: line, organization: null as string | null };
-    });
-  const recipientNames = outsiders.map((o) => o.name);
-  const recipientUsers = formData.getAll("recipientUsers").map(String).filter(Boolean);
+  const recipientUsers = [...new Set(formData.getAll("recipientUsers").map(String).filter(Boolean))];
+  const issueNow = formData.get("issueNow") === "on";
 
  if (!reasonForIssue) return { error: "Every transmittal states its reason for issue." };
  if (!dateOfIssue) return { error: "Date of issue is required." };
  if (!revisionIds.length) return { error: "List the documents and revisions enclosed." };
- if (!recipientNames.length && !recipientUsers.length) return { error: "Recipients are identified individually by name." };
+ if (!recipientUsers.length) return { error: "Name at least one person to send it to — a company on its own is not a recipient." };
   if (direction === "OUTGOING" && !subject) return { error: "Give the transmittal a subject — it is the first thing the recipient reads." };
 
   const reasons = await getActiveSet("REASONS_FOR_ISSUE");
@@ -88,7 +86,7 @@ export async function createTransmittalAction(_prev: { error?: string } | undefi
       responseRequired,
       responsePeriodDays,
       responseDueDate,
-      status: direction === "OUTGOING" ? "DRAFT" : "ISSUED",
+      status: "DRAFT",
       receivedDate: direction === "INCOMING" ? base : null,
       receivedByParty: direction === "INCOMING" ? user.organization ?? "DELIOS" : null,
       subject,
@@ -97,20 +95,13 @@ export async function createTransmittalAction(_prev: { error?: string } | undefi
       createdById: user.id,
       createdByName: user.name,
       items: { create: revisionIds.map((rid) => ({ projectId, revisionId: rid })) },
-      recipients: {
-        create: [
-          ...recipientUsers.map((uid) => ({ projectId, userId: uid, name: "—", organization: issuingParty })),
-          ...outsiders.map((o) => ({ projectId, name: o.name, organization: o.organization })),
-        ],
-      },
+      recipients: { create: recipientUsers.map((uid) => ({ projectId, userId: uid, name: "—" })) },
     },
   });
-  // fill recipient names for user-selected rows
-  if (recipientUsers.length) {
-    const users = await db.user.findMany({ where: { id: { in: recipientUsers } } });
-    for (const u of users) {
-      await db.transmittalRecipient.updateMany({ where: { transmittalId: t.id, userId: u.id }, data: { name: u.name, organization: u.organization ?? issuingParty } });
-    }
+  // The recipient carries the name and company their account holds.
+  const chosen = await db.user.findMany({ where: { id: { in: recipientUsers } }, include: { party: { select: { name: true } } } });
+  for (const u of chosen) {
+    await db.transmittalRecipient.updateMany({ where: { transmittalId: t.id, userId: u.id }, data: { name: u.name, organization: u.party?.name ?? u.organization ?? issuingParty } });
   }
   await audit({
     actor: user,
@@ -118,8 +109,16 @@ export async function createTransmittalAction(_prev: { error?: string } | undefi
     entityType: "Transmittal",
     entityId: t.id,
     entityLabel: t.number,
- detail: `${direction.toLowerCase()} · reason: ${reason.label} · ${revisionIds.length} item(s) · ${recipientUsers.length + recipientNames.length} recipient(s).`,
+ detail: `${direction.toLowerCase()} · reason: ${reason.label} · ${revisionIds.length} item(s) · ${recipientUsers.length} recipient(s).`,
   });
+  // What arrives is a record of something that already happened, so it is issued
+  // on creation. What we send is sent when we say so — here, or later from the
+  // transmittal itself.
+  if (direction === "INCOMING") await db.transmittal.update({ where: { id: t.id }, data: { status: "ISSUED" } });
+  else if (issueNow) {
+    const sent = await issueTransmittal(ctx, t.id);
+    if (sent.error) redirect(`/transmittals/${t.id}?issueError=${encodeURIComponent(sent.error)}`);
+  }
   // Incoming documents are reviewed through a route once accepted (§11.11):
   // Document Control sends them from the transmittal, like any other review.
   redirect(`/transmittals/${t.id}`);
@@ -127,8 +126,12 @@ export async function createTransmittalAction(_prev: { error?: string } | undefi
 
 export async function issueTransmittalAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
   const ctx = await requireScope();
+  return issueTransmittal(ctx, String(formData.get("transmittalId") ?? ""));
+}
+
+/** Issuing is the act that sends it: the date stands, the recipients are told, and it becomes evidence. */
+async function issueTransmittal(ctx: Awaited<ReturnType<typeof requireScope>>, id: string): Promise<{ error?: string }> {
   const { user, db, projectId, orgId } = ctx;
-  const id = String(formData.get("transmittalId") ?? "");
   try {
     await enforce("ISSUE", { transmittalId: id }, ctx);
   } catch (e) {
@@ -226,25 +229,4 @@ export async function acceptanceCheckAction(_prev: { error?: string } | undefine
   return {};
 }
 
-/** Record acknowledgement by a named recipient (§11.5 receipt evidence). */
-export async function acknowledgeReceiptAction(formData: FormData) {
-  const ctx = await requireScope();
-  const { user, db, projectId, orgId } = ctx;
-  const recipientId = String(formData.get("recipientId") ?? "");
-  const transmittalId = String(formData.get("transmittalId") ?? "");
-  const recipient = await db.transmittalRecipient.findUnique({ where: { id: recipientId } });
-  if (!recipient || recipient.transmittalId !== transmittalId) return;
-  if (recipient.userId !== user.id && !isController(user) && !isAdmin(user)) return;
-  if (!recipient.acknowledgedAt) {
-    await db.transmittalRecipient.update({ where: { id: recipientId }, data: { acknowledgedAt: new Date() } });
-  }
-  const t = await db.transmittal.findUnique({ where: { id: transmittalId } });
-  if (!recipient.acknowledgedAt) {
- await audit({ actor: user, action: "RECEIPT_RECORDED", entityType: "Transmittal", entityId: transmittalId, entityLabel: t?.number ?? transmittalId, detail: `Formal receipt acknowledged by ${recipient.name}.` });
-    if (t?.createdById && t.createdById !== user.id) {
-      await notify(t.createdById, "TRANSMITTAL_ACKNOWLEDGED", `${recipient.name} acknowledged ${t.number}`, "Formal receipt evidence was recorded.", `/transmittals/${transmittalId}`);
-    }
-  }
-  revalidatePath(`/transmittals/${transmittalId}`);
-}
 

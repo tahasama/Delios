@@ -104,7 +104,14 @@ export const getScope = cache(async (): Promise<Scope | null> => {
     select: { code: true },
   });
   const allowed = visibleConfidentiality(actor, allCodes.map((c) => c.code));
-  const scoped = scopedClient(hostOrgId, chosen.projectId, allowed);
+  // Someone from another party is not staff: their register holds what their own
+  // party produced and what was issued to them, and nothing else. Applied here,
+  // so no page can forget it.
+  const party = user.partyCode
+    ? await bootstrap.db.party.findFirst({ where: { code: user.partyCode }, select: { name: true } })
+    : null;
+  const external = user.isInternal ? null : { partyCode: user.partyCode, userId: user.id, organization: party?.name ?? null };
+  const scoped = scopedClient(hostOrgId, chosen.projectId, allowed, external);
 
   // Authority is held per project, not globally: the same person may author on
   // one project and control another (§1.4 — ownership is by role).

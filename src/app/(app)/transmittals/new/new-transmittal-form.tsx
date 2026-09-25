@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ActionForm } from "@/components/form";
 import { Field, inputCls, Card } from "@/components/ui";
 import { createTransmittalAction } from "@/lib/actions/transmittals";
+import { RecipientPicker, type Company } from "./recipient-picker";
 
 type Opt = { code: string; label: string; props: Record<string, unknown> };
 type RevOpt = { id: string; label: string; released: boolean };
@@ -18,12 +19,15 @@ export type Prefill = { revisionIds?: string[]; userIds?: string[]; outsiders?: 
  * starts a review.
  */
 export function NewTransmittalForm({
-  reasons, revisions, users, reviewers, defaultDirection, preselectedRevisionIds, prefill,
+  reasons, revisions, users, reviewers, companies, ourOrganization, defaultDirection, preselectedRevisionIds, prefill,
 }: {
   reasons: Opt[];
   revisions: RevOpt[];
   users: UserOpt[];
   reviewers: UserOpt[];
+  /** Companies with people who can be sent something, for the recipient picker. */
+  companies: Company[];
+  ourOrganization: string;
   defaultDirection: "OUTGOING" | "INCOMING";
   preselectedRevisionIds?: string[];
   prefill?: Prefill;
@@ -32,10 +36,13 @@ export function NewTransmittalForm({
   const [reasonCode, setReasonCode] = useState(prefill?.reason && reasons.some((r) => r.code === prefill.reason) ? prefill.reason : "");
   const needsReview = reasons.find((r) => r.code === reasonCode)?.props.reviewCycle === true;
   const choices = direction === "OUTGOING" ? revisions.filter((r) => r.released) : revisions;
+  // Creating a transmittal sends nothing by itself. Saying so, and offering to
+  // do both at once, is why people stopped finding a draft they thought they had sent.
+  const [issueNow, setIssueNow] = useState(true);
 
   return (
     <Card className="max-w-3xl">
-      <ActionForm action={createTransmittalAction} submitLabel={direction === "OUTGOING" ? "Create transmittal" : "Record receipt"}>
+      <ActionForm action={createTransmittalAction} submitLabel={direction === "OUTGOING" ? (issueNow ? "Create and send it" : "Create it as a draft") : "Record receipt"}>
         <div className="flex gap-2">
           {(["OUTGOING", "INCOMING"] as const).map((d) => (
             <label key={d} className={`cursor-pointer rounded-lg border px-3 py-2 text-xs font-medium ${direction === d ? "border-brand-line bg-tint text-brand-ink" : "border-slate-300 text-slate-500"}`}>
@@ -46,9 +53,15 @@ export function NewTransmittalForm({
         </div>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field label={direction === "OUTGOING" ? "Sent to" : "Received from"} required>
-            <input name="issuingParty" required className={inputCls} placeholder="Company name" defaultValue={prefill?.party ?? ""} />
-          </Field>
+          {direction === "INCOMING" ? (
+            <Field label="Received from" required>
+              <input name="issuingParty" required className={inputCls} placeholder="Company name" defaultValue={prefill?.party ?? ""} />
+            </Field>
+          ) : (
+            <Field label="Sent by">
+              <p className="pt-1 text-sm font-medium text-slate-700">{ourOrganization}</p>
+            </Field>
+          )}
           <Field label="Why" required hint="what the recipient should do with it">
             <select name="reasonForIssue" required className={inputCls} value={reasonCode} onChange={(e) => setReasonCode(e.target.value)}>
               <option value="" disabled>Choose…</option>
@@ -82,16 +95,16 @@ export function NewTransmittalForm({
           </select>
         </Field>
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field label="People here who get a copy">
-            <select name="recipientUsers" multiple className={`${inputCls} h-28`} defaultValue={prefill?.userIds ?? []}>
-              {users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
-            </select>
-          </Field>
-          <Field label="Outside recipients" hint="one per line: name (company)">
-            <textarea name="recipientNames" rows={4} className={inputCls} defaultValue={prefill?.outsiders ?? ""} placeholder={"John Doe (MADASUD)\nA. Smith (ECGS)"} />
-          </Field>
-        </div>
+        <RecipientPicker companies={companies} preselected={prefill?.userIds ?? []} />
+
+        {direction === "OUTGOING" ? (
+          <label className="flex items-start gap-2 rounded-lg bg-tint-soft px-3 py-2.5 text-xs text-slate-700">
+            <input type="checkbox" name="issueNow" checked={issueNow} onChange={(e) => setIssueNow(e.target.checked)} className="mt-0.5" />
+            <span>
+              <strong>Send it as soon as it is created.</strong> Leave this off to keep it as a draft — a draft has been sent to nobody.
+            </span>
+          </label>
+        ) : null}
 
         {needsReview && direction === "INCOMING" ? <p className="text-[11px] text-slate-500">Once accepted, each document is sent down a review route, whose last step gives the binding verdict.</p> : null}
 

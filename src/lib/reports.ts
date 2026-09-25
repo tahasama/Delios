@@ -225,7 +225,7 @@ async function transmittals(t: Tenant): Promise<Report> {
   const now = new Date();
   const list = await t.db.transmittal.findMany({
     where: { OR: [{ dateOfIssue: { gte: since } }, { status: "ISSUED", direction: "INCOMING" }, { responseRequired: true, status: { notIn: ["CLOSED"] } }] },
-    include: { recipients: { select: { name: true, acknowledgedAt: true } }, items: { select: { id: true } } },
+    include: { recipients: { select: { name: true, openedAt: true } }, items: { select: { id: true } } },
     orderBy: { dateOfIssue: "desc" },
   });
   const segments: Segment[] = [
@@ -255,7 +255,7 @@ async function transmittals(t: Tenant): Promise<Report> {
   const rows = list.map((x) => [
     { text: x.number, href: `/transmittals/${x.id}` }, x.direction === "INCOMING" ? "In" : "Out", iso(x.dateOfIssue),
     x.direction === "INCOMING" ? x.issuingParty : x.recipients.map((r) => r.name).filter(Boolean).join(", "),
-    x.items.length, `${x.recipients.filter((r) => r.acknowledgedAt).length}/${x.recipients.length}`, waitingOn(x),
+    x.items.length, `${x.recipients.filter((r) => r.openedAt).length}/${x.recipients.length}`, waitingOn(x),
   ] as Cell[]);
   const toCheck = list.filter((x) => x.direction === "INCOMING" && x.status === "ISSUED").length;
   const overdue = list.filter((x) => x.responseRequired && x.responseDueDate && x.responseDueDate < now && x.status !== "CLOSED").length;
@@ -270,7 +270,7 @@ async function transmittals(t: Tenant): Promise<Report> {
       { label: "Responses overdue", value: overdue, tone: overdue ? "bad" : "good" },
     ],
     chart: { title: "Transmittals per month", segments, bars: months },
-    columns: ["Transmittal", "In / out", "Date", "From / to", "Documents", "Acknowledged", "Waiting on"],
+    columns: ["Transmittal", "In / out", "Date", "From / to", "Documents", "Seen by", "Waiting on"],
     rows,
     empty: "No transmittal in the last six months.",
   };

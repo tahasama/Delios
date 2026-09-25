@@ -6,7 +6,7 @@ import { PageHeader, Card, Chip, Banner, Field, inputCls, DataTable, Th, Td } fr
 import { ActionForm } from "@/components/form";
 import { ACCEPTANCE_CONDITIONS, REASON_LABEL, type ReasonForIssue } from "@/lib/standard";
 import { fmtDate, fmtDateTime } from "@/lib/utils";
-import { issueTransmittalAction, acceptanceCheckAction, acknowledgeReceiptAction } from "@/lib/actions/transmittals";
+import { issueTransmittalAction, acceptanceCheckAction } from "@/lib/actions/transmittals";
 import { preflight } from "@/lib/rules/preflight";
 import { PreflightPanel, Guarded } from "@/components/preflight";
 import { ReceiptTracker } from "./receipt-tracker";
@@ -16,9 +16,10 @@ import { ArrowLeft } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
-export default async function TransmittalDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function TransmittalDetailPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ issueError?: string }> }) {
   const { user, db } = await requireScope();
   const { id } = await params;
+  const sp = await searchParams;
   const t = await db.transmittal.findUnique({
     where: { id },
     include: {
@@ -48,7 +49,7 @@ export default async function TransmittalDetailPage({ params }: { params: Promis
         title={t.subject ? `${t.number} — ${t.subject}` : t.number}
         subtitle={[
           t.direction === "OUTGOING"
-            ? `Sent to ${t.recipients.map((r) => r.organization ?? r.name).filter((v, i, all) => all.indexOf(v) === i).join(", ") || "—"} on ${fmtDate(t.dateOfIssue)}`
+            ? `${t.createdByName} sent it to ${t.recipients.map((r) => r.name).join(", ") || "nobody yet"} at ${t.recipients.map((r) => r.organization ?? "—").filter((v, i, all) => all.indexOf(v) === i).join(", ")} on ${fmtDate(t.dateOfIssue)}`
             : `${t.issuingParty} sent it on ${fmtDate(t.dateOfIssue)}${t.receivedDate ? `, and it arrived ${fmtDate(t.receivedDate)}` : ""}`,
           `${t.direction === "OUTGOING" ? "They" : "We"} received it ${(REASON_LABEL[t.reasonForIssue as ReasonForIssue] ?? t.reasonForIssue).toLowerCase() === "information" ? "for information only" : `for ${(REASON_LABEL[t.reasonForIssue as ReasonForIssue] ?? t.reasonForIssue).toLowerCase()}`}`,
           t.responseRequired ? `An answer is due by ${fmtDate(t.responseDueDate)}` : "No answer is needed",
@@ -63,6 +64,14 @@ export default async function TransmittalDetailPage({ params }: { params: Promis
           ) : null}
         </>}
       />
+
+      {t.status === "DRAFT" ? (
+        <Banner tone="warn" title="Nothing has been sent yet">
+          This is a draft. The recipients below have not been told, and it carries no date of issue until it is issued.
+          {controller ? " Issue it with the button above." : " Document Control issues it."}
+        </Banner>
+      ) : null}
+      {sp.issueError ? <Banner tone="warn" title="Created, but not sent">{sp.issueError} Issue it above once that is settled.</Banner> : null}
 
       {t.message ? (
         <Card title="Message">
@@ -157,6 +166,16 @@ export default async function TransmittalDetailPage({ params }: { params: Promis
             </Card>
           ) : null}
 
+          {t.direction === "OUTGOING" ? (
+            <details className="rounded-2xl border border-slate-200 bg-surface px-5 py-3 shadow-sm">
+              <summary className="cursor-pointer list-none text-sm font-semibold text-slate-800">What the receiver will check when it arrives</summary>
+              <ul className="mt-2 space-y-1 text-xs text-slate-600">
+                {ACCEPTANCE_CONDITIONS.map((c) => <li key={c.key} className="flex gap-2"><span className="text-slate-300">·</span>{c.label}</li>)}
+              </ul>
+              <p className="mt-2 text-[11px] text-slate-500">Their document control runs the same check we run on what arrives here. Anything failing comes back with a reason.</p>
+            </details>
+          ) : null}
+
           {conditions.length ? (
             <details className="rounded-2xl border border-slate-200 bg-surface px-5 py-3 shadow-sm">
               <summary className="cursor-pointer list-none text-sm text-slate-700">
@@ -174,39 +193,28 @@ export default async function TransmittalDetailPage({ params }: { params: Promis
 
         <div className="space-y-4">
 
-          <Card title={`Recipients · ${t.recipients.length}`}>
+          <Card title={`Recipients · ${t.recipients.length}`} description="Everyone named here can open this transmittal and the documents it carries. Opening it while signed in is recorded as receipt — there is nothing for them to confirm.">
             <ul className="divide-y divide-slate-100">
               {t.recipients.map((r) => (
                 <li key={r.id} className="py-2.5 text-sm">
                   <div className="flex items-center justify-between gap-3">
                     <span className="font-medium text-slate-700">{r.name}{r.organization ? <span className="font-normal text-slate-400"> · {r.organization}</span> : null}</span>
-                    {r.acknowledgedAt ? (
-                      <Chip className="bg-emerald-100 text-emerald-800 ring-emerald-300">acknowledged</Chip>
-                    ) : r.openedAt ? (
-                      <Chip className="bg-sky-100 text-sky-800 ring-sky-300">opened</Chip>
+                    {r.openedAt ? (
+                      <Chip className="bg-emerald-100 text-emerald-800 ring-emerald-300">seen</Chip>
                     ) : r.notifiedAt ? (
-                      <Chip className="bg-amber-100 text-amber-800 ring-amber-300">notified</Chip>
+                      <Chip className="bg-amber-100 text-amber-800 ring-amber-300">told</Chip>
                     ) : (
-                      <Chip className="bg-slate-100 text-slate-500 ring-slate-200">pending</Chip>
+                      <Chip className="bg-slate-100 text-slate-500 ring-slate-200">not sent yet</Chip>
                     )}
                   </div>
                   <div className="mt-1 flex items-center justify-between gap-3 text-[11px] text-slate-400">
                     <span>
-                      {r.acknowledgedAt
-                        ? `Acknowledged ${fmtDateTime(r.acknowledgedAt)}`
-                        : r.openedAt
-                          ? `Opened ${fmtDateTime(r.openedAt)}`
-                          : r.notifiedAt
-                            ? `Notified ${fmtDateTime(r.notifiedAt)}`
-                            : r.userId ? "Not yet issued" : "Outside recipient — no account here yet"}
+                      {r.openedAt
+                        ? `Opened it ${fmtDateTime(r.openedAt)}${r.viewCount > 1 ? `, ${r.viewCount} times since` : ""}`
+                        : r.notifiedAt
+                          ? `Told ${fmtDateTime(r.notifiedAt)} — not opened yet`
+                          : "Waiting to be issued"}
                     </span>
-                    {!r.acknowledgedAt && r.userId === user.id ? (
-                      <form action={acknowledgeReceiptAction}>
-                        <input type="hidden" name="recipientId" value={r.id} />
-                        <input type="hidden" name="transmittalId" value={t.id} />
-                        <button className="font-semibold text-brand-ink hover:underline">Acknowledge receipt</button>
-                      </form>
-                    ) : null}
                   </div>
                 </li>
               ))}

@@ -28,6 +28,7 @@ export default async function TransmittalsPage({ searchParams }: { searchParams:
   const chosen = sp.view ?? (sp.direction === "INCOMING" ? "in" : sp.direction === "OUTGOING" ? "out" : checkCount ? "check" : "all");
   const view = VIEWS.find((v) => v.id === chosen) ?? VIEWS[0];
   const list = await db.transmittal.findMany({ where: view.where, orderBy: { createdAt: "desc" }, take: 100, include: { items: true, recipients: true } });
+  const ourOrganization = (await db.party.findFirst({ where: { isInternal: true }, select: { name: true } }))?.name ?? "Our organization";
 
   return (
     <div className="space-y-4">
@@ -49,15 +50,19 @@ export default async function TransmittalsPage({ searchParams }: { searchParams:
       {list.length === 0 ? (
         <EmptyState title={view.id === "check" ? "Nothing is waiting to be checked" : view.id === "all" ? "No transmittals yet" : "Nothing here"} body="A transmittal is how documents are formally sent to, or received from, another party." action={view.id === "all" ? <ButtonLink href="/transmittals/new" variant="secondary">New transmittal</ButtonLink> : undefined} />
       ) : (
-        <DataTable head={<tr><Th>Number</Th><Th>To / from</Th><Th>Why</Th><Th>Date</Th><Th>Documents</Th><Th>Status</Th><Th>Reply due</Th></tr>}>
+        <DataTable id="transmittals" head={<tr><Th>Number</Th><Th>From</Th><Th>To</Th><Th>Why</Th><Th>Date</Th><Th>Documents</Th><Th>Status</Th><Th>Seen</Th><Th>Reply due</Th></tr>}>
           {list.map((t) => {
-            const party = t.direction === "OUTGOING"
-              ? [...new Set(t.recipients.map((r) => r.organization ?? r.name))].join(", ") || "—"
-              : t.issuingParty;
+            // Who sent it and who it went to, as two facts rather than one column.
+            const from = t.direction === "OUTGOING" ? ourOrganization : t.issuingParty;
+            const to = t.direction === "OUTGOING"
+              ? [...new Set(t.recipients.map((r) => r.organization ?? r.name))].join(", ") || "nobody yet"
+              : ourOrganization;
+            const seen = t.recipients.filter((r) => r.openedAt).length;
             return (
               <tr key={t.id}>
                 <Td><Link href={`/transmittals/${t.id}`} className="font-mono text-[13px] font-semibold text-brand-ink hover:underline">{t.number}</Link>{t.subject ? <span className="block max-w-72 truncate text-xs text-slate-500">{t.subject}</span> : null}</Td>
-                <Td className="text-xs"><span className="text-slate-400">{t.direction === "OUTGOING" ? "to" : "from"}</span> {party}</Td>
+                <Td className="text-xs">{from}</Td>
+                <Td className="text-xs">{to}</Td>
                 <Td className="text-xs">{REASON_LABEL[t.reasonForIssue as ReasonForIssue] ?? t.reasonForIssue}</Td>
                 <Td className="whitespace-nowrap text-xs">{fmtDate(t.dateOfIssue)}</Td>
                 <Td className="tabular-nums text-xs">{t.items.length}</Td>
@@ -68,6 +73,10 @@ export default async function TransmittalsPage({ searchParams }: { searchParams:
                     : t.status === "ISSUED" ? "bg-amber-100 text-amber-800 ring-amber-300"
                     : "bg-slate-100 text-slate-600 ring-slate-300"
                   }>{t.direction === "INCOMING" && t.status === "ISSUED" ? "to check" : t.status.toLowerCase()}</Chip>
+                </Td>
+                <Td className="whitespace-nowrap text-xs" title="Opening it while signed in is recorded as receipt">
+                  {t.status === "DRAFT" || t.recipients.length === 0 ? <span className="text-slate-300">—</span>
+                    : <span className={seen === t.recipients.length ? "text-emerald-700" : "text-slate-500"}>{seen}/{t.recipients.length}</span>}
                 </Td>
                 <Td className="whitespace-nowrap text-xs">{t.responseDueDate ? fmtDate(t.responseDueDate) : "—"}</Td>
               </tr>
