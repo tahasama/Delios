@@ -1,7 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { requireScope } from "@/lib/scope";
 import { PageHeader, ButtonLink } from "@/components/ui";
-import { OUTCOME_CONSEQUENCES, DOC_STATES, DOC_STATE_LABEL, REV_STATES, REV_STATE_LABEL, type DocState, type RevState } from "@/lib/standard";
+import { OUTCOME_CONSEQUENCES, DOC_STATES, DOC_STATE_LABEL, REV_STATES, REV_STATE_LABEL, revStateLabel, type DocState, type RevState } from "@/lib/standard";
 import { getSet } from "@/lib/config";
 import { DocumentRegister } from "./document-register";
 import { isReadOnly } from "@/lib/auth";
@@ -107,7 +107,8 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
       retentionClass: doc.retentionClass, placeholder: doc.isPlaceholder,
       docState: doc.state, docStateLabel: DOC_STATE_LABEL[doc.state as DocState] ?? doc.state,
       revision: latest?.value ?? null,
-      revState: latest?.state ?? null, revStateLabel: latest ? REV_STATE_LABEL[latest.state as RevState] ?? latest.state : "No revision yet",
+      revState: latest?.state ?? null,
+      revStateLabel: latest ? revStateLabel(latest.state, !!latest.proposedStatus) : "No revision yet",
       owner, blockingComments: openCycle?.comments.length ?? 0,
       verdict: decided?.outcome ?? null, verdictLabel: decided?.outcome ? verdictLabel.get(decided.outcome) ?? decided.outcome : null,
       verdictBy: decided?.outcomeByName ?? null, verdictPending: pending,

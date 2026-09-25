@@ -550,7 +550,7 @@ export const RUNNERS: Runners = {
 
   // ── Review ────────────────────────────────────────────────────────────────
   "RO-02": async (ctx) => {
-    const cycles = await ctx.db.reviewCycle.findMany({ where: { status: "CLOSED" }, include: { revision: { include: { document: { select: { docNumber: true } } } } } });
+    const cycles = await ctx.db.reviewCycle.findMany({ where: { status: "CLOSED", binding: true }, include: { revision: { include: { document: { select: { docNumber: true } } } } } });
     return cycles
       .filter((c) => !c.submittedAt || !c.receivedAt || !c.issuedToReviewAt || !c.returnedFromReviewAt || !c.returnedToOriginatorAt)
 .map((c) => ({ entityKey: `ReviewCycle:${c.id}`, entityType: "ReviewCycle", entityId: c.id, documentId: c.revision.documentId, entityLabel: `${c.revision.document.docNumber} rev ${c.revision.value} cycle ${c.sequence}`, description: "Custody point timestamp missing." }));
@@ -561,8 +561,10 @@ export const RUNNERS: Runners = {
   },
   "RO-04": async (ctx) => {
     const cycles = await ctx.db.reviewCycle.findMany({ where: { outcome: { not: null } }, include: { revision: { include: { document: { select: { docNumber: true } } } } } });
-    const set = ctx.allSets.get("REVIEW_OUTCOMES");
- return cycles.filter((c) => set && !set.has(c.outcome!)).map((c) => ({ entityKey: `ReviewCycle:${c.id}`, entityType: "ReviewCycle", entityId: c.id, documentId: c.revision.documentId, entityLabel: `${c.revision.document.docNumber} rev ${c.revision.value}`, description: "Outcome not in the published set." }));
+    const verdicts = ctx.allSets.get("REVIEW_OUTCOMES");
+    const advice = ctx.allSets.get("REVIEW_ADVICE");
+    const setFor = (c: { binding: boolean; outcomeSetKey: string | null }) => (c.outcomeSetKey ? ctx.allSets.get(c.outcomeSetKey) : undefined) ?? (c.binding ? verdicts : advice);
+ return cycles.filter((c) => { const set = setFor(c); return set && !set.has(c.outcome!); }).map((c) => ({ entityKey: `ReviewCycle:${c.id}`, entityType: "ReviewCycle", entityId: c.id, documentId: c.revision.documentId, entityLabel: `${c.revision.document.docNumber} rev ${c.revision.value}`, description: "Outcome not in the published set." }));
   },
   "RO-05": async (ctx) => {
     const outcomes = await ctx.db.configValue.findMany({ where: { setKey: "REVIEW_OUTCOMES" } });

@@ -24,6 +24,21 @@ import { verdictMeaning, assertMayGiveBindingVerdict, recordApproval } from "./v
 // verdict that permits release is recorded as the release approval; one that
 // does not returns the route to the author. There is no separate approval act.
 
+/**
+ * Two lists, one per kind of step. An advisory step says what its comments
+ * amount to; only the deciding step gives a verdict. Keeping them apart is why
+ * an adviser cannot reach a final code, and a decider cannot file advice.
+ */
+export const VERDICT_SET = "REVIEW_OUTCOMES";
+export const ADVICE_SET = "REVIEW_ADVICE";
+
+/** Which list a step answers from: the last step decides, the rest advise. */
+export function setKeyForStep(stepIndex: number, stepCount: number, stepSetKey?: string | null, templateSetKey?: string | null): string {
+  const decides = stepIndex === stepCount - 1;
+  if (decides) return templateSetKey ?? stepSetKey ?? VERDICT_SET;
+  return stepSetKey ?? ADVICE_SET;
+}
+
 export type WfStep = {
   act: "REVIEW" | "APPROVAL";
   mode: "ANY_OF" | "ALL_CONSOLIDATOR" | "SERIAL" | "ALL";
@@ -122,8 +137,7 @@ export async function startWorkflowRun(t: Tenant, revisionId: string, templateId
   const proposed = await Promise.all(baseSteps.map((s) => proposeForStep(t, [rev.document], s)));
   const steps: WfRuntimeStep[] = baseSteps.map((s, i) => ({
     ...s,
-    // One verdict set per route, so every step answers from the same list.
-    outcomeSetKey: template.outcomeSetKey ?? s.outcomeSetKey ?? "REVIEW_OUTCOMES",
+    outcomeSetKey: setKeyForStep(i, baseSteps.length, s.outcomeSetKey, template.outcomeSetKey),
     participantIds: overrideParticipantIds?.[i]?.length ? overrideParticipantIds[i] : proposed[i].map((p) => p.id),
     status: i === 0 ? "active" : "pending",
     decidedBy: [],
@@ -241,7 +255,9 @@ export async function recordStepOutcome(t: Tenant, runId: string, user: SessionU
 
   const rev = await db.revision.findUniqueOrThrow({ where: { id: run.revisionId }, include: { document: true } });
   const label = `${rev.document.docNumber} rev ${rev.value}`;
-  const outcomeSetKey = step.outcomeSetKey ?? "REVIEW_OUTCOMES";
+  const outcomeSetKey = step.outcomeSetKey ?? VERDICT_SET;
+  /** Closing a step ends the review interval; only a verdict that sends the revision back returns it to its author. */
+  const closed = (toAuthor: boolean) => ({ returnedFromReviewAt: new Date(), returnedToOriginatorAt: toAuthor ? new Date() : null, status: "CLOSED" });
 
   const verdict = await verdictMeaning(t, outcomeSetKey, outcomeCode);
   if (!verdict) return { ok: false, error: `Choose an active verdict from ${outcomeSetKey}.` };
@@ -251,7 +267,6 @@ export async function recordStepOutcome(t: Tenant, runId: string, user: SessionU
   // Within the deciding step, whose verdict binds depends on how it decides:
   // serial and consolidated steps bind on their last person; the others on everyone.
   const binds = decides && bindsOnStep(step, user.id);
-  if (binds && returnsToAuthor && !note) return { ok: false, error: `${verdict.label} goes back to the author — say what must change.` };
   // The deciders say what the revision may be used for; the control function
   // releases at exactly that and cannot change it.
   if (binds && !returnsToAuthor) {
@@ -271,6 +286,25 @@ export async function recordStepOutcome(t: Tenant, runId: string, user: SessionU
   }
   if (!decides) await db.reviewCycle.update({ where: { id: step.cycleId }, data: { binding: false } });
 
+  // What this person's comments amount to is one fact, said once. Advice must
+  // match the comments they left; a verdict that returns the revision, or
+  // carries comments into the next one, must say what has to change.
+  const own = step.cycleId
+    ? await db.reviewComment.findMany({ where: { cycleId: step.cycleId, authorId: user.id }, select: { progressionPreventing: true } })
+    : [];
+  const blocking = own.filter((c) => c.progressionPreventing).length;
+  if (verdict.advice) {
+    if (verdict.comments === "none" && own.length) return { ok: false, error: `You left ${own.length} comment${own.length > 1 ? "s" : ""} on this revision. Choose “Comments, not blocking”, or “Comments, blocking” if one of them must be settled first.` };
+    if (verdict.comments === "some" && !own.length) return { ok: false, error: "You have not written a comment. Write one, or choose “Nothing to say”." };
+    if (verdict.comments === "some" && blocking) return { ok: false, error: "One of your comments is marked blocking, so your advice is “Comments, blocking”." };
+    if (verdict.comments === "blocking" && !blocking) return { ok: false, error: "None of your comments is marked blocking. Mark the one that must be settled, or choose “Comments, not blocking”." };
+  }
+  if (binds && returnsToAuthor && !note && !blocking) return { ok: false, error: `${verdict.label} goes back to the author — say what must change, or mark the blocking comment that says it.` };
+  if (binds && !returnsToAuthor && verdict.resubmit && !note) {
+    const written = await db.reviewComment.count({ where: { cycle: { revisionId: run.revisionId } } });
+    if (!written) return { ok: false, error: `${verdict.label} carries comments into the next revision, so there must be comments. Write them, or choose the verdict that accepts it outright.` };
+  }
+
   const finishBindingDecision = async () => {
     if (!decides) return advance(t, runId, user);
     if (returnsToAuthor) return returnWorkflow(t, runId, user, `${verdict.label}${note ? ` — ${note}` : ""}`);
@@ -278,15 +312,18 @@ export async function recordStepOutcome(t: Tenant, runId: string, user: SessionU
     return advance(t, runId, user);
   };
 
-  if (step.cycleId) {
+  // A note is kept as a comment so it reads with the rest; an empty one is not
+  // worth a row, and an empty row would make "accepted with comments" look
+  // like it carried comments.
+  if (step.cycleId && note) {
     await db.reviewComment.create({
-      data: { projectId, cycleId: step.cycleId, authorId: user.id, authorName: user.name, text: note || `(recorded outcome: ${outcomeCode})`, classification: "NON_BLOCKING", progressionPreventing: false, status: "CLOSED", resolution: note ?? undefined, closedAt: new Date() },
+      data: { projectId, cycleId: step.cycleId, authorId: user.id, authorName: user.name, text: note, classification: "NON_BLOCKING", progressionPreventing: false, status: "CLOSED", resolution: note, closedAt: new Date() },
     });
   }
   step.decidedBy = [...(step.decidedBy ?? []), user.id];
 
   if (step.mode === "ANY_OF") {
-    await db.reviewCycle.update({ where: { id: step.cycleId }, data: { outcome: outcomeCode, outcomeAt: new Date(), outcomeByName: user.name, outcomeNote: note ?? null, returnedFromReviewAt: new Date(), returnedToOriginatorAt: new Date(), status: "CLOSED" } });
+    await db.reviewCycle.update({ where: { id: step.cycleId }, data: { outcome: outcomeCode, outcomeAt: new Date(), outcomeByName: user.name, outcomeNote: note ?? null, ...closed(decides && returnsToAuthor) } });
     await finishBindingDecision();
     return { ok: true, message: `Decision recorded on ${label}.` };
   }
@@ -299,7 +336,7 @@ export async function recordStepOutcome(t: Tenant, runId: string, user: SessionU
  if (pendingBefore.length) return { ok: false, error: "Serial review: earlier reviewers decide first." };
     const isLast = idx === step.participantIds.length - 1;
     if (isLast) {
-      await db.reviewCycle.update({ where: { id: step.cycleId }, data: { outcome: outcomeCode, outcomeAt: new Date(), outcomeByName: user.name, outcomeNote: note ?? null, returnedFromReviewAt: new Date(), returnedToOriginatorAt: new Date(), status: "CLOSED" } });
+      await db.reviewCycle.update({ where: { id: step.cycleId }, data: { outcome: outcomeCode, outcomeAt: new Date(), outcomeByName: user.name, outcomeNote: note ?? null, ...closed(decides && returnsToAuthor) } });
       await finishBindingDecision();
       return { ok: true, message: `Final serial decision recorded on ${label}.` };
     }
@@ -315,7 +352,7 @@ export async function recordStepOutcome(t: Tenant, runId: string, user: SessionU
     await db.workflowRun.update({ where: { id: runId }, data: { steps: JSON.stringify(steps) } });
     if (!allDone) return { ok: true, message: "Input recorded — waiting for the others on this step." };
     const worst = step.inputs.find((i) => i.returns) ?? step.inputs[step.inputs.length - 1];
-    await db.reviewCycle.update({ where: { id: step.cycleId }, data: { outcome: worst.code, outcomeAt: new Date(), outcomeByName: user.name, outcomeNote: note ?? null, returnedFromReviewAt: new Date(), returnedToOriginatorAt: new Date(), status: "CLOSED" } });
+    await db.reviewCycle.update({ where: { id: step.cycleId }, data: { outcome: worst.code, outcomeAt: new Date(), outcomeByName: user.name, outcomeNote: note ?? null, ...closed(decides && worst.returns) } });
     if (decides && worst.returns) await returnWorkflow(t, runId, user, "The deciders asked for changes.");
     else if (decides) { await recordApproval(t, rev.id, user, `Binding verdict ${worst.code}`); await advance(t, runId, user); }
     else await advance(t, runId, user);
@@ -327,7 +364,7 @@ export async function recordStepOutcome(t: Tenant, runId: string, user: SessionU
   const othersDone = step.participantIds.slice(0, -1).every((p) => step.decidedBy!.includes(p));
   const consolidator = step.participantIds[step.participantIds.length - 1];
   if (user.id === consolidator && othersDone) {
-    await db.reviewCycle.update({ where: { id: step.cycleId }, data: { outcome: outcomeCode, outcomeAt: new Date(), outcomeByName: user.name, outcomeNote: note ?? null, returnedFromReviewAt: new Date(), returnedToOriginatorAt: new Date(), status: "CLOSED" } });
+    await db.reviewCycle.update({ where: { id: step.cycleId }, data: { outcome: outcomeCode, outcomeAt: new Date(), outcomeByName: user.name, outcomeNote: note ?? null, ...closed(decides && returnsToAuthor) } });
     await finishBindingDecision();
     return { ok: true, message: `Consolidated decision recorded on ${label}.` };
   }

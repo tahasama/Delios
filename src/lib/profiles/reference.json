@@ -367,7 +367,7 @@
     {
       "key": "REVIEW_OUTCOMES",
       "title": "Review outcomes",
-      "description": "D.7 — the verdict on a submitted revision and what it does (§9.3). The last step of a review route gives it; a verdict that is final is the release approval.",
+      "description": "D.7 - the verdict on a submitted revision and what it does. Only the last step of a review route gives it, and a verdict that is final is the release approval. Earlier steps give advice, from Review advice.",
       "values": [
         {
           "code": "C1",
@@ -399,6 +399,46 @@
           "props": {
             "proceed": true,
             "resubmit": false
+          }
+        }
+      ]
+    },
+    {
+      "key": "REVIEW_ADVICE",
+      "title": "Review advice",
+      "description": "What an advisory step says. Every step of a review route except the last gives advice: it is passed to the decider and never returns the document by itself. The last step gives a verdict, from Review outcomes.",
+      "values": [
+        {
+          "code": "NO_COMMENT",
+          "label": "Nothing to say",
+          "props": {
+            "advice": true,
+            "proceed": true,
+            "blocking": false,
+            "comments": "none",
+            "meaning": "You read it and found nothing worth writing down."
+          }
+        },
+        {
+          "code": "COMMENTS",
+          "label": "Comments, not blocking",
+          "props": {
+            "advice": true,
+            "proceed": true,
+            "blocking": false,
+            "comments": "some",
+            "meaning": "You wrote comments. None of them stops the revision from being released."
+          }
+        },
+        {
+          "code": "COMMENTS_BLOCKING",
+          "label": "Comments, blocking",
+          "props": {
+            "advice": true,
+            "proceed": true,
+            "blocking": true,
+            "comments": "blocking",
+            "meaning": "At least one of your comments must be settled before the revision can be released."
           }
         }
       ]
@@ -676,20 +716,22 @@
     {
       "key": "COMMENT_CLASSES",
       "title": "Comment classifications",
-      "description": "D.10 — every comment carries a progression consequence (§9.6).",
+      "description": "D.10 - every comment says whether it stops release. A blocking comment must be settled before the revision is released; a comment that is not blocking is recorded and carried into the next revision.",
       "values": [
         {
           "code": "BLOCKING",
-          "label": "Blocking (Class 1)",
+          "label": "Class 1 - blocking",
           "props": {
-            "progressionPreventing": true
+            "progressionPreventing": true,
+            "meaning": "Must be settled before the revision can be released."
           }
         },
         {
           "code": "NON_BLOCKING",
-          "label": "Non-blocking (Class 2/3)",
+          "label": "Class 2 - not blocking",
           "props": {
-            "progressionPreventing": false
+            "progressionPreventing": false,
+            "meaning": "Recorded, and answered in the next revision. It does not stop release."
           }
         }
       ]

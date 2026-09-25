@@ -15,9 +15,19 @@ import { audit, notify } from "./audit";
 export async function verdictMeaning(t: Pick<Tenant, "db">, setKey: string | null | undefined, code: string) {
   const row = await t.db.configValue.findFirst({ where: { setKey: setKey ?? "REVIEW_OUTCOMES", code, status: "ACTIVE" } });
   if (!row) return null;
-  let props: { proceed?: boolean; resubmit?: boolean } = {};
+  let props: { proceed?: boolean; resubmit?: boolean; advice?: boolean; blocking?: boolean; comments?: string } = {};
   try { props = row.props ? JSON.parse(row.props) : {}; } catch { props = {}; }
-  return { code: row.code, label: row.label, proceed: props.proceed === true, resubmit: props.resubmit === true };
+  return {
+    code: row.code,
+    label: row.label,
+    proceed: props.proceed === true,
+    resubmit: props.resubmit === true,
+    // Advice, from an advisory step's own list: it says what the adviser's
+    // comments amount to, and never returns the document by itself.
+    advice: props.advice === true,
+    blocking: props.blocking === true,
+    comments: typeof props.comments === "string" ? props.comments : null,
+  };
 }
 
 /**

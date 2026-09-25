@@ -7,7 +7,7 @@ import { ActionForm } from "@/components/form";
 import { OUTCOME_CONSEQUENCES } from "@/lib/standard";
 import { fmtDateTime } from "@/lib/utils";
 import { getActiveSet } from "@/lib/config";
-import { verdictEffect, VERDICT_EFFECT_SHORT } from "@/lib/verdict-effect";
+import { decisionOptions, statusOptions } from "@/lib/decision-options";
 import { VerdictDecision } from "@/app/(app)/documents/[id]/verdict-status";
 import { preflight } from "@/lib/rules/preflight";
 import { Guarded } from "@/components/preflight";
@@ -39,14 +39,15 @@ export default async function ReviewCyclePage({ params }: { params: Promise<{ id
   const doc = rev.document;
   const rendition = rev.files.find((file) => file.kind === "RENDITION") ?? null;
   const blockingOpen = cycle.comments.filter((comment) => comment.progressionPreventing && comment.status === "OPEN");
+  const myComments = cycle.comments.filter((comment) => comment.authorId === user.id);
   const canRecordOutcome = (assigned || controller) && !cycle.outcome && Boolean(cycle.issuedToReviewAt);
   const canReturn = controller && Boolean(cycle.outcome) && !cycle.returnedToOriginatorAt;
   const custody = [
     { label: "Submitted", at: cycle.submittedAt, holder: cycle.openedByName },
     { label: "Received by control", at: cycle.receivedAt, holder: "Document Control" },
     { label: "With reviewers", at: cycle.issuedToReviewAt, holder: cycle.assignments.map((assignment) => assignment.userName).join(", ") || "Unassigned" },
-    { label: "Review returned", at: cycle.returnedFromReviewAt, holder: "Document Control" },
-    { label: "Returned to author", at: cycle.returnedToOriginatorAt, holder: doc.createdByName },
+    { label: cycle.binding ? "Review returned" : "Advice given", at: cycle.returnedFromReviewAt, holder: cycle.binding ? "Document Control" : cycle.outcomeByName ?? "the reviewers" },
+    { label: cycle.binding ? "Returned to author" : "Passed to whoever decides", at: cycle.binding ? cycle.returnedToOriginatorAt : cycle.returnedFromReviewAt, holder: cycle.binding ? doc.createdByName : "the deciding step" },
   ];
   const currentCustody = [...custody].reverse().find((point) => point.at) ?? custody[0];
 
@@ -82,17 +83,13 @@ export default async function ReviewCyclePage({ params }: { params: Promise<{ id
               {comment.progressionPreventing && comment.status === "OPEN" && (assigned || controller) ? <div className="mt-3 border-t border-red-100 pt-3"><ActionForm action={closeCommentAction} submitLabel="Resolve comment" size="sm" hidden={{ commentId: comment.id, cycleId: cycle.id }}><input name="resolution" required className={inputCls} placeholder="How was it resolved?"/></ActionForm></div> : null}
               {cycle.status === "OPEN" && (assigned || controller) ? <details className="mt-2"><summary className="cursor-pointer text-[11px] font-semibold text-slate-500">Change impact</summary><div className="mt-2"><ActionForm action={reclassifyCommentAction} submitLabel="Save" size="sm" hidden={{ commentId: comment.id, cycleId: cycle.id }}><label className="flex items-center gap-2 text-xs text-slate-600"><input type="checkbox" name="prevent" defaultChecked={comment.progressionPreventing}/> Blocks progression</label><input name="note" className={inputCls} placeholder="Why"/></ActionForm></div></details> : null}
             </li>)}</ul> : <p className="text-sm text-slate-400">No comments yet.</p>}
-            {cycle.status === "OPEN" && (assigned || controller) ? <div className="mt-4 border-t border-slate-100 pt-4"><ActionForm action={addCommentAction} submitLabel="Add comment" size="sm" hidden={{ cycleId: cycle.id }}><Field label="Comment" required><textarea name="text" rows={3} required className={inputCls} placeholder="What needs to change, and where"/></Field><Field label="Impact"><select name="classification" className={inputCls} defaultValue={commentClasses.find((item) => item.props.progressionPreventing === true)?.code ?? "NON_BLOCKING"}>{commentClasses.map((item) => <option key={item.code} value={item.code}>{item.label}</option>)}</select></Field></ActionForm></div> : null}
+            {cycle.status === "OPEN" && (assigned || controller) ? <div className="mt-4 border-t border-slate-100 pt-4"><ActionForm action={addCommentAction} submitLabel="Add comment" size="sm" hidden={{ cycleId: cycle.id }}><Field label="Comment" required><textarea name="text" rows={3} required className={inputCls} placeholder="What needs to change, and where"/></Field><Field label="Impact" hint="blocking stops release until it is settled; not blocking is answered in the next revision"><select name="classification" className={inputCls} defaultValue={commentClasses.find((item) => item.props.progressionPreventing !== true)?.code ?? "NON_BLOCKING"}>{commentClasses.map((item) => <option key={item.code} value={item.code}>{item.label}</option>)}</select></Field></ActionForm></div> : null}
           </Card>
         </div>
 
         <aside className="space-y-4">
           <Card title={cycle.binding ? "Binding verdict" : "Advice"} description={cycle.binding ? "The one decision on this revision. A verdict that proceeds is its release approval, so only someone who may approve the document can give it." : "Input for the route's decider; it does not decide on its own."}>
-            {cycle.outcome ? <div><p className="text-sm font-semibold text-slate-900"><span className="font-mono">{cycle.outcome}</span> · {verdictLabel(cycle.outcome)}</p><p className="mt-1 text-xs leading-5 text-slate-500">{OUTCOME_CONSEQUENCES[cycle.outcome]?.blurb}</p><p className="mt-3 text-xs text-slate-500">{cycle.outcomeByName}, {fmtDateTime(cycle.outcomeAt)}</p>{canReturn ? <div className="mt-4 border-t border-slate-100 pt-4"><ActionForm action={returnToOriginatorAction} submitLabel="Return to author" size="sm" hidden={{ cycleId: cycle.id }}/></div> : null}</div> : <Guarded result={await preflight("RECORD_OUTCOME", { cycleId: cycle.id })}><ActionForm action={recordOutcomeAction} submitLabel={cycle.binding ? "Give my verdict" : "Give my advice"} hidden={{ cycleId: cycle.id }}><VerdictDecision
-                deciding={cycle.binding}
-                verdicts={outcomes.map((o) => ({ code: o.code, label: o.label, effect: VERDICT_EFFECT_SHORT[verdictEffect(o.props)], proceeds: verdictEffect(o.props) !== "RETURN" }))}
-                statuses={statuses.map((st) => ({ code: st.code, label: st.label, allowsWork: st.props.executionFlag === true }))}
-              /></ActionForm></Guarded>}
+            {cycle.outcome ? <div><p className="text-sm font-semibold text-slate-900"><span className="font-mono">{cycle.outcome}</span> · {verdictLabel(cycle.outcome)}</p><p className="mt-1 text-xs leading-5 text-slate-500">{OUTCOME_CONSEQUENCES[cycle.outcome]?.blurb}</p><p className="mt-3 text-xs text-slate-500">{cycle.outcomeByName}, {fmtDateTime(cycle.outcomeAt)}</p>{canReturn ? <div className="mt-4 border-t border-slate-100 pt-4"><ActionForm action={returnToOriginatorAction} submitLabel="Return to author" size="sm" hidden={{ cycleId: cycle.id }}/></div> : null}</div> : <Guarded result={await preflight("RECORD_OUTCOME", { cycleId: cycle.id })}><ActionForm action={recordOutcomeAction} submitLabel={cycle.binding ? "Give my verdict" : "Give my advice"} hidden={{ cycleId: cycle.id }}><VerdictDecision deciding={cycle.binding} verdicts={decisionOptions(outcomes)} statuses={statusOptions(statuses)} own={{ total: myComments.length, blocking: myComments.filter((c) => c.progressionPreventing).length }} /></ActionForm></Guarded>}
             {cycle.outcome ? null : <p className="mt-2 text-xs leading-5 text-slate-500">{!cycle.issuedToReviewAt ? "Document Control sends it to the reviewers first." : ""}</p>}
           </Card>
 

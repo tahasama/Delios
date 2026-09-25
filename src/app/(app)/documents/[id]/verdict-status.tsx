@@ -3,30 +3,69 @@
 import { useState } from "react";
 import { Field, inputCls } from "@/components/ui";
 
-export type VerdictOption = { code: string; label: string; effect: string; proceeds: boolean };
-export type StatusOption = { code: string; label: string; allowsWork: boolean };
+export type VerdictOption = {
+  code: string;
+  label: string;
+  effect: string;
+  proceeds: boolean;
+  /** The verdict carries comments into the next revision (accepted with comments). */
+  resubmit?: boolean;
+  /** An advisory step's own list: what the adviser's comments amount to. */
+  advice?: boolean;
+  /** "none" | "some" | "blocking" — which comments this advice claims. */
+  comments?: string | null;
+  meaning?: string | null;
+};
+export type StatusOption = { code: string; label: string; allowsWork: boolean; may?: string | null };
 
 /**
- * The verdict, and — when it lets the revision proceed — what it may then be
- * used for. The status is the reviewers' decision, so it is required here and
- * cannot be changed at release. A verdict that sends the revision back asks
- * for a reason instead.
+ * One form for both kinds of step, because a step is only ever one of them.
+ *
+ * An advisory step chooses from the advice list: what its comments amount to.
+ * It never returns the revision and never says what the revision may be used
+ * for. The deciding step chooses from the verdict list, and a verdict that
+ * proceeds must say what the revision may then be used for — the control
+ * function releases at exactly that and cannot change it.
  */
-export function VerdictDecision({ verdicts, statuses, deciding }: { verdicts: VerdictOption[]; statuses: StatusOption[]; deciding: boolean }) {
+export function VerdictDecision({ verdicts, statuses, deciding, own }: {
+  verdicts: VerdictOption[];
+  statuses: StatusOption[];
+  deciding: boolean;
+  /** This person's comments on this step, so their advice can match them. */
+  own?: { total: number; blocking: number };
+}) {
   const [code, setCode] = useState("");
   const [status, setStatus] = useState("");
   const verdict = verdicts.find((v) => v.code === code);
+  const advice = verdict?.advice === true;
   const proceeds = verdict?.proceeds === true;
   const chosen = statuses.find((s) => s.code === status);
+  // A verdict that returns the revision needs a reason; one that carries
+  // comments into the next revision needs the comments themselves.
+  const needsWords = !!verdict && !advice && (!proceeds || verdict.resubmit === true);
 
   return (
     <>
-      <Field label={deciding ? "Your verdict" : "Your advice"} required>
+      <Field
+        label={deciding ? "Your verdict" : "Your advice"}
+        required
+        hint={deciding ? "the one decision on this revision" : "it goes to whoever decides; it does not return the document by itself"}
+      >
         <select name="outcome" required className={inputCls} value={code} onChange={(e) => setCode(e.target.value)}>
           <option value="" disabled>Choose…</option>
-          {verdicts.map((v) => <option key={v.code} value={v.code}>{v.code} — {v.label} ({v.effect})</option>)}
+          {verdicts.map((v) => (
+            <option key={v.code} value={v.code}>{v.advice ? v.label : `${v.code} — ${v.label} (${v.effect})`}</option>
+          ))}
         </select>
+        {verdict?.meaning ? <span className="mt-1.5 block text-[11px] text-slate-500">{verdict.meaning}</span> : null}
       </Field>
+
+      {!deciding && own ? (
+        <p className="-mt-1 text-[11px] text-slate-500">
+          You have written {own.total === 0 ? "no comments" : `${own.total} comment${own.total > 1 ? "s" : ""}`}
+          {own.blocking ? `, ${own.blocking} of them blocking` : ""}. Your advice has to match them.
+        </p>
+      ) : null}
 
       {deciding && proceeds ? (
         <Field label="It may then be used for" required hint="your decision — the control function releases at exactly this and cannot change it">
@@ -36,16 +75,28 @@ export function VerdictDecision({ verdicts, statuses, deciding }: { verdicts: Ve
           </select>
           {chosen ? (
             <span className={`mt-1.5 block text-[11px] ${chosen.allowsWork ? "font-semibold text-amber-700" : "text-slate-500"}`}>
-              {chosen.allowsWork
-                ? `Once released, people may build, fabricate or order from it (${chosen.code}).`
-                : `Once released, it may be read and commented on, but not built from (${chosen.code}).`}
+              {chosen.may
+                ? `Once released: ${chosen.may.charAt(0).toLowerCase()}${chosen.may.slice(1)} (${chosen.code}).`
+                : chosen.allowsWork
+                  ? `Once released, people may build, fabricate or order from it (${chosen.code}).`
+                  : `Once released, it may be read and commented on, but not built from (${chosen.code}).`}
             </span>
           ) : null}
         </Field>
       ) : null}
 
-      <Field label={proceeds || !code ? "Comment" : "What must change"} required={!!code && !proceeds} hint={code && !proceeds ? "the author needs to know what to fix" : "optional"}>
-        <textarea name="note" rows={2} required={!!code && !proceeds} className={inputCls} placeholder={proceeds ? "what you checked" : "what must change before it comes back"} />
+      <Field
+        label={needsWords ? (proceeds ? "What the next revision must fix" : "What must change") : "Note"}
+        required={needsWords}
+        hint={needsWords ? "the author needs to know what to do" : "optional — your comments say the rest"}
+      >
+        <textarea
+          name="note"
+          rows={2}
+          required={needsWords}
+          className={inputCls}
+          placeholder={needsWords ? (proceeds ? "what to settle in the next revision" : "what must change before it comes back") : "anything worth recording"}
+        />
       </Field>
     </>
   );

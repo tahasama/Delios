@@ -5,7 +5,7 @@ import { Chip, Field, inputCls } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { ActionForm } from "@/components/form";
 import { recordStepOutcomeAction } from "@/lib/actions/workflow";
-import { verdictEffect, VERDICT_EFFECT_SHORT } from "@/lib/verdict-effect";
+import { decisionOptions, statusOptions } from "@/lib/decision-options";
 import { getActiveSet } from "@/lib/config";
 import { VerdictDecision } from "./verdict-status";
 import { Send, CheckCircle2, Rocket } from "lucide-react";
@@ -84,8 +84,8 @@ export async function WorkflowPanel({ doc, user, lead, extra: after }: { doc: Do
   }
   if (revs.length > 0) {
     return (
-      <Card title={revs[0].state === "IN_REVIEW" ? "In review" : "Not in use"} className={revs[0].state === "IN_REVIEW" ? "border-brand-line/30 bg-tint-soft" : undefined}>
-        <p className="text-sm text-slate-700">{revs[0].state === "IN_REVIEW" ? <>Rev {revs[0].value} is with its reviewers.</> : <>The latest revision (rev {revs[0].value}) is <strong>{revs[0].state.replaceAll("_", " ").toLowerCase()}</strong>.</>}</p>
+      <Card title={revs[0].state === "IN_REVIEW" ? (revs[0].proposedStatus ? "Next step: release" : "In review") : "Not in use"} className={revs[0].state === "IN_REVIEW" ? "border-brand-line/30 bg-tint-soft" : undefined}>
+        <p className="text-sm text-slate-700">{revs[0].state === "IN_REVIEW" ? (revs[0].proposedStatus ? <>The review is over. Rev {revs[0].value} is decided <strong>to be {revs[0].proposedStatus}</strong> and waits for Document Control to release it.</> : <>Rev {revs[0].value} is with its reviewers.</>) : <>The latest revision (rev {revs[0].value}) is <strong>{revs[0].state.replaceAll("_", " ").toLowerCase()}</strong>.</>}</p>
         {extra}
       </Card>
     );
@@ -145,10 +145,41 @@ async function RunActivePanel({ run, user, extra }: { run: { id: string; templat
   // The last step decides; the earlier steps' verdicts are advice shown to the decider.
   const deciding = run.currentStep === run.steps.length - 1;
   const adviceCycleIds = run.steps.slice(0, run.currentStep).map((s) => s.cycleId).filter((id): id is string => !!id);
-  const advice = deciding && adviceCycleIds.length
-    ? await db.reviewCycle.findMany({ where: { id: { in: adviceCycleIds } }, select: { id: true, outcome: true, outcomeByName: true, outcomeNote: true } })
+  const advice = adviceCycleIds.length
+    ? await db.reviewCycle.findMany({
+        where: { id: { in: adviceCycleIds } },
+        select: { id: true, outcome: true, outcomeByName: true, outcomeNote: true, outcomeSetKey: true, comments: { select: { id: true, authorName: true, text: true, progressionPreventing: true, status: true }, orderBy: { createdAt: "asc" } } },
+      })
     : [];
+  // The earlier steps answer from the advice list, so their labels come from it.
+  const adviceLabels = new Map((await getActiveSet("REVIEW_ADVICE")).map((a) => [a.code, a.label]));
   const outcomeLabel = new Map(outcomes.map((o) => [o.code, o.label]));
+  const said = (code: string) => adviceLabels.get(code) ?? outcomeLabel.get(code) ?? code;
+  const earlier = advice.some((a) => a.outcome || a.comments.length) ? (
+    <div className="mb-3 rounded-lg bg-surface p-2.5 text-xs ring-1 ring-slate-200">
+      <p className="mb-1 font-semibold text-slate-700">What the earlier steps said</p>
+      <ul className="space-y-1.5 text-slate-600">
+        {advice.map((a) => (
+          <li key={a.id}>
+            {a.outcome ? <><span className="font-semibold">{said(a.outcome)}</span> — {a.outcomeByName}{a.outcomeNote ? `: “${a.outcomeNote}”` : ""}</> : <span className="text-slate-400">no advice recorded yet</span>}
+            {a.comments.length ? (
+              <ul className="mt-1 space-y-0.5 border-l border-slate-200 pl-2">
+                {a.comments.map((c) => (
+                  <li key={c.id} className={c.progressionPreventing ? "text-red-700" : "text-slate-500"}>
+                    {c.progressionPreventing ? "blocking" : "comment"} · {c.authorName}: {c.text}
+                    {c.progressionPreventing && c.status === "CLOSED" ? " (settled)" : ""}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </li>
+        ))}
+      </ul>
+    </div>
+  ) : null;
+  // An adviser's own comments, so the form can hold their advice to them.
+  const ownRows = step?.cycleId ? await db.reviewComment.findMany({ where: { cycleId: step.cycleId, authorId: user.id }, select: { progressionPreventing: true } }) : [];
+  const ownComments = { total: ownRows.length, blocking: ownRows.filter((c) => c.progressionPreventing).length };
 
   return (
     <Card title={iDecide ? "Next step: your decision" : "In review"} description={`${run.templateName} · step ${run.currentStep + 1} of ${run.steps.length}`} className="border-brand-line/30 bg-tint-soft">
@@ -169,23 +200,13 @@ async function RunActivePanel({ run, user, extra }: { run: { id: string; templat
         })}
       </ol>
 
+      {earlier}
+
       {step && step.status === "active" ? (
         iDecide ? (
           <Action label={deciding ? "Your verdict decides this revision" : "Your advice goes to whoever decides"}>
-            {advice.some((a) => a.outcome) ? (
-              <div className="mb-3 rounded-lg bg-surface p-2.5 text-xs ring-1 ring-slate-200">
-                <p className="mb-1 font-semibold text-slate-700">Advice from the earlier steps</p>
-                <ul className="space-y-0.5 text-slate-600">
-                  {advice.filter((a) => a.outcome).map((a) => <li key={a.id}><span className="font-mono font-semibold">{a.outcome}</span> {outcomeLabel.get(a.outcome!) ?? ""} — {a.outcomeByName}{a.outcomeNote ? `: “${a.outcomeNote}”` : ""}</li>)}
-                </ul>
-              </div>
-            ) : null}
             <ActionForm action={recordStepOutcomeAction} submitLabel={deciding ? "Give my verdict" : "Give my advice"} size="sm" hidden={{ runId: run.id }}>
-              <VerdictDecision
-                deciding={deciding}
-                verdicts={outcomes.map((o) => ({ code: o.code, label: o.label, effect: VERDICT_EFFECT_SHORT[verdictEffect(o.props)], proceeds: verdictEffect(o.props) !== "RETURN" }))}
-                statuses={statuses.map((st) => ({ code: st.code, label: st.label, allowsWork: st.props.executionFlag === true }))}
-              />
+              <VerdictDecision deciding={deciding} verdicts={decisionOptions(outcomes)} statuses={statusOptions(statuses)} own={ownComments} />
             </ActionForm>
             <p className="mt-2 text-[11px] text-slate-400">Recorded under your name. Verdicts come from your organization&apos;s list — <Link href="/guide/codes#outcome" className="underline">what each one means</Link>.</p>
           </Action>

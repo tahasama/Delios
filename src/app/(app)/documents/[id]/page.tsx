@@ -7,7 +7,7 @@ import { Prisma } from "@prisma/client";
 import { isController, isAdmin, mayContributeToDocument } from "@/lib/auth";
 import { Chip, StateChip, Banner, btn, Field, inputCls } from "@/components/ui";
 import { ActionForm } from "@/components/form";
-import { DOC_STATE_LABEL, DOC_STATE_COLOR, REV_STATE_LABEL, REV_STATE_COLOR, type DocState, type RevState } from "@/lib/standard";
+import { DOC_STATE_LABEL, DOC_STATE_COLOR, REV_STATE_LABEL, REV_STATE_COLOR, revStateLabel, revStateColor, type DocState, type RevState } from "@/lib/standard";
 import { fmtDate, timeAgo, plain } from "@/lib/utils";
 import { getActiveSet, getSet, getValue } from "@/lib/config";
 import { updateDocumentAction, linkAssetAction, unlinkRelationshipAction, endDocumentStateAction } from "@/lib/actions/documents";
@@ -208,8 +208,8 @@ export default async function DocumentDetailPage({
     </div>
   );
 
-  const stateLabel = shown ? REV_STATE_LABEL[shown.state as RevState] ?? shown.state : DOC_STATE_LABEL[doc.state as DocState] ?? doc.state;
-  const stateColor = shown ? REV_STATE_COLOR[shown.state as RevState] ?? "" : DOC_STATE_COLOR[doc.state as DocState] ?? "";
+  const stateLabel = shown ? revStateLabel(shown.state, !!shown.proposedStatus) : DOC_STATE_LABEL[doc.state as DocState] ?? doc.state;
+  const stateColor = shown ? revStateColor(shown.state, !!shown.proposedStatus) : DOC_STATE_COLOR[doc.state as DocState] ?? "";
 
   return (
     <div className="space-y-4">

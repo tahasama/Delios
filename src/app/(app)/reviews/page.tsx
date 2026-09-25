@@ -25,7 +25,7 @@ export default async function ReviewsPage({ searchParams }: { searchParams: Prom
   const sp = await searchParams;
   const status = VIEWS.some((v) => v.id === sp.status) ? sp.status! : "ALL";
   const q = (sp.q ?? "").trim();
-  const [cycles, counts, verdicts] = await Promise.all([
+  const [cycles, counts, verdicts, adviceValues] = await Promise.all([
     db.reviewCycle.findMany({
       where: {
         ...(status === "ALL" ? {} : { status }),
@@ -41,11 +41,12 @@ export default async function ReviewsPage({ searchParams }: { searchParams: Prom
     }),
     db.reviewCycle.groupBy({ by: ["status"], _count: true }),
     getSet("REVIEW_OUTCOMES"),
+    getSet("REVIEW_ADVICE"),
   ]);
   const count = (s: string) => (s === "ALL" ? counts.reduce((n, c) => n + c._count, 0) : counts.find((c) => c.status === s)?._count ?? 0);
   // Codes from the organization's list; older records may carry the Standard's
   // own consequence names (APPROVED, REVISE_AND_RESUBMIT…).
-  const verdictLabel = new Map<string, string>([...Object.entries(OUTCOME_CONSEQUENCES).map(([k, v]) => [k, v.label] as [string, string]), ...verdicts.map((v) => [v.code, v.label] as [string, string])]);
+  const verdictLabel = new Map<string, string>([...Object.entries(OUTCOME_CONSEQUENCES).map(([k, v]) => [k, v.label] as [string, string]), ...verdicts.map((v) => [v.code, v.label] as [string, string]), ...adviceValues.map((v) => [v.code, v.label] as [string, string])]);
   const proceeds = new Map<string, boolean>([...Object.entries(OUTCOME_CONSEQUENCES).map(([k, v]) => [k, v.proceed] as [string, boolean]), ...verdicts.map((v) => [v.code, v.props.proceed === true] as [string, boolean])]);
 
   return (
@@ -107,7 +108,7 @@ export default async function ReviewsPage({ searchParams }: { searchParams: Prom
                 <Td className="whitespace-nowrap text-xs">
                   {c.outcome ? (
                     <span className={c.binding ? (proceeds.get(c.outcome) ? "text-emerald-700" : "text-red-700") : "text-slate-600"}>
-                      {verdictLabel.get(c.outcome) && verdictLabel.get(c.outcome) !== c.outcome && !(c.outcome in OUTCOME_CONSEQUENCES) ? <><span className="font-mono font-bold">{c.outcome}</span> {verdictLabel.get(c.outcome)}</> : <span className="font-semibold">{verdictLabel.get(c.outcome) ?? c.outcome}</span>}
+                      {c.binding && verdictLabel.get(c.outcome) && verdictLabel.get(c.outcome) !== c.outcome && !(c.outcome in OUTCOME_CONSEQUENCES) ? <><span className="font-mono font-bold">{c.outcome}</span> {verdictLabel.get(c.outcome)}</> : <span className="font-semibold">{verdictLabel.get(c.outcome) ?? c.outcome}</span>}
                       {c.outcomeByName ? <span className="block text-[11px] text-slate-400">{c.outcomeByName}</span> : null}
                     </span>
                   ) : c.status === "OPEN" ? <span className="text-amber-700">waiting</span> : <span className="text-slate-300">—</span>}

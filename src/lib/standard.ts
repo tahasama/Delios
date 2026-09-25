@@ -40,6 +40,20 @@ export const REV_STATE_LABEL: Record<RevState, string> = {
   SUPERSEDED: "Superseded",
   VOID: "Void",
 };
+/**
+ * In review covers two situations people read differently: with the reviewers,
+ * and decided but not yet released. The state is the same either way; the
+ * label says which of the two it is, so nobody waits on a review that is over.
+ */
+export function revStateLabel(state: string, decided?: boolean): string {
+  if (state === "IN_REVIEW" && decided) return "For release";
+  return REV_STATE_LABEL[state as RevState] ?? state;
+}
+export function revStateColor(state: string, decided?: boolean): string {
+  if (state === "IN_REVIEW" && decided) return "bg-sky-100 text-sky-800 ring-sky-300";
+  return REV_STATE_COLOR[state as RevState] ?? "";
+}
+
 export const REV_STATE_COLOR: Record<RevState, string> = {
   IN_PREPARATION: "bg-slate-100 text-slate-700 ring-slate-300",
   IN_REVIEW: "bg-amber-100 text-amber-800 ring-amber-300",

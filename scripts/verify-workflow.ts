@@ -36,6 +36,12 @@ async function main() {
   // A verdict that stops release; "approved with comments" proceeds.
   const back = proceed.find((v) => v.props.proceed === false)!;
 
+  // Advice, from the advisory steps' own list: what the adviser's comments amount to.
+  const adviceValues = (await db.configValue.findMany({ where: { setKey: "REVIEW_ADVICE", status: "ACTIVE" } }))
+    .map((v) => ({ code: v.code, props: v.props ? (JSON.parse(v.props) as { comments?: string }) : {} }));
+  const nothingToSay = adviceValues.find((v) => v.props.comments === "none")!;
+  const blockingAdvice = adviceValues.find((v) => v.props.comments === "blocking")!;
+
   // What a proceeding verdict says the revision may be used for.
   const useFor = (await db.configValue.findFirstOrThrow({ where: { setKey: "STATUSES", status: "ACTIVE" } })).code;
   const stamp = Date.now().toString(36);
@@ -97,16 +103,28 @@ async function main() {
     check("route starts", started.ok, started.ok ? "" : started.error);
     const runId = started.ok ? started.runId : "";
 
-    const second = await recordStepOutcome(t, runId, r2, ok.code, "no issue");
+    const verdictOnAdvice = await recordStepOutcome(t, runId, r2, ok.code, "no issue");
+    check("an adviser cannot reach a verdict code", !verdictOnAdvice.ok, verdictOnAdvice.error ?? "recorded");
+    const second = await recordStepOutcome(t, runId, r2, nothingToSay.code);
     check("any of the three may go first", second.ok, second.error ?? "");
     let run = await getRunForRevision(t, rev.id);
     check("step waits while others are outstanding", run?.currentStep === 0);
-    await recordStepOutcome(t, runId, comm, ok.code, "fine for commissioning");
+    await recordStepOutcome(t, runId, comm, nothingToSay.code);
     run = await getRunForRevision(t, rev.id);
     check("still waiting on the third", run?.currentStep === 0);
-    await recordStepOutcome(t, runId, r1, back.code, "clarify load case");
+    // Advice has to match the comments: claiming a blocking comment without one is refused.
+    const unsupported = await recordStepOutcome(t, runId, r1, blockingAdvice.code);
+    check("advice cannot claim a blocking comment that does not exist", !unsupported.ok, unsupported.error ?? "recorded");
+    const adviceCycleId = run?.steps[0].cycleId ?? "";
+    await t.db.reviewComment.create({
+      data: { projectId: p1.id, cycleId: adviceCycleId, authorId: r1.id, authorName: r1.name, text: "Load case is not stated.", classification: "BLOCKING", progressionPreventing: true },
+    });
+    const blocked = await recordStepOutcome(t, runId, r1, blockingAdvice.code);
+    check("all three in — moves to the lead, even when one is blocking", blocked.ok && run?.currentStep === 0, blocked.error ?? "");
     run = await getRunForRevision(t, rev.id);
-    check("all three in — moves to the lead, even with a request for changes", run?.currentStep === 1 && run?.status === "ACTIVE");
+    check("the advisory step does not return the revision to its author", run?.currentStep === 1 && run?.status === "ACTIVE");
+    const adviceCycle = await t.db.reviewCycle.findUniqueOrThrow({ where: { id: adviceCycleId } });
+    check("and its custody stops at advice given", !!adviceCycle.returnedFromReviewAt && adviceCycle.returnedToOriginatorAt === null);
 
     const notLead = await recordStepOutcome(t, runId, r1, ok.code);
     check("only the lead decides the lead step", !notLead.ok);
@@ -134,6 +152,7 @@ async function main() {
     const s5 = await startWorkflowRun(t, rev5.id, consolidated, admin);
     check("reviewers may sit on the deciding step when only the consolidator binds", s5.ok, s5.ok ? "" : s5.error);
     const id5 = s5.ok ? s5.runId : "";
+    // A consolidated step is the deciding step, so everyone on it answers from the verdict list.
     const in1 = await recordStepOutcome(t, id5, r1, ok.code, "fine");
     const in2 = await recordStepOutcome(t, id5, r2, ok.code, "fine");
     check("their verdicts are taken as input", in1.ok && in2.ok, in1.error ?? in2.error ?? "");
