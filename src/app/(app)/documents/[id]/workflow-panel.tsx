@@ -9,7 +9,8 @@ import { decisionOptions, statusOptions } from "@/lib/decision-options";
 import { getActiveSet } from "@/lib/config";
 import { VerdictDecision } from "./verdict-status";
 import { Send, CheckCircle2, Rocket } from "lucide-react";
-import { getRunForRevision, type WfRuntimeStep } from "@/lib/workflow";
+import { getRunForRevision, dueState, type WfRuntimeStep } from "@/lib/workflow";
+import { fmtDate } from "@/lib/utils";
 import { confirmRecordAction, correctRecordAction } from "@/lib/actions/governance";
 import { SendForReview } from "@/components/send-for-review-panel";
 import { isController } from "@/lib/auth";
@@ -195,6 +196,11 @@ async function RunActivePanel({ run, user, extra }: { run: { id: string; templat
               <Chip className={i === run.steps.length - 1 ? "bg-emerald-100 text-emerald-800 ring-emerald-300" : "bg-sky-100 text-sky-800 ring-sky-300"}>{i === run.steps.length - 1 ? "decision" : "advice"}</Chip>
               <span className="text-xs text-slate-500">{names}</span>
               {s.status === "active" ? <Chip className="bg-amber-100 text-amber-800 ring-amber-300">waiting</Chip> : null}
+              {s.status === "active" && activeCycle?.dueAt ? (
+                <Chip className={dueState(activeCycle.dueAt, false) === "overdue" ? "bg-red-100 text-red-800 ring-red-300" : dueState(activeCycle.dueAt, false) === "at risk" ? "bg-amber-100 text-amber-900 ring-amber-400" : "bg-slate-100 text-slate-600 ring-slate-300"}>
+                  due {fmtDate(activeCycle.dueAt)}
+                </Chip>
+              ) : null}
               {s.status === "declined" ? <Chip className="bg-red-100 text-red-800 ring-red-300">declined</Chip> : null}
             </li>
           );

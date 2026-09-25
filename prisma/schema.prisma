@@ -569,6 +569,11 @@ model ReviewCycle {
   issuedToReviewAt       DateTime? // control function
   returnedFromReviewAt   DateTime? // reviewer
   returnedToOriginatorAt DateTime? // control function
+  // How long this step has, and whether anyone has been warned that it is late.
+  // The route says how many days each step gets; the due date is set when the
+  // step opens, so a late step can be seen without reading the route.
+  dueAt                  DateTime?
+  riskNotifiedAt         DateTime?
   outcome                String? // exactly one per cycle, immutable once recorded (§9.4)
   outcomeSetKey          String? // the published set this cycle's outcome must come from
   outcomeAt              DateTime?

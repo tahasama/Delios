@@ -12,6 +12,8 @@ export type WorkflowBuilderStep = {
   participantIds: string[];
   functionIds?: string[];
   title?: string;
+  /** Working days this step has once it opens. Empty means it has no date. */
+  days?: number;
 };
 
 type Person = { id: string; name: string; role: string; party: { name: string; isInternal: boolean } | null };
@@ -153,6 +155,7 @@ export function WorkflowTemplateBuilder({ id, name = "", description = "", class
                   <span className="mt-1.5 block text-[11px] leading-4 text-slate-600">
                     {empty ? <span className="text-amber-700">Nobody yet — the discipline decides who</span> : [...people, ...fns.map((f) => `${f} (function)`)].join(", ")}
                   </span>
+                  {step.days ? <span className="mt-1.5 block text-[10px] text-slate-400">{step.days} working day{step.days === 1 ? "" : "s"}</span> : null}
                   {people.length + fns.length > 1 ? (
                     <span className="mt-1.5 flex items-center gap-1 text-[10px] text-slate-400"><Users2 className="h-3 w-3" /> {HOW.find((h) => h.value === step.mode)?.label}</span>
                   ) : null}
@@ -165,6 +168,15 @@ export function WorkflowTemplateBuilder({ id, name = "", description = "", class
           })}
         </div>
 
+        {steps.some((x) => x.days) ? (
+          <p className="mt-2 text-xs text-slate-500">
+            The whole route takes <strong className="font-semibold text-slate-700">{steps.reduce((n, x) => n + (x.days ?? 0), 0)} working days</strong> when every step uses its time.
+            Steps without a number have no date.
+          </p>
+        ) : (
+          <p className="mt-2 text-xs text-slate-500">No step has a time limit yet. Open a box to give it one, and reviews get a due date.</p>
+        )}
+
         {/* ── The open box ───────────────────────────────────────────────── */}
         {open !== null && steps[open] ? (
           <div className="mt-3 rounded-xl border border-brand-line/40 bg-surface p-4">
@@ -176,6 +188,19 @@ export function WorkflowTemplateBuilder({ id, name = "", description = "", class
                 aria-label={`Name of step ${open + 1}`}
                 placeholder={open === steps.length - 1 ? "Decision" : "Review"}
               />
+              <label className="flex items-center gap-1.5 text-xs text-slate-600">
+                <input
+                  type="number"
+                  min={0}
+                  max={90}
+                  value={steps[open].days ?? ""}
+                  onChange={(e) => update(open, { days: e.target.value ? Number(e.target.value) : undefined })}
+                  className={`${inputCls} w-16 text-center`}
+                  aria-label={`Working days for step ${open + 1}`}
+                  placeholder="—"
+                />
+                working days
+              </label>
               <span className="text-xs text-slate-500">{open === steps.length - 1 ? "This box decides. Only people who may approve the document can be on it." : "This box advises the one that decides."}</span>
               <button type="button" onClick={() => remove(open)} disabled={steps.length === 1} className="ml-auto inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-slate-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-30">
                 <Trash2 className="h-3.5 w-3.5" /> Remove this box

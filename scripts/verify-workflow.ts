@@ -66,8 +66,8 @@ async function main() {
 
   try {
     const parallelThenLead = await template("Three inputs then lead", [
-      { act: "REVIEW", mode: "ALL", participantIds: [r1.id, r2.id, comm.id] },
-      { act: "REVIEW", mode: "ANY_OF", participantIds: [lead.id] },
+      { act: "REVIEW", mode: "ALL", participantIds: [r1.id, r2.id, comm.id], days: 5 },
+      { act: "REVIEW", mode: "ANY_OF", participantIds: [lead.id], days: 3 },
     ]);
 
     console.log("\nOnly the distribution matrix decides who can be sent a document\n");
@@ -109,6 +109,8 @@ async function main() {
     check("any of the three may go first", second.ok, second.error ?? "");
     let run = await getRunForRevision(t, rev.id);
     check("step waits while others are outstanding", run?.currentStep === 0);
+    const openCycle = await t.db.reviewCycle.findUniqueOrThrow({ where: { id: run?.steps[0].cycleId ?? "" } });
+    check("a step with days carries a due date", !!openCycle.dueAt, openCycle.dueAt?.toDateString() ?? "none");
     await recordStepOutcome(t, runId, comm, nothingToSay.code);
     run = await getRunForRevision(t, rev.id);
     check("still waiting on the third", run?.currentStep === 0);

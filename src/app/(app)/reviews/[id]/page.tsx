@@ -5,7 +5,8 @@ import { isController, isAdmin } from "@/lib/auth";
 import { Card, Chip, Banner, btn, Field, inputCls } from "@/components/ui";
 import { ActionForm } from "@/components/form";
 import { OUTCOME_CONSEQUENCES } from "@/lib/standard";
-import { fmtDateTime } from "@/lib/utils";
+import { fmtDate, fmtDateTime } from "@/lib/utils";
+import { dueState } from "@/lib/workflow";
 import { getActiveSet } from "@/lib/config";
 import { decisionOptions, statusOptions } from "@/lib/decision-options";
 import { VerdictDecision } from "@/app/(app)/documents/[id]/verdict-status";
@@ -61,6 +62,11 @@ export default async function ReviewCyclePage({ params }: { params: Promise<{ id
             <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-500">
               <span className="rounded-md bg-slate-100 px-2 py-0.5 font-mono font-bold text-slate-700">Rev {rev.value}</span>
               <Chip className={cycle.status === "OPEN" ? "bg-amber-100 text-amber-800 ring-amber-200" : "bg-slate-100 text-slate-600 ring-slate-200"}>Review {cycle.sequence} · {cycle.status === "OPEN" ? "open" : "closed"}</Chip>
+              {cycle.dueAt ? (
+                <Chip className={dueState(cycle.dueAt, cycle.status !== "OPEN") === "overdue" ? "bg-red-100 text-red-800 ring-red-200" : dueState(cycle.dueAt, cycle.status !== "OPEN") === "at risk" ? "bg-amber-100 text-amber-900 ring-amber-300" : "bg-slate-100 text-slate-600 ring-slate-200"}>
+                  due {fmtDate(cycle.dueAt)}{cycle.status === "OPEN" ? ` · ${dueState(cycle.dueAt, false)}` : ""}
+                </Chip>
+              ) : null}
               <span>{cycle.outcome ? `${OUTCOME_CONSEQUENCES[cycle.outcome]?.label ?? cycle.outcome} — ${cycle.outcomeByName ?? ""}` : `${currentCustody.label.toLowerCase()} · ${cycle.assignments.filter((assignment) => assignment.completedAt).length} of ${cycle.assignments.length} reviewers done`}</span>
             </div>
           </div>

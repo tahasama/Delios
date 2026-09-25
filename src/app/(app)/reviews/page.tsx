@@ -1,5 +1,8 @@
 import Link from "next/link";
+import { after } from "next/server";
 import { requireScope } from "@/lib/scope";
+import { dueState } from "@/lib/workflow";
+import { warnLateReviews } from "@/lib/review-risk";
 import { getSet } from "@/lib/config";
 import { PageHeader, DataTable, Th, Td, Chip, EmptyState } from "@/components/ui";
 import { fmtDate } from "@/lib/utils";
@@ -21,7 +24,11 @@ const VIEWS = [
  * binding verdict; earlier steps are advice to it.
  */
 export default async function ReviewsPage({ searchParams }: { searchParams: Promise<{ status?: string; q?: string }> }) {
-  const { db } = await requireScope();
+  const ctx = await requireScope();
+  const { db } = ctx;
+  // One automatic warning per review that is about to miss its date. After that
+  // it is Document Control's call, and their chase is a transmittal.
+  after(() => warnLateReviews(ctx).catch(() => {}));
   const sp = await searchParams;
   const status = VIEWS.some((v) => v.id === sp.status) ? sp.status! : "ALL";
   const q = (sp.q ?? "").trim();
@@ -34,7 +41,7 @@ export default async function ReviewsPage({ searchParams }: { searchParams: Prom
       orderBy: { submittedAt: "desc" },
       take: 500,
       include: {
-        revision: { select: { value: true, state: true, releasedAt: true, document: { select: { id: true, docNumber: true, title: true } } } },
+        revision: { select: { id: true, value: true, state: true, releasedAt: true, document: { select: { id: true, docNumber: true, title: true } } } },
         assignments: { orderBy: { order: "asc" } },
         comments: { where: { progressionPreventing: true, status: "OPEN" }, select: { id: true } },
       },
@@ -80,6 +87,7 @@ export default async function ReviewsPage({ searchParams }: { searchParams: Prom
               <Th>Kind</Th>
               <Th>Verdict</Th>
               <Th>Reviewers</Th>
+              <Th title="When this step has to be answered. It comes from the days the route gives the step.">Due</Th>
               <Th>Opened</Th>
               <Th>Opened by</Th>
               <Th>Closed</Th>
@@ -92,6 +100,8 @@ export default async function ReviewsPage({ searchParams }: { searchParams: Prom
             // A review that starts after its revision was released is the recipient's, not ours.
             const postRelease = !!c.revision.releasedAt && c.submittedAt > c.revision.releasedAt;
             const done = c.assignments.filter((a) => a.completedAt).length;
+            const state = dueState(c.dueAt, c.status !== "OPEN");
+            const waitingOn = c.assignments.filter((a) => !a.completedAt);
             return (
               <tr key={c.id}>
                 <Td className="min-w-[240px]">
@@ -116,6 +126,27 @@ export default async function ReviewsPage({ searchParams }: { searchParams: Prom
                 <Td className="text-xs">
                   {c.assignments.length ? <span title={c.assignments.map((a) => `${a.completedAt ? "✓" : "○"} ${a.userName}`).join("\n")}>{c.assignments.map((a) => a.userName).join(", ")}</span> : <span className="text-slate-400">unassigned</span>}
                   {c.status === "OPEN" && c.assignments.length > 1 ? <span className="block text-[11px] text-slate-400">{done} of {c.assignments.length} done</span> : null}
+                </Td>
+                <Td className="whitespace-nowrap text-xs tabular-nums">
+                  {c.dueAt ? (
+                    <>
+                      <span className={state === "overdue" ? "font-semibold text-red-700" : state === "at risk" ? "font-semibold text-amber-700" : "text-slate-500"}>{fmtDate(c.dueAt)}</span>
+                      <span className={`block font-sans text-[11px] ${state === "overdue" ? "text-red-600" : state === "at risk" ? "text-amber-700" : "text-slate-400"}`}>
+                        {c.status === "OPEN" ? state : "answered"}
+                      </span>
+                      {c.status === "OPEN" && state !== "on time" ? (
+                        <Link
+                          href={`/transmittals/new?revisions=${c.revision.id}&users=${waitingOn.map((a) => a.userId).join(",")}&reason=REVIEW&subject=${encodeURIComponent(`${c.revision.document.docNumber} rev ${c.revision.value} — review still open`)}&message=${encodeURIComponent(`This review was due on ${fmtDate(c.dueAt)}. Please answer it.${c.riskNotifiedAt ? ` An automatic warning went out on ${fmtDate(c.riskNotifiedAt)}.` : ""}`)}`}
+                          className="mt-0.5 block font-sans text-[11px] font-semibold text-link hover:underline"
+                        >
+                          Notify
+                        </Link>
+                      ) : null}
+                      {c.riskNotifiedAt ? <span className="block font-sans text-[10px] text-slate-400">warned {fmtDate(c.riskNotifiedAt)}</span> : null}
+                    </>
+                  ) : (
+                    <span className="text-slate-300" title="The route gives this step no time limit">—</span>
+                  )}
                 </Td>
                 <Td className="whitespace-nowrap text-xs tabular-nums text-slate-500">{fmtDate(c.submittedAt)}</Td>
                 <Td className="whitespace-nowrap text-xs text-slate-500">{c.openedByName}</Td>

@@ -130,11 +130,11 @@ async function main() {
   const reviewer2 = await db.user.findUniqueOrThrow({ where: { orgId_email: { orgId, email: "reviewer2@delios.local" } } });
   const approver = await db.user.findUniqueOrThrow({ where: { orgId_email: { orgId, email: "approver@delios.local" } } });
   const templates = [
-    { name: "Single approval", description: "One approver, straight to release.", steps: [{ act: "APPROVAL", mode: "ANY_OF", participantIds: [approver.id] }] },
-    { name: "Review then approval", description: "One reviewer records the outcome, then the approver decides.", steps: [{ act: "REVIEW", mode: "ANY_OF", participantIds: [reviewer.id] }, { act: "APPROVAL", mode: "ANY_OF", participantIds: [approver.id] }] },
-    { name: "3-step serial review + approval", description: "Reviewers decide in order (the last outcome is binding, §9.7), then approval.", steps: [{ act: "REVIEW", mode: "SERIAL", participantIds: [reviewer.id, reviewer2.id, approver.id] }, { act: "APPROVAL", mode: "ANY_OF", participantIds: [approver.id] }] },
-    { name: "Parallel review, any-of", description: "Several reviewers in parallel — the first decision closes it.", steps: [{ act: "REVIEW", mode: "ANY_OF", participantIds: [reviewer.id, reviewer2.id] }, { act: "APPROVAL", mode: "ANY_OF", participantIds: [approver.id] }] },
-    { name: "Parallel review + consolidator", description: "Everyone reviews; the consolidator records the binding outcome (§9.7).", steps: [{ act: "REVIEW", mode: "ALL_CONSOLIDATOR", participantIds: [reviewer.id, reviewer2.id, approver.id] }] },
+    { name: "Single approval", description: "One approver, straight to release.", steps: [{ act: "APPROVAL", mode: "ANY_OF", participantIds: [approver.id], days: 3 }] },
+    { name: "Review then approval", description: "One reviewer records the outcome, then the approver decides.", steps: [{ act: "REVIEW", mode: "ANY_OF", participantIds: [reviewer.id], days: 5 }, { act: "APPROVAL", mode: "ANY_OF", participantIds: [approver.id], days: 3 }] },
+    { name: "3-step serial review + approval", description: "Reviewers decide in order (the last outcome is binding, §9.7), then approval.", steps: [{ act: "REVIEW", mode: "SERIAL", participantIds: [reviewer.id, reviewer2.id, approver.id], days: 8 }, { act: "APPROVAL", mode: "ANY_OF", participantIds: [approver.id], days: 3 }] },
+    { name: "Parallel review, any-of", description: "Several reviewers in parallel — the first decision closes it.", steps: [{ act: "REVIEW", mode: "ANY_OF", participantIds: [reviewer.id, reviewer2.id], days: 5 }, { act: "APPROVAL", mode: "ANY_OF", participantIds: [approver.id], days: 3 }] },
+    { name: "Parallel review + consolidator", description: "Everyone reviews; the consolidator records the binding outcome (§9.7).", steps: [{ act: "REVIEW", mode: "ALL_CONSOLIDATOR", participantIds: [reviewer.id, reviewer2.id, approver.id], days: 5 }] },
   ];
   for (const t of templates) {
     await db.workflowTemplate.upsert({

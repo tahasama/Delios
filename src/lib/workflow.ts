@@ -47,7 +47,33 @@ export type WfStep = {
   functionIds?: string[];
   outcomeSetKey?: string;
   title?: string;
+  /** Working days this step has once it opens. Left empty, the step has no date. */
+  days?: number;
 };
+
+/** Working days only: a review that opens on Friday is not late on Monday. */
+export function addWorkingDays(from: Date, days: number): Date {
+  const out = new Date(from);
+  let left = Math.max(0, Math.round(days));
+  while (left > 0) {
+    out.setDate(out.getDate() + 1);
+    const day = out.getDay();
+    if (day !== 0 && day !== 6) left--;
+  }
+  return out;
+}
+
+/**
+ * Where a step stands against its date. "At risk" is its last day: time to
+ * warn whoever holds it, while they can still answer on time.
+ */
+export type DueState = "none" | "on time" | "at risk" | "overdue";
+export function dueState(dueAt: Date | null | undefined, closed: boolean, now = new Date()): DueState {
+  if (!dueAt) return "none";
+  if (closed) return "on time";
+  if (dueAt.getTime() < now.getTime()) return "overdue";
+  return dueAt.getTime() - now.getTime() <= 86_400_000 ? "at risk" : "on time";
+}
 
 export type WfRuntimeStep = WfStep & {
   status: "pending" | "active" | "done" | "declined";
@@ -110,6 +136,7 @@ async function spawnCycleForStep(t: Tenant, revisionId: string, step: WfRuntimeS
       receivedAt: new Date(),
       issuedToReviewAt: new Date(),
       outcomeSetKey: step.outcomeSetKey ?? null,
+      dueAt: step.days ? addWorkingDays(new Date(), step.days) : null,
       binding: step.act === "APPROVAL",
     },
   });
