@@ -32,6 +32,17 @@ import { verdictMeaning, assertMayGiveBindingVerdict, recordApproval } from "./v
 export const VERDICT_SET = "REVIEW_OUTCOMES";
 export const ADVICE_SET = "REVIEW_ADVICE";
 
+/**
+ * What an adviser's comments amount to. An adviser is not asked: the answer is
+ * already in what they wrote, and asking a second time only allows the two to
+ * disagree. A blocking comment is the whole of "I object"; no comment is the
+ * whole of "nothing to say".
+ */
+export function adviceFor(comments: { progressionPreventing: boolean }[]): string {
+  if (comments.some((c) => c.progressionPreventing)) return "COMMENTS_BLOCKING";
+  return comments.length ? "COMMENTS" : "NO_COMMENT";
+}
+
 /** Which list a step answers from: the last step decides, the rest advise. */
 export function setKeyForStep(stepIndex: number, stepCount: number, stepSetKey?: string | null, templateSetKey?: string | null): string {
   const decides = stepIndex === stepCount - 1;
@@ -295,14 +306,21 @@ export async function recordStepOutcome(t: Tenant, runId: string, user: SessionU
 
   const rev = await db.revision.findUniqueOrThrow({ where: { id: run.revisionId }, include: { document: true } });
   const label = `${rev.document.docNumber} rev ${rev.value}`;
-  const outcomeSetKey = step.outcomeSetKey ?? VERDICT_SET;
+  const decidesStep = run.currentStep === steps.length - 1;
+  const outcomeSetKey = decidesStep ? step.outcomeSetKey ?? VERDICT_SET : ADVICE_SET;
+  // An advisory step records what the comments say, whatever was posted. What
+  // one adviser wrote is their own advice; what the step says is all of it,
+  // so the order people answer in cannot change the answer.
+  const adviceOn = async (where: { cycleId: string; authorId?: string }) =>
+    adviceFor(await db.reviewComment.findMany({ where, select: { progressionPreventing: true } }));
+  if (!decidesStep) outcomeCode = step.cycleId ? await adviceOn({ cycleId: step.cycleId, authorId: user.id }) : "NO_COMMENT";
   /** Closing a step ends the review interval; only a verdict that sends the revision back returns it to its author. */
   const closed = (toAuthor: boolean) => ({ returnedFromReviewAt: new Date(), returnedToOriginatorAt: toAuthor ? new Date() : null, status: "CLOSED" });
 
   const verdict = await verdictMeaning(t, outcomeSetKey, outcomeCode);
   if (!verdict) return { ok: false, error: `Choose an active verdict from ${outcomeSetKey}.` };
   // The last step decides; every earlier step advises.
-  const decides = run.currentStep === steps.length - 1;
+  const decides = decidesStep;
   const returnsToAuthor = !verdict.proceed;
   // Within the deciding step, whose verdict binds depends on how it decides:
   // serial and consolidated steps bind on their last person; the others on everyone.
@@ -326,24 +344,20 @@ export async function recordStepOutcome(t: Tenant, runId: string, user: SessionU
   }
   if (!decides) await db.reviewCycle.update({ where: { id: step.cycleId }, data: { binding: false } });
 
-  // What this person's comments amount to is one fact, said once. Advice must
-  // match the comments they left; a verdict that returns the revision, or
-  // carries comments into the next one, must say what has to change.
+  // A verdict that returns the revision, or carries comments into the next one,
+  // has to say what must change. A blocking comment already says it.
   const own = step.cycleId
-    ? await db.reviewComment.findMany({ where: { cycleId: step.cycleId, authorId: user.id }, select: { progressionPreventing: true } })
+    ? await db.reviewComment.findMany({ where: { cycleId: step.cycleId }, select: { progressionPreventing: true } })
     : [];
   const blocking = own.filter((c) => c.progressionPreventing).length;
-  if (verdict.advice) {
-    if (verdict.comments === "none" && own.length) return { ok: false, error: `You left ${own.length} comment${own.length > 1 ? "s" : ""} on this revision. Choose “Comments, not blocking”, or “Comments, blocking” if one of them must be settled first.` };
-    if (verdict.comments === "some" && !own.length) return { ok: false, error: "You have not written a comment. Write one, or choose “Nothing to say”." };
-    if (verdict.comments === "some" && blocking) return { ok: false, error: "One of your comments is marked blocking, so your advice is “Comments, blocking”." };
-    if (verdict.comments === "blocking" && !blocking) return { ok: false, error: "None of your comments is marked blocking. Mark the one that must be settled, or choose “Comments, not blocking”." };
-  }
   if (binds && returnsToAuthor && !note && !blocking) return { ok: false, error: `${verdict.label} goes back to the author — say what must change, or mark the blocking comment that says it.` };
   if (binds && !returnsToAuthor && verdict.resubmit && !note) {
     const written = await db.reviewComment.count({ where: { cycle: { revisionId: run.revisionId } } });
     if (!written) return { ok: false, error: `${verdict.label} carries comments into the next revision, so there must be comments. Write them, or choose the verdict that accepts it outright.` };
   }
+
+  /** The code the closing cycle carries: the verdict, or all the advice given on it. */
+  const closingCode = async () => (decides || !step.cycleId ? outcomeCode : adviceOn({ cycleId: step.cycleId }));
 
   const finishBindingDecision = async () => {
     if (!decides) return advance(t, runId, user);
@@ -363,7 +377,7 @@ export async function recordStepOutcome(t: Tenant, runId: string, user: SessionU
   step.decidedBy = [...(step.decidedBy ?? []), user.id];
 
   if (step.mode === "ANY_OF") {
-    await db.reviewCycle.update({ where: { id: step.cycleId }, data: { outcome: outcomeCode, outcomeAt: new Date(), outcomeByName: user.name, outcomeNote: note ?? null, ...closed(decides && returnsToAuthor) } });
+    await db.reviewCycle.update({ where: { id: step.cycleId }, data: { outcome: await closingCode(), outcomeAt: new Date(), outcomeByName: user.name, outcomeNote: note ?? null, ...closed(decides && returnsToAuthor) } });
     await finishBindingDecision();
     return { ok: true, message: `Decision recorded on ${label}.` };
   }
@@ -376,7 +390,7 @@ export async function recordStepOutcome(t: Tenant, runId: string, user: SessionU
  if (pendingBefore.length) return { ok: false, error: "Serial review: earlier reviewers decide first." };
     const isLast = idx === step.participantIds.length - 1;
     if (isLast) {
-      await db.reviewCycle.update({ where: { id: step.cycleId }, data: { outcome: outcomeCode, outcomeAt: new Date(), outcomeByName: user.name, outcomeNote: note ?? null, ...closed(decides && returnsToAuthor) } });
+      await db.reviewCycle.update({ where: { id: step.cycleId }, data: { outcome: await closingCode(), outcomeAt: new Date(), outcomeByName: user.name, outcomeNote: note ?? null, ...closed(decides && returnsToAuthor) } });
       await finishBindingDecision();
       return { ok: true, message: `Final serial decision recorded on ${label}.` };
     }
@@ -392,7 +406,7 @@ export async function recordStepOutcome(t: Tenant, runId: string, user: SessionU
     await db.workflowRun.update({ where: { id: runId }, data: { steps: JSON.stringify(steps) } });
     if (!allDone) return { ok: true, message: "Input recorded — waiting for the others on this step." };
     const worst = step.inputs.find((i) => i.returns) ?? step.inputs[step.inputs.length - 1];
-    await db.reviewCycle.update({ where: { id: step.cycleId }, data: { outcome: worst.code, outcomeAt: new Date(), outcomeByName: user.name, outcomeNote: note ?? null, ...closed(decides && worst.returns) } });
+    await db.reviewCycle.update({ where: { id: step.cycleId }, data: { outcome: decides ? worst.code : await closingCode(), outcomeAt: new Date(), outcomeByName: user.name, outcomeNote: note ?? null, ...closed(decides && worst.returns) } });
     if (decides && worst.returns) await returnWorkflow(t, runId, user, "The deciders asked for changes.");
     else if (decides) { await recordApproval(t, rev.id, user, `Binding verdict ${worst.code}`); await advance(t, runId, user); }
     else await advance(t, runId, user);
@@ -404,7 +418,7 @@ export async function recordStepOutcome(t: Tenant, runId: string, user: SessionU
   const othersDone = step.participantIds.slice(0, -1).every((p) => step.decidedBy!.includes(p));
   const consolidator = step.participantIds[step.participantIds.length - 1];
   if (user.id === consolidator && othersDone) {
-    await db.reviewCycle.update({ where: { id: step.cycleId }, data: { outcome: outcomeCode, outcomeAt: new Date(), outcomeByName: user.name, outcomeNote: note ?? null, ...closed(decides && returnsToAuthor) } });
+    await db.reviewCycle.update({ where: { id: step.cycleId }, data: { outcome: await closingCode(), outcomeAt: new Date(), outcomeByName: user.name, outcomeNote: note ?? null, ...closed(decides && returnsToAuthor) } });
     await finishBindingDecision();
     return { ok: true, message: `Consolidated decision recorded on ${label}.` };
   }

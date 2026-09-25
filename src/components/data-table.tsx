@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Columns3, Rows3, RotateCcw, Check } from "lucide-react";
+import { ChevronDown, ChevronUp, Columns3, GripVertical, RotateCcw, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
  * Choices are remembered per table in this browser. They are conveniences:
  * the page renders the same without them.
  */
+/** A saved layout. `dense` is read from older saved layouts and ignored. */
 type Prefs = { hidden: string[]; widths: Record<string, number>; dense: boolean };
 const EMPTY: Prefs = { hidden: [], widths: {}, dense: false };
 const MIN_WIDTH = 56;
@@ -36,7 +37,16 @@ function save(key: string, p: Prefs, base: Prefs) {
   } catch {}
 }
 
-const labelOf = (th: HTMLTableCellElement) => (th.dataset.label ?? th.textContent ?? "").replace(/\s+/g, " ").trim();
+/**
+ * A column's name, as the show/hide menu prints it. Hover notes inside a header
+ * carry `data-note` and are left out, or every column would end in "i".
+ */
+const labelOf = (th: HTMLTableCellElement) => {
+  if (th.dataset.label) return th.dataset.label.replace(/\s+/g, " ").trim();
+  const copy = th.cloneNode(true) as HTMLElement;
+  copy.querySelectorAll("[data-note]").forEach((note) => note.remove());
+  return (copy.textContent ?? "").replace(/\s+/g, " ").trim();
+};
 
 export function DataTable({
   head,
@@ -45,6 +55,11 @@ export function DataTable({
   id,
   toolbar = true,
   defaultHidden,
+  onMove,
+  onReorder,
+  forced,
+  tools,
+  fill,
 }: {
   head: React.ReactNode;
   children: React.ReactNode;
@@ -55,6 +70,32 @@ export function DataTable({
   toolbar?: boolean;
   /** Columns available from the column menu but hidden until someone asks for them. */
   defaultHidden?: string[];
+  /**
+   * Lets the column menu move a column. Dragging a header is a fiddly gesture
+   * for something people do rarely, so a table that can be reordered says so
+   * here instead, with two arrows per row.
+   */
+  onMove?: (label: string, by: -1 | 1) => void;
+  /** Drops a column where another one sits — the menu's drag, for a long move. */
+  onReorder?: (label: string, onto: string) => void;
+  /**
+   * Columns that stay visible whatever the saved layout says, because
+   * something on the page depends on them — a filter that narrowed by one.
+   */
+  forced?: string[];
+  /**
+   * Anything else that acts on the table as a whole — taking it away as a file,
+   * printing it — shown beside the column controls, which is where somebody
+   * looking for what they can do to a table looks.
+   */
+  tools?: React.ReactNode;
+  /**
+   * Makes the rows the only thing that scrolls: the table takes whatever height
+   * is left between where it starts and the bottom of the window, so the
+   * masthead, the filters and the paging stay on screen while the rows move
+   * under them. The frame it must fit inside is marked `data-dt-frame`.
+   */
+  fill?: boolean;
 }) {
   const scope = `dt${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
   const tableRef = useRef<HTMLTableElement>(null);
@@ -62,6 +103,9 @@ export function DataTable({
   const [rows, setRows] = useState(0);
   const [prefs, setPrefs] = useState<Prefs>(() => ({ ...EMPTY, hidden: defaultHidden ?? [] }));
   const [menu, setMenu] = useState(false);
+  const [dragging, setDragging] = useState<string | null>(null);
+  /** The row the dragged column would land on, so the drop is shown before it happens. */
+  const [over, setOver] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const key = id ?? labels.join("|");
   const hiddenKey = (defaultHidden ?? []).join("|");
@@ -146,12 +190,12 @@ export function DataTable({
     const out: string[] = [];
     labels.forEach((l, i) => {
       const n = i + 1;
-      if (l && prefs.hidden.includes(l)) out.push(`${s} tr > :nth-child(${n}):not([colspan]){display:none}`);
+      if (l && prefs.hidden.includes(l) && !(forced ?? []).includes(l)) out.push(`${s} tr > :nth-child(${n}):not([colspan]){display:none}`);
       const w = prefs.widths[l || `#${i}`];
       if (w) out.push(`${s} thead th:nth-child(${n}){width:${w}px;min-width:${w}px;max-width:${w}px}${s} tbody td:nth-child(${n}):not([colspan]){max-width:${w}px;white-space:normal;overflow-wrap:anywhere;overflow:hidden;text-overflow:ellipsis}`);
     });
     return out.join("\n");
-  }, [labels, prefs, scope]);
+  }, [labels, prefs, scope, forced]);
 
   const hideable = labels.filter(Boolean);
   const shown = hideable.filter((l) => !prefs.hidden.includes(l)).length;
@@ -159,48 +203,104 @@ export function DataTable({
   const withBar = toolbar && hideable.length >= 3;
   const sticky = rows > STICKY_AFTER;
 
+  // How tall the rows may be, measured rather than guessed: the window, less
+  // where the rows start, less whatever the page keeps below them (the paging
+  // bar), less a hair so the frame's own edge still shows.
+  const scroller = useRef<HTMLDivElement>(null);
+  const [height, setHeight] = useState<number | null>(null);
+  useEffect(() => {
+    if (!fill) return;
+    const measure = () => {
+      const box = scroller.current;
+      if (!box) return;
+      const top = box.getBoundingClientRect().top;
+      const frame = box.closest("[data-dt-frame]");
+      const below = frame ? frame.getBoundingClientRect().bottom - box.getBoundingClientRect().bottom : 0;
+      setHeight(Math.max(240, Math.round(window.innerHeight - top - below - 18)));
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    const watch = new ResizeObserver(measure);
+    if (scroller.current?.closest("[data-dt-frame]")) watch.observe(scroller.current.closest("[data-dt-frame]")!);
+    return () => { window.removeEventListener("resize", measure); watch.disconnect(); };
+  }, [fill, rows, prefs]);
+
   return (
-    <div className={cn("dt rounded-2xl border border-slate-200 bg-surface shadow-sm", className)} data-dt={scope} data-density={prefs.dense ? "compact" : undefined}>
+    <div className={cn("dt rounded-2xl border border-slate-200 bg-surface shadow-sm", className)} data-dt={scope}>
       {css ? <style>{css}</style> : null}
       {withBar ? (
         <div className="no-print flex items-center justify-between gap-2 border-b border-slate-100 px-3 py-1.5">
           <p className="px-1 text-[11px] font-medium tabular-nums text-slate-400">{rows} {rows === 1 ? "row" : "rows"}</p>
           <div className="flex items-center gap-0.5">
             {customised ? (
-              <button type="button" onClick={() => update(() => base)} className="dt-tool" title="Back to the standard columns, widths and row size">
+              <button type="button" onClick={() => update(() => base)} className="dt-tool" title="Back to the standard columns and widths">
                 <RotateCcw className="h-3.5 w-3.5" /> Reset
               </button>
             ) : null}
-            <button type="button" onClick={() => update((p) => ({ ...p, dense: !p.dense }))} className="dt-tool" aria-pressed={prefs.dense} title={prefs.dense ? "Switch to comfortable rows" : "Switch to compact rows"}>
-              <Rows3 className="h-3.5 w-3.5" /> {prefs.dense ? "Compact" : "Comfortable"}
-            </button>
+            {tools}
+
             <div className="relative" ref={menuRef}>
               <button type="button" onClick={() => setMenu((m) => !m)} className="dt-tool" aria-expanded={menu} aria-haspopup="true">
                 <Columns3 className="h-3.5 w-3.5" /> Columns{shown < hideable.length ? ` ${shown}/${hideable.length}` : ""}
               </button>
               {menu ? (
-                <div className="absolute right-0 top-full z-30 mt-1 w-60 rounded-xl border border-slate-200 bg-surface p-1.5 shadow-xl" role="menu">
-                  <p className="px-2.5 pb-1 pt-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">Show columns</p>
-                  <div className="scroll-thin max-h-72 overflow-y-auto">
+                <div className="dt-menu absolute right-0 top-full z-30 mt-1 w-60 rounded-xl p-1.5" role="menu">
+                  <p className="flex items-center justify-between px-2.5 pb-1 pt-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">
+                    Show columns
+                    {onReorder ? <span className="font-medium normal-case tracking-normal text-slate-400">{dragging ? `Moving ${dragging}` : "drag to reorder"}</span> : null}
+                  </p>
+                  <div className="scroll-thin max-h-[min(60vh,28rem)] overflow-y-auto">
                     {hideable.map((l) => {
                       const on = !prefs.hidden.includes(l);
                       const last = on && shown === 1;
                       return (
-                        <button
+                        <div
                           key={l}
-                          type="button"
-                          role="menuitemcheckbox"
-                          aria-checked={on}
-                          disabled={last}
-                          title={last ? "At least one column stays visible" : undefined}
-                          onClick={() => update((p) => ({ ...p, hidden: on ? [...p.hidden, l] : p.hidden.filter((h) => h !== l) }))}
-                          className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                          draggable={!!onReorder}
+                          onDragStart={(e) => { setDragging(l); e.dataTransfer.effectAllowed = "move"; }}
+                          onDragEnd={() => { setDragging(null); setOver(null); }}
+                          onDragOver={(e) => {
+                            if (!onReorder || !dragging || dragging === l) return;
+                            e.preventDefault();
+                            e.dataTransfer.dropEffect = "move";
+                            setOver(l);
+                          }}
+                          onDragLeave={() => setOver((held) => (held === l ? null : held))}
+                          onDrop={() => { if (onReorder && dragging) onReorder(dragging, l); setDragging(null); setOver(null); }}
+                          className={cn(
+                            "dt-col group/col relative flex items-center gap-1 rounded-lg pr-1",
+                            onReorder && "cursor-grab active:cursor-grabbing",
+                            dragging === l ? "opacity-40" : "hover:bg-slate-50",
+                            over === l && "dt-col-target",
+                          )}
                         >
-                          <span className={cn("grid h-4 w-4 shrink-0 place-items-center rounded border", on ? "border-brand bg-brand text-white" : "border-slate-300 bg-surface")}>
-                            {on ? <Check className="h-3 w-3" /> : null}
-                          </span>
-                          <span className="truncate">{l}</span>
-                        </button>
+                          {onReorder ? <GripVertical className="dt-col-grip h-3.5 w-3.5 shrink-0 text-slate-300" aria-hidden /> : null}
+                          <button
+                            type="button"
+                            role="menuitemcheckbox"
+                            aria-checked={on}
+                            disabled={last}
+                            title={last ? "At least one column stays visible" : undefined}
+                            onClick={() => update((p) => ({ ...p, hidden: on ? [...p.hidden, l] : p.hidden.filter((h) => h !== l) }))}
+                            className="flex min-w-0 flex-1 items-center gap-2 rounded-lg py-1.5 pl-1 pr-1.5 text-left text-xs text-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            <span className={cn("grid h-4 w-4 shrink-0 place-items-center rounded border", on ? "border-brand bg-brand text-white" : "border-slate-300 bg-surface")}>
+                              {on ? <Check className="h-3 w-3" /> : null}
+                            </span>
+                            <span className="truncate">{l}</span>
+                            {(forced ?? []).includes(l) ? <span className="ml-auto shrink-0 text-[9px] uppercase tracking-wide text-slate-400" title="A filter is narrowing by this column, so it stays in view">filtered</span> : null}
+                          </button>
+                          {onMove ? (
+                            <span className="flex shrink-0 opacity-0 transition-opacity group-hover/col:opacity-100">
+                              <button type="button" aria-label={`Move ${l} left`} title="Move this column left" onClick={() => onMove(l, -1)} className="rounded p-0.5 text-slate-400 hover:bg-slate-200 hover:text-slate-700">
+                                <ChevronUp className="h-3 w-3" />
+                              </button>
+                              <button type="button" aria-label={`Move ${l} right`} title="Move this column right" onClick={() => onMove(l, 1)} className="rounded p-0.5 text-slate-400 hover:bg-slate-200 hover:text-slate-700">
+                                <ChevronDown className="h-3 w-3" />
+                              </button>
+                            </span>
+                          ) : null}
+                        </div>
                       );
                     })}
                   </div>
@@ -209,14 +309,20 @@ export function DataTable({
                       Show all
                     </button>
                   ) : null}
-                  <p className="border-t border-slate-100 px-2.5 pb-1 pt-2 text-[10px] leading-4 text-slate-400">Drag a column edge to resize it; double-click the edge to reset.</p>
+                  <p className="border-t border-slate-100 px-2.5 pb-1 pt-2 text-[10px] leading-4 text-slate-400">Drag a column edge to resize it; double-click the edge to reset.{onMove ? " Drag a row here to move a column, or step it with the arrows." : ""}</p>
                 </div>
               ) : null}
             </div>
           </div>
         </div>
       ) : null}
-      <div className={cn("scroll-thin overflow-x-auto", withBar ? "rounded-b-2xl" : "rounded-2xl", sticky && "dt-sticky max-h-[72vh] overflow-y-auto")} onPointerDown={onPointerDown} onDoubleClick={onDoubleClick}>
+      <div
+        ref={scroller}
+        style={fill && height ? { maxHeight: height } : undefined}
+        className={cn("scroll-thin overflow-x-auto", withBar ? "rounded-b-2xl" : "rounded-2xl", (sticky || fill) && "dt-sticky overflow-y-auto", sticky && !fill && "max-h-[72vh]")}
+        onPointerDown={onPointerDown}
+        onDoubleClick={onDoubleClick}
+      >
         <table ref={tableRef} className="min-w-full">
           <thead>{head}</thead>
           <tbody>{children}</tbody>

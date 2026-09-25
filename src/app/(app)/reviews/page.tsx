@@ -4,7 +4,7 @@ import { requireScope } from "@/lib/scope";
 import { dueState } from "@/lib/workflow";
 import { warnLateReviews } from "@/lib/review-risk";
 import { getSet } from "@/lib/config";
-import { PageHeader, DataTable, Th, Td, Chip, EmptyState } from "@/components/ui";
+import { PageHeader, DataTable, Th, Td, Chip, EmptyState, Info } from "@/components/ui";
 import { fmtDate } from "@/lib/utils";
 import { OUTCOME_CONSEQUENCES } from "@/lib/standard";
 import { ArrowRight } from "lucide-react";
@@ -84,14 +84,14 @@ export default async function ReviewsPage({ searchParams }: { searchParams: Prom
             <tr>
               <Th>Document</Th>
               <Th>Rev</Th>
-              <Th>Kind</Th>
-              <Th>Verdict</Th>
+              <Th>Kind <Info>A decision is the last step of a route and releases the revision or sends it back. Advice is any earlier step. A client review happens after we released it, and is answered by a new revision.</Info></Th>
+              <Th>Verdict <Info>On a decision, the code the decider gave. On an advisory step, what that person’s comments amounted to — advisers are not asked for a code.</Info></Th>
               <Th>Reviewers</Th>
               <Th title="When this step has to be answered. It comes from the days the route gives the step.">Due</Th>
               <Th>Opened</Th>
               <Th>Opened by</Th>
               <Th>Closed</Th>
-              <Th>Blocking</Th>
+              <Th>Blocking <Info>Comments marked as stopping the release and not yet settled. While one is open the revision cannot be released, whatever the verdict says.</Info></Th>
               <Th />
             </tr>
           }

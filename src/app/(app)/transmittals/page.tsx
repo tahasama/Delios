@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { Prisma } from "@prisma/client";
 import { requireScope } from "@/lib/scope";
-import { PageHeader, DataTable, Th, Td, Chip, EmptyState, ButtonLink } from "@/components/ui";
+import { PageHeader, DataTable, Th, Td, Chip, EmptyState, ButtonLink, Info } from "@/components/ui";
 import { REASON_LABEL, type ReasonForIssue } from "@/lib/standard";
 import { fmtDate, cn } from "@/lib/utils";
 
@@ -50,7 +50,11 @@ export default async function TransmittalsPage({ searchParams }: { searchParams:
       {list.length === 0 ? (
         <EmptyState title={view.id === "check" ? "Nothing is waiting to be checked" : view.id === "all" ? "No transmittals yet" : "Nothing here"} body="A transmittal is how documents are formally sent to, or received from, another party." action={view.id === "all" ? <ButtonLink href="/transmittals/new" variant="secondary">New transmittal</ButtonLink> : undefined} />
       ) : (
-        <DataTable id="transmittals" head={<tr><Th>Number</Th><Th>From</Th><Th>To</Th><Th>Why</Th><Th>Date</Th><Th>Documents</Th><Th>Status</Th><Th>Seen</Th><Th>Reply due</Th></tr>}>
+        <DataTable id="transmittals" head={<tr><Th>Number</Th><Th>From</Th><Th>To</Th><Th>Why <Info>The reason for issue: what the recipient is expected to do with it. It also decides whether a reply is due, and by when.</Info></Th>
+              <Th>Date</Th><Th>Documents</Th>
+              <Th>Status <Info>Draft means nothing has been sent. Issued means the recipients were told. On what arrives: to check, then accepted or rejected, then closed.</Info></Th>
+              <Th>Seen by <Info>A recipient who opened it while signed in. That is the receipt — there is nothing for them to confirm.</Info></Th>
+              <Th>Reply due <Info>Where the reason for issue requires an answer. On what arrives, the period runs from the day we accept it, not the day it arrived.</Info></Th></tr>}>
           {list.map((t) => {
             // Who sent it and who it went to, as two facts rather than one column.
             const from = t.direction === "OUTGOING" ? ourOrganization : t.issuingParty;
@@ -74,9 +78,20 @@ export default async function TransmittalsPage({ searchParams }: { searchParams:
                     : "bg-slate-100 text-slate-600 ring-slate-300"
                   }>{t.direction === "INCOMING" && t.status === "ISSUED" ? "to check" : t.status.toLowerCase()}</Chip>
                 </Td>
-                <Td className="whitespace-nowrap text-xs" title="Opening it while signed in is recorded as receipt">
-                  {t.status === "DRAFT" || t.recipients.length === 0 ? <span className="text-slate-300">—</span>
-                    : <span className={seen === t.recipients.length ? "text-emerald-700" : "text-slate-500"}>{seen}/{t.recipients.length}</span>}
+                {/* Who has seen it, in the row: opening it while signed in is the receipt. */}
+                <Td className="text-xs">
+                  {t.status === "DRAFT" || t.recipients.length === 0 ? (
+                    <span className="text-slate-300">—</span>
+                  ) : (
+                    <>
+                      <span className={seen === t.recipients.length ? "font-semibold text-emerald-700" : seen ? "text-slate-600" : "text-amber-700"}>
+                        {seen} of {t.recipients.length}
+                      </span>
+                      <span className="block max-w-56 truncate text-[11px] text-slate-400" title={t.recipients.map((r) => `${r.openedAt ? "seen" : "not yet"} · ${r.name}`).join(" | ")}>
+                        {seen === 0 ? "nobody yet" : seen === t.recipients.length ? "everyone" : t.recipients.filter((r) => r.openedAt).map((r) => r.name).join(", ")}
+                      </span>
+                    </>
+                  )}
                 </Td>
                 <Td className="whitespace-nowrap text-xs">{t.responseDueDate ? fmtDate(t.responseDueDate) : "—"}</Td>
               </tr>

@@ -128,7 +128,10 @@ export async function recordStepOutcomeAction(_prev: { error?: string; ok?: stri
   const outcomeCode = String(formData.get("outcome") ?? "");
   const note = String(formData.get("note") ?? "").trim() || undefined;
   const proposedStatus = String(formData.get("proposedStatus") ?? "").trim() || undefined;
-  if (!outcomeCode) return { error: "Choose the verdict." };
+  // An advisory step sends no code — the engine reads it off the comments.
+  const run = await db.workflowRun.findUnique({ where: { id: runId }, select: { steps: true, currentStep: true } });
+  const advising = !!run && run.currentStep < (JSON.parse(run.steps) as unknown[]).length - 1;
+  if (!outcomeCode && !advising) return { error: "Choose the verdict." };
   try {
     const res = await recordStepOutcome(ctx, runId, user, outcomeCode, note, proposedStatus);
     if (!res.ok) return { error: res.error };

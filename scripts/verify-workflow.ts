@@ -103,29 +103,31 @@ async function main() {
     check("route starts", started.ok, started.ok ? "" : started.error);
     const runId = started.ok ? started.runId : "";
 
-    const verdictOnAdvice = await recordStepOutcome(t, runId, r2, ok.code, "no issue");
-    check("an adviser cannot reach a verdict code", !verdictOnAdvice.ok, verdictOnAdvice.error ?? "recorded");
-    const second = await recordStepOutcome(t, runId, r2, nothingToSay.code);
+    // An adviser answers with their comments, not a code. Whatever code is
+    // posted, the advice recorded is what their comments say.
+    const second = await recordStepOutcome(t, runId, r2, ok.code, "no issue");
     check("any of the three may go first", second.ok, second.error ?? "");
     let run = await getRunForRevision(t, rev.id);
+    const step0 = run?.steps[0];
+    check("an adviser's answer is read off their comments, not the code they posted",
+      (step0?.inputs ?? []).some((i) => i.userId === r2.id && i.code === nothingToSay.code),
+      JSON.stringify(step0?.inputs ?? []));
     check("step waits while others are outstanding", run?.currentStep === 0);
     const openCycle = await t.db.reviewCycle.findUniqueOrThrow({ where: { id: run?.steps[0].cycleId ?? "" } });
     check("a step with days carries a due date", !!openCycle.dueAt, openCycle.dueAt?.toDateString() ?? "none");
-    await recordStepOutcome(t, runId, comm, nothingToSay.code);
+    await recordStepOutcome(t, runId, comm, "");
     run = await getRunForRevision(t, rev.id);
     check("still waiting on the third", run?.currentStep === 0);
-    // Advice has to match the comments: claiming a blocking comment without one is refused.
-    const unsupported = await recordStepOutcome(t, runId, r1, blockingAdvice.code);
-    check("advice cannot claim a blocking comment that does not exist", !unsupported.ok, unsupported.error ?? "recorded");
     const adviceCycleId = run?.steps[0].cycleId ?? "";
     await t.db.reviewComment.create({
       data: { projectId: p1.id, cycleId: adviceCycleId, authorId: r1.id, authorName: r1.name, text: "Load case is not stated.", classification: "BLOCKING", progressionPreventing: true },
     });
-    const blocked = await recordStepOutcome(t, runId, r1, blockingAdvice.code);
-    check("all three in — moves to the lead, even when one is blocking", blocked.ok && run?.currentStep === 0, blocked.error ?? "");
+    const blocked = await recordStepOutcome(t, runId, r1, "");
+    check("all three in — moves to the lead, even when one is blocking", blocked.ok, blocked.error ?? "");
     run = await getRunForRevision(t, rev.id);
-    check("the advisory step does not return the revision to its author", run?.currentStep === 1 && run?.status === "ACTIVE");
     const adviceCycle = await t.db.reviewCycle.findUniqueOrThrow({ where: { id: adviceCycleId } });
+    check("a blocking comment makes the advice blocking", adviceCycle.outcome === blockingAdvice.code, adviceCycle.outcome ?? "none");
+    check("the advisory step does not return the revision to its author", run?.currentStep === 1 && run?.status === "ACTIVE");
     check("and its custody stops at advice given", !!adviceCycle.returnedFromReviewAt && adviceCycle.returnedToOriginatorAt === null);
 
     const notLead = await recordStepOutcome(t, runId, r1, ok.code);

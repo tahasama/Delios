@@ -33,9 +33,9 @@ export const SET_PROP_FIELDS: Record<string, PropField[]> = {
   SUBPROJECTS: [
     { key: "project", label: "Belongs to project", type: "text", hint: "the project code; leave it empty to offer this sub-project on every project" },
   ],
+  // Advice is read off the comments, never chosen, so only its wording is an
+  // organization's business.
   REVIEW_ADVICE: [
-    { key: "comments", label: "Which comments it claims", type: "select", options: ["none", "some", "blocking"], hint: "the advice must match the comments the adviser left" },
-    { key: "blocking", label: "At least one comment stops release", type: "bool", hint: "" },
     { key: "meaning", label: "What it means, in one line", type: "text" },
   ],
   REASONS_FOR_ISSUE: [

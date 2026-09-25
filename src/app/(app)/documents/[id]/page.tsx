@@ -18,6 +18,7 @@ import { withdrawApprovalAction } from "@/lib/actions/governance";
 import { setLegalHoldAction, disposeDocumentAction } from "@/lib/actions/retention";
 import { getRunForRevision } from "@/lib/workflow";
 import { WorkflowPanel, Action } from "./workflow-panel";
+import { Timeline } from "@/components/timeline";
 import { DocTabs } from "./doc-tabs";
 import { ArrowLeft, ChevronRight, Download, ExternalLink, FileText, Send } from "lucide-react";
 import { hasVerb } from "@/lib/auth";
@@ -108,6 +109,9 @@ export default async function DocumentDetailPage({
     path: (JSON.parse(t.steps) as { act: string; participantIds: string[] }[]).map((st) => `${st.act === "APPROVAL" ? "approve" : "review"}: ${st.participantIds.map((pid) => personName.get(pid) ?? "?").join(", ")}`).join(" → "),
   }));
   const cycles = doc.revisions.flatMap((rev) => rev.cycles.map((c) => ({ rev, c }))).sort((x, y) => +y.c.submittedAt - +x.c.submittedAt);
+
+  // This revision's own review steps and transmittals, for its progress line.
+  const mine = cycles.filter((x) => x.rev.id === (shown?.id ?? ""));
 
   // Properties, each once, empty ones left out.
   const details: [string, string | null][] = [
@@ -332,6 +336,29 @@ export default async function DocumentDetailPage({
                 ) : null}
               </div>
             ),
+          },
+          {
+            id: "life",
+            label: "Life of this revision",
+            content: shown ? (
+              <div className="px-5 py-4">
+                <Timeline
+                  points={[
+                    { label: `Rev ${shown.value} established`, at: shown.createdAt, holder: shown.authorizedByName ?? doc.createdByName, detail: shown.reasonForRevision ?? null },
+                    { label: "Sent for review", at: mine.map((x) => x.c.submittedAt).sort((a, b) => a.getTime() - b.getTime())[0] ?? null, holder: mine.length ? `${mine.length} step${mine.length === 1 ? "" : "s"}` : null },
+                    {
+                      label: "Decided",
+                      at: mine.filter((x) => x.c.binding).map((x) => x.c.outcomeAt).filter(Boolean).sort((a, b) => b!.getTime() - a!.getTime())[0] ?? null,
+                      holder: mine.find((x) => x.c.binding && x.c.outcome)?.c.outcomeByName ?? null,
+                      detail: shown.proposedStatus && !shown.releasedAt ? `to be ${shown.proposedStatus} once released` : null,
+                    },
+                    { label: shown.statusCode ? `Released at ${shown.statusCode}` : "Released", at: shown.releasedAt, holder: shown.releasedByName ?? null },
+                    { label: "Issued to somebody", at: transmittalItems.filter((i) => i.revisionId === shown.id).map((i) => i.transmittal.dateOfIssue).sort((a, b) => a.getTime() - b.getTime())[0] ?? null, holder: transmittalItems.filter((i) => i.revisionId === shown.id).length ? `${transmittalItems.filter((i) => i.revisionId === shown.id).length} transmittal(s)` : null },
+                    { label: "Replaced by a newer revision", at: shown.state === "SUPERSEDED" ? shown.supersededAt ?? null : null, skipped: shown.state === "RELEASED" },
+                  ]}
+                />
+              </div>
+            ) : <Empty>No revision yet.</Empty>,
           },
           {
             id: "revisions",

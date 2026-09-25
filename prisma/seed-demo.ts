@@ -189,14 +189,31 @@ export async function seedDemoProject(db: PrismaClient, orgId: string, projectId
 
   async function mkApproval(revId: string, docId: string, docNumber: string, revValue: string, approver: keyof typeof users) {
     const u = users[approver];
+    // The authority is the function the person holds on this project, exactly as
+    // a real approval records it — not the word "APPROVER".
+    const held = await db.projectMembership.findFirst({ where: { projectId, userId: u.id, active: true }, include: { function: { select: { name: true } } } });
     await db.approval.create({
-      data: { projectId, revisionId: revId, approverId: u.id, approverName: u.name, approverRole: "APPROVER", matrixVersion: 1, decidedAt: d(-41) },
+      data: { projectId, revisionId: revId, approverId: u.id, approverName: u.name, approverRole: held?.function.name ?? "Approver", matrixVersion: 1, decidedAt: d(-41) },
     });
     await db.auditEvent.create({
       data: { projectId, actorId: u.id, actorName: u.name, action: "APPROVAL", entityType: "Revision", entityId: revId, entityLabel: `${docNumber} rev ${revValue}`, detail: "Approved under authority matrix v1 (§8.3)." },
     });
     void docId; void docNumber;
   }
+
+  // The demo answers from the organization's published verdict list, exactly as
+  // a reviewer does. It used to write the Standard's own consequence names
+  // (APPROVED_WITH_COMMENTS and friends), which are not codes anybody
+  // publishes, so the register printed them raw.
+  const publishedVerdicts = (await db.configValue.findMany({ where: { orgId, setKey: "REVIEW_OUTCOMES", status: "ACTIVE" } }))
+    .map((v) => ({ code: v.code, props: v.props ? (JSON.parse(v.props) as { proceed?: boolean; resubmit?: boolean }) : {} }));
+  const verdictCode = (kind: "accept" | "accept_with_comments" | "return") => {
+    const match = publishedVerdicts.find((v) =>
+      kind === "return" ? v.props.proceed !== true
+        : kind === "accept_with_comments" ? v.props.proceed === true && v.props.resubmit === true
+          : v.props.proceed === true && v.props.resubmit !== true);
+    return match?.code ?? publishedVerdicts[0]?.code ?? "C1";
+  };
 
   async function mkCycle(
     revId: string, docId: string, docNumber: string, revValue: string,
@@ -239,10 +256,10 @@ export async function seedDemoProject(db: PrismaClient, orgId: string, projectId
   const ga = await mkDoc({ docNumber: "Q6637021-74-CI-DSW-00001", title: "Non-process building 74 — general arrangement, site works", deliverableType: "ENG", docType: "DSW", discipline: "CI", assetCodes: ["TK-201"], createdBy: "author", criticality: "QUALITY", retentionClass: "ASSET_LIFE" });
   const gaA = await mkRev(ga.id, ga.docNumber, { value: "A", state: "SUPERSEDED", statusCode: "IFC", reason: "First issue for construction", change: "Initial site works GA", releasedAt: d(-50), supersededAt: d(-25) });
   await mkApproval(gaA.id, ga.id, ga.docNumber, "A", "approver");
-  await mkCycle(gaA.id, ga.id, ga.docNumber, "A", { seq: 1, outcome: "REVISE_AND_RESUBMIT" });
+  await mkCycle(gaA.id, ga.id, ga.docNumber, "A", { seq: 1, outcome: verdictCode("return") });
   const gaB = await mkRev(ga.id, ga.docNumber, { value: "B", state: "RELEASED", statusCode: "AFC", reason: "Client comments incorporated", change: "Drainage invert levels revised from 102.35 to 102.55 m AD", releasedAt: d(-25), authorization: "Review outcome REVISE_AND_RESUBMIT on cycle 1 (§9.3)" });
   await mkApproval(gaB.id, ga.id, ga.docNumber, "B", "approver");
-  await mkCycle(gaB.id, ga.id, ga.docNumber, "B", { seq: 2, outcome: "APPROVED" });
+  await mkCycle(gaB.id, ga.id, ga.docNumber, "B", { seq: 2, outcome: verdictCode("accept") });
   await db.notification.create({ data: { projectId, userId: users.author.id, type: "SUPERSEDED", title: `Superseded: ${ga.docNumber} rev A`, body: "Rev B was released at AFC. Stop use; recall or mark controlled copies (§12.2–12.4).", link: `/documents/${ga.id}` } });
 
   // ── 2 · Foundation drawings — live review, with the reviewer now ───────────
@@ -255,7 +272,7 @@ export async function seedDemoProject(db: PrismaClient, orgId: string, projectId
   const rebarA = await mkRev(rebar.id, rebar.docNumber, { value: "A", state: "RELEASED", statusCode: "IFC", reason: "First issue", change: "Slab reinforcement", releasedAt: d(-15), bogusFile: true });
   void rebarA;
   // no approval row — ST-07 / AP-01 ▲
-  const rebarCycle = await mkCycle((await db.revision.findFirstOrThrow({ where: { documentId: rebar.id } })).id, rebar.id, rebar.docNumber, "A", { seq: 1, outcome: "APPROVED_WITH_COMMENTS", blockingComment: true });
+  const rebarCycle = await mkCycle((await db.revision.findFirstOrThrow({ where: { documentId: rebar.id } })).id, rebar.id, rebar.docNumber, "A", { seq: 1, outcome: verdictCode("accept_with_comments"), blockingComment: true });
   void rebarCycle; // blocking comment left OPEN on a released revision — RO-14 ▲
 
   // ── 4 · Vendor datasheet — in preparation by the supplier ─────────────────
@@ -275,7 +292,7 @@ export async function seedDemoProject(db: PrismaClient, orgId: string, projectId
   const spc = await mkDoc({ docNumber: "Q6637021-74-CI-SPC-00001", title: "Non-process building 74 — concrete works specification", deliverableType: "ENG", docType: "SPC", discipline: "CI", assetCodes: ["TK-201"], createdBy: "author", criticality: "QUALITY", retentionClass: "ASSET_LIFE" });
   const spcA = await mkRev(spc.id, spc.docNumber, { value: "A", state: "RELEASED", statusCode: "IFR", reason: "Issued for review", change: "First specification issue", releasedAt: d(-22) });
   await mkApproval(spcA.id, spc.id, spc.docNumber, "A", "approver");
-  await mkCycle(spcA.id, spc.id, spc.docNumber, "A", { seq: 1, outcome: "REVISE_AND_RESUBMIT", note: "Curing regime conflicts with the project specification." });
+  await mkCycle(spcA.id, spc.id, spc.docNumber, "A", { seq: 1, outcome: verdictCode("return"), note: "Curing regime conflicts with the project specification." });
   // no follow-up revision — RO-07 ▲
 
   // ── 8 · O&M manual — as-built current; stale copy on the superseded rev ────
@@ -337,7 +354,7 @@ export async function seedDemoProject(db: PrismaClient, orgId: string, projectId
     const status = i % 3 === 0 ? "IFC" : i % 3 === 1 ? "AFC" : "IFI";
     const revA = await mkRev(doc.id, doc.docNumber, { value: "A", state: "RELEASED", statusCode: status, reason: "First issue", change: `Initial issue of ${doc.docNumber.split("-").slice(-2).join("-")}`, releasedAt: d(-20 - i) });
     await mkApproval(revA.id, doc.id, doc.docNumber, "A", "approver");
-    await mkCycle(revA.id, doc.id, doc.docNumber, "A", { seq: 1, outcome: "APPROVED" });
+    await mkCycle(revA.id, doc.id, doc.docNumber, "A", { seq: 1, outcome: verdictCode("accept") });
   }
 
   // ── Transmittals (Part 11) ─────────────────────────────────────────────────

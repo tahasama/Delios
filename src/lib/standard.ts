@@ -86,6 +86,22 @@ export const DOC_STATE_LABEL: Record<DocState, string> = {
   CANCELLED: "Cancelled",
   ARCHIVED: "Archived",
 };
+export const DOC_MEANING: Record<DocState, { means: string; how: string }> = {
+  PLANNED: { means: "The number is reserved; nothing has been released under it yet.", how: "Set when the document is created or listed." },
+  ACTIVE: { means: "In use \u2014 at least one revision has been released.", how: "Automatic, at the first release." },
+  WITHDRAWN: { means: "Taken out of use after it was released. Its revisions stay on record.", how: "Document Control, with a reason." },
+  CANCELLED: { means: "Dropped before anything was released.", how: "Document Control, with a reason. Not possible once released." },
+  ARCHIVED: { means: "Closed at the end of its life, kept for retention.", how: "Document Control, with a reason." },
+};
+
+export const REV_MEANING: Record<RevState, { means: string; how: string }> = {
+  IN_PREPARATION: { means: "Being written. Only the author's side works from it.", how: "The author starts a new revision." },
+  IN_REVIEW: { means: "Submitted; reviewers and approvers are looking at it.", how: "The author sends it for review." },
+  RELEASED: { means: "The current revision \u2014 the one people work from.", how: "Document Control releases it, once it is approved and no blocking comment is open." },
+  SUPERSEDED: { means: "Replaced by a later released revision. Kept, not used.", how: "Automatic, when the next revision is released." },
+  VOID: { means: "Found to be wrong after release and cancelled.", how: "Document Control, with a reason and a check of what was built from it." },
+};
+
 export const DOC_STATE_COLOR: Record<DocState, string> = {
   PLANNED: "bg-sky-100 text-sky-800 ring-sky-300",
   ACTIVE: "bg-emerald-100 text-emerald-800 ring-emerald-300",

@@ -3,23 +3,16 @@ import type { VerdictOption, StatusOption } from "@/app/(app)/documents/[id]/ver
 
 type SetValue = { code: string; label: string; props: Record<string, unknown> };
 
-/**
- * A published list as the decision form needs it. Advice and verdicts come
- * from different lists, and the form only has to know which one it was given:
- * an advice value carries `advice: true` and says which comments it claims.
- */
+/** A published verdict list as the deciding step's form needs it. */
 export function decisionOptions(values: SetValue[]): VerdictOption[] {
   return values.map((v) => {
     const effect = verdictEffect(v.props);
-    const advice = v.props.advice === true;
     return {
       code: v.code,
       label: v.label,
       effect: VERDICT_EFFECT_SHORT[effect],
-      proceeds: advice ? true : effect !== "RETURN",
+      proceeds: effect !== "RETURN",
       resubmit: v.props.resubmit === true,
-      advice,
-      comments: typeof v.props.comments === "string" ? v.props.comments : null,
       meaning: typeof v.props.meaning === "string" ? v.props.meaning : null,
     };
   });

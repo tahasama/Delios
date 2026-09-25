@@ -51,6 +51,24 @@ export default async function HomePage() {
     : [];
   const owed: { pkg: string; rows: Awaited<ReturnType<typeof supplierRows>> }[] = [];
   for (const p of supplierPkgs) owed.push({ pkg: p.identifier, rows: (await supplierRows(ctx, p)).filter((r) => WITH_SUPPLIER.includes(r.state)) });
+  // Decided by the reviewers, not yet released — and those a blocking comment
+  // still holds. Both used to sit on the register, which is a record, not a
+  // work queue: whose desk a document is on differs by reader, so it lives here.
+  const decided = controller
+    ? await db.revision.findMany({
+        where: { state: "IN_REVIEW", proposedStatus: { not: null } },
+        include: {
+          document: { select: { id: true, docNumber: true, title: true } },
+          cycles: { where: { status: "OPEN" }, select: { id: true, comments: { where: { progressionPreventing: true, status: "OPEN" }, select: { id: true } } } },
+        },
+        orderBy: { createdAt: "asc" },
+        take: 25,
+      })
+    : [];
+  const blockedOn = (rev: (typeof decided)[number]) => rev.cycles.flatMap((c) => c.comments).length;
+  const toRelease = decided.filter((rev) => !blockedOn(rev));
+  const held = decided.filter((rev) => blockedOn(rev));
+
   // Accepted submissions Document Control still has to route.
   const toRoute = controller
     ? await db.transmittal.findMany({ where: { direction: "INCOMING", status: { in: ["ACCEPTED", "CLOSED"] }, items: { some: { revision: { state: "IN_PREPARATION" } } } }, orderBy: { dateOfIssue: "asc" }, take: 20 })
@@ -101,7 +119,7 @@ export default async function HomePage() {
     .filter((a) => a.total > 0 && a.ready < a.total && a.scheduledDate);
 
   const owedCount = owed.reduce((n, o) => n + o.rows.length, 0);
-  const waiting = planning.length + reviews.length + verdicts.length + returned.length + incoming.length + drafts.length + toRoute.length + owedCount;
+  const waiting = planning.length + reviews.length + verdicts.length + returned.length + incoming.length + drafts.length + toRoute.length + owedCount + toRelease.length + held.length;
 
   return (
     <div className="space-y-6">
@@ -140,6 +158,32 @@ export default async function HomePage() {
             {returned.map((c) => (
               <Row key={c.id} href={`/reviews/${c.id}`} doc={c.revision.document} rev={c.revision.value} cta="See comments"
                 note={<span className="text-xs text-slate-500">{c.outcome?.replaceAll("_", " ").toLowerCase()}{c.comments.length ? ` · ${c.comments.length} blocking` : ""}</span>} />
+            ))}
+          </Group>
+
+          <Group title="Ready to release" count={toRelease.length}>
+            {toRelease.map((rev) => (
+              <Row
+                key={rev.id}
+                href={`/documents/${rev.documentId}`}
+                doc={rev.document}
+                rev={rev.value}
+                cta="Release"
+                note={<span className="text-xs text-slate-500">decided <span className="font-mono font-semibold text-slate-700">to be {rev.proposedStatus}</span></span>}
+              />
+            ))}
+          </Group>
+
+          <Group title="Held by a blocking comment" count={held.length}>
+            {held.map((rev) => (
+              <Row
+                key={rev.id}
+                href={`/reviews/${rev.cycles[0]?.id ?? ""}`}
+                doc={rev.document}
+                rev={rev.value}
+                cta="See the comment"
+                note={<Chip className="bg-red-100 text-red-700 ring-red-300">{blockedOn(rev)} blocking</Chip>}
+              />
             ))}
           </Group>
 

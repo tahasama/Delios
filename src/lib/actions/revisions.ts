@@ -189,10 +189,12 @@ export async function addCommentAction(_prev: { error?: string } | undefined, fo
   const assigned = await db.reviewAssignment.findFirst({ where: { cycleId, userId: user.id } });
   if (!assigned && !isController(user) && !isAdmin(user)) return { error: "You may comment only on a review assigned to you." };
   const text = String(formData.get("text") ?? "").trim();
-  const classification = String(formData.get("classification") ?? "NON_BLOCKING");
+  // One question, asked once: does this comment stop the release? The published
+  // classification is still what gets stored, so the register is unchanged.
+  const blocking = formData.get("blocking") === "on";
   const classes = await getActiveSet("COMMENT_CLASSES");
-  const cls = classes.find((c) => c.code === classification);
-  const blocking = cls?.props.progressionPreventing === true;
+  const classification = classes.find((c) => (c.props.progressionPreventing === true) === blocking)?.code
+    ?? (blocking ? "BLOCKING" : "NON_BLOCKING");
   if (!text) return { error: "Comment text is required." };
   await db.reviewComment.create({
     data: { projectId, cycleId, authorId: user.id, authorName: user.name, text, classification, progressionPreventing: blocking },

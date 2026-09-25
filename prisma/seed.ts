@@ -86,7 +86,7 @@ async function main() {
   const users = [
     { email: "admin@delios.local", name: "Administrator", role: "ADMIN", partyId: org.id },
     { email: "controller@delios.local", name: "Document Control", role: "CONTROLLER", partyId: org.id },
-    { email: "approver@delios.local", name: "Lead Engineer (approver)", role: "APPROVER", partyId: org.id },
+    { email: "approver@delios.local", name: "Lead Engineer", role: "APPROVER", partyId: org.id },
     { email: "reviewer@delios.local", name: "Reviewer 1", role: "REVIEWER", partyId: org.id },
     { email: "reviewer2@delios.local", name: "Reviewer 2", role: "REVIEWER", partyId: org.id },
     { email: "author@delios.local", name: "Author — Electrical", role: "AUTHOR", partyId: org.id },

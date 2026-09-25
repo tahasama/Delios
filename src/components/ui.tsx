@@ -188,14 +188,8 @@ export function EmptyState({ title, body, action }: { title: string; body?: stri
  */
 export function Info({ children, className }: { children: string; className?: string }) {
   return (
-    <span
-      tabIndex={0}
-      role="note"
-      title={children}
-      aria-label={children}
-      className={cn("ml-1 inline-grid h-[14px] w-[14px] cursor-help place-items-center rounded-full bg-slate-200 text-[9px] font-bold text-slate-600 align-[1px] hover:bg-slate-300", className)}
-    >
-      i
+    <span tabIndex={0} role="note" data-note title={children} aria-label={children} className={cn("ml-1 inline-flex cursor-help align-[-2px] text-slate-400 transition-colors hover:text-brand-ink", className)}>
+      <InfoIcon className="h-3.5 w-3.5" strokeWidth={2} />
     </span>
   );
 }

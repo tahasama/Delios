@@ -213,7 +213,7 @@ async function RunActivePanel({ run, user, extra }: { run: { id: string; templat
         iDecide ? (
           <Action label={deciding ? "Your verdict decides this revision" : "Your advice goes to whoever decides"}>
             <ActionForm action={recordStepOutcomeAction} submitLabel={deciding ? "Give my verdict" : "Give my advice"} size="sm" hidden={{ runId: run.id }}>
-              <VerdictDecision deciding={deciding} verdicts={decisionOptions(outcomes)} statuses={statusOptions(statuses)} own={ownComments} />
+              <VerdictDecision deciding={deciding} verdicts={decisionOptions(outcomes)} statuses={statusOptions(statuses)} own={ownComments} commentsHref={step?.cycleId ? `/reviews/${step.cycleId}` : undefined} />
             </ActionForm>
             <p className="mt-2 text-[11px] text-slate-400">Recorded under your name. Verdicts come from your organization&apos;s list — <Link href="/guide/codes#outcome" className="underline">what each one means</Link>.</p>
           </Action>

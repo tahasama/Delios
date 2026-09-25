@@ -12,7 +12,8 @@
 @theme inline {
   --color-accent: #1e3a5f;
   --color-accent-light: #2d5480;
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-sans: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-mono), ui-monospace, "SFMono-Regular", monospace;
 }
 
 html {
@@ -44,6 +45,46 @@ table {
   border-spacing: 0;
 }
 
+/* Tailwind's own reset gives a button the arrow cursor, which makes half this
+   application look like text. Anything that acts when clicked says so under the
+   pointer; anything that cannot act says that too. Kept in the base layer, so a
+   cursor set on the element itself — grab on a row being dragged, help on a
+   hover note — still wins. */
+@layer base {
+  button,
+  summary,
+  label:has(> input[type="checkbox"]),
+  input[type="checkbox"],
+  input[type="radio"],
+  input[type="file"],
+  select,
+  [role="button"] {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  select:disabled,
+  input:disabled,
+  textarea:disabled,
+  [aria-disabled="true"] {
+    cursor: not-allowed;
+  }
+}
+
+/* A native dropdown paints its own popup, and on Windows it takes the colours
+   from the control, not from the page. Without this, every select in the app
+   opens as white text on white in dark mode. */
+select,
+option,
+optgroup {
+  color-scheme: inherit;
+}
+option,
+optgroup {
+  background-color: var(--color-surface);
+  color: var(--color-slate-800);
+}
+
 summary::-webkit-details-marker {
   display: none;
 }
@@ -64,6 +105,196 @@ summary::-webkit-details-marker {
 }
 .scroll-thin::-webkit-scrollbar-track {
   background: transparent;
+}
+
+
+/* ── The register ──────────────────────────────────────────────────────────
+   The documents register is the screen people live in, so it is drawn as what
+   it is: a controlled register. No cards, no pills, no shadows — a hairline
+   grid, tabular figures, and one colour rail per row carrying the revision's
+   state. Everything here is scoped to .register, so the rest of the app keeps
+   its own vocabulary. */
+@layer components {
+  .register {
+    --rail: var(--color-slate-300);
+    --hair: var(--color-line);
+  }
+
+  /* The plate: the register's own masthead. */
+  .plate-title {
+    font-weight: 600;
+    letter-spacing: -0.03em;
+    font-size: clamp(1.5rem, 1.1rem + 1.4vw, 2.1rem);
+    line-height: 1.05;
+  }
+  .plate-figure {
+    display: block;
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-weight: 500;
+    font-size: clamp(1.1rem, 0.9rem + 0.7vw, 1.5rem);
+    line-height: 1.1;
+    color: var(--color-slate-900);
+  }
+  .plate-label {
+    display: block;
+    margin-top: 0.15rem;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--color-slate-500);
+  }
+  /* A figure that is also a filter: the underline appears on hover, never a button. */
+  a.plate-cell { transition: background-color 120ms; }
+  a.plate-cell:hover { background: var(--color-tint-soft); }
+  a.plate-cell:hover .plate-label { color: var(--color-brand-ink); }
+  .plate-cell[aria-current="true"] { background: var(--color-tint); }
+  .plate-cell[aria-current="true"] .plate-label { color: var(--color-brand-ink); }
+
+  /* Metadata set the way a drawing sets it: small, spaced, upper case. */
+  .stencil {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  /* Inside a row, a state is a label beside the data, so it is set smaller
+     still and never competes with the document number. */
+  .meta {
+    font-size: 11px;
+    font-weight: 400;
+    letter-spacing: 0;
+    line-height: 1.2;
+    color: var(--color-slate-500);
+  }
+  .register .dt-td .stencil { font-size: 9px; font-weight: 500; letter-spacing: 0.07em; }
+
+  /* The arrow that says a column can be ordered. Dim until it is used, but
+     never invisible: an affordance nobody can see is not an affordance. */
+  .sort-mark { opacity: 0.35; transition: opacity 120ms; }
+  .dt-th:hover .sort-mark { opacity: 0.7; }
+  .sort-mark[data-on="true"] { opacity: 1; }
+
+  /* A published code: the code alone, its meaning on hover, the whole list one
+     click away. The underline appears on hover so it reads as a link without
+     colouring every code in the table blue. */
+  .code-ref {
+    font-family: var(--font-mono);
+    font-weight: 500;
+    text-decoration-color: transparent;
+    text-underline-offset: 3px;
+    transition: text-decoration-color 120ms;
+  }
+  .code-ref:hover, .code-ref:focus-visible { text-decoration: underline; text-decoration-color: currentColor; }
+
+  /* The state rail. Each row carries a 3px bar in its state's colour, so a
+     screenful of rows reads as a distribution before a single word is read. */
+  .register .rail {
+    position: relative;
+    padding-left: 0.85rem !important;
+  }
+  .register .rail::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: var(--rail);
+    transition: width 120ms ease-out;
+  }
+  .register tbody > tr:hover .rail::before { width: 5px; }
+  .rail-none { --rail: var(--color-slate-200); }
+  .rail-prep { --rail: var(--color-amber-400); }
+  .rail-review { --rail: var(--color-sky-400); }
+  .rail-release { --rail: var(--color-brand-line); }
+  .rail-released { --rail: var(--color-emerald-500); }
+  .rail-superseded { --rail: var(--color-violet-400); }
+  .rail-void { --rail: var(--color-red-400); }
+
+  /* Denser rows than the rest of the app: this table is read for hours. */
+  .register .dt-td { padding-block: 0.55rem; font-size: 0.8125rem; vertical-align: middle; overflow: visible; border-bottom: 1px solid var(--hair); }
+  .register .dt-th { padding-block: 0.5rem; letter-spacing: 0.07em; text-transform: uppercase; border-bottom: 1px solid var(--color-line-strong); }
+  .register .dt { border-radius: 0; }
+  .register tbody > tr:hover > .dt-td { background: var(--color-tint-soft); }
+
+  /* Superseded and void are facts about the past, so they are stamped rather
+     than tagged — the one deliberately analogue move in the app. */
+  .stamp {
+    display: inline-flex;
+    align-items: center;
+    flex: none;
+    height: 16px;
+    transform: rotate(-3.5deg);
+    border: 1px solid currentColor;
+    border-radius: 2px;
+    padding: 0 0.3rem;
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    line-height: 1;
+    text-transform: uppercase;
+    white-space: nowrap;
+    opacity: 0.75;
+  }
+
+  /* An active filter, removable, reading as a fact rather than a control. */
+  .facet {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    border: 1px solid var(--hair);
+    border-radius: 2px;
+    padding: 0.15rem 0.4rem;
+    font-size: 11px;
+    color: var(--color-slate-600);
+    transition: border-color 120ms, color 120ms;
+  }
+  .facet:hover { border-color: var(--color-red-300); color: var(--color-red-700); }
+  .facet-key { font-size: 10px; font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase; color: var(--color-slate-400); }
+
+  /* Filters sit on a rule, not in a box. */
+  /* Every filter cell, whether it is a native select or a button that opens a
+     panel. A reader should not have to learn two controls to narrow a register,
+     so both carry the same rule, the same caret and the same "on" state. */
+  .register select.plain,
+  .register button.plain,
+  .register input.plain {
+    appearance: none;
+    border: 0;
+    border-bottom: 1px solid var(--hair);
+    border-radius: 0;
+    background: transparent;
+    padding: 0.3rem 1.1rem 0.3rem 0.15rem;
+    font-size: 12px;
+    color: var(--color-slate-700);
+    transition: border-color 120ms, color 120ms;
+  }
+  .register select.plain,
+  .register button.plain { background-image: linear-gradient(45deg, transparent 50%, var(--color-slate-400) 50%), linear-gradient(135deg, var(--color-slate-400) 50%, transparent 50%); background-position: right 0.42rem center, right 0.18rem center; background-size: 4px 4px, 4px 4px; background-repeat: no-repeat; }
+  .register select.plain:hover, .register button.plain:hover, .register input.plain:hover { border-color: var(--color-slate-400); }
+  .register select.plain:focus, .register button.plain:focus, .register input.plain:focus { outline: none; border-color: var(--color-brand-line); color: var(--color-slate-900); }
+  .register select.plain[data-on="true"],
+  .register button.plain[data-on="true"] { color: var(--color-brand-ink); border-color: var(--color-brand-line); font-weight: 600; }
+  /* A switch, not a field: no caret and no rule under it, so it does not read
+     as one more thing to fill in. */
+  .register button.plain[data-caret="none"] { background-image: none; border-bottom-color: transparent; padding-right: 0.15rem; }
+  .register button.plain[data-caret="none"]:hover { border-bottom-color: transparent; color: var(--color-brand-ink); }
+  /* A panel trigger says what is chosen on one line, however long it is. */
+  .register button.plain { display: block; width: 100%; overflow: hidden; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* The selection bar: square, docked, and it slides rather than appears. */
+  .dock { animation: dock-in 220ms cubic-bezier(0.22, 1, 0.36, 1); }
+  @keyframes dock-in {
+    from { transform: translateY(8px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .dock { animation: none; }
+    .register .rail::before, .register tbody > tr { transition: none; }
+  }
 }
 
 @media print {
@@ -97,8 +328,6 @@ summary::-webkit-details-marker {
     color: var(--color-slate-700);
     border-bottom: 1px solid var(--color-slate-100);
   }
-  [data-density="compact"] .dt-th { padding-block: 0.45rem; }
-  [data-density="compact"] .dt-td { padding-block: 0.4rem; font-size: 0.8125rem; }
   .dt tbody > tr:last-child > .dt-td { border-bottom: 0; }
   .dt tbody > tr { transition: background-color 120ms; }
   .dt tbody > tr:hover > .dt-td { background: var(--color-slate-50); }
@@ -109,6 +338,17 @@ summary::-webkit-details-marker {
   /* The column edge you drag. It sits fully inside its own header cell: sticky
      headers each form a stacking context, so a handle that overhangs into the
      next cell would be covered by it. */
+  /* The browser reads the colour scheme of the element under the pointer to
+     decide which system cursor to draw, and an element that inherits "normal"
+     falls back to the operating system's setting — a machine set to dark then
+     draws a white resize cursor on a white table. Saying it on the table itself
+     settles it wherever the pointer happens to be. */
+  .dt, .register { color-scheme: light; }
+  .dark .dt, .dark .register { color-scheme: dark; }
+
+  /* The resize cursor, drawn rather than asked for: the same black arrows and
+     bar the system draws, with a white halo — because a machine set to dark
+     hands the browser a white cursor whatever the page says its scheme is. */
   .dt-resizer {
     position: absolute;
     top: 0;
@@ -116,7 +356,7 @@ summary::-webkit-details-marker {
     z-index: 3;
     width: 10px;
     height: 100%;
-    cursor: col-resize;
+    cursor: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='24'%20height='24'%20viewBox='0%200%2024%2024'%3E%3Cg%20fill='%23ffffff'%20stroke='%23ffffff'%20stroke-width='2.2'%20stroke-linejoin='round'%3E%3Cpath%20d='M11.25%204h1.5v16h-1.5z'/%3E%3Cpath%20d='M7%207.5%202%2012l5%204.5z'/%3E%3Cpath%20d='M17%207.5%2022%2012l-5%204.5z'/%3E%3C/g%3E%3Cg%20fill='%23000000'%3E%3Cpath%20d='M11.25%204h1.5v16h-1.5z'/%3E%3Cpath%20d='M7%207.5%202%2012l5%204.5z'/%3E%3Cpath%20d='M17%207.5%2022%2012l-5%204.5z'/%3E%3C/g%3E%3C/svg%3E") 12 12, col-resize;
     touch-action: none;
   }
   .dt-resizer::after {
@@ -132,7 +372,43 @@ summary::-webkit-details-marker {
   .dt-th:last-child .dt-resizer::after { display: none; }
   .dt-th:hover .dt-resizer::after { background: var(--color-slate-400); }
   .dt-resizer:hover::after, .dt-resizer:active::after { top: 0; bottom: 0; width: 3px; background: var(--color-link); }
-  .dt-resizing { cursor: col-resize; user-select: none; }
+  .dt-resizing, .dt-resizing * { cursor: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='24'%20height='24'%20viewBox='0%200%2024%2024'%3E%3Cg%20fill='%23ffffff'%20stroke='%23ffffff'%20stroke-width='2.2'%20stroke-linejoin='round'%3E%3Cpath%20d='M11.25%204h1.5v16h-1.5z'/%3E%3Cpath%20d='M7%207.5%202%2012l5%204.5z'/%3E%3Cpath%20d='M17%207.5%2022%2012l-5%204.5z'/%3E%3C/g%3E%3Cg%20fill='%23000000'%3E%3Cpath%20d='M11.25%204h1.5v16h-1.5z'/%3E%3Cpath%20d='M7%207.5%202%2012l5%204.5z'/%3E%3Cpath%20d='M17%207.5%2022%2012l-5%204.5z'/%3E%3C/g%3E%3C/svg%3E") 12 12, col-resize; }
+  .dt-resizing { user-select: none; }
+  .dark .dt-resizer,
+  .dark .dt-resizing,
+  .dark .dt-resizing * { cursor: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='24'%20height='24'%20viewBox='0%200%2024%2024'%3E%3Cg%20fill='%23000000'%20stroke='%23000000'%20stroke-width='2.2'%20stroke-linejoin='round'%3E%3Cpath%20d='M11.25%204h1.5v16h-1.5z'/%3E%3Cpath%20d='M7%207.5%202%2012l5%204.5z'/%3E%3Cpath%20d='M17%207.5%2022%2012l-5%204.5z'/%3E%3C/g%3E%3Cg%20fill='%23ffffff'%3E%3Cpath%20d='M11.25%204h1.5v16h-1.5z'/%3E%3Cpath%20d='M7%207.5%202%2012l5%204.5z'/%3E%3Cpath%20d='M17%207.5%2022%2012l-5%204.5z'/%3E%3C/g%3E%3C/svg%3E") 12 12, col-resize; }
+
+  /* A menu floating over the table. A shadow alone disappears on a dark
+     background, so the panel also carries a hairline of its own. */
+  .dt-menu {
+    background: var(--color-surface);
+    border: 1px solid var(--color-slate-200);
+    box-shadow: 0 12px 32px rgb(15 23 42 / 0.16);
+  }
+  :root.dark .dt-menu {
+    border-color: color-mix(in oklab, var(--color-slate-400) 45%, transparent);
+    box-shadow: 0 16px 40px rgb(0 0 0 / 0.6);
+  }
+
+  /* A row of the column menu. The grip appears under the cursor, so the row
+     says "you can move me" at the moment somebody might want to. */
+  .dt-col-grip { opacity: 0; transition: opacity 120ms; }
+  /* A row that can be dragged reads as draggable across the whole row, its
+     own show/hide button included. */
+  .dt-col[draggable="true"] > button { cursor: inherit; }
+  .dt-col:hover .dt-col-grip { opacity: 1; }
+  /* Where the dragged column would land: a solid line on the edge it takes. */
+  .dt-col-target::before {
+    content: "";
+    position: absolute;
+    left: 0.25rem;
+    right: 0.25rem;
+    top: -1px;
+    height: 2px;
+    border-radius: 2px;
+    background: var(--color-brand);
+  }
+  .dt-col-target { background: var(--color-tint-soft); }
 
   .dt-tool {
     display: inline-flex;

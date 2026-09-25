@@ -2,7 +2,7 @@ import Link from "next/link";
 import { requireScope } from "@/lib/scope";
 import { getActiveSet } from "@/lib/config";
 import { PageHeader, Card, DataTable, Th, Td, Chip } from "@/components/ui";
-import { DOC_STATES, DOC_STATE_LABEL, DOC_STATE_COLOR, REV_STATES, REV_STATE_LABEL, REV_STATE_COLOR, EMPTY_TITLE_WORDS, type DocState, type RevState } from "@/lib/standard";
+import { DOC_STATES, DOC_STATE_LABEL, DOC_STATE_COLOR, DOC_MEANING, REV_STATES, REV_STATE_LABEL, REV_STATE_COLOR, REV_MEANING, EMPTY_TITLE_WORDS, type DocState, type RevState } from "@/lib/standard";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { VERDICT_EFFECT, verdictEffect } from "@/lib/verdict-effect";
 
@@ -15,28 +15,13 @@ export const metadata = { title: "States and codes" };
  * fixed by the Standard or published by the organization.
  */
 
-const DOC_MEANING: Record<DocState, { means: string; how: string }> = {
-  PLANNED: { means: "The number is reserved; nothing has been released under it yet.", how: "Set when the document is created or listed." },
-  ACTIVE: { means: "In use — at least one revision has been released.", how: "Automatic, at the first release." },
-  WITHDRAWN: { means: "Taken out of use after it was released. Its revisions stay on record.", how: "Document Control, with a reason." },
-  CANCELLED: { means: "Dropped before anything was released.", how: "Document Control, with a reason. Not possible once released." },
-  ARCHIVED: { means: "Closed at the end of its life, kept for retention.", how: "Document Control, with a reason." },
-};
-
-const REV_MEANING: Record<RevState, { means: string; how: string }> = {
-  IN_PREPARATION: { means: "Being written. Only the author's side works from it.", how: "The author starts a new revision." },
-  IN_REVIEW: { means: "Submitted; reviewers and approvers are looking at it.", how: "The author sends it for review." },
-  RELEASED: { means: "The current revision — the one people work from.", how: "Document Control releases it, once it is approved and no blocking comment is open." },
-  SUPERSEDED: { means: "Replaced by a later released revision. Kept, not used.", how: "Automatic, when the next revision is released." },
-  VOID: { means: "Found to be wrong after release and cancelled.", how: "Document Control, with a reason and a check of what was built from it." },
-};
-
 const CONSEQUENCE = Object.fromEntries(VERDICT_EFFECT.map((e) => [e.value, e.label]));
 
 export default async function CodesPage() {
   const ctx = await requireScope();
-  const [statuses, outcomes, advice, commentClasses] = await Promise.all([
+  const [statuses, outcomes, advice, commentClasses, criticalities, confidentialities] = await Promise.all([
     getActiveSet("STATUSES"), getActiveSet("REVIEW_OUTCOMES"), getActiveSet("REVIEW_ADVICE"), getActiveSet("COMMENT_CLASSES"),
+    getActiveSet("CRITICALITY"), getActiveSet("CONFIDENTIALITY"),
   ]);
   const canEdit = ctx.can("CONFIGURE");
   const text = (v: unknown) => (typeof v === "string" && v !== "—" ? v : null);
@@ -121,8 +106,8 @@ export default async function CodesPage() {
         </p>
       </Card>
 
-      <Card id="advice" title="3b · Review advice — what an earlier step says" description="Every step of a route except the last gives advice. It is read by whoever decides and never returns the document by itself. The advice has to match the comments the adviser left, so what their comments amount to is said once.">
-        <DataTable id="codes-advice" toolbar={false} head={<tr><Th>Advice</Th><Th>What it means</Th></tr>}>
+      <Card id="advice" title="3b · Review advice — what an earlier step says" description="Every step of a route except the last gives advice, and an adviser is never asked to choose it: it is read off the comments they wrote. No comment means nothing to say; a comment marked as stopping the release means that must be settled first. The decider reads it and is not bound by it — except that a blocking comment still stops the release until it is settled.">
+        <DataTable id="codes-advice" toolbar={false} head={<tr><Th>Advice</Th><Th>What the adviser did</Th></tr>}>
           {advice.map((a) => (
             <tr key={a.code}>
               <Td className="whitespace-nowrap font-medium text-slate-800">{a.label}</Td>
@@ -167,6 +152,30 @@ export default async function CodesPage() {
             Which one a project uses is a contract decision; many use only one of them.
           </p>
         </div>
+      </Card>
+
+      <Card id="criticality" title="5 · Criticality — how serious an error would be" description="Set when the document is created. It decides who must approve it, how long it is kept, and the format it is kept in — so it is not a label, it is a consequence.">
+        <DataTable id="codes-criticality" toolbar={false} head={<tr><Th>Level</Th><Th>Approved by</Th><Th>Kept for</Th><Th>Format</Th></tr>}>
+          {criticalities.map((item) => (
+            <tr key={item.code}>
+              <Td className="whitespace-nowrap font-medium text-slate-800">{item.label}</Td>
+              <Td className="text-xs">{typeof item.props.approval === "string" ? String(item.props.approval).toLowerCase() : "\u2014"}</Td>
+              <Td className="text-xs">{typeof item.props.retention === "string" ? String(item.props.retention).replaceAll("_", " ").toLowerCase() : "\u2014"}</Td>
+              <Td className="text-xs">{typeof item.props.format === "string" ? item.props.format : "\u2014"}</Td>
+            </tr>
+          ))}
+        </DataTable>
+      </Card>
+
+      <Card id="confidentiality" title="6 \u00b7 Confidentiality — who may see it" description="A clearance rule, not a warning label. Someone whose clearance is below a document's confidentiality does not see the document at all: not in the register, not in a count, not in a search.">
+        <DataTable id="codes-confidentiality" toolbar={false} head={<tr><Th>Level</Th><Th>Who sees it</Th></tr>}>
+          {confidentialities.map((item) => (
+            <tr key={item.code}>
+              <Td className="whitespace-nowrap font-medium text-slate-800">{item.label}</Td>
+              <Td className="text-xs">{item.props.default === true ? "The level a new document takes unless someone chooses another." : "Anyone whose function carries at least this clearance."}</Td>
+            </tr>
+          ))}
+        </DataTable>
       </Card>
 
       <Card title="Who decides these lists">
