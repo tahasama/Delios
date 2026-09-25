@@ -6,9 +6,10 @@ import { ActionForm } from "@/components/form";
 import { Field, inputCls, btn, Card } from "@/components/ui";
 import { createDocumentAction } from "@/lib/actions/documents";
 import { cn } from "@/lib/utils";
-import { Check } from "lucide-react";
+import { Check, AlertTriangle } from "lucide-react";
+import { isEmptyTitle } from "@/lib/standard";
 
-type Opt = { code: string; label: string };
+type Opt = { code: string; label: string; meaning?: string | null };
 
 const PRODUCER_LABEL: Record<string, string> = {
   ENG: "Internal engineering",
@@ -24,12 +25,14 @@ const PRODUCER_LABEL: Record<string, string> = {
  * with the file. Fields sit two to a row so nothing scrolls away.
  */
 export function NewDocumentForm({
-  received, routes, numberingSets, deliverableTypes, docTypes, disciplines, projects, subprojects, suppliers, pos, criticalities, confidentialities, retentionClasses, defaultConfidentiality,
+  received, routes, numberingSets, deliverableTypes, docTypes, disciplines, currentProject, subprojects, suppliers, pos, criticalities, confidentialities, retentionClasses, defaultConfidentiality,
 }: {
   received: boolean;
   routes: { id: string; name: string; isDefault: boolean; path: string }[];
   numberingSets: Record<string, string[]>;
-  deliverableTypes: Opt[]; docTypes: Opt[]; disciplines: Opt[]; projects: Opt[]; subprojects: Opt[]; suppliers: Opt[]; pos: Opt[]; criticalities: Opt[]; confidentialities: Opt[]; retentionClasses: Opt[];
+  /** The project being worked in. A document is registered here, so it is not a choice. */
+  currentProject: { code: string; name: string };
+  deliverableTypes: Opt[]; docTypes: Opt[]; disciplines: Opt[]; subprojects: Opt[]; suppliers: Opt[]; pos: Opt[]; criticalities: Opt[]; confidentialities: Opt[]; retentionClasses: Opt[];
   defaultConfidentiality: string | null;
 }) {
   const [step, setStep] = useState(1);
@@ -39,6 +42,11 @@ export function NewDocumentForm({
   const [docType, setDocType] = useState("");
   const [discipline, setDiscipline] = useState("");
   const [title, setTitle] = useState("");
+  const [criticality, setCriticality] = useState("");
+  const [confidentiality, setConfidentiality] = useState(defaultConfidentiality ?? "");
+  // The register refuses a title that only repeats the type, so the form says so first.
+  const emptyTitle = title.trim().length > 0 && isEmptyTitle(title);
+  const meaningOf = (options: Opt[], code: string) => options.find((o) => o.code === code)?.meaning ?? null;
   const needs = (setKey: string) => (numberingSets[producer] ?? []).includes(setKey);
   const external = producer === "CTR" || producer === "VND" || producer === "TPY" || producer === "CLT";
   const docTypeLabel = docTypes.find((t) => t.code === docType)?.label ?? docType;
@@ -139,18 +147,26 @@ export function NewDocumentForm({
             </p>
           )}
 
-          <Field label="Title" required hint="what it is about — “Drawing” on its own is refused">
-            <input name="title" required maxLength={200} value={title} onChange={(e) => setTitle(e.target.value)} className={inputCls} placeholder="e.g. Feed pump P-101 general arrangement and dimensions" />
+          <Field label="Title" required hint="what it is about, in the words someone searching would use">
+            <input name="title" required maxLength={200} value={title} onChange={(e) => setTitle(e.target.value)} className={inputCls} aria-invalid={emptyTitle} placeholder="e.g. Feed pump P-101 general arrangement and dimensions" />
+            {emptyTitle ? (
+              <span className="mt-1.5 flex items-start gap-1.5 rounded-lg bg-amber-50 px-2.5 py-2 text-[11px] text-amber-800 ring-1 ring-amber-200">
+                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                <span>
+                  <strong>“{title.trim()}” says nothing about the document.</strong> The type already says it is a {docTypeLabel.toLowerCase()} — the title has to say which one.{" "}
+                  <Link href="/guide/codes#titles" target="_blank" className="font-semibold underline">Titles that are refused →</Link>
+                </span>
+              </span>
+            ) : null}
           </Field>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Field label="Project" required>
-              <select name="projectCode" required className={inputCls} defaultValue="">
-                <option value="" disabled>Choose…</option>
-                {projects.map((o) => <option key={o.code} value={o.code}>{o.code} — {o.label}</option>)}
-              </select>
+            <Field label="Project">
+              <input type="hidden" name="projectCode" value={currentProject.code} />
+              <p className="pt-1 text-sm font-medium text-slate-700">{currentProject.code} — {currentProject.name}</p>
+              <span className="mt-0.5 block text-[11px] text-slate-500">The project you are working in. Switch project in the header to register somewhere else.</span>
             </Field>
-            <Field label="Sub-project" required={needs("SUBPROJECTS")}>
+            <Field label="Sub-project" required={needs("SUBPROJECTS")} hint={subprojects.length ? "this project’s sub-projects" : "none defined for this project"}>
               <select name="subProject" required={needs("SUBPROJECTS")} className={inputCls} defaultValue="">
                 <option value="" disabled={needs("SUBPROJECTS")}>{needs("SUBPROJECTS") ? "Choose…" : "—"}</option>
                 {subprojects.map((o) => <option key={o.code} value={o.code}>{o.label}</option>)}
@@ -176,17 +192,19 @@ export function NewDocumentForm({
               </>
             ) : null}
             <Field label="Criticality" required hint="how serious an error in it would be">
-              <select name="criticality" required className={inputCls} defaultValue="">
+              <select name="criticality" required className={inputCls} value={criticality} onChange={(e) => setCriticality(e.target.value)}>
                 <option value="" disabled>Choose…</option>
                 {criticalities.map((o) => <option key={o.code} value={o.code}>{o.label}</option>)}
               </select>
+              {meaningOf(criticalities, criticality) ? <span className="mt-1 block text-[11px] text-slate-500">{meaningOf(criticalities, criticality)}</span> : null}
             </Field>
             <Field label="Who may see it?">
-              <select name="confidentiality" className={inputCls} defaultValue={defaultConfidentiality ?? ""}>
+              <select name="confidentiality" className={inputCls} value={confidentiality} onChange={(e) => setConfidentiality(e.target.value)}>
                 {confidentialities.map((o) => <option key={o.code} value={o.code}>{o.label}</option>)}
               </select>
+              {meaningOf(confidentialities, confidentiality) ? <span className="mt-1 block text-[11px] text-slate-500">{meaningOf(confidentialities, confidentiality)}</span> : null}
             </Field>
-            <Field label="Keep for" hint="left automatic, it follows the criticality">
+            <Field label="Keep it for" hint="how long it stays in the archive after the project; automatic follows the criticality">
               <select name="retentionClass" className={inputCls} defaultValue="">
                 <option value="">Automatic</option>
                 {retentionClasses.map((o) => <option key={o.code} value={o.code}>{o.label}</option>)}
@@ -197,21 +215,25 @@ export function NewDocumentForm({
                 <input type="file" name="nativeFile" className="block w-full text-sm" onChange={(e) => setHasFile(!!e.target.files?.length)} />
               </Field>
             )}
-            <Field label="After it is registered" className="sm:col-span-2" hint={routes.length ? undefined : "no review route is set up yet — ask an administrator"}>
-              <select name="sendTemplateId" className={inputCls} value={sendTo} onChange={(e) => setSendTo(e.target.value)}>
+            <Field
+              label="After it is registered"
+              className="sm:col-span-2"
+              hint={routes.length ? (hasFile ? undefined : "attach the file above to send it for review now") : "no review route is set up yet — ask an administrator"}
+            >
+              <select name="sendTemplateId" disabled={!hasFile} className={cn(inputCls, !hasFile && "cursor-not-allowed bg-slate-50 text-slate-400")} value={hasFile ? sendTo : ""} onChange={(e) => setSendTo(e.target.value)}>
                 <option value="">Register it only — I will send it for review later</option>
                 {routes.map((r) => <option key={r.id} value={r.id}>Send for review — {r.name}</option>)}
               </select>
-              {route ? <span className="mt-1.5 block text-[11px] text-slate-500">It goes to {route.path}</span> : null}
-              {sendTo && !hasFile ? <span className="mt-1.5 block text-[11px] font-semibold text-amber-700">Attach the file first, or it cannot be sent.</span> : null}
+              {hasFile && route ? <span className="mt-1.5 block text-[11px] text-slate-500">It goes to {route.path}</span> : null}
+              {!hasFile ? <span className="mt-1.5 block text-[11px] text-slate-500">Nothing can be reviewed until there is something to read. Register it now, and send it once the file exists.</span> : null}
             </Field>
           </div>
 
           <div className="flex items-center justify-between gap-3 border-t border-slate-100 pt-4">
             {received ? <Link href="/documents" className={btn("ghost", "sm")}>Cancel</Link> : <button type="button" onClick={() => setStep(1)} className={btn("ghost", "sm")}>Back</button>}
             <div className="flex items-center gap-3">
-              <span className="hidden text-[11px] text-slate-500 sm:block">{sendTo ? "It gets its number, then goes to the route" : "It gets its number and waits in the register"}</span>
-              <button type="submit" className={btn("primary", "sm")}>{sendTo ? "Create and send" : received ? "Register it" : "Create and get a number"}</button>
+              <span className="hidden text-[11px] text-slate-500 sm:block">{hasFile && sendTo ? "It gets its number, then goes to the route" : "It gets its number and waits in the register"}</span>
+              <button type="submit" disabled={emptyTitle} className={btn("primary", "sm")}>{hasFile && sendTo ? "Create and send" : received ? "Register it" : "Create and get a number"}</button>
             </div>
           </div>
         </div>

@@ -30,6 +30,9 @@ export const SET_PROP_FIELDS: Record<string, PropField[]> = {
   REVIEW_OUTCOMES: [
  { key: "effect", label: "What this verdict does", type: "choice", options: VERDICT_EFFECT, read: verdictEffect, hint: "" },
   ],
+  SUBPROJECTS: [
+    { key: "project", label: "Belongs to project", type: "text", hint: "the project code; leave it empty to offer this sub-project on every project" },
+  ],
   REVIEW_ADVICE: [
     { key: "comments", label: "Which comments it claims", type: "select", options: ["none", "some", "blocking"], hint: "the advice must match the comments the adviser left" },
     { key: "blocking", label: "At least one comment stops release", type: "bool", hint: "" },

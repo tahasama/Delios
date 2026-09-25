@@ -4,7 +4,7 @@ import { readFile } from "fs/promises";
 import path from "path";
 import type { Tenant, ScopedDb } from "@/lib/tenant";
 import { UPLOAD_ROOT } from "@/lib/files";
-import { REV_STATES, DOC_STATES, EXCLUDED_REV_LETTERS } from "@/lib/standard";
+import { REV_STATES, DOC_STATES, EXCLUDED_REV_LETTERS, isEmptyTitle } from "@/lib/standard";
 
 // Annex H runners — each returns the failing items for its check, or the
 // special strings NOT_CHECKED / NOT_EXECUTABLE. Evidence only; no judgement (§17.1).
@@ -222,7 +222,7 @@ export const RUNNERS: Runners = {
   },
   "MD-06": async (ctx) => {
     const docs = await ctx.db.document.findMany({ select: { id: true, docNumber: true, title: true } });
- return docs.filter((d) => /^(report|drawing|layout|document|spec|unc?itled|test)$/i.test(d.title.trim())).map((d) => doc(d, "Generic, non-descriptive title."));
+ return docs.filter((d) => isEmptyTitle(d.title)).map((d) => doc(d, "The title only repeats the document type."));
   },
   "MD-07": async (ctx) => {
     const docs = await ctx.db.document.findMany({ where: { isPlaceholder: false } });

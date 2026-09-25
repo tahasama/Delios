@@ -76,7 +76,7 @@ export function counterPrefix(scheme: SchemeInfo, fieldValues: Record<string, st
   for (const field of scheme.fields) {
     if (field.rule?.startsWith("COUNTER")) continue;
     const v = fieldValues[field.label];
-    if (!v) throw new Error(`Missing value for numbering field "${field.label}"`);
+    if (!v) throw new Error(`The number for this kind of document is built from ${field.label.toLowerCase()}, so it has to be chosen first.`);
     parts.push(v);
   }
   return { prefix: parts.join(scheme.delimiter), number: "" };

@@ -3,6 +3,7 @@
 import { startWorkflowRun } from "@/lib/workflow";
 import { redirect } from "next/navigation";
 import { requireScope } from "@/lib/scope";
+import { isEmptyTitle } from "@/lib/standard";
 import { revalidatePath } from "next/cache";
 import { isController, isAdmin, mayCreateDocument, mayContributeToDocument } from "@/lib/auth";
 import { audit } from "@/lib/audit";
@@ -35,7 +36,7 @@ export async function createDocumentAction(_prev: { error?: string } | undefined
   const kind = String(formData.get("kind") ?? "DOCUMENT") === "RECORD" ? "RECORD" : "DOCUMENT";
 
  if (!title) return { error: "A descriptive title is required — generic titles are non-conformant." };
- if (/^(report|drawing|layout|document|spec)$/i.test(title)) return { error: `"${title}" is a generic, non-descriptive title. Describe the content.` };
+ if (isEmptyTitle(title)) return { error: `“${title}” only repeats the document type. Say which one it is — what it shows, and of what.` };
  if (!deliverableType) return { error: "Deliverable type is required — it drives the numbering scheme." };
  if (!docType) return { error: "Document type is required." };
  if (!discipline) return { error: "Discipline is required — exactly one." };
@@ -61,7 +62,7 @@ export async function createDocumentAction(_prev: { error?: string } | undefined
     if (!setKey || !value) continue;
     const active = await getActiveSet(setKey);
     if (!active.some((v) => v.code === value)) {
- return { error: `"${label}" value "${value}" is not in the published active set.` };
+ return { error: `${label} “${value}” is not one of the published values. Choose one from the list, or ask an administrator to publish it.` };
     }
   }
 
@@ -90,7 +91,7 @@ export async function createDocumentAction(_prev: { error?: string } | undefined
   if (enforceNow && req("po") === "required" && !contractRef) missingConditional.push("contract / PO");
   if (enforceNow && req("receivedDate") === "required" && !receivedDate) missingConditional.push("date received");
   if (missingConditional.length) {
- return { error: `The type-to-field matrix requires ${missingConditional.join(", ")} for this deliverable type.` };
+ return { error: `A document from another party needs ${missingConditional.join(" and ")} before it can be registered.` };
   }
   const external = req("receivedDate") !== "na";
   const retentionClass = chosenRetention ?? (await retentionFor(ctx, criticality));
@@ -209,7 +210,7 @@ export async function updateDocumentAction(_prev: { error?: string; ok?: string 
     }
   }
   if (!changes.length) return { ok: "No changes to record." };
-  if ("title" in data && typeof data.title === "string" && /^(report|drawing|layout|document|spec)$/i.test(data.title.trim())) {
+  if ("title" in data && typeof data.title === "string" && isEmptyTitle(data.title)) {
  return { error: "Generic titles are non-conformant." };
   }
   await db.document.update({ where: { id }, data });

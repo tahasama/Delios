@@ -30,6 +30,20 @@ export const ROLE_BLURB: Record<Role, string> = {
   VIEWER: "Read-only access to released, current information.",
 };
 
+/**
+ * A title that only repeats the document type says nothing: the type field
+ * already holds it, and nobody can find the document by it. One list, used by
+ * the form, the register, release and the conformance checks alike.
+ */
+export const EMPTY_TITLE_WORDS = [
+  "report", "drawing", "layout", "document", "specification", "spec", "sketch", "plan", "note", "memo",
+  "list", "schedule", "calculation", "datasheet", "procedure", "manual", "untitled", "test",
+];
+export function isEmptyTitle(title: string | null | undefined): boolean {
+  const words = (title ?? "").trim().toLowerCase().replace(/s$/, "");
+  return words.length === 0 || EMPTY_TITLE_WORDS.includes(words);
+}
+
 // §7.2 — revision states (fixed set, forward-only §7.5)
 export const REV_STATES = ["IN_PREPARATION", "IN_REVIEW", "RELEASED", "SUPERSEDED", "VOID"] as const;
 export type RevState = (typeof REV_STATES)[number];

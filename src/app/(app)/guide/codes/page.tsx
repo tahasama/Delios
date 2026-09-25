@@ -2,7 +2,7 @@ import Link from "next/link";
 import { requireScope } from "@/lib/scope";
 import { getActiveSet } from "@/lib/config";
 import { PageHeader, Card, DataTable, Th, Td, Chip } from "@/components/ui";
-import { DOC_STATES, DOC_STATE_LABEL, DOC_STATE_COLOR, REV_STATES, REV_STATE_LABEL, REV_STATE_COLOR, type DocState, type RevState } from "@/lib/standard";
+import { DOC_STATES, DOC_STATE_LABEL, DOC_STATE_COLOR, REV_STATES, REV_STATE_LABEL, REV_STATE_COLOR, EMPTY_TITLE_WORDS, type DocState, type RevState } from "@/lib/standard";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { VERDICT_EFFECT, verdictEffect } from "@/lib/verdict-effect";
 
@@ -109,6 +109,16 @@ export default async function CodesPage() {
             </tr>
           ))}
         </DataTable>
+      </Card>
+
+      <Card id="titles" title="Titles the register refuses" description="A title that only repeats the document type says nothing: the type field already holds it, and nobody can find the document by it. These words, on their own, are refused — write what it shows, and of what.">
+        <p className="flex flex-wrap gap-1.5">
+          {EMPTY_TITLE_WORDS.map((w) => <span key={w} className="rounded-md bg-slate-100 px-2 py-0.5 text-xs text-slate-600">{w}</span>)}
+        </p>
+        <p className="mt-3 text-xs text-slate-500">
+          Refused: <span className="line-through">Drawing</span> · <span className="line-through">Report</span>.
+          Accepted: <strong>Feed pump P-101 general arrangement</strong> · <strong>Cable schedule, substation B</strong>.
+        </p>
       </Card>
 
       <Card id="advice" title="3b · Review advice — what an earlier step says" description="Every step of a route except the last gives advice. It is read by whoever decides and never returns the document by itself. The advice has to match the comments the adviser left, so what their comments amount to is said once.">

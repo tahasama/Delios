@@ -1,5 +1,5 @@
 import { registerGate, ok, warn, block, type Gate, type GateContext, type Subject } from "./registry";
-import { ROLE_RANK } from "../standard";
+import { ROLE_RANK, isEmptyTitle } from "../standard";
 
 /**
  * The gates themselves, one per precondition the Standard states.
@@ -246,7 +246,7 @@ const releaseMetadata: Gate = {
     if (!rev) return block("No revision selected.");
     const doc = rev.document;
     const missing: string[] = [];
-    if (!doc.title || /^(report|drawing|layout|document)$/i.test(doc.title.trim())) missing.push("a descriptive title");
+    if (isEmptyTitle(doc.title)) missing.push("a descriptive title");
     if (!doc.docType) missing.push("document type");
     if (!doc.discipline) missing.push("discipline");
     if (!doc.retentionClass) missing.push("retention class");

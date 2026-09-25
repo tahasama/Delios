@@ -8,6 +8,7 @@ import type { SessionUser } from "./auth";
 import { verdictMeaning, assertMayGiveBindingVerdict, recordApproval } from "./verdict";
 import { isAdmin } from "@/lib/auth";
 import { holdersOf } from "./permissions";
+import { isEmptyTitle } from "./standard";
 
 export { verdictMeaning, assertMayGiveBindingVerdict, recordApproval } from "./verdict";
 
@@ -305,7 +306,7 @@ export async function releaseRevision(t: Tenant, revisionId: string, user: Sessi
   // §4.8 — core metadata complete before release
   const doc = rev.document;
   const missing: string[] = [];
-  if (!doc.title || /^(report|drawing|layout|document)$/i.test(doc.title.trim())) missing.push("a descriptive title");
+  if (isEmptyTitle(doc.title)) missing.push("a descriptive title");
   if (!doc.docType) missing.push("document type");
   if (!doc.discipline) missing.push("discipline");
   if (!doc.retentionClass) missing.push("retention class");
