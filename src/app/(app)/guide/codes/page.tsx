@@ -2,7 +2,7 @@ import Link from "next/link";
 import { requireScope } from "@/lib/scope";
 import { getActiveSet } from "@/lib/config";
 import { PageHeader, Card, DataTable, Th, Td, Chip } from "@/components/ui";
-import { DOC_STATES, DOC_STATE_LABEL, DOC_STATE_COLOR, DOC_MEANING, REV_STATES, REV_STATE_LABEL, REV_STATE_COLOR, REV_MEANING, EMPTY_TITLE_WORDS, type DocState, type RevState } from "@/lib/standard";
+import { ADVICE_CODES, ADVICE_LABEL, ADVICE_MEANING, DOC_STATES, DOC_STATE_LABEL, DOC_STATE_COLOR, DOC_MEANING, REV_STATES, REV_STATE_LABEL, REV_STATE_COLOR, REV_MEANING, EMPTY_TITLE_WORDS, type DocState, type RevState } from "@/lib/standard";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { VERDICT_EFFECT, verdictEffect } from "@/lib/verdict-effect";
 
@@ -49,7 +49,7 @@ export default async function CodesPage() {
           <FlowStep n="2" title="Write rev A" who="Author" body="Content being prepared." chips={[["2", "In preparation"]]} />
           <FlowStep n="3" title="Send down a route" who="Author or Document Control" body="The route names who advises and who decides." chips={[["2", "In review"]]} />
           <FlowStep n="4" title="Advise" who="Reviewers" body="Comments and a suggested verdict." chips={[]} />
-          <FlowStep n="5" title="Decide" who="Last step · an approver" body="The binding verdict, and what it may be used for." chips={[["3", "C1 / C2 / C3 / C4"], ["4", "to be IFC"]]} />
+          <FlowStep n="5" title="Decide" who="Last step · an approver" body="The binding verdict, and what it may be used for." chips={[["3", "C1 / C2 / C3 / C4"], ["4", "IFC"]]} />
           <FlowStep n="6" title="Release" who="Document Control" body="Checks, then releases at the status decided — “to be” drops." chips={[["2", "Released"], ["4", "IFC"], ["1", "Active"]]} last />
         </ol>
         <div className="mt-4 grid grid-cols-1 gap-3 text-xs leading-5 text-slate-600 md:grid-cols-3">
@@ -108,10 +108,11 @@ export default async function CodesPage() {
 
       <Card id="advice" title="3b · Review advice — what an earlier step says" description="Every step of a route except the last gives advice, and an adviser is never asked to choose it: it is read off the comments they wrote. No comment means nothing to say; a comment marked as stopping the release means that must be settled first. The decider reads it and is not bound by it — except that a blocking comment still stops the release until it is settled.">
         <DataTable id="codes-advice" toolbar={false} head={<tr><Th>Advice</Th><Th>What the adviser did</Th></tr>}>
-          {advice.map((a) => (
+          {(advice.length ? advice.map((a) => ({ code: a.code, label: a.label, meaning: typeof a.props.meaning === "string" ? a.props.meaning : ADVICE_MEANING[a.code] ?? "—" }))
+            : ADVICE_CODES.map((code) => ({ code, label: ADVICE_LABEL[code], meaning: ADVICE_MEANING[code] }))).map((a) => (
             <tr key={a.code}>
               <Td className="whitespace-nowrap font-medium text-slate-800">{a.label}</Td>
-              <Td className="text-xs">{typeof a.props.meaning === "string" ? a.props.meaning : "—"}</Td>
+              <Td className="text-xs">{a.meaning}</Td>
             </tr>
           ))}
         </DataTable>
@@ -131,7 +132,7 @@ export default async function CodesPage() {
       <Card
         id="status"
         title="4 · Released for — what a released revision may be used for"
-        description="The status. Chosen by whoever gives the binding verdict — it reads “to be IFC” until Document Control releases the revision at exactly that. It is printed on the document and on the transmittal, and a transmittal sent for execution only accepts codes that allow work."
+        description="What the revision is issued for. Every step of a review route sets it or confirms it, and the last step’s answer stands. It is in force only once Document Control releases the revision: until then the revision reads Not released. It is printed on the document and on the transmittal, and a transmittal sent for execution only accepts codes that allow work."
       >
         <DataTable id="codes-statuses" toolbar={false} head={<tr><Th>Code</Th><Th>Meaning</Th><Th>Allows work</Th><Th>You may</Th><Th>You may not</Th></tr>}>
           {statuses.map((s) => (

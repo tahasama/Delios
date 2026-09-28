@@ -6,22 +6,27 @@ import { revalidatePath } from "next/cache";
 import { isController, isAdmin } from "@/lib/auth";
 import { audit, notify, notifyMany } from "@/lib/audit";
 import { getActiveSet } from "@/lib/config";
+import { ENCLOSURE_CONDITIONS } from "@/lib/standard";
 import { issueGateError, openReviewCycle } from "@/lib/lifecycle";
 import type { Tenant } from "@/lib/scope";
 import { enforce } from "@/lib/rules/preflight";
+import { nextRecordNumber } from "@/lib/numbering-records";
 
-async function nextTransmittalNumber(t: Tenant): Promise<string> {
-  const { db, projectId } = t;
-  const seq = await db.$transaction(async (tx) => {
-    const c = await tx.numberCounter.findUnique({ where: { projectId_prefix: { projectId, prefix: "TR" } } });
-    if (c) {
-      await tx.numberCounter.update({ where: { id: c.id }, data: { next: { increment: 1 } } });
-      return c.next;
-    }
-    await tx.numberCounter.create({ data: { projectId, prefix: "TR", next: 2 } });
-    return 1;
-  });
-  return `TR-${String(seq).padStart(4, "0")}`;
+/**
+ * The number a transmittal is raised under: built from the organization's own
+ * scheme when one is routed for transmittals, and from the short form when none
+ * is. Sender and receiver are party codes, so the same handover reads the same
+ * from both ends.
+ */
+async function nextTransmittalNumber(t: Tenant, facts: { project: string; sender: string | null; receiver: string | null; reason: string }): Promise<string> {
+  return nextRecordNumber(t, "TRANSMITTAL", facts, "TR");
+}
+
+/** A party's published code, which is what a number carries — never its name. */
+async function partyCode(t: Tenant, name: string | null | undefined): Promise<string | null> {
+  if (!name) return null;
+  const party = await t.db.party.findFirst({ where: { name }, select: { code: true } });
+  return party?.code ?? null;
 }
 
 // G.2 steps 5–8 / G.5 steps 1 — the control function raises the transmittal (§11.13).
@@ -46,7 +51,10 @@ export async function createTransmittalAction(_prev: { error?: string } | undefi
 
  if (!reasonForIssue) return { error: "Every transmittal states its reason for issue." };
  if (!dateOfIssue) return { error: "Date of issue is required." };
- if (!revisionIds.length) return { error: "List the documents and revisions enclosed." };
+ // A transmittal with nothing enclosed is ordinary correspondence — a
+ // clarification, a notice, an answer — and is allowed, so long as it says
+ // something. What it may never be is empty of both documents and words.
+ if (!revisionIds.length && !message && !subject) return { error: "Enclose at least one revision, or write a subject and a message — a transmittal cannot be empty of both." };
  if (!recipientUsers.length) return { error: "Name at least one person to send it to — a company on its own is not a recipient." };
   if (direction === "OUTGOING" && !subject) return { error: "Give the transmittal a subject — it is the first thing the recipient reads." };
 
@@ -75,10 +83,24 @@ export async function createTransmittalAction(_prev: { error?: string } | undefi
   const base = new Date(dateOfIssue);
   const responseDueDate = responseRequired && responsePeriodDays ? new Date(base.getTime() + responsePeriodDays * 86400000) : null;
 
+  // The number is built before the record, from the parties it travels between.
+  const internalParty = await db.party.findFirst({ where: { isInternal: true }, select: { code: true } });
+  const recipientParties = recipientUsers.length
+    ? await db.user.findMany({ where: { id: { in: recipientUsers } }, select: { party: { select: { code: true } } } })
+    : [];
+  const receiverCodes = [...new Set(recipientParties.map((person) => person.party?.code).filter((code): code is string => !!code))];
+  const project = await db.project.findUnique({ where: { id: projectId }, select: { code: true } });
+  const transmittalNumber = await nextTransmittalNumber(ctx, {
+    project: project?.code ?? "",
+    sender: direction === "OUTGOING" ? internalParty?.code ?? null : await partyCode(ctx, issuingParty),
+    receiver: direction === "OUTGOING" ? (receiverCodes.length === 1 ? receiverCodes[0] : receiverCodes.length ? "MULTI" : null) : internalParty?.code ?? null,
+    reason: reasonForIssue,
+  });
+
   const t = await db.transmittal.create({
     data: {
       projectId,
-      number: await nextTransmittalNumber(ctx),
+      number: transmittalNumber,
       direction,
       reasonForIssue,
       dateOfIssue: base,
@@ -174,10 +196,19 @@ export async function acceptanceCheckAction(_prev: { error?: string } | undefine
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Acceptance blocked." };
   }
-  const conditions = ["a", "b", "c", "d", "e"].map((k) => ({ key: k, pass: formData.get(`cond_${k}`) === "on" }));
   const notes = String(formData.get("notes") ?? "").trim();
   const t = await db.transmittal.findUniqueOrThrow({ where: { id }, include: { items: true, recipients: true } });
   if (t.status !== "ISSUED") return { error: "Only an issued transmittal can be accepted or rejected." };
+
+  // A transmittal with nothing enclosed is checked on the conditions that can
+  // be checked; the ones about enclosures are recorded as not applicable, so
+  // the record says why they were not answered rather than leaving them blank.
+  const enclosed = t.items.length > 0;
+  const conditions = ["a", "b", "c", "d", "e"].map((k) => (
+    !enclosed && (ENCLOSURE_CONDITIONS as readonly string[]).includes(k)
+      ? { key: k, pass: true, notApplicable: true }
+      : { key: k, pass: formData.get(`cond_${k}`) === "on" }
+  ));
 
   const allPass = conditions.every((c) => c.pass);
   if (!allPass && !notes) return { error: "Tell the sender why it is rejected — they will see this." };

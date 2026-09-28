@@ -89,7 +89,9 @@ export function NewTransmittalForm({
           </>
         ) : null}
 
-        <Field label="Documents" required hint={direction === "OUTGOING" ? "only released revisions can be sent — Ctrl/Cmd-click for several" : "Ctrl/Cmd-click for several"}>
+        {/* A transmittal may carry a message alone — a clarification, a notice,
+            an answer — so the enclosures are optional and the field says so. */}
+        <Field label="Documents" hint={direction === "OUTGOING" ? "only released revisions can be sent — Ctrl/Cmd-click for several; leave empty to send a message alone" : "Ctrl/Cmd-click for several; leave empty for a message alone"}>
           <select name="revisionIds" multiple className={`${inputCls} h-40`} defaultValue={[...(preselectedRevisionIds ?? []), ...(prefill?.revisionIds ?? [])]}>
             {choices.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}
           </select>

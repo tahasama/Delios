@@ -21,14 +21,15 @@ export async function saveUpload(
   t: Tenant,
   file: File,
   docNumber: string,
-  kind: "NATIVE" | "RENDITION",
+  kind: "NATIVE" | "RENDITION" | "STAMPED" | "EVIDENCE",
   revValue: string
 ): Promise<SavedFile> {
   if (!file || typeof file.arrayBuffer !== "function") throw new Error("No file provided.");
   if (file.size > 20 * 1024 * 1024) throw new Error("File exceeds the 20 MB limit.");
   const buf = Buffer.from(await file.arrayBuffer());
   const ext = path.extname(file.name) || (kind === "RENDITION" ? ".pdf" : "");
-  const storedName = `${docNumber}_Rev-${revValue}${kind === "RENDITION" ? "" : "_native"}${ext}`;
+  const suffix = kind === "RENDITION" ? "" : kind === "NATIVE" ? "_native" : `_${kind.toLowerCase()}`;
+  const storedName = `${docNumber}_Rev-${revValue}${suffix}${ext}`;
   const relPath = path.join(t.projectId, docNumber, `${randomUUID()}__${storedName}`);
   const abs = path.join(UPLOAD_ROOT, relPath);
   await mkdir(path.dirname(abs), { recursive: true });
@@ -58,7 +59,7 @@ export async function saveBuffer(
   t: Tenant,
   buf: Uint8Array,
   docNumber: string,
-  kind: "NATIVE" | "RENDITION",
+  kind: "NATIVE" | "RENDITION" | "STAMPED" | "EVIDENCE",
   revValue: string,
   uploadedByName?: string,
   uploadedById?: string

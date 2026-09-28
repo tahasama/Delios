@@ -4,6 +4,7 @@ import { CheckCircle2, CircleDashed, ArrowRight, Building2, Tags, FileDigit, Wor
 import { profileForKind, missingFromProfile, type Profile } from "@/lib/profiles";
 import { draftProfileAction } from "@/lib/actions/profiles";
 import { isAdmin } from "@/lib/auth";
+import { holdersOf } from "@/lib/permissions";
 import { Banner, Card, Chip, Field, PageHeader, inputCls } from "@/components/ui";
 import { ActionForm } from "@/components/form";
 import { setScopeAction, addExceptionAction } from "@/lib/actions/admin";
@@ -49,10 +50,15 @@ export default async function DmpReadinessPage() {
   const tagged = actions.filter((a) => (a.departments ?? "").trim()).length;
   const measuredRecently = !!lastRun && Date.now() - lastRun.ranAt.getTime() <= (scope?.measurementIntervalDays ?? 30) * 86_400_000;
 
+  // Whether this project has a control stage is not a setting: it is whether
+  // anybody holds the control function on it.
+  const controlHolders = await holdersOf(ctx, "CONTROL");
+
   // Annex C in the order an organization actually makes the decisions.
   const steps = [
  { title: "State the scope", text: "What information is controlled, at which assessment level, and the integrity threshold it is measured against.", href: "#scope", action: "Publish scope", icon: Building2, done: Boolean(scope?.organizationName && scope?.scopeStatement), evidence: scope?.scopeStatement ? `Scope published · threshold ${scope.integrityThreshold}%`: "No scope statement" , todo: "Write what this project controls and the level it is measured at." },
  { title: "Name the functions and people", text: "Who does what, by function rather than by name, and which department each person answers for — they receive requirements calls and confirm readiness.", href: "/admin/users", action: "People & functions", icon: Users, done: members > 1 && withDepartment > 0, evidence: members <= 1 ? "Only you are on this project — add the people who write, review and approve" : withDepartment === 0 ? `${members} people on the project, but none says which department they answer for — departments receive the requirements calls` : `${members} on this project · ${withDepartment} with a department · ${externalParties} external part${externalParties === 1 ? "y": "ies"}` , todo: members <= 1 ? "Add the people who write, review and approve, and give each one a function." : "Set a department on at least one person — departments receive the requirements calls and confirm readiness before an activity." },
+ { title: "Decide whether there is a control function", text: "Somebody between the work and the record, who receives, releases and sends — or nobody, and the people doing the work do those acts themselves. It is not a setting: give the function to somebody, or to no one.", href: "/distribution", action: "Functions", icon: ShieldCheck, done: true, evidence: controlHolders.length ? `${controlHolders.length} ${controlHolders.length === 1 ? "person holds" : "people hold"} it: ${controlHolders.map((one) => one.name).join(", ")} — they receive, release and send` : "Nobody holds it — the deciding step releases, and whoever asks for a revision to go out sends it themselves", todo: "" },
  { title: "Publish the project's vocabulary", text: "Disciplines, document types, statuses, outcomes, reasons and retention classes. Each project type's starter profile adds its own values.", href: "/admin/config", action: "Value sets", icon: Tags, done: requiredSets.length === REQUIRED.length && requiredSets.every((set) => set._count.values > 0) && profileGaps.length === 0, evidence: `${requiredSets.filter((s) => s._count.values > 0).length}/${REQUIRED.length} essential sets${profileGaps.length ? ` · ${profileGaps.map((g) => `${g.profile.name}: ${g.missing} starter value(s) not published`).join(" · ")}`: ""}` , todo: "Publish the lists still empty: disciplines, document types, statuses, verdicts, reasons for issue and retention classes." },
  { title: "Publish numbering", text: "Numbers are built from ordered fields and each deliverable type is routed to its scheme, so nobody invents a number.", href: "/admin/numbering", action: "Numbering", icon: FileDigit, done: schemes > 0 && routings > 0, evidence: `${schemes} scheme${schemes === 1 ? "": "s"} · ${routings} routing${routings === 1 ? "": "s"}` , todo: "Build a numbering scheme and route each kind of document to it." },
  { title: "Set the distribution matrix", text: "Which functions review, approve and receive each class of document. The Approve column is the approval authority.", href: "/distribution", action: "Distribution", icon: ShieldCheck, done: verbsGranted.has("REVIEW") && verbsGranted.has("APPROVE"), evidence: `${rules.length} rule${rules.length === 1 ? "": "s"} · ${verbsGranted.has("APPROVE") ? "approval granted": "nobody may approve"}` , todo: "Give at least one function Review and one function Approve, so documents can be routed." },
@@ -140,6 +146,7 @@ export default async function DmpReadinessPage() {
           </p>
         ) : null}
       </Card>
+
 
       <Card id="exceptions" title={`Exceptions register (${exceptions.length})`} description="Agreed departures from the rules, with who allowed them and until when.">
         {exceptions.length ? (

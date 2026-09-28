@@ -47,6 +47,7 @@ type Search = {
   to?: string;
   criticality?: string;
   confidentiality?: string;
+  deliverable?: string;
   sort?: string;
   dir?: string;
   page?: string;
@@ -80,6 +81,10 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
   // on the review.
   const criticality = sp.criticality ?? "";
   const confidentiality = sp.confidentiality ?? "";
+  // Who produced it — internal engineering, a contractor, a vendor, the client.
+  // It decides the numbering scheme, so the register both shows it and narrows
+  // by it.
+  const deliverable = sp.deliverable ?? "";
   // Which date, and between which two days. Every date the register already
   // knows — nothing new is stored to make this work. Either end may be left
   // open: "released, from 1 March" is a question people actually ask.
@@ -121,6 +126,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
       state ? { state } : {}, discipline ? { discipline } : {}, docType ? { docType } : {},
       supplier ? { originator: supplier } : {}, po ? { contractRef: po } : {},
       criticality ? { criticality } : {}, confidentiality ? { confidentiality } : {},
+      deliverable ? { deliverableType: deliverable } : {},
     ],
   };
 
@@ -129,7 +135,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
   // holds. So the register is read twice: once thinly, to find out which
   // documents match and in what order, and once in full for the page on screen.
   // The expensive joins then touch 50 rows rather than every document.
-  const [sieve, disciplines, types, statuses, verdictSet, supplierCodes, poCodes, criticalities, confidentialities, retentions, templates] = await Promise.all([
+  const [sieve, disciplines, types, statuses, verdictSet, supplierCodes, poCodes, criticalities, confidentialities, retentions, deliverableTypes, templates] = await Promise.all([
     db.document.findMany({
       where,
       orderBy: { updatedAt: "desc" },
@@ -137,12 +143,13 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
         id: true,
         docNumber: true, title: true, discipline: true, docType: true, originator: true,
         subProject: true, contractRef: true, criticality: true, confidentiality: true,
-        state: true, updatedAt: true, createdDate: true, retentionClass: true,
+        state: true, updatedAt: true, createdDate: true, retentionClass: true, deliverableType: true,
         revisions: {
           orderBy: { createdAt: "desc" },
           take: 1,
           select: {
-            value: true, state: true, statusCode: true, proposedStatus: true, releasedAt: true, issueDate: true, plannedSubmissionDate: true,
+            value: true, state: true, statusCode: true, releasedAt: true,
+            issueDate: true, plannedSubmissionDate: true,
             createdAt: true,
             files: { orderBy: { createdAt: "desc" }, take: 1, select: { createdAt: true } },
             cycles: { orderBy: { sequence: "desc" }, select: { binding: true, outcome: true } },
@@ -151,7 +158,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
       },
     }),
     getSet("DISCIPLINES"), getSet("DOCUMENT_TYPES"), getSet("STATUSES"), getSet("REVIEW_OUTCOMES"), getSet("SUPPLIER_CODES"), getSet("PURCHASE_ORDERS"),
-    getSet("CRITICALITY"), getSet("CONFIDENTIALITY"), getSet("RETENTION_CLASSES"),
+    getSet("CRITICALITY"), getSet("CONFIDENTIALITY"), getSet("RETENTION_CLASSES"), getSet("DELIVERABLE_TYPES"),
     db.workflowTemplate.findMany({ where: { active: true }, orderBy: [{ isDefault: "desc" }, { name: "asc" }] }),
   ]);
   // Which date each choice reads. The sieve already carries all of them.
@@ -171,7 +178,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
     const latest = doc.revisions[0] ?? null;
     const binding = latest?.cycles.filter((c) => c.binding) ?? [];
     const decided = binding.find((c) => c.outcome) ?? null;
-    const forRelease = latest?.state === "IN_REVIEW" && !!latest.proposedStatus;
+    const forRelease = latest?.state === "NOT_RELEASED";
     if (revState === "NONE" && latest) return false;
     if (revState === "FOR_RELEASE" && !forRelease) return false;
     if (revState === "IN_REVIEW" && (latest?.state !== "IN_REVIEW" || forRelease)) return false;
@@ -197,7 +204,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
     rev: (doc) => doc.revisions[0]?.value ?? "",
     revState: (doc) => REV_STATES.indexOf((doc.revisions[0]?.state ?? "") as RevState),
     docState: (doc) => DOC_STATES.indexOf(doc.state as DocState),
-    releasedFor: (doc) => doc.revisions[0]?.statusCode ?? doc.revisions[0]?.proposedStatus ?? "",
+    releasedFor: (doc) => doc.revisions[0]?.statusCode ?? "",
     verdict: (doc) => doc.revisions[0]?.cycles.find((cycle) => cycle.binding && cycle.outcome)?.outcome ?? "",
     discipline: (doc) => doc.discipline,
     docType: (doc) => doc.docType,
@@ -207,6 +214,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
     criticality: (doc) => doc.criticality ?? "",
     confidentiality: (doc) => doc.confidentiality ?? "",
     retention: (doc) => doc.retentionClass ?? "",
+    deliverable: (doc) => doc.deliverableType,
     planned: (doc) => doc.revisions[0]?.plannedSubmissionDate?.getTime() ?? 0,
     issued: (doc) => doc.revisions[0]?.issueDate?.getTime() ?? 0,
     released: (doc) => doc.revisions[0]?.releasedAt?.getTime() ?? 0,
@@ -240,6 +248,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
         files: { select: { createdAt: true } },
         cycles: { orderBy: { sequence: "desc" } },
         approvals: { where: { withdrawnAt: null }, orderBy: { decidedAt: "desc" }, take: 1 },
+        transmittalItems: { where: { transmittal: { direction: "OUTGOING" } }, select: { id: true }, take: 1 },
       } },
       _count: { select: { baselineEntries: true, packageMembers: true } },
     },
@@ -253,6 +262,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
   const disciplineLabel = new Map(disciplines.map((d) => [d.code, d.label]));
   const typeLabel = new Map(types.map((t) => [t.code, t.label]));
   const retentionLabel = new Map(retentions.map((item) => [item.code, item.label]));
+  const deliverableLabel = new Map(deliverableTypes.map((item) => [item.code, item.label]));
   const statusLabel = new Map(statuses.map((item) => [item.code, item.label]));
   const publishedVerdicts = new Set(verdictSet.map((item) => item.code));
   const verdictLabel = new Map<string, string>([...Object.entries(OUTCOME_CONSEQUENCES).map(([k, v]) => [k, v.label] as [string, string]), ...verdictSet.map((item) => [item.code, item.label] as [string, string])]);
@@ -271,7 +281,8 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
     const released = latest?.state === "RELEASED" ? latest : null;
     return {
       id: doc.id, docNumber: doc.docNumber, title: doc.title, deliverableType: doc.deliverableType,
-      docType: doc.docType, discipline: doc.discipline, docTypeLabel: typeLabel.get(doc.docType) ?? doc.docType, disciplineLabel: disciplineLabel.get(doc.discipline) ?? doc.discipline, originator: doc.originator, subProject: doc.subProject,
+      docType: doc.docType, discipline: doc.discipline,
+      deliverableLabel: deliverableLabel.get(doc.deliverableType) ?? pretty(doc.deliverableType), docTypeLabel: typeLabel.get(doc.docType) ?? doc.docType, disciplineLabel: disciplineLabel.get(doc.discipline) ?? doc.discipline, originator: doc.originator, subProject: doc.subProject,
       contractRef: doc.contractRef, criticality: doc.criticality, confidentiality: doc.confidentiality,
       retentionClass: doc.retentionClass,
       retentionLabel: doc.retentionClass ? retentionLabel.get(doc.retentionClass) ?? pretty(doc.retentionClass) : null,
@@ -279,15 +290,18 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
       docState: doc.state, docStateLabel: DOC_STATE_LABEL[doc.state as DocState] ?? doc.state,
       revision: latest?.value ?? null,
       revState: latest?.state ?? null,
-      revStateLabel: latest ? revStateLabel(latest.state, !!latest.proposedStatus) : "No revision yet",
+      revStateLabel: latest ? revStateLabel(latest.state) : "No revision yet",
+      // Released and nobody asked for it to be sent: in use, and nobody told.
+      notIssued: !!released && !released.transmittalItems.length,
       // A code is printed only when the organization publishes it. Records made
       // before the list existed carry the Standard's own consequence names,
       // which are sentences, not codes: those show their meaning alone.
       verdict: decided?.outcome && publishedVerdicts.has(decided.outcome) ? decided.outcome : null,
       verdictLabel: decided?.outcome ? verdictLabel.get(decided.outcome) ?? decided.outcome : null,
       releasedFor: released?.statusCode ?? null,
-      // Decided by the reviewers, not yet released: shown as "to be IFC".
-      proposedFor: !released && latest?.proposedStatus ? latest.proposedStatus : null, releasedForLabel: released?.statusCode ? statusLabel.get(released.statusCode) ?? released.statusCode : null,
+      // The status an unreleased revision carries. It is real, and it is not in
+      // force: the state column says so.
+      proposedFor: !released ? latest?.statusCode ?? null : null, releasedForLabel: released?.statusCode ? statusLabel.get(released.statusCode) ?? released.statusCode : null,
       releasedForUse: released?.statusCode ? statusUse.get(released.statusCode) ?? null : null,
       createdDate: doc.createdDate.toISOString(), updatedAt: doc.updatedAt.toISOString(),
       plannedSubmissionDate: working?.plannedSubmissionDate?.toISOString() ?? latest?.plannedSubmissionDate?.toISOString() ?? null,
@@ -327,7 +341,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
   for (const code of REV_STATES) codes[`REV_STATE|${code}`] = `${REV_STATE_LABEL[code]} — ${REV_MEANING[code].means}`;
 
   const query = new URLSearchParams();
-  if (q) query.set("q", q); if (state) query.set("state", state); if (discipline) query.set("discipline", discipline); if (docType) query.set("docType", docType); if (revState) query.set("rev", revState); if (statusCode) query.set("status", statusCode); if (verdictCode) query.set("verdict", verdictCode); if (supplier) query.set("supplier", supplier); if (po) query.set("po", po); if (view === "all") query.set("view", "all"); if (criticality) query.set("criticality", criticality); if (confidentiality) query.set("confidentiality", confidentiality);
+  if (q) query.set("q", q); if (state) query.set("state", state); if (discipline) query.set("discipline", discipline); if (docType) query.set("docType", docType); if (revState) query.set("rev", revState); if (statusCode) query.set("status", statusCode); if (verdictCode) query.set("verdict", verdictCode); if (supplier) query.set("supplier", supplier); if (po) query.set("po", po); if (view === "all") query.set("view", "all"); if (criticality) query.set("criticality", criticality); if (confidentiality) query.set("confidentiality", confidentiality); if (deliverable) query.set("deliverable", deliverable);
   if (dateOn) query.set("on", dateOn); if (sp.from) query.set("from", sp.from); if (sp.to) query.set("to", sp.to);
   if (sort) { query.set("sort", sort); query.set("dir", dir); }
 
@@ -340,15 +354,16 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
       paging={{ page: current, pages, perPage, sizes: PAGE_SIZES, from: matchCount ? (current - 1) * perPage + 1 : 0, to: Math.min(current * perPage, matchCount), query: query.toString() }}
       codes={codes}
       sort={{ key: sort, dir }}
-      userCanAct={!isReadOnly(user)} filters={{ q, terms, state, rev: revState, status: statusCode, verdict: verdictCode, supplier, po, discipline, docType, view, criticality, confidentiality, on: dateOn, from: sp.from ?? "", to: sp.to ?? "" }} filterOptions={{ states: DOC_STATES.map((code) => ({ code, label: DOC_STATE_LABEL[code] ?? code })), revStates: [
+      userCanAct={!isReadOnly(user)} filters={{ q, terms, state, rev: revState, status: statusCode, verdict: verdictCode, supplier, po, discipline, docType, view, criticality, confidentiality, deliverable, on: dateOn, from: sp.from ?? "", to: sp.to ?? "" }} filterOptions={{ states: DOC_STATES.map((code) => ({ code, label: DOC_STATE_LABEL[code] ?? code })), revStates: [
       { code: "NONE", label: "No revision yet" },
       { code: "IN_PREPARATION", label: REV_STATE_LABEL.IN_PREPARATION },
       { code: "IN_REVIEW", label: REV_STATE_LABEL.IN_REVIEW },
+      { code: "NOT_RELEASED", label: REV_STATE_LABEL.NOT_RELEASED },
       { code: "FOR_RELEASE", label: "For release — decided, not released" },
       { code: "RELEASED", label: REV_STATE_LABEL.RELEASED },
       { code: "SUPERSEDED", label: REV_STATE_LABEL.SUPERSEDED },
       { code: "VOID", label: REV_STATE_LABEL.VOID },
-    ], statuses: statuses.map((item) => ({ code: item.code, label: `${item.code} — ${item.label}` })), verdicts: verdictSet.map((item) => ({ code: item.code, label: `${item.code} — ${item.label}` })), suppliers: supplierCodes.map((item) => ({ code: item.code, label: item.label })), pos: poCodes.map((item) => ({ code: item.code, label: item.label })), disciplines: disciplines.filter((item) => usedDisciplines.has(item.code)).map((item) => ({ code: item.code, label: item.status === "RETIRED" ? `${item.label} (retired)` : item.label })), types: types.filter((item) => usedTypes.has(item.code)).map((item) => ({ code: item.code, label: item.status === "RETIRED" ? `${item.label} (retired)` : item.label })), criticalities: criticalities.map((item) => ({ code: item.code, label: item.label })), confidentialities: confidentialities.map((item) => ({ code: item.code, label: item.label.split(" — ")[0] })), dateFields: DATE_FIELDS.map((field) => ({ code: field.key, label: field.label })) }} exportHref={`/api/register/export${query.size ? `?${query.toString()}` : ""}`} />
+    ], statuses: statuses.map((item) => ({ code: item.code, label: `${item.code} — ${item.label}` })), verdicts: verdictSet.map((item) => ({ code: item.code, label: `${item.code} — ${item.label}` })), suppliers: supplierCodes.map((item) => ({ code: item.code, label: item.label })), pos: poCodes.map((item) => ({ code: item.code, label: item.label })), disciplines: disciplines.filter((item) => usedDisciplines.has(item.code)).map((item) => ({ code: item.code, label: item.status === "RETIRED" ? `${item.label} (retired)` : item.label })), types: types.filter((item) => usedTypes.has(item.code)).map((item) => ({ code: item.code, label: item.status === "RETIRED" ? `${item.label} (retired)` : item.label })), criticalities: criticalities.map((item) => ({ code: item.code, label: item.label })), deliverables: deliverableTypes.map((item) => ({ code: item.code, label: item.label })), confidentialities: confidentialities.map((item) => ({ code: item.code, label: item.label.split(" — ")[0] })), dateFields: DATE_FIELDS.map((field) => ({ code: field.key, label: field.label })) }} exportHref={`/api/register/export${query.size ? `?${query.toString()}` : ""}`} />
   </div>;
 }
 

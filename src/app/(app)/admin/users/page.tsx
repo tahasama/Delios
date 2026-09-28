@@ -10,8 +10,9 @@ import { inviteGuestAction, createVisitorAction } from "@/lib/actions/guests";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "People & access" };
 
-export default async function AdminUsersPage() {
+export default async function AdminUsersPage({ searchParams }: { searchParams: Promise<{ org?: string; project?: string }> }) {
   const { user: me, db, projectId, project } = await requireScope();
+  const sp = await searchParams;
   if (!maySetup(me, SETUP_PAGES.find((p) => p.href === "/admin/users")!)) {
     return <PageHeader title="People & access" subtitle="Administrators and the control function." />;
   }
@@ -45,6 +46,14 @@ export default async function AdminUsersPage() {
   ]);
   const externalParties = parties.filter((p) => !p.isInternal);
   const deptLabel = (code: string) => disciplines.find((d) => d.code === code)?.label ?? code;
+
+  // Which people the list shows: everyone, or one organization's, and only
+  // those on a chosen project.
+  const shownOrg = sp.org ? parties.find((party) => party.id === sp.org) ?? null : null;
+  const projectFilter = sp.project && projects.some((item) => item.id === sp.project) ? sp.project : "";
+  const shown = users.filter((person) =>
+    (!shownOrg || person.partyId === shownOrg.id)
+    && (!projectFilter || person.memberships.some((seat) => seat.projectId === projectFilter)));
 
   const functionOptions = functions.map((f) => <option key={f.id} value={f.id}>{f.name}</option>);
   const projectPicker = (
@@ -117,9 +126,42 @@ export default async function AdminUsersPage() {
         </div>
       </Card>
 
-      <Card title={`Our people · ${users.length}`} description={`Job and department shown for ${project.code}. What a job may do is set in Functions and the distribution matrix.`}>
+      <Card
+        title={shownOrg ? `${shownOrg.name} · ${shown.length}` : `Our people · ${shown.length}`}
+        description={shownOrg ? "Everyone recorded at this organization. Someone with no job on a project is here by name only — we fill in for them." : `Job and department shown for ${project.code}. What a job may do is set in Functions and the distribution matrix.`}
+      >
+        {/* Narrowing this list is two questions: whose people, and on which
+            project. Both are links, so the answer can be shared. */}
+        <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
+          <span className="text-slate-400">Organization</span>
+          <a href="/admin/users" className={`rounded-lg px-2 py-1 font-semibold ${shownOrg ? "text-link hover:bg-slate-50" : "bg-slate-100 text-slate-800"}`}>All</a>
+          {parties.map((party) => (
+            <a
+              key={party.id}
+              href={`/admin/users?org=${party.id}${projectFilter ? `&project=${projectFilter}` : ""}`}
+              className={`rounded-lg px-2 py-1 font-semibold ${shownOrg?.id === party.id ? "bg-slate-100 text-slate-800" : "text-link hover:bg-slate-50"}`}
+            >
+              {party.name}
+            </a>
+          ))}
+          {projects.length > 1 ? (
+            <>
+              <span className="ml-3 text-slate-400">Project</span>
+              <a href={shownOrg ? `/admin/users?org=${shownOrg.id}` : "/admin/users"} className={`rounded-lg px-2 py-1 font-semibold ${projectFilter ? "text-link hover:bg-slate-50" : "bg-slate-100 text-slate-800"}`}>Any</a>
+              {projects.map((item) => (
+                <a
+                  key={item.id}
+                  href={`/admin/users?project=${item.id}${shownOrg ? `&org=${shownOrg.id}` : ""}`}
+                  className={`rounded-lg px-2 py-1 font-semibold ${projectFilter === item.id ? "bg-slate-100 text-slate-800" : "text-link hover:bg-slate-50"}`}
+                >
+                  {item.code}
+                </a>
+              ))}
+            </>
+          ) : null}
+        </div>
         <DataTable head={<tr><Th>Person</Th><Th>Company</Th><Th>Job on {project.code}</Th><Th>Department</Th><Th>Other projects</Th><Th></Th></tr>}>
-          {users.map((u) => {
+          {shown.map((u) => {
             const here = u.memberships.find((m) => m.projectId === projectId);
             const elsewhere = u.memberships.filter((m) => m.projectId !== projectId);
             return (

@@ -1,32 +1,44 @@
 import { PageHeader, Card, Chip, EmptyState } from "@/components/ui";
 import { requireScope } from "@/lib/scope";
 import { deleteTemplateAction } from "@/lib/actions/workflow";
-import { getSets } from "@/lib/config";
+import { getSets, getActiveSet } from "@/lib/config";
 import { WorkflowTemplateBuilder, type WorkflowBuilderStep } from "./workflow-template-builder";
 import { hasVerb } from "@/lib/auth";
 import { ArrowRight } from "lucide-react";
 import { verdictSets } from "@/lib/verdict-sets";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Workflow templates" };
+export const metadata = { title: "Review routes" };
 
 type Step = WorkflowBuilderStep;
 
 export default async function WorkflowTemplatesPage() {
   const { user: me, db } = await requireScope();
   const admin = hasVerb(me, "ROUTES");
-  const [templates, sets, users, classValues, functions] = await Promise.all([
+  const [templates, sets, users, classValues, functions, outsideParties] = await Promise.all([
     db.workflowTemplate.findMany({ where: { active: true }, orderBy: { createdAt: "asc" } }),
     getSets(),
     db.user.findMany({ where: { active: true }, orderBy: { name: "asc" }, include: { party: true } }),
-    db.configValue.findMany({ where: { setKey: { in: ["DOCUMENT_TYPES", "DISCIPLINES", "CRITICALITY"] }, status: "ACTIVE" }, orderBy: [{ sort: "asc" }, { label: "asc" }] }),
+    db.configValue.findMany({ where: { setKey: { in: ["DOCUMENT_TYPES", "DISCIPLINES", "CRITICALITY", "DELIVERABLE_TYPES", "SUPPLIER_CODES"] }, status: "ACTIVE" }, orderBy: [{ sort: "asc" }, { label: "asc" }] }),
     db.function.findMany({ where: { active: true }, orderBy: { sort: "asc" }, select: { id: true, name: true } }),
+    // Parties that can hold a step of a route: a client, a control office, a
+    // supplier. How each of them answers is set in Parties & people.
+    db.party.findMany({ where: { isInternal: false, active: true }, orderBy: { name: "asc" }, select: { id: true, name: true, participation: true } }),
   ]);
   const outcomeSets = sets.filter((s) => s.key.includes("OUTCOME") || s.key.includes("REVIEW"));
+  // What each status lets a step do. The rules live in the status list, so a
+  // route can only offer what the organization published.
+  const statusChoices = (await getActiveSet("STATUSES")).map((value) => {
+    return { code: value.code, label: value.label };
+  });
   const classOptions = {
     documentTypes: classValues.filter((value) => value.setKey === "DOCUMENT_TYPES").map(({ code, label }) => ({ code, label })),
     disciplines: classValues.filter((value) => value.setKey === "DISCIPLINES").map(({ code, label }) => ({ code, label })),
     criticalities: classValues.filter((value) => value.setKey === "CRITICALITY").map(({ code, label }) => ({ code, label })),
+    // Who produces it, and which outside organization it came from: a supplier
+    // drawing and one of ours are the same type and take different routes.
+    deliverableTypes: classValues.filter((value) => value.setKey === "DELIVERABLE_TYPES").map(({ code, label }) => ({ code, label })),
+    originators: classValues.filter((value) => value.setKey === "SUPPLIER_CODES").map(({ code, label }) => ({ code, label })),
   };
   const nameOf = (id: string) => users.find((u) => u.id === id)?.name ?? id;
   const setViews = await verdictSets({ db }, templates.map((t) => t.outcomeSetKey ?? "REVIEW_OUTCOMES"));
@@ -88,12 +100,12 @@ export default async function WorkflowTemplatesPage() {
                     );
                   })}
                 </div>
-                <p className="mt-2 text-[11px] text-slate-400">Used for: {t.classes === "*" ? "all documents" : "selected document classes"}</p>
+                <p className="mt-2 text-[11px] text-slate-400">Used for: {scopeWords(t.classes)}</p>
                 {admin ? (
                   <details className="mt-3 rounded-lg border border-slate-200">
                     <summary className="cursor-pointer px-3 py-2 text-xs font-medium text-slate-600">Edit</summary>
                     <div className="border-t border-slate-100 p-3">
-                      <WorkflowTemplateBuilder functions={functions} id={t.id} name={t.name} description={t.description ?? ""} classes={t.classes} outcomeSetKey={t.outcomeSetKey ?? "REVIEW_OUTCOMES"} isDefault={t.isDefault} initialSteps={steps} users={users} outcomeSets={outcomeSets.map((s) => s.key)} classOptions={classOptions} />
+                      <WorkflowTemplateBuilder outsideParties={outsideParties} functions={functions} id={t.id} name={t.name} description={t.description ?? ""} classes={t.classes} outcomeSetKey={t.outcomeSetKey ?? "REVIEW_OUTCOMES"} isDefault={t.isDefault} initialSteps={steps} users={users} outcomeSets={outcomeSets.map((s) => s.key)} classOptions={classOptions} statuses={statusChoices} />
                     </div>
                   </details>
                 ) : null}
@@ -106,9 +118,26 @@ export default async function WorkflowTemplatesPage() {
       {admin ? (
         <details className="rounded-2xl border border-slate-200 bg-surface px-5 py-3 shadow-sm">
           <summary className="cursor-pointer text-sm font-semibold text-brand-ink">+ New review route</summary>
-          <div className="mt-3"><WorkflowTemplateBuilder functions={functions} users={users} outcomeSets={outcomeSets.map((s) => s.key)} classOptions={classOptions} /></div>
+          <div className="mt-3"><WorkflowTemplateBuilder outsideParties={outsideParties} functions={functions} users={users} outcomeSets={outcomeSets.map((s) => s.key)} classOptions={classOptions} statuses={statusChoices} /></div>
         </details>
       ) : null}
     </div>
   );
+}
+
+/**
+ * What a route is chosen by, said in words. An empty answer on any one of the
+ * five means it does not narrow by that, so it is left out.
+ */
+function scopeWords(classes: string): string {
+  if (!classes || classes === "*") return "all documents";
+  try {
+    const parsed = JSON.parse(classes) as { docType?: string; discipline?: string; criticality?: string; deliverableType?: string; originator?: string }[];
+    const said = parsed
+      .map((p) => [p.deliverableType, p.docType, p.discipline, p.criticality, p.originator ? `from ${p.originator}` : null].filter(Boolean).join(" · "))
+      .filter(Boolean);
+    return said.length ? said.join("  or  ") : "all documents";
+  } catch {
+    return "selected document classes";
+  }
 }

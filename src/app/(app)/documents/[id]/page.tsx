@@ -12,8 +12,12 @@ import { fmtDate, timeAgo, plain } from "@/lib/utils";
 import { getActiveSet, getSet, getValue } from "@/lib/config";
 import { updateDocumentAction, linkAssetAction, unlinkRelationshipAction, endDocumentStateAction } from "@/lib/actions/documents";
 import {
-  prepareRevisionAction, uploadRevisionFilesAction, releaseRevisionAction, voidRevisionAction,
+  prepareRevisionAction, uploadRevisionFilesAction, releaseRevisionAction, voidRevisionAction, returnAtGateAction,
 } from "@/lib/actions/revisions";
+import { parseRecipients, mayRequestIssue, requestChoices, authorOf, issuePolicy, decisionLetsItOut } from "@/lib/issue-requests";
+import { requestIssueAction, carryOutRequestAction, cancelRequestAction } from "@/lib/actions/issue-requests";
+import { RequestIssue } from "./request-issue";
+import { ReturnTarget } from "./return-target";
 import { withdrawApprovalAction } from "@/lib/actions/governance";
 import { setLegalHoldAction, disposeDocumentAction } from "@/lib/actions/retention";
 import { getRunForRevision } from "@/lib/workflow";
@@ -90,13 +94,61 @@ export default async function DocumentDetailPage({
   const controller = isController(user) || isAdmin(user);
   const inPrep = doc.revisions.find((r) => r.state === "IN_PREPARATION");
   const inReview = doc.revisions.find((r) => r.state === "IN_REVIEW");
+  // Decided, waiting for Document Control. Still the revision in hand, and the
+  // one the release card is about.
+  const notReleased = doc.revisions.find((r) => r.state === "NOT_RELEASED");
   const current = doc.revisions.find((r) => r.state === "RELEASED");
-  const working = inPrep ?? inReview ?? null;
+  const working = inPrep ?? inReview ?? notReleased ?? null;
   const shown = current ?? working ?? doc.revisions[0] ?? null;
   const pdf = shown?.files.find((f) => f.kind === "RENDITION") ?? null;
   const native = shown?.files.find((f) => f.kind === "NATIVE") ?? null;
+  // Requests on the revision in hand: who asked for it to be sent, to whom, and
+  // whether it has gone. Releasing and issuing are two acts; this is the second.
+  const carrying = working ?? current ?? null;
+  const requests = carrying
+    ? await db.issueRequest.findMany({
+        where: { revisionId: carrying.id, status: { not: "CANCELLED" } },
+        orderBy: { raisedAt: "asc" },
+        include: { transmittal: { select: { id: true, number: true } } },
+      })
+    : [];
+  const requestNames = {
+    people: new Map(
+      (await db.user.findMany({
+        where: { id: { in: [...new Set(requests.flatMap((one) => parseRecipients(one.recipients).internalUserIds))] } },
+        select: { id: true, name: true },
+      })).map((one) => [one.id, one.name] as [string, string]),
+    ),
+    parties: new Map(
+      (await db.party.findMany({
+        where: { id: { in: [...new Set(requests.flatMap((one) => parseRecipients(one.recipients).partyIds))] } },
+        select: { id: true, name: true },
+      })).map((one) => [one.id, one.name] as [string, string]),
+    ),
+  };
+  // Released and never sent to anybody: in use, and nobody told. True whether
+  // or not this organization asks for issuing.
+  const notIssued = !!current && !transmittalItems.some((item) => item.revisionId === current.id && item.transmittal.direction === "OUTGOING");
+  const policy = await issuePolicy(ctx);
+  const mayAsk = carrying ? await mayRequestIssue(ctx, carrying.id, user.id) || controller : false;
+  const askChoices = mayAsk && carrying && policy.asked ? await requestChoices(ctx, doc) : null;
+  const issueReasons = askChoices ? await getActiveSet("REASONS_FOR_ISSUE") : [];
+  const revisionAuthor = carrying ? await authorOf(ctx, carrying.id) : null;
+
+  // What the deciding step answered, and whether that answer is final. A verdict
+  // that asks for changes does not release: releasing it would supersede the
+  // revision people are working from and replace it with the one just rejected.
+  const decidingCycle = working?.cycles.find((one) => one.binding && one.outcome) ?? null;
+  const decidedVerdict = decidingCycle?.outcome ?? null;
+  const decisionFinal = working ? await decisionLetsItOut(ctx, working.id) : true;
+  // The published reasons a route may be rewound. A document that is wrong is
+  // replaced by the next revision; only a fault in the route sends it back to a
+  // step, and the organization says what counts as one.
+  const returnReasons = await getActiveSet("RETURN_REASONS");
   const workingHasPdf = !!working?.files.some((f) => f.kind === "RENDITION");
   const run = working ? await getRunForRevision(ctx, working.id) : null;
+  // The steps of its route, for choosing where a revision goes back to.
+  const routeSteps = (run?.steps ?? []).map((step, index) => ({ number: index + 1, title: step.title ?? `Step ${index + 1}` }));
   const snapshotCount = await db.documentSnapshot.count({ where: { documentId: id } });
   const [routeRows, peopleRows] = await Promise.all([
     db.workflowTemplate.findMany({ where: { active: true }, orderBy: [{ isDefault: "desc" }, { name: "asc" }] }),
@@ -130,7 +182,10 @@ export default async function DocumentDetailPage({
   ];
 
   // What the Next step card offers besides the review route itself.
-  const lead = canEdit && working && !workingHasPdf ? (
+  // A file is attached while the revision is being prepared. Once it is with
+  // its reviewers, or decided, attaching one would change what was reviewed
+  // after the fact — the next revision carries the new file.
+  const lead = canEdit && working && !workingHasPdf && working.state === "IN_PREPARATION" ? (
     <div className="mt-1">
         <Step title={`Attach the file to rev ${working.value}`} open>
           <ActionForm action={uploadRevisionFilesAction} submitLabel="Attach" size="sm" hidden={{ revisionId: working.id }}>
@@ -157,16 +212,120 @@ export default async function DocumentDetailPage({
         </Link>
       ) : null}
 
+      {/* Releasing says the revision is the one in use; issuing says somebody
+          was told. Every ask is here with what came of it, and anybody with
+          standing on the document may add another. */}
+      {carrying && policy.asked && carrying.state !== "IN_REVIEW" && (carrying.state !== "NOT_RELEASED" || decisionFinal) ? (
+        <Step title={`Sending rev ${carrying.value} out`} open={requests.some((one) => one.status === "OPEN") || notIssued}>
+          {requests.length ? (
+            <ul className="space-y-2">
+              {requests.map((one) => {
+                const to = parseRecipients(one.recipients);
+                return (
+                  <li key={one.id} className="rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-xs">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-semibold text-slate-800">{one.reason}</span>
+                      <Chip className={one.status === "DONE" ? "bg-emerald-100 text-emerald-800 ring-emerald-300" : "bg-amber-100 text-amber-800 ring-amber-300"}>
+                        {one.status === "DONE" ? "sent" : "waiting"}
+                      </Chip>
+                      <span className="text-slate-400">asked by {one.raisedByName}, {fmtDate(one.raisedAt)}</span>
+                    </div>
+                    {one.delegated ? (
+                      <p className="mt-1.5 text-slate-600">Left to the author to say who it goes to.</p>
+                    ) : (
+                      <p className="mt-1.5 text-slate-600">
+                        {[
+                          to.internalUserIds.map((id) => requestNames.people.get(id) ?? id).join(", "),
+                          to.partyIds.map((id) => requestNames.parties.get(id) ?? id).join(", "),
+                        ].filter(Boolean).join(" · ")}
+                      </p>
+                    )}
+                    {one.note ? <p className="mt-1 text-[11px] text-slate-500">{one.note}</p> : null}
+                    {one.status === "DONE" && one.transmittal ? (
+                      <p className="mt-1.5 text-[11px] text-slate-500">
+                        Sent {fmtDate(one.carriedOutAt)} by {one.carriedOutBy} ·{" "}
+                        <Link href={`/transmittals/${one.transmittal.id}`} className="font-mono font-semibold text-link hover:underline">{one.transmittal.number}</Link>
+                      </p>
+                    ) : null}
+                    {one.status === "OPEN" && !one.delegated ? (
+                      <div className="mt-2 flex flex-wrap gap-2 border-t border-slate-200 pt-2">
+                        {controller && carrying.state === "RELEASED" ? (
+                          <ActionForm action={carryOutRequestAction} submitLabel="Send it" size="sm" hidden={{ requestId: one.id }} />
+                        ) : (
+                          <p className="text-[11px] text-slate-400">
+                            {carrying.state === "RELEASED" ? "Waiting for Document Control to send it." : "It goes out when the revision is released."}
+                          </p>
+                        )}
+                        {one.raisedById === user.id || controller ? (
+                          <ActionForm action={cancelRequestAction} submitLabel="Withdraw" variant="danger" size="sm" hidden={{ requestId: one.id }} />
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <p className="text-xs text-slate-500">
+              {notIssued
+                ? "Nobody has asked for this revision to be sent. It is released and in use; no one has been told."
+                : "No request yet."}
+            </p>
+          )}
+
+          {askChoices ? (
+            <details className="mt-3 border-t border-slate-100 pt-3">
+              <summary className="cursor-pointer text-xs font-semibold text-link">Ask for it to be sent</summary>
+              <div className="mt-2">
+                <ActionForm action={requestIssueAction} submitLabel="Ask" size="sm" hidden={{ revisionId: carrying.id }}>
+                  <RequestIssue
+                    author={revisionAuthor}
+                    reasons={issueReasons.map((one) => ({ code: one.code, label: one.label }))}
+                    proposed={askChoices.proposed}
+                    others={askChoices.others}
+                    parties={askChoices.parties}
+                  />
+                </ActionForm>
+              </div>
+            </details>
+          ) : null}
+        </Step>
+      ) : null}
+
       {controller && working ? (
-        <Step title={`Release rev ${working.value}`} open={run?.status === "DONE" || working.approvals.some((a) => !a.withdrawnAt)}>
-          <PreflightPanel result={await preflight("RELEASE", { revisionId: working.id }, ctx)} className="mb-3" />
-          {working.proposedStatus ? (
+        <Step title={decisionFinal ? `Release rev ${working.value}` : `Send rev ${working.value} back`} open={run?.status === "DONE" || working.approvals.some((a) => !a.withdrawnAt)}>
+          {decisionFinal ? <PreflightPanel result={await preflight("RELEASE", { revisionId: working.id }, ctx)} className="mb-3" /> : null}
+          {/* What was asked for is read on its own card; releasing carries out
+              every request waiting, and asks nobody's permission to publish. */}
+          {requests.some((one) => one.status === "OPEN" && !one.delegated) ? (
+            <p className="mb-3 text-xs text-slate-500">
+              Releasing also sends {requests.filter((one) => one.status === "OPEN" && !one.delegated).length} request{requests.filter((one) => one.status === "OPEN" && !one.delegated).length === 1 ? "" : "s"} that {requests.filter((one) => one.status === "OPEN" && !one.delegated).length === 1 ? "is" : "are"} waiting.
+            </p>
+          ) : null}
+          {working.statusCode || !decisionFinal ? (
             <>
-              <p className="mb-3 rounded-xl bg-tint px-3.5 py-2.5 text-xs text-brand-ink">
-                The reviewers decided it may be used for <strong>{working.proposedStatus} — {label(statuses, working.proposedStatus)}</strong>.
-                Releasing makes that the current revision at that status. You do not choose it.
+              {/* A final verdict releases. One that asks for changes does not:
+                  releasing it would supersede the revision people are working
+                  from, and replace it with the one just rejected. It goes back
+                  to a step of its route, or to its author. */}
+              <p className={`mb-3 rounded-xl px-3.5 py-2.5 text-xs ${decisionFinal ? "bg-tint text-brand-ink" : "bg-orange-50 text-orange-900 ring-1 ring-orange-200"}`}>
+                The route settled on <strong>{working.statusCode} — {label(statuses, working.statusCode)}</strong>
+                {decidedVerdict ? <> with <strong>{decidedVerdict}</strong></> : null}.
+                {decisionFinal
+                  ? " Releasing puts that status in force. You do not choose it."
+                  : " That verdict asks for changes, so this revision is not released: releasing it would replace the revision people are working from. Send it back."}
               </p>
-              <ActionForm action={releaseRevisionAction} submitLabel={`Release as ${working.proposedStatus}`} size="sm" hidden={{ revisionId: working.id, statusCode: working.proposedStatus }} />
+              {decisionFinal ? (
+                <ActionForm action={releaseRevisionAction} submitLabel={`Release as ${working.statusCode}`} size="sm" hidden={{ revisionId: working.id, statusCode: working.statusCode ?? "" }} />
+              ) : null}
+              <details className="mt-3 border-t border-slate-100 pt-3" open={!decisionFinal}>
+                <summary className="cursor-pointer text-xs font-semibold text-slate-600">{decisionFinal ? "Send it back instead" : "Send it back"}</summary>
+                <div className="mt-2">
+                  <ActionForm action={returnAtGateAction} submitLabel="Send it back" size="sm" hidden={{ revisionId: working.id }}>
+                    <ReturnTarget steps={routeSteps} reasons={returnReasons.map((one) => ({ code: one.code, label: one.label, meaning: typeof one.props.meaning === "string" ? one.props.meaning : null }))} />
+                  </ActionForm>
+                </div>
+              </details>
             </>
           ) : (
             <ActionForm action={releaseRevisionAction} submitLabel="Release" size="sm" hidden={{ revisionId: working.id }}>
@@ -212,8 +371,8 @@ export default async function DocumentDetailPage({
     </div>
   );
 
-  const stateLabel = shown ? revStateLabel(shown.state, !!shown.proposedStatus) : DOC_STATE_LABEL[doc.state as DocState] ?? doc.state;
-  const stateColor = shown ? revStateColor(shown.state, !!shown.proposedStatus) : DOC_STATE_COLOR[doc.state as DocState] ?? "";
+  const stateLabel = shown ? revStateLabel(shown.state) : DOC_STATE_LABEL[doc.state as DocState] ?? doc.state;
+  const stateColor = shown ? revStateColor(shown.state) : DOC_STATE_COLOR[doc.state as DocState] ?? "";
 
   return (
     <div className="space-y-4">
@@ -221,8 +380,7 @@ export default async function DocumentDetailPage({
       {sp.sendError ? <Banner tone="warn" title="Registered, but not sent">{sp.sendError} Send it from the step below.</Banner> : null}
       {sp.released ? (
         <Banner tone="good" title={`Released${sp.superseded ? ` · rev ${sp.superseded} superseded` : ""}`}>
-          This revision is now the one in use. Releasing does not tell anyone: send it on a transmittal, where you choose who receives it and why.
-          {current ? <Link href={`/transmittals/new?revisions=${current.id}`} className="ml-1 font-semibold text-emerald-900 underline">Issue it now →</Link> : null}
+          This revision is now the one in use.{sp.issued && sp.issued !== "0" ? ` It was issued as the decision asked: ${sp.issued} transmittal${sp.issued === "1" ? "" : "s"} raised.` : " Nobody has been told yet."}
         </Banner>
       ) : null}
 
@@ -231,19 +389,32 @@ export default async function DocumentDetailPage({
         <Link href="/documents" className="inline-flex items-center gap-1 text-xs font-semibold text-link hover:underline"><ArrowLeft className="h-3.5 w-3.5" /> Documents</Link>
         <div className="mt-2 flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
-            <p className="font-mono text-sm font-bold text-slate-500">{doc.docNumber}</p>
+            <p className="flex flex-wrap items-center gap-2 font-mono text-sm font-bold text-slate-500">
+              {doc.docNumber}
+              {notIssued ? (
+                <span
+                  title="Released and in use. Nobody has asked for it to be sent, so nobody has been told — including anyone whose approval it may still need."
+                  className="rounded-md border border-amber-400 px-1.5 py-0.5 font-sans text-[10px] font-bold uppercase tracking-wide text-amber-700"
+                >
+                  Not issued
+                </span>
+              ) : null}
+            </p>
             <h1 className="mt-0.5 text-xl font-semibold text-slate-950">{doc.title}</h1>
             <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-500">
               {shown ? <span className="rounded-md bg-slate-100 px-2 py-0.5 font-mono font-bold text-slate-700">Rev {shown.value}</span> : null}
               <StateChip label={stateLabel} color={stateColor} />
-              {shown?.statusCode ? <span>{shown.statusCode} · {label(statuses, shown.statusCode)}</span> : shown?.proposedStatus ? <span className="text-slate-500">to be {shown.proposedStatus} once released</span> : null}
-              {current && working ? <span className="text-amber-700">· rev {working.value} in progress</span> : null}
+              {shown?.statusCode ? <span>{shown.statusCode} · {label(statuses, shown.statusCode)}</span> : null}
+              {/* The masthead is about the released revision; this says what
+                  the one after it is actually doing, in the same words the
+                  register uses — "in progress" is not a state. */}
+              {current && working ? <span className="text-amber-700">· rev {working.value} {revStateLabel(working.state).toLowerCase()}</span> : null}
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
             {pdf ? <a href={`/api/files/${pdf.id}`} target="_blank" className={btn("primary", "sm")}><ExternalLink className="h-4 w-4" /> Open PDF</a> : null}
             {native ? <a href={`/api/files/${native.id}?dl=1`} className={btn("secondary", "sm")}><Download className="h-4 w-4" /> Source file</a> : null}
-            {current ? <Link href={`/transmittals/new?doc=${doc.id}`} className={btn("secondary", "sm")}><Send className="h-4 w-4" /> Send out</Link> : null}
+            {current ? <Link href={`/transmittals/new?doc=${doc.id}`} className={btn("secondary", "sm")}><Send className="h-4 w-4" /> Issue</Link> : null}
           </div>
         </div>
       </header>
@@ -344,13 +515,23 @@ export default async function DocumentDetailPage({
               <div className="px-5 py-4">
                 <Timeline
                   points={[
-                    { label: `Rev ${shown.value} established`, at: shown.createdAt, holder: shown.authorizedByName ?? doc.createdByName, detail: shown.reasonForRevision ?? null },
+                    {
+                      label: `Rev ${shown.value} established`,
+                      at: shown.createdAt,
+                      // Who answers for the content, and who placed the file: two
+                      // different people in most organizations.
+                      holder: shown.authoredByName ?? shown.authorizedByName ?? doc.createdByName,
+                      detail: [
+                        shown.reasonForRevision,
+                        shown.uploadedByName && shown.uploadedByName !== (shown.authoredByName ?? "") ? `Filed by ${shown.uploadedByName}` : null,
+                      ].filter(Boolean).join(" · ") || null,
+                    },
                     { label: "Sent for review", at: mine.map((x) => x.c.submittedAt).sort((a, b) => a.getTime() - b.getTime())[0] ?? null, holder: mine.length ? `${mine.length} step${mine.length === 1 ? "" : "s"}` : null },
                     {
                       label: "Decided",
                       at: mine.filter((x) => x.c.binding).map((x) => x.c.outcomeAt).filter(Boolean).sort((a, b) => b!.getTime() - a!.getTime())[0] ?? null,
                       holder: mine.find((x) => x.c.binding && x.c.outcome)?.c.outcomeByName ?? null,
-                      detail: shown.proposedStatus && !shown.releasedAt ? `to be ${shown.proposedStatus} once released` : null,
+                      detail: shown.statusCode && !shown.releasedAt ? `${shown.statusCode}, not released` : null,
                     },
                     { label: shown.statusCode ? `Released at ${shown.statusCode}` : "Released", at: shown.releasedAt, holder: shown.releasedByName ?? null },
                     { label: "Issued to somebody", at: transmittalItems.filter((i) => i.revisionId === shown.id).map((i) => i.transmittal.dateOfIssue).sort((a, b) => a.getTime() - b.getTime())[0] ?? null, holder: transmittalItems.filter((i) => i.revisionId === shown.id).length ? `${transmittalItems.filter((i) => i.revisionId === shown.id).length} transmittal(s)` : null },
@@ -366,8 +547,10 @@ export default async function DocumentDetailPage({
             count: doc.revisions.length,
             content: doc.revisions.length ? (
               <ul className="divide-y divide-slate-100">
-                {doc.revisions.map((rev) => (
-                  <RevisionRow key={rev.id} rev={rev} statusLabel={label(statuses, rev.statusCode)} controller={controller} userId={user.id} userRole={user.role} />
+                {doc.revisions.map((rev, index) => (
+                  /* Only the newest revision can still be acted on. Everything
+                     before it is frozen as it was issued. */
+                  <RevisionRow key={rev.id} rev={rev} latest={index === 0} statusLabel={label(statuses, rev.statusCode)} controller={controller} userId={user.id} userRole={user.role} />
                 ))}
               </ul>
             ) : <Empty>No revision yet.</Empty>,
@@ -530,7 +713,7 @@ type RevData = Prisma.RevisionGetPayload<{
 }>;
 
 /** One line per revision; its record and its per-revision controls open in place. */
-function RevisionRow({ rev, statusLabel, controller, userId, userRole }: { rev: RevData; statusLabel: string | null; controller: boolean; userId: string; userRole: string }) {
+function RevisionRow({ rev, latest, statusLabel, controller, userId, userRole }: { rev: RevData; latest: boolean; statusLabel: string | null; controller: boolean; userId: string; userRole: string }) {
   const state = rev.state as RevState;
   const pdf = rev.files.find((f) => f.kind === "RENDITION");
   const native = rev.files.find((f) => f.kind === "NATIVE");
@@ -576,20 +759,28 @@ function RevisionRow({ rev, statusLabel, controller, userId, userRole }: { rev: 
             </p>
           ) : null}
 
-          {approval && !approval.withdrawnAt && (userId === approval.approverId || userRole === "ADMIN") ? (
+          {approval && !approval.withdrawnAt && latest && controller ? (
             <details>
               <summary className="cursor-pointer text-xs font-semibold text-red-700">Withdraw this approval…</summary>
               <div className="mt-2 max-w-md">
                 <ActionForm action={withdrawApprovalAction} submitLabel="Withdraw approval" variant="danger" size="sm" hidden={{ revisionId: rev.id }}>
-                  <input name="reason" className={inputCls} placeholder="Reason" />
+                  <input name="reason" required className={inputCls} placeholder="Why, and who asked for it" />
                 </ActionForm>
               </div>
             </details>
           ) : null}
 
-          {controller && state === "RELEASED" ? (
+          {/* Voiding is for the newest revision only: a revision already
+              replaced is frozen as it was issued, and voiding it would change
+              nothing anybody works from.
+
+              Two occasions. One that was released in error, which somebody may
+              already have worked from. And one that was never reviewed at all —
+              opened, left, and now in the way of the next one: voiding it says
+              it never counted, which is the truth, and clears the document. */}
+          {controller && latest && (state === "RELEASED" || (state === "IN_PREPARATION" && !rev.cycles.length)) ? (
             <details>
-              <summary className="cursor-pointer text-xs font-semibold text-red-700">Void — issued in error…</summary>
+              <summary className="cursor-pointer text-xs font-semibold text-red-700">{state === "RELEASED" ? "Void — issued in error…" : "Void — it was never reviewed…"}</summary>
               <div className="mt-2 max-w-md">
                 <ActionForm action={voidRevisionAction} submitLabel="Void revision" variant="danger" size="sm" hidden={{ revisionId: rev.id }}>
                   <Field label="Reason" required><input name="voidReason" className={inputCls} placeholder="e.g. issued against the wrong contract" /></Field>

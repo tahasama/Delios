@@ -406,39 +406,30 @@
     {
       "key": "REVIEW_ADVICE",
       "title": "Review advice",
-      "description": "What an advisory step says. Every step of a review route except the last gives advice: it is passed to the decider and never returns the document by itself. The last step gives a verdict, from Review outcomes.",
+      "description": "What an advisory step says. Every step of a review route except the last gives advice: it is passed to the decider and never returns the document by itself. The last step gives a verdict, from Review outcomes. Nobody picks it: it follows from the comments that step left.",
       "values": [
         {
           "code": "NO_COMMENT",
-          "label": "Nothing to say",
+          "label": "No comment",
           "props": {
-            "advice": true,
-            "proceed": true,
-            "blocking": false,
             "comments": "none",
-            "meaning": "You read it and found nothing worth writing down."
+            "meaning": "The step read the revision and wrote nothing."
           }
         },
         {
           "code": "COMMENTS",
-          "label": "Comments, not blocking",
+          "label": "Comments, none blocking",
           "props": {
-            "advice": true,
-            "proceed": true,
-            "blocking": false,
             "comments": "some",
-            "meaning": "You wrote comments. None of them stops the revision from being released."
+            "meaning": "The step left comments; none of them stops the release."
           }
         },
         {
           "code": "COMMENTS_BLOCKING",
-          "label": "Comments, blocking",
+          "label": "Blocking comments",
           "props": {
-            "advice": true,
-            "proceed": true,
-            "blocking": true,
             "comments": "blocking",
-            "meaning": "At least one of your comments must be settled before the revision can be released."
+            "meaning": "The step left a comment that stops the release until it is settled."
           }
         }
       ]
@@ -636,6 +627,17 @@
             "reviewCycle": false,
             "response": false,
             "acceptancePeriodDays": 5
+          }
+        },
+        {
+          "code": "REQUEST",
+          "label": "Request",
+          "props": {
+            "maturity": "Whatever exists",
+            "reviewCycle": false,
+            "response": true,
+            "acceptancePeriodDays": 5,
+            "responsePeriodDays": 7
           }
         }
       ]
@@ -838,6 +840,41 @@
             "po": "optional",
             "receivedDate": "required",
             "subProject": "optional"
+          }
+        }
+      ]
+    },
+    {
+      "key": "RETURN_REASONS",
+      "title": "Reasons to send a revision back to a step",
+      "description": "Why a review route is rewound to an earlier step on the same revision. Every one of them is a fault in the route, not in the document.",
+      "values": [
+        {
+          "code": "WRONG_FILE",
+          "label": "The wrong file was attached",
+          "props": {
+            "meaning": "What is under review is not the file that was meant to be reviewed."
+          }
+        },
+        {
+          "code": "WRONG_PEOPLE",
+          "label": "The wrong people were on a step",
+          "props": {
+            "meaning": "A step was seated with people who should not have answered it, or missed people who should."
+          }
+        },
+        {
+          "code": "STEP_SKIPPED",
+          "label": "A step was missed",
+          "props": {
+            "meaning": "The route ran past a step that should have answered."
+          }
+        },
+        {
+          "code": "ANSWER_IN_ERROR",
+          "label": "An answer was recorded in error",
+          "props": {
+            "meaning": "Somebody recorded a verdict on the wrong document, or against the wrong step."
           }
         }
       ]

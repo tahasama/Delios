@@ -8,17 +8,27 @@ import { saveTemplateAction } from "@/lib/actions/workflow";
 
 export type WorkflowBuilderStep = {
   act: "REVIEW" | "APPROVAL";
+  /** An outside party answers this step instead of our own people. */
+  partyId?: string;
   mode: "ANY_OF" | "ALL_CONSOLIDATOR" | "SERIAL" | "ALL";
   participantIds: string[];
   functionIds?: string[];
   title?: string;
   /** Working days this step has once it opens. Empty means it has no date. */
   days?: number;
+  /** On the deciding step, the statuses it may decide on. Empty means any. */
+  grantsStatuses?: string[];
 };
 
 type Person = { id: string; name: string; role: string; party: { name: string; isInternal: boolean } | null };
 type ClassOption = { code: string; label: string };
-type ClassOptions = { documentTypes: ClassOption[]; disciplines: ClassOption[]; criticalities: ClassOption[] };
+type ClassOptions = { documentTypes: ClassOption[]; disciplines: ClassOption[]; criticalities: ClassOption[]; deliverableTypes: ClassOption[]; originators: ClassOption[] };
+
+/**
+ * A published status as this builder needs it: what it is called, and whether
+ * the deciding step's choice of it is final.
+ */
+type StatusChoice = { code: string; label: string };
 
 /** How the people on one step work, in the words a project uses. */
 const HOW: { value: WorkflowBuilderStep["mode"]; label: string; hint: string }[] = [
@@ -33,7 +43,7 @@ const HOW: { value: WorkflowBuilderStep["mode"]; label: string; hint: string }[]
  * one deciding. Two names in a box means they work in parallel. Add a box
  * between any two, or at the end, and give it whoever should be on it.
  */
-export function WorkflowTemplateBuilder({ id, name = "", description = "", classes = "*", outcomeSetKey = "REVIEW_OUTCOMES", isDefault = false, initialSteps, users, functions = [], outcomeSets, classOptions }: {
+export function WorkflowTemplateBuilder({ id, name = "", description = "", classes = "*", outcomeSetKey = "REVIEW_OUTCOMES", isDefault = false, initialSteps, users, functions = [], outsideParties = [], outcomeSets, classOptions, statuses }: {
   id?: string;
   name?: string;
   description?: string;
@@ -43,8 +53,12 @@ export function WorkflowTemplateBuilder({ id, name = "", description = "", class
   initialSteps?: WorkflowBuilderStep[];
   users: Person[];
   functions?: { id: string; name: string }[];
+  /** Parties that can hold a step: a client, a control office, a supplier. */
+  outsideParties?: { id: string; name: string; participation: string }[];
   outcomeSets: string[];
   classOptions: ClassOptions;
+  /** The published statuses, with what each one lets a step do. */
+  statuses: StatusChoice[];
 }) {
   const [draft, setDraft] = useState<WorkflowBuilderStep[]>(
     initialSteps?.length ? initialSteps : [
@@ -101,7 +115,11 @@ export function WorkflowTemplateBuilder({ id, name = "", description = "", class
       <input type="hidden" name="classes" value={allClasses ? "*" : JSON.stringify([scope])} />
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <Field label="Route name" required><input name="name" required defaultValue={name} className={inputCls} placeholder="e.g. Engineering review, then the lead decides" /></Field>
+        {/* One convention, so a list of routes reads as a list of answers:
+            what it covers, then who decides it. */}
+        <Field label="Route name" required hint="what it covers — who decides it">
+          <input name="name" required defaultValue={name} className={inputCls} placeholder="Engineering drawings — lead engineer decides" />
+        </Field>
         <Field label="When to use it"><input name="description" defaultValue={description} className={inputCls} placeholder="Tell the sender when this route is the right one" /></Field>
         <Field label="Verdict list" hint="what the deciding step answers with; the steps before it always answer from the advice list">
           <select name="outcomeSetKey" defaultValue={outcomeSetKey} className={inputCls}>
@@ -153,7 +171,9 @@ export function WorkflowTemplateBuilder({ id, name = "", description = "", class
                   </span>
                   <span className="mt-1 block text-sm font-semibold text-slate-900">{step.title || (decides ? "Decision" : `Review ${index + 1}`)}</span>
                   <span className="mt-1.5 block text-[11px] leading-4 text-slate-600">
-                    {empty ? <span className="text-amber-700">Nobody yet — the discipline decides who</span> : [...people, ...fns.map((f) => `${f} (function)`)].join(", ")}
+                    {step.partyId
+                      ? <span className="font-medium text-slate-700">{outsideParties.find((party) => party.id === step.partyId)?.name ?? "An outside party"}<span className="block text-[10px] text-slate-400">outside party</span></span>
+                      : empty ? <span className="text-amber-700">Nobody yet — the discipline decides who</span> : [...people, ...fns.map((f) => `${f} (function)`)].join(", ")}
                   </span>
                   {step.days ? <span className="mt-1.5 block text-[10px] text-slate-400">{step.days} working day{step.days === 1 ? "" : "s"}</span> : null}
                   {people.length + fns.length > 1 ? (
@@ -208,11 +228,47 @@ export function WorkflowTemplateBuilder({ id, name = "", description = "", class
               <button type="button" onClick={() => setOpen(null)} className="rounded-lg p-1 text-slate-400 hover:text-slate-700" aria-label="Close"><X className="h-4 w-4" /></button>
             </div>
 
+            {steps[open].partyId ? (
+              <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                <p className="text-xs font-semibold text-slate-800">{outsideParties.find((party) => party.id === steps[open].partyId)?.name ?? "An outside party"} answers this step</p>
+                <p className="mt-1 text-[11px] leading-4 text-slate-500">
+                  {outsideParties.find((party) => party.id === steps[open].partyId)?.participation === "IN_APP"
+                    ? "They answer here, in their own account."
+                    : "We send it to them and write down their answer. Who carries that, and whether it needs proof, is set on the party in Parties & people."}
+                </p>
+                <button type="button" onClick={() => update(open, { partyId: undefined })} className="mt-2 text-[11px] font-semibold text-link hover:underline">
+                  Choose our own people instead
+                </button>
+              </div>
+            ) : (
             <div className="mt-4 grid gap-4 xl:grid-cols-[1fr_280px]">
               <div>
                 <p className="text-xs font-medium text-slate-700">People</p>
                 <p className="mb-1.5 text-[11px] text-slate-400">Two or more work in parallel. Leave the box empty to assign by the document&apos;s discipline when it is sent.</p>
                 <div className="scroll-thin max-h-56 overflow-y-auto rounded-xl border border-slate-200 p-2">
+                  {/* An outside party sits in the same list as our own people:
+                      picking one is how a step becomes external. */}
+                  {outsideParties.length ? (
+                    <div className="mb-2">
+                      <p className="px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">Outside parties</p>
+                      <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
+                        {outsideParties.map((party) => (
+                          <button
+                            key={party.id}
+                            type="button"
+                            onClick={() => update(open, { partyId: party.id, participantIds: [], functionIds: [] })}
+                            className="flex items-center gap-2 rounded-lg border border-transparent px-2.5 py-2 text-left text-xs text-slate-600 transition hover:bg-slate-50"
+                          >
+                            <span className="grid h-5 w-5 shrink-0 place-items-center rounded-md border border-slate-300" />
+                            <span className="min-w-0">
+                              <span className="block truncate font-semibold">{party.name}</span>
+                              <span className="block text-[10px] text-slate-400">{party.participation === "IN_APP" ? "answers here" : "we record their answer"}</span>
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
                   {parties.map(([party, list]) => (
                     <div key={party} className="mb-2 last:mb-0">
                       <p className="px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">{party}</p>
@@ -249,12 +305,52 @@ export function WorkflowTemplateBuilder({ id, name = "", description = "", class
                     })}
                   </div>
                 </div>
+
                 {steps[open].participantIds.length + (steps[open].functionIds?.length ?? 0) > 1 ? (
                   <Field label="How they work" hint={HOW.find((h) => h.value === steps[open]!.mode)?.hint}>
                     <select value={steps[open].mode} onChange={(e) => update(open, { mode: e.target.value as WorkflowBuilderStep["mode"] })} className={inputCls}>
                       {HOW.map((h) => <option key={h.value} value={h.value}>{h.label}</option>)}
                     </select>
                   </Field>
+                ) : null}
+              </div>
+            </div>
+            )}
+
+            {/* ── What this step does to the status ─────────────────────── */}
+            <div className="mt-4 border-t border-slate-100 pt-4">
+              <p className="text-xs font-medium text-slate-700">What it does to the status</p>
+              <p className="mb-2 text-[11px] leading-4 text-slate-400">
+                {open === steps.length - 1
+                  ? "This box decides what the revision may be used for. Narrow the list if it may only decide on some of the statuses."
+                  : "Nothing. A revision has a status only once Document Control publishes one; where it stands meanwhile is this route, and why it goes out is the reason for issue on the transmittal that carries it."}
+              </p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {open === steps.length - 1 ? (
+                  <div>
+                    <p className="text-xs font-medium text-slate-700">May decide on</p>
+                    <p className="mb-1.5 text-[11px] text-slate-400">Nothing ticked: any status it is allowed to name.</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {statuses.map((one) => {
+                        const on = (steps[open!].grantsStatuses ?? []).includes(one.code);
+                        return (
+                          <button
+                            key={one.code}
+                            type="button"
+                            title={`${one.code} is published exactly as this box names it.`}
+                            onClick={() => {
+                              const picked = new Set(steps[open!].grantsStatuses ?? []);
+                              picked.has(one.code) ? picked.delete(one.code) : picked.add(one.code);
+                              update(open!, { grantsStatuses: picked.size ? [...picked] : undefined });
+                            }}
+                            className={`rounded-full border px-2.5 py-1 text-xs ${on ? "border-brand-line bg-tint font-semibold text-brand-ink" : "border-slate-300 bg-surface text-slate-600 hover:bg-slate-50"}`}
+                          >
+                            {on ? "✓ " : ""}{one.code}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                 ) : null}
               </div>
             </div>
@@ -276,6 +372,8 @@ export function WorkflowTemplateBuilder({ id, name = "", description = "", class
             <Field label="Document type"><select className={inputCls} value={scope.docType ?? ""} onChange={(e) => setScope((v) => ({ ...v, docType: e.target.value || undefined }))}><option value="">Any type</option>{classOptions.documentTypes.map((i) => <option key={i.code} value={i.code}>{i.code} — {i.label}</option>)}</select></Field>
             <Field label="Discipline"><select className={inputCls} value={scope.discipline ?? ""} onChange={(e) => setScope((v) => ({ ...v, discipline: e.target.value || undefined }))}><option value="">Any discipline</option>{classOptions.disciplines.map((i) => <option key={i.code} value={i.code}>{i.code} — {i.label}</option>)}</select></Field>
             <Field label="Criticality"><select className={inputCls} value={scope.criticality ?? ""} onChange={(e) => setScope((v) => ({ ...v, criticality: e.target.value || undefined }))}><option value="">Any criticality</option>{classOptions.criticalities.map((i) => <option key={i.code} value={i.code}>{i.code} — {i.label}</option>)}</select></Field>
+            <Field label="Produced by" hint="ours, a supplier's, the client's"><select className={inputCls} value={scope.deliverableType ?? ""} onChange={(e) => setScope((v) => ({ ...v, deliverableType: e.target.value || undefined }))}><option value="">Anyone</option>{classOptions.deliverableTypes.map((i) => <option key={i.code} value={i.code}>{i.code} — {i.label}</option>)}</select></Field>
+            <Field label="From which organization" hint="only documents that came from this one"><select className={inputCls} value={scope.originator ?? ""} onChange={(e) => setScope((v) => ({ ...v, originator: e.target.value || undefined }))}><option value="">Any organization</option>{classOptions.originators.map((i) => <option key={i.code} value={i.code}>{i.code} — {i.label}</option>)}</select></Field>
           </div>
         ) : null}
       </section>
@@ -293,10 +391,13 @@ function AddHere({ onClick }: { onClick: () => void }) {
   );
 }
 
-function parseScope(classes: string): { docType?: string; discipline?: string; criticality?: string } {
+/** The five things a route can be chosen by. Any one left empty matches all. */
+type Scope = { docType?: string; discipline?: string; criticality?: string; deliverableType?: string; originator?: string };
+
+function parseScope(classes: string): Scope {
   if (!classes || classes === "*") return {};
   try {
-    const parsed = JSON.parse(classes) as { docType?: string; discipline?: string; criticality?: string }[];
+    const parsed = JSON.parse(classes) as Scope[];
     return parsed[0] ?? {};
   } catch {
     return {};

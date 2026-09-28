@@ -4,9 +4,11 @@ import { revalidatePath } from "next/cache";
 import { requireScope } from "@/lib/scope";
 import { mayContributeToDocument } from "@/lib/auth";
 import { audit } from "@/lib/audit";
-import { startWorkflowRun, recordStepOutcome, recordStepApproval, normalizeRoute, type WfStep } from "@/lib/workflow";
+import { startWorkflowRun, recordStepOutcome, recordStepApproval, normalizeRoute, rewindRoute, type WfStep } from "@/lib/workflow";
 import { isReadOnly } from "@/lib/auth";
 import { hasVerb, isAdmin, isController } from "@/lib/auth";
+import { getActiveSet } from "@/lib/config";
+import { requestFromForm } from "@/lib/issue-requests";
 
 // ── Workflow templates (organization-defined routing) ────────────────────────
 
@@ -36,9 +38,17 @@ export async function saveTemplateAction(_prev: { error?: string } | undefined, 
     let steps: unknown;
     try { steps = JSON.parse(stepsRaw); } catch { return { error: "Steps are not valid JSON." }; }
     if (!Array.isArray(steps) || steps.length === 0) return { error: "Add at least one step." };
-    for (const st of steps as Record<string, unknown>[]) {
+    // What a step says about the status has to name statuses the organization
+    // published, and an intermediate status has to be one a step may hand on at.
+    const statusValues = await getActiveSet("STATUSES");
+    const byCode = new Set(statusValues.map((value) => value.code));
+    for (const [index, st] of (steps as Record<string, unknown>[]).entries()) {
       if (!["REVIEW", "APPROVAL"].includes(String(st.act))) return { error: "Each step is REVIEW or APPROVAL." };
       if (!["ANY_OF", "ALL_CONSOLIDATOR", "SERIAL", "ALL"].includes(String(st.mode))) return { error: "Choose how each step decides." };
+      if (Array.isArray(st.grantsStatuses)) {
+        const unknown = (st.grantsStatuses as unknown[]).map(String).filter((code) => !byCode.has(code));
+        if (unknown.length) return { error: `Not published statuses: ${unknown.join(", ")}.` };
+      }
       // A step that names nobody is fine: when sent, it is assigned from the
       // distribution matrix by the documents' discipline, and the sender adjusts.
     }
@@ -121,19 +131,38 @@ export async function sendForReviewAction(_prev: { error?: string; ok?: string }
 
 // ── Recording decisions on the active step ───────────────────────────────────
 
+/** Whoever holds the open step sends the route back to an earlier one. */
+export async function rewindRouteAction(_prev: { ok?: string; error?: string } | undefined, formData: FormData): Promise<{ ok?: string; error?: string }> {
+  const ctx = await requireScope();
+  const { user } = ctx;
+  const runId = String(formData.get("runId") ?? "");
+  const toStep = Number(formData.get("toStep") ?? "");
+  if (!runId || !toStep) return { error: "Say which step it goes back to." };
+  const res = await rewindRoute(
+    ctx,
+    runId,
+    user,
+    toStep,
+    String(formData.get("returnReason") ?? "").trim(),
+    String(formData.get("reason") ?? "").trim(),
+  );
+  if (!res.ok) return { error: res.error };
+  revalidatePath("/");
+  return { ok: "Sent back." };
+}
+
 export async function recordStepOutcomeAction(_prev: { error?: string; ok?: string } | undefined, formData: FormData): Promise<{ error?: string; ok?: string }> {
   const ctx = await requireScope();
   const { user, db, projectId, orgId } = ctx;
   const runId = String(formData.get("runId") ?? "");
   const outcomeCode = String(formData.get("outcome") ?? "");
-  const note = String(formData.get("note") ?? "").trim() || undefined;
-  const proposedStatus = String(formData.get("proposedStatus") ?? "").trim() || undefined;
-  // An advisory step sends no code — the engine reads it off the comments.
-  const run = await db.workflowRun.findUnique({ where: { id: runId }, select: { steps: true, currentStep: true } });
-  const advising = !!run && run.currentStep < (JSON.parse(run.steps) as unknown[]).length - 1;
-  if (!outcomeCode && !advising) return { error: "Choose the verdict." };
+  // The comment a verdict carries when it says something is wrong. Every step
+  // answers with a verdict, so there is always a code.
+  const note = String(formData.get("comment") ?? "").trim() || undefined;
+  const issuedFor = String(formData.get("issuedFor") ?? "").trim() || undefined;
+  if (!outcomeCode) return { error: "Choose the verdict." };
   try {
-    const res = await recordStepOutcome(ctx, runId, user, outcomeCode, note, proposedStatus);
+    const res = await recordStepOutcome(ctx, runId, user, outcomeCode, note, issuedFor, formData.get("confirmStatus") === "on", Number(formData.get("closesWithStep") ?? "") || null, requestFromForm(formData));
     if (!res.ok) return { error: res.error };
     revalidatePath("/");
     return { ok: res.message };
@@ -168,6 +197,36 @@ export async function recordStepApprovalAction(_prev: { error?: string; ok?: str
 
 // ── Parties (§0.3) ───────────────────────────────────────────────────────────
 
+/**
+ * Remove a party that was added by mistake. Only one that never had a person,
+ * never held a review step, and whose code appears on no document or
+ * transmittal: anything that has been used is revoked instead, so the record
+ * keeps meaning what it meant.
+ */
+export async function deletePartyAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
+  const ctx = await requireScope();
+  const { user: admin, db } = ctx;
+  if (!isAdmin(admin)) return { error: "Administrators only." };
+  const id = String(formData.get("id") ?? "").trim();
+  const party = await db.party.findFirst({ where: { id }, include: { _count: { select: { users: true, cycles: true } } } });
+  if (!party) return { error: "That party no longer exists." };
+  if (party.isInternal) return { error: "Your own organization cannot be removed." };
+  if (party._count.users) return { error: `${party.name} has ${party._count.users} ${party._count.users === 1 ? "person" : "people"}. Revoke its access instead — removing it would orphan them.` };
+  if (party._count.cycles) return { error: `${party.name} has answered a review step. Revoke its access instead; the record keeps its name.` };
+
+  const used = await Promise.all([
+    db.document.count({ where: { originator: party.code } }),
+    db.transmittal.count({ where: { issuingParty: party.name } }),
+    db.transmittalRecipient.count({ where: { organization: party.name } }),
+  ]);
+  if (used.some((n) => n > 0)) return { error: `${party.name} appears on documents or transmittals. Revoke its access instead.` };
+
+  await db.party.delete({ where: { id } });
+  await audit({ actor: admin, action: "PARTY_REMOVED", entityType: "Party", entityId: party.code, entityLabel: party.name, detail: "Removed: it never held a person, a step, a document or a transmittal." });
+  revalidatePath("/admin/parties");
+  return {};
+}
+
 export async function savePartyAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
   try {
     const ctx = await requireScope();
@@ -176,27 +235,54 @@ export async function savePartyAction(_prev: { error?: string } | undefined, for
     const id = String(formData.get("id") ?? "").trim();
     const code = String(formData.get("code") ?? "").trim().toUpperCase();
     const name = String(formData.get("name") ?? "").trim();
-    const isInternal = formData.get("isInternal") === "on";
+    // Our own organization is registered once, at setup. Everything added here
+    // is another organization.
+    const isInternal = false;
     const contactId = String(formData.get("contactId") ?? "") || null;
     const backupId = String(formData.get("backupId") ?? "") || null;
+    // How this party takes part in a review route, and who carries it when they
+    // do not answer here.
+    const kind = ["COLLABORATOR", "GUEST", "OFFLINE"].includes(String(formData.get("kind") ?? ""))
+      ? String(formData.get("kind"))
+      : "COLLABORATOR";
+    // The older wording is kept in step with the kind, so records and code that
+    // still read it stay correct.
+    const participation = kind === "OFFLINE" ? "BY_PROXY" : "IN_APP";
+    // Anything recorded for an organization that is not here carries its proof.
+    // It is a rule, not a preference, so it is not asked.
+    const evidenceRequiredForKind = kind === "OFFLINE";
+    const liaisonFunction = String(formData.get("liaisonFunction") ?? "").trim() || null;
     if (contactId && backupId && contactId === backupId) return { error: "The backup has to be someone other than the contact." };
     if (id) {
-      // The code is fixed once issued: document numbers and originators carry it.
       const party = await db.party.findFirst({ where: { id } });
       if (!party) return { error: "That party no longer exists." };
+      // The code can be corrected, but what was issued under the old one keeps
+      // it: a document number is a record, not a pointer.
+      if (code && code !== party.code) {
+        const clash = await db.party.findFirst({ where: { orgId, code, NOT: { id } } });
+        if (clash) return { error: `${clash.name} already uses the code ${code}.` };
+        await db.party.update({ where: { id }, data: { code } });
+        await audit({ actor: admin, action: "PARTY_CODE_CHANGED", entityType: "Party", entityId: code, entityLabel: name || party.name, oldValue: party.code, newValue: code, detail: "Documents and transmittals already issued keep the old code." });
+      }
       const active = formData.get("active") === "on";
       if (!name) return { error: "A party needs a name." };
       if (party.isInternal && !active) return { error: "Your own organization cannot be switched off." };
       // Somebody has to answer for a party we exchange documents with.
       if (!party.isInternal && active && !contactId) return { error: `Name the person who answers for ${name}. The backup is optional.` };
-      await db.party.update({ where: { id }, data: { name, active, contactId, backupId } });
+      await db.party.update({
+        where: { id },
+        data: party.isInternal
+          ? { name, active, contactId, backupId }
+          : { name, active, contactId, backupId, kind, participation, liaisonFunction, evidenceRequired: evidenceRequiredForKind },
+      });
       if (party.active !== active || party.name !== name) {
         await audit({ actor: admin, action: active ? "PARTY_UPDATED" : "PARTY_REVOKED", entityType: "Party", entityId: party.code, entityLabel: name, oldValue: `${party.name}${party.active ? "" : " (revoked)"}`, newValue: `${name}${active ? "" : " (revoked)"}`, detail: active ? undefined : "Access revoked: its people can no longer sign in." });
       }
     } else {
       if (!code || !name) return { error: "Code and name are required." };
-      if (!isInternal && !contactId) return { error: "Name the person who answers for this party." };
-      await db.party.create({ data: { orgId, code, name, isInternal, contactId, backupId } });
+      // A new party has no people yet, so the contact is named from its own
+      // people once they exist — not borrowed from ours.
+      await db.party.create({ data: { orgId, code, name, isInternal, contactId, backupId, kind, participation, evidenceRequired: evidenceRequiredForKind } });
     }
     revalidatePath("/admin/parties");
     revalidatePath("/admin/users");
@@ -223,3 +309,108 @@ export async function setUserPartyAction(_prev: { error?: string } | undefined, 
     return { error: e instanceof Error ? e.message : "Failed." };
   }
 }
+
+// ── Steps answered by a party that is not in this system ─────────────────────
+
+/**
+ * The pack went out. Records when, by what channel, under whose reference, and
+ * with the proof of sending attached. The clock on the step runs from here.
+ */
+export async function markDispatchedAction(_prev: { error?: string; ok?: string } | undefined, formData: FormData): Promise<{ error?: string; ok?: string }> {
+  const ctx = await requireScope();
+  const { user, db } = ctx;
+  const cycleId = String(formData.get("cycleId") ?? "");
+  const channel = String(formData.get("channel") ?? "").trim();
+  const reference = String(formData.get("reference") ?? "").trim() || null;
+  const when = String(formData.get("sentOn") ?? "").trim();
+  const note = String(formData.get("note") ?? "").trim() || null;
+  if (!channel) return { error: "Say where it went." };
+
+  const cycle = await db.reviewCycle.findUnique({
+    where: { id: cycleId },
+    include: { party: true, revision: { include: { document: true } }, assignments: true },
+  });
+  if (!cycle || !cycle.partyId) return { error: "This step is not answered by an outside party." };
+  if (cycle.status !== "OPEN") return { error: "This step is closed." };
+  if (!cycle.assignments.some((seat) => seat.userId === user.id) && !isController(user) && !isAdmin(user)) {
+    return { error: "Only the person carrying this exchange records that it was sent." };
+  }
+
+  const proof = formData.get("evidence");
+  // This step leaves our system, so the only thing that makes it a record is
+  // what proves it left.
+  if (!(proof instanceof File) || proof.size === 0) {
+    return { error: "Attach the proof it was sent — the email, or the receipt their system gave you." };
+  }
+  let evidence: string | null = null;
+  if (proof instanceof File && proof.size > 0) {
+    const { saveUpload } = await import("@/lib/files");
+    const saved = await saveUpload(ctx, proof, cycle.revision.document.docNumber, "EVIDENCE", cycle.revision.value);
+    const file = await db.storedFile.create({
+      data: {
+        projectId: ctx.projectId, name: saved.name, path: saved.relPath, size: saved.size, mime: saved.mime,
+        sha256: saved.sha256, kind: "EVIDENCE", revisionId: cycle.revisionId, cycleId: cycle.id,
+        uploadedById: user.id, uploadedByName: user.name,
+      },
+    });
+    evidence = file.id;
+  }
+
+  const sentAt = when ? new Date(`${when}T12:00:00`) : new Date();
+
+  // Sending it out is a handover between parties, so it belongs in the register
+  // of correspondence as well as on the step. The transmittal is raised here,
+  // at the moment it actually left, and the step points at it.
+  let transmittalId = cycle.transmittalId;
+  if (!transmittalId) {
+    const { nextRecordNumber } = await import("@/lib/numbering-records");
+    const [internal, project] = await Promise.all([
+      db.party.findFirst({ where: { isInternal: true }, select: { code: true, name: true } }),
+      db.project.findUnique({ where: { id: ctx.projectId }, select: { code: true } }),
+    ]);
+    const number = await nextRecordNumber(
+      ctx,
+      "TRANSMITTAL",
+      { project: project?.code ?? "", sender: internal?.code ?? null, receiver: cycle.party?.code ?? null, reason: "REVIEW" },
+      "TR",
+    );
+    const raised = await db.transmittal.create({
+      data: {
+        projectId: ctx.projectId,
+        number,
+        direction: "OUTGOING",
+        reasonForIssue: "REVIEW",
+        dateOfIssue: sentAt,
+        issuingParty: internal?.name ?? "Our organization",
+        subject: `${cycle.revision.document.docNumber} rev ${cycle.revision.value} — for review`,
+        message: `Sent to ${cycle.party?.name ?? "an outside party"} by ${channel}${reference ? ` (${reference})` : ""}.`,
+        status: "ISSUED",
+        createdById: user.id,
+        createdByName: user.name,
+        items: { create: [{ projectId: ctx.projectId, revisionId: cycle.revisionId }] },
+        recipients: cycle.party
+          ? { create: [{ projectId: ctx.projectId, name: cycle.party.name, organization: cycle.party.name }] }
+          : undefined,
+      },
+    });
+    transmittalId = raised.id;
+  }
+
+  await db.reviewCycle.update({
+    where: { id: cycleId },
+    data: {
+      dispatchedAt: sentAt,
+      dispatchChannel: channel,
+      dispatchRef: note ? `${reference ?? ""}${reference ? " · " : ""}${note}` : reference,
+      transmittalId,
+    },
+  });
+  await audit({
+    tenant: ctx, actor: user, action: "STEP_DISPATCHED", entityType: "ReviewCycle", entityId: cycleId,
+    entityLabel: `${cycle.revision.document.docNumber} rev ${cycle.revision.value}`,
+    detail: `Sent to ${cycle.party?.name ?? "an outside party"} outside our system, by ${channel}${reference ? ` (${reference})` : ""}. Proof attached.`,
+  });
+  revalidatePath("/");
+  return { ok: "Recorded as sent." };
+}
+

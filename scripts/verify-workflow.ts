@@ -36,11 +36,11 @@ async function main() {
   // A verdict that stops release; "approved with comments" proceeds.
   const back = proceed.find((v) => v.props.proceed === false)!;
 
-  // Advice, from the advisory steps' own list: what the adviser's comments amount to.
+  // Advice: worked out from the comments, and worded by the published list.
   const adviceValues = (await db.configValue.findMany({ where: { setKey: "REVIEW_ADVICE", status: "ACTIVE" } }))
     .map((v) => ({ code: v.code, props: v.props ? (JSON.parse(v.props) as { comments?: string }) : {} }));
-  const nothingToSay = adviceValues.find((v) => v.props.comments === "none")!;
-  const blockingAdvice = adviceValues.find((v) => v.props.comments === "blocking")!;
+  const nothingToSay = adviceValues.find((v) => v.props.comments === "none") ?? { code: "NO_COMMENT" };
+  const blockingAdvice = adviceValues.find((v) => v.props.comments === "blocking") ?? { code: "COMMENTS_BLOCKING" };
 
   // What a proceeding verdict says the revision may be used for.
   const useFor = (await db.configValue.findFirstOrThrow({ where: { setKey: "STATUSES", status: "ACTIVE" } })).code;
@@ -140,7 +140,7 @@ async function main() {
     const cycles = await t.db.reviewCycle.findMany({ where: { revisionId: rev.id }, orderBy: { sequence: "asc" } });
     check("the specialists' step is advice, the lead's step binds", cycles.length === 2 && !cycles[0].binding && cycles[1].binding);
     const decidedRev = await t.db.revision.findUniqueOrThrow({ where: { id: rev.id } });
-    check("the verdict carries what it may be used for", decidedRev.proposedStatus === useFor, decidedRev.proposedStatus ?? "none");
+    check("the verdict carries what it may be used for", decidedRev.statusCode === useFor, decidedRev.statusCode ?? "none");
     const noStatus = await recordStepOutcome(t, runId, lead, ok.code, "agreed");
     check("a verdict that proceeds without a status is refused", !noStatus.ok);
 

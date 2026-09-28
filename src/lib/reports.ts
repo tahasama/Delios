@@ -74,7 +74,7 @@ async function registerStatus(t: Tenant): Promise<Report> {
     if (["WITHDRAWN", "CANCELLED", "ARCHIVED", "DISPOSED"].includes(d.state)) return "out";
     if (d.revisions.some((r) => r.state === "RELEASED")) return "released";
     const latest = d.revisions[0]?.state;
-    if (latest === "IN_REVIEW") return "review";
+    if (latest === "IN_REVIEW" || latest === "NOT_RELEASED") return "review";
     if (latest === "IN_PREPARATION") return "work";
     return "planned";
   };

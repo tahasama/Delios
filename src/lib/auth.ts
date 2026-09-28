@@ -140,7 +140,12 @@ export function atLeast(user: SessionUser | null, role: Role): boolean {
 
 /** The control function: Control, or Configure. */
 export function isController(user: SessionUser | null): boolean {
-  return hasVerb(user, "CONTROL") || hasVerb(user, "CONFIGURE");
+  // Configuring a project is not working in it. An administrator sets the app
+  // up and leaves; whether anybody stands between the work and the record is
+  // the project's answer, given by granting the control function to somebody or
+  // to no one. An administrator who is also the control function holds the verb
+  // like anybody else.
+  return hasVerb(user, "CONTROL");
 }
 
 /** An administrator: publishes configuration, people and the matrix. */

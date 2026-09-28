@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DELIOS — Home v4</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ── Only tokens that exist in src/app/theme.css ─────────────────────────── */
+:root{
+  --surface:#ffffff; --canvas:#eceff4; --canvas-deep:#e2e7ee;
+  --line:#d7dde6; --line-strong:#bcc6d4;
+  --brand:#1e3a5f; --brand-hover:#2d5480; --brand-strong:#17324d;
+  --brand-line:#3b6389; --link:#2b5b80; --tint:#e4eef7; --tint-soft:#f2f6fb;
+  --slate-400:#94a3b8; --slate-500:#64748b; --slate-600:#475569;
+  --slate-700:#334155; --slate-900:#0f172a;
+  --red-700:oklch(50.5% 0.213 27.518); --red-50:oklch(97.1% 0.013 17.38);
+  --amber-700:oklch(55.5% 0.163 48.998); --amber-50:oklch(98.7% 0.022 95.277);
+  --emerald-600:oklch(59.6% 0.145 163.225);
+  --sans:"IBM Plex Sans",ui-sans-serif,system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,monospace;
+  --ease:cubic-bezier(.2,.6,.3,1);
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --surface:#111823; --canvas:#0a0f17; --canvas-deep:#070b12;
+  --line:#273245; --line-strong:#37455c;
+  --brand:#2f5e8e; --brand-hover:#3a70a6; --brand-strong:#28527d;
+  --brand-line:#5f8fbf; --link:#8db8de; --tint:#1a2a3c; --tint-soft:#152131;
+  --slate-400:#64738a; --slate-500:#8795a9; --slate-600:#a4aebd;
+  --slate-700:#c0c9d5; --slate-900:#e9edf2;
+  --red-700:oklch(80.8% 0.114 19.571); --red-50:oklch(28% 0.06 19);
+  --amber-700:oklch(87.9% 0.169 91.605); --amber-50:oklch(28% 0.06 80);
+  --emerald-600:oklch(69.6% 0.17 162.48);
+}}
+:root[data-theme="dark"]{
+  --surface:#111823; --canvas:#0a0f17; --canvas-deep:#070b12;
+  --line:#273245; --line-strong:#37455c;
+  --brand:#2f5e8e; --brand-hover:#3a70a6; --brand-strong:#28527d;
+  --brand-line:#5f8fbf; --link:#8db8de; --tint:#1a2a3c; --tint-soft:#152131;
+  --slate-400:#64738a; --slate-500:#8795a9; --slate-600:#a4aebd;
+  --slate-700:#c0c9d5; --slate-900:#e9edf2;
+  --red-700:oklch(80.8% 0.114 19.571); --red-50:oklch(28% 0.06 19);
+  --amber-700:oklch(87.9% 0.169 91.605); --amber-50:oklch(28% 0.06 80);
+  --emerald-600:oklch(69.6% 0.17 162.48);
+}
+
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{
+  background:var(--canvas);color:var(--slate-900);font-family:var(--sans);
+  font-size:15px;line-height:1.5;text-wrap:pretty;-webkit-font-smoothing:antialiased;
+}
+a{color:inherit;text-decoration:none}
+
+.app{display:grid;grid-template-columns:272px minmax(0,1fr);min-height:100vh}
+@media(max-width:860px){.app{grid-template-columns:minmax(0,1fr)}}
+
+/* ── Left: the queues, always present ───────────────────────────────────── */
+.rail{background:var(--brand);color:#fff;padding:22px 0 26px;display:flex;flex-direction:column}
+@media(max-width:860px){.rail{padding-bottom:14px}}
+.rail .who{padding:0 22px 18px;border-bottom:1px solid rgb(255 255 255/.13)}
+.rail .who .hi{margin:0;font-size:17px;font-weight:600;letter-spacing:-.005em}
+.rail .who .sum{margin:5px 0 0;font-size:13px;color:#a9c4de}
+.rail .who .sum b{color:#fff;font-family:var(--mono);font-weight:600}
+
+.qs{list-style:none;margin:0;padding:14px 12px 0;flex:1}
+.q{
+  display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:10px;
+  padding:9px 10px;border-radius:7px;font-size:14px;color:#cfe0ef;
+  transition:background .14s var(--ease),color .14s var(--ease);
+}
+.q:hover{background:rgb(255 255 255/.08);color:#fff}
+.q[aria-current]{background:#fff;color:var(--brand-strong);font-weight:600}
+.q .c{font-family:var(--mono);font-size:13px;font-weight:600;color:#9dbbd8}
+.q[aria-current] .c{color:var(--brand)}
+.q.overdue .c{color:#ffb4ae}
+.q[aria-current].overdue .c{color:var(--red-700)}
+.q.quiet{color:#8fa9c2}
+.qs .sep{margin:14px 10px 8px;font-size:10.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#7e9cba}
+
+.watch{padding:0 22px;margin-top:8px;border-top:1px solid rgb(255 255 255/.13);padding-top:16px}
+.watch h3{margin:0 0 8px;font-size:10.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#7e9cba}
+.watch a{display:flex;justify-content:space-between;gap:10px;padding:6px 0;font-size:13px;color:#cfe0ef}
+.watch a:hover{color:#fff}
+.watch .when{font-family:var(--mono);font-size:12px;color:#ffb4ae}
+.watch .when.soon{color:#e8c98d}
+
+/* ── Right: one ledger ──────────────────────────────────────────────────── */
+.main{padding:26px 30px 60px;min-width:0}
+@media(max-width:860px){.main{padding:20px 16px 48px}}
+.bar{display:flex;align-items:baseline;gap:12px;margin:0 0 18px}
+.bar h1{margin:0;font-size:21px;font-weight:600;letter-spacing:-.01em}
+.bar .note{font-size:14px;color:var(--slate-500)}
+.bar .all{margin-left:auto;font-size:13px;font-weight:600;color:var(--link)}
+.bar .all:hover{text-decoration:underline}
+
+.ledger{background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+table{width:100%;border-collapse:collapse}
+thead th{
+  position:sticky;top:0;z-index:2;background:var(--surface);
+  text-align:left;font-size:10.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--slate-400);padding:11px 20px;border-bottom:1px solid var(--line-strong);
+}
+thead th.r{text-align:right}
+tbody tr{border-bottom:1px solid var(--line)}
+tbody tr:last-child{border-bottom:0}
+tbody tr:not(.band):hover{background:var(--tint-soft)}
+td{padding:13px 20px;vertical-align:middle}
+.num{font-family:var(--mono);font-size:14px;font-weight:600;color:var(--slate-900);white-space:nowrap}
+.num .rev{color:var(--slate-400);font-weight:400;margin-left:8px}
+.ttl{display:block;margin-top:2px;font-size:13.5px;color:var(--slate-600);max-width:52ch;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.act{font-size:14px;color:var(--slate-600)}
+.act b{font-weight:600;color:var(--slate-900)}
+.code{font-family:var(--mono);font-weight:600;color:var(--slate-900)}
+td.age{text-align:right;font-family:var(--mono);font-size:14px;color:var(--slate-500);white-space:nowrap}
+td.age.w{color:var(--amber-700);font-weight:600}
+td.age.a{color:var(--red-700);font-weight:700}
+td.go{text-align:right;width:1%;white-space:nowrap}
+.go a{font-size:13px;font-weight:600;color:var(--link)}
+tbody tr:hover .go a{text-decoration:underline}
+.flag{
+  display:inline-block;margin-left:9px;font-size:11.5px;font-weight:600;
+  color:var(--red-700);background:var(--red-50);border-radius:5px;padding:1px 7px;
+}
+tr.band td{
+  position:sticky;top:39px;z-index:1;background:var(--canvas-deep);
+  padding:6px 20px;font-size:10.5px;font-weight:700;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--slate-500);
+}
+
+#tw{position:fixed;right:20px;bottom:20px;z-index:50;font-size:13px}
+#tw button.open{background:var(--brand);color:#fff;border:0;border-radius:99px;padding:10px 17px;font-family:var(--sans);font-size:13px;font-weight:600;cursor:pointer}
+#tw .panel{display:none;background:var(--surface);border:1px solid var(--line-strong);border-radius:10px;padding:16px;width:240px}
+#tw.on .panel{display:block} #tw.on button.open{display:none}
+#tw label{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:0 0 10px;color:var(--slate-600)}
+#tw select{font-family:var(--sans);font-size:13px;padding:4px 7px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--slate-900)}
+#tw .close{background:none;border:0;color:var(--link);font-weight:600;cursor:pointer;padding:0;font-size:13px}
+[data-density="tight"] td{padding-top:9px;padding-bottom:9px}
+[data-density="loose"] td{padding-top:18px;padding-bottom:18px}
+[data-bands="off"] tr.band{display:none}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <nav class="rail">
+    <div class="who">
+      <p class="hi">Taha Maatof</p>
+      <p class="sum"><b>9</b> waiting · oldest <b>11d</b></p>
+    </div>
+
+    <ul class="qs" id="qs">
+      <li><a class="q overdue" href="#" data-k="held" aria-current="page">Send back <span class="c">1</span></a></li>
+      <li><a class="q" href="#" data-k="verdict">Give the verdict <span class="c">2</span></a></li>
+      <li><a class="q" href="#" data-k="release">Ready to release <span class="c">2</span></a></li>
+      <li><a class="q overdue" href="#" data-k="unsent">Released, never sent <span class="c">2</span></a></li>
+      <li><a class="q" href="#" data-k="advice">Review — your advice <span class="c">1</span></a></li>
+      <li><a class="q" href="#" data-k="drafts">Your drafts <span class="c">1</span></a></li>
+      <li class="sep">Nothing waiting</li>
+      <li><a class="q quiet" href="#" data-k="incoming">Received <span class="c">0</span></a></li>
+      <li><a class="q quiet" href="#" data-k="route">Send for review <span class="c">0</span></a></li>
+    </ul>
+
+    <div class="watch">
+      <h3>On other people</h3>
+      <a href="#"><span>MADASUD stamp</span><span class="when">9d over</span></a>
+      <a href="#"><span>ONEE acknowledgement</span><span class="when soon">3d</span></a>
+      <h3 style="margin-top:14px">Schedule at risk</h3>
+      <a href="#"><span>A-1420 Pump house</span><span class="when">overdue</span></a>
+      <a href="#"><span>A-1615 Clarifier pour</span><span class="when soon">14 Oct</span></a>
+    </div>
+  </nav>
+
+  <main class="main">
+    <div class="bar">
+      <h1 id="title">Send back</h1>
+      <span class="note" id="note">the decision asked for changes — it holds the author up</span>
+      <a class="all" href="#" id="allBtn">Everything waiting →</a>
+    </div>
+
+    <section class="ledger">
+      <table>
+        <thead><tr><th>Document</th><th>What it needs</th><th class="r">Waiting</th><th></th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </section>
+  </main>
+</div>
+
+<div id="tw">
+  <button class="open" onclick="tw.classList.add('on')">Tweaks</button>
+  <div class="panel">
+    <label>Theme<select onchange="document.documentElement.dataset.theme=this.value">
+      <option value="">system</option><option value="light">light</option><option value="dark">dark</option></select></label>
+    <label>Density<select onchange="document.body.dataset.density=this.value">
+      <option value="">normal</option><option value="tight">tight</option><option value="loose">loose</option></select></label>
+    <label>Age bands<select onchange="document.body.dataset.bands=this.value">
+      <option value="">on</option><option value="off">off</option></select></label>
+    <button class="close" onclick="tw.classList.remove('on')">close</button>
+  </div>
+</div>
+
+<script>
+// Shape only. Real rows come from the queue the page already builds.
+const WORK = [
+  {k:"held",    n:"Q6637021-74-ME-CAL-00002", r:"B", t:"Pump house ventilation — heat emission calculation", act:'<b>C3, revise and resubmit</b> — send it back', d:11, flag:"holds the author up", go:"Send back"},
+  {k:"verdict", n:"Q6637021-71-ST-DSW-00001", r:"B", t:"Clarifier TK-201 — structural foundation drawing", act:'<b>Your verdict decides it</b>', d:6, flag:"two people waiting", go:"Decide"},
+  {k:"verdict", n:"Q6637021-70-CI-DSW-00001", r:"C", t:"Feed pump bay P-101/P-102 — civil site works", act:'<b>Your verdict decides it</b>', d:2, go:"Decide"},
+  {k:"release", n:"Q6637021-74-ST-DSW-00001", r:"B", t:"Non-process building 74 — reinforcement arrangement", act:'Release at <span class="code">IFC</span>', d:3, go:"Release"},
+  {k:"release", n:"Q6637021-73-WW-MAN-00001", r:"C", t:"Aeration blower BL-301 — operation and maintenance", act:'Release at <span class="code">IFI</span>', d:0, go:"Release"},
+  {k:"unsent",  n:"Q6637021-72-AR-DSW-00001", r:"A", t:"Site protection 72 — architectural finishes", act:'At <span class="code">AFC</span> — nobody has been told', d:8, go:"Ask to send"},
+  {k:"unsent",  n:"Q6637021-75-CI-SPC-00001", r:"B", t:"Water tower WT-401 — concrete and reinforcement spec", act:'At <span class="code">IFC</span> — nobody has been told', d:1, go:"Ask to send"},
+  {k:"advice",  n:"Q6637021-73-WW-PRO-00001", r:"B", t:"Aeration system BL-301 — start-up and shutdown", act:'Your advice — step 2 of 3', d:0, go:"Review"},
+  {k:"drafts",  n:"Q6637021-74-EL-SCH-00001", r:"A", t:"Feed pump P-101 — motor cable schedule", act:'No file attached yet', d:4, go:"Continue"},
+];
+const NOTE = {
+  held:["Send back","the decision asked for changes — it holds the author up"],
+  verdict:["Give the verdict","yours is the one decision on the revision"],
+  release:["Ready to release","decided, and nobody may work from it until you publish"],
+  unsent:["Released, never sent","in use, and nobody has been told"],
+  advice:["Review — your advice","input for whoever decides"],
+  drafts:["Your drafts","yours to finish"],
+  incoming:["Received","nothing to check"],
+  route:["Send for review","nothing to route"],
+};
+const BANDS=[[8,"Older than a week"],[2,"Earlier this week"],[1,"Yesterday"],[0,"Today"]];
+const age=d=>d===0?"today":d===1?"1 day":d+" days";
+const tone=d=>d>=7?"a":d>=3?"w":"";
+
+function draw(kind){
+  const list=(kind?WORK.filter(w=>w.k===kind):WORK).slice().sort((a,b)=>b.d-a.d);
+  const body=document.getElementById("rows"); body.innerHTML=""; let cut=null;
+  if(!list.length){
+    body.innerHTML=`<tr><td colspan="4" style="padding:34px 20px;color:var(--slate-500);font-size:14px">Nothing here.</td></tr>`;
+  }
+  for(const w of list){
+    const band=BANDS.find(([f])=>w.d>=f)[1];
+    if(band!==cut){cut=band;body.insertAdjacentHTML("beforeend",`<tr class="band"><td colspan="4">${band}</td></tr>`);}
+    body.insertAdjacentHTML("beforeend",`
+      <tr>
+        <td><span class="num">${w.n}<span class="rev">rev ${w.r}</span></span><span class="ttl">${w.t}</span></td>
+        <td class="act">${w.act}${w.flag?`<span class="flag">${w.flag}</span>`:""}</td>
+        <td class="age ${tone(w.d)}">${age(w.d)}</td>
+        <td class="go"><a href="#">${w.go} →</a></td>
+      </tr>`);
+  }
+  const [t,n]=kind?NOTE[kind]:["Everything waiting on you","worst first"];
+  document.getElementById("title").textContent=t;
+  document.getElementById("note").textContent=n;
+  document.getElementById("allBtn").style.display=kind?"":"none";
+}
+document.querySelectorAll(".q").forEach(q=>{
+  q.addEventListener("click",e=>{
+    e.preventDefault();
+    document.querySelectorAll(".q").forEach(x=>x.removeAttribute("aria-current"));
+    q.setAttribute("aria-current","page"); draw(q.dataset.k);
+  });
+});
+document.getElementById("allBtn").addEventListener("click",e=>{
+  e.preventDefault();
+  document.querySelectorAll(".q").forEach(x=>x.removeAttribute("aria-current"));
+  draw(null);
+});
+draw("held");
+</script>
+</body>
+</html>

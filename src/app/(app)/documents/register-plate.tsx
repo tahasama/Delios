@@ -13,7 +13,7 @@ export function RegisterPlate({ project, canCreate }: {
   canCreate: boolean;
 }) {
   return (
-    <div className="border-b border-line px-4 pb-3 pt-3.5 sm:px-5">
+    <div className="border-b border-line px-4 pb-2.5 pt-3 sm:px-5">
       <p className="stencil text-slate-400">
         <span className="font-mono tracking-normal text-slate-500">{project.code}</span>
         <span className="mx-1.5 text-slate-300">/</span>
@@ -29,7 +29,7 @@ export function RegisterPlate({ project, canCreate }: {
           </ButtonLink>
         ) : null}
       </div>
-      <p className="mt-1 max-w-xl text-xs leading-5 text-slate-500">
+      <p className="mt-0.5 max-w-xl text-[11px] leading-4 text-slate-500">
         Every controlled document on this project, one row each, showing the revision in hand now.
       </p>
     </div>

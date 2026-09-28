@@ -25,8 +25,15 @@ export async function SendForReview({ revisionIds }: { revisionIds: string[] }) 
   const applies = (classes: string) => {
     if (classes === "*") return true;
     try {
-      const patterns = JSON.parse(classes) as { docType?: string; discipline?: string; criticality?: string }[];
-      return docs.every((d) => patterns.some((p) => (!p.docType || p.docType === d.docType) && (!p.discipline || p.discipline === d.discipline) && (!p.criticality || p.criticality === d.criticality)));
+      // Originator is part of the match: "a supplier document we produced" and
+      // "one we did not" are the same type and discipline, and route differently.
+      const patterns = JSON.parse(classes) as { docType?: string; discipline?: string; criticality?: string; deliverableType?: string; originator?: string }[];
+      return docs.every((d) => patterns.some((p) =>
+        (!p.docType || p.docType === d.docType)
+        && (!p.discipline || p.discipline === d.discipline)
+        && (!p.criticality || p.criticality === d.criticality)
+        && (!p.deliverableType || p.deliverableType === d.deliverableType)
+        && (!p.originator || p.originator === (d.originator ?? ""))));
     } catch {
       return false;
     }

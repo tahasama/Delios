@@ -13,7 +13,7 @@ import { isEmptyTitle } from "./standard";
 export { verdictMeaning, assertMayGiveBindingVerdict, recordApproval } from "./verdict";
 
 /** The published statuses, read through the tenant so scripts can use this file too. */
-async function publishedStatuses(t: Pick<Tenant, "db">) {
+export async function publishedStatuses(t: Pick<Tenant, "db">) {
   const rows = await t.db.configValue.findMany({ where: { setKey: "STATUSES", status: "ACTIVE" }, orderBy: [{ sort: "asc" }, { code: "asc" }] });
   return rows.map((r) => {
     let props: Record<string, unknown> = {};
@@ -88,8 +88,10 @@ export async function openReviewCycle(
   if (rev.state !== "IN_PREPARATION") throw new Error("Only a revision in preparation can be submitted for review.");
   const seq = (await db.reviewCycle.count({ where: { revisionId } })) + 1;
   const mode = opts.mode ?? "PARALLEL";
+  const { reviewNumber } = await import("./workflow");
   const cycle = await db.reviewCycle.create({
     data: { projectId,
+      number: await reviewNumber(t),
       revisionId,
       mode,
       sequence: seq,
@@ -163,7 +165,7 @@ export async function recordReviewOutcome(
   user: SessionUser,
   outcome: string,
   note?: string,
-  proposedStatus?: string,
+  issuedFor?: string,
 ) {
   const { db, projectId } = t;
   const cycle = await db.reviewCycle.findUniqueOrThrow({
@@ -187,10 +189,15 @@ export async function recordReviewOutcome(
   const approves = cycle.binding && cons.proceed && cycle.revision.state === "IN_REVIEW";
   if (approves) {
     await assertMayGiveBindingVerdict(t, cycle.revisionId, user);
-    if (!proposedStatus) throw new Error("Say what this revision may be used for once released — “to be IFC”, for instance.");
-    const published = await db.configValue.findFirst({ where: { setKey: "STATUSES", code: proposedStatus, status: "ACTIVE" } });
-    if (!published) throw new Error(`“${proposedStatus}” is not one of the published statuses.`);
-    await db.revision.update({ where: { id: cycle.revisionId }, data: { proposedStatus } });
+    if (!issuedFor) throw new Error("Say what this revision is issued for.");
+    const published = await db.configValue.findFirst({ where: { setKey: "STATUSES", code: issuedFor, status: "ACTIVE" } });
+    if (!published) throw new Error(`“${issuedFor}” is not one of the published statuses.`);
+    // The route is over and the status is settled. It is not in force until
+    // Document Control publishes it, and the state is what says so.
+    await db.revision.update({
+      where: { id: cycle.revisionId },
+      data: { statusCode: issuedFor, statusSetAt: new Date(), statusSetByName: user.name, state: "NOT_RELEASED" },
+    });
   }
   if (cycle.issuedToReviewAt) await db.reviewCycle.update({ where: { id: cycleId }, data: { returnedFromReviewAt: new Date() } });
   const blockingOpen = cycle.comments.some((c) => c.progressionPreventing && c.status === "OPEN");
@@ -265,6 +272,91 @@ export async function returnToOriginator(t: Tenant, cycleId: string, user: Sessi
   return { authorization };
 }
 
+/**
+ * Document Control sends a decided revision back instead of publishing it.
+ *
+ * The gate is not a rubber stamp: what the deciders settled on can still be
+ * wrong for the record — the wrong file, a missing enclosure, a status that
+ * cannot be true yet. Sending it back drops the decided status and authorizes
+ * the next revision, and the reason is part of the record.
+ */
+export async function returnAtGate(t: Tenant, revisionId: string, user: SessionUser, reason: string, toStep?: number | null, returnReason?: string | null) {
+  const { db } = t;
+  const rev = await db.revision.findUniqueOrThrow({ where: { id: revisionId }, include: { document: true } });
+  if (rev.state !== "NOT_RELEASED") throw new Error("Only a revision waiting to be published can be sent back from the gate.");
+  if (!reason.trim() && !toStep) throw new Error("Say why it is going back — whoever gets it has to know what to do.");
+
+  // Back to a step of the route, or back to the author. A revision that goes to
+  // a step is in review again and the route picks up there; one that goes to
+  // the author is in preparation, and the status it was going out at no longer
+  // describes anything.
+  const run = await db.workflowRun.findFirst({ where: { revisionId, status: { in: ["ACTIVE", "DONE"] } }, orderBy: { createdAt: "desc" } });
+  const steps = run ? (JSON.parse(run.steps) as { title?: string; status?: string; cycleId?: string; act: string; mode: string; participantIds: string[] }[]) : [];
+  const index = toStep && run && toStep >= 1 && toStep <= steps.length ? toStep - 1 : null;
+  if (index !== null) {
+    // Sending the same revision round again is only honest when the route was
+    // the problem. The organization publishes what counts as that.
+    const published = returnReason
+      ? await db.configValue.findFirst({ where: { setKey: "RETURN_REASONS", code: returnReason, status: "ACTIVE" } })
+      : null;
+    if (!published) {
+      throw new Error("Sending a revision back to a step needs one of the published reasons — they are all faults in the route. A document that is wrong is replaced by the next revision.");
+    }
+  }
+
+  await db.reviewCycle.updateMany({ where: { revisionId, status: "OPEN" }, data: { status: "CLOSED", returnedToOriginatorAt: new Date() } });
+
+  if (index !== null && run) {
+    // The route runs again from that step. Everything from it onward is pending
+    // once more; what came before it keeps the answer it gave.
+    const { spawnCycleAt } = await import("./workflow");
+    for (let i = index; i < steps.length; i++) {
+      steps[i].status = i === index ? "active" : "pending";
+      steps[i].cycleId = undefined;
+    }
+    await db.workflowRun.update({ where: { id: run.id }, data: { steps: JSON.stringify(steps), currentStep: index, status: "ACTIVE" } });
+    await db.revision.update({ where: { id: revisionId }, data: { state: "IN_REVIEW" } });
+    await spawnCycleAt(t, run.id, index, user);
+  } else {
+    // A revision that goes back to its author is over: it is kept as what was
+    // submitted and what was said about it, and the next revision replaces it.
+    // Correcting it in place would erase the thing the record exists for.
+    await db.revision.update({
+      where: { id: revisionId },
+      data: {
+        state: "RETURNED",
+        returnedAt: new Date(),
+        returnedReason: reason,
+        authorizationReason: `Sent back by the control function: ${reason}`,
+        authorizedById: user.id,
+        authorizedByName: user.name,
+        authorizedAt: new Date(),
+      },
+    });
+    await db.workflowRun.updateMany({ where: { revisionId, status: { in: ["ACTIVE", "DONE"] } }, data: { status: "RETURNED" } });
+  }
+  const where = index !== null ? (steps[index].title ?? `step ${index + 1}`) : "its author";
+  await audit({
+    tenant: t, actor: user, action: "RELEASE_REFUSED", entityType: "Revision", entityId: revisionId,
+    entityLabel: `${rev.document.docNumber} rev ${rev.value}`,
+    oldValue: rev.statusCode ?? null, newValue: where, detail: reason,
+  });
+  // Everybody who took part in the route hears it. They gave a verdict on a
+  // revision that is not going out; the next one is coming back to them.
+  const onTheRoute = await db.reviewAssignment.findMany({
+    where: { cycle: { revisionId } },
+    select: { userId: true },
+  });
+  await notifyMany(
+    [rev.document.createdById, ...onTheRoute.map((seat) => seat.userId)],
+    "RELEASE_REFUSED",
+    `Sent back: ${rev.document.docNumber} rev ${rev.value}`,
+    `Not published — back to ${where}. ${reason}`,
+    `/documents/${rev.documentId}`,
+    t,
+  );
+}
+
 // ── Approval & release (Parts 8, 7) ─────────────────────────────────────────
 
 export async function requiredApprovalRole(t: Tenant, document: { discipline: string; docType: string; criticality: string | null }): Promise<{ minRole: string; version: number } | null> {
@@ -295,8 +387,11 @@ export async function releaseRevision(t: Tenant, revisionId: string, user: Sessi
   // Whatever the caller passes, the status the reviewers decided on wins.
   const { db, projectId } = t;
   const { rev, label } = await revisionLabel(t, revisionId);
-  if (rev.proposedStatus) statusCode = rev.proposedStatus;
-  if (rev.state !== "IN_REVIEW" && rev.state !== "IN_PREPARATION") throw new Error("Only an in-review revision can be released.");
+  // The status the route settled on stands. Document Control publishes at
+  // exactly that, or sends the revision back — it does not hold a second
+  // opinion on what the revision is for.
+  if (rev.statusCode) statusCode = rev.statusCode;
+  if (rev.state !== "NOT_RELEASED" && rev.state !== "IN_REVIEW" && rev.state !== "IN_PREPARATION") throw new Error("Only a revision that is with its route, or waiting to be published, can be released.");
   const statuses = await publishedStatuses(t);
   const status = statuses.find((s) => s.code === statusCode);
  if (!status) throw new Error("Status is not in the published set.");
@@ -316,9 +411,6 @@ export async function releaseRevision(t: Tenant, revisionId: string, user: Sessi
   if (!rev.changeDescription) missing.push("description of change");
  if (!rev.renditionFileId) missing.push("a rendition");
  if (missing.length) throw new Error(`Release blocked — metadata incomplete: ${missing.join(", ")}.`);
-  // blocking comments prevent use (§9.6) — but release itself is allowed? §17.3: "released revision with open progression-preventing comment" is a structural contradiction → block release while blocking comments open
-  const openBlocking = await db.reviewComment.count({ where: { cycle: { revisionId }, progressionPreventing: true, status: "OPEN" } });
- if (openBlocking > 0) throw new Error(`Release blocked: ${openBlocking} progression-preventing comment(s) still open.`);
   const execFlag = status.props.executionFlag === true;
   const now = new Date();
   let renditionId = rev.renditionFileId;
@@ -420,11 +512,19 @@ export async function releaseRevision(t: Tenant, revisionId: string, user: Sessi
 export async function voidRevision(t: Tenant, revisionId: string, user: SessionUser, reason: string, reassessment?: string) {
   const { db, projectId } = t;
   const { rev, label } = await revisionLabel(t, revisionId);
-  if (rev.state !== "RELEASED") throw new Error("Only a released revision can be voided.");
-  // void by decision of the authority that approved it (§7.2)
-  const approval = await db.approval.findFirst({ where: { revisionId }, orderBy: { decidedAt: "desc" } });
-  const allowed = isAdmin(user) || (approval && approval.approverId === user.id);
- if (!allowed) throw new Error("Voiding is decided by the authority that approved the revision.");
+  // Released in error, or never reviewed at all: a revision opened, left, and
+  // now in the way of the next one. Voiding the second says it never counted,
+  // which is the truth.
+  const reviewed = await db.reviewCycle.count({ where: { revisionId } });
+  const neverReviewed = rev.state === "IN_PREPARATION" && reviewed === 0;
+  if (rev.state !== "RELEASED" && !neverReviewed) throw new Error("A revision is voided when it was released in error, or when it was never reviewed at all.");
+  if (!neverReviewed) {
+    // Voiding what was issued is the approving authority's decision (§7.2).
+    // Voiding something nobody ever looked at is housekeeping.
+    const approval = await db.approval.findFirst({ where: { revisionId }, orderBy: { decidedAt: "desc" } });
+    const allowed = isAdmin(user) || (approval && approval.approverId === user.id);
+    if (!allowed) throw new Error("Voiding is decided by the authority that approved the revision.");
+  }
   const now = new Date();
   await db.revision.update({ where: { id: revisionId }, data: { state: "VOID", voidedAt: now, voidReason: reason, voidAuthority: user.name, voidReassessment: reassessment ?? null } });
   try {

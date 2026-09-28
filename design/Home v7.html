@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DELIOS — Home v7</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;1,6..72,300&display=swap" rel="stylesheet">
+<style>
+/* Tokens: src/app/theme.css only. Content column; the app's sidebar is not drawn. */
+:root{
+  --surface:#ffffff; --canvas:#eceff4;
+  --line:#d7dde6; --line-strong:#bcc6d4;
+  --brand:#1e3a5f; --link:#2b5b80; --tint-soft:#f2f6fb;
+  --slate-400:#94a3b8; --slate-500:#64748b; --slate-600:#475569; --slate-900:#0f172a;
+  --red-700:oklch(50.5% 0.213 27.518);
+  --sans:"IBM Plex Sans",ui-sans-serif,system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,monospace;
+  --serif:"Newsreader",Georgia,serif;
+  --ease:cubic-bezier(.2,.6,.3,1);
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --surface:#111823; --canvas:#0a0f17;
+  --line:#273245; --line-strong:#37455c;
+  --brand:#2f5e8e; --link:#8db8de; --tint-soft:#152131;
+  --slate-400:#64738a; --slate-500:#8795a9; --slate-600:#a4aebd; --slate-900:#e9edf2;
+  --red-700:oklch(80.8% 0.114 19.571);
+}}
+:root[data-theme="dark"]{
+  --surface:#111823; --canvas:#0a0f17;
+  --line:#273245; --line-strong:#37455c;
+  --brand:#2f5e8e; --link:#8db8de; --tint-soft:#152131;
+  --slate-400:#64738a; --slate-500:#8795a9; --slate-600:#a4aebd; --slate-900:#e9edf2;
+  --red-700:oklch(80.8% 0.114 19.571);
+}
+
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  background:var(--surface);color:var(--slate-900);font-family:var(--sans);
+  font-size:17px;line-height:1.6;text-wrap:pretty;-webkit-font-smoothing:antialiased;
+}
+a{color:inherit;text-decoration:none}
+.page{max-width:760px;margin:0 auto;padding:72px 28px 120px}
+@media(max-width:640px){.page{padding:44px 20px 80px}}
+
+/* ── The opening ────────────────────────────────────────────────────────── */
+.today{
+  font-family:var(--mono);font-size:12px;font-weight:400;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--slate-400);margin:0 0 20px;
+}
+h1{
+  margin:0;font-family:var(--serif);font-weight:300;
+  font-size:clamp(32px,4.6vw,46px);line-height:1.18;letter-spacing:-.015em;
+}
+h1 .n{font-weight:400}
+h1 em{font-style:italic;color:var(--slate-500)}
+
+/* ── The things ─────────────────────────────────────────────────────────── */
+.things{margin:52px 0 0;padding:0;list-style:none}
+.thing{padding:22px 0;border-top:1px solid var(--line)}
+.thing:last-child{border-bottom:1px solid var(--line)}
+.thing a.row{display:block;transition:opacity .16s var(--ease)}
+.thing a.row:hover{opacity:.62}
+.thing .said{margin:0;font-size:18px;line-height:1.5;color:var(--slate-900)}
+.thing .said b{font-weight:600}
+.thing .said .doc{font-family:var(--mono);font-size:15.5px;font-weight:500}
+.thing .said .late{color:var(--red-700)}
+.thing .meta{
+  margin:7px 0 0;font-size:14.5px;color:var(--slate-500);
+  display:flex;flex-wrap:wrap;gap:0 10px;align-items:baseline;
+}
+.thing .meta .dot{color:var(--slate-400)}
+.thing .meta .go{margin-left:auto;color:var(--link);font-weight:500}
+.thing a.row:hover .go{text-decoration:underline}
+
+/* ── The rest, quietly ──────────────────────────────────────────────────── */
+.rest{margin-top:56px}
+.rest h2{
+  margin:0 0 4px;font-family:var(--mono);font-size:12px;font-weight:400;
+  letter-spacing:.14em;text-transform:uppercase;color:var(--slate-400);
+}
+.rest ul{list-style:none;margin:14px 0 0;padding:0;columns:2;column-gap:36px}
+@media(max-width:560px){.rest ul{columns:1}}
+.rest li{break-inside:avoid;padding:7px 0}
+.rest a{font-size:16px;color:var(--slate-600);display:flex;gap:10px;align-items:baseline}
+.rest a:hover{color:var(--slate-900)}
+.rest a .c{font-family:var(--mono);font-size:14px;color:var(--slate-400);margin-left:auto}
+
+.closing{margin-top:64px;font-size:15px;color:var(--slate-400)}
+.closing a{color:var(--link)}
+.closing a:hover{text-decoration:underline}
+
+#tw{position:fixed;right:22px;bottom:22px;z-index:50;font-size:13px}
+#tw button.open{background:none;border:1px solid var(--line-strong);color:var(--slate-500);border-radius:99px;padding:8px 15px;font-family:var(--sans);font-size:12.5px;cursor:pointer}
+#tw button.open:hover{color:var(--slate-900)}
+#tw .panel{display:none;background:var(--surface);border:1px solid var(--line-strong);border-radius:9px;padding:16px;width:236px}
+#tw.on .panel{display:block} #tw.on button.open{display:none}
+#tw label{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:0 0 10px;color:var(--slate-600);font-size:13px}
+#tw select{font-family:var(--sans);font-size:13px;padding:4px 7px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--slate-900)}
+#tw .close{background:none;border:0;color:var(--link);font-weight:500;cursor:pointer;padding:0;font-size:13px}
+body[data-role="author"] .control-only,
+body[data-role="reviewer"] .control-only{display:none}
+</style>
+</head>
+<body data-role="control">
+<div class="page">
+
+  <p class="today">Monday 28 September · Q6637021 Thermal piping</p>
+
+  <h1>
+    <span class="n">Three</span> things need you today.<br>
+    <em>Everything else can wait.</em>
+  </h1>
+
+  <ul class="things">
+
+    <li class="thing">
+      <a class="row" href="#">
+        <p class="said">
+          <b>Send back</b> <span class="doc">Q6637021-74-ME-CAL-00002</span> rev B —
+          the lead rejected it, and its author cannot start the next revision until you do.
+        </p>
+        <p class="meta">
+          <span>waiting 11 days</span><span class="dot">·</span>
+          <span class="late">holds up A-1420, already overdue</span>
+          <span class="go">Send it back →</span>
+        </p>
+      </a>
+    </li>
+
+    <li class="thing">
+      <a class="row" href="#">
+        <p class="said">
+          <b>Give the verdict</b> on <span class="doc">Q6637021-71-ST-DSW-00001</span> rev B.
+          Two reviewers have answered and are waiting on you.
+        </p>
+        <p class="meta">
+          <span>waiting 6 days</span><span class="dot">·</span>
+          <span>needed for the clarifier pour on 14 October</span>
+          <span class="go">Decide →</span>
+        </p>
+      </a>
+    </li>
+
+    <li class="thing">
+      <a class="row" href="#">
+        <p class="said">
+          <b>Release</b> <span class="doc">Q6637021-74-ST-DSW-00001</span> rev B at IFC.
+          The route settled it three days ago; nobody may build from it until you publish.
+        </p>
+        <p class="meta">
+          <span>waiting 3 days</span><span class="dot">·</span>
+          <span>needed for A-1702 on 19 October</span>
+          <span class="go">Release →</span>
+        </p>
+      </a>
+    </li>
+
+  </ul>
+
+  <section class="rest">
+    <h2>Also yours</h2>
+    <ul>
+      <li><a href="#">One more verdict<span class="c">1</span></a></li>
+      <li><a href="#">Advice on a review<span class="c">1</span></a></li>
+      <li><a href="#">Ready to release<span class="c">1</span></a></li>
+      <li><a href="#">Released, never sent<span class="c">2</span></a></li>
+      <li><a href="#">Your drafts<span class="c">1</span></a></li>
+      <li class="control-only"><a href="#">Waiting on other people<span class="c">2</span></a></li>
+    </ul>
+  </section>
+
+  <p class="closing">
+    The register is <a href="#">94% clean</a>, last checked six days ago.
+    <span class="control-only">Two critical issues are open.</span>
+  </p>
+</div>
+
+<div id="tw">
+  <button class="open" onclick="tw.classList.add('on')">Tweaks</button>
+  <div class="panel">
+    <label>Signed in as<select onchange="document.body.dataset.role=this.value">
+      <option value="control">Document Control</option><option value="reviewer">Reviewer</option><option value="author">Author</option></select></label>
+    <label>Theme<select onchange="document.documentElement.dataset.theme=this.value">
+      <option value="">system</option><option value="light">light</option><option value="dark">dark</option></select></label>
+    <button class="close" onclick="tw.classList.remove('on')">close</button>
+  </div>
+</div>
+</body>
+</html>

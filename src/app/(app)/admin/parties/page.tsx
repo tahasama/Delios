@@ -1,45 +1,55 @@
 import { isAdmin } from "@/lib/auth";
 import { SETUP_PAGES, maySetup } from "../setup-pages";
 import { requireScope } from "@/lib/scope";
-import { saveDistributionRuleAction, deleteDistributionRuleAction } from "@/lib/actions/retention";
-import { getActiveSet } from "@/lib/config";
 import { PageHeader, Card, DataTable, Th, Td, Chip, Field, inputCls } from "@/components/ui";
 import { ActionForm } from "@/components/form";
-import { savePartyAction } from "@/lib/actions/workflow";
+import { savePartyAction, deletePartyAction } from "@/lib/actions/workflow";
+import { PartyKindFields } from "./party-fields";
+import { PARTY_KINDS } from "@/lib/party-kinds";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Parties & people" };
+export const metadata = { title: "Organizations" };
 
 // §0.3 — our organization and the external parties it exchanges information with.
 export default async function AdminPartiesPage() {
   const { user: me, db } = await requireScope();
-  if (!maySetup(me, SETUP_PAGES.find((p) => p.href === "/admin/parties")!)) return <PageHeader title="Parties" subtitle="Administrators and the control function." />;
-  const [parties, rules, deliverables, confs] = await Promise.all([
+  if (!maySetup(me, SETUP_PAGES.find((p) => p.href === "/admin/parties")!)) return <PageHeader title="Organizations" subtitle="Administrators and the control function." />;
+  const [parties] = await Promise.all([
     db.party.findMany({ orderBy: [{ isInternal: "desc" }, { name: "asc" }], include: { _count: { select: { users: true } }, contact: { select: { id: true, name: true, email: true } }, backup: { select: { id: true, name: true } } } }),
-    db.distributionRule.findMany({ orderBy: [{ deliverableType: "asc" }, { confidentiality: "asc" }] }),
-    getActiveSet("DELIVERABLE_TYPES"),
-    getActiveSet("CONFIDENTIALITY"),
   ]);
   const people = await db.user.findMany({ where: { active: true }, orderBy: { name: "asc" }, select: { id: true, name: true, email: true, partyId: true } });
-  const users = people;
-  const nameOf = (id: string) => users.find((u) => u.id === id)?.name ?? id;
-  const mayEdit = true; // this page is administrators only
+  const functions = await db.function.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } });
+
+  const KINDS = PARTY_KINDS;
+  /** How many people this organization has here. Everyone here signs in. */
+  const signingIn = (partyId: string) => people.filter((person) => person.partyId === partyId).length;
+  /** Records written before the kinds existed still read correctly. */
+  const kindOf = (party: { kind: string; participation: string }) =>
+    party.participation && party.participation !== "IN_APP" ? "OFFLINE" : party.kind ?? "COLLABORATOR";
 
   return (
     <div className="space-y-4">
       <PageHeader
-        title="Parties"
-        subtitle="Your organization and the companies you exchange documents with. Assign people to them in People & access."
+        title="Organizations"
+        subtitle="Yours, and the others you exchange documents with. Their people are added in People & access."
       />
       <div className="space-y-4">
         <div className="space-y-4">
-          <Card title={`Parties (${parties.length})`}>
-            <DataTable head={<tr><Th>Code</Th><Th>Name</Th><Th>Type</Th><Th>Who answers for it</Th><Th>People</Th><Th></Th></tr>}>
+          <Card title={`Organizations (${parties.length})`}>
+            <DataTable head={<tr><Th>Code</Th><Th>Name</Th><Th>Type</Th><Th label="How they work with us">How they work with us</Th><Th>Who answers for it</Th><Th>People</Th><Th></Th></tr>}>
               {parties.map((p) => (
                 <tr key={p.id} className={p.active ? "align-top" : "align-top opacity-60"}>
                   <Td className="font-mono text-xs font-semibold">{p.code}</Td>
                   <Td>{p.name}</Td>
                   <Td><Chip className={p.isInternal ? "bg-sky-100 text-sky-800 ring-sky-300" : "bg-violet-100 text-violet-800 ring-violet-300"}>{p.isInternal ? "our organization" : "external"}</Chip></Td>
+                  <Td className="text-xs">
+                    {p.isInternal ? <span className="text-slate-400">—</span> : (
+                      <>
+                        <span className="font-medium text-slate-700">{KINDS.find((k) => k.value === kindOf(p))?.label}</span>
+                        <span className="block max-w-56 text-[11px] leading-4 text-slate-400">{KINDS.find((k) => k.value === kindOf(p))?.hint}</span>
+                      </>
+                    )}
+                  </Td>
                   <Td className="text-xs">
                     {p.contact ? (
                       <>
@@ -48,30 +58,41 @@ export default async function AdminPartiesPage() {
                       </>
                     ) : p.isInternal ? <span className="text-slate-400">—</span> : <span className="font-semibold text-amber-700">nobody named</span>}
                   </Td>
-                  <Td className="tabular-nums text-xs">{p._count.users}{p.active ? "" : <span className="block text-[11px] font-semibold text-red-700">access revoked</span>}</Td>
+                  <Td className="tabular-nums text-xs">
+                    {p._count.users
+                      ? <a href={`/admin/users?org=${p.id}`} className="font-semibold text-link hover:underline">{p._count.users}</a>
+                      : <span className="text-slate-400">0</span>}
+                    {p.active ? null : <span className="block text-[11px] font-semibold text-red-700">access revoked</span>}
+                  </Td>
                   <Td>
                     <details>
                       <summary className="cursor-pointer text-xs font-semibold text-link">Edit</summary>
                       <div className="mt-2 w-80">
-                        <ActionForm action={savePartyAction} submitLabel="Save" size="sm" hidden={{ id: p.id, code: p.code }}>
+                        <ActionForm action={savePartyAction} submitLabel="Save" size="sm" hidden={{ id: p.id }}>
                           <Field label="Name" required><input name="name" required defaultValue={p.name} className={inputCls} /></Field>
-                          <Field label="Who answers for it" required={!p.isInternal} hint="the person we write to about their documents">
-                            <select name="contactId" defaultValue={p.contactId ?? ""} className={inputCls}>
-                              <option value="">— nobody —</option>
-                              {people.filter((u) => u.partyId === p.id || u.partyId === null).map((u) => <option key={u.id} value={u.id}>{u.name}{u.email ? ` · ${u.email}` : ""}</option>)}
-                            </select>
-                          </Field>
-                          <Field label="Backup" hint="optional — who stands in when the contact is away">
-                            <select name="backupId" defaultValue={p.backupId ?? ""} className={inputCls}>
-                              <option value="">— none —</option>
-                              {people.filter((u) => u.partyId === p.id || u.partyId === null).map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
-                            </select>
+                          <Field label="Code" required hint="documents and transmittals already issued keep the old code — only what comes next uses this one">
+                            <input name="code" required maxLength={20} defaultValue={p.code} className={inputCls} />
                           </Field>
                           {p.isInternal ? null : (
-                            <label className="flex items-center gap-2 text-xs text-slate-600"><input type="checkbox" name="active" defaultChecked={p.active} /> Has access — untick to revoke; its {p._count.users} {p._count.users === 1 ? "person" : "people"} can no longer sign in</label>
+                            <PartyKindFields
+                              kind={kindOf(p)}
+                              contactId={p.contactId ?? ""}
+                              backupId={p.backupId ?? ""}
+                              liaisonFunction={p.liaisonFunction ?? ""}
+                              people={people.filter((u) => u.partyId === p.id)}
+                              functions={functions}
+                              access={{ active: p.active, signingIn: signingIn(p.id) }}
+                            />
                           )}
                           {p.isInternal ? <input type="hidden" name="active" value="on" /> : null}
                         </ActionForm>
+                        {!p.isInternal && p._count.users === 0 ? (
+                          <div className="mt-3 border-t border-slate-100 pt-3">
+                            <ActionForm action={deletePartyAction} submitLabel="Remove this organization" size="sm" variant="danger" hidden={{ id: p.id }}>
+                              <p className="text-xs text-slate-500">It has nobody, so it can be removed outright. Once it holds a person, a step, a document or a transmittal, revoke its access instead.</p>
+                            </ActionForm>
+                          </div>
+                        ) : null}
                       </div>
                     </details>
                   </Td>
@@ -80,94 +101,26 @@ export default async function AdminPartiesPage() {
             </DataTable>
           </Card>
         </div>
-        <details className="rounded-2xl border border-slate-200 bg-surface px-5 py-3 shadow-sm"><summary className="cursor-pointer text-sm font-semibold text-brand-ink">+ Add a party</summary><div className="mt-3 max-w-2xl">
-          <ActionForm action={savePartyAction} submitLabel="Add party" size="sm">
-            <p className="text-xs text-slate-500">Add the people first in <a href="/admin/users" className="font-semibold text-link hover:underline">People &amp; access</a>, then name one of them here as the contact.</p>
-            <Field label="Code" required hint="short, unique — e.g. MADASUD">
-              <input name="code" required maxLength={20} className={inputCls} />
-            </Field>
-            <Field label="Name" required>
-              <input name="name" required className={inputCls} />
-            </Field>
-            <Field label="Who answers for it" hint="required for an outside party">
-              <select name="contactId" defaultValue="" className={inputCls}>
-                <option value="">— nobody yet —</option>
-                {people.map((u) => <option key={u.id} value={u.id}>{u.name}{u.email ? ` · ${u.email}` : ""}</option>)}
-              </select>
-            </Field>
-            <Field label="Backup" hint="optional">
-              <select name="backupId" defaultValue="" className={inputCls}>
-                <option value="">— none —</option>
-                {people.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
-              </select>
-            </Field>
-            <label className="flex items-center gap-2 text-sm text-slate-700">
-              <input type="checkbox" name="isInternal" /> This is our organization (internal)
-            </label>
+        <details className="rounded-2xl border border-slate-200 bg-surface px-5 py-3 shadow-sm"><summary className="cursor-pointer text-sm font-semibold text-brand-ink">+ Add an organization</summary><div className="mt-3 max-w-2xl">
+          <ActionForm action={savePartyAction} submitLabel="Register this organization" size="sm">
+            <p className="text-xs text-slate-500">
+              Another organization you exchange documents with. Yours is already here, registered once at setup.
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Code" required hint="short, unique — e.g. MADASUD">
+                <input name="code" required maxLength={20} className={inputCls} />
+              </Field>
+              <Field label="Name" required>
+                <input name="name" required className={inputCls} />
+              </Field>
+            </div>
+            <PartyKindFields kind="OFFLINE" contactId="" backupId="" liaisonFunction="" people={[]} functions={functions} />
+            <p className="text-[11px] leading-4 text-slate-400">
+              A collaborator or a guest needs accounts, created in <a href="/admin/users" className="font-semibold text-link hover:underline">People &amp; access</a> and attached to this organization; then you name the one who answers for it.
+              An organization that is not on the EDMS needs nobody here: one of our functions carries it, and fills in its review, comments and answer with proof each time.
+            </p>
           </ActionForm>
         </div></details>
-      <Card
-        title={`External parties (${rules.length})`}
-        description="Organizations with no account here that must still receive certain documents."
-      >
-        <div className="space-y-3">
-          <div>
-            {rules.length === 0 ? (
-              <p className="text-xs text-slate-400">
-                None.
-              </p>
-            ) : (
-              <DataTable head={<tr><Th>Deliverable type</Th><Th>Confidentiality</Th><Th>Internal</Th><Th>External parties</Th><Th></Th></tr>}>
-                {rules.map((r) => {
-                  const ids = JSON.parse(r.userIds) as string[];
-                  const parties = r.partyNames ? (JSON.parse(r.partyNames) as string[]) : [];
-                  return (
-                    <tr key={r.id}>
-                      <Td className="font-mono text-xs">{r.deliverableType}</Td>
-                      <Td><Chip>{r.confidentiality}</Chip></Td>
-                      <Td className="text-xs">{ids.map(nameOf).join(", ") || "—"}</Td>
-                      <Td className="text-xs">{parties.join(", ") || "—"}</Td>
-                      <Td>
-                        {mayEdit ? <form action={deleteDistributionRuleAction}>
-                          <input type="hidden" name="id" value={r.id} />
-                          <button className="text-xs text-slate-400 hover:text-red-600">remove</button>
-                        </form> : null}
-                      </Td>
-                    </tr>
-                  );
-                })}
-              </DataTable>
-            )}
-          </div>
-
-          {mayEdit ? <details className="max-w-xl">
-            <summary className="cursor-pointer text-xs font-semibold text-link">+ Add an external party</summary>
-            <div className="mt-3">
-            <ActionForm action={saveDistributionRuleAction} submitLabel="Add" size="sm">
-              <Field label="Deliverable type" required>
-                <select name="deliverableType" required className={inputCls} defaultValue="">
-                  <option value="" disabled>Choose…</option>
-                  {deliverables.map((d) => <option key={d.code} value={d.code}>{d.code} — {d.label}</option>)}
-                </select>
-              </Field>
-              <Field label="Confidentiality" required>
-                <select name="confidentiality" className={inputCls} defaultValue="INTERNAL">
-                  {confs.map((c) => <option key={c.code} value={c.code}>{c.label}</option>)}
-                </select>
-              </Field>
-              <Field label="External parties" hint="One per line — organizations without accounts here">
-                <textarea name="partyNames" rows={3} className={inputCls} placeholder={"Client engineering\nCertifying authority"} />
-              </Field>
-              <Field label="Also these people" hint="Only if someone needs it outside their function">
-                <select name="userIds" multiple size={4} className={`${inputCls} h-auto py-1.5`}>
-                  {users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
-                </select>
-              </Field>
-            </ActionForm>
-            </div>
-          </details> : null}
-        </div>
-      </Card>
       </div>
     </div>
   );

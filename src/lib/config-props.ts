@@ -36,7 +36,14 @@ export const SET_PROP_FIELDS: Record<string, PropField[]> = {
   // Advice is read off the comments, never chosen, so only its wording is an
   // organization's business.
   REVIEW_ADVICE: [
-    { key: "meaning", label: "What it means, in one line", type: "text" },
+    { key: "comments", label: "What the adviser's comments amount to", type: "select", options: ["none", "some", "blocking"] },
+    { key: "meaning", label: "What it means", type: "text" },
+  ],
+  // Why a review route is rewound to an earlier step on the same revision.
+  // Every one of them is a fault in the route, not in the document: a document
+  // that is wrong is replaced by the next revision, never sent round again.
+  RETURN_REASONS: [
+    { key: "meaning", label: "What it means", type: "text" },
   ],
   REASONS_FOR_ISSUE: [
  { key: "maturity", label: "Required maturity", type: "text", hint: "what state the revision must be in" },
@@ -52,7 +59,7 @@ export const SET_PROP_FIELDS: Record<string, PropField[]> = {
  { key: "default", label: "Used when none is chosen", type: "bool", hint: "" },
   ],
   ISSUE_CODES: [
-    { key: "reason", label: "Maps to reason for issue", type: "select", options: ["INFORMATION", "REVIEW", "APPROVAL", "PRICING", "EXECUTION", "RECORD"] },
+    { key: "reason", label: "Maps to reason for issue", type: "select", options: ["INFORMATION", "REVIEW", "APPROVAL", "PRICING", "EXECUTION", "RECORD", "REQUEST"] },
   ],
   CRITICALITY: [
  { key: "approval", label: "Minimum approval role", type: "select", options: ["REVIEWER", "APPROVER", "CONTROLLER", "ADMIN"], hint: "" },

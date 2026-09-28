@@ -85,6 +85,11 @@ export async function submitSupplierPackageAction(_prev: { error?: string; ok?: 
         data: {
           projectId, documentId: doc.id, value, series, state: "IN_PREPARATION",
           reasonForRevision: doc.revisions.length ? "Resubmission" : "First submission",
+          // A supplier's document is authored by the supplier, whoever uploads it.
+          authoredByName: doc.originator ?? pkg.partyCode ?? "Supplier",
+          authoredByParty: doc.originator ?? null,
+          uploadedById: user.id,
+          uploadedByName: user.name,
           changeDescription: doc.revisions.length ? "Resubmitted by the supplier" : "Initial submission",
           plannedSubmissionDate: latest?.plannedSubmissionDate ?? pkg.completionDate,
           authorizationReason: `Supplier submission through package ${pkg.identifier}`,

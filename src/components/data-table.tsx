@@ -90,10 +90,10 @@ export function DataTable({
    */
   tools?: React.ReactNode;
   /**
-   * Makes the rows the only thing that scrolls: the table takes whatever height
-   * is left between where it starts and the bottom of the window, so the
-   * masthead, the filters and the paging stay on screen while the rows move
-   * under them. The frame it must fit inside is marked `data-dt-frame`.
+   * Makes the rows the only thing that scrolls: the table stands 85% of the
+   * window tall, its bar holds under the application header and its paging
+   * holds the floor of the window, so the tools and the place in the table stay
+   * put while the rows move between them.
    */
   fill?: boolean;
 }) {
@@ -203,33 +203,52 @@ export function DataTable({
   const withBar = toolbar && hideable.length >= 3;
   const sticky = rows > STICKY_AFTER;
 
-  // How tall the rows may be, measured rather than guessed: the window, less
-  // where the rows start, less whatever the page keeps below them (the paging
-  // bar), less a hair so the frame's own edge still shows.
+  // How tall the rows are: the window, less everything that will still be on
+  // screen when the page is scrolled to the bottom — the application header,
+  // the table's own bar above the rows, the paging under them, and whatever
+  // padding the page keeps below the frame. All four are read from the page
+  // rather than assumed, and none of them depends on the height being set, so
+  // there is no loop.
   const scroller = useRef<HTMLDivElement>(null);
   const [height, setHeight] = useState<number | null>(null);
   useEffect(() => {
     if (!fill) return;
+    const box = scroller.current;
+    if (!box) return;
+    const bar = box.parentElement?.querySelector<HTMLElement>(":scope > .dt-bar") ?? null;
+    const frame = box.closest<HTMLElement>("[data-dt-frame]");
+    const foot = frame?.querySelector<HTMLElement>(":scope > [data-dt-foot]") ?? null;
+    const header = document.querySelector<HTMLElement>("[data-app-header]");
+
     const measure = () => {
-      const box = scroller.current;
-      if (!box) return;
-      const top = box.getBoundingClientRect().top;
-      const frame = box.closest("[data-dt-frame]");
-      const below = frame ? frame.getBoundingClientRect().bottom - box.getBoundingClientRect().bottom : 0;
-      setHeight(Math.max(240, Math.round(window.innerHeight - top - below - 18)));
+      const page = document.documentElement;
+      // What the page keeps under the frame: measured as the gap between the
+      // frame's foot and the end of the document, so a change of page padding
+      // needs no change here.
+      const edge = frame
+        ? Math.max(0, Math.round(page.scrollHeight - (frame.getBoundingClientRect().bottom + window.scrollY)))
+        : 0;
+      const taken = (header?.offsetHeight ?? 0) + (bar?.offsetHeight ?? 0) + (foot?.offsetHeight ?? 0) + edge;
+      setHeight(Math.max(240, Math.round(window.innerHeight - taken)));
     };
+
     measure();
     window.addEventListener("resize", measure);
+    // A late webfont, a wrapped label or a header that changes shape all change
+    // the sums above without the window ever being resized.
     const watch = new ResizeObserver(measure);
-    if (scroller.current?.closest("[data-dt-frame]")) watch.observe(scroller.current.closest("[data-dt-frame]")!);
+    for (const part of [bar, foot, header]) if (part) watch.observe(part);
+    document.fonts?.ready.then(measure).catch(() => {});
     return () => { window.removeEventListener("resize", measure); watch.disconnect(); };
-  }, [fill, rows, prefs]);
+  }, [fill, rows]);
 
   return (
     <div className={cn("dt rounded-2xl border border-slate-200 bg-surface shadow-sm", className)} data-dt={scope}>
       {css ? <style>{css}</style> : null}
       {withBar ? (
-        <div className="no-print flex items-center justify-between gap-2 border-b border-slate-100 px-3 py-1.5">
+        <div className={cn(
+          "dt-bar no-print flex items-center justify-between gap-2 border-b border-slate-100 bg-surface px-3 py-1.5",
+        )}>
           <p className="px-1 text-[11px] font-medium tabular-nums text-slate-400">{rows} {rows === 1 ? "row" : "rows"}</p>
           <div className="flex items-center gap-0.5">
             {customised ? (

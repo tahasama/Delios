@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { isController, isAdmin } from "@/lib/auth";
 import { PageHeader, Card, Chip, Banner, Field, inputCls, DataTable, Th, Td } from "@/components/ui";
 import { ActionForm } from "@/components/form";
-import { ACCEPTANCE_CONDITIONS, REASON_LABEL, type ReasonForIssue } from "@/lib/standard";
+import { ACCEPTANCE_CONDITIONS, ENCLOSURE_CONDITIONS, REASON_LABEL, type ReasonForIssue } from "@/lib/standard";
 import { fmtDate, fmtDateTime } from "@/lib/utils";
 import { issueTransmittalAction, acceptanceCheckAction } from "@/lib/actions/transmittals";
 import { preflight } from "@/lib/rules/preflight";
@@ -135,7 +135,7 @@ export default async function TransmittalDetailPage({ params, searchParams }: { 
                   <Action label="Accept">
                     <ActionForm action={acceptanceCheckAction} submitLabel="Accept" size="sm" hidden={{ transmittalId: t.id }}>
                       <ul className="space-y-2">
-                        {ACCEPTANCE_CONDITIONS.map((c) => (
+                        {ACCEPTANCE_CONDITIONS.filter((c) => t.items.length > 0 || !(ENCLOSURE_CONDITIONS as readonly string[]).includes(c.key)).map((c) => (
                           <li key={c.key} className="flex items-start gap-2 text-sm text-slate-700">
                             <input type="checkbox" name={`cond_${c.key}`} required className="mt-1" id={`cond-${c.key}`} />
                             <label htmlFor={`cond-${c.key}`}>{c.label}</label>

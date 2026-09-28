@@ -6,7 +6,7 @@ import { warnLateReviews } from "@/lib/review-risk";
 import { getSet } from "@/lib/config";
 import { PageHeader, DataTable, Th, Td, Chip, EmptyState, Info } from "@/components/ui";
 import { fmtDate } from "@/lib/utils";
-import { OUTCOME_CONSEQUENCES } from "@/lib/standard";
+import { ADVICE_LABEL, OUTCOME_CONSEQUENCES } from "@/lib/standard";
 import { ArrowRight } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -53,7 +53,7 @@ export default async function ReviewsPage({ searchParams }: { searchParams: Prom
   const count = (s: string) => (s === "ALL" ? counts.reduce((n, c) => n + c._count, 0) : counts.find((c) => c.status === s)?._count ?? 0);
   // Codes from the organization's list; older records may carry the Standard's
   // own consequence names (APPROVED, REVISE_AND_RESUBMIT…).
-  const verdictLabel = new Map<string, string>([...Object.entries(OUTCOME_CONSEQUENCES).map(([k, v]) => [k, v.label] as [string, string]), ...verdicts.map((v) => [v.code, v.label] as [string, string]), ...adviceValues.map((v) => [v.code, v.label] as [string, string])]);
+  const verdictLabel = new Map<string, string>([...Object.entries(OUTCOME_CONSEQUENCES).map(([k, v]) => [k, v.label] as [string, string]), ...verdicts.map((v) => [v.code, v.label] as [string, string]), ...Object.entries(ADVICE_LABEL).map(([code, label]) => [code, label] as [string, string]), ...adviceValues.map((v) => [v.code, v.label] as [string, string])]);
   const proceeds = new Map<string, boolean>([...Object.entries(OUTCOME_CONSEQUENCES).map(([k, v]) => [k, v.proceed] as [string, boolean]), ...verdicts.map((v) => [v.code, v.props.proceed === true] as [string, boolean])]);
 
   return (
@@ -82,6 +82,7 @@ export default async function ReviewsPage({ searchParams }: { searchParams: Prom
           defaultHidden={["Opened by", "Closed"]}
           head={
             <tr>
+              <Th>Review <Info>Its own number, like a transmittal or an action. Click it to open the review.</Info></Th>
               <Th>Document</Th>
               <Th>Rev</Th>
               <Th>Kind <Info>A decision is the last step of a route and releases the revision or sends it back. Advice is any earlier step. A client review happens after we released it, and is answered by a new revision.</Info></Th>
@@ -104,6 +105,9 @@ export default async function ReviewsPage({ searchParams }: { searchParams: Prom
             const waitingOn = c.assignments.filter((a) => !a.completedAt);
             return (
               <tr key={c.id}>
+                <Td className="whitespace-nowrap">
+                  <Link href={`/reviews/${c.id}`} className="font-mono text-xs font-bold text-link hover:underline">{c.number ?? "—"}</Link>
+                </Td>
                 <Td className="min-w-[240px]">
                   <Link href={`/documents/${c.revision.document.id}`} className="font-mono text-xs font-bold text-link hover:underline">{c.revision.document.docNumber}</Link>
                   <span className="block max-w-72 truncate text-xs text-slate-500" title={c.revision.document.title}>{c.revision.document.title}</span>

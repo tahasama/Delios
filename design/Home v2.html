@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DELIOS — Home v2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&display=swap" rel="stylesheet">
+<style>
+/* ── Tokens from src/app/theme.css. Nothing invented. ────────────────────── */
+:root{
+  --surface:#ffffff; --canvas:#eceff4; --canvas-deep:#e2e7ee;
+  --line:#d7dde6; --line-strong:#bcc6d4;
+  --brand:#1e3a5f; --brand-hover:#2d5480; --brand-strong:#17324d;
+  --brand-line:#3b6389; --link:#2b5b80; --tint:#e4eef7; --tint-soft:#f2f6fb;
+  --ink:#0f172a; --ink-2:#48566b; --ink-3:#7c8798;
+  --warn:#9a5b06; --warn-soft:#f6e6cd; --alarm:#9b1c1c; --alarm-soft:#f6d9d9;
+  --sans:"IBM Plex Sans",ui-sans-serif,system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,monospace;
+  --serif:"Newsreader",Georgia,serif;
+  --r:10px; --ease:cubic-bezier(.2,.6,.3,1);
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --surface:#111823; --canvas:#0a0f17; --canvas-deep:#070b12;
+  --line:#273245; --line-strong:#37455c;
+  --brand:#2f5e8e; --brand-hover:#3a70a6; --brand-strong:#28527d;
+  --brand-line:#5f8fbf; --link:#8db8de; --tint:#1a2a3c; --tint-soft:#152131;
+  --ink:#e6edf6; --ink-2:#9fb0c4; --ink-3:#6c7c92;
+  --warn:#e6a94a; --warn-soft:#3a2c16; --alarm:#f08b8b; --alarm-soft:#3a1c1c;
+}}
+:root[data-theme="dark"]{
+  --surface:#111823; --canvas:#0a0f17; --canvas-deep:#070b12;
+  --line:#273245; --line-strong:#37455c;
+  --brand:#2f5e8e; --brand-hover:#3a70a6; --brand-strong:#28527d;
+  --brand-line:#5f8fbf; --link:#8db8de; --tint:#1a2a3c; --tint-soft:#152131;
+  --ink:#e6edf6; --ink-2:#9fb0c4; --ink-3:#6c7c92;
+  --warn:#e6a94a; --warn-soft:#3a2c16; --alarm:#f08b8b; --alarm-soft:#3a1c1c;
+}
+
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--canvas);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.5;text-wrap:pretty;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+.wrap{max-width:1240px;margin:0 auto;padding:30px 18px 72px}
+
+/* ── The line. Your work, placed on the document's journey. ──────────────── */
+.line{
+  background:var(--surface);border:1px solid var(--line);border-radius:var(--r);
+  padding:24px 26px 6px;margin-bottom:16px;position:relative;overflow:hidden;
+}
+.line .said{margin:0 0 20px;font-family:var(--serif);font-weight:400;font-size:clamp(24px,2.9vw,33px);line-height:1.15;letter-spacing:-.01em}
+.line .said b{font-weight:600}
+.line .said em{font-style:italic;color:var(--ink-2)}
+
+.stations{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));position:relative}
+.rail{position:absolute;left:6%;right:6%;top:13px;height:1px;background:var(--line-strong)}
+.rail i{position:absolute;inset:0;background:linear-gradient(90deg,transparent,var(--brand-line),transparent);opacity:.5;
+  transform:translateX(-30%);animation:flow 7s var(--ease) infinite}
+@keyframes flow{0%{transform:translateX(-35%)}100%{transform:translateX(105%)}}
+@media (prefers-reduced-motion:reduce){.rail i{animation:none;opacity:.25}}
+
+.st{background:none;border:0;padding:0 6px 20px;font-family:var(--sans);color:inherit;cursor:pointer;text-align:center;position:relative}
+.st .dot{
+  width:11px;height:11px;border-radius:99px;background:var(--surface);
+  border:2px solid var(--line-strong);margin:8px auto 12px;position:relative;z-index:1;
+  transition:border-color .16s var(--ease),transform .16s var(--ease),box-shadow .16s var(--ease);
+}
+.st .n{display:block;font-family:var(--mono);font-size:30px;font-weight:500;line-height:1;letter-spacing:-.02em}
+.st .lab{display:block;margin-top:7px;font-size:12px;font-weight:600;color:var(--ink-2)}
+.st .old{display:block;margin-top:3px;font-family:var(--mono);font-size:11px;color:var(--ink-3)}
+.st:hover .dot{transform:scale(1.25)}
+.st[aria-pressed="true"] .dot{border-color:var(--brand-line);box-shadow:0 0 0 4px var(--tint)}
+.st[aria-pressed="true"] .lab{color:var(--ink)}
+.st.warm .dot{border-color:var(--warn)} .st.warm .old{color:var(--warn)}
+.st.hot .dot{border-color:var(--alarm);background:var(--alarm)} .st.hot .old{color:var(--alarm);font-weight:600}
+.st.none .n{color:var(--ink-3)} .st.none .dot{border-color:var(--line)}
+
+/* the swell: a bar under the station, width by count, colour by worst age */
+.st .swell{position:absolute;left:14%;right:14%;bottom:8px;height:3px;border-radius:2px;background:var(--canvas-deep);overflow:hidden}
+.st .swell i{display:block;height:100%;background:var(--brand-line)}
+.st.warm .swell i{background:var(--warn)} .st.hot .swell i{background:var(--alarm)}
+
+/* ── The register underneath ─────────────────────────────────────────────── */
+.sheet{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.sheet > header{display:flex;align-items:baseline;gap:10px;padding:14px 20px;border-bottom:1px solid var(--line)}
+.sheet h2{margin:0;font-size:13.5px;font-weight:600}
+.sheet .hint{font-size:12.5px;color:var(--ink-3)}
+.sheet .clear{margin-left:auto;font-size:12px;font-weight:600;color:var(--link)}
+
+table{width:100%;border-collapse:collapse}
+thead th{
+  text-align:left;font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--ink-3);padding:8px 20px;border-bottom:1px solid var(--line);background:var(--tint-soft);
+}
+thead th.r{text-align:right}
+tbody tr{border-bottom:1px solid var(--line);transition:background .14s var(--ease)}
+tbody tr:last-child{border-bottom:0}
+tbody tr:hover{background:var(--tint-soft)}
+td{padding:10px 20px;vertical-align:middle}
+td.doc{min-width:0}
+.num{font-family:var(--mono);font-size:13px;font-weight:600;white-space:nowrap}
+.num .rev{color:var(--ink-3);font-weight:400;margin-left:7px}
+.ttl{display:block;font-size:12.5px;color:var(--ink-2);max-width:46ch;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.act{font-size:12.5px;color:var(--ink-2)}
+.act b{font-weight:600;color:var(--ink)}
+.code{font-family:var(--mono);font-weight:600}
+td.age{text-align:right;font-family:var(--mono);font-size:12.5px;color:var(--ink-3);white-space:nowrap}
+td.age.w{color:var(--warn)} td.age.a{color:var(--alarm);font-weight:600}
+td.go{text-align:right;width:1%;white-space:nowrap}
+.go a{font-size:12px;font-weight:600;color:var(--link)}
+tbody tr:hover .go a{text-decoration:underline}
+.blocks{display:inline-block;margin-left:8px;font-size:11px;font-weight:600;color:var(--alarm);background:var(--alarm-soft);border-radius:5px;padding:1px 6px}
+
+.band td{
+  background:var(--canvas-deep);padding:5px 20px;
+  font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);
+}
+
+.side{margin-top:16px;display:grid;gap:14px;grid-template-columns:minmax(0,1fr)}
+@media(min-width:900px){.side{grid-template-columns:1fr 1fr}}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px 20px}
+.card h3{margin:0 0 4px;font-size:12.5px;font-weight:600}
+.card p{margin:0;font-size:12.5px;color:var(--ink-2)}
+.card .row{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:7px 0;border-top:1px solid var(--line)}
+.card .row:first-of-type{margin-top:8px}
+.card .code{font-size:12.5px;color:var(--link)}
+.card .when{font-family:var(--mono);font-size:12px;color:var(--warn)}
+.card .when.a{color:var(--alarm);font-weight:600}
+
+#tw{position:fixed;right:18px;bottom:18px;z-index:50;font-size:12.5px}
+#tw button.open{background:var(--brand);color:#fff;border:0;border-radius:99px;padding:9px 15px;font-family:var(--sans);font-size:12.5px;font-weight:600;cursor:pointer}
+#tw .panel{display:none;background:var(--surface);border:1px solid var(--line-strong);border-radius:var(--r);padding:14px;width:234px}
+#tw.on .panel{display:block} #tw.on button.open{display:none}
+#tw label{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:0 0 9px;color:var(--ink-2)}
+#tw select{font-family:var(--sans);font-size:12px;padding:3px 6px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink)}
+#tw .close{background:none;border:0;color:var(--link);font-weight:600;cursor:pointer;padding:0;font-size:12px}
+[data-density="tight"] td{padding-top:6px;padding-bottom:6px}
+[data-density="loose"] td{padding-top:14px;padding-bottom:14px}
+[data-rail="off"] .stations{display:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <section class="line">
+    <p class="said">Nine things wait on you. <em>The oldest has waited eleven days.</em></p>
+    <div class="stations">
+      <div class="rail" aria-hidden="true"><i></i></div>
+
+      <button class="st" data-k="draft" aria-pressed="false">
+        <span class="dot"></span><span class="n">1</span>
+        <span class="lab">Drafting</span><span class="old">4d</span>
+        <span class="swell"><i style="width:20%"></i></span>
+      </button>
+
+      <button class="st warm" data-k="review" aria-pressed="false">
+        <span class="dot"></span><span class="n">3</span>
+        <span class="lab">In review</span><span class="old">6d</span>
+        <span class="swell"><i style="width:60%"></i></span>
+      </button>
+
+      <button class="st hot" data-k="decided" aria-pressed="true">
+        <span class="dot"></span><span class="n">3</span>
+        <span class="lab">Decided</span><span class="old">11d</span>
+        <span class="swell"><i style="width:100%"></i></span>
+      </button>
+
+      <button class="st warm" data-k="released" aria-pressed="false">
+        <span class="dot"></span><span class="n">2</span>
+        <span class="lab">Released</span><span class="old">8d</span>
+        <span class="swell"><i style="width:40%"></i></span>
+      </button>
+
+      <button class="st none" data-k="issued" aria-pressed="false">
+        <span class="dot"></span><span class="n">0</span>
+        <span class="lab">Issued</span><span class="old">—</span>
+        <span class="swell"><i style="width:0%"></i></span>
+      </button>
+    </div>
+  </section>
+
+  <section class="sheet">
+    <header>
+      <h2 id="sheetTitle">Decided — waiting on you</h2>
+      <span class="hint" id="sheetHint">three revisions, nothing moves until you act</span>
+      <a class="clear" href="#" id="clearBtn">Show everything →</a>
+    </header>
+    <table>
+      <thead>
+        <tr><th>Document</th><th>What it needs</th><th class="r">Waiting</th><th></th></tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </section>
+
+  <div class="side">
+    <div class="card">
+      <h3>Schedule at risk</h3>
+      <p>Activities whose documents will not be ready.</p>
+      <div class="row"><span><span class="code">A-1420</span> Pump house mechanical installation</span><span class="when a">overdue</span></div>
+      <div class="row"><span><span class="code">A-1615</span> Clarifier concrete pour</span><span class="when">14 Oct</span></div>
+    </div>
+    <div class="card">
+      <h3>Waiting on other people</h3>
+      <p>Yours to chase, not to do.</p>
+      <div class="row"><span><span class="code">RV-0044</span> MADASUD stamp</span><span class="when a">9d overdue</span></div>
+      <div class="row"><span><span class="code">TR-0031</span> ONEE acknowledgement</span><span class="when">3d</span></div>
+    </div>
+  </div>
+</div>
+
+<div id="tw">
+  <button class="open" onclick="tw.classList.add('on')">Tweaks</button>
+  <div class="panel">
+    <label>Theme<select onchange="document.documentElement.dataset.theme=this.value">
+      <option value="">system</option><option value="light">light</option><option value="dark">dark</option></select></label>
+    <label>Density<select onchange="document.body.dataset.density=this.value">
+      <option value="">normal</option><option value="tight">tight</option><option value="loose">loose</option></select></label>
+    <label>The rail<select onchange="document.body.dataset.rail=this.value">
+      <option value="">on</option><option value="off">off</option></select></label>
+    <button class="close" onclick="tw.classList.remove('on')">close</button>
+  </div>
+</div>
+
+<script>
+// Shape only. Real counts come from the queue the page already builds.
+const WORK = [
+  {k:"decided", n:"Q6637021-74-ME-CAL-00002", r:"B", t:"Pump house ventilation — heat emission calculation", act:"Send it back — <b>C3, revise and resubmit</b>", d:11, blocks:true, go:"Send back"},
+  {k:"decided", n:"Q6637021-74-ST-DSW-00001", r:"B", t:"Non-process building 74 — reinforcement arrangement", act:'Release at <span class="code">IFC</span>', d:3, go:"Release"},
+  {k:"decided", n:"Q6637021-73-WW-MAN-00001", r:"C", t:"Aeration blower BL-301 — operation and maintenance", act:'Release at <span class="code">IFI</span>', d:0, go:"Release"},
+  {k:"review",  n:"Q6637021-71-ST-DSW-00001", r:"B", t:"Clarifier TK-201 — structural foundation drawing", act:"Your verdict decides it", d:6, blocks:true, go:"Decide"},
+  {k:"review",  n:"Q6637021-70-CI-DSW-00001", r:"C", t:"Feed pump bay P-101/P-102 — civil site works", act:"Your verdict decides it", d:2, go:"Decide"},
+  {k:"review",  n:"Q6637021-73-WW-PRO-00001", r:"B", t:"Aeration system BL-301 — start-up and shutdown", act:"Your advice, step 2 of 3", d:0, go:"Review"},
+  {k:"released",n:"Q6637021-72-AR-DSW-00001", r:"A", t:"Site protection 72 — architectural finishes", act:'At <span class="code">AFC</span>, nobody has been told', d:8, go:"Ask to send"},
+  {k:"released",n:"Q6637021-75-CI-SPC-00001", r:"B", t:"Water tower WT-401 — concrete and reinforcement spec", act:'At <span class="code">IFC</span>, nobody has been told', d:1, go:"Ask to send"},
+  {k:"draft",   n:"Q6637021-74-EL-SCH-00001", r:"A", t:"Feed pump P-101 — motor cable schedule", act:"No file attached yet", d:4, go:"Continue"},
+];
+const TITLE = {
+  draft:["Drafting — yours to finish","one revision, no file on it yet"],
+  review:["In review — waiting on you","three revisions, each one somebody is expecting"],
+  decided:["Decided — waiting on you","three revisions, nothing moves until you act"],
+  released:["Released — never sent","in use, and nobody has been told"],
+  issued:["Issued","nothing of yours is waiting here"],
+};
+const BANDS = [[8,"Older than a week"],[2,"Earlier this week"],[1,"Yesterday"],[0,"Today"]];
+const age = d => d===0 ? "today" : d+" day"+(d===1?"":"s");
+const tone = d => d>=7 ? "a" : d>=3 ? "w" : "";
+
+function draw(kind){
+  const list = (kind ? WORK.filter(w=>w.k===kind) : WORK).slice().sort((a,b)=>b.d-a.d);
+  const body = document.getElementById("rows");
+  body.innerHTML = "";
+  let cut = null;
+  for(const w of list){
+    const band = BANDS.find(([from])=>w.d>=from)[1];
+    if(band !== cut){
+      cut = band;
+      body.insertAdjacentHTML("beforeend",`<tr class="band"><td colspan="4">${band}</td></tr>`);
+    }
+    body.insertAdjacentHTML("beforeend",`
+      <tr>
+        <td class="doc"><span class="num">${w.n}<span class="rev">rev ${w.r}</span></span>
+          <span class="ttl">${w.t}</span></td>
+        <td class="act">${w.act}${w.blocks?'<span class="blocks">holds somebody up</span>':""}</td>
+        <td class="age ${tone(w.d)}">${age(w.d)}</td>
+        <td class="go"><a href="#">${w.go} →</a></td>
+      </tr>`);
+  }
+  const [t,h] = kind ? TITLE[kind] : ["Everything waiting on you","nine revisions, worst first"];
+  document.getElementById("sheetTitle").textContent = t;
+  document.getElementById("sheetHint").textContent = h;
+  document.getElementById("clearBtn").style.display = kind ? "" : "none";
+}
+
+document.querySelectorAll(".st").forEach(b=>{
+  b.addEventListener("click",()=>{
+    const on = b.getAttribute("aria-pressed")==="true";
+    document.querySelectorAll(".st").forEach(x=>x.setAttribute("aria-pressed","false"));
+    if(!on){ b.setAttribute("aria-pressed","true"); draw(b.dataset.k); } else draw(null);
+  });
+});
+document.getElementById("clearBtn").addEventListener("click",e=>{
+  e.preventDefault();
+  document.querySelectorAll(".st").forEach(x=>x.setAttribute("aria-pressed","false"));
+  draw(null);
+});
+draw("decided");
+</script>
+</body>
+</html>

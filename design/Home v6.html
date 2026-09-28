@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DELIOS — Home v6</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* Tokens: src/app/theme.css only. Content column — the app's sidebar is not drawn. */
+:root{
+  --surface:#ffffff; --canvas:#eceff4; --canvas-deep:#e2e7ee;
+  --line:#d7dde6; --line-strong:#bcc6d4;
+  --brand:#1e3a5f; --brand-hover:#2d5480; --brand-strong:#17324d;
+  --brand-line:#3b6389; --link:#2b5b80; --tint:#e4eef7; --tint-soft:#f2f6fb;
+  --slate-400:#94a3b8; --slate-500:#64748b; --slate-600:#475569; --slate-900:#0f172a;
+  --red-700:oklch(50.5% 0.213 27.518); --red-100:oklch(93.6% 0.032 17.717);
+  --amber-700:oklch(55.5% 0.163 48.998); --amber-100:oklch(96.2% 0.059 95.617);
+  --emerald-600:oklch(59.6% 0.145 163.225); --emerald-100:oklch(95% 0.052 163.051);
+  --sans:"IBM Plex Sans",ui-sans-serif,system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,monospace;
+  --ease:cubic-bezier(.2,.6,.3,1);
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --surface:#111823; --canvas:#0a0f17; --canvas-deep:#070b12;
+  --line:#273245; --line-strong:#37455c;
+  --brand:#2f5e8e; --brand-hover:#3a70a6; --brand-strong:#28527d;
+  --brand-line:#5f8fbf; --link:#8db8de; --tint:#1a2a3c; --tint-soft:#152131;
+  --slate-400:#64738a; --slate-500:#8795a9; --slate-600:#a4aebd; --slate-900:#e9edf2;
+  --red-700:oklch(80.8% 0.114 19.571); --red-100:oklch(30% 0.07 19);
+  --amber-700:oklch(87.9% 0.169 91.605); --amber-100:oklch(30% 0.07 80);
+  --emerald-600:oklch(69.6% 0.17 162.48); --emerald-100:oklch(28% 0.06 163);
+}}
+:root[data-theme="dark"]{
+  --surface:#111823; --canvas:#0a0f17; --canvas-deep:#070b12;
+  --line:#273245; --line-strong:#37455c;
+  --brand:#2f5e8e; --brand-hover:#3a70a6; --brand-strong:#28527d;
+  --brand-line:#5f8fbf; --link:#8db8de; --tint:#1a2a3c; --tint-soft:#152131;
+  --slate-400:#64738a; --slate-500:#8795a9; --slate-600:#a4aebd; --slate-900:#e9edf2;
+  --red-700:oklch(80.8% 0.114 19.571); --red-100:oklch(30% 0.07 19);
+  --amber-700:oklch(87.9% 0.169 91.605); --amber-100:oklch(30% 0.07 80);
+  --emerald-600:oklch(69.6% 0.17 162.48); --emerald-100:oklch(28% 0.06 163);
+}
+
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--canvas);color:var(--slate-900);font-family:var(--sans);font-size:15px;line-height:1.5;text-wrap:pretty;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+.col{max-width:1180px;margin:0 auto;padding:26px 24px 72px}
+@media(max-width:700px){.col{padding:20px 14px 52px}}
+
+h2.sec{margin:0 0 3px;font-size:17px;font-weight:600;letter-spacing:-.01em}
+p.sub{margin:0 0 13px;font-size:13.5px;color:var(--slate-500)}
+.secbar{display:flex;align-items:flex-end;gap:14px;margin-bottom:13px}
+.secbar .more{margin-left:auto;font-size:13px;font-weight:600;color:var(--link)}
+.secbar .more:hover{text-decoration:underline}
+
+/* ── 1 · The schedule. Everyone's shared reality, so it comes first. ────── */
+.sched{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(224px,1fr));margin-bottom:30px}
+.act{
+  background:var(--surface);border:1px solid var(--line);border-top:3px solid var(--emerald-600);
+  border-radius:9px;padding:14px 16px 15px;transition:border-color .14s var(--ease),transform .14s var(--ease);
+}
+.act:hover{transform:translateY(-1px);border-color:var(--line-strong)}
+.act.warn{border-top-color:var(--amber-700)}
+.act.late{border-top-color:var(--red-700)}
+.act .when{display:flex;align-items:baseline;gap:8px}
+.act .d{font-family:var(--mono);font-size:22px;font-weight:600;letter-spacing:-.02em;line-height:1}
+.act .mo{font-size:12.5px;font-weight:600;color:var(--slate-500);text-transform:uppercase;letter-spacing:.06em}
+.act .in{margin-left:auto;font-family:var(--mono);font-size:12px;font-weight:600;color:var(--slate-500)}
+.act.warn .in{color:var(--amber-700)} .act.late .in{color:var(--red-700)}
+.act .code{display:block;margin-top:9px;font-family:var(--mono);font-size:12.5px;font-weight:600;color:var(--link)}
+.act .nm{display:block;margin-top:1px;font-size:14px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.act .docs{display:flex;gap:3px;margin-top:11px}
+.act .docs i{flex:1;height:6px;border-radius:2px;background:var(--canvas-deep)}
+.act .docs i.on{background:var(--emerald-600)}
+.act.warn .docs i.on{background:var(--amber-700)}
+.act.late .docs i.on{background:var(--red-700)}
+.act .ready{display:block;margin-top:7px;font-size:12.5px;color:var(--slate-500)}
+.act .ready b{font-family:var(--mono);font-weight:600;color:var(--slate-900)}
+.act .ready.bad b{color:var(--red-700)}
+
+/* ── 2 · Your work ──────────────────────────────────────────────────────── */
+.figs{display:flex;flex-wrap:wrap;gap:0 34px;margin-bottom:15px}
+.fig{display:flex;align-items:baseline;gap:9px;padding:5px 0}
+.fig .v{font-family:var(--mono);font-size:26px;font-weight:600;line-height:1;letter-spacing:-.02em}
+.fig .k{font-size:13.5px;color:var(--slate-600)}
+.fig.alarm .v{color:var(--red-700)} .fig.alarm .k{color:var(--red-700);font-weight:500}
+.fig.warn .v{color:var(--amber-700)}
+.fig .v small{font-size:14px;font-weight:500;color:var(--slate-500)}
+
+.filters{display:flex;flex-wrap:wrap;align-items:center;gap:18px;margin-bottom:12px}
+.filters a{font-size:13.5px;font-weight:500;color:var(--slate-500);padding-bottom:5px;border-bottom:2px solid transparent;transition:color .14s var(--ease),border-color .14s var(--ease)}
+.filters a:hover{color:var(--slate-900)}
+.filters a[aria-current]{color:var(--slate-900);font-weight:600;border-bottom-color:var(--brand)}
+.filters a .c{font-family:var(--mono);font-size:12.5px;color:var(--slate-400);margin-left:6px}
+.filters a[aria-current] .c{color:var(--brand-line)}
+
+.ledger{background:var(--surface);border:1px solid var(--line);border-radius:9px;overflow:hidden}
+table{width:100%;border-collapse:collapse;table-layout:fixed}
+col.c-doc{width:auto} col.c-act{width:36%} col.c-age{width:104px} col.c-go{width:130px}
+thead th{text-align:left;font-size:10.5px;font-weight:700;letter-spacing:.11em;text-transform:uppercase;color:var(--slate-400);padding:10px 20px;border-bottom:1px solid var(--line-strong)}
+thead th.r{text-align:right}
+tbody tr{border-bottom:1px solid var(--line)}
+tbody tr:last-child{border-bottom:0}
+tbody tr:not(.band):hover{background:var(--tint-soft)}
+td{padding:13px 20px;vertical-align:top}
+.num{font-family:var(--mono);font-size:14px;font-weight:600;white-space:nowrap}
+.num .rev{color:var(--slate-400);font-weight:400;margin-left:8px}
+.ttl{display:block;margin-top:3px;font-size:13.5px;color:var(--slate-600);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.what{font-size:14px;color:var(--slate-600);line-height:1.45}
+.what b{font-weight:600;color:var(--slate-900)}
+.what .code{font-family:var(--mono);font-weight:600;color:var(--slate-900)}
+.what .flag{display:block;margin-top:4px;font-size:12.5px;font-weight:600;color:var(--red-700)}
+.what .for{display:block;margin-top:4px;font-size:12.5px;color:var(--slate-500)}
+.what .for b{color:var(--slate-600);font-weight:600}
+td.age{text-align:right;font-family:var(--mono);font-size:14px;color:var(--slate-500);white-space:nowrap;padding-top:14px}
+td.age.w{color:var(--amber-700);font-weight:600}
+td.age.a{color:var(--red-700);font-weight:600}
+td.go{text-align:right;padding-top:12px}
+.go a{display:inline-block;font-size:13px;font-weight:600;color:#fff;background:var(--brand);border-radius:6px;padding:6px 12px;transition:background .14s var(--ease)}
+.go a:hover{background:var(--brand-hover)}
+.go a.ghost{color:var(--brand);background:none;border:1px solid var(--line-strong)}
+.go a.ghost:hover{background:var(--tint)}
+tr.band td{background:var(--canvas-deep);padding:6px 20px;font-size:10.5px;font-weight:700;letter-spacing:.11em;text-transform:uppercase;color:var(--slate-500)}
+.empty{padding:38px 20px;color:var(--slate-500);font-size:14px}
+
+/* ── 3 · Control only ───────────────────────────────────────────────────── */
+.control{margin-top:30px;display:grid;gap:14px;grid-template-columns:minmax(0,1fr)}
+@media(min-width:860px){.control{grid-template-columns:1fr 1fr}}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:9px;padding:16px 18px}
+.panel h3{margin:0;font-size:14px;font-weight:600}
+.panel .lead{margin:2px 0 0;font-size:12.5px;color:var(--slate-400)}
+.panel .big{display:flex;align-items:baseline;gap:10px;margin-top:10px}
+.panel .big .v{font-family:var(--mono);font-size:28px;font-weight:600;line-height:1}
+.panel .big .v.ok{color:var(--emerald-600)} .panel .big .v.bad{color:var(--red-700)}
+.panel .big .note{font-size:13px;color:var(--slate-500)}
+.panel a.row{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-top:1px solid var(--line);font-size:13.5px;color:var(--slate-600);margin-top:8px}
+.panel a.row:first-of-type{margin-top:10px}
+.panel a.row:hover{color:var(--slate-900)}
+.panel .code{font-family:var(--mono);font-size:13px;font-weight:600;color:var(--link);margin-right:8px}
+.panel .when{font-family:var(--mono);font-size:12.5px;color:var(--amber-700);white-space:nowrap}
+.panel .when.a{color:var(--red-700);font-weight:600}
+
+#tw{position:fixed;right:20px;bottom:20px;z-index:50;font-size:13px}
+#tw button.open{background:var(--brand);color:#fff;border:0;border-radius:99px;padding:10px 17px;font-family:var(--sans);font-size:13px;font-weight:600;cursor:pointer}
+#tw .panel2{display:none;background:var(--surface);border:1px solid var(--line-strong);border-radius:9px;padding:16px;width:240px}
+#tw.on .panel2{display:block} #tw.on button.open{display:none}
+#tw label{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:0 0 10px;color:var(--slate-600)}
+#tw select{font-family:var(--sans);font-size:13px;padding:4px 7px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--slate-900)}
+#tw .close{background:none;border:0;color:var(--link);font-weight:600;cursor:pointer;padding:0;font-size:13px}
+[data-density="tight"] td{padding-top:9px;padding-bottom:9px}
+[data-density="loose"] td{padding-top:18px;padding-bottom:18px}
+/* Role decides what exists on the page, not what is greyed out. */
+body[data-role="author"] .control,
+body[data-role="author"] .fig.control{display:none}
+body[data-role="reviewer"] .control,
+body[data-role="reviewer"] .fig.control{display:none}
+</style>
+</head>
+<body data-role="control">
+<div class="col">
+
+  <!-- 1 · The schedule: what the project needs, whoever you are -->
+  <section>
+    <div class="secbar">
+      <div>
+        <h2 class="sec">What the schedule needs</h2>
+        <p class="sub" style="margin:0">Activities in the next three weeks, and whether their documents are ready.</p>
+      </div>
+      <a class="more" href="#">All activities →</a>
+    </div>
+    <div class="sched">
+      <a class="act late" href="#">
+        <span class="when"><span class="d">02</span><span class="mo">Oct</span><span class="in">overdue</span></span>
+        <span class="code">A-1420</span>
+        <span class="nm">Pump house mechanical installation</span>
+        <span class="docs"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i></span>
+        <span class="ready bad"><b>5 of 8</b> documents ready</span>
+      </a>
+      <a class="act warn" href="#">
+        <span class="when"><span class="d">14</span><span class="mo">Oct</span><span class="in">in 12 days</span></span>
+        <span class="code">A-1615</span>
+        <span class="nm">Clarifier concrete pour</span>
+        <span class="docs"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i></span>
+        <span class="ready"><b>4 of 5</b> documents ready</span>
+      </a>
+      <a class="act" href="#">
+        <span class="when"><span class="d">19</span><span class="mo">Oct</span><span class="in">in 17 days</span></span>
+        <span class="code">A-1702</span>
+        <span class="nm">Blower house slab reinforcement</span>
+        <span class="docs"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i></span>
+        <span class="ready"><b>6 of 6</b> documents ready</span>
+      </a>
+      <a class="act warn" href="#">
+        <span class="when"><span class="d">23</span><span class="mo">Oct</span><span class="in">in 21 days</span></span>
+        <span class="code">A-1745</span>
+        <span class="nm">Feed pump alignment and commissioning</span>
+        <span class="docs"><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i><i></i></span>
+        <span class="ready"><b>2 of 7</b> documents ready</span>
+      </a>
+    </div>
+  </section>
+
+  <!-- 2 · Your work -->
+  <section>
+    <div class="secbar">
+      <div>
+        <h2 class="sec">Waiting on you</h2>
+        <p class="sub" style="margin:0">Worst first. Two of these hold somebody else up.</p>
+      </div>
+    </div>
+
+    <div class="figs">
+      <span class="fig alarm"><span class="v">9</span><span class="k">waiting · oldest 11 days</span></span>
+      <span class="fig"><span class="v">2</span><span class="k">hold somebody up</span></span>
+      <span class="fig warn"><span class="v">2</span><span class="k">released, never sent</span></span>
+    </div>
+
+    <nav class="filters" id="filters" aria-label="What is waiting">
+      <a href="#" data-k="" aria-current="page">Everything <span class="c">9</span></a>
+      <a href="#" data-k="held">Send back <span class="c">1</span></a>
+      <a href="#" data-k="verdict">Verdicts <span class="c">2</span></a>
+      <a href="#" data-k="release">Release <span class="c">2</span></a>
+      <a href="#" data-k="unsent">Never sent <span class="c">2</span></a>
+      <a href="#" data-k="advice">Advice <span class="c">1</span></a>
+      <a href="#" data-k="drafts">Drafts <span class="c">1</span></a>
+    </nav>
+
+    <div class="ledger">
+      <table>
+        <colgroup><col class="c-doc"><col class="c-act"><col class="c-age"><col class="c-go"></colgroup>
+        <thead><tr><th>Document</th><th>What it needs</th><th class="r">Waiting</th><th></th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 3 · Control function only -->
+  <section class="control">
+    <div class="panel">
+      <h3>Register health</h3>
+      <p class="lead">From the last assurance run, 26 September.</p>
+      <div class="big"><span class="v ok">94<small>%</small></span><span class="note">clean · <b style="color:var(--red-700)">2 critical issues</b> open</span></div>
+      <a class="row" href="#"><span>Run the checks again</span><span class="when">6 days ago</span></a>
+    </div>
+    <div class="panel">
+      <h3>Waiting on other people</h3>
+      <p class="lead">Yours to chase, not to do.</p>
+      <a class="row" href="#"><span><span class="code">RV-0044</span>MADASUD stamp — 09201 rev D</span><span class="when a">9 days over</span></a>
+      <a class="row" href="#"><span><span class="code">TR-0031</span>ONEE acknowledgement</span><span class="when">3 days</span></a>
+    </div>
+  </section>
+</div>
+
+<div id="tw">
+  <button class="open" onclick="tw.classList.add('on')">Tweaks</button>
+  <div class="panel2">
+    <label>Signed in as<select onchange="document.body.dataset.role=this.value">
+      <option value="control">Document Control</option><option value="reviewer">Reviewer</option><option value="author">Author</option></select></label>
+    <label>Theme<select onchange="document.documentElement.dataset.theme=this.value">
+      <option value="">system</option><option value="light">light</option><option value="dark">dark</option></select></label>
+    <label>Density<select onchange="document.body.dataset.density=this.value">
+      <option value="">normal</option><option value="tight">tight</option><option value="loose">loose</option></select></label>
+    <button class="close" onclick="tw.classList.remove('on')">close</button>
+  </div>
+</div>
+
+<script>
+// Shape only — the real rows come from the queue the page already builds.
+const WORK=[
+ {k:"held",n:"Q6637021-74-ME-CAL-00002",r:"B",t:"Pump house ventilation — heat emission calculation",what:'<b>C3 — revise and resubmit.</b> Send it back to its author.',flag:"The author cannot start rev C until you do",need:"A-1420 · overdue",d:11,go:"Send back"},
+ {k:"verdict",n:"Q6637021-71-ST-DSW-00001",r:"B",t:"Clarifier TK-201 — structural foundation drawing",what:'<b>Your verdict decides this revision.</b>',flag:"Two reviewers have answered and are waiting",need:"A-1615 · 14 Oct",d:6,go:"Decide"},
+ {k:"unsent",n:"Q6637021-72-AR-DSW-00001",r:"A",t:"Site protection 72 — architectural finishes",what:'Released at <span class="code">AFC</span>. Nobody has been told.',d:8,go:"Ask to send",ghost:true},
+ {k:"drafts",n:"Q6637021-74-EL-SCH-00001",r:"A",t:"Feed pump P-101 — motor cable schedule",what:'No file attached yet.',need:"A-1745 · 23 Oct",d:4,go:"Continue",ghost:true},
+ {k:"release",n:"Q6637021-74-ST-DSW-00001",r:"B",t:"Non-process building 74 — reinforcement arrangement",what:'Decided <span class="code">C1</span>. Release it at <span class="code">IFC</span>.',need:"A-1702 · 19 Oct",d:3,go:"Release"},
+ {k:"verdict",n:"Q6637021-70-CI-DSW-00001",r:"C",t:"Feed pump bay P-101/P-102 — civil site works",what:'<b>Your verdict decides this revision.</b>',d:2,go:"Decide"},
+ {k:"unsent",n:"Q6637021-75-CI-SPC-00001",r:"B",t:"Water tower WT-401 — concrete and reinforcement spec",what:'Released at <span class="code">IFC</span>. Nobody has been told.',d:1,go:"Ask to send",ghost:true},
+ {k:"release",n:"Q6637021-73-WW-MAN-00001",r:"C",t:"Aeration blower BL-301 — operation and maintenance",what:'Decided <span class="code">C1</span>. Release it at <span class="code">IFI</span>.',d:0,go:"Release"},
+ {k:"advice",n:"Q6637021-73-WW-PRO-00001",r:"B",t:"Aeration system BL-301 — start-up and shutdown",what:'Your advice — step 2 of 3.',d:0,go:"Review",ghost:true},
+];
+const BANDS=[[8,"Older than a week"],[2,"Earlier this week"],[1,"Yesterday"],[0,"Today"]];
+const age=d=>d===0?"today":d===1?"1 day":d+" days";
+const tone=d=>d>=7?"a":d>=3?"w":"";
+
+function draw(kind){
+  const list=(kind?WORK.filter(w=>w.k===kind):WORK).slice().sort((a,b)=>b.d-a.d);
+  const body=document.getElementById("rows"); body.innerHTML=""; let cut=null;
+  if(!list.length){body.innerHTML=`<tr><td colspan="4" class="empty">Nothing here.</td></tr>`;return;}
+  for(const w of list){
+    const band=BANDS.find(([f])=>w.d>=f)[1];
+    if(band!==cut){cut=band;body.insertAdjacentHTML("beforeend",`<tr class="band"><td colspan="4">${band}</td></tr>`);}
+    body.insertAdjacentHTML("beforeend",`
+      <tr>
+        <td><span class="num">${w.n}<span class="rev">rev ${w.r}</span></span><span class="ttl">${w.t}</span></td>
+        <td class="what">${w.what}
+          ${w.flag?`<span class="flag">${w.flag}</span>`:""}
+          ${w.need?`<span class="for">needed for <b>${w.need}</b></span>`:""}</td>
+        <td class="age ${tone(w.d)}">${age(w.d)}</td>
+        <td class="go"><a class="${w.ghost?"ghost":""}" href="#">${w.go}</a></td>
+      </tr>`);
+  }
+}
+document.querySelectorAll("#filters a").forEach(a=>{
+  a.addEventListener("click",e=>{
+    e.preventDefault();
+    document.querySelectorAll("#filters a").forEach(x=>x.removeAttribute("aria-current"));
+    a.setAttribute("aria-current","page"); draw(a.dataset.k||null);
+  });
+});
+draw(null);
+</script>
+</body>
+</html>

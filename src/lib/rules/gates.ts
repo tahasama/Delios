@@ -182,7 +182,7 @@ const releaseState: Gate = {
   async evaluate(ctx, subject) {
     const rev = await revisionOf(ctx, subject);
     if (!rev) return block("No revision selected.");
-    if (rev.state === "IN_REVIEW" || rev.state === "IN_PREPARATION") return ok("Ready to move to released.");
+    if (rev.state === "NOT_RELEASED" || rev.state === "IN_REVIEW" || rev.state === "IN_PREPARATION") return ok("Ready to move to released.");
     return block(
       `A ${rev.state.replace(/_/g, " ").toLowerCase()} revision cannot be released.`,
  "States move forward only.",
@@ -218,7 +218,7 @@ const releaseStatus: Gate = {
   clause: "§7.7",
   async evaluate(ctx, subject) {
     const rev = await revisionOf(ctx, subject);
-    const code = subject.statusCode ?? rev?.proposedStatus ?? null;
+    const code = subject.statusCode ?? rev?.statusCode ?? null;
     if (!code) {
       return warn(
         "The reviewers have not said what it may be used for.",
@@ -263,24 +263,6 @@ const releaseMetadata: Gate = {
   },
 };
 
-const releaseBlockingComments: Gate = {
-  id: "REL-COMMENTS",
-  intent: "RELEASE",
-  title: "No blocking comments open",
-  clause: "§9.6 · §17.3",
-  preventsCheck: "RO-04",
-  async evaluate(ctx, subject) {
-    if (!subject.revisionId) return block("No revision selected.");
-    const open = await ctx.db.reviewComment.count({
-      where: { cycle: { revisionId: subject.revisionId }, progressionPreventing: true, status: "OPEN" },
-    });
-    if (open === 0) return ok("No progression-preventing comment is open.");
-    return block(
-      `${open} progression-preventing comment${open === 1 ? "" : "s"} still open.`,
- "Releasing over one is a structural contradiction. Close or reclassify them first.",
-    );
-  },
-};
 
 // ── Issue a transmittal (Part 11) ────────────────────────────────────────────
 
@@ -513,7 +495,7 @@ const reviseNoOpenRevision: Gate = {
   async evaluate(ctx, subject) {
     if (!subject.documentId) return block("No document selected.");
     const open = await ctx.db.revision.findFirst({
-      where: { documentId: subject.documentId, state: { in: ["IN_PREPARATION", "IN_REVIEW"] } },
+      where: { documentId: subject.documentId, state: { in: ["IN_PREPARATION", "IN_REVIEW", "NOT_RELEASED"] } },
     });
     if (!open) return ok("Nothing open.");
     return block(
@@ -590,7 +572,6 @@ const gates: Gate[] = [
   releaseApproval,
   releaseStatus,
   releaseMetadata,
-  releaseBlockingComments,
   issueItems,
   issueRecipients,
   voidState,

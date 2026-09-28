@@ -40,13 +40,14 @@ model Organization {
   authorityRows     AuthorityRow[]
   workflowTemplates WorkflowTemplate[]
   spineLinks        SpineLink[]
-  spineBaselines         SpineBaseline[]
+  spineBaselines    SpineBaseline[]
   functions         Function[]
   permissionRules   PermissionRule[]
   controlledSets    ControlledSet[]
 }
 
 model Project {
+  issueRequests IssueRequest[]
   id        String       @id @default(cuid())
   orgId     String
   org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
@@ -59,43 +60,43 @@ model Project {
   startDate DateTime?
   createdAt DateTime     @default(now())
 
-  members               ProjectMembership[]
-  delegations           Delegation[]
-  numberCounters        NumberCounter[]
-  documents             Document[]
-  revisions             Revision[]
-  documentSnapshots     DocumentSnapshot[]
-  approvals             Approval[]
-  reviewCycles          ReviewCycle[]
-  reviewAssignments     ReviewAssignment[]
-  reviewComments        ReviewComment[]
-  transmittals          Transmittal[]
-  transmittalItems      TransmittalItem[]
-  transmittalRecipients TransmittalRecipient[]
-  registeredCopies      RegisteredCopy[]
-  actions               Action[]
-  baselineEntries       BaselineEntry[]
-  scheduleVersions      ScheduleVersion[]
-  scheduleActivities    ScheduleActivity[]
-  packages              Package[]
-  packageMembers        PackageMember[]
-  relationships         Relationship[]
-  assetItems            AssetItem[]
-  storedFiles           StoredFile[]
-  auditEvents           AuditEvent[]
-  defects               Defect[]
-  checkRuns             CheckRun[]
-  checkRunItems         CheckRunItem[]
-  notifications         Notification[]
-  obsolescenceRecords   ObsolescenceRecord[]
-  exceptionEntries      ExceptionEntry[]
-  distributionRules     DistributionRule[]
-  numberRanges          NumberRange[]
-  workflowRuns          WorkflowRun[]
-  scopeConfigs          ScopeConfig[]
-  controlledSets        ControlledSet[]
-  requirementCalls      RequirementCall[]
-  senderIssues          SenderIssue[]
+  members                ProjectMembership[]
+  delegations            Delegation[]
+  numberCounters         NumberCounter[]
+  documents              Document[]
+  revisions              Revision[]
+  documentSnapshots      DocumentSnapshot[]
+  approvals              Approval[]
+  reviewCycles           ReviewCycle[]
+  reviewAssignments      ReviewAssignment[]
+  reviewComments         ReviewComment[]
+  transmittals           Transmittal[]
+  transmittalItems       TransmittalItem[]
+  transmittalRecipients  TransmittalRecipient[]
+  registeredCopies       RegisteredCopy[]
+  actions                Action[]
+  baselineEntries        BaselineEntry[]
+  scheduleVersions       ScheduleVersion[]
+  scheduleActivities     ScheduleActivity[]
+  packages               Package[]
+  packageMembers         PackageMember[]
+  relationships          Relationship[]
+  assetItems             AssetItem[]
+  storedFiles            StoredFile[]
+  auditEvents            AuditEvent[]
+  defects                Defect[]
+  checkRuns              CheckRun[]
+  checkRunItems          CheckRunItem[]
+  notifications          Notification[]
+  obsolescenceRecords    ObsolescenceRecord[]
+  exceptionEntries       ExceptionEntry[]
+  distributionRules      DistributionRule[]
+  numberRanges           NumberRange[]
+  workflowRuns           WorkflowRun[]
+  scopeConfigs           ScopeConfig[]
+  controlledSets         ControlledSet[]
+  requirementCalls       RequirementCall[]
+  senderIssues           SenderIssue[]
   readinessConfirmations ReadinessConfirmation[]
 
   @@unique([orgId, code])
@@ -266,18 +267,21 @@ model User {
   organization   String? // legacy free-text (kept for existing rows)
   partyId        String?
   party          Party?              @relation(fields: [partyId], references: [id])
+  // A person of an outside organization can be recorded without ever signing
+  // in: their name is what our columns show, and one of our people fills in
+  // their answers. Giving them access later is one switch, not a new person.
   active         Boolean             @default(true)
   createdAt      DateTime            @default(now())
   approvals      Approval[]
   delegationsOut Delegation[]        @relation("DelegationFrom")
   delegationsIn  Delegation[]        @relation("DelegationTo")
   memberships    ProjectMembership[]
+  contactFor     Party[]             @relation("PartyContact")
+  backupFor      Party[]             @relation("PartyBackup")
 
   @@unique([orgId, email])
   @@index([orgId])
   @@index([email])
-  contactFor    Party[]  @relation("PartyContact")
-  backupFor     Party[]  @relation("PartyBackup")
 }
 
 model Delegation {
@@ -329,21 +333,21 @@ model ConfigSet {
 }
 
 model ConfigValue {
-  id     String       @id @default(cuid())
-  orgId  String
-  org    Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  setKey String
-  code   String
-  label  String
-  sort   Int          @default(0)
-  status String       @default("ACTIVE") // ACTIVE | RETIRED (in-use values retired, never deleted §4.7)
-  props  String? // JSON: executionFlag, mayProceed, requiresResubmission, period days, default flags…
-  set    ConfigSet    @relation(fields: [orgId, setKey], references: [orgId, key])
+  id        String       @id @default(cuid())
+  orgId     String
+  org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  setKey    String
+  code      String
+  label     String
+  sort      Int          @default(0)
+  status    String       @default("ACTIVE") // ACTIVE | RETIRED (in-use values retired, never deleted §4.7)
+  props     String? // JSON: executionFlag, mayProceed, requiresResubmission, period days, default flags…
+  set       ConfigSet    @relation(fields: [orgId, setKey], references: [orgId, key])
+  // When the value last changed — compared with the approved DMP revision.
+  updatedAt DateTime     @default(now()) @updatedAt
 
   @@unique([orgId, setKey, code])
   @@index([orgId, setKey])
-  // When the value last changed — compared with the approved DMP revision.
-  updatedAt DateTime @default(now()) @updatedAt
 }
 
 // Numbering schemes (§3.2, per Standard-Numbering-Config.xlsx)
@@ -457,10 +461,16 @@ model Revision {
   value                 String // revision value, never reused (§6.3), never in the number (§3.5)
   series                String            @default("DESIGN") // DESIGN | EXECUTION (§6.2)
   state                 String            @default("IN_PREPARATION") // IN_PREPARATION IN_REVIEW RELEASED SUPERSEDED VOID (§7.2)
-  statusCode            String? // what a released revision may be used for (§7.6)
-  // What the reviewers decided it should be released as — "to be IFC". The
-  // control function releases at exactly this; it does not choose the status.
-  proposedStatus         String?
+  // The one status a revision carries: what it is issued for. Every step of a
+  // route sets it or confirms it; the state says whether it is in force.
+  statusCode            String?
+  statusSetAt           DateTime?
+  statusSetByName       String?
+  // Reviewed and sent back to its author: kept as what was submitted and what
+  // was said about it, never released, replaced by the next revision.
+  returnedAt            DateTime?
+  returnedReason        String?
+  issueRequests         IssueRequest[]
   phase                 String? // held at revision level (§5.5)
   reasonForRevision     String? // §6.6
   changeDescription     String? // §6.6 — describes what changed
@@ -489,6 +499,13 @@ model Revision {
   submittedAt           DateTime?
   submittedById         String?
   submittedByName       String?
+  // Content and custody are two different answers. The author is answerable for
+  // what the document says; the uploader only placed the file.
+  authoredById          String?
+  authoredByName        String?
+  authoredByParty       String?
+  uploadedById          String?
+  uploadedByName        String?
   createdAt             DateTime          @default(now())
   cycles                ReviewCycle[]
   approvals             Approval[]
@@ -552,6 +569,9 @@ model Approval {
 
 model ReviewCycle {
   id                     String             @id @default(cuid())
+  // A review is a record like a transmittal or an action, so it carries a
+  // number of its own: what people say on the phone, and what a column shows.
+  number                 String?
   projectId              String
   project                Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
   revisionId             String
@@ -576,15 +596,32 @@ model ReviewCycle {
   riskNotifiedAt         DateTime?
   outcome                String? // exactly one per cycle, immutable once recorded (§9.4)
   outcomeSetKey          String? // the published set this cycle's outcome must come from
+  // What the route said this step may decide between. Copied from the route
+  // when the step opens, so the answer is judged against what was asked, not
+  // against the route as edited since.
+  grantsStatuses         String? // JSON array of status codes; empty means whatever the status list allows
   outcomeAt              DateTime?
   outcomeByName          String?
   outcomeNote            String?
   // A route's earlier steps give advice; only its last step's verdict binds —
   // and a binding verdict that permits release is the release approval.
   binding                Boolean            @default(true)
+  // An external step: the party whose answer this cycle waits for. Their answer
+  // may be recorded by one of our people, and then the record says both who
+  // decided and who wrote it down.
+  partyId                String?
+  party                  Party?             @relation(fields: [partyId], references: [id])
+  dispatchedAt           DateTime?
+  dispatchChannel        String? // how it went: their portal, email, post
+  dispatchRef            String? // their submission reference, where they give one
+  recordedById           String?
+  recordedByName         String?
+  // Their own code, kept as they wrote it, beside the verdict it maps to.
+  foreignOutcome         String?
   createdAt              DateTime           @default(now())
   comments               ReviewComment[]
   assignments            ReviewAssignment[]
+  files                  StoredFile[]
 
   @@index([status])
   @@index([revisionId])
@@ -616,6 +653,12 @@ model ReviewComment {
   text                          String
   classification                String // comment classification (D.10)
   progressionPreventing         Boolean     @default(false) // §9.6
+  // What closes a comment that stops the release. Most are settled by the next
+  // revision. Some are settled by somebody else's answer — "approved, under
+  // reserve of the architect" — and then the step that answers closes it, and
+  // the revision does not have to go round again.
+  closesWith                    String      @default("REVISION") // REVISION | STEP
+  closesWithStep                Int? // the step of this route whose approval closes it, counting from 1
   status                        String      @default("OPEN") // OPEN | CLOSED
   resolution                    String?
   closedAt                      DateTime?
@@ -632,6 +675,7 @@ model ReviewComment {
 // ── Record type 4 · Transmittal (Part 11) ────────────────────────────────────
 
 model Transmittal {
+  issueRequests       IssueRequest[]
   id                  String                 @id @default(cuid())
   projectId           String
   project             Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -724,9 +768,9 @@ model RegisteredCopy {
 // ── Record type 5 · Baseline (Part 14) ───────────────────────────────────────
 
 model Action {
-  id                 String             @id @default(cuid())
+  id                 String                  @id @default(cuid())
   projectId          String
-  project            Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project            Project                 @relation(fields: [projectId], references: [id], onDelete: Cascade)
   code               String // unique, never reused (§14.2)
   name               String
   scheduledDate      DateTime?
@@ -739,7 +783,7 @@ model Action {
   // When the system first warned the departments that this activity was at
   // risk. The warning goes out once, by itself; later ones are sent by hand.
   riskNotifiedAt     DateTime?
-  createdAt          DateTime           @default(now())
+  createdAt          DateTime                @default(now())
   entries            BaselineEntry[]
   scheduleActivities ScheduleActivity[]
   confirmations      ReadinessConfirmation[]
@@ -749,26 +793,26 @@ model Action {
 }
 
 model BaselineEntry {
-  id             String   @id @default(cuid())
-  projectId      String
-  project        Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  actionId       String
-  action         Action   @relation(fields: [actionId], references: [id])
-  documentId     String
-  document       Document @relation(fields: [documentId], references: [id])
-  requiredStatus String // required status, not revision (§14.3)
-  requiredBy     DateTime
+  id               String   @id @default(cuid())
+  projectId        String
+  project          Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  actionId         String
+  action           Action   @relation(fields: [actionId], references: [id])
+  documentId       String
+  document         Document @relation(fields: [documentId], references: [id])
+  requiredStatus   String // required status, not revision (§14.3)
+  requiredBy       DateTime
   // Who owns the requirement, who delivers the document and who approves it.
-  department     String?
-  submittedBy    String? // party code, or our organization
-  approvedBy     String? // function or party that approves it
+  department       String?
+  submittedBy      String? // party code, or our organization
+  approvedBy       String? // function or party that approves it
   // Needed-by rule: this many business days before the action date (default
   // 25 = five working weeks). Null leadBusinessDays with manualDate = a fixed date.
   leadBusinessDays Int?
-  manualDate     Boolean  @default(false)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @default(now()) @updatedAt
-  createdByName  String?
+  manualDate       Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @default(now()) @updatedAt
+  createdByName    String?
 
   @@unique([projectId, actionId, documentId])
   @@index([documentId])
@@ -967,20 +1011,23 @@ model AssetItem {
 // ── Files (Part 10) ──────────────────────────────────────────────────────────
 
 model StoredFile {
-  id             String    @id @default(cuid())
+  id             String       @id @default(cuid())
   projectId      String
-  project        Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project        Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
   name           String
   path           String // relative to ./uploads
   size           Int
   mime           String
   sha256         String // integrity: verifiable as unaltered (§10.5)
-  kind           String // NATIVE | RENDITION
+  kind           String // NATIVE | RENDITION | STAMPED | EVIDENCE
   revisionId     String?
-  revision       Revision? @relation(fields: [revisionId], references: [id])
+  revision       Revision?    @relation(fields: [revisionId], references: [id])
+  // A stamped copy returned by an outside party, or the proof of an exchange.
+  cycleId        String?
+  cycle          ReviewCycle? @relation(fields: [cycleId], references: [id])
   uploadedById   String?
   uploadedByName String?
-  createdAt      DateTime  @default(now())
+  createdAt      DateTime     @default(now())
 
   @@index([projectId])
 }
@@ -1217,7 +1264,7 @@ model WorkflowTemplate {
   org           Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
   name          String
   description   String?
-  classes       String       @default("*") // JSON: [{docType?, discipline?, criticality?}] patterns; "*" = applies to all
+  classes       String       @default("*") // JSON: [{docType?, discipline?, criticality?, deliverableType?, originator?}] patterns; "*" = applies to all
   steps         String // JSON: [{ act: REVIEW|APPROVAL, mode: ANY_OF|ALL_CONSOLIDATOR|SERIAL, participantIds: [], outcomeSetKey? }]
   outcomeSetKey String? // the review-outcome set bound to this template's review steps
   isDefault     Boolean      @default(false)
@@ -1252,22 +1299,44 @@ model WorkflowRun {
 
 // §0.3 — parties: our organization and external organizations
 model Party {
-  id         String       @id @default(cuid())
-  orgId      String
-  org        Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  code       String
-  name       String
-  isInternal Boolean      @default(false)
+  id               String        @id @default(cuid())
+  orgId            String
+  org              Organization  @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  code             String
+  name             String
+  isInternal       Boolean       @default(false)
   // Revoking a party ends its people's access without deleting anything:
   // they cannot sign in, and the party is no longer offered in pickers.
-  active     Boolean      @default(true)
-  users      User[]
+  active           Boolean       @default(true)
+  users            User[]
+  cycles           ReviewCycle[]
   // Who answers for this party. The contact is required for an outside party;
   // the backup is whoever stands in when the contact is away.
-  contactId  String?
-  contact    User?        @relation("PartyContact", fields: [contactId], references: [id])
-  backupId   String?
-  backup     User?        @relation("PartyBackup", fields: [backupId], references: [id])
+  contactId        String?
+  contact          User?         @relation("PartyContact", fields: [contactId], references: [id])
+  backupId         String?
+  backup           User?         @relation("PartyBackup", fields: [backupId], references: [id])
+  // How this organization works with us:
+  //   COLLABORATOR they run this EDMS with us; their people answer here
+  //   GUEST        accounts here, but only to do a task on this project
+  //   OFFLINE      no accounts at all; our named person records for them
+  kind             String        @default("COLLABORATOR")
+  // Kept so records written before the three kinds still read correctly.
+  participation    String        @default("IN_APP")
+  // Who answers for the party when it holds no account here: a person at that
+  // organization, addressable without ever signing in.
+  contactName      String?
+  contactEmail     String?
+  backupName       String?
+  backupEmail      String?
+  // Which function of ours carries the exchange when the party does not answer
+  // here. Empty falls back to the control function.
+  liaisonFunction  String?
+  // Their system, where they impose one, so the record can say where it went.
+  externalSystem   String?
+  // Whether a recorded answer must carry its proof. True for anything recorded
+  // on a party's behalf.
+  evidenceRequired Boolean       @default(true)
 
   @@unique([orgId, code])
   @@index([orgId])
@@ -1295,4 +1364,49 @@ model ScopeConfig {
   executionSeriesStart    Int      @default(0) // C.5.2 — declared starting value of the numeric execution series
 
   @@index([projectId])
+}
+
+
+/**
+ * A request to send a revision somewhere.
+ *
+ * Releasing a revision and telling people about it are two different acts, and
+ * the second one is asked for. Anybody with standing on the document may ask —
+ * whoever wrote it, whoever uploaded it, whoever started the review, whoever
+ * decided it — and they may ask at any time, once or several times: issue it to
+ * these people now, ask that organization to approve it next week.
+ *
+ * Document Control carries a request out. Where a project runs without a
+ * control function, whoever asked carries it out themselves. Until somebody
+ * asks, a released revision is simply not issued, and the record says so.
+ */
+model IssueRequest {
+  id              String   @id @default(cuid())
+  projectId       String
+  project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  revisionId      String
+  revision        Revision @relation(fields: [revisionId], references: [id], onDelete: Cascade)
+  /**
+   * Why it goes to them, from the published reasons for issue: for information,
+   * for review, for approval, for pricing, for execution. What is wanted back —
+   * if anything — is a property of the reason, not a second question.
+   */
+  reason          String   @default("INFORMATION")
+  /** JSON: { internalUserIds, partyIds, note } — who it goes to. */
+  recipients      String
+  note            String?
+  /** The asker left the choice to whoever wrote the revision. */
+  delegated       Boolean  @default(false)
+  raisedById      String
+  raisedByName    String
+  raisedAt        DateTime @default(now())
+  /** OPEN — waiting to be carried out. DONE — the transmittal exists. CANCELLED. */
+  status          String   @default("OPEN")
+  carriedOutAt    DateTime?
+  carriedOutBy    String?
+  transmittalId   String?
+  transmittal     Transmittal? @relation(fields: [transmittalId], references: [id])
+
+  @@index([revisionId])
+  @@index([projectId, status])
 }

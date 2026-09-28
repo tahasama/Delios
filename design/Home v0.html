@@ -1,0 +1,365 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DELIOS — Home v0</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&display=swap" rel="stylesheet">
+<style>
+/* ── Tokens: taken from src/app/theme.css, not invented ──────────────────── */
+:root{
+  --surface:#ffffff; --canvas:#eceff4; --canvas-deep:#e2e7ee;
+  --line:#d7dde6; --line-strong:#bcc6d4;
+  --brand:#1e3a5f; --brand-hover:#2d5480; --brand-strong:#17324d;
+  --brand-line:#3b6389; --link:#2b5b80; --tint:#e4eef7; --tint-soft:#f2f6fb;
+  --ink:#0f172a; --ink-2:#475569; --ink-3:#7c8798;
+  --warn:#9a5b06; --warn-bg:#fdf3e3; --alarm:#9b1c1c; --alarm-bg:#fdecec;
+  --good:#166534;
+  --sans:"IBM Plex Sans",ui-sans-serif,system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,monospace;
+  --serif:"Newsreader",Georgia,serif;
+  --r:10px; --ease:cubic-bezier(.2,.6,.3,1);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --surface:#111823; --canvas:#0a0f17; --canvas-deep:#070b12;
+    --line:#273245; --line-strong:#37455c;
+    --brand:#2f5e8e; --brand-hover:#3a70a6; --brand-strong:#28527d;
+    --brand-line:#5f8fbf; --link:#8db8de; --tint:#1a2a3c; --tint-soft:#152131;
+    --ink:#e6edf6; --ink-2:#9fb0c4; --ink-3:#6c7c92;
+    --warn:#e6a94a; --warn-bg:#2a2013; --alarm:#f08b8b; --alarm-bg:#2a1414;
+    --good:#6fcf97;
+  }
+}
+:root[data-theme="dark"]{
+  --surface:#111823; --canvas:#0a0f17; --canvas-deep:#070b12;
+  --line:#273245; --line-strong:#37455c;
+  --brand:#2f5e8e; --brand-hover:#3a70a6; --brand-strong:#28527d;
+  --brand-line:#5f8fbf; --link:#8db8de; --tint:#1a2a3c; --tint-soft:#152131;
+  --ink:#e6edf6; --ink-2:#9fb0c4; --ink-3:#6c7c92;
+  --warn:#e6a94a; --warn-bg:#2a2013; --alarm:#f08b8b; --alarm-bg:#2a1414;
+  --good:#6fcf97;
+}
+
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  background:var(--canvas); color:var(--ink); font-family:var(--sans);
+  font-size:15px; line-height:1.5; text-wrap:pretty;
+  -webkit-font-smoothing:antialiased;
+}
+a{color:inherit;text-decoration:none}
+.wrap{max-width:1180px;margin:0 auto;padding:28px 16px 64px}
+
+/* ── The answer. One line, said once, in the human voice ─────────────────── */
+.answer{
+  background:var(--surface); border:1px solid var(--line); border-radius:var(--r);
+  padding:26px 28px 22px; margin-bottom:22px;
+}
+.answer h1{
+  margin:0; font-family:var(--serif); font-weight:400;
+  font-size:clamp(26px,3.2vw,36px); line-height:1.15; letter-spacing:-.01em;
+}
+.answer h1 b{font-weight:600}
+.answer .sub{margin:8px 0 0;color:var(--ink-2);font-size:14px}
+.answer .worst{
+  display:inline-flex;align-items:baseline;gap:6px;
+  font-family:var(--mono);font-size:13px;color:var(--warn);
+}
+
+/* ── Tab rail: what this person has, nothing they do not ─────────────────── */
+.rail{display:flex;flex-wrap:wrap;gap:2px;margin:0 0 18px;border-bottom:1px solid var(--line)}
+.rail a{
+  padding:9px 13px 10px;font-size:13px;font-weight:600;color:var(--ink-3);
+  border-bottom:2px solid transparent;transition:color .14s var(--ease),border-color .14s var(--ease);
+}
+.rail a:hover{color:var(--ink)}
+.rail a[aria-current]{color:var(--brand-line);border-bottom-color:var(--brand-line)}
+.rail a .n{font-family:var(--mono);font-weight:500;color:var(--ink-3);margin-left:5px}
+.rail a[aria-current] .n{color:var(--brand-line)}
+
+.cols{display:grid;grid-template-columns:minmax(0,1fr);gap:18px}
+@media(min-width:1040px){.cols{grid-template-columns:minmax(0,1fr) 316px}}
+
+/* ── A group of waiting work ─────────────────────────────────────────────── */
+.grp{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.grp + .grp{margin-top:14px}
+.grp > header{
+  display:flex;align-items:center;gap:10px;
+  padding:13px 18px;border-bottom:1px solid var(--line);
+}
+.grp h2{margin:0;font-size:13.5px;font-weight:600;letter-spacing:.005em}
+.grp .count{
+  font-family:var(--mono);font-size:12px;font-weight:500;color:var(--ink-2);
+  background:var(--canvas-deep);border-radius:5px;padding:1px 7px;
+}
+.grp .oldest{font-size:12px;color:var(--ink-3)}
+.grp .seeall{margin-left:auto;font-size:12px;font-weight:600;color:var(--link)}
+.grp .seeall:hover{text-decoration:underline}
+
+/* Priority bar: the one thing that says "this group is the problem" */
+.grp.hot > header{box-shadow:inset 3px 0 0 var(--alarm)}
+.grp.warm > header{box-shadow:inset 3px 0 0 var(--warn)}
+
+.rows{list-style:none;margin:0;padding:0}
+.rows li + li{border-top:1px solid var(--line)}
+.row{
+  display:grid;grid-template-columns:minmax(0,1fr) auto auto;
+  align-items:center;gap:14px;padding:11px 18px;
+  transition:background .14s var(--ease);
+}
+.row:hover{background:var(--tint-soft)}
+.row:focus-visible{outline:2px solid var(--brand-line);outline-offset:-2px}
+.num{font-family:var(--mono);font-size:13px;font-weight:600}
+.num .rev{color:var(--ink-3);font-weight:400;margin-left:7px}
+.ttl{display:block;font-size:12.5px;color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.why{font-size:12px;color:var(--ink-2)}
+.why .code{font-family:var(--mono);font-weight:600;color:var(--ink)}
+.age{font-family:var(--mono);font-size:12px;color:var(--ink-3);text-align:right;min-width:52px}
+.age.w{color:var(--warn)}
+.age.a{color:var(--alarm);font-weight:600}
+.tag{
+  display:inline-block;font-size:11px;font-weight:600;border-radius:5px;
+  padding:1px 7px;border:1px solid transparent;
+}
+.tag.warn{color:var(--warn);background:var(--warn-bg);border-color:color-mix(in oklab,var(--warn) 30%,transparent)}
+.tag.alarm{color:var(--alarm);background:var(--alarm-bg);border-color:color-mix(in oklab,var(--alarm) 30%,transparent)}
+
+/* Band header, tab view only */
+.band{
+  padding:6px 18px;background:var(--canvas-deep);
+  font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);
+  border-top:1px solid var(--line);
+}
+.rows li:first-child .band{border-top:0}
+
+/* ── Sidebar ─────────────────────────────────────────────────────────────── */
+aside .grp .row{grid-template-columns:minmax(0,1fr) auto}
+.risk .code{font-family:var(--mono);font-size:12.5px;font-weight:600;color:var(--link)}
+.risk p{margin:2px 0 0;font-size:12.5px;color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.risk .meter{margin-top:6px;height:3px;background:var(--canvas-deep);border-radius:2px;overflow:hidden}
+.risk .meter i{display:block;height:100%;background:var(--brand-line)}
+.risk small{font-size:11.5px;color:var(--ink-3)}
+
+.clear{
+  display:flex;gap:12px;align-items:center;background:var(--surface);
+  border:1px solid var(--line);border-radius:var(--r);padding:20px 22px;color:var(--ink-2);font-size:14px;
+}
+
+/* ── Tweaks ──────────────────────────────────────────────────────────────── */
+#tw{position:fixed;right:18px;bottom:18px;z-index:50;font-size:12.5px}
+#tw button.open{
+  background:var(--brand);color:#fff;border:0;border-radius:99px;padding:9px 15px;
+  font-family:var(--sans);font-size:12.5px;font-weight:600;cursor:pointer;
+}
+#tw .panel{
+  display:none;background:var(--surface);border:1px solid var(--line-strong);
+  border-radius:var(--r);padding:14px;width:230px;
+}
+#tw.on .panel{display:block}
+#tw.on button.open{display:none}
+#tw label{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:0 0 9px;color:var(--ink-2)}
+#tw select{font-family:var(--sans);font-size:12px;padding:3px 6px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink)}
+#tw .close{background:none;border:0;color:var(--link);font-weight:600;cursor:pointer;padding:0;font-size:12px}
+[data-density="tight"] .row{padding-top:7px;padding-bottom:7px}
+[data-density="loose"] .row{padding-top:15px;padding-bottom:15px}
+[data-serif="off"] .answer h1{font-family:var(--sans);font-weight:600;font-size:clamp(22px,2.4vw,28px)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- The answer, before anything else. -->
+  <section class="answer">
+    <h1>Good day, Taha. <b>Nine things</b> wait on you.</h1>
+    <p class="sub">
+      <span class="worst">oldest 11 days</span>
+      &nbsp;·&nbsp; two of them hold somebody else up.
+    </p>
+  </section>
+
+  <nav class="rail" aria-label="What is waiting">
+    <a href="#" aria-current="page">All <span class="n">9</span></a>
+    <a href="#">Give the verdict <span class="n">2</span></a>
+    <a href="#">Your advice <span class="n">1</span></a>
+    <a href="#">Ready to release <span class="n">2</span></a>
+    <a href="#">Send back <span class="n">1</span></a>
+    <a href="#">Never sent <span class="n">2</span></a>
+    <a href="#">Your drafts <span class="n">1</span></a>
+  </nav>
+
+  <div class="cols">
+    <div>
+
+      <!-- Worst first. The bar on the header is the only alarm. -->
+      <section class="grp hot">
+        <header>
+          <h2>Send back — the decision asked for changes</h2>
+          <span class="count">1</span>
+          <span class="oldest">oldest 11 days</span>
+        </header>
+        <ul class="rows">
+          <li><a class="row" href="#">
+            <span><span class="num">Q6637021-74-ME-CAL-00002<span class="rev">rev B</span></span>
+              <span class="ttl">Pump house ventilation — heat emission calculation</span></span>
+            <span class="why"><span class="tag alarm">C3 rejected</span></span>
+            <span class="age a">11d</span>
+          </a></li>
+        </ul>
+      </section>
+
+      <section class="grp warm">
+        <header>
+          <h2>Give the verdict</h2>
+          <span class="count">2</span>
+          <span class="oldest">oldest 6 days</span>
+        </header>
+        <ul class="rows">
+          <li><a class="row" href="#">
+            <span><span class="num">Q6637021-71-ST-DSW-00001<span class="rev">rev B</span></span>
+              <span class="ttl">Clarifier TK-201 — structural foundation drawing</span></span>
+            <span class="why">yours decides it</span>
+            <span class="age w">6d</span>
+          </a></li>
+          <li><a class="row" href="#">
+            <span><span class="num">Q6637021-70-CI-DSW-00001<span class="rev">rev C</span></span>
+              <span class="ttl">Feed pump bay P-101/P-102 — civil site works</span></span>
+            <span class="why">yours decides it</span>
+            <span class="age">2d</span>
+          </a></li>
+        </ul>
+      </section>
+
+      <section class="grp">
+        <header>
+          <h2>Ready to release</h2>
+          <span class="count">2</span>
+          <span class="oldest">oldest 3 days</span>
+        </header>
+        <ul class="rows">
+          <li><a class="row" href="#">
+            <span><span class="num">Q6637021-74-ST-DSW-00001<span class="rev">rev B</span></span>
+              <span class="ttl">Non-process building 74 — reinforcement arrangement</span></span>
+            <span class="why">at <span class="code">IFC</span>, decided <span class="code">C1</span></span>
+            <span class="age w">3d</span>
+          </a></li>
+          <li><a class="row" href="#">
+            <span><span class="num">Q6637021-73-WW-MAN-00001<span class="rev">rev C</span></span>
+              <span class="ttl">Aeration blower BL-301 — operation and maintenance</span></span>
+            <span class="why">at <span class="code">IFI</span>, decided <span class="code">C1</span></span>
+            <span class="age">today</span>
+          </a></li>
+        </ul>
+      </section>
+
+      <section class="grp">
+        <header>
+          <h2>Released, never sent</h2>
+          <span class="count">2</span>
+          <span class="oldest">oldest 8 days</span>
+          <a class="seeall" href="#">See all 2 →</a>
+        </header>
+        <ul class="rows">
+          <li><a class="row" href="#">
+            <span><span class="num">Q6637021-72-AR-DSW-00001<span class="rev">rev A</span></span>
+              <span class="ttl">Site protection 72 — architectural finishes</span></span>
+            <span class="why">at <span class="code">AFC</span>, nobody told</span>
+            <span class="age a">8d</span>
+          </a></li>
+          <li><a class="row" href="#">
+            <span><span class="num">Q6637021-75-CI-SPC-00001<span class="rev">rev B</span></span>
+              <span class="ttl">Water tower WT-401 — concrete and reinforcement spec</span></span>
+            <span class="why">at <span class="code">IFC</span>, nobody told</span>
+            <span class="age">1d</span>
+          </a></li>
+        </ul>
+      </section>
+
+      <section class="grp">
+        <header>
+          <h2>Review — your advice</h2>
+          <span class="count">1</span>
+        </header>
+        <ul class="rows">
+          <li><a class="row" href="#">
+            <span><span class="num">Q6637021-73-WW-PRO-00001<span class="rev">rev B</span></span>
+              <span class="ttl">Aeration system BL-301 — start-up and shutdown</span></span>
+            <span class="why">step 2 of 3</span>
+            <span class="age">today</span>
+          </a></li>
+        </ul>
+      </section>
+
+      <section class="grp">
+        <header>
+          <h2>Your drafts</h2>
+          <span class="count">1</span>
+        </header>
+        <ul class="rows">
+          <li><a class="row" href="#">
+            <span><span class="num">Q6637021-74-EL-SCH-00001<span class="rev">rev A</span></span>
+              <span class="ttl">Feed pump P-101 — motor cable schedule</span></span>
+            <span class="why">no file yet</span>
+            <span class="age">4d</span>
+          </a></li>
+        </ul>
+      </section>
+
+    </div>
+
+    <aside>
+      <section class="grp">
+        <header>
+          <h2>Schedule at risk</h2>
+          <a class="seeall" href="#">Schedule →</a>
+        </header>
+        <ul class="rows">
+          <li><a class="row risk" href="#">
+            <span>
+              <span class="code">A-1420</span>
+              <p>Pump house mechanical installation</p>
+              <span class="meter"><i style="width:62%"></i></span>
+              <small>5 of 8 documents ready</small>
+            </span>
+            <span class="age a">overdue</span>
+          </a></li>
+          <li><a class="row risk" href="#">
+            <span>
+              <span class="code">A-1615</span>
+              <p>Clarifier concrete pour</p>
+              <span class="meter"><i style="width:80%"></i></span>
+              <small>4 of 5 documents ready</small>
+            </span>
+            <span class="age w">14 Oct</span>
+          </a></li>
+        </ul>
+      </section>
+    </aside>
+  </div>
+</div>
+
+<div id="tw">
+  <button class="open" onclick="document.getElementById('tw').classList.add('on')">Tweaks</button>
+  <div class="panel">
+    <label>Theme
+      <select onchange="document.documentElement.dataset.theme=this.value">
+        <option value="">system</option><option value="light">light</option><option value="dark">dark</option>
+      </select>
+    </label>
+    <label>Row density
+      <select onchange="document.body.dataset.density=this.value">
+        <option value="">normal</option><option value="tight">tight</option><option value="loose">loose</option>
+      </select>
+    </label>
+    <label>Greeting face
+      <select onchange="document.body.dataset.serif=this.value">
+        <option value="">serif</option><option value="off">sans</option>
+      </select>
+    </label>
+    <button class="close" onclick="document.getElementById('tw').classList.remove('on')">close</button>
+  </div>
+</div>
+</body>
+</html>

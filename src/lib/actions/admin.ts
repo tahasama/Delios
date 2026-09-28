@@ -1,5 +1,7 @@
 "use server";
 
+import { randomUUID } from "crypto";
+
 import { revalidatePath } from "next/cache";
 import { requireAdminScope, requireScope, crossProject, type Tenant } from "@/lib/scope";
 import { redirect } from "next/navigation";
@@ -226,6 +228,7 @@ export async function setScopeAction(_prev: { error?: string } | undefined, form
     const assessmentLevel = String(formData.get("assessmentLevel") ?? "Full");
     const integrityThreshold = Number(formData.get("integrityThreshold") ?? 95);
     const measurementIntervalDays = Number(formData.get("measurementIntervalDays") ?? 30);
+    // Whether Document Control stands between the decision and the issue.
  if (!organizationName || !scopeStatement) return { error: "Organization and scope statement are required." };
     const existing = await db.scopeConfig.findFirst();
     if (existing) {

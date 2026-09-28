@@ -82,8 +82,12 @@ export async function withdrawApprovalAction(_prev: { error?: string } | undefin
  if (!reason) return { error: "A withdrawal is recorded with its reason." };
   const approval = await db.approval.findFirst({ where: { revisionId, withdrawnAt: null }, orderBy: { decidedAt: "desc" } });
   if (!approval) return { error: "No live approval to withdraw." };
-  const allowed = isAdmin(user) || approval.approverId === user.id;
- if (!allowed) return { error: "Only the approving authority (or an administrator) withdraws an approval." };
+  // Withdrawing an approval is the control function's act, whoever asked for
+  // it. The approver who changed their mind asks; the record says who did it
+  // and why, in one place.
+  if (!isController(user)) {
+    return { error: "The control function withdraws an approval. Ask them, and say why — the reason goes on the record." };
+  }
 
   const rev = await db.revision.findUniqueOrThrow({ where: { id: revisionId }, include: { document: true } });
   // An approval only governs the revision it was given on, and a newer revision
@@ -91,7 +95,7 @@ export async function withdrawApprovalAction(_prev: { error?: string } | undefin
   // nobody is working from, and put the document into Withdrawn although its
   // current revision stands. Withdraw the current revision's approval instead.
   const newer = await db.revision.findFirst({
-    where: { documentId: rev.documentId, createdAt: { gt: rev.createdAt }, state: { in: ["IN_REVIEW", "RELEASED", "SUPERSEDED"] } },
+    where: { documentId: rev.documentId, createdAt: { gt: rev.createdAt }, state: { in: ["IN_REVIEW", "NOT_RELEASED", "RELEASED", "SUPERSEDED"] } },
     orderBy: { createdAt: "desc" },
     select: { value: true },
   });

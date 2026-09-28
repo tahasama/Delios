@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getScope } from "@/lib/scope";
+import { db } from "@/lib/db";
 import { getSessionUser } from "@/lib/auth";
 import { readStored } from "@/lib/files";
 import { audit } from "@/lib/audit";
@@ -9,9 +9,6 @@ import { audit } from "@/lib/audit";
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await getSessionUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const ctx = await getScope();
-  if (!ctx) return NextResponse.json({ error: "No active project" }, { status: 403 });
-  const { db } = ctx;
   const { id } = await params;
   const file = await db.storedFile.findUnique({
     where: { id },
@@ -20,13 +17,13 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   if (!file) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const doc = file.revision?.document;
-  if (doc && !ctx.canSee(doc.confidentiality)) {
-    // §5.7 is about who may see it, not who wrote it, so there is no author
-    // exemption: clearance is the whole test.
-    return NextResponse.json(
-      { error: ctx.why("READ", doc) },
-      { status: 403 },
-    );
+  if (doc) {
+    const conf = doc.confidentiality ?? "INTERNAL";
+    const privileged = ["ADMIN", "CONTROLLER", "APPROVER"].includes(user.role);
+    const isAuthor = doc.createdById === user.id;
+    if ((conf === "RESTRICTED" || conf === "CONFIDENTIAL") && !privileged && !isAuthor) {
+      return NextResponse.json({ error: "Access does not match the confidentiality classification (§5.7)" }, { status: 403 });
+    }
   }
 
   try {

@@ -56,7 +56,7 @@ export async function stampPdf(source: Buffer | Uint8Array | undefined, info: St
         x: 24, y: 24, width: Math.min(width - 48, 300), height: 26,
         color: rgb(0.85, 0.1, 0.1),
       });
- page.drawText(info.state === "VOID" ? "VOID — treated as never valid": "SUPERSEDED — visibly marked not-current", {
+      page.drawText(info.state === "VOID" ? "VOID (§12.1) — treated as never valid" : "SUPERSEDED (§12.5) — visibly marked not-current", {
         x: 32, y: 32, size: 9, font, color: rgb(1, 1, 1),
       });
     }

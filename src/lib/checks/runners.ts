@@ -4,7 +4,7 @@ import { readFile } from "fs/promises";
 import path from "path";
 import type { Tenant, ScopedDb } from "@/lib/tenant";
 import { UPLOAD_ROOT } from "@/lib/files";
-import { REV_STATES, DOC_STATES, EXCLUDED_REV_LETTERS, isEmptyTitle } from "@/lib/standard";
+import { ADVICE_CODES, REV_STATES, DOC_STATES, EXCLUDED_REV_LETTERS, isEmptyTitle } from "@/lib/standard";
 
 // Annex H runners — each returns the failing items for its check, or the
 // special strings NOT_CHECKED / NOT_EXECUTABLE. Evidence only; no judgement (§17.1).
@@ -562,7 +562,7 @@ export const RUNNERS: Runners = {
   "RO-04": async (ctx) => {
     const cycles = await ctx.db.reviewCycle.findMany({ where: { outcome: { not: null } }, include: { revision: { include: { document: { select: { docNumber: true } } } } } });
     const verdicts = ctx.allSets.get("REVIEW_OUTCOMES");
-    const advice = ctx.allSets.get("REVIEW_ADVICE");
+    const advice = ctx.allSets.get("REVIEW_ADVICE") ?? new Set<string>(ADVICE_CODES);
     const setFor = (c: { binding: boolean; outcomeSetKey: string | null }) => (c.outcomeSetKey ? ctx.allSets.get(c.outcomeSetKey) : undefined) ?? (c.binding ? verdicts : advice);
  return cycles.filter((c) => { const set = setFor(c); return set && !set.has(c.outcome!); }).map((c) => ({ entityKey: `ReviewCycle:${c.id}`, entityType: "ReviewCycle", entityId: c.id, documentId: c.revision.documentId, entityLabel: `${c.revision.document.docNumber} rev ${c.revision.value}`, description: "Outcome not in the published set." }));
   },

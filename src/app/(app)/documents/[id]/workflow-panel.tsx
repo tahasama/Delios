@@ -1,11 +1,15 @@
 import Link from "next/link";
 import { requireScope } from "@/lib/scope";
 import { mayContributeToDocument, type SessionUser } from "@/lib/auth";
-import { Chip, Field, inputCls } from "@/components/ui";
+import { Chip, Field, inputCls, btn } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { ActionForm } from "@/components/form";
 import { recordStepOutcomeAction } from "@/lib/actions/workflow";
 import { decisionOptions, statusOptions } from "@/lib/decision-options";
+import { requestChoices, authorOf, issuePolicy } from "@/lib/issue-requests";
+import { RequestIssue } from "./request-issue";
+import { ArrowRight } from "lucide-react";
+import { ADVICE_LABEL } from "@/lib/standard";
 import { getActiveSet } from "@/lib/config";
 import { VerdictDecision } from "./verdict-status";
 import { Send, CheckCircle2, Rocket } from "lucide-react";
@@ -51,11 +55,31 @@ export async function WorkflowPanel({ doc, user, lead, extra: after }: { doc: Do
   const controller = isController(user);
 
   if (run && run.status === "ACTIVE") return <RunActivePanel run={run} user={user} extra={extra} />;
-  if (run && run.status === "DONE") {
+  // The latest revision decides what is waiting on whom. A finished run says
+  // nothing about that: it stays finished after the revision is released.
+  if (run && run.status === "DONE" && revs[0]?.state === "NOT_RELEASED") {
+    const decided = await db.reviewCycle.findFirst({
+      where: { revisionId: revs[0].id, binding: true, outcome: { not: null } },
+      orderBy: { sequence: "desc" },
+      select: { outcome: true, outcomeSetKey: true, outcomeByName: true },
+    });
+    const verdicts = await getActiveSet(decided?.outcomeSetKey ?? "REVIEW_OUTCOMES");
+    const said = decided?.outcome ? verdicts.find((one) => one.code === decided.outcome) : null;
+    const letsItOut = said ? said.props.proceed === true : true;
     return (
-      <Card title="Next step: release" description={`${run.templateName} is complete.`} className="border-emerald-300/50 bg-emerald-50/40">
-        <p className="flex items-center gap-2 text-sm text-slate-700">
-          <CheckCircle2 className="h-4 w-4 text-emerald-600" /> Everyone has signed off. {controller ? "Release it below." : "Document Control releases it next."}
+      <Card
+        title={`Rev ${revs[0].value} is decided`}
+        description={`Route: ${run.templateName}.`}
+        className={letsItOut ? "border-emerald-300 bg-emerald-50" : "border-orange-300 bg-orange-50"}
+      >
+        <p className="flex items-start gap-2 text-sm text-slate-700">
+          <CheckCircle2 className={`mt-0.5 h-4 w-4 ${letsItOut ? "text-emerald-600" : "text-orange-600"}`} />
+          <span>
+            {decided?.outcome ? <><strong>{said?.label ?? decided.outcome}</strong>{decided.outcomeByName ? ` — ${decided.outcomeByName}` : ""}. </> : null}
+            {letsItOut
+              ? controller ? "Release it below." : "Document Control releases it next."
+              : controller ? "It asks for changes, so it is not released. Send it back below." : "It asks for changes, so Document Control will send it back."}
+          </span>
         </p>
         {extra}
       </Card>
@@ -85,8 +109,8 @@ export async function WorkflowPanel({ doc, user, lead, extra: after }: { doc: Do
   }
   if (revs.length > 0) {
     return (
-      <Card title={revs[0].state === "IN_REVIEW" ? (revs[0].proposedStatus ? "Next step: release" : "In review") : "Not in use"} className={revs[0].state === "IN_REVIEW" ? "border-brand-line/30 bg-tint-soft" : undefined}>
-        <p className="text-sm text-slate-700">{revs[0].state === "IN_REVIEW" ? (revs[0].proposedStatus ? <>The review is over. Rev {revs[0].value} is decided <strong>to be {revs[0].proposedStatus}</strong> and waits for Document Control to release it.</> : <>Rev {revs[0].value} is with its reviewers.</>) : <>The latest revision (rev {revs[0].value}) is <strong>{revs[0].state.replaceAll("_", " ").toLowerCase()}</strong>.</>}</p>
+      <Card title={revs[0].state === "NOT_RELEASED" ? "Next step: release" : revs[0].state === "IN_REVIEW" ? "In review" : "Not in use"} className={revs[0].state === "IN_REVIEW" || revs[0].state === "NOT_RELEASED" ? "border-brand-line/30 bg-tint-soft" : undefined}>
+        <p className="text-sm text-slate-700">{revs[0].state === "NOT_RELEASED" ? <>The route is finished. Rev {revs[0].value} is at <strong>{revs[0].statusCode}</strong> and is <strong>not released</strong> until Document Control publishes it.</> : revs[0].state === "IN_REVIEW" ? <>Rev {revs[0].value} is with its reviewers.</> : <>The latest revision (rev {revs[0].value}) is <strong>{revs[0].state.replaceAll("_", " ").toLowerCase()}</strong>.</>}</p>
         {extra}
       </Card>
     );
@@ -131,12 +155,18 @@ async function SendPanel({ doc, revId, value, hasFiles, user, lead, extra }: { d
 // ── Active run: step progress + the user's decision form ────────────────────
 
 async function RunActivePanel({ run, user, extra }: { run: { id: string; templateName: string; steps: WfRuntimeStep[]; currentStep: number }; user: SessionUser; extra?: React.ReactNode }) {
-  const { db } = await requireScope();
+  const ctx = await requireScope();
+  const { db } = ctx;
   const step = run.steps[run.currentStep];
   const allParticipantIds = [...new Set(run.steps.flatMap((item) => item.participantIds))];
   const participants = await db.user.findMany({ where: { id: { in: allParticipantIds } }, include: { party: true } });
   const mine = !!step && step.participantIds.includes(user.id);
   const activeCycle = step?.cycleId ? await db.reviewCycle.findUnique({ where: { id: step.cycleId } }) : null;
+  // The status the revision arrives at this step carrying, so the person either
+  // changes it or confirms it on purpose.
+  const carrying = activeCycle
+    ? (await db.revision.findUnique({ where: { id: activeCycle.revisionId }, select: { statusCode: true } }))?.statusCode ?? null
+    : null;
   const outcomeSetKey = activeCycle?.outcomeSetKey ?? "REVIEW_OUTCOMES";
   const outcomes = await getActiveSet(outcomeSetKey);
   const statuses = await getActiveSet("STATUSES");
@@ -145,6 +175,17 @@ async function RunActivePanel({ run, user, extra }: { run: { id: string; templat
   const iDecide = !!step && mine && !alreadyGave && (step.mode !== "SERIAL" || serialNext === user.id);
   // The last step decides; the earlier steps' verdicts are advice shown to the decider.
   const deciding = run.currentStep === run.steps.length - 1;
+  // The deciding step is offered the first request.
+  const nextStep = deciding && activeCycle && !activeCycle.outcome && (await issuePolicy(ctx)).asked
+    ? await requestChoices(ctx, (await db.revision.findUniqueOrThrow({ where: { id: activeCycle.revisionId }, select: { document: true } })).document)
+    : null;
+  const issueReasons = nextStep ? await getActiveSet("REASONS_FOR_ISSUE") : [];
+  const author = nextStep && activeCycle ? await authorOf(ctx, activeCycle.revisionId) : null;
+  // The steps still to come, for a reservation held against one of them.
+  const laterSteps = run.steps.slice(run.currentStep + 1).map((one, index) => ({
+    number: run.currentStep + 2 + index,
+    title: one.title ?? `Step ${run.currentStep + 2 + index}`,
+  }));
   const adviceCycleIds = run.steps.slice(0, run.currentStep).map((s) => s.cycleId).filter((id): id is string => !!id);
   const advice = adviceCycleIds.length
     ? await db.reviewCycle.findMany({
@@ -152,8 +193,10 @@ async function RunActivePanel({ run, user, extra }: { run: { id: string; templat
         select: { id: true, outcome: true, outcomeByName: true, outcomeNote: true, outcomeSetKey: true, comments: { select: { id: true, authorName: true, text: true, progressionPreventing: true, status: true }, orderBy: { createdAt: "asc" } } },
       })
     : [];
-  // The earlier steps answer from the advice list, so their labels come from it.
-  const adviceLabels = new Map((await getActiveSet("REVIEW_ADVICE")).map((a) => [a.code, a.label]));
+  // An earlier step's answer is worked out from its comments; the words for it
+  // come from the organization's published list, the Standard's own only until
+  // that list exists.
+  const adviceLabels = new Map<string, string>([...Object.entries(ADVICE_LABEL), ...(await getActiveSet("REVIEW_ADVICE")).map((a) => [a.code, a.label] as [string, string])]);
   const outcomeLabel = new Map(outcomes.map((o) => [o.code, o.label]));
   const said = (code: string) => adviceLabels.get(code) ?? outcomeLabel.get(code) ?? code;
   const earlier = advice.some((a) => a.outcome || a.comments.length) ? (
@@ -211,11 +254,22 @@ async function RunActivePanel({ run, user, extra }: { run: { id: string; templat
 
       {step && step.status === "active" ? (
         iDecide ? (
-          <Action label={deciding ? "Your verdict decides this revision" : "Your advice goes to whoever decides"}>
-            <ActionForm action={recordStepOutcomeAction} submitLabel={deciding ? "Give my verdict" : "Give my advice"} size="sm" hidden={{ runId: run.id }}>
-              <VerdictDecision deciding={deciding} verdicts={decisionOptions(outcomes)} statuses={statusOptions(statuses)} own={ownComments} commentsHref={step?.cycleId ? `/reviews/${step.cycleId}` : undefined} />
-            </ActionForm>
-            <p className="mt-2 text-[11px] text-slate-400">Recorded under your name. Verdicts come from your organization&apos;s list — <Link href="/guide/codes#outcome" className="underline">what each one means</Link>.</p>
+          /* A review is answered in one place — the review itself, where the
+             document is on screen, the earlier steps are readable and the
+             progress is drawn. This card says it is your turn and takes you
+             there; a second copy of the form here would be a second place for
+             the same act, and two places to answer means two things to keep
+             right. */
+          <Action label={deciding ? "It is your turn — your verdict decides this revision" : "It is your turn — your advice goes to whoever decides"}>
+            {step.cycleId ? (
+              <Link href={`/reviews/${step.cycleId}`} className={btn("primary", "sm")}>
+                Open the review <ArrowRight className="h-4 w-4" />
+              </Link>
+            ) : (
+              <ActionForm action={recordStepOutcomeAction} submitLabel={deciding ? "Give my verdict" : "Give my advice"} size="sm" hidden={{ runId: run.id }}>
+                <VerdictDecision deciding={deciding} verdicts={decisionOptions(outcomes)} statuses={statusOptions(statuses, step.grantsStatuses)} carrying={carrying} laterSteps={laterSteps} request={nextStep ? <RequestIssue onDecision author={author} reasons={issueReasons.map((one) => ({ code: one.code, label: one.label }))} proposed={nextStep.proposed} others={nextStep.others} parties={nextStep.parties} /> : null} />
+              </ActionForm>
+            )}
           </Action>
         ) : (
           <p className="text-sm text-slate-600">

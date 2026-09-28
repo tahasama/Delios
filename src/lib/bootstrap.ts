@@ -26,6 +26,13 @@ export async function publishReferenceConfiguration(db: PrismaClient, orgId: str
   const schemeDefs = [
     { name: "Internal", notes: "Project · Document type · Discipline · Sequence(4). Edit freely.", fields: [["Project code", "PROJECT_CODES"], ["Document type", "DOCUMENT_TYPES"], ["Discipline", "DISCIPLINES"], ["Sequence", null, "COUNTER:DIGITS(4)"]] },
  { name: "Supplier", notes: "Project · Party · PO · Document type · Discipline · Sequence(4). For external producers.", fields: [["Project code", "PROJECT_CODES"], ["Supplier code", "SUPPLIER_CODES"], ["Purchase order", "PURCHASE_ORDERS"], ["Document type", "DOCUMENT_TYPES"], ["Discipline", "DISCIPLINES"], ["Sequence", null, "COUNTER:DIGITS(4)"]] },
+    // Transmittals and actions are numbered by a scheme too, so the rule lives
+    // where an organization can read and change it rather than in the code that
+    // raises them. Their fields read the record: who sent it, who it went to,
+    // and why. A field the record cannot answer is left out of the number.
+    { name: "Transmittals", notes: "Project, TR, sender, receiver, reason, sequence(4). The fields read the record itself.", fields: [["Project code", null, "PROJECT"], ["Record", null, "FIXED(TR)"], ["Sender", null, "SENDER"], ["Receiver", null, "RECEIVER"], ["Reason for issue", null, "REASON"], ["Sequence", null, "COUNTER:DIGITS(4)"]] },
+    { name: "Actions", notes: "Project, AC, owner party, kind, sequence(4). The fields read the record itself.", fields: [["Project code", null, "PROJECT"], ["Record", null, "FIXED(AC)"], ["Owner", null, "RECEIVER"], ["Kind", null, "REASON"], ["Sequence", null, "COUNTER:DIGITS(4)"]] },
+    { name: "Reviews", notes: "Project, RV, sequence(4). A review is a step of a route on one revision; the document and the revision are on the record, so the number stays short.", fields: [["Project code", null, "PROJECT"], ["Record", null, "FIXED(RV)"], ["Sequence", null, "COUNTER:DIGITS(4)"]] },
   ];
   // Schemes are seeded once, never rewritten. A scheme defines how existing
   // document numbers decompose, so re-publishing the reference configuration
@@ -53,6 +60,9 @@ export async function publishReferenceConfiguration(db: PrismaClient, orgId: str
     { deliverableType: "ENG", schemeName: "Internal" },
     { deliverableType: "TPY", schemeName: "Internal" },
     { deliverableType: "CLT", schemeName: "Internal" },
+    { deliverableType: "TRANSMITTAL", schemeName: "Transmittals" },
+    { deliverableType: "ACTION", schemeName: "Actions" },
+    { deliverableType: "REVIEW", schemeName: "Reviews" },
   ];
   for (const route of defaultRouting) {
     const existing = await db.schemeRouting.findUnique({

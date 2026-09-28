@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DELIOS — Home v3</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&display=swap" rel="stylesheet">
+<style>
+/* ── Tokens from src/app/theme.css; ink darkened for contrast ───────────── */
+:root{
+  --surface:#ffffff; --canvas:#e6eaf1; --canvas-deep:#dbe1ea;
+  --line:#ccd4e0; --line-strong:#a9b5c6;
+  --brand:#1e3a5f; --brand-hover:#2d5480; --brand-strong:#17324d;
+  --brand-line:#3b6389; --link:#245176; --tint:#e0ebf6; --tint-soft:#eff4fa;
+  --ink:#0b1220; --ink-2:#37465c; --ink-3:#6b7a8e;
+  --warn:#8a4b00; --warn-line:#c98a2e; --warn-soft:#fbeed6;
+  --alarm:#8c1515; --alarm-line:#c0392b; --alarm-soft:#f8dcda;
+  --sans:"IBM Plex Sans",ui-sans-serif,system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,monospace;
+  --serif:"Newsreader",Georgia,serif;
+  --r:10px; --ease:cubic-bezier(.2,.6,.3,1);
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --surface:#141c28; --canvas:#0a0f17; --canvas-deep:#080d14;
+  --line:#2c3950; --line-strong:#44546e;
+  --brand:#2f5e8e; --brand-hover:#3a70a6; --brand-strong:#28527d;
+  --brand-line:#6f9fcf; --link:#9cc6ea; --tint:#1c2c40; --tint-soft:#172232;
+  --ink:#f0f5fb; --ink-2:#b3c3d6; --ink-3:#7e8ea3;
+  --warn:#f0b357; --warn-line:#d79a3c; --warn-soft:#3a2a12;
+  --alarm:#ff9a94; --alarm-line:#e0645c; --alarm-soft:#3d1a18;
+}}
+:root[data-theme="dark"]{
+  --surface:#141c28; --canvas:#0a0f17; --canvas-deep:#080d14;
+  --line:#2c3950; --line-strong:#44546e;
+  --brand:#2f5e8e; --brand-hover:#3a70a6; --brand-strong:#28527d;
+  --brand-line:#6f9fcf; --link:#9cc6ea; --tint:#1c2c40; --tint-soft:#172232;
+  --ink:#f0f5fb; --ink-2:#b3c3d6; --ink-3:#7e8ea3;
+  --warn:#f0b357; --warn-line:#d79a3c; --warn-soft:#3a2a12;
+  --alarm:#ff9a94; --alarm-line:#e0645c; --alarm-soft:#3d1a18;
+}
+
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--canvas);color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.5;text-wrap:pretty;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+.wrap{max-width:1240px;margin:0 auto;padding:32px 18px 80px}
+
+/* ── Masthead: the answer, with weight ──────────────────────────────────── */
+.head{
+  background:var(--brand);color:#fff;border-radius:var(--r) var(--r) 0 0;
+  padding:26px 30px 24px;position:relative;overflow:hidden;
+}
+.head .eyebrow{
+  margin:0 0 10px;font-family:var(--mono);font-size:11.5px;font-weight:500;
+  letter-spacing:.12em;text-transform:uppercase;color:#9dbbd8;
+}
+.head h1{
+  margin:0;font-family:var(--serif);font-weight:400;
+  font-size:clamp(28px,3.4vw,40px);line-height:1.1;letter-spacing:-.015em;color:#fff;
+}
+.head h1 b{font-weight:600}
+.head h1 em{font-style:italic;color:#b9d2ea}
+
+/* ── The rail: one line, dots sitting on it, counts above ───────────────── */
+.track{background:var(--surface);border:1px solid var(--line);border-top:0;border-radius:0 0 var(--r) var(--r);padding:26px 30px 22px;margin-bottom:18px}
+.stations{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));position:relative;padding-top:4px}
+.stations::before{
+  content:"";position:absolute;left:10%;right:10%;top:calc(4px + 54px);height:2px;
+  background:var(--line);border-radius:2px;
+}
+.st{
+  position:relative;background:none;border:0;padding:0 4px;cursor:pointer;
+  font-family:var(--sans);color:inherit;text-align:center;
+}
+.st .n{
+  display:block;font-family:var(--mono);font-size:38px;font-weight:600;line-height:1;
+  letter-spacing:-.03em;color:var(--ink);transition:color .16s var(--ease);
+}
+.st .dot{
+  display:block;width:14px;height:14px;margin:16px auto 0;border-radius:99px;
+  background:var(--surface);border:2px solid var(--line-strong);position:relative;z-index:2;
+  transition:transform .16s var(--ease),border-color .16s var(--ease),background .16s var(--ease),box-shadow .16s var(--ease);
+}
+.st .lab{display:block;margin-top:14px;font-size:13.5px;font-weight:600;color:var(--ink-2)}
+.st .old{display:block;margin-top:4px;font-family:var(--mono);font-size:12px;font-weight:500;color:var(--ink-3)}
+
+.st:hover .dot{transform:scale(1.2)}
+.st:focus-visible{outline:2px solid var(--brand-line);outline-offset:4px;border-radius:6px}
+.st[aria-pressed="true"] .dot{border-color:var(--brand);background:var(--brand);box-shadow:0 0 0 5px var(--tint)}
+.st[aria-pressed="true"] .lab{color:var(--ink)}
+.st.warm .n{color:var(--warn)} .st.warm .dot{border-color:var(--warn-line)} .st.warm .old{color:var(--warn);font-weight:600}
+.st.hot .n{color:var(--alarm)} .st.hot .dot{border-color:var(--alarm-line)} .st.hot .old{color:var(--alarm);font-weight:700}
+.st.hot[aria-pressed="true"] .dot{background:var(--alarm-line);border-color:var(--alarm-line);box-shadow:0 0 0 5px var(--alarm-soft)}
+.st.empty .n{color:var(--ink-3);font-weight:400} .st.empty .dot{border-color:var(--line)}
+.st.empty .lab,.st.empty .old{color:var(--ink-3)}
+
+/* ── Register ───────────────────────────────────────────────────────────── */
+.sheet{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.sheet > header{display:flex;align-items:baseline;gap:12px;padding:16px 22px;border-bottom:2px solid var(--line-strong)}
+.sheet h2{margin:0;font-size:16px;font-weight:600;letter-spacing:-.005em}
+.sheet .hint{font-size:13.5px;color:var(--ink-2)}
+.sheet .clear{margin-left:auto;font-size:13px;font-weight:600;color:var(--link)}
+.sheet .clear:hover{text-decoration:underline}
+
+table{width:100%;border-collapse:collapse}
+thead th{
+  text-align:left;font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;
+  color:var(--ink-3);padding:9px 22px;border-bottom:1px solid var(--line);
+}
+thead th.r{text-align:right}
+tbody tr{border-bottom:1px solid var(--line);transition:background .14s var(--ease)}
+tbody tr:last-child{border-bottom:0}
+tbody tr:not(.band):hover{background:var(--tint-soft)}
+td{padding:12px 22px;vertical-align:middle}
+.num{font-family:var(--mono);font-size:14.5px;font-weight:600;color:var(--ink);white-space:nowrap}
+.num .rev{color:var(--ink-3);font-weight:400;margin-left:8px}
+.ttl{display:block;margin-top:2px;font-size:13.5px;color:var(--ink-2);max-width:48ch;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.act{font-size:14px;color:var(--ink-2)}
+.act b{font-weight:600;color:var(--ink)}
+.code{font-family:var(--mono);font-weight:600;color:var(--ink)}
+td.age{text-align:right;font-family:var(--mono);font-size:14px;font-weight:500;color:var(--ink-2);white-space:nowrap}
+td.age.w{color:var(--warn);font-weight:600} td.age.a{color:var(--alarm);font-weight:700}
+td.go{text-align:right;width:1%;white-space:nowrap}
+.go a{font-size:13px;font-weight:600;color:var(--link)}
+tbody tr:hover .go a{text-decoration:underline}
+.blocks{
+  display:inline-block;margin-left:9px;font-size:11.5px;font-weight:700;color:var(--alarm);
+  background:var(--alarm-soft);border:1px solid var(--alarm-line);border-radius:5px;padding:1px 7px;
+}
+tr.band td{
+  background:var(--canvas-deep);padding:7px 22px;
+  font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-2);
+}
+
+.side{margin-top:18px;display:grid;gap:16px;grid-template-columns:minmax(0,1fr)}
+@media(min-width:900px){.side{grid-template-columns:1fr 1fr}}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:18px 22px}
+.card h3{margin:0;font-size:14px;font-weight:600}
+.card > p{margin:3px 0 0;font-size:13px;color:var(--ink-3)}
+.card .row{display:flex;justify-content:space-between;align-items:baseline;gap:14px;padding:10px 0;border-top:1px solid var(--line);font-size:14px}
+.card .row:first-of-type{margin-top:10px}
+.card .code{font-family:var(--mono);font-size:13.5px;font-weight:600;color:var(--link)}
+.card .what{color:var(--ink-2)}
+.card .when{font-family:var(--mono);font-size:13px;font-weight:600;color:var(--warn);white-space:nowrap}
+.card .when.a{color:var(--alarm)}
+
+#tw{position:fixed;right:20px;bottom:20px;z-index:50;font-size:13px}
+#tw button.open{background:var(--brand);color:#fff;border:0;border-radius:99px;padding:10px 17px;font-family:var(--sans);font-size:13px;font-weight:600;cursor:pointer}
+#tw .panel{display:none;background:var(--surface);border:1px solid var(--line-strong);border-radius:var(--r);padding:16px;width:244px}
+#tw.on .panel{display:block} #tw.on button.open{display:none}
+#tw label{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:0 0 10px;color:var(--ink-2)}
+#tw select{font-family:var(--sans);font-size:13px;padding:4px 7px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink)}
+#tw .close{background:none;border:0;color:var(--link);font-weight:600;cursor:pointer;padding:0;font-size:13px}
+[data-density="tight"] td{padding-top:8px;padding-bottom:8px}
+[data-density="loose"] td{padding-top:17px;padding-bottom:17px}
+[data-rail="off"] .track{display:none}
+[data-rail="off"] .head{border-radius:var(--r);margin-bottom:18px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="head">
+    <p class="eyebrow">Q6637021 · Thermal piping system</p>
+    <h1><b>Nine things</b> wait on you. <em>The oldest has waited eleven days.</em></h1>
+  </header>
+
+  <section class="track">
+    <div class="stations">
+      <button class="st" data-k="draft" aria-pressed="false">
+        <span class="n">1</span><span class="dot"></span>
+        <span class="lab">Drafting</span><span class="old">4 days</span>
+      </button>
+      <button class="st warm" data-k="review" aria-pressed="false">
+        <span class="n">3</span><span class="dot"></span>
+        <span class="lab">In review</span><span class="old">6 days</span>
+      </button>
+      <button class="st hot" data-k="decided" aria-pressed="true">
+        <span class="n">3</span><span class="dot"></span>
+        <span class="lab">Decided</span><span class="old">11 days</span>
+      </button>
+      <button class="st warm" data-k="released" aria-pressed="false">
+        <span class="n">2</span><span class="dot"></span>
+        <span class="lab">Released</span><span class="old">8 days</span>
+      </button>
+      <button class="st empty" data-k="issued" aria-pressed="false">
+        <span class="n">0</span><span class="dot"></span>
+        <span class="lab">Issued</span><span class="old">—</span>
+      </button>
+    </div>
+  </section>
+
+  <section class="sheet">
+    <header>
+      <h2 id="sheetTitle">Decided — waiting on you</h2>
+      <span class="hint" id="sheetHint">nothing moves until you act</span>
+      <a class="clear" href="#" id="clearBtn">Show everything →</a>
+    </header>
+    <table>
+      <thead><tr><th>Document</th><th>What it needs</th><th class="r">Waiting</th><th></th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </section>
+
+  <div class="side">
+    <div class="card">
+      <h3>Schedule at risk</h3>
+      <p>Activities whose documents will not be ready in time.</p>
+      <div class="row"><span><span class="code">A-1420</span> <span class="what">Pump house mechanical installation</span></span><span class="when a">overdue</span></div>
+      <div class="row"><span><span class="code">A-1615</span> <span class="what">Clarifier concrete pour</span></span><span class="when">14 Oct</span></div>
+    </div>
+    <div class="card">
+      <h3>Waiting on other people</h3>
+      <p>Yours to chase, not to do.</p>
+      <div class="row"><span><span class="code">RV-0044</span> <span class="what">MADASUD stamp</span></span><span class="when a">9 days over</span></div>
+      <div class="row"><span><span class="code">TR-0031</span> <span class="what">ONEE acknowledgement</span></span><span class="when">3 days</span></div>
+    </div>
+  </div>
+</div>
+
+<div id="tw">
+  <button class="open" onclick="tw.classList.add('on')">Tweaks</button>
+  <div class="panel">
+    <label>Theme<select onchange="document.documentElement.dataset.theme=this.value">
+      <option value="">system</option><option value="light">light</option><option value="dark">dark</option></select></label>
+    <label>Density<select onchange="document.body.dataset.density=this.value">
+      <option value="">normal</option><option value="tight">tight</option><option value="loose">loose</option></select></label>
+    <label>The rail<select onchange="document.body.dataset.rail=this.value">
+      <option value="">on</option><option value="off">off</option></select></label>
+    <button class="close" onclick="tw.classList.remove('on')">close</button>
+  </div>
+</div>
+
+<script>
+// Shape only. Real rows come from the queue the page already builds.
+const WORK = [
+  {k:"decided", n:"Q6637021-74-ME-CAL-00002", r:"B", t:"Pump house ventilation — heat emission calculation", act:'Send it back — <b>C3, revise and resubmit</b>', d:11, blocks:true, go:"Send back"},
+  {k:"decided", n:"Q6637021-74-ST-DSW-00001", r:"B", t:"Non-process building 74 — reinforcement arrangement", act:'Release at <span class="code">IFC</span>', d:3, go:"Release"},
+  {k:"decided", n:"Q6637021-73-WW-MAN-00001", r:"C", t:"Aeration blower BL-301 — operation and maintenance", act:'Release at <span class="code">IFI</span>', d:0, go:"Release"},
+  {k:"review",  n:"Q6637021-71-ST-DSW-00001", r:"B", t:"Clarifier TK-201 — structural foundation drawing", act:'<b>Your verdict decides it</b>', d:6, blocks:true, go:"Decide"},
+  {k:"review",  n:"Q6637021-70-CI-DSW-00001", r:"C", t:"Feed pump bay P-101/P-102 — civil site works", act:'<b>Your verdict decides it</b>', d:2, go:"Decide"},
+  {k:"review",  n:"Q6637021-73-WW-PRO-00001", r:"B", t:"Aeration system BL-301 — start-up and shutdown", act:'Your advice, step 2 of 3', d:0, go:"Review"},
+  {k:"released",n:"Q6637021-72-AR-DSW-00001", r:"A", t:"Site protection 72 — architectural finishes", act:'At <span class="code">AFC</span>, nobody has been told', d:8, go:"Ask to send"},
+  {k:"released",n:"Q6637021-75-CI-SPC-00001", r:"B", t:"Water tower WT-401 — concrete and reinforcement spec", act:'At <span class="code">IFC</span>, nobody has been told', d:1, go:"Ask to send"},
+  {k:"draft",   n:"Q6637021-74-EL-SCH-00001", r:"A", t:"Feed pump P-101 — motor cable schedule", act:'No file attached yet', d:4, go:"Continue"},
+];
+const TITLE = {
+  draft:["Drafting — yours to finish","one revision, no file on it yet"],
+  review:["In review — waiting on you","each one somebody is expecting"],
+  decided:["Decided — waiting on you","nothing moves until you act"],
+  released:["Released — never sent","in use, and nobody has been told"],
+  issued:["Issued","nothing of yours is waiting here"],
+};
+const BANDS = [[8,"Older than a week"],[2,"Earlier this week"],[1,"Yesterday"],[0,"Today"]];
+const age = d => d===0 ? "today" : d===1 ? "1 day" : d+" days";
+const tone = d => d>=7 ? "a" : d>=3 ? "w" : "";
+
+function draw(kind){
+  const list = (kind ? WORK.filter(w=>w.k===kind) : WORK).slice().sort((a,b)=>b.d-a.d);
+  const body = document.getElementById("rows");
+  body.innerHTML = "";
+  let cut = null;
+  for(const w of list){
+    const band = BANDS.find(([from])=>w.d>=from)[1];
+    if(band !== cut){ cut = band; body.insertAdjacentHTML("beforeend",`<tr class="band"><td colspan="4">${band}</td></tr>`); }
+    body.insertAdjacentHTML("beforeend",`
+      <tr>
+        <td><span class="num">${w.n}<span class="rev">rev ${w.r}</span></span><span class="ttl">${w.t}</span></td>
+        <td class="act">${w.act}${w.blocks?'<span class="blocks">holds somebody up</span>':""}</td>
+        <td class="age ${tone(w.d)}">${age(w.d)}</td>
+        <td class="go"><a href="#">${w.go} →</a></td>
+      </tr>`);
+  }
+  const [t,h] = kind ? TITLE[kind] : ["Everything waiting on you","worst first"];
+  document.getElementById("sheetTitle").textContent = t;
+  document.getElementById("sheetHint").textContent = h;
+  document.getElementById("clearBtn").style.display = kind ? "" : "none";
+}
+document.querySelectorAll(".st").forEach(b=>{
+  b.addEventListener("click",()=>{
+    const on = b.getAttribute("aria-pressed")==="true";
+    document.querySelectorAll(".st").forEach(x=>x.setAttribute("aria-pressed","false"));
+    if(!on){ b.setAttribute("aria-pressed","true"); draw(b.dataset.k); } else draw(null);
+  });
+});
+document.getElementById("clearBtn").addEventListener("click",e=>{
+  e.preventDefault();
+  document.querySelectorAll(".st").forEach(x=>x.setAttribute("aria-pressed","false"));
+  draw(null);
+});
+draw("decided");
+</script>
+</body>
+</html>
