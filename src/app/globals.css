@@ -293,6 +293,28 @@ summary::-webkit-details-marker {
      as one more thing to fill in. */
   .register button.plain[data-caret="none"] { background-image: none; border-bottom-color: transparent; padding-right: 0.15rem; }
   .register button.plain[data-caret="none"]:hover { border-bottom-color: transparent; color: var(--color-brand-ink); }
+
+  /* Asking is a deliberate act now — nothing reaches the database until this
+     is pressed — so it is a button, not another plain control pretending to be
+     one. It fills once a filter is applied, the way a pressed switch stays in. */
+  .ask {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex: none;
+    border-radius: 0.5rem;
+    border: 1px solid var(--color-line-strong);
+    background: var(--color-surface);
+    padding: 0.4rem 0.85rem;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--color-brand-ink);
+    box-shadow: 0 1px 1px rgb(15 23 42 / 4%);
+    transition: background-color 140ms, border-color 140ms, color 140ms;
+  }
+  .ask:hover { border-color: var(--color-brand-line); background: var(--color-tint); }
+  .ask[data-on="true"] { background: var(--color-brand); border-color: var(--color-brand); color: #ffffff; }
+  .ask[data-on="true"]:hover { background: var(--color-brand-hover); }
   /* A panel trigger says what is chosen on one line, however long it is. */
   .register button.plain { display: block; width: 100%; overflow: hidden; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
 
@@ -381,6 +403,24 @@ summary::-webkit-details-marker {
     .home-rise, .home-fill, .home-band::after { animation: none; }
     .home-sheen { display: none; }
   }
+
+  /* The edge of an aspect card.
+     One family — navy through indigo, blue, sky, cyan, teal, slate — because
+     the board is read as one thing and warm marks pull the eye out of it. Each
+     is the colour itself at about half strength rather than a pale step off
+     the scale: a tint mixed into white goes grey at three pixels, while the
+     same hue held back to 45% keeps its temperature and still sits behind the
+     card's content instead of in front of it. Every edge is three pixels. */
+  .edge-brand { background: color-mix(in oklab, var(--color-blue-700) 45%, transparent); }
+  .edge-indigo { background: color-mix(in oklab, var(--color-indigo-500) 45%, transparent); }
+  .edge-blue { background: color-mix(in oklab, var(--color-blue-500) 45%, transparent); }
+  .edge-sky { background: color-mix(in oklab, var(--color-sky-700) 45%, transparent); }
+  .edge-cyan { background: color-mix(in oklab, var(--color-cyan-600) 45%, transparent); }
+  .edge-teal { background: color-mix(in oklab, var(--color-teal-600) 45%, transparent); }
+  .edge-violet { background: color-mix(in oklab, var(--color-violet-400) 45%, transparent); }
+  .edge-steel { background: color-mix(in oklab, var(--color-violet-600) 45%, transparent); }
+  .edge-ocean { background: color-mix(in oklab, var(--color-cyan-800) 45%, transparent); }
+  .edge-slate { background: color-mix(in oklab, var(--color-slate-400) 45%, transparent); }
 
   /* ── Home: the aspect control ─────────────────────────────────────────────
      One sunken track holding every aspect, with the open one lifted out of it
@@ -587,6 +627,28 @@ summary::-webkit-details-marker {
     --keep: #067647;
     font-feature-settings: "liga" 1, "kern" 1;
   }
+  /* The audit trail is correspondence too — somebody did something to
+     something on a day — so it borrows the log book's paper, serif and
+     postmark, and repaints them in the project's own colours rather than the
+     dispatch log's indigo and teal. Direction is not the question here; what
+     kind of act it was is, so each family carries its own edge. */
+  .logbook {
+    --paper: var(--color-surface);
+    --paper-edge: var(--color-line);
+    --ink: var(--color-slate-900);
+    --ink-soft: var(--color-slate-600);
+    --ink-faint: var(--color-slate-400);
+    --out: var(--color-brand-line);
+    --in: var(--color-emerald-700);
+    --seal: var(--color-amber-700);
+    --keep: var(--color-violet-700);
+  }
+  .edge-move { --edge: var(--color-brand-line); }
+  .edge-settle { --edge: var(--color-emerald-700); }
+  .edge-back { --edge: var(--color-amber-700); }
+  .edge-send { --edge: var(--color-violet-700); }
+  .edge-keep { --edge: var(--color-slate-400); }
+
   .dark .dispatch {
     --paper: #0f1218;
     --paper-edge: #232936;
@@ -651,13 +713,18 @@ summary::-webkit-details-marker {
     border-left: 3px solid var(--edge, var(--ink-faint));
     border-radius: 3px;
     padding: 0.85rem 1rem 0.8rem 1.1rem;
-    transition: border-color 140ms, box-shadow 140ms, transform 140ms;
+    transition: border-color 220ms cubic-bezier(0.2, 0.6, 0.3, 1), box-shadow 220ms cubic-bezier(0.2, 0.6, 0.3, 1), transform 220ms cubic-bezier(0.2, 0.6, 0.3, 1), background-color 220ms cubic-bezier(0.2, 0.6, 0.3, 1);
   }
   .slip:hover {
     border-color: var(--edge, var(--ink-faint));
     box-shadow: 0 1px 0 var(--paper-edge), 0 10px 24px -18px rgb(0 0 0 / 55%);
     transform: translateY(-1px);
   }
+  /* The log's acts are read in a column of their own colours already; taking
+     the hover border as well turns every pass of the mouse into a flash. The
+     lift and the shadow are enough to say which one is under the hand. */
+  .logbook .slip:hover { border-color: var(--paper-edge); }
+
   .slip-out { --edge: var(--out); }
   .slip-in { --edge: var(--in); }
   .slip-draft { --edge: var(--ink-faint); border-left-style: dashed; }

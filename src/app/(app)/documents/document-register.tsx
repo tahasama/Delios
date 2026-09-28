@@ -5,11 +5,11 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowDown, ArrowLeftRight, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, Download, GitPullRequestArrow, Minus, PackagePlus, Pin, PinOff, Plus, Search, X } from "lucide-react";
 import { DataTable } from "@/components/data-table";
-import { DateWindow } from "./date-window";
+import { DateWindow } from "@/components/date-window";
 import { Th, Td, Info } from "@/components/ui";
 
 /** Available from the Columns menu; off until someone wants them. */
-const OPTIONAL = ["Document state", "Review verdict", "Originator", "Sub-project", "Contract", "Criticality", "Confidentiality", "Planned submission", "Issued", "Released", "Decided by", "In packages", "Kept for", "Revision started", "File added"];
+const OPTIONAL = ["Document state", "Review verdict", "Originator", "Sub-project", "Contract", "Criticality", "Confidentiality", "Planned submission", "Issued", "Released", "Decided by", "In packages", "Kept for", "Produced by", "Revision started", "File added"];
 
 /** Which column each date filter talks about, so filtering by it shows it. */
 const DATE_COLUMN: Record<string, string> = {
@@ -21,11 +21,11 @@ type RegisterRow = {
   id: string; docNumber: string; title: string; deliverableType: string; docType: string; discipline: string;
   originator: string | null; subProject: string | null; contractRef: string | null; criticality: string | null;
   confidentiality: string | null; retentionClass: string | null; retentionLabel: string | null; placeholder: boolean;
-  docTypeLabel: string; disciplineLabel: string;
+  docTypeLabel: string; disciplineLabel: string; deliverableLabel: string;
   docState: string; docStateLabel: string;
   revision: string | null; revState: string | null; revStateLabel: string;
   verdict: string | null; verdictLabel: string | null;
-  releasedFor: string | null; releasedForLabel: string | null; releasedForUse: string | null; proposedFor: string | null;
+  releasedFor: string | null; releasedForLabel: string | null; releasedForUse: string | null; proposedFor: string | null; notIssued: boolean;
   createdDate: string; updatedAt: string; plannedSubmissionDate: string | null; issueDate: string | null; releasedAt: string | null;
   decidedBy: string | null; packageCount: number; hasReleased: boolean; reviewRevisionId: string | null;
   fileAdded: string | null; revStarted: string | null; decidedByDelegated: boolean;
@@ -43,7 +43,7 @@ export type Paging = {
   query: string;
 };
 
-type Filters = { q: string; terms: string[]; state: string; rev: string; status: string; verdict: string; supplier: string; po: string; discipline: string; docType: string; criticality: string; confidentiality: string; view: string; on: string; from: string; to: string };
+type Filters = { q: string; terms: string[]; state: string; rev: string; status: string; verdict: string; supplier: string; po: string; discipline: string; docType: string; criticality: string; confidentiality: string; deliverable: string; view: string; on: string; from: string; to: string };
 
 /** Where the guide explains each kind of code. */
 const GUIDE: Record<string, string> = {
@@ -94,7 +94,7 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
   /** The masthead, rendered on the server so it can read the project. */
   plate?: React.ReactNode;
   filters: Filters;
-  filterOptions: { states: Opt[]; revStates: Opt[]; statuses: Opt[]; verdicts: Opt[]; suppliers: Opt[]; pos: Opt[]; disciplines: Opt[]; types: Opt[]; criticalities: Opt[]; confidentialities: Opt[]; dateFields: Opt[] };
+  filterOptions: { states: Opt[]; revStates: Opt[]; statuses: Opt[]; verdicts: Opt[]; suppliers: Opt[]; pos: Opt[]; disciplines: Opt[]; types: Opt[]; criticalities: Opt[]; confidentialities: Opt[]; deliverables: Opt[]; dateFields: Opt[] };
   exportHref: string;
 }) {
   const router = useRouter();
@@ -105,10 +105,10 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
   const [frozen, setFrozen] = useState(true);
   // The filters asked least often are folded away until somebody asks for them,
   // and unfold themselves whenever one of them is doing something.
-  const [extra, setExtra] = useState(!!filters.criticality || !!filters.confidentiality);
+  const [extra, setExtra] = useState(!!filters.criticality || !!filters.confidentiality || !!filters.deliverable);
   useEffect(() => {
-    if (filters.criticality || filters.confidentiality) setExtra(true);
-  }, [filters.criticality, filters.confidentiality]);
+    if (filters.criticality || filters.confidentiality || filters.deliverable) setExtra(true);
+  }, [filters.criticality, filters.confidentiality, filters.deliverable]);
 
   // The order someone dragged their columns into, and whether they keep the
   // first column in view. Both are this browser's business, not the register's.
@@ -161,6 +161,7 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
     filters.docType && "Type",
     filters.criticality && "Criticality",
     filters.confidentiality && "Confidentiality",
+    filters.deliverable && "Produced by",
     filters.on && DATE_COLUMN[filters.on],
   ].filter((label): label is string => !!label);
 
@@ -237,6 +238,7 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
   if (filters.docType) facets.push({ key: "type", label: labelIn(filterOptions.types, filters.docType), without: drop("docType") });
   if (filters.criticality) facets.push({ key: "criticality", label: labelIn(filterOptions.criticalities, filters.criticality), without: drop("criticality") });
   if (filters.confidentiality) facets.push({ key: "confidentiality", label: labelIn(filterOptions.confidentialities, filters.confidentiality), without: drop("confidentiality") });
+  if (filters.deliverable) facets.push({ key: "produced by", label: labelIn(filterOptions.deliverables, filters.deliverable), without: drop("deliverable") });
 
   return <>
     <section data-dt-frame className="register border-y border-line bg-surface sm:rounded-sm sm:border-x">
@@ -253,7 +255,7 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
           for (const [key, value] of data.entries()) if (value && key !== "view") params.set(key, String(value));
           go(`/documents${params.size ? `?${params}` : ""}`);
         }}
-        className="border-b border-line px-4 py-2.5 sm:px-5"
+        className="border-b border-line px-4 py-3.5 sm:px-5"
       >
         <div className="flex items-end gap-4">
           <label className="relative min-w-0 flex-1">
@@ -266,12 +268,16 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
               className="plain w-full !py-1.5 !pl-6 !text-[13px]"
             />
           </label>
+          {/* Nothing is asked of the database until this is pressed. A query
+              per keystroke, or per choice, is what a register of tens of
+              thousands cannot afford. */}
+          <button className="ask" data-on={facets.length ? "true" : "false"}>Show</button>
           {pending ? <span className="stencil whitespace-nowrap pb-1 text-slate-400">Narrowing…</span> : null}
         </div>
 
         {/* Five to a row: eight plain choices, the date, and the switch that
             unfolds the two asked least often onto a row of their own. */}
-        <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3 md:grid-cols-5">
+        <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3.5 sm:grid-cols-3 md:grid-cols-5">
           <Filter name="state" value={filters.state} empty="Document state" options={filterOptions.states} />
           <Filter name="rev" value={filters.rev} empty="Revision state" options={filterOptions.revStates} />
           <Filter name="status" value={filters.status} empty="Released for" options={filterOptions.statuses} />
@@ -300,9 +306,11 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
           {extra ? <>
             <Filter name="criticality" value={filters.criticality} empty="Criticality" options={filterOptions.criticalities} />
             <Filter name="confidentiality" value={filters.confidentiality} empty="Confidentiality" options={filterOptions.confidentialities} />
+            <Filter name="deliverable" value={filters.deliverable} empty="Produced by" options={filterOptions.deliverables} />
           </> : <>
             <input type="hidden" name="criticality" value={filters.criticality} />
             <input type="hidden" name="confidentiality" value={filters.confidentiality} />
+            <input type="hidden" name="deliverable" value={filters.deliverable} />
           </>}
           <input type="hidden" name="view" value={filters.view} />
           <noscript><button className="stencil text-brand-ink">Apply</button></noscript>
@@ -310,7 +318,7 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
       </form>
 
       {facets.length ? (
-        <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-4 py-2 sm:px-5">
+        <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-4 py-1.5 sm:px-5">
           <span className="stencil mr-1 text-slate-400">Showing</span>
           {facets.map((facet) => (
             <button key={`${facet.key}-${facet.label}`} type="button" onClick={() => go(facet.without)} className="facet" title="Remove this filter">
@@ -404,7 +412,7 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
                 {row.revState === "VOID" ? <span className="stamp text-red-700">void</span> : null}
                 {row.placeholder ? <span className="stamp text-slate-500">number reserved</span> : null}
               </span>
-              <p className="mt-0.5 max-w-[46ch] truncate text-[13px] text-slate-800" title={row.title}>{row.title}</p>
+              <p className="mt-0.5 block truncate text-[13px] text-slate-800" title={row.title}>{row.title}</p>
             </Td>
             {columns.map((column) => <Td key={column.key} className={column.cellClass}>{column.cell(row, codes)}</Td>)}
           </tr>;
@@ -416,7 +424,7 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
       </div>
 
       {paging && total > 0 ? (
-        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 border-t border-line px-4 py-2 sm:px-5">
+        <div data-dt-foot className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 border-t border-line bg-surface px-4 py-2 sm:px-5">
           <p className="font-mono text-[11px] tabular-nums text-slate-500">
             {paging.from.toLocaleString("en-GB")}–{paging.to.toLocaleString("en-GB")}
             <span className="ml-1.5 font-sans text-slate-400">of {total.toLocaleString("en-GB")}</span>
@@ -472,7 +480,14 @@ const COLUMNS: Column[] = [
     label: "Revision state",
     note: "Where the latest revision stands: in preparation, in review, for release once decided, released, superseded, void. Who is holding a review up, and the comments on it, are on the review itself.",
     cellClass: "whitespace-nowrap",
-    cell: (row, codes) => <CodeRef code={row.revStateLabel} note={codes[`REV_STATE|${row.revState ?? ""}`]} href={row.revState ? GUIDE.REV_STATE : undefined} className={`meta !font-sans ${REV_INK[row.revState ?? ""] ?? ""}`} />,
+    cell: (row, codes) => (
+      <>
+        <CodeRef code={row.revStateLabel} note={codes[`REV_STATE|${row.revState ?? ""}`]} href={row.revState ? GUIDE.REV_STATE : undefined} className={`meta !font-sans ${REV_INK[row.revState ?? ""] ?? ""}`} />
+        {/* Released, and nobody asked for it to be sent. It is in use; nobody
+            has been told, including anyone whose approval it may still need. */}
+        {row.notIssued ? <span title="Nobody has asked for it to be sent." className="ml-1.5 rounded border border-amber-400 px-1 text-[9px] font-bold uppercase tracking-wide text-amber-700">not issued</span> : null}
+      </>
+    ),
   },
   {
     key: "verdict", sort: "verdict",
@@ -486,20 +501,27 @@ const COLUMNS: Column[] = [
   {
     key: "releasedFor", sort: "releasedFor",
     label: "Released for",
-    note: "What a released revision may be used for — IFC, AFC, AB and the rest. “to be IFC” means the reviewers decided it and Document Control has not released it yet.",
+    note: "What the revision is issued for — IFC, AFC, AB and the rest. Every step of a review route sets it or confirms it. Whether it is in force is the revision state beside it: a revision that is Not released carries its status but nobody may work from it.",
     cellClass: "whitespace-nowrap text-xs",
     cell: (row, codes) =>
+      /* The status prints the same whether or not it is in force. Which it is
+         is the revision state, in its own column, where it belongs. */
       !row.releasedFor && row.proposedFor ? (
-        <span className="text-slate-500">
-          <span className="meta mr-1 text-slate-400">to be</span>
-          <CodeRef code={row.proposedFor} note={`${codes[`STATUS|${row.proposedFor}`] ?? row.proposedFor}\n\nDecided by the reviewers; it applies when Document Control releases the revision.`} href={GUIDE.STATUS} className="font-semibold text-slate-700" />
-        </span>
+        <CodeRef code={row.proposedFor} note={`${codes[`STATUS|${row.proposedFor}`] ?? row.proposedFor}
+
+The revision is not released, so this status is not in force.`} href={GUIDE.STATUS} className="font-semibold text-slate-600" />
       ) : row.releasedFor ? (
         <CodeRef code={row.releasedFor} note={codes[`STATUS|${row.releasedFor}`]} href={GUIDE.STATUS} className="font-semibold text-slate-900" />
       ) : <Muted />,
   },
   { key: "discipline", sort: "discipline", label: "Discipline", cellClass: "whitespace-nowrap text-xs text-slate-600", cell: (row) => row.disciplineLabel },
   { key: "docType", sort: "docType", label: "Type", cellClass: "max-w-48 truncate text-xs text-slate-600", cell: (row) => row.docTypeLabel },
+  {
+    key: "deliverable", sort: "deliverable", label: "Produced by",
+    note: "Who produces this kind of deliverable — our own engineering, a contractor, a vendor, the client. It decides which numbering scheme the document is numbered under.",
+    cellClass: "max-w-40 truncate text-xs text-slate-600",
+    cell: (row) => row.deliverableLabel,
+  },
   {
     key: "originator", sort: "originator",
     label: "Originator",
@@ -563,7 +585,6 @@ function Filter({ name, value, empty, options, disabled }: { name: string; value
         defaultValue={value}
         disabled={disabled}
         data-on={value ? "true" : "false"}
-        onChange={(event) => event.currentTarget.form?.requestSubmit()}
         className="plain w-full disabled:cursor-not-allowed disabled:opacity-40"
       >
         <option value="">{empty}</option>
