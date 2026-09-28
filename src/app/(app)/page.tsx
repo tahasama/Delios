@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Count } from "./tally";
 import { requireScope } from "@/lib/scope";
 import { isController, isAdmin } from "@/lib/auth";
 import { fmtDate } from "@/lib/utils";
@@ -6,7 +7,6 @@ import { supplierRows, WITH_SUPPLIER, STATE_LABEL } from "@/lib/supplier";
 import { departmentsOf, businessDaysBefore, DEFAULT_LEAD_BUSINESS_DAYS } from "@/lib/schedule";
 import { departmentRows, senderRows, isDepartmentSender } from "@/lib/requirements-process";
 import { getActiveSet } from "@/lib/config";
-import { Count } from "./tally";
 import { ArrowRight, CheckCheck, FileStack, Inbox, ListChecks, MessageSquare, PenLine, Plus, Send, Share2, Undo2, Upload } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -108,6 +108,23 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
     orderBy: { ts: "desc" },
     take: 4,
   });
+  // A quiet day should not leave the panel empty or showing one lonely line:
+  // when the last working day produced almost nothing, the journal reaches
+  // further back and says so instead.
+  const older = news.length < 4
+    ? await db.auditEvent.findMany({
+        where: { ts: { lt: since }, action: { in: NEWS } },
+        orderBy: { ts: "desc" },
+        take: 4 - news.length,
+      })
+    : [];
+  const journal = [...news, ...older];
+  // An audit label reads "Q6637021-75-CI-SPC-00001 rev B — route name", and a
+  // supplier's number runs half as long again. The panel measures its own
+  // entries: the widest number sets the column the revisions line up in, and
+  // when that number is long the kind is dropped rather than squeezed.
+  const widest = Math.max(20, ...journal.map((e) => read(e.entityLabel)?.number.length ?? 0));
+  const room = widest <= 26;
 
   // The requirements process: what is waiting on Document Control, and what
   // is waiting on the department this person answers for.
@@ -210,7 +227,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
       href: `/packages/${o.pkg}`, code: r.doc.docNumber, title: r.doc.title,
       tag: STATE_LABEL[r.state], tone: r.late && r.state === "NOT_SENT" ? "amber" : "plain", cta: "Upload",
     }))),
-    advice: advice.map<Row>((a) => ({
+    review: advice.map<Row>((a) => ({
       href: `/reviews/${a.cycleId}`, code: a.cycle.revision.document.docNumber, rev: a.cycle.revision.value,
       title: a.cycle.revision.document.title, tag: "advice", tone: "sky",
       at: a.cycle.issuedToReviewAt ?? a.cycle.submittedAt, cta: "Review",
@@ -241,30 +258,30 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
     { id: "verdict", tab: "Decide", title: "Decide", icon: <CheckCheck />, accent: "sky",
       asks: "Documents waiting on your verdict to move on.",
       then: "Their route is stopped at your step until you answer.", call: "Give the verdicts" },
+    { id: "review", tab: "Advice", title: "Advice on a review", icon: <MessageSquare />, accent: "indigo",
+      asks: "Reviews asking what you think before the verdict.",
+      then: "The decider is waiting on you to close the step.", call: "Give your advice" },
+    { id: "incoming", tab: "Received", title: "Received, to check", icon: <Inbox />, accent: "cyan",
+      asks: "Transmittals that arrived and were never checked.",
+      then: "Nothing inside them enters the register until you accept.", call: "Check them" },
     { id: "release", tab: "Release", title: "Release or send back", icon: <FileStack />, accent: "emerald",
       asks: "The reviewers decided; they are not released yet.",
       then: "Nobody may build from them, and no revision can start.", call: "Settle them" },
-    { id: "returned", tab: "Returned", title: "Came back to you", icon: <Undo2 />, accent: "amber",
-      asks: "Your documents came back with the reviewers' comments.",
-      then: "Each one is finished: the next revision starts fresh.", call: "Read the comments" },
     { id: "unsent", tab: "Not sent", title: "Released, never sent", icon: <Send />, accent: "violet",
       asks: "Released, but nobody outside has been told yet.",
       then: "Whoever needs them is working from an older issue.", call: "Ask for them to go out" },
-    { id: "owed", tab: "To upload", title: "To send us", icon: <Upload />, accent: "slate",
-      asks: "Documents your package still owes, and we await.",
-      then: "The package cannot close until every one arrives.", call: "Upload them" },
-    { id: "advice", tab: "Advice", title: "Advice on a review", icon: <MessageSquare />, accent: "sky",
-      asks: "Reviews asking what you think before the verdict.",
-      then: "The decider is waiting on you to close the step.", call: "Give your advice" },
-    { id: "incoming", tab: "Received", title: "Received, to check", icon: <Inbox />, accent: "sky",
-      asks: "Transmittals that arrived and were never checked.",
-      then: "Nothing inside them enters the register until you accept.", call: "Check them" },
-    { id: "route", tab: "To send out", title: "Send for review", icon: <Share2 />, accent: "emerald",
-      asks: "Accepted by us, and still not sent out for review.",
-      then: "The reviewers cannot start, and the clock is running.", call: "Send them out" },
-    { id: "requirements", tab: "Requirements", title: "Document requirements", icon: <ListChecks />, accent: "slate",
+    { id: "requirements", tab: "Requirements", title: "Document requirements", icon: <ListChecks />, accent: "orange",
       asks: "Asks in the requirements process, still open.",
       then: "The schedule cannot say what it needs until answered.", call: "Work the list" },
+    { id: "returned", tab: "Returned", title: "Came back to you", icon: <Undo2 />, accent: "amber",
+      asks: "Your documents came back with the reviewers' comments.",
+      then: "Each one is finished: the next revision starts fresh.", call: "Read the comments" },
+    { id: "route", tab: "To send out", title: "Send for review", icon: <Share2 />, accent: "teal",
+      asks: "Accepted by us, and still not sent out for review.",
+      then: "The reviewers cannot start, and the clock is running.", call: "Send them out" },
+    { id: "owed", tab: "To upload", title: "To send us", icon: <Upload />, accent: "rose",
+      asks: "Documents your package still owes, and we await.",
+      then: "The package cannot close until every one arrives.", call: "Upload them" },
     { id: "drafts", tab: "Drafts", title: "Your drafts", icon: <PenLine />, accent: "slate",
       asks: "Documents you started and have not submitted.",
       then: "Nobody knows they exist until you send them for review.", call: "Carry on writing" },
@@ -320,6 +337,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
             <Fig href="/actions" value={atRisk.length} label="activities short of documents" index={3} />
           )}
         </div>
+
       </header>
 
       <nav aria-label="What is waiting" className="home-seg mt-4">
@@ -363,33 +381,36 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         </main>
 
         <aside className="grid min-w-0 gap-3">
-          {news.length ? (
+          {journal.length ? (
             <section className="home-rise rounded-xl border border-line bg-surface px-4 py-3" style={rise()}>
-              <h2 className="mb-2.5 text-[11px] font-semibold tracking-[0.09em] text-slate-400 uppercase">Since {weekday(since)}</h2>
+              <h2 className="mb-2.5 text-[11px] font-semibold tracking-[0.09em] text-slate-400 uppercase">{older.length ? "Lately" : `Since ${weekday(since)}`}</h2>
               <ul>
-                {news.map((e, i) => {
-                  // An audit label reads "Q6637021-75-CI-SPC-00001 rev B — route
-                  // name". A supplier's number can run to forty characters, so it
-                  // takes the whole first line and the revision drops to the right
-                  // of the line below, where there is always room for two letters.
-                  const label = (e.entityLabel ?? "").split(" — ")[0];
-                  const at = label.lastIndexOf(" rev ");
-                  const number = at === -1 ? label : label.slice(0, at);
-                  const rev = at === -1 ? null : label.slice(at + 5);
+                {journal.map((e, i) => {
+                  const kind = ACTIVITY[e.action];
+                  const shape = read(e.entityLabel);
+                  if (!kind || !shape) return null;
                   return (
                     <li key={e.id} className="relative min-w-0 pb-2.5 pl-[18px] last:pb-0">
-                      <span className={`absolute top-[5px] left-0 h-[7px] w-[7px] rounded-full border-2 bg-surface ${NEWS_MARK[e.action] ?? "border-slate-300"}`} />
-                      {i < news.length - 1 ? <span className="absolute top-[14px] -bottom-px left-[3px] w-px bg-line" /> : null}
-                      {number ? <span className="block truncate font-mono text-[12.5px] font-semibold text-link">{number}</span> : null}
-                      <span className="flex items-baseline gap-2 text-[12.5px] text-slate-600">
-                        <span className="min-w-0 truncate">{NEWS_WORDS[e.action] ?? e.action.replaceAll("_", " ").toLowerCase()}</span>
-                        {rev ? <span className="ml-auto shrink-0 font-mono text-[11.5px] text-slate-400">rev {rev}</span> : null}
+                      <span className={`absolute top-[5px] left-0 h-[7px] w-[7px] rounded-full border-2 bg-surface ${kind.mark}`} />
+                      {i < journal.length - 1 ? <span className="absolute top-[14px] -bottom-px left-[3px] w-px bg-line" /> : null}
+                      {/* The lines are held to the width of the longest number in
+                          the panel, so every revision lands in the same column
+                          instead of drifting out to the panel's edge. */}
+                      <span className="block min-w-0" style={{ maxWidth: `${widest}ch` }}>
+                        <span className="flex items-baseline gap-2">
+                          <span className="min-w-0 truncate font-mono text-[12.5px] font-semibold text-link">{shape.number}</span>
+                          {room ? <span className="ml-auto shrink-0 text-[11px] text-slate-400">{kind.kind}</span> : null}
+                        </span>
+                        <span className="flex items-baseline gap-2 text-[12.5px] text-slate-600">
+                          <span className="min-w-0 truncate">{kind.said}</span>
+                          {shape.rev ? <span className="ml-auto shrink-0 font-mono text-[11.5px] text-slate-400">rev {shape.rev}</span> : null}
+                        </span>
+                        <span className="block truncate text-[11px] text-slate-400">{e.actorName} · {when(e.ts)}</span>
                       </span>
-                      <span className="block truncate text-[11px] text-slate-400">{e.actorName} · {when(e.ts)}</span>
                     </li>
                   );
                 })}
-                            </ul>
+              </ul>
                             <Link href="/audit" className="mt-2.5 inline-block text-xs font-semibold text-link hover:underline">Everything that happened →</Link>
             </section>
           ) : null}
@@ -448,43 +469,42 @@ type Row = {
   cta: string;
 };
 
-/** The audit actions that are news to somebody, not bookkeeping. */
-const NEWS = [
-  "RELEASE",
-  "REVIEW_OUTCOME",
-  "WORKFLOW_RETURNED",
-  "WORKFLOW_COMPLETED",
-  "WORKFLOW_STARTED",
-  "TRANSMITTAL_RAISED",
-  "TRANSMITTAL_OPENED",
-  "REVISION_ESTABLISHED",
-  "REGISTER_ENTRY",
-];
-
-const NEWS_WORDS: Record<string, string> = {
-  RELEASE: "was released",
-  REVIEW_OUTCOME: "was decided",
-  WORKFLOW_RETURNED: "came back to its author",
-  WORKFLOW_COMPLETED: "finished its review route",
-  WORKFLOW_STARTED: "went out for review",
-  TRANSMITTAL_RAISED: "was issued",
-  TRANSMITTAL_OPENED: "arrived",
-  REVISION_ESTABLISHED: "started a new revision",
-  REGISTER_ENTRY: "joined the register",
+/**
+ * What the project did, and what to call it.
+ *
+ * The journal used to follow documents — released, decided, returned — which
+ * is the register's job and says nothing about the transmittal that went out
+ * or the requirements that were asked for. A project is run by its activities,
+ * so every kind of activity is here: what came in and went out, what was
+ * reviewed and decided, what was asked for, and what the register itself was
+ * checked against. Each carries the word for what kind of thing it was, so a
+ * reader can tell a transmittal from a verdict without reading the sentence.
+ */
+const ACTIVITY: Record<string, { kind: string; said: string; mark: string }> = {
+  TRANSMITTAL_RAISED: { kind: "Transmittal", said: "was issued", mark: "border-violet-600" },
+  TRANSMITTAL_OPENED: { kind: "Transmittal", said: "arrived", mark: "border-violet-600" },
+  CUSTODY: { kind: "Transmittal", said: "changed hands", mark: "border-violet-600" },
+  ISSUE_REQUESTED: { kind: "Issue", said: "was asked to go out", mark: "border-violet-600" },
+  ISSUE: { kind: "Issue", said: "went out", mark: "border-violet-600" },
+  ISSUED: { kind: "Issue", said: "was issued out", mark: "border-violet-600" },
+  ISSUE_REQUEST_CANCELLED: { kind: "Issue", said: "the request was cancelled", mark: "border-slate-400" },
+  RELEASE: { kind: "Release", said: "was released", mark: "border-emerald-600" },
+  WORKFLOW_STARTED: { kind: "Review", said: "went out for review", mark: "border-brand-line" },
+  STEP_DISPATCHED: { kind: "Review", said: "reached its next step", mark: "border-brand-line" },
+  REVIEW_OUTCOME: { kind: "Decision", said: "was decided", mark: "border-amber-600" },
+  APPROVAL: { kind: "Decision", said: "was approved", mark: "border-emerald-600" },
+  WORKFLOW_COMPLETED: { kind: "Decision", said: "finished its review route", mark: "border-emerald-600" },
+  WORKFLOW_RETURNED: { kind: "Return", said: "came back to its author", mark: "border-amber-600" },
+  REVISION_ESTABLISHED: { kind: "Revision", said: "was started", mark: "border-slate-400" },
+  REGISTER_ENTRY: { kind: "Register", said: "joined the register", mark: "border-slate-400" },
+  REQUIREMENTS_ISSUED: { kind: "Requirements", said: "were asked for", mark: "border-slate-400" },
+  REQUIREMENTS_REMINDER: { kind: "Requirements", said: "were chased", mark: "border-amber-600" },
+  SHORTFALL_ISSUED: { kind: "Schedule", said: "was warned as short", mark: "border-amber-600" },
+  SHORTFALL_ACCEPTED: { kind: "Schedule", said: "was accepted as short", mark: "border-slate-400" },
+  CHECK_RUN: { kind: "Register", said: "was checked", mark: "border-slate-400" },
 };
 
-/** The colour a piece of news is marked with, by what kind of news it is. */
-const NEWS_MARK: Record<string, string> = {
-  RELEASE: "border-emerald-600",
-  REVIEW_OUTCOME: "border-amber-600",
-  WORKFLOW_RETURNED: "border-amber-600",
-  WORKFLOW_COMPLETED: "border-emerald-600",
-  WORKFLOW_STARTED: "border-brand-line",
-  TRANSMITTAL_RAISED: "border-violet-600",
-  TRANSMITTAL_OPENED: "border-violet-600",
-  REVISION_ESTABLISHED: "border-slate-400",
-  REGISTER_ENTRY: "border-slate-400",
-};
+const NEWS = Object.keys(ACTIVITY);
 
 const TONES: Record<Row["tone"], string> = {
   amber: "bg-amber-50 text-amber-700",
@@ -493,6 +513,14 @@ const TONES: Record<Row["tone"], string> = {
   violet: "bg-violet-50 text-violet-700",
   plain: "bg-canvas-deep text-slate-600",
 };
+
+/** The number and revision inside an audit label, if it carries them. */
+function read(label: string | null): { number: string; rev: string | null } | null {
+  const said = (label ?? "").split(" — ")[0].trim();
+  if (!said) return null;
+  const at = said.lastIndexOf(" rev ");
+  return at === -1 ? { number: said, rev: null } : { number: said.slice(0, at), rev: said.slice(at + 5) };
+}
 
 function daysOf(at: Date | null | undefined): number | null {
   if (!at) return null;
@@ -541,7 +569,7 @@ function Fig({ value, unit, label, index, href }: {
 }) {
   const body = (
     <>
-      <Count value={value} unit={unit} delay={index * 70} />
+      <Count value={value} unit={unit} delay={260 + index * 70} />
       <span className={`home-soft mt-1.5 block text-[12.5px] ${href ? "group-hover:underline group-hover:underline-offset-[3px]" : ""}`}>{label}</span>
     </>
   );
@@ -555,7 +583,7 @@ type Aspect = {
   title: string;
   icon: React.ReactNode;
   /** Its own colour, kept to the card's edge so the board stays quiet. */
-  accent: "sky" | "emerald" | "amber" | "violet" | "slate";
+  accent: "sky" | "indigo" | "cyan" | "emerald" | "teal" | "amber" | "orange" | "violet" | "rose" | "slate";
   /** Its name in the tab bar, kept to a word or two. */
   tab: string;
   /** What is being asked of the reader, in one line. */
@@ -565,12 +593,21 @@ type Aspect = {
   call: string;
 };
 
-/** The edge is the only coloured thing on a card, and it is pale on purpose. */
+/**
+ * The edge is the only coloured thing on a card, and it is pale on purpose.
+ * Every aspect has one of its own: two cards sharing a colour look related,
+ * and none of these are.
+ */
 const EDGE: Record<Aspect["accent"], string> = {
   sky: "bg-sky-200",
+  indigo: "bg-indigo-200",
+  cyan: "bg-cyan-200",
   emerald: "bg-emerald-200",
+  teal: "bg-teal-200",
   amber: "bg-amber-200",
+  orange: "bg-orange-200",
   violet: "bg-violet-200",
+  rose: "bg-rose-200",
   slate: "bg-slate-200",
 };
 
@@ -605,6 +642,7 @@ function Card({ aspect, rows, style }: { aspect: Aspect; rows: Row[]; style?: Re
   return (
     <Link
       href={`/?view=${aspect.id}`}
+      scroll={false}
       style={style}
       className="home-rise group relative flex min-w-0 flex-col overflow-hidden rounded-xl border border-line bg-surface px-4 pt-3.5 pb-3 transition hover:-translate-y-px hover:border-line-strong hover:shadow-md"
     >
