@@ -1,29 +1,33 @@
 import Link from "next/link";
 import { requireScope } from "@/lib/scope";
-import { ButtonLink, Chip } from "@/components/ui";
 import { isController, isAdmin } from "@/lib/auth";
 import { fmtDate } from "@/lib/utils";
 import { supplierRows, WITH_SUPPLIER, STATE_LABEL } from "@/lib/supplier";
-import { parseSteps } from "@/lib/workflow";
 import { departmentsOf, businessDaysBefore, DEFAULT_LEAD_BUSINESS_DAYS } from "@/lib/schedule";
 import { departmentRows, senderRows, isDepartmentSender } from "@/lib/requirements-process";
-import { ArrowRight, CheckCircle2, FilePlus2, ShieldCheck } from "lucide-react";
-import { hasVerb } from "@/lib/auth";
+import { getActiveSet } from "@/lib/config";
+import { Count } from "./tally";
+import { ArrowRight, CheckCheck, FileStack, Inbox, ListChecks, MessageSquare, PenLine, Plus, Send, Share2, Undo2, Upload } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
 /**
- * Home is the work queue. It used to be a dashboard that summarised the queue
- * four ways and linked to a separate My work page that listed it a fifth; now
- * the items themselves are here, each with the one thing to do about it.
+ * Home greets the reader and says where they stand.
+ *
+ * The band answers "how am I doing" in four figures before anything is read.
+ * Under it the work is set in rows of fixed places — number, tag, age, verb —
+ * so the eye lands rather than reads, and beside it the project itself: what
+ * moved since the reader was last here, what the schedule still needs, how
+ * clean the register is. The page used to be a column of cards that listed the
+ * reader's chores and never told them the news.
  */
-export default async function HomePage() {
+export default async function HomePage({ searchParams }: { searchParams: Promise<{ view?: string }> }) {
+  const view = (await searchParams).view;
   const ctx = await requireScope();
   const { user, db } = ctx;
-  const canDecide = hasVerb(user, "APPROVE") || hasVerb(user, "REVIEW");
   const controller = isController(user) || isAdmin(user);
 
-  const [assigned, returned, incoming, drafts, actions, lastRun, criticalDefects] = await Promise.all([
+  const [assigned, returned, incoming, drafts, actions, lastRun, criticalDefects, totalDocs] = await Promise.all([
     db.reviewAssignment.findMany({
       where: { userId: user.id, completedAt: null, cycle: { status: "OPEN", issuedToReviewAt: { not: null } } },
       include: { cycle: { include: { revision: { include: { document: true } }, comments: true } } },
@@ -43,6 +47,7 @@ export default async function HomePage() {
     }),
     controller ? db.checkRun.findFirst({ orderBy: { ranAt: "desc" } }) : Promise.resolve(null),
     controller ? db.defect.count({ where: { severity: "CRITICAL", status: { in: ["OPEN", "ACCEPTED"] } } }) : Promise.resolve(0),
+    controller ? db.document.count() : Promise.resolve(0),
   ]);
 
   // A supplier's work is its package: what it still owes, and what came back.
@@ -51,28 +56,58 @@ export default async function HomePage() {
     : [];
   const owed: { pkg: string; rows: Awaited<ReturnType<typeof supplierRows>> }[] = [];
   for (const p of supplierPkgs) owed.push({ pkg: p.identifier, rows: (await supplierRows(ctx, p)).filter((r) => WITH_SUPPLIER.includes(r.state)) });
-  // Decided by the reviewers, not yet released — and those a blocking comment
-  // still holds. Both used to sit on the register, which is a record, not a
-  // work queue: whose desk a document is on differs by reader, so it lives here.
+
+  // Decided by the reviewers, not yet released — and those the decision sent
+  // back. Whose desk a document is on differs by reader, so it lives here and
+  // not on the register, which is a record.
   const decided = controller
     ? await db.revision.findMany({
-        where: { state: "IN_REVIEW", proposedStatus: { not: null } },
+        where: { state: "NOT_RELEASED" },
         include: {
           document: { select: { id: true, docNumber: true, title: true } },
-          cycles: { where: { status: "OPEN" }, select: { id: true, comments: { where: { progressionPreventing: true, status: "OPEN" }, select: { id: true } } } },
+          cycles: { select: { id: true, binding: true, outcome: true } },
         },
         orderBy: { createdAt: "asc" },
         take: 25,
       })
     : [];
-  const blockedOn = (rev: (typeof decided)[number]) => rev.cycles.flatMap((c) => c.comments).length;
-  const toRelease = decided.filter((rev) => !blockedOn(rev));
-  const held = decided.filter((rev) => blockedOn(rev));
+  const verdictValues = controller ? await getActiveSet("REVIEW_OUTCOMES") : [];
+  const lettsOut = (code: string | null | undefined) =>
+    !code || verdictValues.find((one) => one.code === code)?.props.proceed === true;
+  const withVerdict = decided.map((rev) => ({ ...rev, decidedAs: rev.cycles.find((c) => c.binding && c.outcome)?.outcome ?? null }));
+  const toRelease = withVerdict.filter((rev) => lettsOut(rev.decidedAs));
+  const held = withVerdict.filter((rev) => !lettsOut(rev.decidedAs));
+
+  // Released, and nobody was ever told. Not a decision anybody owes: whoever
+  // needed it sent did not ask, and this is where that stops being invisible.
+  const neverSent = controller
+    ? await db.revision.findMany({
+        where: { state: "RELEASED", transmittalItems: { none: { transmittal: { direction: "OUTGOING" } } } },
+        include: { document: { select: { id: true, docNumber: true, title: true } } },
+        orderBy: { releasedAt: "asc" },
+        take: 25,
+      })
+    : [];
 
   // Accepted submissions Document Control still has to route.
   const toRoute = controller
     ? await db.transmittal.findMany({ where: { direction: "INCOMING", status: { in: ["ACCEPTED", "CLOSED"] }, items: { some: { revision: { state: "IN_PREPARATION" } } } }, orderBy: { dateOfIssue: "asc" }, take: 20 })
     : [];
+
+  // What moved while the reader was away: the last working day's worth of the
+  // events that are news to somebody, not bookkeeping.
+  //
+  // Project-wide, for everybody. A release, a rejection or a transmittal is a
+  // fact about the project, not about the person reading it; scoping the
+  // record by department is how people stop trusting it, because each of them
+  // ends up looking at a different project. What a reader may not see is
+  // already settled by the scope and by clearance, not by this page.
+  const since = lastWorkingDay();
+  const news = await db.auditEvent.findMany({
+    where: { ts: { gte: since }, action: { in: NEWS } },
+    orderBy: { ts: "desc" },
+    take: 4,
+  });
 
   // The requirements process: what is waiting on Document Control, and what
   // is waiting on the department this person answers for.
@@ -81,24 +116,24 @@ export default async function HomePage() {
     const me = await db.projectMembership.findFirst({ where: { projectId: ctx.projectId, userId: user.id, active: true } });
     const control = ctx.can("CONTROL");
     const untagged = actions.filter((a) => !departmentsOf(a).length).length;
-    if ((control || ctx.can("PLAN")) && untagged) planning.push({ key: "tag", href: "/actions/requirements", label: `${untagged} activit${untagged === 1 ? "y" : "ies"} without departments`, sub: "The project manager's departments list", cta: "Open →" });
+    if ((control || ctx.can("PLAN")) && untagged) planning.push({ key: "tag", href: "/actions/requirements", label: `${untagged} activit${untagged === 1 ? "y" : "ies"} without departments`, sub: "The project manager's departments list", cta: "Open" });
     if (control || me?.department) {
       for (const d of await departmentRows(ctx)) {
-        if (control && d.notIssued.length) planning.push({ key: `ask-${d.department}`, href: "/actions/requirements", label: `Ask ${d.department} for its documents`, sub: `${d.notIssued.length} activit${d.notIssued.length === 1 ? "y" : "ies"} not asked yet`, cta: "Issue →" });
-        if (control && d.state === "OVERDUE" && d.call) planning.push({ key: `late-${d.department}`, href: "/actions/requirements", label: `${d.department} list overdue`, sub: `due ${fmtDate(d.call.dueAt)}${d.call.reminders ? ` · reminded ${d.call.reminders}×` : ""}`, cta: "Chase →", late: true });
-        if (me?.department === d.department && d.call && !d.call.answeredAt) planning.push({ key: `fill-${d.department}`, href: `/api/requirements/sheet?dept=${d.department}`, label: `List the documents ${d.department} needs`, sub: `${d.call.actionCodes.split(",").length} activities · due ${fmtDate(d.call.dueAt)} · return it to Document Control`, cta: "Sheet ↓", late: d.state === "OVERDUE" });
+        if (control && d.notIssued.length) planning.push({ key: `ask-${d.department}`, href: "/actions/requirements", label: `Ask ${d.department} for its documents`, sub: `${d.notIssued.length} activit${d.notIssued.length === 1 ? "y" : "ies"} not asked yet`, cta: "Issue" });
+        if (control && d.state === "OVERDUE" && d.call) planning.push({ key: `late-${d.department}`, href: "/actions/requirements", label: `${d.department} list overdue`, sub: `due ${fmtDate(d.call.dueAt)}${d.call.reminders ? ` · reminded ${d.call.reminders}×` : ""}`, cta: "Chase", late: true });
+        if (me?.department === d.department && d.call && !d.call.answeredAt) planning.push({ key: `fill-${d.department}`, href: `/api/requirements/sheet?dept=${d.department}`, label: `List the documents ${d.department} needs`, sub: `${d.call.actionCodes.split(",").length} activities · due ${fmtDate(d.call.dueAt)}`, cta: "Sheet", late: d.state === "OVERDUE" });
       }
     }
     if (control) {
       const toIssue = (await senderRows(ctx)).filter((r) => !r.lastIssue || r.changedSinceIssue);
-      if (toIssue.length) planning.push({ key: "issue", href: "/actions/requirements", label: `Issue the requirements to ${toIssue.length} sender${toIssue.length === 1 ? "" : "s"}`, sub: toIssue.map((r) => (isDepartmentSender(r.sender) ? r.sender.slice(5) : r.sender)).join(", "), cta: "Issue →" });
+      if (toIssue.length) planning.push({ key: "issue", href: "/actions/requirements", label: `Issue the requirements to ${toIssue.length} sender${toIssue.length === 1 ? "" : "s"}`, sub: toIssue.map((r) => (isDepartmentSender(r.sender) ? r.sender.slice(5) : r.sender)).join(", "), cta: "Issue" });
     }
     if (me?.department) {
       const confirmations = await db.readinessConfirmation.findMany({ where: { department: me.department }, select: { actionId: true } });
       for (const a of actions) {
         if (!a.scheduledDate || !departmentsOf(a).includes(me.department) || confirmations.some((c) => c.actionId === a.id)) continue;
         if (businessDaysBefore(a.scheduledDate, DEFAULT_LEAD_BUSINESS_DAYS).getTime() > Date.now()) continue;
-        planning.push({ key: `confirm-${a.id}`, href: `/actions/${a.code}#confirm`, label: `Confirm ${me.department} documents for ${a.code}`, sub: `${a.name} · ${fmtDate(a.scheduledDate)}`, cta: "Confirm →", late: a.scheduledDate.getTime() < Date.now() });
+        planning.push({ key: `confirm-${a.id}`, href: `/actions/${a.code}#confirm`, label: `Confirm ${me.department} documents for ${a.code}`, sub: `${a.name} · ${fmtDate(a.scheduledDate)}`, cta: "Confirm", late: a.scheduledDate.getTime() < Date.now() });
       }
     }
   }
@@ -106,217 +141,552 @@ export default async function HomePage() {
   // One list per kind of ask: advice on a route's earlier step, or the
   // binding verdict — the one decision, which is also the release approval.
   const verdicts = assigned.filter((a) => a.cycle.binding);
-  const reviews = assigned.filter((a) => !a.cycle.binding);
+  const advice = assigned.filter((a) => !a.cycle.binding);
 
-  // Schedule actions whose documents will not be ready in time.
+  // Schedule activities whose documents will not be ready in time, for the
+  // people engaged in them.
+  //
+  // Being engaged is not only a matter of which department an activity is
+  // tagged with — plenty of people hold no department at all. Somebody is
+  // engaged when the activity names their department, when they own it, or
+  // when they are writing or reviewing one of the documents it waits on.
+  // Document Control and the planners are engaged in all of them, because
+  // chasing the schedule is their work.
+  const engagedDocs = new Set<string>([
+    ...assigned.map((a) => a.cycle.revision.document.docNumber),
+    ...returned.map((c) => c.revision.document.docNumber),
+    ...drafts.map((rev) => rev.document.docNumber),
+    ...(await db.document.findMany({ where: { createdById: user.id }, select: { docNumber: true } })).map((d) => d.docNumber),
+  ]);
+  const wholeSchedule = controller || ctx.can("PLAN");
   const atRisk = actions
     .map((a) => {
-      const total = a.entries.length;
-      const ready = a.entries.filter((e) => e.document.revisions[0]?.statusCode === e.requiredStatus).length;
+      const short = a.entries.filter((e) => e.document.revisions[0]?.statusCode !== e.requiredStatus);
       const late = a.scheduledDate ? a.scheduledDate.getTime() < Date.now() : false;
-      return { ...a, total, ready, late };
+      const mine =
+        (!!user.department && departmentsOf(a).includes(user.department)) ||
+        (!!a.ownerName && a.ownerName === user.name) ||
+        a.entries.some((e) => engagedDocs.has(e.document.docNumber));
+      return { ...a, total: a.entries.length, ready: a.entries.length - short.length, short, late, mine };
     })
-    .filter((a) => a.total > 0 && a.ready < a.total && a.scheduledDate);
+    .filter((a) => a.total > 0 && a.short.length && a.scheduledDate)
+    .filter((a) => wholeSchedule || a.mine)
+    // Newest first, deliberately. Sorted by how late they are, one activity
+    // nobody intends to fix would sit at the top for months and hide every
+    // risk that appeared after it; sorted by date, what has just gone wrong is
+    // what the panel shows, and the standing failures are the schedule page's.
+    .sort((a, b) => (b.scheduledDate?.getTime() ?? 0) - (a.scheduledDate?.getTime() ?? 0));
 
-  const owedCount = owed.reduce((n, o) => n + o.rows.length, 0);
-  const waiting = planning.length + reviews.length + verdicts.length + returned.length + incoming.length + drafts.length + toRoute.length + owedCount + toRelease.length + held.length;
+  const blocking = (c: { comments: { progressionPreventing: boolean; status: string }[] }) =>
+    c.comments.some((one) => one.progressionPreventing && one.status === "OPEN");
+
+  // ── The rows, by queue ────────────────────────────────────────────────────
+  const rows: Record<string, Row[]> = {
+    verdict: verdicts.map<Row>((a) => ({
+      href: `/reviews/${a.cycleId}`, code: a.cycle.revision.document.docNumber, rev: a.cycle.revision.value,
+      title: a.cycle.revision.document.title,
+      tag: blocking(a.cycle) ? "blocking" : "binding", tone: blocking(a.cycle) ? "amber" : "sky",
+      at: a.cycle.issuedToReviewAt ?? a.cycle.submittedAt, cta: "Decide",
+    })),
+    release: [
+      ...held.map<Row>((rev) => ({
+        href: `/documents/${rev.documentId}`, code: rev.document.docNumber, rev: rev.value, title: rev.document.title,
+        tag: rev.decidedAs ?? "changes asked", tone: "amber", at: rev.statusSetAt, cta: "Send back",
+      })),
+      ...toRelease.map<Row>((rev) => ({
+        href: `/documents/${rev.documentId}`, code: rev.document.docNumber, rev: rev.value, title: rev.document.title,
+        tag: rev.statusCode ?? "decided", tone: "emerald", at: rev.statusSetAt, cta: "Release",
+      })),
+    ],
+    returned: returned.map<Row>((c) => ({
+      href: `/reviews/${c.id}`, code: c.revision.document.docNumber, rev: c.revision.value, title: c.revision.document.title,
+      tag: c.outcome ?? "reviewed", tone: "amber", at: c.returnedToOriginatorAt, cta: "See comments",
+    })),
+    unsent: neverSent.map<Row>((rev) => ({
+      href: `/documents/${rev.documentId}`, code: rev.document.docNumber, rev: rev.value, title: rev.document.title,
+      tag: rev.statusCode ?? "released", tone: "violet", at: rev.releasedAt, cta: "Ask to send",
+    })),
+    owed: owed.flatMap<Row>((o) => o.rows.map((r) => ({
+      href: `/packages/${o.pkg}`, code: r.doc.docNumber, title: r.doc.title,
+      tag: STATE_LABEL[r.state], tone: r.late && r.state === "NOT_SENT" ? "amber" : "plain", cta: "Upload",
+    }))),
+    advice: advice.map<Row>((a) => ({
+      href: `/reviews/${a.cycleId}`, code: a.cycle.revision.document.docNumber, rev: a.cycle.revision.value,
+      title: a.cycle.revision.document.title, tag: "advice", tone: "sky",
+      at: a.cycle.issuedToReviewAt ?? a.cycle.submittedAt, cta: "Review",
+    })),
+    incoming: incoming.map<Row>((t) => ({
+      href: `/transmittals/${t.id}`, code: t.number, title: `from ${t.issuingParty}`,
+      tag: "received", tone: "sky", at: t.dateOfIssue, cta: "Check",
+    })),
+    route: toRoute.map<Row>((t) => ({
+      href: `/transmittals/${t.id}`, code: t.number, title: `from ${t.issuingParty}`,
+      tag: "accepted", tone: "emerald", at: t.dateOfIssue, cta: "Send for review",
+    })),
+    requirements: planning.map<Row>((p) => ({
+      href: p.href, code: p.label, plain: true, title: p.sub,
+      tag: p.late ? "overdue" : "asked", tone: p.late ? "amber" : "plain", cta: p.cta,
+    })),
+    drafts: drafts.map<Row>((rev) => ({
+      href: `/documents/${rev.documentId}#workflow`, code: rev.document.docNumber, rev: rev.value, title: rev.document.title,
+      tag: rev.renditionFileId ? "file attached" : "no file", tone: "plain", at: rev.createdAt, cta: "Continue",
+    })),
+  };
+
+  // Every kind of work is an aspect, and every aspect is the same size on the
+  // page: a card saying how many there are and what state they are in, and one
+  // way in. Nothing on a card competes for attention by being bigger; which
+  // document matters is the reader's call, made in the list the card opens.
+  const ASPECTS: Aspect[] = [
+    { id: "verdict", tab: "Decide", title: "Decide", icon: <CheckCheck />, accent: "sky",
+      asks: "Documents waiting on your verdict to move on.",
+      then: "Their route is stopped at your step until you answer.", call: "Give the verdicts" },
+    { id: "release", tab: "Release", title: "Release or send back", icon: <FileStack />, accent: "emerald",
+      asks: "The reviewers decided; they are not released yet.",
+      then: "Nobody may build from them, and no revision can start.", call: "Settle them" },
+    { id: "returned", tab: "Returned", title: "Came back to you", icon: <Undo2 />, accent: "amber",
+      asks: "Your documents came back with the reviewers' comments.",
+      then: "Each one is finished: the next revision starts fresh.", call: "Read the comments" },
+    { id: "unsent", tab: "Not sent", title: "Released, never sent", icon: <Send />, accent: "violet",
+      asks: "Released, but nobody outside has been told yet.",
+      then: "Whoever needs them is working from an older issue.", call: "Ask for them to go out" },
+    { id: "owed", tab: "To upload", title: "To send us", icon: <Upload />, accent: "slate",
+      asks: "Documents your package still owes, and we await.",
+      then: "The package cannot close until every one arrives.", call: "Upload them" },
+    { id: "advice", tab: "Advice", title: "Advice on a review", icon: <MessageSquare />, accent: "sky",
+      asks: "Reviews asking what you think before the verdict.",
+      then: "The decider is waiting on you to close the step.", call: "Give your advice" },
+    { id: "incoming", tab: "Received", title: "Received, to check", icon: <Inbox />, accent: "sky",
+      asks: "Transmittals that arrived and were never checked.",
+      then: "Nothing inside them enters the register until you accept.", call: "Check them" },
+    { id: "route", tab: "To send out", title: "Send for review", icon: <Share2 />, accent: "emerald",
+      asks: "Accepted by us, and still not sent out for review.",
+      then: "The reviewers cannot start, and the clock is running.", call: "Send them out" },
+    { id: "requirements", tab: "Requirements", title: "Document requirements", icon: <ListChecks />, accent: "slate",
+      asks: "Asks in the requirements process, still open.",
+      then: "The schedule cannot say what it needs until answered.", call: "Work the list" },
+    { id: "drafts", tab: "Drafts", title: "Your drafts", icon: <PenLine />, accent: "slate",
+      asks: "Documents you started and have not submitted.",
+      then: "Nobody knows they exist until you send them for review.", call: "Carry on writing" },
+  ];
+
+  const all = Object.values(rows).flat();
+  const today = ["verdict", "release", "returned", "unsent", "owed"].flatMap((id) => rows[id]);
+  const longest = Math.max(0, ...all.map((one) => daysOf(one.at) ?? 0));
+  // Asked for one kind, the page becomes that one kind, in full.
+  const opened = view ? ASPECTS.find((one) => one.id === view) : null;
+
+  // The panels arrive in reading order, once. See `.home-rise` in globals.css.
+  let place = -1;
+  const rise = () => {
+    place += 1;
+    return { "--d": `${260 + place * 90}ms` } as React.CSSProperties;
+  };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-950">Good day, {user.name.split(" ")[0]}.</h1>
-          <p className="mt-1 text-sm text-slate-500">{waiting ? `${waiting} thing${waiting === 1 ? "" : "s"} waiting on you.` : "Nothing is waiting on you."}</p>
-        </div>
-        {user.isInternal ? <ButtonLink href="/documents/new"><FilePlus2 className="h-4 w-4" /> Create document</ButtonLink> : null}
-      </div>
-
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
-        <div className="space-y-4">
-          {waiting === 0 ? (
-            <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-surface px-5 py-6 shadow-sm">
-              <CheckCircle2 className="h-6 w-6 text-emerald-500" />
-              <p className="text-sm text-slate-600">You are clear. New reviews, verdicts to give and returned work appear here.</p>
-            </div>
-          ) : null}
-
-          <Group title="Give the verdict" count={verdicts.length}>
-            {verdicts.map((a) => (
-              <Row key={a.id} href={`/reviews/${a.cycleId}`} doc={a.cycle.revision.document} rev={a.cycle.revision.value} cta="Decide"
-                note={a.cycle.comments.some((c) => c.progressionPreventing && c.status === "OPEN") ? <Chip className="bg-red-100 text-red-700 ring-red-300">blocking comments</Chip> : null} />
-            ))}
-          </Group>
-
-          <Group title="Review — your advice" count={reviews.length}>
-            {reviews.map((a) => (
-              <Row key={a.id} href={`/reviews/${a.cycleId}`} doc={a.cycle.revision.document} rev={a.cycle.revision.value} cta="Review"
-                note={a.cycle.comments.some((c) => c.progressionPreventing && c.status === "OPEN") ? <Chip className="bg-red-100 text-red-700 ring-red-300">blocking comments</Chip> : null} />
-            ))}
-          </Group>
-
-          <Group title="Returned to you" count={returned.length}>
-            {returned.map((c) => (
-              <Row key={c.id} href={`/reviews/${c.id}`} doc={c.revision.document} rev={c.revision.value} cta="See comments"
-                note={<span className="text-xs text-slate-500">{c.outcome?.replaceAll("_", " ").toLowerCase()}{c.comments.length ? ` · ${c.comments.length} blocking` : ""}</span>} />
-            ))}
-          </Group>
-
-          <Group title="Ready to release" count={toRelease.length}>
-            {toRelease.map((rev) => (
-              <Row
-                key={rev.id}
-                href={`/documents/${rev.documentId}`}
-                doc={rev.document}
-                rev={rev.value}
-                cta="Release"
-                note={<span className="text-xs text-slate-500">decided <span className="font-mono font-semibold text-slate-700">to be {rev.proposedStatus}</span></span>}
-              />
-            ))}
-          </Group>
-
-          <Group title="Held by a blocking comment" count={held.length}>
-            {held.map((rev) => (
-              <Row
-                key={rev.id}
-                href={`/reviews/${rev.cycles[0]?.id ?? ""}`}
-                doc={rev.document}
-                rev={rev.value}
-                cta="See the comment"
-                note={<Chip className="bg-red-100 text-red-700 ring-red-300">{blockedOn(rev)} blocking</Chip>}
-              />
-            ))}
-          </Group>
-
-          <Group title="Received — check and accept" count={incoming.length}>
-            {incoming.map((t) => (
-              <li key={t.id}>
-                <Link href={`/transmittals/${t.id}`} className="flex items-center gap-3 px-5 py-3 hover:bg-slate-50">
-                  <span className="font-mono text-[13px] font-semibold text-slate-900">{t.number}</span>
-                  <span className="min-w-0 flex-1 truncate text-xs text-slate-500">from {t.issuingParty} · {fmtDate(t.dateOfIssue)}</span>
-                  <span className="text-xs font-semibold text-link">Check →</span>
-                </Link>
-              </li>
-            ))}
-          </Group>
-
-          {owed.map((o) => (
-            <Group key={o.pkg} title="To send us" count={o.rows.length}>
-              {o.rows.map((r) => (
-                <li key={r.doc.id}>
-                  <Link href={`/packages/${o.pkg}`} className="flex items-center gap-3 px-5 py-3 hover:bg-slate-50">
-                    <span className="min-w-0 flex-1">
-                      <span className="font-mono text-[13px] font-semibold text-slate-900">{r.doc.docNumber}</span>
-                      <span className="block truncate text-xs text-slate-500">{r.doc.title}</span>
-                    </span>
-                    <span className={`text-xs ${r.state === "NOT_SENT" ? (r.late ? "text-red-700" : "text-slate-500") : "text-orange-700"}`}>{STATE_LABEL[r.state]}{r.late && r.state === "NOT_SENT" ? " · overdue" : ""}</span>
-                    <span className="shrink-0 text-xs font-semibold text-link">Upload →</span>
-                  </Link>
-                </li>
-              ))}
-            </Group>
-          ))}
-
-          <Group title="Document requirements" count={planning.length}>
-            {planning.map((p) => (
-              <li key={p.key}>
-                <a href={p.href} className="flex items-center gap-3 px-5 py-3 hover:bg-slate-50">
-                  <span className="min-w-0 flex-1">
-                    <span className={`text-[13px] font-semibold ${p.late ? "text-red-700" : "text-slate-900"}`}>{p.label}</span>
-                    <span className="block truncate text-xs text-slate-500">{p.sub}</span>
-                  </span>
-                  <span className="shrink-0 text-xs font-semibold text-link">{p.cta}</span>
-                </a>
-              </li>
-            ))}
-          </Group>
-
-          <Group title="Accepted — send for review" count={toRoute.length}>
-            {toRoute.map((t) => (
-              <li key={t.id}>
-                <Link href={`/transmittals/${t.id}`} className="flex items-center gap-3 px-5 py-3 hover:bg-slate-50">
-                  <span className="font-mono text-[13px] font-semibold text-slate-900">{t.number}</span>
-                  <span className="min-w-0 flex-1 truncate text-xs text-slate-500">from {t.issuingParty} · {fmtDate(t.dateOfIssue)}</span>
-                  <span className="text-xs font-semibold text-link">Route →</span>
-                </Link>
-              </li>
-            ))}
-          </Group>
-
-          <Group title="Your drafts" count={drafts.length}>
-            {drafts.map((rev) => (
-              <Row key={rev.id} href={`/documents/${rev.documentId}#workflow`} doc={rev.document} rev={rev.value} cta="Continue"
-                note={<span className="text-xs text-slate-500">{rev.renditionFileId ? "file attached" : "no file yet"}</span>} />
-            ))}
-          </Group>
-        </div>
-
-        <aside className={user.isInternal ? "space-y-4" : "hidden"}>
-          <section className="overflow-hidden rounded-2xl border border-slate-200 bg-surface shadow-sm">
-            <header className="flex items-center justify-between border-b border-slate-100 px-5 py-3">
-              <h2 className="text-sm font-semibold text-slate-900">Schedule at risk</h2>
-              <Link href="/actions" className="text-xs font-semibold text-link hover:underline">Schedule →</Link>
-            </header>
-            {atRisk.length ? (
-              <ul className="divide-y divide-slate-100">
-                {atRisk.slice(0, 6).map((a) => (
-                  <li key={a.id}>
-                    <Link href={`/actions/${a.code}`} className="block px-5 py-3 hover:bg-slate-50">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="font-mono text-xs font-bold text-link">{a.code}</span>
-                        <span className={`text-[11px] font-semibold ${a.late ? "text-red-700" : "text-amber-700"}`}>{a.late ? "overdue" : fmtDate(a.scheduledDate)}</span>
-                      </div>
-                      <p className="mt-0.5 truncate text-xs text-slate-700">{a.name}</p>
-                      <p className="text-[11px] text-slate-400">{a.ready} of {a.total} documents ready</p>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="px-5 py-4 text-xs text-slate-500">{actions.length ? "Every scheduled action has its documents." : "No schedule loaded yet."}</p>
-            )}
-          </section>
-
-          {controller ? (
-            <Link href="/conformance" className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-surface px-5 py-4 shadow-sm hover:bg-slate-50">
-              <ShieldCheck className={`h-5 w-5 ${lastRun && lastRun.integrity >= 95 && !criticalDefects ? "text-emerald-600" : "text-amber-600"}`} />
-              <span className="min-w-0 flex-1">
-                <span className="block text-sm font-semibold text-slate-800">Register health</span>
-                <span className="block text-xs text-slate-500">{lastRun ? `${lastRun.integrity.toFixed(0)}% clean · ${criticalDefects} critical issue${criticalDefects === 1 ? "" : "s"}` : "Not checked yet"}</span>
-              </span>
-              <ArrowRight className="h-4 w-4 text-slate-300" />
+    <div className="@container min-w-0 overflow-x-clip">
+      <header className="home-band home-rise px-6 py-5" style={{ "--d": "0ms" } as React.CSSProperties}>
+        <span className="home-sheen" aria-hidden="true" />
+        <div className="flex flex-wrap items-end justify-between gap-6">
+          <div>
+            <p className="home-faint mb-2 font-mono text-[11px] font-medium tracking-[0.14em] uppercase">{fmtDate(new Date())}</p>
+            <h1 className="text-[27px] leading-tight font-semibold tracking-tight">{greeting()}, {user.name.split(" ")[0]}.</h1>
+            <p className="home-soft mt-1.5 text-[13.5px]">
+              {ctx.project.name}
+              <span className="mx-1.5 opacity-45">·</span>
+              {user.functionName ?? (controller ? "Document Control" : user.isInternal ? "Project team" : user.partyName ?? "Partner")}
+            </p>
+          </div>
+          {user.isInternal ? (
+            <Link href="/documents/new" className="inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2.5 text-[13px] font-semibold whitespace-nowrap text-brand-strong transition hover:-translate-y-px hover:shadow-lg">
+              <Plus className="h-4 w-4" /> Create document
             </Link>
           ) : null}
+        </div>
+
+        <div className="home-rule mt-4 grid grid-cols-2 gap-4 border-t pt-3.5 md:grid-cols-4">
+          <Fig value={today.length} label={today.length === 1 ? "needs you today" : "need you today"} index={0} />
+          <Fig value={all.length} label="waiting on you in all" index={1} />
+          <Fig value={longest} unit="d" label={longest ? "the longest has waited" : "nothing has been left"} index={2} />
+          {controller ? (
+            <Fig
+              href="/conformance"
+              value={lastRun ? Math.round(lastRun.integrity) : 0}
+              unit="%"
+              label={lastRun ? `register clean${criticalDefects ? ` · ${criticalDefects} critical` : ""}` : "register not checked yet"}
+              index={3}
+            />
+          ) : (
+            <Fig href="/actions" value={atRisk.length} label="activities short of documents" index={3} />
+          )}
+        </div>
+      </header>
+
+      <nav aria-label="What is waiting" className="home-seg mt-4">
+        {/* Navigation keeps the reader where they were: switching aspect is a
+            filter, not a new page, so the scroll position is left alone. */}
+        <Link href="/" scroll={false} aria-current={!view ? "page" : undefined} className="home-segment">
+          All <span className="home-segment-n">{all.length}</span>
+        </Link>
+        {ASPECTS.filter((one) => rows[one.id].length).map((one) => {
+          const stale = rows[one.id].some((row) => (daysOf(row.at) ?? 0) >= 7);
+          return (
+            <Link
+              key={one.id}
+              href={`/?view=${one.id}`}
+              scroll={false}
+              aria-current={view === one.id ? "page" : undefined}
+              className="home-segment"
+            >
+              {one.tab}
+              <span className={`home-segment-n ${stale ? "home-segment-late" : ""}`}>{rows[one.id].length}</span>
+            </Link>
+          );
+        })}
+      </nav>
+
+      <div className="mt-3 grid grid-cols-1 gap-3.5 xl:grid-cols-[minmax(0,1fr)_296px] xl:items-start">
+        <main className="@container min-w-0">
+          {opened ? (
+            <Queue aspect={opened} rows={rows[opened.id]} style={rise()} />
+          ) : all.length ? (
+            <div className="grid grid-cols-1 gap-3.5 @[38rem]:grid-cols-2">
+              {ASPECTS.filter((one) => rows[one.id].length).map((one) => (
+                <Card key={one.id} aspect={one} rows={rows[one.id]} style={rise()} />
+              ))}
+            </div>
+          ) : (
+            <section className="home-rise rounded-xl border border-line bg-surface px-5 py-8 text-sm text-slate-500" style={rise()}>
+              You are clear. Reviews to answer, verdicts to give and work sent back to you appear here.
+            </section>
+          )}
+        </main>
+
+        <aside className="grid min-w-0 gap-3">
+          {news.length ? (
+            <section className="home-rise rounded-xl border border-line bg-surface px-4 py-3" style={rise()}>
+              <h2 className="mb-2.5 text-[11px] font-semibold tracking-[0.09em] text-slate-400 uppercase">Since {weekday(since)}</h2>
+              <ul>
+                {news.map((e, i) => {
+                  // An audit label reads "Q6637021-75-CI-SPC-00001 rev B — route
+                  // name". A supplier's number can run to forty characters, so it
+                  // takes the whole first line and the revision drops to the right
+                  // of the line below, where there is always room for two letters.
+                  const label = (e.entityLabel ?? "").split(" — ")[0];
+                  const at = label.lastIndexOf(" rev ");
+                  const number = at === -1 ? label : label.slice(0, at);
+                  const rev = at === -1 ? null : label.slice(at + 5);
+                  return (
+                    <li key={e.id} className="relative min-w-0 pb-2.5 pl-[18px] last:pb-0">
+                      <span className={`absolute top-[5px] left-0 h-[7px] w-[7px] rounded-full border-2 bg-surface ${NEWS_MARK[e.action] ?? "border-slate-300"}`} />
+                      {i < news.length - 1 ? <span className="absolute top-[14px] -bottom-px left-[3px] w-px bg-line" /> : null}
+                      {number ? <span className="block truncate font-mono text-[12.5px] font-semibold text-link">{number}</span> : null}
+                      <span className="flex items-baseline gap-2 text-[12.5px] text-slate-600">
+                        <span className="min-w-0 truncate">{NEWS_WORDS[e.action] ?? e.action.replaceAll("_", " ").toLowerCase()}</span>
+                        {rev ? <span className="ml-auto shrink-0 font-mono text-[11.5px] text-slate-400">rev {rev}</span> : null}
+                      </span>
+                      <span className="block truncate text-[11px] text-slate-400">{e.actorName} · {when(e.ts)}</span>
+                    </li>
+                  );
+                })}
+                            </ul>
+                            <Link href="/audit" className="mt-2.5 inline-block text-xs font-semibold text-link hover:underline">Everything that happened →</Link>
+            </section>
+          ) : null}
+
+          {user.isInternal && atRisk.length ? (
+            <section className="home-rise rounded-xl border border-line bg-surface px-4 py-3" style={rise()}>
+              <h2 className="mb-1 text-[11px] font-semibold tracking-[0.09em] text-slate-400 uppercase">Schedule</h2>
+              {atRisk.slice(0, 3).map((a) => {
+                // An activity's name carries where it is after a dash — "Foundation
+                // concrete pour — clarifier TK-201, area 71" — and the place is
+                // what tells a reader whether it is theirs, so it gets its own line.
+                const [what, ...place] = a.name.split(" — ");
+                const off = Math.abs(Math.round(((a.scheduledDate?.getTime() ?? 0) - Date.now()) / 86_400_000));
+                return (
+                  <Link key={a.id} href={`/actions/${a.code}`} className="block min-w-0 border-t border-line py-2.5 first:border-t-0">
+                    <span className="flex items-baseline gap-2">
+                      <span className="font-mono text-[12.5px] font-semibold text-link">{a.code}</span>
+                      {wholeSchedule && a.mine ? <span className="rounded bg-tint px-1.5 text-[10px] font-semibold tracking-wide text-brand-ink uppercase">yours</span> : null}
+                      <span className={`ml-auto font-mono text-[11.5px] whitespace-nowrap ${a.late ? "font-semibold text-amber-700" : "text-slate-400"}`}>
+                        {a.late ? "overdue" : fmtDate(a.scheduledDate)}
+                      </span>
+                    </span>
+                    <span className="mt-0.5 block truncate text-[12.5px] text-slate-700">{what}</span>
+                    {place.length ? <span className="block truncate text-[11.5px] text-slate-500">{place.join(" — ")}</span> : null}
+                    <span className="mt-1 flex items-baseline gap-2 text-[11px] text-slate-400">
+                      <span className="truncate"><b className="font-mono font-semibold text-slate-600">{a.ready}/{a.total}</b> documents ready</span>
+                      <span className={`ml-auto whitespace-nowrap ${a.late ? "font-semibold text-amber-700" : ""}`}>
+                        {a.late ? `${off} day${off === 1 ? "" : "s"} late` : `in ${off} day${off === 1 ? "" : "s"}`}
+                      </span>
+                    </span>
+                  </Link>
+                );
+              })}
+                            <Link href="/actions" className="mt-2.5 inline-block text-xs font-semibold text-link hover:underline">The whole schedule{atRisk.length > 3 ? ` · ${atRisk.length} at risk` : ""} →</Link>
+            </section>
+          ) : null}
+
         </aside>
       </div>
     </div>
   );
 }
 
-function Group({ title, count, children }: { title: string; count: number; children: React.ReactNode }) {
-  if (!count) return null;
+/** One row of a queue: a thing, a tag, how long it waited, the verb. */
+type Row = {
+  href: string;
+  /** Document or transmittal number — or, for a requirements ask, its sentence. */
+  code: string;
+  /** True when the code is prose, not a number, so it is not set in mono. */
+  plain?: boolean;
+  rev?: string | null;
+  title: string;
+  tag: string;
+  tone: "amber" | "sky" | "emerald" | "violet" | "plain";
+  at?: Date | null;
+  cta: string;
+};
+
+/** The audit actions that are news to somebody, not bookkeeping. */
+const NEWS = [
+  "RELEASE",
+  "REVIEW_OUTCOME",
+  "WORKFLOW_RETURNED",
+  "WORKFLOW_COMPLETED",
+  "WORKFLOW_STARTED",
+  "TRANSMITTAL_RAISED",
+  "TRANSMITTAL_OPENED",
+  "REVISION_ESTABLISHED",
+  "REGISTER_ENTRY",
+];
+
+const NEWS_WORDS: Record<string, string> = {
+  RELEASE: "was released",
+  REVIEW_OUTCOME: "was decided",
+  WORKFLOW_RETURNED: "came back to its author",
+  WORKFLOW_COMPLETED: "finished its review route",
+  WORKFLOW_STARTED: "went out for review",
+  TRANSMITTAL_RAISED: "was issued",
+  TRANSMITTAL_OPENED: "arrived",
+  REVISION_ESTABLISHED: "started a new revision",
+  REGISTER_ENTRY: "joined the register",
+};
+
+/** The colour a piece of news is marked with, by what kind of news it is. */
+const NEWS_MARK: Record<string, string> = {
+  RELEASE: "border-emerald-600",
+  REVIEW_OUTCOME: "border-amber-600",
+  WORKFLOW_RETURNED: "border-amber-600",
+  WORKFLOW_COMPLETED: "border-emerald-600",
+  WORKFLOW_STARTED: "border-brand-line",
+  TRANSMITTAL_RAISED: "border-violet-600",
+  TRANSMITTAL_OPENED: "border-violet-600",
+  REVISION_ESTABLISHED: "border-slate-400",
+  REGISTER_ENTRY: "border-slate-400",
+};
+
+const TONES: Record<Row["tone"], string> = {
+  amber: "bg-amber-50 text-amber-700",
+  sky: "bg-sky-50 text-sky-700",
+  emerald: "bg-emerald-50 text-emerald-700",
+  violet: "bg-violet-50 text-violet-700",
+  plain: "bg-canvas-deep text-slate-600",
+};
+
+function daysOf(at: Date | null | undefined): number | null {
+  if (!at) return null;
+  return Math.max(0, Math.round((Date.now() - at.getTime()) / 86_400_000));
+}
+
+/** The last working day, so on a Monday the news says "since Friday". */
+function lastWorkingDay(): Date {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  do {
+    d.setDate(d.getDate() - 1);
+  } while (d.getDay() === 0 || d.getDay() === 6);
+  return d;
+}
+
+function weekday(d: Date): string {
+  return d.toLocaleDateString("en-GB", { weekday: "long" });
+}
+
+/** How long ago, in the words a person would use. */
+function when(at: Date): string {
+  const mins = Math.round((Date.now() - at.getTime()) / 60_000);
+  if (mins < 60) return mins <= 1 ? "just now" : `${mins} minutes ago`;
+  const hours = Math.round(mins / 60);
+  if (hours < 24) return `${hours} hour${hours === 1 ? "" : "s"} ago`;
+  const days = Math.round(hours / 24);
+  if (days === 1) return "yesterday";
+  if (days < 7) return `${days} days ago`;
+  return fmtDate(at);
+}
+
+function greeting(): string {
+  const hour = new Date().getHours();
+  return hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+}
+
+/** One figure in the band. It counts up once, from a value already rendered. */
+function Fig({ value, unit, label, index, href }: {
+  value: number;
+  unit?: string;
+  label: string;
+  /** Its place in the row, which is also when it starts counting. */
+  index: number;
+  href?: string;
+}) {
+  const body = (
+    <>
+      <Count value={value} unit={unit} delay={index * 70} />
+      <span className={`home-soft mt-1.5 block text-[12.5px] ${href ? "group-hover:underline group-hover:underline-offset-[3px]" : ""}`}>{label}</span>
+    </>
+  );
+  const frame = "home-rule block border-r pr-4 last:border-r-0 even:border-r-0 md:even:border-r md:last:border-r-0";
+  return href ? <Link href={href} className={`group ${frame}`}>{body}</Link> : <div className={frame}>{body}</div>;
+}
+
+/** What a card needs to know about its aspect. */
+type Aspect = {
+  id: string;
+  title: string;
+  icon: React.ReactNode;
+  /** Its own colour, kept to the card's edge so the board stays quiet. */
+  accent: "sky" | "emerald" | "amber" | "violet" | "slate";
+  /** Its name in the tab bar, kept to a word or two. */
+  tab: string;
+  /** What is being asked of the reader, in one line. */
+  asks: string;
+  /** What hangs on it, in one more. */
+  then: string;
+  call: string;
+};
+
+/** The edge is the only coloured thing on a card, and it is pale on purpose. */
+const EDGE: Record<Aspect["accent"], string> = {
+  sky: "bg-sky-200",
+  emerald: "bg-emerald-200",
+  amber: "bg-amber-200",
+  violet: "bg-violet-200",
+  slate: "bg-slate-200",
+};
+
+/**
+ * One aspect, as a card: how many, what is being asked, and how old it is.
+ *
+ * No document is named. Naming one would be a decision about which document
+ * matters, and that decision belongs to the reader, in the list the card opens.
+ * What a queue must say from across the room is its size and its age, so the
+ * age is drawn — one bar, oldest first — rather than described.
+ */
+function Card({ aspect, rows, style }: { aspect: Aspect; rows: Row[]; style?: React.CSSProperties }) {
+  // Some queues hold things that never had a date — an ask in the requirements
+  // process is not "from Tuesday", it is simply open. A card for those says so
+  // rather than reporting an age it made up.
+  const dated = rows.filter((one) => one.at);
+  const oldest = Math.max(0, ...dated.map((one) => daysOf(one.at) ?? 0));
+  const bucket = (days: number | null) => (days === null ? "week" : days >= 7 ? "old" : days >= 1 ? "week" : "new");
+  const count = { old: 0, week: 0, new: 0 };
+  for (const one of dated) count[bucket(daysOf(one.at))] += 1;
+  // The states the queue holds, counted: three at most, so the card keeps its
+  // shape whatever is in it.
+  const byTag = new Map<string, number>();
+  for (const one of rows) byTag.set(one.tag, (byTag.get(one.tag) ?? 0) + 1);
+  const states = [...byTag.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3);
+  const said = [
+    count.old ? `${count.old} over a week` : null,
+    count.week ? `${count.week} this week` : null,
+    count.new ? `${count.new} today` : null,
+  ].filter(Boolean).join(" · ");
+
   return (
-    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-surface shadow-sm">
-      <header className="flex items-center gap-2 border-b border-slate-100 px-5 py-3">
-        <h2 className="text-sm font-semibold text-slate-900">{title}</h2>
-        <span className="rounded-full bg-slate-100 px-2 text-xs font-bold text-slate-600">{count}</span>
+    <Link
+      href={`/?view=${aspect.id}`}
+      style={style}
+      className="home-rise group relative flex min-w-0 flex-col overflow-hidden rounded-xl border border-line bg-surface px-4 pt-3.5 pb-3 transition hover:-translate-y-px hover:border-line-strong hover:shadow-md"
+    >
+      <span className={`absolute inset-y-0 left-0 w-[3px] ${EDGE[aspect.accent]}`} aria-hidden="true" />
+
+      <span className="flex min-w-0 items-center gap-2">
+        <span className="grid h-[22px] w-[22px] shrink-0 place-items-center rounded-md bg-canvas-deep text-slate-500 [&_svg]:h-[13px] [&_svg]:w-[13px]">{aspect.icon}</span>
+        <h2 className="truncate text-[13px] font-semibold text-slate-800">{aspect.title}</h2>
+        <b className="ml-auto font-mono text-[22px] leading-none font-semibold tracking-tight tabular-nums text-slate-900">{rows.length}</b>
+      </span>
+
+      <span className="mt-2 block truncate text-[12.5px] text-slate-600">{aspect.asks}</span>
+      <span className="mt-0.5 block truncate text-[12px] text-slate-400">{aspect.then}</span>
+
+      {states.length ? (
+        <span className="mt-2.5 flex flex-wrap gap-1">
+          {states.map(([tag, n]) => (
+            <span key={tag} className="rounded bg-canvas-deep px-1.5 py-0.5 font-mono text-[11px] font-semibold text-slate-600">
+              {tag}{n > 1 ? ` ${n}` : ""}
+            </span>
+          ))}
+        </span>
+      ) : null}
+
+      <span className="home-fill mt-3.5 flex h-1 gap-0.5 overflow-hidden rounded-full">
+        {!dated.length ? <i className="block flex-1 rounded-full bg-slate-200" /> : null}
+        {count.old ? <i className="block rounded-full bg-amber-500" style={{ flex: count.old }} /> : null}
+        {count.week ? <i className="block rounded-full bg-brand-line" style={{ flex: count.week }} /> : null}
+        {count.new ? <i className="block rounded-full bg-slate-300" style={{ flex: count.new }} /> : null}
+      </span>
+
+      <span className="mt-1.5 mb-2.5 flex items-baseline gap-2 text-[11.5px] text-slate-500">
+        <span className="min-w-0 truncate">{dated.length ? said : `${rows.length} open`}</span>
+        {dated.length ? (
+          <span className={`ml-auto font-mono tabular-nums whitespace-nowrap ${oldest >= 7 ? "font-semibold text-amber-700" : "text-slate-400"}`}>
+            {oldest === 0 ? "all today" : `oldest ${oldest}d`}
+          </span>
+        ) : (
+          <span className="ml-auto whitespace-nowrap text-slate-400">no date</span>
+        )}
+      </span>
+
+      <span className="mt-auto flex items-center justify-between gap-2 border-t border-line pt-3 text-[12.5px] font-semibold text-link">
+        {aspect.call}
+        <ArrowRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" />
+      </span>
+    </Link>
+  );
+}
+
+/** One aspect, opened: every row in it, in the same places every time. */
+function Queue({ aspect, rows, style }: { aspect: Aspect; rows: Row[]; style?: React.CSSProperties }) {
+  return (
+    <section className="home-rise mb-3.5 min-w-0 overflow-hidden rounded-xl border border-line bg-surface" style={style}>
+      <header className="flex items-center gap-2.5 border-b border-line px-4 py-3">
+        <span className="grid h-[22px] w-[22px] place-items-center rounded-md bg-canvas-deep text-slate-500 [&_svg]:h-[13px] [&_svg]:w-[13px]">{aspect.icon}</span>
+        <h2 className="text-[13.5px] font-semibold">{aspect.title}</h2>
+        <span className="ml-auto font-mono text-xs text-slate-400">{rows.length}</span>
       </header>
-      <ul className="divide-y divide-slate-100">{children}</ul>
+      {rows.map((one) => <Line key={one.href + one.code + (one.rev ?? "")} row={one} />)}
     </section>
   );
 }
 
-function Row({ href, doc, rev, cta, note }: { href: string; doc: { docNumber: string; title: string }; rev: string; cta: string; note?: React.ReactNode }) {
+function Line({ row }: { row: Row }) {
+  const days = daysOf(row.at);
   return (
-    <li>
-      <Link href={href} className="flex items-center gap-3 px-5 py-3 hover:bg-slate-50">
-        <span className="min-w-0 flex-1">
-          <span className="font-mono text-[13px] font-semibold text-slate-900">{doc.docNumber}</span>
-          <span className="ml-1.5 font-mono text-xs text-slate-500">rev {rev}</span>
-          <span className="block truncate text-xs text-slate-500">{doc.title}</span>
+    <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-t border-line px-4 py-2.5 transition hover:bg-tint-soft sm:grid-cols-[minmax(0,1fr)_auto_auto_auto]">
+      <Link href={row.href} className="col-span-2 min-w-0 sm:col-span-1">
+        <span className={row.plain ? "block text-[13px] font-semibold text-slate-900" : "block font-mono text-[13px] font-semibold whitespace-nowrap text-slate-900"}>
+          {row.code}
+          {row.rev ? <span className="ml-1.5 font-normal text-slate-400">rev {row.rev}</span> : null}
         </span>
-        {note}
-        <span className="shrink-0 text-xs font-semibold text-link">{cta} →</span>
+        <span className="mt-px block truncate text-[12.5px] text-slate-500" title={row.title}>{row.title}</span>
       </Link>
-    </li>
+      <span className={`rounded-md px-1.5 py-0.5 font-mono text-[11.5px] font-semibold whitespace-nowrap ${TONES[row.tone]}`}>{row.tag}</span>
+      <span className={`min-w-12 text-right font-mono text-xs tabular-nums whitespace-nowrap ${days !== null && days >= 5 ? "font-semibold text-amber-700" : "text-slate-400"}`}>
+        {days === null ? "—" : days === 0 ? "today" : `${days}d`}
+      </span>
+      <Link href={row.href} className="inline-block rounded-md border border-line-strong px-2.5 py-1 text-[12.5px] font-semibold whitespace-nowrap text-brand-ink transition hover:border-brand-line hover:bg-tint">
+        {row.cta}
+      </Link>
+    </div>
   );
 }

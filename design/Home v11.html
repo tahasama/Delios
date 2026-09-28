@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DELIOS — Home v11</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --surface:#ffffff; --canvas:#eceff4; --canvas-deep:#e2e7ee;
+  --line:#d7dde6; --line-strong:#bcc6d4;
+  --brand:#1e3a5f; --brand-hover:#2d5480; --brand-strong:#17324d; --brand-line:#3b6389; --brand-ink:#1e3a5f;
+  --link:#2b5b80; --tint:#e4eef7; --tint-soft:#f2f6fb;
+  --slate-300:#cbd5e1; --slate-400:#94a3b8; --slate-500:#64748b; --slate-600:#475569; --slate-900:#0f172a;
+  --amber:oklch(55.5% 0.163 48.998); --amber-bg:oklch(96.2% 0.059 95.617);
+  --sky:oklch(50% 0.134 242.749); --sky-bg:oklch(95.1% 0.026 236.824);
+  --emerald:oklch(50.8% 0.118 165.612); --emerald-bg:oklch(95% 0.052 163.051);
+  --violet:oklch(49.1% 0.27 292.581); --violet-bg:oklch(94.3% 0.029 294.588);
+  --sans:"IBM Plex Sans",ui-sans-serif,system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,monospace;
+  --ease:cubic-bezier(.2,.6,.3,1);
+}
+:root[data-theme="dark"]{
+  --surface:#111823; --canvas:#0a0f17; --canvas-deep:#1a2231;
+  --line:#273245; --line-strong:#37455c;
+  --brand:#16243a; --brand-hover:#3a70a6; --brand-strong:#101a2b; --brand-line:#5f8fbf; --brand-ink:#c6d9ec;
+  --link:#8db8de; --tint:#1a2a3c; --tint-soft:#152131;
+  --slate-300:#3a475c; --slate-400:#64738a; --slate-500:#8795a9; --slate-600:#a2adbd; --slate-900:#e9edf2;
+  --amber:oklch(87.9% 0.169 91.605); --amber-bg:oklch(28% 0.06 80);
+  --sky:oklch(82.8% 0.111 230.318); --sky-bg:oklch(27% 0.05 235);
+  --emerald:oklch(84.5% 0.143 164.978); --emerald-bg:oklch(26% 0.05 163);
+  --violet:oklch(81.1% 0.111 293.571); --violet-bg:oklch(27% 0.06 293);
+}
+*{box-sizing:border-box}
+html,body{margin:0;overflow-x:clip}
+body{background:var(--canvas);color:var(--slate-900);font-family:var(--sans);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+.col{max-width:1200px;margin:0 auto;padding:22px 22px 80px}
+
+/* ── Band (locked in v10) ───────────────────────────────────────────────── */
+.band{position:relative;overflow:hidden;border-radius:14px;color:#fff;padding:26px 28px;
+  background:linear-gradient(115deg,var(--brand-strong) 0%,var(--brand) 58%,var(--brand-hover) 140%)}
+.band::after{content:"";position:absolute;inset:auto -80px -170px auto;width:420px;height:420px;border-radius:50%;
+  background:radial-gradient(circle,rgba(122,176,224,.22),transparent 68%)}
+.band .inner{position:relative;display:flex;align-items:flex-end;justify-content:space-between;gap:28px;flex-wrap:wrap}
+.band .when{margin:0 0 9px;font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.5)}
+.band h1{margin:0;font-size:27px;font-weight:600;letter-spacing:-.015em}
+.band .who{margin:7px 0 0;font-size:13.5px;color:rgba(255,255,255,.72)}
+.make{display:inline-flex;align-items:center;gap:7px;background:#fff;color:var(--brand-strong);border-radius:8px;padding:9px 15px;font-size:13px;font-weight:600}
+.tally{position:relative;margin-top:22px;padding-top:18px;border-top:1px solid rgba(255,255,255,.18);display:grid;grid-template-columns:repeat(4,1fr);gap:18px}
+.t{border-right:1px solid rgba(255,255,255,.18);padding-right:16px}
+.t:last-child{border-right:0}
+.t .v{display:block;font-family:var(--mono);font-size:27px;font-weight:600;line-height:1;font-variant-numeric:tabular-nums}
+.t .v small{font-size:14px;opacity:.7}
+.t .k{display:block;margin-top:7px;font-size:12.5px;color:rgba(255,255,255,.72)}
+
+/* ── Sub nav: a scroller of filter chips, count inside the chip ──────────── */
+.subnav{display:flex;gap:7px;margin:16px 0 14px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
+.subnav::-webkit-scrollbar{display:none}
+.chip{
+  display:inline-flex;align-items:center;gap:7px;white-space:nowrap;border:1px solid var(--line);
+  background:var(--surface);border-radius:99px;padding:6px 13px;font-size:12.5px;font-weight:500;color:var(--slate-600);
+  transition:border-color .16s var(--ease),color .16s var(--ease),background .16s var(--ease);
+}
+.chip:hover{border-color:var(--line-strong);color:var(--slate-900)}
+.chip .n{font-family:var(--mono);font-size:11.5px;font-weight:600;color:var(--slate-400);
+  background:var(--canvas);border-radius:99px;padding:1px 6px;min-width:20px;text-align:center}
+.chip[aria-current]{background:var(--brand);border-color:var(--brand);color:#fff;font-weight:600}
+.chip[aria-current] .n{background:rgba(255,255,255,.18);color:#fff}
+.chip.off{color:var(--slate-400);background:transparent;border-style:dashed;cursor:default}
+.chip.off .n{background:transparent;color:var(--slate-300)}
+
+/* ── The board ──────────────────────────────────────────────────────────── */
+.grid{display:grid;gap:16px;grid-template-columns:minmax(0,1fr)}
+@media(min-width:1020px){.grid{grid-template-columns:minmax(0,1fr) 312px;align-items:start}}
+.cards{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(232px,1fr))}
+
+.card{
+  position:relative;display:flex;flex-direction:column;min-width:0;overflow:hidden;
+  background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:15px 16px 13px;
+  transition:border-color .18s var(--ease),transform .18s var(--ease),box-shadow .18s var(--ease);
+}
+.card::before{content:"";position:absolute;inset:0 auto 0 0;width:3px;background:var(--accent)}
+.card:hover{border-color:var(--line-strong);transform:translateY(-1px);box-shadow:0 4px 14px rgba(15,23,42,.06)}
+.card .top{display:flex;align-items:center;gap:8px;min-width:0}
+.card .top h2{margin:0;font-size:12.5px;font-weight:600;color:var(--slate-600);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card .top .ico{display:grid;place-items:center;width:22px;height:22px;border-radius:6px;background:var(--accent-bg);color:var(--accent);flex:none}
+.card .top .ico svg{width:13px;height:13px}
+.card .fig{display:flex;align-items:flex-end;gap:8px;margin-top:12px}
+.card .fig b{font-family:var(--mono);font-size:32px;font-weight:600;line-height:.9;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.card .fig span{font-size:12.5px;color:var(--slate-500);padding-bottom:2px}
+
+/* Age profile: three segments, oldest first. The whole state of a queue in 4px. */
+.age{margin-top:13px}
+.age .bar{display:flex;gap:2px;height:4px;border-radius:99px;overflow:hidden}
+.age .bar i{display:block;border-radius:99px}
+.age .bar .old{background:var(--amber)}
+.age .bar .wk{background:var(--brand-line)}
+.age .bar .new{background:var(--slate-300)}
+.age .key{display:flex;gap:10px;margin-top:7px;font-size:11.5px;color:var(--slate-500);flex-wrap:wrap}
+.age .key b{font-family:var(--mono);font-weight:600;color:var(--slate-600)}
+.age .key .warn b,.age .key .warn{color:var(--amber)}
+
+.card .go{
+  display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:14px;padding-top:11px;
+  border-top:1px solid var(--line);font-size:12.5px;font-weight:600;color:var(--link);
+}
+.card .go svg{width:14px;height:14px;transition:transform .18s var(--ease)}
+.card:hover .go svg{transform:translateX(2px)}
+
+/* ── Right: the project ─────────────────────────────────────────────────── */
+.side{display:grid;gap:14px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.panel h2{margin:0 0 10px;font-size:11px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--slate-400)}
+
+/* Timeline: number, then the sentence under it, both clipped to one line. */
+.feed{margin:0;padding:0;list-style:none}
+.feed li{position:relative;padding:0 0 13px 18px;min-width:0}
+.feed li:last-child{padding-bottom:0}
+.feed li::before{content:"";position:absolute;left:0;top:5px;width:7px;height:7px;border-radius:99px;
+  background:var(--surface);border:2px solid var(--accent,var(--brand-line))}
+.feed li::after{content:"";position:absolute;left:3px;top:14px;bottom:-1px;width:1px;background:var(--line)}
+.feed li:last-child::after{display:none}
+.feed .num{display:block;font-family:var(--mono);font-size:12.5px;font-weight:600;color:var(--link);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.feed .said{display:block;font-size:12.5px;color:var(--slate-600);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.feed .ago{display:block;margin-top:1px;font-size:11px;color:var(--slate-400);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.feed li.rel{--accent:var(--emerald)} .feed li.dec{--accent:var(--amber)}
+.feed li.out{--accent:var(--brand-line)} .feed li.new{--accent:var(--violet)}
+
+.sched a{display:block;padding:8px 0;border-top:1px solid var(--line);min-width:0}
+.sched a:first-of-type{border-top:0}
+.sched .row1{display:flex;align-items:baseline;gap:8px}
+.sched .c{font-family:var(--mono);font-size:12.5px;font-weight:600;color:var(--link)}
+.sched .w{margin-left:auto;font-family:var(--mono);font-size:11.5px;color:var(--slate-400);white-space:nowrap}
+.sched .w.late{color:var(--amber);font-weight:600}
+.sched .nm{display:block;margin-top:1px;font-size:12.5px;color:var(--slate-600);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+.meter{height:5px;border-radius:99px;background:var(--canvas-deep);overflow:hidden;margin:9px 0 8px}
+.meter i{display:block;height:100%;border-radius:99px;background:var(--amber)}
+.panel .line{display:flex;align-items:baseline;justify-content:space-between;font-size:13px;color:var(--slate-600)}
+.panel .line b{font-family:var(--mono);font-size:15px;font-weight:600;color:var(--slate-900)}
+.panel .note{margin:4px 0 0;font-size:12px;color:var(--slate-400)}
+.panel .note.warn{color:var(--amber)}
+.panel .more{display:inline-block;margin-top:10px;font-size:12px;font-weight:600;color:var(--link)}
+
+#tw{position:fixed;right:18px;bottom:18px;z-index:50}
+#tw select{font-family:var(--sans);font-size:12.5px;padding:6px 9px;border:1px solid var(--line-strong);border-radius:8px;background:var(--surface);color:var(--slate-900)}
+</style>
+</head>
+<body>
+<div class="col">
+
+  <header class="band">
+    <div class="inner">
+      <div>
+        <p class="when">Monday 28 September 2026</p>
+        <h1>Good morning, Taha.</h1>
+        <p class="who">Q6637021 Thermal piping · Document Control</p>
+      </div>
+      <a class="make" href="#">+ Create document</a>
+    </div>
+    <div class="tally">
+      <span class="t"><span class="v">9</span><span class="k">need you today</span></span>
+      <span class="t"><span class="v">14</span><span class="k">waiting on you in all</span></span>
+      <span class="t"><span class="v">11<small>d</small></span><span class="k">the longest has waited</span></span>
+      <span class="t"><span class="v">19<small>%</small></span><span class="k">register clean · 6 critical</span></span>
+    </div>
+  </header>
+
+  <nav class="subnav" aria-label="Everything that can be waiting">
+    <a class="chip" href="#" aria-current="page">Everything <span class="n">14</span></a>
+    <a class="chip" href="#">Decide <span class="n">3</span></a>
+    <a class="chip" href="#">Release or send back <span class="n">4</span></a>
+    <a class="chip" href="#">Came back to you <span class="n">2</span></a>
+    <a class="chip" href="#">Never sent <span class="n">2</span></a>
+    <a class="chip" href="#">Advice <span class="n">1</span></a>
+    <a class="chip" href="#">Received <span class="n">1</span></a>
+    <a class="chip" href="#">Drafts <span class="n">1</span></a>
+    <span class="chip off">Requirements <span class="n">0</span></span>
+  </nav>
+
+  <div class="grid">
+    <main>
+      <div class="cards">
+
+        <a class="card" href="#" style="--accent:var(--sky);--accent-bg:var(--sky-bg)">
+          <span class="top">
+            <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span>
+            <h2>Decide</h2>
+          </span>
+          <span class="fig"><b>3</b><span>verdicts</span></span>
+          <span class="age">
+            <span class="bar"><i class="old" style="flex:1"></i><i class="wk" style="flex:1"></i><i class="new" style="flex:1"></i></span>
+            <span class="key"><span class="warn"><b>1</b> over a week</span><span><b>1</b> this week</span><span><b>1</b> today</span></span>
+          </span>
+          <span class="go">Give the verdicts <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+        </a>
+
+        <a class="card" href="#" style="--accent:var(--emerald);--accent-bg:var(--emerald-bg)">
+          <span class="top">
+            <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v5H4z"/><path d="M4 13h16v7H4z"/><path d="M8 17h4"/></svg></span>
+            <h2>Release or send back</h2>
+          </span>
+          <span class="fig"><b>4</b><span>decided, not out</span></span>
+          <span class="age">
+            <span class="bar"><i class="old" style="flex:2"></i><i class="wk" style="flex:1"></i><i class="new" style="flex:1"></i></span>
+            <span class="key"><span class="warn"><b>2</b> over a week</span><span><b>1</b> this week</span><span><b>1</b> today</span></span>
+          </span>
+          <span class="go">Settle them <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+        </a>
+
+        <a class="card" href="#" style="--accent:var(--amber);--accent-bg:var(--amber-bg)">
+          <span class="top">
+            <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-1"/></svg></span>
+            <h2>Came back to you</h2>
+          </span>
+          <span class="fig"><b>2</b><span>to revise</span></span>
+          <span class="age">
+            <span class="bar"><i class="old" style="flex:1"></i><i class="wk" style="flex:1"></i></span>
+            <span class="key"><span class="warn"><b>1</b> over a week</span><span><b>1</b> this week</span></span>
+          </span>
+          <span class="go">Read the comments <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+        </a>
+
+        <a class="card" href="#" style="--accent:var(--violet);--accent-bg:var(--violet-bg)">
+          <span class="top">
+            <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4z"/></svg></span>
+            <h2>Released, never sent</h2>
+          </span>
+          <span class="fig"><b>2</b><span>nobody told</span></span>
+          <span class="age">
+            <span class="bar"><i class="old" style="flex:1"></i><i class="new" style="flex:1"></i></span>
+            <span class="key"><span class="warn"><b>1</b> over a week</span><span><b>1</b> today</span></span>
+          </span>
+          <span class="go">Ask for them to go out <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+        </a>
+
+        <a class="card" href="#" style="--accent:var(--sky);--accent-bg:var(--sky-bg)">
+          <span class="top">
+            <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
+            <h2>Advice on a review</h2>
+          </span>
+          <span class="fig"><b>1</b><span>to answer</span></span>
+          <span class="age">
+            <span class="bar"><i class="new" style="flex:1"></i></span>
+            <span class="key"><span><b>1</b> today</span></span>
+          </span>
+          <span class="go">Give your advice <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+        </a>
+
+        <a class="card" href="#" style="--accent:var(--slate-400);--accent-bg:var(--canvas-deep)">
+          <span class="top">
+            <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></span>
+            <h2>Your drafts</h2>
+          </span>
+          <span class="fig"><b>1</b><span>not submitted</span></span>
+          <span class="age">
+            <span class="bar"><i class="wk" style="flex:1"></i></span>
+            <span class="key"><span><b>1</b> this week</span></span>
+          </span>
+          <span class="go">Carry on writing <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+        </a>
+
+      </div>
+    </main>
+
+    <aside class="side">
+      <section class="panel">
+        <h2>Since Friday</h2>
+        <ul class="feed">
+          <li class="rel">
+            <span class="num">Q6637021-74-ST-DSW-00001 rev B</span>
+            <span class="said">was released at IFC</span>
+            <span class="ago">Document Control · 2 hours ago</span>
+          </li>
+          <li class="dec">
+            <span class="num">Q6637021-74-ME-CAL-00002 rev B</span>
+            <span class="said">came back to its author</span>
+            <span class="ago">Lead Engineer · yesterday</span>
+          </li>
+          <li class="out">
+            <span class="num">Q6637021-75-CI-SPC-00001 rev B</span>
+            <span class="said">went out for review</span>
+            <span class="ago">Administrator · yesterday</span>
+          </li>
+          <li class="new">
+            <span class="num">TR-0031</span>
+            <span class="said">arrived from ONEE, 6 documents</span>
+            <span class="ago">Document Control · Friday</span>
+          </li>
+        </ul>
+        <a class="more" href="#">Everything that happened →</a>
+      </section>
+
+      <section class="panel sched">
+        <h2>Schedule</h2>
+        <a href="#"><span class="row1"><span class="c">A-1420</span><span class="w late">overdue</span></span><span class="nm">Pump house mechanical installation</span></a>
+        <a href="#"><span class="row1"><span class="c">A-1615</span><span class="w">14 Oct</span></span><span class="nm">Clarifier concrete pour and curing</span></a>
+        <a href="#"><span class="row1"><span class="c">A-1702</span><span class="w">19 Oct</span></span><span class="nm">Blower house handover to commissioning</span></a>
+        <a class="more" href="#">The whole schedule →</a>
+      </section>
+
+      <section class="panel">
+        <h2>Register</h2>
+        <div class="line"><span>Clean</span><b>19%</b></div>
+        <div class="meter"><i style="width:19%"></i></div>
+        <p class="note">32 documents · checked 5 days ago</p>
+        <p class="note warn">6 critical issues open</p>
+        <a class="more" href="#">See what is wrong →</a>
+      </section>
+    </aside>
+  </div>
+</div>
+
+<div id="tw">
+  <select onchange="document.documentElement.dataset.theme=this.value">
+    <option value="">light</option><option value="dark">dark</option></select>
+</div>
+</body>
+</html>

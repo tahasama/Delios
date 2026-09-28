@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DELIOS — Home v9</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Tokens from src/app/theme.css only. Content column; the app's sidebar is not
+   drawn here.
+
+   The idea: nothing to read. Every line is a document number, a tag and a verb,
+   in the same three places every time, so the eye lands rather than reads. The
+   work is on the left, the project's state on the right, and no sentence runs
+   longer than a glance. */
+:root{
+  --surface:#ffffff; --canvas:#eceff4; --canvas-deep:#e2e7ee;
+  --line:#d7dde6; --line-strong:#bcc6d4;
+  --brand:#1e3a5f; --brand-hover:#2d5480; --brand-line:#3b6389; --brand-ink:#1e3a5f;
+  --link:#2b5b80; --tint:#e4eef7; --tint-soft:#f2f6fb;
+  --slate-300:#cbd5e1; --slate-400:#94a3b8; --slate-500:#64748b; --slate-600:#475569; --slate-700:#334155; --slate-900:#0f172a;
+  --amber-700:oklch(55.5% 0.163 48.998); --amber-bg:oklch(96.2% 0.059 95.617);
+  --sky-700:oklch(50% 0.134 242.749); --sky-bg:oklch(95.1% 0.026 236.824);
+  --emerald-700:oklch(50.8% 0.118 165.612); --emerald-bg:oklch(95% 0.052 163.051);
+  --violet-700:oklch(49.1% 0.27 292.581); --violet-bg:oklch(94.3% 0.029 294.588);
+  --sans:"IBM Plex Sans",ui-sans-serif,system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,monospace;
+  --ease:cubic-bezier(.2,.6,.3,1);
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --surface:#111823; --canvas:#0a0f17; --canvas-deep:#070b12;
+  --line:#273245; --line-strong:#37455c;
+  --brand:#2f5e8e; --brand-hover:#3a70a6; --brand-line:#5f8fbf; --brand-ink:#c6d9ec;
+  --link:#8db8de; --tint:#1a2a3c; --tint-soft:#152131;
+  --slate-300:#3a475c; --slate-400:#64738a; --slate-500:#8795a9; --slate-600:#a2adbd; --slate-700:#c0c9d5; --slate-900:#e9edf2;
+  --amber-700:oklch(87.9% 0.169 91.605); --amber-bg:oklch(28% 0.06 80);
+  --sky-700:oklch(82.8% 0.111 230.318); --sky-bg:oklch(27% 0.05 235);
+  --emerald-700:oklch(84.5% 0.143 164.978); --emerald-bg:oklch(26% 0.05 163);
+  --violet-700:oklch(81.1% 0.111 293.571); --violet-bg:oklch(27% 0.06 293);
+}}
+:root[data-theme="dark"]{
+  --surface:#111823; --canvas:#0a0f17; --canvas-deep:#070b12;
+  --line:#273245; --line-strong:#37455c;
+  --brand:#2f5e8e; --brand-hover:#3a70a6; --brand-line:#5f8fbf; --brand-ink:#c6d9ec;
+  --link:#8db8de; --tint:#1a2a3c; --tint-soft:#152131;
+  --slate-300:#3a475c; --slate-400:#64738a; --slate-500:#8795a9; --slate-600:#a2adbd; --slate-700:#c0c9d5; --slate-900:#e9edf2;
+  --amber-700:oklch(87.9% 0.169 91.605); --amber-bg:oklch(28% 0.06 80);
+  --sky-700:oklch(82.8% 0.111 230.318); --sky-bg:oklch(27% 0.05 235);
+  --emerald-700:oklch(84.5% 0.143 164.978); --emerald-bg:oklch(26% 0.05 163);
+  --violet-700:oklch(81.1% 0.111 293.571); --violet-bg:oklch(27% 0.06 293);
+}
+
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--canvas);color:var(--slate-900);font-family:var(--sans);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+:focus-visible{outline:2px solid var(--brand-line);outline-offset:2px;border-radius:5px}
+.col{max-width:1180px;margin:0 auto;padding:26px 22px 80px}
+@media(max-width:700px){.col{padding:18px 14px 56px}}
+
+/* ── Head: who, where, and the one button ───────────────────────────────── */
+.head{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:18px}
+.head h1{margin:0;font-size:19px;font-weight:600;letter-spacing:-.01em}
+.head .sub{margin:2px 0 0;font-size:12.5px;color:var(--slate-500)}
+.head .sub b{font-weight:600;color:var(--slate-700)}
+.make{display:inline-flex;align-items:center;gap:7px;background:var(--brand);color:#fff;border-radius:7px;
+  padding:8px 14px;font-size:13px;font-weight:600;white-space:nowrap;transition:background .2s var(--ease)}
+.make:hover{background:var(--brand-hover)}
+.make svg{width:15px;height:15px}
+
+/* ── Two columns: the work, and the project ─────────────────────────────── */
+.grid{display:grid;gap:16px;grid-template-columns:minmax(0,1fr)}
+@media(min-width:1000px){.grid{grid-template-columns:minmax(0,1fr) 296px;align-items:start}}
+
+/* ── A queue: header bar, then rows of three fixed places ───────────────── */
+.queue{background:var(--surface);border:1px solid var(--line);border-radius:11px;overflow:hidden;margin-bottom:14px}
+.queue > header{display:flex;align-items:center;gap:9px;padding:11px 16px;border-bottom:1px solid var(--line);background:var(--tint-soft)}
+.queue > header svg{width:15px;height:15px;color:var(--brand-line);flex:none}
+.queue > header h2{margin:0;font-size:13px;font-weight:600;letter-spacing:.005em}
+.queue > header .count{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--slate-500);
+  background:var(--surface);border:1px solid var(--line);border-radius:99px;padding:0 7px;line-height:18px}
+.queue > header .all{margin-left:auto;font-size:12px;font-weight:600;color:var(--link)}
+.queue > header .all:hover{text-decoration:underline}
+
+.r{display:grid;grid-template-columns:minmax(0,1fr) auto auto auto;align-items:center;gap:12px;
+  padding:11px 16px;border-bottom:1px solid var(--line);transition:background .16s var(--ease)}
+.r:last-child{border-bottom:0}
+.r:hover{background:var(--tint-soft)}
+.r .id{min-width:0}
+.r .n{display:block;font-family:var(--mono);font-size:13px;font-weight:600;color:var(--slate-900);white-space:nowrap}
+.r .n em{font-style:normal;font-weight:400;color:var(--slate-400);margin-left:7px}
+.r .t{display:block;margin-top:1px;font-size:12.5px;color:var(--slate-500);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tag{font-family:var(--mono);font-size:11.5px;font-weight:600;border-radius:5px;padding:2px 7px;white-space:nowrap}
+.tag.amber{background:var(--amber-bg);color:var(--amber-700)}
+.tag.sky{background:var(--sky-bg);color:var(--sky-700)}
+.tag.emerald{background:var(--emerald-bg);color:var(--emerald-700)}
+.tag.violet{background:var(--violet-bg);color:var(--violet-700)}
+.tag.plain{background:var(--canvas-deep);color:var(--slate-600)}
+.r .age{font-family:var(--mono);font-size:12px;color:var(--slate-400);white-space:nowrap;text-align:right;min-width:46px;font-variant-numeric:tabular-nums}
+.r .age.old{color:var(--amber-700);font-weight:600}
+.go{display:inline-block;border:1px solid var(--line-strong);border-radius:7px;padding:5px 11px;
+  font-size:12.5px;font-weight:600;color:var(--brand-ink);white-space:nowrap;transition:background .18s var(--ease),border-color .18s var(--ease)}
+.r:hover .go{background:var(--tint);border-color:var(--brand-line)}
+@media(max-width:620px){
+  .r{grid-template-columns:minmax(0,1fr) auto;row-gap:8px}
+  .r .id{grid-column:1/-1} .r .age{text-align:left;margin-left:auto}
+}
+
+/* ── Small stuff, one line each ─────────────────────────────────────────── */
+.minor{background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:4px 16px 8px}
+.minor h2{margin:0;padding:9px 0 7px;font-size:11px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--slate-400)}
+.minor a{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--line);font-size:13px;color:var(--slate-600)}
+.minor a:hover{color:var(--slate-900)}
+.minor a .n{margin-left:auto;font-family:var(--mono);font-size:12px;color:var(--slate-400)}
+
+/* ── Right: the project, at a glance ────────────────────────────────────── */
+.side{display:grid;gap:14px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:14px 16px}
+.panel h2{margin:0 0 10px;font-size:11px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--slate-400)}
+.stat{display:flex;align-items:baseline;gap:10px;padding:6px 0}
+.stat + .stat{border-top:1px solid var(--line)}
+.stat .v{font-family:var(--mono);font-size:17px;font-weight:600;min-width:30px;font-variant-numeric:tabular-nums}
+.stat .k{font-size:13px;color:var(--slate-600)}
+.stat .w{margin-left:auto;font-size:11.5px;color:var(--slate-400);white-space:nowrap}
+.stat.warn .v{color:var(--amber-700)}
+
+.bar{height:5px;border-radius:99px;background:var(--canvas-deep);overflow:hidden;margin:9px 0 7px}
+.bar i{display:block;height:100%;border-radius:99px;background:var(--brand-line)}
+.panel .line{display:flex;align-items:baseline;justify-content:space-between;gap:10px;font-size:13px;color:var(--slate-600)}
+.panel .line b{font-family:var(--mono);font-size:15px;font-weight:600;color:var(--slate-900)}
+.panel .note{margin:6px 0 0;font-size:12px;color:var(--slate-400)}
+.panel .note.warn{color:var(--amber-700)}
+.panel .more{display:inline-block;margin-top:10px;font-size:12px;font-weight:600;color:var(--link)}
+.panel .more:hover{text-decoration:underline}
+.sched{display:flex;align-items:baseline;gap:9px;padding:7px 0;font-size:13px;color:var(--slate-600)}
+.sched + .sched{border-top:1px solid var(--line)}
+.sched .c{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--link)}
+.sched .nm{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sched .w{margin-left:auto;font-family:var(--mono);font-size:11.5px;color:var(--slate-400);white-space:nowrap}
+.sched .w.late{color:var(--amber-700);font-weight:600}
+
+#tw{position:fixed;right:18px;bottom:18px;z-index:50;font-size:13px}
+#tw button.open{background:var(--surface);border:1px solid var(--line-strong);color:var(--slate-500);border-radius:99px;padding:7px 14px;font-family:var(--sans);font-size:12.5px;cursor:pointer}
+#tw .panel2{display:none;background:var(--surface);border:1px solid var(--line-strong);border-radius:10px;padding:15px;width:236px}
+#tw.on .panel2{display:block} #tw.on button.open{display:none}
+#tw label{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:0 0 10px;color:var(--slate-600);font-size:13px}
+#tw select{font-family:var(--sans);font-size:13px;padding:4px 7px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--slate-900)}
+#tw .close{background:none;border:0;color:var(--link);font-weight:600;cursor:pointer;padding:0;font-size:13px}
+body[data-role="author"] .control-only{display:none}
+@media (prefers-reduced-motion: reduce){*{transition:none!important}}
+</style>
+</head>
+<body data-role="control">
+<div class="col">
+
+  <header class="head">
+    <div>
+      <h1>Good morning, Taha.</h1>
+      <p class="sub"><b>6</b> waiting on you · <b>3</b> need you today · Q6637021 Thermal piping</p>
+    </div>
+    <a class="make" href="#">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+      Create document
+    </a>
+  </header>
+
+  <div class="grid">
+    <main>
+
+      <section class="queue">
+        <header>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+          <h2>Decide</h2><span class="count">2</span>
+        </header>
+        <div class="r">
+          <span class="id">
+            <span class="n">Q6637021-71-ST-DSW-00001 <em>rev B</em></span>
+            <span class="t">Clarifier TK-201 — structural foundation drawing</span>
+          </span>
+          <span class="tag sky">binding</span>
+          <span class="age old">6d</span>
+          <a class="go" href="#">Decide</a>
+        </div>
+        <div class="r">
+          <span class="id">
+            <span class="n">Q6637021-70-CI-DSW-00001 <em>rev C</em></span>
+            <span class="t">Feed pump bay P-101/P-102 — civil site works</span>
+          </span>
+          <span class="tag sky">binding</span>
+          <span class="age">2d</span>
+          <a class="go" href="#">Decide</a>
+        </div>
+      </section>
+
+      <section class="queue control-only">
+        <header>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v5H4z"/><path d="M4 13h16v7H4z"/><path d="M8 17h4"/></svg>
+          <h2>Release or send back</h2><span class="count">3</span>
+        </header>
+        <div class="r">
+          <span class="id">
+            <span class="n">Q6637021-74-ME-CAL-00002 <em>rev B</em></span>
+            <span class="t">Pump house ventilation — heat emission calculation</span>
+          </span>
+          <span class="tag amber">C3</span>
+          <span class="age old">11d</span>
+          <a class="go" href="#">Send back</a>
+        </div>
+        <div class="r">
+          <span class="id">
+            <span class="n">Q6637021-74-ST-DSW-00001 <em>rev B</em></span>
+            <span class="t">Non-process building 74 — reinforcement arrangement</span>
+          </span>
+          <span class="tag emerald">IFC</span>
+          <span class="age">3d</span>
+          <a class="go" href="#">Release</a>
+        </div>
+        <div class="r">
+          <span class="id">
+            <span class="n">Q6637021-73-WW-MAN-00001 <em>rev C</em></span>
+            <span class="t">Aeration blower BL-301 — operation and maintenance</span>
+          </span>
+          <span class="tag emerald">IFI</span>
+          <span class="age">today</span>
+          <a class="go" href="#">Release</a>
+        </div>
+      </section>
+
+      <section class="queue control-only">
+        <header>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4z"/></svg>
+          <h2>Released, never sent</h2><span class="count">2</span>
+          <a class="all" href="#">All</a>
+        </header>
+        <div class="r">
+          <span class="id">
+            <span class="n">Q6637021-72-AR-DSW-00001 <em>rev A</em></span>
+            <span class="t">Site protection 72 — architectural finishes</span>
+          </span>
+          <span class="tag violet">AFC</span>
+          <span class="age old">8d</span>
+          <a class="go" href="#">Ask to send</a>
+        </div>
+        <div class="r">
+          <span class="id">
+            <span class="n">Q6637021-75-CI-SPC-00001 <em>rev B</em></span>
+            <span class="t">Water tower WT-401 — concrete and reinforcement spec</span>
+          </span>
+          <span class="tag violet">IFC</span>
+          <span class="age">1d</span>
+          <a class="go" href="#">Ask to send</a>
+        </div>
+      </section>
+
+      <section class="minor">
+        <h2>Also yours</h2>
+        <a href="#">Advice on a review<span class="n">1</span></a>
+        <a href="#">Received, to check<span class="n">2</span></a>
+        <a href="#">Document requirements<span class="n">2</span></a>
+        <a href="#">Your drafts<span class="n">1</span></a>
+      </section>
+
+    </main>
+
+    <aside class="side">
+      <section class="panel">
+        <h2>This week</h2>
+        <div class="stat"><span class="v">7</span><span class="k">released</span><span class="w">+2 on last week</span></div>
+        <div class="stat"><span class="v">4</span><span class="k">in review</span><span class="w">2 with you</span></div>
+        <div class="stat warn"><span class="v">3</span><span class="k">sent back</span><span class="w">new revisions due</span></div>
+      </section>
+
+      <section class="panel">
+        <h2>Schedule</h2>
+        <div class="sched"><span class="c">A-1420</span><span class="nm">Pump house installation</span><span class="w late">overdue</span></div>
+        <div class="sched"><span class="c">A-1615</span><span class="nm">Clarifier concrete pour</span><span class="w">14 Oct</span></div>
+        <div class="sched"><span class="c">A-1702</span><span class="nm">Blower house handover</span><span class="w">19 Oct</span></div>
+        <a class="more" href="#">The whole schedule →</a>
+      </section>
+
+      <section class="panel control-only">
+        <h2>Register</h2>
+        <div class="line"><span>Clean</span><b>94%</b></div>
+        <div class="bar"><i style="width:94%"></i></div>
+        <p class="note">1 284 documents · checked 6 days ago</p>
+        <p class="note warn">2 critical issues open</p>
+        <a class="more" href="#">See what is wrong →</a>
+      </section>
+    </aside>
+  </div>
+</div>
+
+<div id="tw">
+  <button class="open" onclick="tw.classList.add('on')">Tweaks</button>
+  <div class="panel2">
+    <label>Signed in as<select onchange="document.body.dataset.role=this.value">
+      <option value="control">Document Control</option><option value="author">Author</option></select></label>
+    <label>Theme<select onchange="document.documentElement.dataset.theme=this.value">
+      <option value="">system</option><option value="light">light</option><option value="dark">dark</option></select></label>
+    <button class="close" onclick="tw.classList.remove('on')">close</button>
+  </div>
+</div>
+</body>
+</html>

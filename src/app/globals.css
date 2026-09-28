@@ -124,8 +124,8 @@ summary::-webkit-details-marker {
   .plate-title {
     font-weight: 600;
     letter-spacing: -0.03em;
-    font-size: clamp(1.5rem, 1.1rem + 1.4vw, 2.1rem);
-    line-height: 1.05;
+    font-size: clamp(1.25rem, 1rem + 0.9vw, 1.6rem);
+    line-height: 1.1;
   }
   .plate-figure {
     display: block;
@@ -240,6 +240,17 @@ summary::-webkit-details-marker {
     opacity: 0.75;
   }
 
+  /* Receipt: one dot per recipient, filled when they opened it. A row of dots
+     is read before any sentence about who has seen what. */
+  .register .seen-dot {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    border: 1px solid var(--color-slate-400);
+  }
+  .register .seen-on { background: var(--color-brand-line); border-color: var(--color-brand-line); }
+
   /* An active filter, removable, reading as a fact rather than a control. */
   .facet {
     display: inline-flex;
@@ -296,6 +307,121 @@ summary::-webkit-details-marker {
     .register .rail::before, .register tbody > tr { transition: none; }
   }
 }
+
+@layer components {
+  /* ── Home: the greeting band ───────────────────────────────────────────────
+     The one place in the product that is not paper. Navy, because that is the
+     brand, with a single soft light in the corner; the numbers sit on a
+     hairline beneath the greeting. Everything here is decoration in service of
+     one question — how do I stand — so it is kept to a gradient, a rule and a
+     light that drifts too slowly to notice. */
+  .home-band {
+    position: relative;
+    overflow: hidden;
+    border-radius: 14px;
+    color: #ffffff;
+    background: linear-gradient(115deg, var(--color-brand-strong) 0%, var(--color-brand) 58%, var(--color-brand-hover) 140%);
+  }
+  .home-band::after {
+    content: "";
+    position: absolute;
+    inset: auto -80px -170px auto;
+    width: 420px;
+    height: 420px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(122, 176, 224, 0.22), transparent 68%);
+    pointer-events: none;
+  }
+  :root.dark .home-band::after { background: radial-gradient(circle, rgba(95, 143, 191, 0.18), transparent 68%); }
+  .home-band > * { position: relative; }
+  .home-rule { border-color: rgba(255, 255, 255, 0.18); }
+  .home-soft { color: rgba(255, 255, 255, 0.72); }
+  .home-faint { color: rgba(255, 255, 255, 0.5); }
+
+  /* One pass of light across the band when the page arrives, then never again. */
+  .home-sheen {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 22%;
+    pointer-events: none;
+    background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.14), transparent);
+    animation: home-sheen 1500ms cubic-bezier(0.2, 0.6, 0.3, 1) 320ms both;
+  }
+  .home-band::after { animation: home-drift 22s cubic-bezier(0.2, 0.6, 0.3, 1) infinite alternate; }
+
+  /* The page arrives in reading order: band, then each panel, once. */
+  .home-rise { animation: home-rise 500ms cubic-bezier(0.2, 0.6, 0.3, 1) both; animation-delay: var(--d, 0ms); }
+
+  @keyframes home-rise { from { opacity: 0; transform: translateY(9px); } to { opacity: 1; transform: none; } }
+  @keyframes home-sheen { from { transform: translateX(-120%) skewX(-18deg); } to { transform: translateX(320%) skewX(-18deg); } }
+  @keyframes home-drift { from { transform: translate3d(0, 0, 0) scale(1); } to { transform: translate3d(-26px, -14px, 0) scale(1.08); } }
+
+
+  /* The age bar fills once, left to right, so a card reads as it settles. */
+  .home-fill { transform-origin: left center; animation: home-fill 640ms cubic-bezier(0.2, 0.6, 0.3, 1) 420ms both; }
+  @keyframes home-fill { from { transform: scaleX(0); opacity: 0; } to { transform: scaleX(1); opacity: 1; } }
+
+  @media (prefers-reduced-motion: reduce) {
+    .home-rise, .home-fill, .home-band::after { animation: none; }
+    .home-sheen { display: none; }
+  }
+
+  /* ── Home: the aspect control ─────────────────────────────────────────────
+     One sunken track holding every aspect, with the open one lifted out of it
+     on paper. It reads as a single instrument rather than ten buttons, and the
+     count beside each name turns amber when something in it has waited a week,
+     so the control itself says where the trouble is. */
+  .home-seg {
+    display: flex;
+    gap: 0.125rem;
+    padding: 0.25rem;
+    border-radius: 0.75rem;
+    background: var(--color-canvas-deep);
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  :root.dark .home-seg { background: color-mix(in srgb, var(--color-canvas-deep) 60%, var(--color-surface)); }
+  .home-seg::-webkit-scrollbar { display: none; }
+  .home-segment {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    white-space: nowrap;
+    border-radius: 0.55rem;
+    padding: 0.4rem 0.75rem;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--color-slate-500);
+    transition: color 160ms, background-color 160ms, box-shadow 160ms;
+  }
+  .home-segment:hover { color: var(--color-slate-900); }
+  .home-segment[aria-current="page"] {
+    background: var(--color-surface);
+    color: var(--color-slate-900);
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.1), 0 1px 1px rgba(15, 23, 42, 0.06);
+  }
+  .home-segment-n {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.25rem;
+    min-width: 1.25rem;
+    text-align: center;
+    border-radius: 99px;
+    padding: 0 0.3rem;
+    background: color-mix(in srgb, var(--color-slate-400) 22%, transparent);
+    color: var(--color-slate-600);
+  }
+  .home-segment[aria-current="page"] .home-segment-n { background: var(--color-tint); color: var(--color-brand-ink); }
+  .home-segment-n.home-segment-late {
+    background: color-mix(in srgb, var(--color-amber-500) 26%, transparent);
+    color: var(--color-amber-700);
+  }
+}
+
 
 @media print {
   .no-print {
@@ -422,6 +548,256 @@ summary::-webkit-details-marker {
     transition: background-color 120ms, color 120ms;
   }
   .dt-tool:hover, .dt-tool[aria-expanded="true"], .dt-tool[aria-pressed="true"] { background: var(--color-slate-100); color: var(--color-slate-800); }
+}
+
+/* ── The dispatch log ──────────────────────────────────────────────────────
+   Transmittals are not rows of data, they are letters with documents attached:
+   somebody sent something to somebody on a day, and somebody is expected to do
+   something about it. So this screen is drawn as correspondence rather than as
+   a register — paper rather than grid, a serif for what a person wrote, a
+   postmark rather than a status pill, and the day itself as the organising
+   line. Everything is scoped to .dispatch, so the register keeps its own
+   vocabulary and the two can be compared side by side. */
+@layer components {
+  .dispatch {
+    --paper: #ffffff;
+    --paper-edge: #e4e7ec;
+    --ink: #101828;
+    --ink-soft: #5a6478;
+    --ink-faint: #98a1b2;
+    /* Direction is the one thing colour is spent on: indigo left our hands,
+       teal arrived in them. Everything else is graphite. */
+    --out: #4338ca;
+    --in: #0f766e;
+    --seal: #b42318;
+    --keep: #067647;
+    font-feature-settings: "liga" 1, "kern" 1;
+  }
+  .dark .dispatch {
+    --paper: #0f1218;
+    --paper-edge: #232936;
+    --ink: #e7eaf0;
+    --ink-soft: #97a1b2;
+    --ink-faint: #667186;
+    --out: #a5b4fc;
+    --in: #5eead4;
+    --seal: #fda29b;
+    --keep: #6ee7b7;
+  }
+
+  /* The masthead of a log book: what this is, on the paper it is kept on. */
+  .dispatch-head {
+    background: var(--paper);
+    border: 1px solid var(--paper-edge);
+    border-radius: 3px;
+  }
+  .dispatch-title {
+    font-family: var(--font-serif), Georgia, serif;
+    font-weight: 500;
+    font-size: clamp(1.7rem, 1.2rem + 1.6vw, 2.4rem);
+    line-height: 1.05;
+    letter-spacing: -0.015em;
+    color: var(--ink);
+  }
+  .dispatch-lede {
+    font-family: var(--font-serif), Georgia, serif;
+    font-size: 15px;
+    line-height: 1.5;
+    color: var(--ink-soft);
+  }
+
+  /* The day. Correspondence is filed by the day it moved, so the day is a rule
+     across the page and not a column somebody has to sort. */
+  .day-rule {
+    display: flex;
+    align-items: baseline;
+    gap: 0.75rem;
+    color: var(--ink-faint);
+  }
+  .day-rule::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: var(--paper-edge);
+  }
+  .day-name {
+    font-family: var(--font-serif), Georgia, serif;
+    font-size: 15px;
+    font-style: italic;
+    color: var(--ink-soft);
+  }
+
+  /* One dispatch: a slip of paper with a coloured edge saying which way it
+     went, and everything a person needs before deciding to open it. */
+  .slip {
+    position: relative;
+    display: block;
+    background: var(--paper);
+    border: 1px solid var(--paper-edge);
+    border-left: 3px solid var(--edge, var(--ink-faint));
+    border-radius: 3px;
+    padding: 0.85rem 1rem 0.8rem 1.1rem;
+    transition: border-color 140ms, box-shadow 140ms, transform 140ms;
+  }
+  .slip:hover {
+    border-color: var(--edge, var(--ink-faint));
+    box-shadow: 0 1px 0 var(--paper-edge), 0 10px 24px -18px rgb(0 0 0 / 55%);
+    transform: translateY(-1px);
+  }
+  .slip-out { --edge: var(--out); }
+  .slip-in { --edge: var(--in); }
+  .slip-draft { --edge: var(--ink-faint); border-left-style: dashed; }
+
+  .slip-number {
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    color: var(--edge, var(--ink));
+  }
+  .slip-subject {
+    font-family: var(--font-serif), Georgia, serif;
+    font-size: 17px;
+    line-height: 1.3;
+    color: var(--ink);
+  }
+  .slip-note {
+    font-size: 12px;
+    color: var(--ink-soft);
+  }
+  .slip-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+
+  /* The route, drawn rather than written: who sent it, the line it travelled,
+     and who has it now. */
+  .route {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+    font-size: 12.5px;
+    color: var(--ink-soft);
+  }
+  .route-line {
+    position: relative;
+    display: inline-block;
+    flex: none;
+    width: 2.4rem;
+    height: 1px;
+    background: var(--edge, var(--ink-faint));
+    opacity: 0.55;
+  }
+  .route-line::after {
+    content: "";
+    position: absolute;
+    right: 0;
+    top: -2.5px;
+    border-left: 5px solid var(--edge, var(--ink-faint));
+    border-top: 3px solid transparent;
+    border-bottom: 3px solid transparent;
+  }
+  .route-party { font-weight: 500; color: var(--ink); }
+
+  /* The postmark: struck on, slightly off square, never a coloured pill. */
+  .postmark {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    transform: rotate(-2deg);
+    border: 1.5px solid currentColor;
+    border-radius: 2px;
+    padding: 0.1rem 0.4rem;
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    opacity: 0.85;
+  }
+  .mark-draft { color: var(--ink-faint); border-style: dashed; }
+  .mark-sent { color: var(--out); }
+  .mark-check { color: var(--in); }
+  .mark-accepted { color: var(--keep); }
+  .mark-rejected { color: var(--seal); }
+  .mark-closed { color: var(--ink-faint); }
+
+  /* Receipt: one dot per recipient, filled when they opened it. A row of dots
+     is read before any sentence about who has seen what. */
+  .dot {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    border: 1px solid var(--edge, var(--ink-faint));
+  }
+  .dot-on { background: var(--edge, var(--ink-faint)); }
+
+  /* A reply that is owed, and how near it is. */
+  .due-soon { color: var(--in); }
+  .due-late { color: var(--seal); font-weight: 600; }
+
+  /* The log as a table. It is a register, so it is a grid — but a register of
+     correspondence, so it keeps the paper, the serif and the postmark, and the
+     direction is a coloured mark at the head of the row rather than a word. */
+  .dispatch .dt { background: transparent; }
+  .dispatch .dt-th {
+    font-family: var(--font-serif), Georgia, serif;
+    font-size: 12px;
+    font-weight: 500;
+    font-style: italic;
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--ink-soft);
+    border-bottom: 1px solid var(--paper-edge);
+    padding-block: 0.5rem;
+  }
+  .dispatch .dt-td {
+    border-bottom: 1px solid color-mix(in srgb, var(--paper-edge) 60%, transparent);
+    padding-block: 0.5rem;
+    vertical-align: middle;
+    color: var(--ink);
+  }
+  .dispatch tbody > tr:hover > .dt-td { background: color-mix(in srgb, var(--paper-edge) 28%, transparent); }
+  .dispatch .dt-bar { background: transparent; border-bottom-color: var(--paper-edge); }
+  .dispatch .slip-subject { font-size: 14.5px; line-height: 1.25; }
+  .dispatch .slip-number { font-size: 12px; color: var(--edge, var(--ink)); }
+
+  /* Which way it went, as the row's own colour. */
+  .dispatch tr.way-out { --edge: var(--out); }
+  .dispatch tr.way-in { --edge: var(--in); }
+  .dispatch .way { color: var(--edge, var(--ink-faint)); padding-left: 0.6rem !important; }
+
+  /* The filing rail: which part of the log you are reading. */
+  .file-tab {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.75rem;
+    border-left: 2px solid transparent;
+    padding: 0.4rem 0.6rem;
+    font-size: 13px;
+    color: var(--ink-soft);
+    transition: border-color 120ms, color 120ms, background-color 120ms;
+  }
+  .file-tab:hover { color: var(--ink); background: color-mix(in srgb, var(--paper-edge) 35%, transparent); }
+  .file-tab[aria-current="page"] {
+    border-left-color: var(--out);
+    color: var(--ink);
+    font-weight: 600;
+    background: color-mix(in srgb, var(--paper-edge) 45%, transparent);
+  }
+  .file-count {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink-faint);
+  }
+  .file-tab[aria-current="page"] .file-count { color: var(--ink-soft); }
 }
 
 @media print {

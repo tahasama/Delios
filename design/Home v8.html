@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DELIOS — Home v8</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;450;500;600&display=swap" rel="stylesheet">
+<style>
+/* Tokens from src/app/theme.css only. This is the CONTENT COLUMN — the app's
+   own sidebar sits to the left and is not drawn here.
+
+   The idea: a working page, not a scoreboard. No large red numbers, no wall of
+   counters. One sentence says how the day stands; the few things that are
+   actually yours are set as rows you can read; everything else waits quietly
+   below in one line each. Colour is spent on one thing only — the action. */
+:root{
+  --surface:#ffffff; --canvas:#eceff4;
+  --line:#d7dde6; --line-strong:#bcc6d4;
+  --brand:#1e3a5f; --brand-hover:#2d5480; --brand-line:#3b6389; --brand-ink:#1e3a5f;
+  --link:#2b5b80; --tint:#e4eef7; --tint-soft:#f2f6fb;
+  --slate-400:#94a3b8; --slate-500:#64748b; --slate-600:#475569; --slate-700:#334155; --slate-900:#0f172a;
+  --amber-700:oklch(55.5% 0.163 48.998);
+  --red-700:oklch(50.5% 0.213 27.518);
+  --emerald-600:oklch(59.6% 0.145 163.225);
+  --sans:"IBM Plex Sans",ui-sans-serif,system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,monospace;
+  --ease:cubic-bezier(.2,.6,.3,1);
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --surface:#111823; --canvas:#0a0f17;
+  --line:#273245; --line-strong:#37455c;
+  --brand:#2f5e8e; --brand-hover:#3a70a6; --brand-line:#5f8fbf; --brand-ink:#c6d9ec;
+  --link:#8db8de; --tint:#1a2a3c; --tint-soft:#152131;
+  --slate-400:#64738a; --slate-500:#8795a9; --slate-600:#a2adbd; --slate-700:#c0c9d5; --slate-900:#e9edf2;
+  --amber-700:oklch(82.8% 0.153 76.5); --red-700:oklch(80.8% 0.114 19.571); --emerald-600:oklch(79.6% 0.15 162.48);
+}}
+:root[data-theme="dark"]{
+  --surface:#111823; --canvas:#0a0f17;
+  --line:#273245; --line-strong:#37455c;
+  --brand:#2f5e8e; --brand-hover:#3a70a6; --brand-line:#5f8fbf; --brand-ink:#c6d9ec;
+  --link:#8db8de; --tint:#1a2a3c; --tint-soft:#152131;
+  --slate-400:#64738a; --slate-500:#8795a9; --slate-600:#a2adbd; --slate-700:#c0c9d5; --slate-900:#e9edf2;
+  --amber-700:oklch(82.8% 0.153 76.5); --red-700:oklch(80.8% 0.114 19.571); --emerald-600:oklch(79.6% 0.15 162.48);
+}
+
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  background:var(--canvas);color:var(--slate-900);font-family:var(--sans);
+  font-size:15px;line-height:1.55;text-wrap:pretty;-webkit-font-smoothing:antialiased;
+}
+a{color:inherit;text-decoration:none}
+:focus-visible{outline:2px solid var(--brand-line);outline-offset:2px;border-radius:4px}
+.col{max-width:980px;margin:0 auto;padding:34px 24px 88px}
+@media(max-width:700px){.col{padding:24px 16px 64px}}
+
+/* ── The opening: a date, a greeting, one sentence of standing ──────────── */
+.top{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap}
+.date{
+  font-family:var(--mono);font-size:11px;font-weight:500;letter-spacing:.13em;
+  text-transform:uppercase;color:var(--slate-400);margin:0 0 8px;
+}
+h1{margin:0;font-size:25px;font-weight:600;letter-spacing:-.012em;line-height:1.25}
+.standing{margin:7px 0 0;font-size:15px;color:var(--slate-600);max-width:56ch}
+.standing b{font-weight:600;color:var(--slate-900)}
+.standing .quiet{color:var(--slate-400)}
+.make{
+  display:inline-flex;align-items:center;gap:8px;background:var(--brand);color:#fff;
+  border-radius:8px;padding:9px 15px;font-size:13.5px;font-weight:600;white-space:nowrap;
+  transition:background .2s var(--ease);
+}
+.make:hover{background:var(--brand-hover)}
+.make svg{width:15px;height:15px}
+
+/* ── Yours now. One panel, roomy rows, one action each. ─────────────────── */
+.yours{margin-top:26px;background:var(--surface);border:1px solid var(--line);border-radius:12px}
+.yours > h2{
+  margin:0;padding:15px 22px 13px;font-size:12px;font-weight:600;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--slate-500);border-bottom:1px solid var(--line);
+}
+.item{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px;align-items:center;
+  padding:17px 22px;border-bottom:1px solid var(--line);transition:background .18s var(--ease)}
+.item:last-child{border-bottom:0}
+.item:hover{background:var(--tint-soft)}
+.item .ask{margin:0;font-size:15px;color:var(--slate-700);line-height:1.5}
+.item .ask b{font-weight:600;color:var(--slate-900)}
+.item .num{font-family:var(--mono);font-size:14px;font-weight:600;color:var(--slate-900)}
+.item .num .rev{font-weight:400;color:var(--slate-500)}
+.item .code{font-family:var(--mono);font-weight:600;color:var(--slate-900)}
+.item .ttl{
+  display:block;margin-top:3px;font-size:13px;color:var(--slate-500);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:62ch;
+}
+.item .when{margin-top:5px;font-size:12.5px;color:var(--slate-400);display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.item .when .late{color:var(--amber-700);font-weight:500}
+.item .when .dot{width:3px;height:3px;border-radius:99px;background:currentColor;opacity:.5}
+.do{
+  display:inline-block;border:1px solid var(--line-strong);border-radius:8px;
+  padding:7px 14px;font-size:13.5px;font-weight:600;color:var(--brand-ink);white-space:nowrap;
+  transition:background .2s var(--ease),border-color .2s var(--ease);
+}
+.item:hover .do{background:var(--tint);border-color:var(--brand-line)}
+
+/* Clear day */
+.clear{display:flex;gap:13px;align-items:flex-start;padding:26px 22px;color:var(--slate-500);font-size:14.5px}
+.clear svg{width:19px;height:19px;color:var(--emerald-600);flex:none;margin-top:1px}
+
+/* ── Everything else: one line per kind, no counters shouting ───────────── */
+.rest{margin-top:30px}
+.rest h2{
+  margin:0 0 4px;font-size:12px;font-weight:600;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--slate-500);
+}
+.rest ul{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:0 32px;grid-template-columns:1fr}
+@media(min-width:660px){.rest ul{grid-template-columns:1fr 1fr}}
+.rest li{border-top:1px solid var(--line)}
+.rest a{display:flex;align-items:baseline;gap:10px;padding:10px 2px;font-size:14px;color:var(--slate-600);transition:color .18s var(--ease)}
+.rest a:hover{color:var(--slate-900)}
+.rest a .n{margin-left:auto;font-family:var(--mono);font-size:13px;color:var(--slate-400);font-variant-numeric:tabular-nums}
+.rest a .arrow{color:var(--slate-300,var(--slate-400));opacity:0;transition:opacity .18s var(--ease)}
+.rest a:hover .arrow{opacity:1;color:var(--link)}
+
+/* ── Two facts at the foot. Sentences, not gauges. ──────────────────────── */
+.facts{margin-top:34px;display:grid;gap:14px;grid-template-columns:1fr}
+@media(min-width:760px){.facts{grid-template-columns:1fr 1fr}}
+.fact{
+  background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px 18px;
+  transition:border-color .2s var(--ease);
+}
+.fact:hover{border-color:var(--line-strong)}
+.fact h3{margin:0 0 3px;font-size:13px;font-weight:600;color:var(--slate-900)}
+.fact p{margin:0;font-size:13.5px;color:var(--slate-500);line-height:1.5}
+.fact p .amber{color:var(--amber-700);font-weight:500}
+.fact ul{list-style:none;margin:9px 0 0;padding:0}
+.fact li{display:flex;gap:10px;align-items:baseline;padding:6px 0 0;font-size:13.5px;color:var(--slate-600)}
+.fact li .c{font-family:var(--mono);font-size:12.5px;font-weight:600;color:var(--link)}
+.fact li .w{margin-left:auto;font-family:var(--mono);font-size:12.5px;color:var(--slate-400);white-space:nowrap}
+.fact li .w.late{color:var(--amber-700)}
+.fact .more{display:inline-block;margin-top:11px;font-size:12.5px;font-weight:600;color:var(--link)}
+.fact .more:hover{text-decoration:underline}
+
+#tw{position:fixed;right:20px;bottom:20px;z-index:50;font-size:13px}
+#tw button.open{background:var(--surface);border:1px solid var(--line-strong);color:var(--slate-500);border-radius:99px;padding:8px 15px;font-family:var(--sans);font-size:12.5px;cursor:pointer}
+#tw button.open:hover{color:var(--slate-900)}
+#tw .panel{display:none;background:var(--surface);border:1px solid var(--line-strong);border-radius:10px;padding:16px;width:244px}
+#tw.on .panel{display:block} #tw.on button.open{display:none}
+#tw label{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:0 0 10px;color:var(--slate-600);font-size:13px}
+#tw select{font-family:var(--sans);font-size:13px;padding:4px 7px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--slate-900)}
+#tw .close{background:none;border:0;color:var(--link);font-weight:600;cursor:pointer;padding:0;font-size:13px}
+body[data-role="author"] .control-only{display:none}
+body[data-role="author"] .author-only{display:block}
+.author-only{display:none}
+@media (prefers-reduced-motion: reduce){*{transition:none!important}}
+</style>
+</head>
+<body data-role="control">
+<div class="col">
+
+  <header class="top">
+    <div>
+      <p class="date">Monday 28 September · Q6637021 Thermal piping</p>
+      <h1>Good morning, Taha.</h1>
+      <p class="standing">
+        <b>Three</b> things are yours to do today, the oldest since <b>17 September</b>.
+        <span class="quiet">Nine more are moving on their own.</span>
+      </p>
+    </div>
+    <a class="make" href="#">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+      Create document
+    </a>
+  </header>
+
+  <section class="yours" aria-labelledby="yours-h">
+    <h2 id="yours-h">Yours to do</h2>
+
+    <div class="item">
+      <div>
+        <p class="ask">
+          <b>Send it back.</b> The lead asked for changes, so
+          <span class="num">Q6637021-74-ME-CAL-00002 <span class="rev">rev B</span></span>
+          waits on you before its author can start rev C.
+        </p>
+        <span class="ttl">Pump house ventilation — heat emission calculation</span>
+        <p class="when"><span>decided 17 September</span><span class="dot"></span><span class="late">11 days here</span></p>
+      </div>
+      <a class="do" href="#">Send back</a>
+    </div>
+
+    <div class="item">
+      <div>
+        <p class="ask">
+          <b>Give the verdict</b> on
+          <span class="num">Q6637021-71-ST-DSW-00001 <span class="rev">rev B</span></span>.
+          Two reviewers have answered; yours settles it.
+        </p>
+        <span class="ttl">Clarifier TK-201 — structural foundation drawing</span>
+        <p class="when"><span>with you since 22 September</span><span class="dot"></span><span>6 days</span></p>
+      </div>
+      <a class="do" href="#">Decide</a>
+    </div>
+
+    <div class="item">
+      <div>
+        <p class="ask">
+          <b>Release</b> <span class="num">Q6637021-74-ST-DSW-00001 <span class="rev">rev B</span></span>
+          at <span class="code">IFC</span>. The route settled it and nobody may build from it until you do.
+        </p>
+        <span class="ttl">Non-process building 74 — reinforcement arrangement</span>
+        <p class="when"><span>decided 25 September</span><span class="dot"></span><span>3 days</span></p>
+      </div>
+      <a class="do" href="#">Release</a>
+    </div>
+  </section>
+
+  <section class="rest">
+    <h2>Also waiting, when you have a moment</h2>
+    <ul>
+      <li><a href="#">Advice on a review<span class="n">1</span><span class="arrow">→</span></a></li>
+      <li><a href="#">Ready to release<span class="n">1</span><span class="arrow">→</span></a></li>
+      <li><a href="#">Released, never sent<span class="n">2</span><span class="arrow">→</span></a></li>
+      <li><a href="#">Received, to check<span class="n">2</span><span class="arrow">→</span></a></li>
+      <li><a href="#">Your drafts<span class="n">1</span><span class="arrow">→</span></a></li>
+      <li><a href="#">Document requirements<span class="n">2</span><span class="arrow">→</span></a></li>
+    </ul>
+  </section>
+
+  <section class="facts">
+    <div class="fact">
+      <h3>The schedule</h3>
+      <p>Two activities will not have all their documents in time.</p>
+      <ul>
+        <li><span class="c">A-1420</span> Pump house mechanical installation <span class="w late">overdue</span></li>
+        <li><span class="c">A-1615</span> Clarifier concrete pour <span class="w">14 Oct</span></li>
+      </ul>
+      <a class="more" href="#">The whole schedule →</a>
+    </div>
+
+    <div class="fact control-only">
+      <h3>The register</h3>
+      <p><b>94% clean</b>, last checked six days ago. <span class="amber">Two critical issues are open.</span></p>
+      <a class="more" href="#">See what is wrong →</a>
+    </div>
+
+    <div class="fact author-only">
+      <h3>Your documents</h3>
+      <p>Eleven in the register, two in review, one draft. Nothing of yours is overdue.</p>
+      <a class="more" href="#">Your register →</a>
+    </div>
+  </section>
+</div>
+
+<div id="tw">
+  <button class="open" onclick="tw.classList.add('on')">Tweaks</button>
+  <div class="panel">
+    <label>Signed in as<select onchange="document.body.dataset.role=this.value">
+      <option value="control">Document Control</option><option value="author">Author</option></select></label>
+    <label>Theme<select onchange="document.documentElement.dataset.theme=this.value">
+      <option value="">system</option><option value="light">light</option><option value="dark">dark</option></select></label>
+    <button class="close" onclick="tw.classList.remove('on')">close</button>
+  </div>
+</div>
+</body>
+</html>
