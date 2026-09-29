@@ -1,3 +1,4 @@
+import { readyReading, countingRevision, meetsRequirement } from "@/lib/readiness";
 import Link from "next/link";
 import { requireScope } from "@/lib/scope";
 import { notFound } from "next/navigation";
@@ -5,7 +6,7 @@ import { PageHeader, Card, Chip, DataTable, Th, Td, Banner, inputCls, btn } from
 import { ActionForm } from "@/components/form";
 import { confirmReadinessAction } from "@/lib/actions/requirements";
 import { clearance } from "@/lib/requirements-process";
-import { departmentsOf, DEFAULT_LEAD_BUSINESS_DAYS, businessDaysBefore } from "@/lib/schedule";
+import { departmentsOf, DEFAULT_LEAD_DAYS, daysBefore } from "@/lib/schedule";
 import { shortfall } from "@/lib/risk-notice";
 import { Timeline } from "@/components/timeline";
 import { fmtDate } from "@/lib/utils";
@@ -22,10 +23,13 @@ export default async function ActionDetailPage({ params, searchParams }: { param
   const { db } = ctx;
   const { code } = await params;
   const { dept } = await searchParams;
+  // What counts as delivered is the project's answer, and it decides which
+  // revision of each document is worth loading at all.
+  const reading = await readyReading(ctx);
   const action = await db.action.findFirst({
     where: { code },
     include: {
-      entries: { include: { document: { include: { revisions: { where: { state: "RELEASED" }, orderBy: { releasedAt: "desc" }, take: 1 } } } }, orderBy: [{ department: "asc" }, { requiredBy: "asc" }] },
+      entries: { include: { document: { include: { revisions: countingRevision(reading) } } } , orderBy: [{ department: "asc" }, { requiredBy: "asc" }] },
       scheduleActivities: { include: { scheduleVersion: true }, orderBy: { scheduleVersion: { importedAt: "desc" } }, take: 1 },
       confirmations: true,
     },
@@ -48,9 +52,9 @@ export default async function ActionDetailPage({ params, searchParams }: { param
   const me = await db.projectMembership.findFirst({ where: { projectId: ctx.projectId, userId: ctx.user.id, active: true } });
   const clear = clearance(action);
   // Confirmation opens with the review window: from submit-by to the activity.
-  const confirmOpens = action.scheduledDate ? businessDaysBefore(action.scheduledDate, DEFAULT_LEAD_BUSINESS_DAYS) : null;
+  const confirmOpens = action.scheduledDate ? daysBefore(action.scheduledDate, DEFAULT_LEAD_DAYS) : null;
   const entries = dept ? action.entries.filter((e) => e.department === dept) : action.entries;
-  const readyCount = action.entries.filter((e) => e.document.revisions[0]?.statusCode === e.requiredStatus).length;
+  const readyCount = action.entries.filter((e) => meetsRequirement(e.document.revisions, e.requiredStatus)).length;
   const overdue = action.scheduledDate && new Date(action.scheduledDate) < new Date();
   // The earliest date a document is owed: where the activity's own clock starts.
   const firstDue = action.entries.map((e) => e.requiredBy).filter(Boolean).sort((a, b) => a.getTime() - b.getTime())[0] ?? null;
@@ -145,7 +149,7 @@ export default async function ActionDetailPage({ params, searchParams }: { param
           <DataTable head={<tr><Th>Document</Th><Th>Department</Th><Th>From</Th><Th>Approved by</Th><Th>Needed at</Th><Th>Submit by</Th><Th>Has</Th><Th>Ready</Th></tr>}>
             {entries.map((e) => {
               const cur = e.document.revisions[0];
-              const ready = cur?.statusCode === e.requiredStatus;
+              const ready = meetsRequirement(e.document.revisions, e.requiredStatus);
               const late = !ready && e.requiredBy < new Date();
               return (
                 <tr key={e.id}>
@@ -156,7 +160,7 @@ export default async function ActionDetailPage({ params, searchParams }: { param
                   <Td className="text-xs">{e.requiredStatus}</Td>
                   <Td className="whitespace-nowrap text-xs">
                     <span className={late ? "font-semibold text-red-700" : ""}>{fmtDate(e.requiredBy)}</span>
-                    <span className="block text-[10px] text-slate-400">{e.manualDate ? "fixed date" : `${e.leadBusinessDays ?? DEFAULT_LEAD_BUSINESS_DAYS} working days before`}</span>
+                    <span className="block text-[10px] text-slate-400">{e.manualDate ? "fixed date" : `${e.leadBusinessDays ?? DEFAULT_LEAD_DAYS} days before`}</span>
                   </Td>
                   <Td className="text-xs">{cur ? `rev ${cur.value} · ${cur.statusCode}` : e.document.isPlaceholder ? "not started" : "not released"}</Td>
                   <Td>{ready ? <Chip className="bg-emerald-100 text-emerald-800 ring-emerald-300">yes</Chip> : <Chip className={late ? "bg-red-100 text-red-800 ring-red-300" : "bg-amber-100 text-amber-800 ring-amber-300"}>{late ? "late" : "no"}</Chip>}</Td>
@@ -182,7 +186,7 @@ export default async function ActionDetailPage({ params, searchParams }: { param
               const mine = me?.department === d || control;
               // Requirements listed before departments existed count against every department.
               const deptEntries = action.entries.filter((e) => e.department === d || !e.department);
-              const missing = deptEntries.filter((e) => e.document.revisions[0]?.statusCode !== e.requiredStatus);
+              const missing = deptEntries.filter((e) => !meetsRequirement(e.document.revisions, e.requiredStatus));
               return (
                 <li key={d} className="flex flex-wrap items-start justify-between gap-3 py-2.5">
                   <div className="min-w-0">

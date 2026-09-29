@@ -1,3 +1,4 @@
+import { heldVerbs } from "@/lib/permissions";
 /**
  * Every configuration screen, in one list.
  *
@@ -27,7 +28,8 @@ export type SetupPage = {
 /** Does this person reach this setup page? */
 export function maySetup(user: { verbs?: string[]; role?: string } | null, page: SetupPage): boolean {
   if (!user) return false;
-  const holds = (verb: string) => (user.verbs ?? []).includes(verb) || user.role === "ADMIN";
+  const held = heldVerbs(user);
+  const holds = (verb: string) => held.includes(verb);
   if (holds(page.verb ?? "CONFIGURE")) return true;
   return page.control === true && holds("CONTROL");
 }
@@ -70,9 +72,15 @@ export const SETUP_PAGES: SetupPage[] = [
   {
     href: "/admin/functions",
     title: "Functions & permissions",
-    text: "What each function may do, and the clearance it carries. An administrator’s own function can only be changed by an administrator.",
+    text: "What each function may do. An administrator’s own function can only be changed by an administrator.",
     group: "Access",
     control: true,
+  },
+  {
+    href: "/admin/control",
+    title: "Who does what",
+    text: "For each act — sending a document out, handing a review to somebody else — whether Document Control carries it out or the people doing the work do it themselves.",
+    group: "Access",
   },
   {
     href: "/admin/users",

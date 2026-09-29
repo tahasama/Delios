@@ -1,5 +1,5 @@
 import { registerGate, ok, warn, block, type Gate, type GateContext, type Subject } from "./registry";
-import { ROLE_RANK, isEmptyTitle } from "../standard";
+import { isEmptyTitle } from "../standard";
 
 /**
  * The gates themselves, one per precondition the Standard states.
@@ -207,6 +207,32 @@ const releaseApproval: Gate = {
     return block(
       "No binding verdict lets this revision proceed yet.",
  "Nothing is released until the review's deciding step gives a verdict that proceeds.",
+    );
+  },
+};
+
+/**
+ * Releasing a revision is issuing it, so the question "who receives this?" is
+ * answered before the act, not after it. The gate says so on the screen in the
+ * same words the act refuses with.
+ */
+const releaseIssuance: Gate = {
+  id: "REL-ISSUE",
+  intent: "RELEASE",
+  title: "Somebody has said where it goes",
+  clause: "§11.1",
+  async evaluate(ctx, subject) {
+    if (!subject.revisionId) return block("No revision selected.");
+    const { pendingIssue } = await import("../issue-requests");
+    const { policy } = await import("../control-activities");
+    const together = (await policy(ctx, "POLICY_RELEASE")) === "TOGETHER";
+    const going = await pendingIssue(ctx, subject.revisionId, { recipients: together });
+    if (going.ok) {
+      return ok(together ? "It goes out to the people who were named." : "Nothing is waiting on it.");
+    }
+    return block(
+      going.error.replace(/^Release blocked: /, ""),
+      together ? "Releasing a revision is sending it: the two are one act." : "An approval that was asked for is waited for.",
     );
   },
 };
@@ -570,6 +596,7 @@ const gates: Gate[] = [
   approveSelfReview,
   releaseState,
   releaseApproval,
+  releaseIssuance,
   releaseStatus,
   releaseMetadata,
   issueItems,

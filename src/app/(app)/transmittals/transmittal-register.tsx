@@ -68,6 +68,9 @@ export function TransmittalRegister({ rows, total, filters, filterOptions, expor
   const [pending, startTransition] = useTransition();
   const [order, setOrder] = useState<string[] | null>(null);
   const [frozen, setFrozen] = useState(true);
+  const [selected, setSelected] = useState<string[]>([]);
+  const [allMatching, setAllMatching] = useState(false);
+  const pageSelected = rows.length > 0 && selected.length === rows.length;
   const go = (href: string) => startTransition(() => router.replace(href, { scroll: false }));
 
   // The order somebody dragged their columns into, and whether the number stays
@@ -167,8 +170,8 @@ export function TransmittalRegister({ rows, total, filters, filterOptions, expor
   }
 
 
-  return (
-    <section data-dt-frame className="register border-y border-line bg-surface sm:rounded-sm sm:border-x">
+  return <>
+    <section className="register register-sheet register-sheet-open mb-5">
       {plate}
 
       <form
@@ -180,7 +183,7 @@ export function TransmittalRegister({ rows, total, filters, filterOptions, expor
           for (const [key, value] of data.entries()) if (value) params.set(key, String(value));
           go(`/transmittals${params.size ? `?${params}` : ""}`);
         }}
-        className="filter-bay border-b border-line px-4 py-3.5 sm:px-5"
+        className="asking px-5 py-3.5 pb-5 sm:px-6"
       >
         <div className="flex items-end gap-4">
           <label className="relative min-w-0 flex-1">
@@ -210,8 +213,11 @@ export function TransmittalRegister({ rows, total, filters, filterOptions, expor
         </div>
       </form>
 
+    </section>
+
+    <section data-dt-frame className="register register-sheet">
       {facets.length ? (
-        <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-4 py-1.5 sm:px-5">
+        <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2 sm:px-6">
           <span className="stencil mr-1 text-slate-400">Showing</span>
           {facets.map((facet) => (
             <button key={`${facet.key}-${facet.label}`} type="button" onClick={() => go(facet.without)} className="facet" title="Remove this filter">
@@ -231,6 +237,22 @@ export function TransmittalRegister({ rows, total, filters, filterOptions, expor
         </div>
       ) : null}
 
+      {pageSelected && total > rows.length ? (
+        <div className="flex flex-wrap items-center gap-2 border-b border-line bg-tint px-5 py-2.5 text-xs text-brand-ink sm:px-6">
+          {allMatching ? (
+            <>
+              <span>All <strong className="font-mono">{total.toLocaleString("en-GB")}</strong> transmittals these filters match are selected. Export takes all of them.</span>
+              <button type="button" onClick={() => setAllMatching(false)} className="font-semibold underline underline-offset-2">This page only</button>
+            </>
+          ) : (
+            <>
+              <span>All <strong className="font-mono">{rows.length}</strong> on this page are selected.</span>
+              <button type="button" onClick={() => setAllMatching(true)} className="font-semibold underline underline-offset-2">Select all {total.toLocaleString("en-GB")} these filters match</button>
+            </>
+          )}
+        </div>
+      ) : null}
+
       <div className={pending ? "opacity-60 transition-opacity" : "transition-opacity"}>
         {rows.length ? (
           <DataTable
@@ -242,12 +264,23 @@ export function TransmittalRegister({ rows, total, filters, filterOptions, expor
             forced={forced}
             fill
             tools={
-              <a href={exportHref} className="dt-tool" title="Every column of every row these filters match, as CSV">
+              <a
+                href={allMatching || !selected.length ? exportHref : `/api/export/transmittals?ids=${encodeURIComponent(selected.join(","))}`}
+                className="dt-tool"
+                title={selected.length && !allMatching ? "The transmittals you have ticked, as CSV" : "Every transmittal these filters match, as CSV"}
+              >
                 <Download className="h-3.5 w-3.5" /> Export
               </a>
             }
             head={<tr>
-              <Th className={`${frozen ? "sticky left-0 z-[4]" : ""} w-10`} label="Way" title="Which way it went: out to another party, or in to us" />
+              <Th className={`rail-head ${frozen ? "sticky left-0 z-[4]" : ""} w-10`}>
+                <input
+                  aria-label="Select every transmittal on this page"
+                  type="checkbox"
+                  checked={pageSelected}
+                  onChange={() => { setAllMatching(false); setSelected(pageSelected ? [] : rows.map((row) => row.id)); }}
+                />
+              </Th>
               <Th className={`${frozen ? "sticky left-10 z-[4]" : ""} min-w-[280px]`} label="Transmittal">
                 <span className="inline-flex items-center gap-2">
                   <SortButton label="Number" on={sort?.key === "number" ? sort.dir : null} onClick={() => go(sortHref("number"))} />
@@ -277,21 +310,36 @@ export function TransmittalRegister({ rows, total, filters, filterOptions, expor
               ))}
             </tr>}
           >
-            {rows.map((row) => (
-              <tr key={row.id}>
-                {/* The direction, read before any word in the row. */}
-                <Td className={`rail ${RAIL[row.status] ?? "rail-none"} ${frozen ? "sticky left-0 z-[1]" : ""} whitespace-nowrap bg-surface`}>
-                  {row.outgoing
-                    ? <ArrowUpRight className="h-3.5 w-3.5 text-brand-line" aria-label="Sent" />
-                    : <ArrowDownLeft className="h-3.5 w-3.5 text-amber-600" aria-label="Received" />}
+            {rows.map((row) => {
+              const on = selected.includes(row.id);
+              return (
+              <tr key={row.id} className={on ? "[&>td]:bg-tint" : undefined}>
+                <Td className={`rail ${RAIL[row.status] ?? "rail-none"} ${frozen ? "sticky left-0 z-[1]" : ""} ${on ? "bg-tint" : "bg-surface"}`}>
+                  <input
+                    aria-label={`Select ${row.number}`}
+                    type="checkbox"
+                    checked={on}
+                    onChange={() => {
+                      setAllMatching(false);
+                      setSelected((held) => held.includes(row.id) ? held.filter((one) => one !== row.id) : [...held, row.id]);
+                    }}
+                  />
                 </Td>
                 <Td className={`${frozen ? "sticky left-10 z-[1]" : ""} min-w-[280px] bg-surface`}>
-                  <Link href={`/transmittals/${row.id}`} className="whitespace-nowrap font-mono text-xs font-semibold tracking-tight text-link hover:underline">{row.number}</Link>
+                  {/* The direction is read before any word in the row, so it sits
+                      with the number rather than in a column of its own. */}
+                  <span className="flex items-baseline gap-2">
+                    {row.outgoing
+                      ? <ArrowUpRight className="h-3.5 w-3.5 shrink-0 self-center text-brand-line" aria-label="Sent" />
+                      : <ArrowDownLeft className="h-3.5 w-3.5 shrink-0 self-center text-amber-600" aria-label="Received" />}
+                    <Link href={`/transmittals/${row.id}`} className="whitespace-nowrap font-mono text-xs font-semibold tracking-tight text-link hover:underline">{row.number}</Link>
+                  </span>
                   {row.subject ? <p className="mt-0.5 block truncate text-[13px] text-slate-800" title={row.subject}>{row.subject}</p> : null}
                 </Td>
                 {columns.map((column) => <Td key={column.key} className={column.cellClass}>{column.cell(row, reasonNotes)}</Td>)}
               </tr>
-            ))}
+              );
+            })}
           </DataTable>
         ) : (
           <div className="px-6 py-20 text-center">
@@ -303,7 +351,7 @@ export function TransmittalRegister({ rows, total, filters, filterOptions, expor
       </div>
 
       {paging && total > 0 ? (
-        <div data-dt-foot className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 border-t border-line px-4 py-2 sm:px-5">
+        <div data-dt-foot className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 border-t border-line px-5 py-2.5 sm:px-6">
           <p className="font-mono text-[11px] tabular-nums text-slate-500">
             {paging.from.toLocaleString("en-GB")}–{paging.to.toLocaleString("en-GB")}
             <span className="ml-1.5 font-sans text-slate-400">of {total.toLocaleString("en-GB")}</span>
@@ -324,7 +372,7 @@ export function TransmittalRegister({ rows, total, filters, filterOptions, expor
         </div>
       ) : null}
     </section>
-  );
+  </>;
 }
 
 // ── The columns, in the order they start in ─────────────────────────────────

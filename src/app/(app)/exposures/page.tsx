@@ -6,6 +6,7 @@ import { ActionForm } from "@/components/form";
 import { EXPOSURES } from "@/lib/standard";
 import { recordVoidReassessmentAction } from "@/lib/actions/revisions";
 import { untoldRecipients, sendCurrentLink } from "@/lib/supersession";
+import { haltedWhere } from "@/lib/halted";
 import { AssuranceTabs } from "@/app/(app)/conformance/tabs";
 
 export const dynamic = "force-dynamic";
@@ -24,8 +25,11 @@ export default async function ExposuresPage() {
     // Only revisions someone received and was never told about (§12.3).
     untoldRecipients(ctx),
     db.revision.findMany({
-      where: { state: "RELEASED", cycles: { some: { comments: { some: { progressionPreventing: true, status: "OPEN" } } } } },
-      include: { document: true, cycles: { include: { comments: { where: { progressionPreventing: true, status: "OPEN" } } } } },
+      where: await haltedWhere(ctx),
+      include: {
+        document: true,
+        cycles: { where: { binding: true, outcome: { not: null } }, orderBy: { outcomeAt: "desc" }, take: 1 },
+      },
     }),
     db.baselineEntry.findMany({ where: { document: { state: "WITHDRAWN" } }, include: { document: true, action: true } }),
     db.revision.findMany({ where: { state: "VOID", voidReassessment: null }, include: { document: true } }),
@@ -83,7 +87,10 @@ export default async function ExposuresPage() {
                 <span className="text-sm">
                   <Link href={`/documents/${r.documentId}`} className="font-mono font-semibold text-brand-ink hover:underline">{r.document.docNumber}</Link>
                   <span className="ml-1.5 font-mono text-xs">rev {r.value}</span>
-                  <span className="block text-xs text-slate-400">{r.cycles.reduce((a, c) => a + c.comments.length, 0)} blocking comment(s) open — do not work from it</span>
+                  <span className="block text-xs text-slate-400">
+                    {r.cycles[0]?.outcomeByName ? `${r.cycles[0].outcomeByName} decided ` : "Decided "}
+                    {r.cycles[0]?.outcome ?? "—"} — do not work from it
+                  </span>
                 </span>
               </li>
             ))}

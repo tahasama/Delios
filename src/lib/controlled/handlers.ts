@@ -214,37 +214,47 @@ const distributionMatrix: Handler = {
 
 type ActivityRow = {
   externalId: string;
-  /** The scheduler's own code, or empty — the system then assigns A00001, A00002… */
+  /** The code the system issued, or empty — it then assigns A00001, A00002… */
   actionCode: string;
   name: string;
-  baselineDate: string | null;
-  forecastDate: string | null;
+  description: string | null;
+  date: string | null;
   responsibleParty: string | null;
 };
 
+/**
+ * What a schedule has to say: which activity, what it is, and when it happens.
+ * Nothing about the planning tool: every tool exports these four things.
+ */
 const SCHEDULE_COLUMNS = [
-  "Activity ID",
+  "Activity Code",
   "Action Code",
   "Activity Name",
-  "Baseline Date",
-  "Forecast Date",
+  "Activity Description",
+  "Date",
   "Responsible Party",
 ];
+
+/** What the same columns used to be called, so an older file still uploads. */
+const SCHEDULE_ALIASES = {
+  "Activity Code": ["Activity ID"],
+  Date: ["Forecast Date", "Baseline Date", "Activity Date"],
+};
 
 const schedule: Handler = {
   kind: "SCHEDULE",
   title: "Project schedule",
   blurb:
-    "The activities the project must be ready for. Action Code: leave it empty for a new activity — the system assigns the next code (A00001, A00002…) and keeps it for that Activity ID; after approval, download what is in force and put the codes into your schedule. Departments are not given here — the project manager tags them in the departments list. A new version moves the activity dates, and every needed-by date follows.",
+    "The activities the project must be ready for. Activity Code: your own code from whatever tool you plan in. Action Code: leave it empty for a new activity — the system assigns the next code (A00001, A00002…) and keeps it for that activity; after approval, download what is in force and put the codes back into your programme. Activity Description is optional. Date is the day the activity happens, as YYYY-MM-DD. Departments are not given here — the project manager tags them in the departments list. A new version moves the activity dates, and every needed-by date follows.",
   clause: "§14.2 · §14.6",
   level: "PROJECT",
   columns: SCHEDULE_COLUMNS,
-  sample: ["P6-1010", "", "Foundation concrete pour — clarifier", "2026-09-14", "2026-09-21", "Civil contractor"],
+  sample: ["1010", "", "Foundation concrete pour — clarifier", "Clarifier TK-201, area 71", "2026-09-21", "Civil contractor"],
   approverHint: "Document Control",
 
   async parse(t, rows): Promise<ParseResult> {
-    const required = ["Activity ID", "Activity Name", "Baseline Date", "Forecast Date"];
-    const { index, missing } = headerIndex(rows, required);
+    const required = ["Activity Code", "Activity Name", "Date"];
+    const { index, missing } = headerIndex(rows, required, SCHEDULE_ALIASES);
     if (missing.length) {
       return { ok: false, issues: [{ line: 1, message: `Missing column(s): ${missing.join(", ")}. Download the template and keep its header row.` }] };
     }
@@ -260,21 +270,19 @@ const schedule: Handler = {
       const row = rows[i];
       if (row.every((c) => !c.trim())) continue;
 
-      const externalId = cell(row, index, "Activity ID");
+      const externalId = cell(row, index, "Activity Code");
       const actionCode = cell(row, index, "Action Code").toUpperCase();
       const name = cell(row, index, "Activity Name");
-      const baselineRaw = cell(row, index, "Baseline Date");
-      const forecastRaw = cell(row, index, "Forecast Date");
+      const dateRaw = cell(row, index, "Date");
       const errors: string[] = [];
 
-      if (!externalId) errors.push("Activity ID is missing");
-      else if (ids.has(externalId)) errors.push(`Activity ID ${externalId} is duplicated`);
+      if (!externalId) errors.push("Activity Code is missing");
+      else if (ids.has(externalId)) errors.push(`Activity Code ${externalId} is duplicated`);
       if (actionCode && !issued.has(actionCode)) errors.push(`Action Code ${actionCode} was never issued by the system — leave it empty for a new activity`);
  else if (actionCode && codes.has(actionCode)) errors.push(`Action Code ${actionCode} is duplicated — an action code is assigned once`);
       if (!name) errors.push("Activity Name is missing");
-      if (!baselineRaw && !forecastRaw) errors.push("Baseline Date or Forecast Date is required");
-      if (baselineRaw && !parseDate(baselineRaw)) errors.push("Baseline Date must be YYYY-MM-DD");
-      if (forecastRaw && !parseDate(forecastRaw)) errors.push("Forecast Date must be YYYY-MM-DD");
+      if (!dateRaw) errors.push("Date is missing");
+      else if (!parseDate(dateRaw)) errors.push("Date must be YYYY-MM-DD");
 
       if (externalId) ids.add(externalId);
       if (actionCode) codes.add(actionCode);
@@ -288,8 +296,8 @@ const schedule: Handler = {
         externalId,
         actionCode,
         name,
-        baselineDate: baselineRaw || null,
-        forecastDate: forecastRaw || null,
+        description: cell(row, index, "Activity Description") || null,
+        date: dateRaw || null,
         responsibleParty: cell(row, index, "Responsible Party") || null,
       });
     }
@@ -306,8 +314,8 @@ const schedule: Handler = {
       externalId: a.scheduleRef ?? a.code,
       actionCode: a.code,
       name: a.name,
-      baselineDate: null,
-      forecastDate: a.scheduledDate ? a.scheduledDate.toISOString().slice(0, 10) : null,
+      description: a.description,
+      date: a.scheduledDate ? a.scheduledDate.toISOString().slice(0, 10) : null,
       responsibleParty: a.ownerName,
     }));
   },
@@ -319,7 +327,7 @@ const schedule: Handler = {
       current as ActivityRow[],
       next as ActivityRow[],
       (a) => a.externalId,
-      (a) => `${a.name} · ${a.forecastDate ?? a.baselineDate ?? "no date"}`,
+      (a) => `${a.name} · ${a.date ?? "no date"}`,
     );
   },
 
@@ -336,7 +344,7 @@ const schedule: Handler = {
 
     const resolved: (ActivityRow & { actionId: string; code: string })[] = [];
     for (const row of rows) {
-      const effective = parseDate(row.forecastDate ?? "") ?? parseDate(row.baselineDate ?? "");
+      const effective = parseDate(row.date ?? "");
       // The same activity keeps its action — found by its code, or by its Activity ID.
       const existing = row.actionCode
         ? await t.db.action.findFirst({ where: { code: row.actionCode } })
@@ -344,7 +352,7 @@ const schedule: Handler = {
       if (existing) {
         await t.db.action.update({
           where: { id: existing.id },
-          data: { name: row.name, scheduledDate: effective, ownerName: row.responsibleParty, scheduleRef: row.externalId },
+          data: { name: row.name, description: row.description, scheduledDate: effective, ownerName: row.responsibleParty, scheduleRef: row.externalId },
         });
         resolved.push({ ...row, actionId: existing.id, code: existing.code });
         updated++;
@@ -353,14 +361,14 @@ const schedule: Handler = {
         const code = row.actionCode || (await nextActionCode(t));
         if (!row.actionCode) assigned++;
         const action = await t.db.action.create({
-          data: { projectId: t.projectId, code, name: row.name, scheduledDate: effective, ownerName: row.responsibleParty, scheduleRef: row.externalId },
+          data: { projectId: t.projectId, code, name: row.name, description: row.description, scheduledDate: effective, ownerName: row.responsibleParty, scheduleRef: row.externalId },
         });
         resolved.push({ ...row, actionId: action.id, code });
         created++;
       }
     }
 
-    // Needed-by dates follow their activity (default five working weeks before).
+    // Needed-by dates follow their activity (seven days before, by default).
     const redated = await redateRequirements(t);
 
     await t.db.scheduleVersion.create({
@@ -378,8 +386,11 @@ const schedule: Handler = {
             externalId: row.externalId,
             actionCode: row.code,
             name: row.name,
-            baselineDate: parseDate(row.baselineDate ?? ""),
-            forecastDate: parseDate(row.forecastDate ?? ""),
+            // One date per activity. The version keeps it as both the date it
+            // was published with and the date in force, so a later version can
+            // still be compared against what this one said.
+            baselineDate: parseDate(row.date ?? ""),
+            forecastDate: parseDate(row.date ?? ""),
             responsibleParty: row.responsibleParty,
             actionId: row.actionId,
           })),

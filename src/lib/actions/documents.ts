@@ -1,5 +1,6 @@
 "use server";
 
+import { carrierRefusal } from "@/lib/control-activities";
 import { startWorkflowRun } from "@/lib/workflow";
 import { redirect } from "next/navigation";
 import { requireScope } from "@/lib/scope";
@@ -281,8 +282,13 @@ export async function unlinkRelationshipAction(formData: FormData) {
 export async function endDocumentStateAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
   const ctx = await requireScope();
   const { user, db, projectId, orgId } = ctx;
-  if (!isController(user) && !isAdmin(user)) return { error: "Only the control function may take a document out of use (Part 12)." };
   const documentId = String(formData.get("documentId") ?? "");
+  const registered = await db.document.findUnique({ where: { id: documentId }, select: { createdById: true } });
+  const cannotWithdraw = await carrierRefusal(ctx, "WITHDRAW", {
+    control: isController(user) || isAdmin(user),
+    standing: registered?.createdById === user.id,
+  });
+  if (cannotWithdraw) return { error: cannotWithdraw };
   const kind = String(formData.get("kind") ?? "") as "WITHDRAWN" | "CANCELLED" | "ARCHIVED";
   const reason = String(formData.get("reason") ?? "").trim();
  if (!reason) return { error: "A reason is required — each end state is recorded with date and authority." };

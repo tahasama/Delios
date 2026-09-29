@@ -1,0 +1,633 @@
+"use client";
+
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState, useTransition } from "react";
+import { ArrowDown, ArrowRight, ArrowUp, ArrowUpDown, CalendarRange, ChevronDown, ChevronLeft, ChevronRight, Download, Pin, PinOff, Rows3, Search, X } from "lucide-react";
+import { DataTable, Th, Td, Chip, Info } from "@/components/ui";
+import { DateWindow } from "@/components/date-window";
+
+/**
+ * The schedule, asked about once and answered two ways.
+ *
+ * One sheet holds the question — the search, the narrowing choices, the window
+ * of days — and under it either the plan drawn as bars or the same actions as a
+ * table. They are two views of one answer, not two pages, so the filters are
+ * asked for once and both obey them.
+ */
+export type PlanTableRow = {
+  id: string;
+  code: string;
+  name: string;
+  description: string | null;
+  owner: string | null;
+  departments: string[];
+  date: string | null;
+  when: string;
+  late: boolean;
+  readiness: "DONE" | "READY" | "AT_RISK" | "NOT_READY" | "UPCOMING" | "UNKNOWN";
+  ready: number;
+  total: number;
+  nextNeeded: string | null;
+  nextOverdue: boolean;
+  missing: { docNumber: string; status: string }[];
+  confirmed: string;
+  confirmedTone: "good" | "bad" | "plain";
+};
+
+type Opt = { code: string; label: string };
+
+export function PlanRegister({
+  plate, uploads, view, plan, more, rows, total, filters, filterOptions, facets, paging, sort, exportHref,
+}: {
+  plate: React.ReactNode;
+  /** The three uploads the schedule rests on, shown with the title they belong to. */
+  uploads: React.ReactNode;
+  /** Which of the two views is showing. */
+  view: "plan" | "table";
+  /** The plan, drawn by the server component, shown under the question. */
+  plan: React.ReactNode;
+  /** How much of the plan is drawn, where the rest is, and the days it covers. */
+  more?: {
+    shown: number;
+    total: number;
+    /** How many more it draws at a time, and the ways to change that. */
+    step: number;
+    steps: { by: number; href: string }[];
+    href: string | null;
+    /** The days the plan is drawn across, and the address that widens or narrows it. */
+    window: { label: string; href: string; wide: boolean; elsewhere: number } | null;
+  };
+  rows: PlanTableRow[];
+  total: number;
+  filters: { q: string; state: string; discipline: string; docType: string; supplier: string; code: string; on: string; from: string; to: string };
+  filterOptions: { states: Opt[]; disciplines: Opt[]; types: Opt[]; suppliers: Opt[]; codes: Opt[]; dateFields: Opt[] };
+  facets: { key: string; label: string; without: string }[];
+  paging: { page: number; pages: number; perPage: number; sizes: number[]; from: number; to: number; query: string };
+  sort?: { key: string; dir: "asc" | "desc" };
+  exportHref: string;
+}) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const [selected, setSelected] = useState<string[]>([]);
+  const [allMatching, setAllMatching] = useState(false);
+  const [order, setOrder] = useState<string[] | null>(null);
+  const [frozen, setFrozen] = useState(true);
+
+  // The order somebody dragged their columns into is this browser's business.
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(ORDER_KEY);
+      if (raw) setOrder(JSON.parse(raw) as string[]);
+      setFrozen(localStorage.getItem(FREEZE_KEY) !== "0");
+    } catch {}
+  }, []);
+  const columns = useMemo(() => {
+    if (!order) return COLUMNS;
+    const byKey = new Map(COLUMNS.map((column) => [column.key, column]));
+    const moved = order.map((key) => byKey.get(key)).filter((column): column is Column => !!column);
+    return [...moved, ...COLUMNS.filter((column) => !order.includes(column.key))];
+  }, [order]);
+  const remember = (keys: string[]) => {
+    setOrder(keys);
+    try { localStorage.setItem(ORDER_KEY, JSON.stringify(keys)); } catch {}
+  };
+  /** Drop one column where another sits, by name — the menu's drag. */
+  const moveTo = (label: string, before: string) => {
+    const keys = columns.map((column) => column.key);
+    const from = columns.findIndex((column) => column.label === label);
+    const at = columns.findIndex((column) => column.label === before);
+    if (from < 0 || at < 0 || from === at) return;
+    const next = keys.filter((_, i) => i !== from);
+    next.splice(at, 0, keys[from]);
+    remember(next);
+  };
+  /** Move a column one place, by its name as the column menu prints it. */
+  const move = (label: string, by: -1 | 1) => {
+    const keys = columns.map((column) => column.key);
+    const from = columns.findIndex((column) => column.label === label);
+    const to = from + by;
+    if (from < 0 || to < 0 || to >= keys.length) return;
+    const next = [...keys];
+    [next[from], next[to]] = [next[to], next[from]];
+    remember(next);
+  };
+
+  const go = (href: string) => startTransition(() => router.replace(href, { scroll: false }));
+  const here = (params: URLSearchParams) => `/actions${params.size ? `?${params}` : ""}`;
+
+  /** The same question, ordered by another column. */
+  const sortHref = (key: string) => {
+    const params = new URLSearchParams(paging.query);
+    if (sort?.key !== key) { params.set("sort", key); params.set("dir", "asc"); }
+    else if (sort.dir === "asc") { params.set("sort", key); params.set("dir", "desc"); }
+    else { params.delete("sort"); params.delete("dir"); }
+    params.delete("page");
+    return here(params);
+  };
+  const viewHref = (next: "plan" | "table") => {
+    const params = new URLSearchParams(paging.query);
+    if (next === "table") params.set("view", "table");
+    else params.delete("view");
+    params.delete("page");
+    return here(params);
+  };
+  const step = (to: number) => {
+    const params = new URLSearchParams(paging.query);
+    if (to > 1) params.set("page", String(to));
+    else params.delete("page");
+    return here(params);
+  };
+  const sized = (per: number) => {
+    const params = new URLSearchParams(paging.query);
+    params.set("per", String(per));
+    params.delete("page");
+    return here(params);
+  };
+
+  const pageSelected = rows.length > 0 && selected.length === rows.length;
+  const selectedExportHref = allMatching || !selected.length ? exportHref : `/api/export/baseline?ids=${encodeURIComponent(selected.join(","))}`;
+
+  return <>
+    <section className="register register-sheet register-sheet-open mb-4">
+      {plate}
+
+      {/* What the schedule rests on: three uploads, with the title they belong
+          to rather than as a band of their own. */}
+      <div className="border-b border-line px-5 py-3 sm:px-6">{uploads}</div>
+
+      <form
+        action="/actions"
+        onSubmit={(event) => {
+          event.preventDefault();
+          const data = new FormData(event.currentTarget);
+          const params = new URLSearchParams();
+          if (view === "table") params.set("view", "table");
+          for (const [key, value] of data.entries()) if (value) params.set(key, String(value));
+          go(here(params));
+        }}
+        className="asking px-5 py-3.5 pb-5 sm:px-6"
+      >
+        <div className="flex items-center gap-3">
+          <label className="search-field relative min-w-0 flex-1">
+            <span className="sr-only">Search the schedule</span>
+            <Search className="absolute top-1/2 left-0 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input
+              name="q"
+              defaultValue={filters.q}
+              placeholder={'A space narrows, a comma widens: pour clarifier  ·  A00005, A00012  ·  "switchroom energisation"'}
+              className="plain w-full !py-2 !pl-6 !text-[13.5px]"
+            />
+          </label>
+          <button className="ask" data-on={facets.length ? "true" : "false"} disabled={pending}>
+            {pending ? "Filtering" : "Apply"}
+          </button>
+        </div>
+
+        {/* Every narrowing on one line at the width this page is read at. */}
+        <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3.5 sm:grid-cols-3 lg:grid-cols-6">
+          <Narrow name="code" value={filters.code} empty="Action" options={filterOptions.codes} />
+          <Narrow name="state" value={filters.state} empty="State" options={filterOptions.states} />
+          <Narrow name="discipline" value={filters.discipline} empty="Discipline" options={filterOptions.disciplines} />
+          <Narrow name="docType" value={filters.docType} empty="Type" options={filterOptions.types} />
+          <Narrow name="supplier" value={filters.supplier} empty="Supplier" options={filterOptions.suppliers} />
+          <DateWindow fields={filterOptions.dateFields} on={filters.on} from={filters.from} to={filters.to} />
+        </div>
+      </form>
+    </section>
+
+    {/* The two views stand on their own between the question and the answer.
+        One frame, split down the middle: the chosen side is the lit one, and
+        the other is drawn as the control it is rather than left as plain text. */}
+    <nav className="mb-4 grid grid-cols-2 space overflow-hidden rounded-xl border border-line bg-surface" aria-label="How to look at the schedule">
+      {([
+        { id: "plan", label: "The plan", hint: "drawn on a timeline", icon: CalendarRange },
+        { id: "table", label: "The table", hint: "one line per action", icon: Rows3 },
+      ] as const).map((tab, at) => {
+        const on = view === tab.id;
+        return (
+          <Link
+            key={tab.id}
+            href={viewHref(tab.id)}
+            scroll={false}
+            aria-current={on ? "page" : undefined}
+            className={`group flex items-center justify-center gap-2 px-4 py-3 text-sm font-semibold transition ${
+              at === 0 ? "border-r border-line" : ""
+            } ${
+              on
+                ? "bg-surface text-brand-ink shadow-[inset_0_-3px_0_0_var(--color-brand)]"
+                : "bg-slate-100 text-slate-600 hover:bg-surface hover:text-brand-ink shadow-[inset_0_-3px_0_0_var(--color-brand)]/20"
+            }`}
+          >
+            <tab.icon className="h-4 w-4" />
+            {tab.label}
+            <span className={`hidden text-[11px] font-normal sm:inline ${on ? "text-slate-400" : "text-slate-500"}`}>· {tab.hint}</span>
+            {/* The side you are not on is the one you can go to, so it is the
+                one that carries the arrow. */}
+            {on ? null : <ArrowRight className="h-3.5 w-3.5 text-slate-400 transition group-hover:translate-x-0.5" />}
+          </Link>
+        );
+      })}
+    </nav>
+
+    <section data-dt-frame className="register register-sheet">
+      {facets.length ? (
+        <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2 sm:px-6">
+          <span className="stencil mr-1 text-slate-400">Showing</span>
+          {facets.map((facet) => (
+            <button key={`${facet.key}-${facet.label}`} type="button" onClick={() => go(facet.without)} className="facet" title="Remove this filter">
+              <span className="facet-key">{facet.key}</span>
+              <span className="font-medium">{facet.label}</span>
+              <X className="h-3 w-3" />
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={() => go(view === "table" ? "/actions?view=table" : "/actions")}
+            className="ml-1 inline-flex items-center gap-1 rounded-sm bg-brand px-2 py-1 text-[11px] font-semibold text-white transition-colors hover:bg-brand-hover"
+          >
+            <X className="h-3 w-3" /> Clear all {facets.length}
+          </button>
+          <span className="ml-auto font-mono text-[11px] tabular-nums text-slate-500">{total.toLocaleString("en-GB")} action{total === 1 ? "" : "s"}</span>
+        </div>
+      ) : null}
+
+      {view === "plan" ? (
+        <div className={pending ? "opacity-60 transition-opacity" : "transition-opacity"}>
+          {/* What the plan covers, and what its colours mean: the two things a
+              reader needs before the bars, at the two corners above them. */}
+          <div className="flex items-start justify-between gap-4 px-5 pt-3 sm:px-6">
+            <span className="font-mono text-[11px] tracking-tight text-slate-500 tabular-nums">
+              {more?.window && !more.window.wide ? more.window.label : "Every date in the schedule"}
+            </span>
+            <span
+              className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1 text-[11px] text-slate-500"
+              title="Each bar runs from the day the first document is needed to the day the work happens; the line is today. The colour says whether the register holds every document the action needs, released and at the status it asks for."
+            >
+              {([
+                ["bg-emerald-700", "done"],
+                ["bg-emerald-400", "ready"],
+                ["bg-sky-500", "ahead"],
+                ["bg-amber-500", "at risk"],
+                ["bg-red-500", "overdue"],
+              ] as const).map(([tone, word]) => (
+                <span key={word} className="inline-flex items-center gap-1.5">
+                  <span className={`h-1.5 w-3 rounded-full ${tone}`} />
+                  {word}
+                </span>
+              ))}
+            </span>
+          </div>
+
+          {plan}
+
+          {more && more.total ? (
+            <div data-dt-foot className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 border-t border-line px-5 py-2.5 sm:px-6">
+              {/* How much of the schedule is in front of you, and the way out of
+                  the window — one line, on the left where counts are read. */}
+              <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-slate-500">
+                <span className="font-mono tabular-nums">
+                  {more.shown.toLocaleString("en-GB")}<span className="ml-1 font-sans text-slate-400">of {more.total.toLocaleString("en-GB")}</span>
+                </span>
+                {more.window && more.window.elsewhere ? (
+                  <span className="text-amber-800">· {more.window.elsewhere.toLocaleString("en-GB")} outside these days</span>
+                ) : null}
+                {more.window ? (
+                  <button
+                    type="button"
+                    onClick={() => go(more.window!.href)}
+                    className="rounded-md border border-line bg-surface px-2 py-0.5 font-semibold text-slate-700 transition hover:border-brand-line/50 hover:text-brand-ink"
+                  >
+                    {more.window.wide ? "Back to today" : "Show every date"}
+                  </button>
+                ) : null}
+              </p>
+
+              {more.href ? (
+                <button
+                  type="button"
+                  onClick={() => go(more.href!)}
+                  disabled={pending}
+                  className="inline-flex min-w-48 items-center justify-center gap-1.5 rounded-lg border border-line bg-surface px-5 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-brand-line/50 hover:text-brand-ink disabled:text-slate-400"
+                >
+                  {pending ? "Loading…" : `Load ${Math.min(more.step, more.total - more.shown)} more`}
+                  <ChevronDown className="h-3.5 w-3.5" />
+                </button>
+              ) : <span className="text-[11px] text-slate-400">all of them drawn</span>}
+
+              {/* How many more each press draws. */}
+              <label className="flex items-center justify-end gap-1.5 leading-none">
+                <span className="sr-only">How many actions to load at a time</span>
+                <select
+                  className="plain"
+                  value={more.step}
+                  onChange={(event) => {
+                    const chosen = more.steps.find((one) => one.by === Number(event.target.value));
+                    if (chosen) go(chosen.href);
+                  }}
+                >
+                  {more.steps.map((one) => <option key={one.by} value={one.by}>{one.by}</option>)}
+                </select>
+                <span className="stencil text-slate-400">at a time</span>
+              </label>
+            </div>
+          ) : null}
+        </div>
+      ) : (
+        <>
+          {pageSelected && total > rows.length ? (
+            <div className="flex flex-wrap items-center gap-2 border-b border-line bg-tint px-5 py-2.5 text-xs text-brand-ink sm:px-6">
+              {allMatching ? (
+                <>
+                  <span>All <strong className="font-mono">{total.toLocaleString("en-GB")}</strong> actions these filters match are selected. Export takes all of them.</span>
+                  <button type="button" onClick={() => setAllMatching(false)} className="font-semibold underline underline-offset-2">This page only</button>
+                </>
+              ) : (
+                <>
+                  <span>All <strong className="font-mono">{rows.length}</strong> on this page are selected.</span>
+                  <button type="button" onClick={() => setAllMatching(true)} className="font-semibold underline underline-offset-2">Select all {total.toLocaleString("en-GB")} these filters match</button>
+                </>
+              )}
+            </div>
+          ) : null}
+
+          <div className={pending ? "opacity-60 transition-opacity" : "transition-opacity"}>
+            {rows.length ? (
+              <DataTable
+                id="actions"
+                className="rounded-none border-0 shadow-none"
+                defaultHidden={["Description", "Responsible", "Confirmed"]}
+                fill
+                tools={
+                  <a
+                    href={selectedExportHref}
+                    className="dt-tool"
+                    title={selected.length && !allMatching ? "The actions you have ticked, with what each one needs, as CSV" : "Every action, with what each one needs, as CSV"}
+                  >
+                    <Download className="h-3.5 w-3.5" /> Export
+                  </a>
+                }
+                onMove={move}
+                onReorder={moveTo}
+                head={
+                  <tr>
+                    <Th className={`rail-head ${frozen ? "sticky left-0 z-[4]" : ""} w-10`}>
+                      <input
+                        aria-label="Select every action on this page"
+                        type="checkbox"
+                        checked={pageSelected}
+                        onChange={() => { setAllMatching(false); setSelected(pageSelected ? [] : rows.map((row) => row.id)); }}
+                      />
+                    </Th>
+                    <Th className={`${frozen ? "sticky left-10 z-[4]" : ""} min-w-[260px]`} label="Action">
+                      <span className="inline-flex items-center gap-2">
+                        <SortButton label="Action" on={sort?.key === "code" ? sort.dir : null} onClick={() => go(sortHref("code"))} />
+                        <span className="text-slate-300">/</span>
+                        <SortButton label="Name" on={sort?.key === "name" ? sort.dir : null} onClick={() => go(sortHref("name"))} />
+                        {/* Freezing only ever affects this column, so it is switched here. */}
+                        <button
+                          type="button"
+                          onClick={() => setFrozen((held) => { try { localStorage.setItem(FREEZE_KEY, held ? "0" : "1"); } catch {} return !held; })}
+                          aria-pressed={frozen}
+                          title={frozen ? "This column stays in view while you scroll sideways. Click to let it scroll away." : "This column scrolls away with the rest. Click to keep it in view."}
+                          className={`rounded-sm p-0.5 transition-colors hover:text-brand-ink ${frozen ? "text-slate-400" : "text-slate-300"}`}
+                        >
+                          {frozen ? <Pin className="h-3 w-3" /> : <PinOff className="h-3 w-3" />}
+                        </button>
+                      </span>
+                    </Th>
+                    {columns.map((column) => (
+                      <Th key={column.key} label={column.label} className={column.headClass} sorted={column.sort && sort?.key === column.sort ? sort.dir : null}>
+                        <span className="inline-flex items-center gap-1">
+                          {column.sort
+                            ? <SortButton label={column.label} on={sort?.key === column.sort ? sort.dir : null} onClick={() => go(sortHref(column.sort!))} />
+                            : column.label}
+                          {column.note ? <Info>{column.note}</Info> : null}
+                        </span>
+                      </Th>
+                    ))}
+                  </tr>
+                }
+              >
+                {rows.map((row) => {
+                  const on = selected.includes(row.id);
+                  return (
+                    <tr key={row.id} className={on ? "[&>td]:bg-tint" : undefined}>
+                      <Td className={`rail ${RAIL[row.readiness]} ${frozen ? "sticky left-0 z-[1]" : ""} ${on ? "bg-tint" : "bg-surface"}`}>
+                        <input
+                          aria-label={`Select action ${row.code}`}
+                          type="checkbox"
+                          checked={on}
+                          onChange={() => {
+                            setAllMatching(false);
+                            setSelected((held) => held.includes(row.id) ? held.filter((one) => one !== row.id) : [...held, row.id]);
+                          }}
+                        />
+                      </Td>
+                      <Td className={`${frozen ? "sticky left-10 z-[1]" : ""} min-w-[260px] ${on ? "bg-tint" : "bg-surface"}`}>
+                        <Link href={`/actions/${row.code}`} className="doc-number">{row.code}</Link>
+                        <span className="doc-title block max-w-80 truncate" title={row.name}>{row.name}</span>
+                      </Td>
+                      {columns.map((column) => <Td key={column.key} className={column.cellClass}>{column.cell(row)}</Td>)}
+                    </tr>
+                  );
+                })}
+              </DataTable>
+            ) : (
+              <div className="px-6 py-20 text-center">
+                <p className="font-mono text-xs tracking-[0.2em] text-slate-400 uppercase">no actions</p>
+                <p className="mt-2 text-sm text-slate-700">Nothing in the schedule matches these filters.</p>
+                {facets.length ? <button type="button" onClick={() => go("/actions?view=table")} className="mt-3 text-xs font-semibold text-link hover:underline">Clear the {facets.length} filter{facets.length === 1 ? "" : "s"} →</button> : null}
+              </div>
+            )}
+          </div>
+
+          {total > 0 ? (
+            <div data-dt-foot className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 border-t border-line px-5 py-2.5 sm:px-6">
+              <p className="font-mono text-[11px] tabular-nums text-slate-500">
+                {paging.from.toLocaleString("en-GB")}–{paging.to.toLocaleString("en-GB")}
+                <span className="ml-1.5 font-sans text-slate-400">of {total.toLocaleString("en-GB")}</span>
+              </p>
+              {paging.pages > 1 ? (
+                <span className="flex items-center gap-2">
+                  <PageStep onClick={() => go(step(paging.page - 1))} disabled={paging.page === 1} label="Previous page"><ChevronLeft className="h-4 w-4" /></PageStep>
+                  <span className="font-mono text-[11px] tabular-nums text-slate-500">{paging.page} of {paging.pages}</span>
+                  <PageStep onClick={() => go(step(paging.page + 1))} disabled={paging.page === paging.pages} label="Next page"><ChevronRight className="h-4 w-4" /></PageStep>
+                </span>
+              ) : <span />}
+              <label className="flex items-center justify-end gap-1.5">
+                <span className="stencil text-slate-400">Rows</span>
+                <select className="plain" value={paging.perPage} onChange={(event) => go(sized(Number(event.target.value)))}>
+                  {paging.sizes.map((size) => <option key={size} value={size}>{size}</option>)}
+                </select>
+              </label>
+            </div>
+          ) : null}
+        </>
+      )}
+    </section>
+  </>;
+}
+
+/** One narrowing choice, drawn as the register draws them. */
+function Narrow({ name, value, empty, options }: { name: string; value: string; empty: string; options: Opt[] }) {
+  return (
+    <label className="min-w-0 flex-1">
+      <span className="sr-only">{empty}</span>
+      <select name={name} defaultValue={value} data-on={value ? "true" : "false"} className="plain w-full">
+        <option value="">{empty}</option>
+        {options.map((option) => <option key={option.code} value={option.code}>{option.label}</option>)}
+      </select>
+    </label>
+  );
+}
+
+/** One step through the register. A step that leads nowhere is shown, and dead. */
+function PageStep({ onClick, disabled, label, children }: { onClick: () => void; disabled: boolean; label: string; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={label}
+      className="rounded-sm p-1 text-slate-500 transition-colors hover:bg-slate-100 hover:text-brand-ink disabled:cursor-default disabled:text-slate-300 disabled:hover:bg-transparent"
+    >
+      {children}
+    </button>
+  );
+}
+
+/** Where this browser keeps the order its reader dragged the columns into. */
+const ORDER_KEY = "actions:columns";
+
+/** Whether the reader keeps the action in view while scrolling sideways. */
+const FREEZE_KEY = "actions:freeze";
+
+type Column = {
+  key: string;
+  label: string;
+  sort?: string;
+  note?: string;
+  headClass?: string;
+  cellClass?: string;
+  cell: (row: PlanTableRow) => React.ReactNode;
+};
+
+/**
+ * The rail down the left of a row, in the colour of the state that row is in —
+ * the same five colours the plan draws its bars in, and the same rail the
+ * register and the dispatch log carry.
+ */
+const RAIL: Record<PlanTableRow["readiness"], string> = {
+  DONE: "rail-released",
+  READY: "rail-released",
+  UPCOMING: "rail-review",
+  AT_RISK: "rail-prep",
+  NOT_READY: "rail-void",
+  UNKNOWN: "rail-none",
+};
+
+const READINESS: Record<PlanTableRow["readiness"], { label: string; chip: string }> = {
+  DONE: { label: "Done", chip: "bg-emerald-600/10 text-emerald-900 ring-emerald-300" },
+  READY: { label: "Ready", chip: "bg-emerald-100 text-emerald-800 ring-emerald-200" },
+  UPCOMING: { label: "Still ahead", chip: "bg-sky-100 text-sky-800 ring-sky-200" },
+  AT_RISK: { label: "At risk", chip: "bg-amber-100 text-amber-800 ring-amber-200" },
+  NOT_READY: { label: "Overdue", chip: "bg-red-100 text-red-800 ring-red-200" },
+  UNKNOWN: { label: "Nothing listed", chip: "bg-slate-100 text-slate-600 ring-slate-200" },
+};
+
+/** The columns, in the order they start in. */
+const COLUMNS: Column[] = [
+  {
+    key: "departments", label: "Disciplines",
+    note: "The disciplines the project manager tagged this action with. They are the ones asked what it needs.",
+    cell: (row) => row.departments.length
+      ? <span className="flex max-w-56 flex-wrap gap-1">{row.departments.map((one) => <span key={one} className="whitespace-nowrap rounded-md bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-600">{one}</span>)}</span>
+      : <span className="text-xs font-semibold text-amber-700">needs disciplines</span>,
+  },
+  {
+    key: "readiness", label: "State",
+    note: "Every state is about one thing: does the register hold a released revision of each listed document, at the status the action needs? Done — the day has passed and it did. Ready — the day is today or ahead and it does. Still ahead — the day is ahead and nothing is owed within the week. At risk — a document is owed within a week, or already. Overdue — the day has passed and something is still missing.",
+    cellClass: "whitespace-nowrap",
+    cell: (row) => <Chip className={READINESS[row.readiness].chip}>{READINESS[row.readiness].label}</Chip>,
+  },
+  {
+    key: "date", label: "Date", sort: "date",
+    headClass: "text-right", cellClass: "whitespace-nowrap text-right text-xs tabular-nums",
+    cell: (row) => row.date
+      ? <>
+          <span className="text-sm font-medium text-slate-800">{row.date}</span>
+          <span className={`block font-sans text-[11px] ${row.late ? "font-semibold text-red-600" : "text-slate-400"}`}>{row.when}</span>
+        </>
+      : <span className="text-slate-300">—</span>,
+  },
+  {
+    key: "ready", label: "Ready", sort: "documents",
+    note: "How many of the documents this action needs are at the status it needs.",
+    headClass: "text-right", cellClass: "whitespace-nowrap text-right",
+    cell: (row) => row.total
+      ? <span className="inline-flex flex-col items-end gap-1">
+          <span className="text-sm font-semibold tabular-nums text-slate-800">{row.ready}<span className="font-normal text-slate-400"> / {row.total}</span></span>
+          <span className="h-1 w-14 overflow-hidden rounded-full bg-slate-100">
+            <span
+              className={`block h-full rounded-full ${row.ready === row.total ? "bg-emerald-500" : row.ready ? "bg-amber-500" : "bg-red-400"}`}
+              style={{ width: `${Math.max(Math.round((row.ready / row.total) * 100), 4)}%` }}
+            />
+          </span>
+        </span>
+      : <span className="text-xs text-slate-300">—</span>,
+  },
+  {
+    key: "nextDue", label: "Next due",
+    note: "The earliest day a document still missing is needed.",
+    headClass: "text-right", cellClass: "whitespace-nowrap text-right text-xs tabular-nums",
+    cell: (row) => row.nextNeeded
+      ? <span className={row.nextOverdue ? "font-semibold text-red-600" : "text-slate-600"}>{row.nextNeeded}</span>
+      : <span className="text-slate-300">—</span>,
+  },
+  {
+    key: "missing", label: "Still missing", cellClass: "min-w-[240px]",
+    cell: (row) => row.missing.length
+      ? <ul className="space-y-1">
+          {row.missing.slice(0, 3).map((one) => (
+            <li key={one.docNumber} className="flex flex-wrap items-center gap-1.5 text-xs">
+              <span className="whitespace-nowrap font-mono text-[11px] font-semibold text-slate-700">{one.docNumber}</span>
+              <span className="whitespace-nowrap rounded bg-amber-100 px-1 py-px text-[10px] font-bold text-amber-800" title={`Needs status ${one.status}`}>needs {one.status}</span>
+            </li>
+          ))}
+          {row.missing.length > 3 ? <li><Link href={`/actions/${row.code}`} className="text-[11px] font-semibold text-link hover:underline">+{row.missing.length - 3} more</Link></li> : null}
+        </ul>
+      : row.total === 0
+        ? <span className="text-xs text-slate-400">Nothing listed yet</span>
+        : <span className="text-xs font-medium text-emerald-700">Nothing missing</span>,
+  },
+  {
+    key: "confirmed", label: "Confirmed",
+    note: "Whether each discipline has confirmed it has what it needs, in the days before the action.",
+    cellClass: "whitespace-nowrap text-xs",
+    cell: (row) => (
+      <span className={row.confirmedTone === "good" ? "font-semibold text-emerald-700" : row.confirmedTone === "bad" ? "font-semibold text-red-700" : "text-slate-500"}>
+        {row.confirmed}
+      </span>
+    ),
+  },
+  { key: "description", label: "Description", cellClass: "max-w-72 truncate text-xs text-slate-600", cell: (row) => row.description ?? <span className="text-slate-300">·</span> },
+  { key: "owner", label: "Responsible", cellClass: "whitespace-nowrap text-xs text-slate-600", cell: (row) => row.owner ?? <span className="text-slate-300">·</span> },
+];
+
+/** The arrow that says a column can be ordered. Dim until it is used. */
+function SortButton({ label, on, onClick }: { label: string; on: "asc" | "desc" | null; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="inline-flex items-center gap-1 uppercase tracking-[inherit] transition-colors hover:text-brand-ink"
+      title={on ? (on === "asc" ? "Sorted first to last. Click to reverse." : "Sorted last to first. Click to clear.") : `Sort by ${label.toLowerCase()}`}
+    >
+      {label}
+      <span className="sort-mark" data-on={on ? "true" : "false"}>
+        {on === "asc" ? <ArrowUp className="h-3 w-3 text-brand-ink" /> : on === "desc" ? <ArrowDown className="h-3 w-3 text-brand-ink" /> : <ArrowUpDown className="h-3 w-3" />}
+      </span>
+    </button>
+  );
+}

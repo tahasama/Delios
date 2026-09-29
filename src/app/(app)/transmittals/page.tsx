@@ -46,6 +46,17 @@ type Search = {
   view?: string; direction?: string;
 };
 
+/** Which column each date filter reads. */
+const DATE_COLUMN: Record<string, string> = {
+  issued: "dateOfIssue",
+  due: "responseDueDate",
+  received: "receivedDate",
+  created: "createdAt",
+};
+
+/** The orders the log offers. */
+const SORT_KEYS = ["number", "from", "to", "reason", "issued", "documents", "subject", "received", "status", "due"];
+
 const midnight = (date: Date) => new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
 
 export default async function TransmittalsPage({ searchParams }: { searchParams: Promise<Search> }) {
@@ -80,6 +91,8 @@ export default async function TransmittalsPage({ searchParams }: { searchParams:
   const from = readDay(sp.from, false);
   const to = readDay(sp.to, true);
 
+  const sort = sp.sort && SORT_KEYS.includes(sp.sort) ? sp.sort : "";
+  const dir = sp.order === "asc" ? ("asc" as const) : ("desc" as const);
   const perPage = PAGE_SIZES.includes(Number(sp.per)) ? Number(sp.per) : 50;
   const page = Math.max(1, Number(sp.page) || 1);
 
@@ -99,15 +112,33 @@ export default async function TransmittalsPage({ searchParams }: { searchParams:
       status === "TO_CHECK" ? { direction: "INCOMING", status: "ISSUED" } : status ? { status } : {},
       reason ? { reasonForIssue: reason } : {},
       party ? { OR: [{ issuingParty: party }, { recipients: { some: { organization: party } } }] } : {},
+      // Which date, and between which two days. Every one of them is a column,
+      // so the window is asked of the database rather than applied afterwards.
+      dateOn && (from || to)
+        ? ({ [DATE_COLUMN[dateOn]]: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } } as Prisma.TransmittalWhereInput)
+        : {},
     ],
   };
 
-  const [matching, parties, recipientParties, publishedReasons] = await Promise.all([
-    db.transmittal.findMany({
-      where,
-      orderBy: { createdAt: "desc" },
-      include: { recipients: true, _count: { select: { items: true } } },
-    }),
+  // Which column each order reads. The two that are not columns — who it went
+  // to, and how many documents it carried — are a list and a count, so they
+  // are ordered by the party that sent it and by the count itself.
+  const SORTS: Record<string, Prisma.TransmittalOrderByWithRelationInput> = {
+    number: { number: dir },
+    from: { issuingParty: dir },
+    to: { issuingParty: dir },
+    reason: { reasonForIssue: dir },
+    issued: { dateOfIssue: dir },
+    documents: { items: { _count: dir } },
+    subject: { subject: dir },
+    received: { receivedDate: dir },
+    status: { status: dir },
+    due: { responseDueDate: dir },
+  };
+  const orderBy = sort ? SORTS[sort] : { createdAt: "desc" as const };
+
+  const [total, parties, recipientParties, publishedReasons] = await Promise.all([
+    db.transmittal.count({ where }),
     db.transmittal.findMany({ select: { issuingParty: true }, distinct: ["issuingParty"] }),
     db.transmittalRecipient.findMany({ where: { organization: { not: null } }, select: { organization: true }, distinct: ["organization"] }),
     getSet("REASONS_FOR_ISSUE"),
@@ -129,55 +160,19 @@ export default async function TransmittalsPage({ searchParams }: { searchParams:
   }
   const reasonOptions = (publishedReasons.length ? publishedReasons.map((item) => ({ code: item.code, label: item.label })) : REASONS_FOR_ISSUE.map((code) => ({ code, label: REASON_LABEL[code] })));
 
-  // The date filter reads a date the log already holds; nothing is stored to
-  // make it work.
-  type Held = (typeof matching)[number];
-  const DATE_READERS: Record<string, (item: Held) => Date | null> = {
-    issued: (item) => item.dateOfIssue,
-    due: (item) => item.responseDueDate,
-    received: (item) => item.receivedDate,
-    created: (item) => item.createdAt,
-  };
 
-  const keep = matching.filter((item) => {
-    if (dateOn && (from || to)) {
-      const when = DATE_READERS[dateOn](item);
-      if (!when) return false;
-      if (from && when < from) return false;
-      if (to && when > to) return false;
-    }
-    return true;
-  });
-
-  // Ordering runs over every match, and the page is cut from that order after.
-  const SORTS: Record<string, (item: Held) => string | number> = {
-    number: (item) => item.number,
-    from: (item) => (item.direction === "OUTGOING" ? "" : item.issuingParty ?? ""),
-    to: (item) => (item.direction === "OUTGOING" ? item.recipients.map((r) => r.organization ?? r.name).sort().join(", ") : ""),
-    reason: (item) => item.reasonForIssue,
-    issued: (item) => (item.dateOfIssue ?? item.createdAt).getTime(),
-    documents: (item) => item._count.items,
-    subject: (item) => (item.subject ?? "").toLowerCase(),
-    received: (item) => item.receivedDate?.getTime() ?? 0,
-    status: (item) => item.status,
-    due: (item) => item.responseDueDate?.getTime() ?? 0,
-  };
-  const sort = sp.sort && SORTS[sp.sort] ? sp.sort : "";
-  const dir = sp.order === "asc" ? "asc" : "desc";
-  if (sort) {
-    const read = SORTS[sort];
-    keep.sort((a, b) => {
-      const left = read(a);
-      const right = read(b);
-      const cmp = typeof left === "number" && typeof right === "number" ? left - right : String(left).localeCompare(String(right));
-      return dir === "asc" ? cmp : -cmp;
-    });
-  }
-
-  const total = keep.length;
   const pages = Math.max(1, Math.ceil(total / perPage));
   const current = Math.min(page, pages);
-  const slice = keep.slice((current - 1) * perPage, current * perPage);
+
+  // The page itself: the database orders and cuts it, and the joins touch the
+  // fifty rows on screen rather than every transmittal the filters match.
+  const slice = await db.transmittal.findMany({
+    where,
+    orderBy,
+    skip: (current - 1) * perPage,
+    take: perPage,
+    include: { recipients: true, _count: { select: { items: true } } },
+  });
 
   const ourOrganization = (await db.party.findFirst({ where: { isInternal: true }, select: { name: true } }))?.name ?? "Our organization";
   const today = midnight(new Date());

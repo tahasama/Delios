@@ -7,6 +7,7 @@ import { RunChecksButton } from "./run-button";
 import { AssuranceTabs } from "./tabs";
 import { problemDocuments } from "@/lib/problems";
 import { untoldRecipients } from "@/lib/supersession";
+import { haltedWhere } from "@/lib/halted";
 import { ArrowRight } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -37,7 +38,7 @@ export default async function AssurancePage({ searchParams }: { searchParams: Pr
     db.defect.groupBy({ by: ["ownerRole", "severity", "status"], _count: true }),
     Promise.all([
       untoldRecipients(ctx).then((u) => u.length),
-      db.revision.count({ where: { state: "RELEASED", cycles: { some: { comments: { some: { progressionPreventing: true, status: "OPEN" } } } } } }),
+      haltedWhere(ctx).then((where) => db.revision.count({ where })),
       db.baselineEntry.count({ where: { document: { state: "WITHDRAWN" } } }),
       db.revision.count({ where: { state: "VOID", voidReassessment: null } }),
     ]).then((n) => n.reduce((a, b) => a + b, 0)),

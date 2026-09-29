@@ -36,6 +36,9 @@ export async function requestIssueAction(_prev: { error?: string } | undefined, 
   if (!asked.delegated && noRecipients(asked.recipients)) {
     return { error: "Say who it goes to, or leave it to the author." };
   }
+  if (asked.needsApproval && !asked.approverId) {
+    return { error: "Say which party has to approve it before it is released." };
+  }
   const request = await db.issueRequest.create({
     data: {
       projectId,
@@ -44,6 +47,8 @@ export async function requestIssueAction(_prev: { error?: string } | undefined, 
       recipients: JSON.stringify(asked.recipients),
       note: asked.note,
       delegated: asked.delegated,
+      needsApproval: asked.needsApproval,
+      approverId: asked.approverId,
       raisedById: user.id,
       raisedByName: user.name,
     },

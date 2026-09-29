@@ -109,8 +109,8 @@ async function main() {
 
     const s1 = toCsv([
       schedule.columns,
-      ["P6-1000", "", "Foundation pour", "2026-10-01", "2026-10-01", "Civil"],
-      ["P6-1010", "", "Switchroom energisation", "2026-11-01", "2026-11-01", "Electrical"],
+      ["P6-1000", "", "Foundation pour", "Raft under the clarifier", "2026-10-01", "Civil"],
+      ["P6-1010", "", "Switchroom energisation", "", "2026-11-01", "Electrical"],
     ]);
     const p1 = await schedule.parse(t, parseCsv(s1), "default");
     check("a schedule without codes parses", p1.ok, p1.ok ? `${p1.rowCount} activities` : "");
@@ -119,7 +119,8 @@ async function main() {
 
     const actions = await t.db.action.findMany({ orderBy: { code: "asc" } });
     check("the system assigned A-codes (§14.2)", actions.length === 2 && actions.every((a) => /^A\d{5}$/.test(a.code)), actions.map((a) => a.code).join(", "));
-    check("the action date is the forecast date", actions[0].scheduledDate?.toISOString().slice(0, 10) === "2026-10-01");
+    check("the action takes the date the schedule gives", actions[0].scheduledDate?.toISOString().slice(0, 10) === "2026-10-01");
+    check("the activity keeps its description", actions[0].description === "Raft under the clarifier");
     check("the schedule carries no departments", actions.every((a) => !a.departments));
 
     // ── Departments per activity (the project manager's list) ─────────────
@@ -127,15 +128,15 @@ async function main() {
     const deptList = handlerFor("ACTION_DEPARTMENTS")!;
     const exported = await deptList.exportRows!(t, "default");
     check("the list downloads pre-filled with every activity", exported.length === 2 && exported[0][0] === actions[0].code, `${exported.length} rows`);
-    const tagFile = toCsv([deptList.columns, [actions[0].code, "", "", "CI"], [actions[1].code, "", "", "EL, ME"]]);
+    const tagFile = toCsv([deptList.columns, [actions[0].code, "", "", "", "", "CI"], [actions[1].code, "", "", "", "", "EL, ME"]]);
     const tp = await deptList.parse(t, parseCsv(tagFile), "default");
     check("a filled list parses", tp.ok, tp.ok ? "" : tp.issues[0]?.message);
     if (!tp.ok) throw new Error("departments parse failed");
     await deptList.apply(t, tp.payload, "default", "Rev 01");
     const tagged = await t.db.action.findMany({ orderBy: { code: "asc" } });
     check("activities are tagged", tagged[0].departments === "CI" && tagged[1].departments === "EL,ME", tagged.map((a) => a.departments).join(" / "));
-    check("an activity with no department is refused (obligatory)", !(await deptList.parse(t, parseCsv(toCsv([deptList.columns, [actions[0].code, "", "", ""]])), "default")).ok);
-    check("an unknown department is refused", !(await deptList.parse(t, parseCsv(toCsv([deptList.columns, [actions[0].code, "", "", "QQ"]])), "default")).ok);
+    check("an activity with no department is refused (obligatory)", !(await deptList.parse(t, parseCsv(toCsv([deptList.columns, [actions[0].code, "", "", "", "", ""]])), "default")).ok);
+    check("an unknown department is refused", !(await deptList.parse(t, parseCsv(toCsv([deptList.columns, [actions[0].code, "", "", "", "", "QQ"]])), "default")).ok);
     check("the project manager approves his own list",
       canDecide({ state: "SUBMITTED", submittedById: "pm", userId: "pm", mayConfigure: false, mayControl: true, ownerApproves: deptList.ownerApproves }).ok);
     check("…while other lists keep four eyes",
@@ -159,14 +160,14 @@ async function main() {
     // The same activities again, still without codes, one a month later.
     const s2 = toCsv([
       schedule.columns,
-      ["P6-1000", "", "Foundation pour", "2026-10-01", "2026-11-02", "Civil"],
-      ["P6-1010", "", "Switchroom energisation", "2026-11-01", "2026-11-01", "Electrical"],
+      ["P6-1000", "", "Foundation pour", "Raft under the clarifier", "2026-11-02", "Civil"],
+      ["P6-1010", "", "Switchroom energisation", "", "2026-11-01", "Electrical"],
     ]);
     const p2 = await schedule.parse(t, parseCsv(s2), "default");
     if (!p2.ok) throw new Error("second schedule parse failed");
 
     const scheduleDiff = schedule.diff(await schedule.current(t, "default"), p2.payload);
-    check("the diff lines activities up by Activity ID", scheduleDiff.filter((l) => l.change === "ADDED").length === 0, summariseDiff(scheduleDiff));
+    check("the diff lines activities up by Activity Code", scheduleDiff.filter((l) => l.change === "ADDED").length === 0, summariseDiff(scheduleDiff));
     check("…and shows only the date that moved", scheduleDiff.filter((l) => l.change === "CHANGED").length === 1);
 
     await schedule.apply(t, p2.payload, "default", "Rev 02");
@@ -175,9 +176,9 @@ async function main() {
     check("the action moved and kept its code", moved.scheduledDate?.toISOString().slice(0, 10) === "2026-11-02" && moved.code === actions[0].code);
 
     const entry = await t.db.baselineEntry.findFirstOrThrow({ where: { documentId: doc.id } });
-    check("its needed-by date moved with it: 5 working days before",
+    check("its needed-by date moved with it: seven days before",
       entry.requiredBy.toISOString().slice(0, 10) === "2026-10-26",
-      `activity Mon 2026-11-02 less 5 working days = ${entry.requiredBy.toISOString().slice(0, 10)}`);
+      `activity 2026-11-02 less seven days = ${entry.requiredBy.toISOString().slice(0, 10)}`);
 
     check("the applied schedule is recorded as a live version",
       (await t.db.scheduleVersion.count({ where: { status: "PUBLISHED" } })) === 1);
@@ -185,18 +186,18 @@ async function main() {
       (await t.db.scheduleVersion.count({ where: { status: "SUPERSEDED" } })) === 1);
 
     console.log("\nThe schedule refuses what it cannot reconcile\n");
-    const foreign = toCsv([schedule.columns, ["P6-2000", "VA-001", "One", "2026-10-01", "", "", ""]]);
+    const foreign = toCsv([schedule.columns, ["P6-2000", "VA-001", "One", "", "2026-10-01", ""]]);
     check("refuses a code the system did not issue", !(await schedule.parse(t, parseCsv(foreign), "default")).ok);
-    const dupCode = toCsv([schedule.columns, ["P6-1", actions[0].code, "One", "2026-10-01", "", "", ""], ["P6-2", actions[0].code, "Two", "2026-10-02", "", "", ""]]);
+    const dupCode = toCsv([schedule.columns, ["P6-1", actions[0].code, "One", "", "2026-10-01", ""], ["P6-2", actions[0].code, "Two", "", "2026-10-02", ""]]);
     check("refuses a code used twice (§14.2)", !(await schedule.parse(t, parseCsv(dupCode), "default")).ok);
-    const badDate = toCsv([schedule.columns, ["P6-4", "", "One", "01/10/2026", "", "", ""]]);
+    const badDate = toCsv([schedule.columns, ["P6-4", "", "One", "", "01/10/2026", ""]]);
     check("refuses a date that is not YYYY-MM-DD", !(await schedule.parse(t, parseCsv(badDate), "default")).ok);
     const noDate = toCsv([schedule.columns, ["P6-5", "", "One", "", "", ""]]);
     check("refuses an activity with no date at all", !(await schedule.parse(t, parseCsv(noDate), "default")).ok);
 
     // The scheduler's round trip: download what is in force, upload it back.
-    const inForce = (await schedule.current(t, "default")) as { externalId: string; actionCode: string; name: string; baselineDate: string | null; forecastDate: string | null; responsibleParty: string | null }[];
-    const roundTrip = toCsv([schedule.columns, ...inForce.map((a) => [a.externalId, a.actionCode, a.name, a.baselineDate ?? "", a.forecastDate ?? "", a.responsibleParty ?? ""])]);
+    const inForce = (await schedule.current(t, "default")) as { externalId: string; actionCode: string; name: string; description: string | null; date: string | null; responsibleParty: string | null }[];
+    const roundTrip = toCsv([schedule.columns, ...inForce.map((a) => [a.externalId, a.actionCode, a.name, a.description ?? "", a.date ?? "", a.responsibleParty ?? ""])]);
     const rt = await schedule.parse(t, parseCsv(roundTrip), "default");
     check("what is in force uploads back as it is", rt.ok && schedule.diff(inForce, rt.payload).every((l) => l.change === "UNCHANGED"), rt.ok ? "" : rt.issues[0]?.message);
 
@@ -217,8 +218,8 @@ async function main() {
 
     const r1 = toCsv([
       reqs.columns,
-      [civil.code, "CI", "VP1-CI-DWG-0001", "", "", "", "APPROVER", "AFC", "", "", "", "", "TK-201"],
-      [civil.code, "CI", "", "Pour sequence method statement", dt, "", "REVIEWER", "IFC", "2026-10-15", pc, sp, "", "TK-201"],
+      ["CI", civil.code, "", "", "", "VP1-CI-DWG-0001", "CI", "", "", "", "AFC", "APPROVER", "TK-201", "", "", ""],
+      ["CI", civil.code, "", "", "", "Pour sequence method statement", "CI", dt, "", "2026-10-15", "IFC", "REVIEWER", "TK-201", pc, sp, ""],
     ]);
     const q1 = await reqs.parse(t, parseCsv(r1), "default");
     check("a requirements list parses", q1.ok, q1.ok ? `${q1.rowCount} rows` : q1.issues[0]?.message);
@@ -227,31 +228,31 @@ async function main() {
     const listed = await t.db.baselineEntry.findMany({ where: { actionId: civil.id }, include: { document: true } });
     check("a new document became a numbered placeholder", listed.some((e) => e.document.isPlaceholder && e.document.title === "Pour sequence method statement"));
     const byRule = listed.find((e) => e.document.docNumber === "VP1-CI-DWG-0001")!;
-    check("needed-by defaults to 5 working days before the activity", byRule.requiredBy.toISOString().slice(0, 10) === "2026-10-26" && !byRule.manualDate, byRule.requiredBy.toISOString().slice(0, 10));
+    check("needed-by defaults to seven days before the activity", byRule.requiredBy.toISOString().slice(0, 10) === "2026-10-26" && !byRule.manualDate, byRule.requiredBy.toISOString().slice(0, 10));
     const fixed = listed.find((e) => e.manualDate);
     check("a given date is kept as given", fixed?.requiredBy.toISOString().slice(0, 10) === "2026-10-15");
     check("who submits and who approves are recorded", byRule.approvedBy === "APPROVER" && byRule.department === "CI");
 
-    const noTag = toCsv([reqs.columns, [untagged.code, "CI", "VP1-CI-DWG-0001", "", "", "", "APPROVER", "AFC", "", "", "", "", "TK-201"]]);
+    const noTag = toCsv([reqs.columns, ["CI", untagged.code, "", "", "", "VP1-CI-DWG-0001", "CI", "", "", "", "AFC", "APPROVER", "TK-201", "", "", ""]]);
     const noTagResult = await reqs.parse(t, parseCsv(noTag), "default");
     check("refuses an action the project manager has not tagged", !noTagResult.ok && /no departments/.test(noTagResult.issues[0].message));
-    const wrongDept = toCsv([reqs.columns, [electrical.code, "CI", "VP1-CI-DWG-0001", "", "", "", "APPROVER", "AFC", "", "", "", "", "TK-201"]]);
+    const wrongDept = toCsv([reqs.columns, ["CI", electrical.code, "", "", "", "VP1-CI-DWG-0001", "CI", "", "", "", "AFC", "APPROVER", "TK-201", "", "", ""]]);
     check("refuses a department the action is not tagged with", !(await reqs.parse(t, parseCsv(wrongDept), "default")).ok);
 
-    const noAsset = toCsv([reqs.columns, [civil.code, "CI", "VP1-CI-DWG-0001", "", "", "", "APPROVER", "AFC", "", "", "", "", ""]]);
+    const noAsset = toCsv([reqs.columns, ["CI", civil.code, "", "", "", "VP1-CI-DWG-0001", "CI", "", "", "", "AFC", "APPROVER", "", "", "", ""]]);
     const noAssetResult = await reqs.parse(t, parseCsv(noAsset), "default");
     check("a drawing must say which equipment or material it is about", !noAssetResult.ok && /Equipment or material/.test(noAssetResult.issues[0].message), noAssetResult.ok ? "accepted" : noAssetResult.issues[0].message);
     check("the tag became a piece of equipment in the register", !!(await t.db.assetItem.findFirst({ where: { code: "TK-201" } })));
 
     // The department lists only one of its two documents now.
-    const r2 = toCsv([reqs.columns, [civil.code, "CI", "VP1-CI-DWG-0001", "", "", "", "APPROVER", "AFC", "", "", "", "", "TK-201"]]);
+    const r2 = toCsv([reqs.columns, ["CI", civil.code, "", "", "", "VP1-CI-DWG-0001", "CI", "", "", "", "AFC", "APPROVER", "TK-201", "", "", ""]]);
     const q2 = await reqs.parse(t, parseCsv(r2), "default");
     if (!q2.ok) throw new Error("second requirements parse failed");
     await reqs.apply(t, q2.payload, "default", "Rev 02");
     check("what a department no longer lists is no longer required", (await t.db.baselineEntry.count({ where: { actionId: civil.id } })) === 1);
 
     // The schedule moves again; the rule-based date follows, one week later.
-    const s3 = toCsv([schedule.columns, ["P6-1000", "", "Foundation pour", "2026-10-01", "2026-11-09", "Civil"], ["P6-1010", "", "Switchroom energisation", "2026-11-01", "2026-11-01", "Electrical"]]);
+    const s3 = toCsv([schedule.columns, ["P6-1000", "", "Foundation pour", "Raft under the clarifier", "2026-11-09", "Civil"], ["P6-1010", "", "Switchroom energisation", "", "2026-11-01", "Electrical"]]);
     const p3 = await schedule.parse(t, parseCsv(s3), "default");
     if (!p3.ok) throw new Error("third schedule parse failed");
     await schedule.apply(t, p3.payload, "default", "Rev 03");
@@ -274,7 +275,9 @@ async function main() {
     const back = await reqs.parse(t, sheet, "default");
     check("a department sheet uploads back unchanged", back.ok && reqs.diff(await reqs.current(t, "default"), back.payload).every((l) => l.change === "UNCHANGED"), back.ok ? "" : back.issues[0]?.message);
     const elSheet = await departmentSheet(t, "EL");
-    check("a department with nothing listed gets one line per activity", elSheet.length === 2 && elSheet[1][0] === electrical.code && !elSheet[1][2]);
+    check("a department with nothing listed still gets room to write",
+      elSheet.length === 6 && elSheet[1][0] === "EL" && elSheet[1][1] === electrical.code && !elSheet[1][5],
+      `${elSheet.length - 1} lines under one activity`);
     check("…and a sheet left empty uploads as nothing", !(await reqs.parse(t, elSheet, "default")).ok);
 
     if (!back.ok) throw new Error("sheet round trip failed");

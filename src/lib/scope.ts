@@ -3,10 +3,10 @@ import { cache } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { db } from "./db";
-import { getCurrentUser, atLeast, type SessionUser } from "./auth";
+import { getCurrentUser, atLeast, hasVerb, type SessionUser } from "./auth";
 import type { Role } from "./standard";
 import { scopedClient, type ScopedDb, type Tenant } from "./tenant";
-import { loadActor, can, canSee, verbsFor, explain, visibleConfidentiality, type Actor, type Verb, type DocumentClass } from "./permissions";
+import { loadActor, can, verbsFor, explain, openConfidentiality, type Actor, type Verb, type DocumentClass } from "./permissions";
 
 export { scopedClient, tenantFor, ORG_SCOPED, PROJECT_SCOPED } from "./tenant";
 export type { ScopedDb, Tenant } from "./tenant";
@@ -48,7 +48,6 @@ export type Scope = Tenant & {
   /** May the signed-in person do this, here? */
   can: (verb: Verb, target?: DocumentClass | null) => boolean;
   /** §5.7 — is this confidentiality within their clearance? */
-  canSee: (confidentiality: string | null | undefined) => boolean;
   /** Every verb they hold against a class, for explaining the screen. */
   verbs: (target?: DocumentClass | null) => Verb[];
   /** Why a decision went the way it did, in the Standard's words. */
@@ -99,11 +98,20 @@ export const getScope = cache(async (): Promise<Scope | null> => {
   const actor = await loadActor(bootstrap, chosen.functionId);
   if (!actor) return null;
 
-  const allCodes = await bootstrap.db.configValue.findMany({
+  const confidentialityValues = await bootstrap.db.configValue.findMany({
     where: { setKey: "CONFIDENTIALITY" },
-    select: { code: true },
+    select: { code: true, props: true },
   });
-  const allowed = visibleConfidentiality(actor, allCodes.map((c) => c.code));
+  // Which levels are the ordinary register, and which are read only by the
+  // people named on the document. An administrator reads everything.
+  const openCodes = openConfidentiality(confidentialityValues.map((one) => {
+    let props: Record<string, unknown> = {};
+    if (one.props) {
+      try { props = JSON.parse(one.props) as Record<string, unknown>; } catch { /* a malformed prop is not a level */ }
+    }
+    return { code: one.code, props };
+  }));
+  const reader = { userId: user.id, everything: can(actor, "CONFIGURE"), openCodes };
   // Someone from another party is not staff: their register holds what their own
   // party produced and what was issued to them, and nothing else. Applied here,
   // so no page can forget it.
@@ -111,7 +119,7 @@ export const getScope = cache(async (): Promise<Scope | null> => {
     ? await bootstrap.db.party.findFirst({ where: { code: user.partyCode }, select: { name: true } })
     : null;
   const external = user.isInternal ? null : { partyCode: user.partyCode, userId: user.id, organization: party?.name ?? null };
-  const scoped = scopedClient(hostOrgId, chosen.projectId, allowed, external);
+  const scoped = scopedClient(hostOrgId, chosen.projectId, reader, external);
 
   // Authority is held per project, not globally: the same person may author on
   // one project and control another (§1.4 — ownership is by role).
@@ -129,7 +137,6 @@ export const getScope = cache(async (): Promise<Scope | null> => {
     isGuest: user.orgId !== hostOrgId,
     db: scoped,
     can: (verb, target) => can(actor, verb, target),
-    canSee: (confidentiality) => canSee(actor, confidentiality),
     verbs: (target) => verbsFor(actor, target),
     why: (verb, target) => explain(actor, verb, target),
   };
@@ -142,7 +149,7 @@ export async function requireScope(): Promise<Scope> {
     if (!user) redirect("/login");
     // An administrator whose organization has no project yet is not stuck —
     // they are simply earlier in the process than this screen assumes.
-    if (user.role === "ADMIN") {
+    if (hasVerb(user, "CONFIGURE")) {
       const projects = await db.project.count({ where: { orgId: user.orgId, status: "ACTIVE" } });
       if (projects === 0) redirect("/setup");
     }

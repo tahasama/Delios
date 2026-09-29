@@ -1,3 +1,4 @@
+import { readyReading, countingRevision, meetsRequirement } from "@/lib/readiness";
 import Link from "next/link";
 import { Count } from "./tally";
 import { requireScope } from "@/lib/scope";
@@ -6,7 +7,7 @@ import { fmtDate, fmtDateTime } from "@/lib/utils";
 import { DateWindow } from "@/components/date-window";
 import { Search } from "lucide-react";
 import { supplierRows, WITH_SUPPLIER, STATE_LABEL } from "@/lib/supplier";
-import { departmentsOf, businessDaysBefore, DEFAULT_LEAD_BUSINESS_DAYS } from "@/lib/schedule";
+import { departmentsOf, daysBefore, DEFAULT_LEAD_DAYS } from "@/lib/schedule";
 import { departmentRows, senderRows, isDepartmentSender } from "@/lib/requirements-process";
 import { getActiveSet } from "@/lib/config";
 import { ArrowRight, CheckCheck, FileStack, Inbox, ListChecks, MessageSquare, PenLine, Plus, Send, Share2, Undo2, Upload } from "lucide-react";
@@ -29,11 +30,13 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const ctx = await requireScope();
   const { user, db } = ctx;
   const controller = isController(user) || isAdmin(user);
+  // What counts as delivered for an action is the project's answer.
+  const reading = await readyReading(ctx);
 
   const [assigned, returned, incoming, drafts, actions, lastRun, criticalDefects, totalDocs] = await Promise.all([
     db.reviewAssignment.findMany({
       where: { userId: user.id, completedAt: null, cycle: { status: "OPEN", issuedToReviewAt: { not: null } } },
-      include: { cycle: { include: { revision: { include: { document: true } }, comments: true } } },
+      include: { cycle: { include: { revision: { include: { document: true } } } } },
       take: 50,
     }),
     db.reviewCycle.findMany({
@@ -46,7 +49,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
     db.revision.findMany({ where: { state: "IN_PREPARATION", submittedAt: null, document: { createdById: user.id } }, include: { document: true }, take: 50 }),
     db.action.findMany({
       orderBy: { scheduledDate: "asc" },
-      include: { entries: { include: { document: { include: { revisions: { where: { state: "RELEASED" }, orderBy: { releasedAt: "desc" }, take: 1 } } } } } },
+      include: { entries: { include: { document: { include: { revisions: countingRevision(reading) } } } } },
     }),
     controller ? db.checkRun.findFirst({ orderBy: { ranAt: "desc" } }) : Promise.resolve(null),
     controller ? db.defect.count({ where: { severity: "CRITICAL", status: { in: ["OPEN", "ACCEPTED"] } } }) : Promise.resolve(0),
@@ -104,7 +107,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   // fact about the project, not about the person reading it; scoping the
   // record by department is how people stop trusting it, because each of them
   // ends up looking at a different project. What a reader may not see is
-  // already settled by the scope and by clearance, not by this page.
+  // already settled by the scope, not by this page.
   const since = lastWorkingDay();
   const news = await db.auditEvent.findMany({
     where: { ts: { gte: since }, action: { in: NEWS } },
@@ -177,7 +180,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
       const confirmations = await db.readinessConfirmation.findMany({ where: { department: me.department }, select: { actionId: true } });
       for (const a of actions) {
         if (!a.scheduledDate || !departmentsOf(a).includes(me.department) || confirmations.some((c) => c.actionId === a.id)) continue;
-        if (businessDaysBefore(a.scheduledDate, DEFAULT_LEAD_BUSINESS_DAYS).getTime() > Date.now()) continue;
+        if (daysBefore(a.scheduledDate, DEFAULT_LEAD_DAYS).getTime() > Date.now()) continue;
         planning.push({ key: `confirm-${a.id}`, href: `/actions/${a.code}#confirm`, label: `Confirm ${me.department} documents for ${a.code}`, sub: `${a.name} · ${fmtDate(a.scheduledDate)}`, cta: "Confirm", late: a.scheduledDate.getTime() < Date.now() });
       }
     }
@@ -206,7 +209,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const wholeSchedule = controller || ctx.can("PLAN");
   const atRisk = actions
     .map((a) => {
-      const short = a.entries.filter((e) => e.document.revisions[0]?.statusCode !== e.requiredStatus);
+      const short = a.entries.filter((e) => !meetsRequirement(e.document.revisions, e.requiredStatus));
       const late = a.scheduledDate ? a.scheduledDate.getTime() < Date.now() : false;
       const mine =
         (!!user.department && departmentsOf(a).includes(user.department)) ||
@@ -222,15 +225,13 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
     // what the panel shows, and the standing failures are the schedule page's.
     .sort((a, b) => (b.scheduledDate?.getTime() ?? 0) - (a.scheduledDate?.getTime() ?? 0));
 
-  const blocking = (c: { comments: { progressionPreventing: boolean; status: string }[] }) =>
-    c.comments.some((one) => one.progressionPreventing && one.status === "OPEN");
 
   // ── The rows, by queue ────────────────────────────────────────────────────
   const rows: Record<string, Row[]> = {
     verdict: verdicts.map<Row>((a) => ({
       href: `/reviews/${a.cycleId}`, code: a.cycle.revision.document.docNumber, rev: a.cycle.revision.value,
       title: a.cycle.revision.document.title,
-      tag: blocking(a.cycle) ? "blocking" : "binding", tone: blocking(a.cycle) ? "amber" : "sky",
+      tag: "binding", tone: "sky",
       at: a.cycle.issuedToReviewAt ?? a.cycle.submittedAt, cta: "Decide",
     })),
     release: [
@@ -629,6 +630,10 @@ const ACTIVITY: Record<string, { kind: string; said: string; mark: string }> = {
   REQUIREMENTS_REMINDER: { kind: "Requirements", said: "were reminded", mark: "border-amber-600" },
   SHORTFALL_ISSUED: { kind: "Schedule", said: "was reported short", mark: "border-amber-600" },
   SHORTFALL_ACCEPTED: { kind: "Schedule", said: "shortfall was accepted", mark: "border-slate-400" },
+  DELEGATION_REQUESTED: { kind: "Review", said: "was asked to be handed over", mark: "border-amber-600" },
+  DELEGATION_GRANTED: { kind: "Review", said: "was handed to somebody else", mark: "border-brand-line" },
+  DELEGATION_REFUSED: { kind: "Review", said: "stayed with its reviewer", mark: "border-slate-400" },
+  DELEGATION_WITHDRAWN: { kind: "Review", said: "came back to its reviewer", mark: "border-slate-400" },
   CHECK_RUN: { kind: "Register", said: "was checked", mark: "border-slate-400" },
 };
 

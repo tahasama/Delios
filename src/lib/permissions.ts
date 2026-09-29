@@ -12,6 +12,26 @@ import type { Tenant } from "./tenant";
  * maintained as two matrices that drift apart.
  */
 
+/**
+ * Before a project is chosen there is no function to read, so the account's
+ * standing role stands in. Everywhere inside a project the matrix decides and
+ * this table is never consulted.
+ */
+export const ROLE_FALLBACK_VERBS: Record<string, string[]> = {
+  ADMIN: ["READ", "CREATE", "REVISE", "REVIEW", "APPROVE", "TRANSMIT", "RECEIVE", "ACCEPT", "CONTROL", "CONFIGURE"],
+  CONTROLLER: ["READ", "CREATE", "REVISE", "TRANSMIT", "RECEIVE", "ACCEPT", "CONTROL"],
+  APPROVER: ["READ", "REVIEW", "APPROVE", "RECEIVE"],
+  REVIEWER: ["READ", "REVIEW", "RECEIVE"],
+  AUTHOR: ["READ", "CREATE", "REVISE", "RECEIVE"],
+  VIEWER: ["READ"],
+};
+
+/** The verbs this person holds: the project function's, or the role's until one exists. */
+export function heldVerbs(user: { verbs?: string[]; role?: string } | null | undefined): string[] {
+  if (!user) return [];
+  return user.verbs ?? ROLE_FALLBACK_VERBS[user.role ?? ""] ?? [];
+}
+
 export const VERBS = [
   "READ",
   "CREATE",
@@ -85,6 +105,23 @@ export const DEFAULT_CONFIDENTIALITY_LEVEL: Record<string, number> = {
   CONFIDENTIAL: 4,
   SECRET: 5,
 };
+
+/**
+ * The confidentiality codes open to everybody on the project.
+ *
+ * A level at or below the one marked as the default — Internal, in the
+ * reference configuration — is the ordinary register: everyone who reaches the
+ * project reads it. Anything above it is closed, and closed means read by the
+ * people named on the document itself, one by one, and by nobody else.
+ */
+export function openConfidentiality(
+  values: { code: string; props?: Record<string, unknown> }[],
+): string[] {
+  const levels = new Map(values.map((one) => [one.code, typeof one.props?.level === "number" ? (one.props.level as number) : DEFAULT_CONFIDENTIALITY_LEVEL[one.code.toUpperCase()] ?? 1]));
+  const marked = values.filter((one) => one.props?.default === true).map((one) => levels.get(one.code) ?? 2);
+  const ceiling = marked.length ? Math.max(...marked) : 2;
+  return values.filter((one) => (levels.get(one.code) ?? 1) <= ceiling).map((one) => one.code);
+}
 
 export function confidentialityLevel(
   code: string | null | undefined,
@@ -196,9 +233,12 @@ function matches(rule: Rule, target: DocumentClass): boolean {
  * May this actor do `verb`?
  *
  * With a target, the rules are narrowed to those whose class selectors match
- * it, and reading additionally requires clearance for its confidentiality.
- * Without a target the question is "anywhere at all", which is what
+ * it. Without a target the question is "anywhere at all", which is what
  * configuration and control verbs ask.
+ *
+ * Confidentiality is not asked here. A document above the open levels is read
+ * by the people named on it — see `DocumentAccess` and the reader filter in
+ * `src/lib/tenant.ts` — so a closed document never reaches this question.
  *
  * Grants accumulate: a function's rules are a union, never a precedence chain.
  * There is deliberately no deny rule — a permission someone does not hold is
@@ -207,34 +247,17 @@ function matches(rule: Rule, target: DocumentClass): boolean {
  */
 export function can(actor: Actor | null, verb: Verb, target?: DocumentClass | null): boolean {
   if (!actor) return false;
-  if (target && !canSee(actor, target.confidentiality)) return false;
   const applicable = target ? actor.rules.filter((r) => matches(r, target)) : actor.rules;
   return applicable.some((r) => implies(r.verbs, verb));
-}
-
-/** §5.7 — clearance gate, independent of any verb. */
-export function canSee(actor: Actor | null, confidentiality: string | null | undefined): boolean {
-  if (!actor) return false;
-  return confidentialityLevel(confidentiality, actor.levels) <= actor.clearance;
 }
 
 /** Every verb this actor holds against a class — for explaining a decision. */
 export function verbsFor(actor: Actor | null, target?: DocumentClass | null): Verb[] {
   if (!actor) return [];
-  if (target && !canSee(actor, target.confidentiality)) return [];
   const applicable = target ? actor.rules.filter((r) => matches(r, target)) : actor.rules;
   const held = new Set<Verb>();
   for (const rule of applicable) for (const verb of rule.verbs) held.add(verb);
   return VERBS.filter((v) => held.has(v));
-}
-
-/**
- * The confidentiality codes this actor may see, for narrowing a query before it
- * runs rather than filtering rows after they come back.
- */
-export function visibleConfidentiality(actor: Actor | null, allCodes: string[]): string[] {
-  if (!actor) return [];
-  return allCodes.filter((code) => confidentialityLevel(code, actor.levels) <= actor.clearance);
 }
 
 /**
@@ -243,9 +266,6 @@ export function visibleConfidentiality(actor: Actor | null, allCodes: string[]):
  */
 export function explain(actor: Actor | null, verb: Verb, target?: DocumentClass | null): string {
   if (!actor) return "You hold no function on this project.";
-  if (target && !canSee(actor, target.confidentiality)) {
- return `${actor.functionName} is cleared to level ${actor.clearance}; this item is ${target.confidentiality ?? "unclassified"}.`;
-  }
   if (can(actor, verb, target)) return `${actor.functionName} may ${VERB_LABEL[verb].toLowerCase()} this.`;
  return `${actor.functionName} does not hold "${VERB_LABEL[verb]}" for this classification. The permission matrix decides this, not the document.`;
 }

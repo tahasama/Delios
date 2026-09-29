@@ -1,5 +1,5 @@
 import type { Tenant } from "./tenant";
-import { businessDaysBefore, departmentsOf, DEFAULT_LEAD_BUSINESS_DAYS } from "./schedule";
+import { daysBefore, departmentsOf, DEFAULT_LEAD_DAYS } from "./schedule";
 
 /**
  * From schedule to safe activity, in the order it happens:
@@ -17,10 +17,15 @@ import { businessDaysBefore, departmentsOf, DEFAULT_LEAD_BUSINESS_DAYS } from ".
  *   9. The activity goes ahead when every department has confirmed.
  */
 
+/**
+ * The requirements sheet's header, said once. It is the upload template's own
+ * header — a department's sheet and the controlled list are the same file.
+ */
 export const REQUIREMENT_COLUMNS = [
-  "Action Code", "Department", "Document Number", "Title", "Document Type", "Submitted By",
-  "Approved By", "Required Status", "Needed By", "Project Code", "Sub-project", "PO",
-  "Equipment or material",
+  "Department", "Action Code", "Activity Name", "Activity Description", "Date",
+  "Document", "Discipline", "Type", "Supplier", "Date of delivery",
+  "Required Status", "Approved By", "Equipment or material",
+  "Project Code", "Sub-project", "PO",
 ];
 
 /** A sender key: a supplier's party code, or one of our departments. */
@@ -128,6 +133,9 @@ const iso = (d: Date | null | undefined) => (d ? d.toISOString().slice(0, 10) : 
  * one empty line for every activity it has nothing listed for yet. The three
  * columns after PO are there to read; the upload ignores them.
  */
+/** Blank document lines left under each action, so there is room to answer. */
+const SHEET_BLANK_LINES = 5;
+
 export async function departmentSheet(t: Tenant, department: string): Promise<string[][]> {
   const actions = await t.db.action.findMany({
     orderBy: [{ scheduledDate: "asc" }, { code: "asc" }],
@@ -142,15 +150,29 @@ export async function departmentSheet(t: Tenant, department: string): Promise<st
     const link = links.find((l) => l.fromId === documentId);
     return link ? assets.find((a) => a.id === link.toId)?.code ?? "" : "";
   };
-  const header = [...REQUIREMENT_COLUMNS, "Activity Name", "Activity Date", "Default Needed By"];
-  const rows: string[][] = [header];
+  // The sheet is the requirements template, and the lines under each action are
+  // blank on purpose: that is where the department writes what it needs.
+  const rows: string[][] = [REQUIREMENT_COLUMNS];
   for (const a of actions.filter((x) => departmentsOf(x).includes(department))) {
-    const info = [a.name, iso(a.scheduledDate), a.scheduledDate ? iso(businessDaysBefore(a.scheduledDate, DEFAULT_LEAD_BUSINESS_DAYS)) : ""];
-    if (!a.entries.length) rows.push([a.code, department, "", "", "", "", "", "", "", "", "", "", "", ...info]);
-    for (const e of a.entries) {
+    const lines = Math.max(a.entries.length + SHEET_BLANK_LINES, SHEET_BLANK_LINES);
+    for (let i = 0; i < lines; i++) {
+      const e = a.entries[i];
+      const head = i === 0;
       rows.push([
-        a.code, department, e.document.docNumber, e.document.title, e.document.docType, e.submittedBy ?? "",
-        e.approvedBy ?? "", e.requiredStatus, e.manualDate ? iso(e.requiredBy) : "", "", "", "", tagOf(e.documentId), ...info,
+        head ? department : "",
+        head ? a.code : "",
+        head ? a.name : "",
+        head ? a.description ?? "" : "",
+        head ? iso(a.scheduledDate) : "",
+        e?.document.docNumber ?? "",
+        e?.document.discipline ?? "",
+        e?.document.docType ?? "",
+        e?.submittedBy ?? "",
+        e?.manualDate ? iso(e.requiredBy) : "",
+        e?.requiredStatus ?? "",
+        e?.approvedBy ?? "",
+        e ? tagOf(e.documentId) : "",
+        "", "", "",
       ]);
     }
   }
@@ -179,4 +201,4 @@ export function clearance(action: { departments: string | null; confirmations: {
 }
 
 /** Confirmation opens this many working days before the activity (the review window). */
-export const CONFIRM_WINDOW_BUSINESS_DAYS = DEFAULT_LEAD_BUSINESS_DAYS;
+export const CONFIRM_WINDOW_DAYS = DEFAULT_LEAD_DAYS;

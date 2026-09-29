@@ -901,6 +901,10 @@ summary::-webkit-details-marker {
     box-shadow: 0 1px 2px rgb(15 23 42 / 4%), 0 12px 28px -24px rgb(15 23 42 / 45%);
     overflow: hidden;
   }
+  /* The sheet that holds the question has menus that open downwards — the date
+     window, the column list — and a clipped sheet cuts them off. Only the sheet
+     holding the table needs to clip, so this one does not. */
+  .register-sheet-open { overflow: visible; }
 
   /* A hint of grey behind each control, and nothing else: no box, no border.
      An underlined field on white reads as a word until the pointer finds it;
@@ -970,4 +974,18 @@ summary::-webkit-details-marker {
   }
   .code-chip-live { background: var(--color-tint); color: var(--color-brand-ink); }
   .code-chip-held { background: transparent; color: var(--color-slate-500); box-shadow: inset 0 0 0 1px var(--color-line-strong); }
+}
+
+@layer components {
+  /**
+   * A box that scrolls without saying so. For the plan, where the bars scroll
+   * under a fixed calendar and a bar of chrome down the side would cut the
+   * track the dates are measured against.
+   */
+  .scroll-quiet {
+    scrollbar-width: none;
+  }
+  .scroll-quiet::-webkit-scrollbar {
+    display: none;
+  }
 }

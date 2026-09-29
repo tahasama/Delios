@@ -25,7 +25,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
         party: true,
         memberships: {
           where: { active: true },
-          include: { project: { select: { code: true, name: true } }, function: { select: { name: true, clearance: true } } },
+          include: { project: { select: { code: true, name: true } }, function: { select: { name: true } } },
         },
       },
     }),
@@ -39,7 +39,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
       include: {
         user: { select: { id: true, name: true, email: true, org: { select: { name: true } } } },
         project: { select: { code: true, name: true } },
-        function: { select: { name: true, clearance: true } },
+        function: { select: { name: true } },
       },
       orderBy: { createdAt: "desc" },
     }),

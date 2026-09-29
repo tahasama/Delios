@@ -3,7 +3,7 @@
 import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
 import { tenantFor, scopedClient } from "../src/lib/tenant";
-import { loadActor, can, canSee, verbsFor, visibleConfidentiality, holdersOf } from "../src/lib/permissions";
+import { loadActor, can, verbsFor, openConfidentiality, holdersOf } from "../src/lib/permissions";
 import { recipientsFor, offDistribution } from "../src/lib/distribution";
 
 const db = new PrismaClient();
@@ -57,32 +57,59 @@ async function main() {
   // document is useless, however correct it is on paper.
   check("the default Viewer can read an ordinary internal document",
     can(viewer, "READ", { discipline: "CI", docType: "DWG", confidentiality: "INTERNAL" }),
-    `clearance ${viewer.clearance}`);
+    "an ordinary document is the ordinary register");
 
-  console.log("\nClearance (§5.7)\n");
-  check("lead is cleared for RESTRICTED", canSee(lead, "RESTRICTED"), `clearance ${lead.clearance}`);
-  check("technician is NOT cleared for RESTRICTED", !canSee(tech, "RESTRICTED"), `clearance ${tech.clearance}`);
-  check("technician IS cleared for INTERNAL", canSee(tech, "INTERNAL"));
-  check("clearance beats the verb", !can(tech, "READ", restricted), "no read even where the rule would allow it");
-  check("lead reads the restricted report", can(lead, "READ", restricted));
+  console.log("\nA closed document is read by the people named on it\n");
+  // Confidentiality above the open levels is not a ladder: being senior does not
+  // open a closed document, and being named does — whatever else you hold.
+  const confidentialityValues = await db.configValue.findMany({ where: { orgId: org.id, setKey: "CONFIDENTIALITY" }, select: { code: true, props: true } });
+  const openCodes = openConfidentiality(confidentialityValues.map((one) => {
+    let props: Record<string, unknown> = {};
+    if (one.props) { try { props = JSON.parse(one.props) as Record<string, unknown>; } catch { /* not a level */ } }
+    return { code: one.code, props };
+  }));
+  check("Public and Internal are open to the project", openCodes.includes("PUBLIC") && openCodes.includes("INTERNAL"), openCodes.join(", "));
+  check("Restricted and Confidential are not", !openCodes.includes("RESTRICTED") && !openCodes.includes("CONFIDENTIAL"));
 
-  console.log("\nThe clearance filter reaches the query, not just the check\n");
-  const allCodes = (await db.configValue.findMany({ where: { orgId: org.id, setKey: "CONFIDENTIALITY" }, select: { code: true } })).map((c) => c.code);
-  const techDb = scopedClient(org.id, p1.id, visibleConfidentiality(tech, allCodes));
-  const leadDb = scopedClient(org.id, p1.id, visibleConfidentiality(lead, allCodes));
+  const techUser = await db.user.findFirst({ where: { orgId: org.id, memberships: { some: { projectId: p1.id, function: { code: "ELEC_TECH" } } } } });
+  const leadUser = await db.user.findFirst({ where: { orgId: org.id, memberships: { some: { projectId: p1.id, function: { code: "LEAD_ELEC_ENG" } } } } });
+  const adminUser = await db.user.findFirst({ where: { orgId: org.id, memberships: { some: { projectId: p1.id, function: { code: "ADMIN" } } } } });
+  check("the demo has a technician, a lead and an administrator on P1", !!techUser && !!leadUser && !!adminUser);
 
   const restrictedDoc = await db.document.findFirst({ where: { projectId: p1.id, confidentiality: "RESTRICTED" } });
   check("a RESTRICTED document exists to test with", !!restrictedDoc, restrictedDoc?.docNumber);
-  if (restrictedDoc) {
-    check("technician's register does not list it", (await techDb.document.findFirst({ where: { id: restrictedDoc.id } })) === null);
-    check("lead's register does list it", (await leadDb.document.findFirst({ where: { id: restrictedDoc.id } })) !== null);
-    check("it is missing from the technician's count",
-      (await techDb.document.count()) < (await leadDb.document.count()),
-      `${await techDb.document.count()} vs ${await leadDb.document.count()}`);
-    // Searching for it by name must not reveal it either.
+
+  if (techUser && leadUser && adminUser && restrictedDoc) {
+    const reader = (userId: string, everything = false) => scopedClient(org.id, p1.id, { userId, everything, openCodes });
+    const techDb = reader(techUser.id);
+    const leadDb = reader(leadUser.id);
+    const adminDb = reader(adminUser.id, true);
+
+    check("the technician's register does not list it", (await techDb.document.findFirst({ where: { id: restrictedDoc.id } })) === null);
+    check("seniority alone does not open it — the lead cannot either",
+      (await leadDb.document.findFirst({ where: { id: restrictedDoc.id } })) === null);
+    check("the administrator reads it", (await adminDb.document.findFirst({ where: { id: restrictedDoc.id } })) !== null);
     const hunted = await techDb.document.findMany({ where: { docNumber: { contains: restrictedDoc.docNumber } } });
     check("searching for it by number finds nothing", hunted.length === 0);
+    check("it is missing from the technician's count",
+      (await techDb.document.count()) < (await adminDb.document.count()),
+      `${await techDb.document.count()} vs ${await adminDb.document.count()}`);
+    check("its revisions are as closed as it is",
+      (await techDb.revision.findFirst({ where: { documentId: restrictedDoc.id } })) === null);
+    check("so are its reviews",
+      (await techDb.reviewCycle.findFirst({ where: { revision: { documentId: restrictedDoc.id } } })) === null);
+
+    // Named on the document, and it opens — for that person only.
+    const named = await db.documentAccess.create({
+      data: { projectId: p1.id, documentId: restrictedDoc.id, userId: techUser.id, addedById: adminUser.id, addedByName: "verify" },
+    });
+    check("named on it, the technician reads it", (await techDb.document.findFirst({ where: { id: restrictedDoc.id } })) !== null);
+    check("naming one person does not open it to another",
+      (await leadDb.document.findFirst({ where: { id: restrictedDoc.id } })) === null);
+    await db.documentAccess.delete({ where: { id: named.id } });
+    check("taken off the list, it closes again", (await techDb.document.findFirst({ where: { id: restrictedDoc.id } })) === null);
   }
+
 
   console.log("\nDistribution is the matrix read through RECEIVE (§11.8)\n");
   const onElecDrawings = await recipientsFor(t, elecDrawing);
@@ -94,16 +121,16 @@ async function main() {
     onCivilDrawings.map((r) => r.functionName).join(", ") || "nobody");
 
   const onRestricted = await recipientsFor(t, restricted);
-  check("nobody under-cleared is on a RESTRICTED distribution",
+  check("the technician is not on a RESTRICTED report's distribution",
     !onRestricted.some((r) => r.functionName === "Electrical Technician"));
 
   // Issuing to someone off the list is allowed, but must be flagged (§11.8).
-  const techUser = await db.user.findFirst({ where: { orgId: org.id, email: "tech.elec@delios.local" } });
-  if (techUser) {
-    const strangers = await offDistribution(t, civilDrawing, [techUser.id]);
+  const technician = await db.user.findFirst({ where: { orgId: org.id, email: "tech.elec@delios.local" } });
+  if (technician) {
+    const strangers = await offDistribution(t, civilDrawing, [technician.id]);
     check("issuing civil drawings to the technician is flagged off-distribution", strangers.length === 1,
       strangers[0]?.basis);
-    const normal = await offDistribution(t, elecDrawing, [techUser.id]);
+    const normal = await offDistribution(t, elecDrawing, [technician.id]);
     check("issuing electrical drawings to them is not flagged", normal.length === 0);
   }
 
@@ -113,7 +140,7 @@ async function main() {
   });
   const emptyActor = await loadActor(t, empty.id);
   check("holds no verbs at all", verbsFor(emptyActor).length === 0);
-  check("cannot read, despite clearance 4", !can(emptyActor, "READ", elecDrawing));
+  check("cannot read anything", !can(emptyActor, "READ", elecDrawing));
   check("cannot create", !can(emptyActor, "CREATE", elecDrawing));
   check("is on nobody's distribution", !(await recipientsFor(t, elecDrawing)).some((r) => r.functionName === empty.name));
   await db.function.delete({ where: { id: empty.id } });

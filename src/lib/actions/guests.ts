@@ -22,7 +22,7 @@ export type GuestState = { error?: string; ok?: string };
  *             deactivate it the day they leave.
  *
  * Both end up as an ordinary ProjectMembership holding a function, so
- * everything downstream — clearance, the matrix, distribution — applies to them
+ * everything downstream — the matrix, distribution, who may read a closed document — applies to them
  * exactly as it does to staff. Nothing about being external is special-cased.
  */
 

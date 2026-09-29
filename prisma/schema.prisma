@@ -62,6 +62,8 @@ model Project {
 
   members                ProjectMembership[]
   delegations            Delegation[]
+  documentAccess         DocumentAccess[]
+  controlSettings        ControlSetting[]
   numberCounters         NumberCounter[]
   documents              Document[]
   revisions              Revision[]
@@ -139,8 +141,9 @@ model Function {
   code        String
   name        String
   description String?
-  // §5.7 — the highest confidentiality level this function may see. A document
-  // above it is not listed, not searchable and not openable.
+  // Was the highest confidentiality level this function could see. Nothing reads
+  // it any more: a document above the open levels is read by the people named on
+  // it (see DocumentAccess), never by rank. Kept so old records still parse.
   clearance   Int          @default(1)
   // The pre-Phase-2 vocabulary, kept so the six role names still mean something
   // in the UI and in the checks that have not moved to verbs yet.
@@ -275,6 +278,7 @@ model User {
   createdAt      DateTime            @default(now())
   approvals      Approval[]
   delegationsOut Delegation[]        @relation("DelegationFrom")
+  documentAccess DocumentAccess[]    @relation("DocumentAccessUser")
   delegationsIn  Delegation[]        @relation("DelegationTo")
   memberships    ProjectMembership[]
   contactFor     Party[]             @relation("PartyContact")
@@ -297,8 +301,91 @@ model Delegation {
   scope      String? // document class scope note (§8.5)
   endDate    DateTime // no delegation without an end date (§8.5)
   createdAt  DateTime @default(now())
+  /**
+   * What is handed over: REVIEW to give advice in someone's place, APPROVE to
+   * give the binding verdict in their place. A delegation hands over one of
+   * them, never "everything I can do".
+   */
+  verb       String   @default("REVIEW")
+  /**
+   * The review it was raised from, when it was raised from one. A delegation
+   * with no cycle covers the class its scope names.
+   */
+  cycleId    String?
+  cycle      ReviewCycle? @relation(fields: [cycleId], references: [id])
+  /**
+   * OPEN — asked for, and Document Control has not carried it out yet.
+   * ACTIVE — in force. REFUSED — Document Control declined it, with a reason.
+   * WITHDRAWN — the person who asked took it back.
+   *
+   * Where a project has no control function the request step does not exist and
+   * a delegation is ACTIVE from the moment it is made.
+   */
+  status     String   @default("ACTIVE")
+  reason     String?
+  askedById  String?
+  askedByName String?
+  grantedById String?
+  grantedByName String?
+  grantedAt  DateTime?
+  refusedReason String?
 
   @@index([projectId])
+  @@index([toUserId, status])
+  @@index([cycleId])
+}
+
+/**
+ * Who carries out one kind of act: Document Control, or the people doing the
+ * work themselves.
+ *
+ * FOLLOW is the honest default — it reads the project, so an organization that
+ * gives the control function to somebody has that function receive, release and
+ * send, and one that gives it to nobody has the work keep its own record. An
+ * administrator overrides a single act with CONTROL or SELF, because exceptions
+ * are agreed per project and this is where they are written down.
+ *
+ * The list of acts is declared in `src/lib/control-activities.ts`; a row here
+ * exists only for an act somebody has overridden.
+ */
+model ControlSetting {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  key       String
+  mode      String   @default("FOLLOW") // FOLLOW | CONTROL | SELF
+  setById   String?
+  setByName String?
+  updatedAt DateTime @updatedAt
+
+  @@unique([projectId, key])
+  @@index([projectId])
+}
+
+/**
+ * Who may read a document that is not open to the project.
+ *
+ * Confidentiality above the open levels is not a ladder anyone climbs by rank:
+ * the people who may read it are named, one by one, by whoever is answerable
+ * for the content — the author or the person who uploaded it — and by nobody
+ * else. An administrator reads everything, because somebody must be able to.
+ */
+model DocumentAccess {
+  id           String   @id @default(cuid())
+  projectId    String
+  project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  documentId   String
+  document     Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User     @relation("DocumentAccessUser", fields: [userId], references: [id], onDelete: Cascade)
+  addedById    String
+  addedByName  String
+  reason       String?
+  createdAt    DateTime @default(now())
+
+  @@unique([documentId, userId])
+  @@index([projectId])
+  @@index([userId])
 }
 
 // Approval authority matrix (§8.2) — versioned; most specific matching row governs.
@@ -463,6 +550,7 @@ model Document {
   packageMembers  PackageMember[]
   defects         Defect[] // entityKey references this document (defect.documentRef)
   snapshots       DocumentSnapshot[]
+  access          DocumentAccess[]
 
   @@unique([projectId, docNumber])
   @@index([state])
@@ -516,9 +604,12 @@ model Revision {
   authorizedById        String?
   authorizedByName      String?
   authorizedAt          DateTime?
+  // Released and issued are one act: a revision is released only when it is
+  // sent, so these two are stamped together and never one without the other.
   releasedAt            DateTime?
   releasedById          String?
   releasedByName        String?
+  issuedAt              DateTime?
   supersededAt          DateTime?
   supersededById        String?
   voidedAt              DateTime?
@@ -653,14 +744,25 @@ model ReviewCycle {
   recordedByName         String?
   // Their own code, kept as they wrote it, beside the verdict it maps to.
   foreignOutcome         String?
+  /**
+   * The outside approval a release waits on. Set when this step exists only to
+   * carry an issue request's approval: the party answers, and their answer
+   * releases and issues the revision or sends it back to review.
+   */
+  issueRequestId         String?
+  issueRequest           IssueRequest? @relation(fields: [issueRequestId], references: [id])
   createdAt              DateTime           @default(now())
   comments               ReviewComment[]
   assignments            ReviewAssignment[]
   files                  StoredFile[]
+  delegations            Delegation[]
 
   @@index([status])
   @@index([revisionId])
   @@index([projectId])
+  // The reviews page reads them newest first, narrowed by status.
+  @@index([projectId, submittedAt])
+  @@index([status, submittedAt])
 }
 
 model ReviewAssignment {
@@ -745,6 +847,13 @@ model Transmittal {
   @@index([direction])
   @@index([status])
   @@index([projectId])
+  // The log's own order, and the columns it narrows by.
+  @@index([projectId, dateOfIssue])
+  @@index([projectId, createdAt])
+  @@index([reasonForIssue])
+  @@index([issuingParty])
+  @@index([responseDueDate])
+  @@index([receivedDate])
 }
 
 model TransmittalItem {
@@ -808,6 +917,9 @@ model Action {
   project            Project                 @relation(fields: [projectId], references: [id], onDelete: Cascade)
   code               String // unique, never reused (§14.2)
   name               String
+  // What the activity is, in the scheduler's own words. Optional: a name is
+  // often enough, and a description is what makes a cryptic name readable.
+  description        String?
   scheduledDate      DateTime?
   ownerName          String?
   scheduleRef        String?
@@ -818,6 +930,19 @@ model Action {
   // When the system first warned the departments that this activity was at
   // risk. The warning goes out once, by itself; later ones are sent by hand.
   riskNotifiedAt     DateTime?
+  // ── What this action is waiting for, said on the action ────────────────────
+  // Whether an action is ready is a question about every document on its list
+  // and the revision each one carries. Asking it row by row means loading the
+  // whole schedule to show fifteen of it, and it cannot be filtered or paged in
+  // the database at all. So the answer is kept here, written by the code that
+  // changes it (see `src/lib/action-readiness.ts`). Nothing here is a new fact.
+  needCount          Int                     @default(0)
+  // Met under the two readings an organization may choose between: released and
+  // issued at the status asked for, or carrying that status however it got it.
+  metIssuedCount     Int                     @default(0)
+  metStatusCount     Int                     @default(0)
+  // The earliest day a document still missing is owed.
+  nextNeededAt       DateTime?
   createdAt          DateTime                @default(now())
   entries            BaselineEntry[]
   scheduleActivities ScheduleActivity[]
@@ -825,6 +950,10 @@ model Action {
 
   @@unique([projectId, code])
   @@index([projectId])
+  // The plan's own order, and the window of days it opens on.
+  @@index([projectId, scheduledDate])
+  // What is owed next, which is what "at risk" is read from.
+  @@index([projectId, nextNeededAt])
 }
 
 model BaselineEntry {
@@ -1345,6 +1474,7 @@ model Party {
   active           Boolean       @default(true)
   users            User[]
   cycles           ReviewCycle[]
+  approvals        IssueRequest[] @relation("IssueApprover")
   // Who answers for this party. The contact is required for an outside party;
   // the backup is whoever stands in when the contact is away.
   contactId        String?
@@ -1455,6 +1585,14 @@ model IssueRequest {
    * The asker left the choice to whoever wrote the revision.
    */
   delegated     Boolean      @default(false)
+  /**
+   * An outside party has to approve this revision before it is released. Until
+   * their answer comes back the revision is not released; their acceptance
+   * releases and issues it, their rejection sends it back to review.
+   */
+  needsApproval Boolean      @default(false)
+  approverId    String?
+  approver      Party?       @relation("IssueApprover", fields: [approverId], references: [id])
   raisedById    String
   raisedByName  String
   raisedAt      DateTime     @default(now())
@@ -1466,6 +1604,8 @@ model IssueRequest {
   carriedOutBy  String?
   transmittalId String?
   transmittal   Transmittal? @relation(fields: [transmittalId], references: [id])
+  /** The step that carries this request's outside approval, where one is needed. */
+  approvalSteps ReviewCycle[]
 
   @@index([revisionId])
   @@index([projectId, status])

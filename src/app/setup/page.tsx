@@ -99,7 +99,7 @@ export default async function SetupPage() {
                 <Field label="Function" required hint="What they do — change it any time">
                   <select name="functionId" required className={inputCls} defaultValue="">
                     <option value="" disabled>Choose…</option>
-                    {functions.map((f) => <option key={f.id} value={f.id}>{f.name} · clearance {f.clearance}</option>)}
+                    {functions.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
                   </select>
                 </Field>
                 <Field label="Initial password" required hint="You hand this over yourself — nothing is emailed">

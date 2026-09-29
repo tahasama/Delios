@@ -1,3 +1,4 @@
+import { delegationInForce } from "./delegation";
 import type { Tenant } from "./tenant";
 import type { SessionUser } from "./auth";
 import { hasVerb } from "./auth";
@@ -43,7 +44,9 @@ export async function assertMayGiveBindingVerdict(t: Tenant, revisionId: string,
   const scoped = t as Tenant & { can?: (verb: "APPROVE", target: typeof rev.document) => boolean };
   const holds = scoped.can ? scoped.can("APPROVE", rev.document) : hasVerb(user, "APPROVE");
   if (holds) return;
-  const del = await t.db.delegation.findFirst({ where: { toUserId: user.id, endDate: { gte: new Date() } } });
+  // A delegation counts only where the person who gave it may approve this
+  // class and the person who received it is named for it too (§8.5).
+  const del = await delegationInForce(t, { userId: user.id, verb: "APPROVE", target: rev.document });
   if (!del) throw new Error(`Only someone who may approve ${rev.document.docNumber} can give the binding verdict that releases it — ${user.name} may not (distribution matrix).`);
 }
 
@@ -66,8 +69,8 @@ export async function recordApproval(t: Tenant, revisionId: string, user: Sessio
   const holds = scoped.can ? scoped.can("APPROVE", rev.document) : hasVerb(user, "APPROVE");
   let viaDelegation = false;
   if (!holds) {
-    const del = await db.delegation.findFirst({ where: { toUserId: user.id, endDate: { gte: new Date() } } });
- if (!del) throw new Error(`${user.name} does not hold Approve for this class in the distribution matrix, and no delegation is in force.`);
+    const del = await delegationInForce(t, { userId: user.id, verb: "APPROVE", target: rev.document });
+ if (!del) throw new Error(`${user.name} does not hold Approve for this class in the distribution matrix, and no delegation in force lets them act in somebody's place.`);
     viaDelegation = true;
   }
   const matrixVersion = await matrixVersionInForce(t);

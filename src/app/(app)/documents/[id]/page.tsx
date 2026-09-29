@@ -1,3 +1,6 @@
+import { ReadersPanel } from "./readers-panel";
+import { openConfidentiality } from "@/lib/permissions";
+import { controlDoes } from "@/lib/control-activities";
 import { notFound } from "next/navigation";
 import { requireScope } from "@/lib/scope";
 import { preflight } from "@/lib/rules/preflight";
@@ -92,6 +95,37 @@ export default async function DocumentDetailPage({
 
   const canEdit = mayContributeToDocument(user, doc) && !["WITHDRAWN", "CANCELLED"].includes(doc.state);
   const controller = isController(user) || isAdmin(user);
+
+  // A closed document — above the open confidentiality levels — is read by the
+  // people named on it. Whoever is answerable for the content names them.
+  // Who retires a document and who voids a revision is the project's answer.
+  const [withdrawIsControl, voidIsControl] = await Promise.all([
+    controlDoes(ctx, "WITHDRAW"),
+    controlDoes(ctx, "VOID"),
+  ]);
+  const mayRetire = controller || (!withdrawIsControl && doc.createdById === user.id);
+
+  const confidentialityRows = await getSet("CONFIDENTIALITY");
+  const openCodes = openConfidentiality(confidentialityRows.map((one) => ({ code: one.code, props: one.props })));
+  const closed = !!doc.confidentiality && !openCodes.includes(doc.confidentiality);
+  const answerableFor = closed
+    ? [...new Set([doc.createdByName, ...doc.revisions.flatMap((r) => [r.authoredByName, r.uploadedByName])].filter((one): one is string => !!one))]
+    : [];
+  const mayNameReaders = closed
+    && (isAdmin(user)
+      || doc.createdById === user.id
+      || doc.revisions.some((r) => r.authoredById === user.id || r.uploadedById === user.id));
+  const [namedReaders, projectPeople] = closed
+    ? await Promise.all([
+        db.documentAccess.findMany({ where: { documentId: doc.id }, orderBy: { createdAt: "asc" }, include: { user: { select: { name: true } } } }),
+        mayNameReaders
+          ? db.projectMembership.findMany({
+              where: { active: true, user: { active: true } },
+              include: { user: { select: { id: true, name: true } }, function: { select: { name: true } } },
+            })
+          : Promise.resolve([]),
+      ])
+    : [[], []];
   const inPrep = doc.revisions.find((r) => r.state === "IN_PREPARATION");
   const inReview = doc.revisions.find((r) => r.state === "IN_REVIEW");
   // Decided, waiting for Document Control. Still the revision in hand, and the
@@ -455,6 +489,18 @@ export default async function DocumentDetailPage({
                     </div>
                   ))}
                 </dl>
+                {closed ? (
+                  <ReadersPanel
+                    documentId={doc.id}
+                    confidentiality={label(confidentialities, doc.confidentiality) ?? doc.confidentiality ?? "closed"}
+                    readers={namedReaders.map((row) => ({ id: row.id, name: row.user.name, addedByName: row.addedByName, reason: row.reason, at: row.createdAt }))}
+                    candidates={projectPeople
+                      .filter((one) => !namedReaders.some((row) => row.userId === one.user.id) && one.user.id !== doc.createdById)
+                      .map((one) => ({ id: one.user.id, name: one.user.name, functionName: one.function?.name ?? null }))}
+                    mayName={mayNameReaders}
+                    answerable={answerableFor}
+                  />
+                ) : null}
                 {canEdit ? (
                   <details className="mt-4">
                     <summary className="cursor-pointer list-none text-xs font-semibold text-link">Edit details</summary>
@@ -485,7 +531,7 @@ export default async function DocumentDetailPage({
                       ) : (
                         <>
                           <ActionForm action={setLegalHoldAction} submitLabel={doc.legalHold ? "Lift legal hold" : "Put on legal hold"} size="sm" variant="secondary" hidden={{ documentId: doc.id, hold: doc.legalHold ? "off" : "on" }} />
-                          {doc.state === "ACTIVE" ? (
+                          {doc.state === "ACTIVE" && mayRetire ? (
                             <ActionForm action={endDocumentStateAction} submitLabel="Retire" variant="danger" size="sm" hidden={{ documentId: doc.id }} confirmText="People who received it will be told to stop using it. Continue?">
                               <Field label="Retire as">
                                 <select name="kind" className={inputCls} defaultValue="WITHDRAWN">
@@ -550,7 +596,7 @@ export default async function DocumentDetailPage({
                 {doc.revisions.map((rev, index) => (
                   /* Only the newest revision can still be acted on. Everything
                      before it is frozen as it was issued. */
-                  <RevisionRow key={rev.id} rev={rev} latest={index === 0} statusLabel={label(statuses, rev.statusCode)} controller={controller} userId={user.id} userRole={user.role} />
+                  <RevisionRow key={rev.id} rev={rev} latest={index === 0} statusLabel={label(statuses, rev.statusCode)} controller={controller} userId={user.id} userRole={user.role} voidIsControl={voidIsControl} />
                 ))}
               </ul>
             ) : <Empty>No revision yet.</Empty>,
@@ -570,7 +616,6 @@ export default async function DocumentDetailPage({
                         {c.status === "OPEN" ? `with ${c.assignments.map((a) => a.userName).join(", ") || "nobody yet"}` : prettyState(c.outcome ?? "closed")}
                       </span>
                       {c.comments.length ? <span className="text-[11px] text-slate-500">{c.comments.length} comment{c.comments.length === 1 ? "" : "s"}</span> : null}
-                      {c.comments.some((x) => x.progressionPreventing && x.status === "OPEN") ? <Chip className="bg-red-100 text-red-700 ring-red-300">blocking</Chip> : null}
                       <span className="text-[11px] text-slate-400">{fmtDate(c.submittedAt)}</span>
                     </Link>
                   </li>
@@ -713,7 +758,7 @@ type RevData = Prisma.RevisionGetPayload<{
 }>;
 
 /** One line per revision; its record and its per-revision controls open in place. */
-function RevisionRow({ rev, latest, statusLabel, controller, userId, userRole }: { rev: RevData; latest: boolean; statusLabel: string | null; controller: boolean; userId: string; userRole: string }) {
+function RevisionRow({ rev, latest, statusLabel, controller, userId, userRole, voidIsControl }: { rev: RevData; latest: boolean; statusLabel: string | null; controller: boolean; userId: string; userRole: string; voidIsControl: boolean }) {
   const state = rev.state as RevState;
   const pdf = rev.files.find((f) => f.kind === "RENDITION");
   const native = rev.files.find((f) => f.kind === "NATIVE");
@@ -778,7 +823,7 @@ function RevisionRow({ rev, latest, statusLabel, controller, userId, userRole }:
               already have worked from. And one that was never reviewed at all —
               opened, left, and now in the way of the next one: voiding it says
               it never counted, which is the truth, and clears the document. */}
-          {controller && latest && (state === "RELEASED" || (state === "IN_PREPARATION" && !rev.cycles.length)) ? (
+          {(controller || (!voidIsControl && (rev.authoredById === userId || rev.uploadedById === userId))) && latest && (state === "RELEASED" || (state === "IN_PREPARATION" && !rev.cycles.length)) ? (
             <details>
               <summary className="cursor-pointer text-xs font-semibold text-red-700">{state === "RELEASED" ? "Void — issued in error…" : "Void — it was never reviewed…"}</summary>
               <div className="mt-2 max-w-md">

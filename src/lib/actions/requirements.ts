@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireScope } from "@/lib/scope";
 import { audit, notifyMany } from "@/lib/audit";
 import { departmentRows, departmentMembers, senderRecipients, senderRows, isDepartmentSender } from "@/lib/requirements-process";
-import { departmentsOf, businessDaysBefore, DEFAULT_LEAD_BUSINESS_DAYS } from "@/lib/schedule";
+import { departmentsOf, daysBefore, DEFAULT_LEAD_DAYS } from "@/lib/schedule";
 import { parseDate } from "@/lib/controlled/registry";
 import { fmtDate } from "@/lib/utils";
 import { holdersOf } from "@/lib/permissions";
@@ -135,8 +135,8 @@ export async function confirmReadinessAction(_prev: State | undefined, formData:
   if (!action) return { error: "That activity no longer exists." };
   if (!departmentsOf(action).includes(department)) return { error: `${department} is not concerned by ${action.code}.` };
   // Confirmation belongs to the review window: from submit-by to the activity.
-  const opens = action.scheduledDate ? businessDaysBefore(action.scheduledDate, DEFAULT_LEAD_BUSINESS_DAYS) : null;
-  if (opens && opens.getTime() > Date.now()) return { error: `Confirmation opens ${fmtDate(opens)}, ${DEFAULT_LEAD_BUSINESS_DAYS} working days before the activity.` };
+  const opens = action.scheduledDate ? daysBefore(action.scheduledDate, DEFAULT_LEAD_DAYS) : null;
+  if (opens && opens.getTime() > Date.now()) return { error: `Confirmation opens ${fmtDate(opens)}, ${DEFAULT_LEAD_DAYS} days before the activity.` };
 
   const membership = await db.projectMembership.findFirst({ where: { projectId: ctx.projectId, userId: user.id, active: true } });
   if (membership?.department !== department && !ctx.can("CONTROL")) return { error: `Only someone from ${department} confirms for ${department}.` };

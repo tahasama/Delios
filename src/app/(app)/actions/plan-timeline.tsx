@@ -7,13 +7,21 @@ export type PlanRow = {
   scheduledDate: Date | null;
   /** The earliest date a document is needed for this activity. */
   firstNeeded: Date | null;
-  readiness: "READY" | "AT_RISK" | "NOT_READY" | "UNKNOWN";
+  readiness: "DONE" | "READY" | "AT_RISK" | "NOT_READY" | "UPCOMING" | "UNKNOWN";
   ready: number;
   total: number;
 };
 
+/**
+ * What the colour says, and only that: dark green is done, green is ready,
+ * blue is work still
+ * ahead with nothing owed yet, amber is a document owed within the week, red is
+ * a day that has passed with something still missing, grey is nothing listed.
+ */
 const TONE: Record<PlanRow["readiness"], string> = {
-  READY: "bg-emerald-500",
+  DONE: "bg-emerald-700",
+  READY: "bg-emerald-400",
+  UPCOMING: "bg-sky-500",
   AT_RISK: "bg-amber-500",
   NOT_READY: "bg-red-500",
   UNKNOWN: "bg-slate-300",
@@ -25,52 +33,99 @@ const DAY = 86_400_000;
  * document is needed to the day the work happens. Today is the vertical line,
  * so what is late is obvious without reading a single date.
  */
-export function PlanTimeline({ rows }: { rows: PlanRow[] }) {
+export function PlanTimeline({ rows, window, fit }: {
+  rows: PlanRow[];
+  /**
+   * How many bars the plan opens with. The box is exactly that tall, so what
+   * opens never scrolls and what is loaded afterwards scrolls inside it rather
+   * than pushing the page about.
+   */
+  fit?: number;
+  /**
+   * The days the plan is drawn across. Given, it is the window somebody asked
+   * for — a month either side of today, unless they said otherwise — so the
+   * bars keep the same scale however many activities fall inside it.
+   */
+  window?: { from: Date; to: Date };
+}) {
   const dated = rows.filter((r) => r.scheduledDate);
   if (!dated.length) return null;
   const starts = dated.map((r) => (r.firstNeeded ?? r.scheduledDate!).getTime());
   const ends = dated.map((r) => r.scheduledDate!.getTime());
   const now = Date.now();
-  const min = Math.min(...starts, now) - 3 * DAY;
-  const max = Math.max(...ends, now) + 3 * DAY;
+  const min = window ? window.from.getTime() : Math.min(...starts, now) - 3 * DAY;
+  const max = window ? window.to.getTime() : Math.max(...ends, now) + 3 * DAY;
   const span = Math.max(max - min, DAY);
   const at = (t: number) => ((t - min) / span) * 100;
 
-  // A tick on the first of each month the plan covers.
-  const ticks: { left: number; label: string }[] = [];
+  // The day the plan starts, then the first of each month it covers. Without
+  // the first of those, the leftmost line falls days inside the plan and every
+  // bar that begins at the edge looks as though it began before the calendar.
+  const ticks: { left: number; label: string }[] = [
+    { left: 0, label: new Date(min).toLocaleDateString("en-GB", { day: "numeric", month: "short" }) },
+  ];
   const cursor = new Date(min);
   cursor.setDate(1);
   cursor.setHours(0, 0, 0, 0);
   while (cursor.getTime() <= max) {
-    if (cursor.getTime() >= min) ticks.push({ left: at(cursor.getTime()), label: cursor.toLocaleDateString("en-GB", { month: "short", year: "2-digit" }) });
+    // A month that starts within a few days of the edge would print its name on
+    // top of the starting day's, so it is left to the line to say it.
+    if (cursor.getTime() >= min && at(cursor.getTime()) > 6) {
+      ticks.push({ left: at(cursor.getTime()), label: cursor.toLocaleDateString("en-GB", { month: "short", year: "2-digit" }) });
+    }
     cursor.setMonth(cursor.getMonth() + 1);
   }
 
   return (
-    <section className="rounded-2xl border border-slate-200 bg-surface p-4 shadow-sm">
-      <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="text-sm font-semibold text-slate-900">The plan</h2>
-        <p className="text-[11px] text-slate-400">Each bar runs from the day the first document is needed to the day the work happens. The line is today.</p>
+    <section className="px-5 pt-1 pb-4 sm:px-6">
+      {/* The dates are written once, above everything, and stay there: the bars
+          scroll under them rather than taking the calendar with them.
+          The band and the grid below it cover exactly the track the bars are
+          drawn in — the names take 200px and the gap 8px on the left, the ready
+          count 56px and its gap on the right. Any other figure and the dates
+          line up with nothing. */}
+      <div className="relative ml-[208px] mr-[64px] h-4">
+        {ticks.map((t) => (
+          <span key={t.label} className="absolute top-0 whitespace-nowrap text-[10px] leading-none text-slate-400" style={{ left: `${t.left}%`, marginLeft: "0.25rem" }}>
+            {t.label}
+          </span>
+        ))}
+        <span
+          className="absolute top-0 whitespace-nowrap rounded bg-red-500 px-1 text-[10px] leading-4 font-semibold text-white"
+          style={{ left: `${at(now)}%`, marginLeft: "0.25rem" }}
+        >
+          today · {fmtDate(new Date(now))}
+        </span>
       </div>
-      <div className="relative">
-        {/* month grid */}
-        <div className="pointer-events-none absolute inset-0 ml-[210px]">
-          {ticks.map((t) => (
-            <div key={t.label} className="absolute top-0 h-full border-l border-dashed border-slate-200" style={{ left: `${t.left}%` }}>
-              <span className="absolute -top-0.5 left-1 text-[10px] text-slate-400">{t.label}</span>
-            </div>
-          ))}
-          {/* Today, with its date — a bare line leaves people counting months. */}
-          <div className="absolute top-0 h-full border-l-2 border-red-400/70" style={{ left: `${at(now)}%` }}>
-            <span className="absolute -top-0.5 left-1 whitespace-nowrap rounded bg-red-500 px-1 text-[10px] font-semibold text-white">today · {fmtDate(new Date(now))}</span>
+
+      {/* A plan is as long as the project. It keeps the height it opened at and
+          scrolls inside it, so loading more never pushes the page about. One
+          bar is 20px and the gap between two is 10px. */}
+      <div
+        className="scroll-quiet relative overflow-x-hidden overflow-y-auto"
+        style={{ maxHeight: `${Math.max(fit ?? 12, 1) * 30 + 6}px` }}
+      >
+        {/* The lines are drawn on the bars, not on the window onto them: this
+            box is as tall as every bar there is, so today's line reaches the
+            last one however far down it was loaded. */}
+        <div className="relative min-h-full">
+          <div className="pointer-events-none absolute inset-y-0 left-[208px] right-[64px]">
+            {ticks.map((t) => (
+              <div key={t.label} className="absolute top-0 h-full border-l border-dashed border-slate-200" style={{ left: `${t.left}%` }} />
+            ))}
+            <div className="absolute top-0 h-full border-l-2 border-red-400/70" style={{ left: `${at(now)}%` }} />
           </div>
-        </div>
-        <ul className="relative space-y-1.5 pt-4">
+          <ul className="relative space-y-2.5 pt-1">
           {dated.map((r) => {
             const start = (r.firstNeeded ?? r.scheduledDate!).getTime();
             const end = r.scheduledDate!.getTime();
-            const left = at(Math.min(start, end));
-            const width = Math.max(at(Math.max(start, end)) - left, 0.6);
+            // A bar that starts before the window is drawn from its edge, not
+            // off the side of it — otherwise it runs back over the names.
+            const rawLeft = at(Math.min(start, end));
+            const rawRight = at(Math.max(start, end));
+            const left = Math.max(rawLeft, 0);
+            const width = Math.max(Math.min(rawRight, 100) - left, 0.6);
+            const fromBefore = rawLeft < 0;
             return (
               <li key={r.code} className="flex items-center gap-2">
                 <Link href={`/actions/${r.code}`} className="w-[200px] shrink-0 truncate text-xs text-slate-600 hover:text-link" title={`${r.code} — ${r.name}`}>
@@ -78,17 +133,20 @@ export function PlanTimeline({ rows }: { rows: PlanRow[] }) {
                 </Link>
                 <span className="relative h-5 flex-1">
                   <span
-                    className={`absolute top-1/2 h-2.5 -translate-y-1/2 rounded-full ${TONE[r.readiness]}`}
+                    className={`absolute top-1/2 h-2.5 -translate-y-1/2 ${TONE[r.readiness]} ${fromBefore ? "rounded-r-full" : "rounded-full"}`}
                     style={{ left: `${left}%`, width: `${width}%` }}
                     title={`${r.code}: documents needed from ${fmtDate(r.firstNeeded)} · work on ${fmtDate(r.scheduledDate)} · ${r.ready} of ${r.total} ready`}
                   />
-                  <span className="absolute top-1/2 h-3.5 w-1 -translate-y-1/2 rounded bg-slate-700" style={{ left: `${at(end)}%` }} />
+                  {at(end) >= 0 && at(end) <= 100
+                    ? <span className="absolute top-1/2 h-3.5 w-1 -translate-y-1/2 rounded bg-slate-700" style={{ left: `${at(end)}%` }} />
+                    : null}
                 </span>
                 <span className="w-14 shrink-0 text-right text-[11px] tabular-nums text-slate-500">{r.total ? `${r.ready}/${r.total}` : "—"}</span>
               </li>
             );
           })}
-        </ul>
+          </ul>
+        </div>
       </div>
     </section>
   );

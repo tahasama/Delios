@@ -1,5 +1,7 @@
 "use server";
 
+import { carrierRefusal } from "@/lib/control-activities";
+import { mayAnswerCycle } from "@/lib/delegation";
 import { startWorkflowRun } from "@/lib/workflow";
 import { redirect } from "next/navigation";
 import { requireScope } from "@/lib/scope";
@@ -9,7 +11,6 @@ import { audit, notifyMany } from "@/lib/audit";
 import { saveUpload } from "@/lib/files";
 import { parseSteps, recordStepOutcome } from "@/lib/workflow";
 import { requestFromForm } from "@/lib/issue-requests";
-import { carryOutOpenRequests } from "@/lib/issue-requests";
 import { executionSeriesStarted, openReviewCycle, recordReviewOutcome, returnToOriginator, returnAtGate, issueToReview, recordApproval, releaseRevision, voidRevision } from "@/lib/lifecycle";
 import { enforce } from "@/lib/rules/preflight";
 import { nextRevisionValue } from "@/lib/numbering";
@@ -79,9 +80,12 @@ export async function prepareRevisionAction(_prev: { error?: string } | undefine
       authorizedByName = user.name;
       authorizedAt = new Date();
     } else if (explicitAuth) {
-      if (!isController(user) && !isAdmin(user)) {
- return { error: "Authorization to revise is issued by the designated control function — no party establishes a revision without it." };
-      }
+      const document = await db.document.findUnique({ where: { id: documentId }, select: { createdById: true } });
+      const cannotAuthorize = await carrierRefusal(ctx, "AUTHORIZE_REVISION", {
+        control: isController(user) || isAdmin(user),
+        standing: document?.createdById === user.id,
+      });
+      if (cannotAuthorize) return { error: cannotAuthorize };
       authorizationReason = explicitAuth;
       authorizedById = user.id;
       authorizedByName = user.name;
@@ -184,8 +188,15 @@ export async function uploadRevisionFilesAction(_prev: { error?: string } | unde
 export async function issueToReviewAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
   const ctx = await requireScope();
   const { user, db, projectId, orgId } = ctx;
- if (!isController(user) && !isAdmin(user)) return { error: "The control function issues cycles to review." };
   const cycleId = String(formData.get("cycleId") ?? "");
+  // Whoever sent it for review may issue it to the reviewers where the project
+  // carries this out itself; where Document Control does, they do.
+  const opened = await db.reviewCycle.findUnique({ where: { id: cycleId }, select: { openedById: true } });
+  const cannotIssue = await carrierRefusal(ctx, "REVIEW_ISSUE", {
+    control: isController(user) || isAdmin(user),
+    standing: opened?.openedById === user.id,
+  });
+  if (cannotIssue) return { error: cannotIssue };
   try {
     await issueToReview(ctx, cycleId, user);
   } catch (e) {
@@ -199,8 +210,12 @@ export async function addCommentAction(_prev: { error?: string } | undefined, fo
   const ctx = await requireScope();
   const { user, db, projectId, orgId } = ctx;
   const cycleId = String(formData.get("cycleId") ?? "");
-  const assigned = await db.reviewAssignment.findFirst({ where: { cycleId, userId: user.id } });
-  if (!assigned && !isController(user) && !isAdmin(user)) return { error: "You may comment only on a review assigned to you." };
+  // A reviewer comments on their own step; somebody holding a delegation from a
+  // reviewer comments in their place, and the comment says so.
+  const stands = await mayAnswerCycle(ctx, { cycleId, userId: user.id, verb: "REVIEW" });
+  if (!stands.ok && !isController(user) && !isAdmin(user)) {
+    return { error: "You may comment only on a review assigned to you, or one delegated to you by somebody it is assigned to." };
+  }
   const text = String(formData.get("text") ?? "").trim();
   // One question, asked once: does this comment stop the release? The published
   // classification is still what gets stored, so the register is unchanged.
@@ -302,7 +317,7 @@ export async function closeCommentAction(_prev: { error?: string } | undefined, 
   const { user, db, projectId, orgId } = ctx;
   const commentId = String(formData.get("commentId") ?? "");
   const comment = await db.reviewComment.findUniqueOrThrow({ where: { id: commentId } });
-  const assigned = await db.reviewAssignment.findFirst({ where: { cycleId: comment.cycleId, userId: user.id } });
+  const assigned = (await mayAnswerCycle(ctx, { cycleId: comment.cycleId, userId: user.id, verb: "REVIEW" })).ok;
   if (comment.authorId !== user.id && !assigned && !isController(user) && !isAdmin(user)) {
  return { error: "Only the comment author, an assigned reviewer or the control function closes comments." };
   }
@@ -379,8 +394,15 @@ export async function recordOutcomeAction(_prev: { error?: string } | undefined,
 export async function returnToOriginatorAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
   const ctx = await requireScope();
   const { user, db, projectId, orgId } = ctx;
- if (!isController(user) && !isAdmin(user)) return { error: "An outcome shall not pass directly from reviewer to originator — the control function returns it." };
   const cycleId = String(formData.get("cycleId") ?? "");
+  // A reviewer of the step may return it where the project carries this out
+  // itself; where Document Control does, an answer never goes straight back.
+  const answered = await db.reviewCycle.findUnique({ where: { id: cycleId }, select: { assignments: { select: { userId: true } } } });
+  const cannotReturn = await carrierRefusal(ctx, "RETURN_OUTCOME", {
+    control: isController(user) || isAdmin(user),
+    standing: !!answered?.assignments.some((seat) => seat.userId === user.id),
+  });
+  if (cannotReturn) return { error: cannotReturn };
   try {
     await returnToOriginator(ctx, cycleId, user);
   } catch (e) {
@@ -399,20 +421,17 @@ export async function releaseRevisionAction(_prev: { error?: string } | undefine
   const statusCode = String(formData.get("statusCode") ?? "");
  if (!statusCode) return { error: "Choose the status the revision is released at." };
   let result;
-  let issued = 0;
   try {
     await enforce("RELEASE", { revisionId, statusCode }, ctx);
+    // Releasing is issuing: the act sends what was asked for, so nothing is
+    // carried out separately here.
     result = await releaseRevision(ctx, revisionId, user, statusCode);
-    // Releasing is Document Control's own act and needs nobody's permission.
-    // Issuing is not: every request still waiting is carried out here, and a
-    // revision nobody asked about is released and not issued.
-    issued = await carryOutOpenRequests(ctx, revisionId, user);
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Release blocked." };
   }
   const rev = await db.revision.findUniqueOrThrow({ where: { id: revisionId } });
   revalidatePath(`/documents/${rev.documentId}`);
-  redirect(`/documents/${rev.documentId}?released=1&issued=${issued}&superseded=${result.superseded ?? ""}`);
+  redirect(`/documents/${rev.documentId}?released=1&superseded=${result.superseded ?? ""}`);
 }
 
 /** Document Control refuses to publish a decided revision and says why. */
@@ -451,9 +470,11 @@ export async function voidRevisionAction(_prev: { error?: string } | undefined, 
     select: { value: true },
   });
   if (newer) return { error: `Rev ${subject.value} has already been replaced by rev ${newer.value}. Only the newest revision can be voided; everything before it is frozen as it was issued.` };
-  // Voiding is the control function's act. Anybody who thinks a revision should
-  // be voided asks them, and the reason on the record says who asked.
-  if (!isController(user)) return { error: "The control function voids a revision. Ask them, and say why — the reason goes on the record." };
+  // Where Document Control carries this out, anybody who thinks a revision
+  // should be voided asks them, and the reason on the record says who asked.
+  const wroteIt = subject.authoredById === user.id || subject.uploadedById === user.id;
+  const cannotVoid = await carrierRefusal(ctx, "VOID", { control: isController(user) || isAdmin(user), standing: wroteIt });
+  if (cannotVoid) return { error: cannotVoid };
   // Released in error, or never reviewed at all. A revision in the middle of a
   // route is neither: finish it, or send it back.
   const reviewed = await db.reviewCycle.count({ where: { revisionId } });
@@ -476,8 +497,13 @@ export async function voidRevisionAction(_prev: { error?: string } | undefined, 
 export async function recordVoidReassessmentAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
   const ctx = await requireScope();
   const { user, db, projectId, orgId } = ctx;
-  if (!isController(user) && !isAdmin(user)) return { error: "Only the control function records reassessment." };
   const revisionId = String(formData.get("revisionId") ?? "");
+  const voided = await db.revision.findUnique({ where: { id: revisionId }, select: { authoredById: true, uploadedById: true } });
+  const cannotRecord = await carrierRefusal(ctx, "VOID", {
+    control: isController(user) || isAdmin(user),
+    standing: voided?.authoredById === user.id || voided?.uploadedById === user.id,
+  });
+  if (cannotRecord) return { error: cannotRecord };
   const note = String(formData.get("note") ?? "").trim();
  if (!note) return { error: "Describe the reassessment of work performed." };
   await db.revision.update({ where: { id: revisionId }, data: { voidReassessment: note } });

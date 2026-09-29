@@ -1,17 +1,17 @@
 import type { Tenant } from "./tenant";
 
-/** Documents are needed five working days before the activity unless stated otherwise. */
-export const DEFAULT_LEAD_BUSINESS_DAYS = 5;
+/**
+ * A document is needed seven days before its activity unless the list gives it a
+ * date of its own. Plain days, not working days: a schedule counts in days, and
+ * a needed-by date that quietly shifts with weekends is a date nobody can
+ * predict from the activity.
+ */
+export const DEFAULT_LEAD_DAYS = 7;
 
-/** `days` working days (Mon–Fri) before `date`. */
-export function businessDaysBefore(date: Date, days: number): Date {
+/** `days` days before `date`. */
+export function daysBefore(date: Date, days: number): Date {
   const d = new Date(date);
-  let left = days;
-  while (left > 0) {
-    d.setDate(d.getDate() - 1);
-    const wd = d.getDay();
-    if (wd !== 0 && wd !== 6) left--;
-  }
+  d.setDate(d.getDate() - days);
   return d;
 }
 
@@ -31,7 +31,8 @@ export function businessDaysAfter(date: Date, days: number): Date {
 export function neededBy(actionDate: Date | null, entry: { leadBusinessDays: number | null; manualDate: boolean; requiredBy?: Date }): Date | null {
   if (entry.manualDate) return entry.requiredBy ?? null;
   if (!actionDate) return entry.requiredBy ?? null;
-  return businessDaysBefore(actionDate, entry.leadBusinessDays ?? DEFAULT_LEAD_BUSINESS_DAYS);
+  // The column is still named for working days; what it holds is days.
+  return daysBefore(actionDate, entry.leadBusinessDays ?? DEFAULT_LEAD_DAYS);
 }
 
 /**

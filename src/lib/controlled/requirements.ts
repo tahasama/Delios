@@ -1,6 +1,6 @@
 import { register, headerIndex, cell, parseDate, diffByKey, type Handler, type ParseIssue, type ParseResult } from "./registry";
 import { allocateNumber } from "../numbering";
-import { businessDaysBefore, DEFAULT_LEAD_BUSINESS_DAYS, departmentsOf } from "../schedule";
+import { daysBefore, DEFAULT_LEAD_DAYS, departmentsOf } from "../schedule";
 import { retentionFor } from "../retention";
 
 /**
@@ -17,6 +17,8 @@ import { retentionFor } from "../retention";
 type RequirementRow = {
   actionCode: string;
   department: string;
+  /** The discipline of the document itself, which need not be the department's. */
+  discipline: string | null;
   docNumber: string | null;   // existing document, or null to create a placeholder
   title: string | null;
   docType: string | null;
@@ -31,38 +33,63 @@ type RequirementRow = {
   assetCode: string | null;
 };
 
+/**
+ * The sheet a department fills in: its own name, the action, what the action is,
+ * and then one line per document it needs. The action's name, description and
+ * date are there to read — they come from the schedule.
+ *
+ * The first ten columns are the whole job. The four after them are only needed
+ * for a document that does not exist yet, to build its number.
+ */
 const COLUMNS = [
-  "Action Code",
   "Department",
-  "Document Number",
-  "Title",
-  "Document Type",
-  "Submitted By",
-  "Approved By",
+  "Action Code",
+  "Activity Name",
+  "Activity Description",
+  "Date",
+  "Document",
+  "Discipline",
+  "Type",
+  "Supplier",
+  "Date of delivery",
   "Required Status",
-  "Needed By",
+  "Approved By",
+  "Equipment or material",
   "Project Code",
   "Sub-project",
   "PO",
-  "Equipment or material",
 ];
 
-const OURS = ["", "OURS", "US", "INTERNAL"];
+/** What the same columns used to be called, so an older file still uploads. */
+const ALIASES: Record<string, string[]> = {
+  Department: ["Departments"],
+  "Action Code": ["Activity Code", "Activity ID"],
+  Document: ["Document Number", "Documents", "Title"],
+  Type: ["Document Type"],
+  Supplier: ["Submitted By"],
+  "Date of delivery": ["Needed By"],
+  Date: ["Activity Date"],
+};
+
+/** How many empty document lines a pre-filled sheet leaves under each action. */
+const BLANK_LINES = 5;
+
+const OURS = ["", "OURS", "US", "INTERNAL", "INTERNAL ENGINEERING", "OUR ENGINEERING", "ENG"];
 
 const requirements: Handler = {
   kind: "DOCUMENT_REQUIREMENTS",
   title: "Document requirements",
   blurb:
-    "What each department needs for each scheduled activity. Action Code: an A-code from the schedule, already tagged with its departments by the project manager. Document Number: an existing document, or leave it empty and give Title and Document Type to create a placeholder (Project Code and Sub-project, plus PO for a supplier, are then needed for its number). Submitted By: the supplier code, or empty for us. Approved By: the function that approves it. Needed By: leave empty for 5 working days before the activity, or give a date.",
+    "What each department needs for each action. Download it pre-filled: every action tagged with a department comes with blank lines under it, ready for the documents. Department and Action Code are only written on the first line of a group — the lines under it inherit them. Document: an existing document number, or a name for one that does not exist yet, which is created as a placeholder (then Type, Discipline, Project Code and Sub-project — plus PO for a supplier's document — build its number). Supplier: the supplier code, or leave it empty for our own engineering. Date of delivery: leave it empty for seven days before the action, or give a date.",
   clause: "§14.1 · §14.3",
   level: "PROJECT",
   columns: COLUMNS,
-  sample: ["A00001", "EL", "Q6637021-74-EL-DSW-09102", "", "", "", "APPROVER", "AFC", "", "", "", "", "BL-301"],
+  sample: ["EL", "A00001", "Pump house — MCC energisation", "MCC-2 and its feeders", "2026-10-20", "Q6637021-74-EL-DSW-09102", "EL", "DSW", "", "", "", "", "BL-301", "", "", ""],
   approverHint: "Document Control",
 
   async parse(t, rows): Promise<ParseResult> {
-    const required = ["Action Code", "Department", "Document Number", "Approved By", "Required Status"];
-    const { index, missing } = headerIndex(rows, required);
+    const required = ["Action Code", "Department", "Document"];
+    const { index, missing } = headerIndex(rows, required, ALIASES);
     if (missing.length) return { ok: false, issues: [{ line: 1, message: `Missing column(s): ${missing.join(", ")}. Download the template and keep its header row.` }] };
 
     const [actions, docs, functions, values] = await Promise.all([
@@ -82,34 +109,53 @@ const requirements: Handler = {
       }).map((v) => v.code),
     );
     const fnCodes = new Set(functions.map((f) => f.code));
+    // A requirement is about being able to build from the document, so the
+    // status it defaults to is the first one that permits execution.
+    const statusValues = values.filter((v) => v.setKey === "STATUSES");
+    const permits = (v: { props: string | null }) => {
+      try { return v.props ? (JSON.parse(v.props) as { executionFlag?: boolean }).executionFlag === true : false; } catch { return false; }
+    };
+    const defaultStatus = (statusValues.find(permits) ?? statusValues[0])?.code ?? "";
     const inSet = (key: string, code: string) => values.some((v) => v.setKey === key && v.code === code);
 
     const issues: ParseIssue[] = [];
     const parsed: RequirementRow[] = [];
     const seen = new Set<string>();
 
+    // A group of lines shares its action and department: they are written on the
+    // first line, and the lines under it inherit them, the way anybody filling in
+    // a sheet by hand would expect.
+    let lastAction = "";
+    let lastDepartment = "";
+
     for (let i = 1; i < rows.length; i++) {
       const line = i + 1;
       const row = rows[i];
       if (row.every((c) => !c.trim())) continue;
-      const actionCode = cell(row, index, "Action Code").toUpperCase();
-      const department = cell(row, index, "Department").toUpperCase();
-      const docNumber = cell(row, index, "Document Number") || null;
-      const title = cell(row, index, "Title") || null;
-      const docType = cell(row, index, "Document Type").toUpperCase() || null;
-      const submitted = cell(row, index, "Submitted By").toUpperCase();
+      const actionCode = cell(row, index, "Action Code").toUpperCase() || lastAction;
+      const department = (cell(row, index, "Department").toUpperCase() || lastDepartment).split(",")[0].trim();
+      if (actionCode) lastAction = actionCode;
+      if (department) lastDepartment = department;
+      const named = cell(row, index, "Document");
+      // An existing document is named by its number; anything else is the name of
+      // a document that does not exist yet.
+      const docNumber = named && docNumbers.has(named) ? named : null;
+      const title = docNumber ? null : named || null;
+      const discipline = cell(row, index, "Discipline").toUpperCase() || null;
+      const docType = cell(row, index, "Type").toUpperCase() || null;
+      const submitted = cell(row, index, "Supplier").toUpperCase();
       const approvedBy = cell(row, index, "Approved By").toUpperCase();
-      const requiredStatus = cell(row, index, "Required Status").toUpperCase();
-      const neededRaw = cell(row, index, "Needed By");
+      const requiredStatus = cell(row, index, "Required Status").toUpperCase() || defaultStatus;
+      const neededRaw = cell(row, index, "Date of delivery");
       const projectCode = cell(row, index, "Project Code") || null;
       const subProject = cell(row, index, "Sub-project") || null;
       const po = cell(row, index, "PO") || null;
       // What the document is about: the tag of the equipment, or the material.
       // Without it nobody can find the document from the thing it describes.
       const assetCode = cell(row, index, "Equipment or material").toUpperCase() || null;
-      // A department sheet arrives with one line per activity; a line left
-      // without a document means nothing is needed there.
-      if (!docNumber && !title) continue;
+      // A pre-filled sheet arrives with blank lines under every action; a line
+      // with no document on it means nothing more is needed there.
+      if (!named) continue;
       const errors: string[] = [];
 
       const action = actionByCode.get(actionCode);
@@ -119,11 +165,12 @@ const requirements: Handler = {
       else if (!departmentsOf(action).includes(department)) errors.push(`${department || "(no department)"} is not a department of ${actionCode} (${departmentsOf(action).join(", ")})`);
 
       const external = !OURS.includes(submitted);
-      if (external && !inSet("SUPPLIER_CODES", submitted)) errors.push(`Submitted By "${submitted}" is not a supplier code`);
-      if (!approvedBy) errors.push("Approved By is missing");
-      else if (!fnCodes.has(approvedBy)) errors.push(`Approved By "${approvedBy}" is not a function`);
-      if (!inSet("STATUSES", requiredStatus)) errors.push(`Required Status "${requiredStatus}" is not a published status`);
-      if (neededRaw && !parseDate(neededRaw)) errors.push("Needed By must be YYYY-MM-DD");
+      if (external && !inSet("SUPPLIER_CODES", submitted)) errors.push(`Supplier "${submitted}" is not a supplier code — leave it empty for our own engineering`);
+      if (approvedBy && !fnCodes.has(approvedBy)) errors.push(`Approved By "${approvedBy}" is not a function`);
+      if (!requiredStatus) errors.push("No status is published, so there is nothing a document can be required at");
+      else if (!inSet("STATUSES", requiredStatus)) errors.push(`Required Status "${requiredStatus}" is not a published status`);
+      if (neededRaw && !parseDate(neededRaw)) errors.push("Date of delivery must be YYYY-MM-DD");
+      if (discipline && !inSet("DISCIPLINES", discipline)) errors.push(`Discipline "${discipline}" is not a published discipline`);
 
       // A drawing or datasheet of a thing must say which thing.
       const typeForAsset = docType ?? (docNumber ? typeOfDoc.get(docNumber) ?? null : null);
@@ -131,14 +178,13 @@ const requirements: Handler = {
         errors.push(`A ${typeForAsset} describes equipment — give its tag or material under "Equipment or material"`);
       }
 
-      if (docNumber) {
-        if (!docNumbers.has(docNumber)) errors.push(`Document ${docNumber} is not in the register — leave the number empty to create it`);
-      } else {
-        if (!title) errors.push("Give a Document Number, or a Title for a new document");
-        if (!docType || !inSet("DOCUMENT_TYPES", docType)) errors.push(`Document Type "${docType ?? ""}" is not a published type`);
-        if (!projectCode || !inSet("PROJECT_CODES", projectCode)) errors.push("A new document needs a Project Code for its number");
-        if (!subProject || !inSet("SUBPROJECTS", subProject)) errors.push("A new document needs a Sub-project for its number");
-        if (external && (!po || !inSet("PURCHASE_ORDERS", po))) errors.push("A new supplier document needs its PO for its number");
+      if (!docNumber) {
+        // A name nobody can turn into a number is not a requirement yet.
+        if (!docType || !inSet("DOCUMENT_TYPES", docType)) errors.push(`"${named}" is not in the register, so it is created — give its Type`);
+        if (!discipline) errors.push(`"${named}" is created, so give its Discipline`);
+        if (!projectCode || !inSet("PROJECT_CODES", projectCode)) errors.push(`"${named}" is created and needs a Project Code for its number`);
+        if (!subProject || !inSet("SUBPROJECTS", subProject)) errors.push(`"${named}" is created and needs a Sub-project for its number`);
+        if (external && (!po || !inSet("PURCHASE_ORDERS", po))) errors.push(`"${named}" comes from a supplier, so it needs its PO for its number`);
       }
 
       const key = `${actionCode}|${docNumber ?? title}`;
@@ -148,7 +194,7 @@ const requirements: Handler = {
       if (errors.length) { issues.push({ line, message: errors.join("; ") }); continue; }
       parsed.push({
         assetCode,
-        actionCode, department, docNumber, title, docType,
+        actionCode, department, discipline, docNumber, title, docType,
         submittedBy: external ? submitted : null, approvedBy, requiredStatus,
         neededBy: neededRaw || null, projectCode, subProject, po,
       });
@@ -164,6 +210,7 @@ const requirements: Handler = {
     return entries.map((e): RequirementRow => ({
       actionCode: e.action.code,
       department: e.department ?? e.document.discipline,
+      discipline: e.document.discipline,
       docNumber: e.document.docNumber,
       title: e.document.title,
       // What is already in force says nothing about equipment; a sheet that
@@ -179,11 +226,43 @@ const requirements: Handler = {
   },
 
   async exportRows(t) {
-    const rows = (await this.current(t, "default")) as RequirementRow[];
-    return rows.map((r) => [
-      r.actionCode, r.department, r.docNumber ?? "", r.title ?? "", r.docType ?? "", r.submittedBy ?? "",
-      r.approvedBy, r.requiredStatus, r.neededBy ?? "", "", "", "",
+    const [actions, entries] = await Promise.all([
+      t.db.action.findMany({ orderBy: [{ scheduledDate: "asc" }, { code: "asc" }] }),
+      t.db.baselineEntry.findMany({ include: { document: true }, orderBy: { document: { docNumber: "asc" } } }),
     ]);
+    const iso = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : "");
+    const rows: string[][] = [];
+
+    for (const action of actions) {
+      const departments = departmentsOf(action);
+      if (!departments.length) continue;
+      for (const department of departments) {
+        const mine = entries.filter((e) => e.actionId === action.id && (e.department ?? e.document.discipline) === department);
+        // What is already required, then blank lines to write more on: a sheet
+        // with no room to write is a sheet nobody can answer.
+        const lines = mine.length + BLANK_LINES;
+        for (let i = 0; i < lines; i++) {
+          const entry = mine[i];
+          const head = i === 0;
+          rows.push([
+            head ? department : "",
+            head ? action.code : "",
+            head ? action.name : "",
+            head ? action.description ?? "" : "",
+            head ? iso(action.scheduledDate) : "",
+            entry?.document.docNumber ?? "",
+            entry?.document.discipline ?? "",
+            entry?.document.docType ?? "",
+            entry?.submittedBy ?? entry?.document.originator ?? "",
+            entry?.manualDate ? iso(entry.requiredBy) : "",
+            entry?.requiredStatus ?? "",
+            entry?.approvedBy ?? "",
+            "", "", "", "",
+          ]);
+        }
+      }
+    }
+    return rows;
   },
 
   diff(current, next) {
@@ -194,7 +273,7 @@ const requirements: Handler = {
       (current as RequirementRow[]).filter((r) => covered.has(`${r.actionCode}|${r.department}`)),
       next as RequirementRow[],
       (r) => `${r.actionCode} · ${r.docNumber ?? `new: ${r.title}`}`,
-      (r) => `${r.department} · from ${r.submittedBy ?? "us"} · approved by ${r.approvedBy} · at ${r.requiredStatus} · ${r.neededBy ?? `${DEFAULT_LEAD_BUSINESS_DAYS} working days before`}`,
+      (r) => `${r.department} · from ${r.submittedBy ?? "us"} · approved by ${r.approvedBy} · at ${r.requiredStatus} · ${r.neededBy ?? `${DEFAULT_LEAD_DAYS} days before`}`,
     );
   },
 
@@ -212,18 +291,20 @@ const requirements: Handler = {
         docId = (await t.db.document.findFirstOrThrow({ where: { docNumber: row.docNumber } })).id;
       } else {
         const deliverableType = row.submittedBy ? "VND" : "ENG";
+        // The document's own discipline, which is not always the department's.
+        const discipline = row.discipline ?? row.department;
         const { docNumber } = await allocateNumber(t, deliverableType, {
           "Project code": row.projectCode ?? "",
           Subproject: row.subProject ?? "",
           "Supplier code": row.submittedBy ?? "",
           "Purchase order": row.po ?? "",
-          Discipline: row.department,
+          Discipline: discipline,
           "Document type": row.docType ?? "",
         });
         const doc = await t.db.document.create({
           data: {
             projectId: t.projectId, docNumber, title: row.title ?? docNumber, deliverableType, docType: row.docType ?? "",
-            discipline: row.department, originator: row.submittedBy, subProject: row.subProject, contractRef: row.po,
+            discipline, originator: row.submittedBy, subProject: row.subProject, contractRef: row.po,
             state: "PLANNED", isPlaceholder: true, createdById: "requirements", createdByName: "Document requirements list",
             retentionClass: await retentionFor(t, null),
           },
@@ -245,11 +326,11 @@ const requirements: Handler = {
       const manual = !!row.neededBy;
       const requiredBy = manual
         ? parseDate(row.neededBy!)!
-        : action.scheduledDate ? businessDaysBefore(action.scheduledDate, DEFAULT_LEAD_BUSINESS_DAYS) : new Date();
+        : action.scheduledDate ? daysBefore(action.scheduledDate, DEFAULT_LEAD_DAYS) : new Date();
       const data = {
         requiredStatus: row.requiredStatus, requiredBy, department: row.department,
         submittedBy: row.submittedBy, approvedBy: row.approvedBy,
-        leadBusinessDays: manual ? null : DEFAULT_LEAD_BUSINESS_DAYS, manualDate: manual,
+        leadBusinessDays: manual ? null : DEFAULT_LEAD_DAYS, manualDate: manual,
         createdByName: "Document requirements list",
       };
       const existing = await t.db.baselineEntry.findFirst({ where: { actionId: action.id, documentId: docId } });

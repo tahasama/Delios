@@ -168,12 +168,12 @@ export default async function CodesPage() {
         </DataTable>
       </Card>
 
-      <Card id="confidentiality" title="6 \u00b7 Confidentiality — who may see it" description="A clearance rule, not a warning label. Someone whose clearance is below a document's confidentiality does not see the document at all: not in the register, not in a count, not in a search.">
+      <Card id="confidentiality" title="6 \u00b7 Confidentiality — who may see it" description="Not a warning label. Up to the open levels it is the ordinary register, read by everybody on the project. Above them the document is read by the people named on it — its author, whoever uploaded it, whoever they name, and an administrator — and to everybody else it does not exist: not in the register, not in a count, not in a search.">
         <DataTable id="codes-confidentiality" toolbar={false} head={<tr><Th>Level</Th><Th>Who sees it</Th></tr>}>
           {confidentialities.map((item) => (
             <tr key={item.code}>
               <Td className="whitespace-nowrap font-medium text-slate-800">{item.label}</Td>
-              <Td className="text-xs">{item.props.default === true ? "The level a new document takes unless someone chooses another." : "Anyone whose function carries at least this clearance."}</Td>
+              <Td className="text-xs">{item.props.default === true ? "The level a new document takes unless someone chooses another." : "Everybody on the project, up to this level; above it, the people named on the document."}</Td>
             </tr>
           ))}
         </DataTable>

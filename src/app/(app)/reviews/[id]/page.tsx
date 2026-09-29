@@ -9,6 +9,9 @@ import { fmtDate, fmtDateTime } from "@/lib/utils";
 import { dueState, getRunForRevision } from "@/lib/workflow";
 import { rewindRouteAction } from "@/lib/actions/workflow";
 import { requestChoices, authorOf, issuePolicy } from "@/lib/issue-requests";
+import { DelegatePanel, type DelegationRow } from "./delegate-panel";
+import { delegateCandidates } from "@/lib/delegation";
+import { controlDoes } from "@/lib/control-activities";
 import { RequestIssue } from "@/app/(app)/documents/[id]/request-issue";
 import { Timeline } from "@/components/timeline";
 import { getActiveSet } from "@/lib/config";
@@ -94,7 +97,32 @@ export default async function ReviewCyclePage({ params }: { params: Promise<{ id
     ? run.steps.slice(0, myStep).map((step, index) => ({ number: index + 1, title: step.title ?? `Step ${index + 1}` })).filter((_, index) => run.steps[index].status === "done")
     : [];
   const rewindReasons = rewindTo.length ? await getActiveSet("RETURN_REASONS") : [];
-  const blockingOpen = cycle.comments.filter((comment) => comment.progressionPreventing && comment.status === "OPEN");
+  // Handing this step over. What is asked of this step — advice or the decision
+  // — is what may be handed over, and only to somebody the matrix names for it.
+  const handVerb: "REVIEW" | "APPROVE" = cycle.binding ? "APPROVE" : "REVIEW";
+  const [handCandidates, handThroughControl, handRows] = await Promise.all([
+    assigned && cycle.status === "OPEN" ? delegateCandidates(ctx, { target: doc, verb: handVerb, fromUserId: user.id }) : Promise.resolve([]),
+    controlDoes(ctx, "DELEGATE"),
+    db.delegation.findMany({
+      where: { cycleId: cycle.id },
+      orderBy: { createdAt: "desc" },
+      include: { fromUser: { select: { name: true } }, toUser: { select: { name: true } } },
+    }),
+  ]);
+  const handOvers: DelegationRow[] = handRows.map((row) => ({
+    id: row.id,
+    fromName: row.fromUser.name,
+    toName: row.toUser.name,
+    status: row.status,
+    endDate: row.endDate,
+    reason: row.reason,
+    refusedReason: row.refusedReason,
+    askedByName: row.askedByName,
+    grantedByName: row.grantedByName,
+    mine: row.fromUserId === user.id,
+  }));
+
+  const reserves = cycle.comments.filter((comment) => comment.progressionPreventing && comment.status === "OPEN");
   const myComments = cycle.comments.filter((comment) => comment.authorId === user.id);
   const canRecordOutcome = (assigned || controller) && !cycle.outcome && Boolean(cycle.issuedToReviewAt);
   // A step answered by an outside party that holds no accounts here: one of our
@@ -121,7 +149,15 @@ export default async function ReviewCyclePage({ params }: { params: Promise<{ id
   // sends the revision back at the gate, with a reason, and everyone who sat on
   // the route is told. A review the control function ran on its own still ends
   // by handing the outcome to the author.
-  const canReturn = controller && !onARoute && cycle.binding && Boolean(cycle.outcome) && !cycle.returnedToOriginatorAt;
+  // Who carries these two out is the project's answer, and the buttons follow
+  // it: see `src/lib/control-activities.ts` and Settings → Who does what.
+  const [returnIsControl, issueIsControl] = await Promise.all([
+    controlDoes(ctx, "RETURN_OUTCOME"),
+    controlDoes(ctx, "REVIEW_ISSUE"),
+  ]);
+  const mayReturn = controller || (!returnIsControl && assigned);
+  const mayIssueToReviewers = controller || (!issueIsControl && cycle.openedById === user.id);
+  const canReturn = mayReturn && !onARoute && cycle.binding && Boolean(cycle.outcome) && !cycle.returnedToOriginatorAt;
   const custody = onARoute
     ? [
         { label: "Revision opened", at: rev.createdAt, holder: doc.createdByName },
@@ -180,7 +216,7 @@ export default async function ReviewCyclePage({ params }: { params: Promise<{ id
         </div>
       </header>
 
-      {blockingOpen.length ? <Banner tone="danger" title="Progress is blocked">{blockingOpen.length} blocking comment{blockingOpen.length === 1 ? "" : "s"} must be resolved first.</Banner> : null}
+      {reserves.length ? <Banner tone="warn" title="Held under reserve">{reserves.length} comment{reserves.length === 1 ? " carries a reserve" : "s carry a reserve"} that the route has still to settle. The decider's verdict is what releases the revision.</Banner> : null}
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
         <div className="space-y-4">
@@ -229,6 +265,18 @@ export default async function ReviewCyclePage({ params }: { params: Promise<{ id
             </Card>
           ) : null}
 
+          {cycle.status === "OPEN" ? (
+            <DelegatePanel
+              cycleId={cycle.id}
+              verb={handVerb}
+              candidates={handCandidates.map((one) => ({ id: one.id, name: one.name, functionName: one.functionName }))}
+              throughControl={handThroughControl}
+              rows={handOvers}
+              controller={controller}
+              mayHandOver={assigned && !cycle.outcome}
+            />
+          ) : null}
+
           <Card title={cycle.binding ? "Binding verdict" : "Advice"} description={cycle.binding ? "The one decision on this revision. A verdict that proceeds is its release approval, so only someone who may approve the document can give it." : "Input for the route's decider; it does not decide on its own."}>
             {cycle.outcome ? <div><p className="text-sm font-semibold text-slate-900">{cycle.binding ? <><span className="font-mono">{cycle.outcome}</span> · {verdictLabel(cycle.outcome)}</> : verdictLabel(cycle.outcome)}</p><p className="mt-1 text-xs leading-5 text-slate-500">{OUTCOME_CONSEQUENCES[cycle.outcome]?.blurb}</p>              {/* What the verdict said. A verdict that reads "Comments" and
                   shows no comments is not a record of anything. */}
@@ -267,7 +315,7 @@ export default async function ReviewCyclePage({ params }: { params: Promise<{ id
             {cycle.outcome ? null : <p className="mt-2 text-xs leading-5 text-slate-500">{!cycle.issuedToReviewAt ? "Document Control sends it to the reviewers first." : ""}</p>}
           </Card>
 
-          {!cycle.issuedToReviewAt ? <Card title="Send to reviewers">{controller ? <ActionForm action={issueToReviewAction} submitLabel="Send to reviewers" hidden={{ cycleId: cycle.id }}/> : <p className="text-xs text-slate-500">Waiting for Document Control.</p>}</Card> : null}
+          {!cycle.issuedToReviewAt ? <Card title="Send to reviewers">{mayIssueToReviewers ? <ActionForm action={issueToReviewAction} submitLabel="Send to reviewers" hidden={{ cycleId: cycle.id }}/> : <p className="text-xs text-slate-500">{issueIsControl ? "Waiting for Document Control." : "Waiting for whoever sent it for review."}</p>}</Card> : null}
 
           {earlier.length ? (
             <Card title="What the earlier steps said" description="Their verdicts and their comments, in order.">

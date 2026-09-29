@@ -3,15 +3,6 @@
 export const ROLES = ["ADMIN", "CONTROLLER", "APPROVER", "REVIEWER", "AUTHOR", "VIEWER"] as const;
 export type Role = (typeof ROLES)[number];
 
-export const ROLE_RANK: Record<Role, number> = {
-  VIEWER: 0,
-  AUTHOR: 1,
-  REVIEWER: 2,
-  APPROVER: 3,
-  CONTROLLER: 3,
-  ADMIN: 5,
-};
-
 export const ROLE_LABEL: Record<Role, string> = {
   ADMIN: "Administrator",
   CONTROLLER: "Document Controller",
@@ -51,8 +42,8 @@ export const REV_STATE_LABEL: Record<RevState, string> = {
   IN_PREPARATION: "In preparation",
   IN_REVIEW: "In review",
   NOT_RELEASED: "Not released",
-  RETURNED: "Returned",
-  RELEASED: "Released",
+  RETURNED: "Returned to review",
+  RELEASED: "Released & issued",
   SUPERSEDED: "Superseded",
   VOID: "Void",
 };
@@ -148,7 +139,7 @@ export const REASONS_WITH_RESPONSE: ReasonForIssue[] = ["REVIEW", "APPROVAL", "P
 // §12.6 — the five exposure conditions
 export const EXPOSURES = [
   { key: "UNPROPAGATED_SUPERSESSION", label: "Replaced, but recipients not told", detail: "A newer revision exists; people who got the old one were never informed.", who: "Document Control" },
-  { key: "BLOCKED_WORK", label: "Work blocked by a comment", detail: "A released revision still has an open blocking comment.", who: "Reviewer and executing party" },
+  { key: "BLOCKED_WORK", label: "Released, but the verdict says stop", detail: "A released revision carries a binding verdict that does not permit the work to proceed.", who: "Document Control and executing party" },
   { key: "ORPHANED_WITHDRAWAL", label: "Withdrawn but still needed", detail: "A schedule action or package still requires a withdrawn document.", who: "Package or action owner" },
   { key: "UNRESOLVED_VOID", label: "Voided — impact not checked", detail: "A revision was voided and nobody has recorded what was built from it.", who: "The party that performed the work" },
 ] as const;
@@ -172,7 +163,7 @@ export const ACCEPTANCE_CONDITIONS = [
 export const ADVICE_CODES = ["NO_COMMENT", "COMMENTS", "COMMENTS_BLOCKING"] as const;
 export type AdviceCode = (typeof ADVICE_CODES)[number];
 export const ADVICE_LABEL: Record<string, string> = {
-  NO_COMMENT: "No comment",
+  NO_COMMENT: "No comments",
   COMMENTS: "Comments, none blocking",
   COMMENTS_BLOCKING: "Blocking comments",
 };

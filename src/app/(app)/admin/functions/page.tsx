@@ -144,14 +144,14 @@ export default async function FunctionsPage() {
         </DataTable>
       </Card>
 
-      <Card title="Change a function" description="Open one to edit its rules, clearance or retire it. Rules only add permissions; nothing takes them away.">
+      <Card title="Change a function" description="Open one to edit its rules or retire it. Rules only add permissions; nothing takes them away.">
         <ul className="divide-y divide-slate-100">
           {functions.map((fn) => (
             <li key={fn.id}>
               <details>
                 <summary className="flex cursor-pointer list-none items-center gap-3 py-2.5 text-sm">
                   <span className="font-semibold text-slate-800">{fn.name}</span>
-                  <span className="text-xs text-slate-400">{fn._count.memberships} {fn._count.memberships === 1 ? "person" : "people"} · sees up to level {fn.clearance}</span>
+                  <span className="text-xs text-slate-400">{fn._count.memberships} {fn._count.memberships === 1 ? "person" : "people"}</span>
                   {fn.active ? null : <Chip className="bg-slate-100 text-slate-500 ring-slate-300">retired</Chip>}
                   {fn.rules.length === 0 ? <span className="text-xs text-amber-700">no rules — can do nothing</span> : null}
                 </summary>
@@ -202,8 +202,7 @@ export default async function FunctionsPage() {
 
                   <ActionForm action={updateFunctionAction} submitLabel="Save" size="sm" hidden={{ functionId: fn.id, name: fn.name }} className="flex flex-wrap items-center gap-3 space-y-0">
                     <label className="flex items-center gap-2 text-xs text-slate-600">
-                      Sees confidentiality up to level
-                      <input name="clearance" type="number" min={1} max={9} defaultValue={fn.clearance} className="w-16 rounded-md border border-slate-300 px-1.5 py-1 text-xs" />
+                      Department
                       <select name="department" defaultValue={fn.department ?? ""} className="rounded-md border border-slate-300 px-1.5 py-1 text-xs" title="The department this job sits in — optional">
                         <option value="">no department</option>
                         {disciplines.map((d) => <option key={d.code} value={d.code}>{d.label}</option>)}
@@ -224,7 +223,6 @@ export default async function FunctionsPage() {
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Field label="Name" required hint="as your organization names the job"><input name="name" required className={inputCls} placeholder="Construction manager, HVAC technician…" /></Field>
                 <Field label="Short code" required><input name="code" required className={`${inputCls} uppercase`} placeholder="ELEC_TECH" /></Field>
-                <Field label="Sees confidentiality up to level" required><input name="clearance" type="number" min={1} max={9} defaultValue={2} className={inputCls} /></Field>
                 <Field label="Department" hint="optional — the department this job sits in">
                   <select name="department" defaultValue="" className={inputCls}>
                     <option value="">No department</option>

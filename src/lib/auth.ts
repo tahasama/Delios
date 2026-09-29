@@ -5,6 +5,7 @@ import bcrypt from "bcryptjs";
 import { SignJWT, jwtVerify } from "jose";
 import { db } from "./db";
 import type { Role } from "./standard";
+import { heldVerbs } from "./permissions";
 
 const COOKIE = "edms_session";
 const secret = new TextEncoder().encode(process.env.SESSION_SECRET ?? "dev-secret");
@@ -56,25 +57,12 @@ export type SessionUser = {
   department?: string | null;
 };
 
-/**
- * Before a project is chosen there is no function to read, so the account's
- * standing role stands in. Everywhere inside a project the matrix decides.
- */
-const ROLE_FALLBACK: Record<Role, string[]> = {
-  ADMIN: ["READ", "CREATE", "REVISE", "REVIEW", "APPROVE", "TRANSMIT", "RECEIVE", "ACCEPT", "CONTROL", "CONFIGURE"],
-  CONTROLLER: ["READ", "CREATE", "REVISE", "TRANSMIT", "RECEIVE", "ACCEPT", "CONTROL"],
-  APPROVER: ["READ", "REVIEW", "APPROVE", "RECEIVE"],
-  REVIEWER: ["READ", "REVIEW", "RECEIVE"],
-  AUTHOR: ["READ", "CREATE", "REVISE", "RECEIVE"],
-  VIEWER: ["READ"],
-};
-
 const ORG_VERBS = ["PLAN", "ROUTES", "MATRIX"];
 
 /** Does this person hold `verb` anywhere on the current project? */
 export function hasVerb(user: SessionUser | null | undefined, verb: string): boolean {
   if (!user) return false;
-  const held = user.verbs ?? ROLE_FALLBACK[user.role] ?? [];
+  const held = heldVerbs(user);
   return held.includes(verb) || (ORG_VERBS.includes(verb) && held.includes("CONFIGURE"));
 }
 

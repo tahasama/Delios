@@ -86,10 +86,25 @@ export function allHandlers(): Handler[] {
 
 // ── Shared helpers for handlers ──────────────────────────────────────────────
 
-export function headerIndex(rows: string[][], columns: string[]): { index: Map<string, number>; missing: string[] } {
+export function headerIndex(
+  rows: string[][],
+  columns: string[],
+  /**
+   * Older spellings of a column, so a file downloaded before a template was
+   * renamed still uploads. Canonical name → the names it also answers to.
+   */
+  aliases: Record<string, string[]> = {},
+): { index: Map<string, number>; missing: string[] } {
   const header = (rows[0] ?? []).map((h) => h.trim());
   const index = new Map<string, number>();
   header.forEach((h, i) => index.set(h, i));
+  for (const [canonical, older] of Object.entries(aliases)) {
+    if (index.has(canonical)) continue;
+    for (const name of older) {
+      const at = index.get(name);
+      if (at !== undefined) { index.set(canonical, at); break; }
+    }
+  }
   return { index, missing: columns.filter((c) => !index.has(c)) };
 }
 

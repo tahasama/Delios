@@ -409,13 +409,27 @@ async function advance(t: Tenant, runId: string, user: SessionUser) {
     // function does not have it. Where nobody holds Control — or where the
     // project says it wants no gate — the binding verdict releases the revision
     // at the status it decided on, and issues it as the decider asked.
+    // An outside party that has to approve it answers before anything is
+    // released: the step opens now, and the revision waits.
+    const { openApprovalStep } = await import("./issue-requests");
+    const outside = await openApprovalStep(t, run.revisionId, user);
+    if (outside.opened) {
+      await audit({
+        tenant: t, actor: user, action: "STEP_DISPATCHED", entityType: "Revision", entityId: run.revisionId,
+        entityLabel: `${rev.document.docNumber} rev ${rev.value}`,
+        detail: `Waiting on ${outside.party ?? "an outside party"} to approve it before it is released and issued.`,
+      });
+      await notifyMany(contributorIds, "WORKFLOW_DONE", `Waiting on ${outside.party ?? "an outside party"}: ${rev.document.docNumber} rev ${rev.value}`, "The route is done. It is released and issued when their approval comes back.", `/documents/${rev.documentId}`, t);
+      return;
+    }
+
     const controllers = await holdersOf(t, "CONTROL");
-    const { issueGateIsControl, carryOutOpenRequests } = await import("./issue-requests");
+    const { issueGateIsControl } = await import("./issue-requests");
     if (!controllers.length || !(await issueGateIsControl(t))) {
       const { releaseRevision } = await import("./lifecycle");
       try {
+        // Releasing is issuing; the act sends what the decider asked for.
         await releaseRevision(t, run.revisionId, user, rev.statusCode ?? "");
-        await carryOutOpenRequests(t, run.revisionId, user);
         await audit({ tenant: t, actor: user, action: "RELEASE", entityType: "Revision", entityId: run.revisionId, entityLabel: `${rev.document.docNumber} rev ${rev.value}`, detail: controllers.length ? "Released on the binding verdict: this project issues without a Document Control gate." : "Released on the binding verdict: this organization publishes no control function." });
       } catch (e) {
         await notifyMany(contributorIds, "RELEASE_BLOCKED", `Not released: ${rev.document.docNumber} rev ${rev.value}`, e instanceof Error ? e.message : "Release failed.", `/documents/${rev.documentId}`, t);
@@ -524,6 +538,9 @@ export async function recordStepOutcome(
     recipients: { internalUserIds: string[]; partyIds: string[] };
     delegated: boolean;
     note?: string | null;
+    /** An outside party has to approve it before it is released at all. */
+    needsApproval?: boolean;
+    approverId?: string | null;
   },
   /**
    * An outside party decided, and one of our people wrote it down. The verdict
@@ -531,18 +548,35 @@ export async function recordStepOutcome(
    */
   onBehalfOf?: string,
 ): Promise<{ ok: boolean; error?: string; message?: string }> {
-  const said = onBehalfOf ? `${onBehalfOf} (recorded by ${user.name})` : user.name;
+  let said = onBehalfOf ? `${onBehalfOf} (recorded by ${user.name})` : user.name;
   const { db, projectId } = t;
   const run = await db.workflowRun.findUniqueOrThrow({ where: { id: runId } });
   if (run.status !== "ACTIVE") return { ok: false, error: "This workflow is not active." };
   const steps = parseSteps(run.steps);
   const step = steps[run.currentStep];
   if (!step || step.status !== "active") return { ok: false, error: "No active step to decide on." };
-  if (!step.participantIds.includes(user.id)) return { ok: false, error: "Only a participant of this step records its verdict." };
-
   const rev = await db.revision.findUniqueOrThrow({ where: { id: run.revisionId }, include: { document: true } });
   const label = `${rev.document.docNumber} rev ${rev.value}`;
   const decidesStep = run.currentStep === steps.length - 1;
+  // A participant answers their own step. Somebody else answers it only through
+  // a delegation from a participant, and only if the matrix names them for the
+  // same act on this class — so the step never reaches a person the route and
+  // the matrix together leave out (§8.5).
+  let inPlaceOf: string | null = null;
+  if (!step.participantIds.includes(user.id)) {
+    const { delegationInForce } = await import("./delegation");
+    const del = await delegationInForce(t, {
+      userId: user.id,
+      verb: decidesStep ? "APPROVE" : "REVIEW",
+      target: rev.document,
+      cycleId: step.cycleId ?? null,
+    });
+    if (!del || !step.participantIds.includes(del.fromUserId)) {
+      return { ok: false, error: "Only a participant of this step records its verdict, or somebody holding a delegation from one of them." };
+    }
+    inPlaceOf = del.fromUser.name;
+    said = `${user.name} for ${inPlaceOf} (by delegation)`;
+  }
   const outcomeSetKey = decidesStep ? step.outcomeSetKey ?? VERDICT_SET : ADVICE_SET;
   /** Closing a step ends the review interval; only a verdict that sends the revision back returns it to its author. */
   const closed = (_toAuthor: boolean) => ({ returnedFromReviewAt: new Date(), status: "CLOSED" });
@@ -585,6 +619,9 @@ export async function recordStepOutcome(
     if (!request.delegated && noRecipients(request.recipients)) {
       return { ok: false, error: "Say who it goes to, or leave it to the author, or untick \u201cask for it to be issued now\u201d." };
     }
+    if (request.needsApproval && !request.approverId) {
+      return { ok: false, error: "Say which party has to approve it before it is released." };
+    }
     await t.db.issueRequest.create({
       data: {
         projectId,
@@ -593,6 +630,8 @@ export async function recordStepOutcome(
         recipients: JSON.stringify(request.recipients),
         note: request.note ?? null,
         delegated: request.delegated,
+        needsApproval: !!request.needsApproval,
+        approverId: request.approverId ?? null,
         raisedById: user.id,
         raisedByName: said,
       },

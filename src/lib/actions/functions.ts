@@ -50,21 +50,16 @@ export async function createFunctionAction(
   const code = String(formData.get("code") ?? "").trim().toUpperCase();
   const name = String(formData.get("name") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim() || null;
-  const clearance = Number(formData.get("clearance") ?? 1);
   const verbs = readVerbs(formData);
   const legacyRole = roleFromVerbs(verbs);
 
   if (!name) return { error: "Give the function the name people actually use for it." };
   if (!CODE.test(code)) return { error: "The code is short and uppercase, e.g. ELEC_TECH." };
-  if (!Number.isInteger(clearance) || clearance < 1 || clearance > 9) {
- return { error: "Clearance is a level from 1 upwards." };
-  }
-
   const dup = await db.function.findFirst({ where: { code } });
   if (dup) return { error: `A function with code ${code} is already published.` };
 
   const fn = await db.function.create({
-    data: { orgId, code, name, description, clearance, legacyRole, department: String(formData.get("department") ?? "") || null, sort: 100 },
+    data: { orgId, code, name, description, legacyRole, department: String(formData.get("department") ?? "") || null, sort: 100 },
   });
   // A function with no rule can do nothing, which is a confusing place to
   // leave an administrator — start it with whatever verbs they ticked.
@@ -76,7 +71,7 @@ export async function createFunctionAction(
 
   await audit({
     actor: admin, action: "FUNCTION_PUBLISHED", entityType: "Function", entityId: fn.id, entityLabel: name,
- detail: `Clearance ${clearance}; ${verbs.length ? verbs.join(", "): "no verbs yet"}.`,
+ detail: `${verbs.length ? verbs.join(", ") : "No verbs yet"}.`,
   });
   revalidatePath("/admin/functions");
   return { ok: `${name} published.` };
@@ -91,17 +86,12 @@ export async function updateFunctionAction(
 
   const id = String(formData.get("functionId") ?? "");
   const name = String(formData.get("name") ?? "").trim();
-  const clearance = Number(formData.get("clearance") ?? 1);
   const active = formData.get("active") === "on";
 
   const fn = await db.function.findFirst({ where: { id }, include: { rules: true } });
   if (!fn) return { error: "That function is not published in your organization." };
   const guardUpdate = adminFunctionGuard(ctx, fn);
   if (guardUpdate) return { error: guardUpdate };
-  if (!Number.isInteger(clearance) || clearance < 1 || clearance > 9) {
- return { error: "Clearance is a level from 1 upwards." };
-  }
-
   // Deactivating a function that people still hold would silently strip their
   // authority mid-project; §4.7's "retire, never delete while in use" applies
   // to the matrix as much as to a value set.
@@ -114,12 +104,12 @@ export async function updateFunctionAction(
 
   await db.function.update({
     where: { id },
-    data: { name: name || fn.name, clearance, active , department: String(formData.get("department") ?? "") || null },
+    data: { name: name || fn.name, active, department: String(formData.get("department") ?? "") || null },
   });
   await audit({
     actor: admin, action: "FUNCTION_UPDATED", entityType: "Function", entityId: id, entityLabel: fn.name,
-    oldValue: `clearance ${fn.clearance}/${fn.active ? "active" : "retired"}`,
-    newValue: `clearance ${clearance}/${active ? "active" : "retired"}`,
+    oldValue: fn.active ? "active" : "retired",
+    newValue: active ? "active" : "retired",
   });
   revalidatePath("/admin/functions");
   return { ok: "Saved." };

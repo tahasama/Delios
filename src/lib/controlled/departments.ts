@@ -12,7 +12,10 @@ import { departmentsOf } from "../schedule";
  */
 type DepartmentRow = { actionCode: string; departments: string[] };
 
-const COLUMNS = ["Action Code", "Activity Name", "Activity Date", "Departments"];
+const COLUMNS = ["Action Code", "Activity Code", "Activity Name", "Activity Description", "Date", "Departments"];
+
+/** What the same columns used to be called, so an older file still uploads. */
+const ALIASES = { Date: ["Activity Date"], "Activity Code": ["Activity ID"] };
 
 export function splitDepartments(raw: string): string[] {
   return [...new Set(raw.toUpperCase().split(/[\s,;|/]+/).map((s) => s.trim()).filter(Boolean))].sort();
@@ -20,19 +23,19 @@ export function splitDepartments(raw: string): string[] {
 
 const departments: Handler = {
   kind: "ACTION_DEPARTMENTS",
-  title: "Departments per activity",
+  title: "Departments per action",
   blurb:
-    "Which departments each activity concerns — the project manager's list. Download it pre-filled with every activity, fill Departments with discipline codes (EL, ME…, several separated by commas), upload and approve it. Activity Name and Activity Date are there to read; they are not changed from here.",
+    "Which departments each action concerns — the project manager's list. Download it pre-filled with every action, fill the Departments column, upload it and approve it. Departments: discipline codes, and where an action concerns several, separate them with a comma — EL, ME. Everything else on the row comes from the schedule and is there to read; it is not changed from here.",
   clause: "§14.1",
   level: "PROJECT",
   columns: COLUMNS,
-  sample: ["A00001", "Pump house — MCC energisation", "2026-10-20", "EL, ME"],
+  sample: ["A00001", "1010", "Pump house — MCC energisation", "MCC-2 and its feeders", "2026-10-20", "EL, ME"],
   approverHint: "the project manager who uploads it",
   ownerApproves: true,
   ownerVerb: "PLAN",
 
   async parse(t, rows): Promise<ParseResult> {
-    const { index, missing } = headerIndex(rows, ["Action Code", "Departments"]);
+    const { index, missing } = headerIndex(rows, ["Action Code", "Departments"], ALIASES);
     if (missing.length) return { ok: false, issues: [{ line: 1, message: `Missing column(s): ${missing.join(", ")}. Download the list and keep its header row.` }] };
 
     const [actions, disciplines, entries] = await Promise.all([
@@ -79,7 +82,14 @@ const departments: Handler = {
 
   async exportRows(t) {
     const actions = await t.db.action.findMany({ orderBy: [{ scheduledDate: "asc" }, { code: "asc" }] });
-    return actions.map((a) => [a.code, a.name, a.scheduledDate?.toISOString().slice(0, 10) ?? "", departmentsOf(a).join(", ")]);
+    return actions.map((a) => [
+      a.code,
+      a.scheduleRef ?? "",
+      a.name,
+      a.description ?? "",
+      a.scheduledDate?.toISOString().slice(0, 10) ?? "",
+      departmentsOf(a).join(", "),
+    ]);
   },
 
   diff(current, next) {

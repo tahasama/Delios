@@ -16,8 +16,10 @@ export type PickReason = { code: string; label: string };
  *
  * On the deciding step of a review it appears with **ask for it to be issued
  * now** ticked, because the person who has just settled what a revision is for
- * is the likeliest to know who needs it. Unticking it is an answer too: the
- * decision stands, nobody is told, and the document says so until somebody asks.
+ * is the likeliest to know who needs it. Releasing a revision is issuing it, so
+ * this answer is what lets it be released at all: leave it to whoever wrote it
+ * and the route waits for them, name an outside approver and the release waits
+ * for that party.
  */
 export function RequestIssue({ reasons, proposed, others, parties, author, onDecision }: {
   /** The published reasons for issue. */
@@ -36,6 +38,9 @@ export function RequestIssue({ reasons, proposed, others, parties, author, onDec
   const [asking, setAsking] = useState(true);
   const [delegated, setDelegated] = useState(false);
   const [addingOthers, setAddingOthers] = useState(false);
+  // Some revisions cannot be released until somebody outside has approved them.
+  // Saying so here is what makes the release wait for their answer.
+  const [outside, setOutside] = useState(false);
 
   return (
     <div className={onDecision ? "space-y-3 border-t border-slate-100 pt-3" : "space-y-3"}>
@@ -111,6 +116,28 @@ export function RequestIssue({ reasons, proposed, others, parties, author, onDec
                       </label>
                     ))}
                   </div>
+                </div>
+              ) : null}
+
+              {parties.length ? (
+                <div className="rounded-lg bg-tint-soft px-3 py-2.5">
+                  <label className="flex items-start gap-2 text-xs text-slate-700">
+                    <input type="checkbox" name="needsApproval" checked={outside} onChange={(event) => setOutside(event.target.checked)} className="mt-0.5" />
+                    <span>
+                      <strong className="font-semibold">Somebody outside has to approve it first.</strong> It is not released until their
+                      answer comes back: they accept and it is released and issued, they refuse and it goes back to review.
+                    </span>
+                  </label>
+                  {outside ? (
+                    <div className="mt-2">
+                      <Field label="Who approves it" required>
+                        <select name="approverId" required defaultValue="" className={inputCls}>
+                          <option value="" disabled>Choose…</option>
+                          {parties.map((party) => <option key={party.id} value={party.id}>{party.name}</option>)}
+                        </select>
+                      </Field>
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
 

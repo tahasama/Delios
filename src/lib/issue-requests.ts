@@ -1,3 +1,4 @@
+import type { SessionUser } from "./auth";
 import type { Tenant } from "./tenant";
 
 /**
@@ -56,12 +57,17 @@ export function recipientsFromForm(formData: FormData): RequestRecipients {
  * moment somebody knows who needs it. Unticking it is a deliberate "not now".
  */
 export function requestFromForm(formData: FormData) {
+  const needsApproval = formData.get("needsApproval") === "on";
   return {
     give: formData.get("askNow") !== "off",
     reason: String(formData.get("issueReason") ?? "INFORMATION"),
     recipients: recipientsFromForm(formData),
     delegated: formData.get("delegateNextStep") === "on",
     note: String(formData.get("issueNote") ?? "").trim() || null,
+    // An outside party may have to approve the revision before it is released
+    // at all. Then the release waits for them, and their answer decides it.
+    needsApproval,
+    approverId: needsApproval ? String(formData.get("approverId") ?? "") || null : null,
   };
 }
 
@@ -298,6 +304,132 @@ export async function carryOutRequest(
 }
 
 /** Every open request on a revision, carried out in the order they were asked. */
+/**
+ * Is this revision ready to be released — that is, does somebody's answer exist
+ * about where it goes, and is nothing outside still to answer?
+ *
+ * Three ways it is not ready: nobody has said at all; the choice was handed to
+ * the initiator and they have not made it; an outside party has to approve it
+ * and their answer is not back. The words are the ones the reader has to act
+ * on, because this refusal is what they will see.
+ */
+export async function pendingIssue(
+  t: Tenant,
+  revisionId: string,
+  /**
+   * `recipients` false where the project releases without issuing: then nobody
+   * need have said where it goes, and only an outside approval holds it.
+   */
+  { recipients = true }: { recipients?: boolean } = {},
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const requests = await t.db.issueRequest.findMany({
+    where: { revisionId, status: "OPEN" },
+    include: { approver: { select: { name: true } } },
+  });
+  const waitingOnOutside = requests.find((one) => one.needsApproval);
+  if (waitingOnOutside) {
+    return {
+      ok: false,
+      error: `Release blocked: ${waitingOnOutside.approver?.name ?? "an outside party"} has to approve this revision first. It is released and issued when their answer comes back.`,
+    };
+  }
+  if (!recipients) return { ok: true };
+  if (!requests.length) {
+    return {
+      ok: false,
+      error: "Release blocked: nobody has said who this revision goes to. Releasing it is sending it, so say who receives it — our own people, an outside party, or both.",
+    };
+  }
+  const named = requests.find((one) => !one.delegated && !noRecipients(parseRecipients(one.recipients)));
+  if (!named) {
+    return {
+      ok: false,
+      error: "Release blocked: the choice of who receives this revision was left to whoever started the route, and they have not made it yet.",
+    };
+  }
+  return { ok: true };
+}
+
+/**
+ * Open the step that carries an outside approval, where a request asks for one.
+ *
+ * It is an ordinary step of the record — a party, a date, a verdict — so it is
+ * dispatched, chased and answered like any other, and the revision stays not
+ * released while it is open.
+ */
+export async function openApprovalStep(
+  t: Tenant,
+  revisionId: string,
+  user: { id: string; name: string },
+): Promise<{ opened: boolean; party?: string }> {
+  const request = await t.db.issueRequest.findFirst({
+    where: { revisionId, status: "OPEN", needsApproval: true },
+    include: { approver: { select: { id: true, name: true } } },
+    orderBy: { raisedAt: "asc" },
+  });
+  if (!request?.approver) return { opened: false };
+  const already = await t.db.reviewCycle.findFirst({ where: { issueRequestId: request.id, status: "OPEN" } });
+  if (already) return { opened: true, party: request.approver.name };
+
+  const { reviewNumber } = await import("./workflow");
+  const sequence = (await t.db.reviewCycle.count({ where: { revisionId } })) + 1;
+  await t.db.reviewCycle.create({
+    data: {
+      projectId: t.projectId,
+      number: await reviewNumber(t),
+      revisionId,
+      issueRequestId: request.id,
+      partyId: request.approver.id,
+      mode: "PARALLEL",
+      sequence,
+      // Their answer is what releases the revision, so the step binds.
+      binding: true,
+      openedById: user.id,
+      openedByName: user.name,
+      submittedAt: new Date(),
+      receivedAt: new Date(),
+      status: "OPEN",
+    },
+  });
+  return { opened: true, party: request.approver.name };
+}
+
+/**
+ * The outside party has answered. Their acceptance releases and issues the
+ * revision; their refusal sends it back to review, because what they rejected
+ * is the work, not the sending of it.
+ */
+export async function settleApproval(
+  t: Tenant,
+  cycleId: string,
+  /** Whoever wrote the answer down: the act is theirs, the verdict is the party's. */
+  user: SessionUser,
+  accepted: boolean,
+): Promise<{ released: boolean }> {
+  const cycle = await t.db.reviewCycle.findUnique({
+    where: { id: cycleId },
+    include: { revision: true, issueRequest: { include: { approver: { select: { name: true } } } } },
+  });
+  if (!cycle?.issueRequest) return { released: false };
+  const { audit } = await import("./audit");
+
+  if (!accepted) {
+    await t.db.revision.update({ where: { id: cycle.revisionId }, data: { state: "IN_REVIEW" } });
+    await audit({
+      tenant: t, actor: user, action: "WORKFLOW_RETURNED", entityType: "Revision", entityId: cycle.revisionId,
+      detail: `${cycle.issueRequest.approver?.name ?? "The outside party"} did not approve it — returned to review.`,
+    });
+    return { released: false };
+  }
+
+  // Approved outside: the request is an ordinary one again, and releasing it
+  // sends it, in the one act.
+  await t.db.issueRequest.update({ where: { id: cycle.issueRequest.id }, data: { needsApproval: false } });
+  const { releaseRevision } = await import("./lifecycle");
+  await releaseRevision(t, cycle.revisionId, user, cycle.revision.statusCode ?? "");
+  return { released: true };
+}
+
 export async function carryOutOpenRequests(t: Tenant, revisionId: string, user: { id: string; name: string }): Promise<number> {
   const open = await t.db.issueRequest.findMany({ where: { revisionId, status: "OPEN", delegated: false }, orderBy: { raisedAt: "asc" }, select: { id: true } });
   let raised = 0;

@@ -24,6 +24,42 @@ export async function GET(req: Request, { params }: { params: Promise<{ kind: st
       const cur = d.revisions.find((r) => r.state === "RELEASED");
       rows.push([d.docNumber, d.title, d.deliverableType, d.docType, d.discipline, d.state, d.isPlaceholder ? "yes" : "no", cur?.value ?? "", cur?.statusCode ?? "", cur?.releasedAt?.toISOString().slice(0, 10) ?? "", d.retentionClass ?? "", d.criticality ?? "", d.confidentiality ?? ""]);
     }
+  } else if (kind === "reviews") {
+    // The reviews page exports what it is showing: a selection when rows are
+    // ticked, otherwise every review the filters match.
+    const url = new URL(req.url);
+    const ids = (url.searchParams.get("ids") ?? "").split(",").map((one) => one.trim()).filter(Boolean);
+    const status = url.searchParams.get("status") ?? "";
+    const kindAsked = url.searchParams.get("kind") ?? "";
+    const verdict = url.searchParams.get("verdict") ?? "";
+    const q = (url.searchParams.get("q") ?? "").trim();
+    const cycles = await db.reviewCycle.findMany({
+      where: ids.length ? { id: { in: ids } } : {
+        AND: [
+          status && status !== "ALL" ? { status } : {},
+          kindAsked ? { binding: kindAsked === "DECISION" } : {},
+          verdict ? { outcome: verdict } : {},
+          q ? { revision: { document: { OR: [{ docNumber: { contains: q } }, { title: { contains: q } }] } } } : {},
+        ],
+      },
+      orderBy: { submittedAt: "desc" },
+      include: {
+        revision: { select: { value: true, document: { select: { docNumber: true, title: true } } } },
+        assignments: { orderBy: { order: "asc" } },
+        comments: { where: { progressionPreventing: true, status: "OPEN" }, select: { id: true } },
+      },
+    });
+    rows = [["Review", "Document number", "Title", "Revision", "Kind", "Verdict", "Decided by", "Reviewers", "Opened", "Opened by", "Due", "Closed", "Blocking comments", "Status"]];
+    for (const c of cycles) {
+      rows.push([
+        c.number ?? "", c.revision.document.docNumber, c.revision.document.title, c.revision.value,
+        c.binding ? "Decision" : "Advice", c.outcome ?? "", c.outcomeByName ?? "",
+        c.assignments.map((a) => a.userName).join("; "),
+        c.submittedAt.toISOString(), c.openedByName ?? "",
+        c.dueAt?.toISOString() ?? "", c.outcomeAt?.toISOString() ?? "",
+        c.comments.length, c.status,
+      ]);
+    }
   } else if (kind === "review-matrix") {
     const documents = await db.document.findMany({ orderBy: { docNumber: "asc" }, include: { revisions: { orderBy: { createdAt: "desc" }, include: { workflowRuns: { orderBy: { updatedAt: "desc" }, take: 1 }, cycles: { orderBy: { sequence: "desc" }, take: 1, include: { assignments: true, comments: { where: { status: "OPEN", progressionPreventing: true } } } }, approvals: { orderBy: { decidedAt: "desc" }, take: 1 } } } } });
     rows = [["Document number", "Title", "Discipline", "Type", "Criticality", "Revision", "Revision state", "Workflow", "Workflow state", "Review cycle", "Review status", "Reviewers", "Review outcome", "Blocking comments", "Approved by", "Approval role", "Authority matrix version", "Planned submission"]];
@@ -36,11 +72,18 @@ export async function GET(req: Request, { params }: { params: Promise<{ kind: st
     }
     name = "review-approval-matrix";
   } else if (kind === "baseline") {
-    const actions = await db.action.findMany({ orderBy: { code: "asc" }, include: { entries: { include: { document: true } } } });
-    rows = [["Action code", "Action", "Scheduled date", "Owner", "Schedule ref", "Document number", "Required status", "Required by"]];
+    // The actions somebody ticked, or all of them.
+    const ticked = (new URL(req.url).searchParams.get("ids") ?? "").split(",").map((one) => one.trim()).filter(Boolean);
+    const actions = await db.action.findMany({
+      where: ticked.length ? { id: { in: ticked } } : {},
+      orderBy: { code: "asc" },
+      include: { entries: { include: { document: true } } },
+    });
+    rows = [["Action code", "Action", "Description", "Scheduled date", "Owner", "Departments", "Document number", "Required status", "Required by"]];
     for (const a of actions) {
-      if (!a.entries.length) rows.push([a.code, a.name, a.scheduledDate?.toISOString().slice(0, 10) ?? "", a.ownerName ?? "", a.scheduleRef ?? "", "", "", ""]);
-      for (const e of a.entries) rows.push([a.code, a.name, a.scheduledDate?.toISOString().slice(0, 10) ?? "", a.ownerName ?? "", a.scheduleRef ?? "", e.document.docNumber, e.requiredStatus, e.requiredBy.toISOString().slice(0, 10)]);
+      const head = [a.code, a.name, a.description ?? "", a.scheduledDate?.toISOString().slice(0, 10) ?? "", a.ownerName ?? "", a.departments ?? ""];
+      if (!a.entries.length) rows.push([...head, "", "", ""]);
+      for (const e of a.entries) rows.push([...head, e.document.docNumber, e.requiredStatus, e.requiredBy.toISOString().slice(0, 10)]);
     }
     name = "actions-baseline";
   } else if (kind === "packages") {
@@ -54,7 +97,12 @@ export async function GET(req: Request, { params }: { params: Promise<{ kind: st
       }
     }
   } else if (kind === "transmittals") {
-    const list = await db.transmittal.findMany({ orderBy: { number: "asc" }, include: { items: { include: { revision: { include: { document: true } } } }, recipients: true } });
+    const ticked = (new URL(req.url).searchParams.get("ids") ?? "").split(",").map((one) => one.trim()).filter(Boolean);
+    const list = await db.transmittal.findMany({
+      where: ticked.length ? { id: { in: ticked } } : {},
+      orderBy: { number: "asc" },
+      include: { items: { include: { revision: { include: { document: true } } } }, recipients: true },
+    });
     rows = [["Number", "Direction", "Reason", "Date of issue", "Issuing party", "Status", "Response due", "Received date", "Items", "Recipients"]];
     for (const t of list) {
       const items = t.items.map((i) => `${i.revision.document.docNumber} rev ${i.revision.value}`).join("; ");

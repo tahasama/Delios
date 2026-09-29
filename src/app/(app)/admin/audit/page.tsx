@@ -27,7 +27,7 @@ const FAMILIES: Family[] = [
     id: "review",
     label: "Reviews and decisions",
     edge: "edge-move",
-    actions: ["WORKFLOW_STARTED", "STEP_DISPATCHED", "REVIEW_OUTCOME", "APPROVAL", "WORKFLOW_COMPLETED", "REVIEW_COMMENT", "COMMENT_RECLASSIFIED", "CONDITION_SETTLED"],
+    actions: ["WORKFLOW_STARTED", "STEP_DISPATCHED", "REVIEW_OUTCOME", "APPROVAL", "WORKFLOW_COMPLETED", "REVIEW_COMMENT", "COMMENT_RECLASSIFIED", "CONDITION_SETTLED", "DELEGATION_REQUESTED", "DELEGATION_GRANTED", "DELEGATION_REFUSED", "DELEGATION_WITHDRAWN"],
   },
   {
     id: "release",
@@ -51,9 +51,9 @@ const FAMILIES: Family[] = [
     id: "keeping",
     label: "Record keeping",
     edge: "edge-keep",
-    actions: ["METADATA_CHANGE", "FILE_UPLOADED", "CHECK_RUN", "PACKAGE_CREATED", "RELATIONSHIP", "TEMPLATE_SAVED", "TEMPLATE_REMOVED", "CONFIG_VALUE_RETIRED", "PERMISSION_RULE_PUBLISHED", "SCOPE_UPDATED", "PROJECT_OPENED", "USER_CREATED", "USER_UPDATED", "VISITOR_CREATED"],
+    actions: ["METADATA_CHANGE", "FILE_UPLOADED", "CHECK_RUN", "PACKAGE_CREATED", "RELATIONSHIP", "TEMPLATE_SAVED", "TEMPLATE_REMOVED", "CONFIG_VALUE_RETIRED", "PERMISSION_RULE_PUBLISHED", "SCOPE_UPDATED", "CONTROL_SETTING_CHANGED", "PROJECT_OPENED", "USER_CREATED", "USER_UPDATED", "VISITOR_CREATED"],
   },
-  { id: "access", label: "Who read what", edge: "edge-keep", actions: ["DOWNLOAD", "LOGIN"] },
+  { id: "access", label: "Who read what", edge: "edge-keep", actions: ["DOWNLOAD", "LOGIN", "ACCESS_GRANTED", "ACCESS_WITHDRAWN"] },
 ];
 
 const familyOf = (action: string) => FAMILIES.find((f) => f.actions.includes(action));

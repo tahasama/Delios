@@ -1,16 +1,55 @@
-import Link from "next/link";
+import { Prisma } from "@prisma/client";
 import { after } from "next/server";
 import { requireScope } from "@/lib/scope";
 import { dueState } from "@/lib/workflow";
 import { warnLateReviews } from "@/lib/review-risk";
 import { getSet } from "@/lib/config";
-import { PageHeader, DataTable, Th, Td, Chip, EmptyState, Info } from "@/components/ui";
+import { readSearch } from "@/lib/register-query";
+import { ReviewsRegister, type ReviewRow } from "./reviews-register";
+import { ReviewsPlate } from "./reviews-plate";
 import { fmtDate } from "@/lib/utils";
 import { ADVICE_LABEL, OUTCOME_CONSEQUENCES } from "@/lib/standard";
-import { ArrowRight } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Reviews" };
+
+/** How many reviews a page holds. */
+const PAGE_SIZES = [25, 50, 100, 250];
+
+type Search = {
+  status?: string; q?: string; page?: string; per?: string;
+  kind?: string; verdict?: string; due?: string; sort?: string; dir?: string;
+  discipline?: string; docType?: string; supplier?: string; po?: string; deliverable?: string;
+  on?: string; from?: string; to?: string;
+};
+
+/** A review is a decision or it is advice; the route says which. */
+const KINDS = [
+  { code: "DECISION", label: "Decision" },
+  { code: "ADVICE", label: "Advice" },
+];
+
+/** How it stands against the date the route gave it. */
+const DUES = [
+  { code: "OVERDUE", label: "Overdue" },
+  { code: "SOON", label: "Due within three days" },
+  { code: "NONE", label: "No date given" },
+];
+
+/** The dates a review holds, and the column each one is kept in. */
+const DATE_FIELDS = [
+  { key: "opened", label: "Opened" },
+  { key: "due", label: "Due" },
+  { key: "closed", label: "Closed" },
+] as const;
+const DATE_COLUMN: Record<string, string> = { opened: "submittedAt", due: "dueAt", closed: "outcomeAt" };
+
+/** A date from the address, as the day it names. */
+function readDay(value: string | undefined, endOfDay: boolean): Date | null {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const at = new Date(`${value}T${endOfDay ? "23:59:59.999" : "00:00:00.000"}`);
+  return Number.isNaN(at.getTime()) ? null : at;
+}
 
 const VIEWS = [
   { id: "ALL", label: "All" },
@@ -23,7 +62,7 @@ const VIEWS = [
  * each time it was reviewed. The deciding review of a route carries the
  * binding verdict; earlier steps are advice to it.
  */
-export default async function ReviewsPage({ searchParams }: { searchParams: Promise<{ status?: string; q?: string }> }) {
+export default async function ReviewsPage({ searchParams }: { searchParams: Promise<Search> }) {
   const ctx = await requireScope();
   const { db } = ctx;
   // One automatic warning per review that is about to miss its date. After that
@@ -32,136 +71,266 @@ export default async function ReviewsPage({ searchParams }: { searchParams: Prom
   const sp = await searchParams;
   const status = VIEWS.some((v) => v.id === sp.status) ? sp.status! : "ALL";
   const q = (sp.q ?? "").trim();
-  const [cycles, counts, verdicts, adviceValues] = await Promise.all([
+  const searches = readSearch(q);
+  const kind = KINDS.some((one) => one.code === sp.kind) ? sp.kind! : "";
+  const verdict = (sp.verdict ?? "").trim();
+  const due = DUES.some((one) => one.code === sp.due) ? sp.due! : "";
+  const dir = sp.dir === "desc" ? ("desc" as const) : ("asc" as const);
+  // What the document is and where it came from: the register narrows by these,
+  // and a reviewer asking "what is on my desk in piping" asks the same thing.
+  const discipline = (sp.discipline ?? "").trim();
+  const docType = (sp.docType ?? "").trim();
+  const supplier = (sp.supplier ?? "").trim();
+  const po = (sp.po ?? "").trim();
+  const deliverable = (sp.deliverable ?? "").trim();
+  const dateOn = DATE_COLUMN[sp.on ?? ""] ? sp.on! : "";
+  const from = readDay(sp.from, false);
+  const to = readDay(sp.to, true);
+  const soon = new Date(Date.now() + 3 * 86_400_000);
+
+  const where: Prisma.ReviewCycleWhereInput = {
+    AND: [
+      status === "ALL" ? {} : { status },
+      ...(searches.length
+        ? [{
+            OR: searches.map((search) => ({
+              AND: search.words.map((word) => ({
+                OR: [
+                  { number: { contains: word } },
+                  { outcome: { contains: word } },
+                  { outcomeByName: { contains: word } },
+                  { assignments: { some: { userName: { contains: word } } } },
+                  { revision: { value: word } },
+                  { revision: { document: { docNumber: { startsWith: word } } } },
+                  { revision: { document: { docNumber: { contains: word } } } },
+                  { revision: { document: { title: { contains: word } } } },
+                  { revision: { document: { originator: { contains: word } } } },
+                  { revision: { document: { contractRef: { contains: word } } } },
+                ],
+              })),
+            })),
+          }]
+        : []),
+      kind ? { binding: kind === "DECISION" } : {},
+      verdict ? { outcome: verdict } : {},
+      // What is late, and what is about to be: both are the date the route gave
+      // the step, read against today.
+      discipline || docType || supplier || po || deliverable
+        ? {
+            revision: {
+              document: {
+                ...(discipline ? { discipline } : {}),
+                ...(docType ? { docType } : {}),
+                ...(supplier ? { originator: supplier } : {}),
+                ...(po ? { contractRef: po } : {}),
+                ...(deliverable ? { deliverableType: deliverable } : {}),
+              },
+            },
+          }
+        : {},
+      due === "OVERDUE" ? { status: "OPEN", dueAt: { lt: new Date() } }
+        : due === "SOON" ? { status: "OPEN", dueAt: { gte: new Date(), lte: soon } }
+          : due === "NONE" ? { dueAt: null }
+            : {},
+      dateOn && (from || to)
+        ? ({ [DATE_COLUMN[dateOn]]: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } } as Prisma.ReviewCycleWhereInput)
+        : {},
+    ],
+  };
+  const SORTS: Record<string, Prisma.ReviewCycleOrderByWithRelationInput> = {
+    number: { number: dir },
+    document: { revision: { document: { docNumber: dir } } },
+    rev: { revision: { value: dir } },
+    kind: { binding: dir },
+    verdict: { outcome: dir },
+    due: { dueAt: dir },
+    opened: { submittedAt: dir },
+    closed: { outcomeAt: dir },
+    discipline: { revision: { document: { discipline: dir } } },
+    docType: { revision: { document: { docType: dir } } },
+  };
+  const sort = sp.sort && SORTS[sp.sort] ? sp.sort : "";
+  const orderBy = sort ? SORTS[sort] : { submittedAt: "desc" as const };
+  const perPage = PAGE_SIZES.includes(Number(sp.per)) ? Number(sp.per) : 50;
+  const asked = Math.max(1, Number(sp.page) || 1);
+  const matching = await db.reviewCycle.count({ where });
+  const pages = Math.max(1, Math.ceil(matching / perPage));
+  const page = Math.min(asked, pages);
+
+  const [cycles, verdicts, adviceValues, disciplines, types, suppliers, pos, deliverables, inUse] = await Promise.all([
     db.reviewCycle.findMany({
-      where: {
-        ...(status === "ALL" ? {} : { status }),
-        ...(q ? { revision: { document: { OR: [{ docNumber: { contains: q } }, { title: { contains: q } }] } } } : {}),
-      },
-      orderBy: { submittedAt: "desc" },
-      take: 500,
+      where,
+      orderBy,
+      skip: (page - 1) * perPage,
+      take: perPage,
       include: {
-        revision: { select: { id: true, value: true, state: true, releasedAt: true, document: { select: { id: true, docNumber: true, title: true } } } },
+        revision: {
+          select: {
+            id: true, value: true, state: true, releasedAt: true,
+            // When this issue reached us, and who recorded it. A revision that
+            // came from outside arrives through its package or a transmittal;
+            // one of ours is simply written here.
+            submittedAt: true, submittedByName: true,
+            document: {
+              select: {
+                id: true, docNumber: true, title: true, discipline: true, docType: true,
+                originator: true, contractRef: true, deliverableType: true, receivedDate: true,
+              },
+            },
+          },
+        },
         assignments: { orderBy: { order: "asc" } },
-        comments: { where: { progressionPreventing: true, status: "OPEN" }, select: { id: true } },
       },
     }),
-    db.reviewCycle.groupBy({ by: ["status"], _count: true }),
     getSet("REVIEW_OUTCOMES"),
     getSet("REVIEW_ADVICE"),
+    getSet("DISCIPLINES"),
+    getSet("DOCUMENT_TYPES"),
+    getSet("SUPPLIER_CODES"),
+    getSet("PURCHASE_ORDERS"),
+    getSet("DELIVERABLE_TYPES"),
+    // The choices offer what the reviews actually hold, not every value the
+    // organization publishes.
+    db.document.groupBy({ by: ["discipline", "docType"] }),
   ]);
-  const count = (s: string) => (s === "ALL" ? counts.reduce((n, c) => n + c._count, 0) : counts.find((c) => c.status === s)?._count ?? 0);
+  const disciplineLabel = new Map(disciplines.map((one) => [one.code, one.label]));
+  const typeLabel = new Map(types.map((one) => [one.code, one.label]));
+  const deliverableLabel = new Map(deliverables.map((one) => [one.code, one.label]));
+  const usedDisciplines = new Set(inUse.map((one) => one.discipline));
+  const usedTypes = new Set(inUse.map((one) => one.docType));
   // Codes from the organization's list; older records may carry the Standard's
   // own consequence names (APPROVED, REVISE_AND_RESUBMIT…).
   const verdictLabel = new Map<string, string>([...Object.entries(OUTCOME_CONSEQUENCES).map(([k, v]) => [k, v.label] as [string, string]), ...verdicts.map((v) => [v.code, v.label] as [string, string]), ...Object.entries(ADVICE_LABEL).map(([code, label]) => [code, label] as [string, string]), ...adviceValues.map((v) => [v.code, v.label] as [string, string])]);
+  /** The address without one of the filters, so a facet can drop itself. */
+  const drop = (key: keyof Search) => {
+    const params = new URLSearchParams();
+    const held: [keyof Search, string][] = [
+      ["status", status === "ALL" ? "" : status], ["q", q], ["kind", kind], ["verdict", verdict],
+      ["due", due], ["discipline", discipline], ["docType", docType], ["supplier", supplier], ["po", po],
+      ["deliverable", deliverable], ["on", dateOn], ["from", sp.from ?? ""], ["to", sp.to ?? ""],
+    ];
+    for (const [name, value] of held) {
+      if (!value || name === key) continue;
+      if (key === "on" && (name === "from" || name === "to")) continue;
+      params.set(name, value);
+    }
+    return `/reviews${params.size ? `?${params}` : ""}`;
+  };
+  const said = (options: { code: string; label: string }[], code: string) => options.find((one) => one.code === code)?.label ?? code;
+  const facets: { key: string; label: string; without: string }[] = [];
+  if (q) facets.push({ key: "search", label: q, without: drop("q") });
+  if (kind) facets.push({ key: "kind", label: said(KINDS, kind), without: drop("kind") });
+  if (verdict) facets.push({ key: "verdict", label: verdict, without: drop("verdict") });
+  if (due) facets.push({ key: "due", label: said(DUES, due), without: drop("due") });
+  if (discipline) facets.push({ key: "discipline", label: disciplineLabel.get(discipline) ?? discipline, without: drop("discipline") });
+  if (docType) facets.push({ key: "type", label: typeLabel.get(docType) ?? docType, without: drop("docType") });
+  if (supplier) facets.push({ key: "supplier", label: supplier, without: drop("supplier") });
+  if (po) facets.push({ key: "contract", label: po, without: drop("po") });
+  if (deliverable) facets.push({ key: "produced by", label: deliverableLabel.get(deliverable) ?? deliverable, without: drop("deliverable") });
+  if (dateOn && (sp.from || sp.to)) {
+    const window = sp.to && sp.to !== sp.from ? `${sp.from ?? "the beginning"} to ${sp.to}` : sp.from ?? "";
+    facets.push({ key: said(DATE_FIELDS.map((f) => ({ code: f.key, label: f.label })), dateOn).toLowerCase(), label: window, without: drop("on") });
+  }
+
+  /** The same question, another page of it. */
+  const step = (to: number) => {
+    const params = new URLSearchParams(drop("page" as keyof Search).split("?")[1] ?? "");
+    if (perPage !== 50) params.set("per", String(perPage));
+    if (to > 1) params.set("page", String(to));
+    return `/reviews${params.size ? `?${params}` : ""}`;
+  };
   const proceeds = new Map<string, boolean>([...Object.entries(OUTCOME_CONSEQUENCES).map(([k, v]) => [k, v.proceed] as [string, boolean]), ...verdicts.map((v) => [v.code, v.props.proceed === true] as [string, boolean])]);
 
+  /** The same question, another page of it. */
+  const query = new URLSearchParams();
+  if (status !== "ALL") query.set("status", status);
+  if (q) query.set("q", q);
+  if (kind) query.set("kind", kind);
+  if (verdict) query.set("verdict", verdict);
+  if (due) query.set("due", due);
+  if (discipline) query.set("discipline", discipline);
+  if (docType) query.set("docType", docType);
+  if (supplier) query.set("supplier", supplier);
+  if (po) query.set("po", po);
+  if (deliverable) query.set("deliverable", deliverable);
+  if (sort) { query.set("sort", sort); query.set("dir", dir); }
+  if (dateOn) query.set("on", dateOn);
+  if (sp.from) query.set("from", sp.from);
+  if (sp.to) query.set("to", sp.to);
+  if (perPage !== 50) query.set("per", String(perPage));
+
+  const rows: ReviewRow[] = cycles.map((c) => {
+    // A review that starts after its revision was released is the recipient's,
+    // not ours: their verdict never changes it, a new revision answers it.
+    const postRelease = !!c.revision.releasedAt && c.submittedAt > c.revision.releasedAt;
+    const state = dueState(c.dueAt, c.status !== "OPEN");
+    const waitingOn = c.assignments.filter((a) => !a.completedAt);
+    const late = c.status === "OPEN" && state !== "on time" && c.dueAt;
+    return {
+      id: c.id,
+      number: c.number,
+      documentId: c.revision.document.id,
+      docNumber: c.revision.document.docNumber,
+      title: c.revision.document.title,
+      revision: c.revision.value,
+      kind: postRelease ? "client review" : c.binding ? "decision" : "advice",
+      verdict: c.binding ? c.outcome : null,
+      verdictLabel: c.outcome ? verdictLabel.get(c.outcome) ?? c.outcome : null,
+      verdictProceeds: c.outcome && c.binding ? proceeds.get(c.outcome) ?? null : null,
+      decidedBy: c.outcomeByName,
+      open: c.status === "OPEN",
+      reviewers: c.assignments.map((a) => ({ name: a.userName, done: !!a.completedAt })),
+      doneCount: c.assignments.filter((a) => a.completedAt).length,
+      dueAt: c.dueAt ? fmtDate(c.dueAt) : null,
+      dueState: state,
+      notifyHref: late
+        ? `/transmittals/new?revisions=${c.revision.id}&users=${waitingOn.map((a) => a.userId).join(",")}&reason=REVIEW&subject=${encodeURIComponent(`${c.revision.document.docNumber} rev ${c.revision.value} — review still open`)}&message=${encodeURIComponent(`This review was due on ${fmtDate(c.dueAt!)}. Please answer it.${c.riskNotifiedAt ? ` An automatic warning went out on ${fmtDate(c.riskNotifiedAt)}.` : ""}`)}`
+        : null,
+      warnedAt: c.riskNotifiedAt ? fmtDate(c.riskNotifiedAt) : null,
+      openedAt: fmtDate(c.submittedAt),
+      openedBy: c.openedByName,
+      discipline: disciplineLabel.get(c.revision.document.discipline) ?? c.revision.document.discipline,
+      docType: typeLabel.get(c.revision.document.docType) ?? c.revision.document.docType,
+      producedBy: deliverableLabel.get(c.revision.document.deliverableType) ?? c.revision.document.deliverableType,
+      from: c.revision.document.originator,
+      contract: c.revision.document.contractRef,
+      // The day the document reached us. Ours are written when the revision is
+      // opened; an outside one carries the day its submission arrived.
+      receivedAt: c.revision.submittedAt
+        ? fmtDate(c.revision.submittedAt)
+        : c.revision.document.receivedDate ? fmtDate(c.revision.document.receivedDate) : null,
+      receivedFrom: c.revision.document.originator ?? c.revision.submittedByName,
+      closedAt: c.outcomeAt ? fmtDate(c.outcomeAt) : null,
+    };
+  });
+
   return (
-    <div className="space-y-5">
-      <PageHeader title="Reviews" subtitle="Every review ever made — a document appears once for each time it was reviewed. A decision releases the revision or sends it back; advice is input to that decision; a client review happens after we released it, and is answered by a new revision." />
-
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <nav className="flex gap-1 rounded-xl bg-slate-100 p-1" aria-label="Which reviews">
-          {VIEWS.map((v) => (
-            <Link key={v.id} href={`/reviews?status=${v.id}${q ? `&q=${encodeURIComponent(q)}` : ""}`} aria-current={status === v.id ? "page" : undefined} className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${status === v.id ? "bg-surface text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-800"}`}>
-              {v.label} <span className="font-normal text-slate-400">{count(v.id)}</span>
-            </Link>
-          ))}
-        </nav>
-        <form className="flex gap-2">
-          <input type="hidden" name="status" value={status} />
-          <input name="q" defaultValue={q} placeholder="Document number or title" className="h-9 w-64 rounded-xl border border-slate-200 bg-surface px-3 text-xs outline-none focus:border-brand-line" />
-        </form>
-      </div>
-
-      {cycles.length === 0 ? (
-        <EmptyState title={status === "OPEN" ? "No review is open" : "No reviews"} body="A review starts when a revision is sent down a review route." />
-      ) : (
-        <DataTable
-          id="reviews"
-          defaultHidden={["Opened by", "Closed"]}
-          head={
-            <tr>
-              <Th>Review <Info>Its own number, like a transmittal or an action. Click it to open the review.</Info></Th>
-              <Th>Document</Th>
-              <Th>Rev</Th>
-              <Th>Kind <Info>A decision is the last step of a route and releases the revision or sends it back. Advice is any earlier step. A client review happens after we released it, and is answered by a new revision.</Info></Th>
-              <Th>Verdict <Info>On a decision, the code the decider gave. On an advisory step, what that person’s comments amounted to — advisers are not asked for a code.</Info></Th>
-              <Th>Reviewers</Th>
-              <Th title="When this step has to be answered. It comes from the days the route gives the step.">Due</Th>
-              <Th>Opened</Th>
-              <Th>Opened by</Th>
-              <Th>Closed</Th>
-              <Th>Blocking <Info>Comments marked as stopping the release and not yet settled. While one is open the revision cannot be released, whatever the verdict says.</Info></Th>
-              <Th />
-            </tr>
-          }
-        >
-          {cycles.map((c) => {
-            // A review that starts after its revision was released is the recipient's, not ours.
-            const postRelease = !!c.revision.releasedAt && c.submittedAt > c.revision.releasedAt;
-            const done = c.assignments.filter((a) => a.completedAt).length;
-            const state = dueState(c.dueAt, c.status !== "OPEN");
-            const waitingOn = c.assignments.filter((a) => !a.completedAt);
-            return (
-              <tr key={c.id}>
-                <Td className="whitespace-nowrap">
-                  <Link href={`/reviews/${c.id}`} className="font-mono text-xs font-bold text-link hover:underline">{c.number ?? "—"}</Link>
-                </Td>
-                <Td className="min-w-[240px]">
-                  <Link href={`/documents/${c.revision.document.id}`} className="font-mono text-xs font-bold text-link hover:underline">{c.revision.document.docNumber}</Link>
-                  <span className="block max-w-72 truncate text-xs text-slate-500" title={c.revision.document.title}>{c.revision.document.title}</span>
-                </Td>
-                <Td className="font-mono text-xs font-semibold text-slate-800">{c.revision.value}</Td>
-                <Td className="whitespace-nowrap">
-                  <Chip className={postRelease ? "bg-violet-100 text-violet-800 ring-violet-300" : c.binding ? "bg-emerald-100 text-emerald-800 ring-emerald-300" : "bg-sky-100 text-sky-800 ring-sky-300"}
-                    title={postRelease ? "The recipient reviewed a revision we had already released. Their verdict never changes it; a new revision answers it." : c.binding ? "The last step of the route. Its verdict releases the revision, or sends it back." : "An earlier step of the route. Input for whoever decides."}>
-                    {postRelease ? "client review" : c.binding ? "decision" : "advice"}
-                  </Chip>
-                </Td>
-                <Td className="whitespace-nowrap text-xs">
-                  {c.outcome ? (
-                    <span className={c.binding ? (proceeds.get(c.outcome) ? "text-emerald-700" : "text-red-700") : "text-slate-600"}>
-                      {c.binding && verdictLabel.get(c.outcome) && verdictLabel.get(c.outcome) !== c.outcome && !(c.outcome in OUTCOME_CONSEQUENCES) ? <><span className="font-mono font-bold">{c.outcome}</span> {verdictLabel.get(c.outcome)}</> : <span className="font-semibold">{verdictLabel.get(c.outcome) ?? c.outcome}</span>}
-                      {c.outcomeByName ? <span className="block text-[11px] text-slate-400">{c.outcomeByName}</span> : null}
-                    </span>
-                  ) : c.status === "OPEN" ? <span className="text-amber-700">waiting</span> : <span className="text-slate-300">—</span>}
-                </Td>
-                <Td className="text-xs">
-                  {c.assignments.length ? <span title={c.assignments.map((a) => `${a.completedAt ? "✓" : "○"} ${a.userName}`).join("\n")}>{c.assignments.map((a) => a.userName).join(", ")}</span> : <span className="text-slate-400">unassigned</span>}
-                  {c.status === "OPEN" && c.assignments.length > 1 ? <span className="block text-[11px] text-slate-400">{done} of {c.assignments.length} done</span> : null}
-                </Td>
-                <Td className="whitespace-nowrap text-xs tabular-nums">
-                  {c.dueAt ? (
-                    <>
-                      <span className={state === "overdue" ? "font-semibold text-red-700" : state === "at risk" ? "font-semibold text-amber-700" : "text-slate-500"}>{fmtDate(c.dueAt)}</span>
-                      <span className={`block font-sans text-[11px] ${state === "overdue" ? "text-red-600" : state === "at risk" ? "text-amber-700" : "text-slate-400"}`}>
-                        {c.status === "OPEN" ? state : "answered"}
-                      </span>
-                      {c.status === "OPEN" && state !== "on time" ? (
-                        <Link
-                          href={`/transmittals/new?revisions=${c.revision.id}&users=${waitingOn.map((a) => a.userId).join(",")}&reason=REVIEW&subject=${encodeURIComponent(`${c.revision.document.docNumber} rev ${c.revision.value} — review still open`)}&message=${encodeURIComponent(`This review was due on ${fmtDate(c.dueAt)}. Please answer it.${c.riskNotifiedAt ? ` An automatic warning went out on ${fmtDate(c.riskNotifiedAt)}.` : ""}`)}`}
-                          className="mt-0.5 block font-sans text-[11px] font-semibold text-link hover:underline"
-                        >
-                          Notify
-                        </Link>
-                      ) : null}
-                      {c.riskNotifiedAt ? <span className="block font-sans text-[10px] text-slate-400">warned {fmtDate(c.riskNotifiedAt)}</span> : null}
-                    </>
-                  ) : (
-                    <span className="text-slate-300" title="The route gives this step no time limit">—</span>
-                  )}
-                </Td>
-                <Td className="whitespace-nowrap text-xs tabular-nums text-slate-500">{fmtDate(c.submittedAt)}</Td>
-                <Td className="whitespace-nowrap text-xs text-slate-500">{c.openedByName}</Td>
-                <Td className="whitespace-nowrap text-xs tabular-nums text-slate-500">{c.outcomeAt ? fmtDate(c.outcomeAt) : "—"}</Td>
-                <Td>{c.comments.length ? <Chip className="bg-red-100 text-red-800 ring-red-300">{c.comments.length} open</Chip> : <span className="text-xs text-slate-300">—</span>}</Td>
-                <Td className="text-right"><Link href={`/reviews/${c.id}`} className="inline-flex items-center gap-1 whitespace-nowrap text-xs font-semibold text-link">Open <ArrowRight className="h-3.5 w-3.5" /></Link></Td>
-              </tr>
-            );
-          })}
-        </DataTable>
-      )}
-    </div>
+    <ReviewsRegister
+      plate={<ReviewsPlate />}
+      rows={rows}
+      total={matching}
+      filters={{ q, status: status === "ALL" ? "" : status, kind, verdict, due, discipline, docType, supplier, po, deliverable, on: dateOn, from: sp.from ?? "", to: sp.to ?? "" }}
+      filterOptions={{
+        statuses: VIEWS.filter((v) => v.id !== "ALL").map((v) => ({ code: v.id, label: v.label })),
+        kinds: KINDS,
+        verdicts: verdicts.map((one) => ({ code: one.code, label: `${one.code} — ${one.label}` })),
+        dues: DUES,
+        disciplines: disciplines.filter((one) => usedDisciplines.has(one.code)).map((one) => ({ code: one.code, label: one.label })),
+        types: types.filter((one) => usedTypes.has(one.code)).map((one) => ({ code: one.code, label: one.label })),
+        suppliers: suppliers.map((one) => ({ code: one.code, label: one.label })),
+        pos: pos.map((one) => ({ code: one.code, label: one.label })),
+        deliverables: deliverables.map((one) => ({ code: one.code, label: one.label })),
+        dateFields: DATE_FIELDS.map((field) => ({ code: field.key, label: field.label })),
+      }}
+      facets={facets}
+      sort={{ key: sort, dir }}
+      paging={{
+        page, pages, perPage, sizes: PAGE_SIZES,
+        from: matching ? (page - 1) * perPage + 1 : 0,
+        to: Math.min(page * perPage, matching),
+        query: query.toString(),
+      }}
+      exportHref={`/api/export/reviews${query.size ? `?${query}` : ""}`}
+    />
   );
 }

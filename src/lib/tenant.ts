@@ -1,3 +1,4 @@
+import { deferred, deferredActions } from "./restate-defer";
 import { db } from "./db";
 
 /**
@@ -34,6 +35,9 @@ export const ORG_SCOPED = new Set([
 
 export const PROJECT_SCOPED = new Set([
   "Delegation",
+  "IssueRequest",
+  "ControlSetting",
+  "DocumentAccess",
   "RegisterView",
   "NumberCounter",
   "Document",
@@ -119,11 +123,52 @@ function injectData(data: unknown, key: string, value: string): unknown {
 }
 
 /**
- * Models whose rows carry a confidentiality of their own. A clearance filter is
- * applied to these as well as the tenancy key, so §5.7 is enforced in the same
- * place and cannot be forgotten at a call site.
+ * Who is reading, for the one question the register asks of a closed document:
+ * are you named on it?
+ *
+ * Confidentiality above the open levels is not a ladder climbed by rank. The
+ * people who may read such a document are named on the document itself by
+ * whoever is answerable for its content — its author, or whoever uploaded the
+ * file — and an administrator reads everything, because somebody must be able
+ * to.
  */
-const CONFIDENTIAL_MODELS = new Set(["Document"]);
+export type Reader = {
+  userId: string;
+  /** Holds CONFIGURE: reads the whole register, closed documents included. */
+  everything: boolean;
+  /** The confidentiality codes open to everybody on the project. */
+  openCodes: string[];
+};
+
+function closedDocumentFilter(reader: Reader) {
+  return {
+    OR: [
+      { confidentiality: null },
+      { confidentiality: { in: reader.openCodes } },
+      // Answerable for it, so never locked out of it.
+      { createdById: reader.userId },
+      { revisions: { some: { OR: [{ authoredById: reader.userId }, { uploadedById: reader.userId }] } } },
+      { access: { some: { userId: reader.userId } } },
+    ],
+  };
+}
+
+/**
+ * The same rule, said once per model that hangs off a document: a closed
+ * document's revisions, reviews, files and enclosures are as closed as the
+ * document is. The transmittal itself stays visible — it is correspondence, and
+ * what it carries is filtered here.
+ */
+const CLOSED_MODELS: Record<string, (reader: Reader) => Record<string, unknown>> = {
+  Document: closedDocumentFilter,
+  Revision: (reader) => ({ document: closedDocumentFilter(reader) }),
+  ReviewCycle: (reader) => ({ revision: { document: closedDocumentFilter(reader) } }),
+  ReviewComment: (reader) => ({ cycle: { revision: { document: closedDocumentFilter(reader) } } }),
+  TransmittalItem: (reader) => ({ revision: { document: closedDocumentFilter(reader) } }),
+  DocumentAccess: (reader) => ({ document: closedDocumentFilter(reader) }),
+  DocumentSnapshot: (reader) => ({ document: closedDocumentFilter(reader) }),
+  StoredFile: (reader) => ({ OR: [{ revisionId: null }, { revision: { document: closedDocumentFilter(reader) } }] }),
+};
 
 /**
  * Someone from another party reading our register. They are not staff: they see
@@ -170,11 +215,11 @@ export function scopedClient(
   orgId: string,
   projectId: string,
   /**
-   * The confidentiality codes the reader is cleared for. `null` means no
-   * clearance filtering — used by seeds, importers and the conformance engine,
-   * which measure the register rather than read it on someone's behalf.
+   * Who is reading. `null` means nobody in particular — seeds, importers and the
+   * conformance engine, which measure the register rather than read it on
+   * somebody's behalf — and then closed documents are not filtered out.
    */
-  allowedConfidentiality: string[] | null = null,
+  reader: Reader | null = null,
   /** Set when the reader belongs to another party; null for our own staff. */
   external: ExternalReader | null = null,
 ) {
@@ -200,10 +245,10 @@ export function scopedClient(
             const scopedWhere: Record<string, unknown> = { ...where, [key]: value };
             const extra: unknown[] = [];
             if (external && model && EXTERNAL_MODELS[model]) extra.push(EXTERNAL_MODELS[model](external));
-            if (allowedConfidentiality && model && CONFIDENTIAL_MODELS.has(model)) {
-              // An unclassified item is readable by anyone who can reach the
-              // project; a classified one needs the clearance for its level.
-              extra.push({ OR: [{ confidentiality: null }, { confidentiality: { in: allowedConfidentiality } }] });
+            if (reader && !reader.everything && model && CLOSED_MODELS[model]) {
+              // An open document is the ordinary register, read by everybody on
+              // the project; a closed one is read by the people named on it.
+              extra.push(CLOSED_MODELS[model](reader));
             }
             if (extra.length) {
               scopedWhere.AND = Array.isArray(where.AND)
@@ -242,10 +287,25 @@ export function scopedClient(
 
           const done = await scoped();
           // A write to a revision, a review cycle or a file changes what the
-          // register says about the document that owns it.
+          // register says about the document that owns it — and what every
+          // action waiting on that document is waiting for.
           if (model && RESTATES[model] && WRITE_OPS.has(operation)) {
+            const waiting = deferred();
             for (const documentId of await touched(model, (args ?? {}) as Record<string, unknown>, done)) {
-              await restateDocument(documentId);
+              // Inside a transaction the write lock is held, and restating on
+              // another connection would wait for a lock that waits for it.
+              // So it is remembered and done the moment the transaction ends.
+              if (waiting) waiting.add(documentId);
+              else await restateDocument(documentId);
+            }
+          }
+          // A line added to or removed from an action's list changes the same
+          // answer, from the other side.
+          if (model === "BaselineEntry" && WRITE_OPS.has(operation)) {
+            const waiting = deferredActions();
+            for (const actionId of await touchedActions((args ?? {}) as Record<string, unknown>, done)) {
+              if (waiting) waiting.add(actionId);
+              else await restateActionById(orgId, projectId, actionId);
             }
           }
           return done;
@@ -317,8 +377,35 @@ async function touched(model: string, args: Record<string, unknown>, result: unk
   return [...ids];
 }
 
+/**
+ * The actions a write to the requirements list touched. A created or updated
+ * line says its action; a deletion is found by what the selector matches, before
+ * the row is gone, which is why the id is read from the result as well.
+ */
+async function touchedActions(args: Record<string, unknown>, result: unknown): Promise<string[]> {
+  const ids = new Set<string>();
+  const add = (value: unknown) => {
+    if (typeof value === "string") ids.add(value);
+  };
+  const fromRecord = (record: unknown) => {
+    if (record && typeof record === "object") add((record as Record<string, unknown>).actionId);
+  };
+  fromRecord(result);
+  fromRecord(args.data);
+  fromRecord(args.create);
+  fromRecord(args.where);
+  if (Array.isArray(args.data)) for (const one of args.data) fromRecord(one);
+  return [...ids];
+}
+
+/** Rewrite what one action is waiting for, on its own tenant. */
+async function restateActionById(orgId: string, projectId: string, actionId: string) {
+  const { restateAction } = await import("./action-readiness");
+  await restateAction(tenantFor(orgId, projectId), actionId);
+}
+
 /** Recompute a document's copy of its latest revision's facts. */
-async function restateDocument(documentId: string) {
+export async function restateDocument(documentId: string) {
   const latest = await db.revision.findFirst({
     where: { documentId },
     orderBy: { createdAt: "desc" },
@@ -344,6 +431,16 @@ async function restateDocument(documentId: string) {
       latestReleasedAt: latest?.releasedAt ?? null,
     },
   });
+
+  // Every action that lists this document is waiting on a different answer now.
+  const waiting = await db.baselineEntry.findMany({ where: { documentId }, select: { actionId: true, projectId: true } });
+  const seen = new Set<string>();
+  for (const row of waiting) {
+    if (seen.has(row.actionId)) continue;
+    seen.add(row.actionId);
+    const project = await db.project.findUnique({ where: { id: row.projectId }, select: { orgId: true } });
+    if (project) await restateActionById(project.orgId, row.projectId, row.actionId);
+  }
 }
 
 

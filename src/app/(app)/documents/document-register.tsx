@@ -264,7 +264,7 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
   if (filters.deliverable) facets.push({ key: "produced by", label: labelIn(filterOptions.deliverables, filters.deliverable), without: drop("deliverable") });
 
   return <>
-    <section className="register register-sheet mb-5">
+    <section className="register register-sheet register-sheet-open mb-5">
       {plate}
 
       {/* Search gets its own line: it is how most people arrive, and it takes
@@ -639,7 +639,7 @@ The revision is not released, so this status is not in force.`} href={GUIDE.STAT
   {
     key: "confidentiality", sort: "confidentiality",
     label: "Confidentiality",
-    note: "Who may see it. Someone whose clearance is below it does not see the document at all — not in lists, counts or searches.",
+    note: "Who may see it. Above the open levels it is read only by the people named on the document itself — to anybody else it is not in lists, counts or searches.",
     cellClass: "whitespace-nowrap",
     cell: (row, codes) => row.confidentiality
       ? <CodeRef code={codes[`CONFIDENTIALITY_SHORT|${row.confidentiality}`] ?? row.confidentiality.toLowerCase()} note={codes[`CONFIDENTIALITY|${row.confidentiality}`]} href={GUIDE.CONFIDENTIALITY} className="meta !font-sans" />

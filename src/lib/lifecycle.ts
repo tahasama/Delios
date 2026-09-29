@@ -1,3 +1,5 @@
+import { withDeferredRestate } from "./restate-defer";
+import { restateDocument } from "./tenant";
 import type { Tenant } from "./tenant";
 import { readFile, writeFile } from "fs/promises";
 import path from "path";
@@ -186,17 +188,20 @@ export async function recordReviewOutcome(
  if (cycle.outcome) throw new Error("This cycle already carries a recorded outcome — it is immutable.");
   const cons = await verdictMeaning(t, cycle.outcomeSetKey, outcome);
  if (!cons) throw new Error("Outcome is not in the published set.");
-  const approves = cycle.binding && cons.proceed && cycle.revision.state === "IN_REVIEW";
+  // A step that exists to carry an outside party's approval of a release is
+  // answered here like any other, and what it decides is the release itself.
+  const outsideApproval = !!cycle.issueRequestId;
+  const approves = cycle.binding && cons.proceed && cycle.revision.state === "IN_REVIEW" && !outsideApproval;
   if (approves) {
     await assertMayGiveBindingVerdict(t, cycle.revisionId, user);
     if (!issuedFor) throw new Error("Say what this revision is issued for.");
     const published = await db.configValue.findFirst({ where: { setKey: "STATUSES", code: issuedFor, status: "ACTIVE" } });
     if (!published) throw new Error(`“${issuedFor}” is not one of the published statuses.`);
-    // The route is over and the status is settled. It is not in force until
-    // Document Control publishes it, and the state is what says so.
+    // The status the route settled on. The state moves after the approval is
+    // recorded, because an approval is recorded against a revision in review.
     await db.revision.update({
       where: { id: cycle.revisionId },
-      data: { statusCode: issuedFor, statusSetAt: new Date(), statusSetByName: user.name, state: "NOT_RELEASED" },
+      data: { statusCode: issuedFor, statusSetAt: new Date(), statusSetByName: user.name },
     });
   }
   if (cycle.issuedToReviewAt) await db.reviewCycle.update({ where: { id: cycleId }, data: { returnedFromReviewAt: new Date() } });
@@ -206,7 +211,23 @@ export async function recordReviewOutcome(
     data: { outcome, outcomeAt: new Date(), outcomeByName: user.name, outcomeNote: note ?? null, returnedFromReviewAt: cycle.returnedFromReviewAt ?? new Date() },
   });
   await db.reviewAssignment.updateMany({ where: { cycleId, userId: user.id }, data: { completedAt: new Date() } });
-  if (approves) await recordApproval(t, cycle.revisionId, user, `Binding verdict ${cons.code} — ${cons.label}${note ? `: ${note}` : ""}`);
+  if (approves) {
+    await recordApproval(t, cycle.revisionId, user, `Binding verdict ${cons.code} — ${cons.label}${note ? `: ${note}` : ""}`);
+    // The route is over and the status is settled. It is not in force until it
+    // is released, and the state is what says so.
+    await db.revision.update({ where: { id: cycle.revisionId }, data: { state: "NOT_RELEASED" } });
+    // Where the issuance says an outside party approves it first, their step
+    // opens now and the revision waits for their answer.
+    const { openApprovalStep } = await import("./issue-requests");
+    await openApprovalStep(t, cycle.revisionId, user);
+  }
+  if (outsideApproval) {
+    // Their acceptance releases and issues it; their refusal sends it back to
+    // review, because what they refused is the work, not the sending.
+    await db.reviewCycle.update({ where: { id: cycleId }, data: { status: "CLOSED" } });
+    const { settleApproval } = await import("./issue-requests");
+    await settleApproval(t, cycleId, user, cons.proceed === true);
+  }
   await audit({
     tenant: t,
     actor: user,
@@ -383,6 +404,18 @@ export async function requiredApprovalRole(t: Tenant, document: { discipline: st
 }
 
 /** Release a revision at a stated status (§7.5–7.6). Supersedes the current revision (§7.5, §12.1). */
+/**
+ * Releasing a revision is the same act as issuing it.
+ *
+ * A revision is either not released, or released and issued: there is no state
+ * in between, because a document published to nobody helps nobody and a
+ * document sent to somebody without being published is a document nobody can
+ * answer for. So this act refuses to run until somebody has said where the
+ * revision goes, and it sends it as part of releasing it.
+ *
+ * Where an outside party has to approve it first, the revision stays not
+ * released until their answer comes back: see `pendingIssue`.
+ */
 export async function releaseRevision(t: Tenant, revisionId: string, user: SessionUser, statusCode: string) {
   // Whatever the caller passes, the status the reviewers decided on wins.
   const { db, projectId } = t;
@@ -398,6 +431,16 @@ export async function releaseRevision(t: Tenant, revisionId: string, user: Sessi
   // §8.1 — no release without recorded approval
   const approval = await db.approval.findFirst({ where: { revisionId }, orderBy: { decidedAt: "desc" } });
  if (!approval) throw new Error("Release blocked: no approval is recorded for this revision.");
+  // What releasing means is the project's own answer. Where it means released
+  // and issued, somebody has to have said who receives it, and an outside
+  // approval still to come holds it. Where releasing stands on its own, only
+  // that second condition applies — an approval asked for is an approval waited
+  // for, whatever else the organization does.
+  const { pendingIssue } = await import("./issue-requests");
+  const { policy } = await import("./control-activities");
+  const together = (await policy(t, "POLICY_RELEASE")) === "TOGETHER";
+  const going = await pendingIssue(t, revisionId, { recipients: together });
+  if (!going.ok) throw new Error(going.error);
   // §4.8 — core metadata complete before release
   const doc = rev.document;
   const missing: string[] = [];
@@ -449,10 +492,16 @@ export async function releaseRevision(t: Tenant, revisionId: string, user: Sessi
 
   // Supersede the current released revision, if any (§7.5)
   const current = await db.revision.findFirst({ where: { documentId: doc.id, state: "RELEASED" } });
-  await db.$transaction(async (tx) => {
+  // Releasing stamps the superseded rendition inside the transaction, which is
+  // real work on a large PDF; five seconds is not always enough for it. What
+  // the writes inside it change about the register is written back after the
+  // transaction commits, because the lock it holds is the same one that would
+  // be needed to write it back.
+  await withDeferredRestate(() => db.$transaction(async (tx) => {
     await tx.revision.update({
       where: { id: revisionId },
-      data: { state: "RELEASED", statusCode, releasedAt: now, releasedById: user.id, releasedByName: user.name, issueDate: rev.issueDate ?? now },
+      // Released and issued, stamped together.
+      data: { state: "RELEASED", statusCode, releasedAt: now, issuedAt: now, releasedById: user.id, releasedByName: user.name, issueDate: rev.issueDate ?? now },
     });
     if (current) {
       await tx.revision.update({ where: { id: current.id }, data: { state: "SUPERSEDED", supersededAt: now, supersededById: user.id } });
@@ -482,7 +531,10 @@ export async function releaseRevision(t: Tenant, revisionId: string, user: Sessi
     if (doc.state === "PLANNED") {
       await tx.document.update({ where: { id: doc.id }, data: { state: "ACTIVE", isPlaceholder: false } });
     }
-  });
+  }, { timeout: 30_000, maxWait: 10_000 }), restateDocument);
+  // The same act: what was asked for is sent now, not later.
+  const { carryOutOpenRequests } = await import("./issue-requests");
+  const issued = await carryOutOpenRequests(t, revisionId, user);
   await audit({
     tenant: t,
     actor: user,
@@ -490,7 +542,7 @@ export async function releaseRevision(t: Tenant, revisionId: string, user: Sessi
     entityType: "Revision",
     entityId: revisionId,
     entityLabel: label,
-    newValue: `Released at ${status.code}`,
+    newValue: `Released at ${status.code}, issued on ${issued} transmittal${issued === 1 ? "" : "s"}`,
     detail: `Approved by ${approval.approverName} (matrix v${approval.matrixVersion}).${current ? ` Supersedes rev ${current.value}.` : ""}${execFlag ? " Status permits physical execution." : ""}`,
   });
   if (current) {
