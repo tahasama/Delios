@@ -36,17 +36,17 @@ const DAY = 86_400_000;
 export function PlanTimeline({ rows, window, fit }: {
   rows: PlanRow[];
   /**
-   * How many bars the plan opens with. The box is exactly that tall, so what
-   * opens never scrolls and what is loaded afterwards scrolls inside it rather
-   * than pushing the page about.
-   */
-  fit?: number;
-  /**
    * The days the plan is drawn across. Given, it is the window somebody asked
    * for — a month either side of today, unless they said otherwise — so the
    * bars keep the same scale however many activities fall inside it.
    */
   window?: { from: Date; to: Date };
+  /**
+   * How many bars the plan opens with. The box is exactly that tall, so what
+   * opens never scrolls and what is loaded afterwards scrolls inside it rather
+   * than pushing the page about.
+   */
+  fit?: number;
 }) {
   const dated = rows.filter((r) => r.scheduledDate);
   if (!dated.length) return null;
@@ -98,6 +98,9 @@ export function PlanTimeline({ rows, window, fit }: {
         </span>
       </div>
 
+      {/* A plan is as long as the project. It keeps the height it opened at and
+          scrolls inside it, so loading more never pushes the page about. One
+          bar is 20px and the gap between two is 10px. */}
       {/* A plan is as long as the project. It keeps the height it opened at and
           scrolls inside it, so loading more never pushes the page about. One
           bar is 20px and the gap between two is 10px. */}

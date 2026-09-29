@@ -60,6 +60,8 @@ export function DataTable({
   forced,
   tools,
   fill,
+  capHeight,
+  stretch,
 }: {
   head: React.ReactNode;
   children: React.ReactNode;
@@ -96,6 +98,19 @@ export function DataTable({
    * put while the rows move between them.
    */
   fill?: boolean;
+  /**
+   * How tall the card holding this table should come to. What its tools bar,
+   * header row and footer take is measured, and the rows are given the rest, so
+   * a page that draws the same rows another way can hand both views one number
+   * and have them end at the same line.
+   */
+  capHeight?: number;
+  /**
+   * The card around this table already has a height, and the table is to fill
+   * what is left of it. Nothing is measured: the rows take the space, and the
+   * footer stays at the bottom where it was.
+   */
+  stretch?: boolean;
 }) {
   const scope = `dt${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
   const tableRef = useRef<HTMLTableElement>(null);
@@ -212,7 +227,10 @@ export function DataTable({
   const scroller = useRef<HTMLDivElement>(null);
   const [height, setHeight] = useState<number | null>(null);
   useEffect(() => {
-    if (!fill) return;
+    // Where the card says how tall it is, the table simply fills it: the rows
+    // take whatever the tools bar, the header row and the footer leave, and no
+    // measurement decides anything.
+    if (!fill || stretch) return;
     const box = scroller.current;
     if (!box) return;
     const bar = box.parentElement?.querySelector<HTMLElement>(":scope > .dt-bar") ?? null;
@@ -229,7 +247,20 @@ export function DataTable({
         ? Math.max(0, Math.round(page.scrollHeight - (frame.getBoundingClientRect().bottom + window.scrollY)))
         : 0;
       const taken = (header?.offsetHeight ?? 0) + (bar?.offsetHeight ?? 0) + (foot?.offsetHeight ?? 0) + edge;
-      setHeight(Math.max(240, Math.round(window.innerHeight - taken)));
+      const room = Math.round(window.innerHeight - taken);
+      // A table that shares a page with another view of the same rows ends
+      // where that view ends. What the tools bar and the header row take is
+      // measured rather than guessed, so the two cards match whatever the
+      // labels wrap to.
+      const head = box.querySelector<HTMLElement>("thead")?.offsetHeight ?? 0;
+      // Where a card height is given, it is the answer: the rows take all of it
+      // that the bar, the header row and the footer leave. Clamping that to what
+      // the window happens to have left would leave the card standing taller
+      // than its rows, with a band of nothing under them.
+      const capped = capHeight
+        ? capHeight - (bar?.offsetHeight ?? 0) - head - (foot?.offsetHeight ?? 0)
+        : room;
+      setHeight(Math.max(120, capped));
     };
 
     measure();
@@ -240,10 +271,10 @@ export function DataTable({
     for (const part of [bar, foot, header]) if (part) watch.observe(part);
     document.fonts?.ready.then(measure).catch(() => {});
     return () => { window.removeEventListener("resize", measure); watch.disconnect(); };
-  }, [fill, rows]);
+  }, [fill, stretch, rows, capHeight]);
 
   return (
-    <div className={cn("dt rounded-2xl border border-slate-200 bg-surface shadow-sm", className)} data-dt={scope}>
+    <div className={cn("dt rounded-2xl border border-slate-200 bg-surface shadow-sm", stretch && "flex min-h-0 flex-1 flex-col", className)} data-dt={scope}>
       {css ? <style>{css}</style> : null}
       {withBar ? (
         <div className={cn(
@@ -337,8 +368,14 @@ export function DataTable({
       ) : null}
       <div
         ref={scroller}
-        style={fill && height ? { maxHeight: height } : undefined}
-        className={cn("scroll-thin overflow-x-auto", withBar ? "rounded-b-2xl" : "rounded-2xl", (sticky || fill) && "dt-sticky overflow-y-auto", sticky && !fill && "max-h-[72vh]")}
+        style={!stretch && fill && height ? { maxHeight: height } : undefined}
+        className={cn(
+          "scroll-thin overflow-x-auto",
+          withBar ? "rounded-b-2xl" : "rounded-2xl",
+          (sticky || fill) && "dt-sticky overflow-y-auto",
+          sticky && !fill && "max-h-[72vh]",
+          stretch && "min-h-0 flex-1",
+        )}
         onPointerDown={onPointerDown}
         onDoubleClick={onDoubleClick}
       >

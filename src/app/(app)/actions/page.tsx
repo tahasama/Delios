@@ -68,6 +68,16 @@ const RISK_DAYS = 7;
  */
 const PLAN_FIRST = 12;
 
+/** One bar and the gap under it, in pixels: what a row of the plan takes. */
+const PLAN_ROW = 30;
+
+/**
+ * What the plan spends on everything that is not a bar: the band carrying the
+ * dates, the padding under the last bar, and the footer. Only a fallback — the
+ * table matches the plan's card as measured, and uses this until it has been.
+ */
+const CARD_CHROME = 6 + 20 + 16 + 45;
+
 /** How many more the plan draws at a time — the reader's choice, like rows. */
 const PLAN_STEPS = [5, 10, 25, 50, 100];
 
@@ -343,6 +353,7 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
           />
         }
         uploads={<PlanCards />}
+        cardHeight={PLAN_FIRST * PLAN_ROW + CARD_CHROME}
         view={view}
         more={
           view === "plan"

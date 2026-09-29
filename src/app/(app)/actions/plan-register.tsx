@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { ArrowDown, ArrowRight, ArrowUp, ArrowUpDown, CalendarRange, ChevronDown, ChevronLeft, ChevronRight, Download, Pin, PinOff, Rows3, Search, X } from "lucide-react";
 import { DataTable, Th, Td, Chip, Info } from "@/components/ui";
 import { DateWindow } from "@/components/date-window";
@@ -38,7 +38,7 @@ export type PlanTableRow = {
 type Opt = { code: string; label: string };
 
 export function PlanRegister({
-  plate, uploads, view, plan, more, rows, total, filters, filterOptions, facets, paging, sort, exportHref,
+  plate, uploads, view, plan, cardHeight, more, rows, total, filters, filterOptions, facets, paging, sort, exportHref,
 }: {
   plate: React.ReactNode;
   /** The three uploads the schedule rests on, shown with the title they belong to. */
@@ -47,6 +47,11 @@ export function PlanRegister({
   view: "plan" | "table";
   /** The plan, drawn by the server component, shown under the question. */
   plan: React.ReactNode;
+  /**
+   * How tall the card holding the answer is, in pixels. Both views are given
+   * the same box and each fills it, so switching between them moves nothing.
+   */
+  cardHeight: number;
   /** How much of the plan is drawn, where the rest is, and the days it covers. */
   more?: {
     shown: number;
@@ -73,6 +78,35 @@ export function PlanRegister({
   const [allMatching, setAllMatching] = useState(false);
   const [order, setOrder] = useState<string[] | null>(null);
   const [frozen, setFrozen] = useState(true);
+  /**
+   * The plan decides how tall this card is; the table is then made to match it.
+   * It is measured while the plan is on screen and kept for the table, because
+   * only one of the two is ever rendered.
+   */
+  const card = useRef<HTMLElement>(null);
+  const [planCard, setPlanCard] = useState<number | null>(null);
+  useEffect(() => {
+    if (view !== "plan") {
+      try {
+        const kept = Number(localStorage.getItem(CARD_KEY));
+        if (kept > 0) setPlanCard(kept);
+      } catch {}
+      return;
+    }
+    const measure = () => {
+      const box = card.current;
+      if (!box) return;
+      const tall = box.getBoundingClientRect().height;
+      if (tall > 0) {
+        setPlanCard(tall);
+        try { localStorage.setItem(CARD_KEY, tall.toFixed(2)); } catch {}
+      }
+    };
+    measure();
+    const watch = new ResizeObserver(measure);
+    if (card.current) watch.observe(card.current);
+    return () => watch.disconnect();
+  }, [view, rows.length]);
 
   // The order somebody dragged their columns into is this browser's business.
   useEffect(() => {
@@ -230,7 +264,12 @@ export function PlanRegister({
       })}
     </nav>
 
-    <section data-dt-frame className="register register-sheet">
+    <section
+      ref={card}
+      data-dt-frame
+      className={`register register-sheet ${view === "table" ? "flex flex-col" : ""}`}
+      style={view === "table" && planCard ? { height: planCard } : undefined}
+    >
       {facets.length ? (
         <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2 sm:px-6">
           <span className="stencil mr-1 text-slate-400">Showing</span>
@@ -256,7 +295,7 @@ export function PlanRegister({
         <div className={pending ? "opacity-60 transition-opacity" : "transition-opacity"}>
           {/* What the plan covers, and what its colours mean: the two things a
               reader needs before the bars, at the two corners above them. */}
-          <div className="flex items-start justify-between gap-4 px-5 pt-3 sm:px-6">
+          <div className="flex items-start justify-between gap-4 px-5 pt-3 sm:px-6 mt-2">
             <span className="font-mono text-[11px] tracking-tight text-slate-500 tabular-nums">
               {more?.window && !more.window.wide ? more.window.label : "Every date in the schedule"}
             </span>
@@ -334,7 +373,7 @@ export function PlanRegister({
           ) : null}
         </div>
       ) : (
-        <>
+        <div className="flex min-h-0 flex-1 flex-col">
           {pageSelected && total > rows.length ? (
             <div className="flex flex-wrap items-center gap-2 border-b border-line bg-tint px-5 py-2.5 text-xs text-brand-ink sm:px-6">
               {allMatching ? (
@@ -351,13 +390,15 @@ export function PlanRegister({
             </div>
           ) : null}
 
-          <div className={pending ? "opacity-60 transition-opacity" : "transition-opacity"}>
+          <div className={`flex min-h-0 flex-1 flex-col ${pending ? "opacity-60 transition-opacity" : "transition-opacity"}`}>
             {rows.length ? (
               <DataTable
                 id="actions"
                 className="rounded-none border-0 shadow-none"
                 defaultHidden={["Description", "Responsible", "Confirmed"]}
                 fill
+                stretch={!!planCard}
+                capHeight={planCard ?? cardHeight}
                 tools={
                   <a
                     href={selectedExportHref}
@@ -463,7 +504,7 @@ export function PlanRegister({
               </label>
             </div>
           ) : null}
-        </>
+        </div>
       )}
     </section>
   </>;
@@ -499,6 +540,9 @@ function PageStep({ onClick, disabled, label, children }: { onClick: () => void;
 
 /** Where this browser keeps the order its reader dragged the columns into. */
 const ORDER_KEY = "actions:columns";
+
+/** Where the plan's measured card height is kept for the table to match. */
+const CARD_KEY = "actions:card";
 
 /** Whether the reader keeps the action in view while scrolling sideways. */
 const FREEZE_KEY = "actions:freeze";
