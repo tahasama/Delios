@@ -194,9 +194,24 @@ export function Info({ children, className }: { children: string; className?: st
   );
 }
 
-export function Th({ children, className, label, title }: { children?: React.ReactNode; className?: string; label?: string; title?: string }) {
+export function Th({ children, className, label, title, sorted }: {
+  children?: React.ReactNode;
+  className?: string;
+  label?: string;
+  title?: string;
+  /** Which way this column is sorted, when it is the one sorted. */
+  sorted?: "asc" | "desc" | null;
+}) {
   return (
-    <th scope="col" data-label={label} title={title} className={cn("dt-th", className)}>
+    <th
+      scope="col"
+      data-label={label}
+      title={title}
+      // The arrow says it to whoever can see it; aria-sort says the same thing
+      // to whoever cannot, and tells them which column the order belongs to.
+      aria-sort={sorted === "asc" ? "ascending" : sorted === "desc" ? "descending" : label ? "none" : undefined}
+      className={cn("dt-th", className)}
+    >
       {children}
       <span data-col-resizer aria-hidden className="dt-resizer" />
     </th>

@@ -1,0 +1,159 @@
+import { Prisma } from "@prisma/client";
+import type { Tenant } from "./tenant";
+
+/**
+ * What the register was asked, read from the address.
+ *
+ * The register, its export and anything else that answers the same question
+ * build their `where` here. Before this, the export honoured four of the
+ * eleven filters, so "export what these filters match" quietly meant something
+ * else than what the screen showed — the kind of difference nobody notices
+ * until a spreadsheet is already in somebody's inbox.
+ */
+export type RegisterSearch = {
+  q?: string;
+  state?: string;
+  rev?: string;
+  status?: string;
+  verdict?: string;
+  supplier?: string;
+  po?: string;
+  discipline?: string;
+  docType?: string;
+  criticality?: string;
+  confidentiality?: string;
+  deliverable?: string;
+  on?: string;
+  from?: string;
+  to?: string;
+  view?: string;
+};
+
+/** The dates the register holds, and the column each one is kept in. */
+export const DATE_COLUMN: Record<string, string> = {
+  created: "createdDate",
+  revStarted: "latestRevAt",
+  fileAdded: "latestFileAt",
+  planned: "latestPlannedAt",
+  issued: "latestIssueAt",
+  released: "latestReleasedAt",
+  updated: "updatedAt",
+};
+
+/**
+ * Two rules, and only two: a space narrows, a comma widens.
+ *   pump ME IFC    every word must match, somewhere in the row
+ *   P-101, P-102   either one is a match
+ *   "feed pump" ME a quoted phrase counts as one word
+ */
+export function readSearch(q: string) {
+  return q
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .slice(0, 8)
+    .map((part) => ({
+      text: part,
+      words: [...part.matchAll(/"([^"]+)"|(\S+)/g)].map((m) => (m[1] ?? m[2]).trim()).filter(Boolean).slice(0, 6),
+    }))
+    .filter((search) => search.words.length);
+}
+
+/** A date from the address, as the day it names. */
+export function readDay(value: string | undefined, endOfDay: boolean): Date | null {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const at = new Date(`${value}T${endOfDay ? "23:59:59.999" : "00:00:00.000"}`);
+  return Number.isNaN(at.getTime()) ? null : at;
+}
+
+/**
+ * The documents an asset code names. A search term may be a tag number rather
+ * than anything written on the document, and the register answers for both.
+ */
+export async function documentsForAssets(t: Tenant, words: string[]): Promise<string[]> {
+  if (!words.length) return [];
+  const assets = await t.db.assetItem.findMany({
+    where: { OR: words.flatMap((word) => [{ code: { contains: word } }, { name: { contains: word } }]) },
+    select: { id: true },
+  });
+  if (!assets.length) return [];
+  const links = await t.db.relationship.findMany({
+    where: { kind: "DOC_ASSET", toId: { in: assets.map((asset) => asset.id) } },
+    select: { fromId: true },
+  });
+  return links.map((link) => link.fromId);
+}
+
+/**
+ * Everything the register was asked, as one `where`.
+ *
+ * Every question is a column: the four that belong to the newest revision are
+ * kept on the document by the scoped client, so the database can narrow, order
+ * and page by them instead of the page reading every match into memory.
+ */
+export function registerWhere(sp: RegisterSearch, assetDocIds: string[] = []): Prisma.DocumentWhereInput {
+  const searches = readSearch((sp.q ?? "").trim());
+  const view = sp.view === "all" ? "all" : "current";
+  const state = sp.state ?? "";
+  const revState = sp.rev ?? "";
+  const dateOn = DATE_COLUMN[sp.on ?? ""] ? sp.on! : "";
+  const from = readDay(sp.from, false);
+  const to = readDay(sp.to, true);
+
+  // "In review" and "for release" are two states of one revision, and "none"
+  // is the absence of one; the rest name themselves.
+  const revStateWhere: Prisma.DocumentWhereInput =
+    revState === "NONE" ? { latestRevisionId: null }
+      : revState === "FOR_RELEASE" ? { latestRevState: "NOT_RELEASED" }
+        : revState === "IN_REVIEW" ? { latestRevState: "IN_REVIEW" }
+          : revState ? { latestRevState: revState }
+            : {};
+
+  return {
+    AND: [
+      ...(state || view === "all" ? [] : [{ state: { notIn: ["WITHDRAWN", "CANCELLED", "ARCHIVED"] } }]),
+      ...(searches.length
+        ? [{
+            OR: searches.map((search) => ({
+              AND: search.words.map((word) => ({
+                OR: [
+                  // A document number is typed from its front, so it is matched
+                  // from its front as well: that match can use the index.
+                  { docNumber: { startsWith: word } },
+                  { docNumber: { contains: word } }, { title: { contains: word } }, { originator: { contains: word } },
+                  { contractRef: { contains: word } }, { previousId: { contains: word } },
+                  { discipline: { contains: word } }, { docType: { contains: word } }, { subProject: { contains: word } },
+                  ...(assetDocIds.length ? [{ id: { in: assetDocIds } }] : []),
+                ],
+              })),
+            })),
+          }]
+        : []),
+      state ? { state } : {},
+      sp.discipline ? { discipline: sp.discipline } : {},
+      sp.docType ? { docType: sp.docType } : {},
+      sp.supplier ? { originator: sp.supplier } : {},
+      sp.po ? { contractRef: sp.po } : {},
+      sp.criticality ? { criticality: sp.criticality } : {},
+      sp.confidentiality ? { confidentiality: sp.confidentiality } : {},
+      sp.deliverable ? { deliverableType: sp.deliverable } : {},
+      revStateWhere,
+      sp.status ? { latestRevState: "RELEASED", latestStatusCode: sp.status } : {},
+      sp.verdict ? { latestVerdict: sp.verdict } : {},
+      dateOn && (from || to)
+        ? ({ [DATE_COLUMN[dateOn]]: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } } as Prisma.DocumentWhereInput)
+        : {},
+    ],
+  };
+}
+
+/** Which column each sort reads. All of them are columns; none is derived. */
+export const REGISTER_SORTS: Record<string, string> = {
+  fileAdded: "latestFileAt", revStarted: "latestRevAt", docNumber: "docNumber", title: "title",
+  rev: "latestRevValue", revState: "latestRevState", docState: "state", releasedFor: "latestStatusCode",
+  verdict: "latestVerdict", discipline: "discipline", docType: "docType", originator: "originator",
+  subProject: "subProject", contract: "contractRef", criticality: "criticality",
+  confidentiality: "confidentiality", retention: "retentionClass", deliverable: "deliverableType",
+  planned: "latestPlannedAt", issued: "latestIssueAt", released: "latestReleasedAt",
+  updated: "updatedAt", created: "createdDate",
+};

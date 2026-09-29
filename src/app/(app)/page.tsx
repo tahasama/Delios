@@ -435,7 +435,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
                   <span className="shrink-0">
                     <DateWindow fields={[{ code: "ts", label: "The day it happened" }]} on={sp.from ? "ts" : ""} from={sp.from ?? ""} to={sp.to ?? ""} />
                   </span>
-                  <button className="ask" data-on={asked ? "true" : "false"}>Show</button>
+                  <button className="ask" data-on={asked ? "true" : "false"}>Apply</button>
                   {asked ? (
                     <Link href="/?view=log" scroll={false} className="stencil pb-1.5 text-brand-ink hover:underline">Clear</Link>
                   ) : null}

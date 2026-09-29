@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { saveRegisterView, deleteRegisterView } from "@/lib/actions/register-views";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowDown, ArrowLeftRight, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, Download, GitPullRequestArrow, Minus, PackagePlus, Pin, PinOff, Plus, Search, X } from "lucide-react";
@@ -84,8 +85,10 @@ type Column = {
   cell: (row: RegisterRow, codes: Record<string, string>) => React.ReactNode;
 };
 
-export function DocumentRegister({ rows, total, userCanAct, filters, filterOptions, exportHref, plate, paging, codes, sort }: {
+export function DocumentRegister({ rows, total, userCanAct, filters, filterOptions, exportHref, plate, paging, codes, sort, views }: {
   rows: RegisterRow[]; total: number; userCanAct: boolean;
+  /** The questions this reader keeps, and the address each one asks. */
+  views: { id: string; name: string; query: string }[];
   paging?: Paging;
   /** The column the register is ordered by, and which way. */
   sort?: { key: string; dir: "asc" | "desc" };
@@ -171,6 +174,26 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
   const pageSelected = rows.length > 0 && selected.length === rows.length;
   const transmittalHref = `/transmittals/new?docs=${encodeURIComponent(transmittableRows.map((row) => row.id).join(","))}`;
   // Exporting every match needs no list of ids: the filters are the list.
+  /**
+   * The columns this reader is looking at, as the table's own preferences hold
+   * them. An export that ignored them would be a second register.
+   */
+  const shownColumns = () => {
+    const hidden = new Set<string>();
+    try {
+      const raw = localStorage.getItem("table:register");
+      if (raw) for (const label of (JSON.parse(raw) as { hidden?: string[] }).hidden ?? []) hidden.add(label);
+      else for (const label of OPTIONAL) hidden.add(label);
+    } catch {
+      for (const label of OPTIONAL) hidden.add(label);
+    }
+    return COLUMNS.map((column) => column.label).filter((label) => !hidden.has(label));
+  };
+  const exportWith = (href: string) => {
+    const url = new URL(href, window.location.origin);
+    url.searchParams.set("cols", shownColumns().join("|"));
+    return url.pathname + url.search;
+  };
   const selectedExportHref = allMatching ? exportHref : selected.length ? `/api/register/export?ids=${encodeURIComponent(selected.join(","))}` : exportHref;
   function toggle(id: string) {
     setAllMatching(false);
@@ -241,12 +264,13 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
   if (filters.deliverable) facets.push({ key: "produced by", label: labelIn(filterOptions.deliverables, filters.deliverable), without: drop("deliverable") });
 
   return <>
-    <section data-dt-frame className="register border-y border-line bg-surface sm:rounded-sm sm:border-x">
+    <section className="register register-sheet mb-5">
       {plate}
 
       {/* Search gets its own line: it is how most people arrive, and it takes
           several terms at once. The filters sit under it, on their own rule. */}
       <form
+        key={paging?.query ?? ""}
         action="/documents"
         onSubmit={(event) => {
           event.preventDefault();
@@ -255,24 +279,27 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
           for (const [key, value] of data.entries()) if (value && key !== "view") params.set(key, String(value));
           go(`/documents${params.size ? `?${params}` : ""}`);
         }}
-        className="border-b border-line px-4 py-3.5 sm:px-5"
+        className="asking border-b border-line px-5 py-3.5 sm:px-6"
       >
-        <div className="flex items-end gap-4">
-          <label className="relative min-w-0 flex-1">
+        <div className="flex items-center gap-3">
+          <label className="search-field relative min-w-0 flex-1">
             <span className="sr-only">Search the register</span>
             <Search className="absolute left-0 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
               name="q"
               defaultValue={filters.q}
               placeholder={'A space narrows, a comma widens: pump ME  ·  P-101, P-102  ·  "feed pump"'}
-              className="plain w-full !py-1.5 !pl-6 !text-[13px]"
+              className="plain w-full !py-2 !pl-6 !text-[13.5px]"
             />
           </label>
           {/* Nothing is asked of the database until this is pressed. A query
               per keystroke, or per choice, is what a register of tens of
               thousands cannot afford. */}
-          <button className="ask" data-on={facets.length ? "true" : "false"}>Show</button>
-          {pending ? <span className="stencil whitespace-nowrap pb-1 text-slate-400">Narrowing…</span> : null}
+          {/* One button, one state: while the answer is being fetched it says so
+              in place, rather than beside a word that is no longer true. */}
+          <button className="ask" data-on={facets.length ? "true" : "false"} disabled={pending}>
+            {pending ? "Filtering" : "Apply"}
+          </button>
         </div>
 
         {/* Five to a row: eight plain choices, the date, and the switch that
@@ -317,8 +344,55 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
         </div>
       </form>
 
+      <div className="kept-views flex flex-wrap items-center gap-x-3 gap-y-1.5 px-5 pt-2 pb-5 sm:px-6">
+        <span className="stencil text-slate-400">Views</span>
+        {views.length ? views.map((view) => (
+          <span key={view.id} className="group inline-flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => go(`/documents${view.query ? `?${view.query}` : ""}`)}
+              className="text-[12.5px] font-medium text-slate-600 transition-colors hover:text-brand-ink"
+            >
+              {view.name}
+            </button>
+            <form action={deleteRegisterView}>
+              <input type="hidden" name="id" value={view.id} />
+              <button
+                type="submit"
+                aria-label={`Forget the view ${view.name}`}
+                title="Forget this view"
+                className="rounded-sm p-0.5 text-slate-300 opacity-0 transition-opacity group-hover:opacity-100 hover:text-red-700"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </form>
+          </span>
+        )) : (
+          <span className="text-[12.5px] text-slate-400">
+            Nothing yet, choose your filters, give them a name and save for future reuse.
+          </span>
+        )}
+
+        {facets.length ? (
+          <form action={saveRegisterView} className="ml-auto flex items-center gap-1.5">
+            <input type="hidden" name="query" value={paging?.query ?? ""} />
+            <input
+              name="name"
+              required
+              maxLength={60}
+              placeholder="Keep this view as…"
+              className="plain !py-1 !text-[12.5px] w-44"
+            />
+            <button className="stencil text-brand-ink hover:underline">Keep</button>
+          </form>
+        ) : null}
+      </div>
+    </section>
+
+    <section data-dt-frame className="register register-sheet">
+
       {facets.length ? (
-        <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-4 py-1.5 sm:px-5">
+        <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2 sm:px-6">
           <span className="stencil mr-1 text-slate-400">Showing</span>
           {facets.map((facet) => (
             <button key={`${facet.key}-${facet.label}`} type="button" onClick={() => go(facet.without)} className="facet" title="Remove this filter">
@@ -341,7 +415,7 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
       {/* Selecting a page is one thing; acting on every match is another, and
           the difference is said out loud rather than assumed. */}
       {pageSelected && paging && total > rows.length ? (
-        <div className="flex flex-wrap items-center gap-2 border-b border-line bg-tint px-4 py-2 text-xs text-brand-ink sm:px-5">
+        <div className="flex flex-wrap items-center gap-2 border-b border-line bg-tint px-5 py-2.5 text-xs text-brand-ink sm:px-6">
           {allMatching ? (
             <>
               <span>All <strong className="font-mono">{total.toLocaleString("en-GB")}</strong> documents these filters match are selected. Export takes all of them; the other actions take the {rows.length} on this page.</span>
@@ -358,11 +432,16 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
 
       <div className={pending ? "opacity-60 transition-opacity" : "transition-opacity"}>
         {rows.length ? <DataTable id="register" className="rounded-none border-0 shadow-none" defaultHidden={OPTIONAL} onMove={move} onReorder={moveTo} forced={forced} fill tools={
-          <a href={exportHref} className="dt-tool" title="Every column of every row the current filters match, as CSV">
+          <a
+            href={exportHref}
+            onClick={(event) => { event.preventDefault(); window.location.href = exportWith(exportHref); }}
+            className="dt-tool"
+            title="The rows these filters match, in the columns you are looking at, as CSV"
+          >
             <Download className="h-3.5 w-3.5" /> Export
           </a>
         } head={<tr>
-          <Th className={`${frozen ? "sticky left-0 z-[4]" : ""} w-10`}>
+          <Th className={`rail-head ${frozen ? "sticky left-0 z-[4]" : ""} w-10`}>
             <input
               aria-label="Select every document on this page"
               title="Selects this page. The register offers every match above."
@@ -371,7 +450,11 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
               onChange={() => { setAllMatching(false); setSelected(pageSelected ? [] : rows.map((row) => row.id)); }}
             />
           </Th>
-          <Th className={`${frozen ? "sticky left-10 z-[4]" : ""} min-w-[280px]`} label="Document">
+          <Th
+            className={`${frozen ? "sticky left-10 z-[4]" : ""} min-w-[280px]`}
+            label="Document"
+            sorted={sort?.key === "docNumber" || sort?.key === "title" ? sort.dir : null}
+          >
             <span className="inline-flex items-center gap-2">
               <SortButton label="Number" on={sort?.key === "docNumber" ? sort.dir : null} onClick={() => go(sortHref("docNumber"))} />
               <span className="text-slate-300">/</span>
@@ -389,7 +472,12 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
             </span>
           </Th>
           {columns.map((column) => (
-            <Th key={column.key} label={column.label} className={column.headClass}>
+            <Th
+              key={column.key}
+              label={column.label}
+              className={column.headClass}
+              sorted={column.sort && sort?.key === column.sort ? sort.dir : null}
+            >
               <span className="inline-flex items-center gap-1">
                 {column.sort
                   ? <SortButton label={column.label} on={sort?.key === column.sort ? sort.dir : null} onClick={() => go(sortHref(column.sort!))} />
@@ -407,12 +495,12 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
             </Td>
             <Td className={`${frozen ? "sticky left-10 z-[1]" : ""} min-w-[280px] ${pin}`}>
               <span className="relative flex items-center gap-1.5">
-                <Link href={`/documents/${row.id}`} className="relative z-[1] whitespace-nowrap font-mono text-xs font-semibold tracking-tight text-link hover:underline">{row.docNumber}</Link>
+                <Link href={`/documents/${row.id}`} className="doc-number relative z-[1] whitespace-nowrap">{row.docNumber}</Link>
                 {row.revState === "SUPERSEDED" ? <span className="stamp text-violet-700">superseded</span> : null}
                 {row.revState === "VOID" ? <span className="stamp text-red-700">void</span> : null}
                 {row.placeholder ? <span className="stamp text-slate-500">number reserved</span> : null}
               </span>
-              <p className="mt-0.5 block truncate text-[13px] text-slate-800" title={row.title}>{row.title}</p>
+              <p className="doc-title mt-0.5 block truncate" title={row.title}>{row.title}</p>
             </Td>
             {columns.map((column) => <Td key={column.key} className={column.cellClass}>{column.cell(row, codes)}</Td>)}
           </tr>;
@@ -424,7 +512,7 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
       </div>
 
       {paging && total > 0 ? (
-        <div data-dt-foot className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 border-t border-line bg-surface px-4 py-2 sm:px-5">
+        <div data-dt-foot className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 border-t border-line bg-surface px-5 py-2.5 sm:px-6">
           <p className="font-mono text-[11px] tabular-nums text-slate-500">
             {paging.from.toLocaleString("en-GB")}–{paging.to.toLocaleString("en-GB")}
             <span className="ml-1.5 font-sans text-slate-400">of {total.toLocaleString("en-GB")}</span>
@@ -453,7 +541,13 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
       {userCanAct ? (selectedRevisionIds.length ? <Link href={`/reviews/send?revisions=${encodeURIComponent(selectedRevisionIds.join(","))}`} className="inline-flex items-center gap-1.5 rounded-sm bg-[#d9a441] px-3 py-2 text-xs font-semibold text-brand-ink"><GitPullRequestArrow className="h-4 w-4" /> Send for review ({selectedRevisionIds.length})</Link> : <span className="inline-flex items-center gap-1.5 rounded-sm bg-white/10 px-3 py-2 text-xs font-semibold text-white/55" title="Only documents with a revision being prepared can be sent"><GitPullRequestArrow className="h-4 w-4" /> Nothing ready to send</span>) : null}
       {transmittableRows.length ? <Link href={transmittalHref} className="inline-flex items-center gap-1.5 rounded-sm bg-white/10 px-3 py-2 text-xs font-semibold hover:bg-white/15"><ArrowLeftRight className="h-4 w-4" /> Create transmittal ({transmittableRows.length})</Link> : <span className="inline-flex items-center gap-1.5 rounded-sm bg-white/10 px-3 py-2 text-xs font-semibold text-white/55" title="Only current released revisions may be sent on an outgoing transmittal"><ArrowLeftRight className="h-4 w-4" /> No released revision to transmit</span>}
       {userCanAct ? <Link href={`/packages/add?docs=${encodeURIComponent(selected.join(","))}`} className="inline-flex items-center gap-1.5 rounded-sm bg-white/10 px-3 py-2 text-xs font-semibold hover:bg-white/15"><PackagePlus className="h-4 w-4" /> Add to package</Link> : null}
-      <a href={selectedExportHref} className="inline-flex items-center gap-1.5 rounded-sm bg-white/10 px-3 py-2 text-xs font-semibold hover:bg-white/15"><Download className="h-4 w-4" /> Export {allMatching ? "all matching" : "selected"}</a>
+      <a
+        href={selectedExportHref}
+        onClick={(event) => { event.preventDefault(); window.location.href = exportWith(selectedExportHref); }}
+        className="inline-flex items-center gap-1.5 rounded-sm bg-white/10 px-3 py-2 text-xs font-semibold hover:bg-white/15"
+      >
+        <Download className="h-4 w-4" /> Export {allMatching ? "all matching" : "selected"}
+      </a>
       <button onClick={() => { setSelected([]); setAllMatching(false); }} className="ml-auto rounded-lg p-2 text-white/60 hover:bg-white/10 hover:text-white" aria-label="Clear selection"><X className="h-4 w-4" /></button>
     </div> : null}
   </>;
@@ -495,7 +589,7 @@ const COLUMNS: Column[] = [
     note: "What the deciding step of the review route said about this revision. Advice from earlier steps is on the review itself, not here.",
     cellClass: "whitespace-nowrap text-xs",
     cell: (row) =>
-      row.verdict ? <CodeRef code={row.verdict} note={row.verdictLabel ?? undefined} href={GUIDE.VERDICT} className="font-semibold text-slate-900" />
+      row.verdict ? <CodeRef code={row.verdict} note={row.verdictLabel ?? undefined} href={GUIDE.VERDICT} className="code-chip" />
         : row.verdictLabel ? <span className="meta">{row.verdictLabel}</span> : <Muted />,
   },
   {
@@ -509,11 +603,13 @@ const COLUMNS: Column[] = [
       !row.releasedFor && row.proposedFor ? (
         <CodeRef code={row.proposedFor} note={`${codes[`STATUS|${row.proposedFor}`] ?? row.proposedFor}
 
-The revision is not released, so this status is not in force.`} href={GUIDE.STATUS} className="font-semibold text-slate-600" />
+The revision is not released, so this status is not in force.`} href={GUIDE.STATUS} className="code-chip code-chip-held" />
       ) : row.releasedFor ? (
-        <CodeRef code={row.releasedFor} note={codes[`STATUS|${row.releasedFor}`]} href={GUIDE.STATUS} className="font-semibold text-slate-900" />
+        <CodeRef code={row.releasedFor} note={codes[`STATUS|${row.releasedFor}`]} href={GUIDE.STATUS} className="code-chip code-chip-live" />
       ) : <Muted />,
   },
+  { key: "created", sort: "created", label: "Created", headClass: "text-right", cellClass: "whitespace-nowrap text-right font-mono text-xs tabular-nums", cell: (row) => date(row.createdDate) },
+  { key: "updated", sort: "updated", label: "Updated", headClass: "text-right", cellClass: "whitespace-nowrap text-right font-mono text-xs tabular-nums text-slate-500", cell: (row) => date(row.updatedAt) },
   { key: "discipline", sort: "discipline", label: "Discipline", cellClass: "whitespace-nowrap text-xs text-slate-600", cell: (row) => row.disciplineLabel },
   { key: "docType", sort: "docType", label: "Type", cellClass: "max-w-48 truncate text-xs text-slate-600", cell: (row) => row.docTypeLabel },
   {
@@ -567,10 +663,8 @@ The revision is not released, so this status is not in force.`} href={GUIDE.STAT
     cell: (row) => row.decidedBy ? <span title={row.decidedByDelegated ? "Given by delegation" : undefined}>{row.decidedBy}{row.decidedByDelegated ? " ·" : ""}</span> : <Muted />,
   },
   { key: "packages", label: "In packages", headClass: "text-right", cellClass: "text-right font-mono text-xs tabular-nums", cell: (row) => row.packageCount || <Muted /> },
-  { key: "created", sort: "created", label: "Created", headClass: "text-right", cellClass: "whitespace-nowrap text-right font-mono text-xs tabular-nums", cell: (row) => date(row.createdDate) },
   { key: "revStarted", sort: "revStarted", label: "Revision started", headClass: "text-right", cellClass: "whitespace-nowrap text-right font-mono text-xs tabular-nums", cell: (row) => row.revStarted ? date(row.revStarted) : <Muted /> },
   { key: "fileAdded", sort: "fileAdded", label: "File added", headClass: "text-right", cellClass: "whitespace-nowrap text-right font-mono text-xs tabular-nums", cell: (row) => row.fileAdded ? date(row.fileAdded) : <Muted /> },
-  { key: "updated", sort: "updated", label: "Updated", headClass: "text-right", cellClass: "whitespace-nowrap text-right font-mono text-xs tabular-nums text-slate-500", cell: (row) => date(row.updatedAt) },
 ];
 
 // ── Pieces ──────────────────────────────────────────────────────────────────

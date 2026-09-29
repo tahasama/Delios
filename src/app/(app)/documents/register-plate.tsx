@@ -13,15 +13,11 @@ export function RegisterPlate({ project, canCreate }: {
   canCreate: boolean;
 }) {
   return (
-    <div className="border-b border-line px-4 pb-2.5 pt-3 sm:px-5">
-      <p className="stencil text-slate-400">
-        <span className="font-mono tracking-normal text-slate-500">{project.code}</span>
-        <span className="mx-1.5 text-slate-300">/</span>
-        {project.name}
-      </p>
-      {/* The title and the one action sit on the same line, so the eye finds
-          both at once instead of hunting for the button beside a subtitle. */}
-      <div className="mt-1 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+    <div className="border-b border-line px-5 pt-6 pb-3 sm:px-6">
+      {/* The project is named in the header of every page and in the switcher
+          beside it. Repeating it here is a line of chrome that says nothing the
+          reader did not already know. */}
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
         <h1 className="plate-title min-w-0 text-slate-950">Document register</h1>
         {canCreate ? (
           <ButtonLink href="/documents/new">
@@ -29,7 +25,7 @@ export function RegisterPlate({ project, canCreate }: {
           </ButtonLink>
         ) : null}
       </div>
-      <p className="mt-0.5 max-w-xl text-[11px] leading-4 text-slate-500">
+      <p className="mt-1 max-w-xl text-[11.5px] leading-4 text-slate-500">
         Every controlled document on this project, one row each, showing the revision in hand now.
       </p>
     </div>

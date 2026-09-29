@@ -885,3 +885,89 @@ summary::-webkit-details-marker {
   .dt-resizer { display: none; }
   .dt-sticky { max-height: none !important; overflow: visible !important; }
 }
+
+/* ── The register's frame ──────────────────────────────────────────────────
+   Declared last on purpose: the register's own vocabulary is described further
+   up this file at the same strength, and when two descriptions of one thing
+   sit at the same strength the later one wins. Everything here is the frame
+   around the table — the table itself is untouched. */
+@layer components {
+  /* The page is two objects: the question, then the answer. Each is a sheet
+     with an edge, with the canvas showing between them. */
+  .register-sheet {
+    background: var(--color-surface);
+    border: 1px solid var(--color-line);
+    border-radius: 0.875rem;
+    box-shadow: 0 1px 2px rgb(15 23 42 / 4%), 0 12px 28px -24px rgb(15 23 42 / 45%);
+    overflow: hidden;
+  }
+
+  /* A hint of grey behind each control, and nothing else: no box, no border.
+     An underlined field on white reads as a word until the pointer finds it;
+     a surface behind it reads as something to operate. */
+  .register .asking select.plain,
+  .register .asking button.plain,
+  .register .asking input.plain {
+    background-color: color-mix(in oklab, var(--color-canvas) 60%, var(--color-surface));
+    padding-left: 0.4rem;
+    border-radius: 0.25rem 0.25rem 0 0;
+  }
+  .register .asking select.plain:hover,
+  .register .asking button.plain:hover,
+  .register .asking input.plain:hover {
+    background-color: color-mix(in oklab, var(--color-canvas) 85%, var(--color-surface));
+  }
+  .register .asking select.plain[data-on="true"],
+  .register .asking button.plain[data-on="true"] { background-color: var(--color-tint); }
+
+  /* The kept views are a way back to a question, so they sit quieter than the
+     question itself. */
+  .register .kept-views { background: color-mix(in oklab, var(--color-canvas) 35%, var(--color-surface)); }
+
+  /* The count and the tools describe the table; they are not its first row, so
+     they sit on the page's own colour and the sheet starts beneath them. */
+  .register .dt-bar {
+    background: var(--color-canvas);
+    border-bottom: 1px solid var(--color-line-strong);
+    padding-block: 0.55rem;
+  }
+
+  /* The box that selects every row lines up with the boxes it selects: the
+     rows are inset by the width of their state rail, so this is too. */
+  .register .rail-head { padding-left: 0.85rem !important; }
+
+  /* The number is the row's name, so it is ink; the blue arrives when it is
+     about to be followed. */
+  .doc-number {
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--color-slate-900);
+    text-decoration-color: transparent;
+    text-underline-offset: 3px;
+    transition: color 120ms, text-decoration-color 120ms;
+  }
+  .doc-number:hover, .doc-number:focus-visible {
+    color: var(--color-link);
+    text-decoration: underline;
+    text-decoration-color: currentColor;
+  }
+  .doc-title { font-size: 12.5px; color: var(--color-slate-500); }
+
+  /* A status and a verdict are found rather than read, so they are chips. */
+  .code-chip {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 0.3rem;
+    padding: 0.05rem 0.4rem;
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0;
+    background: var(--color-canvas-deep);
+    color: var(--color-slate-700);
+  }
+  .code-chip-live { background: var(--color-tint); color: var(--color-brand-ink); }
+  .code-chip-held { background: transparent; color: var(--color-slate-500); box-shadow: inset 0 0 0 1px var(--color-line-strong); }
+}

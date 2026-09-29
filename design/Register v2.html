@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DELIOS — Document register</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* Tokens from src/app/theme.css only. The app's sidebar is not drawn.
+   THE TABLE IS UNTOUCHED — this is the frame around it.
+
+   The direction, stated plainly: a register is not a dashboard. It is a bound
+   record, and the things it has always been drawn like are the title block on
+   a drawing and the index page of a specification. So: no cards, no shadows,
+   no rounded boxes, no pills. Rules and type do the work, the way they do on
+   paper. Colour appears only where it carries meaning — the state rail, a late
+   date — and never as decoration. */
+:root{
+  --surface:#ffffff; --canvas:#eceff4; --canvas-deep:#e2e7ee;
+  --line:#d7dde6; --line-strong:#bcc6d4;
+  --brand:#1e3a5f; --brand-hover:#2d5480; --brand-line:#3b6389; --brand-ink:#1e3a5f;
+  --link:#2b5b80; --tint:#e4eef7; --tint-soft:#f2f6fb;
+  --slate-300:#cbd5e1; --slate-400:#94a3b8; --slate-500:#64748b; --slate-600:#475569; --slate-700:#334155; --slate-900:#0f172a;
+  --amber:oklch(55.5% 0.163 48.998);
+  --emerald:oklch(50.8% 0.118 165.612);
+  --sans:"IBM Plex Sans",ui-sans-serif,system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--surface);color:var(--slate-900);font-family:var(--sans);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+.sheet{max-width:1360px;margin:0 auto;padding:0 26px 60px}
+
+/* ── The title block ──────────────────────────────────────────────────────
+   A drawing says what it is in a ruled block: the sheet's name large, the
+   project and the date in the margin, and the figures that describe the sheet
+   set as a run of type rather than as boxes. */
+.block{border-bottom:2px solid var(--slate-900);padding:22px 0 10px}
+.block .over{
+  display:flex;align-items:baseline;gap:14px;
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--slate-400);
+}
+.block .over b{font-weight:500;color:var(--slate-600)}
+.block .over .right{margin-left:auto;letter-spacing:.1em}
+.block .name{display:flex;align-items:flex-end;justify-content:space-between;gap:28px;margin-top:9px}
+h1{margin:0;font-size:29px;font-weight:600;letter-spacing:-.025em;line-height:1}
+.block .lede{margin:7px 0 0;font-size:13px;color:var(--slate-500);max-width:58ch}
+.make{
+  display:inline-flex;align-items:center;gap:7px;flex:none;
+  border:1px solid var(--slate-900);background:var(--slate-900);color:#fff;
+  padding:8px 15px;font-size:13px;font-weight:600;
+}
+.make:hover{background:var(--brand)}
+.make svg{width:15px;height:15px}
+
+/* The tally, as a line of type: figure, name, figure, name. A click on one
+   narrows the register to it, which is why they are set as links and not as
+   ornaments. */
+.tally{display:flex;flex-wrap:wrap;align-items:baseline;gap:0 26px;margin-top:16px}
+.tally a{display:flex;align-items:baseline;gap:7px;padding-bottom:2px;border-bottom:2px solid transparent}
+.tally a:hover{border-bottom-color:var(--line-strong)}
+.tally a[aria-current]{border-bottom-color:var(--slate-900)}
+.tally .n{font-family:var(--mono);font-size:17px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--slate-900)}
+.tally .k{font-size:11px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--slate-400)}
+.tally a[aria-current] .k{color:var(--slate-700)}
+.tally .dot{width:5px;height:5px;border-radius:99px;background:var(--mark,transparent);align-self:center}
+.tally .review{--mark:var(--brand-line)} .tally .settle{--mark:var(--amber)} .tally .out{--mark:var(--emerald)}
+
+/* ── The margin note: what is being asked ────────────────────────────────
+   On paper the reader's own annotations live in the margin, not in a panel.
+   The filters read as a sentence in the register's own voice; each value is
+   the control itself, underlined the way a filled-in field is underlined on
+   a form. */
+.asking{display:flex;align-items:flex-start;gap:20px;padding:13px 0 11px;border-bottom:1px solid var(--line)}
+.asking .lbl{
+  flex:none;padding-top:3px;font-family:var(--mono);font-size:10px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--slate-400);width:74px;
+}
+.sentence{flex:1;min-width:0;font-size:14.5px;line-height:2.05;color:var(--slate-600)}
+.sentence .f{
+  appearance:none;border:0;border-bottom:1px solid var(--line-strong);background:transparent;
+  font-family:var(--mono);font-size:13.5px;color:var(--slate-900);padding:1px 16px 1px 2px;margin:0 1px;cursor:pointer;
+  background-image:linear-gradient(45deg,transparent 50%,var(--slate-400) 50%),linear-gradient(135deg,var(--slate-400) 50%,transparent 50%);
+  background-position:right 5px center,right 1px center;background-size:4px 4px,4px 4px;background-repeat:no-repeat;
+}
+.sentence .f:hover{border-bottom-color:var(--slate-900)}
+.sentence .f[data-on]{color:var(--brand-ink);border-bottom-color:var(--brand-line);font-weight:600}
+.sentence .f.wide{min-width:210px;padding-right:18px}
+.sentence input.f{cursor:text;background-image:none;padding-right:2px;min-width:230px}
+.sentence .more{border:0;background:none;font-family:var(--sans);font-size:13px;color:var(--slate-400);cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+.sentence .more:hover{color:var(--brand-ink)}
+.asking .do{
+  flex:none;display:inline-flex;align-items:center;justify-content:center;min-width:84px;
+  border:1px solid var(--line-strong);background:var(--surface);padding:6px 14px;
+  font-size:13px;font-weight:600;color:var(--brand-ink);
+}
+.asking .do:hover{background:var(--tint);border-color:var(--brand-line)}
+.asking .do[data-on]{background:var(--slate-900);border-color:var(--slate-900);color:#fff}
+
+/* The kept questions, in the margin opposite. */
+.kept{display:flex;align-items:baseline;gap:16px;padding:8px 0;border-bottom:1px solid var(--line)}
+.kept .lbl{flex:none;font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--slate-400);width:74px}
+.kept a{font-size:13px;color:var(--slate-600);border-bottom:1px solid var(--line)}
+.kept a:hover{color:var(--brand-ink);border-bottom-color:var(--brand-line)}
+.kept .none{font-size:13px;color:var(--slate-400)}
+.kept .keep{margin-left:auto;display:flex;align-items:baseline;gap:9px}
+.kept .keep input{border:0;border-bottom:1px solid var(--line);background:transparent;font-family:var(--sans);font-size:13px;padding:2px 0;width:180px}
+.kept .keep input:focus{outline:none;border-bottom-color:var(--brand-line)}
+.kept .keep button{border:0;background:none;font-family:var(--sans);font-size:12.5px;font-weight:600;color:var(--link);cursor:pointer}
+
+/* ── The count line ─────────────────────────────────────────────────────── */
+.count{display:flex;align-items:baseline;gap:10px;padding:14px 0 8px}
+.count .n{font-family:var(--mono);font-size:22px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.count .of{font-size:13px;color:var(--slate-500)}
+.count .tools{margin-left:auto;display:flex;align-items:baseline;gap:18px}
+.count .tools a{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;color:var(--slate-500)}
+.count .tools a:hover{color:var(--brand-ink)}
+.count .tools svg{width:14px;height:14px}
+
+/* ── The table — as it is in the app today, untouched ──────────────────── */
+table{width:100%;border-collapse:collapse}
+thead th{
+  text-align:left;padding:8px 14px;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--slate-400);border-top:1px solid var(--slate-900);border-bottom:1px solid var(--line-strong);white-space:nowrap;
+}
+thead th.r{text-align:right}
+tbody td{padding:9px 14px;border-bottom:1px solid var(--line);vertical-align:middle;font-size:13px}
+tbody tr:hover td{background:var(--tint-soft)}
+td.rail{position:relative;padding-left:14px;width:34px}
+td.rail::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--rail,var(--slate-300));transition:width .12s}
+tr:hover td.rail::before{width:5px}
+tr.review{--rail:var(--brand-line)} tr.settle{--rail:var(--amber)} tr.out{--rail:var(--emerald)} tr.none{--rail:var(--slate-300)}
+.num{font-family:var(--mono);font-size:12.5px;font-weight:600;letter-spacing:-.01em;color:var(--slate-900);white-space:nowrap}
+.num:hover{color:var(--link);text-decoration:underline;text-underline-offset:3px}
+.ttl{display:block;margin-top:1px;font-size:12.5px;color:var(--slate-500);max-width:34ch;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rev{font-family:var(--mono);font-size:13px;font-weight:600;color:var(--slate-900)}
+.state{font-size:11.5px;color:var(--slate-500)}
+.codechip{display:inline-flex;border-radius:5px;padding:1px 6px;font-family:var(--mono);font-size:11.5px;font-weight:600;background:var(--canvas-deep);color:var(--slate-700)}
+.codechip.live{background:var(--tint);color:var(--brand-ink)}
+.codechip.held{background:transparent;color:var(--slate-500);box-shadow:inset 0 0 0 1px var(--line-strong)}
+td.when{text-align:right;font-family:var(--mono);font-size:12px;color:var(--slate-500);white-space:nowrap;font-variant-numeric:tabular-nums}
+.muted{color:var(--slate-300)}
+
+/* ── The foot, ruled like the head ─────────────────────────────────────── */
+.foot{display:flex;align-items:baseline;gap:16px;padding:11px 0;border-top:2px solid var(--slate-900)}
+.foot .range{font-family:var(--mono);font-size:11.5px;color:var(--slate-500);font-variant-numeric:tabular-nums}
+.foot .pages{margin:0 auto;display:flex;align-items:baseline;gap:12px}
+.foot .pages a{font-family:var(--mono);font-size:12.5px;color:var(--slate-500)}
+.foot .pages a:hover{color:var(--slate-900)}
+.foot .pages a[aria-current]{color:var(--slate-900);font-weight:600;border-bottom:2px solid var(--slate-900)}
+.foot select{border:0;border-bottom:1px solid var(--line);background:transparent;font-family:var(--sans);font-size:12.5px;color:var(--slate-500);padding:1px 0}
+</style>
+</head>
+<body>
+<div class="sheet">
+
+  <header class="block">
+    <p class="over">
+      <b>Q6637021</b> · Thermal piping
+      <span class="right">Register · sheet 1 of 1 · read 29 Sept 2026</span>
+    </p>
+    <div class="name">
+      <div>
+        <h1>Document register</h1>
+        <p class="lede">Every controlled document on this project, one row each, showing the revision in hand now.</p>
+      </div>
+      <a class="make" href="#">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+        Create document
+      </a>
+    </div>
+
+    <nav class="tally" aria-label="What the register holds">
+      <a href="#" aria-current="page"><span class="n">32</span><span class="k">entries</span></a>
+      <a class="review" href="#"><span class="dot"></span><span class="n">12</span><span class="k">in review</span></a>
+      <a class="settle" href="#"><span class="dot"></span><span class="n">15</span><span class="k">reviewed, not released</span></a>
+      <a class="out" href="#"><span class="dot"></span><span class="n">4</span><span class="k">released</span></a>
+      <a href="#"><span class="n">1</span><span class="k">no revision</span></a>
+    </nav>
+  </header>
+
+  <section class="asking">
+    <span class="lbl">Showing</span>
+    <p class="sentence">
+      documents
+      <select class="f" data-on><option>in review</option></select>
+      in
+      <select class="f" data-on><option>mechanical</option></select>,
+      released for
+      <select class="f"><option>any status</option></select>,
+      decided
+      <select class="f"><option>any verdict</option></select>,
+      from
+      <select class="f wide"><option>any supplier or contract</option></select>,
+      dated
+      <select class="f"><option>any time</option></select>
+      — matching
+      <input class="f" placeholder="a number, a title, a tag">
+      <button class="more">and four more</button>
+    </p>
+    <button class="do" data-on>Apply</button>
+  </section>
+
+  <section class="kept">
+    <span class="lbl">Kept</span>
+    <a href="#">My discipline</a>
+    <a href="#">Waiting on me</a>
+    <a href="#">Released, never sent</a>
+    <span class="keep">
+      <input placeholder="Name what you asked for">
+      <button>Keep</button>
+    </span>
+  </section>
+
+  <div class="count">
+    <span class="n">9</span>
+    <span class="of">of 32 entries · newest change first</span>
+    <span class="tools">
+      <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5"/></svg>Reset</a>
+      <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 19h16"/></svg>Export</a>
+      <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="1"/><path d="M9 4v16M15 4v16"/></svg>Columns 8 of 24</a>
+    </span>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th></th><th>Number / Title</th><th>Rev</th><th>Revision state</th><th>Released for</th><th>Verdict</th>
+        <th>Discipline</th><th>Type</th><th class="r">Created</th><th class="r">Updated</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr class="settle">
+        <td class="rail"><input type="checkbox"></td>
+        <td><a class="num" href="#">Q6637021-74-ME-DSW-09201</a><span class="ttl">Pump house — ventilation layout</span></td>
+        <td class="rev">F</td><td class="state">Not released</td>
+        <td><span class="codechip held">IFC</span></td><td><span class="codechip">C3</span></td>
+        <td class="state">Mechanical</td><td class="state">Drawing</td>
+        <td class="when">25 Sept 2026</td><td class="when">25 Sept 2026</td>
+      </tr>
+      <tr class="settle">
+        <td class="rail"><input type="checkbox"></td>
+        <td><a class="num" href="#">Q6637021-71-EW-A116-00001</a><span class="ttl">Earthworks — platform levels</span></td>
+        <td class="rev">A</td><td class="state">Not released</td>
+        <td><span class="codechip held">IFC</span></td><td><span class="codechip">C1</span></td>
+        <td class="state">Earthworks</td><td class="state">A116</td>
+        <td class="when">23 Sept 2026</td><td class="when">23 Sept 2026</td>
+      </tr>
+      <tr class="review">
+        <td class="rail"><input type="checkbox"></td>
+        <td><a class="num" href="#">Q6637021-70-AR-BOD-00001</a><span class="ttl">Basis of design — architectural</span></td>
+        <td class="rev">A</td><td class="state">In review</td>
+        <td><span class="codechip held">IFC</span></td><td class="muted">·</td>
+        <td class="state">Architecture</td><td class="state">Basis of design</td>
+        <td class="when">23 Sept 2026</td><td class="when">23 Sept 2026</td>
+      </tr>
+      <tr class="review">
+        <td class="rail"><input type="checkbox"></td>
+        <td><a class="num" href="#">Q6637021-74-MAD-ECGS-ME-DAS-00002</a><span class="ttl">WALK 7 — Blower datasheet — arrived from the supplier</span></td>
+        <td class="rev">A</td><td class="state">In review</td>
+        <td class="muted">·</td><td class="muted">·</td>
+        <td class="state">Mechanical</td><td class="state">Datasheet</td>
+        <td class="when">03 Sept 2026</td><td class="when">23 Sept 2026</td>
+      </tr>
+      <tr class="settle">
+        <td class="rail"><input type="checkbox"></td>
+        <td><a class="num" href="#">Q6637021-74-ME-DGA-00002</a><span class="ttl">WALK 6 — General arrangement — issued to the client</span></td>
+        <td class="rev">B</td><td class="state">Not released</td>
+        <td><span class="codechip held">IFC</span></td><td><span class="codechip">C3</span></td>
+        <td class="state">Mechanical</td><td class="state">General arrangement</td>
+        <td class="when">03 Sept 2026</td><td class="when">23 Sept 2026</td>
+      </tr>
+      <tr class="out">
+        <td class="rail"><input type="checkbox"></td>
+        <td><a class="num" href="#">Q6637021-74-EL-DSW-00023</a><span class="ttl">WALK 5 — Lighting layout</span></td>
+        <td class="rev">B</td><td class="state">Released</td>
+        <td><span class="codechip live">IFC</span></td><td><span class="codechip">C1</span></td>
+        <td class="state">Electrical</td><td class="state">Drawing</td>
+        <td class="when">03 Sept 2026</td><td class="when">23 Sept 2026</td>
+      </tr>
+      <tr class="review">
+        <td class="rail"><input type="checkbox"></td>
+        <td><a class="num" href="#">Q6637021-74-EL-DSW-00022</a><span class="ttl">WALK 4 — Cable trench layout</span></td>
+        <td class="rev">B</td><td class="state">In review</td>
+        <td><span class="codechip held">IFC</span></td><td class="muted">·</td>
+        <td class="state">Electrical</td><td class="state">Drawing</td>
+        <td class="when">03 Sept 2026</td><td class="when">23 Sept 2026</td>
+      </tr>
+      <tr class="none">
+        <td class="rail"><input type="checkbox"></td>
+        <td><a class="num" href="#">Q6637021-71-CI-DSW-00001</a><span class="ttl">Site clearance — number reserved</span></td>
+        <td class="rev muted">·</td><td class="state">No revision yet</td>
+        <td class="muted">·</td><td class="muted">·</td>
+        <td class="state">Civil</td><td class="state">Drawing</td>
+        <td class="when">01 Sept 2026</td><td class="when">01 Sept 2026</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="foot">
+    <span class="range">1–9 of 9</span>
+    <span class="pages"><a href="#">Previous</a><a href="#" aria-current="page">1</a><a href="#">Next</a></span>
+    <select><option>50 a page</option></select>
+  </div>
+</div>
+</body>
+</html>

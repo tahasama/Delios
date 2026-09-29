@@ -4,6 +4,7 @@ import { RegisterPlate } from "./register-plate";
 import { OUTCOME_CONSEQUENCES, DOC_STATES, DOC_STATE_LABEL, DOC_MEANING, REV_STATES, REV_STATE_LABEL, REV_MEANING, revStateLabel, type DocState, type RevState } from "@/lib/standard";
 import { getSet } from "@/lib/config";
 import { DocumentRegister } from "./document-register";
+import { registerWhere, REGISTER_SORTS, documentsForAssets, readSearch, readDay } from "@/lib/register-query";
 import { isReadOnly } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -54,17 +55,11 @@ type Search = {
   per?: string; q?: string; state?: string; rev?: string; status?: string; verdict?: string; supplier?: string; po?: string; discipline?: string; docType?: string; view?: string };
 
 export default async function DocumentsPage({ searchParams }: { searchParams: Promise<Search> }) {
-  const { user, db, project } = await requireScope();
+  const scope = await requireScope();
+  const { user, db, project } = scope;
   const sp = await searchParams;
   const q = (sp.q ?? "").trim();
-  // Two rules, and only two: a space narrows, a comma widens.
-  //   pump ME IFC        every word must match, somewhere in the row
-  //   P-101, P-102       either one is a match
-  //   "feed pump" ME     a quoted phrase counts as one word
-  // So a comma separates searches, and each search may itself have several words.
-  const searches = q.split(",").map((part) => part.trim()).filter(Boolean).slice(0, 8)
-    .map((part) => ({ text: part, words: [...part.matchAll(/"([^"]+)"|(\S+)/g)].map((m) => (m[1] ?? m[2]).trim()).filter(Boolean).slice(0, 6) }))
-    .filter((search) => search.words.length);
+  const searches = readSearch(q);
   const terms = searches.map((search) => search.text);
   const state = sp.state ?? "";
   const discipline = sp.discipline ?? "";
@@ -89,160 +84,42 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
   // knows — nothing new is stored to make this work. Either end may be left
   // open: "released, from 1 March" is a question people actually ask.
   const dateOn = DATE_FIELDS.some((field) => field.key === sp.on) ? sp.on! : "";
-  const day = (value: string | undefined, endOfDay: boolean) => {
-    if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
-    const at = new Date(`${value}T${endOfDay ? "23:59:59.999" : "00:00:00.000"}`);
-    return Number.isNaN(at.getTime()) ? null : at;
-  };
-  const from = day(sp.from, false);
-  const to = day(sp.to, true);
+  const from = readDay(sp.from, false);
+  const to = readDay(sp.to, true);
+  const assetDocIds = await documentsForAssets(scope, searches.flatMap((search) => search.words));
+
+  const where = registerWhere(sp, assetDocIds);
+
+  const sort = sp.sort && REGISTER_SORTS[sp.sort] ? sp.sort : "";
+  const dir = sp.dir === "asc" ? "asc" : "desc";
+  const orderBy: Prisma.DocumentOrderByWithRelationInput = sort
+    ? ({ [REGISTER_SORTS[sort]]: dir } as Prisma.DocumentOrderByWithRelationInput)
+    : { updatedAt: "desc" };
+
   const perPage = PAGE_SIZES.includes(Number(sp.per)) ? Number(sp.per) : 50;
   const page = Math.max(1, Number(sp.page) || 1);
 
-  let assetDocIds: string[] = [];
-  const allWords = searches.flatMap((search) => search.words);
-  if (allWords.length) {
-    const assets = await db.assetItem.findMany({ where: { OR: allWords.flatMap((word) => [{ code: { contains: word } }, { name: { contains: word } }]) }, select: { id: true } });
-    if (assets.length) {
-      const rels = await db.relationship.findMany({ where: { kind: "DOC_ASSET", toId: { in: assets.map((asset) => asset.id) } }, select: { fromId: true } });
-      assetDocIds = rels.map((rel) => rel.fromId);
-    }
-  }
+  const [matchCount, disciplines, types, statuses, verdictSet, supplierCodes, poCodes, criticalities, confidentialities, retentions, deliverableTypes, templates, inUse, views] =
+    await Promise.all([
+      db.document.count({ where }),
+      getSet("DISCIPLINES"), getSet("DOCUMENT_TYPES"), getSet("STATUSES"), getSet("REVIEW_OUTCOMES"), getSet("SUPPLIER_CODES"), getSet("PURCHASE_ORDERS"),
+      getSet("CRITICALITY"), getSet("CONFIDENTIALITY"), getSet("RETENTION_CLASSES"), getSet("DELIVERABLE_TYPES"),
+      db.workflowTemplate.findMany({ where: { active: true }, orderBy: [{ isDefault: "desc" }, { name: "asc" }] }),
+      // Filters offer what the register holds, not every value published.
+      db.document.groupBy({ by: ["discipline", "docType"] }),
+      // The questions this reader keeps, oldest first so the list stays put.
+      db.registerView.findMany({ where: { userId: user.id }, orderBy: { createdAt: "asc" }, select: { id: true, name: true, query: true } }),
+    ]);
 
-  const where: Prisma.DocumentWhereInput = {
-    AND: [
-      ...(state || view === "all" ? [] : [{ state: { notIn: ["WITHDRAWN", "CANCELLED", "ARCHIVED"] } }]),
-      // One search is its words, ANDed. Several searches are ORed together.
-      ...(searches.length
-        ? [{ OR: searches.map((search) => ({
-            AND: search.words.map((word) => ({ OR: [
-              { docNumber: { contains: word } }, { title: { contains: word } }, { originator: { contains: word } },
-              { contractRef: { contains: word } }, { previousId: { contains: word } },
-              { discipline: { contains: word } }, { docType: { contains: word } }, { subProject: { contains: word } },
-              ...(assetDocIds.length ? [{ id: { in: assetDocIds } }] : []),
-            ] })),
-          })) }]
-        : []),
-      state ? { state } : {}, discipline ? { discipline } : {}, docType ? { docType } : {},
-      supplier ? { originator: supplier } : {}, po ? { contractRef: po } : {},
-      criticality ? { criticality } : {}, confidentiality ? { confidentiality } : {},
-      deliverable ? { deliverableType: deliverable } : {},
-    ],
-  };
-
-  // Four of the filters — revision state, released for, verdict, and the two
-  // "waiting on" views — are read off the latest revision, which no column
-  // holds. So the register is read twice: once thinly, to find out which
-  // documents match and in what order, and once in full for the page on screen.
-  // The expensive joins then touch 50 rows rather than every document.
-  const [sieve, disciplines, types, statuses, verdictSet, supplierCodes, poCodes, criticalities, confidentialities, retentions, deliverableTypes, templates] = await Promise.all([
-    db.document.findMany({
-      where,
-      orderBy: { updatedAt: "desc" },
-      select: {
-        id: true,
-        docNumber: true, title: true, discipline: true, docType: true, originator: true,
-        subProject: true, contractRef: true, criticality: true, confidentiality: true,
-        state: true, updatedAt: true, createdDate: true, retentionClass: true, deliverableType: true,
-        revisions: {
-          orderBy: { createdAt: "desc" },
-          take: 1,
-          select: {
-            value: true, state: true, statusCode: true, releasedAt: true,
-            issueDate: true, plannedSubmissionDate: true,
-            createdAt: true,
-            files: { orderBy: { createdAt: "desc" }, take: 1, select: { createdAt: true } },
-            cycles: { orderBy: { sequence: "desc" }, select: { binding: true, outcome: true } },
-          },
-        },
-      },
-    }),
-    getSet("DISCIPLINES"), getSet("DOCUMENT_TYPES"), getSet("STATUSES"), getSet("REVIEW_OUTCOMES"), getSet("SUPPLIER_CODES"), getSet("PURCHASE_ORDERS"),
-    getSet("CRITICALITY"), getSet("CONFIDENTIALITY"), getSet("RETENTION_CLASSES"), getSet("DELIVERABLE_TYPES"),
-    db.workflowTemplate.findMany({ where: { active: true }, orderBy: [{ isDefault: "desc" }, { name: "asc" }] }),
-  ]);
-  // Which date each choice reads. The sieve already carries all of them.
-  type SieveDoc = (typeof sieve)[number];
-  const DATE_READERS: Record<string, (doc: SieveDoc) => Date | null> = {
-    created: (doc) => doc.createdDate,
-    revStarted: (doc) => doc.revisions[0]?.createdAt ?? null,
-    fileAdded: (doc) => doc.revisions[0]?.files[0]?.createdAt ?? null,
-    planned: (doc) => doc.revisions[0]?.plannedSubmissionDate ?? null,
-    issued: (doc) => doc.revisions[0]?.issueDate ?? null,
-    released: (doc) => doc.revisions[0]?.releasedAt ?? null,
-    updated: (doc) => doc.updatedAt,
-  };
-
-  // Which documents the derived filters keep, in the order they will be shown.
-  const keep = sieve.filter((doc) => {
-    const latest = doc.revisions[0] ?? null;
-    const binding = latest?.cycles.filter((c) => c.binding) ?? [];
-    const decided = binding.find((c) => c.outcome) ?? null;
-    const forRelease = latest?.state === "NOT_RELEASED";
-    if (revState === "NONE" && latest) return false;
-    if (revState === "FOR_RELEASE" && !forRelease) return false;
-    if (revState === "IN_REVIEW" && (latest?.state !== "IN_REVIEW" || forRelease)) return false;
-    if (revState && !["NONE", "FOR_RELEASE", "IN_REVIEW"].includes(revState) && latest?.state !== revState) return false;
-    if (statusCode && !(latest?.state === "RELEASED" && latest.statusCode === statusCode)) return false;
-    if (verdictCode && decided?.outcome !== verdictCode) return false;
-    if (dateOn && (from || to)) {
-      const when = DATE_READERS[dateOn](doc);
-      if (!when) return false;
-      if (from && when < from) return false;
-      if (to && when > to) return false;
-    }
-    return true;
-  });
-  // Sorting, over every match rather than over the page: the column someone
-  // clicked decides the order, and the page is cut from that order afterwards.
-  type Sieved = (typeof keep)[number];
-  const SORTS: Record<string, (doc: Sieved) => string | number | null> = {
-    fileAdded: (doc) => doc.revisions[0]?.files[0]?.createdAt.getTime() ?? 0,
-    revStarted: (doc) => doc.revisions[0]?.createdAt.getTime() ?? 0,
-    docNumber: (doc) => doc.docNumber,
-    title: (doc) => doc.title.toLowerCase(),
-    rev: (doc) => doc.revisions[0]?.value ?? "",
-    revState: (doc) => REV_STATES.indexOf((doc.revisions[0]?.state ?? "") as RevState),
-    docState: (doc) => DOC_STATES.indexOf(doc.state as DocState),
-    releasedFor: (doc) => doc.revisions[0]?.statusCode ?? "",
-    verdict: (doc) => doc.revisions[0]?.cycles.find((cycle) => cycle.binding && cycle.outcome)?.outcome ?? "",
-    discipline: (doc) => doc.discipline,
-    docType: (doc) => doc.docType,
-    originator: (doc) => doc.originator ?? "",
-    subProject: (doc) => doc.subProject ?? "",
-    contract: (doc) => doc.contractRef ?? "",
-    criticality: (doc) => doc.criticality ?? "",
-    confidentiality: (doc) => doc.confidentiality ?? "",
-    retention: (doc) => doc.retentionClass ?? "",
-    deliverable: (doc) => doc.deliverableType,
-    planned: (doc) => doc.revisions[0]?.plannedSubmissionDate?.getTime() ?? 0,
-    issued: (doc) => doc.revisions[0]?.issueDate?.getTime() ?? 0,
-    released: (doc) => doc.revisions[0]?.releasedAt?.getTime() ?? 0,
-    updated: (doc) => doc.updatedAt.getTime(),
-    created: (doc) => doc.createdDate.getTime(),
-  };
-  const sort = sp.sort && SORTS[sp.sort] ? sp.sort : "";
-  const dir = sp.dir === "asc" ? "asc" : "desc";
-  if (sort) {
-    const read = SORTS[sort];
-    keep.sort((a, b) => {
-      const left = read(a) ?? "";
-      const right = read(b) ?? "";
-      const cmp = typeof left === "number" && typeof right === "number" ? left - right : String(left).localeCompare(String(right));
-      return dir === "asc" ? cmp : -cmp;
-    });
-  }
-
-  const matchCount = keep.length;
   const pages = Math.max(1, Math.ceil(matchCount / perPage));
   const current = Math.min(page, pages);
-  const pageIds = keep.slice((current - 1) * perPage, current * perPage).map((doc) => doc.id);
 
-  // The page itself, in full. Prisma returns rows unordered, so the order the
-  // sieve established is restored by index.
-  const order = new Map(pageIds.map((id, i) => [id, i]));
-  const docs = (await db.document.findMany({
-    where: { id: { in: pageIds } },
+  // The page itself, in full: the expensive includes touch fifty rows.
+  const docs = await db.document.findMany({
+    where,
+    orderBy,
+    skip: (current - 1) * perPage,
+    take: perPage,
     include: {
       revisions: { orderBy: { createdAt: "desc" }, include: {
         files: { select: { createdAt: true } },
@@ -252,11 +129,9 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
       } },
       _count: { select: { baselineEntries: true, packageMembers: true } },
     },
-  })).sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0));
-  const total = sieve.length;
+  });
 
   // Filters offer what the register holds, not every value the organisation publishes.
-  const inUse = await db.document.findMany({ select: { discipline: true, docType: true }, distinct: ["discipline", "docType"] });
   const usedDisciplines = new Set(inUse.map((d) => d.discipline));
   const usedTypes = new Set(inUse.map((d) => d.docType));
   const disciplineLabel = new Map(disciplines.map((d) => [d.code, d.label]));
@@ -351,6 +226,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
       plate={<RegisterPlate project={{ code: project.code, name: project.name }} canCreate={!isReadOnly(user)} />}
       rows={rows}
       total={matchCount}
+      views={views}
       paging={{ page: current, pages, perPage, sizes: PAGE_SIZES, from: matchCount ? (current - 1) * perPage + 1 : 0, to: Math.min(current * perPage, matchCount), query: query.toString() }}
       codes={codes}
       sort={{ key: sort, dir }}
@@ -359,7 +235,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
       { code: "IN_PREPARATION", label: REV_STATE_LABEL.IN_PREPARATION },
       { code: "IN_REVIEW", label: REV_STATE_LABEL.IN_REVIEW },
       { code: "NOT_RELEASED", label: REV_STATE_LABEL.NOT_RELEASED },
-      { code: "FOR_RELEASE", label: "For release — decided, not released" },
+      { code: "FOR_RELEASE", label: "Reviewed" },
       { code: "RELEASED", label: REV_STATE_LABEL.RELEASED },
       { code: "SUPERSEDED", label: REV_STATE_LABEL.SUPERSEDED },
       { code: "VOID", label: REV_STATE_LABEL.VOID },

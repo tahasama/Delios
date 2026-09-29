@@ -180,7 +180,7 @@ export function TransmittalRegister({ rows, total, filters, filterOptions, expor
           for (const [key, value] of data.entries()) if (value) params.set(key, String(value));
           go(`/transmittals${params.size ? `?${params}` : ""}`);
         }}
-        className="border-b border-line px-4 py-3.5 sm:px-5"
+        className="filter-bay border-b border-line px-4 py-3.5 sm:px-5"
       >
         <div className="flex items-end gap-4">
           <label className="relative min-w-0 flex-1">
@@ -195,8 +195,9 @@ export function TransmittalRegister({ rows, total, filters, filterOptions, expor
           </label>
           {/* Nothing is asked of the database until this is pressed: one query
               per question, not one per keystroke or per choice. */}
-          <button className="ask" data-on={facets.length ? "true" : "false"}>Show</button>
-          {pending ? <span className="stencil whitespace-nowrap pb-1 text-slate-400">Narrowing…</span> : null}
+          <button className="ask" data-on={facets.length ? "true" : "false"} disabled={pending}>
+            {pending ? "Filtering" : "Apply"}
+          </button>
         </div>
 
         {/* Five to a row, one row: a handover has fewer questions than a document. */}

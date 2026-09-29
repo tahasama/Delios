@@ -48,17 +48,17 @@ model Organization {
 
 model Project {
   issueRequests IssueRequest[]
-  id        String       @id @default(cuid())
-  orgId     String
-  org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  code      String // short project code, unique within the organization
-  name      String
+  id            String         @id @default(cuid())
+  orgId         String
+  org           Organization   @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  code          String // short project code, unique within the organization
+  name          String
   // Project type drives the seed profile only — never behaviour. The Standard
   // is domain-neutral (§1.2) and so is this column.
-  kind      String       @default("GENERIC") // GENERIC | INDUSTRIAL | ENERGY | CONSTRUCTION
-  status    String       @default("ACTIVE") // ACTIVE | ARCHIVED
-  startDate DateTime?
-  createdAt DateTime     @default(now())
+  kind          String         @default("GENERIC") // GENERIC | INDUSTRIAL | ENERGY | CONSTRUCTION
+  status        String         @default("ACTIVE") // ACTIVE | ARCHIVED
+  startDate     DateTime?
+  createdAt     DateTime       @default(now())
 
   members                ProjectMembership[]
   delegations            Delegation[]
@@ -98,6 +98,7 @@ model Project {
   requirementCalls       RequirementCall[]
   senderIssues           SenderIssue[]
   readinessConfirmations ReadinessConfirmation[]
+  registerViews          RegisterView[]
 
   @@unique([orgId, code])
   @@index([orgId])
@@ -278,6 +279,7 @@ model User {
   memberships    ProjectMembership[]
   contactFor     Party[]             @relation("PartyContact")
   backupFor      Party[]             @relation("PartyBackup")
+  registerViews  RegisterView[]
 
   @@unique([orgId, email])
   @@index([orgId])
@@ -405,38 +407,57 @@ model NumberCounter {
 // ── Record type 1 · Document (Parts 3–5) ─────────────────────────────────────
 
 model Document {
-  id              String             @id @default(cuid())
-  projectId       String
-  project         Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  docNumber       String // assigned once, never reused (§3.1)
-  title           String
-  deliverableType String // where it came from (§5.2) — set at creation, immutable
-  docType         String // what kind (§5.3)
-  discipline      String // who owns content (§5.4)
-  originator      String? // supplier/party code when external
-  subProject      String?
-  contractRef     String? // contract / purchase order
-  criticality     String? // §5.6
-  confidentiality String? // §5.7 — drives access
-  retentionClass  String? // §13.2
-  state           String             @default("PLANNED") // PLANNED ACTIVE WITHDRAWN CANCELLED ARCHIVED (§7.3)
-  kind            String             @default("DOCUMENT") // DOCUMENT | RECORD (§2.2 — a record is fixed, never revised)
-  confirmedAt     DateTime? // record confirmation (§2.2)
-  confirmedByName String?
-  disposedAt      DateTime? // §13.5 — disposal authorized and recorded; entry retained
-  disposedBy      String?
-  disposalBasis   String?
-  legalHold       Boolean            @default(false) // §13.5 — overrides disposal
-  isPlaceholder   Boolean            @default(false) // register entry before first revision (§16.8)
-  previousId      String? // previous identifier of a renumbered item (§3.8)
-  legacyScheme    String? // identification of pre-existing schemes (§3.8)
-  createdDate     DateTime           @default(now()) // date created (§4.5)
-  receivedDate    DateTime? // date received from external party (§4.5)
-  appVersion      String? // authoring application+version for proprietary natives (§10.1)
-  createdById     String
-  createdByName   String
-  createdAt       DateTime           @default(now())
-  updatedAt       DateTime           @updatedAt
+  id               String    @id @default(cuid())
+  projectId        String
+  project          Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  docNumber        String // assigned once, never reused (§3.1)
+  title            String
+  deliverableType  String // where it came from (§5.2) — set at creation, immutable
+  docType          String // what kind (§5.3)
+  discipline       String // who owns content (§5.4)
+  originator       String? // supplier/party code when external
+  subProject       String?
+  contractRef      String? // contract / purchase order
+  criticality      String? // §5.6
+  confidentiality  String? // §5.7 — drives access
+  retentionClass   String? // §13.2
+  state            String    @default("PLANNED") // PLANNED ACTIVE WITHDRAWN CANCELLED ARCHIVED (§7.3)
+  kind             String    @default("DOCUMENT") // DOCUMENT | RECORD (§2.2 — a record is fixed, never revised)
+  confirmedAt      DateTime? // record confirmation (§2.2)
+  confirmedByName  String?
+  disposedAt       DateTime? // §13.5 — disposal authorized and recorded; entry retained
+  disposedBy       String?
+  disposalBasis    String?
+  legalHold        Boolean   @default(false) // §13.5 — overrides disposal
+  isPlaceholder    Boolean   @default(false) // register entry before first revision (§16.8)
+  previousId       String? // previous identifier of a renumbered item (§3.8)
+  legacyScheme     String? // identification of pre-existing schemes (§3.8)
+  createdDate      DateTime  @default(now()) // date created (§4.5)
+  receivedDate     DateTime? // date received from external party (§4.5)
+  appVersion       String? // authoring application+version for proprietary natives (§10.1)
+  createdById      String
+  createdByName    String
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  // ── The latest revision, said on the document ──────────────────────────────
+  // The register asks four questions of every row — which revision is in hand,
+  // what state it is in, what it is issued for, and what the reviewers decided
+  // — and all four live on the newest revision. Reading them through the
+  // relation means loading every matching document and its revisions to show
+  // fifty, so they are kept here as well, written by the code that changes
+  // them (see `restate` in src/lib/latest.ts). Nothing here is a new fact: it
+  // is the same fact, in the place the register can sort and page by.
+  latestRevisionId String?
+  latestRevValue   String?
+  latestRevState   String?
+  latestStatusCode String?
+  latestVerdict    String?
+  latestRevAt      DateTime?
+  latestFileAt     DateTime?
+  latestPlannedAt  DateTime?
+  latestIssueAt    DateTime?
+  latestReleasedAt DateTime?
+
   revisions       Revision[]
   baselineEntries BaselineEntry[]
   packageMembers  PackageMember[]
@@ -448,6 +469,17 @@ model Document {
   @@index([discipline])
   @@index([docType])
   @@index([projectId])
+  // The register's own order, and the columns it narrows by.
+  @@index([projectId, updatedAt])
+  @@index([projectId, docNumber])
+  @@index([originator])
+  @@index([contractRef])
+  @@index([deliverableType])
+  @@index([criticality])
+  @@index([confidentiality])
+  @@index([latestRevState])
+  @@index([latestStatusCode])
+  @@index([latestVerdict])
 }
 
 // ── Record type 2 · Revision (Parts 6–10) ────────────────────────────────────
@@ -517,6 +549,9 @@ model Revision {
   @@unique([projectId, documentId, value])
   @@index([state])
   @@index([projectId])
+  // "The latest revision of this document" is asked on every register row, on
+  // every document page, and by the workflow engine.
+  @@index([documentId, createdAt])
 }
 
 // Immutable point-in-time materializations taken at lifecycle and control
@@ -1343,6 +1378,28 @@ model Party {
 }
 
 // Scope & conformance statement (C.1, §1.6)
+/**
+ * A register view somebody keeps: the question they ask every morning, under a
+ * name. The filters already live in the address, so a view is that address and
+ * nothing more — no copy of the rows, nothing to go stale.
+ */
+model RegisterView {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  /**
+   * The query string, as the register wrote it.
+   */
+  query     String
+  createdAt DateTime @default(now())
+
+  @@unique([projectId, userId, name])
+  @@index([projectId, userId])
+}
+
 model ScopeConfig {
   id                      String   @id @default(cuid())
   // The register document that is this project's Document Management Plan;
@@ -1366,46 +1423,49 @@ model ScopeConfig {
   @@index([projectId])
 }
 
-
 /**
  * A request to send a revision somewhere.
- *
  * Releasing a revision and telling people about it are two different acts, and
  * the second one is asked for. Anybody with standing on the document may ask —
  * whoever wrote it, whoever uploaded it, whoever started the review, whoever
  * decided it — and they may ask at any time, once or several times: issue it to
  * these people now, ask that organization to approve it next week.
- *
  * Document Control carries a request out. Where a project runs without a
  * control function, whoever asked carries it out themselves. Until somebody
  * asks, a released revision is simply not issued, and the record says so.
  */
 model IssueRequest {
-  id              String   @id @default(cuid())
-  projectId       String
-  project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  revisionId      String
-  revision        Revision @relation(fields: [revisionId], references: [id], onDelete: Cascade)
+  id            String       @id @default(cuid())
+  projectId     String
+  project       Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  revisionId    String
+  revision      Revision     @relation(fields: [revisionId], references: [id], onDelete: Cascade)
   /**
    * Why it goes to them, from the published reasons for issue: for information,
    * for review, for approval, for pricing, for execution. What is wanted back —
    * if anything — is a property of the reason, not a second question.
    */
-  reason          String   @default("INFORMATION")
-  /** JSON: { internalUserIds, partyIds, note } — who it goes to. */
-  recipients      String
-  note            String?
-  /** The asker left the choice to whoever wrote the revision. */
-  delegated       Boolean  @default(false)
-  raisedById      String
-  raisedByName    String
-  raisedAt        DateTime @default(now())
-  /** OPEN — waiting to be carried out. DONE — the transmittal exists. CANCELLED. */
-  status          String   @default("OPEN")
-  carriedOutAt    DateTime?
-  carriedOutBy    String?
-  transmittalId   String?
-  transmittal     Transmittal? @relation(fields: [transmittalId], references: [id])
+  reason        String       @default("INFORMATION")
+  /**
+   * JSON: { internalUserIds, partyIds, note } — who it goes to.
+   */
+  recipients    String
+  note          String?
+  /**
+   * The asker left the choice to whoever wrote the revision.
+   */
+  delegated     Boolean      @default(false)
+  raisedById    String
+  raisedByName  String
+  raisedAt      DateTime     @default(now())
+  /**
+   * OPEN — waiting to be carried out. DONE — the transmittal exists. CANCELLED.
+   */
+  status        String       @default("OPEN")
+  carriedOutAt  DateTime?
+  carriedOutBy  String?
+  transmittalId String?
+  transmittal   Transmittal? @relation(fields: [transmittalId], references: [id])
 
   @@index([revisionId])
   @@index([projectId, status])

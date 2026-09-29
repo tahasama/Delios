@@ -34,6 +34,7 @@ export const ORG_SCOPED = new Set([
 
 export const PROJECT_SCOPED = new Set([
   "Delegation",
+  "RegisterView",
   "NumberCounter",
   "Document",
   "Revision",
@@ -181,6 +182,9 @@ export function scopedClient(
     query: {
       $allModels: {
         async $allOperations({ model, operation, args, query }) {
+          // The scoping the caller asked for, run first; what it touched is
+          // restated afterwards, so a write and its consequence cannot drift.
+          const scoped = async (): Promise<unknown> => {
           const key = keyFor(model);
           if (!key) return query(args);
           const value = key === "orgId" ? orgId : projectId;
@@ -234,8 +238,110 @@ export function scopedClient(
           }
 
           return query(args);
+          };
+
+          const done = await scoped();
+          // A write to a revision, a review cycle or a file changes what the
+          // register says about the document that owns it.
+          if (model && RESTATES[model] && WRITE_OPS.has(operation)) {
+            for (const documentId of await touched(model, (args ?? {}) as Record<string, unknown>, done)) {
+              await restateDocument(documentId);
+            }
+          }
+          return done;
         },
       },
+    },
+  });
+}
+
+/**
+ * The models whose writes change what the register says about a document.
+ *
+ * `Document.latest*` is a copy of the newest revision's facts, kept so the
+ * register can narrow, sort and page in SQL rather than reading every match
+ * into memory. A copy is only as true as the last thing that wrote it, so
+ * rather than trusting thirty call sites to remember, the client restates the
+ * document itself after any write that could have changed it — and code
+ * written later is covered by construction.
+ */
+const RESTATES: Record<string, "revision" | "byRevision"> = {
+  Revision: "revision",
+  ReviewCycle: "byRevision",
+  StoredFile: "byRevision",
+};
+
+const WRITE_OPS = new Set(["create", "createMany", "update", "updateMany", "upsert", "delete", "deleteMany"]);
+
+/**
+ * Which documents a write touched. A write by id says so in what it returns or
+ * in what it was given; one by filter is asked of the database, because
+ * `updateMany` answers with a count rather than the rows it changed.
+ */
+async function touched(model: string, args: Record<string, unknown>, result: unknown): Promise<string[]> {
+  const kind = RESTATES[model];
+  if (!kind) return [];
+  const ids = new Set<string>();
+
+  const fromRevision = async (revisionId: string) => {
+    const revision = await db.revision.findUnique({ where: { id: revisionId }, select: { documentId: true } });
+    if (revision) ids.add(revision.documentId);
+  };
+
+  for (const row of (Array.isArray(result) ? result : [result]) as ({ documentId?: string; revisionId?: string | null } | null)[]) {
+    if (!row) continue;
+    if (kind === "revision" && row.documentId) ids.add(row.documentId);
+    if (kind === "byRevision" && row.revisionId) await fromRevision(row.revisionId);
+  }
+
+  for (const part of [args.where, args.data, args.create].filter(Boolean) as Record<string, unknown>[]) {
+    if (kind === "revision" && typeof part.documentId === "string") ids.add(part.documentId);
+    if (kind === "byRevision" && typeof part.revisionId === "string") await fromRevision(part.revisionId);
+    if (kind === "revision" && typeof part.id === "string" && typeof part.documentId !== "string") await fromRevision(part.id);
+  }
+
+  // A write by filter names no row: ask which ones answer to it.
+  if (!ids.size && args.where && typeof args.where === "object") {
+    const where = args.where as Record<string, unknown>;
+    if (kind === "revision") {
+      const rows = await db.revision.findMany({ where, select: { documentId: true }, take: 500 });
+      for (const row of rows) ids.add(row.documentId);
+    } else {
+      const rows = model === "ReviewCycle"
+        ? await db.reviewCycle.findMany({ where: where as never, select: { revisionId: true }, take: 500 })
+        : await db.storedFile.findMany({ where: where as never, select: { revisionId: true }, take: 500 });
+      for (const row of rows) if (row.revisionId) await fromRevision(row.revisionId);
+    }
+  }
+
+  return [...ids];
+}
+
+/** Recompute a document's copy of its latest revision's facts. */
+async function restateDocument(documentId: string) {
+  const latest = await db.revision.findFirst({
+    where: { documentId },
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true, value: true, state: true, statusCode: true, createdAt: true,
+      plannedSubmissionDate: true, issueDate: true, releasedAt: true,
+      files: { orderBy: { createdAt: "desc" }, take: 1, select: { createdAt: true } },
+      cycles: { where: { binding: true, outcome: { not: null } }, orderBy: { sequence: "desc" }, take: 1, select: { outcome: true } },
+    },
+  });
+  await db.document.update({
+    where: { id: documentId },
+    data: {
+      latestRevisionId: latest?.id ?? null,
+      latestRevValue: latest?.value ?? null,
+      latestRevState: latest?.state ?? null,
+      latestStatusCode: latest?.statusCode ?? null,
+      latestVerdict: latest?.cycles[0]?.outcome ?? null,
+      latestRevAt: latest?.createdAt ?? null,
+      latestFileAt: latest?.files[0]?.createdAt ?? null,
+      latestPlannedAt: latest?.plannedSubmissionDate ?? null,
+      latestIssueAt: latest?.issueDate ?? null,
+      latestReleasedAt: latest?.releasedAt ?? null,
     },
   });
 }

@@ -1,0 +1,347 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DELIOS — Document register</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* Tokens from src/app/theme.css only. The app's sidebar is not drawn.
+   THE TABLE IS UNCHANGED — everything around it is the redesign. */
+:root{
+  --surface:#ffffff; --canvas:#eceff4; --canvas-deep:#e2e7ee;
+  --line:#d7dde6; --line-strong:#bcc6d4;
+  --brand:#1e3a5f; --brand-hover:#2d5480; --brand-strong:#17324d; --brand-line:#3b6389; --brand-ink:#1e3a5f;
+  --link:#2b5b80; --tint:#e4eef7; --tint-soft:#f2f6fb;
+  --slate-300:#cbd5e1; --slate-400:#94a3b8; --slate-500:#64748b; --slate-600:#475569; --slate-700:#334155; --slate-800:#1e293b; --slate-900:#0f172a;
+  --amber:oklch(55.5% 0.163 48.998);
+  --emerald:oklch(50.8% 0.118 165.612);
+  --violet:oklch(49.1% 0.27 292.581);
+  --sans:"IBM Plex Sans",ui-sans-serif,system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,monospace;
+  --ease:cubic-bezier(.2,.6,.3,1);
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--canvas);color:var(--slate-900);font-family:var(--sans);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+.col{max-width:1320px;margin:0 auto;padding:22px 22px 60px}
+
+/* ── The masthead ─────────────────────────────────────────────────────────
+   A register is a bound book: it says what it is, what it holds, and gives
+   one way in. The figures are not decoration — each is a filter, so the
+   masthead is also the fastest way to narrow the page. */
+.mast{
+  position:relative;overflow:hidden;border-radius:14px 14px 0 0;
+  border:1px solid var(--line);border-bottom:0;background:var(--surface);
+}
+.mast .top{display:flex;align-items:flex-start;justify-content:space-between;gap:24px;padding:18px 22px 14px}
+.crumb{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--slate-400);margin:0 0 6px}
+.crumb b{color:var(--slate-500);font-weight:500}
+h1{margin:0;font-size:22px;font-weight:600;letter-spacing:-.02em;line-height:1.1}
+.lede{margin:5px 0 0;font-size:12.5px;color:var(--slate-500);max-width:52ch}
+.make{
+  display:inline-flex;align-items:center;gap:7px;background:var(--brand);color:#fff;border-radius:8px;
+  padding:9px 15px;font-size:13px;font-weight:600;white-space:nowrap;transition:background .18s var(--ease);
+}
+.make:hover{background:var(--brand-hover)}
+.make svg{width:15px;height:15px}
+
+/* The count strip: what the book holds, and each figure a way to narrow it. */
+.figures{display:flex;border-top:1px solid var(--line)}
+.fig{
+  flex:1;min-width:0;padding:11px 22px;border-right:1px solid var(--line);
+  transition:background .16s var(--ease);
+}
+.fig:last-child{border-right:0}
+a.fig:hover{background:var(--tint-soft)}
+a.fig[aria-current]{background:var(--tint)}
+.fig .n{font-family:var(--mono);font-size:19px;font-weight:600;line-height:1;font-variant-numeric:tabular-nums;color:var(--slate-900)}
+.fig .k{display:block;margin-top:5px;font-size:10.5px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--slate-400)}
+a.fig[aria-current] .k{color:var(--brand-ink)}
+.fig .bar{display:block;height:2px;margin-top:8px;border-radius:2px;background:var(--line)}
+.fig.review .bar{background:var(--brand-line)}
+.fig.settle .bar{background:var(--amber)}
+.fig.out .bar{background:var(--emerald)}
+
+/* ── Asking ───────────────────────────────────────────────────────────────
+   One band, shaded, with the search on its own line and the choices under it.
+   Saved questions sit at the right of the search, where you look for them
+   before you start building the same filter for the fortieth time. */
+.ask{background:color-mix(in oklab,var(--canvas) 55%,var(--surface));border:1px solid var(--line);border-bottom:0;padding:13px 22px 15px}
+.ask .line{display:flex;align-items:center;gap:14px}
+.search{position:relative;flex:1;min-width:0}
+.search svg{position:absolute;left:0;top:50%;transform:translateY(-50%);width:15px;height:15px;color:var(--slate-400)}
+.search input{
+  width:100%;border:0;border-bottom:1px solid var(--line-strong);background:transparent;
+  padding:7px 0 7px 24px;font-family:var(--sans);font-size:13.5px;color:var(--slate-900);
+}
+.search input::placeholder{color:var(--slate-400)}
+.search input:focus{outline:none;border-bottom-color:var(--brand-line)}
+.go{
+  display:inline-flex;align-items:center;justify-content:center;min-width:5.25rem;gap:6px;flex:none;
+  border:1px solid var(--line-strong);background:var(--surface);border-radius:8px;padding:7px 15px;
+  font-size:13px;font-weight:600;color:var(--brand-ink);box-shadow:0 1px 1px rgb(15 23 42/4%);
+  transition:background .14s var(--ease),border-color .14s var(--ease);
+}
+.go:hover{background:var(--tint);border-color:var(--brand-line)}
+.go[data-on]{background:var(--brand);border-color:var(--brand);color:#fff}
+
+.saved{display:flex;align-items:center;gap:8px;flex:none;padding-left:14px;border-left:1px solid var(--line)}
+.saved .lbl{font-size:10px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--slate-400)}
+.saved a{
+  border:1px solid var(--line);background:var(--surface);border-radius:99px;padding:3px 10px;
+  font-size:12px;color:var(--slate-600);transition:border-color .14s var(--ease),color .14s var(--ease);
+}
+.saved a:hover{border-color:var(--brand-line);color:var(--brand-ink)}
+
+.fields{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px 16px;margin-top:13px}
+.field .name{display:block;margin-bottom:3px;font-size:9.5px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--slate-400)}
+.field select,.field .datebox{
+  width:100%;appearance:none;border:1px solid var(--line);background:var(--surface);border-radius:7px;
+  padding:6px 26px 6px 9px;font-family:var(--sans);font-size:12.5px;color:var(--slate-700);
+  background-image:linear-gradient(45deg,transparent 50%,var(--slate-400) 50%),linear-gradient(135deg,var(--slate-400) 50%,transparent 50%);
+  background-position:right 12px center,right 7px center;background-size:4px 4px,4px 4px;background-repeat:no-repeat;
+}
+.field select:hover,.field .datebox:hover{border-color:var(--line-strong)}
+.field select[data-on],.field .datebox[data-on]{border-color:var(--brand-line);background-color:var(--tint);color:var(--brand-ink);font-weight:600}
+.more{
+  align-self:end;display:inline-flex;align-items:center;gap:7px;border:1px dashed var(--line-strong);
+  background:transparent;border-radius:7px;padding:6px 10px;font-family:var(--sans);font-size:12.5px;color:var(--slate-500);cursor:pointer;
+}
+.more:hover{border-color:var(--brand-line);color:var(--brand-ink)}
+
+/* What is being asked, said in words, each removable. */
+.chips{display:flex;flex-wrap:wrap;align-items:center;gap:7px;margin-top:12px;padding-top:11px;border-top:1px dashed var(--line)}
+.chips .lbl{font-size:10px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--slate-400);margin-right:2px}
+.chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--surface);border-radius:99px;padding:3px 9px;font-size:12px;color:var(--slate-700)}
+.chip b{font-family:var(--mono);font-size:11px;font-weight:600;color:var(--slate-900)}
+.chip .k{font-size:9.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--slate-400)}
+.chip .x{color:var(--slate-400)}
+.chip:hover .x{color:var(--amber)}
+.chips .clear{margin-left:4px;font-size:12px;font-weight:600;color:var(--link)}
+.chips .keep{margin-left:auto;display:flex;align-items:center;gap:7px}
+.chips .keep input{border:1px solid var(--line);border-radius:7px;background:var(--surface);padding:4px 9px;font-family:var(--sans);font-size:12px;width:170px}
+.chips .keep button{border:0;background:none;font-family:var(--sans);font-size:12px;font-weight:600;color:var(--link);cursor:pointer}
+
+/* ── The count line, between asking and reading ───────────────────────── */
+.count{
+  display:flex;align-items:center;gap:12px;background:var(--surface);
+  border:1px solid var(--line);border-bottom:0;padding:9px 22px;
+}
+.count .n{font-family:var(--mono);font-size:15px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--slate-900)}
+.count .of{font-size:12.5px;color:var(--slate-500)}
+.count .tools{margin-left:auto;display:flex;align-items:center;gap:4px}
+.count .tools a{display:inline-flex;align-items:center;gap:6px;border-radius:7px;padding:5px 9px;font-size:12px;font-weight:600;color:var(--slate-500)}
+.count .tools a:hover{background:var(--canvas-deep);color:var(--slate-800)}
+.count .tools svg{width:14px;height:14px}
+
+/* ── The table — UNCHANGED, drawn as it is today ─────────────────────── */
+.sheet{background:var(--surface);border:1px solid var(--line);border-radius:0 0 14px 14px;overflow:hidden}
+table{width:100%;border-collapse:collapse}
+thead th{
+  text-align:left;padding:8px 14px;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--slate-400);background:var(--surface);border-bottom:1px solid var(--line-strong);white-space:nowrap;
+}
+thead th.r{text-align:right}
+tbody td{padding:9px 14px;border-bottom:1px solid var(--line);vertical-align:middle;font-size:13px}
+tbody tr:last-child td{border-bottom:0}
+tbody tr:hover td{background:var(--tint-soft)}
+td.rail{position:relative;padding-left:14px;width:34px}
+td.rail::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--rail,var(--slate-300));transition:width .12s}
+tr:hover td.rail::before{width:5px}
+tr.review{--rail:var(--brand-line)} tr.settle{--rail:var(--amber)} tr.out{--rail:var(--emerald)} tr.none{--rail:var(--slate-300)}
+.num{font-family:var(--mono);font-size:12.5px;font-weight:600;letter-spacing:-.01em;color:var(--slate-900);white-space:nowrap}
+.num:hover{color:var(--link);text-decoration:underline;text-underline-offset:3px}
+.ttl{display:block;margin-top:1px;font-size:12.5px;color:var(--slate-500);max-width:34ch;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rev{font-family:var(--mono);font-size:13px;font-weight:600;color:var(--slate-900)}
+.state{font-size:11.5px;color:var(--slate-500)}
+.codechip{display:inline-flex;border-radius:5px;padding:1px 6px;font-family:var(--mono);font-size:11.5px;font-weight:600;background:var(--canvas-deep);color:var(--slate-700)}
+.codechip.live{background:var(--tint);color:var(--brand-ink)}
+.codechip.held{background:transparent;color:var(--slate-500);box-shadow:inset 0 0 0 1px var(--line-strong)}
+td.when{text-align:right;font-family:var(--mono);font-size:12px;color:var(--slate-500);white-space:nowrap;font-variant-numeric:tabular-nums}
+.muted{color:var(--slate-300)}
+
+/* ── The foot ─────────────────────────────────────────────────────────── */
+.foot{display:flex;align-items:center;gap:14px;padding:10px 22px;border-top:1px solid var(--line);background:var(--surface)}
+.foot .range{font-family:var(--mono);font-size:11.5px;color:var(--slate-500);font-variant-numeric:tabular-nums}
+.foot .pages{margin:0 auto;display:flex;align-items:center;gap:4px}
+.foot .pages a{border-radius:6px;padding:4px 9px;font-size:12.5px;color:var(--slate-500)}
+.foot .pages a:hover{background:var(--canvas-deep);color:var(--slate-800)}
+.foot .pages a[aria-current]{background:var(--brand);color:#fff;font-weight:600}
+.foot select{border:1px solid var(--line);border-radius:7px;background:var(--surface);padding:4px 8px;font-family:var(--sans);font-size:12px;color:var(--slate-600)}
+</style>
+</head>
+<body>
+<div class="col">
+
+  <header class="mast">
+    <div class="top">
+      <div>
+        <p class="crumb"><b>Q6637021</b> · Thermal piping</p>
+        <h1>Document register</h1>
+        <p class="lede">Every controlled document on this project, one row each, showing the revision in hand now.</p>
+      </div>
+      <a class="make" href="#">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+        Create document
+      </a>
+    </div>
+
+    <nav class="figures" aria-label="What the register holds">
+      <a class="fig" href="#" aria-current="page">
+        <span class="n">32</span><span class="k">documents</span><span class="bar"></span>
+      </a>
+      <a class="fig review" href="#">
+        <span class="n">12</span><span class="k">in review</span><span class="bar"></span>
+      </a>
+      <a class="fig settle" href="#">
+        <span class="n">15</span><span class="k">reviewed, not released</span><span class="bar"></span>
+      </a>
+      <a class="fig out" href="#">
+        <span class="n">4</span><span class="k">released</span><span class="bar"></span>
+      </a>
+      <a class="fig" href="#">
+        <span class="n">1</span><span class="k">no revision yet</span><span class="bar"></span>
+      </a>
+    </nav>
+  </header>
+
+  <section class="ask">
+    <div class="line">
+      <label class="search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input placeholder="A space narrows, a comma widens:  pump ME  ·  P-101, P-102  ·  &quot;feed pump&quot;">
+      </label>
+      <button class="go" data-on>Apply</button>
+      <span class="saved">
+        <span class="lbl">Saved</span>
+        <a href="#">My discipline</a>
+        <a href="#">Waiting on me</a>
+        <a href="#">Never sent</a>
+      </span>
+    </div>
+
+    <div class="fields">
+      <label class="field"><span class="name">Document state</span><select><option>Any</option></select></label>
+      <label class="field"><span class="name">Revision state</span><select data-on><option>In review</option></select></label>
+      <label class="field"><span class="name">Released for</span><select><option>Any</option></select></label>
+      <label class="field"><span class="name">Verdict</span><select><option>Any</option></select></label>
+      <label class="field"><span class="name">Discipline</span><select data-on><option>Mechanical</option></select></label>
+      <label class="field"><span class="name">Type</span><select><option>Any</option></select></label>
+      <label class="field"><span class="name">Supplier</span><select><option>Any</option></select></label>
+      <label class="field"><span class="name">Contract</span><select><option>Any</option></select></label>
+      <label class="field"><span class="name">When</span><span class="datebox">Any date</span></label>
+      <button class="more">+ More filters</button>
+    </div>
+
+    <div class="chips">
+      <span class="lbl">Asking</span>
+      <span class="chip"><span class="k">revision state</span><b>In review</b><span class="x">×</span></span>
+      <span class="chip"><span class="k">discipline</span><b>Mechanical</b><span class="x">×</span></span>
+      <a class="clear" href="#">Clear both</a>
+      <span class="keep">
+        <input placeholder="Name this view…">
+        <button>Keep</button>
+      </span>
+    </div>
+  </section>
+
+  <div class="count">
+    <span class="n">9</span><span class="of">documents match · sorted by last change</span>
+    <span class="tools">
+      <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5"/></svg>Reset</a>
+      <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 19h16"/></svg>Export</a>
+      <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16M15 4v16"/></svg>Columns 8/24</a>
+    </span>
+  </div>
+
+  <section class="sheet">
+    <table>
+      <thead>
+        <tr>
+          <th></th><th>Number / Title</th><th>Rev</th><th>Revision state</th><th>Released for</th><th>Verdict</th>
+          <th>Discipline</th><th>Type</th><th class="r">Created</th><th class="r">Updated</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="settle">
+          <td class="rail"><input type="checkbox"></td>
+          <td><a class="num" href="#">Q6637021-74-ME-DSW-09201</a><span class="ttl">Pump house — ventilation layout</span></td>
+          <td class="rev">F</td><td class="state">Not released</td>
+          <td><span class="codechip held">IFC</span></td><td><span class="codechip">C3</span></td>
+          <td class="state">Mechanical</td><td class="state">Drawing</td>
+          <td class="when">25 Sept 2026</td><td class="when">25 Sept 2026</td>
+        </tr>
+        <tr class="settle">
+          <td class="rail"><input type="checkbox"></td>
+          <td><a class="num" href="#">Q6637021-71-EW-A116-00001</a><span class="ttl">Earthworks — platform levels</span></td>
+          <td class="rev">A</td><td class="state">Not released</td>
+          <td><span class="codechip held">IFC</span></td><td><span class="codechip">C1</span></td>
+          <td class="state">Earthworks</td><td class="state">A116</td>
+          <td class="when">23 Sept 2026</td><td class="when">23 Sept 2026</td>
+        </tr>
+        <tr class="review">
+          <td class="rail"><input type="checkbox"></td>
+          <td><a class="num" href="#">Q6637021-70-AR-BOD-00001</a><span class="ttl">Basis of design — architectural</span></td>
+          <td class="rev">A</td><td class="state">In review</td>
+          <td><span class="codechip held">IFC</span></td><td class="muted">·</td>
+          <td class="state">Architecture</td><td class="state">Basis of design</td>
+          <td class="when">23 Sept 2026</td><td class="when">23 Sept 2026</td>
+        </tr>
+        <tr class="review">
+          <td class="rail"><input type="checkbox"></td>
+          <td><a class="num" href="#">Q6637021-74-MAD-ECGS-ME-DAS-00002</a><span class="ttl">WALK 7 — Blower datasheet — arrived from the supplier</span></td>
+          <td class="rev">A</td><td class="state">In review</td>
+          <td class="muted">·</td><td class="muted">·</td>
+          <td class="state">Mechanical</td><td class="state">Datasheet</td>
+          <td class="when">03 Sept 2026</td><td class="when">23 Sept 2026</td>
+        </tr>
+        <tr class="settle">
+          <td class="rail"><input type="checkbox"></td>
+          <td><a class="num" href="#">Q6637021-74-ME-DGA-00002</a><span class="ttl">WALK 6 — General arrangement — issued to the client</span></td>
+          <td class="rev">B</td><td class="state">Not released</td>
+          <td><span class="codechip held">IFC</span></td><td><span class="codechip">C3</span></td>
+          <td class="state">Mechanical</td><td class="state">General arrangement</td>
+          <td class="when">03 Sept 2026</td><td class="when">23 Sept 2026</td>
+        </tr>
+        <tr class="out">
+          <td class="rail"><input type="checkbox"></td>
+          <td><a class="num" href="#">Q6637021-74-EL-DSW-00023</a><span class="ttl">WALK 5 — Lighting layout</span></td>
+          <td class="rev">B</td><td class="state">Released</td>
+          <td><span class="codechip live">IFC</span></td><td><span class="codechip">C1</span></td>
+          <td class="state">Electrical</td><td class="state">Drawing</td>
+          <td class="when">03 Sept 2026</td><td class="when">23 Sept 2026</td>
+        </tr>
+        <tr class="review">
+          <td class="rail"><input type="checkbox"></td>
+          <td><a class="num" href="#">Q6637021-74-EL-DSW-00022</a><span class="ttl">WALK 4 — Cable trench layout</span></td>
+          <td class="rev">B</td><td class="state">In review</td>
+          <td><span class="codechip held">IFC</span></td><td class="muted">·</td>
+          <td class="state">Electrical</td><td class="state">Drawing</td>
+          <td class="when">03 Sept 2026</td><td class="when">23 Sept 2026</td>
+        </tr>
+        <tr class="none">
+          <td class="rail"><input type="checkbox"></td>
+          <td><a class="num" href="#">Q6637021-71-CI-DSW-00001</a><span class="ttl">Site clearance — number reserved</span></td>
+          <td class="rev muted">·</td><td class="state">No revision yet</td>
+          <td class="muted">·</td><td class="muted">·</td>
+          <td class="state">Civil</td><td class="state">Drawing</td>
+          <td class="when">01 Sept 2026</td><td class="when">01 Sept 2026</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="foot">
+      <span class="range">1–9 <span style="color:var(--slate-400)">of 9</span></span>
+      <span class="pages">
+        <a href="#">‹</a><a href="#" aria-current="page">1</a><a href="#">›</a>
+      </span>
+      <select><option>50 a page</option></select>
+    </div>
+  </section>
+</div>
+</body>
+</html>
