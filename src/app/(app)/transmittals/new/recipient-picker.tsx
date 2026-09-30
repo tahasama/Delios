@@ -14,10 +14,11 @@ type Person = { id: string; name: string; job: string | null; company: string; o
 type Chosen = Person & { copy: boolean };
 
 /**
- * Who receives it, found by typing rather than by scrolling two lists: part of
- * a name, a company or a job, and Enter takes the one highlighted. As many
- * people as needed, each either addressed — asked to do something, and the
- * ones "seen" is read from — or copied in, and each removable.
+ * Who receives it, the way an email is addressed: the people it is sent to —
+ * asked to do something, and the ones "seen" is read from — and, apart, the
+ * people copied in, kept informed and never asked. Each list is found by
+ * typing part of a name, a company or a job, and Enter takes the one
+ * highlighted; as many as needed, each removable.
  *
  * Only people who exist can be chosen, so a name nobody can be matched to never
  * reaches a transmittal, and everyone chosen can open it.
@@ -27,9 +28,9 @@ export function RecipientPicker({ companies, preselected = [], preselectedCopies
   preselected?: string[];
   /** People copied in — kept informed, and never asked for anything. */
   preselectedCopies?: string[];
-  /** What the list is called: who it goes to, or, for what we received, who it is for. */
+  /** What the first list is called: who it goes to, or, for what we received, who it is for. */
   label?: string;
-  /** How many are chosen, so the form can say when nobody is. */
+  /** How many it is addressed to, so the form can say when nobody is. */
   onCount?: (n: number) => void;
 }) {
   const everyone = useMemo<Person[]>(
@@ -41,12 +42,60 @@ export function RecipientPicker({ companies, preselected = [], preselectedCopies
     ...preselected.flatMap((id) => (byId.get(id) ? [{ ...byId.get(id)!, copy: false }] : [])),
     ...preselectedCopies.filter((id) => !preselected.includes(id)).flatMap((id) => (byId.get(id) ? [{ ...byId.get(id)!, copy: true }] : [])),
   ]);
+  const addressed = chosen.filter((one) => !one.copy).length;
+  useEffect(() => { onCount?.(addressed); }, [addressed, onCount]);
+
+  const add = (people: Person[], copy: boolean) =>
+    setChosen((list) => [...list, ...people.filter((p) => !list.some((one) => one.id === p.id)).map((p) => ({ ...p, copy }))]);
+  const remove = (id: string) => setChosen((list) => list.filter((one) => one.id !== id));
+
+  return (
+    <div className="space-y-5">
+      {/* The ids travel as the form's fields, whichever list they sit in. */}
+      {chosen.map((one) => <input key={one.id} type="hidden" name={one.copy ? "copyUsers" : "recipientUsers"} value={one.id} />)}
+      <Block
+        label={label}
+        required
+        hint="asked to do something with it — type a name, a company or a job, then Enter"
+        copy={false}
+        everyone={everyone}
+        companies={companies}
+        chosen={chosen}
+        onAdd={add}
+        onRemove={remove}
+      />
+      <Block
+        label="Copy to (cc)"
+        hint="kept informed, never asked — optional"
+        copy
+        everyone={everyone}
+        companies={companies}
+        chosen={chosen}
+        onAdd={add}
+        onRemove={remove}
+      />
+    </div>
+  );
+}
+
+/** One list: its search, what the search finds, and who is on it. */
+function Block({ label, hint, required, copy, everyone, companies, chosen, onAdd, onRemove }: {
+  label: string;
+  hint: string;
+  required?: boolean;
+  copy: boolean;
+  everyone: Person[];
+  companies: Company[];
+  chosen: Chosen[];
+  onAdd: (people: Person[], copy: boolean) => void;
+  onRemove: (id: string) => void;
+}) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [hi, setHi] = useState(0);
   const box = useRef<HTMLDivElement>(null);
+  const listId = copy ? "cc-options" : "to-options";
 
-  useEffect(() => { onCount?.(chosen.length); }, [chosen.length, onCount]);
   // Clicking anywhere else closes the list.
   useEffect(() => {
     const away = (event: MouseEvent) => { if (!box.current?.contains(event.target as Node)) setOpen(false); };
@@ -54,7 +103,9 @@ export function RecipientPicker({ companies, preselected = [], preselectedCopies
     return () => document.removeEventListener("mousedown", away);
   }, []);
 
+  // Somebody already on either list is not offered again.
   const taken = new Set(chosen.map((one) => one.id));
+  const mine = chosen.filter((one) => one.copy === copy);
   const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
   const matches = everyone
     .filter((p) => !taken.has(p.id))
@@ -64,18 +115,18 @@ export function RecipientPicker({ companies, preselected = [], preselectedCopies
   const whole = words.length
     ? companies
         .filter((c) => words.every((w) => c.name.toLowerCase().includes(w)))
-        .map((c) => ({ company: c, rest: c.people.filter((p) => !taken.has(p.id)) }))
+        .map((c) => ({ company: c, rest: everyone.filter((p) => p.company === c.name && !taken.has(p.id)) }))
         .filter((one) => one.rest.length > 1)
     : [];
-  const options = [
-    ...matches.map((p) => ({ key: p.id, add: () => [p] })),
-    ...whole.map((w) => ({ key: `all:${w.company.key}`, add: () => w.rest.map((p) => byId.get(p.id)!) })),
+  const options: { key: string; people: Person[]; person?: Person; everyoneAt?: string }[] = [
+    ...matches.map((p) => ({ key: p.id, people: [p], person: p })),
+    ...whole.map((w) => ({ key: `all:${w.company.key}`, people: w.rest, everyoneAt: w.company.name })),
   ];
 
   const take = (index: number) => {
     const option = options[index];
     if (!option) return;
-    setChosen((list) => [...list, ...option.add().filter((p) => !list.some((one) => one.id === p.id)).map((p) => ({ ...p, copy: false }))]);
+    onAdd(option.people, copy);
     setQuery("");
     setHi(0);
   };
@@ -83,15 +134,15 @@ export function RecipientPicker({ companies, preselected = [], preselectedCopies
   return (
     <div ref={box}>
       <p className="mb-1.5 flex flex-wrap items-baseline gap-x-2">
-        <span className="stencil text-slate-500">{label}<span className="ml-0.5 text-red-500">*</span></span>
-        <span className="text-[11px] text-slate-400">type a name, a company or a job, then Enter — as many as needed</span>
+        <span className="stencil text-slate-500">{label}{required ? <span className="ml-0.5 text-red-500">*</span> : null}</span>
+        <span className="text-[11px] text-slate-400">{hint}</span>
       </p>
 
       <div className="relative">
         <div className="flex items-center gap-2">
           <Search className="h-3.5 w-3.5 shrink-0 text-slate-400" />
           <label className="min-w-0 flex-1">
-            <span className="sr-only">Find a person</span>
+            <span className="sr-only">{copy ? "Find somebody to copy in" : "Find a person"}</span>
             <input
               value={query}
               onChange={(e) => { setQuery(e.target.value); setOpen(true); setHi(0); }}
@@ -101,77 +152,55 @@ export function RecipientPicker({ companies, preselected = [], preselectedCopies
                 else if (e.key === "ArrowUp") { e.preventDefault(); setHi((n) => Math.max(n - 1, 0)); }
                 else if (e.key === "Enter") { e.preventDefault(); if (open && options.length) take(hi); }
                 else if (e.key === "Escape") setOpen(false);
-                else if (e.key === "Backspace" && !query && chosen.length) setChosen((list) => list.slice(0, -1));
+                else if (e.key === "Backspace" && !query && mine.length) onRemove(mine[mine.length - 1].id);
               }}
-              placeholder={chosen.length ? "Add another…" : "e.g. ou, electrical, Ferrand…"}
+              placeholder={mine.length ? "Add another…" : copy ? "Nobody copied in" : "e.g. ou, electrical, Ferrand…"}
               className="plain w-full py-1.5 text-[13px]"
               role="combobox"
               aria-expanded={open}
-              aria-controls="recipient-options"
+              aria-controls={listId}
               autoComplete="off"
             />
           </label>
         </div>
 
-        {open && (query || !chosen.length) ? (
-          <ul id="recipient-options" role="listbox" className="dt-menu absolute left-0 right-0 top-full z-30 mt-1 max-h-72 overflow-y-auto rounded-lg py-1">
+        {open && query ? (
+          <ul id={listId} role="listbox" className="dt-menu absolute left-0 right-0 top-full z-30 mt-1 max-h-72 overflow-y-auto rounded-lg py-1">
             {options.length === 0 ? (
               <li className="px-3 py-2 text-xs text-slate-400">Nobody matches that.</li>
-            ) : options.map((option, i) => {
-              const person = byId.get(option.key);
-              const group = whole.find((w) => `all:${w.company.key}` === option.key);
-              return (
-                <li
-                  key={option.key}
-                  role="option"
-                  aria-selected={i === hi}
-                  onMouseDown={(e) => { e.preventDefault(); take(i); }}
-                  onMouseEnter={() => setHi(i)}
-                  className={cn("flex cursor-pointer items-baseline gap-2 px-3 py-1.5 text-[13px]", i === hi ? "bg-tint text-slate-900" : "text-slate-700")}
-                >
-                  {person ? (
-                    <>
-                      <span className="font-medium">{person.name}</span>
-                      <span className="text-[11px] text-slate-400">{person.company}{person.job ? ` · ${person.job}` : ""}{person.offline ? " · not on this system" : ""}</span>
-                    </>
-                  ) : group ? (
-                    <span className="font-medium text-brand-ink">Everyone at {group.company.name} <span className="font-normal text-slate-400">({group.rest.length})</span></span>
-                  ) : null}
-                </li>
-              );
-            })}
+            ) : options.map((option, i) => (
+              <li
+                key={option.key}
+                role="option"
+                aria-selected={i === hi}
+                onMouseDown={(e) => { e.preventDefault(); take(i); }}
+                onMouseEnter={() => setHi(i)}
+                className={cn("flex cursor-pointer items-baseline gap-2 px-3 py-1.5 text-[13px]", i === hi ? "bg-tint text-slate-900" : "text-slate-700")}
+              >
+                {option.person ? (
+                  <>
+                    <span className="font-medium">{option.person.name}</span>
+                    <span className="text-[11px] text-slate-400">{option.person.company}{option.person.job ? ` · ${option.person.job}` : ""}{option.person.offline ? " · not on this system" : ""}</span>
+                  </>
+                ) : (
+                  <span className="font-medium text-brand-ink">Everyone at {option.everyoneAt} <span className="font-normal text-slate-400">({option.people.length})</span></span>
+                )}
+              </li>
+            ))}
           </ul>
         ) : null}
       </div>
 
-      {chosen.length ? (
-        <ul className="mt-3 divide-y divide-line rounded-lg border border-line">
-          {chosen.map((one) => (
+      {mine.length ? (
+        <ul className="mt-2.5 divide-y divide-line rounded-lg border border-line">
+          {mine.map((one) => (
             <li key={one.id} className="px-3 py-2">
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-                <input type="hidden" name={one.copy ? "copyUsers" : "recipientUsers"} value={one.id} />
+              <div className="flex items-center gap-3">
                 <span className="min-w-0 flex-1 text-[13px]">
                   <span className="font-medium text-slate-800">{one.name}</span>
                   <span className="text-slate-400"> &middot; {one.company}</span>
                 </span>
-                {/* Asked, or only kept informed. Said in a word, because it
-                    changes what the transmittal means for that person — and
-                    because "seen" is read from the first kind only. */}
-                <span className="seg p-0.5!" role="radiogroup" aria-label={`${one.name}: addressed or copied in`}>
-                  {([false, true] as const).map((copy) => (
-                    <button
-                      key={String(copy)}
-                      type="button"
-                      aria-current={one.copy === copy ? "page" : undefined}
-                      onClick={() => setChosen((list) => list.map((x) => (x.id === one.id ? { ...x, copy } : x)))}
-                      className="segment px-2! py-0.5! text-[11px]!"
-                      title={copy ? "Kept informed, never asked" : "Asked to do something with it; “seen” is read from these"}
-                    >
-                      {copy ? "Copy" : "Addressed"}
-                    </button>
-                  ))}
-                </span>
-                <button type="button" onClick={() => setChosen((list) => list.filter((x) => x.id !== one.id))} className="grid h-6 w-6 place-items-center rounded-md text-slate-400 hover:bg-tint-soft hover:text-slate-700" aria-label={`Remove ${one.name}`}>
+                <button type="button" onClick={() => onRemove(one.id)} className="grid h-6 w-6 place-items-center rounded-md text-slate-400 hover:bg-tint-soft hover:text-slate-700" aria-label={`Remove ${one.name}`}>
                   <X className="h-3.5 w-3.5" />
                 </button>
               </div>
