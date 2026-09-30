@@ -78,10 +78,11 @@ function main() {
   check("settings requires CONFIGURE", nav.includes("perms.canConfigure"));
 
   console.log("\nIt survives a narrow window\n");
-  check("sidebar hides below lg", nav.includes("hidden w-[268px]") && nav.includes("lg:flex"));
+  // 268px, the sidebar's width, as Tailwind names it: 67 steps of 4px.
+  check("sidebar hides below lg", nav.includes("hidden w-67") && nav.includes("lg:flex"));
   check("a drawer replaces it", nav.includes("MobileNav"));
   const layout = readFileSync(`${APP}/layout.tsx`, "utf-8");
-  check("content padding is responsive", layout.includes("lg:pl-[268px]"));
+  check("content padding is responsive", layout.includes("lg:pl-67"));
   check("header padding is responsive", /px-4[^"]*lg:px-\d/.test(layout));
   const css = readFileSync("src/app/globals.css", "utf-8");
   // A fixed page width once made every screen scroll sideways on a phone and
