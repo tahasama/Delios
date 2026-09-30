@@ -73,17 +73,84 @@ export async function GET(req: Request, { params }: { params: Promise<{ kind: st
     name = "review-approval-matrix";
   } else if (kind === "baseline") {
     // The actions somebody ticked, or all of them.
-    const ticked = (new URL(req.url).searchParams.get("ids") ?? "").split(",").map((one) => one.trim()).filter(Boolean);
+    const query = new URL(req.url).searchParams;
+    const ticked = (query.get("ids") ?? "").split(",").map((one) => one.trim()).filter(Boolean);
+    // An action's own sheet can tick documents rather than actions, and then the
+    // file holds those documents of that action.
+    const onlyDocs = new Set((query.get("docs") ?? "").split(",").map((one) => one.trim()).filter(Boolean));
     const actions = await db.action.findMany({
       where: ticked.length ? { id: { in: ticked } } : {},
       orderBy: { code: "asc" },
-      include: { entries: { include: { document: true } } },
+      include: {
+        entries: { where: onlyDocs.size ? { document: { docNumber: { in: [...onlyDocs] } } } : {}, include: { document: true } },
+        notes: { orderBy: { createdAt: "asc" } },
+      },
     });
-    rows = [["Action code", "Action", "Description", "Scheduled date", "Owner", "Departments", "Document number", "Required status", "Required by"]];
+    const now = Date.now();
+    /** The same six words the schedule uses, so a file and a screen agree. */
+    const state = (a: (typeof actions)[number]) => {
+      if (!a.entries.length) return "Nothing listed";
+      const met = a.metIssuedCount >= a.needCount && a.needCount > 0;
+      const past = !!a.scheduledDate && a.scheduledDate.getTime() < now;
+      if (met) {
+        if (!past) return "Ready";
+        return a.lastMetAt && a.scheduledDate && a.lastMetAt > a.scheduledDate ? "Late receipt" : "Done";
+      }
+      if (past) return "Overdue";
+      return a.nextNeededAt && a.nextNeededAt.getTime() - now <= 7 * 86_400_000 ? "At risk" : "Still ahead";
+    };
+    // Where each document's time went travels with it. The screen names the
+    // step that slipped; the file carries every checkpoint, because an audit
+    // asks what the other two were due and who owed them.
+    const { latenessOf } = await import("@/lib/action-lateness");
+    const lateness = new Map<string, Awaited<ReturnType<typeof latenessOf>>["rows"]>();
+    for (const a of actions) lateness.set(a.id, (await latenessOf(ctx, a.id)).rows);
+
+    rows = [[
+      "Action code", "Action", "Description", "Scheduled date", "Owner", "Departments", "State",
+      "Last document issued", "Decision", "Decision stood at", "Carried by", "Reason", "Delay owed by", "Delay reason",
+      "Document number", "Required status", "Required by",
+      "Delay source", "Delay source happened", "Delay source deadline", "Delay source due", "Delay source owed by",
+      "Sent for review at", "Submission due", "Sent for review owed by",
+      "Route steps",
+      "Released & issued at", "Day of the activity", "Release owed by",
+      "Still outstanding",
+    ]];
     for (const a of actions) {
-      const head = [a.code, a.name, a.description ?? "", a.scheduledDate?.toISOString().slice(0, 10) ?? "", a.ownerName ?? "", a.departments ?? ""];
-      if (!a.entries.length) rows.push([...head, "", "", ""]);
-      for (const e of a.entries) rows.push([...head, e.document.docNumber, e.requiredStatus, e.requiredBy.toISOString().slice(0, 10)]);
+      // What was decided about an action that went ahead without its documents
+      // travels with it: a row that says "late receipt" and nothing else is only
+      // half the record.
+      const note = a.notes[a.notes.length - 1] ?? null;
+      const head = [
+        a.code, a.name, a.description ?? "", a.scheduledDate?.toISOString().slice(0, 10) ?? "",
+        a.ownerName ?? "", a.departments ?? "", state(a), a.lastMetAt?.toISOString().slice(0, 10) ?? "",
+        note ? (note.decision === "CARRIED" ? "Carried out without all of its documents" : "Postponed") : "",
+        note?.plannedDate?.toISOString().slice(0, 10) ?? "",
+        note?.responsibleName ?? "", note?.reason ?? "", note?.delayResponsible ?? "", note?.delayReason ?? "",
+      ];
+      const day = (at: Date | null | undefined) => at?.toISOString().slice(0, 10) ?? "";
+      const chain = lateness.get(a.id) ?? [];
+      if (!a.entries.length) rows.push([...head, ...Array(16).fill("")]);
+      for (const e of a.entries) {
+        const row = chain.find((one) => one.docNumber === e.document.docNumber) ?? null;
+        const points = row?.checkpoints ?? [];
+        const first = points[0] ?? null;
+        const last = points.length > 1 ? points[points.length - 1] : null;
+        // Every step of the route in one cell, in order, because a column per
+        // step would change shape with every route.
+        const steps = points
+          .slice(1, -1)
+          .map((point) => `${point.name}: ${day(point.at) || "not yet"} (due ${day(point.due) || "no date"}, ${point.owedBy})`)
+          .join(" | ");
+        rows.push([
+          ...head, e.document.docNumber, e.requiredStatus, e.requiredBy.toISOString().slice(0, 10),
+          row?.cause?.name ?? "", day(row?.cause?.at), row?.cause?.deadline ?? "", day(row?.cause?.due), row?.cause?.owedBy ?? "",
+          day(first?.at), day(first?.due), first?.owedBy ?? "",
+          steps,
+          day(last?.at), day(last?.due), last?.owedBy ?? "",
+          row?.outstanding ? "yes" : "no",
+        ]);
+      }
     }
     name = "actions-baseline";
   } else if (kind === "packages") {

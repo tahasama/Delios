@@ -38,6 +38,7 @@ export const PROJECT_SCOPED = new Set([
   "IssueRequest",
   "ControlSetting",
   "DocumentAccess",
+  "ActionNote",
   "RegisterView",
   "NumberCounter",
   "Document",

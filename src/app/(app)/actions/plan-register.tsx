@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { ArrowDown, ArrowRight, ArrowUp, ArrowUpDown, CalendarRange, ChevronDown, ChevronLeft, ChevronRight, Download, Pin, PinOff, Rows3, Search, X } from "lucide-react";
 import { DataTable, Th, Td, Chip, Info } from "@/components/ui";
 import { DateWindow } from "@/components/date-window";
+import { CARD_KEY } from "@/components/card-height";
 
 /**
  * The schedule, asked about once and answered two ways.
@@ -25,7 +26,7 @@ export type PlanTableRow = {
   date: string | null;
   when: string;
   late: boolean;
-  readiness: "DONE" | "READY" | "AT_RISK" | "NOT_READY" | "UPCOMING" | "UNKNOWN";
+  readiness: "DONE" | "LATE_RECEIPT" | "READY" | "AT_RISK" | "NOT_READY" | "UPCOMING" | "UNKNOWN";
   ready: number;
   total: number;
   nextNeeded: string | null;
@@ -33,6 +34,9 @@ export type PlanTableRow = {
   missing: { docNumber: string; status: string }[];
   confirmed: string;
   confirmedTone: "good" | "bad" | "plain";
+  /** What became of the work itself, and what its documents were on the day. */
+  happened: "POSTPONED" | "CARRIED" | "DONE" | "AHEAD";
+  happenedNote: string;
 };
 
 type Opt = { code: string; label: string };
@@ -65,8 +69,8 @@ export function PlanRegister({
   };
   rows: PlanTableRow[];
   total: number;
-  filters: { q: string; state: string; discipline: string; docType: string; supplier: string; code: string; on: string; from: string; to: string };
-  filterOptions: { states: Opt[]; disciplines: Opt[]; types: Opt[]; suppliers: Opt[]; codes: Opt[]; dateFields: Opt[] };
+  filters: { q: string; state: string; happened: string; discipline: string; docType: string; supplier: string; code: string; on: string; from: string; to: string };
+  filterOptions: { states: Opt[]; happened: Opt[]; disciplines: Opt[]; types: Opt[]; suppliers: Opt[]; codes: Opt[]; dateFields: Opt[] };
   facets: { key: string; label: string; without: string }[];
   paging: { page: number; pages: number; perPage: number; sizes: number[]; from: number; to: number; query: string };
   sort?: { key: string; dir: "asc" | "desc" };
@@ -84,29 +88,33 @@ export function PlanRegister({
    * only one of the two is ever rendered.
    */
   const card = useRef<HTMLElement>(null);
-  const [planCard, setPlanCard] = useState<number | null>(null);
+  // Never nothing: the standard height until this browser has measured one.
+  const [planCard, setPlanCard] = useState<number>(cardHeight);
   useEffect(() => {
-    if (view !== "plan") {
-      try {
-        const kept = Number(localStorage.getItem(CARD_KEY));
-        if (kept > 0) setPlanCard(kept);
-      } catch {}
-      return;
-    }
+    try {
+      const kept = Number(localStorage.getItem(CARD_KEY));
+      // A kept number below the standard height was measured from a plan that
+      // had been narrowed. It is thrown away rather than used.
+      if (kept >= cardHeight) setPlanCard(kept);
+      else if (kept > 0) localStorage.removeItem(CARD_KEY);
+    } catch {}
+    if (view !== "plan") return;
     const measure = () => {
       const box = card.current;
       if (!box) return;
       const tall = box.getBoundingClientRect().height;
-      if (tall > 0) {
-        setPlanCard(tall);
-        try { localStorage.setItem(CARD_KEY, tall.toFixed(2)); } catch {}
-      }
+      // Only a plan drawing its full complement of bars says what a card is.
+      // A narrowed plan is shorter, and must not take every other register
+      // down with it — the number outlives the question that was asked.
+      if (tall < cardHeight) return;
+      setPlanCard(tall);
+      try { localStorage.setItem(CARD_KEY, tall.toFixed(2)); } catch {}
     };
     measure();
     const watch = new ResizeObserver(measure);
     if (card.current) watch.observe(card.current);
     return () => watch.disconnect();
-  }, [view, rows.length]);
+  }, [view, rows.length, cardHeight]);
 
   // The order somebody dragged their columns into is this browser's business.
   useEffect(() => {
@@ -147,8 +155,37 @@ export function PlanRegister({
     remember(next);
   };
 
-  const go = (href: string) => startTransition(() => router.replace(href, { scroll: false }));
+  /**
+   * Where the reader was when they asked. Narrowing is a question about what
+   * is already on the screen, so the page does not jump to the top to answer
+   * it — neither the window, nor the plan's own list inside the card.
+   */
+  const kept = useRef<{ page: number; list: number } | null>(null);
+  const go = (href: string) => {
+    kept.current = {
+      page: window.scrollY,
+      list: card.current?.querySelector<HTMLElement>(".scroll-quiet")?.scrollTop ?? 0,
+    };
+    startTransition(() => router.replace(href, { scroll: false }));
+  };
   const here = (params: URLSearchParams) => `/actions${params.size ? `?${params}` : ""}`;
+
+  useEffect(() => {
+    if (pending || !kept.current) return;
+    const { page, list } = kept.current;
+    kept.current = null;
+    window.scrollTo({ top: page });
+    const box = card.current?.querySelector<HTMLElement>(".scroll-quiet");
+    if (box) box.scrollTop = list;
+  }, [pending]);
+
+  /** The same question, narrowed to one state — or widened back. */
+  const stateHref = (code: string) => {
+    const params = new URLSearchParams(paging.query);
+    if (code) params.set("state", code); else params.delete("state");
+    params.delete("page");
+    return here(params);
+  };
 
   /** The same question, ordered by another column. */
   const sortHref = (key: string) => {
@@ -219,9 +256,10 @@ export function PlanRegister({
         </div>
 
         {/* Every narrowing on one line at the width this page is read at. */}
-        <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3.5 sm:grid-cols-3 lg:grid-cols-6">
+        <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3.5 sm:grid-cols-4 lg:grid-cols-7">
           <Narrow name="code" value={filters.code} empty="Action" options={filterOptions.codes} />
           <Narrow name="state" value={filters.state} empty="State" options={filterOptions.states} />
+          <Narrow name="happened" value={filters.happened} empty="What happened" options={filterOptions.happened} />
           <Narrow name="discipline" value={filters.discipline} empty="Discipline" options={filterOptions.disciplines} />
           <Narrow name="docType" value={filters.docType} empty="Type" options={filterOptions.types} />
           <Narrow name="supplier" value={filters.supplier} empty="Supplier" options={filterOptions.suppliers} />
@@ -268,7 +306,7 @@ export function PlanRegister({
       ref={card}
       data-dt-frame
       className={`register register-sheet ${view === "table" ? "flex flex-col" : ""}`}
-      style={view === "table" && planCard ? { height: planCard } : undefined}
+      style={view === "table" ? { height: planCard } : undefined}
     >
       {facets.length ? (
         <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2 sm:px-6">
@@ -304,17 +342,30 @@ export function PlanRegister({
               title="Each bar runs from the day the first document is needed to the day the work happens; the line is today. The colour says whether the register holds every document the action needs, released and at the status it asks for."
             >
               {([
-                ["bg-emerald-700", "done"],
-                ["bg-emerald-400", "ready"],
-                ["bg-sky-500", "ahead"],
-                ["bg-amber-500", "at risk"],
-                ["bg-red-500", "overdue"],
-              ] as const).map(([tone, word]) => (
-                <span key={word} className="inline-flex items-center gap-1.5">
-                  <span className={`h-1.5 w-3 rounded-full ${tone}`} />
-                  {word}
-                </span>
-              ))}
+                ["bg-emerald-700", "done", "DONE"],
+                ["bg-violet-400", "late receipt", "LATE_RECEIPT"],
+                ["bg-emerald-400", "ready", "READY"],
+                ["bg-sky-500", "ahead", "UPCOMING"],
+                ["bg-amber-500", "at risk", "AT_RISK"],
+                ["bg-red-500", "overdue", "NOT_READY"],
+              ] as const).map(([tone, word, code]) => {
+                const on = filters.state === code;
+                return (
+                  /* The key is the filter: a reader who has just understood
+                     what a colour means asks for that colour. */
+                  <button
+                    key={word}
+                    type="button"
+                    onClick={() => go(stateHref(on ? "" : code))}
+                    aria-pressed={on}
+                    title={on ? `Showing ${word} only. Click to show every state again.` : `Show ${word} only`}
+                    className={`inline-flex items-center gap-1.5 rounded-full px-1.5 py-0.5 transition-colors hover:bg-slate-100 hover:text-brand-ink ${on ? "bg-slate-100 font-semibold text-brand-ink" : ""}`}
+                  >
+                    <span className={`h-1.5 w-3 rounded-full ${tone}`} />
+                    {word}
+                  </button>
+                );
+              })}
             </span>
           </div>
 
@@ -397,8 +448,8 @@ export function PlanRegister({
                 className="rounded-none border-0 shadow-none"
                 defaultHidden={["Description", "Responsible", "Confirmed"]}
                 fill
-                stretch={!!planCard}
-                capHeight={planCard ?? cardHeight}
+                stretch
+                capHeight={planCard}
                 tools={
                   <a
                     href={selectedExportHref}
@@ -541,8 +592,6 @@ function PageStep({ onClick, disabled, label, children }: { onClick: () => void;
 /** Where this browser keeps the order its reader dragged the columns into. */
 const ORDER_KEY = "actions:columns";
 
-/** Where the plan's measured card height is kept for the table to match. */
-const CARD_KEY = "actions:card";
 
 /** Whether the reader keeps the action in view while scrolling sideways. */
 const FREEZE_KEY = "actions:freeze";
@@ -564,6 +613,7 @@ type Column = {
  */
 const RAIL: Record<PlanTableRow["readiness"], string> = {
   DONE: "rail-released",
+  LATE_RECEIPT: "rail-superseded",
   READY: "rail-released",
   UPCOMING: "rail-review",
   AT_RISK: "rail-prep",
@@ -573,11 +623,19 @@ const RAIL: Record<PlanTableRow["readiness"], string> = {
 
 const READINESS: Record<PlanTableRow["readiness"], { label: string; chip: string }> = {
   DONE: { label: "Done", chip: "bg-emerald-600/10 text-emerald-900 ring-emerald-300" },
+  LATE_RECEIPT: { label: "Late receipt", chip: "bg-violet-100 text-violet-800 ring-violet-300" },
   READY: { label: "Ready", chip: "bg-emerald-100 text-emerald-800 ring-emerald-200" },
   UPCOMING: { label: "Still ahead", chip: "bg-sky-100 text-sky-800 ring-sky-200" },
   AT_RISK: { label: "At risk", chip: "bg-amber-100 text-amber-800 ring-amber-200" },
   NOT_READY: { label: "Overdue", chip: "bg-red-100 text-red-800 ring-red-200" },
   UNKNOWN: { label: "Nothing listed", chip: "bg-slate-100 text-slate-600 ring-slate-200" },
+};
+
+const HAPPENED: Record<PlanTableRow["happened"], { label: string; chip: string }> = {
+  POSTPONED: { label: "Postponed", chip: "bg-slate-100 text-slate-700 ring-slate-300" },
+  CARRIED: { label: "Carried out", chip: "bg-amber-100 text-amber-900 ring-amber-300" },
+  DONE: { label: "Done", chip: "bg-emerald-600/10 text-emerald-900 ring-emerald-300" },
+  AHEAD: { label: "Not yet", chip: "bg-sky-50 text-sky-800 ring-sky-200" },
 };
 
 /** The columns, in the order they start in. */
@@ -591,17 +649,28 @@ const COLUMNS: Column[] = [
   },
   {
     key: "readiness", label: "State",
-    note: "Every state is about one thing: does the register hold a released revision of each listed document, at the status the action needs? Done — the day has passed and it did. Ready — the day is today or ahead and it does. Still ahead — the day is ahead and nothing is owed within the week. At risk — a document is owed within a week, or already. Overdue — the day has passed and something is still missing.",
+    note: "Every state is about one thing: does the register hold a released revision of each listed document, at the status the action needs? Done — the day has passed and it did, in time. Late receipt — everything arrived, but the last of it after the day of the work. Ready — the day is today or ahead and it does. Still ahead — the day is ahead and nothing is owed within the week. At risk — a document is owed within a week, or already. Overdue — the day has passed and something is still missing.",
     cellClass: "whitespace-nowrap",
     cell: (row) => <Chip className={READINESS[row.readiness].chip}>{READINESS[row.readiness].label}</Chip>,
+  },
+  {
+    key: "happened", label: "What happened",
+    note: "What became of the work, which is not the same question as whether its documents arrived. The day passing is the work happening — Postponed, and only Document Control writing that down, takes it back. Carried out means the day passed and it went ahead short of what it needed; Done means it had everything, in time.",
+    cellClass: "whitespace-nowrap",
+    cell: (row) => (
+      <span className="inline-flex flex-col items-start gap-1">
+        <Chip className={HAPPENED[row.happened].chip}>{HAPPENED[row.happened].label}</Chip>
+        <span className="text-[11px] text-slate-400">{row.happenedNote}</span>
+      </span>
+    ),
   },
   {
     key: "date", label: "Date", sort: "date",
     headClass: "text-right", cellClass: "whitespace-nowrap text-right text-xs tabular-nums",
     cell: (row) => row.date
       ? <>
-          <span className="text-sm font-medium text-slate-800">{row.date}</span>
-          <span className={`block font-sans text-[11px] ${row.late ? "font-semibold text-red-600" : "text-slate-400"}`}>{row.when}</span>
+          <span className="text-xs font-medium text-slate-800">{row.date}</span>
+          <span className={`block font-sans text-[11px] ${row.late ? "text-red-400" : "text-slate-400"}`}>{row.when}</span>
         </>
       : <span className="text-slate-300">—</span>,
   },
@@ -611,7 +680,7 @@ const COLUMNS: Column[] = [
     headClass: "text-right", cellClass: "whitespace-nowrap text-right",
     cell: (row) => row.total
       ? <span className="inline-flex flex-col items-end gap-1">
-          <span className="text-sm font-semibold tabular-nums text-slate-800">{row.ready}<span className="font-normal text-slate-400"> / {row.total}</span></span>
+          <span className="text-xs font-semibold tabular-nums text-slate-800">{row.ready}<span className="font-normal text-slate-400"> / {row.total}</span></span>
           <span className="h-1 w-14 overflow-hidden rounded-full bg-slate-100">
             <span
               className={`block h-full rounded-full ${row.ready === row.total ? "bg-emerald-500" : row.ready ? "bg-amber-500" : "bg-red-400"}`}

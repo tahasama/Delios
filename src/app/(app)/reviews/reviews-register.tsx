@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, Download, Pin, PinOff, Search, X } from "lucide-react";
 import { DataTable, Th, Td, Chip, Info } from "@/components/ui";
+import { useCardHeight } from "@/components/card-height";
 import { DateWindow } from "@/components/date-window";
 
 /**
@@ -60,6 +61,8 @@ export function ReviewsRegister({ plate, rows, total, filters, filterOptions, fa
   exportHref: string;
 }) {
   const router = useRouter();
+  // Every register is the height the schedule's plan set.
+  const cardHeight = useCardHeight();
   const [pending, startTransition] = useTransition();
   const [selected, setSelected] = useState<string[]>([]);
   const [allMatching, setAllMatching] = useState(false);
@@ -181,7 +184,11 @@ export function ReviewsRegister({ plate, rows, total, filters, filterOptions, fa
       </form>
     </section>
 
-    <section data-dt-frame className="register register-sheet">
+    <section
+      data-dt-frame
+      className={`register register-sheet ${cardHeight ? "flex flex-col" : ""}`}
+      style={cardHeight ? { height: cardHeight } : undefined}
+    >
       {facets.length ? (
         <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2 sm:px-6">
           <span className="stencil mr-1 text-slate-400">Showing</span>
@@ -219,13 +226,14 @@ export function ReviewsRegister({ plate, rows, total, filters, filterOptions, fa
         </div>
       ) : null}
 
-      <div className={pending ? "opacity-60 transition-opacity" : "transition-opacity"}>
+      <div className={`${cardHeight ? "flex min-h-0 flex-1 flex-col" : ""} ${pending ? "opacity-60 transition-opacity" : "transition-opacity"}`}>
         {rows.length ? (
           <DataTable
             id="reviews"
             className="rounded-none border-0 shadow-none"
             defaultHidden={["Opened by", "Closed", "Produced by", "Contract", "Type"]}
             fill
+            stretch={!!cardHeight}
             tools={
               <a
                 href={selectedExportHref}

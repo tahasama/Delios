@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, ChevronUp, Columns3, GripVertical, RotateCcw, Check } from "lucide-react";
+import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 
 /**
@@ -122,6 +123,25 @@ export function DataTable({
   /** The row the dragged column would land on, so the drop is shown before it happens. */
   const [over, setOver] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const menuPanel = useRef<HTMLDivElement>(null);
+  /**
+   * Where the menu hangs. A table that fills a card sits inside something that
+   * clips what leaves it, so the menu is placed against the window rather than
+   * against the card, and is given the room that is actually below the button.
+   */
+  const menuButton = useRef<HTMLButtonElement>(null);
+  const [menuAt, setMenuAt] = useState<{ top: number; right: number; maxHeight: number } | null>(null);
+
+  /** Where the menu would hang from the button, in page coordinates. */
+  const placeMenu = useCallback(() => {
+    const box = menuButton.current?.getBoundingClientRect();
+    if (!box) return null;
+    return {
+      top: box.bottom + window.scrollY + 6,
+      right: Math.max(document.documentElement.clientWidth - box.right, 8),
+      maxHeight: Math.max(window.innerHeight - box.bottom - 24, 200),
+    };
+  }, []);
   const key = id ?? labels.join("|");
   const hiddenKey = (defaultHidden ?? []).join("|");
   const base = useMemo<Prefs>(() => ({ ...EMPTY, hidden: hiddenKey ? hiddenKey.split("|") : [] }), [hiddenKey]);
@@ -153,9 +173,30 @@ export function DataTable({
     [key, base],
   );
 
+  // A panel that hangs off the page follows the page, so it is closed when the
+  // ground moves under it rather than chasing it frame by frame.
   useEffect(() => {
     if (!menu) return;
-    const close = (e: MouseEvent) => { if (!menuRef.current?.contains(e.target as Node)) setMenu(false); };
+    const shut = () => setMenu(false);
+    const away = (event: Event) => {
+      // Scrolling inside the menu is not the ground moving under it.
+      if (menuPanel.current?.contains(event.target as Node)) return;
+      shut();
+    };
+    window.addEventListener("resize", shut);
+    window.addEventListener("scroll", away, true);
+    return () => {
+      window.removeEventListener("resize", shut);
+      window.removeEventListener("scroll", away, true);
+    };
+  }, [menu]);
+
+  useEffect(() => {
+    if (!menu) return;
+    const close = (e: MouseEvent) => {
+      const at = e.target as Node;
+      if (!menuRef.current?.contains(at) && !menuPanel.current?.contains(at)) setMenu(false);
+    };
     const esc = (e: KeyboardEvent) => { if (e.key === "Escape") setMenu(false); };
     document.addEventListener("mousedown", close);
     document.addEventListener("keydown", esc);
@@ -290,16 +331,28 @@ export function DataTable({
             {tools}
 
             <div className="relative" ref={menuRef}>
-              <button type="button" onClick={() => setMenu((m) => !m)} className="dt-tool" aria-expanded={menu} aria-haspopup="true">
+              <button
+                ref={menuButton}
+                type="button"
+                onClick={() => setMenu((open) => { if (!open) setMenuAt(placeMenu()); return !open; })}
+                className="dt-tool"
+                aria-expanded={menu}
+                aria-haspopup="true"
+              >
                 <Columns3 className="h-3.5 w-3.5" /> Columns{shown < hideable.length ? ` ${shown}/${hideable.length}` : ""}
               </button>
-              {menu ? (
-                <div className="dt-menu absolute right-0 top-full z-30 mt-1 w-60 rounded-xl p-1.5" role="menu">
+              {menu && menuAt ? createPortal(
+                <div
+                  ref={menuPanel}
+                  className="dt-menu scroll-thin absolute z-50 w-60 overflow-y-auto overscroll-contain rounded-xl p-1.5"
+                  role="menu"
+                  style={{ top: menuAt.top, right: menuAt.right, maxHeight: menuAt.maxHeight }}
+                >
                   <p className="flex items-center justify-between px-2.5 pb-1 pt-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">
                     Show columns
                     {onReorder ? <span className="font-medium normal-case tracking-normal text-slate-400">{dragging ? `Moving ${dragging}` : "drag to reorder"}</span> : null}
                   </p>
-                  <div className="scroll-thin max-h-[min(60vh,28rem)] overflow-y-auto">
+                  <div>
                     {hideable.map((l) => {
                       const on = !prefs.hidden.includes(l);
                       const last = on && shown === 1;
@@ -360,7 +413,8 @@ export function DataTable({
                     </button>
                   ) : null}
                   <p className="border-t border-slate-100 px-2.5 pb-1 pt-2 text-[10px] leading-4 text-slate-400">Drag a column edge to resize it; double-click the edge to reset.{onMove ? " Drag a row here to move a column, or step it with the arrows." : ""}</p>
-                </div>
+                </div>,
+                document.body,
               ) : null}
             </div>
           </div>

@@ -22,7 +22,7 @@ export async function restateAction(t: Tenant, actionId: string): Promise<void> 
   if (!entries.length) {
     await t.db.action.update({
       where: { id: actionId },
-      data: { needCount: 0, metIssuedCount: 0, metStatusCount: 0, nextNeededAt: null },
+      data: { needCount: 0, metIssuedCount: 0, metStatusCount: 0, nextNeededAt: null, lastMetAt: null },
     });
     return;
   }
@@ -35,25 +35,37 @@ export async function restateAction(t: Tenant, actionId: string): Promise<void> 
       // The register already keeps what the newest revision says; the released
       // one is asked for beside it.
       latestStatusCode: true,
-      revisions: { where: { state: "RELEASED" }, orderBy: { releasedAt: "desc" }, take: 1, select: { statusCode: true } },
+      revisions: { where: { state: "RELEASED" }, orderBy: { releasedAt: "desc" }, take: 1, select: { statusCode: true, issuedAt: true, releasedAt: true } },
     },
   });
   const released = new Map(documents.map((one) => [one.id, one.revisions[0]?.statusCode ?? null]));
+  const arrived = new Map(documents.map((one) => [one.id, one.revisions[0]?.issuedAt ?? one.revisions[0]?.releasedAt ?? null]));
   const carried = new Map(documents.map((one) => [one.id, one.latestStatusCode]));
 
   let metIssued = 0;
   let metStatus = 0;
   let next: Date | null = null;
+  // The last of them to arrive: what says whether they were there in time.
+  let last: Date | null = null;
   for (const entry of entries) {
     const issued = released.get(entry.documentId) === entry.requiredStatus;
-    if (issued) metIssued++;
-    else if (!next || entry.requiredBy < next) next = entry.requiredBy;
+    if (issued) {
+      metIssued++;
+      const at = arrived.get(entry.documentId) ?? null;
+      if (at && (!last || at > last)) last = at;
+    } else if (!next || entry.requiredBy < next) next = entry.requiredBy;
     if (carried.get(entry.documentId) === entry.requiredStatus) metStatus++;
   }
 
   await t.db.action.update({
     where: { id: actionId },
-    data: { needCount: entries.length, metIssuedCount: metIssued, metStatusCount: metStatus, nextNeededAt: next },
+    data: {
+      needCount: entries.length,
+      metIssuedCount: metIssued,
+      metStatusCount: metStatus,
+      nextNeededAt: next,
+      lastMetAt: metIssued === entries.length ? last : null,
+    },
   });
 }
 

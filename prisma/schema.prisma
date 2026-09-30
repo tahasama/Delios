@@ -64,6 +64,7 @@ model Project {
   delegations            Delegation[]
   documentAccess         DocumentAccess[]
   controlSettings        ControlSetting[]
+  actionNotes            ActionNote[]
   numberCounters         NumberCounter[]
   documents              Document[]
   revisions              Revision[]
@@ -943,6 +944,11 @@ model Action {
   metStatusCount     Int                     @default(0)
   // The earliest day a document still missing is owed.
   nextNeededAt       DateTime?
+  // The day the last of the documents it needs was released and issued. Later
+  // than the action's own date, and the documents arrived after the work: that
+  // is a late receipt, and it is never the same thing as done.
+  lastMetAt          DateTime?
+  notes              ActionNote[]
   createdAt          DateTime                @default(now())
   entries            BaselineEntry[]
   scheduleActivities ScheduleActivity[]
@@ -981,6 +987,39 @@ model BaselineEntry {
   @@unique([projectId, actionId, documentId])
   @@index([documentId])
   @@index([projectId])
+}
+
+/**
+ * What was decided about an action that did not have its documents.
+ *
+ * The work either went ahead without them or was stopped for want of them, and
+ * either way somebody owns that decision and somebody owns the delay behind it.
+ * The note carries the day the action was supposed to happen, frozen, because a
+ * later schedule moves the date and would otherwise erase what was agreed. It
+ * is written once and kept forever: it exists to be read by an audit.
+ */
+model ActionNote {
+  id                String   @id @default(cuid())
+  projectId         String
+  project           Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  actionId          String
+  action            Action   @relation(fields: [actionId], references: [id], onDelete: Cascade)
+  /** CARRIED — it went ahead anyway. STOPPED — it did not. */
+  decision          String
+  /** The day the action stood at when this was written. */
+  plannedDate       DateTime?
+  /** Who carries the decision: the project or construction manager the action names. */
+  responsibleName   String
+  reason            String
+  /** Who the delay is owed by, and what they say about it. */
+  delayResponsible  String?
+  delayReason       String?
+  recordedById      String
+  recordedByName    String
+  createdAt         DateTime @default(now())
+
+  @@index([projectId])
+  @@index([actionId])
 }
 
 // Document Control asks each department concerned by the schedule for the

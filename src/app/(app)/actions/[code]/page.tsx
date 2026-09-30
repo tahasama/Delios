@@ -1,8 +1,12 @@
+import { ActionNotes } from "./lateness";
+import { NeededTable, type NeededRow } from "./needed-table";
+import { latenessOf } from "@/lib/action-lateness";
+import { carrierRefusal } from "@/lib/control-activities";
 import { readyReading, countingRevision, meetsRequirement } from "@/lib/readiness";
 import Link from "next/link";
 import { requireScope } from "@/lib/scope";
 import { notFound } from "next/navigation";
-import { PageHeader, Card, Chip, DataTable, Th, Td, Banner, inputCls, btn } from "@/components/ui";
+import { Card, Chip, Banner } from "@/components/ui";
 import { ActionForm } from "@/components/form";
 import { confirmReadinessAction } from "@/lib/actions/requirements";
 import { clearance } from "@/lib/requirements-process";
@@ -32,6 +36,7 @@ export default async function ActionDetailPage({ params, searchParams }: { param
       entries: { include: { document: { include: { revisions: countingRevision(reading) } } } , orderBy: [{ department: "asc" }, { requiredBy: "asc" }] },
       scheduleActivities: { include: { scheduleVersion: true }, orderBy: { scheduleVersion: { importedAt: "desc" } }, take: 1 },
       confirmations: true,
+      notes: { orderBy: { createdAt: "desc" } },
     },
   });
   if (!action) notFound();
@@ -54,11 +59,27 @@ export default async function ActionDetailPage({ params, searchParams }: { param
   // Confirmation opens with the review window: from submit-by to the activity.
   const confirmOpens = action.scheduledDate ? daysBefore(action.scheduledDate, DEFAULT_LEAD_DAYS) : null;
   const entries = dept ? action.entries.filter((e) => e.department === dept) : action.entries;
+  // Which of the three moments slipped, for each document, and who writes the
+  // note about what was decided.
+  const lateness = await latenessOf(ctx, action.id);
+  const mayNote = !(await carrierRefusal(ctx, "ACTION_NOTE", { control, standing: true }));
+  // Where the time went, and what was decided about work that went ahead
+  // without its documents, are not questions worth asking of an action that has
+  // neither a slip nor a note.
+  const tellsSomething = lateness.rows.some((row) => row.cause || row.outstanding) || action.notes.length > 0;
   const readyCount = action.entries.filter((e) => meetsRequirement(e.document.revisions, e.requiredStatus)).length;
   const overdue = action.scheduledDate && new Date(action.scheduledDate) < new Date();
   // The earliest date a document is owed: where the activity's own clock starts.
   const firstDue = action.entries.map((e) => e.requiredBy).filter(Boolean).sort((a, b) => a.getTime() - b.getTime())[0] ?? null;
-  const readiness = action.entries.length === 0 ? "UNKNOWN" : readyCount === action.entries.length ? "READY" : overdue ? "NOT_READY" : "AT_RISK";
+  // The same six states the schedule uses, said the same way here. Done means
+  // the documents were there in time; late receipt means they came afterwards.
+  const everything = action.entries.length > 0 && readyCount === action.entries.length;
+  const afterwards = !!action.lastMetAt && !!action.scheduledDate && action.lastMetAt > action.scheduledDate;
+  const readiness = action.entries.length === 0
+    ? "UNKNOWN"
+    : everything
+      ? (overdue ? (afterwards ? "LATE_RECEIPT" : "DONE") : "READY")
+      : overdue ? "NOT_READY" : "AT_RISK";
   // Who is short, and the transmittal that tells them — the placeholder numbers
   // are named in it, and the sender adds anyone else who should see it.
   const short = shortfall(action).filter((s) => depts.includes(s.department));
@@ -75,155 +96,217 @@ export default async function ActionDetailPage({ params, searchParams }: { param
     ].join("\n\n"),
   })}`;
 
+  // The work is taken to have happened once its day has passed — that is what
+  // a schedule is — unless Document Control wrote down that it was postponed.
+  const postponed = action.notes.find((note) => note.decision === "STOPPED") ?? null;
+  const happened = !postponed && !!action.scheduledDate && action.scheduledDate.getTime() < Date.now();
+
+  // One row per required document: what it is, whether it is there, and the
+  // step where its time went. Dates are written here so the table stays a
+  // client component without carrying Date objects across.
+  const delayOf = new Map(lateness.rows.map((row) => [row.docNumber, row]));
+  const needed: NeededRow[] = entries.map((e) => {
+    const cur = e.document.revisions[0];
+    const ready = meetsRequirement(e.document.revisions, e.requiredStatus);
+    const slip = delayOf.get(e.document.docNumber) ?? null;
+    return {
+      id: e.id,
+      documentId: e.documentId,
+      docNumber: e.document.docNumber,
+      title: e.document.title,
+      discipline: deptLabel(e.department),
+      from: partyLabel(e.submittedBy ?? e.document.originator),
+      approvedBy: fnLabel(e.approvedBy),
+      requiredStatus: e.requiredStatus,
+      submitBy: fmtDate(e.requiredBy),
+      submitBySort: e.requiredBy.getTime(),
+      submitNote: e.manualDate ? "fixed date" : `${e.leadBusinessDays ?? DEFAULT_LEAD_DAYS} days before`,
+      has: cur ? `rev ${cur.value} \u00b7 ${cur.statusCode}` : e.document.isPlaceholder ? "not started" : "not released",
+      ready,
+      late: !ready && e.requiredBy < new Date(),
+      outstanding: !!slip?.outstanding,
+      source: slip?.cause?.name ?? null,
+      sourceAt: slip?.cause?.at ? fmtDate(slip.cause.at) : null,
+      sourceAtSort: slip?.cause?.at ? slip.cause.at.getTime() : null,
+      deadline: slip?.cause?.deadline ?? null,
+      due: slip?.cause?.due ? fmtDate(slip.cause.due) : null,
+      dueSort: slip?.cause?.due ? slip.cause.due.getTime() : null,
+      owedBy: slip?.cause?.owedBy ?? slip?.checkpoints.at(-1)?.owedBy ?? null,
+      chain: (slip?.checkpoints ?? []).map((point) => ({
+        name: point.name,
+        deadline: point.deadline,
+        at: point.at ? fmtDate(point.at) : null,
+        atSort: point.at ? point.at.getTime() : null,
+        due: point.due ? fmtDate(point.due) : null,
+        late: point.late,
+        owedBy: point.owedBy,
+      })),
+    };
+  });
+
   return (
     <div className="space-y-4">
-      <PageHeader
-        title={`${action.code} — ${action.name}`}
-        subtitle={`${action.ownerName ?? "No owner"} · activity ${fmtDate(action.scheduledDate)} · ${readyCount} of ${action.entries.length} documents ready${action.scheduleActivities[0] ? ` · schedule ${action.scheduleActivities[0].scheduleVersion.versionLabel}` : ""}`}
-        actions={<><Link href="/actions" className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-semibold text-slate-500 hover:bg-slate-100"><ArrowLeft className="h-4 w-4" /> Schedule</Link><ReadinessChip readiness={readiness} /></>}
+      {/* The name of the activity, what it is asking of the reader, and the
+          narrowing — one sheet, because they are read in that order and then
+          answered in the table under them. */}
+      <NeededTable
+        rows={needed}
+        exportHref={`/api/export/baseline?ids=${action.id}`}
+        empty={depts.length ? undefined : "Tag the disciplines first."}
+        link={control && depts.length ? <Link href="/actions/requirements" className="text-xs font-semibold text-link hover:underline">Requirements &rarr;</Link> : undefined}
+        chips={depts.length > 1 ? (
+          <>
+            <Link href={`/actions/${action.code}`} className={`facet ${!dept ? "font-semibold text-brand-ink" : ""}`}>All</Link>
+            {depts.map((d) => (
+              <Link key={d} href={`/actions/${action.code}?dept=${d}`} className={`facet ${dept === d ? "font-semibold text-brand-ink" : ""}`}>
+                <span className="font-medium">{deptLabel(d)}</span>
+                <span className="font-mono tabular-nums">{action.entries.filter((e) => e.department === d).length}</span>
+              </Link>
+            ))}
+          </>
+        ) : undefined}
+        plate={
+          <div className="flex flex-wrap items-start justify-between gap-3 border-b border-line px-5 pt-6 pb-3 sm:px-6">
+            <div className="min-w-0">
+              <h1 className="plate-name min-w-0">
+                <span className="font-mono text-[0.8em] font-medium tracking-tight text-slate-400">{action.code}</span>{" "}
+                {action.name}
+              </h1>
+              <p className="plate-meta mt-1.5">
+                {action.ownerName ?? "No owner"} &middot; activity {fmtDate(action.scheduledDate)} &middot; {readyCount} of {action.entries.length} documents ready
+                {action.scheduleActivities[0] ? ` \u00b7 schedule ${action.scheduleActivities[0].scheduleVersion.versionLabel}` : ""}
+              </p>
+              <p className="mt-1 max-w-2xl text-[11.5px] leading-4 text-slate-400">
+                Check your documents in the table below, and confirm your discipline&rsquo;s documents are available at the bottom of this page.
+              </p>
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
+              <Link href="/actions" className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-semibold text-slate-500 hover:bg-slate-100"><ArrowLeft className="h-4 w-4" /> Schedule</Link>
+              <ReadinessChip readiness={readiness} />
+            </div>
+          </div>
+        }
       />
 
-      <Card
-        title="Departments concerned"
-        actions={control ? <Link href="/actions/requirements" className="text-xs font-semibold text-link hover:underline">Requirements →</Link> : undefined}
-      >
-        {depts.length ? (
-          <>
-            <div className="flex flex-wrap gap-1.5">{depts.map((d) => <Chip key={d} className="bg-tint text-brand-ink ring-link/30">{deptLabel(d)}</Chip>)}</div>
-            {short.length ? (
-              <div className="mt-3 rounded-xl bg-amber-50 p-3 ring-1 ring-amber-200">
-                <p className="text-xs font-semibold text-amber-900">
-                  {readiness === "NOT_READY" ? "Overdue" : "At risk"} — {short.map((s) => `${deptLabel(s.department)} ${s.missing} of ${s.total} missing`).join(", ")}
-                </p>
-                <p className="mt-1 text-[11px] text-amber-900/80">
-                  {action.riskNotifiedAt
-                    ? `Everyone in ${depts.map(deptLabel).join(", ")} was warned automatically on ${fmtDate(action.riskNotifiedAt)}. Send the next reminder yourself, as a transmittal.`
-                    : "The first warning goes out on its own the next time this page is refreshed. You can also send one now."}
-                </p>
-                {control ? (
-                  <p className="mt-2 flex flex-wrap items-center gap-3">
-                    <Link href={remindHref} className={btn("primary", "sm")}>Notify by transmittal</Link>
-                    {/* Where the proof lives: every warning sent is an audit event. */}
-                    {admin ? (
-                      <Link href={`/admin/audit?q=${encodeURIComponent(action.code)}`} className="text-[11px] font-semibold text-amber-900 underline">
-                        Every notice sent for {action.code} →
-                      </Link>
-                    ) : null}
-                  </p>
-                ) : null}
-              </div>
+      {/* Who is concerned and what was decided, with the progress beside them. */}
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_280px]">
+        <div className="space-y-4">
+        <section id="confirm" className="register register-sheet register-sheet-open">
+          <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2 sm:px-6">
+            <span className="stencil mr-1 text-slate-400">Disciplines concerned</span>
+            {depts.length ? (
+              <span className="text-[11px] text-slate-400">
+                {clear.cleared
+                  ? "every discipline has confirmed its documents are available"
+                  : `each confirms its documents are available${confirmOpens ? ` — from ${fmtDate(confirmOpens)}` : ""}`}
+              </span>
             ) : null}
-          </>
-        ) : (
-          <Banner tone="warn" title="Needs departments">The project manager tags this activity in the departments list. Until then its documents cannot be asked for.</Banner>
-        )}
-      </Card>
-
-      {/* The same progress line as a review: what has happened, and what is next. */}
-      <Card title="Progress">
-        <Timeline
-          points={[
-            { label: "Departments tagged", at: depts.length ? action.createdAt : null, holder: depts.length ? depts.map(deptLabel).join(", ") : "nobody yet" },
-            { label: "Documents listed", at: action.entries.length ? action.entries[0].createdAt : null, holder: action.entries.length ? `${action.entries.length} document${action.entries.length === 1 ? "" : "s"}` : "none listed" },
-            { label: "First document due", at: firstDue, holder: firstDue && firstDue < new Date() ? "that date has passed" : null },
-            ...(action.riskNotifiedAt ? [{ label: "Departments warned automatically", at: action.riskNotifiedAt, holder: depts.map(deptLabel).join(", ") }] : []),
-            { label: "Every document ready", at: action.entries.length && readyCount === action.entries.length ? action.scheduledDate : null, holder: `${readyCount} of ${action.entries.length} ready` },
-            { label: "Departments confirmed", at: clear.cleared ? action.confirmations.map((c) => c.confirmedAt).filter(Boolean).sort((x, y) => y!.getTime() - x!.getTime())[0] ?? null : null, holder: `${clear.confirmed.length} of ${clear.depts.length}` },
-            { label: "The work happens", at: null, holder: action.scheduledDate ? fmtDate(action.scheduledDate) : "no date" },
-          ]}
-        />
-      </Card>
-
-      {/* Steps 3–5 — the approved requirements, by department */}
-      <Card
-        title={`Documents needed · ${action.entries.length}`}
-        actions={control && depts.length ? <Link href="/actions/requirements" className="text-xs font-semibold text-link hover:underline">Requirements →</Link> : undefined}
-      >
-        {depts.length > 1 ? (
-          <div className="mb-3 flex flex-wrap gap-1.5 text-xs">
-            <Link href={`/actions/${action.code}`} className={`rounded-full px-2.5 py-1 ${!dept ? "bg-brand text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>All</Link>
-            {depts.map((d) => <Link key={d} href={`/actions/${action.code}?dept=${d}`} className={`rounded-full px-2.5 py-1 ${dept === d ? "bg-brand text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>{deptLabel(d)} ({action.entries.filter((e) => e.department === d).length})</Link>)}
+            {control ? <Link href="/actions/requirements" className="ml-auto text-[11px] font-semibold text-link hover:underline">Requirements &rarr;</Link> : null}
           </div>
-        ) : null}
-        {entries.length ? (
-          <DataTable head={<tr><Th>Document</Th><Th>Department</Th><Th>From</Th><Th>Approved by</Th><Th>Needed at</Th><Th>Submit by</Th><Th>Has</Th><Th>Ready</Th></tr>}>
-            {entries.map((e) => {
-              const cur = e.document.revisions[0];
-              const ready = meetsRequirement(e.document.revisions, e.requiredStatus);
-              const late = !ready && e.requiredBy < new Date();
-              return (
-                <tr key={e.id}>
-                  <Td><Link href={`/documents/${e.documentId}`} className="font-mono text-[13px] font-semibold text-brand-ink hover:underline">{e.document.docNumber}</Link><span className="block max-w-64 truncate text-xs text-slate-400">{e.document.title}</span></Td>
-                  <Td className="text-xs">{deptLabel(e.department)}</Td>
-                  <Td className="text-xs">{partyLabel(e.submittedBy ?? e.document.originator)}</Td>
-                  <Td className="text-xs">{fnLabel(e.approvedBy)}</Td>
-                  <Td className="text-xs">{e.requiredStatus}</Td>
-                  <Td className="whitespace-nowrap text-xs">
-                    <span className={late ? "font-semibold text-red-700" : ""}>{fmtDate(e.requiredBy)}</span>
-                    <span className="block text-[10px] text-slate-400">{e.manualDate ? "fixed date" : `${e.leadBusinessDays ?? DEFAULT_LEAD_DAYS} days before`}</span>
-                  </Td>
-                  <Td className="text-xs">{cur ? `rev ${cur.value} · ${cur.statusCode}` : e.document.isPlaceholder ? "not started" : "not released"}</Td>
-                  <Td>{ready ? <Chip className="bg-emerald-100 text-emerald-800 ring-emerald-300">yes</Chip> : <Chip className={late ? "bg-red-100 text-red-800 ring-red-300" : "bg-amber-100 text-amber-800 ring-amber-300"}>{late ? "late" : "no"}</Chip>}</Td>
-                </tr>
-              );
-            })}
-          </DataTable>
-        ) : (
-          <p className="text-xs text-slate-400">{depts.length ? "No documents listed yet. Each department answers Document Control\u2019s call; the answers become the approved requirements list." : "Tag the departments first."}</p>
-        )}
-      </Card>
-
-      {/* Before the activity — each department confirms */}
-      {depts.length ? (
-        <Card
-          id="confirm"
-          title={clear.cleared ? "Cleared to proceed" : "Confirm before the activity"}
-          description={clear.cleared ? "Every department has confirmed its documents are available." : `Each department confirms its documents are available${confirmOpens ? ` — from ${fmtDate(confirmOpens)}` : ""}.`}
-        >
-          <ul className="divide-y divide-slate-100">
-            {depts.map((d) => {
-              const c = action.confirmations.find((x) => x.department === d);
-              const mine = me?.department === d || control;
-              // Requirements listed before departments existed count against every department.
-              const deptEntries = action.entries.filter((e) => e.department === d || !e.department);
-              const missing = deptEntries.filter((e) => !meetsRequirement(e.document.revisions, e.requiredStatus));
-              return (
-                <li key={d} className="flex flex-wrap items-start justify-between gap-3 py-2.5">
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-slate-800">{deptLabel(d)} <span className="text-xs font-normal text-slate-400">· {deptEntries.length - missing.length} of {deptEntries.length} ready</span></p>
-                    {c ? (
-                      <p className={`text-xs ${c.available ? "text-emerald-700" : "text-red-700"}`}>
-                        {c.available ? "Available" : "Not available"} — {c.confirmedByName}, {fmtDate(c.confirmedAt)}{c.note ? ` · ${c.note}` : ""}
+          {depts.length ? (
+            <ul className="divide-y divide-line">
+              {depts.map((d) => {
+                const c = action.confirmations.find((x) => x.department === d);
+                const mine = me?.department === d || control;
+                // Requirements listed before departments existed count against every one.
+                const deptEntries = action.entries.filter((e) => e.department === d || !e.department);
+                const missing = deptEntries.filter((e) => !meetsRequirement(e.document.revisions, e.requiredStatus));
+                const owes = short.find((one) => one.department === d);
+                return (
+                  <li key={d} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 sm:px-6">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-slate-800">
+                        {deptLabel(d)}
+                        <span className="ml-1.5 text-xs font-normal text-slate-400">· {deptEntries.length - missing.length} of {deptEntries.length} ready</span>
                       </p>
-                    ) : <p className="text-xs text-slate-400">Not confirmed</p>}
-                  </div>
-                  {mine && (!confirmOpens || confirmOpens.getTime() <= Date.now()) ? (
-                    <details className="text-xs" open={!c && me?.department === d}>
-                      <summary className="cursor-pointer text-xs font-semibold text-link">{c ? "Confirm again" : "Confirm"}</summary>
-                      <div className="mt-2 w-72">
-                        <ActionForm action={confirmReadinessAction} submitLabel="Record" size="sm" hidden={{ actionId: action.id, department: d }}>
-                          <label className="flex items-center gap-2"><input type="radio" name="available" value="yes" defaultChecked={!missing.length} /> Documents available</label>
-                          <label className="flex items-center gap-2"><input type="radio" name="available" value="no" defaultChecked={!!missing.length} /> Not available</label>
-                          <input name="note" className={inputCls} placeholder={missing.length ? `${missing.length} not ready — say what and why` : "Note (optional)"} />
+                      {c ? (
+                        <p className={`text-[11px] ${c.available ? "text-emerald-700" : "text-red-700"}`}>
+                          {c.available ? "Available" : "Not available"} — {c.confirmedByName}, {fmtDate(c.confirmedAt)}{c.note ? ` · ${c.note}` : ""}
+                        </p>
+                      ) : <p className="text-[11px] text-slate-400">Not confirmed</p>}
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      {owes && control ? (
+                        <Link href={remindHref} className="text-xs font-semibold text-link hover:underline">Notify</Link>
+                      ) : null}
+                    </div>
+                    {mine && (!confirmOpens || confirmOpens.getTime() <= Date.now()) ? (
+                      /* Answered the way the sheet asks everything else: plain
+                         fields on one line, and one button. */
+                      <details className="w-full text-xs">
+                        <summary className="cursor-pointer text-xs font-semibold text-link">{c ? "Confirm again" : "Confirm"}</summary>
+                        <ActionForm action={confirmReadinessAction} hideSubmit hidden={{ actionId: action.id, department: d }}>
+                          <div className="asking mt-2.5 grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-[auto_minmax(0,1fr)_auto]">
+                            {/* Ticked is available; left untouched says the
+                                documents are not there, and then the note is
+                                what Document Control is alerted with. */}
+                            <label className="flex min-w-0 items-center gap-2 whitespace-nowrap text-xs font-medium text-slate-700">
+                              <input type="checkbox" name="available" value="yes" defaultChecked={!missing.length} />
+                              Documents available
+                            </label>
+                            <label className="min-w-0">
+                              <span className="sr-only">Note</span>
+                              <input name="note" className="plain w-full" placeholder={missing.length ? `${missing.length} not ready — say what and why` : "Note — optional, unless you leave the box unticked"} />
+                            </label>
+                            <button className="ask">Record</button>
+                          </div>
                         </ActionForm>
-                      </div>
-                    </details>
-                  ) : null}
-                </li>
-              );
-            })}
-          </ul>
+                      </details>
+                    ) : null}
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <div className="px-5 py-3.5 sm:px-6">
+              <Banner tone="warn" title="Needs disciplines">The project manager tags this activity in the disciplines list. Until then its documents cannot be asked for.</Banner>
+            </div>
+          )}
+          {short.length && action.riskNotifiedAt ? (
+            <p className="border-t border-line px-5 py-2 text-[11px] text-slate-400 sm:px-6">
+              Everyone concerned was warned automatically on {fmtDate(action.riskNotifiedAt)}.
+              {admin ? <> <Link href={`/admin/audit?q=${encodeURIComponent(action.code)}`} className="font-semibold text-link underline">Every notice sent &rarr;</Link></> : null}
+            </p>
+          ) : null}
+        </section>
+
+          {tellsSomething ? <ActionNotes notes={action.notes} actionId={action.id} mayNote={mayNote} /> : null}
+        </div>
+
+        <aside>
+        <Card title="Progress">
+          <Timeline
+            points={[
+              { label: "Disciplines tagged", at: depts.length ? action.createdAt : null, holder: depts.length ? depts.map(deptLabel).join(", ") : "nobody yet" },
+              { label: "Documents listed", at: action.entries.length ? action.entries[0].createdAt : null, holder: action.entries.length ? `${action.entries.length} document${action.entries.length === 1 ? "" : "s"}` : "none listed" },
+              { label: "First document due", at: firstDue, holder: firstDue && firstDue < new Date() ? "that date has passed" : null },
+              ...(action.riskNotifiedAt ? [{ label: "Warned automatically", at: action.riskNotifiedAt, holder: depts.map(deptLabel).join(", ") }] : []),
+              { label: "Every document ready", at: everything ? action.lastMetAt ?? action.scheduledDate : null, holder: `${readyCount} of ${action.entries.length} ready` },
+              { label: "Disciplines confirmed", at: clear.cleared ? action.confirmations.map((c) => c.confirmedAt).filter(Boolean).sort((x, y) => y!.getTime() - x!.getTime())[0] ?? null : null, holder: `${clear.confirmed.length} of ${clear.depts.length}` },
+              // A schedule's date passing is the work happening. Only Document
+              // Control saying otherwise — a note that the work was postponed —
+              // takes that back.
+              {
+                label: postponed ? "The work was postponed" : happened ? "The work happened" : "The work happens",
+                at: action.scheduledDate,
+                holder: postponed ? `${postponed.responsibleName}: ${postponed.reason}` : null,
+              },
+            ]}
+          />
         </Card>
-      ) : null}
+        </aside>
+      </div>
     </div>
   );
 }
 
-function ReadinessChip({ readiness }: { readiness: "READY" | "AT_RISK" | "NOT_READY" | "UNKNOWN" }) {
+function ReadinessChip({ readiness }: { readiness: "DONE" | "LATE_RECEIPT" | "READY" | "AT_RISK" | "NOT_READY" | "UNKNOWN" }) {
   const map = {
+    DONE: ["Done", "bg-emerald-600/10 text-emerald-900 ring-emerald-300"],
+    LATE_RECEIPT: ["Late receipt", "bg-violet-100 text-violet-800 ring-violet-300"],
     READY: ["Ready", "bg-emerald-100 text-emerald-800 ring-emerald-200"],
     AT_RISK: ["At risk", "bg-amber-100 text-amber-800 ring-amber-200"],
-    NOT_READY: ["Not ready", "bg-red-100 text-red-800 ring-red-200"],
+    NOT_READY: ["Overdue", "bg-red-100 text-red-800 ring-red-200"],
     UNKNOWN: ["No documents listed", "bg-slate-100 text-slate-700 ring-slate-200"],
   } as const;
   return <Chip className={map[readiness][1]}>{map[readiness][0]}</Chip>;

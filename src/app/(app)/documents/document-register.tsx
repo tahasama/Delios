@@ -8,6 +8,7 @@ import { ArrowDown, ArrowLeftRight, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRi
 import { DataTable } from "@/components/data-table";
 import { DateWindow } from "@/components/date-window";
 import { Th, Td, Info } from "@/components/ui";
+import { useCardHeight } from "@/components/card-height";
 
 /** Available from the Columns menu; off until someone wants them. */
 const OPTIONAL = ["Document state", "Review verdict", "Originator", "Sub-project", "Contract", "Criticality", "Confidentiality", "Planned submission", "Issued", "Released", "Decided by", "In packages", "Kept for", "Produced by", "Revision started", "File added"];
@@ -101,6 +102,8 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
   exportHref: string;
 }) {
   const router = useRouter();
+  // Every register is the height the schedule's plan set.
+  const cardHeight = useCardHeight();
   const [pending, startTransition] = useTransition();
   const [selected, setSelected] = useState<string[]>([]);
   const [allMatching, setAllMatching] = useState(false);
@@ -389,7 +392,11 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
       </div>
     </section>
 
-    <section data-dt-frame className="register register-sheet">
+    <section
+      data-dt-frame
+      className={`register register-sheet ${cardHeight ? "flex flex-col" : ""}`}
+      style={cardHeight ? { height: cardHeight } : undefined}
+    >
 
       {facets.length ? (
         <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2 sm:px-6">
@@ -430,8 +437,8 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
         </div>
       ) : null}
 
-      <div className={pending ? "opacity-60 transition-opacity" : "transition-opacity"}>
-        {rows.length ? <DataTable id="register" className="rounded-none border-0 shadow-none" defaultHidden={OPTIONAL} onMove={move} onReorder={moveTo} forced={forced} fill tools={
+      <div className={`${cardHeight ? "flex min-h-0 flex-1 flex-col" : ""} ${pending ? "opacity-60 transition-opacity" : "transition-opacity"}`}>
+        {rows.length ? <DataTable id="register" className="rounded-none border-0 shadow-none" stretch={!!cardHeight} defaultHidden={OPTIONAL} onMove={move} onReorder={moveTo} forced={forced} fill tools={
           <a
             href={exportHref}
             onClick={(event) => { event.preventDefault(); window.location.href = exportWith(exportHref); }}

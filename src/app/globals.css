@@ -127,6 +127,27 @@ summary::-webkit-details-marker {
     font-size: clamp(1.25rem, 1rem + 0.9vw, 1.6rem);
     line-height: 1.1;
   }
+  /* A record's own name — an action, where the plate names one thing rather
+     than a whole register. Set in the serif the dispatch log uses, because a
+     name is read, not scanned. */
+  .plate-name {
+    font-family: var(--font-serif), Georgia, serif;
+    font-weight: 500;
+    letter-spacing: -0.015em;
+    font-size: clamp(1.45rem, 1.1rem + 1vw, 1.95rem);
+    line-height: 1.08;
+    color: var(--color-slate-950);
+  }
+  /* What the plate says about it: heavier and darker than a caption, because
+     the day and the count are the two facts somebody came for. */
+  .plate-meta {
+    font-size: 12.5px;
+    font-weight: 500;
+    line-height: 1.35;
+    color: var(--color-slate-600);
+    font-variant-numeric: tabular-nums;
+  }
+
   .plate-figure {
     display: block;
     font-family: var(--font-mono);

@@ -3,6 +3,7 @@ import { requireScope } from "@/lib/scope";
 import { departmentsOf, daysBefore } from "@/lib/schedule";
 import { clearance } from "@/lib/requirements-process";
 import { readSearch, readDay } from "@/lib/register-query";
+import { PLAN_CARD_HEIGHT, PLAN_FIRST } from "@/lib/plan-card";
 import { readyReading, countingRevision, meetsRequirement } from "@/lib/readiness";
 import { fmtDate } from "@/lib/utils";
 import { after } from "next/server";
@@ -17,8 +18,11 @@ export const metadata = { title: "Schedule & actions" };
 
 type Readiness = PlanTableRow["readiness"];
 
+/** What became of the work, as against whether its documents arrived. */
+type Happened = "POSTPONED" | "CARRIED" | "DONE" | "AHEAD";
+
 type Search = {
-  view?: string; all?: string; q?: string; state?: string; discipline?: string; docType?: string; supplier?: string;
+  view?: string; all?: string; q?: string; state?: string; happened?: string; discipline?: string; docType?: string; supplier?: string;
   code?: string; on?: string; from?: string; to?: string;
   sort?: string; dir?: string; page?: string; per?: string; show?: string; step?: string;
 };
@@ -45,11 +49,28 @@ const SORTS: Record<string, Prisma.ActionOrderByWithRelationInput[]> = {
  */
 const STATES = [
   { code: "DONE", label: "Done" },
+  { code: "LATE_RECEIPT", label: "Late receipt" },
   { code: "READY", label: "Ready" },
   { code: "UPCOMING", label: "Still ahead" },
   { code: "AT_RISK", label: "At risk" },
   { code: "NOT_READY", label: "Overdue" },
   { code: "UNKNOWN", label: "Nothing listed" },
+];
+
+/**
+ * What became of the work, as against whether its documents arrived.
+ *
+ * The day passes and the work is taken to have happened — that is what a
+ * schedule is — unless Document Control wrote down that it was postponed. So
+ * this asks the question the state cannot: which activities went ahead short of
+ * what they needed, and of those, which were owned and which were never
+ * written down at all.
+ */
+const HAPPENED = [
+  { code: "WITHOUT", label: "Happened without all its documents" },
+  { code: "CARRIED", label: "… and it was written down" },
+  { code: "NONE", label: "… and nothing was written down" },
+  { code: "STOPPED", label: "Postponed" },
 ];
 
 /** How many days either side of today the plan shows when nobody says otherwise. */
@@ -66,17 +87,6 @@ const RISK_DAYS = 7;
  * the way to draw more — where the page ends rather than below it, now that the
  * footer carries two rows.
  */
-const PLAN_FIRST = 12;
-
-/** One bar and the gap under it, in pixels: what a row of the plan takes. */
-const PLAN_ROW = 30;
-
-/**
- * What the plan spends on everything that is not a bar: the band carrying the
- * dates, the padding under the last bar, and the footer. Only a fallback — the
- * table matches the plan's card as measured, and uses this until it has been.
- */
-const CARD_CHROME = 6 + 20 + 16 + 45;
 
 /** How many more the plan draws at a time — the reader's choice, like rows. */
 const PLAN_STEPS = [5, 10, 25, 50, 100];
@@ -91,6 +101,7 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
   const searches = readSearch(q);
   const reading = await readyReading(ctx);
   const state = STATES.some((one) => one.code === sp.state) ? sp.state! : "";
+  const happened = HAPPENED.some((one) => one.code === sp.happened) ? sp.happened! : "";
   const discipline = (sp.discipline ?? "").trim();
   const docType = (sp.docType ?? "").trim();
   const supplier = (sp.supplier ?? "").trim();
@@ -128,7 +139,23 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
   const hasAll: Prisma.ActionWhereInput = { [met]: { equals: { _ref: "needCount", _container: "Action" } } } as unknown as Prisma.ActionWhereInput;
   const STATE_WHERE: Record<string, Prisma.ActionWhereInput> = {
     UNKNOWN: { needCount: 0 },
-    DONE: { needCount: { gt: 0 }, ...hasAll, scheduledDate: { lt: now } },
+    // Everything arrived, but the last of it after the day of the work. It is
+    // not done: done means they were there in time.
+    LATE_RECEIPT: {
+      needCount: { gt: 0 },
+      ...hasAll,
+      scheduledDate: { lt: now },
+      lastMetAt: { gt: { _ref: "scheduledDate", _container: "Action" } },
+    } as unknown as Prisma.ActionWhereInput,
+    DONE: {
+      needCount: { gt: 0 },
+      ...hasAll,
+      scheduledDate: { lt: now },
+      OR: [
+        { lastMetAt: null },
+        { lastMetAt: { lte: { _ref: "scheduledDate", _container: "Action" } } } as unknown as Prisma.ActionWhereInput,
+      ],
+    },
     READY: { needCount: { gt: 0 }, ...hasAll, OR: [{ scheduledDate: null }, { scheduledDate: { gte: now } }] },
     NOT_READY: { needCount: { gt: 0 }, ...shortOfWhatItNeeds, scheduledDate: { lt: now } },
     AT_RISK: { needCount: { gt: 0 }, ...shortOfWhatItNeeds, scheduledDate: { gte: now }, nextNeededAt: { lte: risk } },
@@ -140,10 +167,29 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
     },
   };
 
+  // The work happened without everything it needed: its day has passed and, on
+  // that day, either something was still missing or the last of it had not yet
+  // arrived. Both readings of "short on the day", in one clause.
+  const shortOnTheDay: Prisma.ActionWhereInput = {
+    needCount: { gt: 0 },
+    scheduledDate: { lt: now },
+    OR: [
+      shortOfWhatItNeeds,
+      { lastMetAt: { gt: { _ref: "scheduledDate", _container: "Action" } } } as unknown as Prisma.ActionWhereInput,
+    ],
+  };
+  const HAPPENED_WHERE: Record<string, Prisma.ActionWhereInput> = {
+    WITHOUT: { ...shortOnTheDay, NOT: { notes: { some: { decision: "STOPPED" } } } },
+    CARRIED: { ...shortOnTheDay, notes: { some: { decision: "CARRIED" } } },
+    NONE: { ...shortOnTheDay, notes: { none: {} } },
+    STOPPED: { notes: { some: { decision: "STOPPED" } } },
+  };
+
   const where: Prisma.ActionWhereInput = {
     AND: [
       code ? { code } : {},
       state ? STATE_WHERE[state] : {},
+      happened ? HAPPENED_WHERE[happened] : {},
       // A discipline is what an action is tagged with and what a document
       // belongs to — the same list, so the filter answers for both.
       discipline
@@ -203,6 +249,7 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
       ...(view === "table" ? { skip: (page - 1) * perPage, take: perPage } : { take: shown }),
       include: {
         confirmations: true,
+        notes: { select: { decision: true } },
         entries: { include: { document: { include: { revisions: countingRevision(reading) } } } },
       },
     }),
@@ -227,11 +274,25 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
     // the day has passed, a document is already owed or nearly owed, and the
     // ordinary case of work that is simply still ahead.
     let readiness: Readiness = "UNKNOWN";
-    if (total > 0 && missing.length === 0) readiness = daysUntil !== null && daysUntil < 0 ? "DONE" : "READY";
+    if (total > 0 && missing.length === 0) {
+      const afterwards = !!action.lastMetAt && !!action.scheduledDate && action.lastMetAt > action.scheduledDate;
+      readiness = daysUntil !== null && daysUntil < 0 ? (afterwards ? "LATE_RECEIPT" : "DONE") : "READY";
+    }
     else if (total > 0 && daysUntil !== null && daysUntil < 0) readiness = "NOT_READY";
     else if (total > 0 && nextNeeded && nextNeeded.getTime() - Date.now() <= RISK_DAYS * 86_400_000) readiness = "AT_RISK";
     else if (total > 0) readiness = "UPCOMING";
-    return { ...action, total, ready, missing, daysUntil, readiness, firstNeeded, nextNeeded };
+    // What became of the work, which is not the same question as whether its
+    // documents arrived. The day passing is the work happening; only Document
+    // Control saying it was postponed takes that back.
+    const passed = daysUntil !== null && daysUntil < 0;
+    const shortOnTheDay = missing.length > 0
+      || (!!action.lastMetAt && !!action.scheduledDate && action.lastMetAt > action.scheduledDate);
+    const happened: Happened = action.notes.some((note) => note.decision === "STOPPED")
+      ? "POSTPONED"
+      : !passed
+        ? "AHEAD"
+        : shortOnTheDay ? "CARRIED" : "DONE";
+    return { ...action, total, ready, missing, daysUntil, readiness, firstNeeded, nextNeeded, happened };
   });
 
   // The first time an action shows as at risk, its disciplines are told once,
@@ -257,6 +318,17 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
       nextNeeded: row.nextNeeded ? fmtDate(row.nextNeeded) : null,
       nextOverdue: !!row.nextNeeded && row.nextNeeded.getTime() < Date.now(),
       missing: row.missing.map((one) => ({ docNumber: one.document.docNumber, status: one.requiredStatus })),
+      happened: row.happened,
+      // The stamp under the word: what the documents were on the day.
+      happenedNote: !row.total
+        ? "nothing listed"
+        : row.happened === "POSTPONED"
+          ? (row.missing.length ? `${row.missing.length} of ${row.total} missing` : "every document was there")
+          : row.happened === "CARRIED"
+            ? (row.missing.length ? `without ${row.missing.length} of ${row.total}` : `the last of ${row.total} arrived after the day`)
+            : row.happened === "DONE"
+              ? `all ${row.total} documents`
+              : `${row.ready} of ${row.total} ready`,
       confirmed: !clear.depts.length
         ? "—"
         : clear.cleared
@@ -300,6 +372,7 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
   if (q) facets.push({ key: "search", label: q, without: drop("q") });
   if (code) facets.push({ key: "action", label: code, without: drop("code") });
   if (state) facets.push({ key: "state", label: said(STATES, state), without: drop("state") });
+  if (happened) facets.push({ key: "what happened", label: said(HAPPENED, happened), without: drop("happened") });
   if (discipline) facets.push({ key: "discipline", label: said(disciplineRows, discipline), without: drop("discipline") });
   if (docType) facets.push({ key: "type", label: said(typeRows, docType), without: drop("docType") });
   if (supplier) facets.push({ key: "supplier", label: said(supplierRows, supplier), without: drop("supplier") });
@@ -353,7 +426,7 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
           />
         }
         uploads={<PlanCards />}
-        cardHeight={PLAN_FIRST * PLAN_ROW + CARD_CHROME}
+        cardHeight={PLAN_CARD_HEIGHT}
         view={view}
         more={
           view === "plan"
@@ -376,9 +449,10 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
         }
         rows={tableRows}
         total={matching}
-        filters={{ q, state, discipline, docType, supplier, code, on: dateOn, from: sp.from ?? "", to: sp.to ?? "" }}
+        filters={{ q, state, happened, discipline, docType, supplier, code, on: dateOn, from: sp.from ?? "", to: sp.to ?? "" }}
         filterOptions={{
           states: STATES,
+          happened: HAPPENED,
           disciplines: disciplineRows.map((one) => ({ code: one.code, label: one.label })),
           types: typeRows.map((one) => ({ code: one.code, label: one.label })),
           suppliers: supplierRows.map((one) => ({ code: one.code, label: one.label })),

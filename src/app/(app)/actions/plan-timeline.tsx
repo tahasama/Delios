@@ -7,19 +7,20 @@ export type PlanRow = {
   scheduledDate: Date | null;
   /** The earliest date a document is needed for this activity. */
   firstNeeded: Date | null;
-  readiness: "DONE" | "READY" | "AT_RISK" | "NOT_READY" | "UPCOMING" | "UNKNOWN";
+  readiness: "DONE" | "LATE_RECEIPT" | "READY" | "AT_RISK" | "NOT_READY" | "UPCOMING" | "UNKNOWN";
   ready: number;
   total: number;
 };
 
 /**
- * What the colour says, and only that: dark green is done, green is ready,
- * blue is work still
+ * What the colour says, and only that: dark green is done, violet is done but
+ * the documents came after the work, green is ready, blue is work still
  * ahead with nothing owed yet, amber is a document owed within the week, red is
  * a day that has passed with something still missing, grey is nothing listed.
  */
 const TONE: Record<PlanRow["readiness"], string> = {
   DONE: "bg-emerald-700",
+  LATE_RECEIPT: "bg-violet-400",
   READY: "bg-emerald-400",
   UPCOMING: "bg-sky-500",
   AT_RISK: "bg-amber-500",

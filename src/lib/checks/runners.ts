@@ -850,19 +850,38 @@ export const RUNNERS: Runners = {
 .map((e) => doc(e.document, `Baseline date disagrees with the schedule date for ${e.action.code}.`));
   },
   "DB-13": async (ctx) => {
-    const actions = await ctx.db.action.findMany({ where: { scheduledDate: { lt: new Date() } }, include: { entries: { include: { document: { include: { revisions: { where: { state: "RELEASED" } } } } } } } });
+    // An action whose day has passed without its documents is not by itself a
+    // failure of this clause: the clause asks whether readiness was verified.
+    // The record of that verification is the note somebody wrote — what
+    // happened, who approved it, and why — so an action that carries one has
+    // answered, and an action that carries none has not.
+    const actions = await ctx.db.action.findMany({
+      where: { scheduledDate: { lt: new Date() } },
+      include: {
+        notes: { select: { id: true } },
+        confirmations: { select: { id: true } },
+        entries: { include: { document: { include: { revisions: { where: { state: "RELEASED" } } } } } },
+      },
+    });
     const failures: Failure[] = [];
     for (const a of actions) {
+      const short: string[] = [];
       for (const e of a.entries) {
         const current = e.document.revisions[0];
-        if (!current) {
- failures.push(doc(e.document, `Action ${a.code} date passed with its required item never released.`));
-          continue;
-        }
-        if (e.requiredStatus && current.statusCode !== e.requiredStatus) {
- failures.push(doc(e.document, `Action ${a.code} proceeded: item is at ${current.statusCode ?? "no status"}, required ${e.requiredStatus}.`));
+        if (!current) short.push(`${e.document.docNumber} never released`);
+        else if (e.requiredStatus && current.statusCode !== e.requiredStatus) {
+          short.push(`${e.document.docNumber} at ${current.statusCode ?? "no status"}, required ${e.requiredStatus}`);
         }
       }
+      if (!short.length) continue;
+      if (a.notes.length) continue;
+      failures.push({
+        entityKey: `Action:${a.id}`,
+        entityType: "Action",
+        entityId: a.id,
+        entityLabel: a.code,
+        description: `Action ${a.code} passed without ${short.length} of its ${a.entries.length} documents (${short.slice(0, 3).join("; ")}${short.length > 3 ? "; …" : ""}) and nothing was written down about whether it went ahead, who approved that, or why.${a.confirmations.length ? "" : " No discipline confirmed availability either."}`,
+      });
     }
     return failures;
   },

@@ -7,6 +7,7 @@ import { ArrowDown, ArrowDownLeft, ArrowUp, ArrowUpDown, ArrowUpRight, ChevronLe
 import { DataTable } from "@/components/data-table";
 import { DateWindow } from "@/components/date-window";
 import { Th, Td, Info } from "@/components/ui";
+import { useCardHeight } from "@/components/card-height";
 
 /**
  * The transmittal register, set in the same language as the document register:
@@ -65,6 +66,8 @@ export function TransmittalRegister({ rows, total, filters, filterOptions, expor
   exportHref: string;
 }) {
   const router = useRouter();
+  // Every register is the height the schedule's plan set.
+  const cardHeight = useCardHeight();
   const [pending, startTransition] = useTransition();
   const [order, setOrder] = useState<string[] | null>(null);
   const [frozen, setFrozen] = useState(true);
@@ -215,7 +218,11 @@ export function TransmittalRegister({ rows, total, filters, filterOptions, expor
 
     </section>
 
-    <section data-dt-frame className="register register-sheet">
+    <section
+      data-dt-frame
+      className={`register register-sheet ${cardHeight ? "flex flex-col" : ""}`}
+      style={cardHeight ? { height: cardHeight } : undefined}
+    >
       {facets.length ? (
         <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2 sm:px-6">
           <span className="stencil mr-1 text-slate-400">Showing</span>
@@ -253,7 +260,7 @@ export function TransmittalRegister({ rows, total, filters, filterOptions, expor
         </div>
       ) : null}
 
-      <div className={pending ? "opacity-60 transition-opacity" : "transition-opacity"}>
+      <div className={`${cardHeight ? "flex min-h-0 flex-1 flex-col" : ""} ${pending ? "opacity-60 transition-opacity" : "transition-opacity"}`}>
         {rows.length ? (
           <DataTable
             id="transmittals"
@@ -263,6 +270,7 @@ export function TransmittalRegister({ rows, total, filters, filterOptions, expor
             onReorder={moveTo}
             forced={forced}
             fill
+            stretch={!!cardHeight}
             tools={
               <a
                 href={allMatching || !selected.length ? exportHref : `/api/export/transmittals?ids=${encodeURIComponent(selected.join(","))}`}

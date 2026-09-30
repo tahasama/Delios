@@ -68,6 +68,13 @@ export const CONTROL_ACTIVITIES: ControlActivity[] = [
     self: "Whoever registered the document withdraws it.",
   },
   {
+    key: "ACTION_NOTE",
+    title: "Writing down that an action went ahead without its documents",
+    text: "The day passes and something it needed is still missing. Somebody carries the decision to go ahead anyway, or to stop; somebody owns the delay behind it. The note says both, and stays.",
+    control: "Document Control writes it, from what the manager and the late party tell them.",
+    self: "The manager the action answers to writes it themselves.",
+  },
+  {
     key: "VOID",
     title: "Voiding a revision, and recording what came of it",
     text: "A revision released in error, or never reviewed — and the work already done from it.",
