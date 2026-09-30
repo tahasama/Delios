@@ -95,7 +95,7 @@ export default async function FunctionsPage() {
           className="shadow-none"
           head={
             <tr>
-              <Th className="sticky left-0 z-[4] min-w-[220px] align-bottom">Function</Th>
+              <Th className="sticky left-0 z-4 min-w-55 align-bottom">Function</Th>
               <Th className="align-bottom">Department</Th>
               {VERBS.map((v) => (
                 <Th key={v} label={VERB_LABEL[v]} className="px-2 text-center align-bottom normal-case tracking-normal">
@@ -110,7 +110,7 @@ export default async function FunctionsPage() {
             const narrowed = fn.rules.map(scopeText).filter(Boolean);
             return (
               <tr key={fn.id} className={fn.active ? "" : "opacity-45"}>
-                <Td className="sticky left-0 z-[1] bg-surface py-2 text-xs">
+                <Td className="sticky left-0 z-1 bg-surface py-2 text-xs">
                   <p className="font-semibold text-slate-800">{fn.name}</p>
                   {narrowed.length ? <p className="text-[10px] text-slate-500">only for {narrowed.join("; ")}</p> : null}
                 </Td>

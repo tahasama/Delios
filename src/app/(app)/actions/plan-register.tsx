@@ -247,7 +247,7 @@ export function PlanRegister({
               name="q"
               defaultValue={filters.q}
               placeholder={'A space narrows, a comma widens: pour clarifier  ·  A00005, A00012  ·  "switchroom energisation"'}
-              className="plain w-full !py-2 !pl-6 !text-[13.5px]"
+              className="plain w-full py-2! pl-6! text-[13.5px]!"
             />
           </label>
           <button className="ask" data-on={facets.length ? "true" : "false"} disabled={pending}>
@@ -463,7 +463,7 @@ export function PlanRegister({
                 onReorder={moveTo}
                 head={
                   <tr>
-                    <Th className={`rail-head ${frozen ? "sticky left-0 z-[4]" : ""} w-10`}>
+                    <Th className={`rail-head ${frozen ? "sticky left-0 z-4" : ""} w-10`}>
                       <input
                         aria-label="Select every action on this page"
                         type="checkbox"
@@ -471,7 +471,7 @@ export function PlanRegister({
                         onChange={() => { setAllMatching(false); setSelected(pageSelected ? [] : rows.map((row) => row.id)); }}
                       />
                     </Th>
-                    <Th className={`${frozen ? "sticky left-10 z-[4]" : ""} min-w-[260px]`} label="Action">
+                    <Th className={`${frozen ? "sticky left-10 z-4" : ""} min-w-65`} label="Action">
                       <span className="inline-flex items-center gap-2">
                         <SortButton label="Action" on={sort?.key === "code" ? sort.dir : null} onClick={() => go(sortHref("code"))} />
                         <span className="text-slate-300">/</span>
@@ -505,7 +505,7 @@ export function PlanRegister({
                   const on = selected.includes(row.id);
                   return (
                     <tr key={row.id} className={on ? "[&>td]:bg-tint" : undefined}>
-                      <Td className={`rail ${RAIL[row.readiness]} ${frozen ? "sticky left-0 z-[1]" : ""} ${on ? "bg-tint" : "bg-surface"}`}>
+                      <Td className={`rail ${RAIL[row.readiness]} ${frozen ? "sticky left-0 z-1" : ""} ${on ? "bg-tint" : "bg-surface"}`}>
                         <input
                           aria-label={`Select action ${row.code}`}
                           type="checkbox"
@@ -516,7 +516,7 @@ export function PlanRegister({
                           }}
                         />
                       </Td>
-                      <Td className={`${frozen ? "sticky left-10 z-[1]" : ""} min-w-[260px] ${on ? "bg-tint" : "bg-surface"}`}>
+                      <Td className={`${frozen ? "sticky left-10 z-1" : ""} min-w-65 ${on ? "bg-tint" : "bg-surface"}`}>
                         <Link href={`/actions/${row.code}`} className="doc-number">{row.code}</Link>
                         <span className="doc-title block max-w-80 truncate" title={row.name}>{row.name}</span>
                       </Td>
@@ -699,7 +699,7 @@ const COLUMNS: Column[] = [
       : <span className="text-slate-300">—</span>,
   },
   {
-    key: "missing", label: "Still missing", cellClass: "min-w-[240px]",
+    key: "missing", label: "Still missing", cellClass: "min-w-60",
     cell: (row) => row.missing.length
       ? <ul className="space-y-1">
           {row.missing.slice(0, 3).map((one) => (

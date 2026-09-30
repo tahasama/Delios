@@ -85,7 +85,7 @@ export function PlanTimeline({ rows, window, fit }: {
           drawn in — the names take 200px and the gap 8px on the left, the ready
           count 56px and its gap on the right. Any other figure and the dates
           line up with nothing. */}
-      <div className="relative ml-[208px] mr-[64px] h-4">
+      <div className="relative ml-52 mr-16 h-4">
         {ticks.map((t) => (
           <span key={t.label} className="absolute top-0 whitespace-nowrap text-[10px] leading-none text-slate-400" style={{ left: `${t.left}%`, marginLeft: "0.25rem" }}>
             {t.label}
@@ -113,7 +113,7 @@ export function PlanTimeline({ rows, window, fit }: {
             box is as tall as every bar there is, so today's line reaches the
             last one however far down it was loaded. */}
         <div className="relative min-h-full">
-          <div className="pointer-events-none absolute inset-y-0 left-[208px] right-[64px]">
+          <div className="pointer-events-none absolute inset-y-0 left-52 right-16">
             {ticks.map((t) => (
               <div key={t.label} className="absolute top-0 h-full border-l border-dashed border-line" style={{ left: `${t.left}%` }} />
             ))}
@@ -132,7 +132,7 @@ export function PlanTimeline({ rows, window, fit }: {
             const fromBefore = rawLeft < 0;
             return (
               <li key={r.code} className="flex items-center gap-2">
-                <Link href={`/actions/${r.code}`} className="w-[200px] shrink-0 truncate text-xs text-slate-600 hover:text-link" title={`${r.code} — ${r.name}`}>
+                <Link href={`/actions/${r.code}`} className="w-50 shrink-0 truncate text-xs text-slate-600 hover:text-link" title={`${r.code} — ${r.name}`}>
                   <span className="font-mono font-semibold text-slate-700">{r.code}</span> {r.name}
                 </Link>
                 <span className="relative h-5 flex-1">

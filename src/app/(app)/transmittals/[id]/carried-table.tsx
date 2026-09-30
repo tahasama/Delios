@@ -121,7 +121,7 @@ export function CarriedTable({ plate, rows, exportHref }: {
             </>}
             head={
               <tr>
-                <Th className="rail-head min-w-[240px]" label="Document" sorted={sort?.key === "document" ? sort.dir : null}>
+                <Th className="rail-head min-w-60" label="Document" sorted={sort?.key === "document" ? sort.dir : null}>
                   <SortButton label="Document" on={sort?.key === "document" ? sort.dir : null} onClick={() => sortBy("document")} />
                 </Th>
                 <Th label="Revision" sorted={sort?.key === "revision" ? sort.dir : null}>

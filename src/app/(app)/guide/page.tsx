@@ -72,7 +72,7 @@ export default async function GuidePage() {
               <Link href="/" className="inline-flex items-center gap-2 rounded-xl border border-white/20 px-4 py-2.5 text-sm font-semibold text-white">Return home</Link>
             </div>
           </div>
-          <div className="border-l border-white/10 bg-white/[0.04] p-7">
+          <div className="border-l border-white/10 bg-white/4 p-7">
             <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#91acc2]">Workspace now</p>
             <div className="mt-4 grid grid-cols-2 gap-3">
               <Metric label="Documents" value={documents} />
@@ -101,5 +101,5 @@ function CapabilityCard({ href, title, text, icon: Icon, action }: { href: strin
 }
 
 function Metric({ label, value }: { label: string; value: number }) {
-  return <div className="rounded-xl border border-white/10 bg-white/[0.05] px-3 py-3"><p className="text-xl font-semibold tabular-nums">{value}</p><p className="mt-0.5 text-[10px] uppercase tracking-wide text-[#91acc2]">{label}</p></div>;
+  return <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-3"><p className="text-xl font-semibold tabular-nums">{value}</p><p className="mt-0.5 text-[10px] uppercase tracking-wide text-[#91acc2]">{label}</p></div>;
 }

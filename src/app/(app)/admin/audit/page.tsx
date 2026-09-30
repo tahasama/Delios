@@ -135,7 +135,7 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
       </header>
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-[212px_minmax(0,1fr)] lg:items-start">
-        <aside className="lg:sticky lg:top-[88px]">
+        <aside className="lg:sticky lg:top-22">
           <nav aria-label="Kinds of act">
             {FAMILIES.map((f) => (
               <Link
@@ -212,9 +212,9 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
                       {e.field ? (
                         <p className="slip-subject mt-1.5">
                           {e.field}
-                          <span className="text-[15px] text-[color:var(--ink-faint)]"> — </span>
+                          <span className="text-[15px] text-(--ink-faint)"> — </span>
                           <span className="font-mono text-[14px] line-through opacity-70">{e.oldValue ?? "—"}</span>
-                          <span className="text-[color:var(--ink-faint)]"> to </span>
+                          <span className="text-(--ink-faint)"> to </span>
                           <span className="font-mono text-[14px]">{e.newValue ?? "—"}</span>
                         </p>
                       ) : e.detail ? (
@@ -237,7 +237,7 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
           ))}
 
           {!days.length ? (
-            <p className="slip px-4 py-6 text-[13px] text-[color:var(--ink-soft)]">
+            <p className="slip px-4 py-6 text-[13px] text-(--ink-soft)">
               Nothing in the log answers that. {sp.q ? "Try another number or name." : "Acts appear here as they happen."}
             </p>
           ) : null}

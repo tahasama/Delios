@@ -31,8 +31,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <div className="min-h-screen bg-canvas">
       <Sidebar perms={perms} />
-      <div className="lg:pl-[268px] lg:pl-[var(--sidebar-w)]">
-        <header data-app-header className="no-print sticky top-0 z-10 flex h-[72px] items-center gap-3 border-b border-line/80 bg-surface/94 px-4 backdrop-blur sm:gap-5 sm:px-6 lg:px-8">
+      <div className="lg:pl-67 lg:pl-(--sidebar-w)">
+        <header data-app-header className="no-print sticky top-0 z-10 flex h-18 items-center gap-3 border-b border-line/80 bg-surface/94 px-4 backdrop-blur sm:gap-5 sm:px-6 lg:px-8">
           <MobileNav perms={perms} />
           <ProjectSwitcher
             current={project}
@@ -58,7 +58,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <details className="group relative ml-1">
               <summary className="flex cursor-pointer list-none items-center gap-3 rounded-xl border border-line bg-surface px-2 py-1.5 sm:px-3 sm:py-2 outline-none transition hover:border-line-strong focus-visible:ring-3 focus-visible:ring-link/15">
                 <span className="grid h-8 w-8 place-items-center rounded-full bg-tint text-xs font-bold text-brand-ink">{user.name.slice(0, 1).toUpperCase()}</span>
-                <span className="hidden min-w-[112px] sm:block"><span className="block text-xs font-semibold leading-tight text-slate-800">{user.name}</span><span className="mt-0.5 block text-[11px] leading-tight text-slate-400">{user.functionName ?? ROLE_LABEL[user.role as Role] ?? user.role}</span></span>
+                <span className="hidden min-w-28 sm:block"><span className="block text-xs font-semibold leading-tight text-slate-800">{user.name}</span><span className="mt-0.5 block text-[11px] leading-tight text-slate-400">{user.functionName ?? ROLE_LABEL[user.role as Role] ?? user.role}</span></span>
                 <ChevronDown className="hidden h-3.5 w-3.5 text-slate-400 transition group-open:rotate-180 sm:block" />
               </summary>
               <div className="absolute right-0 top-12 z-30 w-64 rounded-2xl border border-line bg-surface p-2 shadow-xl">

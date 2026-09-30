@@ -51,7 +51,7 @@ export default async function ControlActivitiesPage() {
             {(["CONTROL", "SELF", "CUSTOM"] as ProjectMode[]).map((mode) => (
               <label
                 key={mode}
-                className="flex cursor-pointer items-start gap-2.5 rounded-xl border border-line px-3.5 py-3 hover:bg-slate-50 has-[:checked]:border-brand-line has-[:checked]:bg-tint-soft"
+                className="flex cursor-pointer items-start gap-2.5 rounded-xl border border-line px-3.5 py-3 hover:bg-slate-50 has-checked:border-brand-line has-checked:bg-tint-soft"
               >
                 <input type="radio" name="projectMode" value={mode} defaultChecked={projectMode === mode} className="mt-0.5" />
                 <span>
@@ -122,7 +122,7 @@ export default async function ControlActivitiesPage() {
                   {policy.options.map((option) => (
                     <label
                       key={option.value}
-                      className="flex cursor-pointer items-start gap-2.5 rounded-xl border border-line px-3.5 py-3 hover:bg-slate-50 has-[:checked]:border-brand-line has-[:checked]:bg-tint-soft"
+                      className="flex cursor-pointer items-start gap-2.5 rounded-xl border border-line px-3.5 py-3 hover:bg-slate-50 has-checked:border-brand-line has-checked:bg-tint-soft"
                     >
                       <input type="radio" name={policy.key} value={option.value} defaultChecked={value === option.value} className="mt-0.5" />
                       <span>

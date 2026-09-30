@@ -292,7 +292,7 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
               name="q"
               defaultValue={filters.q}
               placeholder={'A space narrows, a comma widens: pump ME  ·  P-101, P-102  ·  "feed pump"'}
-              className="plain w-full !py-2 !pl-6 !text-[13.5px]"
+              className="plain w-full py-2! pl-6! text-[13.5px]!"
             />
           </label>
           {/* Nothing is asked of the database until this is pressed. A query
@@ -384,7 +384,7 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
               required
               maxLength={60}
               placeholder="Keep this view as…"
-              className="plain !py-1 !text-[12.5px] w-44"
+              className="plain py-1! text-[12.5px]! w-44"
             />
             <button className="stencil text-brand-ink hover:underline">Keep</button>
           </form>
@@ -448,7 +448,7 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
             <Download className="h-3.5 w-3.5" /> Export
           </a>
         } head={<tr>
-          <Th className={`rail-head ${frozen ? "sticky left-0 z-[4]" : ""} w-10`}>
+          <Th className={`rail-head ${frozen ? "sticky left-0 z-4" : ""} w-10`}>
             <input
               aria-label="Select every document on this page"
               title="Selects this page. The register offers every match above."
@@ -458,7 +458,7 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
             />
           </Th>
           <Th
-            className={`${frozen ? "sticky left-10 z-[4]" : ""} min-w-[280px]`}
+            className={`${frozen ? "sticky left-10 z-4" : ""} min-w-70`}
             label="Document"
             sorted={sort?.key === "docNumber" || sort?.key === "title" ? sort.dir : null}
           >
@@ -497,12 +497,12 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
           const on = selected.includes(row.id);
           const pin = on ? "bg-tint" : "bg-surface";
           return <tr key={row.id} className={on ? "[&>td]:bg-tint" : undefined}>
-            <Td className={`rail ${RAIL[row.revState ?? "NONE"] ?? "rail-none"} ${frozen ? "sticky left-0 z-[1]" : ""} ${pin}`}>
+            <Td className={`rail ${RAIL[row.revState ?? "NONE"] ?? "rail-none"} ${frozen ? "sticky left-0 z-1" : ""} ${pin}`}>
               <input aria-label={`Select ${row.docNumber}`} type="checkbox" checked={on} onChange={() => toggle(row.id)} />
             </Td>
-            <Td className={`${frozen ? "sticky left-10 z-[1]" : ""} min-w-[280px] ${pin}`}>
+            <Td className={`${frozen ? "sticky left-10 z-1" : ""} min-w-70 ${pin}`}>
               <span className="relative flex items-center gap-1.5">
-                <Link href={`/documents/${row.id}`} className="doc-number relative z-[1] whitespace-nowrap">{row.docNumber}</Link>
+                <Link href={`/documents/${row.id}`} className="doc-number relative z-1 whitespace-nowrap">{row.docNumber}</Link>
                 {row.revState === "SUPERSEDED" ? <span className="stamp text-violet-700">superseded</span> : null}
                 {row.revState === "VOID" ? <span className="stamp text-red-700">void</span> : null}
                 {row.placeholder ? <span className="stamp text-slate-500">number reserved</span> : null}
@@ -568,7 +568,7 @@ const COLUMNS: Column[] = [
     label: "Document state",
     note: "Where the document itself stands: planned, active, superseded, withdrawn. It is about the document, not any one revision.",
     cellClass: "whitespace-nowrap",
-    cell: (row, codes) => <CodeRef code={row.docStateLabel} note={codes[`DOC_STATE|${row.docState}`]} href={GUIDE.DOC_STATE} className="meta !font-sans" />,
+    cell: (row, codes) => <CodeRef code={row.docStateLabel} note={codes[`DOC_STATE|${row.docState}`]} href={GUIDE.DOC_STATE} className="meta font-sans!" />,
   },
   {
     key: "rev", sort: "rev",
@@ -583,7 +583,7 @@ const COLUMNS: Column[] = [
     cellClass: "whitespace-nowrap",
     cell: (row, codes) => (
       <>
-        <CodeRef code={row.revStateLabel} note={codes[`REV_STATE|${row.revState ?? ""}`]} href={row.revState ? GUIDE.REV_STATE : undefined} className={`meta !font-sans ${REV_INK[row.revState ?? ""] ?? ""}`} />
+        <CodeRef code={row.revStateLabel} note={codes[`REV_STATE|${row.revState ?? ""}`]} href={row.revState ? GUIDE.REV_STATE : undefined} className={`meta font-sans! ${REV_INK[row.revState ?? ""] ?? ""}`} />
         {/* Released, and nobody asked for it to be sent. It is in use; nobody
             has been told, including anyone whose approval it may still need. */}
         {row.notIssued ? <span title="Nobody has asked for it to be sent." className="ml-1.5 rounded border border-amber-400 px-1 text-[9px] font-bold uppercase tracking-wide text-amber-700">not issued</span> : null}
@@ -640,7 +640,7 @@ The revision is not released, so this status is not in force.`} href={GUIDE.STAT
     note: "How serious an error in it would be. It decides who must approve, how long it is kept, and the format it is kept in.",
     cellClass: "whitespace-nowrap",
     cell: (row, codes) => row.criticality
-      ? <CodeRef code={codes[`CRITICALITY_SHORT|${row.criticality}`] ?? row.criticality.replaceAll("_", " ").toLowerCase()} note={codes[`CRITICALITY|${row.criticality}`]} href={GUIDE.CRITICALITY} className="meta !font-sans" />
+      ? <CodeRef code={codes[`CRITICALITY_SHORT|${row.criticality}`] ?? row.criticality.replaceAll("_", " ").toLowerCase()} note={codes[`CRITICALITY|${row.criticality}`]} href={GUIDE.CRITICALITY} className="meta font-sans!" />
       : <Muted />,
   },
   {
@@ -649,7 +649,7 @@ The revision is not released, so this status is not in force.`} href={GUIDE.STAT
     note: "Who may see it. Above the open levels it is read only by the people named on the document itself — to anybody else it is not in lists, counts or searches.",
     cellClass: "whitespace-nowrap",
     cell: (row, codes) => row.confidentiality
-      ? <CodeRef code={codes[`CONFIDENTIALITY_SHORT|${row.confidentiality}`] ?? row.confidentiality.toLowerCase()} note={codes[`CONFIDENTIALITY|${row.confidentiality}`]} href={GUIDE.CONFIDENTIALITY} className="meta !font-sans" />
+      ? <CodeRef code={codes[`CONFIDENTIALITY_SHORT|${row.confidentiality}`] ?? row.confidentiality.toLowerCase()} note={codes[`CONFIDENTIALITY|${row.confidentiality}`]} href={GUIDE.CONFIDENTIALITY} className="meta font-sans!" />
       : <Muted />,
   },
   {

@@ -412,18 +412,18 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
                   it sits on is the page's own canvas, so an act passing under it
                   disappears behind the bar rather than showing through its
                   corners, and there is air above and below. */}
-              <div className="sticky top-[72px] z-10 bg-canvas pt-2 pb-3">
+              <div className="sticky top-18 z-10 bg-canvas pt-2 pb-3">
               <form className="register rounded-xl border border-line bg-surface px-4 py-2.5">
                 <input type="hidden" name="view" value="log" />
                 <div className="flex flex-wrap items-end gap-x-4 gap-y-2.5 lg:flex-nowrap">
-                  <label className="relative min-w-[12rem] flex-1">
+                  <label className="relative min-w-48 flex-1">
                     <span className="sr-only">Search the log</span>
                     <Search className="absolute top-1/2 left-0 h-4 w-4 -translate-y-1/2 text-slate-400" />
                     <input
                       name="q"
                       defaultValue={sp.q ?? ""}
                       placeholder="A number, a person, a detail"
-                      className="plain w-full !py-1.5 !pl-6 !text-[13px]"
+                      className="plain w-full py-1.5! pl-6! text-[13px]!"
                     />
                   </label>
                   <label className="shrink-0">
@@ -489,7 +489,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
                 </div>
               ))}
               {!log.length ? (
-                <p className="slip px-4 py-6 text-[13px] text-[color:var(--ink-soft)]">
+                <p className="slip px-4 py-6 text-[13px] text-(--ink-soft)">
                   {asked ? "Nothing in the log answers that." : "Nothing has happened yet."}
                 </p>
               ) : null}
@@ -509,7 +509,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           )}
         </main>
 
-        <aside className="grid min-w-0 gap-3 xl:sticky xl:top-[88px]">
+        <aside className="grid min-w-0 gap-3 xl:sticky xl:top-22">
           {journal.length && view !== "log" ? (
             <section className="home-rise rounded-xl border border-line bg-surface px-4 py-3" style={rise()}>
               <h2 className="mb-2.5 text-[11px] font-semibold tracking-[0.09em] text-slate-400 uppercase">{older.length ? "Lately" : `Since ${weekday(since)}`}</h2>
@@ -519,9 +519,9 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
                   const shape = read(e.entityLabel);
                   if (!kind || !shape) return null;
                   return (
-                    <li key={e.id} className="relative min-w-0 pb-2.5 pl-[18px] last:pb-0">
-                      <span className={`absolute top-[5px] left-0 h-[7px] w-[7px] rounded-full border-2 bg-surface ${kind.mark}`} />
-                      {i < journal.length - 1 ? <span className="absolute top-[14px] -bottom-px left-[3px] w-px bg-line" /> : null}
+                    <li key={e.id} className="relative min-w-0 pb-2.5 pl-4.5 last:pb-0">
+                      <span className={`absolute top-1.25 left-0 h-1.75 w-1.75 rounded-full border-2 bg-surface ${kind.mark}`} />
+                      {i < journal.length - 1 ? <span className="absolute top-3.5 -bottom-px left-0.75 w-px bg-line" /> : null}
                       {/* The lines are held to the width of the longest number in
                           the panel, so every revision lands in the same column
                           instead of drifting out to the panel's edge. */}
@@ -829,10 +829,10 @@ function Card({ aspect, rows, style }: { aspect: Aspect; rows: Row[]; style?: Re
       style={style}
       className="home-rise group relative flex min-w-0 flex-col overflow-hidden rounded-xl border border-line bg-surface px-4 pt-3.5 pb-3 transition hover:-translate-y-px hover:border-line-strong hover:shadow-md"
     >
-      <span className={`absolute inset-y-0 left-0 w-[3px] ${EDGE[aspect.accent]}`} aria-hidden="true" />
+      <span className={`absolute inset-y-0 left-0 w-0.75 ${EDGE[aspect.accent]}`} aria-hidden="true" />
 
       <span className="flex min-w-0 items-center gap-2">
-        <span className="grid h-[22px] w-[22px] shrink-0 place-items-center rounded-md bg-canvas-deep text-slate-500 [&_svg]:h-[13px] [&_svg]:w-[13px]">{aspect.icon}</span>
+        <span className="grid h-5.5 w-5.5 shrink-0 place-items-center rounded-md bg-canvas-deep text-slate-500 [&_svg]:h-3.25 [&_svg]:w-3.25">{aspect.icon}</span>
         <h2 className="truncate text-[13px] font-semibold text-slate-800">{aspect.title}</h2>
         <b className="ml-auto font-mono text-[22px] leading-none font-semibold tracking-tight tabular-nums text-slate-900">{rows.length}</b>
       </span>
@@ -881,7 +881,7 @@ function Queue({ aspect, rows, style }: { aspect: Aspect; rows: Row[]; style?: R
   return (
     <section className="home-rise mb-3.5 min-w-0 overflow-hidden rounded-xl border border-line bg-surface" style={style}>
       <header className="flex items-center gap-2.5 border-b border-line px-4 py-3">
-        <span className="grid h-[22px] w-[22px] place-items-center rounded-md bg-canvas-deep text-slate-500 [&_svg]:h-[13px] [&_svg]:w-[13px]">{aspect.icon}</span>
+        <span className="grid h-5.5 w-5.5 place-items-center rounded-md bg-canvas-deep text-slate-500 [&_svg]:h-3.25 [&_svg]:w-3.25">{aspect.icon}</span>
         <h2 className="text-[13.5px] font-semibold">{aspect.title}</h2>
         <span className="ml-auto font-mono text-xs text-slate-400">{rows.length}</span>
       </header>

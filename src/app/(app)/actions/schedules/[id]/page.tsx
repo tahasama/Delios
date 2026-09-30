@@ -50,7 +50,7 @@ export default async function ScheduleVersionDetailPage({ params }: { params: Pr
           <div className="flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-xl bg-tint text-link"><GitCompareArrows className="h-5 w-5" /></span><div><p className="text-sm font-semibold text-slate-900">Change summary</p><p className="mt-0.5 text-xs text-slate-500">Compared with {previous ? `${previous.versionLabel}, imported ${fmtDate(previous.importedAt)}` : "an empty starting point"}.</p></div></div>
           <div className="mt-5 grid grid-cols-5 gap-2"><ChangeMetric label="New" value={counts.new} tone="blue" /><ChangeMetric label="Date changes" value={counts.date} tone="amber" /><ChangeMetric label="Detail changes" value={counts.detail} tone="amber" /><ChangeMetric label="Removed" value={counts.removed} tone="red" /><ChangeMetric label="Unchanged" value={counts.unchanged} tone="slate" /></div>
         </section>
-        <section className={`min-w-[330px] rounded-2xl border p-6 shadow-sm ${version.status === "DRAFT" ? "border-amber-200 bg-amber-50" : "border-emerald-200 bg-emerald-50"}`}>
+        <section className={`min-w-82.5 rounded-2xl border p-6 shadow-sm ${version.status === "DRAFT" ? "border-amber-200 bg-amber-50" : "border-emerald-200 bg-emerald-50"}`}>
           <div className="flex items-center gap-3">{version.status === "DRAFT" ? <CircleAlert className="h-5 w-5 text-amber-700" /> : <CalendarCheck2 className="h-5 w-5 text-emerald-700" />}<div><p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Status</p><p className="mt-1 text-sm font-semibold text-slate-900">{version.status === "DRAFT" ? "Draft—live dates unchanged" : version.status === "PUBLISHED" ? "Published to live actions" : "Superseded history"}</p></div></div>
           {version.status === "DRAFT" ? <p className="mt-5 text-xs text-slate-600">Approve it in <Link href="/admin/controlled" className="font-semibold text-link">Controlled changes</Link> — the decision is recorded there with its reason.</p> : null}
           {version.publishedAt ? <p className="mt-4 text-xs text-slate-500">Published {fmtDate(version.publishedAt)} by {version.publishedByName}</p> : null}
@@ -75,7 +75,7 @@ function ChangeRow({ change }: { change: ScheduleChange }) {
     <tr className={tint}>
       <Td className="whitespace-nowrap"><ChangeChip type={change.type} /></Td>
       <Td className="whitespace-nowrap font-mono text-xs font-bold text-link">{change.activity.actionCode}</Td>
-      <Td className="min-w-[240px]"><p className="text-sm font-medium text-slate-800">{change.activity.name}</p><p className="mt-0.5 text-[11px] text-slate-400">{change.activity.externalId}</p></Td>
+      <Td className="min-w-60"><p className="text-sm font-medium text-slate-800">{change.activity.name}</p><p className="mt-0.5 text-[11px] text-slate-400">{change.activity.externalId}</p></Td>
       <Td className={`whitespace-nowrap text-xs tabular-nums text-slate-500 ${change.type === "DATE_CHANGED" ? "line-through decoration-slate-300" : ""}`}>{fmtDate(effectiveDate(change.previous))}</Td>
       <Td className="whitespace-nowrap text-xs font-semibold tabular-nums text-slate-800">{change.type === "REMOVED" ? "—" : fmtDate(effectiveDate(change.activity))}</Td>
       <Td className="text-xs text-slate-500">{change.activity.responsibleParty ?? "—"}</Td>

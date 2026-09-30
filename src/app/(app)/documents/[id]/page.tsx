@@ -465,7 +465,7 @@ export default async function DocumentDetailPage({
             id: "viewer",
             label: "Preview",
             content: pdf ? (
-              <iframe src={`/api/files/${pdf.id}`} title={`${doc.docNumber} rev ${shown?.value ?? ""}`} className="h-[70vh] min-h-[480px] w-full bg-slate-100" />
+              <iframe src={`/api/files/${pdf.id}`} title={`${doc.docNumber} rev ${shown?.value ?? ""}`} className="h-[70vh] min-h-120 w-full bg-slate-100" />
             ) : (
               <div className="grid h-48 place-items-center p-6 text-center">
                 <div>

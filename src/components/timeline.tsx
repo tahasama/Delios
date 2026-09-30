@@ -37,7 +37,7 @@ export function Timeline({ points, className }: { points: TimelinePoint[]; class
         <li key={`${point.label}-${i}`} className={point.here ? "relative rounded-lg bg-tint px-2.5 py-2 ring-1 ring-brand-line/30" : "relative"}>
           <span
             aria-hidden
-            className={`absolute -left-[27px] top-1 h-3 w-3 rounded-full ${
+            className={`absolute -left-6.75 top-1 h-3 w-3 rounded-full ${
               point.here ? "bg-brand-strong ring-4 ring-tint" : point.skipped ? "border-2 border-line bg-slate-100" : point.at ? "bg-emerald-500" : "border-2 border-line-strong bg-surface"
             }`}
           />

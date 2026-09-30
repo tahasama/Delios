@@ -161,7 +161,7 @@ export function ReviewsRegister({ plate, rows, total, filters, filterOptions, fa
               name="q"
               defaultValue={filters.q}
               placeholder={'A space narrows, a comma widens: pump ME  ·  RV-0021, RV-0034  ·  "feed pump"'}
-              className="plain w-full !py-2 !pl-6 !text-[13.5px]"
+              className="plain w-full py-2! pl-6! text-[13.5px]!"
             />
           </label>
           <button className="ask" data-on={facets.length ? "true" : "false"} disabled={pending}>
@@ -247,7 +247,7 @@ export function ReviewsRegister({ plate, rows, total, filters, filterOptions, fa
             onReorder={moveTo}
             head={
               <tr>
-                <Th className={`rail-head ${frozen ? "sticky left-0 z-[4]" : ""} w-10`}>
+                <Th className={`rail-head ${frozen ? "sticky left-0 z-4" : ""} w-10`}>
                   <input
                     aria-label="Select every review on this page"
                     type="checkbox"
@@ -255,7 +255,7 @@ export function ReviewsRegister({ plate, rows, total, filters, filterOptions, fa
                     onChange={() => { setAllMatching(false); setSelected(pageSelected ? [] : rows.map((row) => row.id)); }}
                   />
                 </Th>
-                <Th className={`${frozen ? "sticky left-10 z-[4]" : ""} min-w-[240px]`} label="Review">
+                <Th className={`${frozen ? "sticky left-10 z-4" : ""} min-w-60`} label="Review">
                   <span className="inline-flex items-center gap-2">
                     <SortButton label="Review" on={sort?.key === "number" ? sort.dir : null} onClick={() => go(sortHref("number"))} />
                     <span className="text-slate-300">/</span>
@@ -289,7 +289,7 @@ export function ReviewsRegister({ plate, rows, total, filters, filterOptions, fa
               const on = selected.includes(row.id);
               return (
                 <tr key={row.id} className={on ? "[&>td]:bg-tint" : undefined}>
-                  <Td className={`rail ${railFor(row)} ${frozen ? "sticky left-0 z-[1]" : ""} ${on ? "bg-tint" : "bg-surface"}`}>
+                  <Td className={`rail ${railFor(row)} ${frozen ? "sticky left-0 z-1" : ""} ${on ? "bg-tint" : "bg-surface"}`}>
                     <input
                       aria-label={`Select review ${row.number ?? row.docNumber}`}
                       type="checkbox"
@@ -300,7 +300,7 @@ export function ReviewsRegister({ plate, rows, total, filters, filterOptions, fa
                       }}
                     />
                   </Td>
-                  <Td className={`${frozen ? "sticky left-10 z-[1]" : ""} min-w-[240px] ${on ? "bg-tint" : "bg-surface"}`}>
+                  <Td className={`${frozen ? "sticky left-10 z-1" : ""} min-w-60 ${on ? "bg-tint" : "bg-surface"}`}>
                     <span className="flex items-baseline gap-2">
                       <Link href={`/reviews/${row.id}`} className="doc-number">{row.number ?? "—"}</Link>
                       <Link href={`/documents/${row.documentId}`} className="doc-number text-slate-500">{row.docNumber}</Link>

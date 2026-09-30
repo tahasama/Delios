@@ -139,7 +139,7 @@ export default async function AdminDistributionPage({ searchParams }: { searchPa
           id="distribution-matrix"
           head={
             <tr>
-              <Th className="sticky left-0 z-[4] min-w-[220px] align-bottom">Discipline</Th>
+              <Th className="sticky left-0 z-4 min-w-55 align-bottom">Discipline</Th>
               {functions.map((f) => (
                 <Th key={f.id} label={f.name} className="px-1.5 text-center align-bottom normal-case tracking-normal">
                   <span className="mx-auto block whitespace-nowrap pb-1 text-[11px] font-semibold text-slate-600 [text-orientation:mixed] [writing-mode:vertical-rl] rotate-180">{f.name}</span>
@@ -151,7 +151,7 @@ export default async function AdminDistributionPage({ searchParams }: { searchPa
         >
           {grid.map(({ type, cells }) => (
             <tr key={type.code}>
-              <Td className="sticky left-0 z-[1] whitespace-nowrap bg-surface py-1.5 text-xs">
+              <Td className="sticky left-0 z-1 whitespace-nowrap bg-surface py-1.5 text-xs">
                 <span className="font-mono text-[11px] font-semibold text-slate-700">{type.code}</span>{" "}
                 <span className="text-slate-500">{type.label}</span>
               </Td>

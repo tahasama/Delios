@@ -393,7 +393,7 @@ export function NeededTable({ rows, chips, plate, exportHref, empty, link }: {
             }
             head={
               <tr>
-                <Th className={`rail-head ${frozen ? "sticky left-0 z-[4]" : ""} w-10`}>
+                <Th className={`rail-head ${frozen ? "sticky left-0 z-4" : ""} w-10`}>
                   <input
                     aria-label="Select every document on this page"
                     type="checkbox"
@@ -403,7 +403,7 @@ export function NeededTable({ rows, chips, plate, exportHref, empty, link }: {
                       : [...selected, ...shown.map((row) => row.id).filter((id) => !selected.includes(id))])}
                   />
                 </Th>
-                <Th className={`${frozen ? "sticky left-10 z-[4]" : ""} min-w-[220px]`} label="Document" sorted={sort?.key === "document" ? sort.dir : null}>
+                <Th className={`${frozen ? "sticky left-10 z-4" : ""} min-w-55`} label="Document" sorted={sort?.key === "document" ? sort.dir : null}>
                   <span className="inline-flex items-center gap-2">
                     <SortButton label="Document" on={sort?.key === "document" ? sort.dir : null} onClick={() => sortBy("document")} />
                     {/* Freezing only ever affects this column, so it is switched here. */}
@@ -435,7 +435,7 @@ export function NeededTable({ rows, chips, plate, exportHref, empty, link }: {
               const on = selected.includes(row.id);
               return (
                 <tr key={row.id} className={on ? "[&>td]:bg-tint" : undefined}>
-                  <Td className={`rail ${railFor(row)} ${frozen ? "sticky left-0 z-[1]" : ""} ${on ? "bg-tint" : "bg-surface"}`}>
+                  <Td className={`rail ${railFor(row)} ${frozen ? "sticky left-0 z-1" : ""} ${on ? "bg-tint" : "bg-surface"}`}>
                     <input
                       aria-label={`Select document ${row.docNumber}`}
                       type="checkbox"
@@ -443,7 +443,7 @@ export function NeededTable({ rows, chips, plate, exportHref, empty, link }: {
                       onChange={() => setSelected((held) => held.includes(row.id) ? held.filter((one) => one !== row.id) : [...held, row.id])}
                     />
                   </Td>
-                  <Td className={`${frozen ? "sticky left-10 z-[1]" : ""} min-w-[220px] ${on ? "bg-tint" : "bg-surface"}`}>
+                  <Td className={`${frozen ? "sticky left-10 z-1" : ""} min-w-55 ${on ? "bg-tint" : "bg-surface"}`}>
                     <Link href={`/documents/${row.documentId}`} className="doc-number">{row.docNumber}</Link>
                     <span className="doc-title block max-w-72 truncate" title={row.title}>{row.title}</span>
                   </Td>

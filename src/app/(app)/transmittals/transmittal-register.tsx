@@ -198,7 +198,7 @@ export function TransmittalRegister({ rows, total, filters, filterOptions, expor
               name="q"
               defaultValue={filters.q}
               placeholder={'A space narrows, a comma widens: TR pumps  ·  TRN-001, TRN-002  ·  "for approval"'}
-              className="plain w-full !py-1.5 !pl-6 !text-[13px]"
+              className="plain w-full py-1.5! pl-6! text-[13px]!"
             />
           </label>
           {/* Nothing is asked of the database until this is pressed: one query
@@ -283,7 +283,7 @@ export function TransmittalRegister({ rows, total, filters, filterOptions, expor
               </a>
             }
             head={<tr>
-              <Th className={`rail-head ${frozen ? "sticky left-0 z-[4]" : ""} w-10`}>
+              <Th className={`rail-head ${frozen ? "sticky left-0 z-4" : ""} w-10`}>
                 <input
                   aria-label="Select every transmittal on this page"
                   type="checkbox"
@@ -291,7 +291,7 @@ export function TransmittalRegister({ rows, total, filters, filterOptions, expor
                   onChange={() => { setAllMatching(false); setSelected(pageSelected ? [] : rows.map((row) => row.id)); }}
                 />
               </Th>
-              <Th className={`${frozen ? "sticky left-10 z-[4]" : ""} min-w-[280px]`} label="Transmittal">
+              <Th className={`${frozen ? "sticky left-10 z-4" : ""} min-w-70`} label="Transmittal">
                 <span className="inline-flex items-center gap-2">
                   <SortButton label="Number" on={sort?.key === "number" ? sort.dir : null} onClick={() => go(sortHref("number"))} />
                   <span className="text-slate-300">/</span>
@@ -324,7 +324,7 @@ export function TransmittalRegister({ rows, total, filters, filterOptions, expor
               const on = selected.includes(row.id);
               return (
               <tr key={row.id} className={on ? "[&>td]:bg-tint" : undefined}>
-                <Td className={`rail ${RAIL[row.status] ?? "rail-none"} ${frozen ? "sticky left-0 z-[1]" : ""} ${on ? "bg-tint" : "bg-surface"}`}>
+                <Td className={`rail ${RAIL[row.status] ?? "rail-none"} ${frozen ? "sticky left-0 z-1" : ""} ${on ? "bg-tint" : "bg-surface"}`}>
                   <input
                     aria-label={`Select ${row.number}`}
                     type="checkbox"
@@ -335,7 +335,7 @@ export function TransmittalRegister({ rows, total, filters, filterOptions, expor
                     }}
                   />
                 </Td>
-                <Td className={`${frozen ? "sticky left-10 z-[1]" : ""} min-w-[280px] bg-surface`}>
+                <Td className={`${frozen ? "sticky left-10 z-1" : ""} min-w-70 bg-surface`}>
                   {/* The direction is read before any word in the row, so it sits
                       with the number rather than in a column of its own. */}
                   <span className="flex items-baseline gap-2">
@@ -402,7 +402,7 @@ const COLUMNS: Column[] = [
     key: "status", sort: "status", label: "Status",
     note: "Draft means nothing has been sent. Issued means the recipients were told. On what arrives: to check, then accepted or rejected, then closed.",
     cellClass: "whitespace-nowrap",
-    cell: (row) => <span className={`meta !font-sans ${STATUS_INK[row.status] ?? ""}`}>{row.statusLabel}</span>,
+    cell: (row) => <span className={`meta font-sans! ${STATUS_INK[row.status] ?? ""}`}>{row.statusLabel}</span>,
   },
   {
     key: "seen", label: "Seen by",

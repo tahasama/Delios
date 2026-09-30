@@ -308,7 +308,7 @@ export function Sidebar({ perms }: { perms: NavPermissions }) {
 
   return (
     <aside
-      className="sidebar-desktop palette-light no-print fixed inset-y-0 left-0 z-20 hidden w-[268px] flex-col border-r border-[#254663] bg-[#102a43] px-4 py-5 text-slate-200 lg:flex rail:px-2.5 dark:border-white/5 dark:bg-[#0c1522]"
+      className="sidebar-desktop palette-light no-print fixed inset-y-0 left-0 z-20 hidden w-67 flex-col border-r border-[#254663] bg-[#102a43] px-4 py-5 text-slate-200 lg:flex rail:px-2.5 dark:border-white/5 dark:bg-[#0c1522]"
       style={{ width: "var(--sidebar-w)" }}
     >
       <SidebarBody perms={perms} onTip={(t) => { if (!dragging.current) setTip(t); }} />
@@ -365,7 +365,7 @@ export function MobileNav({ perms }: { perms: NavPermissions }) {
       {open ? (
         <div className="no-print fixed inset-0 z-40 lg:hidden">
           <button type="button" aria-label="Close navigation" onClick={() => setOpen(false)} className="absolute inset-0 bg-slate-900/50" />
-          <div className="palette-light absolute inset-y-0 left-0 flex w-[268px] max-w-[85vw] flex-col bg-[#102a43] px-4 py-5 text-slate-200 shadow-2xl">
+          <div className="palette-light absolute inset-y-0 left-0 flex w-67 max-w-[85vw] flex-col bg-[#102a43] px-4 py-5 text-slate-200 shadow-2xl">
             <button
               type="button"
               onClick={() => setOpen(false)}

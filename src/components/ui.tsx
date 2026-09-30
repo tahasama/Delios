@@ -306,7 +306,7 @@ export function Banner({ tone = "info", title, children }: { tone?: "info" | "wa
 }
 
 export function Clause({ children }: { children: React.ReactNode }) {
-  return <span className="ml-1 rounded-[0.25rem] bg-canvas-deep px-1.5 py-0.5 font-mono text-[10px] text-slate-500">{children}</span>;
+  return <span className="ml-1 rounded-sm bg-canvas-deep px-1.5 py-0.5 font-mono text-[10px] text-slate-500">{children}</span>;
 }
 
 export function KeyValue({ items }: { items: { label: string; value: React.ReactNode; clause?: string }[] }) {

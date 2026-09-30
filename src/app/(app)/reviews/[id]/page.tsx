@@ -249,7 +249,7 @@ export default async function ReviewCyclePage({ params }: { params: Promise<{ id
               <span className="text-[11px] text-slate-400">{rendition ? `revision ${rev.value}, as the reviewers see it` : "no PDF to review yet"}</span>
               {rendition ? <a href={`/api/files/${rendition.id}`} target="_blank" className="ml-auto inline-flex items-center gap-1 text-[11px] font-semibold text-link hover:underline"><ExternalLink className="h-3.5 w-3.5" /> Open PDF</a> : null}
             </div>
-            {rendition ? <iframe src={`/api/files/${rendition.id}`} title={`${doc.docNumber} revision ${rev.value}`} className="block h-[640px] w-full bg-canvas"/> : <div className="grid h-48 place-items-center bg-canvas/50 p-6 text-center"><div><FileText className="mx-auto h-8 w-8 text-slate-400"/><p className="mt-2 text-sm font-semibold text-slate-700">No PDF attached</p><Link href={`/documents/${doc.id}#workflow`} className="mt-2 inline-block text-xs font-semibold text-link hover:underline">Attach it on the document →</Link></div></div>}
+            {rendition ? <iframe src={`/api/files/${rendition.id}`} title={`${doc.docNumber} revision ${rev.value}`} className="block h-160 w-full bg-canvas"/> : <div className="grid h-48 place-items-center bg-canvas/50 p-6 text-center"><div><FileText className="mx-auto h-8 w-8 text-slate-400"/><p className="mt-2 text-sm font-semibold text-slate-700">No PDF attached</p><Link href={`/documents/${doc.id}#workflow`} className="mt-2 inline-block text-xs font-semibold text-link hover:underline">Attach it on the document →</Link></div></div>}
           </section>
 
         </div>
