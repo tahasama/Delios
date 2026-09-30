@@ -324,28 +324,3 @@ export async function chaseTransmittalAction(_prev: { error?: string } | undefin
  * left everything else open for ever. Closing says the exchange is finished:
  * what was asked for came back, or nothing more is expected.
  */
-export async function closeTransmittalAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
-  const ctx = await requireScope();
-  const { user, db } = ctx;
-  const id = String(formData.get("transmittalId") ?? "");
-  if (!(isController(user) || isAdmin(user))) return { error: "Document Control closes a transmittal." };
-
-  const t = await db.transmittal.findUniqueOrThrow({ where: { id }, include: { answers: { select: { id: true } } } });
-  if (t.status === "DRAFT") return { error: "A draft has not been sent, so there is nothing to close." };
-  if (t.status === "CLOSED") return { error: "It is already closed." };
-  if (t.responseRequired && !t.answers.length) {
-    return { error: "An answer was asked for and none has come back. Raise the answer against it first — Reply, on the transmittal — or record that none came." };
-  }
-
-  await db.transmittal.update({ where: { id }, data: { status: "CLOSED" } });
-  await audit({
-    actor: user,
-    action: "TRANSMITTAL_CLOSED",
-    entityType: "Transmittal",
-    entityId: id,
-    entityLabel: t.number,
-    detail: t.answers.length ? `Closed after ${t.answers.length} answer(s).` : "Closed — nothing further was expected.",
-  });
-  revalidatePath(`/transmittals/${id}`);
-  return {};
-}

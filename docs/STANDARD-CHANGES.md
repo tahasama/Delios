@@ -221,22 +221,22 @@ page; `/transmittals/new?replyTo=`.
 
 ---
 
-## 12 · Two acts the Standard does not name
+## 12 · An act the Standard does not name
 
 **Clause:** §11.5 *Receipt*, §11.9 *Acceptance of transmittals*, §11.12 *Time
 limits*.
 
-1. **Telling them again.** Where an addressed recipient has not opened a
-   transmittal, the control function may notify them again. The day is recorded
-   against that recipient and in the audit trail. Without this the record was
-   silent about the commonest failure in distribution: nobody looked.
-2. **Closing a transmittal.** A transmittal is closed deliberately when the
-   exchange is finished. Closing is refused while an answer is owed under
-   §11.12 and none has come back. Until now it closed only as a side effect of
-   acceptance, which left every other transmittal open for ever.
+**Telling them again.** Where an addressed recipient has not opened a
+transmittal, the control function may notify them again. The day is recorded
+against that recipient and in the audit trail. Without this the record was
+silent about the commonest failure in distribution: nobody looked.
 
-**Depends on it:** `chaseTransmittalAction`, `closeTransmittalAction`; audit
-acts `TRANSMITTAL_CHASED`, `TRANSMITTAL_CLOSED`.
+A transmittal is not closed by hand. Once issued it is the proof that it was
+sent, and opening it is the proof it reached the person addressed; what happens
+next is a transmittal of its own — an answer, a reply saying what is wrong, an
+onward issue to colleagues. Nothing about the first one needs to be ended.
+
+**Depends on it:** `chaseTransmittalAction`; audit act `TRANSMITTAL_CHASED`.
 
 ---
 
@@ -258,7 +258,7 @@ transmittal page, which keeps ✓ / ✗ / — after the check is made.
 
 **Clause:** §16.6 *Views*, and wherever the Standard enumerates recorded acts.
 
-`ACTION_CARRIED`, `ACTION_STOPPED`, `TRANSMITTAL_CHASED`, `TRANSMITTAL_CLOSED`.
+`ACTION_CARRIED`, `ACTION_STOPPED`, `TRANSMITTAL_CHASED`.
 
 Each is a decision somebody is answerable for, so each is a recorded act and
 each belongs in the project's own log, not only in the administrator's audit

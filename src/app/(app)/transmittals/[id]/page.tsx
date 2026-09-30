@@ -10,7 +10,6 @@ import {
   issueTransmittalAction,
   acceptanceCheckAction,
   chaseTransmittalAction,
-  closeTransmittalAction,
 } from "@/lib/actions/transmittals";
 import { preflight } from "@/lib/rules/preflight";
 import { PreflightPanel, Guarded } from "@/components/preflight";
@@ -189,9 +188,6 @@ export default async function TransmittalDetailPage({ params, searchParams }: { 
                 <Guarded result={await preflight("ISSUE", { transmittalId: t.id })}>
                   <ActionForm action={issueTransmittalAction} submitLabel="Issue" size="sm" hidden={{ transmittalId: t.id }} />
                 </Guarded>
-              ) : null}
-              {controller && !["DRAFT", "CLOSED", "REJECTED"].includes(t.status) ? (
-                <ActionForm action={closeTransmittalAction} submitLabel="Close it" size="sm" variant="secondary" hidden={{ transmittalId: t.id }} />
               ) : null}
             </div>
           </div>
