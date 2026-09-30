@@ -18,6 +18,7 @@ import { CarriedTable, type CarriedRow } from "./carried-table";
 import { Timeline } from "@/components/timeline";
 import { SendForReview } from "@/components/send-for-review-panel";
 import { ArrowLeft } from "lucide-react";
+import { getActiveSet } from "@/lib/config";
 
 export const dynamic = "force-dynamic";
 
@@ -79,6 +80,9 @@ export default async function TransmittalDetailPage({ params, searchParams }: { 
   const mine = t.recipients.find((recipient) => recipient.userId === user.id) ?? null;
   const conditions: { key: string; pass: boolean; notApplicable?: boolean }[] = t.conditionsResult ? JSON.parse(t.conditionsResult) : [];
   const readyToRoute = t.items.filter((one) => one.revision.state === "IN_PREPARATION").map((one) => one.revisionId);
+  // Whether the reason it was sent for asks for a review at all (§11.11). Where
+  // it does not, acceptance is the end of it and "Sent for review" is skipped.
+  const reviewExpected = ((await getActiveSet("REASONS_FOR_ISSUE")).find((one) => one.code === t.reasonForIssue)?.props as Record<string, unknown> | undefined)?.reviewCycle === true;
 
   // Addressed to, and copied in. Seen is read from the first list only: being
   // copied in is being told, not being asked, so a transmittal is not seen
@@ -118,7 +122,6 @@ export default async function TransmittalDetailPage({ params, searchParams }: { 
     ISSUED: "bg-amber-100 text-amber-800 ring-amber-300",
     ACCEPTED: "bg-emerald-100 text-emerald-800 ring-emerald-300",
     REJECTED: "bg-red-100 text-red-800 ring-red-300",
-    CLOSED: "bg-slate-200 text-slate-700 ring-slate-300",
   };
 
   const carried: CarriedRow[] = t.items.map((item) => {
@@ -410,7 +413,7 @@ export default async function TransmittalDetailPage({ params, searchParams }: { 
             </section>
           ) : null}
 
-          {t.direction === "INCOMING" && ["ACCEPTED", "CLOSED"].includes(t.status) && controller && readyToRoute.length ? (
+          {t.direction === "INCOMING" && t.status === "ACCEPTED" && controller && readyToRoute.length ? (
             <section className="register register-sheet register-sheet-open">
               <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2 sm:px-6">
                 <span className="stencil mr-1 text-slate-400">Send for review</span>
@@ -442,7 +445,6 @@ export default async function TransmittalDetailPage({ params, searchParams }: { 
                   at: t.answers[0]?.dateOfIssue ?? null,
                   holder: t.answers.length ? t.answers[0].number : t.responseDueDate ? fmtDate(t.responseDueDate) : "no date",
                 }] : []),
-                { label: "Closed", at: t.status === "CLOSED" ? t.acceptanceCheckedAt ?? t.createdAt : null, holder: t.status === "CLOSED" ? "nothing further is expected" : null },
               ] : [
                 { label: "They sent it", at: t.dateOfIssue, holder: t.issuingParty },
                 { label: "It arrived", at: t.receivedDate, holder: t.receivedByParty ?? null },
@@ -452,13 +454,12 @@ export default async function TransmittalDetailPage({ params, searchParams }: { 
                   holder: t.checkedByName ?? null,
                   detail: t.status === "REJECTED" ? t.rejectionReason : t.acceptanceNotes,
                 },
-                { label: "Sent for review", at: t.cycles[0]?.submittedAt ?? null, holder: t.cycles.length ? `${t.cycles.length} review${t.cycles.length === 1 ? "" : "s"}` : null, skipped: ["CLOSED"].includes(t.status) && !t.cycles.length },
+                { label: "Sent for review", at: t.cycles[0]?.submittedAt ?? null, holder: t.cycles.length ? `${t.cycles.length} review${t.cycles.length === 1 ? "" : "s"}` : null, skipped: t.status === "ACCEPTED" && !t.cycles.length && !reviewExpected },
                 ...(t.responseRequired || t.answers.length ? [{
                   label: t.answers.length ? "Answered" : "An answer is due",
                   at: t.answers[0]?.dateOfIssue ?? null,
                   holder: t.answers.length ? t.answers[0].number : t.responseDueDate ? fmtDate(t.responseDueDate) : "no date",
                 }] : []),
-                { label: "Closed", at: t.status === "CLOSED" ? t.acceptanceCheckedAt : null },
               ]}
             />
           </Card>

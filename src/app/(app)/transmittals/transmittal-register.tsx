@@ -47,7 +47,7 @@ const RAIL: Record<string, string> = {
   DRAFT: "rail-none", ISSUED: "rail-review", ACCEPTED: "rail-released", REJECTED: "rail-void", CLOSED: "rail-superseded",
 };
 const STATUS_INK: Record<string, string> = {
-  DRAFT: "text-slate-500", ISSUED: "text-sky-700", ACCEPTED: "text-emerald-700", REJECTED: "text-red-700", CLOSED: "text-violet-700",
+  DRAFT: "text-slate-500", ISSUED: "text-sky-700", ACCEPTED: "text-emerald-700", REJECTED: "text-red-700",
 };
 
 type Column = {

@@ -19,10 +19,9 @@ const STATUSES = [
   { code: "TO_CHECK", label: "To check — arrived, waiting on us" },
   { code: "ACCEPTED", label: "Accepted" },
   { code: "REJECTED", label: "Rejected" },
-  { code: "CLOSED", label: "Closed" },
 ] as const;
 const STATUS_LABEL: Record<string, string> = {
-  DRAFT: "Draft", ISSUED: "Issued", ACCEPTED: "Accepted", REJECTED: "Rejected", CLOSED: "Closed",
+  DRAFT: "Draft", ISSUED: "Issued", ACCEPTED: "Accepted", REJECTED: "Rejected",
 };
 
 const WAYS = [

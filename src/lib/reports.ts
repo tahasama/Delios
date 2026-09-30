@@ -224,8 +224,8 @@ async function transmittals(t: Tenant): Promise<Report> {
   const since = new Date(Date.now() - 180 * DAY);
   const now = new Date();
   const list = await t.db.transmittal.findMany({
-    where: { OR: [{ dateOfIssue: { gte: since } }, { status: "ISSUED", direction: "INCOMING" }, { responseRequired: true, status: { notIn: ["CLOSED"] } }] },
-    include: { recipients: { select: { name: true, openedAt: true } }, items: { select: { id: true } } },
+    where: { OR: [{ dateOfIssue: { gte: since } }, { status: "ISSUED", direction: "INCOMING" }, { responseRequired: true, answers: { none: {} } }] },
+    include: { recipients: { select: { name: true, openedAt: true } }, items: { select: { id: true } }, answers: { select: { id: true } } },
     orderBy: { dateOfIssue: "desc" },
   });
   const segments: Segment[] = [
@@ -247,7 +247,7 @@ async function transmittals(t: Tenant): Promise<Report> {
   const waitingOn = (x: (typeof list)[number]): Cell => {
     if (x.status === "REJECTED") return { text: "Rejected — awaiting resubmission", tone: "warn" };
     if (x.direction === "INCOMING" && x.status === "ISSUED") return { text: "Us — check and accept", tone: "warn" };
-    if (x.responseRequired && x.status !== "CLOSED" && x.responseDueDate) {
+    if (x.responseRequired && !x.answers.length && x.responseDueDate) {
       return x.responseDueDate < now ? { text: `Response overdue since ${iso(x.responseDueDate)}`, tone: "bad" } : { text: `Response due ${iso(x.responseDueDate)}` };
     }
     return "—";
@@ -258,7 +258,7 @@ async function transmittals(t: Tenant): Promise<Report> {
     x.items.length, `${x.recipients.filter((r) => r.openedAt).length}/${x.recipients.length}`, waitingOn(x),
   ] as Cell[]);
   const toCheck = list.filter((x) => x.direction === "INCOMING" && x.status === "ISSUED").length;
-  const overdue = list.filter((x) => x.responseRequired && x.responseDueDate && x.responseDueDate < now && x.status !== "CLOSED").length;
+  const overdue = list.filter((x) => x.responseRequired && x.responseDueDate && x.responseDueDate < now && !x.answers.length).length;
   return {
     id: "transmittals", title: "Transmittal log", question: "What went out and came in, and what is still waiting?",
     seeAlso: { label: "Open transmittals", href: "/transmittals?view=all" },

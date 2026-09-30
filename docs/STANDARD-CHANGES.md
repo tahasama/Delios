@@ -236,6 +236,11 @@ sent, and opening it is the proof it reached the person addressed; what happens
 next is a transmittal of its own — an answer, a reply saying what is wrong, an
 onward issue to colleagues. Nothing about the first one needs to be ended.
 
+So a transmittal has no *closed* status. Where §11.11 says a transmittal with no
+review obligation is complete on acceptance, *accepted* is that completion; no
+further status is set. Whether an answer owed under §11.12 is still outstanding
+is read from whether one has been linked to it, never from a status.
+
 **Depends on it:** `chaseTransmittalAction`; audit act `TRANSMITTAL_CHASED`.
 
 ---

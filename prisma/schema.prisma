@@ -829,7 +829,7 @@ model Transmittal {
   responseRequired    Boolean                @default(false)
   responsePeriodDays  Int?
   responseDueDate     DateTime?
-  status              String                 @default("DRAFT") // DRAFT ISSUED ACCEPTED REJECTED CLOSED
+  status              String                 @default("DRAFT") // DRAFT ISSUED ACCEPTED REJECTED
   conditionsResult    String? // JSON of the 11.9 a–e acceptance check
   checkedByName       String?
   acceptanceCheckedAt DateTime?

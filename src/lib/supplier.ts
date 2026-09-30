@@ -81,7 +81,7 @@ export async function supplierRows(t: Tenant, pkg: { partyCode: string | null; c
       else if (rev.state === "IN_REVIEW") state = "IN_REVIEW";
       else if (rev.submittedAt && incoming?.status === "REJECTED") { state = "REJECTED"; reason = incoming.rejectionReason; }
       else if (rev.submittedAt && incoming?.status === "ISSUED") state = "AWAITING_CHECK";
-      else if (rev.submittedAt && incoming && ["ACCEPTED", "CLOSED"].includes(incoming.status)) state = "TO_ROUTE";
+      else if (rev.submittedAt && incoming && incoming.status === "ACCEPTED") state = "TO_ROUTE";
     }
     const arrivedOnTime = rev?.submittedAt ? rev.submittedAt.getTime() <= due.getTime() : null;
     const late = state === "NOT_SENT" ? due.getTime() < now : arrivedOnTime === false;

@@ -263,10 +263,8 @@ export async function acceptanceCheckAction(_prev: { error?: string } | undefine
       `/transmittals/${t.id}`
     );
   }
-  // transmittals with no review obligation are complete on acceptance (§11.11)
-  if (allPass && (reasonRow?.props as Record<string, unknown> | undefined)?.reviewCycle !== true) {
-    await db.transmittal.update({ where: { id }, data: { status: "CLOSED" } });
-  }
+  // A transmittal with no review obligation is complete on acceptance (§11.11):
+  // accepted is its last status, with nothing further to set.
   // §11.11 — where the reason requires review, Document Control sends the
   // accepted documents down a review route from the transmittal page.
   revalidatePath(`/transmittals/${id}`);

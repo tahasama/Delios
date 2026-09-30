@@ -27,7 +27,7 @@ export type Untold = {
 const keyOf = (r: { userId: string | null; name: string; organization: string | null }) =>
   r.userId ? `user:${r.userId}` : `name:${(r.organization ? `${r.name} (${r.organization})` : r.name).trim().toLowerCase().replace(/\s+/g, " ")}`;
 
-const SENT = ["ISSUED", "ACCEPTED", "CLOSED"];
+const SENT = ["ISSUED", "ACCEPTED"];
 
 export async function untoldRecipients(t: Pick<Tenant, "db">): Promise<Untold[]> {
   const superseded = await t.db.revision.findMany({

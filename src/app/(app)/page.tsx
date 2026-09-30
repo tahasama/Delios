@@ -97,7 +97,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
 
   // Accepted submissions Document Control still has to route.
   const toRoute = controller
-    ? await db.transmittal.findMany({ where: { direction: "INCOMING", status: { in: ["ACCEPTED", "CLOSED"] }, items: { some: { revision: { state: "IN_PREPARATION" } } } }, orderBy: { dateOfIssue: "asc" }, take: 20 })
+    ? await db.transmittal.findMany({ where: { direction: "INCOMING", status: "ACCEPTED", items: { some: { revision: { state: "IN_PREPARATION" } } } }, orderBy: { dateOfIssue: "asc" }, take: 20 })
     : [];
 
   // What moved while the reader was away: the last working day's worth of the
