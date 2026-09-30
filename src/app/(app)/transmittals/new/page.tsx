@@ -110,9 +110,10 @@ export default async function NewTransmittalPage({ searchParams }: { searchParam
         reviewers={reviewers.map((u) => ({ id: u.id, name: u.name, role: u.functionName }))}
         companies={companies}
         ourOrganization={ourOrganization}
-        defaultDirection={answering
-          ? (answering.direction === "OUTGOING" ? "INCOMING" : "OUTGOING")
-          : sp.direction === "INCOMING" ? "INCOMING" : "OUTGOING"}
+        // Sending is what the form is mostly for, so it opens on sending —
+        // replies included. Only a link that asks to record something
+        // received opens the other way.
+        defaultDirection={sp.direction === "INCOMING" ? "INCOMING" : "OUTGOING"}
         preselectedRevisionIds={preselected}
         prefill={{
           revisionIds: (sp.revisions ?? "").split(",").filter(Boolean),

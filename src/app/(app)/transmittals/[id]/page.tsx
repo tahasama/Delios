@@ -273,7 +273,7 @@ export default async function TransmittalDetailPage({ params, searchParams }: { 
                     {mayNotify ? (
                       waiting.some((one) => one.id === person.id)
                         ? <input type="checkbox" name="recipientIds" value={person.id} form={`notify-again-${t.id}`} aria-label={`Notify ${person.name} again`} className="mt-1" />
-                        : <span className="w-[13px] shrink-0" aria-hidden />
+                        : <span className="w-3.25 shrink-0" aria-hidden />
                     ) : null}
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-slate-700">

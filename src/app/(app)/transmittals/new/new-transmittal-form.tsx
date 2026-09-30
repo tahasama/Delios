@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import { ActionForm } from "@/components/form";
 import { createTransmittalAction } from "@/lib/actions/transmittals";
@@ -34,7 +34,7 @@ const WAYS = {
   },
   INCOMING: {
     title: "We received",
-    says: "Something that reached us outside this system — by email, post, or a supplier's own portal. Recording it gives it a number and puts it in the register for Document Control to check on arrival. To pass something on to colleagues, send instead.",
+    says: "Something that reached us outside this system — by email, post, or a supplier's own portal. Recording it gives the transmittal its own number and puts it in the transmittal register for Document Control to check on arrival. The documents it carries must already be in the document register. To pass something on to colleagues, send instead.",
     Icon: ArrowDownLeft,
   },
 } as const;
@@ -88,6 +88,8 @@ export function NewTransmittalForm({
   // Creating a transmittal sends nothing by itself. Saying so, and offering to
   // do both at once, is why people stopped finding a draft they thought they had sent.
   const [issueNow, setIssueNow] = useState(true);
+  const [people, setPeople] = useState(0);
+  const countPeople = useCallback((n: number) => setPeople(n), []);
 
   const outgoing = direction === "OUTGOING";
   const needsReview = reasons.find((r) => r.code === reasonCode)?.props.reviewCycle === true;
@@ -257,12 +259,14 @@ export function NewTransmittalForm({
           {choices.length === 0 ? (
             <p className="px-5 py-6 text-center text-xs text-slate-400 sm:px-6">Nothing matches that.</p>
           ) : (
-            <ul className="divide-y divide-line">
+            // Five rows, then the list scrolls inside itself: the subject and the
+            // message stay in view however many documents there are.
+            <ul className="max-h-45 divide-y divide-line overflow-y-auto scroll-thin">
               {choices.map((r) => {
                 const on = chosen.includes(r.id);
                 return (
                   <li key={r.id}>
-                    <label className={cn("grid cursor-pointer grid-cols-[auto_minmax(0,14rem)_2.5rem_4rem_minmax(0,1fr)] items-center gap-x-3 px-5 py-2 text-[12.5px] transition-colors sm:px-6", on ? "bg-tint-soft" : "hover:bg-tint-soft")}>
+                    <label className={cn("grid h-9 cursor-pointer grid-cols-[auto_minmax(0,14rem)_2.5rem_4rem_minmax(0,1fr)] items-center gap-x-3 px-5 text-[12.5px] transition-colors sm:px-6", on ? "bg-tint-soft" : "hover:bg-tint-soft")}>
                       <input type="checkbox" name="revisionIds" value={r.id} checked={on} onChange={() => toggle(r.id)} />
                       <span className="truncate font-mono font-semibold text-slate-900">{r.number}</span>
                       <span className="font-mono text-slate-600">{r.rev}</span>
@@ -312,6 +316,7 @@ export function NewTransmittalForm({
               preselected={prefill?.userIds ?? []}
               preselectedCopies={prefill?.copyIds ?? []}
               label={outgoing ? "Sent to" : "For"}
+              onCount={countPeople}
             />
 
             {outgoing ? (
@@ -326,11 +331,11 @@ export function NewTransmittalForm({
             )}
           </div>
           {foot(2,
-            <button type="submit" data-on="true" className="ask">
+            <button type="submit" disabled={!people} data-on={people ? "true" : undefined} className="ask disabled:cursor-not-allowed disabled:opacity-50">
               {outgoing ? (issueNow ? "Create and send it" : "Create it as a draft") : "Record receipt"}
             </button>,
             // What is about to happen, in one line, beside the button that does it.
-            `${picked.length ? `${picked.length} document${picked.length === 1 ? "" : "s"}` : "A letter, no documents"} · ${reasonLabel ?? "no reason chosen"} · ${outgoing ? `from ${ourOrganization}` : `from ${party.trim() || "an unnamed party"}`}`,
+            !people ? "Name at least one person." : `${picked.length ? `${picked.length} document${picked.length === 1 ? "" : "s"}` : "A letter, no documents"} · ${reasonLabel ?? "no reason chosen"} · ${outgoing ? `from ${ourOrganization}` : `from ${party.trim() || "an unnamed party"}`}`,
           )}
         </section>
       </ActionForm>
