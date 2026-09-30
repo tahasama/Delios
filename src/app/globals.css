@@ -384,7 +384,14 @@ summary::-webkit-details-marker {
     background: radial-gradient(circle, rgba(122, 176, 224, 0.22), transparent 68%);
     pointer-events: none;
   }
-  :root.dark .home-band::after { background: radial-gradient(circle, rgba(95, 143, 191, 0.18), transparent 68%); }
+  /* In dark mode the brand blues are lifted so a button reads on a black page;
+     spread across a whole band they glare. The band keeps the same navy family
+     but set deep, a step above the surface, with a hairline to hold its edge. */
+  :root.dark .home-band {
+    background: linear-gradient(115deg, #0f1f33 0%, #16304d 58%, #1f4166 140%);
+    box-shadow: inset 0 0 0 1px rgb(95 143 191 / 0.16);
+  }
+  :root.dark .home-band::after { background: radial-gradient(circle, rgba(95, 143, 191, 0.14), transparent 68%); }
   .home-band > * { position: relative; }
   .home-rule { border-color: rgba(255, 255, 255, 0.18); }
   .home-soft { color: rgba(255, 255, 255, 0.72); }
