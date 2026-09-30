@@ -937,6 +937,16 @@ summary::-webkit-details-marker {
      window, the column list — and a clipped sheet cuts them off. Only the sheet
      holding the table needs to clip, so this one does not. */
   .register-sheet-open { overflow: visible; }
+  /* Not clipping means a band's square corners would stand out past the
+     sheet's rounded ones, so the first and last strips round their own. */
+  .register-sheet-open > :first-child {
+    border-top-left-radius: calc(0.875rem - 1px);
+    border-top-right-radius: calc(0.875rem - 1px);
+  }
+  .register-sheet-open > :last-child {
+    border-bottom-left-radius: calc(0.875rem - 1px);
+    border-bottom-right-radius: calc(0.875rem - 1px);
+  }
 
   /* A hint of grey behind each control, and nothing else: no box, no border.
      An underlined field on white reads as a word until the pointer finds it;
