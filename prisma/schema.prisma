@@ -851,6 +851,7 @@ model Transmittal {
   answers             Transmittal[]          @relation("TransmittalThread")
   items               TransmittalItem[]
   recipients          TransmittalRecipient[]
+  files               StoredFile[]
   cycles              ReviewCycle[]
 
   @@unique([projectId, number])
@@ -1252,7 +1253,7 @@ model StoredFile {
   size           Int
   mime           String
   sha256         String // integrity: verifiable as unaltered (§10.5)
-  kind           String // NATIVE | RENDITION | STAMPED | EVIDENCE
+  kind           String // NATIVE | RENDITION | STAMPED | EVIDENCE | ATTACHMENT
   revisionId     String?
   revision       Revision?    @relation(fields: [revisionId], references: [id])
   // A stamped copy returned by an outside party, or the proof of an exchange.
@@ -1263,6 +1264,11 @@ model StoredFile {
   createdAt      DateTime     @default(now())
   // The proof that a transmittal went to an organization outside the system.
   proofOf        TransmittalRecipient[]
+  // A file that came with a transmittal — their letter, the email, what they
+  // attached — kept as the record of what arrived. It is not a register
+  // document unless somebody makes it one.
+  transmittalId  String?
+  transmittal    Transmittal? @relation(fields: [transmittalId], references: [id])
 
   @@index([projectId])
 }

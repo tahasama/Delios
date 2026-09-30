@@ -129,7 +129,17 @@ export async function createDocumentAction(_prev: { error?: string } | undefined
 
   // An initial file creates the first revision immediately. A PDF is the
   // viewable copy (rendition); anything else is the editable source.
-  const upload = kind === "DOCUMENT" ? (formData.get("nativeFile") as File | null) : null;
+  let upload = kind === "DOCUMENT" ? (formData.get("nativeFile") as File | null) : null;
+  // Or a file kept with a received transmittal: the same bytes become the
+  // first revision, and the transmittal then lists the document it carried.
+  const fromFileId = String(formData.get("fromFileId") ?? "");
+  const kept = kind === "DOCUMENT" && !(upload && upload.size > 0) && fromFileId
+    ? await db.storedFile.findFirst({ where: { id: fromFileId, kind: "ATTACHMENT" }, include: { transmittal: { select: { number: true } } } })
+    : null;
+  if (kept) {
+    const { readStored } = await import("@/lib/files");
+    upload = new File([new Uint8Array(await readStored(kept.path))], kept.name, { type: kept.mime });
+  }
   let sent: "yes" | "no" | string = "no";
   if (upload && upload.size > 0) {
     try {
@@ -160,6 +170,14 @@ export async function createDocumentAction(_prev: { error?: string } | undefined
         },
       });
       await db.storedFile.update({ where: { id: file.id }, data: { revisionId: rev.id } });
+      if (kept?.transmittalId) {
+        const listed = await db.transmittalItem.findFirst({ where: { transmittalId: kept.transmittalId, revisionId: rev.id } });
+        if (!listed) await db.transmittalItem.create({ data: { projectId, transmittalId: kept.transmittalId, revisionId: rev.id } });
+        await audit({
+          actor: user, action: "TRANSMITTAL_FILE_REGISTERED", entityType: "Transmittal", entityId: kept.transmittalId,
+          entityLabel: kept.transmittal?.number ?? docNumber, detail: `${kept.name}, kept with this transmittal, registered as ${docNumber} rev A.`,
+        });
+      }
       await db.document.update({ where: { id: doc.id }, data: { isPlaceholder: false, appVersion: null } });
       await audit({
         actor: user,

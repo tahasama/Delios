@@ -7,9 +7,15 @@ import { NewDocumentForm } from "./new-document-form";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Create document" };
 
-export default async function NewDocumentPage({ searchParams }: { searchParams: Promise<{ received?: string }> }) {
+export default async function NewDocumentPage({ searchParams }: { searchParams: Promise<{ received?: string; fromFile?: string }> }) {
   const { user, db, project } = await requireScope();
-  const received = (await searchParams).received === "1";
+  const sp = await searchParams;
+  const received = sp.received === "1" || !!sp.fromFile;
+  // A file kept with a received transmittal, being made a register document.
+  const kept = sp.fromFile
+    ? await db.storedFile.findFirst({ where: { id: sp.fromFile, kind: "ATTACHMENT" }, select: { id: true, name: true, transmittal: { select: { number: true } } } })
+    : null;
+  const fromFile = kept ? { id: kept.id, name: kept.name, transmittal: kept.transmittal?.number ?? null } : undefined;
   if (!mayCreateDocument(user)) {
     return <div><PageHeader title="Create a document" /><Banner tone="warn" title={user.isInternal ? "Read-only access" : "External party access"}>{user.isInternal ? "Your current access is read-only. Document Control can grant a contribution role when needed." : "External parties do not create register entries. Document Control creates and assigns a placeholder to your organization; you can then contribute files and revisions to that controlled entry."}</Banner></div>;
   }
@@ -70,6 +76,7 @@ export default async function NewDocumentPage({ searchParams }: { searchParams: 
       />
       <NewDocumentForm
         received={received}
+        fromFile={fromFile}
         routes={routes}
         numberingSets={numberingSets}
         deliverableTypes={toOpt(deliverableTypes)}

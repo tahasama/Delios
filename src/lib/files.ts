@@ -21,7 +21,7 @@ export async function saveUpload(
   t: Tenant,
   file: File,
   docNumber: string,
-  kind: "NATIVE" | "RENDITION" | "STAMPED" | "EVIDENCE",
+  kind: "NATIVE" | "RENDITION" | "STAMPED" | "EVIDENCE" | "ATTACHMENT",
   revValue: string
 ): Promise<SavedFile> {
   if (!file || typeof file.arrayBuffer !== "function") throw new Error("No file provided.");
@@ -59,7 +59,7 @@ export async function saveBuffer(
   t: Tenant,
   buf: Uint8Array,
   docNumber: string,
-  kind: "NATIVE" | "RENDITION" | "STAMPED" | "EVIDENCE",
+  kind: "NATIVE" | "RENDITION" | "STAMPED" | "EVIDENCE" | "ATTACHMENT",
   revValue: string,
   uploadedByName?: string,
   uploadedById?: string

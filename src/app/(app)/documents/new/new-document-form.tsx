@@ -25,9 +25,11 @@ const PRODUCER_LABEL: Record<string, string> = {
  * with the file. Fields sit two to a row so nothing scrolls away.
  */
 export function NewDocumentForm({
-  received, routes, numberingSets, deliverableTypes, docTypes, disciplines, currentProject, subprojects, suppliers, pos, criticalities, confidentialities, retentionClasses, defaultConfidentiality,
+  received, fromFile, routes, numberingSets, deliverableTypes, docTypes, disciplines, currentProject, subprojects, suppliers, pos, criticalities, confidentialities, retentionClasses, defaultConfidentiality,
 }: {
   received: boolean;
+  /** A file that came with a received transmittal, used instead of an upload. */
+  fromFile?: { id: string; name: string; transmittal: string | null };
   routes: { id: string; name: string; isDefault: boolean; path: string }[];
   numberingSets: Record<string, string[]>;
   /** The project being worked in. A document is registered here, so it is not a choice. */
@@ -38,7 +40,7 @@ export function NewDocumentForm({
   const [step, setStep] = useState(1);
   const [producer, setProducer] = useState(received ? "VND" : "");
   const [sendTo, setSendTo] = useState(received ? routes.find((r) => r.isDefault)?.id ?? routes[0]?.id ?? "" : "");
-  const [hasFile, setHasFile] = useState(false);
+  const [hasFile, setHasFile] = useState(!!fromFile);
   const [docType, setDocType] = useState("");
   const [discipline, setDiscipline] = useState("");
   const [title, setTitle] = useState("");
@@ -88,9 +90,19 @@ export function NewDocumentForm({
           {received ? (
             <>
               <input type="hidden" name="kind" value="DOCUMENT" />
-              <Field label="The file you received" required hint="a PDF opens in the viewer; any other format is kept as the source file">
-                <input type="file" name="nativeFile" required className="block w-full text-sm" onChange={(e) => setHasFile(!!e.target.files?.length)} />
-              </Field>
+              {fromFile ? (
+                <Field label="The file you received">
+                  <input type="hidden" name="fromFileId" value={fromFile.id} />
+                  <p className="text-sm text-slate-700">
+                    <span className="font-medium">{fromFile.name}</span>
+                    {fromFile.transmittal ? <span className="text-slate-500"> — kept with {fromFile.transmittal}, which will list this document</span> : null}
+                  </p>
+                </Field>
+              ) : (
+                <Field label="The file you received" required hint="a PDF opens in the viewer; any other format is kept as the source file">
+                  <input type="file" name="nativeFile" required className="block w-full text-sm" onChange={(e) => setHasFile(!!e.target.files?.length)} />
+                </Field>
+              )}
             </>
           ) : (
             <Field label="Will it be revised?" required hint="a record is fixed once confirmed — minutes, a test result, a certificate">

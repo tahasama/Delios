@@ -259,17 +259,31 @@ recipient's `dispatchedAt`, `dispatchChannel`, `dispatchRef`,
 
 ---
 
-## 13 · Acceptance conditions that cannot apply
+## 13 · Acceptance is the control function's decision, not a checklist
 
 **Clause:** §11.9 *Acceptance of transmittals*, conditions a–e.
 
-**Must say:** where a transmittal encloses nothing — a clarification, a notice,
-an answer in words — the conditions about enclosures are recorded as **not
-applicable** rather than left blank or ticked. The record then says why they
-were not answered.
+**Must say:** the conditions of §11.9 are what the control function applies
+when it judges what has arrived; they are its procedure, and are not recorded
+one by one. The record keeps the decision — accepted, or rejected with the
+reason the sender is given — who made it, when, and any note. A rejection is
+a decision of its own and must give its reason.
 
-**Depends on it:** `acceptanceCheckAction`; the condition list on the
-transmittal page, which keeps ✓ / ✗ / — after the check is made.
+A received transmittal that encloses nothing — no documents and no files —
+leaves nothing to judge, and is accepted as it is recorded.
+
+Files that came with a received transmittal and are not register documents —
+the covering letter, the email, what was attached — are kept with it as the
+record of what arrived. One becomes a register document only when somebody
+makes it one; the transmittal then lists that document.
+
+Checks recorded condition by condition before this change are kept, and shown
+as they were.
+
+**Depends on it:** `acceptTransmittalAction`, `attachTransmittalFilesAction`;
+files of kind `ATTACHMENT` on the transmittal; "Make it a document" on the
+transmittal page; audit acts `TRANSMITTAL_FILES_ATTACHED`,
+`TRANSMITTAL_FILE_REGISTERED`.
 
 ---
 
@@ -277,7 +291,8 @@ transmittal page, which keeps ✓ / ✗ / — after the check is made.
 
 **Clause:** §16.6 *Views*, and wherever the Standard enumerates recorded acts.
 
-`ACTION_CARRIED`, `ACTION_STOPPED`, `TRANSMITTAL_CHASED`, `TRANSMITTAL_SENT_ON`.
+`ACTION_CARRIED`, `ACTION_STOPPED`, `TRANSMITTAL_CHASED`, `TRANSMITTAL_SENT_ON`,
+`TRANSMITTAL_FILES_ATTACHED`, `TRANSMITTAL_FILE_REGISTERED`.
 
 Each is a decision somebody is answerable for, so each is a recorded act and
 each belongs in the project's own log, not only in the administrator's audit

@@ -4,11 +4,12 @@ import { notFound } from "next/navigation";
 import { isController, isAdmin } from "@/lib/auth";
 import { Card, Chip, Banner } from "@/components/ui";
 import { ActionForm } from "@/components/form";
-import { ACCEPTANCE_CONDITIONS, ENCLOSURE_CONDITIONS, REASON_LABEL, type ReasonForIssue } from "@/lib/standard";
+import { ACCEPTANCE_CONDITIONS, REASON_LABEL, type ReasonForIssue } from "@/lib/standard";
 import { fmtDate, fmtDateTime } from "@/lib/utils";
 import {
   issueTransmittalAction,
-  acceptanceCheckAction,
+  acceptTransmittalAction,
+  attachTransmittalFilesAction,
   chaseTransmittalAction,
   markRecipientSentAction,
 } from "@/lib/actions/transmittals";
@@ -49,7 +50,7 @@ export default async function TransmittalDetailPage({ params, searchParams }: { 
         include: {
           revision: {
             include: {
-              files: { select: { id: true, name: true, kind: true } },
+              files: { select: { id: true, name: true, kind: true, sha256: true } },
               document: {
                 include: {
                   revisions: { orderBy: { createdAt: "desc" }, take: 1, select: { value: true } },
@@ -80,6 +81,7 @@ export default async function TransmittalDetailPage({ params, searchParams }: { 
         },
       },
       cycles: { select: { id: true, status: true, revisionId: true, submittedAt: true } },
+      files: { where: { kind: "ATTACHMENT" }, orderBy: { createdAt: "asc" } },
       issueRequests: { select: { id: true, reason: true, note: true } },
     },
   });
@@ -228,6 +230,57 @@ export default async function TransmittalDetailPage({ params, searchParams }: { 
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_280px]">
         <div className="space-y-4">
+          {/* What came with it that is not a register document: their letter,
+              the email, what they attached. Kept as the record of what arrived;
+              one becomes a document only when somebody makes it one — and then
+              it is found in the register by its own content. */}
+          {t.direction === "INCOMING" && (t.files.length || controller) ? (
+            <section id="files" className="register register-sheet register-sheet-open">
+              <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2 sm:px-6">
+                <span className="stencil mr-1 text-slate-400">Files that came with it</span>
+                <span className="text-[11px] text-slate-400">kept as they arrived — not in the register unless made a document</span>
+                <span className="ml-auto font-mono text-[11px] tabular-nums text-slate-500">{t.files.length}</span>
+              </div>
+              {t.files.length ? (
+                <ul className="divide-y divide-line">
+                  {t.files.map((file) => {
+                    const registered = t.items.find((item) => item.revision.files.some((one) => one.sha256 === file.sha256));
+                    return (
+                      <li key={file.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-2.5 sm:px-6">
+                        <div className="min-w-0">
+                          <a href={`/api/files/${file.id}`} target="_blank" className="text-[13px] font-medium text-link hover:underline">{file.name}</a>
+                          <p className="text-[11px] text-slate-400">
+                            {Math.max(1, Math.round(file.size / 1024))} kB &middot; kept by {file.uploadedByName}, {fmtDate(file.createdAt)}
+                          </p>
+                        </div>
+                        {registered ? (
+                          <Link href={`/documents/${registered.revision.documentId}`} className="text-[11px] text-slate-500 hover:text-link">
+                            in the register as <span className="font-mono font-semibold">{registered.revision.document.docNumber}</span> rev {registered.revision.value}
+                          </Link>
+                        ) : controller ? (
+                          <Link href={`/documents/new?received=1&fromFile=${file.id}`} className="text-[11px] font-semibold text-link hover:underline">Make it a document &rarr;</Link>
+                        ) : null}
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : (
+                <p className="px-5 py-3 text-xs text-slate-400 sm:px-6">Nothing kept with it yet.</p>
+              )}
+              {controller ? (
+                <ActionForm action={attachTransmittalFilesAction} hideSubmit hidden={{ transmittalId: t.id }} className="space-y-0">
+                  <div className="asking flex flex-wrap items-center gap-3 border-t border-line px-5 py-2.5 sm:px-6">
+                    <label className="min-w-0 flex-1">
+                      <span className="sr-only">Files to keep with it</span>
+                      <input type="file" name="attachments" multiple className="plain w-full text-[11px] text-slate-500 file:mr-2 file:rounded file:border-0 file:bg-canvas-deep file:px-2 file:py-0.5 file:text-[11px] file:font-semibold file:text-slate-700" />
+                    </label>
+                    <button className="ask">Keep with it</button>
+                  </div>
+                </ActionForm>
+              ) : null}
+            </section>
+          ) : null}
+
           {t.message || t.issueRequests.length ? (
             <section className="register register-sheet register-sheet-open">
               <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2 sm:px-6">
@@ -407,83 +460,72 @@ export default async function TransmittalDetailPage({ params, searchParams }: { 
             </section>
           ) : null}
 
-          {/* The check on arrival: the five conditions, the answer to each, and
-              who gave it. Kept whole — it is the evidence that what arrived was
-              fit to be used, and an audit reads it condition by condition. */}
+          {/* On arrival: Document Control accepts what came in, or rejects it
+              with a reason the sender reads. How they judge it is their
+              procedure; the record keeps the decision, who made it, when, and
+              what they wrote. A check recorded condition by condition before
+              that is kept as it was — it is evidence. */}
           {t.direction === "INCOMING" || conditions.length ? (
             <section id="check" className="register register-sheet register-sheet-open">
               <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2 sm:px-6">
-                <span className="stencil mr-1 text-slate-400">Checked on arrival</span>
+                <span className="stencil mr-1 text-slate-400">On arrival</span>
                 <span className="text-[11px] text-slate-400">
-                  {conditions.length
-                    ? <>{t.checkedByName}, {fmtDate(t.acceptanceCheckedAt)}</>
-                    : "right documents, complete, readable, correctly numbered — accept to send it on to review, reject to return it"}
+                  {t.status === "ACCEPTED" || t.status === "REJECTED"
+                    ? <>{t.status === "ACCEPTED" ? "accepted" : "rejected"} by {t.checkedByName}, {fmtDate(t.acceptanceCheckedAt)}</>
+                    : t.direction === "INCOMING"
+                      ? "Document Control accepts it, or rejects it with a reason the sender reads"
+                      : "their document control checks what we send"}
                 </span>
-                {conditions.length ? (
-                  <span className={`ml-auto font-mono text-[11px] tabular-nums ${conditions.every((one) => one.pass) ? "text-emerald-700" : "text-red-700"}`}>
-                    {conditions.filter((one) => one.pass).length}/{conditions.length} passed
-                  </span>
-                ) : null}
               </div>
 
-              <ul className="divide-y divide-line">
-                {ACCEPTANCE_CONDITIONS.map((condition) => {
-                  const answer = conditions.find((one) => one.key === condition.key);
-                  return (
-                    <li key={condition.key} className="flex items-start gap-2.5 px-5 py-2 text-xs sm:px-6">
-                      <span className={`mt-0.5 font-semibold ${!answer ? "text-slate-300" : answer.notApplicable ? "text-slate-400" : answer.pass ? "text-emerald-600" : "text-red-600"}`}>
-                        {!answer ? "·" : answer.notApplicable ? "—" : answer.pass ? "✓" : "✗"}
-                      </span>
-                      <span className="text-slate-600">
-                        {condition.label}
-                        {answer?.notApplicable ? <span className="text-slate-400"> — nothing was enclosed, so this was not asked</span> : null}
-                      </span>
-                    </li>
-                  );
-                })}
-              </ul>
-
-              {t.acceptanceNotes ? (
-                <p className="border-t border-line px-5 py-2 text-[11px] text-slate-500 sm:px-6">
-                  They wrote: <span className="text-slate-700">{t.acceptanceNotes}</span>
+              {t.acceptanceNotes && t.status !== "REJECTED" ? (
+                <p className="px-5 py-3 text-xs text-slate-600 sm:px-6">
+                  <span className="text-slate-400">They wrote: </span>{t.acceptanceNotes}
                 </p>
               ) : null}
 
-              {t.direction === "OUTGOING" && !conditions.length ? (
-                <p className="border-t border-line px-5 py-2 text-[11px] text-slate-400 sm:px-6">
-                  Their document control runs this same check on what we send. Anything failing comes back with a reason.
-                </p>
+              {conditions.length ? (
+                <div className={t.acceptanceNotes && t.status !== "REJECTED" ? "border-t border-line" : undefined}>
+                  <p className="px-5 pt-2.5 text-[11px] text-slate-400 sm:px-6">Checked condition by condition when it was recorded:</p>
+                  <ul className="pb-1.5">
+                    {ACCEPTANCE_CONDITIONS.map((condition) => {
+                      const answer = conditions.find((one) => one.key === condition.key);
+                      return (
+                        <li key={condition.key} className="flex items-start gap-2.5 px-5 py-1 text-xs sm:px-6">
+                          <span className={`mt-0.5 font-semibold ${!answer ? "text-slate-300" : answer.notApplicable ? "text-slate-400" : answer.pass ? "text-emerald-600" : "text-red-600"}`}>
+                            {!answer ? "·" : answer.notApplicable ? "—" : answer.pass ? "✓" : "✗"}
+                          </span>
+                          <span className="text-slate-600">
+                            {condition.label}
+                            {answer?.notApplicable ? <span className="text-slate-400"> — nothing was enclosed, so this was not asked</span> : null}
+                          </span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
               ) : null}
 
               {t.direction === "INCOMING" && t.status === "ISSUED" ? (
                 controller ? (
-                  <div className="border-t border-line px-5 py-3.5 sm:px-6">
+                  <div className="px-5 py-3.5 sm:px-6">
                     <PreflightPanel result={await preflight("ACCEPT_TRANSMITTAL", { transmittalId: t.id })} className="mb-3" />
-                    <ActionForm action={acceptanceCheckAction} hideSubmit hidden={{ transmittalId: t.id }}>
-                      <div className="asking grid grid-cols-1 gap-x-4 gap-y-2.5">
-                        {ACCEPTANCE_CONDITIONS
-                          .filter((condition) => t.items.length > 0 || !(ENCLOSURE_CONDITIONS as readonly string[]).includes(condition.key))
-                          .map((condition) => (
-                            <label key={condition.key} className="flex items-start gap-2 text-xs font-medium text-slate-700">
-                              <input type="checkbox" name={`cond_${condition.key}`} className="mt-0.5" />
-                              {condition.label}
-                            </label>
-                          ))}
+                    <ActionForm action={acceptTransmittalAction} hideSubmit hidden={{ transmittalId: t.id }} className="space-y-0">
+                      <div className="asking grid grid-cols-1 items-center gap-x-3 gap-y-2.5 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
                         <label className="min-w-0">
-                          <span className="sr-only">Note, or the reason it is rejected</span>
-                          <input name="notes" className="plain w-full" placeholder="A note — or, if anything above is unticked, why it is going back; the sender reads this" />
+                          <span className="sr-only">A note, or why it is rejected</span>
+                          <input name="notes" className="plain w-full" placeholder="A note — required to reject: the sender reads why" />
                         </label>
-                        <div className="flex justify-end">
-                          <button className="ask">Record the check</button>
-                        </div>
+                        {/* Two buttons, not one: turning something away is a
+                            decision of its own, never a box left unticked. */}
+                        <button name="decision" value="reject" className="ask">Reject</button>
+                        <button name="decision" value="accept" data-on="true" className="ask">Accept</button>
                       </div>
                     </ActionForm>
-                    <p className="mt-2 text-[11px] text-slate-400">
-                      Every condition ticked accepts it and starts the response period. Anything left unticked returns it to the sender with your reason.
-                    </p>
+                    <p className="mt-2 text-[11px] text-slate-400">Accepting starts any response period. Rejecting returns it to the sender with your reason.</p>
                   </div>
                 ) : (
-                  <p className="border-t border-line px-5 py-2.5 text-xs text-slate-500 sm:px-6">Document Control checks what arrives.</p>
+                  <p className="px-5 py-2.5 text-xs text-slate-500 sm:px-6">Document Control checks what arrives.</p>
                 )
               ) : null}
             </section>
@@ -525,7 +567,7 @@ export default async function TransmittalDetailPage({ params, searchParams }: { 
                 { label: "They sent it", at: t.dateOfIssue, holder: t.issuingParty },
                 { label: "It arrived", at: t.receivedDate, holder: t.receivedByParty ?? null },
                 {
-                  label: "Checked on arrival",
+                  label: t.status === "REJECTED" ? "Rejected" : "Accepted",
                   at: t.acceptanceCheckedAt,
                   holder: t.checkedByName ?? null,
                   detail: t.status === "REJECTED" ? t.rejectionReason : t.acceptanceNotes,

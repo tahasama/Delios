@@ -34,7 +34,7 @@ const WAYS = {
   },
   INCOMING: {
     title: "We received",
-    says: "Something that reached us outside this system — by email, post, or a supplier's own portal. Recording it gives the transmittal its own number and puts it in the transmittal register for Document Control to check on arrival. The documents it carries must already be in the document register. To pass something on to colleagues, send instead.",
+    says: "Something that reached us outside this system — by email, post, or a supplier's own portal. Recording it gives the transmittal its own number and puts it in the transmittal register for Document Control to accept. The files that came with it are kept with it, and become register documents only when you make them one. To pass something on to colleagues, send instead.",
     Icon: ArrowDownLeft,
   },
 } as const;
@@ -89,6 +89,7 @@ export function NewTransmittalForm({
   // do both at once, is why people stopped finding a draft they thought they had sent.
   const [issueNow, setIssueNow] = useState(true);
   const [people, setPeople] = useState(0);
+  const [files, setFiles] = useState(0);
   const countPeople = useCallback((n: number) => setPeople(n), []);
 
   const outgoing = direction === "OUTGOING";
@@ -112,7 +113,7 @@ export function NewTransmittalForm({
   const askedFirst = Boolean(reasonCode) && (outgoing || party.trim().length > 0);
   // A transmittal may carry a message alone — a clarification, a notice, an
   // answer — so enclosures are optional, but it may not be empty of both.
-  const saysSomething = chosen.length > 0 || (outgoing ? subject.trim().length > 0 : message.trim().length > 0);
+  const saysSomething = chosen.length > 0 || (!outgoing && files > 0) || (outgoing ? subject.trim().length > 0 : message.trim().length > 0);
   const may = (n: number) => n === 1 || (askedFirst && (n === 2 || saysSomething));
   const toggle = (id: string) => setChosen((ids) => (ids.includes(id) ? ids.filter((one) => one !== id) : [...ids, id]));
   const reasonLabel = reasons.find((r) => r.code === reasonCode)?.label;
@@ -296,14 +297,25 @@ export function NewTransmittalForm({
                 </Ask>
               </>
             ) : (
+              <>
+              <Ask label="Files that came with it" hint="their letter, the email, what they attached — kept with it, not put in the register">
+                <input
+                  type="file"
+                  name="attachments"
+                  multiple
+                  onChange={(e) => setFiles(e.target.files?.length ?? 0)}
+                  className="plain w-full py-1.5 text-[12px] text-slate-500 file:mr-2 file:rounded file:border-0 file:bg-canvas-deep file:px-2 file:py-0.5 file:text-[11px] file:font-semibold file:text-slate-700"
+                />
+              </Ask>
               <Ask label="Message" hint="optional — what they say it is for, in their words">
                 <textarea name="message" rows={3} className={field} value={message} onChange={(e) => setMessage(e.target.value)} />
               </Ask>
+              </>
             )}
           </div>
           {foot(1,
             <button type="button" onClick={() => setStep(3)} disabled={!saysSomething} data-on={saysSomething ? "true" : undefined} className="ask disabled:cursor-not-allowed disabled:opacity-50">Continue</button>,
-            saysSomething ? null : `Enclose a document, or write ${outgoing ? "a subject" : "a message"}.`,
+            saysSomething ? null : outgoing ? "Enclose a document, or write a subject." : "Tick a document, keep a file, or write a message.",
           )}
         </section>
 
@@ -335,7 +347,7 @@ export function NewTransmittalForm({
               {outgoing ? (issueNow ? "Create and send it" : "Create it as a draft") : "Record receipt"}
             </button>,
             // What is about to happen, in one line, beside the button that does it.
-            !people ? "Name at least one person." : `${picked.length ? `${picked.length} document${picked.length === 1 ? "" : "s"}` : "A letter, no documents"} · ${reasonLabel ?? "no reason chosen"} · ${outgoing ? `from ${ourOrganization}` : `from ${party.trim() || "an unnamed party"}`}`,
+            !people ? "Name at least one person it is addressed to." : `${picked.length ? `${picked.length} document${picked.length === 1 ? "" : "s"}` : "No documents"}${!outgoing && files ? ` + ${files} file${files === 1 ? "" : "s"}` : ""}${!outgoing && !picked.length && !files ? " — accepted as it is recorded" : ""} · ${reasonLabel ?? "no reason chosen"} · ${outgoing ? `from ${ourOrganization}` : `from ${party.trim() || "an unnamed party"}`}`,
           )}
         </section>
       </ActionForm>
