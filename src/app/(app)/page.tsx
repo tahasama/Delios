@@ -612,6 +612,13 @@ type Row = {
 const ACTIVITY: Record<string, { kind: string; said: string; mark: string }> = {
   TRANSMITTAL_RAISED: { kind: "Transmittal", said: "was issued", mark: "border-violet-600" },
   TRANSMITTAL_OPENED: { kind: "Transmittal", said: "was received", mark: "border-violet-600" },
+  TRANSMITTAL_RECEIVED: { kind: "Transmittal", said: "was received", mark: "border-violet-600" },
+  TRANSMITTAL_ACCEPTED: { kind: "Transmittal", said: "was accepted on arrival", mark: "border-emerald-600" },
+  TRANSMITTAL_REJECTED: { kind: "Transmittal", said: "was returned to its sender", mark: "border-red-600" },
+  TRANSMITTAL_CHASED: { kind: "Transmittal", said: "was put in front of them again", mark: "border-amber-600" },
+  TRANSMITTAL_CLOSED: { kind: "Transmittal", said: "was closed", mark: "border-slate-400" },
+  ACTION_CARRIED: { kind: "Schedule", said: "went ahead without all of its documents", mark: "border-amber-600" },
+  ACTION_STOPPED: { kind: "Schedule", said: "was postponed", mark: "border-slate-400" },
   CUSTODY: { kind: "Transmittal", said: "was handed over", mark: "border-violet-600" },
   ISSUE_REQUESTED: { kind: "Issue", said: "was requested for issue", mark: "border-violet-600" },
   ISSUE: { kind: "Issue", said: "was issued", mark: "border-violet-600" },
