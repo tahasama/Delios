@@ -293,7 +293,8 @@ summary::-webkit-details-marker {
      so both carry the same rule, the same caret and the same "on" state. */
   .register select.plain,
   .register button.plain,
-  .register input.plain {
+  .register input.plain,
+  .register textarea.plain {
     appearance: none;
     border: 0;
     border-bottom: 1px solid var(--hair);
@@ -306,8 +307,8 @@ summary::-webkit-details-marker {
   }
   .register select.plain,
   .register button.plain { background-image: linear-gradient(45deg, transparent 50%, var(--color-slate-400) 50%), linear-gradient(135deg, var(--color-slate-400) 50%, transparent 50%); background-position: right 0.42rem center, right 0.18rem center; background-size: 4px 4px, 4px 4px; background-repeat: no-repeat; }
-  .register select.plain:hover, .register button.plain:hover, .register input.plain:hover { border-color: var(--color-slate-400); }
-  .register select.plain:focus, .register button.plain:focus, .register input.plain:focus { outline: none; border-color: var(--color-brand-line); color: var(--color-slate-900); }
+  .register select.plain:hover, .register button.plain:hover, .register input.plain:hover, .register textarea.plain:hover { border-color: var(--color-slate-400); }
+  .register select.plain:focus, .register button.plain:focus, .register input.plain:focus, .register textarea.plain:focus { outline: none; border-color: var(--color-brand-line); color: var(--color-slate-900); }
   .register select.plain[data-on="true"],
   .register button.plain[data-on="true"] { color: var(--color-brand-ink); border-color: var(--color-brand-line); font-weight: 600; }
   /* A switch, not a field: no caret and no rule under it, so it does not read
@@ -942,14 +943,16 @@ summary::-webkit-details-marker {
      a surface behind it reads as something to operate. */
   .register .asking select.plain,
   .register .asking button.plain,
-  .register .asking input.plain {
+  .register .asking input.plain,
+  .register .asking textarea.plain {
     background-color: color-mix(in oklab, var(--color-canvas) 60%, var(--color-surface));
     padding-left: 0.4rem;
     border-radius: 0.25rem 0.25rem 0 0;
   }
   .register .asking select.plain:hover,
   .register .asking button.plain:hover,
-  .register .asking input.plain:hover {
+  .register .asking input.plain:hover,
+  .register .asking textarea.plain:hover {
     background-color: color-mix(in oklab, var(--color-canvas) 85%, var(--color-surface));
   }
   .register .asking select.plain[data-on="true"],

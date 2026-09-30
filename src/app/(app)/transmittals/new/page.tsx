@@ -93,10 +93,19 @@ export default async function NewTransmittalPage({ searchParams }: { searchParam
     <div>
       <PageHeader
         title="New transmittal"
+        subtitle="Documents, or a letter, sent to named people — or something that reached us from outside, recorded so it enters the register."
       />
       <NewTransmittalForm
         reasons={reasons.map((r) => ({ code: r.code, label: r.label, props: r.props }))}
-        revisions={revisionRows.map((r) => ({ id: r.id, label: `${r.document.docNumber} rev ${r.value}${r.statusCode ? ` · ${r.statusCode}` : ""} — ${r.document.title.slice(0, 50)}`, released: r.state === "RELEASED" }))}
+        revisions={revisionRows.map((r) => ({
+          id: r.id,
+          label: `${r.document.docNumber} rev ${r.value}${r.statusCode ? ` · ${r.statusCode}` : ""} — ${r.document.title}`,
+          released: r.state === "RELEASED",
+          number: r.document.docNumber,
+          rev: r.value,
+          status: r.statusCode,
+          title: r.document.title,
+        }))}
         users={users.map((u) => ({ id: u.id, name: u.name, role: u.role }))}
         reviewers={reviewers.map((u) => ({ id: u.id, name: u.name, role: u.functionName }))}
         companies={companies}
