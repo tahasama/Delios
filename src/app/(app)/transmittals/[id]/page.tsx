@@ -2,21 +2,39 @@ import Link from "next/link";
 import { requireScope } from "@/lib/scope";
 import { notFound } from "next/navigation";
 import { isController, isAdmin } from "@/lib/auth";
-import { PageHeader, Card, Chip, Banner, Field, inputCls, DataTable, Th, Td } from "@/components/ui";
+import { Card, Chip, Banner } from "@/components/ui";
 import { ActionForm } from "@/components/form";
 import { ACCEPTANCE_CONDITIONS, ENCLOSURE_CONDITIONS, REASON_LABEL, type ReasonForIssue } from "@/lib/standard";
 import { fmtDate, fmtDateTime } from "@/lib/utils";
-import { issueTransmittalAction, acceptanceCheckAction } from "@/lib/actions/transmittals";
+import {
+  issueTransmittalAction,
+  acceptanceCheckAction,
+  chaseTransmittalAction,
+  closeTransmittalAction,
+} from "@/lib/actions/transmittals";
 import { preflight } from "@/lib/rules/preflight";
 import { PreflightPanel, Guarded } from "@/components/preflight";
 import { ReceiptTracker } from "./receipt-tracker";
+import { CarriedTable, type CarriedRow } from "./carried-table";
 import { Timeline } from "@/components/timeline";
-import { Action } from "../../documents/[id]/workflow-panel";
 import { SendForReview } from "@/components/send-for-review-panel";
 import { ArrowLeft } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * One transmittal, in the detail style.
+ *
+ * A transmittal is an act, not a folder: named documents went to named people
+ * on a day, for a stated reason, and something is expected back. So the page is
+ * ordered as that act is read — what it is and what it carries, who was asked
+ * and who was only told, what came back, and what was done about it on arrival
+ * — with the whole history beside it.
+ *
+ * Nothing that was recorded is hidden to make the page tidy: the acceptance
+ * check keeps its condition-by-condition answer, and what Document Control
+ * wrote when they accepted it is shown where they wrote it.
+ */
 export default async function TransmittalDetailPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ issueError?: string }> }) {
   const { user, db } = await requireScope();
   const { id } = await params;
@@ -24,17 +42,78 @@ export default async function TransmittalDetailPage({ params, searchParams }: { 
   const t = await db.transmittal.findUnique({
     where: { id },
     include: {
-      items: { include: { revision: { include: { document: true } } } },
-      recipients: { orderBy: { name: "asc" } },
-      cycles: { include: { revision: { include: { document: true } } } },
+      items: {
+        include: {
+          revision: {
+            include: {
+              files: { select: { id: true, name: true, kind: true } },
+              document: {
+                include: {
+                  revisions: { orderBy: { createdAt: "desc" }, take: 1, select: { value: true } },
+                  baselineEntries: { include: { action: { select: { code: true, name: true } } } },
+                },
+              },
+            },
+          },
+        },
+      },
+      recipients: { orderBy: [{ kind: "asc" }, { name: "asc" }] },
+      // The thread: what this answers, and what has come back against it. An
+      // answer is a transmittal of its own, with its own number and its own
+      // enclosures, so it is linked to rather than copied in here.
+      inReplyTo: { select: { id: true, number: true, subject: true } },
+      answers: {
+        orderBy: { dateOfIssue: "asc" },
+        select: {
+          id: true, number: true, subject: true, dateOfIssue: true, status: true,
+          createdByName: true, issuingParty: true, direction: true,
+          _count: { select: { items: true } },
+        },
+      },
+      cycles: { select: { id: true, status: true, revisionId: true, submittedAt: true } },
+      issueRequests: { select: { id: true, reason: true, note: true } },
     },
   });
   if (!t) notFound();
 
   const controller = isController(user) || isAdmin(user);
-  const currentRecipient = t.recipients.find((recipient) => recipient.userId === user.id);
-  const conditions: { key: string; pass: boolean }[] = t.conditionsResult ? JSON.parse(t.conditionsResult) : [];
-  const readyToRoute = t.items.filter((i) => i.revision.state === "IN_PREPARATION").map((i) => i.revisionId);
+  const mine = t.recipients.find((recipient) => recipient.userId === user.id) ?? null;
+  const conditions: { key: string; pass: boolean; notApplicable?: boolean }[] = t.conditionsResult ? JSON.parse(t.conditionsResult) : [];
+  const readyToRoute = t.items.filter((one) => one.revision.state === "IN_PREPARATION").map((one) => one.revisionId);
+
+  // Addressed to, and copied in. Seen is read from the first list only: being
+  // copied in is being told, not being asked, so a transmittal is not seen
+  // because somebody kept informed happened to look at it.
+  const addressed = t.recipients.filter((one) => one.kind !== "CC");
+  const copied = t.recipients.filter((one) => one.kind === "CC");
+  const seen = addressed.filter((one) => one.openedAt).length;
+  const allSeen = addressed.length > 0 && seen === addressed.length;
+  const waiting = addressed.filter((one) => !one.openedAt && one.userId);
+
+  const replyOverdue = !t.answers.length && t.responseRequired && !!t.responseDueDate && t.responseDueDate.getTime() < Date.now();
+  // Anybody it reached may answer it — the people it was addressed to, the
+  // people copied in who have a question of their own, and whoever raised it.
+  const replyHref = `/transmittals/new?replyTo=${t.id}`;
+
+  // How often each of these documents has gone out before this transmittal —
+  // the third issue of a drawing is a fact about the drawing, not a detail.
+  const documentIds = [...new Set(t.items.map((one) => one.revision.documentId))];
+  const earlier = documentIds.length
+    ? await db.transmittalItem.findMany({
+        where: {
+          revision: { documentId: { in: documentIds } },
+          transmittalId: { not: t.id },
+          transmittal: { dateOfIssue: { lt: t.dateOfIssue }, status: { not: "DRAFT" } },
+        },
+        select: { revision: { select: { documentId: true } } },
+      })
+    : [];
+  const sentBefore = new Map<string, number>();
+  for (const one of earlier) {
+    sentBefore.set(one.revision.documentId, (sentBefore.get(one.revision.documentId) ?? 0) + 1);
+  }
+
+  const reason = (REASON_LABEL[t.reasonForIssue as ReasonForIssue] ?? t.reasonForIssue).toLowerCase();
   const statusColors: Record<string, string> = {
     DRAFT: "bg-slate-100 text-slate-600 ring-slate-300",
     ISSUED: "bg-amber-100 text-amber-800 ring-amber-300",
@@ -43,208 +122,352 @@ export default async function TransmittalDetailPage({ params, searchParams }: { 
     CLOSED: "bg-slate-200 text-slate-700 ring-slate-300",
   };
 
+  const carried: CarriedRow[] = t.items.map((item) => {
+    const cycle = t.cycles.find((one) => one.revisionId === item.revisionId) ?? null;
+    const files = item.revision.files;
+    const current = item.revision.document.revisions[0]?.value ?? null;
+    return {
+      id: item.id,
+      documentId: item.revision.documentId,
+      docNumber: item.revision.document.docNumber,
+      title: item.revision.document.title,
+      revision: item.revision.value,
+      status: item.revision.statusCode ?? item.revision.state.replaceAll("_", " ").toLowerCase(),
+      neededFor: [...new Map(item.revision.document.baselineEntries.map((entry) => [entry.action.code, entry.action])).values()],
+      pdfId: files.find((one) => one.kind === "STAMPED")?.id ?? files.find((one) => one.kind === "RENDITION")?.id ?? null,
+      nativeId: files.find((one) => one.kind === "NATIVE")?.id ?? null,
+      nativeName: files.find((one) => one.kind === "NATIVE")?.name ?? null,
+      supersededSince: item.markedSuperseded || (!!current && current !== item.revision.value),
+      currentRevision: current,
+      sentBefore: sentBefore.get(item.revision.documentId) ?? 0,
+      reviewId: cycle?.id ?? null,
+      reviewOpen: cycle?.status === "OPEN",
+    };
+  });
+
   return (
-    <div className="space-y-5">
-      {currentRecipient && t.status !== "DRAFT" ? <ReceiptTracker transmittalId={t.id} /> : null}
-      <PageHeader
-        title={t.subject ? `${t.number} — ${t.subject}` : t.number}
-        subtitle={[
-          t.direction === "OUTGOING"
-            ? `${t.createdByName} sent it to ${t.recipients.map((r) => r.name).join(", ") || "nobody yet"} at ${t.recipients.map((r) => r.organization ?? "—").filter((v, i, all) => all.indexOf(v) === i).join(", ")} on ${fmtDate(t.dateOfIssue)}`
-            : `${t.issuingParty} sent it on ${fmtDate(t.dateOfIssue)}${t.receivedDate ? `, and it arrived ${fmtDate(t.receivedDate)}` : ""}`,
-          `${t.direction === "OUTGOING" ? "They" : "We"} received it ${(REASON_LABEL[t.reasonForIssue as ReasonForIssue] ?? t.reasonForIssue).toLowerCase() === "information" ? "for information only" : `for ${(REASON_LABEL[t.reasonForIssue as ReasonForIssue] ?? t.reasonForIssue).toLowerCase()}`}`,
-          t.responseRequired ? `An answer is due by ${fmtDate(t.responseDueDate)}` : "No answer is needed",
-        ].filter(Boolean).join(". ") + "."}
-        actions={<>
-          <Link href="/transmittals" className="inline-flex min-h-9 items-center gap-1 rounded-xl px-3 text-xs font-semibold text-slate-500 hover:bg-slate-100"><ArrowLeft className="h-4 w-4"/> Transmittals</Link>
-          <Chip className={statusColors[t.status] ?? ""}>{t.status.toLowerCase()}</Chip>
-          {t.status === "DRAFT" && controller ? (
-            <Guarded result={await preflight("ISSUE", { transmittalId: t.id })}>
-              <ActionForm action={issueTransmittalAction} submitLabel="Issue" size="sm" hidden={{ transmittalId: t.id }} />
-            </Guarded>
-          ) : null}
-        </>}
+    <div className="space-y-4">
+      {mine && t.status !== "DRAFT" ? <ReceiptTracker transmittalId={t.id} /> : null}
+
+      <CarriedTable
+        rows={carried}
+        exportHref={`/api/export/transmittals?ids=${t.id}`}
+        plate={
+          <div className="flex flex-wrap items-start justify-between gap-3 border-b border-line px-5 pt-6 pb-3 sm:px-6">
+            <div className="min-w-0">
+              <h1 className="plate-name min-w-0">
+                <span className="font-mono text-[0.8em] font-medium tracking-tight text-slate-400">{t.number}</span>
+                {t.subject ? <> {t.subject}</> : null}
+              </h1>
+              {/* Who, to whom, when, and what for — the sentence a transmittal
+                  register entry is, said as facts rather than as prose. */}
+              <p className="plate-meta mt-1.5">
+                {t.direction === "OUTGOING"
+                  ? <>{t.createdByName} sent it {fmtDate(t.dateOfIssue)} to {addressed.map((one) => one.name).join(", ") || "nobody yet"}</>
+                  : <>{t.issuingParty} sent it {fmtDate(t.dateOfIssue)}{t.receivedDate ? <>, and it arrived {fmtDate(t.receivedDate)}</> : null}</>}
+                {" "}&middot; {t.items.length} document{t.items.length === 1 ? "" : "s"} &middot; for {reason}
+              </p>
+              <p className="mt-1 max-w-2xl text-[11.5px] leading-4 text-slate-400">
+                {[...new Set(addressed.map((one) => one.organization).filter(Boolean))].join(", ") || (t.direction === "INCOMING" ? t.issuingParty : "no company named")}
+                {copied.length ? <> &middot; {copied.length} copied in: {copied.map((one) => one.name).join(", ")}</> : null}
+                {" · "}
+                {t.status === "DRAFT"
+                  ? "Nothing has been sent yet — it carries no date of issue until it is issued."
+                  : t.responseRequired
+                    ? t.answers.length
+                      ? `Answered ${fmtDate(t.answers[0].dateOfIssue)} by ${t.answers[0].number}.`
+                      : `An answer is due by ${fmtDate(t.responseDueDate)} — write it down under “The answer”.`
+                    : "No answer is needed. Opening it is the receipt."}
+              </p>
+            </div>
+            <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+              <Link href="/transmittals" className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-semibold text-slate-500 hover:bg-slate-100"><ArrowLeft className="h-4 w-4" /> Transmittals</Link>
+              <Link href={`/?view=log&q=${encodeURIComponent(t.number)}`} className="text-[11px] font-semibold text-link hover:underline" title="What has happened to this transmittal, in the project's own log">What is going on &rarr;</Link>
+              <Link href={`/admin/audit?q=${encodeURIComponent(t.number)}`} className="text-[11px] font-semibold text-link hover:underline" title="Every recorded act on this transmittal, in the audit trail">History &rarr;</Link>
+              <Chip className={statusColors[t.status] ?? ""}>{t.status.toLowerCase()}</Chip>
+              {t.status === "DRAFT" && controller ? (
+                <Guarded result={await preflight("ISSUE", { transmittalId: t.id })}>
+                  <ActionForm action={issueTransmittalAction} submitLabel="Issue" size="sm" hidden={{ transmittalId: t.id }} />
+                </Guarded>
+              ) : null}
+              {controller && !["DRAFT", "CLOSED", "REJECTED"].includes(t.status) ? (
+                <ActionForm action={closeTransmittalAction} submitLabel="Close it" size="sm" variant="secondary" hidden={{ transmittalId: t.id }} />
+              ) : null}
+            </div>
+          </div>
+        }
       />
 
-      {t.status === "DRAFT" ? (
-        <Banner tone="warn" title="Nothing has been sent yet">
-          This is a draft. The recipients below have not been told, and it carries no date of issue until it is issued.
-          {controller ? " Issue it with the button above." : " Document Control issues it."}
-        </Banner>
-      ) : null}
       {sp.issueError ? <Banner tone="warn" title="Created, but not sent">{sp.issueError} Issue it above once that is settled.</Banner> : null}
-
-      {t.message ? (
-        <Card title="Message">
-          <p className="whitespace-pre-line text-sm leading-relaxed text-slate-700">{t.message}</p>
-        </Card>
-      ) : null}
-
-      {t.direction === "INCOMING" && t.status === "ISSUED" && t.receivedDate ? (
-        (() => {
-          const daysLeft = 5 - Math.floor((Date.now() - new Date(t.receivedDate).getTime()) / 86400000);
-          return daysLeft <= 2 ? (
-            <Banner tone="warn" title="Acceptance period closing">
-              The acceptance period closes {daysLeft <= 0 ? "today" : `in ${daysLeft} day${daysLeft === 1 ? "" : "s"}`}. Complete the acceptance check before the response window expires.
-            </Banner>
-          ) : null;
-        })()
-      ) : null}
-
       {t.status === "REJECTED" ? (
-        <Banner tone="danger" title="Transmittal rejected">
-          {t.rejectionReason} — the carried items have not been accepted and no review period has started.
-        </Banner>
+        <Banner tone="danger" title="Rejected">{t.rejectionReason} — the documents it carried were not accepted, and no review has started.</Banner>
       ) : null}
 
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_280px]">
+        <div className="space-y-4">
+          {t.message || t.issueRequests.length ? (
+            <section className="register register-sheet register-sheet-open">
+              <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2 sm:px-6">
+                <span className="stencil mr-1 text-slate-400">Why it was sent</span>
+                <span className="text-[11px] text-slate-400">the reason for issue, and what was written to them</span>
+                <span className="ml-auto text-[11px] font-medium text-slate-500">for {reason}</span>
+              </div>
+              {t.message ? (
+                <p className="whitespace-pre-line px-5 py-3.5 text-sm leading-relaxed text-slate-700 sm:px-6">{t.message}</p>
+              ) : null}
+              {t.issueRequests.length ? (
+                <p className="border-t border-line px-5 py-2 text-[11px] text-slate-400 sm:px-6">
+                  Raised from {t.issueRequests.length} issue request{t.issueRequests.length === 1 ? "" : "s"} — whoever released the revision asked for it to go out.
+                  {t.issueRequests.map((one) => one.note).filter(Boolean).length
+                    ? <> They said: {t.issueRequests.map((one) => one.note).filter(Boolean).join(" · ")}</>
+                    : null}
+                </p>
+              ) : null}
+            </section>
+          ) : null}
 
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
-        <div className="space-y-5">
-          <Card title={`Documents · ${t.items.length}`}>
-            <DataTable
-              head={<tr><Th>Document</Th><Th>Rev</Th><Th>Status</Th>{t.cycles.length ? <Th>Review</Th> : null}</tr>}
-            >
-              {t.items.map((item) => (
-                <tr key={item.id}>
-                  <Td>
-                    <Link href={`/documents/${item.revision.documentId}`} className="font-mono text-[13px] font-semibold text-brand-ink hover:underline">
-                      {item.revision.document.docNumber}
-                    </Link>
-                    <span className="block max-w-64 truncate text-xs text-slate-400">{item.revision.document.title}</span>
-                  </Td>
-                  <Td className="font-mono text-xs">{item.revision.value}{item.markedSuperseded ? <span className="ml-2 font-sans text-violet-700">since replaced</span> : null}</Td>
-                  <Td className="text-xs">{item.revision.statusCode ?? item.revision.state.replaceAll("_", " ").toLowerCase()}</Td>
-                  {t.cycles.length ? (
-                  <Td className="text-xs">
-                    {(() => {
-                      const cycle = t.cycles.find((c) => c.revisionId === item.revisionId);
-                      return cycle ? <Link href={`/reviews/${cycle.id}`} className="font-semibold text-brand-ink hover:underline">{cycle.status === "OPEN" ? "in review" : "reviewed"} →</Link> : <span className="text-slate-300">—</span>;
-                    })()}
-                  </Td>
-                  ) : null}
-                </tr>
+          {/* Who it went to, who was kept informed, whether they looked — and
+              the one thing anybody does about somebody who has not. */}
+          <section id="people" className="register register-sheet register-sheet-open">
+            <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2 sm:px-6">
+              <span className="stencil mr-1 text-slate-400">Sent to</span>
+              <span className="text-[11px] text-slate-400">
+                opening it while signed in is the receipt &mdash; copies are told, not asked
+              </span>
+              <span className="ml-auto font-mono text-[11px] tabular-nums text-slate-500">
+                {allSeen ? "all seen" : `${seen} of ${addressed.length} seen`}
+                {copied.length ? <span className="ml-1.5 font-sans text-slate-400">+{copied.length} copied in</span> : null}
+              </span>
+            </div>
+            <ul className="divide-y divide-line">
+              {[...addressed, ...copied].map((person) => (
+                <li key={person.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-2.5 sm:px-6">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-slate-700">
+                      {person.name}
+                      {person.organization ? <span className="font-normal text-slate-400"> &middot; {person.organization}</span> : null}
+                      {person.kind === "CC" ? <span className="ml-1.5 rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">copy</span> : null}
+                    </p>
+                    <p className="text-[11px] text-slate-400">
+                      {person.openedAt
+                        ? <>Opened it {fmtDateTime(person.openedAt)}{person.viewCount > 1 ? <>, and {person.viewCount} times since &mdash; last {fmtDateTime(person.lastViewedAt ?? person.openedAt)}</> : null}</>
+                        : person.notifiedAt
+                          ? <>Told {fmtDateTime(person.notifiedAt)} &mdash; not opened yet</>
+                          : "Waiting to be issued"}
+                    </p>
+                  </div>
+                  {person.openedAt ? (
+                    <Chip className={person.kind === "CC" ? "bg-slate-100 text-slate-600 ring-slate-200" : "bg-emerald-100 text-emerald-800 ring-emerald-300"}>seen</Chip>
+                  ) : person.notifiedAt ? (
+                    <Chip className="bg-amber-100 text-amber-800 ring-amber-300">told</Chip>
+                  ) : (
+                    <Chip className="bg-slate-100 text-slate-500 ring-slate-200">not sent yet</Chip>
+                  )}
+                </li>
               ))}
-            </DataTable>
-          </Card>
-
-          {t.direction === "INCOMING" && t.status === "ISSUED" ? (
-            <Card title="Check what arrived" description="Right documents, complete, readable, correctly numbered. Accept to send it on to review; reject to return it to the sender.">
-              {controller ? (
-                <div className="flex flex-wrap items-start gap-2">
-                  <PreflightPanel result={await preflight("ACCEPT_TRANSMITTAL", { transmittalId: t.id })} className="mb-1 w-full" />
-                  <Action label="Accept">
-                    <ActionForm action={acceptanceCheckAction} submitLabel="Accept" size="sm" hidden={{ transmittalId: t.id }}>
-                      <ul className="space-y-2">
-                        {ACCEPTANCE_CONDITIONS.filter((c) => t.items.length > 0 || !(ENCLOSURE_CONDITIONS as readonly string[]).includes(c.key)).map((c) => (
-                          <li key={c.key} className="flex items-start gap-2 text-sm text-slate-700">
-                            <input type="checkbox" name={`cond_${c.key}`} required className="mt-1" id={`cond-${c.key}`} />
-                            <label htmlFor={`cond-${c.key}`}>{c.label}</label>
-                          </li>
-                        ))}
-                      </ul>
-                      <Field label="Note"><input name="notes" className={inputCls} placeholder="optional" /></Field>
-                    </ActionForm>
-                  </Action>
-                  <Action label="Reject" secondary>
-                    <ActionForm action={acceptanceCheckAction} submitLabel="Reject and return" size="sm" variant="danger" hidden={{ transmittalId: t.id }}>
-                      <Field label="Reason" required hint="the sender sees this and resubmits">
-                        <textarea name="notes" required rows={3} className={inputCls} placeholder="e.g. Wrong revision on the title block; native file missing" />
-                      </Field>
-                    </ActionForm>
-                  </Action>
+            </ul>
+            {controller && waiting.length && t.status !== "DRAFT" ? (
+              <ActionForm action={chaseTransmittalAction} hideSubmit hidden={{ transmittalId: t.id }}>
+                <div className="asking flex flex-wrap items-center gap-3 px-5 py-3 sm:px-6">
+                  <span className="text-[11px] text-slate-500">
+                    {waiting.length === 1 ? `${waiting[0].name} has` : `${waiting.length} of them have`} not opened it. Telling them again is recorded.
+                  </span>
+                  <button className="ask ml-auto">Tell them again</button>
                 </div>
+              </ActionForm>
+            ) : null}
+          </section>
+
+          {/* What came back. Each answer is correspondence in its own right, so
+              this says what they are and where they are, and does not try to
+              hold them. */}
+          {t.status !== "DRAFT" ? (
+            <section id="reply" className="register register-sheet register-sheet-open">
+              <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2 sm:px-6">
+                <span className="stencil mr-1 text-slate-400">The exchange</span>
+                <span className={`text-[11px] ${replyOverdue ? "font-semibold text-red-700" : "text-slate-400"}`}>
+                  {t.answers.length
+                    ? `${t.answers.length} answer${t.answers.length === 1 ? "" : "s"} came back against it`
+                    : t.responseRequired
+                      ? replyOverdue
+                        ? `an answer was due ${fmtDate(t.responseDueDate)} and none has come back`
+                        : `an answer is due by ${fmtDate(t.responseDueDate)}`
+                      : "no answer is owed — anybody it reached may still send one"}
+                </span>
+                <Link href={replyHref} className="ask ml-auto">Reply</Link>
+              </div>
+
+              {t.inReplyTo ? (
+                <p className="border-b border-line px-5 py-2 text-[11px] text-slate-500 sm:px-6">
+                  This is itself an answer to{" "}
+                  <Link href={`/transmittals/${t.inReplyTo.id}`} className="font-mono font-semibold text-link hover:underline">{t.inReplyTo.number}</Link>
+                  {t.inReplyTo.subject ? <> &mdash; {t.inReplyTo.subject}</> : null}.
+                </p>
+              ) : null}
+
+              {t.answers.length ? (
+                <ul className="divide-y divide-line">
+                  {t.answers.map((answer) => (
+                    <li key={answer.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-2.5 sm:px-6">
+                      <div className="min-w-0">
+                        <p className="text-sm">
+                          <Link href={`/transmittals/${answer.id}`} className="doc-number">{answer.number}</Link>
+                          {answer.subject ? <span className="ml-2 font-medium text-slate-700">{answer.subject}</span> : null}
+                        </p>
+                        <p className="text-[11px] text-slate-400">
+                          {answer.direction === "OUTGOING" ? answer.createdByName : answer.issuingParty} &middot; {fmtDate(answer.dateOfIssue)}
+                          {answer._count.items ? <> &middot; {answer._count.items} document{answer._count.items === 1 ? "" : "s"}</> : <> &middot; words only</>}
+                        </p>
+                      </div>
+                      <Chip className={statusColors[answer.status] ?? ""}>{answer.status.toLowerCase()}</Chip>
+                    </li>
+                  ))}
+                </ul>
               ) : (
-                <p className="text-xs leading-5 text-slate-500">Document Control checks what arrives.</p>
+                <p className="px-5 py-3.5 text-xs text-slate-500 sm:px-6">
+                  Nothing has come back yet. An answer is a transmittal of its own — Reply opens one addressed to whoever sent this,
+                  with the people copied in carried over, and you can change any of that before it goes.
+                </p>
               )}
-            </Card>
+            </section>
+          ) : null}
+
+          {/* The check on arrival: the five conditions, the answer to each, and
+              who gave it. Kept whole — it is the evidence that what arrived was
+              fit to be used, and an audit reads it condition by condition. */}
+          {t.direction === "INCOMING" || conditions.length ? (
+            <section id="check" className="register register-sheet register-sheet-open">
+              <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2 sm:px-6">
+                <span className="stencil mr-1 text-slate-400">Checked on arrival</span>
+                <span className="text-[11px] text-slate-400">
+                  {conditions.length
+                    ? <>{t.checkedByName}, {fmtDate(t.acceptanceCheckedAt)}</>
+                    : "right documents, complete, readable, correctly numbered — accept to send it on to review, reject to return it"}
+                </span>
+                {conditions.length ? (
+                  <span className={`ml-auto font-mono text-[11px] tabular-nums ${conditions.every((one) => one.pass) ? "text-emerald-700" : "text-red-700"}`}>
+                    {conditions.filter((one) => one.pass).length}/{conditions.length} passed
+                  </span>
+                ) : null}
+              </div>
+
+              <ul className="divide-y divide-line">
+                {ACCEPTANCE_CONDITIONS.map((condition) => {
+                  const answer = conditions.find((one) => one.key === condition.key);
+                  return (
+                    <li key={condition.key} className="flex items-start gap-2.5 px-5 py-2 text-xs sm:px-6">
+                      <span className={`mt-0.5 font-semibold ${!answer ? "text-slate-300" : answer.notApplicable ? "text-slate-400" : answer.pass ? "text-emerald-600" : "text-red-600"}`}>
+                        {!answer ? "·" : answer.notApplicable ? "—" : answer.pass ? "✓" : "✗"}
+                      </span>
+                      <span className="text-slate-600">
+                        {condition.label}
+                        {answer?.notApplicable ? <span className="text-slate-400"> — nothing was enclosed, so this was not asked</span> : null}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+
+              {t.acceptanceNotes ? (
+                <p className="border-t border-line px-5 py-2 text-[11px] text-slate-500 sm:px-6">
+                  They wrote: <span className="text-slate-700">{t.acceptanceNotes}</span>
+                </p>
+              ) : null}
+
+              {t.direction === "OUTGOING" && !conditions.length ? (
+                <p className="border-t border-line px-5 py-2 text-[11px] text-slate-400 sm:px-6">
+                  Their document control runs this same check on what we send. Anything failing comes back with a reason.
+                </p>
+              ) : null}
+
+              {t.direction === "INCOMING" && t.status === "ISSUED" ? (
+                controller ? (
+                  <div className="border-t border-line px-5 py-3.5 sm:px-6">
+                    <PreflightPanel result={await preflight("ACCEPT_TRANSMITTAL", { transmittalId: t.id })} className="mb-3" />
+                    <ActionForm action={acceptanceCheckAction} hideSubmit hidden={{ transmittalId: t.id }}>
+                      <div className="asking grid grid-cols-1 gap-x-4 gap-y-2.5">
+                        {ACCEPTANCE_CONDITIONS
+                          .filter((condition) => t.items.length > 0 || !(ENCLOSURE_CONDITIONS as readonly string[]).includes(condition.key))
+                          .map((condition) => (
+                            <label key={condition.key} className="flex items-start gap-2 text-xs font-medium text-slate-700">
+                              <input type="checkbox" name={`cond_${condition.key}`} className="mt-0.5" />
+                              {condition.label}
+                            </label>
+                          ))}
+                        <label className="min-w-0">
+                          <span className="sr-only">Note, or the reason it is rejected</span>
+                          <input name="notes" className="plain w-full" placeholder="A note — or, if anything above is unticked, why it is going back; the sender reads this" />
+                        </label>
+                        <div className="flex justify-end">
+                          <button className="ask">Record the check</button>
+                        </div>
+                      </div>
+                    </ActionForm>
+                    <p className="mt-2 text-[11px] text-slate-400">
+                      Every condition ticked accepts it and starts the response period. Anything left unticked returns it to the sender with your reason.
+                    </p>
+                  </div>
+                ) : (
+                  <p className="border-t border-line px-5 py-2.5 text-xs text-slate-500 sm:px-6">Document Control checks what arrives.</p>
+                )
+              ) : null}
+            </section>
           ) : null}
 
           {t.direction === "INCOMING" && ["ACCEPTED", "CLOSED"].includes(t.status) && controller && readyToRoute.length ? (
-            <Card title="Send for review" description={`${readyToRoute.length} accepted document${readyToRoute.length === 1 ? "" : "s"} waiting to be routed.`}>
-              <Action label="Send for review / approval">
+            <section className="register register-sheet register-sheet-open">
+              <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2 sm:px-6">
+                <span className="stencil mr-1 text-slate-400">Send for review</span>
+                <span className="text-[11px] text-slate-400">
+                  {readyToRoute.length} accepted document{readyToRoute.length === 1 ? "" : "s"} waiting to be routed
+                </span>
+              </div>
+              <div className="px-5 py-3.5 sm:px-6">
                 <SendForReview revisionIds={readyToRoute} />
-              </Action>
-            </Card>
-          ) : null}
-
-          {t.direction === "OUTGOING" ? (
-            <details className="rounded-2xl border border-slate-200 bg-surface px-5 py-3 shadow-sm">
-              <summary className="cursor-pointer list-none text-sm font-semibold text-slate-800">What the receiver will check when it arrives</summary>
-              <ul className="mt-2 space-y-1 text-xs text-slate-600">
-                {ACCEPTANCE_CONDITIONS.map((c) => <li key={c.key} className="flex gap-2"><span className="text-slate-300">·</span>{c.label}</li>)}
-              </ul>
-              <p className="mt-2 text-[11px] text-slate-500">Their document control runs the same check we run on what arrives here. Anything failing comes back with a reason.</p>
-            </details>
-          ) : null}
-
-          {conditions.length ? (
-            <details className="rounded-2xl border border-slate-200 bg-surface px-5 py-3 shadow-sm">
-              <summary className="cursor-pointer list-none text-sm text-slate-700">
-                Checked by <strong>{t.checkedByName}</strong>, {fmtDate(t.acceptanceCheckedAt)} — {conditions.filter((c) => c.pass).length} of {conditions.length} checks passed
-              </summary>
-              <ul className="mt-2 space-y-1 text-xs">
-                {ACCEPTANCE_CONDITIONS.map((c) => {
-                  const r = conditions.find((x) => x.key === c.key);
-                  return <li key={c.key} className="flex gap-2"><span className={r?.pass ? "text-emerald-600" : "text-red-600"}>{r?.pass ? "✓" : "✗"}</span><span className="text-slate-600">{c.label}</span></li>;
-                })}
-              </ul>
-            </details>
+              </div>
+            </section>
           ) : null}
         </div>
 
-        <div className="space-y-4">
-
+        {/* What has happened to it, and what is still to come. */}
+        <aside>
           <Card title="Progress">
             <Timeline
               points={t.direction === "OUTGOING" ? [
                 { label: "Raised", at: t.createdAt, holder: t.createdByName },
-                { label: "Issued — the recipients were told", at: t.status === "DRAFT" ? null : t.dateOfIssue, holder: t.status === "DRAFT" ? "nothing has been sent yet" : t.createdByName },
+                { label: "Issued — they were told", at: t.status === "DRAFT" ? null : t.dateOfIssue, holder: t.status === "DRAFT" ? "nothing has been sent yet" : t.createdByName },
                 {
-                  label: "Seen", at: t.recipients.map((r) => r.openedAt).filter(Boolean).sort((x, y) => x!.getTime() - y!.getTime())[0] ?? null,
-                  holder: `${t.recipients.filter((r) => r.openedAt).length} of ${t.recipients.length}`,
+                  label: "Seen",
+                  at: addressed.map((one) => one.openedAt).filter(Boolean).sort((x, y) => x!.getTime() - y!.getTime())[0] ?? null,
+                  holder: `${seen} of ${addressed.length} it was addressed to`,
                 },
-                ...(t.responseRequired ? [{ label: "A reply is due", at: null, holder: t.responseDueDate ? fmtDate(t.responseDueDate) : "no date" }] : []),
+                ...(t.responseRequired || t.answers.length ? [{
+                  label: t.answers.length ? "Answered" : "An answer is due",
+                  at: t.answers[0]?.dateOfIssue ?? null,
+                  holder: t.answers.length ? t.answers[0].number : t.responseDueDate ? fmtDate(t.responseDueDate) : "no date",
+                }] : []),
+                { label: "Closed", at: t.status === "CLOSED" ? t.acceptanceCheckedAt ?? t.createdAt : null, holder: t.status === "CLOSED" ? "nothing further is expected" : null },
               ] : [
                 { label: "They sent it", at: t.dateOfIssue, holder: t.issuingParty },
                 { label: "It arrived", at: t.receivedDate, holder: t.receivedByParty ?? null },
-                { label: "Checked on arrival", at: t.acceptanceCheckedAt, holder: t.checkedByName ?? null, detail: t.status === "REJECTED" ? t.rejectionReason : null },
+                {
+                  label: "Checked on arrival",
+                  at: t.acceptanceCheckedAt,
+                  holder: t.checkedByName ?? null,
+                  detail: t.status === "REJECTED" ? t.rejectionReason : t.acceptanceNotes,
+                },
                 { label: "Sent for review", at: t.cycles[0]?.submittedAt ?? null, holder: t.cycles.length ? `${t.cycles.length} review${t.cycles.length === 1 ? "" : "s"}` : null, skipped: ["CLOSED"].includes(t.status) && !t.cycles.length },
+                ...(t.responseRequired || t.answers.length ? [{
+                  label: t.answers.length ? "Answered" : "An answer is due",
+                  at: t.answers[0]?.dateOfIssue ?? null,
+                  holder: t.answers.length ? t.answers[0].number : t.responseDueDate ? fmtDate(t.responseDueDate) : "no date",
+                }] : []),
                 { label: "Closed", at: t.status === "CLOSED" ? t.acceptanceCheckedAt : null },
               ]}
             />
           </Card>
-
-          <Card title={`Recipients · ${t.recipients.length}`} description="Everyone named here can open this transmittal and the documents it carries. Opening it while signed in is recorded as receipt — there is nothing for them to confirm.">
-            <ul className="divide-y divide-slate-100">
-              {t.recipients.map((r) => (
-                <li key={r.id} className="py-2.5 text-sm">
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="font-medium text-slate-700">{r.name}{r.organization ? <span className="font-normal text-slate-400"> · {r.organization}</span> : null}</span>
-                    {r.openedAt ? (
-                      <Chip className="bg-emerald-100 text-emerald-800 ring-emerald-300">seen</Chip>
-                    ) : r.notifiedAt ? (
-                      <Chip className="bg-amber-100 text-amber-800 ring-amber-300">told</Chip>
-                    ) : (
-                      <Chip className="bg-slate-100 text-slate-500 ring-slate-200">not sent yet</Chip>
-                    )}
-                  </div>
-                  <div className="mt-1 flex items-center justify-between gap-3 text-[11px] text-slate-400">
-                    <span>
-                      {r.openedAt
-                        ? `Opened it ${fmtDateTime(r.openedAt)}${r.viewCount > 1 ? `, ${r.viewCount} times since` : ""}`
-                        : r.notifiedAt
-                          ? `Told ${fmtDateTime(r.notifiedAt)} — not opened yet`
-                          : "Waiting to be issued"}
-                    </span>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </Card>
-
-        </div>
+        </aside>
       </div>
     </div>
   );
 }
-

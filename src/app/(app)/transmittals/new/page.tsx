@@ -7,7 +7,7 @@ import { NewTransmittalForm } from "./new-transmittal-form";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "New transmittal" };
 
-type Search = { doc?: string; docs?: string; direction?: string; revisions?: string; users?: string; to?: string; reason?: string; party?: string; subject?: string; message?: string };
+type Search = { doc?: string; docs?: string; direction?: string; revisions?: string; users?: string; to?: string; reason?: string; party?: string; subject?: string; message?: string; replyTo?: string };
 
 export default async function NewTransmittalPage({ searchParams }: { searchParams: Promise<Search> }) {
   const ctx = await requireScope();
@@ -41,6 +41,31 @@ export default async function NewTransmittalPage({ searchParams }: { searchParam
     }, new Map<string, { key: string; name: string; people: { id: string; name: string; job: string | null }[] }>()).values(),
   ].sort((a, b) => (a.key === "US" ? -1 : b.key === "US" ? 1 : a.name.localeCompare(b.name)));
 
+  // Answering something: the question decides who this goes to. Whoever sent
+  // it is addressed, the people copied in on the question are copied in on the
+  // answer, and the subject carries the thread. All of it is editable — it is a
+  // starting point, not a rule.
+  const answering = sp.replyTo
+    ? await db.transmittal.findUnique({
+        where: { id: sp.replyTo },
+        select: {
+          id: true, number: true, subject: true, direction: true, issuingParty: true, createdById: true,
+          recipients: { select: { userId: true, kind: true } },
+        },
+      })
+    : null;
+  const answerTo = answering
+    ? answering.direction === "OUTGOING"
+      // We sent it, so the answer comes back to whoever raised it.
+      ? [answering.createdById]
+      // It came from outside; the answer goes back to that company, and the
+      // people it named are the ones who know about it.
+      : answering.recipients.filter((one) => one.kind !== "CC" && one.userId).map((one) => one.userId!)
+    : [];
+  const answerCopies = answering
+    ? answering.recipients.filter((one) => one.kind === "CC" && one.userId).map((one) => one.userId!)
+    : [];
+
   const selectedDocumentIds = [...new Set([...(sp.docs ?? "").split(","), ...(sp.doc ? [sp.doc] : [])].map((value) => value.trim()).filter(Boolean))];
   const selectedDocuments = selectedDocumentIds.length ? await db.document.findMany({
     where: { id: { in: selectedDocumentIds } },
@@ -60,12 +85,22 @@ export default async function NewTransmittalPage({ searchParams }: { searchParam
         reviewers={reviewers.map((u) => ({ id: u.id, name: u.name, role: u.functionName }))}
         companies={companies}
         ourOrganization={ourOrganization}
-        defaultDirection={sp.direction === "INCOMING" ? "INCOMING" : "OUTGOING"}
+        defaultDirection={answering
+          ? (answering.direction === "OUTGOING" ? "INCOMING" : "OUTGOING")
+          : sp.direction === "INCOMING" ? "INCOMING" : "OUTGOING"}
         preselectedRevisionIds={preselected}
         prefill={{
           revisionIds: (sp.revisions ?? "").split(",").filter(Boolean),
-          userIds: (sp.users ?? "").split(",").filter(Boolean),
-          outsiders: sp.to, reason: sp.reason, party: sp.party, subject: sp.subject, message: sp.message,
+          userIds: answering ? answerTo : (sp.users ?? "").split(",").filter(Boolean),
+          copyIds: answerCopies,
+          outsiders: sp.to,
+          reason: sp.reason,
+          party: answering && answering.direction === "INCOMING" ? answering.issuingParty : sp.party,
+          subject: answering
+            ? `RE: ${answering.subject ?? answering.number}`
+            : sp.subject,
+          message: sp.message,
+          answering: answering ? { id: answering.id, number: answering.number, subject: answering.subject } : undefined,
         }}
       />
     </div>

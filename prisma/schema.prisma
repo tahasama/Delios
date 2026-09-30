@@ -840,6 +840,15 @@ model Transmittal {
   createdById         String
   createdByName       String
   createdAt           DateTime               @default(now())
+  /**
+   * The transmittal this one answers. An answer is correspondence in its own
+   * right — its own number, its own recipients, its own enclosures — so it is
+   * a transmittal, not a note attached to one, and the two are linked rather
+   * than merged.
+   */
+  inReplyToId         String?
+  inReplyTo           Transmittal?           @relation("TransmittalThread", fields: [inReplyToId], references: [id])
+  answers             Transmittal[]          @relation("TransmittalThread")
   items               TransmittalItem[]
   recipients          TransmittalRecipient[]
   cycles              ReviewCycle[]
@@ -855,6 +864,7 @@ model Transmittal {
   @@index([issuingParty])
   @@index([responseDueDate])
   @@index([receivedDate])
+  @@index([inReplyToId])
 }
 
 model TransmittalItem {
@@ -879,6 +889,12 @@ model TransmittalRecipient {
   transmittalId  String
   transmittal    Transmittal @relation(fields: [transmittalId], references: [id])
   name           String // recipients recorded individually (§11.4)
+  /**
+   * TO — asked to do something with it, and the ones "seen" is read from.
+   * CC — kept informed. Their opening it is recorded, but a transmittal is not
+   * seen because somebody copied in happened to look.
+   */
+  kind           String      @default("TO")
   organization   String?
   userId         String?
   notifiedAt     DateTime? // in-system delivery notification issued

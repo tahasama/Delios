@@ -13,7 +13,15 @@ type Opt = { code: string; label: string; props: Record<string, unknown> };
 type RevOpt = { id: string; label: string; released: boolean };
 type UserOpt = { id: string; name: string; role: string };
 /** Anything the form can start filled in with — from a link such as "Send rev B to them". */
-export type Prefill = { revisionIds?: string[]; userIds?: string[]; outsiders?: string; reason?: string; party?: string; subject?: string; message?: string };
+export type Prefill = {
+  revisionIds?: string[];
+  userIds?: string[];
+  /** People copied in on the question, copied in on the answer. */
+  copyIds?: string[];
+  outsiders?: string; reason?: string; party?: string; subject?: string; message?: string;
+  /** The transmittal being answered: its id, and what to call it on screen. */
+  answering?: { id: string; number: string; subject: string | null };
+};
 
 const STEPS = ["Which way, and why", "What goes with it", "Who gets it"];
 
@@ -105,6 +113,19 @@ export function NewTransmittalForm({
       </ol>
 
       <ActionForm action={createTransmittalAction} hideSubmit>
+        {/* What this answers, where it answers something. The thread is kept by
+            the record rather than by whoever remembers it. */}
+        {prefill?.answering ? (
+          <>
+            <input type="hidden" name="inReplyTo" value={prefill.answering.id} />
+            <p className="mb-4 rounded-lg border border-line bg-tint-soft px-3.5 py-2.5 text-xs text-slate-600">
+              Answering <Link href={`/transmittals/${prefill.answering.id}`} className="font-mono font-semibold text-link hover:underline">{prefill.answering.number}</Link>
+              {prefill.answering.subject ? <> &mdash; {prefill.answering.subject}</> : null}.
+              {" "}The people it was sent to and copied in are carried over; change any of them below.
+            </p>
+          </>
+        ) : null}
+
         {/* ── Step 1 — which way, and why ───────────────────────────────────── */}
         <div className={cn("space-y-4", step !== 1 && "hidden")}>
           <div className="flex gap-2">
@@ -223,7 +244,11 @@ export function NewTransmittalForm({
 
         {/* ── Step 3 — who gets it ──────────────────────────────────────────── */}
         <div className={cn("space-y-4", step !== 3 && "hidden")}>
-          <RecipientPicker companies={companies} preselected={prefill?.userIds ?? []} />
+          <RecipientPicker
+            companies={companies}
+            preselected={prefill?.userIds ?? []}
+            preselectedCopies={prefill?.copyIds ?? []}
+          />
 
           {outgoing ? (
             <label className="flex items-start gap-2 rounded-lg bg-tint-soft px-3 py-2.5 text-xs text-slate-700">

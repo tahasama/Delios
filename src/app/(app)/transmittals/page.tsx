@@ -195,7 +195,12 @@ export default async function TransmittalsPage({ searchParams }: { searchParams:
       status: item.status,
       // What arrived and has not been answered is said as the job it is.
       statusLabel: !outgoing && item.status === "ISSUED" ? "To check" : STATUS_LABEL[item.status] ?? item.status.toLowerCase(),
-      recipients: item.recipients.map((person) => ({ id: person.id, name: person.name, seen: !!person.openedAt })),
+      // Seen is read from the people it was addressed to. Somebody copied in
+      // was told, not asked, and their opening it settles nothing.
+      recipients: item.recipients
+        .filter((person) => person.kind !== "CC")
+        .map((person) => ({ id: person.id, name: person.name, seen: !!person.openedAt })),
+      copies: item.recipients.filter((person) => person.kind === "CC").length,
       dueAt: item.responseDueDate?.toISOString() ?? null,
       dueIn: item.responseDueDate && item.status !== "DRAFT"
         ? Math.round((midnight(item.responseDueDate) - today) / 86_400_000)

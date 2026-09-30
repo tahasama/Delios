@@ -168,13 +168,30 @@ export async function GET(req: Request, { params }: { params: Promise<{ kind: st
     const list = await db.transmittal.findMany({
       where: ticked.length ? { id: { in: ticked } } : {},
       orderBy: { number: "asc" },
-      include: { items: { include: { revision: { include: { document: true } } } }, recipients: true },
+      include: {
+        items: { include: { revision: { include: { document: true } } } },
+        recipients: true,
+        inReplyTo: { select: { number: true } },
+        answers: { orderBy: { dateOfIssue: "asc" }, select: { number: true, dateOfIssue: true } },
+      },
     });
-    rows = [["Number", "Direction", "Reason", "Date of issue", "Issuing party", "Status", "Response due", "Received date", "Items", "Recipients"]];
+    // Who was asked and who was kept informed are different facts, and the
+    // answer that came back is part of the record.
+    rows = [["Number", "Direction", "Reason", "Date of issue", "Issuing party", "Status", "Response due", "Received date", "Items", "Sent to", "Copied in", "Seen by", "In answer to", "Answered at", "Answered by"]];
     for (const t of list) {
       const items = t.items.map((i) => `${i.revision.document.docNumber} rev ${i.revision.value}`).join("; ");
-      const recips = t.recipients.map((r) => r.name).join("; ");
-      rows.push([t.number, t.direction, t.reasonForIssue, t.dateOfIssue.toISOString().slice(0, 10), t.issuingParty, t.status, t.responseDueDate?.toISOString().slice(0, 10) ?? "", t.receivedDate?.toISOString().slice(0, 10) ?? "", items, recips]);
+      const addressed = t.recipients.filter((r) => r.kind !== "CC");
+      const answer = t.answers[0] ?? null;
+      rows.push([
+        t.number, t.direction, t.reasonForIssue, t.dateOfIssue.toISOString().slice(0, 10), t.issuingParty, t.status,
+        t.responseDueDate?.toISOString().slice(0, 10) ?? "", t.receivedDate?.toISOString().slice(0, 10) ?? "", items,
+        addressed.map((r) => r.name).join("; "),
+        t.recipients.filter((r) => r.kind === "CC").map((r) => r.name).join("; "),
+        `${addressed.filter((r) => r.openedAt).length} of ${addressed.length}`,
+        t.inReplyTo?.number ?? "",
+        answer?.dateOfIssue.toISOString().slice(0, 10) ?? "",
+        t.answers.map((one) => one.number).join("; "),
+      ]);
     }
   } else if (kind === "defects") {
     const defects = await db.defect.findMany({ orderBy: [{ severity: "asc" }, { lastSeenAt: "desc" }] });

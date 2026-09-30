@@ -21,6 +21,8 @@ type Row = {
   from: string; to: string; reason: string; reasonLabel: string;
   issuedAt: string; documents: number; status: string; statusLabel: string;
   recipients: { id: string; name: string; seen: boolean }[];
+  /** How many were copied in. They are told, not asked, so they are not "seen". */
+  copies: number;
   dueAt: string | null; dueIn: number | null;
   receivedAt: string | null; checkedBy: string | null;
   replyNeeded: boolean; replyDays: number | null;
@@ -415,6 +417,7 @@ const COLUMNS: Column[] = [
             {row.recipients.slice(0, 8).map((person) => <span key={person.id} className={`seen-dot ${person.seen ? "seen-on" : ""}`} />)}
           </span>
           <span className="font-mono tabular-nums">{seen}/{row.recipients.length}</span>
+          {row.copies ? <span className="text-[10px] text-slate-400">+{row.copies} copied</span> : null}
         </span>
       );
     },
