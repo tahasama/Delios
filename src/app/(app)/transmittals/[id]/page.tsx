@@ -14,7 +14,7 @@ import {
   markRecipientSentAction,
 } from "@/lib/actions/transmittals";
 import { preflight } from "@/lib/rules/preflight";
-import { PreflightPanel, Guarded } from "@/components/preflight";
+import { PreflightPanel } from "@/components/preflight";
 import { ReceiptTracker } from "./receipt-tracker";
 import { NotifyAgain } from "./notify-again";
 import { CarriedTable, type CarriedRow } from "./carried-table";
@@ -110,6 +110,7 @@ export default async function TransmittalDetailPage({ params, searchParams }: { 
   const allSeen = addressed.length > 0 && seen === inApp.length && sentCount === sentOn.length;
   const waiting = addressed.filter((one) => !one.openedAt && one.userId);
   const mayNotify = controller && waiting.length > 0 && t.status !== "DRAFT";
+  const issueCheck = t.status === "DRAFT" && controller ? await preflight("ISSUE", { transmittalId: t.id }) : null;
   // Who of ours carries each of those organizations, and whether that is you.
   const { partyStepHolders } = await import("@/lib/workflow");
   const carriersOf = new Map<string, { names: string; mine: boolean }>();
@@ -208,21 +209,40 @@ export default async function TransmittalDetailPage({ params, searchParams }: { 
                     : "No answer is needed. Opening it is the receipt."}
               </p>
             </div>
-            <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+            {/* The way back and where it stands — nothing else, as on every
+                detail page. What can be done to it lives in the sheet it
+                concerns: issuing, in the draft bar below. */}
+            <div className="flex shrink-0 items-center gap-2">
               <Link href="/transmittals" className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-semibold text-slate-500 hover:bg-slate-100"><ArrowLeft className="h-4 w-4" /> Transmittals</Link>
-              <Link href={`/?view=log&q=${encodeURIComponent(t.number)}`} className="text-[11px] font-semibold text-link hover:underline" title="What has happened to this transmittal, in the project's own log">What is going on &rarr;</Link>
-              <Link href={`/admin/audit?q=${encodeURIComponent(t.number)}`} className="text-[11px] font-semibold text-link hover:underline" title="Every recorded act on this transmittal, in the audit trail">History &rarr;</Link>
               <Chip className={statusColors[t.status] ?? ""}>{t.status.toLowerCase()}</Chip>
-              {t.status === "DRAFT" && controller ? (
-                <Guarded result={await preflight("ISSUE", { transmittalId: t.id })}>
-                  <ActionForm action={issueTransmittalAction} submitLabel="Issue" size="sm" hidden={{ transmittalId: t.id }} />
-                </Guarded>
-              ) : null}
             </div>
           </div>
         }
       />
 
+      {/* A draft has been sent to nobody. Saying so, with the one thing that
+          changes it, in a bar of its own. */}
+      {t.status === "DRAFT" ? (
+        <section className="register register-sheet register-sheet-open">
+          <div className="asking flex flex-wrap items-center gap-x-4 gap-y-2 bg-tint-soft px-5 py-3 sm:px-6">
+            <span className="stencil text-slate-500">Draft</span>
+            <span className="text-xs text-slate-600">Nothing has been sent — issuing it notifies everyone it is addressed to, and dates it.</span>
+            {controller ? (
+              issueCheck!.ok ? (
+                <span className="ml-auto flex items-center gap-3">
+                  <span className="text-[11px] text-slate-400">{issueCheck!.passed.length} check{issueCheck!.passed.length === 1 ? "" : "s"} passed</span>
+                  <ActionForm action={issueTransmittalAction} hideSubmit hidden={{ transmittalId: t.id }} className="space-y-0">
+                    <button data-on="true" className="ask">Issue</button>
+                  </ActionForm>
+                </span>
+              ) : null
+            ) : <span className="ml-auto text-[11px] text-slate-400">Document Control issues it.</span>}
+          </div>
+          {controller && (!issueCheck!.ok || issueCheck!.warnings.length) ? (
+            <div className="border-t border-line px-5 py-3 sm:px-6"><PreflightPanel result={issueCheck!} /></div>
+          ) : null}
+        </section>
+      ) : null}
       {sp.issueError ? <Banner tone="warn" title="Created, but not sent">{sp.issueError} Issue it above once that is settled.</Banner> : null}
       {t.status === "REJECTED" ? (
         <Banner tone="danger" title="Rejected">{t.rejectionReason} — the documents it carried were not accepted, and no review has started.</Banner>
@@ -548,7 +568,17 @@ export default async function TransmittalDetailPage({ params, searchParams }: { 
 
         {/* What has happened to it, and what is still to come. */}
         <aside>
-          <Card title="Progress">
+          <Card
+            title="Progress"
+            actions={controller ? (
+              <span className="flex items-center gap-3 text-[11px] font-semibold">
+                {/* The project's log is Document Control's; the audit trail is
+                    the administrator's. Nobody is shown a door they cannot open. */}
+                <Link href={`/?view=log&q=${encodeURIComponent(t.number)}`} className="text-link hover:underline" title="What has happened to this transmittal, in the project's own log">Log &rarr;</Link>
+                {isAdmin(user) ? <Link href={`/admin/audit?q=${encodeURIComponent(t.number)}`} className="text-link hover:underline" title="Every recorded act on this transmittal, in the audit trail">Audit &rarr;</Link> : null}
+              </span>
+            ) : undefined}
+          >
             <Timeline
               points={t.direction === "OUTGOING" ? [
                 { label: "Raised", at: t.createdAt, holder: t.createdByName },

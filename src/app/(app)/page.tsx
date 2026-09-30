@@ -26,10 +26,12 @@ export const dynamic = "force-dynamic";
  */
 export default async function HomePage({ searchParams }: { searchParams: Promise<{ view?: string; kind?: string; from?: string; to?: string; q?: string }> }) {
   const sp = await searchParams;
-  const view = sp.view;
   const ctx = await requireScope();
   const { user, db } = ctx;
   const controller = isController(user) || isAdmin(user);
+  // The whole log is Document Control's and the administrator's: they answer
+  // for what the record says. Anybody else asking for it gets their own page.
+  const view = sp.view === "log" && !controller ? undefined : sp.view;
   // What counts as delivered for an action is the project's answer.
   const reading = await readyReading(ctx);
 
@@ -394,14 +396,16 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         {/* The log is not work waiting on anybody, so it sits apart at the end
             and carries no count: a number here would join a total that means
             "what is owed by you". */}
-        <Link
-          href="/?view=log"
-          scroll={false}
-          aria-current={view === "log" ? "page" : undefined}
-          className="segment ml-auto"
-        >
-          The log
-        </Link>
+        {controller ? (
+          <Link
+            href="/?view=log"
+            scroll={false}
+            aria-current={view === "log" ? "page" : undefined}
+            className="segment ml-auto"
+          >
+            The log
+          </Link>
+        ) : null}
       </nav>
 
       <div className="mt-3 grid grid-cols-1 gap-3.5 xl:grid-cols-[minmax(0,1fr)_296px] xl:items-start">
@@ -540,7 +544,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
                   );
                 })}
               </ul>
-                            <Link href="/?view=log" scroll={false} className="mt-2.5 inline-block text-xs font-semibold text-link hover:underline">Everything that happened →</Link>
+                            {controller ? <Link href="/?view=log" scroll={false} className="mt-2.5 inline-block text-xs font-semibold text-link hover:underline">Everything that happened →</Link> : null}
             </section>
           ) : null}
 
