@@ -168,6 +168,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
       revStateLabel: latest ? revStateLabel(latest.state) : "No revision yet",
       // Released and nobody asked for it to be sent: in use, and nobody told.
       notIssued: !!released && !released.transmittalItems.length,
+      onHold: released?.heldAt ? (released.heldReason ?? "On hold, not for use.") : null,
       // A code is printed only when the organization publishes it. Records made
       // before the list existed carry the Standard's own consequence names,
       // which are sentences, not codes: those show their meaning alone.

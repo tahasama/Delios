@@ -28,6 +28,8 @@ type RegisterRow = {
   revision: string | null; revState: string | null; revStateLabel: string;
   verdict: string | null; verdictLabel: string | null;
   releasedFor: string | null; releasedForLabel: string | null; releasedForUse: string | null; proposedFor: string | null; notIssued: boolean;
+  /** Released, then put on hold for an outside approval: not for use. */
+  onHold: string | null;
   createdDate: string; updatedAt: string; plannedSubmissionDate: string | null; issueDate: string | null; releasedAt: string | null;
   decidedBy: string | null; packageCount: number; hasReleased: boolean; reviewRevisionId: string | null;
   fileAdded: string | null; revStarted: string | null; decidedByDelegated: boolean;
@@ -587,6 +589,7 @@ const COLUMNS: Column[] = [
         {/* Released, and nobody asked for it to be sent. It is in use; nobody
             has been told, including anyone whose approval it may still need. */}
         {row.notIssued ? <span title="Nobody has asked for it to be sent." className="ml-1.5 rounded border border-amber-400 px-1 text-[9px] font-bold uppercase tracking-wide text-amber-700">not issued</span> : null}
+        {row.onHold ? <span title={row.onHold} className="ml-1.5 rounded border border-red-400 px-1 text-[9px] font-bold uppercase tracking-wide text-red-700">on hold · not for use</span> : null}
       </>
     ),
   },

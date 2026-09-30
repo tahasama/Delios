@@ -68,6 +68,20 @@ export async function requestIssueAction(_prev: { error?: string } | undefined, 
       ctx,
     );
   }
+  // Released already, and now found to need an outside approval: the approval
+  // step opens, and the revision is on hold, not for use, from the moment it
+  // goes to them — at once for a party answering here, when our liaison records
+  // it sent for one that is not.
+  if (rev.state === "RELEASED" && asked.needsApproval) {
+    const { openApprovalStep, holdRevision } = await import("@/lib/issue-requests");
+    const { partyStepHolders } = await import("@/lib/workflow");
+    const opened = await openApprovalStep(ctx, revisionId, user);
+    if (opened.opened && asked.approverId && !(await partyStepHolders(ctx, asked.approverId)).byProxy) {
+      await holdRevision(ctx, revisionId, user, opened.party ?? "the outside party");
+    }
+    revalidatePath(`/documents/${rev.documentId}`);
+    return {};
+  }
   // Where nobody stands between the ask and the send, the asker sends it.
   if (rev.state === "RELEASED" && !(await issueGateIsControl(ctx)) && !asked.delegated) {
     await carryOutRequest(ctx, request.id, user);

@@ -315,6 +315,32 @@ of entry 13, which a letter answers as not applicable.
 
 ---
 
+## 16 · An outside approval is answered through Document Control, and a late one puts the revision on hold
+
+**Clause:** §7 *Release*, §11.10 *Rejection and resubmission*.
+
+**Must say:** an outside party's answer on a revision it must approve goes to
+the control function, like any decided revision. An approval lets it release
+and issue the revision. A refusal blocks release until the control function
+sends the revision back, with a reason, to whoever it goes back to: the
+supplier where it came from outside, otherwise whoever started its route. The
+control function chooses who is copied in; they start as the people who sat on
+the route.
+
+Where a released and issued revision is found to need an outside approval it
+never had, it is put **on hold, not for use** from the moment it goes to that
+party, and stays released — people hold copies of it. It cannot be sent again
+while on hold. An approval lets the control function lift the hold, and what
+was asked for it is then sent. A refusal leaves it on hold for good; it goes
+back with a reason, and the next revision replaces it.
+
+**Depends on it:** `settleApproval`, `returnAtGate`, `holdRevision`,
+`liftHold`, `returnHeld`, `returnRecipients`; `Revision.heldAt`,
+`heldReason`, `heldByName`; audit acts `OUTSIDE_APPROVED`, `OUTSIDE_REFUSED`,
+`REVISION_HELD`, `REVISION_HOLD_LIFTED`.
+
+---
+
 ## Still open — decided in conversation, not yet built
 
 - **Escalation** where somebody refuses to acknowledge carrying an action

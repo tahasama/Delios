@@ -404,6 +404,12 @@ export async function markDispatchedAction(_prev: { error?: string; ok?: string 
     });
   }
 
+  // An approval asked for after release: the revision is on hold, not for use,
+  // from the moment it goes to them.
+  if (cycle.issueRequestId && cycle.revision.state === "RELEASED") {
+    const { holdRevision } = await import("@/lib/issue-requests");
+    await holdRevision(ctx, cycle.revisionId, user, cycle.party?.name ?? "the outside party");
+  }
   await db.reviewCycle.update({
     where: { id: cycleId },
     data: {

@@ -79,7 +79,7 @@ export function RecipientPicker({ companies, preselected = [], preselectedCopies
 }
 
 /** One list: its search, what the search finds, and who is on it. */
-function Block({ label, hint, required, copy, everyone, companies, chosen, onAdd, onRemove }: {
+export function Block({ label, hint, required, copy, everyone, companies, chosen, onAdd, onRemove }: {
   label: string;
   hint: string;
   required?: boolean;
@@ -209,6 +209,37 @@ function Block({ label, hint, required, copy, everyone, companies, chosen, onAdd
           ))}
         </ul>
       ) : null}
+    </div>
+  );
+}
+
+/**
+ * Who is copied in when something is sent back: the people it goes back to are
+ * settled by the record and shown, not chosen; everyone else starts as those
+ * who sat on the route, and Document Control adds or removes as it sees fit.
+ */
+export function CopyPicker({ companies, backTo, preselected = [] }: { companies: Company[]; backTo: string; preselected?: string[] }) {
+  const everyone = useMemo<Person[]>(
+    () => companies.flatMap((c) => c.people.map((p) => ({ id: p.id, name: p.name, job: p.job ?? null, company: c.name, offline: c.offline }))),
+    [companies],
+  );
+  const byId = useMemo(() => new Map(everyone.map((p) => [p.id, p] as const)), [everyone]);
+  const [chosen, setChosen] = useState<Chosen[]>(() => preselected.flatMap((id) => (byId.get(id) ? [{ ...byId.get(id)!, copy: true }] : [])));
+  return (
+    <div className="space-y-3">
+      <input type="hidden" name="copiesChosen" value="1" />
+      {chosen.map((one) => <input key={one.id} type="hidden" name="copyUsers" value={one.id} />)}
+      <p className="text-xs text-slate-600"><span className="stencil mr-2 text-slate-500">Goes back to</span>{backTo}</p>
+      <Block
+        label="Copy to (cc)"
+        hint="told it went back and why — edit as needed"
+        copy
+        everyone={everyone}
+        companies={companies}
+        chosen={chosen}
+        onAdd={(people) => setChosen((list) => [...list, ...people.filter((p) => !list.some((one) => one.id === p.id)).map((p) => ({ ...p, copy: true }))])}
+        onRemove={(id) => setChosen((list) => list.filter((one) => one.id !== id))}
+      />
     </div>
   );
 }

@@ -222,8 +222,8 @@ export async function recordReviewOutcome(
     await openApprovalStep(t, cycle.revisionId, user);
   }
   if (outsideApproval) {
-    // Their acceptance releases and issues it; their refusal sends it back to
-    // review, because what they refused is the work, not the sending.
+    // Their answer goes to Document Control, like any decided revision: they
+    // release and issue it, or send it back.
     await db.reviewCycle.update({ where: { id: cycleId }, data: { status: "CLOSED" } });
     const { settleApproval } = await import("./issue-requests");
     await settleApproval(t, cycleId, user, cons.proceed === true);
@@ -301,7 +301,11 @@ export async function returnToOriginator(t: Tenant, cycleId: string, user: Sessi
  * cannot be true yet. Sending it back drops the decided status and authorizes
  * the next revision, and the reason is part of the record.
  */
-export async function returnAtGate(t: Tenant, revisionId: string, user: SessionUser, reason: string, toStep?: number | null, returnReason?: string | null) {
+export async function returnAtGate(
+  t: Tenant, revisionId: string, user: SessionUser, reason: string, toStep?: number | null, returnReason?: string | null,
+  /** Who Document Control copies in; left out, everybody who sat on the route. */
+  copyIds?: string[],
+) {
   const { db } = t;
   const rev = await db.revision.findUniqueOrThrow({ where: { id: revisionId }, include: { document: true } });
   if (rev.state !== "NOT_RELEASED") throw new Error("Only a revision waiting to be published can be sent back from the gate.");
@@ -356,7 +360,15 @@ export async function returnAtGate(t: Tenant, revisionId: string, user: SessionU
     });
     await db.workflowRun.updateMany({ where: { revisionId, status: { in: ["ACTIVE", "DONE"] } }, data: { status: "RETURNED" } });
   }
-  const where = index !== null ? (steps[index].title ?? `step ${index + 1}`) : "its author";
+  if (index === null) {
+    // Back to whoever started it — or the supplier, where it came from outside —
+    // with whoever Document Control chose to copy in.
+    const onTheRoute = await db.reviewAssignment.findMany({ where: { cycle: { revisionId } }, select: { userId: true } });
+    const { tellReturn } = await import("./issue-requests");
+    await tellReturn(t, rev, reason, copyIds ?? onTheRoute.map((seat) => seat.userId), user, "is not released; the next revision replaces it");
+    return;
+  }
+  const where = steps[index].title ?? `step ${index + 1}`;
   await audit({
     tenant: t, actor: user, action: "RELEASE_REFUSED", entityType: "Revision", entityId: revisionId,
     entityLabel: `${rev.document.docNumber} rev ${rev.value}`,

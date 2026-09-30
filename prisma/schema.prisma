@@ -591,6 +591,16 @@ model Revision {
   // was said about it, never released, replaced by the next revision.
   returnedAt            DateTime?
   returnedReason        String?
+  /**
+   * On hold, not for use: released and issued, then found to need an outside
+   * approval it never had. It stays released — people hold copies of it — but
+   * says plainly it is not to be used until the answer comes back and Document
+   * Control lifts the hold. A refusal leaves it on hold for good; the next
+   * revision replaces it.
+   */
+  heldAt                DateTime?
+  heldReason            String?
+  heldByName            String?
   issueRequests         IssueRequest[]
   phase                 String? // held at revision level (§5.5)
   reasonForRevision     String? // §6.6

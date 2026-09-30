@@ -15,12 +15,14 @@ import { fmtDate, timeAgo, plain } from "@/lib/utils";
 import { getActiveSet, getSet, getValue } from "@/lib/config";
 import { updateDocumentAction, linkAssetAction, unlinkRelationshipAction, endDocumentStateAction } from "@/lib/actions/documents";
 import {
-  prepareRevisionAction, uploadRevisionFilesAction, releaseRevisionAction, voidRevisionAction, returnAtGateAction,
+  prepareRevisionAction, uploadRevisionFilesAction, releaseRevisionAction, voidRevisionAction, returnAtGateAction, liftHoldAction, returnHeldAction,
 } from "@/lib/actions/revisions";
 import { parseRecipients, mayRequestIssue, requestChoices, authorOf, issuePolicy, decisionLetsItOut } from "@/lib/issue-requests";
 import { requestIssueAction, carryOutRequestAction, cancelRequestAction } from "@/lib/actions/issue-requests";
 import { RequestIssue } from "./request-issue";
 import { ReturnTarget } from "./return-target";
+import { CopyPicker } from "@/app/(app)/transmittals/new/recipient-picker";
+import { recipientCompanies } from "@/lib/recipients";
 import { withdrawApprovalAction } from "@/lib/actions/governance";
 import { setLegalHoldAction, disposeDocumentAction } from "@/lib/actions/retention";
 import { getRunForRevision } from "@/lib/workflow";
@@ -183,6 +185,19 @@ export default async function DocumentDetailPage({
   const run = working ? await getRunForRevision(ctx, working.id) : null;
   // The steps of its route, for choosing where a revision goes back to.
   const routeSteps = (run?.steps ?? []).map((step, index) => ({ number: index + 1, title: step.title ?? `Step ${index + 1}` }));
+  // Sending back, and the hold: who it goes back to is the record's answer —
+  // the supplier, or whoever started the route — and who is copied in starts as
+  // the people who sat on the route. Only Document Control sees either.
+  const { returnRecipients, pendingIssue } = await import("@/lib/issue-requests");
+  const held = current?.heldAt ? current : null;
+  const sendBackOf = controller ? (working ?? held) : null;
+  const [people, backTo, routePeople, heldApproval] = sendBackOf ? await Promise.all([
+    recipientCompanies(ctx, { withOffline: false }),
+    returnRecipients(ctx, sendBackOf.id),
+    db.reviewAssignment.findMany({ where: { cycle: { revisionId: sendBackOf.id } }, select: { userId: true } }),
+    held ? db.reviewCycle.findFirst({ where: { revisionId: held.id, issueRequestId: { not: null } }, orderBy: { createdAt: "desc" }, include: { party: { select: { name: true } } } }) : null,
+  ]) : [[], { ids: [], names: "" }, [], null];
+  const heldCleared = held && heldApproval?.status === "CLOSED" ? (await pendingIssue(ctx, held.id, { recipients: false })).ok : false;
   const snapshotCount = await db.documentSnapshot.count({ where: { documentId: id } });
   const [routeRows, peopleRows] = await Promise.all([
     db.workflowTemplate.findMany({ where: { active: true }, orderBy: [{ isDefault: "desc" }, { name: "asc" }] }),
@@ -326,6 +341,29 @@ export default async function DocumentDetailPage({
         </Step>
       ) : null}
 
+      {controller && held && !held.heldReason?.startsWith("Not approved") ? (
+        <Step title={`Rev ${held.value} is on hold`} open>
+          {heldApproval?.status !== "CLOSED" ? (
+            <p className="text-xs text-slate-500">Waiting for {heldApproval?.party?.name ?? "the outside party"} to answer. It stays not for use until then.</p>
+          ) : heldCleared ? (
+            <>
+              <p className="mb-3 text-xs text-slate-600">{heldApproval.party?.name ?? "The outside party"} approved it. Lifting the hold puts it back in use and sends whatever was asked for it.</p>
+              <ActionForm action={liftHoldAction} submitLabel="Lift the hold" size="sm" hidden={{ revisionId: held.id }} />
+            </>
+          ) : (
+            <>
+              <p className="mb-3 text-xs text-slate-600">{heldApproval.party?.name ?? "The outside party"} did not approve it. Sending it back keeps it on hold, not for use, for good; the next revision replaces it.</p>
+              <ActionForm action={returnHeldAction} submitLabel="Send it back" size="sm" variant="danger" hidden={{ revisionId: held.id }}>
+                <Field label="Why it is going back" required hint="whoever gets it reads this">
+                  <textarea name="reason" rows={2} required className={inputCls} />
+                </Field>
+                <CopyPicker companies={people} backTo={backTo.names} preselected={[...new Set(routePeople.map((one) => one.userId))]} />
+              </ActionForm>
+            </>
+          )}
+        </Step>
+      ) : null}
+
       {controller && working ? (
         <Step title={decisionFinal ? `Release rev ${working.value}` : `Send rev ${working.value} back`} open={run?.status === "DONE" || working.approvals.some((a) => !a.withdrawnAt)}>
           {decisionFinal ? <PreflightPanel result={await preflight("RELEASE", { revisionId: working.id }, ctx)} className="mb-3" /> : null}
@@ -357,6 +395,7 @@ export default async function DocumentDetailPage({
                 <div className="mt-2">
                   <ActionForm action={returnAtGateAction} submitLabel="Send it back" size="sm" hidden={{ revisionId: working.id }}>
                     <ReturnTarget steps={routeSteps} reasons={returnReasons.map((one) => ({ code: one.code, label: one.label, meaning: typeof one.props.meaning === "string" ? one.props.meaning : null }))} />
+                    <CopyPicker companies={people} backTo={`${backTo.names} — when it goes back to its author`} preselected={[...new Set(routePeople.map((one) => one.userId))]} />
                   </ActionForm>
                 </div>
               </details>
@@ -433,6 +472,11 @@ export default async function DocumentDetailPage({
                   Not issued
                 </span>
               ) : null}
+              {current?.heldAt ? (
+                <span className="rounded-md border border-red-400 px-1.5 py-0.5 font-sans text-[10px] font-bold uppercase tracking-wide text-red-700">
+                  On hold · not for use
+                </span>
+              ) : null}
             </p>
             <h1 className="mt-0.5 text-xl font-semibold text-slate-950">{doc.title}</h1>
             <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-500">
@@ -448,10 +492,16 @@ export default async function DocumentDetailPage({
           <div className="flex flex-wrap gap-2">
             {pdf ? <a href={`/api/files/${pdf.id}`} target="_blank" className={btn("primary", "sm")}><ExternalLink className="h-4 w-4" /> Open PDF</a> : null}
             {native ? <a href={`/api/files/${native.id}?dl=1`} className={btn("secondary", "sm")}><Download className="h-4 w-4" /> Source file</a> : null}
-            {current ? <Link href={`/transmittals/new?doc=${doc.id}`} className={btn("secondary", "sm")}><Send className="h-4 w-4" /> Issue</Link> : null}
+            {current && !current.heldAt ? <Link href={`/transmittals/new?doc=${doc.id}`} className={btn("secondary", "sm")}><Send className="h-4 w-4" /> Issue</Link> : null}
           </div>
         </div>
       </header>
+
+      {current?.heldAt ? (
+        <Banner tone="danger" title={`Rev ${current.value} is on hold — not for use`}>
+          {current.heldReason} Since {fmtDate(current.heldAt)}{current.heldByName ? `, by ${current.heldByName}` : ""}. It stays released, but nobody may work from it until the hold is lifted.
+        </Banner>
+      ) : null}
 
       {/* Where is it — always in view */}
       <section id="workflow" className="scroll-mt-28">

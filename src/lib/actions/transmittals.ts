@@ -93,6 +93,7 @@ export async function createTransmittalAction(_prev: { error?: string } | undefi
       if (!rev) return { error: "A listed revision no longer exists." };
       const err = issueGateError(rev.state, false);
       if (err) return { error: `${rev.document.docNumber} rev ${rev.value}: ${err}` };
+      if (rev.heldAt) return { error: `${rev.document.docNumber} rev ${rev.value} is on hold, not for use — ${rev.heldReason ?? "awaiting an outside approval"}` };
       // §7.8 — execution requires an execution-permitting status (blocked here, not just flagged by ST-13)
       if (reasonForIssue === "EXECUTION" && rev.statusCode && !execStatuses.has(rev.statusCode)) {
  return { error: `${rev.document.docNumber} rev ${rev.value} is at ${rev.statusCode}, which does not permit physical execution.` };
@@ -211,6 +212,7 @@ async function issueTransmittal(ctx: Awaited<ReturnType<typeof requireScope>>, i
   for (const item of t.items) {
     const err = issueGateError(item.revision.state, item.markedSuperseded);
     if (err) return { error: `${item.revision.document.docNumber} rev ${item.revision.value}: ${err}` };
+    if (item.revision.heldAt) return { error: `${item.revision.document.docNumber} rev ${item.revision.value} is on hold, not for use — ${item.revision.heldReason ?? "awaiting an outside approval"}` };
   }
   const issuedAt = new Date();
   await db.$transaction([

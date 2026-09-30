@@ -442,7 +442,9 @@ export async function returnAtGateAction(_prev: { error?: string } | undefined, 
   const revisionId = String(formData.get("revisionId") ?? "");
   const reason = String(formData.get("reason") ?? "").trim();
   try {
-    await returnAtGate(ctx, revisionId, user, reason, Number(formData.get("toStep") ?? "") || null, String(formData.get("returnReason") ?? "").trim() || null);
+    // Who is copied in, as Document Control left the list; not sent, the route's people.
+    const copies = formData.has("copiesChosen") ? formData.getAll("copyUsers").map(String).filter(Boolean) : undefined;
+    await returnAtGate(ctx, revisionId, user, reason, Number(formData.get("toStep") ?? "") || null, String(formData.get("returnReason") ?? "").trim() || null, copies);
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Could not send it back." };
   }
@@ -512,6 +514,37 @@ export async function recordVoidReassessmentAction(_prev: { error?: string } | u
   return {};
 }
 
+/** An approval asked for after release came back yes: the hold is lifted and what waited is sent. */
+export async function liftHoldAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
+  const ctx = await requireScope();
+  const { user, db } = ctx;
+  if (!isController(user) && !isAdmin(user)) return { error: "Document Control lifts a hold." };
+  const revisionId = String(formData.get("revisionId") ?? "");
+  try {
+    const { liftHold } = await import("@/lib/issue-requests");
+    await liftHold(ctx, revisionId, user);
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "The hold could not be lifted." };
+  }
+  const rev = await db.revision.findUniqueOrThrow({ where: { id: revisionId } });
+  revalidatePath(`/documents/${rev.documentId}`);
+  return {};
+}
 
-
-
+/** An approval asked for after release came back no: it stays on hold for good, and goes back with a reason. */
+export async function returnHeldAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
+  const ctx = await requireScope();
+  const { user, db } = ctx;
+  if (!isController(user) && !isAdmin(user)) return { error: "Only the control function sends a revision back." };
+  const revisionId = String(formData.get("revisionId") ?? "");
+  const reason = String(formData.get("reason") ?? "").trim();
+  try {
+    const { returnHeld } = await import("@/lib/issue-requests");
+    await returnHeld(ctx, revisionId, user, reason, formData.getAll("copyUsers").map(String).filter(Boolean));
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Could not send it back." };
+  }
+  const rev = await db.revision.findUniqueOrThrow({ where: { id: revisionId } });
+  revalidatePath(`/documents/${rev.documentId}`);
+  return {};
+}

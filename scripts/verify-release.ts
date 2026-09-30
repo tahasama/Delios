@@ -11,8 +11,8 @@
 import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
 import { tenantFor } from "../src/lib/tenant";
-import { releaseRevision, recordReviewOutcome, openReviewCycle, issueToReview } from "../src/lib/lifecycle";
-import { pendingIssue, settleApproval } from "../src/lib/issue-requests";
+import { releaseRevision, recordReviewOutcome, openReviewCycle, issueToReview, returnAtGate } from "../src/lib/lifecycle";
+import { pendingIssue, settleApproval, openApprovalStep, holdRevision, liftHold, returnHeld, carryOutRequest } from "../src/lib/issue-requests";
 import type { SessionUser } from "../src/lib/auth";
 
 const db = new PrismaClient();
@@ -121,9 +121,14 @@ async function main() {
       check("releasing it is refused while they hold it", /approve this revision first/.test(held), held.slice(0, 70));
 
       if (step) {
+        await t.db.reviewCycle.update({ where: { id: step.id }, data: { status: "CLOSED" } });
         await settleApproval(t, step.id, actor, true);
+        const waiting = await t.db.revision.findUniqueOrThrow({ where: { id: third.rev.id } });
+        check("their acceptance goes to Document Control, not straight out", waiting.state === "NOT_RELEASED" && !waiting.issuedAt, waiting.state);
+        check("…who may now release it", (await pendingIssue(t, third.rev.id)).ok);
+        await releaseRevision(t, third.rev.id, actor, status.code);
         const after = await t.db.revision.findUniqueOrThrow({ where: { id: third.rev.id } });
-        check("their acceptance releases and issues it", after.state === "RELEASED" && !!after.issuedAt, after.state);
+        check("releasing it releases and issues it", after.state === "RELEASED" && !!after.issuedAt, after.state);
       }
 
       console.log("\n…and when they refuse it\n");
@@ -138,10 +143,64 @@ async function main() {
       });
       await recordReviewOutcome(t, fourth.cycle.id, actor, proceeds, undefined, status.code);
       const theirs = await t.db.reviewCycle.findFirst({ where: { revisionId: fourth.rev.id, issueRequestId: { not: null } } });
-      if (theirs) await settleApproval(t, theirs.id, actor, false);
+      if (theirs) {
+        await t.db.reviewCycle.update({ where: { id: theirs.id }, data: { status: "CLOSED" } });
+        await settleApproval(t, theirs.id, actor, false);
+      }
+      const refused = await t.db.revision.findUniqueOrThrow({ where: { id: fourth.rev.id } });
+      check("their refusal goes to Document Control", refused.state === "NOT_RELEASED" && !refused.issuedAt, refused.state);
+      let blocked = "";
+      try { await releaseRevision(t, fourth.rev.id, actor, status.code); } catch (e) { blocked = e instanceof Error ? e.message : String(e); }
+      check("…who may not release it", /did not approve/.test(blocked), blocked.slice(0, 70));
+      await returnAtGate(t, fourth.rev.id, actor, "Their comments are to be taken in.", null, null, []);
       const back = await t.db.revision.findUniqueOrThrow({ where: { id: fourth.rev.id } });
-      check("it goes back to review", back.state === "IN_REVIEW", back.state);
-      check("…and is not released", back.state !== "RELEASED" && !back.issuedAt);
+      check("…and sends it back, with the reason", back.state === "RETURNED" && back.returnedReason === "Their comments are to be taken in.", back.state);
+
+      console.log("\nAn outside approval found to be needed after release\n");
+      for (const answer of [true, false]) {
+        const late = await decided(answer ? "LATE-YES" : "LATE-NO");
+        await recordReviewOutcome(t, late.cycle.id, actor, proceeds, undefined, status.code);
+        await t.db.issueRequest.create({
+          data: {
+            projectId: project.id, revisionId: late.rev.id, reason: "INFORMATION",
+            recipients: JSON.stringify({ internalUserIds: [admin.id], partyIds: [] }),
+            raisedById: admin.id, raisedByName: admin.name,
+          },
+        });
+        await releaseRevision(t, late.rev.id, actor, status.code);
+        const asked = await t.db.issueRequest.create({
+          data: {
+            projectId: project.id, revisionId: late.rev.id, reason: "APPROVAL",
+            recipients: JSON.stringify({ internalUserIds: [admin.id], partyIds: [] }),
+            needsApproval: true, approverId: party.id,
+            raisedById: admin.id, raisedByName: admin.name,
+          },
+        });
+        const early = await carryOutRequest(t, asked.id, actor);
+        check(`nothing is sent before they answer (${answer ? "yes" : "no"})`, !!early.error && !early.numbers.length, early.error);
+        await openApprovalStep(t, late.rev.id, actor);
+        await holdRevision(t, late.rev.id, actor, party.name);
+        const held = await t.db.revision.findUniqueOrThrow({ where: { id: late.rev.id } });
+        check("it stays released, on hold, not for use", held.state === "RELEASED" && !!held.heldAt, held.heldReason ?? "");
+        const theirStep = await t.db.reviewCycle.findFirstOrThrow({ where: { revisionId: late.rev.id, issueRequestId: asked.id } });
+        await t.db.reviewCycle.update({ where: { id: theirStep.id }, data: { status: "CLOSED" } });
+        await settleApproval(t, theirStep.id, actor, answer);
+        if (answer) {
+          const { sent } = await liftHold(t, late.rev.id, actor);
+          const lifted = await t.db.revision.findUniqueOrThrow({ where: { id: late.rev.id } });
+          check("approved: lifting the hold puts it back in use", !lifted.heldAt);
+          check("…and sends what waited for it", sent > 0, `${sent} transmittal(s)`);
+        } else {
+          let kept = "";
+          try { await liftHold(t, late.rev.id, actor); } catch (e) { kept = e instanceof Error ? e.message : String(e); }
+          check("refused: the hold cannot be lifted", /did not approve/.test(kept), kept.slice(0, 60));
+          await returnHeld(t, late.rev.id, actor, "Not approved by the client.", []);
+          const stays = await t.db.revision.findUniqueOrThrow({ where: { id: late.rev.id } });
+          check("…sent back, it stays on hold for good", !!stays.heldAt && /Not approved/.test(stays.heldReason ?? ""), stays.heldReason ?? "");
+          const left = await t.db.issueRequest.count({ where: { id: asked.id, status: "OPEN" } });
+          check("…and the request that waited is cancelled", left === 0);
+        }
+      }
     } else {
       console.log("\n(no outside party on this project — the approval checks were skipped)\n");
     }
