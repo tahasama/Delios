@@ -902,6 +902,20 @@ model TransmittalRecipient {
   lastViewedAt   DateTime? // most recent authenticated opening
   viewCount      Int         @default(0)
   acknowledgedAt DateTime? // explicit formal receipt acknowledgement
+  /**
+   * An organization with no accounts here (a party of kind OFFLINE). Nobody on
+   * their side can open the transmittal, so it is not seen: one of our people —
+   * the party's liaison — sends it to them outside the system and records that
+   * it went, with the proof. Named the way a review step carried for a party is.
+   */
+  partyId          String?
+  party            Party?      @relation(fields: [partyId], references: [id])
+  dispatchedAt     DateTime? // the day it went to them, outside our system
+  dispatchChannel  String? // how: email, their own system, post
+  dispatchRef      String? // their reference, where they give one
+  dispatchedByName String? // which of us sent it
+  proofFileId      String?
+  proof            StoredFile? @relation(fields: [proofFileId], references: [id])
 
   @@index([transmittalId])
   @@index([userId])
@@ -1247,6 +1261,8 @@ model StoredFile {
   uploadedById   String?
   uploadedByName String?
   createdAt      DateTime     @default(now())
+  // The proof that a transmittal went to an organization outside the system.
+  proofOf        TransmittalRecipient[]
 
   @@index([projectId])
 }
@@ -1529,6 +1545,7 @@ model Party {
   active           Boolean       @default(true)
   users            User[]
   cycles           ReviewCycle[]
+  transmittalRecipients TransmittalRecipient[]
   approvals        IssueRequest[] @relation("IssueApprover")
   // Who answers for this party. The contact is required for an outside party;
   // the backup is whoever stands in when the contact is away.

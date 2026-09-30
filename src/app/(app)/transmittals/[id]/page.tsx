@@ -10,6 +10,7 @@ import {
   issueTransmittalAction,
   acceptanceCheckAction,
   chaseTransmittalAction,
+  markRecipientSentAction,
 } from "@/lib/actions/transmittals";
 import { preflight } from "@/lib/rules/preflight";
 import { PreflightPanel, Guarded } from "@/components/preflight";
@@ -36,7 +37,8 @@ export const dynamic = "force-dynamic";
  * wrote when they accepted it is shown where they wrote it.
  */
 export default async function TransmittalDetailPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ issueError?: string }> }) {
-  const { user, db } = await requireScope();
+  const ctx = await requireScope();
+  const { user, db } = ctx;
   const { id } = await params;
   const sp = await searchParams;
   const t = await db.transmittal.findUnique({
@@ -57,7 +59,13 @@ export default async function TransmittalDetailPage({ params, searchParams }: { 
           },
         },
       },
-      recipients: { orderBy: [{ kind: "asc" }, { name: "asc" }] },
+      recipients: {
+        orderBy: [{ kind: "asc" }, { name: "asc" }],
+        include: {
+          party: { select: { id: true, name: true, evidenceRequired: true, externalSystem: true } },
+          proof: { select: { id: true, name: true } },
+        },
+      },
       // The thread: what this answers, and what has come back against it. An
       // answer is a transmittal of its own, with its own number and its own
       // enclosures, so it is linked to rather than copied in here.
@@ -89,9 +97,23 @@ export default async function TransmittalDetailPage({ params, searchParams }: { 
   // because somebody kept informed happened to look at it.
   const addressed = t.recipients.filter((one) => one.kind !== "CC");
   const copied = t.recipients.filter((one) => one.kind === "CC");
-  const seen = addressed.filter((one) => one.openedAt).length;
-  const allSeen = addressed.length > 0 && seen === addressed.length;
+  // An organization with no accounts here cannot open it, so it is never seen:
+  // for them, the receipt is one of our people recording that it was sent on.
+  const outside = (one: (typeof t.recipients)[number]) => !!one.partyId && !one.userId;
+  const inApp = addressed.filter((one) => !outside(one));
+  const sentOn = addressed.filter(outside);
+  const seen = inApp.filter((one) => one.openedAt).length;
+  const sentCount = sentOn.filter((one) => one.dispatchedAt).length;
+  const allSeen = addressed.length > 0 && seen === inApp.length && sentCount === sentOn.length;
   const waiting = addressed.filter((one) => !one.openedAt && one.userId);
+  // Who of ours carries each of those organizations, and whether that is you.
+  const { partyStepHolders } = await import("@/lib/workflow");
+  const carriersOf = new Map<string, { names: string; mine: boolean }>();
+  for (const partyId of new Set(t.recipients.filter(outside).map((one) => one.partyId!))) {
+    const held = await partyStepHolders(ctx, partyId);
+    const people = held.ids.length ? await db.user.findMany({ where: { id: { in: held.ids } }, select: { name: true } }) : [];
+    carriersOf.set(partyId, { names: people.map((one) => one.name).join(", ") || "Document Control", mine: controller || held.ids.includes(user.id) });
+  }
 
   const replyOverdue = !t.answers.length && t.responseRequired && !!t.responseDueDate && t.responseDueDate.getTime() < Date.now();
   // Anybody it reached may answer it — the people it was addressed to, the
@@ -231,10 +253,12 @@ export default async function TransmittalDetailPage({ params, searchParams }: { 
             <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2 sm:px-6">
               <span className="stencil mr-1 text-slate-400">Sent to</span>
               <span className="text-[11px] text-slate-400">
-                opening it while signed in is the receipt &mdash; copies are told, not asked
+                opening it while signed in is the receipt{sentOn.length ? <>; for an organization not on the system, our sending it on is</> : null} &mdash; copies are told, not asked
               </span>
               <span className="ml-auto font-mono text-[11px] tabular-nums text-slate-500">
-                {allSeen ? "all seen" : `${seen} of ${addressed.length} seen`}
+                {allSeen
+                  ? sentOn.length ? "all seen or sent on" : "all seen"
+                  : [inApp.length ? `${seen} of ${inApp.length} seen` : null, sentOn.length ? `${sentCount} of ${sentOn.length} sent on` : null].filter(Boolean).join(" · ")}
                 {copied.length ? <span className="ml-1.5 font-sans text-slate-400">+{copied.length} copied in</span> : null}
               </span>
             </div>
@@ -248,20 +272,70 @@ export default async function TransmittalDetailPage({ params, searchParams }: { 
                       {person.kind === "CC" ? <span className="ml-1.5 rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">copy</span> : null}
                     </p>
                     <p className="text-[11px] text-slate-400">
-                      {person.openedAt
-                        ? <>Opened it {fmtDateTime(person.openedAt)}{person.viewCount > 1 ? <>, and {person.viewCount} times since &mdash; last {fmtDateTime(person.lastViewedAt ?? person.openedAt)}</> : null}</>
-                        : person.notifiedAt
-                          ? <>Told {fmtDateTime(person.notifiedAt)} &mdash; not opened yet</>
-                          : "Waiting to be issued"}
+                      {outside(person)
+                        ? person.dispatchedAt
+                          ? <>
+                              Sent to them by {person.dispatchChannel} {fmtDate(person.dispatchedAt)}, by {person.dispatchedByName}
+                              {person.dispatchRef ? <> &middot; their reference <span className="font-mono">{person.dispatchRef}</span></> : null}
+                              {person.proof ? <> &middot; <a href={`/api/files/${person.proof.id}`} target="_blank" className="font-semibold text-link hover:underline">proof: {person.proof.name}</a></> : null}
+                            </>
+                          : t.status === "DRAFT"
+                            ? "Not on this system — sent on by us once it is issued"
+                            : <>Not on this system &mdash; {carriersOf.get(person.partyId!)?.names} sends it to them and records it here</>
+                        : person.openedAt
+                          ? <>Opened it {fmtDateTime(person.openedAt)}{person.viewCount > 1 ? <>, and {person.viewCount} times since &mdash; last {fmtDateTime(person.lastViewedAt ?? person.openedAt)}</> : null}</>
+                          : person.notifiedAt
+                            ? <>Told {fmtDateTime(person.notifiedAt)} &mdash; not opened yet</>
+                            : "Waiting to be issued"}
                     </p>
                   </div>
-                  {person.openedAt ? (
+                  {outside(person) ? (
+                    person.dispatchedAt ? (
+                      <Chip className={person.kind === "CC" ? "bg-slate-100 text-slate-600 ring-slate-200" : "bg-emerald-100 text-emerald-800 ring-emerald-300"}>sent on</Chip>
+                    ) : t.status === "DRAFT" ? (
+                      <Chip className="bg-slate-100 text-slate-500 ring-slate-200">not sent yet</Chip>
+                    ) : (
+                      <Chip className="bg-amber-100 text-amber-800 ring-amber-300">to send</Chip>
+                    )
+                  ) : person.openedAt ? (
                     <Chip className={person.kind === "CC" ? "bg-slate-100 text-slate-600 ring-slate-200" : "bg-emerald-100 text-emerald-800 ring-emerald-300"}>seen</Chip>
                   ) : person.notifiedAt ? (
                     <Chip className="bg-amber-100 text-amber-800 ring-amber-300">told</Chip>
                   ) : (
                     <Chip className="bg-slate-100 text-slate-500 ring-slate-200">not sent yet</Chip>
                   )}
+                  {/* Whoever carries this organization says it went, with what
+                      proves it. The form takes the whole line under the row. */}
+                  {outside(person) && !person.dispatchedAt && t.status !== "DRAFT" && carriersOf.get(person.partyId!)?.mine ? (
+                    <ActionForm action={markRecipientSentAction} hideSubmit hidden={{ recipientId: person.id }} className="w-full">
+                      <div className="asking grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-[minmax(0,10rem)_minmax(0,9rem)_minmax(0,1fr)_minmax(0,9rem)_auto] sm:items-center">
+                        <label className="min-w-0">
+                          <span className="sr-only">How it went</span>
+                          <select name="channel" required defaultValue="" className="plain w-full">
+                            <option value="" disabled>How it went…</option>
+                            <option value="email">Email</option>
+                            <option value={person.party?.externalSystem ? `their system (${person.party.externalSystem})` : "their own system"}>
+                              {person.party?.externalSystem ? `Their system — ${person.party.externalSystem}` : "Their own system"}
+                            </option>
+                            <option value="post or by hand">Post, or by hand</option>
+                          </select>
+                        </label>
+                        <label className="min-w-0">
+                          <span className="sr-only">The day it went</span>
+                          <input type="date" name="sentOn" defaultValue={new Date().toISOString().slice(0, 10)} className="plain w-full" />
+                        </label>
+                        <label className="min-w-0">
+                          <span className="sr-only">Proof it went</span>
+                          <input type="file" name="evidence" required={person.party?.evidenceRequired ?? true} className="plain w-full text-[11px] text-slate-500 file:mr-2 file:rounded file:border-0 file:bg-canvas-deep file:px-2 file:py-0.5 file:text-[11px] file:font-semibold file:text-slate-700" title="The email you sent, or the receipt their system gave you" />
+                        </label>
+                        <label className="min-w-0">
+                          <span className="sr-only">Their reference</span>
+                          <input name="reference" placeholder="Their reference" className="plain w-full" />
+                        </label>
+                        <button className="ask">Mark as sent</button>
+                      </div>
+                    </ActionForm>
+                  ) : null}
                 </li>
               ))}
             </ul>
@@ -437,8 +511,8 @@ export default async function TransmittalDetailPage({ params, searchParams }: { 
                 { label: "Issued — they were told", at: t.status === "DRAFT" ? null : t.dateOfIssue, holder: t.status === "DRAFT" ? "nothing has been sent yet" : t.createdByName },
                 {
                   label: "Seen",
-                  at: addressed.map((one) => one.openedAt).filter(Boolean).sort((x, y) => x!.getTime() - y!.getTime())[0] ?? null,
-                  holder: `${seen} of ${addressed.length} it was addressed to`,
+                  at: addressed.map((one) => one.openedAt ?? one.dispatchedAt).filter(Boolean).sort((x, y) => x!.getTime() - y!.getTime())[0] ?? null,
+                  holder: [inApp.length ? `${seen} of ${inApp.length} it was addressed to` : null, sentOn.length ? `${sentCount} of ${sentOn.length} sent on by us` : null].filter(Boolean).join(" · "),
                 },
                 ...(t.responseRequired || t.answers.length ? [{
                   label: t.answers.length ? "Answered" : "An answer is due",

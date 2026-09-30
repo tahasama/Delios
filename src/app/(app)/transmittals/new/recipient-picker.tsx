@@ -4,7 +4,11 @@ import { useState } from "react";
 import { Field, inputCls } from "@/components/ui";
 import { Plus, X } from "lucide-react";
 
-export type Company = { key: string; name: string; people: { id: string; name: string; job?: string | null }[] };
+/**
+ * `offline` is set for an organization with no accounts here: who of ours sends
+ * it on to them. Their one "person" is their contact, and is not an account.
+ */
+export type Company = { key: string; name: string; people: { id: string; name: string; job?: string | null }[]; offline?: string };
 
 /**
  * Who receives it, chosen rather than typed: a company, then a person in that
@@ -33,7 +37,8 @@ export function RecipientPicker({ companies, preselected = [], preselectedCopies
     <Field label="Sent to" required hint="a person, at a company — they will be able to open it. Copy somebody in to keep them informed without asking anything of them.">
       <div className="space-y-2">
         {rows.map((row, i) => {
-          const people = companies.find((c) => c.key === row.company)?.people ?? [];
+          const company = companies.find((c) => c.key === row.company);
+          const people = company?.people ?? [];
           return (
             <div key={i} className="flex flex-wrap items-center gap-2">
               <select
@@ -68,6 +73,9 @@ export function RecipientPicker({ companies, preselected = [], preselectedCopies
                 <option value="to">Sent to</option>
                 <option value="cc">Copy</option>
               </select>
+              {company?.offline ? (
+                <span className="text-[11px] text-slate-500">Not on this system — {company.offline} sends it to them and records the proof.</span>
+              ) : null}
               {people.length === 0 && row.company ? (
                 <span className="text-[11px] text-amber-700">Nobody from this company has an account yet — add them in People &amp; access.</span>
               ) : null}

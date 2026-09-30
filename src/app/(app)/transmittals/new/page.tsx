@@ -2,6 +2,7 @@ import { PageHeader } from "@/components/ui";
 import { requireScope } from "@/lib/scope";
 import { getActiveSet } from "@/lib/config";
 import { holdersOf } from "@/lib/permissions";
+import { partyStepHolders } from "@/lib/workflow";
 import { NewTransmittalForm } from "./new-transmittal-form";
 
 export const dynamic = "force-dynamic";
@@ -34,12 +35,27 @@ export default async function NewTransmittalPage({ searchParams }: { searchParam
       const key = u.party?.code ?? "US";
       const name = u.party?.name ?? ctx.project.name.split(" ")[0] ?? "Our organization";
       if (u.party && u.party.active === false) return map;
-      const group = map.get(key) ?? { key, name: u.party ? name : ourOrganization, people: [] as { id: string; name: string; job: string | null }[] };
+      const group = map.get(key) ?? { key, name: u.party ? name : ourOrganization, people: [] as { id: string; name: string; job: string | null }[], offline: undefined as string | undefined };
       group.people.push({ id: u.id, name: u.name, job: u.organization ?? null });
       map.set(key, group);
       return map;
-    }, new Map<string, { key: string; name: string; people: { id: string; name: string; job: string | null }[] }>()).values(),
-  ].sort((a, b) => (a.key === "US" ? -1 : b.key === "US" ? 1 : a.name.localeCompare(b.name)));
+    }, new Map<string, { key: string; name: string; people: { id: string; name: string; job: string | null }[]; offline?: string }>()).values(),
+  ];
+  // Organizations with no accounts here. Nobody there can open it, so what is
+  // chosen is their contact, and one of our people sends it on: the party's
+  // liaison, or the control function where none is named.
+  const offlineParties = await db.party.findMany({ where: { kind: "OFFLINE", active: true, isInternal: false }, orderBy: { name: "asc" } });
+  for (const party of offlineParties) {
+    const carriers = await partyStepHolders(ctx, party.id);
+    const names = carriers.ids.length ? (await db.user.findMany({ where: { id: { in: carriers.ids } }, select: { name: true } })).map((one) => one.name) : [];
+    companies.push({
+      key: `party:${party.id}`,
+      name: party.name,
+      people: [{ id: `party:${party.id}`, name: party.contactName ?? "Their contact", job: party.contactEmail ?? null }],
+      offline: names.join(", ") || "Document Control",
+    });
+  }
+  companies.sort((a, b) => (a.key === "US" ? -1 : b.key === "US" ? 1 : a.name.localeCompare(b.name)));
 
   // Answering something: the question decides who this goes to. Whoever sent
   // it is addressed, the people copied in on the question are copied in on the

@@ -46,11 +46,21 @@ export async function createTransmittalAction(_prev: { error?: string } | undefi
   const subject = String(formData.get("subject") ?? "").trim() || null;
   const message = String(formData.get("message") ?? "").trim() || null;
   const revisionIds = formData.getAll("revisionIds").map(String).filter(Boolean);
-  const recipientUsers = [...new Set(formData.getAll("recipientUsers").map(String).filter(Boolean))];
+  const chosenTo = [...new Set(formData.getAll("recipientUsers").map(String).filter(Boolean))];
   // Copied in: told, and able to open it, but not asked to do anything — so a
   // transmittal is never "seen" because one of them looked.
-  const copyUsers = [...new Set(formData.getAll("copyUsers").map(String).filter(Boolean))]
-    .filter((one) => !recipientUsers.includes(one));
+  const chosenCc = [...new Set(formData.getAll("copyUsers").map(String).filter(Boolean))]
+    .filter((one) => !chosenTo.includes(one));
+  // An organization with no accounts here is chosen as "party:<id>": its contact,
+  // who one of our people sends it on to.
+  const isParty = (one: string) => one.startsWith("party:");
+  const recipientUsers = chosenTo.filter((one) => !isParty(one));
+  const copyUsers = chosenCc.filter((one) => !isParty(one));
+  const partyTo = chosenTo.filter(isParty).map((one) => one.slice(6));
+  const partyCc = chosenCc.filter(isParty).map((one) => one.slice(6));
+  const offline = partyTo.length || partyCc.length
+    ? await db.party.findMany({ where: { id: { in: [...partyTo, ...partyCc] }, kind: "OFFLINE", active: true } })
+    : [];
   const issueNow = formData.get("issueNow") === "on";
   // The transmittal this one answers, where it is an answer. Correspondence
   // reads as a thread: the question keeps its number, and so does the answer.
@@ -62,7 +72,8 @@ export async function createTransmittalAction(_prev: { error?: string } | undefi
  // clarification, a notice, an answer — and is allowed, so long as it says
  // something. What it may never be is empty of both documents and words.
  if (!revisionIds.length && !message && !subject) return { error: "Enclose at least one revision, or write a subject and a message — a transmittal cannot be empty of both." };
- if (!recipientUsers.length) return { error: "Name at least one person to send it to — a company on its own is not a recipient." };
+ if (!recipientUsers.length && !partyTo.length) return { error: "Name at least one person to send it to — a company on its own is not a recipient." };
+  if (offline.length !== partyTo.length + partyCc.length) return { error: "One of the organizations chosen is no longer set up as working outside the system." };
   if (direction === "OUTGOING" && !subject) return { error: "Give the transmittal a subject — it is the first thing the recipient reads." };
 
   const reasons = await getActiveSet("REASONS_FOR_ISSUE");
@@ -92,10 +103,10 @@ export async function createTransmittalAction(_prev: { error?: string } | undefi
 
   // The number is built before the record, from the parties it travels between.
   const internalParty = await db.party.findFirst({ where: { isInternal: true }, select: { code: true } });
-  const recipientParties = recipientUsers.length
+  const recipientParties = recipientUsers.length || copyUsers.length
     ? await db.user.findMany({ where: { id: { in: [...recipientUsers, ...copyUsers] } }, select: { party: { select: { code: true } } } })
     : [];
-  const receiverCodes = [...new Set(recipientParties.map((person) => person.party?.code).filter((code): code is string => !!code))];
+  const receiverCodes = [...new Set([...recipientParties.map((person) => person.party?.code), ...offline.map((party) => party.code)].filter((code): code is string => !!code))];
   const project = await db.project.findUnique({ where: { id: projectId }, select: { code: true } });
   const transmittalNumber = await nextTransmittalNumber(ctx, {
     project: project?.code ?? "",
@@ -129,6 +140,10 @@ export async function createTransmittalAction(_prev: { error?: string } | undefi
         create: [
           ...recipientUsers.map((uid) => ({ projectId, userId: uid, name: "—", kind: "TO" })),
           ...copyUsers.map((uid) => ({ projectId, userId: uid, name: "—", kind: "CC" })),
+          ...offline.map((party) => ({
+            projectId, partyId: party.id, name: party.contactName ?? party.name, organization: party.name,
+            kind: partyTo.includes(party.id) ? "TO" : "CC",
+          })),
         ],
       },
     },
@@ -144,7 +159,7 @@ export async function createTransmittalAction(_prev: { error?: string } | undefi
     entityType: "Transmittal",
     entityId: t.id,
     entityLabel: t.number,
- detail: `${direction.toLowerCase()} · reason: ${reason.label} · ${revisionIds.length} item(s) · ${recipientUsers.length} recipient(s)${copyUsers.length ? `, ${copyUsers.length} copied in` : ""}${inReplyToId ? " · an answer" : ""}.`,
+ detail: `${direction.toLowerCase()} · reason: ${reason.label} · ${revisionIds.length} item(s) · ${recipientUsers.length + partyTo.length} recipient(s)${copyUsers.length + partyCc.length ? `, ${copyUsers.length + partyCc.length} copied in` : ""}${offline.length ? ` · sent on by us to ${offline.map((party) => party.name).join(", ")}` : ""}${inReplyToId ? " · an answer" : ""}.`,
   });
   // What arrives is a record of something that already happened, so it is issued
   // on creation. What we send is sent when we say so — here, or later from the
@@ -195,6 +210,19 @@ async function issueTransmittal(ctx: Awaited<ReturnType<typeof requireScope>>, i
     `${t.items.length} item(s), reason: ${t.reasonForIssue}${t.responseDueDate ? ` — response due ${t.responseDueDate.toDateString()}` : ""}`,
     `/transmittals/${t.id}`
   );
+  // An organization with no accounts here is not told by the system: one of our
+  // people is, and sends it on to them.
+  const { partyStepHolders } = await import("@/lib/workflow");
+  for (const row of t.recipients.filter((one) => one.partyId && !one.userId)) {
+    const carriers = await partyStepHolders(ctx, row.partyId!);
+    await notifyMany(
+      carriers.ids,
+      "TRANSMITTAL_TO_SEND_ON",
+      `Transmittal ${t.number} — send it to ${row.organization ?? row.name}`,
+      `They are not on this system. Send it to ${row.name}, then record it on the transmittal with the proof.`,
+      `/transmittals/${t.id}#people`,
+    );
+  }
   revalidatePath(`/transmittals/${id}`);
   return {};
 }
@@ -322,3 +350,70 @@ export async function chaseTransmittalAction(_prev: { error?: string } | undefin
  * left everything else open for ever. Closing says the exchange is finished:
  * what was asked for came back, or nothing more is expected.
  */
+
+/**
+ * An organization with no accounts here cannot open a transmittal, so it is not
+ * seen: one of our people sends it to them outside the system — by email, or
+ * through a system of theirs — and records here that it went, with the proof.
+ * That record is what stands in for "seen" on that row.
+ */
+export async function markRecipientSentAction(_prev: { error?: string; ok?: string } | undefined, formData: FormData): Promise<{ error?: string; ok?: string }> {
+  const ctx = await requireScope();
+  const { user, db } = ctx;
+  const recipientId = String(formData.get("recipientId") ?? "");
+  const channel = String(formData.get("channel") ?? "").trim();
+  const reference = String(formData.get("reference") ?? "").trim() || null;
+  const when = String(formData.get("sentOn") ?? "").trim();
+  if (!channel) return { error: "Say how it went to them." };
+
+  const row = await db.transmittalRecipient.findUnique({ where: { id: recipientId }, include: { party: true, transmittal: true } });
+  if (!row || !row.party) return { error: "This recipient is not an organization outside the system." };
+  if (row.transmittal.status === "DRAFT") return { error: "Issue the transmittal first, then send it on." };
+  if (row.dispatchedAt) return { error: "It is already recorded as sent to them." };
+
+  const { partyStepHolders } = await import("@/lib/workflow");
+  const carriers = await partyStepHolders(ctx, row.party.id);
+  if (!carriers.ids.includes(user.id) && !isController(user) && !isAdmin(user)) {
+    return { error: `Only whoever carries the exchange with ${row.party.name} records that it went.` };
+  }
+
+  // It leaves our system here, so what proves it left is the record.
+  const proof = formData.get("evidence");
+  const hasProof = proof instanceof File && proof.size > 0;
+  if (row.party.evidenceRequired && !hasProof) {
+    return { error: "Attach the proof it was sent — the email, or the receipt their system gave you." };
+  }
+  let proofFileId: string | null = null;
+  if (hasProof) {
+    const { saveUpload } = await import("@/lib/files");
+    const saved = await saveUpload(ctx, proof, row.transmittal.number, "EVIDENCE", "sent");
+    const file = await db.storedFile.create({
+      data: {
+        projectId: ctx.projectId, name: saved.name, path: saved.relPath, size: saved.size, mime: saved.mime,
+        sha256: saved.sha256, kind: "EVIDENCE", uploadedById: user.id, uploadedByName: user.name,
+      },
+    });
+    proofFileId = file.id;
+  }
+
+  const dispatchedAt = when ? new Date(`${when}T12:00:00`) : new Date();
+  if (dispatchedAt < row.transmittal.dateOfIssue && dispatchedAt.toDateString() !== row.transmittal.dateOfIssue.toDateString()) {
+    return { error: "It cannot have gone to them before the transmittal was issued." };
+  }
+  if (dispatchedAt.getTime() > Date.now() + 86400000) return { error: "The day it went cannot be in the future." };
+
+  await db.transmittalRecipient.update({
+    where: { id: row.id },
+    data: { dispatchedAt, dispatchChannel: channel, dispatchRef: reference, dispatchedByName: user.name, proofFileId },
+  });
+  await audit({
+    actor: user,
+    action: "TRANSMITTAL_SENT_ON",
+    entityType: "Transmittal",
+    entityId: row.transmittalId,
+    entityLabel: row.transmittal.number,
+    detail: `Sent to ${row.name} at ${row.party.name}, outside our system, by ${channel}${reference ? ` (${reference})` : ""}.${proofFileId ? " Proof attached." : ""}`,
+  });
+  revalidatePath(`/transmittals/${row.transmittalId}`);
+  return { ok: "Recorded as sent." };
+}

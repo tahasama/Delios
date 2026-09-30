@@ -389,11 +389,19 @@ export async function markDispatchedAction(_prev: { error?: string; ok?: string 
         createdByName: user.name,
         items: { create: [{ projectId: ctx.projectId, revisionId: cycle.revisionId }] },
         recipients: cycle.party
-          ? { create: [{ projectId: ctx.projectId, name: cycle.party.name, organization: cycle.party.name }] }
+          ? { create: [{ projectId: ctx.projectId, name: cycle.party.contactName ?? cycle.party.name, organization: cycle.party.name, partyId: cycle.party.id }] }
           : undefined,
       },
     });
     transmittalId = raised.id;
+  }
+  // The transmittal's row for them says the same thing the step does: it went,
+  // how, when, by whom, and the proof — so it reads as sent rather than unseen.
+  if (cycle.party) {
+    await db.transmittalRecipient.updateMany({
+      where: { transmittalId, userId: null, dispatchedAt: null, OR: [{ partyId: cycle.party.id }, { partyId: null, organization: cycle.party.name }] },
+      data: { partyId: cycle.party.id, dispatchedAt: sentAt, dispatchChannel: channel, dispatchRef: reference, dispatchedByName: user.name, proofFileId: evidence },
+    });
   }
 
   await db.reviewCycle.update({

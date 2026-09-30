@@ -195,10 +195,12 @@ export default async function TransmittalsPage({ searchParams }: { searchParams:
       // What arrived and has not been answered is said as the job it is.
       statusLabel: !outgoing && item.status === "ISSUED" ? "To check" : STATUS_LABEL[item.status] ?? item.status.toLowerCase(),
       // Seen is read from the people it was addressed to. Somebody copied in
-      // was told, not asked, and their opening it settles nothing.
+      // was told, not asked, and their opening it settles nothing. An
+      // organization with no accounts here cannot open it: for them, one of us
+      // recording that it was sent on is the receipt.
       recipients: item.recipients
         .filter((person) => person.kind !== "CC")
-        .map((person) => ({ id: person.id, name: person.name, seen: !!person.openedAt })),
+        .map((person) => ({ id: person.id, name: person.name, seen: !!person.openedAt || !!person.dispatchedAt })),
       copies: item.recipients.filter((person) => person.kind === "CC").length,
       dueAt: item.responseDueDate?.toISOString() ?? null,
       dueIn: item.responseDueDate && item.status !== "DRAFT"

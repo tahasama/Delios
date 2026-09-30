@@ -221,7 +221,7 @@ page; `/transmittals/new?replyTo=`.
 
 ---
 
-## 12 · An act the Standard does not name
+## 12 · Acts the Standard does not name
 
 **Clause:** §11.5 *Receipt*, §11.9 *Acceptance of transmittals*, §11.12 *Time
 limits*.
@@ -241,7 +241,20 @@ review obligation is complete on acceptance, *accepted* is that completion; no
 further status is set. Whether an answer owed under §11.12 is still outstanding
 is read from whether one has been linked to it, never from a status.
 
-**Depends on it:** `chaseTransmittalAction`; audit act `TRANSMITTAL_CHASED`.
+**Sending it on.** An organization with no accounts here (a party of kind
+*offline*) cannot open a transmittal, so it can never be seen. It is addressed
+through its contact, and one of our people — the party's liaison, or the
+control function where none is named — is told instead, sends it to them by
+email or through their own system, and records on that recipient the day, how
+it went, their reference and the proof. For that recipient, that record is the
+receipt §11.5 asks for. It is the same record a review step carried for such an
+organization already keeps, and a review step sent that way fills in the
+transmittal's row for them too.
+
+**Depends on it:** `chaseTransmittalAction`, `markRecipientSentAction`; the
+recipient's `dispatchedAt`, `dispatchChannel`, `dispatchRef`,
+`dispatchedByName` and proof; audit acts `TRANSMITTAL_CHASED`,
+`TRANSMITTAL_SENT_ON`.
 
 ---
 
@@ -263,7 +276,7 @@ transmittal page, which keeps ✓ / ✗ / — after the check is made.
 
 **Clause:** §16.6 *Views*, and wherever the Standard enumerates recorded acts.
 
-`ACTION_CARRIED`, `ACTION_STOPPED`, `TRANSMITTAL_CHASED`.
+`ACTION_CARRIED`, `ACTION_STOPPED`, `TRANSMITTAL_CHASED`, `TRANSMITTAL_SENT_ON`.
 
 Each is a decision somebody is answerable for, so each is a recorded act and
 each belongs in the project's own log, not only in the administrator's audit
