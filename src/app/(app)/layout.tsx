@@ -31,7 +31,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <div className="min-h-screen bg-canvas">
       <Sidebar perms={perms} />
-      <div className="lg:pl-67 lg:pl-(--sidebar-w)">
+      {/* The content starts where the sidebar ends, whatever width it has been
+          dragged or collapsed to. One class: --sidebar-w defaults to 268px in
+          globals.css, so there is no second, fixed width to compete with it. */}
+      <div className="lg:pl-(--sidebar-w)">
         <header data-app-header className="no-print sticky top-0 z-10 flex h-18 items-center gap-3 border-b border-line/80 bg-surface/94 px-4 backdrop-blur sm:gap-5 sm:px-6 lg:px-8">
           <MobileNav perms={perms} />
           <ProjectSwitcher

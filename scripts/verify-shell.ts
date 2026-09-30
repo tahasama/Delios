@@ -82,7 +82,9 @@ function main() {
   check("sidebar hides below lg", nav.includes("hidden w-67") && nav.includes("lg:flex"));
   check("a drawer replaces it", nav.includes("MobileNav"));
   const layout = readFileSync(`${APP}/layout.tsx`, "utf-8");
-  check("content padding is responsive", layout.includes("lg:pl-67"));
+  // The content is padded by the sidebar's own width, collapsed or not, and by
+  // nothing else: a fixed width beside it once won and left a gap on every page.
+  check("content padding follows the sidebar", layout.includes("lg:pl-(--sidebar-w)") && !/lg:pl-(\d|\[\d)/.test(layout));
   check("header padding is responsive", /px-4[^"]*lg:px-\d/.test(layout));
   const css = readFileSync("src/app/globals.css", "utf-8");
   // A fixed page width once made every screen scroll sideways on a phone and
