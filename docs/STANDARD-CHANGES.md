@@ -226,9 +226,10 @@ page; `/transmittals/new?replyTo=`.
 **Clause:** §11.5 *Receipt*, §11.9 *Acceptance of transmittals*, §11.12 *Time
 limits*.
 
-**Telling them again.** Where an addressed recipient has not opened a
-transmittal, the control function may notify them again. The day is recorded
-against that recipient and in the audit trail. Without this the record was
+**Notifying again.** Where addressed recipients have not opened a
+transmittal, the control function may notify again whichever of them it
+chooses — one, several, or all. The day is recorded against each recipient
+notified, and their names in the audit trail. Without this the record was
 silent about the commonest failure in distribution: nobody looked.
 
 A transmittal is not closed by hand. Once issued it is the proof that it was

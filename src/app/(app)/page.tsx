@@ -615,7 +615,7 @@ const ACTIVITY: Record<string, { kind: string; said: string; mark: string }> = {
   TRANSMITTAL_RECEIVED: { kind: "Transmittal", said: "was received", mark: "border-violet-600" },
   TRANSMITTAL_ACCEPTED: { kind: "Transmittal", said: "was accepted on arrival", mark: "border-emerald-600" },
   TRANSMITTAL_REJECTED: { kind: "Transmittal", said: "was returned to its sender", mark: "border-red-600" },
-  TRANSMITTAL_CHASED: { kind: "Transmittal", said: "was put in front of them again", mark: "border-amber-600" },
+  TRANSMITTAL_CHASED: { kind: "Transmittal", said: "was notified again to whoever had not opened it", mark: "border-amber-600" },
   TRANSMITTAL_SENT_ON: { kind: "Transmittal", said: "was sent on to an organization outside the system", mark: "border-emerald-600" },
   TRANSMITTAL_CLOSED: { kind: "Transmittal", said: "was closed", mark: "border-slate-400" },
   ACTION_CARRIED: { kind: "Schedule", said: "went ahead without all of its documents", mark: "border-amber-600" },

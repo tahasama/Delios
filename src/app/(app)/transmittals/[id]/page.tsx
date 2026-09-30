@@ -15,6 +15,7 @@ import {
 import { preflight } from "@/lib/rules/preflight";
 import { PreflightPanel, Guarded } from "@/components/preflight";
 import { ReceiptTracker } from "./receipt-tracker";
+import { NotifyAgain } from "./notify-again";
 import { CarriedTable, type CarriedRow } from "./carried-table";
 import { Timeline } from "@/components/timeline";
 import { SendForReview } from "@/components/send-for-review-panel";
@@ -29,7 +30,7 @@ export const dynamic = "force-dynamic";
  * A transmittal is an act, not a folder: named documents went to named people
  * on a day, for a stated reason, and something is expected back. So the page is
  * ordered as that act is read — what it is and what it carries, who was asked
- * and who was only told, what came back, and what was done about it on arrival
+ * and who was only kept informed, what came back, and what was done about it on arrival
  * — with the whole history beside it.
  *
  * Nothing that was recorded is hidden to make the page tidy: the acceptance
@@ -93,7 +94,7 @@ export default async function TransmittalDetailPage({ params, searchParams }: { 
   const reviewExpected = ((await getActiveSet("REASONS_FOR_ISSUE")).find((one) => one.code === t.reasonForIssue)?.props as Record<string, unknown> | undefined)?.reviewCycle === true;
 
   // Addressed to, and copied in. Seen is read from the first list only: being
-  // copied in is being told, not being asked, so a transmittal is not seen
+  // copied in is being kept informed, not being asked, so a transmittal is not seen
   // because somebody kept informed happened to look at it.
   const addressed = t.recipients.filter((one) => one.kind !== "CC");
   const copied = t.recipients.filter((one) => one.kind === "CC");
@@ -106,6 +107,7 @@ export default async function TransmittalDetailPage({ params, searchParams }: { 
   const sentCount = sentOn.filter((one) => one.dispatchedAt).length;
   const allSeen = addressed.length > 0 && seen === inApp.length && sentCount === sentOn.length;
   const waiting = addressed.filter((one) => !one.openedAt && one.userId);
+  const mayNotify = controller && waiting.length > 0 && t.status !== "DRAFT";
   // Who of ours carries each of those organizations, and whether that is you.
   const { partyStepHolders } = await import("@/lib/workflow");
   const carriersOf = new Map<string, { names: string; mine: boolean }>();
@@ -253,7 +255,7 @@ export default async function TransmittalDetailPage({ params, searchParams }: { 
             <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2 sm:px-6">
               <span className="stencil mr-1 text-slate-400">Sent to</span>
               <span className="text-[11px] text-slate-400">
-                opening it while signed in is the receipt{sentOn.length ? <>; for an organization not on the system, our sending it on is</> : null} &mdash; copies are told, not asked
+                opening it while signed in is the receipt{sentOn.length ? <>; for an organization not on the system, our sending it on is</> : null} &mdash; copies are kept informed, not asked
               </span>
               <span className="ml-auto font-mono text-[11px] tabular-nums text-slate-500">
                 {allSeen
@@ -265,6 +267,14 @@ export default async function TransmittalDetailPage({ params, searchParams }: { 
             <ul className="divide-y divide-line">
               {[...addressed, ...copied].map((person) => (
                 <li key={person.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-2.5 sm:px-6">
+                  <div className="flex min-w-0 items-start gap-3">
+                    {/* Who may be notified again: addressed, has an account, has
+                        not opened it. The box belongs to the strip below. */}
+                    {mayNotify ? (
+                      waiting.some((one) => one.id === person.id)
+                        ? <input type="checkbox" name="recipientIds" value={person.id} form={`notify-again-${t.id}`} aria-label={`Notify ${person.name} again`} className="mt-1" />
+                        : <span className="w-[13px] shrink-0" aria-hidden />
+                    ) : null}
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-slate-700">
                       {person.name}
@@ -285,9 +295,10 @@ export default async function TransmittalDetailPage({ params, searchParams }: { 
                         : person.openedAt
                           ? <>Opened it {fmtDateTime(person.openedAt)}{person.viewCount > 1 ? <>, and {person.viewCount} times since &mdash; last {fmtDateTime(person.lastViewedAt ?? person.openedAt)}</> : null}</>
                           : person.notifiedAt
-                            ? <>Told {fmtDateTime(person.notifiedAt)} &mdash; not opened yet</>
+                            ? <>Notified {fmtDateTime(person.notifiedAt)} &mdash; not opened yet</>
                             : "Waiting to be issued"}
                     </p>
+                  </div>
                   </div>
                   {outside(person) ? (
                     person.dispatchedAt ? (
@@ -300,7 +311,7 @@ export default async function TransmittalDetailPage({ params, searchParams }: { 
                   ) : person.openedAt ? (
                     <Chip className={person.kind === "CC" ? "bg-slate-100 text-slate-600 ring-slate-200" : "bg-emerald-100 text-emerald-800 ring-emerald-300"}>seen</Chip>
                   ) : person.notifiedAt ? (
-                    <Chip className="bg-amber-100 text-amber-800 ring-amber-300">told</Chip>
+                    <Chip className="bg-amber-100 text-amber-800 ring-amber-300">notified</Chip>
                   ) : (
                     <Chip className="bg-slate-100 text-slate-500 ring-slate-200">not sent yet</Chip>
                   )}
@@ -339,16 +350,7 @@ export default async function TransmittalDetailPage({ params, searchParams }: { 
                 </li>
               ))}
             </ul>
-            {controller && waiting.length && t.status !== "DRAFT" ? (
-              <ActionForm action={chaseTransmittalAction} hideSubmit hidden={{ transmittalId: t.id }}>
-                <div className="asking flex flex-wrap items-center gap-3 px-5 py-3 sm:px-6">
-                  <span className="text-[11px] text-slate-500">
-                    {waiting.length === 1 ? `${waiting[0].name} has` : `${waiting.length} of them have`} not opened it. Telling them again is recorded.
-                  </span>
-                  <button className="ask ml-auto">Tell them again</button>
-                </div>
-              </ActionForm>
-            ) : null}
+            {mayNotify ? <NotifyAgain action={chaseTransmittalAction} transmittalId={t.id} waiting={waiting.length} /> : null}
           </section>
 
           {/* What came back. Each answer is correspondence in its own right, so
@@ -508,7 +510,7 @@ export default async function TransmittalDetailPage({ params, searchParams }: { 
             <Timeline
               points={t.direction === "OUTGOING" ? [
                 { label: "Raised", at: t.createdAt, holder: t.createdByName },
-                { label: "Issued — they were told", at: t.status === "DRAFT" ? null : t.dateOfIssue, holder: t.status === "DRAFT" ? "nothing has been sent yet" : t.createdByName },
+                { label: "Issued — they were notified", at: t.status === "DRAFT" ? null : t.dateOfIssue, holder: t.status === "DRAFT" ? "nothing has been sent yet" : t.createdByName },
                 {
                   label: "Seen",
                   at: addressed.map((one) => one.openedAt ?? one.dispatchedAt).filter(Boolean).sort((x, y) => x!.getTime() - y!.getTime())[0] ?? null,

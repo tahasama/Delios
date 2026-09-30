@@ -37,6 +37,7 @@ export function ActionForm({
   confirmText,
   hidden,
   hideSubmit,
+  id,
 }: {
   action: (prev: State | undefined, formData: FormData) => Promise<State>;
   children?: React.ReactNode;
@@ -53,12 +54,15 @@ export function ActionForm({
    * a wizard means a button labelled "Continue" that actually submits.
    */
   hideSubmit?: boolean;
+  /** Lets fields elsewhere on the page belong to this form, through their `form` attribute. */
+  id?: string;
 }) {
   const [state, formAction, pending] = useActionState(action, undefined);
   const [missing, setMissing] = useState<MissingField[]>([]);
 
   return (
     <form
+      id={id}
       action={formAction}
       className={cn("space-y-3", className)}
       noValidate

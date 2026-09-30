@@ -302,13 +302,13 @@ export async function acceptanceCheckAction(_prev: { error?: string } | undefine
 
 
 /**
- * Telling again the people who have not opened it.
+ * Notifying again the people who have not opened it.
  *
- * A transmittal is evidence that named people were told. They are told once
- * when it is issued, and nothing in the record says what happens when somebody
- * simply never looks — so this says it: they are told again, on a day, and that
- * day is kept. Only the people it was addressed to are chased; somebody copied
- * in owes nothing.
+ * A transmittal is evidence that named people were notified. They are notified
+ * once when it is issued, and nothing in the record says what happens when
+ * somebody simply never looks — so this says it: whoever Document Control ticks
+ * is notified again, on a day, and that day is kept. Only the people it was
+ * addressed to can be; somebody copied in owes nothing.
  */
 export async function chaseTransmittalAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
   const ctx = await requireScope();
@@ -319,8 +319,13 @@ export async function chaseTransmittalAction(_prev: { error?: string } | undefin
   const t = await db.transmittal.findUniqueOrThrow({ where: { id }, include: { recipients: true } });
   if (t.status === "DRAFT") return { error: "Nothing has been sent yet." };
 
-  const waiting = t.recipients.filter((one) => one.kind !== "CC" && !one.openedAt && one.userId);
-  if (!waiting.length) return { error: "Everybody it was addressed to has opened it." };
+  // Only whoever was ticked: somebody may already have answered by phone, and
+  // notifying them again would be noise.
+  const ticked = new Set(formData.getAll("recipientIds").map(String));
+  const open = t.recipients.filter((one) => one.kind !== "CC" && !one.openedAt && one.userId);
+  if (!open.length) return { error: "Everybody it was addressed to has opened it." };
+  const waiting = open.filter((one) => ticked.has(one.id));
+  if (!waiting.length) return { error: "Tick who to notify again." };
 
   const now = new Date();
   await db.transmittalRecipient.updateMany({ where: { id: { in: waiting.map((one) => one.id) } }, data: { notifiedAt: now } });
@@ -337,7 +342,7 @@ export async function chaseTransmittalAction(_prev: { error?: string } | undefin
     entityType: "Transmittal",
     entityId: id,
     entityLabel: t.number,
-    detail: `Told again: ${waiting.map((one) => one.name).join(", ")}.`,
+    detail: `Notified again: ${waiting.map((one) => one.name).join(", ")}.`,
   });
   revalidatePath(`/transmittals/${id}`);
   return {};
