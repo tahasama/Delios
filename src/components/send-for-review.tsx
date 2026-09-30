@@ -72,7 +72,7 @@ function StepCard({ index, step, pool, many }: { index: number; step: SendStep; 
   const approval = step.act === "APPROVAL";
 
   return (
-    <fieldset className={`flex w-60 shrink-0 flex-col rounded-xl border p-2.5 ${approval ? "border-brand-line/30 bg-tint-soft" : "border-slate-200 bg-surface"}`}>
+    <fieldset className={`flex w-60 shrink-0 flex-col rounded-xl border p-2.5 ${approval ? "border-brand-line/30 bg-tint-soft" : "border-line bg-surface"}`}>
       <legend className="sr-only">Step {index + 1}</legend>
       <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400" title={approval ? "This step's verdict binds; a verdict that proceeds is the release approval" : "Advice for the decider"}>Step {index + 1} · {approval ? "Decides" : "Advises"}</p>
       <p className="text-sm font-semibold text-slate-800">{step.title}</p>
@@ -103,7 +103,7 @@ function StepCard({ index, step, pool, many }: { index: number; step: SendStep; 
       {addable.length ? (
         <select
           aria-label={`Add to step ${index + 1}`}
-          className="mt-2 w-full rounded-md border border-dashed border-slate-300 bg-surface px-2 py-1 text-xs text-slate-600"
+          className="mt-2 w-full rounded-md border border-dashed border-line-strong bg-surface px-2 py-1 text-xs text-slate-600"
           value=""
           onChange={(e) => e.target.value && setChosen([...chosen, e.target.value])}
         >

@@ -4,7 +4,28 @@ import { AlertTriangle, CheckCircle2, Info as InfoIcon } from "lucide-react";
 
 // Shared, server-safe UI primitives. Buttons are plain <button>/<Link> so forms
 // work without client JavaScript.
+//
+// These are drawn in the register's vocabulary — the one described in
+// docs/DETAIL-STYLE.md — rather than in a vocabulary of their own. The registers
+// and the two detail pages were built directly out of .register-sheet, .stencil
+// and .plate-*; everything else in the application reaches those same parts
+// through the primitives here. So a card is a sheet, a masthead is a plate, and
+// a rule is the one hairline token, which is what makes the whole application
+// read as one thing instead of two.
+//
+// Every signature below is unchanged on purpose: a page keeps saying exactly
+// what it said before, and nothing a page was showing is dropped to fit the
+// new shape.
 
+/**
+ * A whole page's masthead. It sits on a sheet of its own, so a page opens the
+ * way a register opens rather than with text floating on the canvas.
+ *
+ * This is `.plate-title`, the masthead of a whole register — not `.plate-name`,
+ * which names one record and is set in the serif. Keeping the two apart is the
+ * point: a page about everything and a page about one thing should not look
+ * alike.
+ */
 export function PageHeader({
   title,
   subtitle,
@@ -17,17 +38,25 @@ export function PageHeader({
   eyebrow?: string;
 }) {
   return (
-    <header className="mb-6 flex flex-wrap items-start justify-between gap-5">
-      <div className="min-w-0">
-        {eyebrow ? <p className="mb-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-[#607f99]">{eyebrow}</p> : null}
-        <h1 className="text-[28px] font-semibold leading-tight tracking-[-0.025em] text-slate-950">{title}</h1>
-        {subtitle ? <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">{subtitle}</p> : null}
+    <header className="register register-sheet register-sheet-open mb-4">
+      <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3 px-5 pt-5 pb-4 sm:px-6">
+        <div className="min-w-0">
+          {eyebrow ? <p className="stencil mb-1.5 text-slate-400">{eyebrow}</p> : null}
+          <h1 className="plate-title text-slate-950">{title}</h1>
+          {subtitle ? <p className="plate-meta mt-1.5 max-w-3xl font-normal">{subtitle}</p> : null}
+        </div>
+        {actions ? <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div> : null}
       </div>
-      {actions ? <div className="flex flex-wrap items-center gap-2 pt-0.5">{actions}</div> : null}
     </header>
   );
 }
 
+/**
+ * A sheet. What used to be a card: the same three things go in — what it is,
+ * the sentence about it, and anything that acts on the whole of it — but they
+ * are set in the band the register uses, so a panel here and a panel on the
+ * action page are the same object.
+ */
 export function Card({
   title,
   description,
@@ -44,24 +73,27 @@ export function Card({
   id?: string;
 }) {
   return (
-    <section id={id} className={cn("overflow-hidden rounded-2xl border border-slate-200 bg-surface shadow-sm", className)}>
+    <section id={id} className={cn("register register-sheet", className)}>
       {title ? (
-        <header className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 px-6 py-4.5">
-          <div>
-            <h2 className="text-[15px] font-semibold text-slate-900">{title}</h2>
-            {description ? <p className="mt-1 max-w-3xl text-xs leading-5 text-slate-500">{description}</p> : null}
-          </div>
-          {actions}
+        <header className="flex flex-wrap items-center gap-x-2.5 gap-y-1 border-b border-line bg-tint-soft px-5 py-2 sm:px-6">
+          <h2 className="stencil shrink-0 text-slate-500">{title}</h2>
+          {description ? <p className="min-w-0 text-[11px] leading-4 text-slate-400">{description}</p> : null}
+          {actions ? <div className="ml-auto flex shrink-0 items-center gap-2">{actions}</div> : null}
         </header>
       ) : null}
-      <div className="px-6 py-5">{children}</div>
+      <div className="px-5 py-4 sm:px-6">{children}</div>
     </section>
   );
 }
 
+/**
+ * A state, a verdict, a count — something found rather than read. Square rather
+ * than a pill, because the register stamps and chips are square and a rounded
+ * pill is the one shape that says "web app" out loud.
+ */
 export function Chip({ children, className, title }: { children: React.ReactNode; className?: string; title?: string }) {
   return (
-    <span title={title} className={cn("inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-semibold leading-none ring-1 ring-inset", className ?? "bg-slate-100 text-slate-700 ring-slate-300")}>
+    <span title={title} className={cn("inline-flex items-center whitespace-nowrap rounded-[0.3rem] px-1.5 py-0.5 text-[11px] font-semibold leading-[1.35] ring-1 ring-inset", className ?? "bg-canvas-deep text-slate-700 ring-line")}>
       {children}
     </span>
   );
@@ -82,13 +114,13 @@ export function SeverityChip({ severity }: { severity: string }) {
 }
 
 export function btn(variant: "primary" | "secondary" | "danger" | "ghost" = "primary", size: "sm" | "md" = "md") {
-  const base = "inline-flex items-center justify-center gap-1.5 rounded-xl font-semibold transition-colors outline-none focus-visible:ring-3 focus-visible:ring-link/20 disabled:cursor-not-allowed disabled:opacity-50";
+  const base = "inline-flex items-center justify-center gap-1.5 rounded-lg font-semibold transition-colors outline-none focus-visible:ring-3 focus-visible:ring-link/20 disabled:cursor-not-allowed disabled:opacity-50";
   const sizes = size === "sm" ? "min-h-9 px-3 py-2 text-xs" : "min-h-10 px-4 py-2.5 text-sm";
   const variants = {
     primary: "bg-brand text-white hover:bg-brand-hover",
-    secondary: "border border-slate-300 bg-surface text-slate-700 hover:bg-slate-50",
+    secondary: "border border-line-strong bg-surface text-slate-700 hover:border-brand-line hover:bg-tint",
     danger: "bg-red-600 text-white hover:bg-red-700",
-    ghost: "text-slate-600 hover:bg-slate-100",
+    ghost: "text-slate-600 hover:bg-tint-soft hover:text-slate-900",
   };
   return `${base} ${sizes} ${variants[variant]}`;
 }
@@ -120,10 +152,10 @@ export function ButtonLink({
  */
 export function FormSection({ title, help, children, className }: { title: string; help?: string; children: React.ReactNode; className?: string }) {
   return (
-    <section className={cn("grid grid-cols-1 gap-x-8 gap-y-4 border-t border-slate-100 py-6 first:border-t-0 first:pt-0 md:grid-cols-[220px_minmax(0,1fr)]", className)}>
+    <section className={cn("grid grid-cols-1 gap-x-8 gap-y-4 border-t border-line py-6 first:border-t-0 first:pt-0 md:grid-cols-[220px_minmax(0,1fr)]", className)}>
       <div>
-        <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
-        {help ? <p className="mt-1 text-xs leading-5 text-slate-500">{help}</p> : null}
+        <h3 className="stencil text-slate-500">{title}</h3>
+        {help ? <p className="mt-1.5 text-[11px] leading-4 text-slate-400">{help}</p> : null}
       </div>
       <div className="space-y-4">{children}</div>
     </section>
@@ -133,8 +165,8 @@ export function FormSection({ title, help, children, className }: { title: strin
 /** The bar that closes a form: what happens next on the left, the buttons on the right. */
 export function FormActions({ children, note }: { children: React.ReactNode; note?: React.ReactNode }) {
   return (
-    <div className="sticky bottom-0 -mx-6 mt-2 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 bg-surface/95 px-6 py-3 backdrop-blur">
-      <p className="min-w-0 text-xs text-slate-500">{note}</p>
+    <div className="sticky bottom-0 -mx-5 mt-2 flex flex-wrap items-center justify-between gap-3 border-t border-line bg-surface/95 px-5 py-3 backdrop-blur sm:-mx-6 sm:px-6">
+      <p className="min-w-0 text-[11px] leading-4 text-slate-400">{note}</p>
       <div className="flex items-center gap-2">{children}</div>
     </div>
   );
@@ -156,11 +188,11 @@ export function Field({
   return (
     <label className={cn("block", className)}>
       <span className="mb-1.5 block">
-        <span className="block text-[13px] font-semibold text-slate-800">
+        <span className="block text-[12.5px] font-semibold text-slate-800">
           {label}
           {required ? <span className="ml-0.5 text-red-500">*</span> : null}
         </span>
-        {hint ? <span className="mt-0.5 block text-[11px] leading-4 text-slate-500">{hint}</span> : null}
+        {hint ? <span className="mt-0.5 block text-[11px] leading-4 text-slate-400">{hint}</span> : null}
       </span>
       {children}
     </label>
@@ -168,13 +200,13 @@ export function Field({
 }
 
 export const inputCls =
-  "min-h-10 w-full rounded-xl border border-slate-300 bg-surface px-3 py-2 text-sm text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-brand-line focus:ring-3 focus:ring-link/15 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500";
+  "min-h-10 w-full rounded-lg border border-line-strong bg-surface px-3 py-2 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-brand-line focus:ring-3 focus:ring-link/15 disabled:cursor-not-allowed disabled:bg-canvas disabled:text-slate-500";
 
 export function EmptyState({ title, body, action }: { title: string; body?: string; action?: React.ReactNode }) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50/70 px-8 py-14 text-center">
+    <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-line-strong bg-canvas/50 px-8 py-12 text-center">
       <p className="text-sm font-semibold text-slate-800">{title}</p>
-      {body ? <p className="mt-1.5 max-w-md text-xs leading-5 text-slate-500">{body}</p> : null}
+      {body ? <p className="mt-1.5 max-w-md text-[11.5px] leading-4 text-slate-400">{body}</p> : null}
       {action ? <div className="mt-4">{action}</div> : null}
     </div>
   );
@@ -228,6 +260,13 @@ export function Td({ children, className, colSpan, title }: { children?: React.R
 
 export { DataTable } from "./data-table";
 
+/**
+ * One figure and what it counts. The register already has a way of setting a
+ * number that is read at a glance — `.plate-figure` over `.plate-label`, mono
+ * and tabular so a column of them lines up — so this uses it rather than
+ * inventing a second one. The figure comes first and its name sits under it,
+ * which is the order the plate uses.
+ */
 export function Stat({ label, value, hint, href, tone = "default" }: { label: string; value: React.ReactNode; hint?: string; href?: string; tone?: "default" | "warn" | "danger" | "good" }) {
   const tones = {
     default: "text-slate-900",
@@ -236,13 +275,15 @@ export function Stat({ label, value, hint, href, tone = "default" }: { label: st
     danger: "text-red-700",
   };
   const body = (
-    <div className="rounded-2xl border border-slate-200 bg-surface px-5 py-4 shadow-sm transition hover:border-slate-300 hover:shadow-md">
-      <p className="text-xs font-semibold text-slate-500">{label}</p>
-      <p className={cn("mt-2 text-2xl font-semibold tabular-nums", tones[tone])}>{value}</p>
-      {hint ? <p className="mt-1 text-xs leading-5 text-slate-400">{hint}</p> : null}
+    <div className="register register-sheet h-full px-5 py-4 transition-colors group-hover:border-brand-line group-hover:bg-tint-soft">
+      <span className={cn("plate-figure", tones[tone])}>{value}</span>
+      <span className="plate-label transition-colors group-hover:text-brand-ink">{label}</span>
+      {hint ? <p className="mt-1.5 text-[11px] leading-4 text-slate-400">{hint}</p> : null}
     </div>
   );
-  return href ? <Link href={href} className="block">{body}</Link> : body;
+  // Only a figure you can follow lights up, so the hover says "this is a way in"
+  // rather than decorating every tile on the page.
+  return href ? <Link href={href} className="group block">{body}</Link> : body;
 }
 
 export function Banner({ tone = "info", title, children }: { tone?: "info" | "warn" | "danger" | "good"; title?: string; children?: React.ReactNode }) {
@@ -254,8 +295,8 @@ export function Banner({ tone = "info", title, children }: { tone?: "info" | "wa
   };
   const Icon = tone === "good" ? CheckCircle2 : tone === "info" ? InfoIcon : AlertTriangle;
   return (
-    <div className={cn("flex items-start gap-3 rounded-2xl border px-4 py-3.5 text-sm", tones[tone])} role={tone === "danger" ? "alert" : "status"}>
-      <Icon className="mt-0.5 h-4.5 w-4.5 shrink-0" />
+    <div className={cn("flex items-start gap-3 rounded-lg border px-4 py-3 text-[13px]", tones[tone])} role={tone === "danger" ? "alert" : "status"}>
+      <Icon className="mt-0.5 h-4 w-4 shrink-0" />
       <div className="min-w-0">
         {title ? <p className="font-semibold">{title}</p> : null}
         {children ? <div className={cn("leading-5", title ? "mt-1" : "")}>{children}</div> : null}
@@ -265,7 +306,7 @@ export function Banner({ tone = "info", title, children }: { tone?: "info" | "wa
 }
 
 export function Clause({ children }: { children: React.ReactNode }) {
-  return <span className="ml-1 rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[10px] text-slate-500">{children}</span>;
+  return <span className="ml-1 rounded-[0.25rem] bg-canvas-deep px-1.5 py-0.5 font-mono text-[10px] text-slate-500">{children}</span>;
 }
 
 export function KeyValue({ items }: { items: { label: string; value: React.ReactNode; clause?: string }[] }) {
@@ -273,10 +314,8 @@ export function KeyValue({ items }: { items: { label: string; value: React.React
     <dl className="grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-2 xl:grid-cols-3">
       {items.map((it) => (
         <div key={it.label}>
-          <dt className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
-            {it.label}
-          </dt>
-          <dd className="mt-0.5 text-sm text-slate-800">{it.value}</dd>
+          <dt className="stencil text-slate-400">{it.label}</dt>
+          <dd className="mt-1 text-[13px] text-slate-800">{it.value}</dd>
         </div>
       ))}
     </dl>

@@ -108,6 +108,47 @@ The register's table, not a plain one — `DataTable` inside
   tool, and a `data-dt-foot` with `1–n of n`, the pager and Rows;
 - a coloured rail on the first cell saying where the row stands.
 
+## When there is no table
+
+The order above — plate, then the table, then the sheets beside the timeline —
+assumes the record has a list at its centre. Not every record does. A review
+(`src/app/(app)/reviews/[id]/page.tsx`) has no table: the thing at its centre is
+the document being judged, read side by side with the place the verdict is
+given. Moving it into the table-first order would put the answer out of sight of
+the thing being answered, which is the purpose of the page.
+
+So a record like that takes the style's **parts** and keeps its own **order**:
+the plate exactly as above (serif name, the facts, the claim; the way back and
+the state chip on the right), and every panel a sheet with its band. What it
+does not take is a shape that would cost it its purpose. Borrow the parts
+always; borrow the order only when the record really is a list.
+
+## The primitives carry it
+
+`Card`, `PageHeader`, `Stat`, `Chip` and the form parts in
+`src/components/ui.tsx` are drawn in this same vocabulary, so a page built from
+them is already in the style without being rewritten:
+
+- `Card` is a sheet: its `title` goes in the band as `.stencil`, its
+  `description` beside it lower case, its `actions` at `ml-auto`.
+- `PageHeader` is a whole page's masthead on a sheet of its own, set in
+  `.plate-title` — the register's masthead, not `.plate-name`. A page about
+  everything and a page about one thing should not look alike.
+- `Stat` is `.plate-figure` over `.plate-label`, the figure first.
+- `Chip` is square, like the stamps and code chips. A rounded pill is the one
+  shape that reads as a generic web app.
+
+Every rule in the application is one hairline token — `border-line`,
+`divide-line`, and `border-line-strong` for the heavier edge — never a
+`slate` step picked by eye. Two greys a shade apart read as two weights of rule.
+
+## Choosing one of a set
+
+Picking one of several — which aspect, whose problems, which family of checks —
+is the segmented control, `.seg` holding `.segment` links, the open one marked
+with `aria-current="page"` and a count in `.segment-n`. It is drawn once in
+`globals.css`. Do not hand-roll a row of pills for it.
+
 ## The rules under the style
 
 - **Nothing is dropped to make a row fit.** Evidence a reader might need goes

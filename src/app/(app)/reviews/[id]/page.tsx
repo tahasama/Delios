@@ -2,7 +2,7 @@ import Link from "next/link";
 import { requireScope } from "@/lib/scope";
 import { notFound } from "next/navigation";
 import { isController, isAdmin } from "@/lib/auth";
-import { Card, Chip, Banner, btn, Field, inputCls } from "@/components/ui";
+import { Card, Chip, Banner, Field, inputCls } from "@/components/ui";
 import { ActionForm } from "@/components/form";
 import { ADVICE_LABEL, OUTCOME_CONSEQUENCES } from "@/lib/standard";
 import { fmtDate, fmtDateTime } from "@/lib/utils";
@@ -187,41 +187,69 @@ export default async function ReviewCyclePage({ params }: { params: Promise<{ id
         { label: "Returned to author", at: cycle.returnedToOriginatorAt, holder: doc.createdByName },
       ];
   const currentCustody = [...custody].reverse().find((point) => point.at) ?? custody[0];
+  // How near the reply is. Overdue and at risk are evidence somebody acts on, so
+  // they keep their colour in the plate rather than becoming plain words.
+  const due = cycle.dueAt ? dueState(cycle.dueAt, cycle.status !== "OPEN") : null;
+  // What this page asks of whoever is reading it — the plate's third line. It
+  // says what to do, never restates a fact the line above already gave.
+  const claim = cycle.outcome
+    ? `Answered. The ${cycle.binding ? "verdict" : "advice"} and every comment it gave are kept with it.`
+    : !cycle.issuedToReviewAt
+      ? "Not with the reviewers yet, so there is nothing to answer."
+      : canRecordOutcome
+        ? `Read the document, then give your ${cycle.binding ? "verdict" : "advice"}.`
+        : "Read the document. The reviewers give their answer here.";
 
   return (
     <div className="space-y-4">
-      <header className="rounded-2xl border border-slate-200 bg-surface px-5 py-4 shadow-sm">
-        <div className="flex flex-wrap items-center gap-3">
-          <Link href={`/documents/${doc.id}`} className="inline-flex items-center gap-1 text-xs font-semibold text-link hover:underline"><ArrowLeft className="h-3.5 w-3.5"/> {doc.docNumber}</Link>
-          {cycle.number ? <span className="font-mono text-xs font-bold text-slate-500">{cycle.number}</span> : null}
-        </div>
-        <div className="mt-2 flex flex-wrap items-start justify-between gap-4">
+      {/* The plate. A review is read — somebody sits with this document to judge
+          it — so it takes the detail style's plate: the name in the serif, the
+          facts somebody came for, and what the page asks of them. Its page order
+          does not follow the action page's, because there is no table here: the
+          thing at the centre is the document itself, read beside the place the
+          answer is given. Copying the table-first order would lose that. */}
+      <section className="register register-sheet register-sheet-open">
+        <div className="flex flex-wrap items-start justify-between gap-3 px-5 pt-6 pb-4 sm:px-6">
           <div className="min-w-0">
-            <h1 className="text-xl font-semibold text-slate-950">{doc.title}</h1>
-            <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-              <span className="rounded-md bg-slate-100 px-2 py-0.5 font-mono font-bold text-slate-700">Rev {rev.value}</span>
-              <Chip className={cycle.status === "OPEN" ? "bg-amber-100 text-amber-800 ring-amber-200" : "bg-slate-100 text-slate-600 ring-slate-200"}>Review {cycle.sequence} · {cycle.status === "OPEN" ? "open" : "closed"}</Chip>
+            <h1 className="plate-name min-w-0">
+              {cycle.number ? <><span className="font-mono text-[0.8em] font-medium tracking-tight text-slate-400">{cycle.number}</span>{" "}</> : null}
+              {doc.title}
+            </h1>
+            <p className="plate-meta mt-1.5">
+              Rev <span className="font-mono">{rev.value}</span>
               {cycle.dueAt ? (
-                <Chip className={dueState(cycle.dueAt, cycle.status !== "OPEN") === "overdue" ? "bg-red-100 text-red-800 ring-red-200" : dueState(cycle.dueAt, cycle.status !== "OPEN") === "at risk" ? "bg-amber-100 text-amber-900 ring-amber-300" : "bg-slate-100 text-slate-600 ring-slate-200"}>
+                <> &middot; <span className={due === "overdue" ? "font-semibold text-red-700" : due === "at risk" ? "text-amber-700" : undefined}>
                   due {fmtDate(cycle.dueAt)}{cycle.status === "OPEN" ? ` · ${dueState(cycle.dueAt, false)}` : ""}
-                </Chip>
+                </span></>
               ) : null}
-              <span>{cycle.outcome ? `${verdictLabel(cycle.outcome)} — ${cycle.outcomeByName ?? ""}` : `${currentCustody.label.toLowerCase()} · ${cycle.assignments.filter((assignment) => assignment.completedAt).length} of ${cycle.assignments.length} reviewers done`}</span>
+              {" · "}
+              {cycle.outcome ? `${verdictLabel(cycle.outcome)} — ${cycle.outcomeByName ?? ""}` : `${currentCustody.label.toLowerCase()} · ${cycle.assignments.filter((assignment) => assignment.completedAt).length} of ${cycle.assignments.length} reviewers done`}
               {/* The status the revision carries. Whether it is in force is the
                   revision's state, not the status. */}
-              {rev.statusCode ? <span className="font-mono font-semibold text-slate-700">{rev.statusCode}</span> : null}
-            </div>
+              {rev.statusCode ? <> &middot; <span className="font-mono font-semibold text-slate-700">{rev.statusCode}</span></> : null}
+            </p>
+            <p className="mt-1 max-w-2xl text-[11.5px] leading-4 text-slate-400">{claim}</p>
           </div>
-          {rendition ? <a href={`/api/files/${rendition.id}`} target="_blank" className={btn("secondary", "sm")}><ExternalLink className="h-4 w-4"/> Open PDF</a> : null}
+          <div className="flex shrink-0 items-center gap-2">
+            <Link href={`/documents/${doc.id}`} className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 font-mono text-xs font-semibold text-slate-500 hover:bg-slate-100"><ArrowLeft className="h-4 w-4" /> {doc.docNumber}</Link>
+            <Chip className={cycle.status === "OPEN" ? "bg-amber-100 text-amber-800 ring-amber-200" : "bg-canvas-deep text-slate-600 ring-line"}>Review {cycle.sequence} · {cycle.status === "OPEN" ? "open" : "closed"}</Chip>
+          </div>
         </div>
-      </header>
+      </section>
 
       {reserves.length ? <Banner tone="warn" title="Held under reserve">{reserves.length} comment{reserves.length === 1 ? " carries a reserve" : "s carry a reserve"} that the route has still to settle. The decider's verdict is what releases the revision.</Banner> : null}
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
         <div className="space-y-4">
-          <section className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 shadow-sm">
-            {rendition ? <iframe src={`/api/files/${rendition.id}`} title={`${doc.docNumber} revision ${rev.value}`} className="h-[640px] w-full"/> : <div className="grid h-48 place-items-center p-6 text-center"><div><FileText className="mx-auto h-8 w-8 text-slate-400"/><p className="mt-2 text-sm font-semibold text-slate-700">No PDF attached</p><Link href={`/documents/${doc.id}#workflow`} className="mt-2 inline-block text-xs font-semibold text-link hover:underline">Attach it on the document →</Link></div></div>}
+          {/* The document under review, on a sheet of its own. Opening it in a
+              tab of its own acts on the whole of it, so it sits in the band. */}
+          <section className="register register-sheet">
+            <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2 sm:px-6">
+              <span className="stencil mr-1 text-slate-400">The document</span>
+              <span className="text-[11px] text-slate-400">{rendition ? `revision ${rev.value}, as the reviewers see it` : "no PDF to review yet"}</span>
+              {rendition ? <a href={`/api/files/${rendition.id}`} target="_blank" className="ml-auto inline-flex items-center gap-1 text-[11px] font-semibold text-link hover:underline"><ExternalLink className="h-3.5 w-3.5" /> Open PDF</a> : null}
+            </div>
+            {rendition ? <iframe src={`/api/files/${rendition.id}`} title={`${doc.docNumber} revision ${rev.value}`} className="block h-[640px] w-full bg-canvas"/> : <div className="grid h-48 place-items-center bg-canvas/50 p-6 text-center"><div><FileText className="mx-auto h-8 w-8 text-slate-400"/><p className="mt-2 text-sm font-semibold text-slate-700">No PDF attached</p><Link href={`/documents/${doc.id}#workflow`} className="mt-2 inline-block text-xs font-semibold text-link hover:underline">Attach it on the document →</Link></div></div>}
           </section>
 
         </div>
@@ -258,7 +286,7 @@ export default async function ReviewCyclePage({ params }: { params: Promise<{ id
                 </p>
               )}
               {cycle.files.length ? (
-                <ul className="mt-3 border-t border-slate-100 pt-3 text-xs text-slate-500">
+                <ul className="mt-3 border-t border-line pt-3 text-xs text-slate-500">
                   {cycle.files.map((file) => <li key={file.id} className="truncate">{file.kind === "STAMPED" ? "Stamped copy" : "Proof"}: {file.name}</li>)}
                 </ul>
               ) : null}
@@ -281,9 +309,9 @@ export default async function ReviewCyclePage({ params }: { params: Promise<{ id
             {cycle.outcome ? <div><p className="text-sm font-semibold text-slate-900">{cycle.binding ? <><span className="font-mono">{cycle.outcome}</span> · {verdictLabel(cycle.outcome)}</> : verdictLabel(cycle.outcome)}</p><p className="mt-1 text-xs leading-5 text-slate-500">{OUTCOME_CONSEQUENCES[cycle.outcome]?.blurb}</p>              {/* What the verdict said. A verdict that reads "Comments" and
                   shows no comments is not a record of anything. */}
               {cycle.comments.length ? (
-                <ul className="mt-3 space-y-2 border-t border-slate-100 pt-3">
+                <ul className="mt-3 space-y-2 border-t border-line pt-3">
                   {cycle.comments.map((comment) => (
-                    <li key={comment.id} className={`rounded-lg px-3 py-2 text-xs ${comment.progressionPreventing && comment.status === "OPEN" ? "bg-red-50 text-red-900 ring-1 ring-red-200" : "bg-slate-50 text-slate-700"}`}>
+                    <li key={comment.id} className={`rounded-lg px-3 py-2 text-xs ${comment.progressionPreventing && comment.status === "OPEN" ? "bg-red-50 text-red-900 ring-1 ring-red-200" : "bg-canvas text-slate-700"}`}>
                       <p className="leading-5">{comment.text}</p>
                       <p className="mt-1 text-[11px] text-slate-400">
                         {comment.authorName} · {fmtDateTime(comment.createdAt)}
@@ -301,10 +329,10 @@ export default async function ReviewCyclePage({ params }: { params: Promise<{ id
                     </li>
                   ))}
                 </ul>
-              ) : null}{canReturn ? <div className="mt-4 border-t border-slate-100 pt-4"><ActionForm action={returnToOriginatorAction} submitLabel="Return to author" size="sm" hidden={{ cycleId: cycle.id }}/></div> : null}</div> : <Guarded result={await preflight("RECORD_OUTCOME", { cycleId: cycle.id })}><ActionForm action={recordOutcomeAction} submitLabel={byProxy && cycle.party ? `Record ${cycle.party.name}’s answer` : cycle.binding ? "Give my verdict" : "Give my advice"} hidden={{ cycleId: cycle.id }}><VerdictDecision deciding={cycle.binding} verdicts={decisionOptions(outcomes)} statuses={statusOptions(statuses, mayDecideOn)} carrying={rev.statusCode} laterSteps={laterSteps} request={nextStep ? <RequestIssue onDecision author={author} reasons={issueReasons.map((one) => ({ code: one.code, label: one.label }))} proposed={nextStep.proposed} others={nextStep.others} parties={nextStep.parties} /> : null} />
+              ) : null}{canReturn ? <div className="mt-4 border-t border-line pt-4"><ActionForm action={returnToOriginatorAction} submitLabel="Return to author" size="sm" hidden={{ cycleId: cycle.id }}/></div> : null}</div> : <Guarded result={await preflight("RECORD_OUTCOME", { cycleId: cycle.id })}><ActionForm action={recordOutcomeAction} submitLabel={byProxy && cycle.party ? `Record ${cycle.party.name}’s answer` : cycle.binding ? "Give my verdict" : "Give my advice"} hidden={{ cycleId: cycle.id }}><VerdictDecision deciding={cycle.binding} verdicts={decisionOptions(outcomes)} statuses={statusOptions(statuses, mayDecideOn)} carrying={rev.statusCode} laterSteps={laterSteps} request={nextStep ? <RequestIssue onDecision author={author} reasons={issueReasons.map((one) => ({ code: one.code, label: one.label }))} proposed={nextStep.proposed} others={nextStep.others} parties={nextStep.parties} /> : null} />
               {byProxy && cycle.party ? (
-                <div className="mt-3 space-y-3 border-t border-slate-100 pt-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Recorded for {cycle.party.name}</p>
+                <div className="mt-3 space-y-3 border-t border-line pt-3">
+                  <p className="stencil text-slate-400">Recorded for {cycle.party.name}</p>
                   <Field label="Who answered" hint="optional — the person at their end, as the proof names them">
                     <input name="theirPerson" className={inputCls} placeholder="Name" />
                   </Field>
@@ -319,9 +347,9 @@ export default async function ReviewCyclePage({ params }: { params: Promise<{ id
 
           {earlier.length ? (
             <Card title="What the earlier steps said" description="Their verdicts and their comments, in order.">
-              <ul className="space-y-3">
+              <ul className="-my-4 divide-y divide-line">
                 {earlier.map((one) => (
-                  <li key={one.id} className="rounded-xl border border-slate-200 p-3">
+                  <li key={one.id} className="py-3">
                     <p className="text-xs font-semibold text-slate-800">
                       {one.number ? <span className="mr-2 font-mono text-slate-400">{one.number}</span> : null}
                       {one.outcome ? verdictLabel(one.outcome) : <span className="text-slate-400">not answered yet</span>}
@@ -330,7 +358,7 @@ export default async function ReviewCyclePage({ params }: { params: Promise<{ id
                     {one.comments.length ? (
                       <ul className="mt-2 space-y-1.5">
                         {one.comments.map((comment) => (
-                          <li key={comment.id} className={`rounded-lg px-2.5 py-1.5 text-xs ${comment.progressionPreventing && comment.status === "OPEN" ? "bg-red-50 text-red-900 ring-1 ring-red-200" : "bg-slate-50 text-slate-700"}`}>
+                          <li key={comment.id} className={`rounded-lg px-2.5 py-1.5 text-xs ${comment.progressionPreventing && comment.status === "OPEN" ? "bg-red-50 text-red-900 ring-1 ring-red-200" : "bg-canvas text-slate-700"}`}>
                             {comment.text}
                             <span className="ml-1 text-[11px] text-slate-400">— {comment.authorName}{comment.progressionPreventing
                               ? comment.status === "OPEN"

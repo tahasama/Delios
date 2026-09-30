@@ -17,7 +17,7 @@ export default async function NotificationsPage() {
       {list.length === 0 ? (
         <EmptyState title="Nothing yet" body="You will be notified when reviews, approvals, issues and obsolescence involve you." />
       ) : (
-        <ul className="divide-y divide-slate-100 overflow-hidden rounded-2xl border border-slate-200 bg-surface shadow-sm">
+        <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-surface shadow-sm">
           {list.map((n) => (
             <li key={n.id} className={`px-5 py-4 transition hover:bg-slate-50 ${n.read ? "" : "bg-sky-50/50"}`}>
               <Link href={n.link ?? "#"} className="flex items-start justify-between gap-4">

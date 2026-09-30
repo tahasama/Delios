@@ -27,7 +27,7 @@ export function ProjectSwitcher({
 
   if (single) {
     return (
-      <div className="min-w-0 flex-1 border-slate-200 sm:min-w-[210px] sm:flex-none sm:border-r sm:pr-5">
+      <div className="min-w-0 flex-1 border-line sm:min-w-[210px] sm:flex-none sm:border-r sm:pr-5">
         <p className="truncate text-sm font-semibold text-slate-800">{current.name}</p>
         <p className="truncate text-xs text-slate-400">
           {organizationName} · {functionName ?? ROLE_LABEL[role] ?? role}
@@ -37,7 +37,7 @@ export function ProjectSwitcher({
   }
 
   return (
-    <details className="group relative min-w-0 flex-1 border-slate-200 sm:min-w-[210px] sm:flex-none sm:border-r sm:pr-5">
+    <details className="group relative min-w-0 flex-1 border-line sm:min-w-[210px] sm:flex-none sm:border-r sm:pr-5">
       <summary className="flex cursor-pointer list-none items-center gap-2 rounded-xl px-2 py-1.5 outline-none transition hover:bg-slate-100 focus-visible:ring-3 focus-visible:ring-link/15">
         <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-tint text-brand-ink">
           <FolderOpen className="h-4 w-4" />
@@ -51,7 +51,7 @@ export function ProjectSwitcher({
         <ChevronDown className="h-3.5 w-3.5 shrink-0 text-slate-400 transition group-open:rotate-180" />
       </summary>
 
-      <div className="absolute left-0 top-14 z-30 w-72 rounded-2xl border border-slate-200 bg-surface p-2 shadow-xl">
+      <div className="absolute left-0 top-14 z-30 w-72 rounded-2xl border border-line bg-surface p-2 shadow-xl">
         <p className="px-3 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-widest text-slate-400">
           {organizationName}
         </p>

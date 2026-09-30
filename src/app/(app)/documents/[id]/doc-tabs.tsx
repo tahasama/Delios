@@ -29,8 +29,8 @@ export function DocTabs({ tabs }: { tabs: DocTab[] }) {
   };
 
   return (
-    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-surface shadow-sm">
-      <nav role="tablist" aria-label="Document" className="scroll-thin flex gap-1 overflow-x-auto border-b border-slate-200 px-3">
+    <section className="overflow-hidden rounded-2xl border border-line bg-surface shadow-sm">
+      <nav role="tablist" aria-label="Document" className="scroll-thin flex gap-1 overflow-x-auto border-b border-line px-3">
         {tabs.map((t) => (
           <button
             key={t.id}

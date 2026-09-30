@@ -65,7 +65,7 @@ export function PartyKindFields({ kind, contactId, backupId, liaisonFunction, pe
       )}
 
       {access && !offline && access.signingIn ? (
-        <div className="mt-1 border-t border-slate-100 pt-3">
+        <div className="mt-1 border-t border-line pt-3">
           <label className="flex items-start gap-2 text-xs text-slate-600">
             <input type="checkbox" name="active" defaultChecked={access.active} className="mt-0.5" />
             <span>Has access — untick to revoke; its {access.signingIn} {access.signingIn === 1 ? "person" : "people"} can no longer sign in</span>

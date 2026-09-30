@@ -69,7 +69,7 @@ export async function SupplierPackage({ pkg }: { pkg: { id: string; identifier: 
             </tr>
           ))}
       </DataTable>
-      {!rows.length ? <p className="mt-2 rounded-2xl border border-dashed border-slate-300 px-5 py-8 text-center text-sm text-slate-400">No documents are expected from {pkg.recipientName} yet. Create placeholders with {pkg.recipientName} as the supplier and they appear here.</p> : null}
+      {!rows.length ? <p className="mt-2 rounded-2xl border border-dashed border-line-strong px-5 py-8 text-center text-sm text-slate-400">No documents are expected from {pkg.recipientName} yet. Create placeholders with {pkg.recipientName} as the supplier and they appear here.</p> : null}
     </div>
   );
 
@@ -78,10 +78,10 @@ export async function SupplierPackage({ pkg }: { pkg: { id: string; identifier: 
       <PageHeader
         title={`${pkg.recipientName} — documents`}
         subtitle={`${pkg.identifier} · everything due by ${fmtDate(pkg.completionDate)} · needed at ${pkg.requiredStatus}`}
-        actions={<>{pkg.partyCode ? <a href={`/api/requirements/sheet?sender=${encodeURIComponent(pkg.partyCode)}`} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-surface px-2.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"><Download className="h-4 w-4" /> Delivery list</a> : null}<Link href="/packages" className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-semibold text-slate-500 hover:bg-slate-100"><ArrowLeft className="h-4 w-4" /> Packages</Link></>}
+        actions={<>{pkg.partyCode ? <a href={`/api/requirements/sheet?sender=${encodeURIComponent(pkg.partyCode)}`} className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-2.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"><Download className="h-4 w-4" /> Delivery list</a> : null}<Link href="/packages" className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-semibold text-slate-500 hover:bg-slate-100"><ArrowLeft className="h-4 w-4" /> Packages</Link></>}
       />
 
-      <section className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-slate-200 bg-slate-200 shadow-sm sm:grid-cols-4">
+      <section className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-line bg-slate-200 shadow-sm sm:grid-cols-4">
         <Figure label="Sent" value={`${f.arrived} of ${f.planned}`} hint={`${f.submissionProgress}% · ${f.notArrivedLate} overdue`} />
         <Figure label="On time" value={`${f.onSchedule}%`} hint={`${f.late} late`} />
         <Figure label="Waiting on" value={`${f.pendingOurs} us · ${f.pendingSupplier} them`} hint="review vs supplier" />

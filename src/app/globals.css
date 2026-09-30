@@ -443,12 +443,15 @@ summary::-webkit-details-marker {
   .edge-ocean { background: color-mix(in oklab, var(--color-cyan-800) 45%, transparent); }
   .edge-slate { background: color-mix(in oklab, var(--color-slate-400) 45%, transparent); }
 
-  /* ── Home: the aspect control ─────────────────────────────────────────────
-     One sunken track holding every aspect, with the open one lifted out of it
-     on paper. It reads as a single instrument rather than ten buttons, and the
-     count beside each name turns amber when something in it has waited a week,
-     so the control itself says where the trouble is. */
-  .home-seg {
+  /* ── The segmented control ────────────────────────────────────────────────
+     Choosing one of a set: which aspect on the home page, whose problems on
+     the assurance page, which family of checks. One sunken track holding every
+     choice, with the open one lifted out of it on paper. It reads as a single
+     instrument rather than a row of separate buttons, and the count beside a
+     name turns amber when something in it has waited a week, so the control
+     itself says where the trouble is. Drawn once here and used everywhere a
+     page asks the reader to pick one of several. */
+  .seg {
     display: flex;
     gap: 0.125rem;
     padding: 0.25rem;
@@ -457,9 +460,9 @@ summary::-webkit-details-marker {
     overflow-x: auto;
     scrollbar-width: none;
   }
-  :root.dark .home-seg { background: color-mix(in srgb, var(--color-canvas-deep) 60%, var(--color-surface)); }
-  .home-seg::-webkit-scrollbar { display: none; }
-  .home-segment {
+  :root.dark .seg { background: color-mix(in srgb, var(--color-canvas-deep) 60%, var(--color-surface)); }
+  .seg::-webkit-scrollbar { display: none; }
+  .segment {
     display: inline-flex;
     align-items: center;
     gap: 0.4rem;
@@ -471,13 +474,13 @@ summary::-webkit-details-marker {
     color: var(--color-slate-500);
     transition: color 160ms, background-color 160ms, box-shadow 160ms;
   }
-  .home-segment:hover { color: var(--color-slate-900); }
-  .home-segment[aria-current="page"] {
+  .segment:hover { color: var(--color-slate-900); }
+  .segment[aria-current="page"] {
     background: var(--color-surface);
     color: var(--color-slate-900);
     box-shadow: 0 1px 2px rgba(15, 23, 42, 0.1), 0 1px 1px rgba(15, 23, 42, 0.06);
   }
-  .home-segment-n {
+  .segment-n {
     font-family: var(--font-mono);
     font-size: 11px;
     font-weight: 600;
@@ -490,8 +493,8 @@ summary::-webkit-details-marker {
     background: color-mix(in srgb, var(--color-slate-400) 22%, transparent);
     color: var(--color-slate-600);
   }
-  .home-segment[aria-current="page"] .home-segment-n { background: var(--color-tint); color: var(--color-brand-ink); }
-  .home-segment-n.home-segment-late {
+  .segment[aria-current="page"] .segment-n { background: var(--color-tint); color: var(--color-brand-ink); }
+  .segment-n.segment-late {
     background: color-mix(in srgb, var(--color-amber-500) 26%, transparent);
     color: var(--color-amber-700);
   }

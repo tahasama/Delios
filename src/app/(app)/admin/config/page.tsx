@@ -161,7 +161,7 @@ export default async function AdminConfigPage({ searchParams }: { searchParams: 
                     <Field label="Description" className="sm:col-span-2"><input name="description" defaultValue={set.description ?? ""} className={inputCls} /></Field>
                   </div>
                 </ActionForm>
-                <div className="mt-3 flex items-center gap-4 border-t border-slate-100 pt-3 text-xs">
+                <div className="mt-3 flex items-center gap-4 border-t border-line pt-3 text-xs">
                   <a href={`/api/export/config-set?set=${encodeURIComponent(set.key)}`} className="font-semibold text-link hover:underline">Export as CSV ↓</a>
                   <form action={deleteSetAction}>
                     <input type="hidden" name="key" value={set.key} />
@@ -176,9 +176,9 @@ export default async function AdminConfigPage({ searchParams }: { searchParams: 
               <label className="relative min-w-60 flex-1">
                 <span className="sr-only">Search this set</span>
                 <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
-                <input name="q" defaultValue={q} placeholder={`Search ${set.title.toLowerCase()} by code or label…`} className="h-9 w-full rounded-lg border border-slate-200 bg-surface pl-8 pr-2 text-xs outline-none focus:border-brand-line" />
+                <input name="q" defaultValue={q} placeholder={`Search ${set.title.toLowerCase()} by code or label…`} className="h-9 w-full rounded-lg border border-line bg-surface pl-8 pr-2 text-xs outline-none focus:border-brand-line" />
               </label>
-              <select name="show" defaultValue={show} className="h-9 rounded-lg border border-slate-200 bg-surface px-2 text-xs text-slate-700">
+              <select name="show" defaultValue={show} className="h-9 rounded-lg border border-line bg-surface px-2 text-xs text-slate-700">
                 <option value="ACTIVE">Active</option>
                 <option value="RETIRED">Retired{retiredCount ? ` (${retiredCount})` : ""}</option>
                 <option value="ALL">All</option>
@@ -225,7 +225,7 @@ export default async function AdminConfigPage({ searchParams }: { searchParams: 
                               {propFields?.map((f) => <PropInput key={f.key} field={f} value={f.type === "choice" ? f.read(props) : props[f.key]} />)}
                             </div>
                           </ActionForm>
-                          <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-slate-200 pt-3 text-xs">
+                          <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-line pt-3 text-xs">
                             <form action={retireConfigValueAction}>
                               <input type="hidden" name="valueId" value={v.id} />
                               <button className={v.status === "ACTIVE" ? "text-slate-500 hover:text-red-600" : "text-slate-500 hover:text-emerald-700"}>{v.status === "ACTIVE" ? "Retire" : "Reactivate"}</button>
@@ -249,7 +249,7 @@ export default async function AdminConfigPage({ searchParams }: { searchParams: 
                 })}
               </DataTable>
             ) : (
-              <p className="rounded-2xl border border-dashed border-slate-300 px-5 py-10 text-center text-sm text-slate-500">
+              <p className="rounded-2xl border border-dashed border-line-strong px-5 py-10 text-center text-sm text-slate-500">
                 {q ? `Nothing in ${set.title} matches “${q}”.` : show === "RETIRED" ? "Nothing retired in this set." : "This set has no values yet — add one."}
               </p>
             )}
@@ -269,7 +269,7 @@ function PropInput({ field, value }: { field: PropField; value: unknown }) {
         <legend className="mb-1 text-xs font-semibold text-slate-700">{field.label}</legend>
         <div className="space-y-1.5">
           {field.options.map((o, i) => (
-            <label key={o.value} className="flex items-start gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 has-[:checked]:border-brand-line has-[:checked]:bg-tint-soft">
+            <label key={o.value} className="flex items-start gap-2 rounded-lg border border-line px-3 py-2 text-sm text-slate-700 has-[:checked]:border-brand-line has-[:checked]:bg-tint-soft">
               <input type="radio" name={`prop_${field.key}`} value={o.value} defaultChecked={value ? value === o.value : i === 0} className="mt-0.5" />
               <span><strong className="font-semibold">{o.label.split(" — ")[0]}</strong>{o.label.includes(" — ") ? <span className="text-slate-500"> — {o.label.split(" — ").slice(1).join(" — ")}</span> : null}</span>
             </label>

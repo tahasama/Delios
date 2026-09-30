@@ -1,14 +1,13 @@
 import Link from "next/link";
 import { requireScope } from "@/lib/scope";
 import { isController, isAdmin } from "@/lib/auth";
-import { PageHeader, Card } from "@/components/ui";
+import { PageHeader, Card, Stat } from "@/components/ui";
 import { fmtDateTime } from "@/lib/utils";
 import { RunChecksButton } from "./run-button";
 import { AssuranceTabs } from "./tabs";
 import { problemDocuments } from "@/lib/problems";
 import { untoldRecipients } from "@/lib/supersession";
 import { haltedWhere } from "@/lib/halted";
-import { ArrowRight } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Assurance" };
@@ -83,8 +82,8 @@ export default async function AssurancePage({ searchParams }: { searchParams: Pr
 
       {/* What to look at */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <Tile href="#documents" label="Serious problems to fix" value={serious} tone={serious ? "bad" : "good"} hint="critical or major, on the documents listed below" />
-        <Tile href="/exposures" label="Out-of-date risks" value={risks} tone={risks ? "warn" : "good"} hint="replaced or withdrawn information that may still be in use" />
+        <Stat href="#documents" label="Serious problems to fix" value={serious} tone={serious ? "danger" : "good"} hint="critical or major, on the documents listed below" />
+        <Stat href="/exposures" label="Out-of-date risks" value={risks} tone={risks ? "warn" : "good"} hint="replaced or withdrawn information that may still be in use" />
       </div>
 
       <Card
@@ -92,17 +91,19 @@ export default async function AssurancePage({ searchParams }: { searchParams: Pr
         title={`Documents with problems · ${work.documents.length}`}
         description="Each line is something wrong on that document, and where to put it right. Fixed problems disappear at the next check run."
       >
-        <div className="mb-3 flex flex-wrap gap-1.5 text-xs">
-          <Link href="/conformance#documents" className={`rounded-full px-2.5 py-1 ${!owner ? "bg-brand text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>Everyone</Link>
+        <nav aria-label="Whose problems" className="seg mb-3 w-fit max-w-full">
+          <Link href="/conformance#documents" aria-current={!owner ? "page" : undefined} className="segment">Everyone</Link>
           {Object.entries(OWNERS).map(([code, label]) => {
             const n = count((d) => d.ownerRole === code && d.status === "OPEN");
             return n ? (
-              <Link key={code} href={`/conformance?owner=${code}#documents`} className={`rounded-full px-2.5 py-1 ${owner === code ? "bg-brand text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>{label} · {n}</Link>
+              <Link key={code} href={`/conformance?owner=${code}#documents`} aria-current={owner === code ? "page" : undefined} className="segment">
+                {label} <span className="segment-n">{n}</span>
+              </Link>
             ) : null;
           })}
-        </div>
+        </nav>
         {work.documents.length ? (
-          <ul className="divide-y divide-slate-100">
+          <ul className="divide-y divide-line">
             {work.documents.slice(0, 60).map((d) => (
               <li key={d.id} className="py-3">
                 <div className="flex flex-wrap items-baseline gap-x-2">
@@ -144,12 +145,3 @@ export default async function AssurancePage({ searchParams }: { searchParams: Pr
   );
 }
 
-function Tile({ href, label, value, hint, tone }: { href: string; label: string; value: string | number; hint: string; tone?: "good" | "warn" | "bad" }) {
-  return (
-    <Link href={href} className="group rounded-2xl border border-slate-200 bg-surface p-4 shadow-sm transition hover:border-brand-line/40 hover:shadow">
-      <p className="flex items-center justify-between text-xs font-semibold text-slate-500">{label}<ArrowRight className="h-3.5 w-3.5 text-slate-300 group-hover:text-link" /></p>
-      <p className={`mt-1 text-2xl font-semibold tabular-nums ${tone === "bad" ? "text-red-700" : tone === "warn" ? "text-amber-700" : tone === "good" ? "text-emerald-700" : "text-slate-900"}`}>{value}</p>
-      <p className="text-[11px] text-slate-400">{hint}</p>
-    </Link>
-  );
-}

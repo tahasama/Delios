@@ -46,7 +46,7 @@ export default async function ScheduleVersionDetailPage({ params }: { params: Pr
       <ControlledSource label="schedule document" sourceType="ScheduleVersion" sourceId={version.id} returnPath={`/actions/schedules/${version.id}`} source={controlledSource} options={sourceOptions} canLink={isController(user) || isAdmin(user)} />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_auto]">
-        <section className="rounded-2xl border border-slate-200 bg-surface p-6 shadow-sm">
+        <section className="rounded-2xl border border-line bg-surface p-6 shadow-sm">
           <div className="flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-xl bg-tint text-link"><GitCompareArrows className="h-5 w-5" /></span><div><p className="text-sm font-semibold text-slate-900">Change summary</p><p className="mt-0.5 text-xs text-slate-500">Compared with {previous ? `${previous.versionLabel}, imported ${fmtDate(previous.importedAt)}` : "an empty starting point"}.</p></div></div>
           <div className="mt-5 grid grid-cols-5 gap-2"><ChangeMetric label="New" value={counts.new} tone="blue" /><ChangeMetric label="Date changes" value={counts.date} tone="amber" /><ChangeMetric label="Detail changes" value={counts.detail} tone="amber" /><ChangeMetric label="Removed" value={counts.removed} tone="red" /><ChangeMetric label="Unchanged" value={counts.unchanged} tone="slate" /></div>
         </section>
@@ -57,8 +57,8 @@ export default async function ScheduleVersionDetailPage({ params }: { params: Pr
         </section>
       </div>
 
-      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-surface shadow-sm">
-        <header className="border-b border-slate-100 px-6 py-5"><h2 className="text-base font-semibold text-slate-900">Activity comparison</h2><p className="mt-1 text-xs text-slate-500">Every imported activity is identified by its action code. Dates shown in red or amber will affect readiness when this version is published.</p></header>
+      <section className="overflow-hidden rounded-2xl border border-line bg-surface shadow-sm">
+        <header className="border-b border-line px-6 py-5"><h2 className="text-base font-semibold text-slate-900">Activity comparison</h2><p className="mt-1 text-xs text-slate-500">Every imported activity is identified by its action code. Dates shown in red or amber will affect readiness when this version is published.</p></header>
         <DataTable id="schedule-changes" className="rounded-none border-0 shadow-none" head={<tr><Th>Change</Th><Th>Action</Th><Th>Activity</Th><Th>Previous date</Th><Th>New date</Th><Th>Responsible party</Th></tr>}>
           {changes.map((change) => <ChangeRow key={`${change.type}-${change.activity.actionCode}`} change={change} />)}
         </DataTable>

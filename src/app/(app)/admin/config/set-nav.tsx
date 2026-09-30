@@ -22,8 +22,8 @@ export function SetNav({ groups, current, children }: { groups: SetNavGroup[]; c
     : groups[tab]?.sets ?? [];
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-surface shadow-sm">
-      <div className="flex flex-wrap items-end justify-between gap-2 border-b border-slate-200 px-3 pt-2">
+    <div className="rounded-2xl border border-line bg-surface shadow-sm">
+      <div className="flex flex-wrap items-end justify-between gap-2 border-b border-line px-3 pt-2">
         <div role="tablist" className="scroll-thin -mb-px flex gap-1 overflow-x-auto">
           {groups.map((g, i) => {
             const on = !needle && i === tab;
@@ -44,11 +44,11 @@ export function SetNav({ groups, current, children }: { groups: SetNavGroup[]; c
         <label className="relative mb-1.5 w-full sm:w-56">
           <span className="sr-only">Find a set</span>
           <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Find a set…" className="h-8 w-full rounded-lg border border-slate-200 bg-surface pl-8 pr-2 text-xs outline-none focus:border-brand-line" />
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Find a set…" className="h-8 w-full rounded-lg border border-line bg-surface pl-8 pr-2 text-xs outline-none focus:border-brand-line" />
         </label>
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-[230px_minmax(0,1fr)]" role="tabpanel">
-        <nav aria-label="Sets" className="border-b border-slate-200 p-2 lg:border-b-0 lg:border-r">
+        <nav aria-label="Sets" className="border-b border-line p-2 lg:border-b-0 lg:border-r">
         <ul className="space-y-px">
           {sets.map((s) => {
             const on = s.key === current;

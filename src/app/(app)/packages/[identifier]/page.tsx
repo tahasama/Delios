@@ -55,7 +55,7 @@ export default async function PackageDetailPage({ params }: { params: Promise<{ 
 
       {overdue ? <Banner tone="danger" title="Past its completion date">This package should have been checked on {fmtDate(pkg.completionDate)}.</Banner> : null}
 
-      <section className="rounded-2xl border border-slate-200 bg-surface p-5 shadow-sm">
+      <section className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
         <p className="text-sm font-semibold text-slate-900">{nextAction}</p>
         <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100"><div className={`h-full rounded-full ${readinessPercent === 100 && pkg.members.length ? "bg-emerald-500" : "bg-[#d9a441]"}`} style={{ width: `${readinessPercent}%` }}/></div>
         <p className="mt-1.5 text-xs text-slate-500">{readyCount} of {pkg.members.length} documents ready</p>
@@ -115,7 +115,7 @@ export default async function PackageDetailPage({ params }: { params: Promise<{ 
           <p className="text-xs text-slate-400">No documents yet.</p>
         )}
         {canAct ? (
-          <details className="mt-4 border-t border-slate-100 pt-3">
+          <details className="mt-4 border-t border-line pt-3">
             <summary className="cursor-pointer text-xs font-semibold text-link">+ Add documents</summary>
             <div className="mt-3">
               <ActionForm action={addPackageMemberAction} submitLabel="Add" size="sm" hidden={{ packageId: pkg.id }}>

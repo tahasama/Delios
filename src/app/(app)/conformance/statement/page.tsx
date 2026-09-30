@@ -39,8 +39,8 @@ export default async function StatementPage() {
       </div>
       <div className="no-print"><AssuranceTabs current="/conformance/statement" /></div>
 
-      <article className="rounded-xl border border-slate-300 bg-surface p-8 shadow-sm print:shadow-none">
-        <header className="border-b border-slate-200 pb-4 text-center">
+      <article className="rounded-xl border border-line-strong bg-surface p-8 shadow-sm print:shadow-none">
+        <header className="border-b border-line pb-4 text-center">
           <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">Conformance assessment statement</p>
           <h1 className="mt-2 text-xl font-semibold text-slate-900">{scope?.organizationName ?? "—"}</h1>
           <p className="text-xs text-slate-500">Issued {fmtDate(new Date())} · recipient: <em>as addressed</em></p>
@@ -67,13 +67,13 @@ export default async function StatementPage() {
         <h2 className="mt-8 text-sm font-semibold uppercase tracking-wide text-slate-500">Non-conformances by severity (§17.2)</h2>
         <table className="mt-2 w-full text-sm">
           <thead>
-            <tr className="border-b border-slate-200 text-left text-xs uppercase text-slate-400">
+            <tr className="border-b border-line text-left text-xs uppercase text-slate-400">
               <th className="py-1.5">Severity</th><th className="py-1.5">Open</th><th className="py-1.5">Accepted (counted, §17.6)</th>
             </tr>
           </thead>
           <tbody>
             {["CRITICAL", "MAJOR", "MINOR", "ADVISORY"].map((sev) => (
-              <tr key={sev} className="border-b border-slate-100">
+              <tr key={sev} className="border-b border-line">
                 <td className="py-1.5 font-medium">{sev}</td>
                 <td className="py-1.5 tabular-nums">{count(sev, "OPEN")}</td>
                 <td className="py-1.5 tabular-nums">{count(sev, "ACCEPTED")}</td>
@@ -96,7 +96,7 @@ export default async function StatementPage() {
           </>
         ) : null}
 
-        <p className="mt-8 border-t border-slate-200 pt-4 text-xs leading-relaxed text-slate-500">
+        <p className="mt-8 border-t border-line pt-4 text-xs leading-relaxed text-slate-500">
           This statement is backed by the Annex H check results recorded in the system on the assessment date. Where the integrity figure
           is below the published threshold ({scope?.integrityThreshold ?? 95}%) or any Critical non-conformance is open, register-derived
           statements of performance, completeness or readiness carry the integrity figure and the open Critical count (§17.7).
@@ -113,7 +113,7 @@ export default async function StatementPage() {
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="grid grid-cols-[220px_1fr] gap-3 border-b border-slate-100 pb-2">
+    <div className="grid grid-cols-[220px_1fr] gap-3 border-b border-line pb-2">
       <dt className="text-xs font-medium uppercase tracking-wide text-slate-400">{label}</dt>
       <dd className="text-sm text-slate-800">{children}</dd>
     </div>

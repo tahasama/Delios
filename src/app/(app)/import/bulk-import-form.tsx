@@ -40,7 +40,7 @@ export function BulkImportForm({ initialKind }: { initialKind: string }) {
           <span className="mb-1.5 block text-xs font-medium text-slate-700">What are you importing?</span>
           <div className="grid gap-2">
             {KINDS.map((k) => (
-              <label key={k.key} className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-slate-200 p-3 transition hover:border-brand-line/40">
+              <label key={k.key} className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-line p-3 transition hover:border-brand-line/40">
                 <input type="radio" name="kind" value={k.key} defaultChecked={(initialKind || k.key) === k.key} className="mt-1" />
                 <span>
                   <span className="block text-sm font-medium text-slate-800">{k.title}</span>
@@ -67,7 +67,7 @@ export function BulkImportForm({ initialKind }: { initialKind: string }) {
       </form>
 
       {state?.rows?.length ? (
-        <div className="mt-5 border-t border-slate-100 pt-4">
+        <div className="mt-5 border-t border-line pt-4">
           <p className="mb-2 text-sm font-medium text-slate-700">
             Line-by-line report{" "}
             <Chip className={state.failed ? "bg-red-100 text-red-800 ring-red-300" : "bg-emerald-100 text-emerald-800 ring-emerald-300"}>

@@ -100,7 +100,7 @@ function LoginForm() {
             <Link href="/signup" className="font-semibold text-brand-ink hover:underline">Register one</Link>
           </p>
 
-          <div className="mt-8 rounded-xl border border-slate-200 bg-surface p-4 text-xs text-slate-500 shadow-sm">
+          <div className="mt-8 rounded-xl border border-line bg-surface p-4 text-xs text-slate-500 shadow-sm">
             <p className="font-medium text-slate-700">Seeded organizations</p>
             <p className="mt-1 text-[11px] leading-relaxed">
               The same address exists in all three — the password decides which one you enter.

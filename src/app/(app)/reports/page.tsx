@@ -75,7 +75,7 @@ export default async function ReportsPage({
       >
         <div className="mb-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
           {report.figures.map((f) => (
-            <div key={f.label} className="rounded-xl border border-slate-200 px-3 py-2.5">
+            <div key={f.label} className="rounded-xl border border-line px-3 py-2.5">
               <p className="text-[11px] font-semibold text-slate-500">{f.label}</p>
               <p className={`text-xl font-semibold tabular-nums ${TEXT[f.tone ?? ""] ?? "text-slate-900"}`}>{f.value}</p>
             </div>

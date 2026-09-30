@@ -207,7 +207,7 @@ async function RunActivePanel({ run, user, extra }: { run: { id: string; templat
           <li key={a.id}>
             {a.outcome ? <><span className="font-semibold">{said(a.outcome)}</span> — {a.outcomeByName}{a.outcomeNote ? `: “${a.outcomeNote}”` : ""}</> : <span className="text-slate-400">no advice recorded yet</span>}
             {a.comments.length ? (
-              <ul className="mt-1 space-y-0.5 border-l border-slate-200 pl-2">
+              <ul className="mt-1 space-y-0.5 border-l border-line pl-2">
                 {a.comments.map((c) => (
                   <li key={c.id} className={c.progressionPreventing ? "text-red-700" : "text-slate-500"}>
                     {c.progressionPreventing ? "blocking" : "comment"} · {c.authorName}: {c.text}
@@ -306,7 +306,7 @@ function RecordPanel({ doc, extra }: { doc: DocLite; extra?: React.ReactNode }) 
         {confirmed ? (
           <details className="rounded-lg border border-violet-200 bg-surface">
             <summary className="cursor-pointer px-3.5 py-2.5 text-sm font-medium text-violet-800">Issue a correction of this record</summary>
-            <div className="border-t border-slate-100 p-3.5">
+            <div className="border-t border-line p-3.5">
               <ActionForm action={correctRecordAction} submitLabel="Create correction record" size="sm" hidden={{ documentId: doc.id }}>
                 <Field label="Title of the correction" required>
                   <input name="title" required className={inputCls} placeholder="e.g. Correction to minutes of 12 March — attendance corrected" />
@@ -326,7 +326,7 @@ function RecordPanel({ doc, extra }: { doc: DocLite; extra?: React.ReactNode }) 
 /** The Next step block: one compact box, title and context on one line. */
 function Card({ title, description, className, children }: { title: string; description?: string; className?: string; children: React.ReactNode }) {
   return (
-    <section className={cn("rounded-2xl border border-slate-200 bg-surface px-5 py-3.5 shadow-sm", className)}>
+    <section className={cn("rounded-2xl border border-line bg-surface px-5 py-3.5 shadow-sm", className)}>
       <p className="text-sm font-semibold text-slate-900">
         {title}
         {description ? <span className="ml-2 text-xs font-normal text-slate-500">{description}</span> : null}
@@ -343,10 +343,10 @@ function Card({ title, description, className, children }: { title: string; desc
 export function Action({ label, secondary, children }: { label: React.ReactNode; secondary?: boolean; children: React.ReactNode }) {
   return (
     <details className="group mt-2 open:w-full">
-      <summary className={`inline-flex cursor-pointer list-none items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-semibold transition ${secondary ? "border border-slate-300 bg-surface text-slate-700 hover:bg-slate-50" : "bg-brand text-white hover:bg-brand-hover"}`}>
+      <summary className={`inline-flex cursor-pointer list-none items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-semibold transition ${secondary ? "border border-line-strong bg-surface text-slate-700 hover:bg-slate-50" : "bg-brand text-white hover:bg-brand-hover"}`}>
         {label}
       </summary>
-      <div className="mt-2 rounded-lg border border-slate-200 bg-surface p-3.5">{children}</div>
+      <div className="mt-2 rounded-lg border border-line bg-surface p-3.5">{children}</div>
     </details>
   );
 }

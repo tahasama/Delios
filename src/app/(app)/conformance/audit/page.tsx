@@ -43,7 +43,7 @@ export default async function AuditToolsPage() {
       <AssuranceTabs current="/conformance/audit" />
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         {tools.map((t) => (
-          <Link key={t.href} href={t.href} className="group flex gap-3 rounded-2xl border border-slate-200 bg-surface p-4 shadow-sm transition hover:border-brand-line/40 hover:shadow-md">
+          <Link key={t.href} href={t.href} className="group flex gap-3 rounded-2xl border border-line bg-surface p-4 shadow-sm transition hover:border-brand-line/40 hover:shadow-md">
             <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-600"><t.icon className="h-5 w-5" /></span>
             <span className="min-w-0 flex-1">
               <span className="flex items-center justify-between text-sm font-semibold text-slate-800">{t.title}<ArrowRight className="h-4 w-4 text-slate-300 group-hover:text-link" /></span>

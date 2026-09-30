@@ -26,7 +26,7 @@ export default async function NoProjectPage() {
 
   return (
     <div className="grid min-h-screen place-items-center bg-canvas px-6">
-      <div className="w-full max-w-lg rounded-2xl border border-slate-200 bg-surface p-8 shadow-sm">
+      <div className="w-full max-w-lg rounded-2xl border border-line bg-surface p-8 shadow-sm">
         <span className="grid h-12 w-12 place-items-center rounded-xl bg-tint text-brand-ink">
           <FolderOpen className="h-6 w-6" />
         </span>
@@ -37,7 +37,7 @@ export default async function NoProjectPage() {
         </p>
 
         {admins.length ? (
-          <div className="mt-6 rounded-xl border border-slate-200 bg-slate-50/60 p-4">
+          <div className="mt-6 rounded-xl border border-line bg-slate-50/60 p-4">
             <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">Who can add you</p>
             <ul className="mt-2 space-y-1.5">
               {admins.map((a) => (

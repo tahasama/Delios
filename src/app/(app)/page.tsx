@@ -370,11 +370,11 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
 
       </header>
 
-      <nav aria-label="What is waiting" className="home-seg mt-4">
+      <nav aria-label="What is waiting" className="seg mt-4">
         {/* Navigation keeps the reader where they were: switching aspect is a
             filter, not a new page, so the scroll position is left alone. */}
-        <Link href="/" scroll={false} aria-current={!view ? "page" : undefined} className="home-segment">
-          All <span className="home-segment-n">{all.length}</span>
+        <Link href="/" scroll={false} aria-current={!view ? "page" : undefined} className="segment">
+          All <span className="segment-n">{all.length}</span>
         </Link>
         {ASPECTS.filter((one) => rows[one.id].length).map((one) => {
           const stale = rows[one.id].some((row) => (daysOf(row.at) ?? 0) >= 7);
@@ -384,10 +384,10 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
               href={`/?view=${one.id}`}
               scroll={false}
               aria-current={view === one.id ? "page" : undefined}
-              className="home-segment"
+              className="segment"
             >
               {one.tab}
-              <span className={`home-segment-n ${stale ? "home-segment-late" : ""}`}>{rows[one.id].length}</span>
+              <span className={`segment-n ${stale ? "segment-late" : ""}`}>{rows[one.id].length}</span>
             </Link>
           );
         })}
@@ -398,7 +398,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           href="/?view=log"
           scroll={false}
           aria-current={view === "log" ? "page" : undefined}
-          className="home-segment ml-auto"
+          className="segment ml-auto"
         >
           The log
         </Link>

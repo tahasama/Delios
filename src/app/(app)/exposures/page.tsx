@@ -51,7 +51,7 @@ export default async function ExposuresPage() {
       {/* 1 — Unpropagated supersession */}
       <Card title={`${exposure("UNPROPAGATED_SUPERSESSION").label} (${unpropagated.length})`} description={`${exposure("UNPROPAGATED_SUPERSESSION").detail} · ${exposure("UNPROPAGATED_SUPERSESSION").who} acts`}>
         {unpropagated.length === 0 ? <p className="text-xs text-emerald-700">✓ Everyone who received a replaced revision has been told.</p> : (
-          <ul className="divide-y divide-slate-100">
+          <ul className="divide-y divide-line">
             {unpropagated.map((u) => (
               <li key={u.old.id} className="py-3">
                 <p className="text-sm">
@@ -81,7 +81,7 @@ export default async function ExposuresPage() {
       {/* 3 — Blocked work */}
       <Card title={`${exposure("BLOCKED_WORK").label} (${blocked.length})`} description={`${exposure("BLOCKED_WORK").detail} · ${exposure("BLOCKED_WORK").who} acts`}>
         {blocked.length === 0 ? <p className="text-xs text-emerald-700">✓ None.</p> : (
-          <ul className="divide-y divide-slate-100">
+          <ul className="divide-y divide-line">
             {blocked.map((r) => (
               <li key={r.id} className="flex items-center justify-between gap-3 py-2">
                 <span className="text-sm">
@@ -101,7 +101,7 @@ export default async function ExposuresPage() {
       {/* 4 — Orphaned withdrawal */}
       <Card title={`${exposure("ORPHANED_WITHDRAWAL").label} (${orphaned.length})`} description={`${exposure("ORPHANED_WITHDRAWAL").detail} · ${exposure("ORPHANED_WITHDRAWAL").who} acts`}>
         {orphaned.length === 0 ? <p className="text-xs text-emerald-700">✓ None.</p> : (
-          <ul className="divide-y divide-slate-100">
+          <ul className="divide-y divide-line">
             {orphaned.map((e) => (
               <li key={e.id} className="flex items-center justify-between gap-3 py-2">
                 <span className="text-sm">
@@ -117,7 +117,7 @@ export default async function ExposuresPage() {
       {/* 5 — Unresolved void */}
       <Card title={`${exposure("UNRESOLVED_VOID").label} (${unresolvedVoid.length})`} description={`${exposure("UNRESOLVED_VOID").detail} · ${exposure("UNRESOLVED_VOID").who} acts`}>
         {unresolvedVoid.length === 0 ? <p className="text-xs text-emerald-700">✓ None.</p> : (
-          <ul className="divide-y divide-slate-100">
+          <ul className="divide-y divide-line">
             {unresolvedVoid.map((r) => (
               <li key={r.id} className="py-2.5">
                 <div className="flex flex-wrap items-center justify-between gap-2">
@@ -130,7 +130,7 @@ export default async function ExposuresPage() {
                 {controller ? (
                   <div className="mt-2 max-w-lg">
                     <ActionForm action={recordVoidReassessmentAction} submitLabel="Record reassessment" size="sm" hidden={{ revisionId: r.id }}>
-                      <input name="note" className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-xs" placeholder="What was built from it, and the outcome of the reassessment" />
+                      <input name="note" className="w-full rounded-lg border border-line-strong px-2 py-1.5 text-xs" placeholder="What was built from it, and the outcome of the reassessment" />
                     </ActionForm>
                   </div>
                 ) : null}

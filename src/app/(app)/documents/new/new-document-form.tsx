@@ -132,7 +132,7 @@ export function NewDocumentForm({
           ) : null}
 
           {received ? null : (
-            <div className="flex items-center justify-between gap-3 border-t border-slate-100 pt-4">
+            <div className="flex items-center justify-between gap-3 border-t border-line pt-4">
               <Link href="/documents" className={btn("ghost", "sm")}>Cancel</Link>
               <button type="button" onClick={() => setStep(2)} disabled={!ready} className={btn("primary", "sm")}>Continue</button>
             </div>
@@ -140,7 +140,7 @@ export function NewDocumentForm({
         </div>
 
         {/* ── Step 2 — how it is described ────────────────────────────────── */}
-        <div className={cn("space-y-4", !received && step !== 2 && "hidden", received && "mt-4 border-t border-slate-100 pt-4")}>
+        <div className={cn("space-y-4", !received && step !== 2 && "hidden", received && "mt-4 border-t border-line pt-4")}>
           {received ? null : (
             <p className="text-xs text-slate-500">
               <strong className="font-semibold text-slate-700">{docTypeLabel}</strong> · {disciplineLabel} · {(PRODUCER_LABEL[producer] ?? "").toLowerCase()}
@@ -229,7 +229,7 @@ export function NewDocumentForm({
             </Field>
           </div>
 
-          <div className="flex items-center justify-between gap-3 border-t border-slate-100 pt-4">
+          <div className="flex items-center justify-between gap-3 border-t border-line pt-4">
             {received ? <Link href="/documents" className={btn("ghost", "sm")}>Cancel</Link> : <button type="button" onClick={() => setStep(1)} className={btn("ghost", "sm")}>Back</button>}
             <div className="flex items-center gap-3">
               <span className="hidden text-[11px] text-slate-500 sm:block">{hasFile && sendTo ? "It gets its number, then goes to the route" : "It gets its number and waits in the register"}</span>

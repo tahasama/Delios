@@ -3,7 +3,6 @@ import { requireScope } from "@/lib/scope";
 import { PageHeader, DataTable, Th, Td, Chip, SeverityChip, ButtonLink } from "@/components/ui";
 import { CATALOG, FAMILY_TITLES } from "@/lib/checks/catalog";
 import { latestResults } from "@/lib/checks/engine";
-import { cn } from "@/lib/utils";
 import { FAMILIES } from "@/lib/checks/catalog";
 import { AssuranceTabs } from "@/app/(app)/conformance/tabs";
 
@@ -40,14 +39,14 @@ export default async function ChecksPage({ searchParams }: { searchParams: Promi
       />
       <AssuranceTabs current="/conformance/checks" />
 
-      <div className="flex flex-wrap gap-1.5">
-        <Link href="/conformance/checks" className={cn("rounded-full px-3 py-1.5 text-xs font-medium", !family ? "bg-brand text-white" : "bg-slate-100 text-slate-600")}>All</Link>
+      <nav aria-label="Family of checks" className="seg w-fit max-w-full">
+        <Link href="/conformance/checks" aria-current={!family ? "page" : undefined} className="segment">All</Link>
         {FAMILIES.map((f) => (
-          <Link key={f} href={`/conformance/checks?family=${f}`} className={cn("rounded-full px-3 py-1.5 text-xs font-medium", family === f ? "bg-brand text-white" : "bg-slate-100 text-slate-600")}>
+          <Link key={f} href={`/conformance/checks?family=${f}`} aria-current={family === f ? "page" : undefined} className="segment">
             {FAMILY_TITLES[f]?.replace(/^H\.\d+\s/, "") ?? f}
           </Link>
         ))}
-      </div>
+      </nav>
 
       <DataTable
         head={<tr><Th>ID</Th><Th>Condition · how it is checked</Th><Th>Evidence</Th><Th>Clause</Th><Th>Severity</Th><Th>Owner</Th><Th>Latest result</Th></tr>}

@@ -51,7 +51,7 @@ export default async function ControlActivitiesPage() {
             {(["CONTROL", "SELF", "CUSTOM"] as ProjectMode[]).map((mode) => (
               <label
                 key={mode}
-                className="flex cursor-pointer items-start gap-2.5 rounded-xl border border-slate-200 px-3.5 py-3 hover:bg-slate-50 has-[:checked]:border-brand-line has-[:checked]:bg-tint-soft"
+                className="flex cursor-pointer items-start gap-2.5 rounded-xl border border-line px-3.5 py-3 hover:bg-slate-50 has-[:checked]:border-brand-line has-[:checked]:bg-tint-soft"
               >
                 <input type="radio" name="projectMode" value={mode} defaultChecked={projectMode === mode} className="mt-0.5" />
                 <span>
@@ -71,9 +71,9 @@ export default async function ControlActivitiesPage() {
           {/* The list decides each act while the answer above is "it depends".
               On the other two answers it is kept as it stands, ready for the day
               the administrator comes back to it. */}
-          <ul className="mt-4 space-y-3 border-t border-slate-100 pt-4">
+          <ul className="mt-4 space-y-3 border-t border-line pt-4">
             {rows.map(({ activity, mode, controlDoes }) => (
-              <li key={activity.key} className="rounded-xl border border-slate-200 px-3.5 py-3">
+              <li key={activity.key} className="rounded-xl border border-line px-3.5 py-3">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-slate-900">{activity.title}</p>
@@ -122,7 +122,7 @@ export default async function ControlActivitiesPage() {
                   {policy.options.map((option) => (
                     <label
                       key={option.value}
-                      className="flex cursor-pointer items-start gap-2.5 rounded-xl border border-slate-200 px-3.5 py-3 hover:bg-slate-50 has-[:checked]:border-brand-line has-[:checked]:bg-tint-soft"
+                      className="flex cursor-pointer items-start gap-2.5 rounded-xl border border-line px-3.5 py-3 hover:bg-slate-50 has-[:checked]:border-brand-line has-[:checked]:bg-tint-soft"
                     >
                       <input type="radio" name={policy.key} value={option.value} defaultChecked={value === option.value} className="mt-0.5" />
                       <span>

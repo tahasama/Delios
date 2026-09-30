@@ -25,7 +25,7 @@ export type TimelinePoint = {
  */
 export function Timeline({ points, className }: { points: TimelinePoint[]; className?: string }) {
   return (
-    <ol className={`relative ml-2 space-y-4 border-l border-slate-200 pl-5 ${className ?? ""}`}>
+    <ol className={`relative ml-2 space-y-4 border-l border-line pl-5 ${className ?? ""}`}>
       {points.map((point, i) => [
         // A heading is a row of its own, so it never sits on the rail where a
         // dot belongs.
@@ -38,7 +38,7 @@ export function Timeline({ points, className }: { points: TimelinePoint[]; class
           <span
             aria-hidden
             className={`absolute -left-[27px] top-1 h-3 w-3 rounded-full ${
-              point.here ? "bg-brand-strong ring-4 ring-tint" : point.skipped ? "border-2 border-slate-200 bg-slate-100" : point.at ? "bg-emerald-500" : "border-2 border-slate-300 bg-surface"
+              point.here ? "bg-brand-strong ring-4 ring-tint" : point.skipped ? "border-2 border-line bg-slate-100" : point.at ? "bg-emerald-500" : "border-2 border-line-strong bg-surface"
             }`}
           />
           <p className={`text-xs font-semibold ${point.here ? "text-brand-ink" : point.at ? "text-slate-800" : "text-slate-500"}`}>

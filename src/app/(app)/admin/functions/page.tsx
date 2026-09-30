@@ -128,7 +128,7 @@ export default async function FunctionsPage() {
                                 type="submit"
                                 title={`${on ? "Remove" : "Grant"} ${VERB_LABEL[v]} for ${fn.name}${narrowed ? " — it is also granted for certain documents only, which is changed below" : ""}`}
                                 aria-label={`${on ? "Remove" : "Grant"} ${VERB_LABEL[v]} for ${fn.name}`}
-                                className={`mx-auto grid h-6 w-6 place-items-center rounded-md border transition ${on ? "border-emerald-300 bg-emerald-100 text-emerald-700 hover:bg-emerald-200" : narrowed ? "border-amber-200 bg-amber-50 text-amber-600 hover:bg-amber-100" : "border-transparent text-slate-200 hover:border-slate-300 hover:text-slate-400"}`}
+                                className={`mx-auto grid h-6 w-6 place-items-center rounded-md border transition ${on ? "border-emerald-300 bg-emerald-100 text-emerald-700 hover:bg-emerald-200" : narrowed ? "border-amber-200 bg-amber-50 text-amber-600 hover:bg-amber-100" : "border-transparent text-slate-200 hover:border-line-strong hover:text-slate-400"}`}
                               >
                                 {on ? <Check className="h-3.5 w-3.5" /> : narrowed ? <span className="text-[10px] font-bold">◐</span> : <Minus className="h-3 w-3" />}
                               </button>
@@ -145,7 +145,7 @@ export default async function FunctionsPage() {
       </Card>
 
       <Card title="Change a function" description="Open one to edit its rules or retire it. Rules only add permissions; nothing takes them away.">
-        <ul className="divide-y divide-slate-100">
+        <ul className="divide-y divide-line">
           {functions.map((fn) => (
             <li key={fn.id}>
               <details>
@@ -203,7 +203,7 @@ export default async function FunctionsPage() {
                   <ActionForm action={updateFunctionAction} submitLabel="Save" size="sm" hidden={{ functionId: fn.id, name: fn.name }} className="flex flex-wrap items-center gap-3 space-y-0">
                     <label className="flex items-center gap-2 text-xs text-slate-600">
                       Department
-                      <select name="department" defaultValue={fn.department ?? ""} className="rounded-md border border-slate-300 px-1.5 py-1 text-xs" title="The department this job sits in — optional">
+                      <select name="department" defaultValue={fn.department ?? ""} className="rounded-md border border-line-strong px-1.5 py-1 text-xs" title="The department this job sits in — optional">
                         <option value="">no department</option>
                         {disciplines.map((d) => <option key={d.code} value={d.code}>{d.label}</option>)}
                       </select>
@@ -216,7 +216,7 @@ export default async function FunctionsPage() {
           ))}
         </ul>
 
-        <details className="mt-3 border-t border-slate-100 pt-3">
+        <details className="mt-3 border-t border-line pt-3">
           <summary className="cursor-pointer text-xs font-semibold text-link">+ New function</summary>
           <div className="mt-3 max-w-2xl">
             <ActionForm action={createFunctionAction} submitLabel="Create function" size="sm">

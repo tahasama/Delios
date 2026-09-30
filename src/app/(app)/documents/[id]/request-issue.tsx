@@ -43,7 +43,7 @@ export function RequestIssue({ reasons, proposed, others, parties, author, onDec
   const [outside, setOutside] = useState(false);
 
   return (
-    <div className={onDecision ? "space-y-3 border-t border-slate-100 pt-3" : "space-y-3"}>
+    <div className={onDecision ? "space-y-3 border-t border-line pt-3" : "space-y-3"}>
       {onDecision ? (
         <>
           <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Once it is released</p>
@@ -88,7 +88,7 @@ export function RequestIssue({ reasons, proposed, others, parties, author, onDec
                 </div>
                 {others.length ? (
                   addingOthers ? (
-                    <div className="mt-2 max-h-40 space-y-1 overflow-y-auto rounded-lg border border-slate-200 p-2">
+                    <div className="mt-2 max-h-40 space-y-1 overflow-y-auto rounded-lg border border-line p-2">
                       {others.map((person) => (
                         <label key={person.id} className="flex items-start gap-2 text-xs text-slate-600">
                           <input type="checkbox" name="internalUserIds" value={person.id} className="mt-0.5" />
@@ -110,7 +110,7 @@ export function RequestIssue({ reasons, proposed, others, parties, author, onDec
                   <p className="mb-1.5 text-[11px] text-slate-400">One transmittal for each.</p>
                   <div className="flex flex-wrap gap-1.5">
                     {parties.map((party) => (
-                      <label key={party.id} className="flex items-center gap-1.5 rounded-full border border-slate-300 px-2.5 py-1 text-xs text-slate-600">
+                      <label key={party.id} className="flex items-center gap-1.5 rounded-full border border-line-strong px-2.5 py-1 text-xs text-slate-600">
                         <input type="checkbox" name="partyIds" value={party.id} />
                         {party.name}
                       </label>

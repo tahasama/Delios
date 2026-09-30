@@ -39,30 +39,33 @@ export default async function DefectsPage({ searchParams }: { searchParams: Prom
       />
       <AssuranceTabs current="/conformance/defects" />
 
-      <div className="flex flex-wrap gap-1.5">
-        {["OPEN", "ACCEPTED", "CLOSED", "ALL"].map((s) => (
-          <Link key={s} href={`/conformance/defects?status=${s}${sp.severity ? `&severity=${sp.severity}` : ""}${sp.owner ? `&owner=${sp.owner}` : ""}`}
-            className={`rounded-full px-3 py-1.5 text-xs font-medium ${(sp.status ?? "OPEN") === s ? "bg-brand text-white" : "bg-slate-100 text-slate-600"}`}>
-            {s}
-          </Link>
-        ))}
-        <span className="mx-2 w-px bg-slate-200" />
-        {["CRITICAL", "MAJOR", "MINOR", "ADVISORY"].map((s) => (
-          <Link key={s} href={`/conformance/defects?severity=${s}${sp.status ? `&status=${sp.status}` : ""}`}
-            className={`rounded-full px-3 py-1.5 text-xs font-medium ${sp.severity === s ? "bg-slate-800 text-white" : "bg-slate-100 text-slate-600"}`}>
-            {s}
-          </Link>
-        ))}
+      <div className="flex flex-wrap items-center gap-3">
+        <nav aria-label="Defect status" className="seg w-fit max-w-full">
+          {["OPEN", "ACCEPTED", "CLOSED", "ALL"].map((s) => (
+            <Link key={s} href={`/conformance/defects?status=${s}${sp.severity ? `&severity=${sp.severity}` : ""}${sp.owner ? `&owner=${sp.owner}` : ""}`}
+              aria-current={(sp.status ?? "OPEN") === s ? "page" : undefined} className="segment">
+              {s}
+            </Link>
+          ))}
+        </nav>
+        <nav aria-label="Severity" className="seg w-fit max-w-full">
+          {["CRITICAL", "MAJOR", "MINOR", "ADVISORY"].map((s) => (
+            <Link key={s} href={`/conformance/defects?severity=${s}${sp.status ? `&status=${sp.status}` : ""}`}
+              aria-current={sp.severity === s ? "page" : undefined} className="segment">
+              {s}
+            </Link>
+          ))}
+        </nav>
       </div>
 
       {defects.length === 0 ? (
-        <p className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-6 py-10 text-center text-sm text-slate-400">No defects in this view.</p>
+        <p className="rounded-xl border border-dashed border-line-strong bg-slate-50 px-6 py-10 text-center text-sm text-slate-400">No defects in this view.</p>
       ) : (
         <div className="space-y-3">
           {defects.map((d) => {
             const meta = CHECK_BY_ID.get(d.checkId);
             return (
-              <article key={d.id} className="rounded-xl border border-slate-200 bg-surface px-4 py-3 shadow-sm">
+              <article key={d.id} className="rounded-xl border border-line bg-surface px-4 py-3 shadow-sm">
                 <div className="flex flex-wrap items-center gap-2">
                   <SeverityChip severity={d.severity} />
                   {d.status !== "OPEN" ? <Chip className={STATUS_STYLE[d.status] ?? ""}>{d.status.toLowerCase()}</Chip> : null}

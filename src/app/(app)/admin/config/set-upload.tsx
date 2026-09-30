@@ -31,7 +31,7 @@ export function SetUpload({ setKey, templateHref }: { setKey: string; templateHr
         </div>
       ) : null}
       {shown ? (
-        <div className="rounded-lg border border-slate-200 bg-surface p-3">
+        <div className="rounded-lg border border-line bg-surface p-3">
           <p className="text-xs font-semibold text-slate-800">{shown.fileName}: {shown.summary}</p>
           {shown.diff.length ? (
             <ul className="scroll-thin mt-2 max-h-56 space-y-0.5 overflow-y-auto text-xs">

@@ -87,7 +87,7 @@ export default async function AdminPage() {
                   const Icon = ICON[page.href] ?? Tags;
                   const f = figure[page.href];
                   return (
-                    <Link key={page.href} href={page.href} className="group flex gap-3 rounded-xl border border-slate-200 bg-surface p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-brand-line/40 hover:shadow-md">
+                    <Link key={page.href} href={page.href} className="group flex gap-3 rounded-xl border border-line bg-surface p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-brand-line/40 hover:shadow-md">
                       <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${TONE[group]}`}><Icon className="h-5 w-5" /></span>
                       <span className="min-w-0 flex-1">
                         <span className="flex items-center justify-between gap-2">
@@ -95,7 +95,7 @@ export default async function AdminPage() {
                           <ArrowRight className="h-4 w-4 shrink-0 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-link" />
                         </span>
                         <span className="mt-0.5 block text-xs leading-relaxed text-slate-500">{page.text}</span>
-                        {f ? <span className={`mt-2 inline-block rounded-full px-2 py-0.5 text-[11px] font-semibold ${f.attention ? "bg-amber-100 text-amber-800" : "bg-slate-100 text-slate-600"}`}>{f.text}</span> : null}
+                        {f ? <span className={`mt-2 inline-block rounded-[0.3rem] px-1.5 py-0.5 text-[11px] font-semibold ${f.attention ? "bg-amber-100 text-amber-800" : "bg-slate-100 text-slate-600"}`}>{f.text}</span> : null}
                       </span>
                     </Link>
                   );

@@ -115,7 +115,7 @@ export function PlanTimeline({ rows, window, fit }: {
         <div className="relative min-h-full">
           <div className="pointer-events-none absolute inset-y-0 left-[208px] right-[64px]">
             {ticks.map((t) => (
-              <div key={t.label} className="absolute top-0 h-full border-l border-dashed border-slate-200" style={{ left: `${t.left}%` }} />
+              <div key={t.label} className="absolute top-0 h-full border-l border-dashed border-line" style={{ left: `${t.left}%` }} />
             ))}
             <div className="absolute top-0 h-full border-l-2 border-red-400/70" style={{ left: `${at(now)}%` }} />
           </div>

@@ -82,7 +82,7 @@ export function RecipientPicker({ companies, preselected = [], preselectedCopies
         <button
           type="button"
           onClick={() => setRows((r) => [...r, { company: r[r.length - 1]?.company ?? companies[0]?.key ?? "", personId: "", copy: false }])}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-surface px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-line-strong bg-surface px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
         >
           <Plus className="h-3.5 w-3.5" /> Another recipient
         </button>

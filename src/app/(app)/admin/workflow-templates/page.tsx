@@ -86,7 +86,7 @@ export default async function WorkflowTemplatesPage() {
                     const who = [...(s.functionIds ?? []).map((fid) => `any ${functions.find((f) => f.id === fid)?.name ?? "?"}`), ...s.participantIds.map(nameOf)];
                     return (
                       <div key={i} className="flex items-stretch gap-1">
-                        <div className={`w-48 shrink-0 rounded-xl border p-2.5 ${decides ? "border-emerald-300 bg-emerald-50/60" : "border-slate-200 bg-slate-50"}`}>
+                        <div className={`w-48 shrink-0 rounded-xl border p-2.5 ${decides ? "border-emerald-300 bg-emerald-50/60" : "border-line bg-slate-50"}`}>
                           <p className="flex items-center justify-between gap-2">
                             <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Step {i + 1}</span>
                             <Chip className={decides ? "bg-emerald-100 text-emerald-800 ring-emerald-300" : "bg-sky-100 text-sky-800 ring-sky-300"}>{decides ? "decides" : "advises"}</Chip>
@@ -102,9 +102,9 @@ export default async function WorkflowTemplatesPage() {
                 </div>
                 <p className="mt-2 text-[11px] text-slate-400">Used for: {scopeWords(t.classes)}</p>
                 {admin ? (
-                  <details className="mt-3 rounded-lg border border-slate-200">
+                  <details className="mt-3 rounded-lg border border-line">
                     <summary className="cursor-pointer px-3 py-2 text-xs font-medium text-slate-600">Edit</summary>
-                    <div className="border-t border-slate-100 p-3">
+                    <div className="border-t border-line p-3">
                       <WorkflowTemplateBuilder outsideParties={outsideParties} functions={functions} id={t.id} name={t.name} description={t.description ?? ""} classes={t.classes} outcomeSetKey={t.outcomeSetKey ?? "REVIEW_OUTCOMES"} isDefault={t.isDefault} initialSteps={steps} users={users} outcomeSets={outcomeSets.map((s) => s.key)} classOptions={classOptions} statuses={statusChoices} />
                     </div>
                   </details>
@@ -116,7 +116,7 @@ export default async function WorkflowTemplatesPage() {
       )}
 
       {admin ? (
-        <details className="rounded-2xl border border-slate-200 bg-surface px-5 py-3 shadow-sm">
+        <details className="rounded-2xl border border-line bg-surface px-5 py-3 shadow-sm">
           <summary className="cursor-pointer text-sm font-semibold text-brand-ink">+ New review route</summary>
           <div className="mt-3"><WorkflowTemplateBuilder outsideParties={outsideParties} functions={functions} users={users} outcomeSets={outcomeSets.map((s) => s.key)} classOptions={classOptions} statuses={statusChoices} /></div>
         </details>

@@ -97,7 +97,7 @@ function CapabilitySection({ title, description, items }: { title: string; descr
 }
 
 function CapabilityCard({ href, title, text, icon: Icon, action }: { href: string; title: string; text: string; icon: React.ComponentType<{ className?: string }>; action?: string }) {
-  return <Link href={href} className="group flex min-h-44 flex-col rounded-2xl border border-slate-200 bg-surface p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-brand-line/40 hover:shadow-md"><span className="grid h-10 w-10 place-items-center rounded-xl bg-tint text-brand-ink"><Icon className="h-5 w-5" /></span><h3 className="mt-4 text-sm font-semibold text-slate-900">{title}</h3><p className="mt-1.5 flex-1 text-xs leading-5 text-slate-500">{text}</p><span className="mt-4 inline-flex items-center gap-1.5 text-xs font-bold text-link">{action ?? "Open this area"}<ArrowRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" /></span></Link>;
+  return <Link href={href} className="group flex min-h-44 flex-col rounded-2xl border border-line bg-surface p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-brand-line/40 hover:shadow-md"><span className="grid h-10 w-10 place-items-center rounded-xl bg-tint text-brand-ink"><Icon className="h-5 w-5" /></span><h3 className="mt-4 text-sm font-semibold text-slate-900">{title}</h3><p className="mt-1.5 flex-1 text-xs leading-5 text-slate-500">{text}</p><span className="mt-4 inline-flex items-center gap-1.5 text-xs font-bold text-link">{action ?? "Open this area"}<ArrowRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" /></span></Link>;
 }
 
 function Metric({ label, value }: { label: string; value: number }) {

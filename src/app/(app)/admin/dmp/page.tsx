@@ -150,7 +150,7 @@ export default async function DmpReadinessPage() {
 
       <Card id="exceptions" title={`Exceptions register (${exceptions.length})`} description="Agreed departures from the rules, with who allowed them and until when.">
         {exceptions.length ? (
-          <ul className="mb-4 divide-y divide-slate-100">
+          <ul className="mb-4 divide-y divide-line">
             {exceptions.map((e) => (
               <li key={e.id} className="py-2 text-sm">
                 <span className="font-medium text-slate-700">{e.item}</span> <span className="text-slate-400">· clauses {e.clauses}</span>

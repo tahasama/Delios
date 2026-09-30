@@ -129,7 +129,7 @@ export function DelegatePanel({
       ) : null}
 
       {answered.length ? (
-        <ul className="mt-3 space-y-1 border-t border-slate-100 pt-3 text-[11px] text-slate-500">
+        <ul className="mt-3 space-y-1 border-t border-line pt-3 text-[11px] text-slate-500">
           {answered.map((row) => (
             <li key={row.id}>
               {row.toName} — {row.status === "REFUSED" ? `declined${row.refusedReason ? `: ${row.refusedReason}` : ""}` : "taken back"}

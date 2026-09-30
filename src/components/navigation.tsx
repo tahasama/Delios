@@ -390,7 +390,7 @@ export function SearchBox({ className }: { className?: string }) {
         name="q"
         aria-label="Search documents"
         placeholder="Search by number, title or tag"
-        className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 pl-9 pr-3 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-[#5e7f9d] focus:bg-surface focus:ring-3 focus:ring-[#5e7f9d]/10"
+        className="h-10 w-full rounded-xl border border-line bg-slate-50 pl-9 pr-3 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-[#5e7f9d] focus:bg-surface focus:ring-3 focus:ring-[#5e7f9d]/10"
       />
     </form>
   );

@@ -203,7 +203,7 @@ export default async function CodesPage() {
 function Layer({ n, href, title, about, examples, who, list }: { n: string; href: string; title: string; about: string; examples: string; who: string; list: string }) {
   const fixed = list.startsWith("Fixed");
   return (
-    <a href={href} className="group rounded-2xl border border-slate-200 bg-surface p-4 shadow-sm transition hover:border-brand-line/40">
+    <a href={href} className="group rounded-2xl border border-line bg-surface p-4 shadow-sm transition hover:border-brand-line/40">
       <p className="flex items-center gap-2 text-sm font-semibold text-slate-900"><Badge n={n} />{title}</p>
       <p className="mt-1 text-xs text-slate-500">of {about}</p>
       <p className="mt-3 font-mono text-[11px] text-slate-700">{examples}</p>
@@ -221,7 +221,7 @@ function Badge({ n }: { n: string }) {
 
 function FlowStep({ n, title, who, body, chips, last }: { n: string; title: string; who: string; body: string; chips: [string, string][]; last?: boolean }) {
   return (
-    <li className="relative rounded-xl border border-slate-200 bg-slate-50 p-3">
+    <li className="relative rounded-xl border border-line bg-slate-50 p-3">
       <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Step {n}</p>
       <p className="mt-0.5 text-sm font-semibold text-slate-900">{title}</p>
       <p className="text-[11px] font-medium text-brand-ink">{who}</p>

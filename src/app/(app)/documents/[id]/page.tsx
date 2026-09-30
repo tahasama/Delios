@@ -241,7 +241,7 @@ export default async function DocumentDetailPage({
     <div className="mt-1 flex flex-wrap items-start gap-x-2 empty:hidden">
       {/* No separate approval: the review's binding verdict is the decision. */}
       {openCycle ? (
-        <Link href={`/reviews/${openCycle.id}`} className="mt-3 inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-surface px-3.5 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+        <Link href={`/reviews/${openCycle.id}`} className="mt-3 inline-flex items-center gap-1.5 rounded-xl border border-line-strong bg-surface px-3.5 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
           Review of rev {inReview?.value} — comments and verdict →
         </Link>
       ) : null}
@@ -256,7 +256,7 @@ export default async function DocumentDetailPage({
               {requests.map((one) => {
                 const to = parseRecipients(one.recipients);
                 return (
-                  <li key={one.id} className="rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-xs">
+                  <li key={one.id} className="rounded-xl border border-line bg-slate-50 px-3.5 py-3 text-xs">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-semibold text-slate-800">{one.reason}</span>
                       <Chip className={one.status === "DONE" ? "bg-emerald-100 text-emerald-800 ring-emerald-300" : "bg-amber-100 text-amber-800 ring-amber-300"}>
@@ -282,7 +282,7 @@ export default async function DocumentDetailPage({
                       </p>
                     ) : null}
                     {one.status === "OPEN" && !one.delegated ? (
-                      <div className="mt-2 flex flex-wrap gap-2 border-t border-slate-200 pt-2">
+                      <div className="mt-2 flex flex-wrap gap-2 border-t border-line pt-2">
                         {controller && carrying.state === "RELEASED" ? (
                           <ActionForm action={carryOutRequestAction} submitLabel="Send it" size="sm" hidden={{ requestId: one.id }} />
                         ) : (
@@ -308,7 +308,7 @@ export default async function DocumentDetailPage({
           )}
 
           {askChoices ? (
-            <details className="mt-3 border-t border-slate-100 pt-3">
+            <details className="mt-3 border-t border-line pt-3">
               <summary className="cursor-pointer text-xs font-semibold text-link">Ask for it to be sent</summary>
               <div className="mt-2">
                 <ActionForm action={requestIssueAction} submitLabel="Ask" size="sm" hidden={{ revisionId: carrying.id }}>
@@ -352,7 +352,7 @@ export default async function DocumentDetailPage({
               {decisionFinal ? (
                 <ActionForm action={releaseRevisionAction} submitLabel={`Release as ${working.statusCode}`} size="sm" hidden={{ revisionId: working.id, statusCode: working.statusCode ?? "" }} />
               ) : null}
-              <details className="mt-3 border-t border-slate-100 pt-3" open={!decisionFinal}>
+              <details className="mt-3 border-t border-line pt-3" open={!decisionFinal}>
                 <summary className="cursor-pointer text-xs font-semibold text-slate-600">{decisionFinal ? "Send it back instead" : "Send it back"}</summary>
                 <div className="mt-2">
                   <ActionForm action={returnAtGateAction} submitLabel="Send it back" size="sm" hidden={{ revisionId: working.id }}>
@@ -419,7 +419,7 @@ export default async function DocumentDetailPage({
       ) : null}
 
       {/* What is it */}
-      <header className="rounded-2xl border border-slate-200 bg-surface px-5 py-4 shadow-sm">
+      <header className="rounded-2xl border border-line bg-surface px-5 py-4 shadow-sm">
         <Link href="/documents" className="inline-flex items-center gap-1 text-xs font-semibold text-link hover:underline"><ArrowLeft className="h-3.5 w-3.5" /> Documents</Link>
         <div className="mt-2 flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
@@ -483,7 +483,7 @@ export default async function DocumentDetailPage({
               <div className="p-5">
                 <dl className="grid grid-cols-1 gap-x-10 sm:grid-cols-2">
                   {details.filter(([, v]) => v).map(([k, v]) => (
-                    <div key={k} className="flex items-start justify-between gap-4 border-b border-slate-100 py-2">
+                    <div key={k} className="flex items-start justify-between gap-4 border-b border-line py-2">
                       <dt className="text-xs text-slate-500">{k}</dt>
                       <dd className="text-right text-xs font-semibold text-slate-800">{v}</dd>
                     </div>
@@ -592,7 +592,7 @@ export default async function DocumentDetailPage({
             label: "Revisions",
             count: doc.revisions.length,
             content: doc.revisions.length ? (
-              <ul className="divide-y divide-slate-100">
+              <ul className="divide-y divide-line">
                 {doc.revisions.map((rev, index) => (
                   /* Only the newest revision can still be acted on. Everything
                      before it is frozen as it was issued. */
@@ -606,7 +606,7 @@ export default async function DocumentDetailPage({
             label: "Reviews",
             count: cycles.length,
             content: cycles.length ? (
-              <ul className="divide-y divide-slate-100">
+              <ul className="divide-y divide-line">
                 {cycles.map(({ rev, c }) => (
                   <li key={c.id}>
                     <Link href={`/reviews/${c.id}`} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-5 py-3 hover:bg-slate-50">
@@ -630,7 +630,7 @@ export default async function DocumentDetailPage({
             content: (
               <>
                 {transmittalItems.length ? (
-                  <ul className="divide-y divide-slate-100">
+                  <ul className="divide-y divide-line">
                     {transmittalItems.map((item) => {
                       const t = item.transmittal;
                       const seen = t.recipients.filter((r) => r.openedAt).length;
@@ -659,7 +659,7 @@ export default async function DocumentDetailPage({
                 {doc.baselineEntries.length + doc.packageMembers.length + assetLinks.length === 0 ? (
                   <p className="py-3 text-xs text-slate-400">Not linked to any schedule action, package or asset.</p>
                 ) : (
-                  <ul className="divide-y divide-slate-100">
+                  <ul className="divide-y divide-line">
                     {doc.baselineEntries.map((e) => (
                       <UsedIn key={e.id} kind="Schedule action" href={`/actions/${e.action.code}`} code={e.action.code} text={`${e.action.name} — needs ${e.requiredStatus} by ${fmtDate(e.requiredBy)}`} />
                     ))}
@@ -680,7 +680,7 @@ export default async function DocumentDetailPage({
                   </ul>
                 )}
                 {canEdit ? (
-                  <details className="border-t border-slate-100 py-3">
+                  <details className="border-t border-line py-3">
                     <summary className="cursor-pointer list-none text-xs font-semibold text-link">+ Link an asset</summary>
                     <div className="mt-2 max-w-md">
                       <ActionForm action={linkAssetAction} submitLabel="Link" size="sm" hidden={{ documentId: doc.id }}>
@@ -701,7 +701,7 @@ export default async function DocumentDetailPage({
             content: (
               <div>
                 {auditEvents.length ? (
-                  <ul className="divide-y divide-slate-100 px-5">
+                  <ul className="divide-y divide-line px-5">
                     {auditEvents.map((e) => (
                       <li key={e.id} className="flex items-start justify-between gap-4 py-2.5">
                         <p className="text-xs text-slate-700">
@@ -714,7 +714,7 @@ export default async function DocumentDetailPage({
                     ))}
                   </ul>
                 ) : <Empty>Nothing recorded yet.</Empty>}
-                {snapshotCount ? <Link href={`/documents/${doc.id}/history`} className="block border-t border-slate-100 px-5 py-3 text-xs font-semibold text-link hover:underline">See the document as it was at each recorded point →</Link> : null}
+                {snapshotCount ? <Link href={`/documents/${doc.id}/history`} className="block border-t border-line px-5 py-3 text-xs font-semibold text-link hover:underline">See the document as it was at each recorded point →</Link> : null}
               </div>
             ),
           },

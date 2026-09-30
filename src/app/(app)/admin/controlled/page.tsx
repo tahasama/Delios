@@ -79,7 +79,7 @@ export default async function ControlledPage() {
             <Link
               key={handler.kind}
               href={`/admin/controlled/${handler.kind}`}
-              className="group flex flex-col rounded-2xl border border-slate-200 bg-surface p-5 shadow-sm outline-none transition hover:border-brand-line/45 hover:shadow-md focus-visible:ring-3 focus-visible:ring-link/20"
+              className="group flex flex-col rounded-2xl border border-line bg-surface p-5 shadow-sm outline-none transition hover:border-brand-line/45 hover:shadow-md focus-visible:ring-3 focus-visible:ring-link/20"
             >
               <div className="flex items-start gap-3">
                 <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-tint text-brand-ink transition group-hover:bg-brand group-hover:text-white">
@@ -97,7 +97,7 @@ export default async function ControlledPage() {
 
               <p className="mt-3 flex-1 text-xs leading-relaxed text-slate-500">{handler.blurb}</p>
 
-              <div className="mt-4 space-y-1.5 border-t border-slate-100 pt-3">
+              <div className="mt-4 space-y-1.5 border-t border-line pt-3">
                 {submitted ? (
                   <p className="flex items-center gap-1.5 text-xs font-medium text-amber-800">
                     <Clock className="h-3.5 w-3.5 shrink-0" />

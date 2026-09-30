@@ -34,18 +34,18 @@ export default async function ScheduleVersionsPage() {
       )}
 
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1.1fr_0.9fr]">
-        <section className="rounded-2xl border border-slate-200 bg-surface shadow-sm">
-          <header className="border-b border-slate-100 px-6 py-5"><div className="flex items-center gap-2"><FileUp className="h-4 w-4 text-link" /><h2 className="text-base font-semibold text-slate-900">Import a schedule update</h2></div><p className="mt-1 text-xs text-slate-500">A schedule change is issued formally and approved by someone other than whoever uploaded it.</p></header>
+        <section className="rounded-2xl border border-line bg-surface shadow-sm">
+          <header className="border-b border-line px-6 py-5"><div className="flex items-center gap-2"><FileUp className="h-4 w-4 text-link" /><h2 className="text-base font-semibold text-slate-900">Import a schedule update</h2></div><p className="mt-1 text-xs text-slate-500">A schedule change is issued formally and approved by someone other than whoever uploaded it.</p></header>
           <div className="px-6 py-5">
             <p className="text-sm text-slate-600">Schedule imports go through <strong>Controlled changes</strong>, together with every other configuration that arrives as a file. You upload it, see exactly which action dates would move, and an approver decides.</p>
             <Link href="/admin/controlled" className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-link">Open controlled changes <ArrowRight className="h-4 w-4" /></Link>
           </div>
         </section>
 
-        <section className="rounded-2xl border border-slate-200 bg-surface shadow-sm">
-          <header className="border-b border-slate-100 px-6 py-5"><div className="flex items-center gap-2"><History className="h-4 w-4 text-link" /><h2 className="text-base font-semibold text-slate-900">Version history</h2></div><p className="mt-1 text-xs text-slate-500">Drafts, the active published version, and superseded sources.</p></header>
+        <section className="rounded-2xl border border-line bg-surface shadow-sm">
+          <header className="border-b border-line px-6 py-5"><div className="flex items-center gap-2"><History className="h-4 w-4 text-link" /><h2 className="text-base font-semibold text-slate-900">Version history</h2></div><p className="mt-1 text-xs text-slate-500">Drafts, the active published version, and superseded sources.</p></header>
           <div className="px-6 py-2">
-            {versions.length ? <ul className="divide-y divide-slate-100">{versions.map((version) => (
+            {versions.length ? <ul className="divide-y divide-line">{versions.map((version) => (
               <li key={version.id}><Link href={`/actions/schedules/${version.id}`} className="group flex items-center justify-between gap-4 py-4"><div className="min-w-0"><div className="flex items-center gap-2"><p className="truncate text-sm font-semibold text-slate-800">{version.versionLabel}</p><StatusChip status={version.status} /></div><p className="mt-1 truncate text-xs text-slate-500">{version.sourceName} · {version._count.activities} activities</p><p className="mt-1 text-[11px] text-slate-400">Imported {fmtDate(version.importedAt)} by {version.importedByName}</p></div><ArrowRight className="h-4 w-4 shrink-0 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-slate-500" /></Link></li>
             ))}</ul> : <div className="py-12 text-center"><p className="text-sm font-semibold text-slate-700">No versions imported</p><p className="mt-1 text-xs text-slate-400">The first validated import will appear here.</p></div>}
           </div>

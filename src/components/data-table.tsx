@@ -315,11 +315,11 @@ export function DataTable({
   }, [fill, stretch, rows, capHeight]);
 
   return (
-    <div className={cn("dt rounded-2xl border border-slate-200 bg-surface shadow-sm", stretch && "flex min-h-0 flex-1 flex-col", className)} data-dt={scope}>
+    <div className={cn("dt rounded-2xl border border-line bg-surface shadow-sm", stretch && "flex min-h-0 flex-1 flex-col", className)} data-dt={scope}>
       {css ? <style>{css}</style> : null}
       {withBar ? (
         <div className={cn(
-          "dt-bar no-print flex items-center justify-between gap-2 border-b border-slate-100 bg-surface px-3 py-1.5",
+          "dt-bar no-print flex items-center justify-between gap-2 border-b border-line bg-surface px-3 py-1.5",
         )}>
           <p className="px-1 text-[11px] font-medium tabular-nums text-slate-400">{rows} {rows === 1 ? "row" : "rows"}</p>
           <div className="flex items-center gap-0.5">
@@ -387,7 +387,7 @@ export function DataTable({
                             onClick={() => update((p) => ({ ...p, hidden: on ? [...p.hidden, l] : p.hidden.filter((h) => h !== l) }))}
                             className="flex min-w-0 flex-1 items-center gap-2 rounded-lg py-1.5 pl-1 pr-1.5 text-left text-xs text-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
                           >
-                            <span className={cn("grid h-4 w-4 shrink-0 place-items-center rounded border", on ? "border-brand bg-brand text-white" : "border-slate-300 bg-surface")}>
+                            <span className={cn("grid h-4 w-4 shrink-0 place-items-center rounded border", on ? "border-brand bg-brand text-white" : "border-line-strong bg-surface")}>
                               {on ? <Check className="h-3 w-3" /> : null}
                             </span>
                             <span className="truncate">{l}</span>
@@ -408,11 +408,11 @@ export function DataTable({
                     })}
                   </div>
                   {prefs.hidden.length ? (
-                    <button type="button" onClick={() => update((p) => ({ ...p, hidden: [] }))} className="mt-1 w-full rounded-lg border-t border-slate-100 px-2.5 py-1.5 text-left text-xs font-semibold text-link hover:bg-slate-50">
+                    <button type="button" onClick={() => update((p) => ({ ...p, hidden: [] }))} className="mt-1 w-full rounded-lg border-t border-line px-2.5 py-1.5 text-left text-xs font-semibold text-link hover:bg-slate-50">
                       Show all
                     </button>
                   ) : null}
-                  <p className="border-t border-slate-100 px-2.5 pb-1 pt-2 text-[10px] leading-4 text-slate-400">Drag a column edge to resize it; double-click the edge to reset.{onMove ? " Drag a row here to move a column, or step it with the arrows." : ""}</p>
+                  <p className="border-t border-line px-2.5 pb-1 pt-2 text-[10px] leading-4 text-slate-400">Drag a column edge to resize it; double-click the edge to reset.{onMove ? " Drag a row here to move a column, or step it with the arrows." : ""}</p>
                 </div>,
                 document.body,
               ) : null}

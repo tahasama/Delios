@@ -38,14 +38,14 @@ export default async function DocumentHistoryPage({ params }: { params: Promise<
           <h1 className="text-2xl font-semibold tracking-tight text-slate-950">{document.docNumber} — as it was</h1>
           <p className="mt-1.5 text-sm text-slate-500">Every point where something was recorded. Open one to see what changed and what was attached then.</p>
         </div>
-        <Link href={`/documents/${id}`} className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-surface px-3.5 py-2 text-sm font-semibold text-slate-700">
+        <Link href={`/documents/${id}`} className="inline-flex items-center gap-1.5 rounded-xl border border-line bg-surface px-3.5 py-2 text-sm font-semibold text-slate-700">
           <ArrowLeft className="h-4 w-4" /> Current document
         </Link>
       </div>
 
-      <section className="rounded-2xl border border-slate-200 bg-surface shadow-sm">
+      <section className="rounded-2xl border border-line bg-surface shadow-sm">
         {points.length ? (
-          <ul className="divide-y divide-slate-100">
+          <ul className="divide-y divide-line">
             {points.map(({ snapshot, revision, changes }, index) => (
               <li key={snapshot.id}>
                 <details className="group">

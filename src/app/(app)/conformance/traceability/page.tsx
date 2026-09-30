@@ -91,7 +91,7 @@ export default async function TraceabilityPage({ searchParams }: { searchParams:
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
         {(["REVIEW_REQUIRED", "GAP", "ALIGNED", "NOT_APPLICABLE", "WITHDRAWN"] as Alignment[]).map((a) => (
-          <Link key={a} href={href({ state: a })} className={cn("rounded-xl border px-3 py-2.5 transition hover:shadow-sm", state === a ? "border-brand-line bg-tint-soft" : "border-slate-200 bg-surface")}>
+          <Link key={a} href={href({ state: a })} className={cn("rounded-xl border px-3 py-2.5 transition hover:shadow-sm", state === a ? "border-brand-line bg-tint-soft" : "border-line bg-surface")}>
             <p className="text-[11px] font-semibold text-slate-500">{ALIGNMENT_LABEL[a]}</p>
             <p className={cn("text-xl font-semibold tabular-nums", a === "GAP" && counts.GAP ? "text-red-700" : a === "REVIEW_REQUIRED" && counts.REVIEW_REQUIRED ? "text-amber-700" : "text-slate-900")}>{counts[a]}</p>
           </Link>
@@ -122,17 +122,20 @@ export default async function TraceabilityPage({ searchParams }: { searchParams:
         )}
       </Card>
 
-      <div className="flex flex-wrap items-center gap-1.5 text-xs">
-        <Link href={href({ state: "OPEN" })} className={cn("rounded-full px-2.5 py-1", state === "OPEN" ? "bg-brand text-white" : "bg-slate-100 text-slate-600")}>Needs attention</Link>
-        <Link href={href({ state: "ALL" })} className={cn("rounded-full px-2.5 py-1", state === ("ALL" as string) ? "bg-brand text-white" : "bg-slate-100 text-slate-600")}>All</Link>
-        <span className="mx-1 text-slate-300">|</span>
-        <Link href={href({ kind: undefined })} className={cn("rounded-full px-2.5 py-1", !sp.kind ? "bg-brand text-white" : "bg-slate-100 text-slate-600")}>Checks and Routes</Link>
-        <Link href={href({ kind: "CHECK" })} className={cn("rounded-full px-2.5 py-1", sp.kind === "CHECK" ? "bg-brand text-white" : "bg-slate-100 text-slate-600")}>Checks</Link>
-        <Link href={href({ kind: "ROUTE" })} className={cn("rounded-full px-2.5 py-1", sp.kind === "ROUTE" ? "bg-brand text-white" : "bg-slate-100 text-slate-600")}>Routes</Link>
+      <div className="flex flex-wrap items-center gap-3 text-xs">
+        <nav aria-label="Which rows" className="seg w-fit max-w-full">
+          <Link href={href({ state: "OPEN" })} aria-current={state === "OPEN" ? "page" : undefined} className="segment">Needs attention</Link>
+          <Link href={href({ state: "ALL" })} aria-current={state === ("ALL" as string) ? "page" : undefined} className="segment">All</Link>
+        </nav>
+        <nav aria-label="Kind" className="seg w-fit max-w-full">
+          <Link href={href({ kind: undefined })} aria-current={!sp.kind ? "page" : undefined} className="segment">Checks and Routes</Link>
+          <Link href={href({ kind: "CHECK" })} aria-current={sp.kind === "CHECK" ? "page" : undefined} className="segment">Checks</Link>
+          <Link href={href({ kind: "ROUTE" })} aria-current={sp.kind === "ROUTE" ? "page" : undefined} className="segment">Routes</Link>
+        </nav>
         <form className="ml-auto" action="/conformance/traceability">
           {sp.state ? <input type="hidden" name="state" value={sp.state} /> : null}
           {sp.kind ? <input type="hidden" name="kind" value={sp.kind} /> : null}
-          <input name="q" defaultValue={sp.q} placeholder="§6.3, ID-02, G.3…" className="w-44 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs" />
+          <input name="q" defaultValue={sp.q} placeholder="§6.3, ID-02, G.3…" className="w-44 rounded-lg border border-line px-2.5 py-1.5 text-xs" />
         </form>
       </div>
 

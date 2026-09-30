@@ -130,7 +130,7 @@ export function NewTransmittalForm({
         <div className={cn("space-y-4", step !== 1 && "hidden")}>
           <div className="flex gap-2">
             {(["OUTGOING", "INCOMING"] as const).map((d) => (
-              <label key={d} className={`cursor-pointer rounded-lg border px-3 py-2 text-xs font-medium ${direction === d ? "border-brand-line bg-tint text-brand-ink" : "border-slate-300 text-slate-500"}`}>
+              <label key={d} className={`cursor-pointer rounded-lg border px-3 py-2 text-xs font-medium ${direction === d ? "border-brand-line bg-tint text-brand-ink" : "border-line-strong text-slate-500"}`}>
                 <input type="radio" name="direction" value={d} checked={direction === d} onChange={() => setDirection(d)} className="mr-1.5" />
                 {d === "OUTGOING" ? "We are sending" : "We received"}
               </label>
@@ -167,7 +167,7 @@ export function NewTransmittalForm({
             <p className="text-[11px] text-slate-500">Once accepted, each document is sent down a review route, whose last step gives the binding verdict.</p>
           ) : null}
 
-          <div className="flex items-center justify-between gap-3 border-t border-slate-100 pt-4">
+          <div className="flex items-center justify-between gap-3 border-t border-line pt-4">
             <Link href="/transmittals" className={btn("ghost", "sm")}>Cancel</Link>
             <button type="button" onClick={() => setStep(2)} disabled={!askedFirst} className={btn("primary", "sm")}>Continue</button>
           </div>
@@ -181,8 +181,8 @@ export function NewTransmittalForm({
               ? "only released revisions can be sent — tick as many as you need, or send a message alone"
               : "tick as many as arrived, or record a message alone"}
           >
-            <div className="rounded-xl border border-slate-200">
-              <div className="flex items-center gap-2 border-b border-slate-100 px-2.5 py-2">
+            <div className="rounded-xl border border-line">
+              <div className="flex items-center gap-2 border-b border-line px-2.5 py-2">
                 <Search className="h-3.5 w-3.5 shrink-0 text-slate-400" />
                 <input
                   value={find}
@@ -233,7 +233,7 @@ export function NewTransmittalForm({
             </Field>
           )}
 
-          <div className="flex items-center justify-between gap-3 border-t border-slate-100 pt-4">
+          <div className="flex items-center justify-between gap-3 border-t border-line pt-4">
             <button type="button" onClick={() => setStep(1)} className={btn("ghost", "sm")}>Back</button>
             <div className="flex items-center gap-3">
               {saysSomething ? null : <span className="hidden text-[11px] text-slate-500 sm:block">Enclose a document, or write {outgoing ? "a subject" : "a message"}.</span>}
@@ -270,7 +270,7 @@ export function NewTransmittalForm({
             {outgoing ? `from ${ourOrganization}` : `from ${party.trim() || "an unnamed party"}`}
           </p>
 
-          <div className="flex items-center justify-between gap-3 border-t border-slate-100 pt-4">
+          <div className="flex items-center justify-between gap-3 border-t border-line pt-4">
             <button type="button" onClick={() => setStep(2)} className={btn("ghost", "sm")}>Back</button>
             <button type="submit" className={btn("primary", "sm")}>
               {outgoing ? (issueNow ? "Create and send it" : "Create it as a draft") : "Record receipt"}

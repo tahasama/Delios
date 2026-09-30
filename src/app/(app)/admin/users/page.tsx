@@ -69,11 +69,11 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
       <PageHeader
         title="People & access"
         subtitle={`Access is per project. Functions shown are for ${project.code} unless marked.`}
-        actions={<Link href="/import?kind=people" className="inline-flex min-h-10 items-center rounded-xl border border-slate-300 bg-surface px-4 text-xs font-semibold text-slate-700 hover:bg-slate-50">Add a whole team from a spreadsheet</Link>}
+        actions={<Link href="/import?kind=people" className="inline-flex min-h-10 items-center rounded-xl border border-line-strong bg-surface px-4 text-xs font-semibold text-slate-700 hover:bg-slate-50">Add a whole team from a spreadsheet</Link>}
       />
 
       <Card title="Add someone">
-        <div className="divide-y divide-slate-100">
+        <div className="divide-y divide-line">
           <AddWay title="Someone in our organization" hint="They sign in straight away with the password you set.">
             <ActionForm action={createUserAction} submitLabel="Create account" size="sm">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

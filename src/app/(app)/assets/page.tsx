@@ -33,7 +33,7 @@ export default async function AssetsPage({ searchParams }: { searchParams: Promi
       />
 
       {keeper ? (
-        <details className="rounded-2xl border border-slate-200 bg-surface px-5 py-3 shadow-sm" open={!assets.length && !q}>
+        <details className="rounded-2xl border border-line bg-surface px-5 py-3 shadow-sm" open={!assets.length && !q}>
           <summary className="cursor-pointer text-sm font-semibold text-brand-ink">+ Add an asset</summary>
           <div className="mt-3 max-w-3xl">
             <ActionForm action={addAssetAction} submitLabel="Add asset" size="sm">
@@ -66,7 +66,7 @@ export default async function AssetsPage({ searchParams }: { searchParams: Promi
                 <p className="mt-2 text-xs font-medium text-slate-500">{countFor(a.id)} document{countFor(a.id) === 1 ? "" : "s"}</p>
               </Link>
               {keeper ? (
-                <details className="mt-2 border-t border-slate-100 pt-2">
+                <details className="mt-2 border-t border-line pt-2">
                   <summary className="cursor-pointer text-xs font-semibold text-link">Edit</summary>
                   <div className="mt-2 space-y-2">
                     <ActionForm action={updateAssetAction} submitLabel="Save" size="sm" hidden={{ id: a.id }}>

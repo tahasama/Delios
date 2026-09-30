@@ -17,16 +17,17 @@ const AUDIT_PAGES = ["/conformance/audit", "/conformance/defects", "/conformance
 export function AssuranceTabs({ current }: { current: string }) {
   const active = AUDIT_PAGES.includes(current) ? "/conformance/audit" : current;
   return (
-    <nav className="scroll-thin -mx-1 flex gap-1 overflow-x-auto px-1" aria-label="Assurance">
-      {TABS.map((t) => (
-        <Link key={t.href} href={t.href} aria-current={active === t.href ? "page" : undefined}
-          className={`whitespace-nowrap rounded-lg px-3 py-2 text-xs font-semibold ${active === t.href ? "bg-brand text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>
-          {t.label}
-        </Link>
-      ))}
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+      <nav className="seg w-fit max-w-full" aria-label="Assurance">
+        {TABS.map((t) => (
+          <Link key={t.href} href={t.href} aria-current={active === t.href ? "page" : undefined} className="segment">
+            {t.label}
+          </Link>
+        ))}
+      </nav>
       {AUDIT_PAGES.includes(current) && current !== "/conformance/audit" ? (
-        <Link href="/conformance/audit" className="whitespace-nowrap px-2 py-2 text-xs text-slate-400 hover:text-slate-600">← all auditor tools</Link>
+        <Link href="/conformance/audit" className="whitespace-nowrap text-xs text-slate-400 hover:text-slate-600">← all auditor tools</Link>
       ) : null}
-    </nav>
+    </div>
   );
 }

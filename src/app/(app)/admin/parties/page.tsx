@@ -87,7 +87,7 @@ export default async function AdminPartiesPage() {
                           {p.isInternal ? <input type="hidden" name="active" value="on" /> : null}
                         </ActionForm>
                         {!p.isInternal && p._count.users === 0 ? (
-                          <div className="mt-3 border-t border-slate-100 pt-3">
+                          <div className="mt-3 border-t border-line pt-3">
                             <ActionForm action={deletePartyAction} submitLabel="Remove this organization" size="sm" variant="danger" hidden={{ id: p.id }}>
                               <p className="text-xs text-slate-500">It has nobody, so it can be removed outright. Once it holds a person, a step, a document or a transmittal, revoke its access instead.</p>
                             </ActionForm>
@@ -101,7 +101,7 @@ export default async function AdminPartiesPage() {
             </DataTable>
           </Card>
         </div>
-        <details className="rounded-2xl border border-slate-200 bg-surface px-5 py-3 shadow-sm"><summary className="cursor-pointer text-sm font-semibold text-brand-ink">+ Add an organization</summary><div className="mt-3 max-w-2xl">
+        <details className="rounded-2xl border border-line bg-surface px-5 py-3 shadow-sm"><summary className="cursor-pointer text-sm font-semibold text-brand-ink">+ Add an organization</summary><div className="mt-3 max-w-2xl">
           <ActionForm action={savePartyAction} submitLabel="Register this organization" size="sm">
             <p className="text-xs text-slate-500">
               Another organization you exchange documents with. Yours is already here, registered once at setup.

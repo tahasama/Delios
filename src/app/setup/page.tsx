@@ -34,7 +34,7 @@ export default async function SetupPage() {
 
   return (
     <div className="min-h-screen bg-canvas">
-      <header className="border-b border-slate-200 bg-surface">
+      <header className="border-b border-line bg-surface">
         <div className="mx-auto flex max-w-4xl items-center gap-3 px-6 py-4">
           <span className="grid h-10 w-10 place-items-center rounded-xl bg-brand text-sm font-black text-white">D</span>
           <div className="min-w-0 flex-1">
@@ -63,7 +63,7 @@ export default async function SetupPage() {
 
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
           {/* People first: they join the project automatically when it opens. */}
-          <section className="rounded-2xl border border-slate-200 bg-surface p-5 shadow-sm">
+          <section className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
             <div className="flex items-start gap-3">
               <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-tint text-brand-ink">
                 <UserPlus className="h-5 w-5" />
@@ -77,7 +77,7 @@ export default async function SetupPage() {
             </div>
 
             {people.length > 1 ? (
-              <ul className="mt-4 space-y-1 border-t border-slate-100 pt-3">
+              <ul className="mt-4 space-y-1 border-t border-line pt-3">
                 {people.map((p) => (
                   <li key={p.id} className="flex items-center justify-between gap-2 text-xs">
                     <span className="min-w-0 truncate text-slate-700">
@@ -90,7 +90,7 @@ export default async function SetupPage() {
               </ul>
             ) : null}
 
-            <div className="mt-4 border-t border-slate-100 pt-4">
+            <div className="mt-4 border-t border-line pt-4">
               <ActionForm action={addPersonAction} submitLabel="Add person" size="sm" resetOnSuccess>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <Field label="Full name" required><input name="name" required className={inputCls} /></Field>
@@ -124,7 +124,7 @@ export default async function SetupPage() {
               </div>
             </div>
 
-            <div className="mt-4 border-t border-slate-100 pt-4">
+            <div className="mt-4 border-t border-line pt-4">
               <ActionForm action={openFirstProjectAction} submitLabel="Open project and start work">
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_130px]">
                   <Field label="Project name" required>
