@@ -284,6 +284,21 @@ trail.
 
 ---
 
+## 15 · A transmittal may carry words alone
+
+**Clause:** §11.3 *What may be issued*, and check IS-03.
+
+**Must say:** a transmittal issues documents, or words, or both. One that
+encloses nothing but has a subject or a message — a clarification, a notice,
+an answer, a covering letter — is complete and is issued like any other. Only a
+transmittal empty of both documents and words is incomplete, and IS-03 counts
+only that one.
+
+**Depends on it:** gate `ISS-ITEMS`; check `IS-03`; the acceptance conditions
+of entry 13, which a letter answers as not applicable.
+
+---
+
 ## Still open — decided in conversation, not yet built
 
 - **Escalation** where somebody refuses to acknowledge carrying an action

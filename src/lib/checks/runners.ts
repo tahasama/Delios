@@ -683,7 +683,9 @@ export const RUNNERS: Runners = {
   "IS-03": async (ctx) => {
     const list = await ctx.db.transmittal.findMany({ include: { items: true, recipients: true } });
     return list
-      .filter((t) => !t.dateOfIssue || !t.issuingParty || t.items.length === 0 || t.recipients.length === 0)
+      // A letter encloses nothing and is complete; one empty of documents and
+      // of words is not.
+      .filter((t) => !t.dateOfIssue || !t.issuingParty || (t.items.length === 0 && !t.subject?.trim() && !t.message?.trim()) || t.recipients.length === 0)
 .map((t) => ({ entityKey: `Transmittal:${t.id}`, entityType: "Transmittal", entityId: t.id, entityLabel: t.number, description: "Transmittal missing a required element — date, party, items or recipients." }));
   },
   "IS-04": async (ctx) => {

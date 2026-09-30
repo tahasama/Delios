@@ -292,6 +292,9 @@ const releaseMetadata: Gate = {
 
 // ── Issue a transmittal (Part 11) ────────────────────────────────────────────
 
+// A transmittal issues something: documents, or words. One that encloses
+// nothing but says something — a clarification, a notice, an answer — is a
+// letter, and goes out like any other. Only one empty of both is refused.
 const issueItems: Gate = {
   id: "ISS-ITEMS",
   intent: "ISSUE",
@@ -301,7 +304,9 @@ const issueItems: Gate = {
     if (!subject.transmittalId) return ok("Items are chosen as you build the transmittal.");
     const count = await ctx.db.transmittalItem.count({ where: { transmittalId: subject.transmittalId } });
     if (count > 0) return ok(`${count} item(s) listed.`);
- return block("No items are listed on this transmittal.", "A transmittal issues something.");
+    const words = await ctx.db.transmittal.findUnique({ where: { id: subject.transmittalId }, select: { subject: true, message: true } });
+    if (words?.subject?.trim() || words?.message?.trim()) return ok("No documents enclosed — it goes out as a letter.");
+    return block("It encloses no documents and says nothing.", "Enclose a revision, or write a subject and a message.");
   },
 };
 

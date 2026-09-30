@@ -154,10 +154,19 @@ async function main() {
     const r = await run(ctx, "ACCEPT_TRANSMITTAL", { transmittalId: issuedT.id });
     check("an issued transmittal can be accepted", !r.blocked.some((b) => b.id === "ACC-ISSUED"));
   }
-  const empty = await t.db.transmittal.findFirst({ where: { items: { none: {} } } });
-  if (empty) {
-    const r = await run(ctx, "ISSUE", { transmittalId: empty.id });
-    check("a transmittal with no items is blocked", r.blocked.some((b) => b.id === "ISS-ITEMS"));
+  // A letter — words, no documents — goes out; a transmittal empty of both
+  // does not. Both are made here and removed again, so the check never
+  // depends on what the demo happens to hold.
+  const shape = { projectId: p1.id, direction: "OUTGOING", reasonForIssue: "INFORMATION", dateOfIssue: new Date(), issuingParty: "Us", status: "DRAFT", createdById: adminUser.id, createdByName: adminUser.name };
+  const letter = await db.transmittal.create({ data: { ...shape, number: `VERIFY-LETTER-${Date.now()}`, subject: "A clarification", message: "Words only." } });
+  const blank = await db.transmittal.create({ data: { ...shape, number: `VERIFY-BLANK-${Date.now()}` } });
+  try {
+    const l = await run(ctx, "ISSUE", { transmittalId: letter.id });
+    check("a letter with no documents may be issued", !l.blocked.some((b) => b.id === "ISS-ITEMS"));
+    const e = await run(ctx, "ISSUE", { transmittalId: blank.id });
+    check("a transmittal with no documents and no words is blocked", e.blocked.some((b) => b.id === "ISS-ITEMS"));
+  } finally {
+    await db.transmittal.deleteMany({ where: { id: { in: [letter.id, blank.id] } } });
   }
 
   console.log("\nEvery intent now has at least one gate\n");
