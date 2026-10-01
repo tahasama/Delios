@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Field, inputCls } from "@/components/ui";
 import { PARTY_KINDS } from "@/lib/party-kinds";
+import { SearchPick } from "@/components/search-pick";
 
 
 /**
@@ -45,18 +46,24 @@ export function PartyKindFields({ kind, contactId, backupId, liaisonFunction, pe
         </Field>
       ) : people.length ? (
         <>
-          <Field label="Who answers for it" hint="one of their own people">
-            <select name="contactId" defaultValue={contactId} className={inputCls}>
-              <option value="">— nobody —</option>
-              {people.map((person) => <option key={person.id} value={person.id}>{person.name}{person.email ? ` · ${person.email}` : ""}</option>)}
-            </select>
-          </Field>
-          <Field label="Backup" hint="optional — who stands in when the contact is away">
-            <select name="backupId" defaultValue={backupId} className={inputCls}>
-              <option value="">— none —</option>
-              {people.map((person) => <option key={person.id} value={person.id}>{person.name}</option>)}
-            </select>
-          </Field>
+          <SearchPick
+            single
+            name="contactId"
+            items={people.map((person) => ({ id: person.id, name: person.name, detail: person.email ?? null }))}
+            initial={contactId ? [contactId] : []}
+            label="Who answers for it"
+            hint="one of their own people"
+            placeholder="Nobody yet"
+          />
+          <SearchPick
+            single
+            name="backupId"
+            items={people.map((person) => ({ id: person.id, name: person.name, detail: person.email ?? null }))}
+            initial={backupId ? [backupId] : []}
+            label="Backup"
+            hint="optional — who stands in when the contact is away"
+            placeholder="No backup"
+          />
         </>
       ) : (
         <p className="text-xs text-amber-800">

@@ -62,5 +62,12 @@ export async function SendForReview({ revisionIds }: { revisionIds: string[] }) 
   }
 
   const person = (p: { id: string; name: string; functionName: string }) => ({ id: p.id, name: p.name, functionName: p.functionName });
-  return <SendForReviewForm revisionIds={revisions.map((r) => r.id)} routes={routes} reviewers={reviewers.map(person)} approvers={approvers.map(person)} />;
+  // Anyone on the project may be copied in; being told is not reviewing.
+  const members = await db.projectMembership.findMany({
+    where: { projectId: ctx.projectId, active: true, user: { active: true } },
+    select: { user: { select: { id: true, name: true } }, function: { select: { name: true } } },
+    orderBy: { user: { name: "asc" } },
+  });
+  const everyone = members.map((m) => ({ id: m.user.id, name: m.user.name, functionName: m.function?.name ?? "" }));
+  return <SendForReviewForm revisionIds={revisions.map((r) => r.id)} routes={routes} reviewers={reviewers.map(person)} approvers={approvers.map(person)} everyone={everyone} />;
 }

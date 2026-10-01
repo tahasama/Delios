@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Field, inputCls } from "@/components/ui";
+import { SearchPick } from "@/components/search-pick";
 
 export type PickPerson = { id: string; name: string; organization: string; /** Why the matrix proposes them. */ basis?: string | null };
 export type PickParty = { id: string; name: string };
@@ -37,7 +38,6 @@ export function RequestIssue({ reasons, proposed, others, parties, author, onDec
 }) {
   const [asking, setAsking] = useState(true);
   const [delegated, setDelegated] = useState(false);
-  const [addingOthers, setAddingOthers] = useState(false);
   // Some revisions cannot be released until somebody outside has approved them.
   // Saying so here is what makes the release wait for their answer.
   const [outside, setOutside] = useState(false);
@@ -70,53 +70,28 @@ export function RequestIssue({ reasons, proposed, others, parties, author, onDec
                 </select>
               </Field>
 
-              <div>
-                <p className="text-xs font-medium text-slate-700">Our own people</p>
-                <p className="mb-1.5 text-[11px] text-slate-400">
-                  {proposed.length ? "The distribution matrix puts these people on it. Untick anyone who should not have it." : "The matrix names nobody for this document."}
-                </p>
-                <div className="space-y-1">
-                  {proposed.map((person) => (
-                    <label key={person.id} className="flex items-start gap-2 text-xs text-slate-700">
-                      <input type="checkbox" name="internalUserIds" value={person.id} defaultChecked className="mt-0.5" />
-                      <span>
-                        {person.name}
-                        {person.basis ? <span className="ml-1 text-[11px] text-slate-400">· {person.basis}</span> : null}
-                      </span>
-                    </label>
-                  ))}
-                </div>
-                {others.length ? (
-                  addingOthers ? (
-                    <div className="mt-2 max-h-40 space-y-1 overflow-y-auto rounded-lg border border-line p-2">
-                      {others.map((person) => (
-                        <label key={person.id} className="flex items-start gap-2 text-xs text-slate-600">
-                          <input type="checkbox" name="internalUserIds" value={person.id} className="mt-0.5" />
-                          <span>{person.name} <span className="text-[11px] text-slate-400">· {person.organization}</span></span>
-                        </label>
-                      ))}
-                    </div>
-                  ) : (
-                    <button type="button" onClick={() => setAddingOthers(true)} className="mt-1.5 text-[11px] font-semibold text-link hover:underline">
-                      Add somebody the matrix does not name
-                    </button>
-                  )
-                ) : null}
-              </div>
+              {/* Found the way a transmittal is addressed: type, Enter. The
+                  matrix's people start on the list; anyone else on the project
+                  is one search away. */}
+              <SearchPick
+                name="internalUserIds"
+                items={[
+                  ...proposed.map((person) => ({ id: person.id, name: person.name, detail: person.basis ?? person.organization })),
+                  ...others.map((person) => ({ id: person.id, name: person.name, detail: person.organization })),
+                ]}
+                initial={proposed.map((person) => person.id)}
+                label="Our own people"
+                hint={proposed.length ? "the distribution matrix put these on it — remove anyone who should not have it" : "the matrix names nobody for this document"}
+              />
 
               {parties.length ? (
-                <div>
-                  <p className="text-xs font-medium text-slate-700">Other organizations</p>
-                  <p className="mb-1.5 text-[11px] text-slate-400">One transmittal for each.</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {parties.map((party) => (
-                      <label key={party.id} className="flex items-center gap-1.5 rounded-full border border-line-strong px-2.5 py-1 text-xs text-slate-600">
-                        <input type="checkbox" name="partyIds" value={party.id} />
-                        {party.name}
-                      </label>
-                    ))}
-                  </div>
-                </div>
+                <SearchPick
+                  name="partyIds"
+                  items={parties.map((party) => ({ id: party.id, name: party.name }))}
+                  label="Other organizations"
+                  hint="one transmittal for each — optional"
+                  placeholder="No other organization"
+                />
               ) : null}
 
               {parties.length ? (

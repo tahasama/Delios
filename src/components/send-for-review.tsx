@@ -4,7 +4,8 @@ import { useState } from "react";
 import { ActionForm } from "@/components/form";
 import { Field, inputCls } from "@/components/ui";
 import { sendForReviewAction } from "@/lib/actions/workflow";
-import { ArrowRight, X } from "lucide-react";
+import { ArrowRight } from "lucide-react";
+import { SearchPick } from "@/components/search-pick";
 
 export type SendPerson = { id: string; name: string; functionName: string };
 export type SendStep = { title: string; act: "REVIEW" | "APPROVAL"; mode: string; proposed: { id: string; why: string }[]; fromFunctions: string[] };
@@ -26,11 +27,13 @@ const MODE: Record<string, string> = {
  * assigns (by the documents' discipline when the route names nobody); the
  * sender removes or adds anyone the matrix allows.
  */
-export function SendForReviewForm({ revisionIds, routes, reviewers, approvers }: {
+export function SendForReviewForm({ revisionIds, routes, reviewers, approvers, everyone = [] }: {
   revisionIds: string[];
   routes: SendRoute[];
   reviewers: SendPerson[];
   approvers: SendPerson[];
+  /** Everyone on the project, who may be copied in. */
+  everyone?: SendPerson[];
 }) {
   const [routeId, setRouteId] = useState(routes.find((r) => r.isDefault)?.id ?? routes[0]?.id ?? "");
   const route = routes.find((r) => r.id === routeId);
@@ -60,57 +63,41 @@ export function SendForReviewForm({ revisionIds, routes, reviewers, approvers }:
           </div>
         ))}
       </div>
-      <p className="text-[11px] text-slate-400">Only people the distribution matrix allows for {revisionIds.length > 1 ? "every selected document" : "this document"} can be added.</p>
+      <p className="text-[11px] text-slate-400">Only people the distribution matrix allows for {revisionIds.length > 1 ? "every selected document" : "this document"} can be added to a step.</p>
+
+      {/* Copied in: told it went out for review and able to follow it, never
+          asked to answer — so the route never waits on them. */}
+      {everyone.length ? (
+        <SearchPick
+          name="copyUsers"
+          items={everyone.map((p) => ({ id: p.id, name: p.name, detail: p.functionName }))}
+          label="Copy to (cc)"
+          hint="kept informed, never asked to review — optional"
+          placeholder="Nobody copied in"
+        />
+      ) : null}
     </ActionForm>
   );
 }
 
 function StepCard({ index, step, pool, many }: { index: number; step: SendStep; pool: SendPerson[]; many: boolean }) {
-  const [chosen, setChosen] = useState<string[]>(step.proposed.map((p) => p.id).filter((id) => pool.some((p) => p.id === id)));
   const why = new Map(step.proposed.map((p) => [p.id, p.why]));
-  const addable = pool.filter((p) => !chosen.includes(p.id));
   const approval = step.act === "APPROVAL";
 
   return (
-    <fieldset className={`flex w-60 shrink-0 flex-col rounded-xl border p-2.5 ${approval ? "border-brand-line/30 bg-tint-soft" : "border-line bg-surface"}`}>
+    <fieldset className={`flex w-64 shrink-0 flex-col rounded-xl border p-2.5 ${approval ? "border-brand-line/30 bg-tint-soft" : "border-line bg-surface"}`}>
       <legend className="sr-only">Step {index + 1}</legend>
       <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400" title={approval ? "This step's verdict binds; a verdict that proceeds is the release approval" : "Advice for the decider"}>Step {index + 1} · {approval ? "Decides" : "Advises"}</p>
       <p className="text-sm font-semibold text-slate-800">{step.title}</p>
-      <p className="mb-2 text-[11px] text-slate-500">{MODE[step.mode] ?? step.mode}</p>
-
-      <ul className={`flex-1 space-y-1 ${step.mode === "SERIAL" ? "list-decimal pl-4" : ""}`}>
-        {chosen.map((id) => {
-          const p = pool.find((x) => x.id === id);
-          if (!p) return null;
-          return (
-            <li key={id} className="text-xs">
-              <input type="hidden" name={`participants_${index}`} value={id} />
-              <span className="inline-flex w-full items-start justify-between gap-1 rounded-md bg-surface px-2 py-1 ring-1 ring-slate-200">
-                <span className="min-w-0">
-                  <span className="block truncate font-medium text-slate-800">{p.name}</span>
-                  <span className="block truncate text-[10px] text-slate-400">{why.get(id) ?? p.functionName}</span>
-                </span>
-                <button type="button" onClick={() => setChosen(chosen.filter((x) => x !== id))} className="rounded p-0.5 text-slate-400 hover:bg-red-50 hover:text-red-600" aria-label={`Remove ${p.name}`}>
-                  <X className="h-3 w-3" />
-                </button>
-              </span>
-            </li>
-          );
-        })}
-        {!chosen.length ? <li className="text-[11px] text-amber-700">{pool.length ? "Nobody yet — add someone." : `Nobody may ${approval ? "approve" : "review"} ${many ? "all of these" : "this"} under the matrix.`}</li> : null}
-      </ul>
-
-      {addable.length ? (
-        <select
-          aria-label={`Add to step ${index + 1}`}
-          className="mt-2 w-full rounded-md border border-dashed border-line-strong bg-surface px-2 py-1 text-xs text-slate-600"
-          value=""
-          onChange={(e) => e.target.value && setChosen([...chosen, e.target.value])}
-        >
-          <option value="">+ add…</option>
-          {addable.map((p) => <option key={p.id} value={p.id}>{p.name} — {p.functionName}</option>)}
-        </select>
-      ) : null}
+      <p className="mb-2 text-[11px] text-slate-500">{MODE[step.mode] ?? step.mode}{step.mode === "SERIAL" ? " — in the order listed" : ""}</p>
+      <SearchPick
+        compact
+        name={`participants_${index}`}
+        items={pool.map((p) => ({ id: p.id, name: p.name, detail: why.get(p.id) ?? p.functionName }))}
+        initial={step.proposed.map((p) => p.id).filter((id) => pool.some((p) => p.id === id))}
+        placeholder={pool.length ? "Type a name, then Enter" : "Nobody allowed"}
+        empty={pool.length ? "Nobody yet — add someone." : `Nobody may ${approval ? "approve" : "review"} ${many ? "all of these" : "this"} under the matrix.`}
+      />
     </fieldset>
   );
 }

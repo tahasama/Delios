@@ -114,6 +114,12 @@ export async function sendForReviewAction(_prev: { error?: string; ok?: string }
   const sent: string[] = [];
   const failed: string[] = [];
   const isStaff = isController(user);
+  // Copied in: told it went out for review, never put on the route. Only
+  // people on this project, and nobody twice.
+  const copyIds = [...new Set(formData.getAll("copyUsers").map(String).filter(Boolean))];
+  const copied = copyIds.length
+    ? await db.user.findMany({ where: { id: { in: copyIds }, active: true, memberships: { some: { projectId: ctx.projectId, active: true } } }, select: { id: true, name: true } })
+    : [];
   for (const rid of revisionIds) {
     const rev = await db.revision.findUnique({ where: { id: rid }, include: { document: true } });
     if (!rev) continue;
@@ -122,7 +128,17 @@ export async function sendForReviewAction(_prev: { error?: string; ok?: string }
     const allowed = mayContributeToDocument(user, rev.document) && (isStaff || (!rev.document.originator && rev.document.createdById === user.id));
     if (!allowed) { failed.push(`${label}: only ${rev.document.originator ? "Document Control" : "its author or Document Control"} can send it`); continue; }
     const res = await startWorkflowRun(ctx, rid, templateId, user, overrides);
-    if (res.ok) { sent.push(label); revalidatePath(`/documents/${rev.documentId}`); }
+    if (res.ok) {
+      sent.push(label);
+      revalidatePath(`/documents/${rev.documentId}`);
+      if (copied.length) {
+        await notifyMany(copied.map((one) => one.id), "REVIEW_COPIED", `For your information: ${label} is out for review`, `${user.name} copied you in. Nothing is asked of you.`, `/documents/${rev.documentId}`, ctx);
+        await audit({
+          tenant: ctx, actor: user, action: "REVIEW_COPIED", entityType: "Revision", entityId: rid, entityLabel: label,
+          newValue: copied.map((one) => one.name).join(", "), detail: `Copied in on the review: ${copied.map((one) => one.name).join(", ")}.`,
+        });
+      }
+    }
     else failed.push(`${label}: ${res.error}`);
   }
   revalidatePath("/"); revalidatePath("/documents");

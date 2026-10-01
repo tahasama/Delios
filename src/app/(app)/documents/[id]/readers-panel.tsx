@@ -2,6 +2,7 @@ import { ActionForm } from "@/components/form";
 import { Field, inputCls } from "@/components/ui";
 import { fmtDate } from "@/lib/utils";
 import { addDocumentReaderAction, removeDocumentReaderAction } from "@/lib/actions/document-access";
+import { SearchPick } from "@/components/search-pick";
 
 export type Reader = { id: string; name: string; addedByName: string; reason: string | null; at: Date };
 
@@ -54,14 +55,13 @@ export function ReadersPanel({
           <div className="mt-3 max-w-xl">
             <ActionForm action={addDocumentReaderAction} submitLabel="Let them read it" size="sm" hidden={{ documentId }}>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <Field label="Who" required>
-                  <select name="userId" required defaultValue="" className={inputCls}>
-                    <option value="" disabled>Choose…</option>
-                    {candidates.map((one) => (
-                      <option key={one.id} value={one.id}>{one.name}{one.functionName ? ` — ${one.functionName}` : ""}</option>
-                    ))}
-                  </select>
-                </Field>
+                <SearchPick
+                  single
+                  name="userId"
+                  items={candidates.map((one) => ({ id: one.id, name: one.name, detail: one.functionName ?? null }))}
+                  label="Who"
+                  required
+                />
                 <Field label="Why" hint="optional — it goes on the record">
                   <input name="reason" className={inputCls} />
                 </Field>

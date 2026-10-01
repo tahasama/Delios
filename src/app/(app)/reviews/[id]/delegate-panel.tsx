@@ -1,4 +1,5 @@
 import { Card, Field, inputCls } from "@/components/ui";
+import { SearchPick } from "@/components/search-pick";
 import { ActionForm } from "@/components/form";
 import { fmtDate } from "@/lib/utils";
 import {
@@ -109,14 +110,14 @@ export function DelegatePanel({
             size="sm"
             hidden={{ cycleId, verb }}
           >
-            <Field label="Who answers it" required>
-              <select name="toUserId" required defaultValue="" className={inputCls}>
-                <option value="" disabled>Choose…</option>
-                {candidates.map((one) => (
-                  <option key={one.id} value={one.id}>{one.name} — {one.functionName}</option>
-                ))}
-              </select>
-            </Field>
+            <SearchPick
+              single
+              name="toUserId"
+              items={candidates.map((one) => ({ id: one.id, name: one.name, detail: one.functionName }))}
+              label="Who answers it"
+              required
+              hint="only people the matrix names for this"
+            />
             <Field label="Until" required hint="a delegation without an end date is a transfer of the job">
               <input type="date" name="endDate" required defaultValue={tomorrow} className={inputCls} />
             </Field>

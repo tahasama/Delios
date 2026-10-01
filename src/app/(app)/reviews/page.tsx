@@ -1,3 +1,4 @@
+import { isReadOnly } from "@/lib/auth";
 import { Prisma } from "@prisma/client";
 import { after } from "next/server";
 import { requireScope } from "@/lib/scope";
@@ -306,7 +307,7 @@ export default async function ReviewsPage({ searchParams }: { searchParams: Prom
 
   return (
     <ReviewsRegister
-      plate={<ReviewsPlate />}
+      plate={<ReviewsPlate canStart={!isReadOnly(ctx.user)} />}
       rows={rows}
       total={matching}
       filters={{ q, status: status === "ALL" ? "" : status, kind, verdict, due, discipline, docType, supplier, po, deliverable, on: dateOn, from: sp.from ?? "", to: sp.to ?? "" }}
