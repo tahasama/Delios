@@ -204,6 +204,23 @@ export const POLICIES: Policy[] = [
     ],
   },
   {
+    key: "POLICY_PDF_STAMP",
+    title: "Stamping the PDF",
+    text: "Whether a binding review verdict — and a hold — is stamped on the PDF copy people open, or kept in the record only. The file as submitted is kept either way.",
+    options: [
+      {
+        value: "ON",
+        label: "Stamp it on the document",
+        text: "The verdict, who gave it, when and why, in the top right of the first page; a revision on hold says so across every page. Whoever opens the file reads where it stands without the app.",
+      },
+      {
+        value: "OFF",
+        label: "Keep it in the record only",
+        text: "The PDF people open stays as it was submitted, apart from the release title block. Where it stands is read in the app.",
+      },
+    ],
+  },
+  {
     key: "POLICY_READY",
     title: "When an action has what it needs",
     text: "What makes a document on an action's list count as delivered.",

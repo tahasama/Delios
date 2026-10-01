@@ -478,7 +478,8 @@ export async function holdRevision(t: Tenant, revisionId: string, user: SessionU
   const reason = `Awaiting approval by ${partyName}.`;
   const heldAt = new Date();
   await t.db.revision.update({ where: { id: revisionId }, data: { heldAt, heldReason: reason, heldByName: user.name } });
-  await stampHold(t, revisionId, user, heldAt);
+  const { policy } = await import("./control-activities");
+  if ((await policy(t, "POLICY_PDF_STAMP")) === "ON") await stampHold(t, revisionId, user, heldAt);
   const { audit } = await import("./audit");
   await audit({
     tenant: t, actor: user, action: "REVISION_HELD", entityType: "Revision", entityId: revisionId,

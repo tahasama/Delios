@@ -165,7 +165,8 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
       docState: doc.state, docStateLabel: DOC_STATE_LABEL[doc.state as DocState] ?? doc.state,
       revision: latest?.value ?? null,
       revState: latest?.state ?? null,
-      revStateLabel: latest ? revStateLabel(latest.state) : "No revision yet",
+      // Released, then held for an outside approval: on hold is what it is now.
+      revStateLabel: latest ? (latest.state === "RELEASED" && latest.heldAt ? "On hold" : revStateLabel(latest.state)) : "No revision yet",
       // Released and nobody asked for it to be sent: in use, and nobody told.
       notIssued: !!released && !released.transmittalItems.length,
       onHold: released?.heldAt ? (released.heldReason ?? "On hold, not for use.") : null,

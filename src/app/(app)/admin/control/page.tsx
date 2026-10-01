@@ -107,7 +107,7 @@ export default async function ControlActivitiesPage() {
 
       <Card
         title="How this project works"
-        description="Two questions that are not about who does something, but about what it means when they do. The app has an opinion; the project may disagree."
+        description="Questions that are not about who does something, but about what it means when they do. The app has an opinion; the project may disagree."
       >
         <ActionForm action={setPolicyAction} submitLabel="Save">
           <div className="space-y-4">

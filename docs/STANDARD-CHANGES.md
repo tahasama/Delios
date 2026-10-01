@@ -341,6 +341,24 @@ back with a reason, and the next revision replaces it.
 
 ---
 
+## 17 · The verdict stamped on the document
+
+**Clause:** §10.2 *Renditions*, §12.5.
+
+**Must say:** where the project chooses, a binding review verdict is stamped
+on the viewable PDF copy — top right of the first page: the review, the
+verdict, who gave it (and for which outside party), the date and time, and the
+reason — whether the review ran on a route or was opened from a received
+transmittal. A revision on hold is stamped ON HOLD — NOT FOR USE on every page.
+Each stamp makes a new copy; the copy as submitted is kept. Whether to stamp is
+the project's choice, set by its administrator; the release title block of
+§12.5 is applied either way.
+
+**Depends on it:** policy `POLICY_PDF_STAMP`; `stampVerdict`, `stampPdf` (state
+HELD).
+
+---
+
 ## Still open — decided in conversation, not yet built
 
 - **Escalation** where somebody refuses to acknowledge carrying an action

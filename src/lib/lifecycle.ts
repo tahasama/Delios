@@ -211,6 +211,16 @@ export async function recordReviewOutcome(
     data: { outcome, outcomeAt: new Date(), outcomeByName: user.name, outcomeNote: note ?? null, returnedFromReviewAt: cycle.returnedFromReviewAt ?? new Date() },
   });
   await db.reviewAssignment.updateMany({ where: { cycleId, userId: user.id }, data: { completedAt: new Date() } });
+  // A binding verdict is stamped on the copy people open, where the project
+  // says so: a new copy, the one before it kept on record.
+  const { policy: projectPolicy } = await import("./control-activities");
+  if (cycle.binding && (await projectPolicy(t, "POLICY_PDF_STAMP")) === "ON") {
+    await stampVerdictOn(t, cycle.revisionId, user, {
+      review: cycle.number, code: cons.code, label: cons.label, proceeds: cons.proceed === true,
+      by: user.name, forParty: cycle.partyId ? (await db.party.findUnique({ where: { id: cycle.partyId }, select: { name: true } }))?.name ?? null : null,
+      at: new Date(), reason: note ?? null,
+    });
+  }
   if (approves) {
     await recordApproval(t, cycle.revisionId, user, `Binding verdict ${cons.code} — ${cons.label}${note ? `: ${note}` : ""}`);
     // The route is over and the status is settled. It is not in force until it
@@ -634,4 +644,21 @@ export function issueGateError(revState: string, markedSuperseded: boolean): str
   if (revState === "RELEASED") return null;
  if (revState === "SUPERSEDED") return markedSuperseded ? null: "A superseded revision may only be issued on specific historical request and must be marked as superseded.";
  return "Only released revisions may be issued.";
+}
+
+/** Stamp a review verdict on a revision's viewable copy. Best effort: the verdict is the record's either way. */
+async function stampVerdictOn(t: Tenant, revisionId: string, user: SessionUser, info: import("./stamp").VerdictStamp) {
+  try {
+    const rev = await t.db.revision.findUniqueOrThrow({ where: { id: revisionId }, include: { document: true } });
+    if (!rev.renditionFileId) return;
+    const row = await t.db.storedFile.findUnique({ where: { id: rev.renditionFileId } });
+    if (!row || row.mime !== "application/pdf") return;
+    const { stampVerdict } = await import("./stamp");
+    const marked = await stampVerdict(new Uint8Array(await readStored(row.path)), info);
+    const made = await saveBuffer(t, marked, rev.document.docNumber, "RENDITION", rev.value, user.name, user.id);
+    await t.db.storedFile.update({ where: { id: made.id }, data: { revisionId } });
+    await t.db.revision.update({ where: { id: revisionId }, data: { renditionFileId: made.id } });
+  } catch {
+    // the verdict stands without the stamp
+  }
 }

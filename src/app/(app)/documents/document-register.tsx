@@ -508,6 +508,7 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
                 {row.revState === "SUPERSEDED" ? <span className="stamp text-violet-700">superseded</span> : null}
                 {row.revState === "VOID" ? <span className="stamp text-red-700">void</span> : null}
                 {row.placeholder ? <span className="stamp text-slate-500">number reserved</span> : null}
+                {row.onHold ? <span title={row.onHold} className="stamp text-red-700">not for use</span> : null}
               </span>
               <p className="doc-title mt-0.5 block truncate" title={row.title}>{row.title}</p>
             </Td>
@@ -589,7 +590,6 @@ const COLUMNS: Column[] = [
         {/* Released, and nobody asked for it to be sent. It is in use; nobody
             has been told, including anyone whose approval it may still need. */}
         {row.notIssued ? <span title="Nobody has asked for it to be sent." className="ml-1.5 rounded border border-amber-400 px-1 text-[9px] font-bold uppercase tracking-wide text-amber-700">not issued</span> : null}
-        {row.onHold ? <span title={row.onHold} className="ml-1.5 rounded border border-red-400 px-1 text-[9px] font-bold uppercase tracking-wide text-red-700">on hold · not for use</span> : null}
       </>
     ),
   },

@@ -219,6 +219,36 @@ async function main() {
     } else {
       console.log("\n(no outside party on this project — the approval checks were skipped)\n");
     }
+    console.log("\nThe verdict stamped on the PDF\n");
+    for (const on of [true, false]) {
+      const stamped = await decided(on ? "STAMP-ON" : "STAMP-OFF");
+      const before = await t.db.revision.findUniqueOrThrow({ where: { id: stamped.rev.id } });
+      const copy = await t.db.storedFile.findUniqueOrThrow({ where: { id: before.renditionFileId! } });
+      const { PDFDocument } = await import("pdf-lib");
+      const blank = await PDFDocument.create(); blank.addPage([595, 842]);
+      const { mkdir, writeFile } = await import("node:fs/promises");
+      const pathMod = await import("node:path");
+      const at = pathMod.join(process.cwd(), "uploads", copy.path);
+      await mkdir(pathMod.dirname(at), { recursive: true });
+      await writeFile(at, await blank.save());
+      if (!on) await db.controlSetting.create({ data: { projectId: project.id, key: "POLICY_PDF_STAMP", mode: "OFF", setByName: "verify" } });
+      try {
+        await recordReviewOutcome(t, stamped.cycle.id, actor, proceeds, "Checked against the datasheet — fit for purpose.", status.code);
+      } finally {
+        await db.controlSetting.deleteMany({ where: { projectId: project.id, key: "POLICY_PDF_STAMP" } });
+      }
+      const after = await t.db.revision.findUniqueOrThrow({ where: { id: stamped.rev.id } });
+      if (on) {
+        check("switched on: the binding verdict gets a stamped copy", after.renditionFileId !== before.renditionFileId);
+        const row = await t.db.storedFile.findUniqueOrThrow({ where: { id: after.renditionFileId! } });
+        const { readStored } = await import("../src/lib/files");
+        check("…which opens as a PDF", (await PDFDocument.load(await readStored(row.path))).getPageCount() === 1);
+        check("…and the copy as submitted is kept", !!(await t.db.storedFile.findUnique({ where: { id: before.renditionFileId! } })));
+      } else {
+        check("switched off: the file is left as it was", after.renditionFileId === before.renditionFileId);
+      }
+    }
+
     console.log("\nAn organization that releases without issuing\n");
     // The project may say that releasing stands on its own. Then nobody need
     // have said where it goes — but an approval asked for is still waited for.

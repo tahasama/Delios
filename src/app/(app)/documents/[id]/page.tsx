@@ -444,8 +444,10 @@ export default async function DocumentDetailPage({
     </div>
   );
 
-  const stateLabel = shown ? revStateLabel(shown.state) : DOC_STATE_LABEL[doc.state as DocState] ?? doc.state;
-  const stateColor = shown ? revStateColor(shown.state) : DOC_STATE_COLOR[doc.state as DocState] ?? "";
+  // Released, then held for an outside approval: on hold is what it is now.
+  const onHold = shown?.state === "RELEASED" && !!shown.heldAt;
+  const stateLabel = onHold ? "On hold" : shown ? revStateLabel(shown.state) : DOC_STATE_LABEL[doc.state as DocState] ?? doc.state;
+  const stateColor = onHold ? "bg-red-50 text-red-800 ring-red-200" : shown ? revStateColor(shown.state) : DOC_STATE_COLOR[doc.state as DocState] ?? "";
 
   return (
     <div className="space-y-4">
@@ -472,11 +474,7 @@ export default async function DocumentDetailPage({
                   Not issued
                 </span>
               ) : null}
-              {current?.heldAt ? (
-                <span className="rounded-md border border-red-400 px-1.5 py-0.5 font-sans text-[10px] font-bold uppercase tracking-wide text-red-700">
-                  On hold · not for use
-                </span>
-              ) : null}
+              {current?.heldAt ? <span className="stamp font-sans text-red-700">not for use</span> : null}
             </p>
             <h1 className="mt-0.5 text-xl font-semibold text-slate-950">{doc.title}</h1>
             <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-500">

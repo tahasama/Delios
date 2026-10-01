@@ -80,3 +80,79 @@ export async function createPlaceholderRendition(info: StampInfo & { content: st
   }
   return stampPdf(await pdf.save(), info);
 }
+
+export type VerdictStamp = {
+  /** The review's own number, e.g. RV-0076. */
+  review: string | null;
+  code: string;
+  label: string;
+  /** Whether the verdict lets the document proceed — the stamp's colour. */
+  proceeds: boolean;
+  by: string;
+  /** An outside party's verdict, written down by one of us. */
+  forParty?: string | null;
+  at: Date;
+  reason?: string | null;
+};
+
+/** Standard PDF fonts carry only Latin-1; anything else is shown as "?" rather than failing. */
+function latin(text: string): string {
+  return text.replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/[–—]/g, "-").replace(/[^\x20-\x7E\xA0-\xFF]/g, "?");
+}
+
+/** Break a sentence into lines no wider than `width` points, at most `max` of them. */
+function lines(text: string, width: number, size: number, font: { widthOfTextAtSize(t: string, s: number): number }, max: number): string[] {
+  const out: string[] = [];
+  let line = "";
+  for (const word of text.split(/\s+/).filter(Boolean)) {
+    const next = line ? `${line} ${word}` : word;
+    if (font.widthOfTextAtSize(next, size) <= width) { line = next; continue; }
+    if (line) out.push(line);
+    line = word;
+    if (out.length === max) break;
+  }
+  if (line && out.length < max) out.push(line);
+  if (out.length === max && text.length > out.join(" ").length) out[max - 1] = `${out[max - 1].replace(/.{0,3}$/, "")}...`;
+  return out;
+}
+
+/**
+ * The review verdict stamped on the first page, top right, the way a reviewer
+ * stamps a paper drawing: which review, what it decided, who decided it, when,
+ * and why. Green where the verdict lets the document proceed, red where it does
+ * not. It sits below the title block the release adds, so the two never meet.
+ */
+export async function stampVerdict(source: Uint8Array, info: VerdictStamp): Promise<Uint8Array> {
+  const pdf = await PDFDocument.load(source);
+  if (pdf.getPageCount() === 0) return source;
+  const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+  const font = await pdf.embedFont(StandardFonts.Helvetica);
+  const page = pdf.getPages()[0];
+  const { width, height } = page.getSize();
+  const ink = info.proceeds ? rgb(0.02, 0.45, 0.25) : rgb(0.75, 0.1, 0.1);
+  const boxW = Math.min(230, width * 0.42);
+  const pad = 8;
+  const reason = info.reason ? lines(latin(info.reason), boxW - pad * 2, 7.5, font, 3) : [];
+  const boxH = 64 + reason.length * 9.5 + (info.forParty ? 9.5 : 0);
+  const x = width - boxW - 18;
+  const top = height - 34 - 12; // below the release title block
+  page.drawRectangle({ x, y: top - boxH, width: boxW, height: boxH, color: rgb(1, 1, 1), opacity: 0.92, borderColor: ink, borderWidth: 1.4 });
+  let y = top - pad - 7;
+  page.drawText(latin(`REVIEW${info.review ? `  ${info.review}` : ""}`), { x: x + pad, y, size: 7, font: bold, color: ink });
+  y -= 15;
+  page.drawText(latin(`${info.code} - ${info.label}`.slice(0, 48)), { x: x + pad, y, size: 11, font: bold, color: ink });
+  y -= 13;
+  page.drawText(latin(info.by), { x: x + pad, y, size: 8, font, color: rgb(0.15, 0.17, 0.22) });
+  if (info.forParty) {
+    y -= 9.5;
+    page.drawText(latin(`for ${info.forParty}`), { x: x + pad, y, size: 7.5, font, color: rgb(0.35, 0.38, 0.45) });
+  }
+  y -= 10;
+  const when = `${info.at.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}  ${info.at.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}`;
+  page.drawText(latin(when), { x: x + pad, y, size: 7.5, font, color: rgb(0.35, 0.38, 0.45) });
+  for (const one of reason) {
+    y -= 9.5;
+    page.drawText(one, { x: x + pad, y, size: 7.5, font, color: rgb(0.2, 0.22, 0.28) });
+  }
+  return pdf.save();
+}
