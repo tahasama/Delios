@@ -167,13 +167,11 @@ export default async function ActionDetailPage({ params, searchParams }: { param
           </>
         ) : undefined}
         plate={
-          <div className="flex flex-wrap items-start justify-between gap-3 border-b border-line px-5 pt-6 pb-3 sm:px-6">
-            <div className="min-w-0">
-              <h1 className="plate-name min-w-0">
-                <span className="font-mono text-[0.8em] font-medium tracking-tight text-slate-400">{action.code}</span>{" "}
-                {action.name}
-              </h1>
-              <p className="plate-meta mt-1.5">
+          <div className="flex flex-col-reverse gap-3 border-b border-line px-5 pt-6 pb-3 sm:px-6 lg:flex-row lg:items-start lg:justify-between">
+            <div className="min-w-0 flex-1">
+              <p className="font-mono text-[12.5px] font-semibold tracking-tight text-slate-500">{action.code}</p>
+              <h1 className="plate-name mt-1 min-w-0">{action.name}</h1>
+              <p className="plate-meta mt-2">
                 {action.ownerName ?? "No owner"} &middot; activity {fmtDate(action.scheduledDate)} &middot; {readyCount} of {action.entries.length} documents ready
                 {action.scheduleActivities[0] ? ` \u00b7 schedule ${action.scheduleActivities[0].scheduleVersion.versionLabel}` : ""}
               </p>

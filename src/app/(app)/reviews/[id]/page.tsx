@@ -210,13 +210,11 @@ export default async function ReviewCyclePage({ params }: { params: Promise<{ id
           thing at the centre is the document itself, read beside the place the
           answer is given. Copying the table-first order would lose that. */}
       <section className="register register-sheet register-sheet-open">
-        <div className="flex flex-wrap items-start justify-between gap-3 px-5 pt-6 pb-4 sm:px-6">
-          <div className="min-w-0">
-            <h1 className="plate-name min-w-0">
-              {cycle.number ? <><span className="font-mono text-[0.8em] font-medium tracking-tight text-slate-400">{cycle.number}</span>{" "}</> : null}
-              {doc.title}
-            </h1>
-            <p className="plate-meta mt-1.5">
+        <div className="flex flex-col-reverse gap-3 px-5 pt-6 pb-4 sm:px-6 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0 flex-1">
+            {cycle.number ? <p className="font-mono text-[12.5px] font-semibold tracking-tight text-slate-500">{cycle.number}</p> : null}
+            <h1 className="plate-name mt-1 min-w-0">{doc.title}</h1>
+            <p className="plate-meta mt-2">
               Rev <span className="font-mono">{rev.value}</span>
               {cycle.dueAt ? (
                 <> &middot; <span className={due === "overdue" ? "font-semibold text-red-700" : due === "at risk" ? "text-amber-700" : undefined}>

@@ -189,15 +189,13 @@ export default async function TransmittalDetailPage({ params, searchParams }: { 
         rows={carried}
         exportHref={`/api/export/transmittals?ids=${t.id}`}
         plate={
-          <div className="flex flex-wrap items-start justify-between gap-3 border-b border-line px-5 pt-6 pb-3 sm:px-6">
-            <div className="min-w-0">
-              <h1 className="plate-name min-w-0">
-                <span className="font-mono text-[0.8em] font-medium tracking-tight text-slate-400">{t.number}</span>
-                {t.subject ? <> {t.subject}</> : null}
-              </h1>
+          <div className="flex flex-col-reverse gap-3 border-b border-line px-5 pt-6 pb-3 sm:px-6 lg:flex-row lg:items-start lg:justify-between">
+            <div className="min-w-0 flex-1">
+              <p className="font-mono text-[12.5px] font-semibold tracking-tight text-slate-500">{t.number}</p>
+              <h1 className="plate-name mt-1 min-w-0">{t.subject || <span className="text-slate-400">No subject</span>}</h1>
               {/* Who, to whom, when, and what for — the sentence a transmittal
                   register entry is, said as facts rather than as prose. */}
-              <p className="plate-meta mt-1.5">
+              <p className="plate-meta mt-2">
                 {t.direction === "OUTGOING"
                   ? <>{t.createdByName} sent it {fmtDate(t.dateOfIssue)} to {addressed.map((one) => one.name).join(", ") || "nobody yet"}</>
                   : <>{t.issuingParty} sent it {fmtDate(t.dateOfIssue)}{t.receivedDate ? <>, and it arrived {fmtDate(t.receivedDate)}</> : null}</>}
