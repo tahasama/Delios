@@ -73,14 +73,14 @@ async function main() {
     check("an organization that renamed nothing reads the defaults", STATE_NAMES.every((one) => defaults[one.code] === DEFAULT_STATE_NAMES[one.code]));
     check("every revision state has a name", REV_STATES.every((state) => stateName(defaults, state).length > 0));
     check("released reads as one act by default", stateName(defaults, "RELEASED") === "Released & issued");
-    check("in two acts: Released until sent, Issued after", stateName(defaults, "RELEASED", { together: false, sent: false }) === "Released" && stateName(defaults, "RELEASED", { together: false, sent: true }) === "Issued");
-    check("on hold wins over released", stateName(defaults, "RELEASED", { together: true, sent: true, held: true }) === "On hold");
+    check("where releasing means go ahead, it reads Released", stateName(defaults, "RELEASED", { together: false }) === "Released");
+    check("on hold wins over released", stateName(defaults, "RELEASED", { together: true, held: true }) === "On hold");
 
     await db.stateName.create({ data: { orgId: org.id, code: "RELEASED_ISSUED", label: "Approved & sent" } });
     await db.stateName.create({ data: { orgId: org.id, code: "IN_REVIEW", label: "Under check" } });
     const renamed = await stateNames(t);
-    check("a renamed state reads its new name", stateName(renamed, "RELEASED", { together: true, sent: true }) === "Approved & sent" && stateName(renamed, "IN_REVIEW") === "Under check");
-    check("the others keep theirs", stateName(renamed, "VOID") === "Void" && stateName(renamed, "RELEASED", { together: false, sent: true }) === "Issued");
+    check("a renamed state reads its new name", stateName(renamed, "RELEASED", { together: true }) === "Approved & sent" && stateName(renamed, "IN_REVIEW") === "Under check");
+    check("the others keep theirs", stateName(renamed, "VOID") === "Void" && stateName(renamed, "RELEASED", { together: false }) === "Released");
 
     const other = await db.organization.create({ data: { slug: `verify-room-other-${Date.now()}`, name: "Another organization" } });
     const otherProject = await db.project.create({ data: { orgId: other.id, code: "CR2", name: "Other" } });

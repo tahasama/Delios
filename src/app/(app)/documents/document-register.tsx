@@ -27,7 +27,7 @@ type RegisterRow = {
   docState: string; docStateLabel: string;
   revision: string | null; revState: string | null; revStateLabel: string;
   verdict: string | null; verdictLabel: string | null;
-  releasedFor: string | null; releasedForLabel: string | null; releasedForUse: string | null; proposedFor: string | null; notIssued: boolean;
+  releasedFor: string | null; releasedForLabel: string | null; releasedForUse: string | null; proposedFor: string | null;
   /** Released, then put on hold for an outside approval: not for use. */
   onHold: string | null;
   createdDate: string; updatedAt: string; plannedSubmissionDate: string | null; issueDate: string | null; releasedAt: string | null;
@@ -589,7 +589,6 @@ const COLUMNS: Column[] = [
         <CodeRef code={row.revStateLabel} note={codes[`REV_STATE|${row.revState ?? ""}`]} href={row.revState ? GUIDE.REV_STATE : undefined} className={`meta font-sans! ${REV_INK[row.revState ?? ""] ?? ""}`} />
         {/* Released, and nobody asked for it to be sent. It is in use; nobody
             has been told, including anyone whose approval it may still need. */}
-        {row.notIssued ? <span title="Nobody has asked for it to be sent." className="ml-1.5 rounded border border-amber-400 px-1 text-[9px] font-bold uppercase tracking-wide text-amber-700">not issued</span> : null}
       </>
     ),
   },

@@ -11,7 +11,7 @@ import { REV_STATE_LABEL, type RevState } from "./standard";
  * else changes. An organization that renames nothing reads the defaults.
  *
  * Besides the revision states there are the names a released revision is read
- * under — one act or two, sent or not — and the hold, so every word the
+ * under — sent with it, or simply in force — and the hold, so every word the
  * register shows for a state is here.
  */
 export const STATE_NAMES = [
@@ -19,9 +19,8 @@ export const STATE_NAMES = [
   { code: "IN_REVIEW", default: REV_STATE_LABEL.IN_REVIEW, means: "On its route, with its reviewers." },
   { code: "NOT_RELEASED", default: REV_STATE_LABEL.NOT_RELEASED, means: "The route is finished; waiting for Document Control to publish it." },
   { code: "RETURNED", default: REV_STATE_LABEL.RETURNED, means: "Document Control sent it back to a step of its route." },
-  { code: "RELEASED_ISSUED", default: "Released & issued", means: "In force and sent — the one act, when releasing and issuing go together." },
-  { code: "RELEASED", default: "Released", means: "In force in the register, not sent yet — when they are two acts." },
-  { code: "ISSUED", default: "Issued", means: "In force and sent — when they are two acts." },
+  { code: "RELEASED_ISSUED", default: "Released & issued", means: "In force and sent to the people named — where releasing sends it (the default)." },
+  { code: "RELEASED", default: "Released", means: "In force; people work from it — where releasing means go ahead." },
   { code: "ON_HOLD", default: "On hold", means: "Released, then held: not for use until it is lifted." },
   { code: "SUPERSEDED", default: REV_STATE_LABEL.SUPERSEDED, means: "A later revision replaced it." },
   { code: "VOID", default: REV_STATE_LABEL.VOID, means: "Treated as never valid." },
@@ -43,18 +42,18 @@ export const stateNames = cache(async (t: Pick<Tenant, "db">): Promise<StateName
 });
 
 /**
- * A revision state as it reads. A released revision reads as the one act, or —
- * in two acts — Released until it is sent and Issued after; on hold wins.
+ * A revision state as it reads. A released revision reads as released and
+ * issued where releasing sends it, and as released where it means go ahead;
+ * on hold wins either way.
  */
 export function stateName(
   names: StateNames,
   state: string,
-  released?: { together: boolean; sent: boolean; held?: boolean },
+  released?: { together: boolean; held?: boolean },
 ): string {
   if (state === "RELEASED") {
     if (released?.held) return names.ON_HOLD;
-    if (!released || released.together) return names.RELEASED_ISSUED;
-    return released.sent ? names.ISSUED : names.RELEASED;
+    return !released || released.together ? names.RELEASED_ISSUED : names.RELEASED;
   }
   return names[state as RevState as StateNameCode] ?? REV_STATE_LABEL[state as RevState] ?? state;
 }

@@ -390,7 +390,7 @@ export default async function ControlRoomPage() {
 
   const stateLabel = (state: Shown) =>
     state === "ON_HOLD" ? names.ON_HOLD
-      : state === "RELEASED" ? (together ? names.RELEASED_ISSUED : `${names.RELEASED}, then ${names.ISSUED.toLowerCase()}`)
+      : state === "RELEASED" ? (together ? names.RELEASED_ISSUED : names.RELEASED)
       : stateName(names, state);
   const stateColor = (state: Shown) => (state === "ON_HOLD" ? "bg-red-50 text-red-800 ring-red-200" : REV_STATE_COLOR[state]);
 
@@ -538,7 +538,7 @@ export default async function ControlRoomPage() {
           </div>
           <div className="px-5 py-3 sm:px-6">
             <p className="stencil text-slate-500">Releasing</p>
-            <p className="mt-1 text-[13px] font-medium text-slate-900">{together ? `${names.RELEASED_ISSUED}, one act` : `${names.RELEASED}, then ${names.ISSUED.toLowerCase()}`}</p>
+            <p className="mt-1 text-[13px] font-medium text-slate-900">{together ? `${names.RELEASED_ISSUED} — releasing sends it` : `${names.RELEASED} — releasing means go ahead`}</p>
             <p className="text-[11px] text-slate-500">{policyRow.get("POLICY_RELEASE")?.set ? "Chosen by an administrator." : "The default."}</p>
           </div>
         </div>

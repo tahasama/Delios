@@ -586,7 +586,6 @@ export async function recordStepOutcome(
    * standing on the document may ask, at any time, as often as the work needs.
    */
   request?: {
-    /** Unticked means "not now" — the decision stands and nothing is asked for. */
     give: boolean;
     reason: string;
     recipients: { internalUserIds: string[]; partyIds: string[] };
@@ -650,10 +649,14 @@ export async function recordStepOutcome(
   // Within the deciding step, whose verdict binds depends on how it decides:
   // serial and consolidated steps bind on their last person; the others on everyone.
   const binds = decides && bindsOnStep(step, user.id);
-  // Who receives it is checked before anything is written.
+  // Who receives it is checked before anything is written — where it is asked.
+  // Where releasing means go ahead, nobody is asked; only an outside approval
+  // that has to come first is still kept.
+  const { issuePolicy, noRecipients } = await import("./issue-requests");
+  const asked = (await issuePolicy(t)).asked;
+  if (request && !asked) request = request.needsApproval ? { ...request, recipients: { internalUserIds: [], partyIds: [] }, delegated: false } : undefined;
   if (binds && !returnsToAuthor && request) {
-    const { noRecipients } = await import("./issue-requests");
-    if (request.give && !request.delegated && noRecipients(request.recipients)) {
+    if (asked && request.give && !request.delegated && noRecipients(request.recipients)) {
       return { ok: false, error: "Say who it goes to, or leave it to the author." };
     }
     if (request.give && request.needsApproval && !request.approverId) {

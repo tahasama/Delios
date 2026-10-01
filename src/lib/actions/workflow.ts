@@ -470,11 +470,14 @@ export async function submitForReleaseAction(_prev: { error?: string; ok?: strin
   const status = (await getActiveSet("STATUSES")).find((one) => one.code === statusCode);
   if (!status) return { error: "Choose the status it is released at." };
 
-  // Who receives it, asked here as the deciding step would ask it.
-  const request = requestFromForm(formData);
+  // Who receives it, asked here as the deciding step would ask it — where
+  // releasing sends it. Where it means go ahead, only an outside approval stays.
+  const { issuePolicy, noRecipients } = await import("@/lib/issue-requests");
+  const asked = (await issuePolicy(ctx)).asked;
+  const formRequest = requestFromForm(formData);
+  const request = asked ? formRequest : { ...formRequest, give: formRequest.needsApproval, recipients: { internalUserIds: [], partyIds: [] }, delegated: false };
   if (request.give) {
-    const { noRecipients } = await import("@/lib/issue-requests");
-    if (!request.delegated && noRecipients(request.recipients)) return { error: "Say who it goes to, or leave it to the author." };
+    if (asked && !request.delegated && noRecipients(request.recipients)) return { error: "Say who it goes to, or leave it to the author." };
     if (request.needsApproval && !request.approverId) return { error: "Say which party has to approve it before it is released." };
   }
 

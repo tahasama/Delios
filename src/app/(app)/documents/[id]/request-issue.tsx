@@ -22,7 +22,7 @@ export type PickReason = { code: string; label: string };
  * A document we produced may need somebody outside to approve it before it is
  * released; that is asked first, because it changes what releasing means.
  */
-export function RequestIssue({ reasons, proposed, others, parties, author, onDecision, ours = true }: {
+export function RequestIssue({ reasons, proposed, others, parties, author, onDecision, ours = true, askWho = true }: {
   /** The published reasons for issue. */
   reasons: PickReason[];
   /** Our people the matrix puts on the distribution for this document. */
@@ -37,12 +37,19 @@ export function RequestIssue({ reasons, proposed, others, parties, author, onDec
   onDecision?: boolean;
   /** We produced the document, so an outside approval may be needed before release. */
   ours?: boolean;
+  /**
+   * Who receives it is asked — false where releasing means go ahead, and then
+   * only the outside approval is offered.
+   */
+  askWho?: boolean;
 }) {
   const [choice, setChoice] = useState<"SEND" | "AUTHOR">("SEND");
   // Some of our revisions cannot be released until somebody outside has
   // approved them. Saying so here is what makes the release wait for them.
   const [outside, setOutside] = useState(false);
   const chosen = choice;
+  const offerOutside = ours && parties.length > 0;
+  if (!askWho && !offerOutside) return null;
 
   const option = (value: typeof choice, label: React.ReactNode) => (
     <label className="flex items-start gap-2 text-xs text-slate-700">
@@ -53,7 +60,7 @@ export function RequestIssue({ reasons, proposed, others, parties, author, onDec
 
   return (
     <div className={onDecision ? "space-y-3 border-t border-line pt-3" : "space-y-3"}>
-      {ours && parties.length ? (
+      {offerOutside ? (
         <div className="rounded-lg bg-amber-50 px-3 py-2.5 ring-1 ring-amber-200">
           <label className="flex items-start gap-2 text-xs text-amber-950">
             <input type="checkbox" name="needsApproval" checked={outside} onChange={(event) => setOutside(event.target.checked)} className="mt-0.5" />
@@ -75,6 +82,7 @@ export function RequestIssue({ reasons, proposed, others, parties, author, onDec
         </div>
       ) : null}
 
+      {askWho ? (<>
       <div className="space-y-1.5">
         {onDecision ? <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Once it is released</p> : null}
         {option("SEND", "Say who receives it")}
@@ -120,6 +128,7 @@ export function RequestIssue({ reasons, proposed, others, parties, author, onDec
           </Field>
         </>
       ) : null}
+      </>) : null}
     </div>
   );
 }

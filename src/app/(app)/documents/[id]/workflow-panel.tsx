@@ -192,7 +192,7 @@ async function SendPanel({ doc, revId, value, hasFiles, user, lead, extra }: { d
               {statuses.map((one) => <option key={one.code} value={one.code}>{one.code} — {one.label}</option>)}
             </select>
           </Field>
-          <RequestIssue onDecision author={author} reasons={reasons.map((one) => ({ code: one.code, label: one.label }))} proposed={choices.proposed} others={choices.others} parties={choices.parties} ours={choices.ours} />
+          <RequestIssue onDecision author={author} reasons={reasons.map((one) => ({ code: one.code, label: one.label }))} proposed={choices.proposed} others={choices.others} parties={choices.parties} ours={choices.ours} askWho={(await issuePolicy(ctx)).asked} />
         </ActionForm>
       ),
     }] : [];
@@ -244,7 +244,8 @@ async function RunActivePanel({ run, user, extra }: { run: { id: string; templat
   // The last step decides; the earlier steps' verdicts are advice shown to the decider.
   const deciding = run.currentStep === run.steps.length - 1;
   // The deciding step is offered the first request.
-  const nextStep = deciding && activeCycle && !activeCycle.outcome && (await issuePolicy(ctx)).asked
+  const askWho = (await issuePolicy(ctx)).asked;
+  const nextStep = deciding && activeCycle && !activeCycle.outcome
     ? await requestChoices(ctx, (await db.revision.findUniqueOrThrow({ where: { id: activeCycle.revisionId }, select: { document: true } })).document)
     : null;
   const issueReasons = nextStep ? await getActiveSet("REASONS_FOR_ISSUE") : [];
@@ -317,7 +318,7 @@ async function RunActivePanel({ run, user, extra }: { run: { id: string; templat
           label: deciding ? "Give your verdict" : "Give your advice",
           body: (
             <ActionForm action={recordStepOutcomeAction} submitLabel={deciding ? "Give my verdict" : "Give my advice"} size="sm" hidden={{ runId: run.id }}>
-              <VerdictDecision deciding={deciding} advice={!deciding && activeCycle ? await myAdvice(ctx, activeCycle.id, user.id) : null} verdicts={decisionOptions(outcomes)} statuses={statusOptions(statuses, step.grantsStatuses)} carrying={carrying} laterSteps={laterSteps} request={nextStep ? <RequestIssue onDecision author={author} reasons={issueReasons.map((one) => ({ code: one.code, label: one.label }))} proposed={nextStep.proposed} others={nextStep.others} parties={nextStep.parties} ours={nextStep.ours} /> : null} />
+              <VerdictDecision deciding={deciding} advice={!deciding && activeCycle ? await myAdvice(ctx, activeCycle.id, user.id) : null} verdicts={decisionOptions(outcomes)} statuses={statusOptions(statuses, step.grantsStatuses)} carrying={carrying} laterSteps={laterSteps} request={nextStep ? <RequestIssue onDecision author={author} reasons={issueReasons.map((one) => ({ code: one.code, label: one.label }))} proposed={nextStep.proposed} others={nextStep.others} parties={nextStep.parties} ours={nextStep.ours} askWho={askWho} /> : null} />
             </ActionForm>
           ),
         });

@@ -165,7 +165,11 @@ export async function hasControlFunction(t: Tenant): Promise<boolean> {
 /** @deprecated Read `hasControlFunction`; kept while callers are moved over. */
 export async function issuePolicy(t: Tenant): Promise<{ controlReleases: boolean; asked: boolean }> {
   const control = await hasControlFunction(t);
-  return { controlReleases: control, asked: true };
+  // Who receives it is asked only where releasing sends it; where releasing
+  // means go ahead, nobody is asked.
+  const { policy } = await import("./control-activities");
+  const asked = (await policy(t, "POLICY_RELEASE")) !== "SEPARATE";
+  return { controlReleases: control, asked };
 }
 
 export async function issueGateIsControl(t: Tenant): Promise<boolean> {

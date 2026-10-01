@@ -173,12 +173,8 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
       revState: latest?.state ?? null,
       // Released, then held for an outside approval: on hold is what it is now.
       revStateLabel: latest
-        ? stateName(names, latest.state, { together, sent: latest.transmittalItems.length > 0, held: !!latest.heldAt })
+        ? stateName(names, latest.state, { together, held: !!latest.heldAt })
         : "No revision yet",
-      // Where releasing is issuing, a released revision nobody was sent breaks
-      // the rule, and is stamped so. Where they are two acts, the state already
-      // says Released, and there is nothing to stamp.
-      notIssued: together && !!released && !released.transmittalItems.length,
       onHold: released?.heldAt ? (released.heldReason ?? "On hold, not for use.") : null,
       // A code is printed only when the organization publishes it. Records made
       // before the list existed carry the Standard's own consequence names,
@@ -248,7 +244,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
       { code: "IN_REVIEW", label: names.IN_REVIEW },
       { code: "NOT_RELEASED", label: names.NOT_RELEASED },
       { code: "FOR_RELEASE", label: "Reviewed" },
-      { code: "RELEASED", label: together ? names.RELEASED_ISSUED : `${names.RELEASED} or ${names.ISSUED.toLowerCase()}` },
+      { code: "RELEASED", label: together ? names.RELEASED_ISSUED : names.RELEASED },
       { code: "SUPERSEDED", label: names.SUPERSEDED },
       { code: "VOID", label: names.VOID },
     ], statuses: statuses.map((item) => ({ code: item.code, label: `${item.code} — ${item.label}` })), verdicts: verdictSet.map((item) => ({ code: item.code, label: `${item.code} — ${item.label}` })), suppliers: supplierCodes.map((item) => ({ code: item.code, label: item.label })), pos: poCodes.map((item) => ({ code: item.code, label: item.label })), disciplines: disciplines.filter((item) => usedDisciplines.has(item.code)).map((item) => ({ code: item.code, label: item.status === "RETIRED" ? `${item.label} (retired)` : item.label })), types: types.filter((item) => usedTypes.has(item.code)).map((item) => ({ code: item.code, label: item.status === "RETIRED" ? `${item.label} (retired)` : item.label })), criticalities: criticalities.map((item) => ({ code: item.code, label: item.label })), deliverables: deliverableTypes.map((item) => ({ code: item.code, label: item.label })), confidentialities: confidentialities.map((item) => ({ code: item.code, label: item.label.split(" — ")[0] })), dateFields: DATE_FIELDS.map((field) => ({ code: field.key, label: field.label })) }} exportHref={`/api/register/export${query.size ? `?${query.toString()}` : ""}`} />

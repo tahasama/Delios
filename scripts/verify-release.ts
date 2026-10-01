@@ -253,13 +253,15 @@ async function main() {
       }
     }
 
-    console.log("\nAn organization that releases without issuing\n");
+    console.log("\nAn organization where releasing means go ahead\n");
     // The project may say that releasing stands on its own. Then nobody need
     // have said where it goes — but an approval asked for is still waited for.
     await db.controlSetting.create({
       data: { projectId: project.id, key: "POLICY_RELEASE", mode: "SEPARATE", setByName: "verify" },
     });
     try {
+      const { issuePolicy } = await import("../src/lib/issue-requests");
+      check("nobody is asked who receives it", !(await issuePolicy(t)).asked);
       const fifth = await decided("ALONE");
       await recordReviewOutcome(t, fifth.cycle.id, actor, proceeds, undefined, status.code);
       const asked = await pendingIssue(t, fifth.rev.id, { recipients: false });

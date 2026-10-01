@@ -143,7 +143,7 @@ export default async function DocumentDetailPage({
   const pdf = shown?.files.find((f) => f.kind === "RENDITION") ?? null;
   const native = shown?.files.find((f) => f.kind === "NATIVE") ?? null;
   // Requests on the revision in hand: who asked for it to be sent, to whom, and
-  // whether it has gone. Releasing and issuing are two acts; this is the second.
+  // whether it has gone.
   const carrying = working ?? current ?? null;
   const requests = carrying
     ? await db.issueRequest.findMany({
@@ -179,9 +179,7 @@ export default async function DocumentDetailPage({
   // A type the organization does not review never goes down a route.
   const reviewed = !(await typeSkipsReview(ctx, doc.docType));
   const sentOut = !!current && transmittalItems.some((item) => item.revisionId === current.id && item.transmittal.direction === "OUTGOING");
-  // Only where releasing is issuing is a released revision nobody was sent a
-  // breach to stamp; where they are two acts, the state says Released.
-  const notIssued = together && !!current && !sentOut;
+  // Where releasing means go ahead, nobody is asked who receives it.
   const policy = await issuePolicy(ctx);
   const mayAsk = carrying ? await mayRequestIssue(ctx, carrying.id, user.id) || controller : false;
   const askChoices = mayAsk && carrying && policy.asked ? await requestChoices(ctx, doc) : null;
@@ -468,7 +466,7 @@ export default async function DocumentDetailPage({
   // Released, then held for an outside approval: on hold is what it is now.
   const onHold = shown?.state === "RELEASED" && !!shown.heldAt;
   const stateLabel = shown
-    ? stateName(names, shown.state, { together, sent: shown.id === current?.id ? sentOut : true, held: onHold })
+    ? stateName(names, shown.state, { together, held: onHold })
     : DOC_STATE_LABEL[doc.state as DocState] ?? doc.state;
   const stateColor = onHold ? "bg-red-50 text-red-800 ring-red-200" : shown ? revStateColor(shown.state) : DOC_STATE_COLOR[doc.state as DocState] ?? "";
 
@@ -493,14 +491,6 @@ export default async function DocumentDetailPage({
             <p className="plate-meta mt-2 flex flex-wrap items-center gap-x-2 gap-y-1">
               {shown ? <span className="font-mono font-semibold text-slate-800">Rev {shown.value}</span> : null}
               <StateChip label={stateLabel} color={stateColor} />
-              {notIssued ? (
-                <span
-                  title="Released and in use. Nobody has asked for it to be sent, so nobody has been told — including anyone whose approval it may still need."
-                  className="stamp font-sans text-amber-700"
-                >
-                  not issued
-                </span>
-              ) : null}
               {current?.heldAt ? <span className="stamp font-sans text-red-700">not for use</span> : null}
               {shown?.statusCode ? <span>&middot; {shown.statusCode} — {label(statuses, shown.statusCode)}</span> : null}
               {/* The plate is about the revision in use; this says what the one
@@ -676,7 +666,7 @@ export default async function DocumentDetailPage({
                 {doc.revisions.map((rev, index) => (
                   /* Only the newest revision can still be acted on. Everything
                      before it is frozen as it was issued. */
-                  <RevisionRow key={rev.id} rev={rev} latest={index === 0} followedBy={index > 0 ? { value: doc.revisions[index - 1].value, why: doc.revisions[index - 1].reasonForRevision } : null} statusLabel={label(statuses, rev.statusCode)} stateLabel={stateName(names, rev.state, { together, sent: rev.id === current?.id ? sentOut : true, held: !!rev.heldAt })} controller={controller} userId={user.id} userRole={user.role} voidIsControl={voidIsControl} />
+                  <RevisionRow key={rev.id} rev={rev} latest={index === 0} followedBy={index > 0 ? { value: doc.revisions[index - 1].value, why: doc.revisions[index - 1].reasonForRevision } : null} statusLabel={label(statuses, rev.statusCode)} stateLabel={stateName(names, rev.state, { together, held: !!rev.heldAt })} controller={controller} userId={user.id} userRole={user.role} voidIsControl={voidIsControl} />
                 ))}
               </ul>
             ) : <Empty>No revision yet.</Empty>,

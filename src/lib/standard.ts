@@ -53,14 +53,6 @@ export const REV_STATE_LABEL: Record<RevState, string> = {
  * Not released means the route is finished and Document Control has not
  * published it, so the status is decided but not in force.
  */
-/**
- * What a released revision is called depends on the project's answer to
- * POLICY_RELEASE: one state where releasing issues it (the default), two in
- * order where it does not — Released until it is sent, then Issued.
- */
-export function releasedLabel(together: boolean, issued: boolean): string {
-  return together ? "Released & issued" : issued ? "Issued" : "Released";
-}
 export function revStateLabel(state: string): string {
   return REV_STATE_LABEL[state as RevState] ?? state;
 }
