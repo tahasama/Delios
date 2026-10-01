@@ -109,8 +109,10 @@ const STAGES: Stage[] = [
     acts: [],
     policies: [],
     sets: ["STATUSES", "NATIVE_FORMATS", "RENDITION_FORMATS"],
-    fixed: [],
-    branches: [{ title: "Allowing a new revision nobody asked for", text: "No review sent it back, and somebody wants one anyway.", act: "AUTHORIZE_REVISION" }],
+    branches: [
+      { title: "Starting a revision nobody asked for", text: "The last one was accepted as it stands; whoever starts the next writes why.", act: "AUTHORIZE_REVISION" },
+    ],
+    fixed: [{ title: "A revision the verdict asked for", text: "Refused, accepted with comments, or sent back by Document Control: the next revision may be started at once, and carries the verdict as its reason." }],
     extras: [],
   },
   {

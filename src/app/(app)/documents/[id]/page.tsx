@@ -12,6 +12,7 @@ import { Chip, StateChip, Banner, btn, Field, inputCls } from "@/components/ui";
 import { ActionForm } from "@/components/form";
 import { DOC_STATE_LABEL, DOC_STATE_COLOR, REV_STATE_COLOR, revStateColor, type DocState, type RevState } from "@/lib/standard";
 import { stateNames, stateName } from "@/lib/state-names";
+import { revisionGround } from "@/lib/revision-ground";
 import { fmtDate, timeAgo, plain } from "@/lib/utils";
 import { getActiveSet, getSet, getValue } from "@/lib/config";
 import { updateDocumentAction, linkAssetAction, unlinkRelationshipAction, endDocumentStateAction } from "@/lib/actions/documents";
@@ -170,6 +171,9 @@ export default async function DocumentDetailPage({
   const together = (await projectPolicy(ctx, "POLICY_RELEASE")) === "TOGETHER";
   // What this organization calls each state; the states themselves are fixed.
   const names = await stateNames(ctx);
+  // Why the next revision may be started: asked for by the last verdict, or
+  // not — and then whoever starts it says why.
+  const ground = doc.isPlaceholder ? { kind: "FIRST" as const } : await revisionGround(ctx, doc.id);
   const sentOut = !!current && transmittalItems.some((item) => item.revisionId === current.id && item.transmittal.direction === "OUTGOING");
   // Only where releasing is issuing is a released revision nobody was sent a
   // breach to stamp; where they are two acts, the state says Released.
@@ -424,10 +428,22 @@ export default async function DocumentDetailPage({
       ) : null}
 
       {canEdit && !working && doc.kind !== "RECORD" ? (
-        <Step title={doc.revisions.length ? "New revision — e.g. a resubmission arrived" : "Start the first revision"} open={!doc.revisions.length}>
+        <Step title={ground.kind === "FIRST" ? "Start the first revision" : ground.kind === "ASKED" ? `New revision — to answer rev ${doc.revisions[0]?.value}` : "New revision — nobody asked for one"} open={!doc.revisions.length}>
           <ActionForm action={prepareRevisionAction} submitLabel="Start revision" hidden={{ documentId: doc.id }}>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <Field label={doc.revisions.length ? "Why it is changing" : "Reason"} required className="sm:col-span-2"><input name="reasonForRevision" className={inputCls} defaultValue={doc.revisions.length ? "" : "First issue"} /></Field>
+              {ground.kind === "FIRST" ? (
+                <Field label="Reason" required className="sm:col-span-2"><input name="reasonForRevision" className={inputCls} defaultValue="First issue" /></Field>
+              ) : ground.kind === "ASKED" ? (
+                // The verdict is the reason; nobody writes it again.
+                <div className="rounded-lg bg-tint-soft px-3 py-2 text-xs text-slate-700 sm:col-span-2">
+                  <span className="stencil mr-2 text-slate-500">Why</span>{ground.why}
+                  {ground.comments ? <span className="text-slate-500"> · {ground.comments} comment{ground.comments === 1 ? "" : "s"} to address</span> : null}
+                </div>
+              ) : (
+                <Field label="Why a new revision" required hint={`rev ${doc.revisions[0]?.value} was accepted as it stands — this stays next to it`} className="sm:col-span-2">
+                  <input name="reasonForRevision" required className={inputCls} />
+                </Field>
+              )}
               <Field label={doc.revisions.length ? "What changed" : "Description"} required className="sm:col-span-2"><input name="changeDescription" className={inputCls} defaultValue={doc.revisions.length ? "" : "Initial version"} /></Field>
               <Field label="Due for submission"><input type="date" name="plannedSubmissionDate" className={inputCls} /></Field>
               <Field label="Phase">
@@ -436,7 +452,6 @@ export default async function DocumentDetailPage({
                   {phases.map((p) => <option key={p.code} value={p.code}>{p.label}</option>)}
                 </select>
               </Field>
-              {!doc.isPlaceholder && !outstandingAuth(doc.revisions) ? <Field label="Authorised because" className="sm:col-span-2"><input name="authorizationReason" className={inputCls} /></Field> : null}
               <Field label="File" hint="optional — a PDF shows in the viewer" className="sm:col-span-2"><input type="file" name="revisionFile" className="block w-full text-xs" /></Field>
               {routes.length ? (
                 <Field label="Then" hint="needs the file above" className="sm:col-span-2">
@@ -655,7 +670,7 @@ export default async function DocumentDetailPage({
                 {doc.revisions.map((rev, index) => (
                   /* Only the newest revision can still be acted on. Everything
                      before it is frozen as it was issued. */
-                  <RevisionRow key={rev.id} rev={rev} latest={index === 0} statusLabel={label(statuses, rev.statusCode)} stateLabel={stateName(names, rev.state, { together, sent: rev.id === current?.id ? sentOut : true, held: !!rev.heldAt })} controller={controller} userId={user.id} userRole={user.role} voidIsControl={voidIsControl} />
+                  <RevisionRow key={rev.id} rev={rev} latest={index === 0} followedBy={index > 0 ? { value: doc.revisions[index - 1].value, why: doc.revisions[index - 1].reasonForRevision } : null} statusLabel={label(statuses, rev.statusCode)} stateLabel={stateName(names, rev.state, { together, sent: rev.id === current?.id ? sentOut : true, held: !!rev.heldAt })} controller={controller} userId={user.id} userRole={user.role} voidIsControl={voidIsControl} />
                 ))}
               </ul>
             ) : <Empty>No revision yet.</Empty>,
@@ -806,18 +821,12 @@ function UsedIn({ kind, href, code, text, children }: { kind: string; href: stri
 
 function prettyState(value: string) { return value.replaceAll("_", " ").toLowerCase(); }
 
-function outstandingAuth(revs: { state: string; cycles: { outcome: string | null; returnedToOriginatorAt: Date | null }[] }[]): boolean {
-  const last = revs[0];
-  if (!last) return false;
-  return last.cycles.some((c) => ["REVISE_AND_RESUBMIT", "APPROVED_WITH_COMMENTS", "REJECTED"].includes(c.outcome ?? "") && c.returnedToOriginatorAt);
-}
-
 type RevData = Prisma.RevisionGetPayload<{
   include: { files: true; approvals: true; cycles: { include: { comments: true; assignments: true } } };
 }>;
 
 /** One line per revision; its record and its per-revision controls open in place. */
-function RevisionRow({ rev, latest, statusLabel, stateLabel, controller, userId, userRole, voidIsControl }: { rev: RevData; latest: boolean; statusLabel: string | null; stateLabel: string; controller: boolean; userId: string; userRole: string; voidIsControl: boolean }) {
+function RevisionRow({ rev, latest, followedBy, statusLabel, stateLabel, controller, userId, userRole, voidIsControl }: { rev: RevData; latest: boolean; followedBy: { value: string; why: string | null } | null; statusLabel: string | null; stateLabel: string; controller: boolean; userId: string; userRole: string; voidIsControl: boolean }) {
   const state = rev.state as RevState;
   const pdf = rev.files.find((f) => f.kind === "RENDITION");
   const native = rev.files.find((f) => f.kind === "NATIVE");
@@ -841,6 +850,13 @@ function RevisionRow({ rev, latest, statusLabel, stateLabel, controller, userId,
           {rev.statusCode ? <span className="text-xs text-slate-500">{rev.statusCode} · {statusLabel}</span> : null}
           <span className="min-w-0 flex-1 truncate text-xs text-slate-600">{rev.changeDescription ?? ""}</span>
           <span className="text-[11px] text-slate-400">{fmtDate(rev.releasedAt ?? rev.createdAt)}</span>
+          {/* Why the next one exists, kept with this one: read where it is
+              asked, without opening the next revision. */}
+          {followedBy?.why ? (
+            <span className="basis-full pl-6 text-[11px] text-slate-500">
+              <span className="font-semibold text-slate-600">Rev {followedBy.value} followed</span> — {followedBy.why}
+            </span>
+          ) : null}
         </summary>
         <div className="space-y-3 bg-slate-50/60 px-5 py-4 pl-11">
           <dl className="grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-2">

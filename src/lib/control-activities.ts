@@ -22,6 +22,11 @@ export type ControlActivity = {
   control: string;
   /** What happens when the people doing the work carry it out. */
   self: string;
+  /**
+   * Left to the people doing the work unless an administrator says otherwise,
+   * whether or not the project has a control function: the recommended default.
+   */
+  workByDefault?: true;
 };
 
 export const CONTROL_ACTIVITIES: ControlActivity[] = [
@@ -55,10 +60,11 @@ export const CONTROL_ACTIVITIES: ControlActivity[] = [
   },
   {
     key: "AUTHORIZE_REVISION",
-    title: "Allowing a new revision to be started",
-    text: "A revision nobody asked for — no review sent it back, and somebody wants to open one anyway.",
-    control: "Document Control states the reason and opens it.",
-    self: "The author opens it and states the reason themselves.",
+    title: "Starting a revision nobody asked for",
+    text: "The last revision was accepted as it stands, and somebody wants a new one anyway. One a verdict asked for — refused, or accepted with comments — needs nobody's leave.",
+    control: "Document Control opens it, and writes why; the reason stays next to the revision it follows.",
+    self: "Whoever works on the document opens it, and writes why; the reason stays next to the revision it follows.",
+    workByDefault: true,
   },
   {
     key: "WITHDRAW",
@@ -173,6 +179,7 @@ export async function controlDoes(t: Tenant, key: string): Promise<boolean> {
     if (own === "CONTROL") return true;
     if (own === "SELF") return false;
   }
+  if (CONTROL_ACTIVITIES.find((one) => one.key === key)?.workByDefault) return false;
   return hasControlFunction(t);
 }
 
@@ -306,11 +313,13 @@ export async function controlSettings(t: Tenant): Promise<{
     set,
     rows: CONTROL_ACTIVITIES.map((activity) => {
       const own = (byKey.get(activity.key) ?? "FOLLOW") as ControlMode;
-      const mine = own === "CONTROL" ? true : own === "SELF" ? false : follows;
+      const mine = own === "CONTROL" ? true : own === "SELF" ? false : activity.workByDefault ? false : follows;
       return {
         activity,
         mode: own,
-        controlDoes: projectMode === "CONTROL" ? true : projectMode === "SELF" ? false : mine,
+        // Until the project answers for everything, each act reads its own
+        // default — which for most is the project's control function.
+        controlDoes: !set ? mine : projectMode === "CONTROL" ? true : projectMode === "SELF" ? false : mine,
         off: !!SKIPPABLE[activity.key] && byKey.get(SKIP_KEY(activity.key)) === "OFF",
       };
     }),

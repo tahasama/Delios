@@ -368,6 +368,36 @@ HELD).
 
 ---
 
+## 18 · A new revision says why it exists, once
+
+**Clause:** §6.5 *Authorization*, §9.3.
+
+**Must say:** a revision is authorized by what happened to the one before it,
+not by a separate act of the control function.
+
+- *The verdict asked for it* — refused, or accepted with comments to carry
+  (a verdict whose effect is "back to the author" or "final, fix next time"),
+  or Document Control sent the revision back. The verdict is the reason: the
+  next revision may be started at once, by whoever works on the document, and
+  it carries the verdict as its reason. Nobody writes it again.
+- *Nobody asked for it* — the revision before was accepted as it stands. A new
+  one may still be started, on any side, but whoever starts it must write why;
+  the form asks only in this case, and the reason is shown next to the revision
+  it follows, where somebody reading the older one will look for it.
+
+The verdict is read for what it does, not for its code, since every
+organization names its own verdicts.
+
+**Default, and preference.** Starting a revision nobody asked for is left to the
+people doing the work by default, whether or not the project has a control
+function. An administrator may give it to Document Control instead; it cannot
+be switched off, because the reason is the record.
+
+**Depends on it:** `revisionGround`; act `AUTHORIZE_REVISION` (default: the
+people doing the work).
+
+---
+
 ## Still open — decided in conversation, not yet built
 
 - **Escalation** where somebody refuses to acknowledge carrying an action

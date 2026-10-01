@@ -1,6 +1,7 @@
 "use server";
 
 import { carrierRefusal } from "@/lib/control-activities";
+import { revisionGround } from "@/lib/revision-ground";
 import { mayAnswerCycle } from "@/lib/delegation";
 import { startWorkflowRun } from "@/lib/workflow";
 import { redirect } from "next/navigation";
@@ -24,11 +25,10 @@ export async function prepareRevisionAction(_prev: { error?: string } | undefine
   const ctx = await requireScope();
   const { user, db, projectId, orgId } = ctx;
   const documentId = String(formData.get("documentId") ?? "");
-  const reasonForRevision = String(formData.get("reasonForRevision") ?? "").trim();
+  let reasonForRevision = String(formData.get("reasonForRevision") ?? "").trim();
   const changeDescription = String(formData.get("changeDescription") ?? "").trim();
   const plannedSubmissionDate = String(formData.get("plannedSubmissionDate") ?? "") || null;
   const phase = String(formData.get("phase") ?? "") || null;
-  const explicitAuth = String(formData.get("authorizationReason") ?? "").trim();
 
   const doc = await db.document.findUniqueOrThrow({ where: { id: documentId } });
   if (!mayContributeToDocument(user, doc)) return { error: "You may prepare revisions only for documents assigned to your organization." };
@@ -37,7 +37,6 @@ export async function prepareRevisionAction(_prev: { error?: string } | undefine
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Cannot start a revision." };
   }
- if (!reasonForRevision) return { error: "Reason for revision is required." };
  if (!changeDescription) return { error: "Description of change is required — it says what changed; it does not restate the reason." };
 
   // One revision in motion at a time. A document has exactly one revision being
@@ -53,47 +52,30 @@ export async function prepareRevisionAction(_prev: { error?: string } | undefine
   }
 
   const isPlaceholder = doc.isPlaceholder;
-  const lastRev = await db.revision.findFirst({ where: { documentId }, orderBy: { createdAt: "desc" } });
 
-  let authorizationReason: string | null = null;
-  let authorizedById: string | null = null;
-  let authorizedByName: string | null = null;
-  let authorizedAt: Date | null = null;
-
-  if (isPlaceholder) {
-    // Placeholder creation IS the authorization for the first revision (§6.5).
- authorizationReason = "Placeholder register entry — authorization for the first revision.";
-    authorizedById = user.id;
-    authorizedByName = user.name;
-    authorizedAt = new Date();
+  // Why this revision may exist, read from the one before it. A verdict that
+  // asked for changes — or Document Control sending it back — is the reason
+  // itself; a revision nobody asked for needs one written by whoever starts it.
+  const ground = isPlaceholder ? { kind: "FIRST" as const } : await revisionGround(ctx, documentId);
+  let authorizationReason: string;
+  if (ground.kind === "FIRST") {
+    if (!reasonForRevision) reasonForRevision = "First issue";
+    authorizationReason = isPlaceholder ? "Placeholder register entry — authorization for the first revision." : "First revision.";
+  } else if (ground.kind === "ASKED") {
+    reasonForRevision = ground.why;
+    authorizationReason = ground.why;
   } else {
-    // A review outcome requiring resubmission is itself the authorization (§9.3/§6.5)
-    const outcome = lastRev
-      ? await db.reviewCycle.findFirst({
-          where: { revisionId: lastRev.id, outcome: { in: ["REVISE_AND_RESUBMIT", "APPROVED_WITH_COMMENTS", "REJECTED"] }, returnedToOriginatorAt: { not: null } },
-          orderBy: { outcomeAt: "desc" },
-        })
-      : null;
-    if (outcome) {
- authorizationReason = `Review outcome "${outcome.outcome}" on cycle ${outcome.sequence}`;
-      authorizedById = user.id;
-      authorizedByName = user.name;
-      authorizedAt = new Date();
-    } else if (explicitAuth) {
-      const document = await db.document.findUnique({ where: { id: documentId }, select: { createdById: true } });
-      const cannotAuthorize = await carrierRefusal(ctx, "AUTHORIZE_REVISION", {
-        control: isController(user) || isAdmin(user),
-        standing: document?.createdById === user.id,
-      });
-      if (cannotAuthorize) return { error: cannotAuthorize };
-      authorizationReason = explicitAuth;
-      authorizedById = user.id;
-      authorizedByName = user.name;
-      authorizedAt = new Date();
-    } else {
- return { error: "No revision may be established without prior authorization. The control function states the reason explicitly." };
-    }
+    if (!reasonForRevision) return { error: "Say why a new revision is needed — the last one was accepted as it stands, so nobody asked for this one." };
+    const cannotAuthorize = await carrierRefusal(ctx, "AUTHORIZE_REVISION", {
+      control: isController(user) || isAdmin(user),
+      standing: true,
+    });
+    if (cannotAuthorize) return { error: cannotAuthorize };
+    authorizationReason = reasonForRevision;
   }
+  const authorizedById = user.id;
+  const authorizedByName = user.name;
+  const authorizedAt = new Date();
 
   const series = isPlaceholder || !(await executionSeriesStarted(ctx, documentId)) ? "DESIGN" : "EXECUTION";
   const existing = await db.revision.findMany({ where: { documentId }, select: { value: true } });
