@@ -204,6 +204,11 @@ export default async function ReviewCyclePage({ params }: { params: Promise<{ id
         ? `Read the document, then give your ${cycle.binding ? "verdict" : "advice"}.`
         : "Read the document. The reviewers give their answer here.";
 
+  // Before anything is chosen, "no outcome chosen yet" says nothing the form
+  // does not; the check still runs when the answer is given.
+  const outcomeCheckRun = cycle.outcome ? null : await preflight("RECORD_OUTCOME", { cycleId: cycle.id });
+  const outcomeChecks = outcomeCheckRun ? { ...outcomeCheckRun, warnings: outcomeCheckRun.warnings.filter((one) => one.id !== "OUT-SET") } : null;
+
   return (
     <div className="space-y-4">
       {/* The plate. A review is read — somebody sits with this document to judge
@@ -231,6 +236,14 @@ export default async function ReviewCyclePage({ params }: { params: Promise<{ id
               {rev.statusCode ? <> &middot; <span className="font-mono font-semibold text-slate-700">{rev.statusCode}</span></> : null}
             </p>
             <p className="mt-1 max-w-2xl text-[11.5px] leading-4 text-slate-400">{claim}</p>
+            {/* What this review's answer is worth, said once up here so the card
+                where it is given can be about giving it. */}
+            <p className="mt-2 max-w-3xl text-[12px] leading-5 text-slate-600">
+              <span className="stencil mr-2 text-slate-500">{cycle.binding ? "Binding verdict" : "Advice"}</span>
+              {cycle.binding
+                ? "The one decision on this revision. A verdict that proceeds is its release approval."
+                : "Input for the route's decider; it does not decide on its own."}
+            </p>
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <Link href={`/documents/${doc.id}`} className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 font-mono text-xs font-semibold text-slate-500 hover:bg-slate-100"><ArrowLeft className="h-4 w-4" /> {doc.docNumber}</Link>
@@ -309,7 +322,7 @@ export default async function ReviewCyclePage({ params }: { params: Promise<{ id
             />
           ) : null}
 
-          <Card title={cycle.binding ? "Binding verdict" : "Advice"} description={cycle.binding ? "The one decision on this revision. A verdict that proceeds is its release approval, so only someone who may approve the document can give it." : "Input for the route's decider; it does not decide on its own."}>
+          <Card title={cycle.binding ? "Binding verdict" : "Advice"}>
             {cycle.outcome ? <div><p className="text-sm font-semibold text-slate-900">{cycle.binding ? <><span className="font-mono">{cycle.outcome}</span> · {verdictLabel(cycle.outcome)}</> : verdictLabel(cycle.outcome)}</p><p className="mt-1 text-xs leading-5 text-slate-500">{OUTCOME_CONSEQUENCES[cycle.outcome]?.blurb}</p>              {/* What the verdict said. A verdict that reads "Comments" and
                   shows no comments is not a record of anything. */}
               {cycle.comments.length ? (
@@ -333,7 +346,7 @@ export default async function ReviewCyclePage({ params }: { params: Promise<{ id
                     </li>
                   ))}
                 </ul>
-              ) : null}{canReturn ? <div className="mt-4 border-t border-line pt-4"><ActionForm action={returnToOriginatorAction} submitLabel="Return to author" size="sm" hidden={{ cycleId: cycle.id }}/></div> : null}</div> : <Guarded result={await preflight("RECORD_OUTCOME", { cycleId: cycle.id })}><ActionForm action={recordOutcomeAction} submitLabel={byProxy && cycle.party ? `Record ${cycle.party.name}’s answer` : cycle.binding ? "Give my verdict" : "Give my advice"} hidden={{ cycleId: cycle.id }}><VerdictDecision deciding={cycle.binding} advice={cycle.binding ? null : await myAdvice(ctx, cycle.id, user.id)} verdicts={decisionOptions(outcomes)} statuses={statusOptions(statuses, mayDecideOn)} carrying={rev.statusCode} laterSteps={laterSteps} request={nextStep ? <RequestIssue onDecision author={author} reasons={issueReasons.map((one) => ({ code: one.code, label: one.label }))} proposed={nextStep.proposed} others={nextStep.others} parties={nextStep.parties} /> : null} />
+              ) : null}{canReturn ? <div className="mt-4 border-t border-line pt-4"><ActionForm action={returnToOriginatorAction} submitLabel="Return to author" size="sm" hidden={{ cycleId: cycle.id }}/></div> : null}</div> : <Guarded result={outcomeChecks!}><ActionForm action={recordOutcomeAction} submitLabel={byProxy && cycle.party ? `Record ${cycle.party.name}’s answer` : cycle.binding ? "Give my verdict" : "Give my advice"} hidden={{ cycleId: cycle.id }}><VerdictDecision deciding={cycle.binding} advice={cycle.binding ? null : await myAdvice(ctx, cycle.id, user.id)} verdicts={decisionOptions(outcomes)} statuses={statusOptions(statuses, mayDecideOn)} carrying={rev.statusCode} laterSteps={laterSteps} request={nextStep ? <RequestIssue onDecision author={author} reasons={issueReasons.map((one) => ({ code: one.code, label: one.label }))} proposed={nextStep.proposed} others={nextStep.others} parties={nextStep.parties} /> : null} />
               {byProxy && cycle.party ? (
                 <div className="mt-3 space-y-3 border-t border-line pt-3">
                   <p className="stencil text-slate-400">Recorded for {cycle.party.name}</p>
@@ -380,7 +393,14 @@ export default async function ReviewCyclePage({ params }: { params: Promise<{ id
           ) : null}
 
           {rewindTo.length ? (
-            <Card title="Something is wrong with the route" description="Not with the document — a document that is wrong is answered by the next revision. This sends the same revision back to a step that has already answered.">
+            // Rarely needed, so a button; the form opens when it is pressed.
+            <details className="register register-sheet register-sheet-open">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-3 sm:px-6">
+                <span className="text-[13px] text-slate-600">Something wrong with the route?</span>
+                <span className="ask">Send it back</span>
+              </summary>
+              <div className="space-y-3 border-t border-line px-5 py-4 sm:px-6">
+              <p className="text-[11px] leading-4 text-slate-500">Not with the document — a document that is wrong is answered by the next revision. This sends the same revision back to a step that has already answered.</p>
               <ActionForm action={rewindRouteAction} submitLabel="Send it back" variant="danger" size="sm" hidden={{ runId: run!.id }}>
                 <Field label="Back to" required>
                   <select name="toStep" required defaultValue="" className={inputCls}>
@@ -398,7 +418,8 @@ export default async function ReviewCyclePage({ params }: { params: Promise<{ id
                   <textarea name="reason" rows={2} required className={inputCls} placeholder="what you found, and what you want done" />
                 </Field>
               </ActionForm>
-            </Card>
+              </div>
+            </details>
           ) : null}
 
           <Card title="Progress" description={run?.templateName ?? undefined}>
