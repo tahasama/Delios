@@ -5,7 +5,7 @@ import { requireScope } from "@/lib/scope";
 import { isController, isAdmin } from "@/lib/auth";
 import { audit, notify } from "@/lib/audit";
 import { controlDoes, actIsOff } from "@/lib/control-activities";
-import { delegationRefusal } from "@/lib/delegation";
+import { delegationRefusal, delegationFlag } from "@/lib/delegation";
 import type { Verb } from "@/lib/permissions";
 
 /**
@@ -55,12 +55,14 @@ export async function delegateReviewAction(_prev: State | undefined, formData: F
   const takes = await db.user.findFirst({ where: { id: toUserId, active: true }, select: { id: true, name: true } });
   if (!takes) return { error: "That person has no active account." };
 
-  // The one rule: only somebody the matrix already names for this act, on this
-  // kind of document, may be handed the step.
+  // Where the matrix is the only rule, only somebody it names for this act may
+  // be handed the step; otherwise anyone on the project, flagged when the
+  // matrix does not name them. Either way the record says who chose whom.
   const refusal = await delegationRefusal(ctx, {
     target, verb, fromUserId: user.id, fromName: user.name, toUserId: takes.id, toName: takes.name,
   });
   if (refusal) return { error: refusal };
+  const flag = await delegationFlag(ctx, { target, verb, toUserId: takes.id, toName: takes.name });
 
   const throughControl = await controlDoes(ctx, "DELEGATE");
   const label = `${target.docNumber} rev ${cycle!.revision.value}`;
@@ -84,7 +86,7 @@ export async function delegateReviewAction(_prev: State | undefined, formData: F
     tenant: ctx, actor: user, action: throughControl ? "DELEGATION_REQUESTED" : "DELEGATION_GRANTED",
     entityType: "Delegation", entityId: row.id, entityLabel: label,
     newValue: `${user.name} → ${takes.name}`,
-    detail: `${verb === "APPROVE" ? "The decision" : "Advice"} on ${label}, until ${endDate}.${reason ? ` ${reason}` : ""}`,
+    detail: `${user.name} delegated ${verb === "APPROVE" ? "the decision" : "their advice"} on ${label} to ${takes.name}, until ${endDate}, and answers for that choice.${reason ? ` ${reason}` : ""}${flag ? ` Flagged: ${flag}` : ""}`,
   });
   if (throughControl) {
     const { holdersOf } = await import("@/lib/permissions");

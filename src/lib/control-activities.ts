@@ -269,7 +269,29 @@ export const POLICIES: Policy[] = [
       },
     ],
   },
+  {
+    key: "POLICY_MATRIX",
+    title: "Who may be put on a review",
+    text: "Whether the distribution matrix decides who can be put on a review step or handed one, or only recommends.",
+    options: [
+      {
+        value: "GUIDE",
+        label: "The matrix recommends — recommended",
+        text: "It proposes the people and is the reference, but anyone on the project can be named. Somebody it does not name for that act is flagged, and the record says who chose them. Projects move without renewing the matrix for every exception.",
+      },
+      {
+        value: "STRICT",
+        label: "The matrix is the only rule",
+        text: "Only people the matrix names for the act, on that kind of document, can be put on a review step or handed one. Anybody else needs the matrix changed first.",
+      },
+    ],
+  },
 ];
+
+/** The matrix is the only rule for who reviews, decides or is handed a step. */
+export async function matrixBinds(t: Tenant): Promise<boolean> {
+  return (await policy(t, "POLICY_MATRIX")) === "STRICT";
+}
 
 /** What this project answered, or the app's opinion where it has not. */
 export async function policy(t: Tenant, key: string): Promise<string> {

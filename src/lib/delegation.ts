@@ -1,8 +1,15 @@
 import type { Tenant } from "./tenant";
 import { holdersOf, can, loadActor, type DocumentClass, type Verb } from "./permissions";
+import { matrixBinds } from "./control-activities";
 
 /**
  * Handing a review step to somebody else.
+ *
+ * Unless the project makes the matrix the only rule (POLICY_MATRIX), it
+ * recommends: anyone on the project may be handed the step, somebody it does
+ * not name for the act is flagged, and the record says who handed it to whom —
+ * the person who delegated answers for the choice. What follows is the strict
+ * reading, which applies only when the project asks for it.
  *
  * The distribution matrix names who may advise and who may decide on a class of
  * document; the review route picks, out of those, the step that advises and the
@@ -32,13 +39,40 @@ async function byPrivilege(t: Tenant): Promise<Set<string>> {
   return new Set([...control, ...configure].map((one) => one.id));
 }
 
-/** Who this person may hand a step of this kind to. */
+/**
+ * Who this person may hand a step of this kind to: those the matrix names,
+ * and — unless it is the only rule — everybody else on the project, flagged.
+ */
 export async function delegateCandidates(
   t: Tenant,
   { target, verb, fromUserId }: { target: Target; verb: Verb; fromUserId: string },
-) {
-  const [named, privileged] = await Promise.all([holdersOf(t, verb, target), byPrivilege(t)]);
-  return named.filter((one) => one.id !== fromUserId && !privileged.has(one.id));
+): Promise<{ id: string; name: string; functionName: string; inMatrix: boolean }[]> {
+  const [named, privileged, strict] = await Promise.all([holdersOf(t, verb, target), byPrivilege(t), matrixBinds(t)]);
+  const recommended = named
+    .filter((one) => one.id !== fromUserId && !privileged.has(one.id))
+    .map((one) => ({ id: one.id, name: one.name, functionName: one.functionName, inMatrix: true }));
+  if (strict) return recommended;
+  const members = await t.db.projectMembership.findMany({
+    where: { projectId: t.projectId, active: true, user: { active: true }, userId: { not: fromUserId } },
+    select: { user: { select: { id: true, name: true } }, function: { select: { name: true } } },
+    orderBy: { user: { name: "asc" } },
+  });
+  const others = members
+    .filter((m) => !recommended.some((one) => one.id === m.user.id))
+    .map((m) => ({ id: m.user.id, name: m.user.name, functionName: m.function?.name ?? "", inMatrix: false }));
+  return [...recommended, ...others];
+}
+
+/**
+ * The flag on a hand-over the matrix would not have made, or null. Said on the
+ * record and beside the hand-over; it never stops it unless the matrix binds.
+ */
+export async function delegationFlag(
+  t: Tenant,
+  { target, verb, toUserId, toName }: { target: Target; verb: Verb; toUserId: string; toName: string },
+): Promise<string | null> {
+  if (await named(t, toUserId, verb, target)) return null;
+  return `${toName} is not named in the matrix to ${verb === "APPROVE" ? "decide" : "advise"} on this kind of document.`;
 }
 
 /** Does this person hold the verb for this class in the matrix, right now? */
@@ -62,6 +96,11 @@ export async function delegationRefusal(
 ): Promise<string | null> {
   if (fromUserId === toUserId) return "A step cannot be handed to the person who already holds it.";
   const act = verb === "APPROVE" ? "decide" : "advise";
+  // The matrix recommends: anyone on the project may take it, flagged.
+  if (!(await matrixBinds(t))) {
+    const member = await t.db.projectMembership.findFirst({ where: { projectId: t.projectId, userId: toUserId, active: true }, select: { id: true } });
+    return member ? null : `${toName} is not on this project.`;
+  }
   if (!(await named(t, fromUserId, verb, target))) {
     return `${fromName} may not ${act} on this document, so there is nothing to hand over.`;
   }
@@ -94,7 +133,9 @@ export async function delegationInForce(
     include: { fromUser: { select: { id: true, name: true } } },
     orderBy: { createdAt: "desc" },
   });
+  const strict = await matrixBinds(t);
   for (const row of rows) {
+    if (!strict) return row;
     // Both ends, as they stand today — not as they stood when it was granted.
     if (!(await named(t, row.fromUserId, verb, target))) continue;
     if (!(await named(t, userId, verb, target))) continue;

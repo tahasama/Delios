@@ -2,6 +2,7 @@ import { requireScope } from "@/lib/scope";
 import { eligiblePeople, proposeForStep, normalizeRoute, type WfStep } from "@/lib/workflow";
 import { SendForReviewForm, type SendRoute } from "./send-for-review";
 import { verdictSets } from "@/lib/verdict-sets";
+import { matrixBinds } from "@/lib/control-activities";
 
 /**
  * Loads what the Send form needs for these revisions: the routes that apply
@@ -14,11 +15,12 @@ export async function SendForReview({ revisionIds }: { revisionIds: string[] }) 
   const docs = revisions.map((r) => r.document);
   if (!docs.length) return null;
 
-  const [templates, functions, reviewers, approvers] = await Promise.all([
+  const [templates, functions, reviewers, approvers, strict] = await Promise.all([
     db.workflowTemplate.findMany({ where: { active: true }, orderBy: [{ isDefault: "desc" }, { name: "asc" }] }),
     db.function.findMany({ select: { id: true, name: true } }),
     eligiblePeople(ctx, docs, "REVIEW"),
     eligiblePeople(ctx, docs, "APPROVAL"),
+    matrixBinds(ctx),
   ]);
   const fnName = new Map(functions.map((f) => [f.id, f.name]));
 
@@ -61,7 +63,7 @@ export async function SendForReview({ revisionIds }: { revisionIds: string[] }) 
     });
   }
 
-  const person = (p: { id: string; name: string; functionName: string }) => ({ id: p.id, name: p.name, functionName: p.functionName });
+  const person = (p: { id: string; name: string; functionName: string }) => ({ id: p.id, name: p.name, functionName: p.functionName, inMatrix: true });
   // Anyone on the project may be copied in; being told is not reviewing.
   const members = await db.projectMembership.findMany({
     where: { projectId: ctx.projectId, active: true, user: { active: true } },
@@ -69,5 +71,10 @@ export async function SendForReview({ revisionIds }: { revisionIds: string[] }) 
     orderBy: { user: { name: "asc" } },
   });
   const everyone = members.map((m) => ({ id: m.user.id, name: m.user.name, functionName: m.function?.name ?? "" }));
-  return <SendForReviewForm revisionIds={revisions.map((r) => r.id)} routes={routes} reviewers={reviewers.map(person)} approvers={approvers.map(person)} everyone={everyone} />;
+  // Unless the matrix is the only rule, it recommends: its people come first,
+  // and anybody else on the project may be put on a step, flagged.
+  const pool = (named: { id: string; name: string; functionName: string }[]) => strict
+    ? named.map(person)
+    : [...named.map(person), ...everyone.filter((one) => !named.some((n) => n.id === one.id)).map((one) => ({ ...one, inMatrix: false }))];
+  return <SendForReviewForm revisionIds={revisions.map((r) => r.id)} routes={routes} reviewers={pool(reviewers)} approvers={pool(approvers)} everyone={everyone} strict={strict} />;
 }

@@ -7,6 +7,7 @@ import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
 import { tenantFor } from "../src/lib/tenant";
 import { startWorkflowRun, recordStepOutcome, getRunForRevision } from "../src/lib/workflow";
+import { delegationRefusal, delegationFlag } from "../src/lib/delegation";
 import type { SessionUser } from "../src/lib/auth";
 
 const db = new PrismaClient();
@@ -69,20 +70,37 @@ async function main() {
     return tpl.id;
   }
 
+  // The project's answer on the matrix, set for a check and put back after.
+  const strict = async (on: boolean) => {
+    await db.controlSetting.deleteMany({ where: { projectId: p1.id, key: "POLICY_MATRIX", setByName: "verify-workflow" } });
+    if (on) await db.controlSetting.create({ data: { projectId: p1.id, key: "POLICY_MATRIX", mode: "STRICT", setByName: "verify-workflow" } as never });
+  };
+
   try {
     const parallelThenLead = await template("Three inputs then lead", [
       { act: "REVIEW", mode: "ALL", participantIds: [r1.id, r2.id, comm.id], days: 5 },
       { act: "REVIEW", mode: "ANY_OF", participantIds: [lead.id], days: 3 },
     ]);
 
-    console.log("\nOnly the distribution matrix decides who can be sent a document\n");
+    console.log("\nThe distribution matrix recommends who is sent a document — or decides, where the project says so\n");
     const offMatrix = await template("Includes a technician", [
       { act: "REVIEW", mode: "ALL", participantIds: [r1.id, tech.id] },
       { act: "REVIEW", mode: "ANY_OF", participantIds: [lead.id] },
     ]);
+    // The matrix recommends unless the project makes it the only rule.
+    const rev0g = await freshRevision("MATRIXG");
+    const allowed = await startWorkflowRun(t, rev0g.id, offMatrix, admin, [[r1.id, tech.id], [lead.id]]);
+    const flagged = allowed.ok ? await t.db.auditEvent.findFirst({ where: { action: "WORKFLOW_STARTED", entityId: allowed.runId } }) : null;
+    check("by default, someone the matrix does not name can be chosen — flagged on the record", allowed.ok && /Flagged/.test(flagged?.detail ?? ""), allowed.ok ? flagged?.detail ?? "" : allowed.error);
+    const handDoc = (await t.db.revision.findUniqueOrThrow({ where: { id: rev0g.id }, include: { document: true } })).document;
+    const hand = { target: handDoc, verb: "REVIEW" as const, fromUserId: r1.id, fromName: r1.name, toUserId: tech.id, toName: tech.name };
+    check("by default, a step can be handed to someone the matrix does not name", (await delegationRefusal(t, hand)) === null);
+    check("and the hand-over is flagged", !!(await delegationFlag(t, hand)));
+    await strict(true);
+    check("where the matrix is the only rule, that hand-over is refused", !!(await delegationRefusal(t, hand)));
     const rev0 = await freshRevision("MATRIX");
     const refused = await startWorkflowRun(t, rev0.id, offMatrix, admin, [[r1.id, tech.id], [lead.id]]);
-    check("choosing someone the matrix does not name is refused", !refused.ok && /distribution matrix/.test(refused.error), refused.ok ? "started" : refused.error);
+    check("where the matrix is the only rule, choosing someone it does not name is refused", !refused.ok && /distribution matrix/.test(refused.error), refused.ok ? "started" : refused.error);
     const rev0b = await freshRevision("MATRIX2");
     const trimmed = await startWorkflowRun(t, rev0b.id, offMatrix, admin);
     const trimmedRun = await getRunForRevision(t, rev0b.id);
@@ -153,7 +171,8 @@ async function main() {
     const reviewerDecides = await template("Reviewer decides", [{ act: "REVIEW", mode: "ANY_OF", participantIds: [r1.id] }]);
     const rev4 = await freshRevision("DECIDER");
     const s4 = await startWorkflowRun(t, rev4.id, reviewerDecides, admin, [[r1.id]]);
-    check("a reviewer cannot be put on the deciding step", !s4.ok && /may not approve/.test(s4.error), s4.ok ? "started" : s4.error);
+    check("where the matrix is the only rule, a reviewer cannot be put on the deciding step", !s4.ok && /may not approve/.test(s4.error), s4.ok ? "started" : s4.error);
+    await strict(false);
 
     console.log("\nA consolidated step: reviewers advise, the last person decides\n");
     const consolidated = await template("Consolidated", [{ act: "REVIEW", mode: "ALL_CONSOLIDATOR", participantIds: [r1.id, r2.id, lead.id] }]);
@@ -183,6 +202,7 @@ async function main() {
     check("one request for changes returns it to the author", run2?.status === "RETURNED", run2?.status);
     check("and nothing is approved", (await t.db.approval.count({ where: { revisionId: rev2.id } })) === 0);
   } finally {
+    await strict(false);
     // Leave the register as it was.
     const revs = await db.revision.findMany({ where: { documentId: { in: made.docs } }, select: { id: true } });
     const revIds = revs.map((r) => r.id);

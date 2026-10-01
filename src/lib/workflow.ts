@@ -375,8 +375,15 @@ export async function startWorkflowRun(t: Tenant, revisionId: string, templateId
   if (steps.some((s) => !s.participantIds.length)) return { ok: false, error: "Every step needs at least one participant." };
   // The matrix governs our own people. An outside party is on the route because
   // the route says so, and its liaison answers for it.
+  // Unless the project makes it the only rule, the matrix recommends: anyone
+  // on the project may sit on a step, and who is outside it is put on the record.
   const offMatrix = await offMatrixParticipants(t, rev.document, steps.filter((s) => !s.partyId));
-  if (offMatrix.length) return { ok: false, error: `Not on the distribution matrix: ${offMatrix.join("; ")}. Add them in Functions & permissions, or choose others.` };
+  const { matrixBinds } = await import("./control-activities");
+  const strictMatrix = await matrixBinds(t);
+  const notMembers = offMatrix.filter((one) => one.endsWith("is not on this project"));
+  if (notMembers.length || (offMatrix.length && strictMatrix)) {
+    return { ok: false, error: `Not on the distribution matrix: ${(strictMatrix ? offMatrix : notMembers).join("; ")}. Add them in Functions & permissions, or choose others.` };
+  }
 
   const run = await db.workflowRun.create({
     data: { projectId,
@@ -403,7 +410,7 @@ export async function startWorkflowRun(t: Tenant, revisionId: string, templateId
     entityType: "WorkflowRun",
     entityId: run.id,
     entityLabel: `${label} — ${template.name}`,
-    detail: `Template "${template.name}" with ${steps.length} step(s).`,
+    detail: `Template "${template.name}" with ${steps.length} step(s).${offMatrix.length ? ` Flagged — chosen by ${user.name} outside the matrix: ${offMatrix.join("; ")}.` : ""}`,
   });
   return { ok: true, runId: run.id };
 }

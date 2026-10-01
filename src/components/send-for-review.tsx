@@ -7,7 +7,7 @@ import { sendForReviewAction } from "@/lib/actions/workflow";
 import { ArrowRight } from "lucide-react";
 import { SearchPick } from "@/components/search-pick";
 
-export type SendPerson = { id: string; name: string; functionName: string };
+export type SendPerson = { id: string; name: string; functionName: string; inMatrix?: boolean };
 export type SendStep = { title: string; act: "REVIEW" | "APPROVAL"; mode: string; proposed: { id: string; why: string }[]; fromFunctions: string[] };
 export type SendRoute = { id: string; name: string; description: string | null; isDefault: boolean; steps: SendStep[]; verdicts: { title: string; values: { code: string; label: string; effectLabel: string }[] } | null };
 
@@ -27,13 +27,15 @@ const MODE: Record<string, string> = {
  * assigns (by the documents' discipline when the route names nobody); the
  * sender removes or adds anyone the matrix allows.
  */
-export function SendForReviewForm({ revisionIds, routes, reviewers, approvers, everyone = [] }: {
+export function SendForReviewForm({ revisionIds, routes, reviewers, approvers, everyone = [], strict = true }: {
   revisionIds: string[];
   routes: SendRoute[];
   reviewers: SendPerson[];
   approvers: SendPerson[];
   /** Everyone on the project, who may be copied in. */
   everyone?: SendPerson[];
+  /** The matrix is the only rule; otherwise anyone may be added, flagged. */
+  strict?: boolean;
 }) {
   const [routeId, setRouteId] = useState(routes.find((r) => r.isDefault)?.id ?? routes[0]?.id ?? "");
   const route = routes.find((r) => r.id === routeId);
@@ -63,7 +65,11 @@ export function SendForReviewForm({ revisionIds, routes, reviewers, approvers, e
           </div>
         ))}
       </div>
-      <p className="text-[11px] text-slate-400">Only people the distribution matrix allows for {revisionIds.length > 1 ? "every selected document" : "this document"} can be added to a step.</p>
+      <p className="text-[11px] text-slate-400">
+        {strict
+          ? `Only people the distribution matrix allows for ${revisionIds.length > 1 ? "every selected document" : "this document"} can be added to a step.`
+          : "The matrix proposes the people. Anyone else on the project can be added — they are flagged, and the record says you chose them."}
+      </p>
 
       {/* Copied in: told it went out for review and able to follow it, never
           asked to answer — so the route never waits on them. */}
@@ -93,7 +99,12 @@ function StepCard({ index, step, pool, many }: { index: number; step: SendStep; 
       <SearchPick
         compact
         name={`participants_${index}`}
-        items={pool.map((p) => ({ id: p.id, name: p.name, detail: why.get(p.id) ?? p.functionName }))}
+        items={pool.map((p) => ({
+          id: p.id,
+          name: p.name,
+          detail: p.inMatrix === false ? `${p.functionName} · not in the matrix` : why.get(p.id) ?? p.functionName,
+          note: p.inMatrix === false ? `Not named in the matrix to ${approval ? "approve" : "review"} this — flagged.` : null,
+        }))}
         initial={step.proposed.map((p) => p.id).filter((id) => pool.some((p) => p.id === id))}
         placeholder={pool.length ? "Type a name, then Enter" : "Nobody allowed"}
         empty={pool.length ? "Nobody yet — add someone." : `Nobody may ${approval ? "approve" : "review"} ${many ? "all of these" : "this"} under the matrix.`}

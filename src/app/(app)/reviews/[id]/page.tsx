@@ -10,8 +10,8 @@ import { myAdvice, dueState, getRunForRevision } from "@/lib/workflow";
 import { rewindRouteAction } from "@/lib/actions/workflow";
 import { requestChoices, authorOf, issuePolicy } from "@/lib/issue-requests";
 import { DelegatePanel, type DelegationRow } from "./delegate-panel";
-import { delegateCandidates } from "@/lib/delegation";
-import { controlDoes, actIsOff } from "@/lib/control-activities";
+import { delegateCandidates, delegationFlag } from "@/lib/delegation";
+import { controlDoes, actIsOff, matrixBinds } from "@/lib/control-activities";
 import { RequestIssue } from "@/app/(app)/documents/[id]/request-issue";
 import { Timeline } from "@/components/timeline";
 import { getActiveSet } from "@/lib/config";
@@ -98,9 +98,10 @@ export default async function ReviewCyclePage({ params }: { params: Promise<{ id
     : [];
   const rewindReasons = rewindTo.length ? await getActiveSet("RETURN_REASONS") : [];
   // Handing this step over. What is asked of this step — advice or the decision
-  // — is what may be handed over, and only to somebody the matrix names for it.
+  // — is what may be handed over; the matrix recommends who (or decides, if
+  // the project makes it the only rule).
   const handVerb: "REVIEW" | "APPROVE" = cycle.binding ? "APPROVE" : "REVIEW";
-  const [handCandidates, handThroughControl, handRows, handOff] = await Promise.all([
+  const [handCandidates, handThroughControl, handRows, handOff, handStrict] = await Promise.all([
     assigned && cycle.status === "OPEN" ? delegateCandidates(ctx, { target: doc, verb: handVerb, fromUserId: user.id }) : Promise.resolve([]),
     controlDoes(ctx, "DELEGATE"),
     db.delegation.findMany({
@@ -109,8 +110,9 @@ export default async function ReviewCyclePage({ params }: { params: Promise<{ id
       include: { fromUser: { select: { name: true } }, toUser: { select: { name: true } } },
     }),
     actIsOff(ctx, "DELEGATE"),
+    matrixBinds(ctx),
   ]);
-  const handOvers: DelegationRow[] = handRows.map((row) => ({
+  const handOvers: DelegationRow[] = await Promise.all(handRows.map(async (row) => ({
     id: row.id,
     fromName: row.fromUser.name,
     toName: row.toUser.name,
@@ -121,7 +123,8 @@ export default async function ReviewCyclePage({ params }: { params: Promise<{ id
     askedByName: row.askedByName,
     grantedByName: row.grantedByName,
     mine: row.fromUserId === user.id,
-  }));
+    flag: await delegationFlag(ctx, { target: doc, verb: row.verb === "APPROVE" ? "APPROVE" : "REVIEW", toUserId: row.toUserId, toName: row.toUser.name }),
+  })));
 
   const reserves = cycle.comments.filter((comment) => comment.progressionPreventing && comment.status === "OPEN");
   const myComments = cycle.comments.filter((comment) => comment.authorId === user.id);
@@ -296,7 +299,8 @@ export default async function ReviewCyclePage({ params }: { params: Promise<{ id
             <DelegatePanel
               cycleId={cycle.id}
               verb={handVerb}
-              candidates={handCandidates.map((one) => ({ id: one.id, name: one.name, functionName: one.functionName }))}
+              candidates={handCandidates}
+              strict={handStrict}
               throughControl={handThroughControl}
               rows={handOvers}
               controller={controller}
