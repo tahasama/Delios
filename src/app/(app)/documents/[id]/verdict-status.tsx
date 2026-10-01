@@ -36,7 +36,7 @@ export type StatusOption = {
  * leaves behind is a revision that is Not released until Document Control
  * publishes it.
  */
-export function VerdictDecision({ verdicts, statuses, deciding, carrying, laterSteps = [], request }: {
+export function VerdictDecision({ verdicts, statuses, deciding, carrying, laterSteps = [], request, advice }: {
   verdicts: VerdictOption[];
   statuses: StatusOption[];
   deciding: boolean;
@@ -56,6 +56,11 @@ export function VerdictDecision({ verdicts, statuses, deciding, carrying, laterS
    * not going anywhere.
    */
   request?: React.ReactNode;
+  /**
+   * On an advice step: what this adviser's comments amount to. Advice is not
+   * chosen — it is read off what they wrote, so the two can never disagree.
+   */
+  advice?: { code: string; comments: number; blocking: number } | null;
 }) {
   const [code, setCode] = useState("");
   const [status, setStatus] = useState(carrying ?? "");
@@ -69,13 +74,29 @@ export function VerdictDecision({ verdicts, statuses, deciding, carrying, laterS
 
   return (
     <>
-      <Field label="Your verdict" required hint={deciding ? "this one decides the revision" : "input for whoever decides"}>
-        <select name="outcome" required className={inputCls} value={code} onChange={(event) => setCode(event.target.value)}>
-          <option value="" disabled>Choose…</option>
-          {verdicts.map((one) => <option key={one.code} value={one.code}>{one.advice ? one.label : `${one.code} — ${one.label} (${one.effect})`}</option>)}
-        </select>
-        {verdict?.meaning ? <span className="mt-1.5 block text-[11px] text-slate-500">{verdict.meaning}</span> : null}
-      </Field>
+      {!deciding && advice ? (
+        // Advice is what the comments say. Write, or mark blocking, the comments
+        // on the review; this follows them.
+        <div className="rounded-lg bg-tint-soft px-3 py-2 text-xs text-slate-700">
+          <input type="hidden" name="outcome" value={advice.code} />
+          <span className="stencil mr-2 text-slate-500">Your advice</span>
+          <strong>{verdicts.find((one) => one.code === advice.code)?.label ?? advice.code}</strong>
+          <span className="block text-[11px] text-slate-500">
+            {advice.comments
+              ? `Worked out from your ${advice.comments} comment${advice.comments === 1 ? "" : "s"}${advice.blocking ? `, ${advice.blocking} of them blocking` : ""}.`
+              : "You have written no comment, so you have nothing to say."}
+            {" "}To change it, add or edit your comments on the review — not here.
+          </span>
+        </div>
+      ) : (
+        <Field label="Your verdict" required hint={deciding ? "this one decides the revision" : "input for whoever decides"}>
+          <select name="outcome" required className={inputCls} value={code} onChange={(event) => setCode(event.target.value)}>
+            <option value="" disabled>Choose…</option>
+            {verdicts.map((one) => <option key={one.code} value={one.code}>{one.advice ? one.label : `${one.code} — ${one.label} (${one.effect})`}</option>)}
+          </select>
+          {verdict?.meaning ? <span className="mt-1.5 block text-[11px] text-slate-500">{verdict.meaning}</span> : null}
+        </Field>
+      )}
 
       <>
           <Field

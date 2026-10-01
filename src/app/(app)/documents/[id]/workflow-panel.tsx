@@ -14,7 +14,7 @@ import { ADVICE_LABEL } from "@/lib/standard";
 import { getActiveSet } from "@/lib/config";
 import { VerdictDecision } from "./verdict-status";
 import { Send, CheckCircle2, Rocket } from "lucide-react";
-import { getRunForRevision, dueState, type WfRuntimeStep } from "@/lib/workflow";
+import { getRunForRevision, dueState, myAdvice, type WfRuntimeStep } from "@/lib/workflow";
 import { fmtDate } from "@/lib/utils";
 import { confirmRecordAction, correctRecordAction } from "@/lib/actions/governance";
 import { SendForReview } from "@/components/send-for-review-panel";
@@ -301,7 +301,7 @@ async function RunActivePanel({ run, user, extra }: { run: { id: string; templat
               </Link>
             ) : (
               <ActionForm action={recordStepOutcomeAction} submitLabel={deciding ? "Give my verdict" : "Give my advice"} size="sm" hidden={{ runId: run.id }}>
-                <VerdictDecision deciding={deciding} verdicts={decisionOptions(outcomes)} statuses={statusOptions(statuses, step.grantsStatuses)} carrying={carrying} laterSteps={laterSteps} request={nextStep ? <RequestIssue onDecision author={author} reasons={issueReasons.map((one) => ({ code: one.code, label: one.label }))} proposed={nextStep.proposed} others={nextStep.others} parties={nextStep.parties} /> : null} />
+                <VerdictDecision deciding={deciding} advice={!deciding && activeCycle ? await myAdvice(ctx, activeCycle.id, user.id) : null} verdicts={decisionOptions(outcomes)} statuses={statusOptions(statuses, step.grantsStatuses)} carrying={carrying} laterSteps={laterSteps} request={nextStep ? <RequestIssue onDecision author={author} reasons={issueReasons.map((one) => ({ code: one.code, label: one.label }))} proposed={nextStep.proposed} others={nextStep.others} parties={nextStep.parties} /> : null} />
               </ActionForm>
             )}
           </Action>

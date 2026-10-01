@@ -6,7 +6,7 @@ import { Card, Chip, Banner, Field, inputCls } from "@/components/ui";
 import { ActionForm } from "@/components/form";
 import { ADVICE_LABEL, OUTCOME_CONSEQUENCES } from "@/lib/standard";
 import { fmtDate, fmtDateTime } from "@/lib/utils";
-import { dueState, getRunForRevision } from "@/lib/workflow";
+import { myAdvice, dueState, getRunForRevision } from "@/lib/workflow";
 import { rewindRouteAction } from "@/lib/actions/workflow";
 import { requestChoices, authorOf, issuePolicy } from "@/lib/issue-requests";
 import { DelegatePanel, type DelegationRow } from "./delegate-panel";
@@ -331,7 +331,7 @@ export default async function ReviewCyclePage({ params }: { params: Promise<{ id
                     </li>
                   ))}
                 </ul>
-              ) : null}{canReturn ? <div className="mt-4 border-t border-line pt-4"><ActionForm action={returnToOriginatorAction} submitLabel="Return to author" size="sm" hidden={{ cycleId: cycle.id }}/></div> : null}</div> : <Guarded result={await preflight("RECORD_OUTCOME", { cycleId: cycle.id })}><ActionForm action={recordOutcomeAction} submitLabel={byProxy && cycle.party ? `Record ${cycle.party.name}’s answer` : cycle.binding ? "Give my verdict" : "Give my advice"} hidden={{ cycleId: cycle.id }}><VerdictDecision deciding={cycle.binding} verdicts={decisionOptions(outcomes)} statuses={statusOptions(statuses, mayDecideOn)} carrying={rev.statusCode} laterSteps={laterSteps} request={nextStep ? <RequestIssue onDecision author={author} reasons={issueReasons.map((one) => ({ code: one.code, label: one.label }))} proposed={nextStep.proposed} others={nextStep.others} parties={nextStep.parties} /> : null} />
+              ) : null}{canReturn ? <div className="mt-4 border-t border-line pt-4"><ActionForm action={returnToOriginatorAction} submitLabel="Return to author" size="sm" hidden={{ cycleId: cycle.id }}/></div> : null}</div> : <Guarded result={await preflight("RECORD_OUTCOME", { cycleId: cycle.id })}><ActionForm action={recordOutcomeAction} submitLabel={byProxy && cycle.party ? `Record ${cycle.party.name}’s answer` : cycle.binding ? "Give my verdict" : "Give my advice"} hidden={{ cycleId: cycle.id }}><VerdictDecision deciding={cycle.binding} advice={cycle.binding ? null : await myAdvice(ctx, cycle.id, user.id)} verdicts={decisionOptions(outcomes)} statuses={statusOptions(statuses, mayDecideOn)} carrying={rev.statusCode} laterSteps={laterSteps} request={nextStep ? <RequestIssue onDecision author={author} reasons={issueReasons.map((one) => ({ code: one.code, label: one.label }))} proposed={nextStep.proposed} others={nextStep.others} parties={nextStep.parties} /> : null} />
               {byProxy && cycle.party ? (
                 <div className="mt-3 space-y-3 border-t border-line pt-3">
                   <p className="stencil text-slate-400">Recorded for {cycle.party.name}</p>

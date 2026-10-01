@@ -32,6 +32,36 @@ import { verdictMeaning, assertMayGiveBindingVerdict, recordApproval } from "./v
 export const VERDICT_SET = "REVIEW_OUTCOMES";
 export const ADVICE_SET = "REVIEW_ADVICE";
 
+/**
+ * What an adviser's comments amount to. An adviser is not asked: the answer is
+ * already in what they wrote, and asking a second time only allows the two to
+ * disagree. A blocking comment is the whole of "I object"; no comment is the
+ * whole of "nothing to say".
+ */
+export function adviceFor(comments: { progressionPreventing: boolean }[]): "none" | "some" | "blocking" {
+  if (comments.some((c) => c.progressionPreventing)) return "blocking";
+  return comments.length ? "some" : "none";
+}
+
+/** The organization's own code for that advice, found by what it means rather than by its name. */
+const STANDARD_ADVICE = { none: "NO_COMMENT", some: "COMMENTS", blocking: "COMMENTS_BLOCKING" } as const;
+/**
+ * What this adviser's comments amount to on this step, for the form that
+ * records it: the code, and the counts it was worked out from.
+ */
+export async function myAdvice(t: Pick<Tenant, "db">, cycleId: string, userId: string): Promise<{ code: string; comments: number; blocking: number }> {
+  const mine = await t.db.reviewComment.findMany({ where: { cycleId, authorId: userId }, select: { progressionPreventing: true } });
+  return { code: await adviceCode(t, adviceFor(mine)), comments: mine.length, blocking: mine.filter((c) => c.progressionPreventing).length };
+}
+
+async function adviceCode(t: Pick<Tenant, "db">, kind: "none" | "some" | "blocking"): Promise<string> {
+  const values = await t.db.configValue.findMany({ where: { setKey: ADVICE_SET, status: "ACTIVE" }, select: { code: true, props: true } });
+  const meant = values.find((one) => {
+    try { return (JSON.parse(one.props ?? "{}") as { comments?: string }).comments === kind; } catch { return false; }
+  });
+  return meant?.code ?? STANDARD_ADVICE[kind];
+}
+
 /** Which list a step answers from: the last step decides, the rest advise. */
 export function setKeyForStep(stepIndex: number, stepCount: number, stepSetKey?: string | null, templateSetKey?: string | null): string {
   const decides = stepIndex === stepCount - 1;
@@ -595,6 +625,12 @@ export async function recordStepOutcome(
     said = `${user.name} for ${inPlaceOf} (by delegation)`;
   }
   const outcomeSetKey = decidesStep ? step.outcomeSetKey ?? VERDICT_SET : ADVICE_SET;
+  // An advisory step records what the comments say, whatever was posted. What
+  // one adviser wrote is their own advice; what the step says is all of it,
+  // so the order people answer in cannot change the answer.
+  const adviceOn = async (where: { cycleId: string; authorId?: string }) =>
+    adviceCode(t, adviceFor(await db.reviewComment.findMany({ where, select: { progressionPreventing: true } })));
+  if (!decidesStep) outcomeCode = step.cycleId ? await adviceOn({ cycleId: step.cycleId, authorId: user.id }) : await adviceCode(t, "none");
   /** Closing a step ends the review interval; only a verdict that sends the revision back returns it to its author. */
   const closed = (_toAuthor: boolean) => ({ returnedFromReviewAt: new Date(), status: "CLOSED" });
 
@@ -687,8 +723,8 @@ export async function recordStepOutcome(
     if (!written) return { ok: false, error: `${verdict.label} carries comments into the next revision, so there must be comments. Write them, or choose the verdict that accepts it outright.` };
   }
 
-  /** The code the closing cycle carries: what the person actually chose. */
-  const closingCode = async () => outcomeCode;
+  /** The code the closing cycle carries: the verdict, or all the advice given on the step. */
+  const closingCode = async () => (decides || !step.cycleId ? outcomeCode : adviceOn({ cycleId: step.cycleId }));
 
   const finishBindingDecision = async () => {
     if (!decides) return advance(t, runId, user);
