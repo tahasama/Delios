@@ -1047,7 +1047,7 @@ summary::-webkit-details-marker {
     background:
       radial-gradient(120% 90% at 50% -10%, rgb(56 98 150 / 0.45), transparent 60%),
       linear-gradient(180deg, #0b1422 0%, #0d1a2c 55%, #0a121e 100%);
-    box-shadow: inset 0 0 0 1px rgb(120 160 210 / 0.14), 0 18px 40px -28px rgb(8 15 28 / 0.9);
+    box-shadow: inset 0 0 0 1px rgb(120 160 210 / 0.14);
   }
   /* Sprocket holes along the top and bottom edges. */
   .scene-film {
@@ -1122,10 +1122,9 @@ summary::-webkit-details-marker {
       rgb(255 255 255 / 0.08);
     box-shadow:
       inset 0 0 0 1px color-mix(in oklab, var(--rail) 70%, transparent),
-      0 0 0 1px rgb(0 0 0 / 0.2),
-      0 14px 34px -10px color-mix(in oklab, var(--rail) 55%, transparent);
+      0 8px 20px -14px color-mix(in oklab, var(--rail) 35%, transparent);
   }
-  .scene[aria-selected="true"]::before { opacity: 1; box-shadow: 0 0 12px var(--rail); }
+  .scene[aria-selected="true"]::before { opacity: 1; }
   .scene-number { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.12em; color: rgb(255 255 255 / 0.5); }
   .scene-title { font-size: 0.95rem; font-weight: 600; letter-spacing: -0.01em; line-height: 1.15; }
   .scene-tagline { font-size: 11px; line-height: 1.35; color: rgb(255 255 255 / 0.62); }
@@ -1157,7 +1156,7 @@ summary::-webkit-details-marker {
     border-block: 3.5px solid transparent;
   }
   .scene-dot { display: inline-block; width: 7px; height: 7px; border-radius: 999px; }
-  .scene-dot-control { background: #7cb6ff; box-shadow: 0 0 6px rgb(124 182 255 / 0.7); }
+  .scene-dot-control { background: #7cb6ff; }
   .scene-dot-work { background: rgb(255 255 255 / 0.85); }
   .scene-dot-fixed { background: transparent; box-shadow: inset 0 0 0 1.5px rgb(255 255 255 / 0.5); }
   .scene-dot-none { background: rgb(255 255 255 / 0.2); }
@@ -1170,7 +1169,6 @@ summary::-webkit-details-marker {
     height: 100%;
     border-radius: inherit;
     background: linear-gradient(90deg, #7cb6ff, #b7d6ff);
-    box-shadow: 0 0 10px rgb(124 182 255 / 0.6);
     transition: width 420ms cubic-bezier(.2,.7,.2,1);
   }
 
@@ -1182,4 +1180,30 @@ summary::-webkit-details-marker {
     .scene[aria-selected="true"] { transform: none; }
     .scene-panel { animation: none; }
   }
+}
+
+@layer components {
+  /* An act's two sides, switched in place in the Control room. */
+  .act-switch {
+    display: inline-flex;
+    gap: 0.125rem;
+    padding: 0.15rem;
+    border-radius: 0.55rem;
+    background: var(--color-canvas-deep);
+  }
+  :root.dark .act-switch { background: color-mix(in srgb, var(--color-canvas-deep) 60%, var(--color-surface)); }
+  .act-side {
+    border-radius: 0.42rem;
+    padding: 0.2rem 0.55rem;
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+    color: var(--color-slate-500);
+    transition: background-color 150ms, color 150ms;
+  }
+  .act-side:hover { color: var(--color-slate-900); }
+  .act-side-on { background: var(--color-surface); color: var(--color-slate-900); box-shadow: 0 1px 2px rgb(15 23 42 / 0.1); }
+  .act-side-control.act-side-on { background: var(--color-tint); color: var(--color-brand-ink); }
+  .act-side-asked { outline: 1.5px dashed var(--color-amber-500); outline-offset: 1px; }
+  .act-confirm { background: var(--color-tint-soft); border: 1px solid var(--color-line); }
 }

@@ -8,6 +8,7 @@ import { holdersOf } from "@/lib/permissions";
 import { REV_STATE_COLOR, type RevState } from "@/lib/standard";
 import { stateNames, stateName } from "@/lib/state-names";
 import { SceneDeck, type Scene } from "./scene-deck";
+import { ActSwitch } from "./act-switch";
 import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -319,7 +320,7 @@ export default async function ControlRoomPage() {
     <div className="space-y-4">
       <PageHeader
         title="Control room"
-        subtitle="How a document moves through this project: who does each step, what is switched on, and the sets each step uses. Change any of it on the page it links to."
+        subtitle="How a document moves through this project: who does each step, what is switched on, and the sets each step uses. Switch who carries out an act right here; the rest changes on the page it links to."
       />
 
       {/* Where the project stands, before the steps. */}
@@ -362,26 +363,11 @@ export default async function ControlRoomPage() {
   );
 }
 
-function Carrier({ control }: { control: boolean }) {
-  return control
-    ? <Chip className="bg-tint text-brand-ink ring-brand-line">Document Control</Chip>
-    : <Chip className="bg-slate-100 text-slate-600 ring-slate-200">The people doing the work</Chip>;
-}
-
-/** One act the organization decides the carrier of, as it stands now. */
+/** One act the organization decides the carrier of, switchable in place. */
 function ActLine({ act, row }: { act: string; row?: { controlDoes: boolean } }) {
   const activity = CONTROL_ACTIVITIES.find((one) => one.key === act);
   if (!activity || !row) return null;
-  return (
-    <li>
-      <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
-        <span className="text-[13px] font-medium text-slate-900">{activity.title}</span>
-        <Carrier control={row.controlDoes} />
-        <Link href="/admin/control" className="text-[11px] font-semibold text-link hover:underline">change</Link>
-      </p>
-      <p className="mt-0.5 text-xs leading-5 text-slate-600">{row.controlDoes ? activity.control : activity.self}</p>
-    </li>
-  );
+  return <ActSwitch act={act} title={activity.title} controlText={activity.control} selfText={activity.self} controlDoes={row.controlDoes} />;
 }
 
 function FixedLine({ title, text }: Fixed) {

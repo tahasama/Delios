@@ -6,6 +6,7 @@ import { audit } from "@/lib/audit";
 import { STATE_NAMES, STATE_NAME_MAX } from "@/lib/state-names";
 import {
   CONTROL_ACTIVITIES,
+  controlSettings,
   MODE_LABEL,
   POLICIES,
   PROJECT_KEY,
@@ -22,7 +23,7 @@ import {
  * every change goes on the record.
  */
 
-type State = { error?: string; message?: string };
+type State = { error?: string; ok?: string };
 
 const ACT_MODES: ControlMode[] = ["CONTROL", "SELF"];
 const PROJECT_MODES: ProjectMode[] = ["CONTROL", "SELF", "CUSTOM"];
@@ -63,9 +64,10 @@ export async function setControlActivitiesAction(_prev: State | undefined, formD
     }
   }
   revalidatePath("/admin/control");
-  if (!changed) return { message: "Nothing changed." };
+  revalidatePath("/admin/flow");
+  if (!changed) return { ok: "Nothing changed." };
   return {
-    message: asked === "CUSTOM"
+    ok: asked === "CUSTOM"
       ? `Saved — act by act. ${CONTROL_ACTIVITIES.length} acts, each with its own answer.`
       : `Saved — ${PROJECT_MODE_LABEL[asked].toLowerCase()}.`,
   };
@@ -86,8 +88,9 @@ export async function setPolicyAction(_prev: State | undefined, formData: FormDa
     }
   }
   revalidatePath("/admin/control");
-  if (!changed.length) return { message: "Nothing changed." };
-  return { message: `Saved: ${changed.join("; ")}.` };
+  revalidatePath("/admin/flow");
+  if (!changed.length) return { ok: "Nothing changed." };
+  return { ok: `Saved: ${changed.join("; ")}.` };
 }
 
 /** One act, changed on its own while the project is on "it depends". */
@@ -97,10 +100,20 @@ export async function setOneControlActivityAction(_prev: State | undefined, form
   const activity = CONTROL_ACTIVITIES.find((one) => one.key === key);
   if (!activity) return { error: "That is not one of the acts." };
   if (!ACT_MODES.includes(value)) return { error: "Choose who carries it out." };
+  // Moving the project to "it depends" must not move any other act: each one
+  // is written down as it stands now before this one changes.
+  const now = await controlSettings(await requireAdminScope());
+  if (now.projectMode !== "CUSTOM") {
+    for (const row of now.rows) {
+      if (row.activity.key === key) continue;
+      await put(row.activity.key, row.controlDoes ? "CONTROL" : "SELF", row.activity.title);
+    }
+  }
   await put(PROJECT_KEY, "CUSTOM", "Who carries out the acts of document control");
   const changed = await put(key, value, activity.title);
   revalidatePath("/admin/control");
-  return { message: changed ? `${activity.title}: ${MODE_LABEL[value].toLowerCase()}.` : "Nothing changed." };
+  revalidatePath("/admin/flow");
+  return { ok: changed ? `${activity.title}: ${MODE_LABEL[value].toLowerCase()}.` : "Nothing changed." };
 }
 
 /**
@@ -143,6 +156,6 @@ export async function setStateNamesAction(_prev: State | undefined, formData: Fo
     changed.push(`${was} → ${label}`);
   }
   revalidatePath("/", "layout");
-  if (!changed.length) return { message: "Nothing changed." };
-  return { message: `Renamed: ${changed.join("; ")}.` };
+  if (!changed.length) return { ok: "Nothing changed." };
+  return { ok: `Renamed: ${changed.join("; ")}.` };
 }
