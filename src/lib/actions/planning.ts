@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { isController, isAdmin } from "@/lib/auth";
 import { audit, notify } from "@/lib/audit";
 import { isReadOnly } from "@/lib/auth";
+import { filterFromForm, isEmpty, describeFilter, syncPackage, parseExcluded } from "@/lib/package-rule";
 
 // ── Actions & deliverable baseline (Part 14) ─────────────────────────────────
 
@@ -20,8 +21,12 @@ export async function createPackageAction(_prev: { error?: string } | undefined,
   if (isReadOnly(user)) return { error: "Viewers cannot create packages." };
   const identifier = String(formData.get("identifier") ?? "").trim();
   const purpose = String(formData.get("purpose") ?? "");
-  const type = String(formData.get("type") ?? "");
-  const membershipRule = String(formData.get("membershipRule") ?? "").trim() || null;
+
+  // A package filled by a rule states it as a filter; its words are made from it.
+  const filter = filterFromForm(formData);
+  const membershipRule = !isEmpty(filter) ? await describeFilter(ctx, filter) : null;
+  // A package with a rule keeps filling itself; the Standard calls it accumulated.
+  const type = membershipRule ? "ACCUMULATED" : "DEFINED";
   // Handed to an organization on the project; its name is kept with the package.
   const recipientPartyId = String(formData.get("recipientPartyId") ?? "") || null;
   const recipientParty = recipientPartyId ? await db.party.findFirst({ where: { id: recipientPartyId }, select: { id: true, name: true } }) : null;
@@ -32,8 +37,6 @@ export async function createPackageAction(_prev: { error?: string } | undefined,
   const acceptanceAuthorityId = String(formData.get("acceptanceAuthorityId") ?? "");
  if (!identifier) return { error: "A package identifier is required — unique, never reused." };
  if (!purpose) return { error: "Every package states a reason for issue." };
- if (!type) return { error: "Defined or accumulated — state the type." };
- if (type === "ACCUMULATED" && !membershipRule) return { error: "An accumulated package states its membership rule." };
  if (!recipientName) return { error: "Choose the organization it is delivered to." };
  if (!completionDate) return { error: "The completion date is required — it triggers assessment." };
  if (!requiredStatus) return { error: "State the status members shall have reached." };
@@ -45,16 +48,18 @@ export async function createPackageAction(_prev: { error?: string } | undefined,
     db.user.findUniqueOrThrow({ where: { id: compositionOwnerId } }),
     db.user.findUniqueOrThrow({ where: { id: acceptanceAuthorityId } }),
   ]);
-  await db.package.create({
+  const created = await db.package.create({
     data: {
       projectId,
+      membershipFilter: membershipRule ? JSON.stringify(filter) : null,
       identifier, purpose, type, membershipRule, recipientName, recipientPartyId: recipientParty?.id ?? null,
       completionDate: new Date(completionDate), requiredStatus,
       compositionOwnerId, compositionOwnerName: owner.name,
       acceptanceAuthorityId, acceptanceAuthorityName: acceptor.name,
     },
   });
- await audit({ actor: user, action: "PACKAGE_CREATED", entityType: "Package", entityId: identifier, entityLabel: identifier, detail: `${type.toLowerCase()} package — ${owner.name} composes, ${acceptor.name} accepts.` });
+ const joined = await syncPackage(ctx, created.id);
+ await audit({ actor: user, action: "PACKAGE_CREATED", entityType: "Package", entityId: identifier, entityLabel: identifier, detail: `${membershipRule ? `Filled by rule: ${membershipRule} (${joined} document${joined === 1 ? "" : "s"} now)` : "A list we choose"} — ${owner.name} composes, ${acceptor.name} accepts.` });
   redirect(`/packages/${identifier}`);
 }
 
@@ -76,6 +81,11 @@ export async function addPackageMemberAction(_prev: { error?: string } | undefin
   const fresh = documentIds.filter((id) => !pkg.members.some((m) => m.documentId === id));
   if (!fresh.length) return { error: "Those documents are already in the package." };
   await db.packageMember.createMany({ data: fresh.map((documentId) => ({ projectId, packageId, documentId, requiredStatus })) });
+  // Added back by hand: no longer kept out.
+  const excluded = parseExcluded(pkg.membershipExcluded);
+  if (excluded.some((id) => fresh.includes(id))) {
+    await db.package.update({ where: { id: packageId }, data: { membershipExcluded: JSON.stringify(excluded.filter((id) => !fresh.includes(id))) } });
+  }
  await audit({ actor: user, action: "PACKAGE_MEMBER", entityType: "Package", entityId: pkg.identifier, entityLabel: pkg.identifier, detail: `${fresh.length} document(s) added.` });
   revalidatePath(`/packages/${pkg.identifier}`);
   // From the register's "Add to package": land on the package, where the result is.
@@ -89,6 +99,7 @@ export async function assessPackageAction(_prev: { error?: string } | undefined,
   const { user, db, projectId, orgId } = ctx;
   if (isReadOnly(user)) return { error: "Viewers cannot assess packages." };
   const packageId = String(formData.get("packageId") ?? "");
+  await syncPackage(ctx, packageId);
   const pkg = await db.package.findUniqueOrThrow({ where: { id: packageId }, include: { members: { include: { document: { include: { revisions: { where: { state: "RELEASED" }, orderBy: { releasedAt: "desc" }, take: 1 } } } } } } });
   if (pkg.closedAt) return { error: "Package already closed." };
   const shortfall = [];
@@ -150,6 +161,7 @@ export async function closePackageAction(_prev: { error?: string } | undefined, 
   const packageId = String(formData.get("packageId") ?? "");
   const ruleCeased = formData.get("ruleCeased") === "on";
   const closureNote = String(formData.get("closureNote") ?? "").trim() || null;
+  await syncPackage(ctx, packageId);
   const pkg = await db.package.findUniqueOrThrow({
     where: { id: packageId },
     include: { members: { include: { document: { include: { revisions: { where: { state: "RELEASED" }, orderBy: { releasedAt: "desc" }, take: 1 } } } } } },
@@ -197,6 +209,53 @@ export async function closePackageAction(_prev: { error?: string } | undefined, 
     data: { closedAt: now, closureNote, deliveredAt: transmittalId ? now : null, transmittalId, ruleCeasedAt: pkg.type === "ACCUMULATED" && ruleCeased ? now : null },
   });
  await audit({ actor: user, action: "PACKAGE_CLOSED", entityType: "Package", entityId: pkg.identifier, entityLabel: pkg.identifier, newValue: number, detail: number ? `Delivered to ${pkg.recipientName} on ${number}: ${ready.length} of ${pkg.members.length} documents.` : "Closure declared." });
+  revalidatePath(`/packages/${pkg.identifier}`);
+  return {};
+}
+
+/** Take documents out of a package. One the rule matches stays out. */
+export async function removePackageMemberAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
+  const ctx = await requireScope();
+  const { user, db } = ctx;
+  if (isReadOnly(user)) return { error: "Viewers cannot change composition." };
+  const packageId = String(formData.get("packageId") ?? "");
+  const documentIds = formData.getAll("documentId").map(String).filter(Boolean);
+  const reason = String(formData.get("reason") ?? "").trim();
+  const pkg = await db.package.findUniqueOrThrow({ where: { id: packageId }, include: { members: { include: { document: { select: { docNumber: true } } } } } });
+  if (pkg.closedAt) return { error: "The package is delivered — its contents are fixed." };
+  if (user.id !== pkg.compositionOwnerId && !isController(user) && !isAdmin(user)) {
+    return { error: `Only ${pkg.compositionOwnerName} or Document Control can change what is in this package.` };
+  }
+  if (!reason) return { error: "Say why they are taken out — it goes on the record." };
+  const going = pkg.members.filter((m) => documentIds.includes(m.documentId));
+  if (!going.length) return { error: "Tick the documents to take out." };
+  await db.packageMember.deleteMany({ where: { packageId, documentId: { in: going.map((m) => m.documentId) } } });
+  const excluded = [...new Set([...parseExcluded(pkg.membershipExcluded), ...going.map((m) => m.documentId)])];
+  await db.package.update({ where: { id: packageId }, data: { membershipExcluded: JSON.stringify(excluded), assessedAt: null, shortfall: null, shortfallIssuedAt: null, shortfallAcceptedBy: null } });
+  await audit({ actor: user, action: "PACKAGE_MEMBER", entityType: "Package", entityId: pkg.identifier, entityLabel: pkg.identifier, detail: `Taken out: ${going.map((m) => m.document.docNumber).join(", ")}. ${reason}` });
+  revalidatePath(`/packages/${pkg.identifier}`);
+  return {};
+}
+
+/** Set, change or clear the rule a package fills itself by. */
+export async function setPackageRuleAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
+  const ctx = await requireScope();
+  const { user, db } = ctx;
+  if (isReadOnly(user)) return { error: "Viewers cannot change composition." };
+  const packageId = String(formData.get("packageId") ?? "");
+  const pkg = await db.package.findUniqueOrThrow({ where: { id: packageId } });
+  if (pkg.closedAt) return { error: "The package is delivered — its contents are fixed." };
+  if (user.id !== pkg.compositionOwnerId && !isController(user) && !isAdmin(user)) {
+    return { error: `Only ${pkg.compositionOwnerName} or Document Control can change what is in this package.` };
+  }
+  const filter = filterFromForm(formData);
+  const rule = isEmpty(filter) ? null : await describeFilter(ctx, filter);
+  await db.package.update({
+    where: { id: packageId },
+    data: { membershipFilter: rule ? JSON.stringify(filter) : null, membershipRule: rule, type: rule ? "ACCUMULATED" : "DEFINED", ruleCeasedAt: null },
+  });
+  const joined = await syncPackage(ctx, packageId);
+  await audit({ actor: user, action: "PACKAGE_RULE", entityType: "Package", entityId: pkg.identifier, entityLabel: pkg.identifier, oldValue: pkg.membershipRule, newValue: rule, detail: rule ? `Fills itself with ${rule}; ${joined} document${joined === 1 ? "" : "s"} joined.` : "No rule: documents are added by hand only." });
   revalidatePath(`/packages/${pkg.identifier}`);
   return {};
 }

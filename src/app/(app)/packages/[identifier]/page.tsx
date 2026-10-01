@@ -4,7 +4,9 @@ import { notFound } from "next/navigation";
 import { Timeline } from "@/components/timeline";
 import { Card, Chip, Info, Field, inputCls, Banner } from "@/components/ui";
 import { ActionForm } from "@/components/form";
-import { addPackageMemberAction, assessPackageAction, issueShortfallAction, closePackageAction, acceptShortfallAction } from "@/lib/actions/planning";
+import { addPackageMemberAction, removePackageMemberAction, setPackageRuleAction, assessPackageAction, issueShortfallAction, closePackageAction, acceptShortfallAction } from "@/lib/actions/planning";
+import { syncPackage, parseFilter } from "@/lib/package-rule";
+import { RuleFields } from "../rule-fields";
 import { getActiveSet } from "@/lib/config";
 import { fmtDate, fmtDateTime, cn } from "@/lib/utils";
 import { ArrowLeft } from "lucide-react";
@@ -21,9 +23,13 @@ export const dynamic = "force-dynamic";
  * it. What is missing on the day goes to the acceptance authority first.
  */
 export default async function PackageDetailPage({ params, searchParams }: { params: Promise<{ identifier: string }>; searchParams: Promise<{ added?: string }> }) {
-  const { user, db } = await requireScope();
+  const ctx = await requireScope();
+  const { user, db } = ctx;
   const { identifier } = await params;
   const sp = await searchParams;
+  // A package with a rule takes in what has come to match it since last seen.
+  const found = await db.package.findFirst({ where: { identifier }, select: { id: true } });
+  if (found) await syncPackage(ctx, found.id);
   const pkg = await db.package.findFirst({
     where: { identifier },
     include: { members: { include: { document: { include: { revisions: { where: { state: "RELEASED" }, orderBy: { releasedAt: "desc" }, take: 1 } } } } } },
@@ -109,6 +115,29 @@ export default async function PackageDetailPage({ params, searchParams }: { para
         </ActionForm>
       ) : <p className="text-xs text-slate-500">Every active document is already in this package.</p>,
     });
+    if (total) items.push({
+      key: "remove",
+      label: "Take documents out",
+      body: (
+        <ActionForm action={removePackageMemberAction} submitLabel="Take the ticked documents out" size="sm" variant="secondary" hidden={{ packageId: pkg.id }}>
+          <div className="-mx-5 border-y border-line sm:-mx-6">
+            <RevisionChecklist name="documentId" rows={pkg.members.map((m) => ({ id: m.documentId, number: m.document.docNumber, rev: m.document.revisions[0]?.value ?? "—", status: m.document.revisions[0]?.statusCode ?? null, title: m.document.title }))} />
+          </div>
+          <Field label="Why" required hint="goes on the record"><input name="reason" required className={inputCls} /></Field>
+          {pkg.membershipRule ? <p className="text-[11px] text-slate-500">A document the rule matches stays out until someone adds it back by hand.</p> : null}
+        </ActionForm>
+      ),
+    });
+    items.push({
+      key: "rule",
+      label: pkg.membershipRule ? "Change the rule" : "Fill it by a rule",
+      body: (
+        <ActionForm action={setPackageRuleAction} submitLabel={pkg.membershipRule ? "Save the rule" : "Set the rule"} size="sm" hidden={{ packageId: pkg.id }}>
+          <p className="text-xs text-slate-500">Every document matching all you choose joins, new ones too, until the package is delivered. Clear every choice to fill it by hand only.</p>
+          <RuleFields initial={parseFilter(pkg.membershipFilter)} />
+        </ActionForm>
+      ),
+    });
   }
 
   return (
@@ -123,7 +152,7 @@ export default async function PackageDetailPage({ params, searchParams }: { para
             </p>
             <p className="mt-1 max-w-3xl text-[11.5px] leading-4 text-slate-400">
               Put together by {pkg.compositionOwnerName} · accepted by {pkg.acceptanceAuthorityName}
-              {pkg.type === "ACCUMULATED" && pkg.membershipRule ? ` · includes ${pkg.membershipRule}` : ""}
+              {pkg.membershipRule ? ` · fills itself with ${pkg.membershipRule}` : ""}
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-2 lg:justify-end">
@@ -150,7 +179,7 @@ export default async function PackageDetailPage({ params, searchParams }: { para
         <section className="register register-sheet register-sheet-open">
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
             <span className="stencil text-slate-600">Documents</span>
-            <span className="text-[11px] text-slate-500">{readyCount} of {total} released at the status they need</span>
+            <span className="text-[11px] text-slate-500">{readyCount} of {total} released at the status they need{pkg.membershipRule && !pkg.closedAt ? ` · ${pkg.membershipRule} joins by itself` : ""}</span>
           </div>
           {total ? (
             <ul className="divide-y divide-line">

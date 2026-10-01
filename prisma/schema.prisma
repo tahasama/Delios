@@ -1210,6 +1210,8 @@ model Package {
   purpose                 String // reason for issue (§2.6)
   type                    String // DEFINED | ACCUMULATED (§15.1)
   membershipRule          String? // stated rule for accumulated packages
+  membershipFilter        String? // JSON: { assetIds, disciplines, docTypes, originators } — what the rule admits
+  membershipExcluded      String? // JSON: document ids taken out by hand, which the rule does not bring back
   recipientName           String
   // Delivery: the organization it is handed to, and the transmittal that carried it.
   recipientPartyId        String?

@@ -13,6 +13,7 @@ import { Download } from "lucide-react";
 import { isReadOnly } from "@/lib/auth";
 import { holdersOf } from "@/lib/permissions";
 import { SearchPick } from "@/components/search-pick";
+import { RuleFields } from "./rule-fields";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Packages" };
@@ -150,10 +151,12 @@ export default async function PackagesPage({ searchParams }: { searchParams: Pro
               <Field label="Why they get it" required><select name="purpose" required className={inputCls} defaultValue=""><option value="" disabled>Choose…</option>{reasons.map((item) => <option key={item.code} value={item.code}>{item.label}</option>)}</select></Field>
               <Field label="Needed at" required><select name="requiredStatus" required className={inputCls} defaultValue=""><option value="" disabled>Choose…</option>{statuses.map((item) => <option key={item.code} value={item.code}>{item.code} · {item.label}</option>)}</select></Field>
               <Field label="Due" required><input type="date" name="completionDate" required className={inputCls}/></Field>
-              <Field label="Contents" required><select name="type" required className={inputCls} defaultValue="DEFINED"><option value="DEFINED">A list we choose</option><option value="ACCUMULATED">Everything matching a rule</option></select></Field>
-              <Field label="Rule" className="md:col-span-3" hint="only for “everything matching a rule”"><input name="membershipRule" className={inputCls} placeholder="Every document tagged to WT-401 at IFC"/></Field>
               <SearchPick single name="compositionOwnerId" required label="Put together by" items={users.map((person) => ({ id: person.id, name: person.name }))} />
               <SearchPick single name="acceptanceAuthorityId" required label="Accepted by" hint="someone else — decides on anything missing" items={users.map((person) => ({ id: person.id, name: person.name }))} />
+            </div>
+            <div className="rounded-lg bg-tint-soft px-4 py-3">
+              <p className="mb-3 flex flex-wrap items-baseline gap-x-2"><span className="stencil text-slate-500">Fills itself with</span><span className="text-[11px] text-slate-400">optional — every document matching all you choose joins, new ones too; you can still add or take out by hand</span></p>
+              <RuleFields />
             </div>
           </ActionForm>
         </div>
