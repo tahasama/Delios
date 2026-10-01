@@ -133,29 +133,43 @@ const STAGES: Stage[] = [
     extras: ["routes", "parties", "unreviewed"],
   },
   {
-    key: "answer",
-    tagline: "The verdict reaches the author",
-    title: "Answer returned",
-    text: "The verdict reaches the author. Accepted goes on to release; sent back means a new revision.",
-    rail: "rail-review",
+    key: "accepted",
+    tagline: "The verdict lets it go on",
+    title: "Accepted",
+    text: "The binding verdict lets it go on — accepted as it stands, or accepted with comments that the next revision carries.",
+    rail: "rail-released",
+    states: [],
+    acts: [],
+    policies: ["POLICY_PDF_STAMP"],
+    sets: ["REVIEW_OUTCOMES"],
+    fixed: [{ title: "What the verdict does", text: "Each verdict is published with what it does: final, final with comments to fix next time, or back to the author. Only the first two go on." }],
+    branches: [],
+    extras: [],
+  },
+  {
+    key: "returned",
+    tagline: "Rejected — back to the author",
+    title: "Returned",
+    text: "The verdict refuses it: it goes back to the author with the comments, and this revision ends here. The next one answers them.",
+    rail: "rail-void",
     states: [],
     acts: ["RETURN_OUTCOME"],
     policies: ["POLICY_PDF_STAMP"],
-    sets: ["RETURN_REASONS"],
-    fixed: [],
+    sets: ["REVIEW_OUTCOMES", "COMMENT_CLASSES"],
+    fixed: [{ title: "The next revision", text: "Asked for by the verdict: it may be started at once, and carries the verdict as its reason." }],
     branches: [],
     extras: [],
   },
   {
     key: "to-sender",
-    tagline: "The verdict goes back",
-    title: "Answer to the sender",
-    text: "The verdict and the comments go back to whoever sent it; a revision sent back means they submit the next one.",
-    rail: "rail-review",
+    tagline: "For correction — this revision ends",
+    title: "Returned to the sender",
+    text: "The verdict refuses it: it goes back to whoever sent it, with the comments, for correction. This revision ends here; their next one starts again at Received.",
+    rail: "rail-void",
     states: [],
     acts: ["RETURN_OUTCOME"],
     policies: ["POLICY_PDF_STAMP"],
-    sets: ["REVIEW_OUTCOMES", "RETURN_REASONS"],
+    sets: ["REVIEW_OUTCOMES", "COMMENT_CLASSES"],
     fixed: [
       { title: "Who it goes back to", text: "The sender, as the document's originator — on a reply to the transmittal it came on. Document Control chooses who else is copied in." },
       { title: "To a sender not on the system", text: "One of our people sends it on and marks it sent, with the proof." },
@@ -164,10 +178,40 @@ const STAGES: Stage[] = [
     extras: ["parties"],
   },
   {
+    key: "gate",
+    tagline: "Checked before it is published",
+    title: "Document Control's check",
+    text: "Decided, and waiting: Document Control publishes it at the status the review settled on — or sends it back when it is wrong for the record.",
+    rail: "rail-release",
+    states: ["NOT_RELEASED"],
+    acts: [],
+    policies: [],
+    sets: ["STATUSES"],
+    fixed: [],
+    branches: [],
+    extras: [],
+  },
+  {
+    key: "gate-return",
+    tagline: "Sent back — this revision ends",
+    title: "Sent back",
+    text: "Document Control refuses to publish it — the wrong file, a missing enclosure, a status that cannot be true yet — and sends it back with a reason. This revision ends; the next one is authorized.",
+    rail: "rail-void",
+    states: ["RETURNED"],
+    acts: [],
+    policies: [],
+    sets: ["RETURN_REASONS"],
+    fixed: [
+      { title: "To the author, or to a step", text: "Back to the author, or — when the route itself was at fault, for one of the published reasons — to an earlier step of the same route. Document Control edits who is copied in." },
+    ],
+    branches: [],
+    extras: [],
+  },
+  {
     key: "approval",
     tagline: "An outside party approves",
-    title: "Outside approval",
-    text: "After our own review, somebody outside must approve it before it is released and issued.",
+    title: "Approved outside",
+    text: "After our own review, somebody outside must approve it before it is released and issued. Approved, it goes on.",
     rail: "rail-release",
     states: ["NOT_RELEASED", "ON_HOLD"],
     acts: [],
@@ -175,11 +219,24 @@ const STAGES: Stage[] = [
     sets: ["REVIEW_OUTCOMES"],
     fixed: [
       { title: "Asked for when it is sent", text: "Whoever asks for it to be sent says that an outside approval is needed, and from whom; the revision stays not released while their step is open." },
-      { title: "Through Document Control's gate", text: "Approved: Document Control releases and issues it. Not approved: release stays blocked until Document Control sends it back — to the author, or to the sender of a document we received — with a reason, and a copy list it edits." },
     ],
     branches: [
       { title: "On hold", text: "An approval found to be needed after release puts the revision on hold, marked not for use; everyone it went to is told, and again when the hold is lifted or it is sent back.", fixed: "Always on: a revision nobody should use is never left reading as in force." },
     ],
+    extras: ["parties"],
+  },
+  {
+    key: "approval-refused",
+    tagline: "Not approved — returned",
+    title: "Not approved",
+    text: "The outside party refuses it: release stays blocked until it is sent back, with a reason, to the author. This revision ends here.",
+    rail: "rail-void",
+    states: ["ON_HOLD"],
+    acts: [],
+    policies: [],
+    sets: [],
+    fixed: [{ title: "Sent back, with a copy list", text: "To the author, with a reason; whoever sends it back chooses who else is told. A revision already released stays on hold, not for use, until the next one replaces it." }],
+    branches: [],
     extras: ["parties"],
   },
   {
@@ -188,7 +245,7 @@ const STAGES: Stage[] = [
     title: "Release",
     text: "The revision comes into force in the register, and the one before it is superseded.",
     rail: "rail-released",
-    states: ["NOT_RELEASED", "RETURNED", "RELEASED", "SUPERSEDED"],
+    states: ["RELEASED", "SUPERSEDED"],
     acts: [],
     policies: ["POLICY_RELEASE"],
     sets: [],
@@ -218,44 +275,56 @@ const STAGES: Stage[] = [
  * The two flows a document can take, from the organization's own side: what
  * it produces, and what it receives. Whether the organization is the owner, the
  * client, a contractor or a supplier changes who is on the other side, never
- * the flow. A column with two lanes runs side by side; a lane with a condition
- * happens only on some documents.
+ * the flow.
+ *
+ * After a decision the line forks: one lane carries on, the other ends — the
+ * revision goes back, and the next one starts the flow again. Who sends it back
+ * follows the project: Document Control where it has one, the people doing the
+ * work where it has not. Without a control function there is no check before
+ * release either; the verdict releases it.
  */
-const FLOWS: { key: string; title: string; from: string; to: string; columns: { scene: string; optional?: string; tagline?: string }[][] }[] = [
-  {
-    key: "produce",
-    title: "Documents we produce",
-    from: "We write it",
-    to: "In force, and sent to whoever needs it",
-    columns: [
-      [{ scene: "register" }],
-      [{ scene: "prepare" }],
-      // One step. Ours always review it; another organization's reviewers are
-      // on the same step, alongside ours, when the route names them.
-      [{ scene: "review", tagline: "Ours always · outside reviewers alongside, when there are any" }],
-      [{ scene: "answer" }],
-      [{ scene: "approval", optional: "an outside approval is asked for" }],
-      [{ scene: "release" }],
-      [{ scene: "issue" }],
-    ],
-  },
-  {
-    key: "receive",
-    title: "Documents we receive",
-    from: "Another organization sends it",
-    to: "The answer back to them — and in force here, if accepted",
-    columns: [
-      [{ scene: "received" }],
-      [{ scene: "theirs" }],
-      // One step, by us, by another organization, or both: the route the
-      // document matches decides who is on it.
-      [{ scene: "review", tagline: "Ours, another organization's, or both" }],
-      [{ scene: "to-sender" }],
-      [{ scene: "release", optional: "it is accepted for use here" }],
-      [{ scene: "issue", optional: "it is passed on to others" }],
-    ],
-  },
-];
+type FlowLane = { scene: string; optional?: string; tagline?: string; end?: boolean };
+function flowsFor({ gate, returner }: { gate: boolean; returner: string }): { key: string; title: string; from: string; to: string; columns: FlowLane[][] }[] {
+  return [
+    {
+      key: "produce",
+      title: "Documents we produce",
+      from: "We write it",
+      to: "In force, and sent to whoever needs it",
+      columns: [
+        [{ scene: "register" }],
+        [{ scene: "prepare" }],
+        // One step. Ours always review it; another organization's reviewers are
+        // on the same step, alongside ours, when the route names them.
+        [{ scene: "review", tagline: "Ours always · outside ones too, when named" }],
+        [{ scene: "accepted" }, { scene: "returned", end: true, tagline: `Rejected — ${returner} returns it` }],
+        ...(gate ? [[{ scene: "gate", tagline: "Passes, and is published" }, { scene: "gate-return", end: true }]] : []),
+        [
+          { scene: "approval", optional: "an outside approval is asked for" },
+          { scene: "approval-refused", end: true, optional: "an outside approval is asked for", tagline: `Not approved — ${returner} returns it` },
+        ],
+        [{ scene: "release" }],
+        [{ scene: "issue" }],
+      ],
+    },
+    {
+      key: "receive",
+      title: "Documents we receive",
+      from: "Another organization sends it",
+      to: "Back to them for correction — or in force here, and passed on",
+      columns: [
+        [{ scene: "received" }],
+        [{ scene: "theirs" }],
+        // One step, by us, by another organization, or both: the route the
+        // document matches decides who is on it.
+        [{ scene: "review", tagline: "Ours, theirs, or both" }],
+        [{ scene: "accepted" }, { scene: "to-sender", end: true, tagline: `For correction — ${returner} returns it` }],
+        [{ scene: "release" }],
+        [{ scene: "issue" }],
+      ],
+    },
+  ];
+}
 
 const EXTRA: Record<Stage["extras"][number], { title: string; href: string }> = {
   numbering: { title: "Numbering schemes", href: "/admin/numbering" },
@@ -336,7 +405,9 @@ export default async function ControlRoomPage() {
   const unplaced = sets.filter((one) => !usedBy.has(one.key));
 
   const panels = Object.fromEntries(stages.map((stage) => {
-    const fixed = stage.key === "release" ? [releaseFixed, ...stage.fixed] : stage.fixed;
+    // The check before release is Document Control's gate where there is one,
+    // and the release itself says so where there is none.
+    const fixed = stage.key === (gate ? "gate" : "release") ? [releaseFixed, ...stage.fixed] : stage.fixed;
     // Not released and Returned to review only exist where there is a gate.
     const states = stage.states.filter((state) => gate || (state !== "NOT_RELEASED" && state !== "RETURNED"));
     const panel = (
@@ -424,7 +495,7 @@ export default async function ControlRoomPage() {
   }));
 
   const sceneOf = (stage: Stage): Scene => {
-    const fixedCount = (stage.key === "release" ? 1 : 0) + stage.fixed.length;
+    const fixedCount = (stage.key === (gate ? "gate" : "release") ? 1 : 0) + stage.fixed.length;
     return {
       key: stage.key,
       title: stage.title,
@@ -439,9 +510,10 @@ export default async function ControlRoomPage() {
     };
   };
   const byKey = new Map(stages.map((stage) => [stage.key, stage]));
-  const flows: Flow[] = FLOWS.map((flow) => ({
+  const returner = actRow.get("RETURN_OUTCOME")?.controlDoes ? "Document Control" : "the reviewer";
+  const flows: Flow[] = flowsFor({ gate, returner }).map((flow) => ({
     ...flow,
-    columns: flow.columns.map((column) => column.map((lane) => ({ scene: { ...sceneOf(byKey.get(lane.scene)!), ...(lane.tagline ? { tagline: lane.tagline } : {}) }, optional: lane.optional }))),
+    columns: flow.columns.map((column) => column.map((lane) => ({ scene: { ...sceneOf(byKey.get(lane.scene)!), ...(lane.tagline ? { tagline: lane.tagline } : {}) }, optional: lane.optional, end: lane.end }))),
   }));
 
   return (

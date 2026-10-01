@@ -16,8 +16,12 @@ export type Scene = {
   sets: number;
 };
 
-/** A scene in its place on a flow; `optional` says when it happens at all. */
-export type Lane = { scene: Scene; optional?: string };
+/**
+ * A scene in its place on a flow; `optional` says when it happens at all, and
+ * `end` marks the branch where this revision stops — it goes back, and the
+ * next revision starts the flow again.
+ */
+export type Lane = { scene: Scene; optional?: string; end?: boolean };
 
 /**
  * One flow a document goes through: its columns in order, and in a column
@@ -126,32 +130,32 @@ export function SceneDeck({ flows, panels }: { flows: Flow[]; panels: Record<str
             if (event.key === "ArrowLeft" || event.key === "ArrowUp") { event.preventDefault(); step(-1, true); }
           }}
         >
-          {flow.columns.map((column, c) => (
-            <div
-              key={`${flow.key}/${c}`}
-              className={cn("scene-col", column.length > 1 && "scene-fork", c < flow.columns.length - 1 && "scene-col-linked")}
-            >
-              {column.length > 1 ? <span className="scene-fork-label">side by side</span> : null}
-              {column.map(({ scene: one, optional }, lane) => {
-                // Scenes side by side share their column's number: 03a, 03b.
-                const number = `${String(c + 1).padStart(2, "0")}${column.length > 1 ? "ab"[lane] ?? "" : ""}`;
-                const index = order.findIndex((l) => l.scene.key === one.key);
-                return (
-                  <button
-                    key={`${flow.key}/${one.key}`}
-                    type="button"
-                    role="tab"
-                    data-scene={one.key}
-                    id={`scene-${one.key}`}
-                    aria-selected={one.key === lit}
-                    aria-controls={`panel-${one.key}`}
-                    tabIndex={one.key === lit ? 0 : -1}
-                    onClick={() => go(one.key)}
-                    className={cn("scene", one.rail, index < at && "scene-past", optional && "scene-optional")}
-                  >
-                    <span className="scene-number">{number}{optional ? " · optional" : ""}</span>
-                    <span className="scene-title">{one.title}</span>
-                    <span className="scene-tagline">{optional ? `If ${optional}` : one.tagline}</span>
+          {flow.columns.map((column, c) => {
+            const main = column.filter((lane) => !lane.end);
+            const ends = column.filter((lane) => lane.end);
+            // A column that forks keeps its cards half height, so the branch
+            // that carries on stays on the line and the one that ends hangs below.
+            const compact = column.length > 1;
+            const card = ({ scene: one, optional, end }: Lane, lane: number) => {
+              const index = order.findIndex((l) => l.scene.key === one.key);
+              const number = `${String(c + 1).padStart(2, "0")}${compact ? "ab"[column.findIndex((l) => l.scene.key === one.key)] ?? "" : ""}`;
+              return (
+                <button
+                  key={`${flow.key}/${one.key}/${lane}`}
+                  type="button"
+                  role="tab"
+                  data-scene={one.key}
+                  id={`scene-${one.key}`}
+                  aria-selected={one.key === lit}
+                  aria-controls={`panel-${one.key}`}
+                  tabIndex={one.key === lit ? 0 : -1}
+                  onClick={() => go(one.key)}
+                  className={cn("scene", one.rail, index < at && "scene-past", optional && "scene-optional", compact && "scene-compact", end && "scene-end")}
+                >
+                  <span className="scene-number">{number}{end ? " · ends" : optional ? " · optional" : ""}</span>
+                  <span className="scene-title">{one.title}</span>
+                  <span className="scene-tagline">{optional && !end && !compact ? `If ${optional}` : one.tagline}</span>
+                  {compact ? null : (
                     <span className="scene-foot">
                       <span className="flex items-center gap-1" title="Who carries out its acts">
                         {one.carriers.length
@@ -160,11 +164,22 @@ export function SceneDeck({ flows, panels }: { flows: Flow[]; panels: Record<str
                       </span>
                       <span>{one.sets ? `${one.sets} set${one.sets === 1 ? "" : "s"}` : "no sets"}</span>
                     </span>
-                  </button>
-                );
-              })}
-            </div>
-          ))}
+                  )}
+                </button>
+              );
+            };
+            return (
+              <div key={`${flow.key}/${c}`} className={cn("scene-col", c < flow.columns.length - 1 && "scene-col-linked")}>
+                <div className={cn("scene-band", main.length > 1 && "scene-fork")}>
+                  {main.length > 1 ? <span className="scene-fork-label">side by side</span> : null}
+                  {main.map(card)}
+                </div>
+                {ends.map((lane, i) => (
+                  <div key={lane.scene.key} className="scene-branch">{card(lane, main.length + i)}</div>
+                ))}
+              </div>
+            );
+          })}
         </div>
 
         <div className="scene-progress" aria-hidden>
