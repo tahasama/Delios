@@ -1211,6 +1211,10 @@ model Package {
   type                    String // DEFINED | ACCUMULATED (§15.1)
   membershipRule          String? // stated rule for accumulated packages
   recipientName           String
+  // Delivery: the organization it is handed to, and the transmittal that carried it.
+  recipientPartyId        String?
+  deliveredAt             DateTime?
+  transmittalId           String?
   completionDate          DateTime // triggers assessment, not closure (§15.6)
   requiredStatus          String
   compositionOwnerId      String

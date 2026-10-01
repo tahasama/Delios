@@ -22,7 +22,10 @@ export async function createPackageAction(_prev: { error?: string } | undefined,
   const purpose = String(formData.get("purpose") ?? "");
   const type = String(formData.get("type") ?? "");
   const membershipRule = String(formData.get("membershipRule") ?? "").trim() || null;
-  const recipientName = String(formData.get("recipientName") ?? "").trim();
+  // Handed to an organization on the project; its name is kept with the package.
+  const recipientPartyId = String(formData.get("recipientPartyId") ?? "") || null;
+  const recipientParty = recipientPartyId ? await db.party.findFirst({ where: { id: recipientPartyId }, select: { id: true, name: true } }) : null;
+  const recipientName = recipientParty?.name ?? String(formData.get("recipientName") ?? "").trim();
   const completionDate = String(formData.get("completionDate") ?? "");
   const requiredStatus = String(formData.get("requiredStatus") ?? "");
   const compositionOwnerId = String(formData.get("compositionOwnerId") ?? "");
@@ -31,7 +34,7 @@ export async function createPackageAction(_prev: { error?: string } | undefined,
  if (!purpose) return { error: "Every package states a reason for issue." };
  if (!type) return { error: "Defined or accumulated — state the type." };
  if (type === "ACCUMULATED" && !membershipRule) return { error: "An accumulated package states its membership rule." };
- if (!recipientName) return { error: "The recipient is required." };
+ if (!recipientName) return { error: "Choose the organization it is delivered to." };
  if (!completionDate) return { error: "The completion date is required — it triggers assessment." };
  if (!requiredStatus) return { error: "State the status members shall have reached." };
  if (!compositionOwnerId || !acceptanceAuthorityId) return { error: "Both owners are required." };
@@ -45,7 +48,7 @@ export async function createPackageAction(_prev: { error?: string } | undefined,
   await db.package.create({
     data: {
       projectId,
-      identifier, purpose, type, membershipRule, recipientName,
+      identifier, purpose, type, membershipRule, recipientName, recipientPartyId: recipientParty?.id ?? null,
       completionDate: new Date(completionDate), requiredStatus,
       compositionOwnerId, compositionOwnerName: owner.name,
       acceptanceAuthorityId, acceptanceAuthorityName: acceptor.name,
@@ -134,10 +137,15 @@ export async function issueShortfallAction(_prev: { error?: string } | undefined
   return {};
 }
 
-/** §15.8 — closure declared by the composition owner; not while a shortfall is unresolved unless accepted. */
+/**
+ * §15.8 — delivering the package, which closes it. Not while a shortfall is
+ * unresolved unless accepted. Where the package names an organization, one
+ * transmittal carries every document that is ready, at the package's reason
+ * for issue; that transmittal is the delivery.
+ */
 export async function closePackageAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
   const ctx = await requireScope();
-  const { user, db, projectId, orgId } = ctx;
+  const { user, db, projectId } = ctx;
   if (isReadOnly(user)) return { error: "Viewers cannot close packages." };
   const packageId = String(formData.get("packageId") ?? "");
   const ruleCeased = formData.get("ruleCeased") === "on";
@@ -146,18 +154,49 @@ export async function closePackageAction(_prev: { error?: string } | undefined, 
     where: { id: packageId },
     include: { members: { include: { document: { include: { revisions: { where: { state: "RELEASED" }, orderBy: { releasedAt: "desc" }, take: 1 } } } } } },
   });
-  if (pkg.closedAt) return { error: "Already closed." };
-  const unresolved = pkg.members.some((m) => {
-    const cur = m.document.revisions[0];
-    return cur?.statusCode !== m.requiredStatus;
-  });
+  if (pkg.closedAt) return { error: "Already delivered." };
+  if (!pkg.assessedAt) return { error: "Check readiness first." };
+  const ready = pkg.members.filter((m) => m.document.revisions[0]?.statusCode === m.requiredStatus);
+  const unresolved = ready.length < pkg.members.length;
   if (unresolved && !pkg.shortfallAcceptedBy) {
- if (!pkg.shortfallIssuedAt) return { error: "A shortfall exists and has not been issued to the acceptance authority." };
- return { error: "Closure blocked — an unresolved shortfall must first be accepted by the acceptance authority." };
+ if (!pkg.shortfallIssuedAt) return { error: "Some documents are not ready. Send the shortfall to the acceptance authority first." };
+ return { error: "Delivery waits for the acceptance authority to accept what is missing." };
   }
- if (pkg.type === "ACCUMULATED" && !ruleCeased) return { error: "State that the membership rule has ceased to admit members." };
-  await db.package.update({ where: { id: packageId }, data: { closedAt: new Date(), closureNote, ruleCeasedAt: pkg.type === "ACCUMULATED" && ruleCeased ? new Date() : null } });
- await audit({ actor: user, action: "PACKAGE_CLOSED", entityType: "Package", entityId: pkg.identifier, entityLabel: pkg.identifier, detail: "Closure declared." });
+ if (pkg.type === "ACCUMULATED" && !ruleCeased) return { error: "State that no more documents will be added." };
+  if (pkg.recipientPartyId && !ready.length) return { error: "Nothing is ready to deliver." };
+
+  let transmittalId: string | null = null;
+  let number: string | null = null;
+  if (pkg.recipientPartyId) {
+    const { nextRecordNumber } = await import("@/lib/numbering-records");
+    const [internal, project, party] = await Promise.all([
+      db.party.findFirst({ where: { isInternal: true }, select: { code: true, name: true } }),
+      db.project.findUnique({ where: { id: projectId }, select: { code: true } }),
+      db.party.findFirst({ where: { id: pkg.recipientPartyId }, select: { code: true, name: true, users: { where: { active: true }, select: { id: true, name: true } } } }),
+    ]);
+    if (!party) return { error: "The organization it is delivered to no longer exists." };
+    number = await nextRecordNumber(ctx, "TRANSMITTAL", { project: project?.code ?? "", sender: internal?.code ?? null, receiver: party.code, reason: pkg.purpose }, "TR");
+    const people = party.users.length ? party.users.map((one) => ({ name: one.name, organization: party.name, userId: one.id })) : [{ name: party.name, organization: party.name, userId: null as string | null }];
+    const sent = await db.transmittal.create({
+      data: {
+        projectId, number, direction: "OUTGOING", reasonForIssue: pkg.purpose, dateOfIssue: new Date(),
+        issuingParty: internal?.name ?? "Our organization",
+        subject: `Package ${pkg.identifier} — ${ready.length} document${ready.length === 1 ? "" : "s"} at ${pkg.requiredStatus}`,
+        message: closureNote, status: "ISSUED", createdById: user.id, createdByName: user.name,
+        items: { create: ready.map((m) => ({ projectId, revisionId: m.document.revisions[0].id })) },
+        recipients: { create: people.map((one) => ({ projectId, name: one.name, organization: one.organization, userId: one.userId })) },
+      },
+    });
+    transmittalId = sent.id;
+    const { notifyMany } = await import("@/lib/audit");
+    await notifyMany(people.map((one) => one.userId).filter((id): id is string => !!id), "TRANSMITTAL_RECEIVED", `Package ${pkg.identifier} — ${number}`, `Delivered to you: ${ready.length} document${ready.length === 1 ? "" : "s"}.`, `/transmittals/${sent.id}`, ctx);
+  }
+  const now = new Date();
+  await db.package.update({
+    where: { id: packageId },
+    data: { closedAt: now, closureNote, deliveredAt: transmittalId ? now : null, transmittalId, ruleCeasedAt: pkg.type === "ACCUMULATED" && ruleCeased ? now : null },
+  });
+ await audit({ actor: user, action: "PACKAGE_CLOSED", entityType: "Package", entityId: pkg.identifier, entityLabel: pkg.identifier, newValue: number, detail: number ? `Delivered to ${pkg.recipientName} on ${number}: ${ready.length} of ${pkg.members.length} documents.` : "Closure declared." });
   revalidatePath(`/packages/${pkg.identifier}`);
   return {};
 }

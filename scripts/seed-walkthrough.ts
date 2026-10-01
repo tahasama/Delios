@@ -43,6 +43,8 @@ async function main() {
   const clientParty =
     (await db.party.findFirst({ where: { orgId: org.id, code: "CLIENT" } })) ??
     (await db.party.create({ data: { orgId: org.id, code: "CLIENT", name: "Riverside Water (client)", isInternal: false } }));
+  // The operations handover package is delivered to the client.
+  await db.package.updateMany({ where: { identifier: "PK-001", recipientPartyId: null }, data: { recipientPartyId: clientParty.id, recipientName: clientParty.name } });
   const viewerFn = await db.function.findFirstOrThrow({ where: { orgId: org.id, code: "VIEWER" } });
   const client =
     (await db.user.findFirst({ where: { orgId: org.id, email: "client@delios.local" } })) ??

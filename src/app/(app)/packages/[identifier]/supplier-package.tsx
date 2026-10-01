@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { requireScope } from "@/lib/scope";
 import { isController, isAdmin } from "@/lib/auth";
-import { PageHeader, Chip, Banner, DataTable, Th, Td } from "@/components/ui";
+import { Chip, DataTable, Th, Td } from "@/components/ui";
+import { FileTally } from "./file-tally";
 import { ActionForm } from "@/components/form";
 import { submitSupplierPackageAction } from "@/lib/actions/supplier";
 import { supplierRows, supplierFigures, STATE_LABEL, WITH_SUPPLIER, type SupplierState } from "@/lib/supplier";
@@ -34,7 +35,7 @@ export async function SupplierPackage({ pkg }: { pkg: { id: string; identifier: 
 
   const table = (
     <div>
-      <DataTable id={isSupplier ? "supplier-package-own" : "supplier-package"} head={<tr><Th>Document</Th><Th>Submit by</Th><Th>Status</Th><Th>{isSupplier ? "Your file" : "Next"}</Th></tr>}>
+      <DataTable className="rounded-none border-0 shadow-none" id={isSupplier ? "supplier-package-own" : "supplier-package"} head={<tr><Th>Document</Th><Th>Submit by</Th><Th>Status</Th><Th>{isSupplier ? "Your file" : "Next"}</Th></tr>}>
           {rows.map((r) => (
             <tr key={r.doc.id}>
               <Td>
@@ -73,36 +74,56 @@ export async function SupplierPackage({ pkg }: { pkg: { id: string; identifier: 
     </div>
   );
 
+  const waiting = rows.filter((r) => canSendRow(r.state)).length;
+
   return (
     <div className="space-y-4">
-      <PageHeader
-        title={`${pkg.recipientName} — documents`}
-        subtitle={`${pkg.identifier} · everything due by ${fmtDate(pkg.completionDate)} · needed at ${pkg.requiredStatus}`}
-        actions={<>{pkg.partyCode ? <a href={`/api/requirements/sheet?sender=${encodeURIComponent(pkg.partyCode)}`} className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-2.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"><Download className="h-4 w-4" /> Delivery list</a> : null}<Link href="/packages" className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-semibold text-slate-500 hover:bg-slate-100"><ArrowLeft className="h-4 w-4" /> Packages</Link></>}
-      />
-
-      <section className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-line bg-slate-200 shadow-sm sm:grid-cols-4">
-        <Figure label="Sent" value={`${f.arrived} of ${f.planned}`} hint={`${f.submissionProgress}% · ${f.notArrivedLate} overdue`} />
-        <Figure label="On time" value={`${f.onSchedule}%`} hint={`${f.late} late`} />
-        <Figure label="Waiting on" value={`${f.pendingOurs} us · ${f.pendingSupplier} them`} hint="review vs supplier" />
-        <Figure label="Approved first time" value={`${f.firstTime}%`} hint={`${f.approved} approved`} />
+      <section className="register register-sheet register-sheet-open">
+        <div className="flex flex-col-reverse gap-3 px-5 pt-6 pb-4 sm:px-6 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0 flex-1">
+            <p className="font-mono text-[12.5px] font-semibold tracking-tight text-slate-500">{pkg.identifier}</p>
+            <h1 className="plate-name mt-1 min-w-0">{isSupplier ? `What ${org} expects from you` : `From ${pkg.recipientName}`}</h1>
+            <p className="plate-meta mt-2">
+              {f.planned} document{f.planned === 1 ? "" : "s"} &middot; everything by {fmtDate(pkg.completionDate)} &middot; needed at <span className="font-mono font-semibold text-slate-700">{pkg.requiredStatus}</span>
+            </p>
+            <p className="mt-1 max-w-3xl text-[11.5px] leading-4 text-slate-400">
+              {isSupplier
+                ? `Attach a file next to each document you deliver, then send. ${org} checks it and either accepts it for review or returns it with a reason.`
+                : `Every document whose supplier is ${pkg.recipientName} is in this package. The supplier sends from here; nothing else counts as arrived.`}
+            </p>
+          </div>
+          <div className="flex shrink-0 items-center gap-2 lg:justify-end">
+            {pkg.partyCode ? <a href={`/api/requirements/sheet?sender=${encodeURIComponent(pkg.partyCode)}`} className="ask inline-flex items-center gap-1.5"><Download className="h-3.5 w-3.5" /> Delivery list</a> : null}
+            {staff ? <Link href="/packages" className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-semibold text-slate-500 hover:bg-slate-100"><ArrowLeft className="h-4 w-4" /> Packages</Link> : null}
+          </div>
+        </div>
+        <div className="grid grid-cols-2 border-t border-line sm:grid-cols-4">
+          <Figure label="Sent" value={`${f.arrived} of ${f.planned}`} hint={`${f.submissionProgress}% · ${f.notArrivedLate} overdue`} />
+          <Figure label="On time" value={`${f.onSchedule}%`} hint={`${f.late} late`} />
+          <Figure label="Waiting on" value={`${f.pendingOurs} us · ${f.pendingSupplier} them`} hint="review vs supplier" />
+          <Figure label="Approved first time" value={`${f.firstTime}%`} hint={`${f.approved} approved`} />
+        </div>
       </section>
 
-      {isSupplier ? (
-        <>
-          <Banner tone="info" title="How to send">Attach a file next to each document you are delivering, then press Send. {org} checks it and either accepts it for review or returns it with a reason.</Banner>
+      <section className="register register-sheet register-sheet-open">
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
+          <span className="stencil text-slate-600">{isSupplier ? "Send documents" : "Documents"}</span>
+          <span className="text-[11px] text-slate-500">{f.pendingSupplier} with {isSupplier ? "you" : pkg.recipientName} · {f.pendingOurs} with {isSupplier ? org : "us"}</span>
+        </div>
+        {isSupplier ? (
           <ActionForm action={submitSupplierPackageAction} submitLabel={`Send to ${org}`} hidden={{ packageId: pkg.id }}>
             {table}
+            <div className="px-5 sm:px-6">{waiting ? <FileTally waiting={waiting} /> : <p className="text-[12px] text-slate-500">Nothing is waiting on you right now.</p>}</div>
           </ActionForm>
-        </>
-      ) : table}
+        ) : table}
+      </section>
     </div>
   );
 }
 
 function Figure({ label, value, hint }: { label: string; value: string; hint: string }) {
   return (
-    <div className="bg-surface px-4 py-3">
+    <div className="border-line px-5 py-3 not-last:border-r sm:px-6">
       <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{label}</p>
       <p className="mt-1 text-lg font-semibold text-slate-900">{value}</p>
       <p className="text-[11px] text-slate-500">{hint}</p>
