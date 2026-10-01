@@ -4,8 +4,10 @@ import { notFound } from "next/navigation";
 import { Timeline } from "@/components/timeline";
 import { Card, Chip, Info, Field, inputCls, Banner } from "@/components/ui";
 import { ActionForm } from "@/components/form";
-import { addPackageMemberAction, removePackageMemberAction, setPackageRuleAction, assessPackageAction, issueShortfallAction, closePackageAction, acceptShortfallAction } from "@/lib/actions/planning";
-import { syncPackage, parseFilter } from "@/lib/package-rule";
+import { addPackageMemberAction, removePackageMemberAction, setPackageRuleAction, assessPackageAction, issueShortfallAction, closePackageAction, acceptShortfallAction, acceptPackageAction } from "@/lib/actions/planning";
+import { syncPackage, parseFilter, meetsStatus, statusList, recipientIds } from "@/lib/package-rule";
+import { SearchPick } from "@/components/search-pick";
+import { isAdmin } from "@/lib/auth";
 import { RuleFields } from "../rule-fields";
 import { getActiveSet } from "@/lib/config";
 import { fmtDate, fmtDateTime, cn } from "@/lib/utils";
@@ -45,39 +47,57 @@ export default async function PackageDetailPage({ params, searchParams }: { para
       take: 500,
       select: { id: true, docNumber: true, title: true, revisions: { where: { state: "RELEASED" }, orderBy: { releasedAt: "desc" }, take: 1, select: { value: true, statusCode: true } } },
     }),
-    pkg.transmittalId ? db.transmittal.findFirst({ where: { id: pkg.transmittalId }, select: { id: true, number: true } }) : null,
+    db.transmittal.findMany({ where: { OR: [{ packageId: pkg.id }, ...(pkg.transmittalId ? [{ id: pkg.transmittalId }] : [])] }, orderBy: { number: "asc" }, select: { id: true, number: true } }),
   ]);
   const shortfall: { docNumber: string; requiredStatus: string; currentStatus: string; reason: string; expectedDate: string | null }[] | null = pkg.shortfall ? JSON.parse(pkg.shortfall) : null;
   const isAcceptor = user.id === pkg.acceptanceAuthorityId;
   const overdue = pkg.completionDate < new Date() && !pkg.closedAt;
   const total = pkg.members.length;
-  const readyCount = pkg.members.filter((member) => member.document.revisions[0]?.statusCode === member.requiredStatus).length;
+  const readyCount = pkg.members.filter((member) => meetsStatus(member.document.revisions[0]?.statusCode, member.requiredStatus)).length;
+  const sendsTo = recipientIds(pkg);
+  const needs = statusList(pkg.requiredStatus);
   const statusName = new Map(statuses.map((x) => [x.code, x.label]));
   const statusMeaning = new Map(statuses.map((x) => [x.code, typeof x.props.may === "string" ? `${x.label}: ${x.props.may}` : x.label]));
-  const spell = (code: string) => `${code}${statusName.get(code) ? ` (${statusName.get(code)!.toLowerCase()})` : ""}`;
+  const spell = (codes: string) => statusList(codes).map((code) => `${code}${statusName.get(code) ? ` (${statusName.get(code)!.toLowerCase()})` : ""}`).join(" or ");
   const purpose = reasons.find((one) => one.code === pkg.purpose)?.label ?? pkg.purpose.toLowerCase();
   const canAct = !isReadOnly(user) && !pkg.closedAt;
   const shortfallFor = new Map((shortfall ?? []).map((s) => [s.docNumber, s]));
   const waitingAcceptance = !!shortfall && !!pkg.shortfallIssuedAt && !pkg.shortfallAcceptedBy;
   const mayDeliver = !!pkg.assessedAt && (!shortfall || !!pkg.shortfallAcceptedBy);
 
-  const state = pkg.closedAt ? "delivered" : shortfall ? "shortfall" : pkg.assessedAt ? "ready" : overdue ? "overdue" : "open";
+  const state = pkg.acceptedAt ? "accepted" : pkg.closedAt ? "delivered" : shortfall ? "shortfall" : pkg.assessedAt ? "ready" : overdue ? "overdue" : "open";
   const stateTone: Record<string, string> = {
-    delivered: "bg-emerald-100 text-emerald-800 ring-emerald-300",
+    accepted: "bg-emerald-100 text-emerald-800 ring-emerald-300",
+    delivered: "bg-sky-100 text-sky-800 ring-sky-300",
     ready: "bg-emerald-100 text-emerald-800 ring-emerald-300",
     shortfall: "bg-amber-100 text-amber-800 ring-amber-300",
     overdue: "bg-red-100 text-red-800 ring-red-300",
     open: "bg-slate-100 text-slate-600 ring-slate-300",
   };
 
-  const note = pkg.closedAt
-    ? delivery ? <>Delivered {fmtDate(pkg.deliveredAt ?? pkg.closedAt)} on <Link href={`/transmittals/${delivery.id}`} className="font-mono font-semibold text-link hover:underline">{delivery.number}</Link>.</> : <>Closed {fmtDate(pkg.closedAt)}.</>
+  const sentOn = delivery.length ? <> on {delivery.map((one, i) => <span key={one.id}>{i ? ", " : ""}<Link href={`/transmittals/${one.id}`} className="font-mono font-semibold text-link hover:underline">{one.number}</Link></span>)}</> : null;
+  const note = pkg.acceptedAt
+    ? <>Delivered {fmtDate(pkg.deliveredAt ?? pkg.closedAt!)}{sentOn}, accepted by <strong className="text-slate-800">{pkg.acceptedByName}</strong> {fmtDate(pkg.acceptedAt)}.</>
+    : pkg.closedAt
+    ? <>Delivered {fmtDate(pkg.deliveredAt ?? pkg.closedAt)}{sentOn}. Waiting for <strong className="text-slate-800">{pkg.acceptanceAuthorityName}</strong> to accept it.</>
     : waitingAcceptance ? <>{readyCount} of {total} ready. Waiting for <strong className="text-slate-800">{pkg.acceptanceAuthorityName}</strong> to accept what is missing.</>
     : shortfall && !pkg.shortfallIssuedAt ? <>{readyCount} of {total} ready. Send what is missing to <strong className="text-slate-800">{pkg.acceptanceAuthorityName}</strong> before delivering.</>
     : mayDeliver ? <>{readyCount} of {total} ready. Deliver it to <strong className="text-slate-800">{pkg.recipientName}</strong>.</>
     : <>{readyCount} of {total} ready. Get every document released at {spell(pkg.requiredStatus)}, then check readiness.</>;
 
   const items: StepItem[] = [];
+  if (pkg.closedAt && !pkg.acceptedAt && (isAcceptor || isAdmin(user))) items.push({
+    key: "accept-package",
+    primary: true,
+    open: isAcceptor,
+    label: "Accept the package",
+    body: (
+      <ActionForm action={acceptPackageAction} submitLabel="Accept" size="sm" hidden={{ packageId: pkg.id }}>
+        <p className="text-xs text-slate-500">You confirm it was delivered as agreed. This is the last step; it is recorded with your name.</p>
+        <Field label="Note" hint="optional"><input name="note" className={inputCls} /></Field>
+      </ActionForm>
+    ),
+  });
   if (canAct) {
     if (!pkg.assessedAt) items.push({ key: "check", primary: total > 0, label: "Check readiness", body: <ActionForm action={assessPackageAction} submitLabel="Check readiness now" size="sm" hidden={{ packageId: pkg.id }}><p className="text-xs text-slate-500">Records which documents are released at the status the package needs, and what is missing.</p></ActionForm> });
     if (shortfall && !pkg.shortfallIssuedAt) items.push({ key: "shortfall", primary: true, label: "Send what is missing", body: <ActionForm action={issueShortfallAction} submitLabel={`Send to ${pkg.acceptanceAuthorityName}`} size="sm" hidden={{ packageId: pkg.id }}><p className="text-xs text-slate-500">{pkg.acceptanceAuthorityName} decides whether the package may be delivered without them.</p></ActionForm> });
@@ -85,12 +105,12 @@ export default async function PackageDetailPage({ params, searchParams }: { para
     if (mayDeliver) items.push({
       key: "deliver",
       primary: true,
-      label: pkg.recipientPartyId ? `Deliver to ${pkg.recipientName}` : "Close the package",
+      label: sendsTo.length ? `Deliver to ${pkg.recipientName}` : "Close the package",
       body: (
-        <ActionForm action={closePackageAction} submitLabel={pkg.recipientPartyId ? `Send ${readyCount} document${readyCount === 1 ? "" : "s"}` : "Close package"} size="sm" hidden={{ packageId: pkg.id }}>
+        <ActionForm action={closePackageAction} submitLabel={sendsTo.length ? `Send ${readyCount} document${readyCount === 1 ? "" : "s"}` : "Close package"} size="sm" hidden={{ packageId: pkg.id }}>
           <p className="text-xs text-slate-500">
-            {pkg.recipientPartyId
-              ? `One transmittal carries every ready document to ${pkg.recipientName}, ${purpose.toLowerCase()}. That delivers the package and closes it.`
+            {sendsTo.length
+              ? `Every ready document goes out on one transmittal to each of ${pkg.recipientName}, ${purpose.toLowerCase()}. Within our own organization it goes to ${pkg.acceptanceAuthorityName}. Then ${pkg.acceptanceAuthorityName} accepts the package.`
               : "This package names no organization, so nothing is sent: closing records that it was handed over."}
           </p>
           {pkg.type === "ACCUMULATED" ? <label className="flex items-center gap-2 text-xs text-slate-600"><input type="checkbox" name="ruleCeased" /> No more documents will be added</label> : null}
@@ -107,11 +127,7 @@ export default async function PackageDetailPage({ params, searchParams }: { para
           <div className="-mx-5 border-y border-line sm:-mx-6">
             <RevisionChecklist name="documentId" rows={candidates.map((d) => ({ id: d.id, number: d.docNumber, rev: d.revisions[0]?.value ?? "—", status: d.revisions[0]?.statusCode ?? null, title: d.title }))} />
           </div>
-          <Field label="Needed at" required>
-            <select name="requiredStatus" required className={inputCls} defaultValue={pkg.requiredStatus}>
-              {statuses.map((s) => <option key={s.code} value={s.code}>{s.code} — {s.label}</option>)}
-            </select>
-          </Field>
+          <SearchPick browse name="requiredStatus" required label="Needed at" hint="one or several — ready at any of them" initial={needs} items={statuses.map((one) => ({ id: one.code, name: one.code, detail: one.label }))} />
         </ActionForm>
       ) : <p className="text-xs text-slate-500">Every active document is already in this package.</p>,
     });
@@ -146,10 +162,11 @@ export default async function PackageDetailPage({ params, searchParams }: { para
         <div className="flex flex-col-reverse gap-3 px-5 pt-6 pb-4 sm:px-6 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0 flex-1">
             <p className="font-mono text-[12.5px] font-semibold tracking-tight text-slate-500">{pkg.identifier}</p>
-            <h1 className="plate-name mt-1 min-w-0">Delivery to {pkg.recipientName}</h1>
+            <h1 className="plate-name mt-1 min-w-0">{pkg.title ?? `Delivery to ${pkg.recipientName}`}</h1>
             <p className="plate-meta mt-2">
-              {total} document{total === 1 ? "" : "s"} &middot; at <span className="font-mono font-semibold text-slate-700">{pkg.requiredStatus}</span>{statusMeaning.get(pkg.requiredStatus) ? <Info>{`${pkg.requiredStatus} — ${statusMeaning.get(pkg.requiredStatus)}`}</Info> : null} by {fmtDate(pkg.completionDate)} &middot; {purpose}
+              To {pkg.recipientName} &middot; {total} document{total === 1 ? "" : "s"} at {needs.map((code, i) => <span key={code}>{i ? " or " : ""}<span className="font-mono font-semibold text-slate-700">{code}</span></span>)}<Info>{needs.map((code) => `${code} — ${statusMeaning.get(code) ?? code}`).join("\n")}</Info> by {fmtDate(pkg.completionDate)} &middot; {purpose}
             </p>
+            {pkg.description ? <p className="mt-1.5 max-w-3xl text-[13px] leading-5 text-slate-600">{pkg.description}</p> : null}
             <p className="mt-1 max-w-3xl text-[11.5px] leading-4 text-slate-400">
               Put together by {pkg.compositionOwnerName} · accepted by {pkg.acceptanceAuthorityName}
               {pkg.membershipRule ? ` · fills itself with ${pkg.membershipRule}` : ""}
@@ -164,14 +181,14 @@ export default async function PackageDetailPage({ params, searchParams }: { para
 
       {overdue ? <Banner tone="danger" title="Past its date">It was due on {fmtDate(pkg.completionDate)}.</Banner> : null}
 
-      <section className={cn("register register-sheet register-sheet-open relative", pkg.closedAt ? "rail-released" : shortfall ? "rail-prep" : "rail-review")}>
+      <section className={cn("register register-sheet register-sheet-open relative", pkg.acceptedAt ? "rail-released" : pkg.closedAt ? "rail-review" : shortfall ? "rail-prep" : "rail-review")}>
         <span className="absolute inset-y-0 left-0 w-0.75 rounded-l-[0.875rem] bg-(--rail)" aria-hidden />
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
-          <span className="stencil text-slate-600">{pkg.closedAt ? "Delivered" : "Next step"}</span>
+          <span className="stencil text-slate-600">{pkg.acceptedAt ? "Accepted" : pkg.closedAt ? "Delivered — to accept" : "Next step"}</span>
         </div>
         <NextStepBody
           items={items}
-          status={<StagePath stages={["Compose", "Check", "Deliver"]} at={pkg.closedAt ? 3 : pkg.assessedAt ? 2 : total ? 1 : 0} note={note} />}
+          status={<StagePath stages={["Compose", "Check", "Deliver", "Accept"]} at={pkg.acceptedAt ? 4 : pkg.closedAt ? 3 : pkg.assessedAt ? 2 : total ? 1 : 0} note={note} />}
         />
       </section>
 
@@ -185,13 +202,13 @@ export default async function PackageDetailPage({ params, searchParams }: { para
             <ul className="divide-y divide-line">
               {pkg.members.map((m) => {
                 const cur = m.document.revisions[0];
-                const ok = cur?.statusCode === m.requiredStatus;
+                const ok = meetsStatus(cur?.statusCode, m.requiredStatus);
                 const why = shortfallFor.get(m.document.docNumber)?.reason;
                 return (
                   <li key={m.id} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 px-5 py-2.5 sm:grid-cols-[minmax(0,19rem)_minmax(0,1fr)_8rem_auto] sm:px-6">
                     <Link href={`/documents/${m.documentId}`} className="doc-number truncate">{m.document.docNumber}</Link>
                     <span className="hidden truncate text-[12.5px] text-slate-500 sm:block">{m.document.title}{why && !ok ? <span className="block text-[11px] text-amber-700">{why}</span> : null}</span>
-                    <span className="hidden text-xs text-slate-600 sm:block" title={statusMeaning.get(m.requiredStatus) ?? undefined}>{cur ? <>rev {cur.value} · {cur.statusCode}</> : "not released"} <span className="text-slate-400">/ {m.requiredStatus}</span></span>
+                    <span className="hidden text-xs text-slate-600 sm:block" title={statusMeaning.get(m.requiredStatus) ?? undefined}>{cur ? <>rev {cur.value} · {cur.statusCode}</> : "not released"} <span className="text-slate-400">/ {statusList(m.requiredStatus).join(" or ")}</span></span>
                     {ok ? <Chip className="bg-emerald-100 text-emerald-800 ring-emerald-300">ready</Chip> : <Chip className="bg-amber-100 text-amber-800 ring-amber-300">not ready</Chip>}
                   </li>
                 );
@@ -209,7 +226,8 @@ export default async function PackageDetailPage({ params, searchParams }: { para
               { label: "Readiness checked", at: pkg.assessedAt, holder: pkg.assessedAt ? `${readyCount} of ${total} ready` : null },
               { label: "What is missing sent to the acceptor", at: pkg.shortfallIssuedAt, holder: pkg.acceptanceAuthorityName, skipped: !!pkg.assessedAt && !shortfall },
               { label: "What is missing accepted", at: pkg.shortfallAcceptedBy ? pkg.shortfallIssuedAt : null, holder: pkg.shortfallAcceptedBy ?? null, skipped: !!pkg.assessedAt && !shortfall },
-              { label: pkg.recipientPartyId ? `Delivered to ${pkg.recipientName}` : "Closed", at: pkg.closedAt, holder: delivery?.number ?? (pkg.closedAt ? fmtDateTime(pkg.closedAt) : null) },
+              { label: sendsTo.length ? `Delivered to ${pkg.recipientName}` : "Closed", at: pkg.closedAt, holder: delivery.map((one) => one.number).join(", ") || (pkg.closedAt ? fmtDateTime(pkg.closedAt) : null) },
+              { label: "Accepted", at: pkg.acceptedAt, holder: pkg.acceptedByName ?? pkg.acceptanceAuthorityName },
             ]}
           />
         </Card>

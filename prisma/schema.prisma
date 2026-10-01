@@ -848,6 +848,7 @@ model Transmittal {
   projectId           String
   project             Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
   number              String // unique, never reused (§11.1)
+  packageId           String? // the delivery package it delivered, if any
   direction           String // OUTGOING | INCOMING
   reasonForIssue      String // from the §2.6 set
   dateOfIssue         DateTime
@@ -1212,9 +1213,15 @@ model Package {
   membershipRule          String? // stated rule for accumulated packages
   membershipFilter        String? // JSON: { assetIds, disciplines, docTypes, originators } — what the rule admits
   membershipExcluded      String? // JSON: document ids taken out by hand, which the rule does not bring back
+  title                   String?
+  description             String?
   recipientName           String
-  // Delivery: the organization it is handed to, and the transmittal that carried it.
+  // Delivery: the organization(s) it is handed to, and the transmittal that carried it.
   recipientPartyId        String?
+  recipientPartyIds       String? // JSON: every organization it goes to; one transmittal each
+  // Accepted at the end, by the acceptance authority, once delivered.
+  acceptedAt              DateTime?
+  acceptedByName          String?
   deliveredAt             DateTime?
   transmittalId           String?
   completionDate          DateTime // triggers assessment, not closure (§15.6)

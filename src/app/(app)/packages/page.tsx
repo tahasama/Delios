@@ -11,9 +11,9 @@ import { getActiveSet } from "@/lib/config";
 import { fmtDate } from "@/lib/utils";
 import { Download } from "lucide-react";
 import { isReadOnly } from "@/lib/auth";
-import { holdersOf } from "@/lib/permissions";
 import { SearchPick } from "@/components/search-pick";
 import { RuleFields } from "./rule-fields";
+import { meetsStatus, statusList } from "@/lib/package-rule";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Packages" };
@@ -30,19 +30,22 @@ export default async function PackagesPage({ searchParams }: { searchParams: Pro
   const [pkgs, reasons, statuses, users] = await Promise.all([
     db.package.findMany({ where: { category, ...(supplierOnly ? { partyCode: user.partyCode ?? "-" } : {}) }, orderBy: { completionDate: "asc" }, include: { members: { include: { document: { include: { revisions: { where: { state: "RELEASED" }, orderBy: { releasedAt: "desc" }, take: 1 } } } } } } }),
     getActiveSet("REASONS_FOR_ISSUE"), getActiveSet("STATUSES"),
-    holdersOf(ctx, "REVIEW"),
+    // Anyone on the project may put a package together or accept it.
+    db.projectMembership.findMany({ where: { projectId: ctx.projectId, active: true, user: { active: true } }, orderBy: { user: { name: "asc" } }, select: { user: { select: { id: true, name: true } }, function: { select: { name: true } } } })
+      .then((rows) => rows.map((one) => ({ id: one.user.id, name: one.user.name, functionName: one.function?.name ?? "" }))),
   ]);
   // A status code on its own says nothing to a newcomer: AB is "as-built".
   const statusMeaning = new Map(statuses.map((s) => [s.code, typeof s.props.may === "string" ? `${s.label}: ${s.props.may}` : s.label]));
-  const parties = supplierOnly ? [] : await db.party.findMany({ where: { active: true }, orderBy: { name: "asc" } });
+  // Our own organization first: a package may be an internal handover.
+  const parties = supplierOnly ? [] : await db.party.findMany({ where: { OR: [{ active: true }, { isInternal: true }] }, orderBy: [{ isInternal: "desc" }, { name: "asc" }] });
   const supplierStats = new Map<string, ReturnType<typeof supplierFigures>>();
   if (category === "SUPPLIER") for (const p of pkgs) supplierStats.set(p.id, supplierFigures(await supplierRows(ctx, p)));
   // "For the schedule": each action's documents, read as a package.
   const rows = pkgs.map((pkg) => {
-    const ready = pkg.members.filter((member) => member.document.revisions[0]?.statusCode === member.requiredStatus).length;
+    const ready = pkg.members.filter((member) => meetsStatus(member.document.revisions[0]?.statusCode, member.requiredStatus)).length;
     const total = pkg.members.length;
     const days = Math.ceil((pkg.completionDate.getTime() - Date.now()) / 86_400_000);
-    const state = pkg.closedAt ? "CLOSED" : pkg.shortfall ? "SHORTFALL" : pkg.assessedAt ? "READY" : days < 0 ? "OVERDUE" : "OPEN";
+    const state = pkg.acceptedAt ? "ACCEPTED" : pkg.closedAt ? "CLOSED" : pkg.shortfall ? "SHORTFALL" : pkg.assessedAt ? "READY" : days < 0 ? "OVERDUE" : "OPEN";
     return { ...pkg, ready, total, days, state };
   });
 
@@ -102,9 +105,9 @@ export default async function PackagesPage({ searchParams }: { searchParams: Pro
                 const percent = pkg.total ? Math.round(pkg.ready / pkg.total * 100) : 0;
                 return (
                   <tr key={pkg.id} className="hover:bg-tint-soft">
-                    <td className={td}><Link href={`/packages/${pkg.identifier}`} className="font-mono text-[13px] font-semibold text-brand-ink hover:underline">{pkg.identifier}</Link><span className="block max-w-72 truncate text-xs text-slate-500">to {pkg.recipientName}</span></td>
+                    <td className={td}><Link href={`/packages/${pkg.identifier}`} className="font-mono text-[13px] font-semibold text-brand-ink hover:underline">{pkg.identifier}</Link><span className="block max-w-80 truncate text-[13px] text-slate-800">{pkg.title ?? `Delivery to ${pkg.recipientName}`}</span><span className="block max-w-80 truncate text-xs text-slate-500">to {pkg.recipientName}</span></td>
                     <td className={td}><Status state={pkg.state}/></td>
-                    <td className={td}><div className="flex items-center gap-2"><div className="h-1.5 w-20 overflow-hidden rounded-full bg-canvas-deep"><div className={`h-full rounded-full ${percent === 100 ? "bg-emerald-500" : "bg-[#d9a441]"}`} style={{ width: `${percent}%` }}/></div><span className="text-xs text-slate-600">{pkg.ready} of {pkg.total} at {pkg.requiredStatus}{statusMeaning.get(pkg.requiredStatus) ? <Info>{`${pkg.requiredStatus} — ${statusMeaning.get(pkg.requiredStatus)}`}</Info> : null}</span></div></td>
+                    <td className={td}><div className="flex items-center gap-2"><div className="h-1.5 w-20 overflow-hidden rounded-full bg-canvas-deep"><div className={`h-full rounded-full ${percent === 100 ? "bg-emerald-500" : "bg-[#d9a441]"}`} style={{ width: `${percent}%` }}/></div><span className="text-xs text-slate-600">{pkg.ready} of {pkg.total} at {statusList(pkg.requiredStatus).join(" or ")}<Info>{statusList(pkg.requiredStatus).map((code) => `${code} — ${statusMeaning.get(code) ?? code}`).join("\n")}</Info></span></div></td>
                     <td className={`${td} whitespace-nowrap text-xs`}>{fmtDate(pkg.completionDate)}{!pkg.closedAt ? <span className={`block text-[11px] ${pkg.days < 0 ? "text-red-700" : "text-slate-400"}`}>{pkg.days < 0 ? `${Math.abs(pkg.days)} days late` : `in ${pkg.days} days`}</span> : null}</td>
                     <td className={`${td} text-xs`}>{pkg.acceptanceAuthorityName}</td>
                   </tr>
@@ -146,13 +149,14 @@ export default async function PackagesPage({ searchParams }: { searchParams: Pro
         <div className="border-t border-line px-5 py-4 sm:px-6">
           <ActionForm action={createPackageAction} submitLabel="Create package">
             <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-              <Field label="Identifier" required hint="unique, never reused"><input name="identifier" required className={inputCls} placeholder="PK-001"/></Field>
-              <SearchPick single browse name="recipientPartyId" required label="Delivered to" hint="the organization that receives it" items={parties.map((p) => ({ id: p.id, name: p.name }))} />
-              <Field label="Why they get it" required><select name="purpose" required className={inputCls} defaultValue=""><option value="" disabled>Choose…</option>{reasons.map((item) => <option key={item.code} value={item.code}>{item.label}</option>)}</select></Field>
-              <Field label="Needed at" required><select name="requiredStatus" required className={inputCls} defaultValue=""><option value="" disabled>Choose…</option>{statuses.map((item) => <option key={item.code} value={item.code}>{item.code} · {item.label}</option>)}</select></Field>
+              <Field label="Title" required hint="numbered PK-… when created" className="md:col-span-2"><input name="title" required className={inputCls} placeholder="Operations handover — pump house"/></Field>
               <Field label="Due" required><input type="date" name="completionDate" required className={inputCls}/></Field>
-              <SearchPick single name="compositionOwnerId" required label="Put together by" items={users.map((person) => ({ id: person.id, name: person.name }))} />
-              <SearchPick single name="acceptanceAuthorityId" required label="Accepted by" hint="someone else — decides on anything missing" items={users.map((person) => ({ id: person.id, name: person.name }))} />
+              <Field label="Description" hint="optional — what it is for, anything the recipient should know" className="md:col-span-3"><textarea name="description" rows={2} className={inputCls}/></Field>
+              <SearchPick browse name="recipientPartyIds" required label="Delivered to" hint="one or several — us too, for an internal handover" items={parties.map((p) => ({ id: p.id, name: p.isInternal ? `${p.name} (us)` : p.name }))} />
+              <Field label="Why they get it" required><select name="purpose" required className={inputCls} defaultValue=""><option value="" disabled>Choose…</option>{reasons.map((item) => <option key={item.code} value={item.code}>{item.label}</option>)}</select></Field>
+              <SearchPick browse name="requiredStatus" required label="Needed at" hint="one or several — ready at any of them" items={statuses.map((item) => ({ id: item.code, name: item.code, detail: item.label }))} />
+              <SearchPick single name="compositionOwnerId" required label="Put together by" items={users.map((person) => ({ id: person.id, name: person.name, detail: person.functionName }))} />
+              <SearchPick single name="acceptanceAuthorityId" required label="Accepted by" hint="someone else — accepts it at the end, and decides on anything missing" items={users.map((person) => ({ id: person.id, name: person.name, detail: person.functionName }))} />
             </div>
             <div className="rounded-lg bg-tint-soft px-4 py-3">
               <p className="mb-3 flex flex-wrap items-baseline gap-x-2"><span className="stencil text-slate-500">Fills itself with</span><span className="text-[11px] text-slate-400">optional — every document matching all you choose joins, new ones too; you can still add or take out by hand</span></p>
@@ -165,4 +169,4 @@ export default async function PackagesPage({ searchParams }: { searchParams: Pro
   </div>;
 }
 
-function Status({ state }: { state: string }) { const cls = state === "READY" || state === "CLOSED" ? "bg-emerald-100 text-emerald-800" : state === "OVERDUE" ? "bg-red-100 text-red-800" : state === "SHORTFALL" ? "bg-amber-100 text-amber-800" : "bg-slate-100 text-slate-600"; return <span className={`rounded-md px-2 py-0.5 text-[10px] font-bold ${cls}`}>{state === "CLOSED" ? "delivered" : state.toLowerCase()}</span>; }
+function Status({ state }: { state: string }) { const cls = state === "READY" || state === "CLOSED" || state === "ACCEPTED" ? "bg-emerald-100 text-emerald-800" : state === "OVERDUE" ? "bg-red-100 text-red-800" : state === "SHORTFALL" ? "bg-amber-100 text-amber-800" : "bg-slate-100 text-slate-600"; return <span className={`rounded-md px-2 py-0.5 text-[10px] font-bold ${cls}`}>{state === "CLOSED" ? "delivered" : state.toLowerCase()}</span>; }

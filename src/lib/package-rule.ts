@@ -107,3 +107,19 @@ export async function syncPackage(t: Tenant, packageId: string): Promise<number>
   await t.db.packageMember.createMany({ data: fresh.map((documentId) => ({ projectId: t.projectId, packageId: pkg.id, documentId, requiredStatus: pkg.requiredStatus })) });
   return fresh.length;
 }
+
+/** The statuses a package or member needs, from its stored list ("AB,IFC"). */
+export function statusList(required: string): string[] {
+  return required.split(",").map((one) => one.trim()).filter(Boolean);
+}
+
+/** A released status meets a need when it is any one of the statuses asked for. */
+export function meetsStatus(statusCode: string | null | undefined, required: string): boolean {
+  return !!statusCode && statusList(required).includes(statusCode);
+}
+
+/** The organizations a package goes to, oldest packages holding only one. */
+export function recipientIds(pkg: { recipientPartyIds: string | null; recipientPartyId: string | null }): string[] {
+  const many = parseExcluded(pkg.recipientPartyIds);
+  return many.length ? many : pkg.recipientPartyId ? [pkg.recipientPartyId] : [];
+}

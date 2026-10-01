@@ -734,7 +734,7 @@ export default async function DocumentDetailPage({
                       <UsedIn key={e.id} kind="Schedule action" href={`/actions/${e.action.code}`} code={e.action.code} text={`${e.action.name} — needs ${e.requiredStatus} by ${fmtDate(e.requiredBy)}`} />
                     ))}
                     {doc.packageMembers.map((m) => (
-                      <UsedIn key={m.id} kind="Package" href={`/packages/${m.package.identifier}`} code={m.package.identifier} text={`${m.package.recipientName} — needs ${m.requiredStatus}`} />
+                      <UsedIn key={m.id} kind="Package" href={`/packages/${m.package.identifier}`} code={m.package.identifier} text={`${m.package.title ?? m.package.recipientName} — needs ${m.requiredStatus.split(",").join(" or ")}`} />
                     ))}
                     {assetLinks.map(({ rel, asset }) => asset ? (
                       <UsedIn key={rel.id} kind="Asset" href={`/assets/${asset.id}`} code={asset.code} text={asset.name}>

@@ -475,7 +475,7 @@ export async function seedDemoProject(db: PrismaClient, orgId: string, projectId
   // ── Package (Part 15) ──────────────────────────────────────────────────────
   const pkg = await db.package.create({
     data: { projectId,
-      identifier: "PK-001", purpose: "RECORD", type: "DEFINED",
+      identifier: "PK-001", title: "Operations handover — as-built records", purpose: "RECORD", type: "DEFINED",
       recipientName: "Riverside Water — Operations handover", completionDate: d(30), requiredStatus: "AB",
       compositionOwnerId: users.author2.id, compositionOwnerName: users.author2.name,
       acceptanceAuthorityId: users.approver.id, acceptanceAuthorityName: users.approver.name,

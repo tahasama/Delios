@@ -6,6 +6,7 @@ import { addPackageMemberAction } from "@/lib/actions/planning";
 import { getActiveSet } from "@/lib/config";
 import { fmtDate } from "@/lib/utils";
 import { ArrowLeft } from "lucide-react";
+import { SearchPick } from "@/components/search-pick";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Add to package" };
@@ -53,16 +54,11 @@ export default async function AddToPackagePage({ searchParams }: { searchParams:
                   <option value="" disabled>Choose…</option>
                   {packages.map((p) => {
                     const already = docs.filter((d) => p.members.some((m) => m.documentId === d.id)).length;
-                    return <option key={p.id} value={p.id}>{p.identifier} — {p.recipientName}, due {fmtDate(p.completionDate)}{already ? ` (${already} already in it)` : ""}</option>;
+                    return <option key={p.id} value={p.id}>{p.identifier} — {p.title ?? p.recipientName}, due {fmtDate(p.completionDate)}{already ? ` (${already} already in it)` : ""}</option>;
                   })}
                 </select>
               </Field>
-              <Field label="Needed at status" required hint="what each must have reached for the package to be complete">
-                <select name="requiredStatus" required className={inputCls} defaultValue="">
-                  <option value="" disabled>Choose…</option>
-                  {statuses.map((s) => <option key={s.code} value={s.code}>{s.code} — {s.label}</option>)}
-                </select>
-              </Field>
+              <SearchPick browse name="requiredStatus" required label="Needed at" hint="one or several — ready at any of them" items={statuses.map((one) => ({ id: one.code, name: one.code, detail: one.label }))} />
             </div>
           </ActionForm>
         )}

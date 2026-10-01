@@ -155,12 +155,12 @@ export async function GET(req: Request, { params }: { params: Promise<{ kind: st
     name = "actions-baseline";
   } else if (kind === "packages") {
     const pkgs = await db.package.findMany({ orderBy: { identifier: "asc" }, include: { members: { include: { document: true } } } });
-    rows = [["Package", "Type", "Purpose", "Recipient", "Completion date", "Required status", "Composition owner", "Acceptance authority", "Closed at", "Member document", "Member required status", "Member current status"]];
+    rows = [["Package", "Title", "Type", "Purpose", "Recipient", "Completion date", "Required status", "Composition owner", "Acceptance authority", "Closed at", "Member document", "Member required status", "Member current status"]];
     for (const p of pkgs) {
-      if (!p.members.length) rows.push([p.identifier, p.type, p.purpose, p.recipientName, p.completionDate.toISOString().slice(0, 10), p.requiredStatus, p.compositionOwnerName, p.acceptanceAuthorityName, p.closedAt?.toISOString().slice(0, 10) ?? "", "", "", ""]);
+      if (!p.members.length) rows.push([p.identifier, p.title ?? "", p.type, p.purpose, p.recipientName, p.completionDate.toISOString().slice(0, 10), p.requiredStatus, p.compositionOwnerName, p.acceptanceAuthorityName, p.closedAt?.toISOString().slice(0, 10) ?? "", "", "", ""]);
       for (const m of p.members) {
         const cur = await db.revision.findFirst({ where: { documentId: m.documentId, state: "RELEASED" } });
-        rows.push([p.identifier, p.type, p.purpose, p.recipientName, p.completionDate.toISOString().slice(0, 10), p.requiredStatus, p.compositionOwnerName, p.acceptanceAuthorityName, p.closedAt?.toISOString().slice(0, 10) ?? "", m.document.docNumber, m.requiredStatus, cur?.statusCode ?? "not released"]);
+        rows.push([p.identifier, p.title ?? "", p.type, p.purpose, p.recipientName, p.completionDate.toISOString().slice(0, 10), p.requiredStatus, p.compositionOwnerName, p.acceptanceAuthorityName, p.closedAt?.toISOString().slice(0, 10) ?? "", m.document.docNumber, m.requiredStatus, cur?.statusCode ?? "not released"]);
       }
     }
   } else if (kind === "transmittals") {

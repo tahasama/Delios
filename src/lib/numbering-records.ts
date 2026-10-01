@@ -13,7 +13,7 @@ import type { Tenant } from "./tenant";
  * Until an organization routes a scheme, the old short form is used, so an
  * upgrade never changes the numbers of records already raised.
  */
-export type RecordKind = "TRANSMITTAL" | "ACTION" | "REVIEW";
+export type RecordKind = "TRANSMITTAL" | "ACTION" | "REVIEW" | "PACKAGE";
 
 /** What the fields of a record's scheme may read. */
 export type RecordFacts = {
@@ -65,7 +65,8 @@ export async function nextRecordNumber(t: Tenant, kind: RecordKind, facts: Recor
 
   if (!scheme || !scheme.fields.length) {
     // No scheme routed: the short form this record has always carried.
-    return `${fallbackPrefix}-${String(await bump(t, fallbackPrefix)).padStart(4, "0")}`;
+    // Packages are few: three digits (PK-001) read better than four.
+    return `${fallbackPrefix}-${String(await bump(t, fallbackPrefix)).padStart(kind === "PACKAGE" ? 3 : 4, "0")}`;
   }
 
   const before: string[] = [];
@@ -85,7 +86,7 @@ export async function nextRecordNumber(t: Tenant, kind: RecordKind, facts: Recor
     (seen ? after : before).push(value.replace(new RegExp(`\\${scheme.delimiter}`, "g"), ""));
   }
 
-  const prefix = [kind === "ACTION" ? "AC" : kind === "REVIEW" ? "RV" : "TR", ...before].join(scheme.delimiter);
+  const prefix = [kind === "ACTION" ? "AC" : kind === "REVIEW" ? "RV" : kind === "PACKAGE" ? "PK" : "TR", ...before].join(scheme.delimiter);
   const sequence = String(await bump(t, prefix)).padStart(digits, "0");
   void projectId;
   return [...before, sequence, ...after].join(scheme.delimiter) || `${fallbackPrefix}-${sequence}`;
