@@ -56,7 +56,12 @@ async function main() {
       },
     });
     made.docs.push(doc.id);
-    return t.db.revision.create({ data: { projectId: p1.id, documentId: doc.id, value: "A", state: "IN_PREPARATION" } });
+    // A route will not start on nothing, so each revision carries a file.
+    const rev = await t.db.revision.create({ data: { projectId: p1.id, documentId: doc.id, value: "A", state: "IN_PREPARATION" } });
+    const file = await t.db.storedFile.create({
+      data: { projectId: p1.id, name: `${doc.docNumber}_Rev-A.pdf`, path: `verify/${doc.docNumber}.pdf`, size: 1, mime: "application/pdf", sha256: "verify", kind: "RENDITION", revisionId: rev.id },
+    });
+    return t.db.revision.update({ where: { id: rev.id }, data: { renditionFileId: file.id } });
   }
   async function template(name: string, steps: object[]) {
     const tpl = await t.db.workflowTemplate.create({ data: { orgId: org.id, name: `${name} ${stamp}`, classes: "*", steps: JSON.stringify(steps), active: true, isDefault: false } as never });
@@ -105,7 +110,7 @@ async function main() {
 
     // An adviser answers with their comments, not a code. Whatever code is
     // posted, the advice recorded is what their comments say.
-    const second = await recordStepOutcome(t, runId, r2, ok.code, "no issue");
+    const second = await recordStepOutcome(t, runId, r2, ok.code, "no issue", useFor, true);
     check("any of the three may go first", second.ok, second.error ?? "");
     let run = await getRunForRevision(t, rev.id);
     const step0 = run?.steps[0];
@@ -115,14 +120,14 @@ async function main() {
     check("step waits while others are outstanding", run?.currentStep === 0);
     const openCycle = await t.db.reviewCycle.findUniqueOrThrow({ where: { id: run?.steps[0].cycleId ?? "" } });
     check("a step with days carries a due date", !!openCycle.dueAt, openCycle.dueAt?.toDateString() ?? "none");
-    await recordStepOutcome(t, runId, comm, "");
+    await recordStepOutcome(t, runId, comm, "", undefined, useFor, true);
     run = await getRunForRevision(t, rev.id);
     check("still waiting on the third", run?.currentStep === 0);
     const adviceCycleId = run?.steps[0].cycleId ?? "";
     await t.db.reviewComment.create({
       data: { projectId: p1.id, cycleId: adviceCycleId, authorId: r1.id, authorName: r1.name, text: "Load case is not stated.", classification: "BLOCKING", progressionPreventing: true },
     });
-    const blocked = await recordStepOutcome(t, runId, r1, "");
+    const blocked = await recordStepOutcome(t, runId, r1, "", undefined, useFor, true);
     check("all three in — moves to the lead, even when one is blocking", blocked.ok, blocked.error ?? "");
     run = await getRunForRevision(t, rev.id);
     const adviceCycle = await t.db.reviewCycle.findUniqueOrThrow({ where: { id: adviceCycleId } });
@@ -132,7 +137,7 @@ async function main() {
 
     const notLead = await recordStepOutcome(t, runId, r1, ok.code);
     check("only the lead decides the lead step", !notLead.ok);
-    const decided = await recordStepOutcome(t, runId, lead, ok.code, "agreed", useFor);
+    const decided = await recordStepOutcome(t, runId, lead, ok.code, "agreed", useFor, true);
     run = await getRunForRevision(t, rev.id);
     check("the lead's decision completes the route", decided.ok && run?.status === "DONE", decided.error ?? "");
     const approvals = await t.db.approval.findMany({ where: { revisionId: rev.id, withdrawnAt: null } });
@@ -157,11 +162,11 @@ async function main() {
     check("reviewers may sit on the deciding step when only the consolidator binds", s5.ok, s5.ok ? "" : s5.error);
     const id5 = s5.ok ? s5.runId : "";
     // A consolidated step is the deciding step, so everyone on it answers from the verdict list.
-    const in1 = await recordStepOutcome(t, id5, r1, ok.code, "fine");
-    const in2 = await recordStepOutcome(t, id5, r2, ok.code, "fine");
+    const in1 = await recordStepOutcome(t, id5, r1, ok.code, "fine", useFor, true);
+    const in2 = await recordStepOutcome(t, id5, r2, ok.code, "fine", useFor, true);
     check("their verdicts are taken as input", in1.ok && in2.ok, in1.error ?? in2.error ?? "");
     check("and approve nothing", (await t.db.approval.count({ where: { revisionId: rev5.id } })) === 0);
-    await recordStepOutcome(t, id5, lead, ok.code, "consolidated", useFor);
+    await recordStepOutcome(t, id5, lead, ok.code, "consolidated", useFor, true);
     const run5 = await getRunForRevision(t, rev5.id);
     const appr5 = await t.db.approval.findMany({ where: { revisionId: rev5.id } });
     check("the consolidator's verdict decides and is the approval", run5?.status === "DONE" && appr5.length === 1 && appr5[0].approverId === lead.id);
@@ -172,7 +177,7 @@ async function main() {
     const s2 = await startWorkflowRun(t, rev2.id, inputsOnly, admin);
     const id2 = s2.ok ? s2.runId : "";
     check("deciders start", s2.ok, s2.ok ? "" : s2.error);
-    await recordStepOutcome(t, id2, lead, ok.code, undefined, useFor);
+    await recordStepOutcome(t, id2, lead, ok.code, undefined, useFor, true);
     await recordStepOutcome(t, id2, admin, back.code, "rework section 3");
     const run2 = await getRunForRevision(t, rev2.id);
     check("one request for changes returns it to the author", run2?.status === "RETURNED", run2?.status);
@@ -187,6 +192,8 @@ async function main() {
     await db.reviewAssignment.deleteMany({ where: { cycleId: { in: cycleIds } } });
     await db.reviewCycle.deleteMany({ where: { id: { in: cycleIds } } });
     await db.approval.deleteMany({ where: { revisionId: { in: revIds } } });
+    await db.revision.updateMany({ where: { id: { in: revIds } }, data: { renditionFileId: null } });
+    await db.storedFile.deleteMany({ where: { revisionId: { in: revIds } } });
     await db.workflowRun.deleteMany({ where: { revisionId: { in: revIds } } });
     await db.documentSnapshot.deleteMany({ where: { documentId: { in: made.docs } } });
     await db.revision.deleteMany({ where: { id: { in: revIds } } });
