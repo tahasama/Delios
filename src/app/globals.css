@@ -1077,20 +1077,17 @@ summary::-webkit-details-marker {
     gap: 1.25rem;
     overflow-x: auto;
     scroll-snap-type: x mandatory;
-    padding: 1.4rem 1.25rem 1.5rem;
+    padding: 1.6rem 1.25rem 1.5rem;
   }
   @media (min-width: 640px) { .scene-track { padding-inline: 1.75rem; } }
 
   .scene {
     position: relative;
-    flex: 1 1 0;
-    min-width: 8.5rem;
-    scroll-snap-align: center;
     display: flex;
     flex-direction: column;
     gap: 0.3rem;
-    min-height: 8.6rem;
-    padding: 0.8rem 0.85rem 0.7rem;
+    min-height: 7.4rem;
+    padding: 0.75rem 0.8rem 0.65rem;
     border-radius: 0.7rem;
     text-align: left;
     background: rgb(255 255 255 / 0.035);
@@ -1138,8 +1135,20 @@ summary::-webkit-details-marker {
     font-size: 10px;
     color: rgb(255 255 255 / 0.5);
   }
-  /* The line from one scene to the next. */
-  .scene-link {
+  /* A column of the flow: one scene, or several side by side, stacked. */
+  .scene-col {
+    position: relative;
+    flex: 1 1 0;
+    min-width: 8.5rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.6rem;
+    scroll-snap-align: center;
+  }
+  /* The line from one column to the next. */
+  .scene-col-linked::after {
+    content: "";
     position: absolute;
     top: 50%;
     right: -1.25rem;
@@ -1147,14 +1156,37 @@ summary::-webkit-details-marker {
     height: 1px;
     background: linear-gradient(90deg, rgb(255 255 255 / 0.35), rgb(255 255 255 / 0.1));
   }
-  .scene-link::after {
+  .scene-col-linked::before {
     content: "";
     position: absolute;
-    right: 2px;
-    top: -3px;
+    z-index: 1;
+    right: calc(-1.25rem + 2px);
+    top: calc(50% - 3px);
     border-left: 5px solid rgb(255 255 255 / 0.35);
     border-block: 3.5px solid transparent;
   }
+  /* Scenes side by side: the line splits before them and joins after. */
+  .scene-fork { padding-inline: 0.55rem; }
+  .scene-fork-label {
+    position: absolute;
+    top: -1.15rem;
+    left: 0;
+    right: 0;
+    text-align: center;
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: rgb(255 255 255 / 0.4);
+  }
+  .scene-fork { background:
+      linear-gradient(rgb(255 255 255 / 0.28), rgb(255 255 255 / 0.28)) left 0 top 25% / 1px 50% no-repeat,
+      linear-gradient(rgb(255 255 255 / 0.28), rgb(255 255 255 / 0.28)) right 0 top 25% / 1px 50% no-repeat; }
+  /* A scene that happens only on some documents. */
+  .scene-optional { outline: 1px dashed rgb(255 255 255 / 0.3); outline-offset: -1px; }
+  .scene-optional:not([aria-selected="true"]) { background: transparent; box-shadow: none; }
+  .scene-optional[aria-selected="true"] { outline-color: color-mix(in oklab, var(--rail) 80%, transparent); }
+  .scene-legend-dashed { display: inline-block; width: 14px; height: 9px; border-radius: 3px; outline: 1px dashed rgb(255 255 255 / 0.5); outline-offset: -1px; }
   .scene-dot { display: inline-block; width: 7px; height: 7px; border-radius: 999px; }
   .scene-dot-control { background: #7cb6ff; }
   .scene-dot-work { background: rgb(255 255 255 / 0.85); }
