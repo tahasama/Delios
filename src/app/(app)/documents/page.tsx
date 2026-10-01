@@ -1,7 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { requireScope } from "@/lib/scope";
 import { RegisterPlate } from "./register-plate";
-import { OUTCOME_CONSEQUENCES, DOC_STATES, DOC_STATE_LABEL, DOC_MEANING, REV_STATES, REV_STATE_LABEL, REV_MEANING, revStateLabel, type DocState, type RevState } from "@/lib/standard";
+import { OUTCOME_CONSEQUENCES, DOC_STATES, DOC_STATE_LABEL, DOC_MEANING, REV_STATES, REV_STATE_LABEL, REV_MEANING, revStateLabel, releasedLabel, type DocState, type RevState } from "@/lib/standard";
 import { getSet } from "@/lib/config";
 import { DocumentRegister } from "./document-register";
 import { registerWhere, REGISTER_SORTS, documentsForAssets, readSearch, readDay } from "@/lib/register-query";
@@ -57,6 +57,9 @@ type Search = {
 export default async function DocumentsPage({ searchParams }: { searchParams: Promise<Search> }) {
   const scope = await requireScope();
   const { user, db, project } = scope;
+  // Released and issued as one act, or as two in order: the project's answer.
+  const { policy } = await import("@/lib/control-activities");
+  const together = (await policy(scope, "POLICY_RELEASE")) === "TOGETHER";
   const sp = await searchParams;
   const q = (sp.q ?? "").trim();
   const searches = readSearch(q);
@@ -166,9 +169,15 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
       revision: latest?.value ?? null,
       revState: latest?.state ?? null,
       // Released, then held for an outside approval: on hold is what it is now.
-      revStateLabel: latest ? (latest.state === "RELEASED" && latest.heldAt ? "On hold" : revStateLabel(latest.state)) : "No revision yet",
-      // Released and nobody asked for it to be sent: in use, and nobody told.
-      notIssued: !!released && !released.transmittalItems.length,
+      revStateLabel: latest
+        ? latest.state === "RELEASED" && latest.heldAt ? "On hold"
+          : latest.state === "RELEASED" ? releasedLabel(together, latest.transmittalItems.length > 0)
+          : revStateLabel(latest.state)
+        : "No revision yet",
+      // Where releasing is issuing, a released revision nobody was sent breaks
+      // the rule, and is stamped so. Where they are two acts, the state already
+      // says Released, and there is nothing to stamp.
+      notIssued: together && !!released && !released.transmittalItems.length,
       onHold: released?.heldAt ? (released.heldReason ?? "On hold, not for use.") : null,
       // A code is printed only when the organization publishes it. Records made
       // before the list existed carry the Standard's own consequence names,
@@ -238,7 +247,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
       { code: "IN_REVIEW", label: REV_STATE_LABEL.IN_REVIEW },
       { code: "NOT_RELEASED", label: REV_STATE_LABEL.NOT_RELEASED },
       { code: "FOR_RELEASE", label: "Reviewed" },
-      { code: "RELEASED", label: REV_STATE_LABEL.RELEASED },
+      { code: "RELEASED", label: together ? REV_STATE_LABEL.RELEASED : "Released or issued" },
       { code: "SUPERSEDED", label: REV_STATE_LABEL.SUPERSEDED },
       { code: "VOID", label: REV_STATE_LABEL.VOID },
     ], statuses: statuses.map((item) => ({ code: item.code, label: `${item.code} — ${item.label}` })), verdicts: verdictSet.map((item) => ({ code: item.code, label: `${item.code} — ${item.label}` })), suppliers: supplierCodes.map((item) => ({ code: item.code, label: item.label })), pos: poCodes.map((item) => ({ code: item.code, label: item.label })), disciplines: disciplines.filter((item) => usedDisciplines.has(item.code)).map((item) => ({ code: item.code, label: item.status === "RETIRED" ? `${item.label} (retired)` : item.label })), types: types.filter((item) => usedTypes.has(item.code)).map((item) => ({ code: item.code, label: item.status === "RETIRED" ? `${item.label} (retired)` : item.label })), criticalities: criticalities.map((item) => ({ code: item.code, label: item.label })), deliverables: deliverableTypes.map((item) => ({ code: item.code, label: item.label })), confidentialities: confidentialities.map((item) => ({ code: item.code, label: item.label.split(" — ")[0] })), dateFields: DATE_FIELDS.map((field) => ({ code: field.key, label: field.label })) }} exportHref={`/api/register/export${query.size ? `?${query.toString()}` : ""}`} />

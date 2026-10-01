@@ -10,7 +10,7 @@ import { Prisma } from "@prisma/client";
 import { isController, isAdmin, mayContributeToDocument } from "@/lib/auth";
 import { Chip, StateChip, Banner, btn, Field, inputCls } from "@/components/ui";
 import { ActionForm } from "@/components/form";
-import { DOC_STATE_LABEL, DOC_STATE_COLOR, REV_STATE_LABEL, REV_STATE_COLOR, revStateLabel, revStateColor, type DocState, type RevState } from "@/lib/standard";
+import { DOC_STATE_LABEL, DOC_STATE_COLOR, REV_STATE_LABEL, REV_STATE_COLOR, revStateLabel, revStateColor, type DocState, type RevState, releasedLabel } from "@/lib/standard";
 import { fmtDate, timeAgo, plain } from "@/lib/utils";
 import { getActiveSet, getSet, getValue } from "@/lib/config";
 import { updateDocumentAction, linkAssetAction, unlinkRelationshipAction, endDocumentStateAction } from "@/lib/actions/documents";
@@ -164,7 +164,13 @@ export default async function DocumentDetailPage({
   };
   // Released and never sent to anybody: in use, and nobody told. True whether
   // or not this organization asks for issuing.
-  const notIssued = !!current && !transmittalItems.some((item) => item.revisionId === current.id && item.transmittal.direction === "OUTGOING");
+  // Released and issued as one act, or as two in order: the project's answer.
+  const { policy: projectPolicy } = await import("@/lib/control-activities");
+  const together = (await projectPolicy(ctx, "POLICY_RELEASE")) === "TOGETHER";
+  const sentOut = !!current && transmittalItems.some((item) => item.revisionId === current.id && item.transmittal.direction === "OUTGOING");
+  // Only where releasing is issuing is a released revision nobody was sent a
+  // breach to stamp; where they are two acts, the state says Released.
+  const notIssued = together && !!current && !sentOut;
   const policy = await issuePolicy(ctx);
   const mayAsk = carrying ? await mayRequestIssue(ctx, carrying.id, user.id) || controller : false;
   const askChoices = mayAsk && carrying && policy.asked ? await requestChoices(ctx, doc) : null;
@@ -265,7 +271,7 @@ export default async function DocumentDetailPage({
           was told. Every ask is here with what came of it, and anybody with
           standing on the document may add another. */}
       {carrying && policy.asked && carrying.state !== "IN_REVIEW" && (carrying.state !== "NOT_RELEASED" || decisionFinal) ? (
-        <Step title={`Sending rev ${carrying.value} out`} open={requests.some((one) => one.status === "OPEN") || notIssued}>
+        <Step title={`Sending rev ${carrying.value} out`} open={requests.some((one) => one.status === "OPEN") || (!!current && !sentOut)}>
           {requests.length ? (
             <ul className="space-y-2">
               {requests.map((one) => {
@@ -316,7 +322,7 @@ export default async function DocumentDetailPage({
             </ul>
           ) : (
             <p className="text-xs text-slate-500">
-              {notIssued
+              {current && !sentOut
                 ? "Nobody has asked for this revision to be sent. It is released and in use; no one has been told."
                 : "No request yet."}
             </p>
@@ -446,7 +452,9 @@ export default async function DocumentDetailPage({
 
   // Released, then held for an outside approval: on hold is what it is now.
   const onHold = shown?.state === "RELEASED" && !!shown.heldAt;
-  const stateLabel = onHold ? "On hold" : shown ? revStateLabel(shown.state) : DOC_STATE_LABEL[doc.state as DocState] ?? doc.state;
+  const stateLabel = onHold ? "On hold"
+    : shown?.state === "RELEASED" && shown.id === current?.id ? releasedLabel(together, sentOut)
+    : shown ? revStateLabel(shown.state) : DOC_STATE_LABEL[doc.state as DocState] ?? doc.state;
   const stateColor = onHold ? "bg-red-50 text-red-800 ring-red-200" : shown ? revStateColor(shown.state) : DOC_STATE_COLOR[doc.state as DocState] ?? "";
 
   return (

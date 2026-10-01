@@ -193,13 +193,13 @@ export const POLICIES: Policy[] = [
     options: [
       {
         value: "TOGETHER",
-        label: "Released and issued, in one act",
-        text: "It is not released until somebody has said who receives it, and releasing it sends it. Nothing is ever published to nobody, and nothing is sent that was not published.",
+        label: "Released and issued, in one act — recommended",
+        text: "It is not released until somebody has said who receives it, and releasing it sends it: the review route is not finished until that is said. Nothing is ever published to nobody, and nothing is sent that was not published.",
       },
       {
         value: "SEPARATE",
-        label: "Released on its own",
-        text: "Releasing puts it in force in the register; sending it is a separate act, done later or not at all. For an organization that runs the pipeline and leaves distribution outside it.",
+        label: "Released, then issued — two acts",
+        text: "Releasing puts it in force in the register and it reads Released; sending it is a separate act, done later or not at all, and then it reads Issued. Saying who receives it is optional on the review route. For an organization that runs the pipeline and leaves distribution outside it.",
       },
     ],
   },

@@ -32,9 +32,18 @@ why. The two timestamps are stamped together.
 and unavailable to the people who needed it, with nothing in the record saying
 so. Latency with no owner.
 
-**Configuration:** an organization that wants them separate keeps them separate
-— `POLICY_RELEASE` (TOGETHER | SEPARATE). The Standard should state the default
-and permit the other, not forbid it (§1.3 *Local configuration*).
+**Default, and preference.** Released and issued in one act is the default —
+what the application recommends and does out of the box. It is not a rule:
+an organization that wants them separate keeps them separate — `POLICY_RELEASE`
+(TOGETHER | SEPARATE), set by its administrator. The Standard should state the
+default and permit the other, not forbid it (§1.3 *Local configuration*).
+
+Where they are separate they are two states in order: **Released**, then
+**Issued** once it is sent; saying who receives it is optional on the review
+route, and a released revision not yet sent is a state of its own, not a
+breach. Where they are one act, such a revision breaks the rule and is stamped
+NOT ISSUED; `scripts/issue-released.ts` issues the ones seeded that way on demo
+data.
 
 **Depends on it:** `releaseRevision` in `src/lib/lifecycle.ts`, the issue-request
 gate, 19 checks in `scripts/verify-release.ts`.
