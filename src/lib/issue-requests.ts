@@ -476,7 +476,9 @@ export async function holdRevision(t: Tenant, revisionId: string, user: SessionU
   const rev = await t.db.revision.findUniqueOrThrow({ where: { id: revisionId }, include: { document: true } });
   if (rev.state !== "RELEASED" || rev.heldAt) return;
   const reason = `Awaiting approval by ${partyName}.`;
-  await t.db.revision.update({ where: { id: revisionId }, data: { heldAt: new Date(), heldReason: reason, heldByName: user.name } });
+  const heldAt = new Date();
+  await t.db.revision.update({ where: { id: revisionId }, data: { heldAt, heldReason: reason, heldByName: user.name } });
+  await stampHold(t, revisionId, user, heldAt);
   const { audit } = await import("./audit");
   await audit({
     tenant: t, actor: user, action: "REVISION_HELD", entityType: "Revision", entityId: revisionId,
@@ -494,7 +496,16 @@ export async function liftHold(t: Tenant, revisionId: string, user: SessionUser)
   if (!rev.heldAt) throw new Error("This revision is not on hold.");
   const pending = await pendingIssue(t, revisionId, { recipients: false });
   if (!pending.ok) throw new Error(pending.error.replace("Release blocked", "The hold stays"));
-  await t.db.revision.update({ where: { id: revisionId }, data: { heldAt: null, heldReason: null, heldByName: null } });
+  // The viewable copy goes back to the one it had before the hold was stamped.
+  const before = await t.db.storedFile.findFirst({
+    where: { revisionId, kind: "RENDITION", createdAt: { lt: rev.heldAt } },
+    orderBy: { createdAt: "desc" },
+    select: { id: true },
+  });
+  await t.db.revision.update({
+    where: { id: revisionId },
+    data: { heldAt: null, heldReason: null, heldByName: null, ...(before ? { renditionFileId: before.id } : {}) },
+  });
   const { audit } = await import("./audit");
   await audit({
     tenant: t, actor: user, action: "REVISION_HOLD_LIFTED", entityType: "Revision", entityId: revisionId,
@@ -548,4 +559,30 @@ export async function tellReturn(
   });
   await notifyMany(to.ids, "RELEASE_REFUSED", `Sent back to you: ${rev.document.docNumber} rev ${rev.value}`, `${reason} — it ${what}.`, `/documents/${rev.documentId}`, t);
   await notifyMany(copies, "RELEASE_REFUSED", `Sent back: ${rev.document.docNumber} rev ${rev.value}`, `Back to ${to.names}. ${reason}`, `/documents/${rev.documentId}`, t);
+}
+
+/**
+ * Stamp the viewable copy ON HOLD — NOT FOR USE, the way a superseded copy is
+ * stamped: a new copy, kept beside the old one, which stays on record and comes
+ * back when the hold is lifted. Best effort — the hold is the record's state
+ * whether or not the PDF could be marked.
+ */
+async function stampHold(t: Tenant, revisionId: string, user: SessionUser, heldAt: Date) {
+  try {
+    const rev = await t.db.revision.findUniqueOrThrow({ where: { id: revisionId }, include: { document: true } });
+    if (!rev.renditionFileId) return;
+    const row = await t.db.storedFile.findUnique({ where: { id: rev.renditionFileId } });
+    if (!row || row.mime !== "application/pdf") return;
+    const { readStored, saveBuffer } = await import("./files");
+    const { stampPdf } = await import("./stamp");
+    const marked = await stampPdf(new Uint8Array(await readStored(row.path)), {
+      docNumber: rev.document.docNumber, rev: rev.value, statusLabel: rev.statusCode ?? "On hold",
+      date: heldAt, state: "HELD", title: rev.document.title,
+    });
+    const made = await saveBuffer(t, marked, rev.document.docNumber, "RENDITION", rev.value, user.name, user.id);
+    await t.db.storedFile.update({ where: { id: made.id }, data: { revisionId, createdAt: new Date(heldAt.getTime() + 1) } });
+    await t.db.revision.update({ where: { id: revisionId }, data: { renditionFileId: made.id } });
+  } catch {
+    // the hold stands without the stamp; the record says it is not for use
+  }
 }

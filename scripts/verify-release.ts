@@ -178,10 +178,24 @@ async function main() {
         });
         const early = await carryOutRequest(t, asked.id, actor);
         check(`nothing is sent before they answer (${answer ? "yes" : "no"})`, !!early.error && !early.numbers.length, early.error);
+        // A real PDF behind its viewable copy, so the hold has something to stamp.
+        const clean = await t.db.revision.findUniqueOrThrow({ where: { id: late.rev.id } });
+        const copy = await t.db.storedFile.findUniqueOrThrow({ where: { id: clean.renditionFileId! } });
+        const { PDFDocument } = await import("pdf-lib");
+        const blank = await PDFDocument.create(); blank.addPage([595, 842]);
+        const { mkdir, writeFile } = await import("node:fs/promises");
+        const pathMod = await import("node:path");
+        const at = pathMod.join(process.cwd(), "uploads", copy.path);
+        await mkdir(pathMod.dirname(at), { recursive: true });
+        await writeFile(at, await blank.save());
         await openApprovalStep(t, late.rev.id, actor);
         await holdRevision(t, late.rev.id, actor, party.name);
         const held = await t.db.revision.findUniqueOrThrow({ where: { id: late.rev.id } });
         check("it stays released, on hold, not for use", held.state === "RELEASED" && !!held.heldAt, held.heldReason ?? "");
+        check("…and its viewable copy is stamped", !!held.renditionFileId && held.renditionFileId !== clean.renditionFileId);
+        const stampedRow = await t.db.storedFile.findUniqueOrThrow({ where: { id: held.renditionFileId! } });
+        const { readStored } = await import("../src/lib/files");
+        check("…as a PDF that opens", (await PDFDocument.load(await readStored(stampedRow.path))).getPageCount() === 1);
         const theirStep = await t.db.reviewCycle.findFirstOrThrow({ where: { revisionId: late.rev.id, issueRequestId: asked.id } });
         await t.db.reviewCycle.update({ where: { id: theirStep.id }, data: { status: "CLOSED" } });
         await settleApproval(t, theirStep.id, actor, answer);
@@ -189,6 +203,7 @@ async function main() {
           const { sent } = await liftHold(t, late.rev.id, actor);
           const lifted = await t.db.revision.findUniqueOrThrow({ where: { id: late.rev.id } });
           check("approved: lifting the hold puts it back in use", !lifted.heldAt);
+          check("…with its unstamped copy back", lifted.renditionFileId === clean.renditionFileId);
           check("…and sends what waited for it", sent > 0, `${sent} transmittal(s)`);
         } else {
           let kept = "";

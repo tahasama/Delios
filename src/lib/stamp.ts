@@ -9,7 +9,8 @@ export type StampInfo = {
   rev: string;
   statusLabel: string;
   date: Date;
-  state?: "RELEASED" | "SUPERSEDED" | "VOID";
+  /** HELD: released, then on hold for an outside approval — not for use. */
+  state?: "RELEASED" | "SUPERSEDED" | "VOID" | "HELD";
   title?: string;
 };
 
@@ -28,7 +29,7 @@ export async function stampPdf(source: Buffer | Uint8Array | undefined, info: St
 
   const font = await pdf.embedFont(StandardFonts.HelveticaBold);
   const small = await pdf.embedFont(StandardFonts.Helvetica);
-  const obsolete = info.state === "SUPERSEDED" || info.state === "VOID";
+  const obsolete = info.state === "SUPERSEDED" || info.state === "VOID" || info.state === "HELD";
 
   // Title block on every page: number, revision, status, date (§10.2 / DEF-FM-05)
   const pages = pdf.getPages();
@@ -42,7 +43,7 @@ export async function stampPdf(source: Buffer | Uint8Array | undefined, info: St
 
     if (obsolete) {
       const angle = Math.atan2(height, width);
-      const text = info.state === "VOID" ? "VOID — NOT VALID" : "SUPERSEDED — NOT FOR USE";
+      const text = info.state === "VOID" ? "VOID — NOT VALID" : info.state === "HELD" ? "ON HOLD — NOT FOR USE" : "SUPERSEDED — NOT FOR USE";
       page.drawText(text, {
         x: width * 0.12,
         y: height * 0.32,
@@ -56,7 +57,7 @@ export async function stampPdf(source: Buffer | Uint8Array | undefined, info: St
         x: 24, y: 24, width: Math.min(width - 48, 300), height: 26,
         color: rgb(0.85, 0.1, 0.1),
       });
-      page.drawText(info.state === "VOID" ? "VOID (§12.1) — treated as never valid" : "SUPERSEDED (§12.5) — visibly marked not-current", {
+      page.drawText(info.state === "VOID" ? "VOID (§12.1) — treated as never valid" : info.state === "HELD" ? "ON HOLD — awaiting outside approval; not for use" : "SUPERSEDED (§12.5) — visibly marked not-current", {
         x: 32, y: 32, size: 9, font, color: rgb(1, 1, 1),
       });
     }
