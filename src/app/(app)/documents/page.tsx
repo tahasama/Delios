@@ -166,13 +166,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
       revision: latest?.value ?? null,
       revState: latest?.state ?? null,
       // Released, then held for an outside approval: on hold is what it is now.
-      // Released and never sent is released, not "released & issued" — the
-      // label says only what happened, and the stamp beside it says the rest.
-      revStateLabel: latest
-        ? latest.state === "RELEASED" && latest.heldAt ? "On hold"
-          : latest.state === "RELEASED" && !latest.transmittalItems?.length ? "Released"
-          : revStateLabel(latest.state)
-        : "No revision yet",
+      revStateLabel: latest ? (latest.state === "RELEASED" && latest.heldAt ? "On hold" : revStateLabel(latest.state)) : "No revision yet",
       // Released and nobody asked for it to be sent: in use, and nobody told.
       notIssued: !!released && !released.transmittalItems.length,
       onHold: released?.heldAt ? (released.heldReason ?? "On hold, not for use.") : null,

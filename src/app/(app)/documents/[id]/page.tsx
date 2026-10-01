@@ -446,8 +446,7 @@ export default async function DocumentDetailPage({
 
   // Released, then held for an outside approval: on hold is what it is now.
   const onHold = shown?.state === "RELEASED" && !!shown.heldAt;
-  // Released and never sent is released, not "released & issued".
-  const stateLabel = onHold ? "On hold" : shown?.state === "RELEASED" && shown.id === current?.id && notIssued ? "Released" : shown ? revStateLabel(shown.state) : DOC_STATE_LABEL[doc.state as DocState] ?? doc.state;
+  const stateLabel = onHold ? "On hold" : shown ? revStateLabel(shown.state) : DOC_STATE_LABEL[doc.state as DocState] ?? doc.state;
   const stateColor = onHold ? "bg-red-50 text-red-800 ring-red-200" : shown ? revStateColor(shown.state) : DOC_STATE_COLOR[doc.state as DocState] ?? "";
 
   return (
