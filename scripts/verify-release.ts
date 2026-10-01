@@ -253,22 +253,22 @@ async function main() {
       }
     }
 
-    console.log("\nThere is no release that reaches nobody\n");
-    // Released is issued and issued is released. A project that once answered
-    // "released on its own" — before the choice was taken away — gains nothing
-    // by it: with nobody named, the revision is still not released.
+    console.log("\nAn organization that releases without issuing\n");
+    // The project may say that releasing stands on its own. Then nobody need
+    // have said where it goes — but an approval asked for is still waited for.
     await db.controlSetting.create({
       data: { projectId: project.id, key: "POLICY_RELEASE", mode: "SEPARATE", setByName: "verify" },
     });
     try {
       const fifth = await decided("ALONE");
       await recordReviewOutcome(t, fifth.cycle.id, actor, proceeds, undefined, status.code);
-      check("with nobody named, it is not ready to release", !(await pendingIssue(t, fifth.rev.id)).ok);
-      let refused = "";
-      try { await releaseRevision(t, fifth.rev.id, actor, status.code); } catch (e) { refused = e instanceof Error ? e.message : String(e); }
-      check("…and releasing it is refused, whatever was once chosen", /nobody has said who/.test(refused), refused.slice(0, 60));
+      const asked = await pendingIssue(t, fifth.rev.id, { recipients: false });
+      check("with nobody named, it may still be released", asked.ok);
+      await releaseRevision(t, fifth.rev.id, actor, status.code);
       const alone = await t.db.revision.findUniqueOrThrow({ where: { id: fifth.rev.id } });
-      check("…so it stays not released", alone.state !== "RELEASED", alone.state);
+      check("it is released", alone.state === "RELEASED");
+      const carried = await t.db.transmittalItem.count({ where: { revisionId: fifth.rev.id } });
+      check("…and nothing was sent", carried === 0, `${carried} item(s)`);
     } finally {
       await db.controlSetting.deleteMany({ where: { projectId: project.id, key: "POLICY_RELEASE" } });
     }

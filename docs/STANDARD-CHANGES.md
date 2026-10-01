@@ -32,12 +32,9 @@ why. The two timestamps are stamped together.
 and unavailable to the people who needed it, with nothing in the record saying
 so. Latency with no owner.
 
-**Not configurable.** A choice to keep them separate was offered and has been
-withdrawn: it reopened exactly the gap this closes. Released is issued, and
-issued is released — the Standard states it, and does not permit the other.
-Records that reach the register released without an issue — imported, or
-seeded — are a finding; `scripts/issue-released.ts` issues them on demo and
-test data only.
+**Configuration:** an organization that wants them separate keeps them separate
+— `POLICY_RELEASE` (TOGETHER | SEPARATE). The Standard should state the default
+and permit the other, not forbid it (§1.3 *Local configuration*).
 
 **Depends on it:** `releaseRevision` in `src/lib/lifecycle.ts`, the issue-request
 gate, 19 checks in `scripts/verify-release.ts`.

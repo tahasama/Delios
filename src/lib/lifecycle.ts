@@ -453,10 +453,15 @@ export async function releaseRevision(t: Tenant, revisionId: string, user: Sessi
   // §8.1 — no release without recorded approval
   const approval = await db.approval.findFirst({ where: { revisionId }, orderBy: { decidedAt: "desc" } });
  if (!approval) throw new Error("Release blocked: no approval is recorded for this revision.");
-  // Released is issued, and issued is released: somebody has to have said who
-  // receives it, and an outside approval still to come holds it.
+  // What releasing means is the project's own answer. Where it means released
+  // and issued, somebody has to have said who receives it, and an outside
+  // approval still to come holds it. Where releasing stands on its own, only
+  // that second condition applies — an approval asked for is an approval waited
+  // for, whatever else the organization does.
   const { pendingIssue } = await import("./issue-requests");
-  const going = await pendingIssue(t, revisionId);
+  const { policy } = await import("./control-activities");
+  const together = (await policy(t, "POLICY_RELEASE")) === "TOGETHER";
+  const going = await pendingIssue(t, revisionId, { recipients: together });
   if (!going.ok) throw new Error(going.error);
   // §4.8 — core metadata complete before release
   const doc = rev.document;

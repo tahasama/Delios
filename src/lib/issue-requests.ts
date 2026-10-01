@@ -320,8 +320,8 @@ export async function pendingIssue(
   t: Tenant,
   revisionId: string,
   /**
-   * `recipients` false where only an outside approval is in question — lifting
-   * a hold on a revision that was already released and issued.
+   * `recipients` false where the project releases without issuing: then nobody
+   * need have said where it goes, and only an outside approval holds it.
    */
   { recipients = true }: { recipients?: boolean } = {},
 ): Promise<{ ok: true } | { ok: false; error: string }> {

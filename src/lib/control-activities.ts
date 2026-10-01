@@ -187,6 +187,23 @@ export type Policy = {
 
 export const POLICIES: Policy[] = [
   {
+    key: "POLICY_RELEASE",
+    title: "What releasing a revision means",
+    text: "The moment a revision becomes the one people work from — and whether sending it out is part of that moment.",
+    options: [
+      {
+        value: "TOGETHER",
+        label: "Released and issued, in one act",
+        text: "It is not released until somebody has said who receives it, and releasing it sends it. Nothing is ever published to nobody, and nothing is sent that was not published.",
+      },
+      {
+        value: "SEPARATE",
+        label: "Released on its own",
+        text: "Releasing puts it in force in the register; sending it is a separate act, done later or not at all. For an organization that runs the pipeline and leaves distribution outside it.",
+      },
+    ],
+  },
+  {
     key: "POLICY_PDF_STAMP",
     title: "Stamping the PDF",
     text: "Whether a binding review verdict — and a hold — is stamped on the PDF copy people open, or kept in the record only. The file as submitted is kept either way.",
