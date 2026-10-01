@@ -16,7 +16,7 @@ export type PickItem = { id: string; name: string; detail?: string | null; note?
  * person copied in, a recipient and a delegate are all found the same way.
  */
 export function SearchPick({
-  items, name, initial = [], label, hint, required, placeholder, empty, single, onCount, onChange, compact,
+  items, name, initial = [], label, hint, required, placeholder, empty, single, onCount, onChange, compact, browse,
 }: {
   items: PickItem[];
   name: string;
@@ -32,6 +32,11 @@ export function SearchPick({
   onCount?: (n: number) => void;
   /** Told the chosen ids whenever they change. */
   onChange?: (ids: string[]) => void;
+  /**
+   * A list worth reading whole — types, disciplines, documents, organizations —
+   * opens on click, and typing narrows it. People are only ever found by name.
+   */
+  browse?: boolean;
   /** Tighter, for a narrow card. */
   compact?: boolean;
 }) {
@@ -58,7 +63,7 @@ export function SearchPick({
   const options = items
     .filter((one) => !chosen.includes(one.id))
     .filter((one) => words.every((w) => `${one.name} ${one.detail ?? ""}`.toLowerCase().includes(w)))
-    .slice(0, 12);
+    .slice(0, browse ? 1000 : 12);
 
   const take = (index: number) => {
     const one = options[index];
@@ -87,6 +92,7 @@ export function SearchPick({
             value={query}
             onChange={(e) => { setQuery(e.target.value); setOpen(true); setHi(0); }}
             onFocus={() => setOpen(true)}
+            onClick={() => setOpen(true)}
             onKeyDown={(e) => {
               if (e.key === "ArrowDown") { e.preventDefault(); setOpen(true); setHi((n) => Math.min(n + 1, options.length - 1)); }
               else if (e.key === "ArrowUp") { e.preventDefault(); setHi((n) => Math.max(n - 1, 0)); }
@@ -97,13 +103,13 @@ export function SearchPick({
             placeholder={placeholder ?? (chosen.length && !single ? "Add another…" : "Type a name, then Enter")}
             aria-label={label ?? placeholder ?? "Search"}
             role="combobox"
-            aria-expanded={open && !!query}
+            aria-expanded={open && (!!query || !!browse)}
             autoComplete="off"
             className={cn("plain w-full", compact ? "py-1 text-xs" : "py-1.5 text-[13px]")}
           />
         </div>
 
-        {open && query ? (
+        {open && (query || browse) ? (
           <ul role="listbox" className="dt-menu absolute left-0 right-0 top-full z-30 mt-1 max-h-72 overflow-y-auto rounded-lg py-1">
             {options.length === 0 ? (
               <li className="px-3 py-2 text-xs text-slate-400">Nobody matches that.</li>

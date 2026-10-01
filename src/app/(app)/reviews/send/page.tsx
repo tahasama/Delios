@@ -76,6 +76,7 @@ export default async function StartReviewPage({ searchParams }: { searchParams: 
             <form method="get" className="space-y-4">
               <SearchPick
                 name="revision"
+                browse
                 items={ready.map((r) => ({
                   id: r.id,
                   name: `${r.document.docNumber} rev ${r.value}`,
@@ -83,7 +84,7 @@ export default async function StartReviewPage({ searchParams }: { searchParams: 
                 }))}
                 label="Documents"
                 required
-                hint="type part of a number or a title, then Enter — as many as go down the same route"
+                hint="click to see them, or type part of a number or title — as many as go down the same route"
                 placeholder="e.g. 50-ME, ventilation…"
               />
               <div className="flex flex-wrap items-center gap-3">

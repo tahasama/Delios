@@ -87,6 +87,7 @@ export function RequestIssue({ reasons, proposed, others, parties, author, onDec
               {parties.length ? (
                 <SearchPick
                   name="partyIds"
+                  browse
                   items={parties.map((party) => ({ id: party.id, name: party.name }))}
                   label="Other organizations"
                   hint="one transmittal for each — optional"

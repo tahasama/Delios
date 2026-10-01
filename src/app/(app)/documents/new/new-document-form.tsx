@@ -157,16 +157,18 @@ export function NewDocumentForm({
               <SearchPick
                 single
                 name="docType"
+                browse
                 items={docTypes.map((o) => ({ id: o.code, name: o.label, detail: o.code }))}
                 label="Type"
                 required
-                hint="type part of its name or code, then Enter"
+                hint="click to see the list, or type to narrow it"
                 placeholder="e.g. drawing, datasheet, DSW…"
                 onChange={(ids) => setDocType(ids[0] ?? "")}
               />
               <SearchPick
                 single
                 name="discipline"
+                browse
                 items={disciplines.map((o) => ({ id: o.code, name: o.label, detail: o.code }))}
                 label="Discipline"
                 required
