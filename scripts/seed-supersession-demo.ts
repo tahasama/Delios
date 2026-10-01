@@ -75,6 +75,7 @@ async function main() {
     data: {
       projectId: p1.id, number, direction: "OUTGOING", reasonForIssue: "EXECUTION", dateOfIssue: new Date("2026-09-03T08:00:00Z"),
       issuingParty: "Our organization", status: "ISSUED", acceptanceNotes: `${TAG} Ventilation layout for installation.`,
+      subject: `For construction — ${DOC} rev ${revA.value}`,
       createdById: controller.id, createdByName: controller.name,
       items: { create: [{ projectId: p1.id, revisionId: revA.id }] },
       recipients: {

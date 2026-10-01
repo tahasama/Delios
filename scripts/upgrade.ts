@@ -8,6 +8,8 @@
 //    maps to (§13.2, §5.6);
 //  - mark the review cycles of a route's earlier steps as advice: only the
 //    last step's verdict binds;
+//  - give every outgoing transmittal a subject where it was written without
+//    one — what it is for and what it carries;
 //  - give every review its number where it was written without one, oldest
 //    first, so the numbers follow the order the reviews happened;
 //  - publish any reference list the organization does not have yet (the advice
@@ -95,4 +97,18 @@ async function numberReviews() {
   }
 }
 
-main().then(numberReviews).finally(() => db.$disconnect());
+/** Outgoing transmittals written before a subject was required get one, said the way the form would. */
+async function subjectTransmittals() {
+  const { subjectFor } = await import("../src/lib/transmittal-subject");
+  const missing = await db.transmittal.findMany({
+    where: { direction: "OUTGOING", OR: [{ subject: null }, { subject: "" }] },
+    select: { id: true, reasonForIssue: true, project: { select: { orgId: true, code: true } }, items: { select: { revision: { select: { document: { select: { docNumber: true } } } } } } },
+  });
+  for (const t of missing) {
+    const label = (await db.configValue.findFirst({ where: { orgId: t.project.orgId, setKey: "REASONS_FOR_ISSUE", code: t.reasonForIssue }, select: { label: true } }))?.label ?? t.reasonForIssue;
+    await db.transmittal.update({ where: { id: t.id }, data: { subject: subjectFor(label, t.items.map((one) => one.revision.document.docNumber)) } });
+  }
+  if (missing.length) console.log(`${missing.length} transmittal(s) given a subject`);
+}
+
+main().then(numberReviews).then(subjectTransmittals).finally(() => db.$disconnect());

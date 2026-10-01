@@ -8,6 +8,7 @@ import { mkdir, writeFile } from "fs/promises";
 import path from "path";
 import { createPlaceholderRendition } from "../src/lib/stamp";
 import { reviewNumber } from "../src/lib/workflow";
+import { subjectFor } from "../src/lib/transmittal-subject";
 import { tenantFor } from "../src/lib/tenant";
 
 const UPLOAD_ROOT = path.join(process.cwd(), "uploads");
@@ -370,8 +371,12 @@ export async function seedDemoProject(db: PrismaClient, orgId: string, projectId
     status: "DRAFT" | "ISSUED" | "ACCEPTED" | "REJECTED",
     issuedDaysAgo: number
   ) => {
+    // What it is for and what it carries, as the form would make somebody say.
+    const carried = await db.revision.findMany({ where: { id: { in: items.map((i) => i.revisionId) } }, select: { document: { select: { docNumber: true } } } });
+    const reasonLabel = (await db.configValue.findFirst({ where: { setKey: "REASONS_FOR_ISSUE", code: reason }, select: { label: true } }))?.label ?? reason;
     const t = await db.transmittal.create({
       data: { projectId,
+        subject: subjectFor(reasonLabel, carried.map((one) => one.document.docNumber)),
         number, direction, reasonForIssue: reason, dateOfIssue: d(-issuedDaysAgo),
         issuingParty: party, responseRequired: reason === "REVIEW" || reason === "APPROVAL" || reason === "PRICING",
         responsePeriodDays: reason === "REVIEW" || reason === "APPROVAL" ? 14 : reason === "PRICING" ? 21 : null,
