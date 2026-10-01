@@ -131,7 +131,7 @@ const STAGES: Stage[] = [
     key: "outside",
     tagline: "Another organization answers",
     title: "Outside review",
-    text: "Another organization reviews it — as a step on the route, or on a transmittal sent for review — while our own review runs.",
+    text: "Another organization reviews it — as a step on the route, or on a transmittal sent for review.",
     rail: "rail-review",
     states: ["IN_REVIEW"],
     acts: [],
@@ -233,7 +233,7 @@ const STAGES: Stage[] = [
  * the flow. A column with two lanes runs side by side; a lane with a condition
  * happens only on some documents.
  */
-const FLOWS: { key: string; title: string; from: string; to: string; columns: { scene: string; optional?: string }[][] }[] = [
+const FLOWS: { key: string; title: string; from: string; to: string; columns: { scene: string; optional?: string }[][]; notes?: Record<number, string> }[] = [
   {
     key: "produce",
     title: "Documents we produce",
@@ -242,12 +242,14 @@ const FLOWS: { key: string; title: string; from: string; to: string; columns: { 
     columns: [
       [{ scene: "register" }],
       [{ scene: "prepare" }],
+      // Ours is always reviewed by us; an outside review joins it on some.
       [{ scene: "review" }, { scene: "outside", optional: "another organization reviews it too" }],
       [{ scene: "answer" }],
       [{ scene: "approval", optional: "an outside approval is asked for" }],
       [{ scene: "release" }],
       [{ scene: "issue" }],
     ],
+    notes: { 2: "always ours · theirs alongside, when it happens" },
   },
   {
     key: "receive",
@@ -257,11 +259,14 @@ const FLOWS: { key: string; title: string; from: string; to: string; columns: { 
     columns: [
       [{ scene: "received" }],
       [{ scene: "theirs" }],
-      [{ scene: "review" }, { scene: "outside", optional: "another organization reviews it too" }],
+      // What we receive is reviewed by us, by another organization, or both —
+      // the document decides, so neither lane is always there.
+      [{ scene: "review", optional: "we review it ourselves" }, { scene: "outside", optional: "another organization reviews it" }],
       [{ scene: "to-sender" }],
       [{ scene: "release", optional: "it is accepted for use here" }],
       [{ scene: "issue", optional: "it is passed on to others" }],
     ],
+    notes: { 2: "ours, theirs, or both" },
   },
 ];
 

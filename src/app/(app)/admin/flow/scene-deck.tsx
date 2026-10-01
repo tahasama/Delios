@@ -23,7 +23,7 @@ export type Lane = { scene: Scene; optional?: string };
  * One flow a document goes through: its columns in order, and in a column
  * with more than one lane, scenes that run side by side.
  */
-export type Flow = { key: string; title: string; from: string; to: string; columns: Lane[][] };
+export type Flow = { key: string; title: string; from: string; to: string; columns: Lane[][]; notes?: Record<number, string> };
 
 /**
  * The flow as a strip of scenes: one flow at a time, one scene of it lit, the
@@ -131,7 +131,7 @@ export function SceneDeck({ flows, panels }: { flows: Flow[]; panels: Record<str
               key={`${flow.key}/${c}`}
               className={cn("scene-col", column.length > 1 && "scene-fork", c < flow.columns.length - 1 && "scene-col-linked")}
             >
-              {column.length > 1 ? <span className="scene-fork-label">side by side</span> : null}
+              {column.length > 1 ? <span className="scene-fork-label">{flow.notes?.[c] ?? "side by side"}</span> : null}
               {column.map(({ scene: one, optional }, lane) => {
                 // Scenes side by side share their column's number: 03a, 03b.
                 const number = `${String(c + 1).padStart(2, "0")}${column.length > 1 ? "ab"[lane] ?? "" : ""}`;

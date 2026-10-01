@@ -1169,15 +1169,13 @@ summary::-webkit-details-marker {
   .scene-fork { padding-inline: 0.55rem; }
   .scene-fork-label {
     position: absolute;
-    top: -1.15rem;
-    left: 0;
-    right: 0;
-    text-align: center;
-    font-size: 9px;
-    font-weight: 600;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: rgb(255 255 255 / 0.4);
+    top: -1.2rem;
+    left: 50%;
+    transform: translateX(-50%);
+    white-space: nowrap;
+    font-size: 10.5px;
+    font-weight: 500;
+    color: rgb(255 255 255 / 0.55);
   }
   .scene-fork { background:
       linear-gradient(rgb(255 255 255 / 0.28), rgb(255 255 255 / 0.28)) left 0 top 25% / 1px 50% no-repeat,
