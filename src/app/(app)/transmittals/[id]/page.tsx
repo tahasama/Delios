@@ -72,6 +72,13 @@ export default async function TransmittalDetailPage({ params, searchParams }: { 
       // answer is a transmittal of its own, with its own number and its own
       // enclosures, so it is linked to rather than copied in here.
       inReplyTo: { select: { id: true, number: true, subject: true } },
+      // What this completes or corrects, and what was sent after it to complete
+      // or correct it. Each is its own transmittal; this one never changes.
+      follows: { select: { id: true, number: true, subject: true } },
+      followedBy: {
+        orderBy: { createdAt: "asc" },
+        select: { id: true, number: true, subject: true, followKind: true, status: true, dateOfIssue: true, _count: { select: { items: true, recipients: true } } },
+      },
       answers: {
         orderBy: { dateOfIssue: "asc" },
         select: {
@@ -425,6 +432,53 @@ export default async function TransmittalDetailPage({ params, searchParams }: { 
             </ul>
             {mayNotify ? <NotifyAgain action={chaseTransmittalAction} transmittalId={t.id} waiting={waiting.length} /> : null}
           </section>
+
+          {/* What was sent after it. A transmittal is never changed once it
+              went: a person or a document left out goes on a supplement, and a
+              package they rejected goes again on one that replaces it. */}
+          {t.direction === "OUTGOING" && (t.status !== "DRAFT" || t.follows) ? (
+            <section id="followed" className="register register-sheet register-sheet-open">
+              <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2 sm:px-6">
+                <span className="stencil mr-1 text-slate-400">Sent after it</span>
+                <span className="text-[11px] text-slate-400">
+                  {t.followedBy.length
+                    ? `${t.followedBy.length} transmittal${t.followedBy.length === 1 ? "" : "s"} completed or corrected it`
+                    : "nothing yet — this one stays as it was sent"}
+                </span>
+                {controller && t.status !== "DRAFT" ? (
+                  t.status === "REJECTED"
+                    ? <Link href={`/transmittals/new?follows=${t.id}&kind=REPLACES`} className="ask ml-auto">Send the corrected package</Link>
+                    : <Link href={`/transmittals/new?follows=${t.id}&kind=SUPPLEMENT`} className="ask ml-auto">Add what was left out</Link>
+                ) : null}
+              </div>
+              {t.follows ? (
+                <p className="border-b border-line px-5 py-2 text-[11px] text-slate-500 sm:px-6">
+                  {t.followKind === "REPLACES" ? "This replaces " : "This is a supplement to "}
+                  <Link href={`/transmittals/${t.follows.id}`} className="font-mono font-semibold text-link hover:underline">{t.follows.number}</Link>
+                  {t.follows.subject ? <> &mdash; {t.follows.subject}</> : null}.
+                </p>
+              ) : null}
+              {t.followedBy.length ? (
+                <ul className="divide-y divide-line">
+                  {t.followedBy.map((one) => (
+                    <li key={one.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-2.5 sm:px-6">
+                      <div className="min-w-0">
+                        <p className="text-sm">
+                          <span className="stencil mr-2 text-slate-400">{one.followKind === "REPLACES" ? "Replaced by" : "Supplement"}</span>
+                          <Link href={`/transmittals/${one.id}`} className="doc-number">{one.number}</Link>
+                        </p>
+                        <p className="text-[11px] text-slate-400">
+                          {one.status === "DRAFT" ? "not sent yet" : fmtDate(one.dateOfIssue)}
+                          {" "}&middot; {one._count.items} document{one._count.items === 1 ? "" : "s"} &middot; {one._count.recipients} recipient{one._count.recipients === 1 ? "" : "s"}
+                        </p>
+                      </div>
+                      <Chip className={statusColors[one.status] ?? ""}>{one.status.toLowerCase()}</Chip>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </section>
+          ) : null}
 
           {/* What came back. Each answer is correspondence in its own right, so
               this says what they are and where they are, and does not try to

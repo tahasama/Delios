@@ -69,6 +69,11 @@ export async function createTransmittalAction(_prev: { error?: string } | undefi
   // The transmittal this one answers, where it is an answer. Correspondence
   // reads as a thread: the question keeps its number, and so does the answer.
   const inReplyToId = String(formData.get("inReplyTo") ?? "").trim() || null;
+  // The transmittal this one completes or corrects. What was sent is never
+  // changed: a supplement adds what was left out, a replacement resends what
+  // they rejected — each its own transmittal, linked to the first.
+  const followsId = String(formData.get("followsId") ?? "").trim() || null;
+  const followKind = followsId ? String(formData.get("followKind") ?? "") : null;
 
  if (!reasonForIssue) return { error: "Every transmittal states its reason for issue." };
  if (!dateOfIssue) return { error: "Date of issue is required." };
@@ -79,6 +84,14 @@ export async function createTransmittalAction(_prev: { error?: string } | undefi
  if (!recipientUsers.length && !partyTo.length) return { error: "Name at least one person to send it to — a company on its own is not a recipient." };
   if (offline.length !== partyTo.length + partyCc.length) return { error: "One of the organizations chosen is no longer set up as working outside the system." };
   if (direction === "OUTGOING" && !subject) return { error: "Give the transmittal a subject — it is the first thing the recipient reads." };
+  const followed = followsId ? await db.transmittal.findUnique({ where: { id: followsId }, select: { number: true, direction: true, status: true } }) : null;
+  if (followsId) {
+    if (!followed) return { error: "The transmittal this follows no longer exists." };
+    if (followKind !== "SUPPLEMENT" && followKind !== "REPLACES") return { error: "Say whether this adds to the first transmittal or replaces it." };
+    if (direction !== "OUTGOING" || followed.direction !== "OUTGOING") return { error: "Only something we sent is supplemented or replaced by us." };
+    if (followed.status === "DRAFT") return { error: `${followed.number} has not gone yet — change it instead.` };
+    if (followKind === "REPLACES" && followed.status !== "REJECTED") return { error: `${followed.number} was not rejected — add what was left out on a supplement instead.` };
+  }
 
   const reasons = await getActiveSet("REASONS_FOR_ISSUE");
   const reason = reasons.find((r) => r.code === reasonForIssue);
@@ -137,6 +150,8 @@ export async function createTransmittalAction(_prev: { error?: string } | undefi
       subject,
       message,
       inReplyToId,
+      followsId: followed ? followsId : null,
+      followKind: followed ? followKind : null,
       acceptanceNotes: direction === "INCOMING" ? notes || null : null,
       createdById: user.id,
       createdByName: user.name,
@@ -164,7 +179,7 @@ export async function createTransmittalAction(_prev: { error?: string } | undefi
     entityType: "Transmittal",
     entityId: t.id,
     entityLabel: t.number,
- detail: `${direction.toLowerCase()} · reason: ${reason.label} · ${revisionIds.length} item(s) · ${recipientUsers.length + partyTo.length} recipient(s)${copyUsers.length + partyCc.length ? `, ${copyUsers.length + partyCc.length} copied in` : ""}${offline.length ? ` · sent on by us to ${offline.map((party) => party.name).join(", ")}` : ""}${inReplyToId ? " · an answer" : ""}.`,
+ detail: `${direction.toLowerCase()} · reason: ${reason.label} · ${revisionIds.length} item(s) · ${recipientUsers.length + partyTo.length} recipient(s)${copyUsers.length + partyCc.length ? `, ${copyUsers.length + partyCc.length} copied in` : ""}${offline.length ? ` · sent on by us to ${offline.map((party) => party.name).join(", ")}` : ""}${inReplyToId ? " · an answer" : ""}${followed ? ` · ${followKind === "REPLACES" ? "replaces" : "supplement to"} ${followed.number}` : ""}.`,
   });
   // What arrives is a record of something that already happened, so it is issued
   // on creation. What we send is sent when we say so — here, or later from the

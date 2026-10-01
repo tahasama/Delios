@@ -8,7 +8,7 @@ import { NewTransmittalForm } from "./new-transmittal-form";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "New transmittal" };
 
-type Search = { doc?: string; docs?: string; direction?: string; revisions?: string; users?: string; to?: string; reason?: string; party?: string; subject?: string; message?: string; replyTo?: string };
+type Search = { doc?: string; docs?: string; direction?: string; revisions?: string; users?: string; to?: string; reason?: string; party?: string; subject?: string; message?: string; replyTo?: string; follows?: string; kind?: string };
 
 export default async function NewTransmittalPage({ searchParams }: { searchParams: Promise<Search> }) {
   const ctx = await requireScope();
@@ -57,6 +57,24 @@ export default async function NewTransmittalPage({ searchParams }: { searchParam
     ? answering.recipients.filter((one) => one.kind === "CC" && one.userId).map((one) => one.userId!)
     : [];
 
+  // Completing or correcting something we sent: the new transmittal starts as a
+  // copy of the first — its reason, its people, its documents — and the sender
+  // changes what was missing. The first stays exactly as it went.
+  const followKind = sp.kind === "REPLACES" ? "REPLACES" : "SUPPLEMENT";
+  const following = sp.follows
+    ? await db.transmittal.findFirst({
+        where: { id: sp.follows, direction: "OUTGOING", NOT: { status: "DRAFT" } },
+        select: {
+          id: true, number: true, subject: true, reasonForIssue: true, status: true, rejectionReason: true,
+          items: { select: { revisionId: true } },
+          recipients: { select: { userId: true, partyId: true, kind: true } },
+        },
+      })
+    : null;
+  const idOf = (one: { userId: string | null; partyId: string | null }) => one.userId ?? (one.partyId ? `party:${one.partyId}` : null);
+  const followTo = following ? following.recipients.filter((one) => one.kind !== "CC").map(idOf).filter((id): id is string => !!id) : [];
+  const followCopies = following ? following.recipients.filter((one) => one.kind === "CC").map(idOf).filter((id): id is string => !!id) : [];
+
   const selectedDocumentIds = [...new Set([...(sp.docs ?? "").split(","), ...(sp.doc ? [sp.doc] : [])].map((value) => value.trim()).filter(Boolean))];
   const selectedDocuments = selectedDocumentIds.length ? await db.document.findMany({
     where: { id: { in: selectedDocumentIds } },
@@ -91,17 +109,20 @@ export default async function NewTransmittalPage({ searchParams }: { searchParam
         defaultDirection={sp.direction === "INCOMING" ? "INCOMING" : "OUTGOING"}
         preselectedRevisionIds={preselected}
         prefill={{
-          revisionIds: (sp.revisions ?? "").split(",").filter(Boolean),
-          userIds: answering ? answerTo : (sp.users ?? "").split(",").filter(Boolean),
-          copyIds: answerCopies,
+          revisionIds: following ? following.items.map((one) => one.revisionId) : (sp.revisions ?? "").split(",").filter(Boolean),
+          userIds: following ? followTo : answering ? answerTo : (sp.users ?? "").split(",").filter(Boolean),
+          copyIds: following ? followCopies : answerCopies,
           outsiders: sp.to,
-          reason: sp.reason,
+          reason: following?.reasonForIssue ?? sp.reason,
           party: answering && answering.direction === "INCOMING" ? answering.issuingParty : sp.party,
-          subject: answering
-            ? `RE: ${answering.subject ?? answering.number}`
-            : sp.subject,
+          subject: following
+            ? `${followKind === "REPLACES" ? "Replaces" : "Supplement to"} ${following.number}${following.subject ? ` — ${following.subject}` : ""}`
+            : answering
+              ? `RE: ${answering.subject ?? answering.number}`
+              : sp.subject,
           message: sp.message,
           answering: answering ? { id: answering.id, number: answering.number, subject: answering.subject } : undefined,
+          following: following ? { id: following.id, number: following.number, kind: followKind, rejection: following.rejectionReason } : undefined,
         }}
       />
     </div>

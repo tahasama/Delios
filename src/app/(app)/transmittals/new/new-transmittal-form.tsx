@@ -20,6 +20,8 @@ export type Prefill = {
   outsiders?: string; reason?: string; party?: string; subject?: string; message?: string;
   /** The transmittal being answered: its id, and what to call it on screen. */
   answering?: { id: string; number: string; subject: string | null };
+  /** The sent transmittal this one completes (a supplement) or corrects (it replaces one they rejected). */
+  following?: { id: string; number: string; kind: "SUPPLEMENT" | "REPLACES"; rejection: string | null };
 };
 
 const STEPS = ["Which way, and why", "What goes with it", "Who gets it"];
@@ -173,6 +175,23 @@ export function NewTransmittalForm({
               Answering <Link href={`/transmittals/${prefill.answering.id}`} className="font-mono font-semibold text-link hover:underline">{prefill.answering.number}</Link>
               {prefill.answering.subject ? <> &mdash; {prefill.answering.subject}</> : null}.
               {" "}The people it was sent to and copied in are carried over; change any of them in step 3.
+            </p>
+          </>
+        ) : null}
+
+        {/* What this completes or corrects. The first transmittal is never
+            changed after it went; this one says which it follows. */}
+        {prefill?.following ? (
+          <>
+            <input type="hidden" name="followsId" value={prefill.following.id} />
+            <input type="hidden" name="followKind" value={prefill.following.kind} />
+            <p className="mb-4 rounded-lg border border-line bg-tint-soft px-4 py-2.5 text-xs text-slate-600">
+              {prefill.following.kind === "REPLACES" ? "Replaces " : "Supplement to "}
+              <Link href={`/transmittals/${prefill.following.id}`} className="font-mono font-semibold text-link hover:underline">{prefill.following.number}</Link>
+              {prefill.following.kind === "REPLACES"
+                ? <>, which they rejected{prefill.following.rejection ? <> &mdash; &ldquo;{prefill.following.rejection}&rdquo;</> : null}. Its documents and people are carried over: swap in the corrected revisions in step 2.</>
+                : <>. Its documents and people are carried over: add the person or the document that was left out, and remove what they already have.</>}
+              {" "}{prefill.following.number} itself stays exactly as it was sent.
             </p>
           </>
         ) : null}

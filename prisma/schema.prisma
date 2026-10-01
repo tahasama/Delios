@@ -879,6 +879,16 @@ model Transmittal {
   inReplyToId         String?
   inReplyTo           Transmittal?           @relation("TransmittalThread", fields: [inReplyToId], references: [id])
   answers             Transmittal[]          @relation("TransmittalThread")
+  /**
+   * The transmittal this one completes or corrects. What was sent is never
+   * changed after it went: a person or a document left out is sent on a
+   * SUPPLEMENT to it, and a package they rejected is sent again as one that
+   * REPLACES it. Both keep their own number, and both say which they follow.
+   */
+  followsId           String?
+  follows             Transmittal?           @relation("TransmittalFollow", fields: [followsId], references: [id])
+  followKind          String? // SUPPLEMENT | REPLACES
+  followedBy          Transmittal[]          @relation("TransmittalFollow")
   items               TransmittalItem[]
   recipients          TransmittalRecipient[]
   files               StoredFile[]
@@ -896,6 +906,7 @@ model Transmittal {
   @@index([responseDueDate])
   @@index([receivedDate])
   @@index([inReplyToId])
+  @@index([followsId])
 }
 
 model TransmittalItem {

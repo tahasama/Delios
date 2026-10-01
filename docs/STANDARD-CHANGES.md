@@ -423,12 +423,26 @@ published.
 
 ---
 
+## 20 · A transmittal is never changed after it went
+
+**Clause:** §11.1, §11.10.
+
+**Must say:** what was sent stays as it was sent. A person or a document left
+out goes on a **supplement**: a new transmittal, with its own number, that says
+which one it adds to. A package the recipient rejected goes again on one that
+**replaces** it, again with its own number. Both start as a copy of the first —
+its reason, its people, its documents — and the sender changes what was
+missing or wrong. The first lists what was sent after it.
+
+A replacement follows only a rejected transmittal; anything else is added to on
+a supplement. A draft has not gone, so it is simply changed.
+
+**Depends on it:** `Transmittal.followsId`, `followKind` (SUPPLEMENT | REPLACES).
+
+---
+
 ## Still open — decided in conversation, not yet built
 
 - **Escalation** where somebody refuses to acknowledge carrying an action
   without its documents. Agreed to be the Standard's and the DMP's business
   rather than the application's; the Standard should say what happens.
-- **Amending a transmittal after issue** — adding a recipient, adding a
-  document, resubmitting after a rejection under §11.10. The application
-  refuses all three today, and the Standard does not say whether they are
-  permitted at all.
