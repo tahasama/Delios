@@ -77,6 +77,12 @@ export const SETUP_PAGES: SetupPage[] = [
     control: true,
   },
   {
+    href: "/admin/flow",
+    title: "Control room",
+    text: "The whole flow on one page: each step a document goes through, who carries it out, what is switched on, and the sets it uses.",
+    group: "Access",
+  },
+  {
     href: "/admin/control",
     title: "Who does what",
     text: "For each act — sending a document out, handing a review to somebody else — whether Document Control carries it out or the people doing the work do it themselves.",

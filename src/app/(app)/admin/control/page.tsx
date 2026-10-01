@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { SETUP_PAGES, maySetup } from "../setup-pages";
 import { requireScope } from "@/lib/scope";
 import { PageHeader, Card, Chip, inputCls } from "@/components/ui";
@@ -38,6 +39,7 @@ export default async function ControlActivitiesPage() {
       <PageHeader
         title="Who does what"
         subtitle="Some acts can be carried out by Document Control, or by the people doing the work. Say which, and the buttons follow."
+        actions={<Link href="/admin/flow" className="text-xs font-semibold text-link hover:underline">See the whole flow &rarr;</Link>}
       />
 
       <Card
