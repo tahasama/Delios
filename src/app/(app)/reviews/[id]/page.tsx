@@ -192,6 +192,12 @@ export default async function ReviewCyclePage({ params }: { params: Promise<{ id
         { label: "Returned to author", at: cycle.returnedToOriginatorAt, holder: doc.createdByName },
       ];
   const currentCustody = [...custody].reverse().find((point) => point.at) ?? custody[0];
+  // Where this review stands, said in the header: on a route, the step it is
+  // (not the last step that finished); otherwise the last custody point.
+  const routeIndex = run ? run.steps.findIndex((step) => step.cycleId === cycle.id) : -1;
+  const standing = run && routeIndex >= 0
+    ? `step ${routeIndex + 1} of ${run.steps.length} · ${run.steps[routeIndex].title ?? (routeIndex === run.steps.length - 1 ? "Decision" : `Review ${routeIndex + 1}`)}`
+    : currentCustody.label.toLowerCase();
   // How near the reply is. Overdue and at risk are evidence somebody acts on, so
   // they keep their colour in the plate rather than becoming plain words.
   const due = cycle.dueAt ? dueState(cycle.dueAt, cycle.status !== "OPEN") : null;
@@ -231,7 +237,7 @@ export default async function ReviewCyclePage({ params }: { params: Promise<{ id
                 </span></>
               ) : null}
               {" · "}
-              {cycle.outcome ? `${verdictLabel(cycle.outcome)} — ${cycle.outcomeByName ?? ""}` : `${currentCustody.label.toLowerCase()} · ${cycle.assignments.filter((assignment) => assignment.completedAt).length} of ${cycle.assignments.length} reviewers done`}
+              {cycle.outcome ? `${verdictLabel(cycle.outcome)} — ${cycle.outcomeByName ?? ""}` : `${standing} · ${cycle.assignments.filter((assignment) => assignment.completedAt).length} of ${cycle.assignments.length} answered`}
               {/* The status the revision carries. Whether it is in force is the
                   revision's state, not the status. */}
               {rev.statusCode ? <> &middot; <span className="font-mono font-semibold text-slate-700">{rev.statusCode}</span></> : null}

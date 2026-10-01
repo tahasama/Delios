@@ -437,16 +437,16 @@ export default async function TransmittalDetailPage({ params, searchParams }: { 
           {t.direction === "OUTGOING" && (t.status !== "DRAFT" || t.follows) ? (
             <section id="followed" className="register register-sheet register-sheet-open">
               <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2 sm:px-6">
-                <span className="stencil mr-1 text-slate-400">Sent after it</span>
+                <span className="stencil mr-1 text-slate-400">Follow-ups</span>
                 <span className="text-[11px] text-slate-400">
                   {t.followedBy.length
-                    ? `${t.followedBy.length} transmittal${t.followedBy.length === 1 ? "" : "s"} completed or corrected it`
-                    : "nothing yet — this one stays as it was sent"}
+                    ? `${t.followedBy.length} sent after it to complete or correct it`
+                    : "a sent transmittal never changes — anything missed or wrong goes on a new one, listed here"}
                 </span>
                 {controller && t.status !== "DRAFT" ? (
                   t.status === "REJECTED"
                     ? <Link href={`/transmittals/new?follows=${t.id}&kind=REPLACES`} className="ask ml-auto">Send the corrected package</Link>
-                    : <Link href={`/transmittals/new?follows=${t.id}&kind=SUPPLEMENT`} className="ask ml-auto">Add what was left out</Link>
+                    : <Link href={`/transmittals/new?follows=${t.id}&kind=SUPPLEMENT`} className="ask ml-auto">Send a follow-up</Link>
                 ) : null}
               </div>
               {t.follows ? (
