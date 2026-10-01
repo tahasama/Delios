@@ -35,6 +35,7 @@ async function main() {
     console.log("\nWhat may be left out\n");
     const never = ["WITHDRAW", "VOID", "RETURN_OUTCOME", "ISSUE", "REVIEW_ISSUE"];
     check("delegation may be left out", !!SKIPPABLE.DELEGATE);
+    check("the action note may be left out", !!SKIPPABLE.ACTION_NOTE);
     check("release, void, withdrawal and the answer reaching its author may not", never.every((key) => !SKIPPABLE[key]));
     check("every skippable act is a real act", Object.keys(SKIPPABLE).every((key) => CONTROL_ACTIVITIES.some((one) => one.key === key)));
 
@@ -49,6 +50,8 @@ async function main() {
 
     await db.controlSetting.create({ data: { projectId: project.id, key: SKIP_KEY("VOID"), mode: "OFF" } });
     check("an act that may not be skipped ignores a stray switch", !(await actIsOff(t, "VOID")));
+    await db.controlSetting.create({ data: { projectId: project.id, key: SKIP_KEY("ACTION_NOTE"), mode: "OFF" } });
+    check("the action note reads as left out on its own switch", (await actIsOff(t, "ACTION_NOTE")) && (await controlSettings(t)).rows.filter((row) => row.off).length === 2);
 
     console.log("\nWhat states are called\n");
     const defaults = await stateNames(t);

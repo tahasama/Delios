@@ -1,7 +1,7 @@
 import { ActionNotes } from "./lateness";
 import { NeededTable, type NeededRow } from "./needed-table";
 import { latenessOf } from "@/lib/action-lateness";
-import { carrierRefusal } from "@/lib/control-activities";
+import { carrierRefusal, actIsOff } from "@/lib/control-activities";
 import { readyReading, countingRevision, meetsRequirement } from "@/lib/readiness";
 import Link from "next/link";
 import { requireScope } from "@/lib/scope";
@@ -62,7 +62,8 @@ export default async function ActionDetailPage({ params, searchParams }: { param
   // Which of the three moments slipped, for each document, and who writes the
   // note about what was decided.
   const lateness = await latenessOf(ctx, action.id);
-  const mayNote = !(await carrierRefusal(ctx, "ACTION_NOTE", { control, standing: true }));
+  // Left out by the organization: the notes already written are still read.
+  const mayNote = !(await actIsOff(ctx, "ACTION_NOTE")) && !(await carrierRefusal(ctx, "ACTION_NOTE", { control, standing: true }));
   // Where the time went, and what was decided about work that went ahead
   // without its documents, are not questions worth asking of an action that has
   // neither a slip nor a note.

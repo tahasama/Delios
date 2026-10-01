@@ -95,6 +95,9 @@ export const SKIPPABLE: Record<string, { off: string }> = {
   DELEGATE: {
     off: "Nobody hands a review over: each step is answered by the person it was given to. Hand-overs already in force run to their end date.",
   },
+  ACTION_NOTE: {
+    off: "No note is written when an action goes ahead without its documents, or is stopped for want of them: the shortfall stays on the action as it is, and an action whose day has passed is taken to have happened. Notes already written stay on the record.",
+  },
 };
 
 export const SKIP_KEY = (key: string) => `SKIP:${key}`;

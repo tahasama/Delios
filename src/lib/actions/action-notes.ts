@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireScope } from "@/lib/scope";
 import { isController, isAdmin } from "@/lib/auth";
 import { audit } from "@/lib/audit";
-import { carrierRefusal } from "@/lib/control-activities";
+import { carrierRefusal, actIsOff } from "@/lib/control-activities";
 
 /**
  * What was decided about an action that did not have its documents.
@@ -27,6 +27,7 @@ export async function recordActionNoteAction(_prev: State | undefined, formData:
   const delayResponsible = String(formData.get("delayResponsible") ?? "").trim() || null;
   const delayReason = String(formData.get("delayReason") ?? "").trim() || null;
 
+  if (await actIsOff(ctx, "ACTION_NOTE")) return { error: "Notes on actions are not used on this project." };
   if (decision !== "CARRIED" && decision !== "STOPPED") {
     return { error: "Say whether the work went ahead without its documents, or was stopped." };
   }
