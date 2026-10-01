@@ -115,7 +115,8 @@ export function SeverityChip({ severity }: { severity: string }) {
 
 export function btn(variant: "primary" | "secondary" | "danger" | "ghost" = "primary", size: "sm" | "md" = "md") {
   const base = "inline-flex items-center justify-center gap-1.5 rounded-lg font-semibold transition-colors outline-none focus-visible:ring-3 focus-visible:ring-link/20 disabled:cursor-not-allowed disabled:opacity-50";
-  const sizes = size === "sm" ? "min-h-9 px-3 py-2 text-xs" : "min-h-10 px-4 py-2.5 text-sm";
+  // Sized as the register's buttons (.ask), so a form's button and a sheet's read as one family.
+  const sizes = size === "sm" ? "min-h-8 px-3 py-1.5 text-xs" : "min-h-8 px-3.5 py-1.5 text-[13px]";
   const variants = {
     primary: "bg-brand text-white hover:bg-brand-hover",
     secondary: "border border-line-strong bg-surface text-slate-700 hover:border-brand-line hover:bg-tint",
@@ -186,13 +187,15 @@ export function Field({
   className?: string;
 }) {
   return (
-    <label className={cn("block", className)}>
-      <span className="mb-1.5 block">
-        <span className="block text-[12.5px] font-semibold text-slate-800">
+    // The register's question: a stencil label with its hint beside it, and an
+    // underlined field — the same everywhere a form asks something.
+    <label className={cn("block min-w-0", className)}>
+      <span className="mb-1 flex flex-wrap items-baseline gap-x-2">
+        <span className="stencil text-slate-500">
           {label}
           {required ? <span className="ml-0.5 text-red-500">*</span> : null}
         </span>
-        {hint ? <span className="mt-0.5 block text-[11px] leading-4 text-slate-400">{hint}</span> : null}
+        {hint ? <span className="text-[11px] leading-4 text-slate-400">{hint}</span> : null}
       </span>
       {children}
     </label>
@@ -200,7 +203,7 @@ export function Field({
 }
 
 export const inputCls =
-  "min-h-10 w-full rounded-lg border border-line-strong bg-surface px-3 py-2 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-brand-line focus:ring-3 focus:ring-link/15 disabled:cursor-not-allowed disabled:bg-canvas disabled:text-slate-500";
+  "w-full rounded-none border-0 border-b border-line-strong bg-transparent px-0.5 py-1.5 text-[13px] text-slate-800 outline-none transition-colors placeholder:text-slate-400 hover:border-slate-400 focus:border-brand-line disabled:cursor-not-allowed disabled:text-slate-500";
 
 export function EmptyState({ title, body, action }: { title: string; body?: string; action?: React.ReactNode }) {
   return (

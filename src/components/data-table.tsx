@@ -319,7 +319,7 @@ export function DataTable({
       {css ? <style>{css}</style> : null}
       {withBar ? (
         <div className={cn(
-          "dt-bar no-print flex items-center justify-between gap-2 border-b border-line bg-surface px-3 py-1.5",
+          "dt-bar no-print flex items-center justify-between gap-2 rounded-t-[inherit] border-b border-line bg-surface px-3 py-1.5",
         )}>
           <p className="px-1 text-[11px] font-medium tabular-nums text-slate-400">{rows} {rows === 1 ? "row" : "rows"}</p>
           <div className="flex items-center gap-0.5">
@@ -425,7 +425,7 @@ export function DataTable({
         style={!stretch && fill && height ? { maxHeight: height } : undefined}
         className={cn(
           "scroll-thin overflow-x-auto",
-          withBar ? "rounded-b-2xl" : "rounded-2xl",
+          withBar ? "rounded-b-[inherit]" : "rounded-[inherit]",
           (sticky || fill) && "dt-sticky overflow-y-auto",
           sticky && !fill && "max-h-[72vh]",
           stretch && "min-h-0 flex-1",
