@@ -54,13 +54,15 @@ export function recipientsFromForm(formData: FormData): RequestRecipients {
 
 /**
  * What a form says about a request, in the shape the engine stores. On the
- * deciding step the answer is one of three: who receives it, leave it to the
- * author, or — where the project allows it — no issue required for now.
+ * deciding step the answer is one of two: who receives it, or leave it to
+ * the author.
  */
 export function requestFromForm(formData: FormData) {
   const needsApproval = formData.get("needsApproval") === "on";
   return {
-    give: formData.get("askNow") !== "off",
+    // Every decision that lets a revision out says who receives it, or leaves
+    // that to its author; "nobody for now" is not an answer.
+    give: true,
     reason: String(formData.get("issueReason") ?? "INFORMATION"),
     recipients: recipientsFromForm(formData),
     delegated: formData.get("delegateNextStep") === "on",
@@ -180,7 +182,6 @@ export async function requestChoices(
   doc: { deliverableType: string; docType: string; discipline: string; criticality: string | null; confidentiality: string | null; originator?: string | null },
 ) {
   const { recipientsFor } = await import("./distribution");
-  const { policy } = await import("./control-activities");
   const onTheMatrix = await recipientsFor(t, doc);
   const proposedIds = new Set(onTheMatrix.map((one) => one.userId));
   const everyone = await t.db.user.findMany({
@@ -195,16 +196,7 @@ export async function requestChoices(
     parties: await t.db.party.findMany({ where: { isInternal: false, active: true }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
     // Only a document we produced waits on somebody outside approving it.
     ours: !doc.originator,
-    noIssue: (await policy(t, "POLICY_NO_ISSUE")) === "ALLOWED",
   };
-}
-
-/** Refused when "no issue required for now" was said and the project does not allow it. */
-export async function noIssueRefusal(t: Tenant, request: { give: boolean }): Promise<string | null> {
-  if (request.give) return null;
-  const { policy } = await import("./control-activities");
-  if ((await policy(t, "POLICY_NO_ISSUE")) === "ALLOWED") return null;
-  return "On this project a released revision always has somebody to send it to: name who receives it, or leave it to its author.";
 }
 
 /**

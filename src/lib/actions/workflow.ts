@@ -472,9 +472,6 @@ export async function submitForReleaseAction(_prev: { error?: string; ok?: strin
 
   // Who receives it, asked here as the deciding step would ask it.
   const request = requestFromForm(formData);
-  const { noIssueRefusal } = await import("@/lib/issue-requests");
-  const refusedNoIssue = await noIssueRefusal(ctx, request);
-  if (refusedNoIssue) return { error: refusedNoIssue };
   if (request.give) {
     const { noRecipients } = await import("@/lib/issue-requests");
     if (!request.delegated && noRecipients(request.recipients)) return { error: "Say who it goes to, or leave it to the author." };

@@ -652,9 +652,7 @@ export async function recordStepOutcome(
   const binds = decides && bindsOnStep(step, user.id);
   // Who receives it is checked before anything is written.
   if (binds && !returnsToAuthor && request) {
-    const { noRecipients, noIssueRefusal } = await import("./issue-requests");
-    const refused = await noIssueRefusal(t, request);
-    if (refused) return { ok: false, error: refused };
+    const { noRecipients } = await import("./issue-requests");
     if (request.give && !request.delegated && noRecipients(request.recipients)) {
       return { ok: false, error: "Say who it goes to, or leave it to the author." };
     }

@@ -15,15 +15,14 @@ export type PickReason = { code: string; label: string };
  * are, and anything the sender needs to know. The distribution matrix proposes
  * our own people and ticks them; everyone else is one search away.
  *
- * The answer is one of: who receives it, leave it to whoever wrote it, or —
- * on the deciding step, where the project allows it — no issue required for
- * now. Releasing a revision is issuing it, so this answer is what lets it be
+ * The answer is one of two: who receives it, or leave it to whoever wrote it.
+ * Releasing a revision is issuing it, so this answer is what lets it be
  * released at all: leave it to the author and the route waits for them.
  *
  * A document we produced may need somebody outside to approve it before it is
  * released; that is asked first, because it changes what releasing means.
  */
-export function RequestIssue({ reasons, proposed, others, parties, author, onDecision, ours = true, noIssue = false }: {
+export function RequestIssue({ reasons, proposed, others, parties, author, onDecision, ours = true }: {
   /** The published reasons for issue. */
   reasons: PickReason[];
   /** Our people the matrix puts on the distribution for this document. */
@@ -38,15 +37,12 @@ export function RequestIssue({ reasons, proposed, others, parties, author, onDec
   onDecision?: boolean;
   /** We produced the document, so an outside approval may be needed before release. */
   ours?: boolean;
-  /** The project allows "no issue required for now" (POLICY_NO_ISSUE). */
-  noIssue?: boolean;
 }) {
-  const [choice, setChoice] = useState<"SEND" | "AUTHOR" | "NONE">("SEND");
+  const [choice, setChoice] = useState<"SEND" | "AUTHOR">("SEND");
   // Some of our revisions cannot be released until somebody outside has
   // approved them. Saying so here is what makes the release wait for them.
   const [outside, setOutside] = useState(false);
-  const offerNone = onDecision && noIssue && !outside;
-  const chosen = choice === "NONE" && !offerNone ? "SEND" : choice;
+  const chosen = choice;
 
   const option = (value: typeof choice, label: React.ReactNode) => (
     <label className="flex items-start gap-2 text-xs text-slate-700">
@@ -83,10 +79,8 @@ export function RequestIssue({ reasons, proposed, others, parties, author, onDec
         {onDecision ? <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Once it is released</p> : null}
         {option("SEND", "Say who receives it")}
         {option("AUTHOR", <>Leave it to {author ?? "whoever wrote it"} — they are notified, and ask for it themselves when they know who needs it</>)}
-        {offerNone ? option("NONE", "No issue required for now — it is released and nobody is told; the document says so") : null}
       </div>
       {chosen === "AUTHOR" ? <input type="hidden" name="delegateNextStep" value="on" /> : null}
-      {chosen === "NONE" ? <input type="hidden" name="askNow" value="off" /> : null}
 
       {chosen === "SEND" ? (
         <>

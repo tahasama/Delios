@@ -8,7 +8,6 @@ import { PrismaClient } from "@prisma/client";
 import { tenantFor } from "../src/lib/tenant";
 import { startWorkflowRun, recordStepOutcome, getRunForRevision } from "../src/lib/workflow";
 import { delegationRefusal, delegationFlag } from "../src/lib/delegation";
-import { noIssueRefusal } from "../src/lib/issue-requests";
 import type { SessionUser } from "../src/lib/auth";
 
 const db = new PrismaClient();
@@ -99,11 +98,6 @@ async function main() {
     check("and the hand-over is flagged", !!(await delegationFlag(t, hand)));
     await strict(true);
     check("where the matrix is the only rule, that hand-over is refused", !!(await delegationRefusal(t, hand)));
-    check("by default, \u201cno issue required for now\u201d is accepted", (await noIssueRefusal(t, { give: false })) === null);
-    await db.controlSetting.create({ data: { projectId: p1.id, key: "POLICY_NO_ISSUE", mode: "NEVER", setByName: "verify-workflow" } as never });
-    check("where the project does not allow it, it is refused", !!(await noIssueRefusal(t, { give: false })));
-    check("naming who receives it is still accepted", (await noIssueRefusal(t, { give: true })) === null);
-    await db.controlSetting.deleteMany({ where: { projectId: p1.id, key: "POLICY_NO_ISSUE", setByName: "verify-workflow" } });
     const rev0 = await freshRevision("MATRIX");
     const refused = await startWorkflowRun(t, rev0.id, offMatrix, admin, [[r1.id, tech.id], [lead.id]]);
     check("where the matrix is the only rule, choosing someone it does not name is refused", !refused.ok && /distribution matrix/.test(refused.error), refused.ok ? "started" : refused.error);
@@ -209,7 +203,6 @@ async function main() {
     check("and nothing is approved", (await t.db.approval.count({ where: { revisionId: rev2.id } })) === 0);
   } finally {
     await strict(false);
-    await db.controlSetting.deleteMany({ where: { projectId: p1.id, key: "POLICY_NO_ISSUE", setByName: "verify-workflow" } });
     // Leave the register as it was.
     const revs = await db.revision.findMany({ where: { documentId: { in: made.docs } }, select: { id: true } });
     const revIds = revs.map((r) => r.id);
