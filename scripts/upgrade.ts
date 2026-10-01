@@ -8,6 +8,8 @@
 //    maps to (§13.2, §5.6);
 //  - mark the review cycles of a route's earlier steps as advice: only the
 //    last step's verdict binds;
+//  - give every review its number where it was written without one, oldest
+//    first, so the numbers follow the order the reviews happened;
 //  - publish any reference list the organization does not have yet (the advice
 //    list, for instance) and any property a reference value has gained, without
 //    touching a value the organization edited itself.
@@ -77,4 +79,20 @@ async function main() {
   }
 }
 
-main().finally(() => db.$disconnect());
+/** Reviews written before every review carried a number get one now, in the order they were opened. */
+async function numberReviews() {
+  const { reviewNumber } = await import("../src/lib/workflow");
+  const projects = await db.project.findMany({ select: { id: true, orgId: true, code: true } });
+  for (const p of projects) {
+    const missing = await db.reviewCycle.findMany({
+      where: { projectId: p.id, OR: [{ number: null }, { number: "" }] },
+      orderBy: [{ submittedAt: "asc" }, { sequence: "asc" }],
+      select: { id: true },
+    });
+    const t = tenantFor(p.orgId, p.id);
+    for (const one of missing) await db.reviewCycle.update({ where: { id: one.id }, data: { number: await reviewNumber(t) } });
+    if (missing.length) console.log(`${p.code}: ${missing.length} review(s) numbered`);
+  }
+}
+
+main().then(numberReviews).finally(() => db.$disconnect());

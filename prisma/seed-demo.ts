@@ -7,6 +7,8 @@ import { createHash } from "crypto";
 import { mkdir, writeFile } from "fs/promises";
 import path from "path";
 import { createPlaceholderRendition } from "../src/lib/stamp";
+import { reviewNumber } from "../src/lib/workflow";
+import { tenantFor } from "../src/lib/tenant";
 
 const UPLOAD_ROOT = path.join(process.cwd(), "uploads");
 
@@ -221,6 +223,8 @@ export async function seedDemoProject(db: PrismaClient, orgId: string, projectId
   ) {
     const cycle = await db.reviewCycle.create({
       data: { projectId,
+        // A review is referred to by its number, like a transmittal.
+        number: await reviewNumber(tenantFor(orgId, projectId)),
         revisionId: revId,
         mode: "PARALLEL",
         sequence: opts.seq,
