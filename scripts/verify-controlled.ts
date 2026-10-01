@@ -79,7 +79,7 @@ async function main() {
     // The requirements template names a scheduled action and a document; give
     // it the two it names, and take them away again afterwards.
     const fxAction = await t.db.action.create({ data: { projectId: project.id, code: "A00001", name: "Fixture", departments: "EL" } });
-    const fxDoc = await t.db.document.create({ data: { projectId: project.id, docNumber: "Q6637021-74-EL-DSW-09102", title: "Fixture", deliverableType: "ENG", docType: "DSW", discipline: "EL", createdById: "verify", createdByName: "verify" } });
+    const fxDoc = await t.db.document.create({ data: { projectId: project.id, docNumber: "P1001-50-EL-DSW-09102", title: "Fixture", deliverableType: "ENG", docType: "DSW", discipline: "EL", createdById: "verify", createdByName: "verify" } });
     for (const h of allHandlers()) {
       const tpl = parseCsv(toCsv([h.columns, h.sample, ...(h.extraSamples ?? [])]));
       const r = await h.parse(t, tpl, h.kind === "VALUE_SET" ? "DISCIPLINES" : "default");

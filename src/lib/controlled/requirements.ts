@@ -84,7 +84,7 @@ const requirements: Handler = {
   clause: "§14.1 · §14.3",
   level: "PROJECT",
   columns: COLUMNS,
-  sample: ["EL", "A00001", "Pump house — MCC energisation", "MCC-2 and its feeders", "2026-10-20", "Q6637021-74-EL-DSW-09102", "EL", "DSW", "", "", "", "", "BL-301", "", "", ""],
+  sample: ["EL", "A00001", "Pump house — MCC energisation", "MCC-2 and its feeders", "2026-10-20", "P1001-50-EL-DSW-09102", "EL", "DSW", "", "", "", "", "BL-301", "", "", ""],
   approverHint: "Document Control",
 
   async parse(t, rows): Promise<ParseResult> {

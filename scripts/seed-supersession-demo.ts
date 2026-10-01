@@ -1,15 +1,15 @@
 // A replaced revision whose outside recipients were never told — to try
 // Assurance → Out-of-date risks → "Send rev B to them" end to end.
 //
-// Q6637021-74-ME-DSW-09201 rev A was released at IFC and issued on a
-// transmittal to two people outside (MADASUD, ONEE) and one reviewer here.
+// P1001-50-ME-DSW-09201 rev A was released at IFC and issued on a
+// transmittal to two people outside (Acme Pumps, Riverside Water) and one reviewer here.
 // Rev B has since been released. The reviewer was told in the app; the two
 // outsiders were not. Re-running resets the example.
 import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
 
 const db = new PrismaClient();
-const DOC = "Q6637021-74-ME-DSW-09201";
+const DOC = "P1001-50-ME-DSW-09201";
 const TAG = "[supersession demo]";
 
 async function nextTr(projectId: string) {
@@ -21,7 +21,7 @@ async function nextTr(projectId: string) {
 
 async function main() {
   const org = await db.organization.findFirstOrThrow({ where: { slug: "our-org" } });
-  const p1 = await db.project.findFirstOrThrow({ where: { orgId: org.id, code: "P1" } });
+  const p1 = await db.project.findFirstOrThrow({ where: { orgId: org.id, code: "P1001" } });
   const who = (email: string) => db.user.findFirstOrThrow({ where: { orgId: org.id, email } });
   const [author, approver, controller, reviewer] = await Promise.all([who("author@delios.local"), who("approver@delios.local"), who("controller@delios.local"), who("reviewer@delios.local")]);
   const pdf = await db.storedFile.findFirstOrThrow({ where: { projectId: p1.id, kind: "RENDITION" } });
@@ -47,7 +47,7 @@ async function main() {
   const doc = await db.document.create({
     data: {
       projectId: p1.id, docNumber: DOC, title: "Pump house — ventilation layout", deliverableType: "ENG", docType: "DWG", discipline: "ME",
-      subProject: "74", criticality: "ROUTINE", confidentiality: "INTERNAL", retentionClass: "PROJECT_DURATION", state: "ACTIVE", isPlaceholder: false,
+      subProject: "50", criticality: "ROUTINE", confidentiality: "INTERNAL", retentionClass: "PROJECT_DURATION", state: "ACTIVE", isPlaceholder: false,
       createdById: author.id, createdByName: author.name,
     },
   });
@@ -79,8 +79,8 @@ async function main() {
       items: { create: [{ projectId: p1.id, revisionId: revA.id }] },
       recipients: {
         create: [
-          { projectId: p1.id, name: "S. Amrani", organization: "MADASUD", notifiedAt: new Date("2026-09-03T08:00:00Z") },
-          { projectId: p1.id, name: "K. Idrissi", organization: "ONEE", notifiedAt: new Date("2026-09-03T08:00:00Z") },
+          { projectId: p1.id, name: "S. Amrani", organization: "Acme Pumps", notifiedAt: new Date("2026-09-03T08:00:00Z") },
+          { projectId: p1.id, name: "K. Idrissi", organization: "Riverside Water (client)", notifiedAt: new Date("2026-09-03T08:00:00Z") },
           { projectId: p1.id, name: reviewer.name, organization: "Our organization", userId: reviewer.id, notifiedAt: new Date("2026-09-03T08:00:00Z") },
         ],
       },

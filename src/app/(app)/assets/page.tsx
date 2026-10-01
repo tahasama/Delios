@@ -40,7 +40,7 @@ export default async function AssetsPage({ searchParams }: { searchParams: Promi
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <Field label="Tag" required hint="as on the drawings, e.g. P-101"><input name="code" required className={`${inputCls} uppercase`} placeholder="P-101" /></Field>
                 <Field label="Name" required className="sm:col-span-2"><input name="name" required className={inputCls} placeholder="Feed pump" /></Field>
-                <Field label="Area"><input name="area" className={inputCls} placeholder="71" /></Field>
+                <Field label="Area"><input name="area" className={inputCls} placeholder="20" /></Field>
                 <Field label="System"><input name="system" className={inputCls} placeholder="Raw water feed" /></Field>
                 <Field label="Unit"><input name="unit" className={inputCls} placeholder="U-100" /></Field>
               </div>

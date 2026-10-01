@@ -21,8 +21,8 @@ only those.
 | `reviewer@delios.local` | Reviewer | Documents waiting for advice |
 | `approver@delios.local` | Lead engineer | Documents waiting for the verdict |
 | `controller@delios.local` | Document Control | Everything: release, issue, check what arrives |
-| `client@delios.local` | ONEE, the client | Only what was issued to them |
-| `vendor@delios.local` | MADASUD, a supplier | Only their own package and documents |
+| `client@delios.local` | Riverside Water, the client | Only what was issued to them |
+| `vendor@delios.local` | Acme Pumps, a supplier | Only their own package and documents |
 | `admin@delios.local` | Administrator | All of the above, plus Settings |
 
 ## The documents it prepares
@@ -35,7 +35,7 @@ only those.
 | WALK 4 | Decided "to be IFC", not released | controller |
 | WALK 5 | Released at IFC, nobody told | controller |
 | WALK 6 | Released at IFA and issued to the client | client |
-| WALK 7 | Arrived from MADASUD, waiting to be checked | controller |
+| WALK 7 | Arrived from Acme Pumps, waiting to be checked | controller |
 
 ---
 
@@ -93,7 +93,7 @@ only those.
 
 ## 6 · Supplier
 
-- [ ] Packages: only MADASUD's package, with what is expected and what is late.
+- [ ] Packages: only Acme Pumps' package, with what is expected and what is late.
 - [ ] Their own documents are visible; ours are not.
 
 ## 7 · Schedule & actions (controller or project manager)

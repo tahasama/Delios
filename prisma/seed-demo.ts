@@ -19,7 +19,7 @@ export async function seedDemoProject(db: PrismaClient, orgId: string, projectId
     console.log(`· Demo project already seeded (${existing} documents) — skipping.`);
     return;
   }
-  console.log("· Seeding the demo project (PRJ Q6637021 — wastewater treatment works)…");
+  console.log("· Seeding the demo project (PRJ P1001 — wastewater treatment works)…");
 
   const users = {
     admin: await db.user.findUniqueOrThrow({ where: { orgId_email: { orgId, email: "admin@delios.local" } } }),
@@ -253,7 +253,7 @@ export async function seedDemoProject(db: PrismaClient, orgId: string, projectId
   }
 
   // ── 1 · GA drawing — the model citizen: A superseded, B current ────────────
-  const ga = await mkDoc({ docNumber: "Q6637021-74-CI-DSW-00001", title: "Non-process building 74 — general arrangement, site works", deliverableType: "ENG", docType: "DSW", discipline: "CI", assetCodes: ["TK-201"], createdBy: "author", criticality: "QUALITY", retentionClass: "ASSET_LIFE" });
+  const ga = await mkDoc({ docNumber: "P1001-50-CI-DSW-00001", title: "Non-process building 50 — general arrangement, site works", deliverableType: "ENG", docType: "DSW", discipline: "CI", assetCodes: ["TK-201"], createdBy: "author", criticality: "QUALITY", retentionClass: "ASSET_LIFE" });
   const gaA = await mkRev(ga.id, ga.docNumber, { value: "A", state: "SUPERSEDED", statusCode: "IFC", reason: "First issue for construction", change: "Initial site works GA", releasedAt: d(-50), supersededAt: d(-25) });
   await mkApproval(gaA.id, ga.id, ga.docNumber, "A", "approver");
   await mkCycle(gaA.id, ga.id, ga.docNumber, "A", { seq: 1, outcome: verdictCode("return") });
@@ -263,12 +263,12 @@ export async function seedDemoProject(db: PrismaClient, orgId: string, projectId
   await db.notification.create({ data: { projectId, userId: users.author.id, type: "SUPERSEDED", title: `Superseded: ${ga.docNumber} rev A`, body: "Rev B was released at AFC. Stop use; recall or mark controlled copies (§12.2–12.4).", link: `/documents/${ga.id}` } });
 
   // ── 2 · Foundation drawings — live review, with the reviewer now ───────────
-  const fdn = await mkDoc({ docNumber: "Q6637021-74-CI-DFN-00001", title: "Non-process building 74 — foundation drawings, pump house", deliverableType: "ENG", docType: "DFN", discipline: "CI", assetCodes: ["P-101", "P-102"], createdBy: "author", criticality: "SAFETY", retentionClass: "ASSET_LIFE", state: "PLANNED" });
+  const fdn = await mkDoc({ docNumber: "P1001-50-CI-DFN-00001", title: "Non-process building 50 — foundation drawings, pump house", deliverableType: "ENG", docType: "DFN", discipline: "CI", assetCodes: ["P-101", "P-102"], createdBy: "author", criticality: "SAFETY", retentionClass: "ASSET_LIFE", state: "PLANNED" });
   const fdnA = await mkRev(fdn.id, fdn.docNumber, { value: "A", state: "IN_REVIEW", reason: "First issue", change: "Foundations for pumps P-101/102", authorization: "Placeholder register entry (§16.8)" });
   await mkCycle(fdnA.id, fdn.id, fdn.docNumber, "A", { seq: 1, open: true });
 
   // ── 3 · DELIBERATE DEFECT: released with no approval + blocking comment open + missing file ──
-  const rebar = await mkDoc({ docNumber: "Q6637021-74-ST-DSW-00001", title: "Non-process building 74 — reinforcement arrangement, blower house slab", deliverableType: "ENG", docType: "DSW", discipline: "ST", assetCodes: ["BL-301"], createdBy: "author2", criticality: "SAFETY", retentionClass: "ASSET_LIFE" });
+  const rebar = await mkDoc({ docNumber: "P1001-50-ST-DSW-00001", title: "Non-process building 50 — reinforcement arrangement, blower house slab", deliverableType: "ENG", docType: "DSW", discipline: "ST", assetCodes: ["BL-301"], createdBy: "author2", criticality: "SAFETY", retentionClass: "ASSET_LIFE" });
   const rebarA = await mkRev(rebar.id, rebar.docNumber, { value: "A", state: "RELEASED", statusCode: "IFC", reason: "First issue", change: "Slab reinforcement", releasedAt: d(-15), bogusFile: true });
   void rebarA;
   // no approval row — ST-07 / AP-01 ▲
@@ -276,27 +276,27 @@ export async function seedDemoProject(db: PrismaClient, orgId: string, projectId
   void rebarCycle; // blocking comment left OPEN on a released revision — RO-14 ▲
 
   // ── 4 · Vendor datasheet — in preparation by the supplier ─────────────────
-  const dat = await mkDoc({ docNumber: "Q6637021-74-MAD-JESA593P22-ME-DAS-00001", title: "Feed pump P-101 — mechanical datasheet, MADASUD offer", deliverableType: "VND", docType: "DAS", discipline: "ME", originator: "MAD", contractRef: "JESA593P22", assetCodes: ["P-101"], createdBy: "vendor", criticality: "QUALITY", retentionClass: "ASSET_LIFE", receivedDate: d(-3), state: "PLANNED" });
+  const dat = await mkDoc({ docNumber: "P1001-50-ACME-PO101-ME-DAS-00001", title: "Feed pump P-101 — mechanical datasheet, Acme Pumps offer", deliverableType: "VND", docType: "DAS", discipline: "ME", originator: "ACME", contractRef: "PO101", assetCodes: ["P-101"], createdBy: "vendor", criticality: "QUALITY", retentionClass: "ASSET_LIFE", receivedDate: d(-3), state: "PLANNED" });
   await mkRev(dat.id, dat.docNumber, { value: "A", state: "IN_PREPARATION", reason: "First issue", change: "Datasheet for offer", authorization: "Placeholder register entry (§16.8)" }, "vendor");
 
   // ── 5 · Vendor calculation — released, issued, controlled copy registered ──
-  const calc = await mkDoc({ docNumber: "Q6637021-74-MAD-JESA593P22-ME-CAL-00001", title: "Feed pump P-101 — induced draft blower sizing calculation", deliverableType: "VND", docType: "CAL", discipline: "ME", originator: "MAD", contractRef: "JESA593P22", assetCodes: ["P-101", "BL-301"], createdBy: "vendor", criticality: "QUALITY", retentionClass: "ASSET_LIFE", receivedDate: d(-20) });
+  const calc = await mkDoc({ docNumber: "P1001-50-ACME-PO101-ME-CAL-00001", title: "Feed pump P-101 — induced draft blower sizing calculation", deliverableType: "VND", docType: "CAL", discipline: "ME", originator: "ACME", contractRef: "PO101", assetCodes: ["P-101", "BL-301"], createdBy: "vendor", criticality: "QUALITY", retentionClass: "ASSET_LIFE", receivedDate: d(-20) });
   const calcA = await mkRev(calc.id, calc.docNumber, { value: "A", state: "RELEASED", statusCode: "AFC", reason: "First issue for construction", change: "Blower sizing per revised duty point", releasedAt: d(-18) });
   await mkApproval(calcA.id, calc.id, calc.docNumber, "A", "approver");
-  await db.registeredCopy.create({ data: { projectId, revisionId: calcA.id, holder: "Site office — container 4", location: "Non-process building 74 site set", status: "ACTIVE" } });
+  await db.registeredCopy.create({ data: { projectId, revisionId: calcA.id, holder: "Site office — container 4", location: "Non-process building 50 site set", status: "ACTIVE" } });
 
   // ── 6 · Planned placeholder required by an action ──────────────────────────
-  const el = await mkDoc({ docNumber: "Q6637021-74-EL-DSW-00001", title: "Water tower WT-401 — electrical small power and lighting layout", deliverableType: "ENG", docType: "DSW", discipline: "EL", assetCodes: ["WT-401"], createdBy: "author", isPlaceholder: true, state: "PLANNED", criticality: "QUALITY" });
+  const el = await mkDoc({ docNumber: "P1001-50-EL-DSW-00001", title: "Water tower WT-401 — electrical small power and lighting layout", deliverableType: "ENG", docType: "DSW", discipline: "EL", assetCodes: ["WT-401"], createdBy: "author", isPlaceholder: true, state: "PLANNED", criticality: "QUALITY" });
 
   // ── 7 · DELIBERATE DEFECT: resubmission required, no revision authorized ────
-  const spc = await mkDoc({ docNumber: "Q6637021-74-CI-SPC-00001", title: "Non-process building 74 — concrete works specification", deliverableType: "ENG", docType: "SPC", discipline: "CI", assetCodes: ["TK-201"], createdBy: "author", criticality: "QUALITY", retentionClass: "ASSET_LIFE" });
+  const spc = await mkDoc({ docNumber: "P1001-50-CI-SPC-00001", title: "Non-process building 50 — concrete works specification", deliverableType: "ENG", docType: "SPC", discipline: "CI", assetCodes: ["TK-201"], createdBy: "author", criticality: "QUALITY", retentionClass: "ASSET_LIFE" });
   const spcA = await mkRev(spc.id, spc.docNumber, { value: "A", state: "RELEASED", statusCode: "IFR", reason: "Issued for review", change: "First specification issue", releasedAt: d(-22) });
   await mkApproval(spcA.id, spc.id, spc.docNumber, "A", "approver");
   await mkCycle(spcA.id, spc.id, spc.docNumber, "A", { seq: 1, outcome: verdictCode("return"), note: "Curing regime conflicts with the project specification." });
   // no follow-up revision — RO-07 ▲
 
   // ── 8 · O&M manual — as-built current; stale copy on the superseded rev ────
-  const man = await mkDoc({ docNumber: "Q6637021-73-WW-MAN-00001", title: "Aeration blower BL-301 — operation and maintenance manual", deliverableType: "ENG", docType: "MAN", discipline: "WW", assetCodes: ["BL-301"], createdBy: "author2", criticality: "QUALITY", retentionClass: "PERMANENT" });
+  const man = await mkDoc({ docNumber: "P1001-40-WW-MAN-00001", title: "Aeration blower BL-301 — operation and maintenance manual", deliverableType: "ENG", docType: "MAN", discipline: "WW", assetCodes: ["BL-301"], createdBy: "author2", criticality: "QUALITY", retentionClass: "PERMANENT" });
   const manA = await mkRev(man.id, man.docNumber, { value: "A", state: "SUPERSEDED", statusCode: "IFC", reason: "First issue", change: "Manual per installed blowers", releasedAt: d(-45), supersededAt: d(-10) });
   await mkApproval(manA.id, man.id, man.docNumber, "A", "approver");
   const manB = await mkRev(man.id, man.docNumber, { value: "B", state: "RELEASED", statusCode: "AB", reason: "As-built update", change: "As-installed blower curve and spare parts list", releasedAt: d(-10), authorization: "Review outcome APPROVED_WITH_COMMENTS on cycle 1 (§9.3)" });
@@ -306,14 +306,14 @@ export async function seedDemoProject(db: PrismaClient, orgId: string, projectId
   void manB;
 
   // ── 9 · DELIBERATE DEFECT: voided, no reassessment recorded ────────────────
-  const wrong = await mkDoc({ docNumber: "Q6637021-71-CI-DSW-00001", title: "Earth works 71 — site protection drawing issued to the wrong package", deliverableType: "ENG", docType: "DSW", discipline: "CI", assetCodes: ["TK-201"], createdBy: "author", criticality: "ROUTINE" });
+  const wrong = await mkDoc({ docNumber: "P1001-20-CI-DSW-00001", title: "Earth works 20 — site protection drawing issued to the wrong package", deliverableType: "ENG", docType: "DSW", discipline: "CI", assetCodes: ["TK-201"], createdBy: "author", criticality: "ROUTINE" });
   const wrongA = await mkRev(wrong.id, wrong.docNumber, { value: "A", state: "VOID", statusCode: "IFI", reason: "Issued for information", change: "Issued in error against sub-project 71", releasedAt: d(-14), voidedAt: d(-12) });
   await mkApproval(wrongA.id, wrong.id, wrong.docNumber, "A", "approver");
   await db.obsolescenceRecord.create({ data: { projectId, kind: "VOID", documentId: wrong.id, revisionId: wrongA.id, reason: "Issued against the wrong sub-project", authorityName: users.admin.name, createdById: users.admin.id } });
   // voidReassessment left null — OB-13 ▲ / exposure 5
 
   // ── 10 · DELIBERATE DEFECT: withdrawn while an action still requires it ────
-  const arch = await mkDoc({ docNumber: "Q6637021-72-AR-DSW-00001", title: "Site protection 72 — architectural finish plans, guard houses", deliverableType: "ENG", docType: "DSW", discipline: "AR", assetCodes: ["WT-401"], createdBy: "author2", state: "WITHDRAWN", criticality: "ROUTINE" });
+  const arch = await mkDoc({ docNumber: "P1001-30-AR-DSW-00001", title: "Site protection 30 — architectural finish plans, guard houses", deliverableType: "ENG", docType: "DSW", discipline: "AR", assetCodes: ["WT-401"], createdBy: "author2", state: "WITHDRAWN", criticality: "ROUTINE" });
   const archA = await mkRev(arch.id, arch.docNumber, { value: "A", state: "RELEASED", statusCode: "IFI", reason: "Issued for information", change: "Preliminary finishes", releasedAt: d(-35) });
   await mkApproval(archA.id, arch.id, arch.docNumber, "A", "approver");
   await db.document.update({ where: { id: arch.id }, data: { state: "WITHDRAWN" } });
@@ -321,17 +321,17 @@ export async function seedDemoProject(db: PrismaClient, orgId: string, projectId
   // still required by action A0007 — OB-14 ▲ / OB-04 ▲ / exposure 4
 
   // ── 11 · DELIBERATE DEFECT: placeholder holding a revision ─────────────────
-  const ph = await mkDoc({ docNumber: "Q6637021-74-EL-DSW-00002", title: "Non-process building 74 — earthing and lightning protection layout", deliverableType: "ENG", docType: "DSW", discipline: "EL", assetCodes: ["WT-401"], createdBy: "author", isPlaceholder: true, state: "PLANNED", criticality: "QUALITY" });
+  const ph = await mkDoc({ docNumber: "P1001-50-EL-DSW-00002", title: "Non-process building 50 — earthing and lightning protection layout", deliverableType: "ENG", docType: "DSW", discipline: "EL", assetCodes: ["WT-401"], createdBy: "author", isPlaceholder: true, state: "PLANNED", criticality: "QUALITY" });
   await mkRev(ph.id, ph.docNumber, { value: "A", state: "IN_PREPARATION", reason: "First issue", change: "Earthing layout", authorization: "Placeholder register entry (§16.8)" });
   // isPlaceholder should have cleared when the revision was established — RG-16 ▲
 
   // ── 12 · DELIBERATE DEFECT: generic title + external without received date ──
-  const gen = await mkDoc({ docNumber: "Q6637021-74-PM-REP-00001", title: "Report", deliverableType: "CLT", docType: "REP", discipline: "GE", assetCodes: ["TK-201"], createdBy: "author", criticality: "ROUTINE", receivedDate: null });
+  const gen = await mkDoc({ docNumber: "P1001-50-PM-REP-00001", title: "Report", deliverableType: "CLT", docType: "REP", discipline: "GE", assetCodes: ["TK-201"], createdBy: "author", criticality: "ROUTINE", receivedDate: null });
   const genA = await mkRev(gen.id, gen.docNumber, { value: "A", state: "RELEASED", statusCode: "IFI", reason: "Issued for information", change: "Client monthly report", releasedAt: d(-8) });
   await mkApproval(genA.id, gen.id, gen.docNumber, "A", "approver");
 
   // ── 13 · DELIBERATE DEFECT: supersession with no notification issued ───────
-  const dat2 = await mkDoc({ docNumber: "Q6637021-70-ECG-JESA601P22-ME-DAS-00001", title: "Backup feed pump P-102 — datasheet, ECGS submittal", deliverableType: "VND", docType: "DAS", discipline: "ME", originator: "ECG", contractRef: "JESA601P22", assetCodes: ["P-102"], createdBy: "vendor", criticality: "QUALITY", receivedDate: d(-30) });
+  const dat2 = await mkDoc({ docNumber: "P1001-10-BUILDCO-PO102-ME-DAS-00001", title: "Backup feed pump P-102 — datasheet, BuildCo Contracting submittal", deliverableType: "VND", docType: "DAS", discipline: "ME", originator: "BUILDCO", contractRef: "PO102", assetCodes: ["P-102"], createdBy: "vendor", criticality: "QUALITY", receivedDate: d(-30) });
   const dat2A = await mkRev(dat2.id, dat2.docNumber, { value: "A", state: "SUPERSEDED", statusCode: "IFA", reason: "Issued for approval", change: "Pump datasheet, first submittal", releasedAt: d(-28), supersededAt: d(-7) });
   await mkApproval(dat2A.id, dat2.id, dat2.docNumber, "A", "approver");
   const dat2B = await mkRev(dat2.id, dat2.docNumber, { value: "B", state: "RELEASED", statusCode: "AFC", reason: "Comments incorporated", change: "Motor rating corrected to 45 kW", releasedAt: d(-7), authorization: "Review outcome REVISE_AND_RESUBMIT on cycle 1 (§9.3)" });
@@ -340,13 +340,13 @@ export async function seedDemoProject(db: PrismaClient, orgId: string, projectId
 
   // ── 14–20 · Clean background register ──────────────────────────────────────
   const clean: DocSeed[] = [
-    { docNumber: "Q6637021-70-CI-DSW-00001", title: "Feed pump bay P-101/P-102 — civil site work drawing", deliverableType: "ENG", docType: "DSW", discipline: "CI", assetCodes: ["P-101"], criticality: "QUALITY", retentionClass: "ASSET_LIFE" },
-    { docNumber: "Q6637021-71-ST-DSW-00001", title: "Clarifier TK-201 — structural foundation drawing", deliverableType: "ENG", docType: "DSW", discipline: "ST", assetCodes: ["TK-201"], criticality: "QUALITY", retentionClass: "ASSET_LIFE" },
-    { docNumber: "Q6637021-73-WW-PRO-00001", title: "Aeration system BL-301 — start-up and shutdown procedure", deliverableType: "ENG", docType: "PRO", discipline: "WW", assetCodes: ["BL-301"], criticality: "SAFETY", retentionClass: "ASSET_LIFE", createdBy: "author2" },
-    { docNumber: "Q6637021-74-ME-CAL-00002", title: "Pump house ventilation — heat emission calculation", deliverableType: "ENG", docType: "CAL", discipline: "ME", assetCodes: ["P-101"], criticality: "ROUTINE" },
-    { docNumber: "Q6637021-75-CI-SPC-00001", title: "Water tower WT-401 — concrete and reinforcement specification", deliverableType: "ENG", docType: "SPC", discipline: "CI", assetCodes: ["WT-401"], criticality: "QUALITY", retentionClass: "ASSET_LIFE", createdBy: "author2" },
-    { docNumber: "Q6637021-74-ECG-JESA601P22-EL-DSW-00001", title: "Pump house — single line diagram, ECGS supply scope", deliverableType: "CTR", docType: "DSW", discipline: "EL", originator: "ECG", contractRef: "JESA601P22", assetCodes: ["P-101"], criticality: "QUALITY", receivedDate: d(-18) },
-    { docNumber: "Q6637021-71-CI-REP-00001", title: "Earth works 71 — compaction test results, week 36", deliverableType: "ENG", docType: "REP", discipline: "CI", assetCodes: ["TK-201"], criticality: "QUALITY", retentionClass: "STATUTORY", createdBy: "author2" },
+    { docNumber: "P1001-10-CI-DSW-00001", title: "Feed pump bay P-101/P-102 — civil site work drawing", deliverableType: "ENG", docType: "DSW", discipline: "CI", assetCodes: ["P-101"], criticality: "QUALITY", retentionClass: "ASSET_LIFE" },
+    { docNumber: "P1001-20-ST-DSW-00001", title: "Clarifier TK-201 — structural foundation drawing", deliverableType: "ENG", docType: "DSW", discipline: "ST", assetCodes: ["TK-201"], criticality: "QUALITY", retentionClass: "ASSET_LIFE" },
+    { docNumber: "P1001-40-WW-PRO-00001", title: "Aeration system BL-301 — start-up and shutdown procedure", deliverableType: "ENG", docType: "PRO", discipline: "WW", assetCodes: ["BL-301"], criticality: "SAFETY", retentionClass: "ASSET_LIFE", createdBy: "author2" },
+    { docNumber: "P1001-50-ME-CAL-00002", title: "Pump house ventilation — heat emission calculation", deliverableType: "ENG", docType: "CAL", discipline: "ME", assetCodes: ["P-101"], criticality: "ROUTINE" },
+    { docNumber: "P1001-60-CI-SPC-00001", title: "Water tower WT-401 — concrete and reinforcement specification", deliverableType: "ENG", docType: "SPC", discipline: "CI", assetCodes: ["WT-401"], criticality: "QUALITY", retentionClass: "ASSET_LIFE", createdBy: "author2" },
+    { docNumber: "P1001-50-BUILDCO-PO102-EL-DSW-00001", title: "Pump house — single line diagram, BuildCo Contracting supply scope", deliverableType: "CTR", docType: "DSW", discipline: "EL", originator: "BUILDCO", contractRef: "PO102", assetCodes: ["P-101"], criticality: "QUALITY", receivedDate: d(-18) },
+    { docNumber: "P1001-20-CI-REP-00001", title: "Earth works 20 — compaction test results, week 36", deliverableType: "ENG", docType: "REP", discipline: "CI", assetCodes: ["TK-201"], criticality: "QUALITY", retentionClass: "STATUTORY", createdBy: "author2" },
   ];
   for (let i = 0; i < clean.length; i++) {
     const s = clean[i];
@@ -392,36 +392,36 @@ export async function seedDemoProject(db: PrismaClient, orgId: string, projectId
     return t;
   };
 
-  await mkTransmittal("TR-0001", "OUTGOING", "EXECUTION", "MADASUD",
+  await mkTransmittal("TR-0001", "OUTGOING", "EXECUTION", "Acme Pumps",
     [{ revisionId: gaB.id }, { revisionId: calcA.id }],
-    [{ name: "MADASUD Rep", organization: "MADASUD", userId: users.vendor.id, opened: true, ack: true }, { name: "A. Bennani (site)", organization: "MADASUD", ack: true }],
+    [{ name: "Acme Pumps Rep", organization: "Acme Pumps", userId: users.vendor.id, opened: true, ack: true }, { name: "A. Bennani (site)", organization: "Acme Pumps", ack: true }],
     "ACCEPTED", 20);
 
-  await mkTransmittal("TR-0002", "INCOMING", "APPROVAL", "MADASUD",
+  await mkTransmittal("TR-0002", "INCOMING", "APPROVAL", "Acme Pumps",
     [{ revisionId: (await db.revision.findFirstOrThrow({ where: { documentId: dat.id } })).id }],
-    [{ name: "MADASUD Rep", organization: "MADASUD", userId: users.vendor.id, ack: true }],
+    [{ name: "Acme Pumps Rep", organization: "Acme Pumps", userId: users.vendor.id, ack: true }],
     "ISSUED", 1); // awaiting the acceptance check (§11.9) — appears on the dashboard
 
-  await mkTransmittal("TR-0003", "OUTGOING", "INFORMATION", "FASOFT",
+  await mkTransmittal("TR-0003", "OUTGOING", "INFORMATION", "Softel Systems",
     [{ revisionId: gaA.id }], // superseded, NOT marked — IS-08 ▲ / OB-03 ▲
-    [{ name: "R. Fassi (document control)", organization: "FASOFT", ack: true }],
+    [{ name: "R. Fassi (document control)", organization: "Softel Systems", ack: true }],
     "ACCEPTED", 12);
 
-  await mkTransmittal("TR-0004", "OUTGOING", "EXECUTION", "STE ELHAGE",
+  await mkTransmittal("TR-0004", "OUTGOING", "EXECUTION", "Elec Services",
     [{ revisionId: spcA.id }], // IFR status — execution not permitted — ST-13 ▲
-    [{ name: "M. El Hage", organization: "STE ELHAGE", ack: true }],
+    [{ name: "M. El Hage", organization: "Elec Services", ack: true }],
     "ACCEPTED", 9);
 
-  await mkTransmittal("TR-0005", "OUTGOING", "REVIEW", "ECGS",
+  await mkTransmittal("TR-0005", "OUTGOING", "REVIEW", "BuildCo Contracting",
     [{ revisionId: dat2B.id }],
-    [{ name: "ECGS Rep", organization: "ECGS", userId: users.vendor.id, ack: true }],
+    [{ name: "BuildCo Contracting Rep", organization: "BuildCo Contracting", userId: users.vendor.id, ack: true }],
     "ACCEPTED", 5);
 
   // ── Actions & baseline (Part 14) ───────────────────────────────────────────
-  const a0007 = await db.action.create({ data: { projectId, code: "A0007", name: "Foundation concrete pour — clarifier TK-201, area 71", scheduledDate: d(-6), ownerName: "Construction manager", scheduleRef: "SCH-REV2-A0007" } });
+  const a0007 = await db.action.create({ data: { projectId, code: "A0007", name: "Foundation concrete pour — clarifier TK-201, area 20", scheduledDate: d(-6), ownerName: "Construction manager", scheduleRef: "SCH-REV2-A0007" } });
   const a0031 = await db.action.create({ data: { projectId, code: "A0031", name: "Water tower WT-401 — mechanical completion handover", scheduledDate: d(58), ownerName: "Commissioning lead", scheduleRef: "SCH-REV2-A0031" } });
   const a0044 = await db.action.create({ data: { projectId, code: "A0044", name: "Aeration blower BL-301 — commissioning readiness review", scheduledDate: d(24), ownerName: "Commissioning lead", scheduleRef: "SCH-REV2-A0044", leadTimeDays: 10 } });
-  await db.baselineEntry.create({ data: { projectId, actionId: a0007.id, documentId: (await db.document.findFirstOrThrow({ where: { docNumber: "Q6637021-71-ST-DSW-00001" } })).id, requiredStatus: "IFC", requiredBy: d(-9), createdByName: users.controller.name } });
+  await db.baselineEntry.create({ data: { projectId, actionId: a0007.id, documentId: (await db.document.findFirstOrThrow({ where: { docNumber: "P1001-20-ST-DSW-00001" } })).id, requiredStatus: "IFC", requiredBy: d(-9), createdByName: users.controller.name } });
   await db.baselineEntry.create({ data: { projectId, actionId: a0007.id, documentId: arch.id, requiredStatus: "AFC", requiredBy: d(-9), createdByName: users.controller.name } }); // withdrawn — OB-14 ▲
   await db.baselineEntry.create({ data: { projectId, actionId: a0031.id, documentId: el.id, requiredStatus: "IFC", requiredBy: d(50), createdByName: users.controller.name } });
   await db.baselineEntry.create({ data: { projectId, actionId: a0031.id, documentId: man.id, requiredStatus: "AB", requiredBy: d(50), createdByName: users.controller.name } });
@@ -467,13 +467,13 @@ export async function seedDemoProject(db: PrismaClient, orgId: string, projectId
   const pkg = await db.package.create({
     data: { projectId,
       identifier: "PK-001", purpose: "RECORD", type: "DEFINED",
-      recipientName: "ONEE — Operations handover", completionDate: d(30), requiredStatus: "AB",
+      recipientName: "Riverside Water — Operations handover", completionDate: d(30), requiredStatus: "AB",
       compositionOwnerId: users.author2.id, compositionOwnerName: users.author2.name,
       acceptanceAuthorityId: users.approver.id, acceptanceAuthorityName: users.approver.name,
     },
   });
   await db.packageMember.create({ data: { projectId, packageId: pkg.id, documentId: man.id, requiredStatus: "AB" } });
-  await db.packageMember.create({ data: { projectId, packageId: pkg.id, documentId: (await db.document.findFirstOrThrow({ where: { docNumber: "Q6637021-75-CI-SPC-00001" } })).id, requiredStatus: "AB" } });
+  await db.packageMember.create({ data: { projectId, packageId: pkg.id, documentId: (await db.document.findFirstOrThrow({ where: { docNumber: "P1001-60-CI-SPC-00001" } })).id, requiredStatus: "AB" } });
 
   // ── Number counters: put every seeded prefix in the issued-range register ──
   const docs = await db.document.findMany({ select: { docNumber: true, deliverableType: true } });

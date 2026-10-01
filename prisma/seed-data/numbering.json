@@ -262,7 +262,7 @@
   ],
   [
    "PC",
-   "Project Controls \u2013 Cost/Schedule",
+   "Project Controls – Cost/Schedule",
    "Active"
   ],
   [
@@ -3159,8 +3159,8 @@
  ],
  "projectCodes": [
   [
-   "Q6637021",
-   "Main project",
+   "P1001",
+   "Wastewater treatment works",
    "Active"
   ],
   [
@@ -3184,38 +3184,43 @@
  ],
  "subprojects": [
   [
-   "71",
-   "Earth work",
+   "00",
+   "Project-wide",
+   "Active"
+  ],
+  [
+   "10",
+   "General",
+   "Active"
+  ],
+  [
+   "20",
+   "Earth works",
+   "Active"
+  ],
+  [
+   "30",
+   "Site protection",
+   "Active"
+  ],
+  [
+   "40",
+   "Process and aeration",
+   "Active"
+  ],
+  [
+   "50",
+   "Non-process building",
+   "Active"
+  ],
+  [
+   "60",
+   "Water tower",
    "Active"
   ],
   [
    "70",
-   "General 70",
-   "Active"
-  ],
-  [
-   "74",
-   "NON-Process Building 74",
-   "Active"
-  ],
-  [
-   "76",
-   "ONEE pipe deviation 76",
-   "Active"
-  ],
-  [
-   "73",
-   "Site protection 73",
-   "Active"
-  ],
-  [
-   "72",
-   "VRD 72",
-   "Active"
-  ],
-  [
-   "75",
-   "Water Tower 75",
+   "Pipe diversion",
    "Active"
   ],
   [
@@ -3239,38 +3244,33 @@
  ],
  "supplierCodes": [
   [
-   "MAD",
-   "MADASUD",
+   "ACME",
+   "Acme Pumps",
    "Active"
   ],
   [
-   "ECG",
-   "ECGS",
+   "BUILDCO",
+   "BuildCo Contracting",
    "Active"
   ],
   [
-   "ENT",
-   "ENTSB",
+   "TECHSUP",
+   "TechSup Instruments",
    "Active"
   ],
   [
-   "FAS",
-   "FASOFT",
+   "SOFTEL",
+   "Softel Systems",
    "Active"
   ],
   [
-   "PHOSBOUCRA",
-   "not yet defined",
+   "ELEC",
+   "Elec Services",
    "Active"
   ],
   [
-   "ELH",
-   "STE ELHAGE",
-   "Active"
-  ],
-  [
-   "UNI",
-   "UNIVERS SAHARA",
+   "UNIWORKS",
+   "Uniworks Civil",
    "Active"
   ],
   [
@@ -3294,48 +3294,38 @@
  ],
  "purchaseOrders": [
   [
-   "JESA601P22",
-   "ECGS",
+   "PO101",
+   "Acme Pumps",
    "Active"
   ],
   [
-   "JESA593P22",
-   "MADASUD",
+   "PO102",
+   "BuildCo Contracting",
    "Active"
   ],
   [
-   "3960018034",
-   "3960018034-MADASUD-74",
+   "PO103",
+   "TechSup Instruments",
    "Active"
   ],
   [
-   "3960018378",
-   "3960018378-FASOFT-74",
+   "PO104",
+   "Uniworks Civil",
    "Active"
   ],
   [
-   "JESA601P22",
-   "ECGS",
+   "PO105",
+   "Acme Pumps — building 50",
    "Active"
   ],
   [
-   "JESA592P22",
-   "ENTSB",
+   "PO106",
+   "Softel Systems — building 50",
    "Active"
   ],
   [
-   "JESA593P22",
-   "MADASUD",
-   "Active"
-  ],
-  [
-   "3960018377",
-   "STE ELHAGE",
-   "Active"
-  ],
-  [
-   "JESA594P22",
-   "UNIVERS SAHARA",
+   "PO107",
+   "Elec Services",
    "Active"
   ],
   [

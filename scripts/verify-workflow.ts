@@ -18,7 +18,7 @@ function check(label: string, ok: boolean, detail = "") {
 
 async function main() {
   const org = await db.organization.findFirstOrThrow({ where: { slug: "our-org" } });
-  const p1 = await db.project.findFirstOrThrow({ where: { orgId: org.id, code: "P1" } });
+  const p1 = await db.project.findFirstOrThrow({ where: { orgId: org.id, code: "P1001" } });
   const t = tenantFor(org.id, p1.id);
 
   const person = async (email: string) => {

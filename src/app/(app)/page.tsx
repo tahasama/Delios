@@ -152,7 +152,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         take: 60,
       })
     : [];
-  // An audit label reads "Q6637021-75-CI-SPC-00001 rev B — route name", and a
+  // An audit label reads "P1001-60-CI-SPC-00001 rev B — route name", and a
   // supplier's number runs half as long again. The panel measures its own
   // entries: the widest number sets the column the revisions line up in, and
   // when that number is long the kind is dropped rather than squeezed.
@@ -553,7 +553,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
               <h2 className="mb-1 text-[11px] font-semibold tracking-[0.09em] text-slate-400 uppercase">Schedule</h2>
               {atRisk.slice(0, 3).map((a) => {
                 // An activity's name carries where it is after a dash — "Foundation
-                // concrete pour — clarifier TK-201, area 71" — and the place is
+                // concrete pour — clarifier TK-201, area 20" — and the place is
                 // what tells a reader whether it is theirs, so it gets its own line.
                 const [what, ...place] = a.name.split(" — ");
                 const off = Math.abs(Math.round(((a.scheduledDate?.getTime() ?? 0) - Date.now()) / 86_400_000));

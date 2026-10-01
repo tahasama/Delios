@@ -16,7 +16,7 @@ const d = (n: number) => new Date(Date.now() + n * day);
 
 async function main() {
   const org = await db.organization.findFirstOrThrow({ where: { slug: "our-org" } });
-  const project = await db.project.findFirstOrThrow({ where: { orgId: org.id, code: "P1" } });
+  const project = await db.project.findFirstOrThrow({ where: { orgId: org.id, code: "P1001" } });
   const projectId = project.id;
   const controller = await db.user.findFirst({ where: { orgId: org.id, email: "controller@delios.local" } })
     ?? (await db.user.findFirstOrThrow({ where: { orgId: org.id, email: "admin@delios.local" } }));

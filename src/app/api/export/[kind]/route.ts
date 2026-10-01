@@ -218,21 +218,21 @@ export async function GET(req: Request, { params }: { params: Promise<{ kind: st
   } else if (kind === "template-deliverables") {
     rows = [
       ["Title", "Producer", "Type", "Discipline", "Project", "SubProject", "Supplier", "PO", "Criticality", "Confidentiality", "RetentionClass", "AssetCode", "ReceivedDate"],
-      ["Feed pump P-103 GA drawing", "ENG", "DSW", "ME", "Q6637021", "74", "", "", "QUALITY", "INTERNAL", "ASSET_LIFE", "P-101", ""],
-      ["Blower BL-301 datasheet (vendor)", "VND", "DAS", "ME", "Q6637021", "73", "MAD", "JESA593P22", "QUALITY", "INTERNAL", "ASSET_LIFE", "BL-301", "2026-09-01"],
+      ["Feed pump P-103 GA drawing", "ENG", "DSW", "ME", "P1001", "50", "", "", "QUALITY", "INTERNAL", "ASSET_LIFE", "P-101", ""],
+      ["Blower BL-301 datasheet (vendor)", "VND", "DAS", "ME", "P1001", "40", "ACME", "PO101", "QUALITY", "INTERNAL", "ASSET_LIFE", "BL-301", "2026-09-01"],
     ];
     name = "template-deliverable-list";
   } else if (kind === "template-baseline") {
     rows = [
       ["Action Code", "Action Name", "Action Date", "Document Number", "Required Status", "Required By"],
-      ["A0042", "Foundation concrete pour - area 71", "2026-10-01", "Q6637021-71-ST-DSW-00001", "IFC", "2026-09-24"],
-      ["A0042", "Foundation concrete pour - area 71", "2026-10-01", "Q6637021-71-CI-REP-00001", "IFC", "2026-09-24"],
+      ["A0042", "Foundation concrete pour - area 20", "2026-10-01", "P1001-20-ST-DSW-00001", "IFC", "2026-09-24"],
+      ["A0042", "Foundation concrete pour - area 20", "2026-10-01", "P1001-20-CI-REP-00001", "IFC", "2026-09-24"],
     ];
     name = "template-baseline";
   } else if (kind === "template-schedule") {
     rows = [
       ["Activity ID", "Action Code", "Activity Name", "Baseline Date", "Forecast Date", "Responsible Party"],
-      ["SCH-1001", "A0042", "Foundation concrete pour - area 71", "2026-10-01", "2026-10-05", "Construction"],
+      ["SCH-1001", "A0042", "Foundation concrete pour - area 20", "2026-10-01", "2026-10-05", "Construction"],
       ["SCH-1015", "A0048", "Mechanical completion - unit 73", "2026-10-18", "2026-10-18", "Commissioning"],
     ];
     name = "template-schedule-version";
@@ -240,13 +240,13 @@ export async function GET(req: Request, { params }: { params: Promise<{ kind: st
     rows = [
       ["Name", "Email", "Company", "Function", "Department"],
       ["A. Benali", "a.benali@example.com", "", "Reviewer", "ME"],
-      ["J. Doe", "j.doe@madasud.example", "MAD", "Supplier contact", ""],
+      ["J. Doe", "j.doe@acmepumps.example", "ACME", "Supplier contact", ""],
     ];
     name = "template-people";
   } else if (kind === "template-metadata") {
     rows = [
       ["Document Number", "Title", "DocType", "Discipline", "Criticality", "Confidentiality", "RetentionClass", "SubProject", "ContractRef"],
-      ["Q6637021-74-CI-DSW-00001", "Corrected title", "", "", "QUALITY", "", "", "75", ""],
+      ["P1001-50-CI-DSW-00001", "Corrected title", "", "", "QUALITY", "", "", "60", ""],
     ];
     name = "template-metadata-update";
   } else {

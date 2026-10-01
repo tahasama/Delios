@@ -25,7 +25,7 @@ function check(label: string, ok: boolean, detail = "") {
 
 async function main() {
   const org = await db.organization.findFirstOrThrow({ where: { slug: "our-org" } });
-  const project = await db.project.findFirstOrThrow({ where: { orgId: org.id, code: "P1" } });
+  const project = await db.project.findFirstOrThrow({ where: { orgId: org.id, code: "P1001" } });
   const t = tenantFor(org.id, project.id);
   const admin = await db.user.findFirstOrThrow({ where: { orgId: org.id, email: "admin@delios.local" } });
   const actor = { ...admin, role: admin.role, organization: admin.organization, partyId: admin.partyId, partyCode: null, partyName: null, isInternal: true } as unknown as SessionUser;

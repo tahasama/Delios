@@ -37,7 +37,7 @@ cp .env.example .env          # PowerShell: Copy-Item .env.example .env
 ```bash
 npx prisma migrate deploy     # create or update the database
 npm run db:seed               # the neutral Annex C starter configuration
-npm run demo                  # optional: the full Q6637021 demo project, upgraded, with the checks run
+npm run demo                  # optional: the full P1001 demo project, upgraded, with the checks run
 npm run dev                   # http://localhost:3000 (add -- -p 4173 for another port)
 ```
 
@@ -55,7 +55,7 @@ Demo passwords are all `demo1234`:
 | `reviewer@delios.local` | Reviewer |
 | `author@delios.local`, `author2@delios.local` | Author / originator |
 | `viewer@delios.local` | Viewer |
-| `vendor@delios.local` | External party (MADASUD) |
+| `vendor@delios.local` | External party (Acme Pumps) |
 
 Other scripts:
 
@@ -67,7 +67,7 @@ npm run db:studio             # browse the database
 
 ## The demo project
 
-The seed creates a worked example on project **Q6637021** (numbering exactly per
+The seed creates a worked example on project **P1001** (numbering exactly per
 `Standard-Numbering-Config.xlsx`): 20 documents across every state — released,
 superseded, in review, in preparation, planned placeholders, a void, a withdrawal —
 plus live review cycles, transmittals TR-0001…0005 (incoming awaiting acceptance

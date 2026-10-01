@@ -14,13 +14,13 @@ function check(label: string, ok: boolean, detail = "") {
 
 async function main() {
   const org = await db.organization.findFirstOrThrow();
-  const p1 = await db.project.findFirstOrThrow({ where: { orgId: org.id, code: "P1" } });
+  const p1 = await db.project.findFirstOrThrow({ where: { orgId: org.id, code: "P1001" } });
 
   // A second project in the same organization.
   const p2 = await db.project.upsert({
-    where: { orgId_code: { orgId: org.id, code: "P2" } },
+    where: { orgId_code: { orgId: org.id, code: "P1002" } },
     update: {},
-    create: { orgId: org.id, code: "P2", name: "Second project", kind: "ENERGY" },
+    create: { orgId: org.id, code: "P1002", name: "Second project", kind: "ENERGY" },
   });
 
   const t1 = tenantFor(org.id, p1.id);

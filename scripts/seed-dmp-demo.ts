@@ -20,9 +20,9 @@ const VERDICTS = [
 
 async function main() {
   const org = await db.organization.findFirstOrThrow({ where: { slug: "our-org" } });
-  const project = await db.project.findFirstOrThrow({ where: { orgId: org.id, code: "P1" } });
+  const project = await db.project.findFirstOrThrow({ where: { orgId: org.id, code: "P1001" } });
   const admin = await db.user.findFirstOrThrow({ where: { orgId: org.id, email: "admin@delios.local" } });
-  const docNumber = "Q6637021-00-GE-PLN-00001";
+  const docNumber = "P1001-00-GE-PLN-00001";
 
   let dmp = await db.document.findFirst({ where: { projectId: project.id, docNumber } });
   if (!dmp) {

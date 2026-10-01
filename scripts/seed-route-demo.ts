@@ -7,13 +7,13 @@ import { PrismaClient } from "@prisma/client";
 const db = new PrismaClient();
 
 const DOCS = [
-  { docNumber: "Q6637021-74-ME-CAL-09101", title: "Pump house — ventilation duct sizing calculation", docType: "CAL", discipline: "ME" },
-  { docNumber: "Q6637021-74-EL-DSW-09102", title: "Pump house — lighting layout drawing", docType: "DSW", discipline: "EL" },
+  { docNumber: "P1001-50-ME-CAL-09101", title: "Pump house — ventilation duct sizing calculation", docType: "CAL", discipline: "ME" },
+  { docNumber: "P1001-50-EL-DSW-09102", title: "Pump house — lighting layout drawing", docType: "DSW", discipline: "EL" },
 ];
 
 async function main() {
   const org = await db.organization.findFirstOrThrow({ where: { slug: "our-org" } });
-  const p1 = await db.project.findFirstOrThrow({ where: { orgId: org.id, code: "P1" } });
+  const p1 = await db.project.findFirstOrThrow({ where: { orgId: org.id, code: "P1001" } });
   const who = async (email: string) => db.user.findFirstOrThrow({ where: { orgId: org.id, email } });
   const [r1, r2, comm, lead, author] = await Promise.all([
     who("reviewer@delios.local"), who("reviewer2@delios.local"), who("commissioning@delios.local"),
@@ -84,7 +84,7 @@ async function main() {
     // A document the requirements list already points at keeps its row.
     const docData = {
       title: d.title, deliverableType: "ENG", docType: d.docType, discipline: d.discipline,
-      subProject: "74", criticality: "ROUTINE", confidentiality: "INTERNAL", retentionClass: null, state: "ACTIVE", isPlaceholder: false,
+      subProject: "50", criticality: "ROUTINE", confidentiality: "INTERNAL", retentionClass: null, state: "ACTIVE", isPlaceholder: false,
       createdById: author.id, createdByName: author.name,
     };
     const referenced = old ? await db.baselineEntry.count({ where: { documentId: old.id } }) : 0;
@@ -92,7 +92,7 @@ async function main() {
     const doc = old && referenced ? await db.document.update({ where: { id: old.id }, data: docData }) : await db.document.create({
       data: {
         projectId: p1.id, docNumber: d.docNumber, title: d.title, deliverableType: "ENG", docType: d.docType, discipline: d.discipline,
-        subProject: "74", criticality: "ROUTINE", confidentiality: "INTERNAL", retentionClass: null, state: "ACTIVE", isPlaceholder: false,
+        subProject: "50", criticality: "ROUTINE", confidentiality: "INTERNAL", retentionClass: null, state: "ACTIVE", isPlaceholder: false,
         createdById: author.id, createdByName: author.name,
       },
     });

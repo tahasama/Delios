@@ -20,38 +20,38 @@ const PLAN: { ref: string; name: string; description: string; at: number; depart
   { ref: "1000", name: "Site establishment — access road and compound", description: "Haul road, gate house, laydown area", at: -84, departments: "CI" },
   { ref: "1010", name: "Bulk earthworks — clarifier basin", description: "Cut to level and shore the basin", at: -70, departments: "CI,ST" },
   { ref: "1020", name: "Piling — clarifier TK-201", description: "42 bored piles under the clarifier raft", at: -56, departments: "CI,ST" },
-  { ref: "1030", name: "Foundation concrete pour — clarifier TK-201", description: "Raft under the clarifier, area 71", at: -42, departments: "CI,ST" },
-  { ref: "1040", name: "Underground services — area 71", description: "Drainage, ducts and earthing grid", at: -35, departments: "CI,EL" },
+  { ref: "1030", name: "Foundation concrete pour — clarifier TK-201", description: "Raft under the clarifier, area 20", at: -42, departments: "CI,ST" },
+  { ref: "1040", name: "Underground services — area 20", description: "Drainage, ducts and earthing grid", at: -35, departments: "CI,EL" },
   { ref: "1050", name: "Clarifier shell erection", description: "Plate erection and welding", at: -28, departments: "ST,ME" },
   { ref: "1060", name: "Switchroom building — blockwork", description: "Walls up to roof level", at: -21, departments: "CI,AR" },
   { ref: "1070", name: "Inlet works — pipework prefabrication", description: "DN600 headers, spools off site", at: -14, departments: "PI,ME" },
   { ref: "1080", name: "Sludge pumps P-301/302 — delivery to site", description: "Two duty pumps and their baseplates", at: -10, departments: "ME" },
-  { ref: "1090", name: "MCC-2 — delivery to site", description: "Motor control centre for area 71", at: -7, departments: "EL" },
+  { ref: "1090", name: "MCC-2 — delivery to site", description: "Motor control centre for area 20", at: -7, departments: "EL" },
   { ref: "1100", name: "Clarifier bridge — mechanical installation", description: "Rotating bridge, drive and scrapers", at: -3, departments: "ME,ST" },
-  { ref: "1110", name: "Switchroom — cable tray and containment", description: "Tray routes from MCC-2 to area 71", at: 2, departments: "EL" },
+  { ref: "1110", name: "Switchroom — cable tray and containment", description: "Tray routes from MCC-2 to area 20", at: 2, departments: "EL" },
   { ref: "1120", name: "Sludge pumps — mechanical installation", description: "Set, align and grout both pumps", at: 5, departments: "ME,PI" },
   { ref: "1130", name: "MCC-2 — installation and termination", description: "Set in place, terminate incomers", at: 9, departments: "EL" },
   { ref: "1140", name: "Inlet works — pipework installation", description: "Erect the prefabricated spools", at: 12, departments: "PI" },
-  { ref: "1150", name: "Instrument loops — area 71 field devices", description: "Level, flow and pressure transmitters", at: 16, departments: "IC,EL" },
+  { ref: "1150", name: "Instrument loops — area 20 field devices", description: "Level, flow and pressure transmitters", at: 16, departments: "IC,EL" },
   { ref: "1160", name: "Pipework pressure test — inlet works", description: "Hydrotest at 1.5 times design", at: 20, departments: "PI,QA" },
-  { ref: "1170", name: "Cable pulling — area 71", description: "Power and control cables to the field", at: 24, departments: "EL" },
-  { ref: "1180", name: "Loop checks — area 71", description: "Field to control system, loop by loop", at: 28, departments: "IC" },
+  { ref: "1170", name: "Cable pulling — area 20", description: "Power and control cables to the field", at: 24, departments: "EL" },
+  { ref: "1180", name: "Loop checks — area 20", description: "Field to control system, loop by loop", at: 28, departments: "IC" },
   { ref: "1190", name: "Motor solo runs — sludge pumps", description: "Uncoupled runs, rotation and vibration", at: 33, departments: "ME,EL" },
   { ref: "1200", name: "Clarifier — cleaning and inspection", description: "Clean down before water is let in", at: 38, departments: "ME,QA" },
   { ref: "1210", name: "Water fill — clarifier TK-201", description: "First fill and leak inspection", at: 44, departments: "PR,ME" },
-  { ref: "1220", name: "Control system — area 71 software load", description: "Load and verify the control narrative", at: 50, departments: "IC" },
+  { ref: "1220", name: "Control system — area 20 software load", description: "Load and verify the control narrative", at: 50, departments: "IC" },
   { ref: "1230", name: "Functional testing — inlet works", description: "Sequences, interlocks and alarms", at: 57, departments: "IC,PR" },
-  { ref: "1240", name: "Safety systems test — area 71", description: "Emergency stops, trips and permissives", at: 63, departments: "SA,IC" },
+  { ref: "1240", name: "Safety systems test — area 20", description: "Emergency stops, trips and permissives", at: 63, departments: "SA,IC" },
   { ref: "1250", name: "Aeration blower BL-301 — commissioning readiness", description: "Readiness review before energisation", at: 70, departments: "ME,PR" },
   { ref: "1260", name: "Energisation — MCC-2", description: "Permanent power on to the switchroom", at: 77, departments: "EL,SA" },
-  { ref: "1270", name: "Wet commissioning — area 71", description: "Plant run on water, then on process", at: 85, departments: "PR,ME,IC" },
+  { ref: "1270", name: "Wet commissioning — area 20", description: "Plant run on water, then on process", at: 85, departments: "PR,ME,IC" },
   { ref: "1280", name: "Performance test — clarifier train", description: "72-hour test against the guarantee", at: 95, departments: "PR,QA" },
-  { ref: "1290", name: "Handover — area 71 to operations", description: "Documentation, spares and training", at: 110, departments: "QA,GE,PM" },
+  { ref: "1290", name: "Handover — area 20 to operations", description: "Documentation, spares and training", at: 110, departments: "QA,GE,PM" },
 ];
 
 async function main() {
   const org = await db.organization.findFirstOrThrow({ where: { slug: "our-org" } });
-  const project = await db.project.findFirstOrThrow({ where: { orgId: org.id, code: "P1" } });
+  const project = await db.project.findFirstOrThrow({ where: { orgId: org.id, code: "P1001" } });
   const t = tenantFor(org.id, project.id);
 
   // The disciplines this project actually publishes; a tag it does not know is

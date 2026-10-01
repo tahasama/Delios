@@ -6,7 +6,7 @@
  * organization defines everything else in the app (or imports it).
  *
  *   npm run db:seed:demo          → additionally imports the private workbook
- *                                   lists (Q6637021 numbering) and the demo project.
+ *                                   lists (P1001 numbering) and the demo project.
  *
  * Idempotent — safe to re-run.
  */
@@ -48,9 +48,9 @@ async function main() {
   orgId = organization.id;
 
   const project = await db.project.upsert({
-    where: { orgId_code: { orgId, code: "P1" } },
+    where: { orgId_code: { orgId, code: "P1001" } },
     update: {},
-    create: { orgId, code: "P1", name: "First project", kind: "GENERIC", startDate: new Date() },
+    create: { orgId, code: "P1001", name: "First project", kind: "GENERIC", startDate: new Date() },
   });
   projectId = project.id;
 
@@ -80,7 +80,7 @@ async function main() {
 
   // ── Parties & users ─────────────────────────────────────────────────────────
   const org = await db.party.upsert({ where: { orgId_code: { orgId, code: "OUR-ORG" } }, update: {}, create: { orgId, code: "OUR-ORG", name: "Our organization", isInternal: true } });
-  const demoSupplier = await db.party.upsert({ where: { orgId_code: { orgId, code: "MAD" } }, update: { name: "MADASUD", isInternal: false }, create: { orgId, code: "MAD", name: "MADASUD", isInternal: false } });
+  const demoSupplier = await db.party.upsert({ where: { orgId_code: { orgId, code: "ACME" } }, update: { name: "Acme Pumps", isInternal: false }, create: { orgId, code: "ACME", name: "Acme Pumps", isInternal: false } });
 
   const hash = await bcrypt.hash("demo1234", 10);
   const users = [
@@ -145,11 +145,11 @@ async function main() {
   }
 
   const assets = [
-    { code: "P-101", name: "Feed pump P-101", area: "70", system: "Feed water", unit: "Unit 70" },
-    { code: "P-102", name: "Backup feed pump P-102", area: "70", system: "Feed water", unit: "Unit 70" },
-    { code: "TK-201", name: "Clarifier tank TK-201", area: "71", system: "Clarification", unit: "Unit 71" },
-    { code: "BL-301", name: "Blower BL-301", area: "73", system: "Aeration", unit: "Unit 73" },
-    { code: "WT-401", name: "Water tower WT-401", area: "75", system: "Distribution", unit: "Unit 75" },
+    { code: "P-101", name: "Feed pump P-101", area: "10", system: "Feed water", unit: "Unit 10" },
+    { code: "P-102", name: "Backup feed pump P-102", area: "10", system: "Feed water", unit: "Unit 10" },
+    { code: "TK-201", name: "Clarifier tank TK-201", area: "20", system: "Clarification", unit: "Unit 20" },
+    { code: "BL-301", name: "Blower BL-301", area: "40", system: "Aeration", unit: "Unit 40" },
+    { code: "WT-401", name: "Water tower WT-401", area: "60", system: "Distribution", unit: "Unit 60" },
   ];
   for (const asset of assets) {
     await db.assetItem.upsert({ where: { projectId_code: { projectId, code: asset.code } }, update: asset, create: { projectId, ...asset } });

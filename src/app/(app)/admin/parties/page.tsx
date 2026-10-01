@@ -107,7 +107,7 @@ export default async function AdminPartiesPage() {
               Another organization you exchange documents with. Yours is already here, registered once at setup.
             </p>
             <div className="grid gap-3 sm:grid-cols-2">
-              <Field label="Code" required hint="short, unique — e.g. MADASUD">
+              <Field label="Code" required hint="short, unique — e.g. Acme Pumps">
                 <input name="code" required maxLength={20} className={inputCls} />
               </Field>
               <Field label="Name" required>

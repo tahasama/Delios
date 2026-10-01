@@ -106,7 +106,7 @@ export async function seedFunctionsDemo(db: PrismaClient, orgId: string, project
     await db.document.create({
       data: {
         projectId,
-        docNumber: "Q6637021-70-EL-RPT-09001",
+        docNumber: "P1001-10-EL-RPT-09001",
         title: "Switchroom access control and key management — restricted",
         deliverableType: anyElectrical?.deliverableType ?? "ENG",
         docType: "RPT",

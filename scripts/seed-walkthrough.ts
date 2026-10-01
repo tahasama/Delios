@@ -32,7 +32,7 @@ const ago = (n: number) => new Date(Date.now() - n * day);
 
 async function main() {
   const org = await db.organization.findFirstOrThrow({ where: { slug: "our-org" } });
-  const project = await db.project.findFirstOrThrow({ where: { orgId: org.id, code: "P1" } });
+  const project = await db.project.findFirstOrThrow({ where: { orgId: org.id, code: "P1001" } });
   const t = tenantFor(org.id, project.id);
   const as = async (email: string): Promise<SessionUser> => {
     const u = await db.user.findFirstOrThrow({ where: { orgId: org.id, email } });
@@ -41,8 +41,8 @@ async function main() {
 
   // ── the client, so someone can look at this from the other side ──────────
   const clientParty =
-    (await db.party.findFirst({ where: { orgId: org.id, code: "ONEE" } })) ??
-    (await db.party.create({ data: { orgId: org.id, code: "ONEE", name: "ONEE (client)", isInternal: false } }));
+    (await db.party.findFirst({ where: { orgId: org.id, code: "CLIENT" } })) ??
+    (await db.party.create({ data: { orgId: org.id, code: "CLIENT", name: "Riverside Water (client)", isInternal: false } }));
   const viewerFn = await db.function.findFirstOrThrow({ where: { orgId: org.id, code: "VIEWER" } });
   const client =
     (await db.user.findFirst({ where: { orgId: org.id, email: "client@delios.local" } })) ??
@@ -89,11 +89,30 @@ async function main() {
   const codes = await db.configValue.findMany({ where: { orgId: org.id, setKey: "REVIEW_OUTCOMES", status: "ACTIVE" } });
   const props = (v: { props: string | null }) => { try { return v.props ? JSON.parse(v.props) : {}; } catch { return {}; } };
   const accept = codes.find((v) => props(v).proceed === true && props(v).resubmit !== true) ?? codes[0];
+  // An earlier step advises, from the advice list; only the last gives the verdict.
+  const adviceCodes = await db.configValue.findMany({ where: { orgId: org.id, setKey: "REVIEW_ADVICE", status: "ACTIVE" } });
+  const noComment = adviceCodes.find((v) => v.code === "NO_COMMENT") ?? adviceCodes[0];
+  const site = await db.user.findMany({ where: { orgId: org.id, email: { in: ["author@delios.local", "author2@delios.local"] } }, select: { id: true } });
+
+  // Each step says what the revision is issued for; the decider also says who
+  // receives it, because releasing it is sending it. A step that fails stops
+  // the walkthrough rather than leaving a half-made example behind.
+  const advise = async (runId: string, note: string) => {
+    const done = await recordStepOutcome(t, runId, reviewer, noComment.code, note, "IFR");
+    if (!done.ok) throw new Error(done.error);
+  };
+  const decide = async (runId: string, status: string, to: { internalUserIds: string[]; partyIds: string[] }) => {
+    const done = await recordStepOutcome(t, runId, approver, accept.code, "Agreed.", status, false, null, {
+      give: true, reason: "INFORMATION", recipients: to, delegated: false, note: null, needsApproval: false, approverId: null,
+    });
+    if (!done.ok) throw new Error(done.error);
+  };
+  const toSite = { internalUserIds: site.map((one) => one.id), partyIds: [] };
 
   async function make(n: number, title: string, discipline: string, docType: string, deliverableType = "ENG", originator: string | null = null) {
     const { docNumber } = await allocateNumber(t, deliverableType, {
-      "Project code": "Q6637021", Subproject: "74", Discipline: discipline, "Document type": docType,
-      "Supplier code": originator ?? "MAD", "Purchase order": "ECGS",
+      "Project code": "P1001", Subproject: "50", Discipline: discipline, "Document type": docType,
+      "Supplier code": originator ?? "ACME", "Purchase order": "PO101",
     });
     const doc = await t.db.document.create({
       data: {
@@ -147,32 +166,32 @@ async function main() {
   const w3 = await make(3, "Feed pump foundation — waiting on the decision", "CI", "CAL");
   const r3 = await startWorkflowRun(t, w3.rev.id, route.id, control, [[reviewer.id], [approver.id]]);
   if (!r3.ok) throw new Error(r3.error);
-  await recordStepOutcome(t, r3.runId, reviewer, accept.code, "Checked against the loading schedule.");
+  await advise(r3.runId, "Checked against the loading schedule.");
   line.push(`WALK 3 ${w3.doc.docNumber} — decision step (approver@delios.local)`);
 
   // 4 — decided "to be IFC", not released
   const w4 = await make(4, "Cable trench layout — decided, waiting to be released", "EL", "DSW");
   const r4 = await startWorkflowRun(t, w4.rev.id, route.id, control, [[reviewer.id], [approver.id]]);
   if (!r4.ok) throw new Error(r4.error);
-  await recordStepOutcome(t, r4.runId, reviewer, accept.code, "No comment.");
-  await recordStepOutcome(t, r4.runId, approver, accept.code, "Agreed.", "IFC");
+  await advise(r4.runId, "No comment.");
+  await decide(r4.runId, "IFC", toSite);
   line.push(`WALK 4 ${w4.doc.docNumber} — decided to be IFC, release it (controller@delios.local)`);
 
-  // 5 — released at IFC, nobody told yet
-  const w5 = await make(5, "Lighting layout — released, nobody told", "EL", "DSW");
+  // 5 — released at IFC, and sent to the site team in the same act
+  const w5 = await make(5, "Lighting layout — released and issued to site", "EL", "DSW");
   const r5 = await startWorkflowRun(t, w5.rev.id, route.id, control, [[reviewer.id], [approver.id]]);
   if (!r5.ok) throw new Error(r5.error);
-  await recordStepOutcome(t, r5.runId, reviewer, accept.code, "No comment.");
-  await recordStepOutcome(t, r5.runId, approver, accept.code, "Agreed.", "IFC");
+  await advise(r5.runId, "No comment.");
+  await decide(r5.runId, "IFC", toSite);
   await releaseRevision(t, w5.rev.id, control, "IFC");
-  line.push(`WALK 5 ${w5.doc.docNumber} — released IFC, issue it (controller@delios.local)`);
+  line.push(`WALK 5 ${w5.doc.docNumber} — released IFC and issued to site (controller@delios.local)`);
 
   // 6 — released and issued to the client
   const w6 = await make(6, "General arrangement — issued to the client", "ME", "DGA");
   const r6 = await startWorkflowRun(t, w6.rev.id, route.id, control, [[reviewer.id], [approver.id]]);
   if (!r6.ok) throw new Error(r6.error);
-  await recordStepOutcome(t, r6.runId, reviewer, accept.code, "No comment.");
-  await recordStepOutcome(t, r6.runId, approver, accept.code, "Agreed.", "IFA");
+  await advise(r6.runId, "No comment.");
+  await decide(r6.runId, "IFA", { internalUserIds: [client.id], partyIds: [] });
   await releaseRevision(t, w6.rev.id, control, "IFA");
   const number = `TR-W${Date.now().toString(36).slice(-4).toUpperCase()}`;
   const out = await t.db.transmittal.create({
@@ -189,11 +208,11 @@ async function main() {
   line.push(`WALK 6 ${w6.doc.docNumber} — issued on ${out.number} (client@delios.local)`);
 
   // 7 — arrived from a supplier, waiting to be checked
-  const w7 = await make(7, "Blower datasheet — arrived from the supplier", "ME", "DAS", "VND", "MAD");
+  const w7 = await make(7, "Blower datasheet — arrived from the supplier", "ME", "DAS", "VND", "ACME");
   const inbound = await t.db.transmittal.create({
     data: {
       projectId: project.id, number: `TR-W${(Date.now() + 1).toString(36).slice(-4).toUpperCase()}`, direction: "INCOMING", status: "ISSUED",
-      reasonForIssue: "REVIEW", issuingParty: "MADASUD", dateOfIssue: ago(1), receivedDate: ago(1), responseRequired: true,
+      reasonForIssue: "REVIEW", issuingParty: "Acme Pumps", dateOfIssue: ago(1), receivedDate: ago(1), responseRequired: true,
       subject: `${w7.doc.docNumber} rev A — for review`, message: "Datasheet for the aeration blower, first issue.",
       createdById: vendor.id, createdByName: vendor.name,
       items: { create: [{ projectId: project.id, revisionId: w7.rev.id }] },
@@ -202,7 +221,7 @@ async function main() {
   line.push(`WALK 7 ${w7.doc.docNumber} — arrived on ${inbound.number}, check it (controller@delios.local)`);
 
   console.log("Walkthrough ready. Everyone signs in with demo1234.\n" + line.map((l) => "  " + l).join("\n"));
-  console.log("\n  client@delios.local is new: ONEE (client), read-only, sees only what was issued to them.");
+  console.log("\n  client@delios.local is new: Riverside Water (client), read-only, sees only what was issued to them.");
   console.log("  Also try: admin@delios.local (settings), author2@delios.local (Civil author), lead.elec@delios.local (Electrical lead).");
 }
 
