@@ -75,11 +75,14 @@ export default async function ControlActivitiesPage() {
               On the other two answers it is kept as it stands, ready for the day
               the administrator comes back to it. */}
           <ul className="mt-4 space-y-3 border-t border-line pt-4">
-            {rows.map(({ activity, mode, controlDoes }) => (
+            {rows.map(({ activity, mode, controlDoes, off }) => (
               <li key={activity.key} className="rounded-xl border border-line px-3.5 py-3">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold text-slate-900">{activity.title}</p>
+                    <p className="text-sm font-semibold text-slate-900">
+                      {activity.title}
+                      {off ? <Chip className="ml-2 bg-slate-100 text-slate-500 ring-slate-200">Skipped — <Link href="/admin/flow" className="underline">turned off in the Control room</Link></Chip> : null}
+                    </p>
                     <p className="mt-0.5 text-xs leading-5 text-slate-600">{activity.text}</p>
                     <p className="mt-1.5 text-xs leading-5 text-slate-700">
                       <Chip className={controlDoes ? "bg-tint text-brand-ink ring-brand-line" : "bg-slate-100 text-slate-600 ring-slate-200"}>

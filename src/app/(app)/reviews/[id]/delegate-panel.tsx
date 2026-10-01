@@ -30,7 +30,7 @@ export type DelegationRow = {
  * the handover is asked for.
  */
 export function DelegatePanel({
-  cycleId, verb, candidates, throughControl, rows, controller, mayHandOver,
+  cycleId, verb, candidates, throughControl, rows, controller, mayHandOver, off = false,
 }: {
   cycleId: string;
   verb: "REVIEW" | "APPROVE";
@@ -41,6 +41,8 @@ export function DelegatePanel({
   controller: boolean;
   /** The viewer holds this step, so there is something of theirs to hand over. */
   mayHandOver: boolean;
+  /** The organization does not use hand-overs: none is asked for or put in force. */
+  off?: boolean;
 }) {
   const open = rows.filter((row) => row.status === "OPEN");
   const active = rows.filter((row) => row.status === "ACTIVE");
@@ -49,6 +51,8 @@ export function DelegatePanel({
   const tomorrow = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
   if (!mayHandOver && !controller && !rows.length) return null;
+  // Left out, and nothing on record: there is nothing to say.
+  if (off && !rows.length) return null;
 
   return (
     <Card
@@ -77,7 +81,11 @@ export function DelegatePanel({
               {row.reason ? <p className="mt-0.5 text-[11px] opacity-80">{row.reason}</p> : null}
               {controller ? (
                 <div className="mt-2 space-y-2">
-                  <ActionForm action={grantDelegationAction} submitLabel="Put it in force" size="sm" hidden={{ delegationId: row.id }} />
+                  {off ? (
+                    <p className="text-[11px] opacity-80">Hand-overs are no longer used on this project, so this can only be declined.</p>
+                  ) : (
+                    <ActionForm action={grantDelegationAction} submitLabel="Put it in force" size="sm" hidden={{ delegationId: row.id }} />
+                  )}
                   <ActionForm action={refuseDelegationAction} submitLabel="Decline" size="sm" variant="secondary" hidden={{ delegationId: row.id }}>
                     <input name="refusedReason" className={inputCls} placeholder="Why — so they know what to do next" />
                   </ActionForm>
@@ -93,7 +101,7 @@ export function DelegatePanel({
         </ul>
       ) : null}
 
-      {mayHandOver && !active.length && !open.length ? (
+      {mayHandOver && !off && !active.length && !open.length ? (
         candidates.length ? (
           <ActionForm
             action={delegateReviewAction}

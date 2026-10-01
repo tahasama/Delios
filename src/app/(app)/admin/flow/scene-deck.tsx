@@ -11,7 +11,7 @@ export type Scene = {
   /** The rail class that gives the scene its colour. */
   rail: string;
   /** How the acts of this step are carried: one mark per act. */
-  carriers: ("control" | "work" | "fixed")[];
+  carriers: ("control" | "work" | "fixed" | "off")[];
   states: string[];
   sets: number;
 };
@@ -110,6 +110,7 @@ export function SceneDeck({ scenes, panels }: { scenes: Scene[]; panels: React.R
           <span className="scene-legend"><span className="scene-dot scene-dot-control" /> Document Control</span>
           <span className="scene-legend"><span className="scene-dot scene-dot-work" /> the people doing the work</span>
           <span className="scene-legend"><span className="scene-dot scene-dot-fixed" /> fixed</span>
+          <span className="scene-legend"><span className="scene-dot scene-dot-off" /> skipped</span>
         </p>
       </section>
 

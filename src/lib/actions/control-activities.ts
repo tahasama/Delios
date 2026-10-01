@@ -7,6 +7,9 @@ import { STATE_NAMES, STATE_NAME_MAX } from "@/lib/state-names";
 import {
   CONTROL_ACTIVITIES,
   controlSettings,
+  SKIPPABLE,
+  SKIP_KEY,
+  actIsOff,
   MODE_LABEL,
   POLICIES,
   PROJECT_KEY,
@@ -96,10 +99,21 @@ export async function setPolicyAction(_prev: State | undefined, formData: FormDa
 /** One act, changed on its own while the project is on "it depends". */
 export async function setOneControlActivityAction(_prev: State | undefined, formData: FormData): Promise<State> {
   const key = String(formData.get("key") ?? "");
-  const value = String(formData.get("mode") ?? "") as ControlMode;
+  const value = String(formData.get("mode") ?? "") as ControlMode | "OFF";
   const activity = CONTROL_ACTIVITIES.find((one) => one.key === key);
   if (!activity) return { error: "That is not one of the acts." };
+  // Left out altogether: who would carry it out stays as it was, for the day
+  // it is turned back on.
+  if (value === "OFF") {
+    if (!SKIPPABLE[key]) return { error: `${activity.title} cannot be left out.` };
+    const changed = await put(SKIP_KEY(key), "OFF", `${activity.title} — left out`);
+    revalidatePath("/admin/control");
+    revalidatePath("/admin/flow");
+    return { ok: changed ? `${activity.title}: left out.` : "Nothing changed." };
+  }
   if (!ACT_MODES.includes(value)) return { error: "Choose who carries it out." };
+  // Choosing a side for an act that was left out brings it back in use.
+  const wasOff = (await actIsOff(await requireAdminScope(), key)) && (await put(SKIP_KEY(key), "ON", `${activity.title} — back in use`));
   // Moving the project to "it depends" must not move any other act: each one
   // is written down as it stands now before this one changes.
   const now = await controlSettings(await requireAdminScope());
@@ -110,7 +124,7 @@ export async function setOneControlActivityAction(_prev: State | undefined, form
     }
   }
   await put(PROJECT_KEY, "CUSTOM", "Who carries out the acts of document control");
-  const changed = await put(key, value, activity.title);
+  const changed = (await put(key, value, activity.title)) || wasOff;
   revalidatePath("/admin/control");
   revalidatePath("/admin/flow");
   return { ok: changed ? `${activity.title}: ${MODE_LABEL[value].toLowerCase()}.` : "Nothing changed." };

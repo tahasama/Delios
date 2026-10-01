@@ -1160,6 +1160,7 @@ summary::-webkit-details-marker {
   .scene-dot-work { background: rgb(255 255 255 / 0.85); }
   .scene-dot-fixed { background: transparent; box-shadow: inset 0 0 0 1.5px rgb(255 255 255 / 0.5); }
   .scene-dot-none { background: rgb(255 255 255 / 0.2); }
+  .scene-dot-off { background: linear-gradient(135deg, transparent 42%, rgb(255 255 255 / 0.55) 42% 58%, transparent 58%); box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.3); }
   .scene-legend { display: inline-flex; align-items: center; gap: 0.4rem; color: rgb(255 255 255 / 0.55); }
 
   .scene-progress { margin: 0 1.25rem 0.75rem; height: 2px; border-radius: 2px; background: rgb(255 255 255 / 0.08); }
@@ -1204,6 +1205,7 @@ summary::-webkit-details-marker {
   .act-side:hover { color: var(--color-slate-900); }
   .act-side-on { background: var(--color-surface); color: var(--color-slate-900); box-shadow: 0 1px 2px rgb(15 23 42 / 0.1); }
   .act-side-control.act-side-on { background: var(--color-tint); color: var(--color-brand-ink); }
+  .act-side-off.act-side-on { background: var(--color-surface); color: var(--color-slate-700); }
   .act-side-asked { outline: 1.5px dashed var(--color-amber-500); outline-offset: 1px; }
   .act-confirm { background: var(--color-tint-soft); border: 1px solid var(--color-line); }
 }

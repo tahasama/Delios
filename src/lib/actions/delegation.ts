@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireScope } from "@/lib/scope";
 import { isController, isAdmin } from "@/lib/auth";
 import { audit, notify } from "@/lib/audit";
-import { controlDoes } from "@/lib/control-activities";
+import { controlDoes, actIsOff } from "@/lib/control-activities";
 import { delegationRefusal } from "@/lib/delegation";
 import type { Verb } from "@/lib/permissions";
 
@@ -34,6 +34,7 @@ export async function delegateReviewAction(_prev: State | undefined, formData: F
   const ctx = await requireScope();
   const { user, db, projectId } = ctx;
   const { cycleId, toUserId, verb, endDate, reason } = await asked(formData);
+  if (await actIsOff(ctx, "DELEGATE")) return { error: "Handing a review over is not used on this project: the step is answered by the person it was given to." };
   if (!toUserId) return { error: "Say who takes it." };
   if (!endDate) return { error: "A delegation ends on a date — say when (§8.5)." };
   const ends = new Date(`${endDate}T23:59:59`);
@@ -112,6 +113,7 @@ export async function grantDelegationAction(_prev: State | undefined, formData: 
   if (row.status !== "OPEN") return { error: "That request has already been answered." };
   const target = row.cycle?.revision.document ?? null;
   if (!target) return { error: "The review this was raised from no longer exists." };
+  if (await actIsOff(ctx, "DELEGATE")) return { error: "Handing a review over is no longer used on this project, so this request can only be declined." };
 
   // Asked for yesterday, carried out today: the rule is applied now, not then.
   const refusal = await delegationRefusal(ctx, {

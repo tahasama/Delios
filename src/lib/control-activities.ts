@@ -84,6 +84,28 @@ export const CONTROL_ACTIVITIES: ControlActivity[] = [
 ];
 
 /**
+ * Acts an organization may leave out altogether, and what that means. Only acts
+ * whose absence leaves the record whole are here: nobody ever skips a release,
+ * a void, a withdrawal, the answer reaching its author, or a hold.
+ *
+ * Skipping is kept apart from who carries an act out, under its own key, so
+ * that turning an act back on finds it carried out as it was before.
+ */
+export const SKIPPABLE: Record<string, { off: string }> = {
+  DELEGATE: {
+    off: "Nobody hands a review over: each step is answered by the person it was given to. Hand-overs already in force run to their end date.",
+  },
+};
+
+export const SKIP_KEY = (key: string) => `SKIP:${key}`;
+
+/** Has the organization left this act out? */
+export async function actIsOff(t: Tenant, key: string): Promise<boolean> {
+  if (!SKIPPABLE[key]) return false;
+  return (await answers(t)).get(SKIP_KEY(key)) === "OFF";
+}
+
+/**
  * Acts that stay where they are, and why — so the screen does not pretend
  * everything is a choice.
  */
@@ -269,7 +291,7 @@ export async function controlSettings(t: Tenant): Promise<{
   /** What the project answers for all of its acts, and whether that was set. */
   projectMode: ProjectMode;
   set: boolean;
-  rows: { activity: ControlActivity; mode: ControlMode; controlDoes: boolean }[];
+  rows: { activity: ControlActivity; mode: ControlMode; controlDoes: boolean; off: boolean }[];
 }> {
   const [byKey, follows] = await Promise.all([answers(t), hasControlFunction(t)]);
   const all = byKey.get(PROJECT_KEY);
@@ -286,6 +308,7 @@ export async function controlSettings(t: Tenant): Promise<{
         activity,
         mode: own,
         controlDoes: projectMode === "CONTROL" ? true : projectMode === "SELF" ? false : mine,
+        off: !!SKIPPABLE[activity.key] && byKey.get(SKIP_KEY(activity.key)) === "OFF",
       };
     }),
   };

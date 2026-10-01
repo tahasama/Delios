@@ -3,7 +3,7 @@ import { Lock } from "lucide-react";
 import { SETUP_PAGES, maySetup } from "../setup-pages";
 import { requireScope } from "@/lib/scope";
 import { PageHeader, Chip, StateChip } from "@/components/ui";
-import { controlSettings, policies, PROJECT_MODE_LABEL, CONTROL_ACTIVITIES } from "@/lib/control-activities";
+import { controlSettings, policies, PROJECT_MODE_LABEL, CONTROL_ACTIVITIES, SKIPPABLE } from "@/lib/control-activities";
 import { holdersOf } from "@/lib/permissions";
 import { REV_STATE_COLOR, type RevState } from "@/lib/standard";
 import { stateNames, stateName } from "@/lib/state-names";
@@ -308,7 +308,7 @@ export default async function ControlRoomPage() {
       tagline: stage.tagline,
       rail: stage.rail,
       carriers: [
-        ...[...stage.acts, ...stage.branches.flatMap((b) => (b.act ? [b.act] : []))].map((key) => (actRow.get(key)?.controlDoes ? "control" : "work") as Scene["carriers"][number]),
+        ...[...stage.acts, ...stage.branches.flatMap((b) => (b.act ? [b.act] : []))].map((key) => (actRow.get(key)?.off ? "off" : actRow.get(key)?.controlDoes ? "control" : "work") as Scene["carriers"][number]),
         ...Array.from({ length: fixedCount + stage.branches.filter((b) => !b.act).length }, () => "fixed" as const),
       ],
       states: stage.states,
@@ -364,10 +364,20 @@ export default async function ControlRoomPage() {
 }
 
 /** One act the organization decides the carrier of, switchable in place. */
-function ActLine({ act, row }: { act: string; row?: { controlDoes: boolean } }) {
+function ActLine({ act, row }: { act: string; row?: { controlDoes: boolean; off: boolean } }) {
   const activity = CONTROL_ACTIVITIES.find((one) => one.key === act);
   if (!activity || !row) return null;
-  return <ActSwitch act={act} title={activity.title} controlText={activity.control} selfText={activity.self} controlDoes={row.controlDoes} />;
+  return (
+    <ActSwitch
+      act={act}
+      title={activity.title}
+      controlText={activity.control}
+      selfText={activity.self}
+      controlDoes={row.controlDoes}
+      offText={SKIPPABLE[act]?.off}
+      off={row.off}
+    />
+  );
 }
 
 function FixedLine({ title, text }: Fixed) {

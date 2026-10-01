@@ -24,14 +24,15 @@
     "issue-released": "tsx scripts/issue-released.ts",
     "verify:tenancy": "tsx scripts/verify-tenancy.ts",
     "verify:permissions": "tsx scripts/verify-permissions.ts",
-    "verify": "tsx scripts/verify-tenancy.ts && tsx scripts/verify-permissions.ts && tsx scripts/verify-controlled.ts && tsx scripts/verify-preflight.ts && tsx scripts/verify-workflow.ts && tsx scripts/verify-release.ts && tsx scripts/verify-spine.ts && tsx scripts/verify-rollout.ts && tsx scripts/verify-shell.ts",
+    "verify": "tsx scripts/verify-tenancy.ts && tsx scripts/verify-permissions.ts && tsx scripts/verify-controlled.ts && tsx scripts/verify-preflight.ts && tsx scripts/verify-workflow.ts && tsx scripts/verify-release.ts && tsx scripts/verify-spine.ts && tsx scripts/verify-rollout.ts && tsx scripts/verify-shell.ts && tsx scripts/verify-room.ts",
     "verify:release": "tsx scripts/verify-release.ts",
     "verify:rollout": "tsx scripts/verify-rollout.ts",
     "verify:spine": "tsx scripts/verify-spine.ts",
     "verify:controlled": "tsx scripts/verify-controlled.ts",
     "verify:preflight": "tsx scripts/verify-preflight.ts",
     "verify:shell": "tsx scripts/verify-shell.ts",
-    "verify:workflow": "tsx scripts/verify-workflow.ts"
+    "verify:workflow": "tsx scripts/verify-workflow.ts",
+    "verify:room": "tsx scripts/verify-room.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

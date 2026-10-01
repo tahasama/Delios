@@ -11,7 +11,7 @@ import { rewindRouteAction } from "@/lib/actions/workflow";
 import { requestChoices, authorOf, issuePolicy } from "@/lib/issue-requests";
 import { DelegatePanel, type DelegationRow } from "./delegate-panel";
 import { delegateCandidates } from "@/lib/delegation";
-import { controlDoes } from "@/lib/control-activities";
+import { controlDoes, actIsOff } from "@/lib/control-activities";
 import { RequestIssue } from "@/app/(app)/documents/[id]/request-issue";
 import { Timeline } from "@/components/timeline";
 import { getActiveSet } from "@/lib/config";
@@ -100,7 +100,7 @@ export default async function ReviewCyclePage({ params }: { params: Promise<{ id
   // Handing this step over. What is asked of this step — advice or the decision
   // — is what may be handed over, and only to somebody the matrix names for it.
   const handVerb: "REVIEW" | "APPROVE" = cycle.binding ? "APPROVE" : "REVIEW";
-  const [handCandidates, handThroughControl, handRows] = await Promise.all([
+  const [handCandidates, handThroughControl, handRows, handOff] = await Promise.all([
     assigned && cycle.status === "OPEN" ? delegateCandidates(ctx, { target: doc, verb: handVerb, fromUserId: user.id }) : Promise.resolve([]),
     controlDoes(ctx, "DELEGATE"),
     db.delegation.findMany({
@@ -108,6 +108,7 @@ export default async function ReviewCyclePage({ params }: { params: Promise<{ id
       orderBy: { createdAt: "desc" },
       include: { fromUser: { select: { name: true } }, toUser: { select: { name: true } } },
     }),
+    actIsOff(ctx, "DELEGATE"),
   ]);
   const handOvers: DelegationRow[] = handRows.map((row) => ({
     id: row.id,
@@ -302,6 +303,7 @@ export default async function ReviewCyclePage({ params }: { params: Promise<{ id
               rows={handOvers}
               controller={controller}
               mayHandOver={assigned && !cycle.outcome}
+              off={handOff}
             />
           ) : null}
 
