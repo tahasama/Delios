@@ -200,15 +200,29 @@ function externalDocumentFilter(reader: ExternalReader) {
  * another party reaches a row only through a document they may see, a
  * transmittal they are on, or one they wrote themselves.
  */
-const EXTERNAL_MODELS: Record<string, (reader: ExternalReader) => Record<string, unknown>> = {
-  Document: externalDocumentFilter,
-  Revision: (reader) => ({ document: externalDocumentFilter(reader) }),
-  ReviewCycle: (reader) => ({ revision: { document: externalDocumentFilter(reader) } }),
-  Transmittal: (reader) => ({
+function externalTransmittalFilter(reader: ExternalReader) {
+  return {
     OR: [
       { recipients: { some: { OR: [{ userId: reader.userId }, ...(reader.organization ? [{ organization: reader.organization }] : [])] } } },
       { createdById: reader.userId },
       ...(reader.organization ? [{ issuingParty: reader.organization }] : []),
+    ],
+  };
+}
+
+const EXTERNAL_MODELS: Record<string, (reader: ExternalReader) => Record<string, unknown>> = {
+  Document: externalDocumentFilter,
+  Revision: (reader) => ({ document: externalDocumentFilter(reader) }),
+  ReviewCycle: (reader) => ({ revision: { document: externalDocumentFilter(reader) } }),
+  Transmittal: externalTransmittalFilter,
+  // A file is theirs to open through what it belongs to: a revision of a
+  // document they may see, a review of one, or a transmittal they are on.
+  StoredFile: (reader) => ({
+    OR: [
+      { revision: { document: externalDocumentFilter(reader) } },
+      { cycle: { revision: { document: externalDocumentFilter(reader) } } },
+      { transmittal: externalTransmittalFilter(reader) },
+      { uploadedById: reader.userId },
     ],
   }),
 };

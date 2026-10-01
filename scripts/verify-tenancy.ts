@@ -227,6 +227,22 @@ async function main() {
     check("they do not see our other documents", !ids.has(staff.id), `${visible.length} visible`);
     check("and cannot reach one by id either", (await outside.document.findFirst({ where: { id: staff.id } })) === null);
 
+    // Files follow what they belong to. A link to a file is not a key to it.
+    const fileOf = (revisionId: string | null, name: string) => db.storedFile.create({
+      data: { projectId: p1.id, name, path: `verify/${stamp}/${name}`, size: 1, mime: "application/pdf", sha256: "x", kind: "RENDITION", revisionId },
+    });
+    const issuedFile = await fileOf(issuedRev.id, "issued.pdf");
+    const strayFile = await fileOf(null, "ours.pdf");
+    check("they can open the file of what was issued to them", !!(await outside.storedFile.findFirst({ where: { id: issuedFile.id } })));
+    check("they cannot open one of our files by its id", (await outside.storedFile.findFirst({ where: { id: strayFile.id } })) === null);
+    const elsewhere = await db.organization.findFirst({ where: { NOT: { id: org.id } }, include: { projects: { take: 1 } } });
+    if (elsewhere?.projects[0]) {
+      const theirClient = tenantFor(elsewhere.id, elsewhere.projects[0].id).db;
+      check("another organization cannot open our file by its id", (await theirClient.storedFile.findFirst({ where: { id: issuedFile.id } })) === null);
+    }
+    check("another project of ours cannot either", (await t2.db.storedFile.findFirst({ where: { id: issuedFile.id } })) === null);
+    await db.storedFile.deleteMany({ where: { id: { in: [issuedFile.id, strayFile.id] } } });
+
     await db.transmittalItem.deleteMany({ where: { transmittalId: transmittal.id } });
     await db.transmittalRecipient.deleteMany({ where: { transmittalId: transmittal.id } });
     await db.transmittal.delete({ where: { id: transmittal.id } });
