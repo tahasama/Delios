@@ -29,7 +29,8 @@ import { recipientCompanies } from "@/lib/recipients";
 import { withdrawApprovalAction } from "@/lib/actions/governance";
 import { setLegalHoldAction, disposeDocumentAction } from "@/lib/actions/retention";
 import { getRunForRevision } from "@/lib/workflow";
-import { WorkflowPanel, Action } from "./workflow-panel";
+import { WorkflowPanel } from "./workflow-panel";
+import type { StepItem } from "./next-step";
 import { Timeline } from "@/components/timeline";
 import { DocTabs } from "./doc-tabs";
 import { ArrowLeft, ChevronRight, Download, ExternalLink, FileText, Send } from "lucide-react";
@@ -250,9 +251,8 @@ export default async function DocumentDetailPage({
   // A file is attached while the revision is being prepared. Once it is with
   // its reviewers, or decided, attaching one would change what was reviewed
   // after the fact — the next revision carries the new file.
-  const lead = canEdit && working && !workingHasPdf && working.state === "IN_PREPARATION" ? (
-    <div className="mt-1">
-        <Step title={`Attach the file to rev ${working.value}`} open>
+  const lead: StepItem[] = canEdit && working && !workingHasPdf && working.state === "IN_PREPARATION" ? [{
+    key: "attach", label: `Attach the file to rev ${working.value}`, open: true, primary: true, body: (
           <ActionForm action={uploadRevisionFilesAction} submitLabel="Attach" size="sm" hidden={{ revisionId: working.id }}>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Field label="PDF" hint="what people will read — needed before release">
@@ -263,25 +263,19 @@ export default async function DocumentDetailPage({
               </Field>
             </div>
           </ActionForm>
-        </Step>
-    </div>
-  ) : null;
+    ),
+  }] : [];
 
   const openCycle = inReview && !run ? await db.reviewCycle.findFirst({ where: { revisionId: inReview.id, status: "OPEN" }, orderBy: { sequence: "desc" }, select: { id: true } }) : null;
-  const extra = (
-    <div className="mt-1 flex flex-wrap items-start gap-x-2 empty:hidden">
-      {/* No separate approval: the review's binding verdict is the decision. */}
-      {openCycle ? (
-        <Link href={`/reviews/${openCycle.id}`} className="mt-3 inline-flex items-center gap-1.5 rounded-xl border border-line-strong bg-surface px-3.5 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
-          Review of rev {inReview?.value} — comments and verdict →
-        </Link>
-      ) : null}
+  const extra: StepItem[] = [
+      // No separate approval: the review's binding verdict is the decision.
+      ...(openCycle ? [{ key: "review", label: `Review of rev ${inReview?.value} — comments and verdict`, href: `/reviews/${openCycle.id}` }] : []),
 
-      {/* Releasing says the revision is the one in use; issuing says somebody
-          was told. Every ask is here with what came of it, and anybody with
-          standing on the document may add another. */}
-      {carrying && policy.asked && carrying.state !== "IN_REVIEW" && (carrying.state !== "NOT_RELEASED" || decisionFinal) ? (
-        <Step title={`Sending rev ${carrying.value} out`} open={requests.some((one) => one.status === "OPEN") || (!!current && !sentOut)}>
+      // Releasing says the revision is the one in use; issuing says somebody
+      // was told. Every ask is here with what came of it, and anybody with
+      // standing on the document may add another.
+      ...(carrying && policy.asked && carrying.state !== "IN_REVIEW" && (carrying.state !== "NOT_RELEASED" || decisionFinal) ? [
+        { key: "send-out", label: `Sending rev ${carrying.value} out`, open: requests.some((one) => one.status === "OPEN") || (!!current && !sentOut), body: (<>
           {requests.length ? (
             <ul className="space-y-2">
               {requests.map((one) => {
@@ -354,11 +348,11 @@ export default async function DocumentDetailPage({
               </div>
             </details>
           ) : null}
-        </Step>
-      ) : null}
+        </>) },
+      ] : []),
 
-      {controller && held && !held.heldReason?.startsWith("Not approved") ? (
-        <Step title={`Rev ${held.value} is on hold`} open>
+      ...(controller && held && !held.heldReason?.startsWith("Not approved") ? [
+        { key: "hold", label: `Rev ${held.value} is on hold`, open: true, body: (<>
           {heldApproval?.status !== "CLOSED" ? (
             <p className="text-xs text-slate-500">Waiting for {heldApproval?.party?.name ?? "the outside party"} to answer. It stays not for use until then.</p>
           ) : heldCleared ? (
@@ -377,11 +371,11 @@ export default async function DocumentDetailPage({
               </ActionForm>
             </>
           )}
-        </Step>
-      ) : null}
+        </>) },
+      ] : []),
 
-      {controller && working ? (
-        <Step title={decisionFinal ? `Release rev ${working.value}` : `Send rev ${working.value} back`} open={run?.status === "DONE" || working.approvals.some((a) => !a.withdrawnAt)}>
+      ...(controller && working ? [
+        { key: "release", primary: decisionFinal && working.state === "NOT_RELEASED", label: decisionFinal ? `Release rev ${working.value}` : `Send rev ${working.value} back`, open: run?.status === "DONE" || working.approvals.some((a) => !a.withdrawnAt), body: (<>
           {decisionFinal ? <PreflightPanel result={await preflight("RELEASE", { revisionId: working.id }, ctx)} className="mb-3" /> : null}
           {/* What was asked for is read on its own card; releasing carries out
               every request waiting, and asks nobody's permission to publish. */}
@@ -427,11 +421,11 @@ export default async function DocumentDetailPage({
             </ActionForm>
           )}
           {current ? <p className="mt-2 text-[11px] text-slate-500">Rev {current.value} will be marked superseded.</p> : null}
-        </Step>
-      ) : null}
+        </>) },
+      ] : []),
 
-      {canEdit && !working && doc.kind !== "RECORD" ? (
-        <Step title={ground.kind === "FIRST" ? "Start the first revision" : ground.kind === "ASKED" ? `New revision — to answer rev ${doc.revisions[0]?.value}` : "New revision — nobody asked for one"} open={!doc.revisions.length}>
+      ...(canEdit && !working && doc.kind !== "RECORD" ? [
+        { key: "revise", primary: ground.kind !== "OWN", label: ground.kind === "FIRST" ? "Start the first revision" : ground.kind === "ASKED" ? `New revision — answer rev ${doc.revisions[0]?.value}` : "Start a new revision", open: !doc.revisions.length, body: (<>
           <ActionForm action={prepareRevisionAction} submitLabel="Start revision" hidden={{ documentId: doc.id }}>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {ground.kind === "FIRST" ? (
@@ -466,10 +460,9 @@ export default async function DocumentDetailPage({
               ) : null}
             </div>
           </ActionForm>
-        </Step>
-      ) : null}
-    </div>
-  );
+        </>) },
+      ] : []),
+  ];
 
   // Released, then held for an outside approval: on hold is what it is now.
   const onHold = shown?.state === "RELEASED" && !!shown.heldAt;
@@ -494,10 +487,8 @@ export default async function DocumentDetailPage({
       <section className="register register-sheet register-sheet-open">
         <div className="flex flex-col-reverse gap-3 px-5 pt-6 pb-4 sm:px-6 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0 flex-1">
-            <h1 className="plate-name min-w-0">
-              <span className="font-mono text-[0.8em] font-medium tracking-tight text-slate-400">{doc.docNumber}</span>{" "}
-              {doc.title}
-            </h1>
+            <p className="font-mono text-[12.5px] font-semibold tracking-tight text-slate-500">{doc.docNumber}</p>
+            <h1 className="plate-name mt-1 min-w-0">{doc.title}</h1>
             <p className="plate-meta mt-2 flex flex-wrap items-center gap-x-2 gap-y-1">
               {shown ? <span className="font-mono font-semibold text-slate-800">Rev {shown.value}</span> : null}
               <StateChip label={stateLabel} color={stateColor} />
@@ -814,10 +805,6 @@ export default async function DocumentDetailPage({
 
 function Empty({ children }: { children: React.ReactNode }) {
   return <p className="px-5 py-6 text-center text-xs text-slate-400">{children}</p>;
-}
-
-function Step({ title, children }: { title: string; open?: boolean; children: React.ReactNode }) {
-  return <Action label={title} secondary>{children}</Action>;
 }
 
 function UsedIn({ kind, href, code, text, children }: { kind: string; href: string; code: string; text: string; children?: React.ReactNode }) {
