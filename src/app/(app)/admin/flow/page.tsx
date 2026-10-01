@@ -7,7 +7,7 @@ import { controlSettings, policies, PROJECT_MODE_LABEL, CONTROL_ACTIVITIES, SKIP
 import { holdersOf } from "@/lib/permissions";
 import { REV_STATE_COLOR, type RevState } from "@/lib/standard";
 import { stateNames, stateName } from "@/lib/state-names";
-import { SceneDeck, type Scene } from "./scene-deck";
+import { SceneDeck, type Route, type Scene } from "./scene-deck";
 import { ActSwitch } from "./act-switch";
 import { cn } from "@/lib/utils";
 
@@ -26,6 +26,9 @@ export const metadata = { title: "Control room" };
 /** A step that is not a choice, and why. */
 type Fixed = { title: string; text: string };
 
+/** A revision state, or the hold, which is read as one. */
+type Shown = RevState | "ON_HOLD";
+
 type Stage = {
   key: string;
   title: string;
@@ -34,7 +37,7 @@ type Stage = {
   text: string;
   rail: string;
   /** The states a revision is in, or leaves in, at this step. */
-  states: RevState[];
+  states: Shown[];
   /** Acts the organization decides the carrier of. */
   acts: string[];
   policies: string[];
@@ -43,10 +46,45 @@ type Stage = {
   /** Roads off the main line, with their act where they have one. */
   branches: { title: string; text: string; act?: string; fixed?: string }[];
   /** Other configuration the step reads, with where it is kept. */
-  extras: ("numbering" | "routes" | "distribution")[];
+  extras: ("numbering" | "routes" | "distribution" | "parties")[];
 };
 
+/**
+ * Every scene, once. A scene several routes pass through — review, release —
+ * is the same scene on each, so what is switched in one is switched in all.
+ */
 const STAGES: Stage[] = [
+  {
+    key: "received",
+    tagline: "Arrives from the supplier",
+    title: "Received",
+    text: "Their transmittal is recorded, checked against the acceptance conditions, and accepted or rejected.",
+    rail: "rail-superseded",
+    states: [],
+    acts: [],
+    policies: [],
+    sets: ["SUPPLIER_CODES", "PURCHASE_ORDERS", "REASONS_FOR_ISSUE", "NATIVE_FORMATS", "RENDITION_FORMATS"],
+    fixed: [
+      { title: "Accepting what arrived", text: "Whoever recorded it accepts or rejects it against the acceptance conditions. A transmittal with nothing enclosed — a letter — is accepted on recording." },
+      { title: "From an organization not on the system", text: "One of our people records it for them; the files that came with it are kept as they arrived." },
+    ],
+    branches: [],
+    extras: ["parties"],
+  },
+  {
+    key: "theirs",
+    tagline: "Made one of ours",
+    title: "Registered",
+    text: "A file that arrived becomes a document in the register, under the supplier's code and order.",
+    rail: "rail-none",
+    states: [],
+    acts: [],
+    policies: [],
+    sets: ["SUPPLIER_CODES", "PURCHASE_ORDERS", "DISCIPLINES", "DOCUMENT_TYPES", "DELIVERABLE_TYPES", "CRITICALITY", "CONFIDENTIALITY"],
+    fixed: [{ title: "Making it a document", text: "Done from what arrived, so the register keeps the link to the transmittal it came on." }],
+    branches: [],
+    extras: ["numbering"],
+  },
   {
     key: "register",
     tagline: "Numbered and classified",
@@ -90,6 +128,23 @@ const STAGES: Stage[] = [
     extras: ["routes"],
   },
   {
+    key: "outside",
+    tagline: "Their reviewers answer",
+    title: "Outside review",
+    text: "A party outside the organization reviews it — as a step on the route, or on a transmittal sent for review.",
+    rail: "rail-review",
+    states: ["IN_REVIEW"],
+    acts: [],
+    policies: ["POLICY_PDF_STAMP"],
+    sets: ["REVIEW_OUTCOMES", "COMMENT_CLASSES", "REASONS_FOR_ISSUE"],
+    fixed: [
+      { title: "As a step on the route", text: "A party with accounts here answers for itself. One that is not on the system is carried by its liaison — or Document Control — who sends the pack out and records what comes back." },
+      { title: "On a transmittal for review", text: "Sent for review or approval, with an answer due by the reason's period; their answer arrives as a reply, and the verdict is recorded against the revision." },
+    ],
+    branches: [],
+    extras: ["parties", "routes"],
+  },
+  {
     key: "answer",
     tagline: "The verdict reaches the author",
     title: "Answer returned",
@@ -104,6 +159,42 @@ const STAGES: Stage[] = [
     extras: [],
   },
   {
+    key: "to-supplier",
+    tagline: "The verdict goes back to them",
+    title: "Answer to the supplier",
+    text: "The verdict and the comments go back to the supplier; a revision sent back means they submit the next one.",
+    rail: "rail-review",
+    states: [],
+    acts: ["RETURN_OUTCOME"],
+    policies: ["POLICY_PDF_STAMP"],
+    sets: ["REVIEW_OUTCOMES", "RETURN_REASONS"],
+    fixed: [
+      { title: "Who it goes back to", text: "The supplier, as the document's originator — sent on a reply to the transmittal it came on. Document Control chooses who else is copied in." },
+      { title: "To a supplier not on the system", text: "One of our people sends it on and marks it sent, with the proof." },
+    ],
+    branches: [],
+    extras: ["parties"],
+  },
+  {
+    key: "approval",
+    tagline: "An outside party approves",
+    title: "Outside approval",
+    text: "After our own review, somebody outside must approve it before it is released and issued.",
+    rail: "rail-release",
+    states: ["NOT_RELEASED", "ON_HOLD"],
+    acts: [],
+    policies: ["POLICY_PDF_STAMP"],
+    sets: ["REVIEW_OUTCOMES"],
+    fixed: [
+      { title: "Asked for when it is sent", text: "Whoever asks for it to be sent says that an outside approval is needed, and from whom; the revision stays not released while their step is open." },
+      { title: "Through Document Control's gate", text: "Approved: Document Control releases and issues it. Not approved: release stays blocked until Document Control sends it back — to the author or the supplier — with a reason, and a copy list it edits." },
+    ],
+    branches: [
+      { title: "On hold", text: "An approval found to be needed after release puts the revision on hold, marked not for use; everyone it went to is told, and again when the hold is lifted or it is sent back.", fixed: "Always on: a revision nobody should use is never left reading as in force." },
+    ],
+    extras: ["parties"],
+  },
+  {
     key: "release",
     tagline: "In force",
     title: "Release",
@@ -115,7 +206,6 @@ const STAGES: Stage[] = [
     sets: [],
     fixed: [],
     branches: [
-      { title: "On hold", text: "An outside answer that arrives late puts the revision on hold, marked not for use, until Document Control lifts it or sends it back.", fixed: "Always on: a revision nobody should use is never left reading as in force." },
       { title: "Voiding a revision", text: "Released in error, or never reviewed — and what was done from it is reassessed.", act: "VOID" },
     ],
     extras: [],
@@ -130,23 +220,45 @@ const STAGES: Stage[] = [
     acts: ["ISSUE"],
     policies: ["POLICY_READY"],
     sets: ["REASONS_FOR_ISSUE", "ISSUE_CODES"],
-    fixed: [],
+    fixed: [{ title: "To an organization not on the system", text: "One of our people sends it on and marks it sent, with the proof; until then it reads as not yet sent." }],
     branches: [{ title: "An action going ahead without its documents", text: "The day passes and something it needed is missing; the note says who decided and who owns the delay.", act: "ACTION_NOTE" }],
-    extras: ["distribution"],
+    extras: ["distribution", "parties"],
+  },
+];
+
+/** The ways a document goes through the project, each a line of scenes. */
+const ROUTES: { key: string; title: string; from: string; to: string; outside: string; scenes: string[] }[] = [
+  {
+    key: "inside",
+    title: "Reviewed inside",
+    from: "We write it",
+    to: "Sent out in force",
+    outside: "Nobody outside, until it is sent.",
+    scenes: ["register", "prepare", "review", "answer", "release", "issue"],
   },
   {
-    key: "receive",
-    tagline: "Taken in from outside",
-    title: "Receive",
-    text: "What arrives from outside is recorded, checked, and accepted or rejected.",
-    rail: "rail-superseded",
-    states: [],
-    acts: [],
-    policies: [],
-    sets: ["SUPPLIER_CODES", "PURCHASE_ORDERS", "PRESERVATION_FORMATS"],
-    fixed: [{ title: "Accepting what arrived", text: "The recipient's act, checked against the acceptance conditions." }],
-    branches: [],
-    extras: [],
+    key: "outside-review",
+    title: "Reviewed outside",
+    from: "We write it",
+    to: "Sent out in force",
+    outside: "A client, a consultant or a third party reviews it.",
+    scenes: ["register", "prepare", "review", "outside", "answer", "release", "issue"],
+  },
+  {
+    key: "outside-approval",
+    title: "Approved outside, after our review",
+    from: "We write it",
+    to: "Sent out in force, once approved",
+    outside: "An outside party approves it after our own review.",
+    scenes: ["register", "prepare", "review", "answer", "approval", "release", "issue"],
+  },
+  {
+    key: "supplier",
+    title: "A supplier's document",
+    from: "It arrives from the supplier",
+    to: "Their verdict sent back; in force if accepted",
+    outside: "The supplier submits it and receives the answer.",
+    scenes: ["received", "theirs", "review", "to-supplier", "release", "issue"],
   },
 ];
 
@@ -154,6 +266,7 @@ const EXTRA: Record<Stage["extras"][number], { title: string; href: string }> = 
   numbering: { title: "Numbering schemes", href: "/admin/numbering" },
   routes: { title: "Review routes", href: "/admin/workflow-templates" },
   distribution: { title: "Distribution rules", href: "/admin/controlled" },
+  parties: { title: "Outside organizations", href: "/admin/parties" },
 };
 
 export default async function ControlRoomPage() {
@@ -162,7 +275,7 @@ export default async function ControlRoomPage() {
   const page = SETUP_PAGES.find((one) => one.href === "/admin/flow")!;
   if (!maySetup(me, page)) return <PageHeader title="Control room" subtitle="Administrators only." />;
 
-  const [settings, chosen, holders, sets, values, templates, schemes, rules, names] = await Promise.all([
+  const [settings, chosen, holders, sets, values, templates, schemes, rules, names, parties] = await Promise.all([
     controlSettings(ctx),
     policies(ctx),
     holdersOf(ctx, "CONTROL"),
@@ -172,6 +285,7 @@ export default async function ControlRoomPage() {
     db.scheme.count({ where: { active: true } }),
     db.distributionRule.count(),
     stateNames(ctx),
+    db.party.findMany({ where: { active: true }, select: { kind: true } }),
   ]);
 
   const gate = holders.length > 0;
@@ -197,10 +311,17 @@ export default async function ControlRoomPage() {
     numbering: `${schemes} in use`,
     routes: `${templates.length} live`,
     distribution: rules ? `${rules} rule${rules === 1 ? "" : "s"}` : "none yet",
+    parties: (() => {
+      const offline = parties.filter((one) => one.kind === "OFFLINE").length;
+      return `${parties.length - offline} answer here · ${offline} not on the system`;
+    })(),
   };
 
-  const stateLabel = (state: RevState) =>
-    state === "RELEASED" ? (together ? names.RELEASED_ISSUED : `${names.RELEASED}, then ${names.ISSUED.toLowerCase()}`) : stateName(names, state);
+  const stateLabel = (state: Shown) =>
+    state === "ON_HOLD" ? names.ON_HOLD
+      : state === "RELEASED" ? (together ? names.RELEASED_ISSUED : `${names.RELEASED}, then ${names.ISSUED.toLowerCase()}`)
+      : stateName(names, state);
+  const stateColor = (state: Shown) => (state === "ON_HOLD" ? "bg-red-50 text-red-800 ring-red-200" : REV_STATE_COLOR[state]);
 
   // Release reads differently with and without somebody standing between the
   // route and the register; the gate is the control function itself.
@@ -212,20 +333,19 @@ export default async function ControlRoomPage() {
   for (const stage of stages) for (const key of stage.sets) usedBy.set(key, [...(usedBy.get(key) ?? []), stage.title]);
   const unplaced = sets.filter((one) => !usedBy.has(one.key));
 
-  const panels = stages.map((stage, i) => {
+  const panels = Object.fromEntries(stages.map((stage) => {
     const fixed = stage.key === "release" ? [releaseFixed, ...stage.fixed] : stage.fixed;
     // Not released and Returned to review only exist where there is a gate.
     const states = stage.states.filter((state) => gate || (state !== "NOT_RELEASED" && state !== "RETURNED"));
-    return (
+    const panel = (
         <section key={stage.key} className={cn("register register-sheet register-sheet-open relative", stage.rail)}>
           <span className="absolute inset-y-0 left-0 w-0.75 rounded-l-[0.875rem] bg-(--rail)" aria-hidden />
           <header className="flex flex-wrap items-baseline gap-x-3 gap-y-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
-            <span className="font-mono text-[11px] text-slate-400">Scene {String(i + 1).padStart(2, "0")}</span>
             <h2 className="text-sm font-semibold text-slate-900">{stage.title}</h2>
             <span className="text-[11px] text-slate-500">{stage.text}</span>
             {states.length ? (
               <span className="flex flex-wrap items-center gap-1.5 sm:ml-auto">
-                {states.map((state) => <StateChip key={state} label={stateLabel(state)} color={REV_STATE_COLOR[state]} />)}
+                {states.map((state) => <StateChip key={state} label={stateLabel(state)} color={stateColor(state)} />)}
                 <Link href="/admin/control#state-names" className="text-[11px] font-semibold text-link hover:underline">rename</Link>
               </span>
             ) : null}
@@ -298,9 +418,10 @@ export default async function ControlRoomPage() {
           </div>
         </section>
     );
-  });
+    return [stage.key, panel];
+  }));
 
-  const scenes: Scene[] = stages.map((stage) => {
+  const sceneOf = (stage: Stage): Scene => {
     const fixedCount = (stage.key === "release" ? 1 : 0) + stage.fixed.length;
     return {
       key: stage.key,
@@ -314,7 +435,9 @@ export default async function ControlRoomPage() {
       states: stage.states,
       sets: stage.sets.length,
     };
-  });
+  };
+  const byKey = new Map(stages.map((stage) => [stage.key, stage]));
+  const routes: Route[] = ROUTES.map((route) => ({ ...route, scenes: route.scenes.map((key) => sceneOf(byKey.get(key)!)) }));
 
   return (
     <div className="space-y-4">
@@ -344,7 +467,7 @@ export default async function ControlRoomPage() {
         </div>
       </section>
 
-      <SceneDeck scenes={scenes} panels={panels} />
+      <SceneDeck routes={routes} panels={panels} />
 
       {unplaced.length ? (
         <section className="register register-sheet register-sheet-open">

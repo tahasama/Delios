@@ -16,14 +16,20 @@ export type Scene = {
   sets: number;
 };
 
+/** One way a document goes through the project, as a line of scenes. */
+export type Route = { key: string; title: string; from: string; to: string; outside: string; scenes: Scene[] };
+
 /**
- * The flow as a strip of scenes: the main line lit one scene at a time, the
+ * The flow as a strip of scenes: one route at a time, one scene of it lit, the
  * details of the lit one underneath. Arrow keys and the hash move between them,
- * so a link to /admin/flow#review opens on Review.
+ * so a link to /admin/flow#supplier/review opens on a supplier's review.
  */
-export function SceneDeck({ scenes, panels }: { scenes: Scene[]; panels: React.ReactNode[] }) {
+export function SceneDeck({ routes, panels }: { routes: Route[]; panels: Record<string, React.ReactNode> }) {
+  const [on, setOn] = useState(0);
   const [at, setAt] = useState(0);
   const track = useRef<HTMLDivElement>(null);
+  const route = routes[on];
+  const scenes = route.scenes;
 
   // Bring a scene to the middle of the strip, without moving the page.
   const centre = (index: number, smooth: boolean) => {
@@ -37,19 +43,38 @@ export function SceneDeck({ scenes, panels }: { scenes: Scene[]; panels: React.R
   const go = useCallback((index: number, focus = false) => {
     const next = Math.max(0, Math.min(scenes.length - 1, index));
     setAt(next);
-    history.replaceState(null, "", `#${scenes[next].key}`);
+    history.replaceState(null, "", `#${route.key}/${scenes[next].key}`);
     const card = centre(next, true);
     if (focus) card?.focus({ preventScroll: true });
-  }, [scenes]);
+  }, [route, scenes]);
 
-  // Open on the scene the address names.
+  // Another route keeps the scene that was lit, where it has one.
+  const pick = (index: number) => {
+    const next = routes[index];
+    const same = Math.max(0, next.scenes.findIndex((one) => one.key === scenes[at]?.key));
+    setOn(index);
+    setAt(same);
+    history.replaceState(null, "", `#${next.key}/${next.scenes[same].key}`);
+    requestAnimationFrame(() => centre(same, true));
+  };
+
+  // Open on the route and scene the address names: #route/scene, or a scene alone.
   useEffect(() => {
-    const found = scenes.findIndex((one) => `#${one.key}` === window.location.hash);
-    if (found > 0) {
-      setAt(found);
-      centre(found, false);
-    }
-  }, [scenes]);
+    const follow = () => {
+      const [first, second] = window.location.hash.slice(1).split("/");
+      let r = routes.findIndex((one) => one.key === first);
+      const sceneKey = r >= 0 ? second : first;
+      if (r < 0) r = Math.max(0, routes.findIndex((one) => one.scenes.some((scene) => scene.key === sceneKey)));
+      const s = Math.max(0, routes[r].scenes.findIndex((scene) => scene.key === sceneKey));
+      setOn(r);
+      setAt(s);
+      requestAnimationFrame(() => centre(s, false));
+    };
+    follow();
+    // A link on this page to another route or scene changes only the hash.
+    window.addEventListener("hashchange", follow);
+    return () => window.removeEventListener("hashchange", follow);
+  }, [routes]);
 
   const scene = scenes[at];
 
@@ -57,8 +82,21 @@ export function SceneDeck({ scenes, panels }: { scenes: Scene[]; panels: React.R
     <div className="space-y-4">
       <section className="scene-deck" aria-label="The flow">
         <div className="scene-film" aria-hidden />
-        <div className="flex items-center justify-between gap-3 px-5 pt-4 sm:px-7">
-          <p className="scene-kicker">The main line · {scenes.length} scenes</p>
+        <div className="flex flex-wrap gap-1.5 px-5 pt-5 sm:px-7" role="group" aria-label="Routes">
+          {routes.map((one, i) => (
+            <button key={one.key} type="button" onClick={() => pick(i)} aria-pressed={i === on} className="route-pick">
+              {one.title}
+            </button>
+          ))}
+        </div>
+        <p className="scene-route px-5 pt-2.5 sm:px-7">
+          <span>{route.from}</span>
+          <span className="scene-route-arrow" aria-hidden>→</span>
+          <span>{route.to}</span>
+          <span className="scene-route-out">{route.outside}</span>
+        </p>
+        <div className="flex items-center justify-between gap-3 px-5 pt-3 sm:px-7">
+          <p className="scene-kicker">{route.title} · {scenes.length} scenes</p>
           <div className="flex items-center gap-1">
             <button type="button" onClick={() => go(at - 1)} disabled={at === 0} className="scene-nav" aria-label="Previous scene"><ChevronLeft className="h-4 w-4" /></button>
             <button type="button" onClick={() => go(at + 1)} disabled={at === scenes.length - 1} className="scene-nav" aria-label="Next scene"><ChevronRight className="h-4 w-4" /></button>
@@ -77,7 +115,7 @@ export function SceneDeck({ scenes, panels }: { scenes: Scene[]; panels: React.R
         >
           {scenes.map((one, i) => (
             <button
-              key={one.key}
+              key={`${route.key}/${one.key}`}
               type="button"
               role="tab"
               id={`scene-${one.key}`}
@@ -115,13 +153,13 @@ export function SceneDeck({ scenes, panels }: { scenes: Scene[]; panels: React.R
       </section>
 
       <div
-        key={scene.key}
+        key={`${route.key}/${scene.key}`}
         role="tabpanel"
         id={`panel-${scene.key}`}
         aria-labelledby={`scene-${scene.key}`}
         className="scene-panel"
       >
-        {panels[at]}
+        {panels[scene.key]}
       </div>
     </div>
   );
