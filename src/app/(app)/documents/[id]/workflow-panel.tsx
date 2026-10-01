@@ -358,14 +358,27 @@ function RecordPanel({ doc, extra }: { doc: DocLite; extra?: React.ReactNode }) 
 }
 
 /** The Next step block: one compact box, title and context on one line. */
+/**
+ * Where the document stands, as a sheet of the register: a band naming the step
+ * and saying what it is about, the body underneath, and a rail down the left in
+ * the colour the register gives that state. The colour is read from the tone a
+ * caller already asks for, so every state keeps the meaning it had.
+ */
 function Card({ title, description, className, children }: { title: string; description?: string; className?: string; children: React.ReactNode }) {
+  const tone = className ?? "";
+  const rail = tone.includes("orange") ? "rail-prep"
+    : tone.includes("emerald") ? "rail-released"
+    : tone.includes("violet") ? "rail-superseded"
+    : tone.includes("brand") ? "rail-review"
+    : "rail-none";
   return (
-    <section className={cn("rounded-2xl border border-line bg-surface px-5 py-3.5 shadow-sm", className)}>
-      <p className="text-sm font-semibold text-slate-900">
-        {title}
-        {description ? <span className="ml-2 text-xs font-normal text-slate-500">{description}</span> : null}
-      </p>
-      <div className="mt-1.5">{children}</div>
+    <section className={cn("register register-sheet register-sheet-open relative", rail)}>
+      <span className="absolute inset-y-0 left-0 w-0.75 rounded-l-[0.875rem] bg-(--rail)" aria-hidden />
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
+        <span className="stencil text-slate-600">{title}</span>
+        {description ? <span className="text-[11px] text-slate-500">{description}</span> : null}
+      </div>
+      <div className="px-5 py-4 sm:px-6">{children}</div>
     </section>
   );
 }
@@ -376,11 +389,11 @@ function Card({ title, description, className, children }: { title: string; desc
  */
 export function Action({ label, secondary, children }: { label: React.ReactNode; secondary?: boolean; children: React.ReactNode }) {
   return (
-    <details className="group mt-2 open:w-full">
-      <summary className={`inline-flex cursor-pointer list-none items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-semibold transition ${secondary ? "border border-line-strong bg-surface text-slate-700 hover:bg-slate-50" : "bg-brand text-white hover:bg-brand-hover"}`}>
+    <details className="group mt-3 open:w-full">
+      <summary data-on={secondary ? undefined : "true"} className="ask inline-flex cursor-pointer list-none items-center gap-2">
         {label}
       </summary>
-      <div className="mt-2 rounded-lg border border-line bg-surface p-3.5">{children}</div>
+      <div className="mt-3 rounded-lg border border-line bg-surface p-4">{children}</div>
     </details>
   );
 }
