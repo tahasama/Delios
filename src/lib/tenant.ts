@@ -29,6 +29,7 @@ export const ORG_SCOPED = new Set([
   "SpineLink",
   "SpineBaseline",
   "ControlledSet",
+  "StateName",
   "Function",
   "PermissionRule",
 ]);

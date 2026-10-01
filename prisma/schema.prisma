@@ -44,6 +44,7 @@ model Organization {
   functions         Function[]
   permissionRules   PermissionRule[]
   controlledSets    ControlledSet[]
+  stateNames        StateName[]
 }
 
 model Project {
@@ -438,6 +439,25 @@ model ConfigValue {
 
   @@unique([orgId, setKey, code])
   @@index([orgId, setKey])
+}
+
+/**
+ * What an organization calls a revision state on screen. The states themselves,
+ * and what each one does, are fixed; only the name people read is theirs. A row
+ * exists only for a state somebody renamed.
+ */
+model StateName {
+  id        String       @id @default(cuid())
+  orgId     String
+  org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  code      String
+  label     String
+  setById   String?
+  setByName String?
+  updatedAt DateTime     @updatedAt
+
+  @@unique([orgId, code])
+  @@index([orgId])
 }
 
 // Numbering schemes (§3.2, per Standard-Numbering-Config.xlsx)

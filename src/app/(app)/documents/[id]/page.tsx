@@ -10,7 +10,8 @@ import { Prisma } from "@prisma/client";
 import { isController, isAdmin, mayContributeToDocument } from "@/lib/auth";
 import { Chip, StateChip, Banner, btn, Field, inputCls } from "@/components/ui";
 import { ActionForm } from "@/components/form";
-import { DOC_STATE_LABEL, DOC_STATE_COLOR, REV_STATE_LABEL, REV_STATE_COLOR, revStateLabel, revStateColor, type DocState, type RevState, releasedLabel } from "@/lib/standard";
+import { DOC_STATE_LABEL, DOC_STATE_COLOR, REV_STATE_COLOR, revStateColor, type DocState, type RevState } from "@/lib/standard";
+import { stateNames, stateName } from "@/lib/state-names";
 import { fmtDate, timeAgo, plain } from "@/lib/utils";
 import { getActiveSet, getSet, getValue } from "@/lib/config";
 import { updateDocumentAction, linkAssetAction, unlinkRelationshipAction, endDocumentStateAction } from "@/lib/actions/documents";
@@ -167,6 +168,8 @@ export default async function DocumentDetailPage({
   // Released and issued as one act, or as two in order: the project's answer.
   const { policy: projectPolicy } = await import("@/lib/control-activities");
   const together = (await projectPolicy(ctx, "POLICY_RELEASE")) === "TOGETHER";
+  // What this organization calls each state; the states themselves are fixed.
+  const names = await stateNames(ctx);
   const sentOut = !!current && transmittalItems.some((item) => item.revisionId === current.id && item.transmittal.direction === "OUTGOING");
   // Only where releasing is issuing is a released revision nobody was sent a
   // breach to stamp; where they are two acts, the state says Released.
@@ -452,9 +455,9 @@ export default async function DocumentDetailPage({
 
   // Released, then held for an outside approval: on hold is what it is now.
   const onHold = shown?.state === "RELEASED" && !!shown.heldAt;
-  const stateLabel = onHold ? "On hold"
-    : shown?.state === "RELEASED" && shown.id === current?.id ? releasedLabel(together, sentOut)
-    : shown ? revStateLabel(shown.state) : DOC_STATE_LABEL[doc.state as DocState] ?? doc.state;
+  const stateLabel = shown
+    ? stateName(names, shown.state, { together, sent: shown.id === current?.id ? sentOut : true, held: onHold })
+    : DOC_STATE_LABEL[doc.state as DocState] ?? doc.state;
   const stateColor = onHold ? "bg-red-50 text-red-800 ring-red-200" : shown ? revStateColor(shown.state) : DOC_STATE_COLOR[doc.state as DocState] ?? "";
 
   return (
@@ -492,7 +495,7 @@ export default async function DocumentDetailPage({
               {/* The masthead is about the released revision; this says what
                   the one after it is actually doing, in the same words the
                   register uses — "in progress" is not a state. */}
-              {current && working ? <span className="text-amber-700">· rev {working.value} {revStateLabel(working.state).toLowerCase()}</span> : null}
+              {current && working ? <span className="text-amber-700">· rev {working.value} {stateName(names, working.state).toLowerCase()}</span> : null}
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -652,7 +655,7 @@ export default async function DocumentDetailPage({
                 {doc.revisions.map((rev, index) => (
                   /* Only the newest revision can still be acted on. Everything
                      before it is frozen as it was issued. */
-                  <RevisionRow key={rev.id} rev={rev} latest={index === 0} statusLabel={label(statuses, rev.statusCode)} controller={controller} userId={user.id} userRole={user.role} voidIsControl={voidIsControl} />
+                  <RevisionRow key={rev.id} rev={rev} latest={index === 0} statusLabel={label(statuses, rev.statusCode)} stateLabel={stateName(names, rev.state, { together, sent: rev.id === current?.id ? sentOut : true, held: !!rev.heldAt })} controller={controller} userId={user.id} userRole={user.role} voidIsControl={voidIsControl} />
                 ))}
               </ul>
             ) : <Empty>No revision yet.</Empty>,
@@ -814,7 +817,7 @@ type RevData = Prisma.RevisionGetPayload<{
 }>;
 
 /** One line per revision; its record and its per-revision controls open in place. */
-function RevisionRow({ rev, latest, statusLabel, controller, userId, userRole, voidIsControl }: { rev: RevData; latest: boolean; statusLabel: string | null; controller: boolean; userId: string; userRole: string; voidIsControl: boolean }) {
+function RevisionRow({ rev, latest, statusLabel, stateLabel, controller, userId, userRole, voidIsControl }: { rev: RevData; latest: boolean; statusLabel: string | null; stateLabel: string; controller: boolean; userId: string; userRole: string; voidIsControl: boolean }) {
   const state = rev.state as RevState;
   const pdf = rev.files.find((f) => f.kind === "RENDITION");
   const native = rev.files.find((f) => f.kind === "NATIVE");
@@ -834,7 +837,7 @@ function RevisionRow({ rev, latest, statusLabel, controller, userId, userRole, v
         <summary className="flex cursor-pointer list-none flex-wrap items-center gap-x-3 gap-y-1 px-5 py-3 hover:bg-slate-50">
           <ChevronRight className="h-3.5 w-3.5 text-slate-400 transition group-open:rotate-90" />
           <span className="font-mono text-sm font-bold text-slate-900">Rev {rev.value}</span>
-          <StateChip label={REV_STATE_LABEL[state] ?? rev.state} color={REV_STATE_COLOR[state] ?? ""} />
+          <StateChip label={stateLabel} color={REV_STATE_COLOR[state] ?? ""} />
           {rev.statusCode ? <span className="text-xs text-slate-500">{rev.statusCode} · {statusLabel}</span> : null}
           <span className="min-w-0 flex-1 truncate text-xs text-slate-600">{rev.changeDescription ?? ""}</span>
           <span className="text-[11px] text-slate-400">{fmtDate(rev.releasedAt ?? rev.createdAt)}</span>

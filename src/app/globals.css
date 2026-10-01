@@ -1033,3 +1033,153 @@ summary::-webkit-details-marker {
     display: none;
   }
 }
+
+@layer components {
+  /* ── Control room: the flow as a strip of scenes ───────────────────────────
+     A darkened theatre: the scenes sit on a film strip, one is lit, the rest
+     wait in the dark. Each scene keeps its step's rail colour, so the colours
+     here are the ones the register uses for the same states. */
+  .scene-deck {
+    position: relative;
+    overflow: hidden;
+    border-radius: 14px;
+    color: #fff;
+    background:
+      radial-gradient(120% 90% at 50% -10%, rgb(56 98 150 / 0.45), transparent 60%),
+      linear-gradient(180deg, #0b1422 0%, #0d1a2c 55%, #0a121e 100%);
+    box-shadow: inset 0 0 0 1px rgb(120 160 210 / 0.14), 0 18px 40px -28px rgb(8 15 28 / 0.9);
+  }
+  /* Sprocket holes along the top and bottom edges. */
+  .scene-film {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+      repeating-linear-gradient(90deg, rgb(255 255 255 / 0.09) 0 10px, transparent 10px 22px) top 6px left 0 / 100% 5px no-repeat,
+      repeating-linear-gradient(90deg, rgb(255 255 255 / 0.09) 0 10px, transparent 10px 22px) bottom 6px left 0 / 100% 5px no-repeat;
+  }
+  .scene-kicker { font-size: 10px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: rgb(255 255 255 / 0.55); }
+  .scene-nav {
+    display: grid;
+    place-items: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    border-radius: 0.5rem;
+    color: rgb(255 255 255 / 0.8);
+    background: rgb(255 255 255 / 0.06);
+    transition: background-color 150ms;
+  }
+  .scene-nav:hover:not(:disabled) { background: rgb(255 255 255 / 0.14); }
+  .scene-nav:disabled { opacity: 0.3; }
+
+  .scene-track {
+    display: flex;
+    gap: 1.25rem;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    padding: 1.4rem 1.25rem 1.5rem;
+  }
+  @media (min-width: 640px) { .scene-track { padding-inline: 1.75rem; } }
+
+  .scene {
+    position: relative;
+    flex: 1 1 0;
+    min-width: 8.5rem;
+    scroll-snap-align: center;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    min-height: 8.6rem;
+    padding: 0.8rem 0.85rem 0.7rem;
+    border-radius: 0.7rem;
+    text-align: left;
+    background: rgb(255 255 255 / 0.035);
+    box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.08);
+    opacity: 0.62;
+    filter: saturate(0.6);
+    transition: opacity 260ms, transform 260ms cubic-bezier(.2,.7,.2,1), background-color 260ms, box-shadow 260ms, filter 260ms;
+  }
+  .scene::before {
+    content: "";
+    position: absolute;
+    left: 0.85rem;
+    right: 0.85rem;
+    top: 0;
+    height: 2px;
+    border-radius: 2px;
+    background: var(--rail);
+    opacity: 0.7;
+  }
+  .scene:hover { opacity: 0.9; }
+  .scene:focus-visible { outline: 2px solid rgb(147 197 253 / 0.8); outline-offset: 3px; }
+  .scene-past { opacity: 0.78; }
+  .scene[aria-selected="true"] {
+    opacity: 1;
+    filter: none;
+    transform: translateY(-4px) scale(1.035);
+    background:
+      radial-gradient(120% 80% at 50% 0%, color-mix(in oklab, var(--rail) 30%, transparent), transparent 70%),
+      rgb(255 255 255 / 0.08);
+    box-shadow:
+      inset 0 0 0 1px color-mix(in oklab, var(--rail) 70%, transparent),
+      0 0 0 1px rgb(0 0 0 / 0.2),
+      0 14px 34px -10px color-mix(in oklab, var(--rail) 55%, transparent);
+  }
+  .scene[aria-selected="true"]::before { opacity: 1; box-shadow: 0 0 12px var(--rail); }
+  .scene-number { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.12em; color: rgb(255 255 255 / 0.5); }
+  .scene-title { font-size: 0.95rem; font-weight: 600; letter-spacing: -0.01em; line-height: 1.15; }
+  .scene-tagline { font-size: 11px; line-height: 1.35; color: rgb(255 255 255 / 0.62); }
+  .scene-foot {
+    margin-top: auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding-top: 0.4rem;
+    font-size: 10px;
+    color: rgb(255 255 255 / 0.5);
+  }
+  /* The line from one scene to the next. */
+  .scene-link {
+    position: absolute;
+    top: 50%;
+    right: -1.25rem;
+    width: 1.25rem;
+    height: 1px;
+    background: linear-gradient(90deg, rgb(255 255 255 / 0.35), rgb(255 255 255 / 0.1));
+  }
+  .scene-link::after {
+    content: "";
+    position: absolute;
+    right: 2px;
+    top: -3px;
+    border-left: 5px solid rgb(255 255 255 / 0.35);
+    border-block: 3.5px solid transparent;
+  }
+  .scene-dot { display: inline-block; width: 7px; height: 7px; border-radius: 999px; }
+  .scene-dot-control { background: #7cb6ff; box-shadow: 0 0 6px rgb(124 182 255 / 0.7); }
+  .scene-dot-work { background: rgb(255 255 255 / 0.85); }
+  .scene-dot-fixed { background: transparent; box-shadow: inset 0 0 0 1.5px rgb(255 255 255 / 0.5); }
+  .scene-dot-none { background: rgb(255 255 255 / 0.2); }
+  .scene-legend { display: inline-flex; align-items: center; gap: 0.4rem; color: rgb(255 255 255 / 0.55); }
+
+  .scene-progress { margin: 0 1.25rem 0.75rem; height: 2px; border-radius: 2px; background: rgb(255 255 255 / 0.08); }
+  @media (min-width: 640px) { .scene-progress { margin-inline: 1.75rem; } }
+  .scene-progress > span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, #7cb6ff, #b7d6ff);
+    box-shadow: 0 0 10px rgb(124 182 255 / 0.6);
+    transition: width 420ms cubic-bezier(.2,.7,.2,1);
+  }
+
+  .scene-panel { animation: scene-in 320ms cubic-bezier(.2,.7,.2,1); }
+  @keyframes scene-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+  @media (prefers-reduced-motion: reduce) {
+    .scene, .scene-progress > span { transition: none; }
+    .scene[aria-selected="true"] { transform: none; }
+    .scene-panel { animation: none; }
+  }
+}

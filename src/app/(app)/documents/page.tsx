@@ -1,7 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { requireScope } from "@/lib/scope";
 import { RegisterPlate } from "./register-plate";
-import { OUTCOME_CONSEQUENCES, DOC_STATES, DOC_STATE_LABEL, DOC_MEANING, REV_STATES, REV_STATE_LABEL, REV_MEANING, revStateLabel, releasedLabel, type DocState, type RevState } from "@/lib/standard";
+import { OUTCOME_CONSEQUENCES, DOC_STATES, DOC_STATE_LABEL, DOC_MEANING, REV_STATES, REV_MEANING, type DocState, type RevState } from "@/lib/standard";
 import { getSet } from "@/lib/config";
 import { DocumentRegister } from "./document-register";
 import { registerWhere, REGISTER_SORTS, documentsForAssets, readSearch, readDay } from "@/lib/register-query";
@@ -60,6 +60,9 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
   // Released and issued as one act, or as two in order: the project's answer.
   const { policy } = await import("@/lib/control-activities");
   const together = (await policy(scope, "POLICY_RELEASE")) === "TOGETHER";
+  // What this organization calls each state; the states themselves are fixed.
+  const { stateNames, stateName } = await import("@/lib/state-names");
+  const names = await stateNames(scope);
   const sp = await searchParams;
   const q = (sp.q ?? "").trim();
   const searches = readSearch(q);
@@ -170,9 +173,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
       revState: latest?.state ?? null,
       // Released, then held for an outside approval: on hold is what it is now.
       revStateLabel: latest
-        ? latest.state === "RELEASED" && latest.heldAt ? "On hold"
-          : latest.state === "RELEASED" ? releasedLabel(together, latest.transmittalItems.length > 0)
-          : revStateLabel(latest.state)
+        ? stateName(names, latest.state, { together, sent: latest.transmittalItems.length > 0, held: !!latest.heldAt })
         : "No revision yet",
       // Where releasing is issuing, a released revision nobody was sent breaks
       // the rule, and is stamped so. Where they are two acts, the state already
@@ -224,7 +225,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
     codes[`CONFIDENTIALITY_SHORT|${item.code}`] = item.label.split(" — ")[0].toLowerCase();
   }
   for (const code of DOC_STATES) codes[`DOC_STATE|${code}`] = `${DOC_STATE_LABEL[code]} — ${DOC_MEANING[code].means}`;
-  for (const code of REV_STATES) codes[`REV_STATE|${code}`] = `${REV_STATE_LABEL[code]} — ${REV_MEANING[code].means}`;
+  for (const code of REV_STATES) codes[`REV_STATE|${code}`] = `${stateName(names, code)} — ${REV_MEANING[code].means}`;
 
   const query = new URLSearchParams();
   if (q) query.set("q", q); if (state) query.set("state", state); if (discipline) query.set("discipline", discipline); if (docType) query.set("docType", docType); if (revState) query.set("rev", revState); if (statusCode) query.set("status", statusCode); if (verdictCode) query.set("verdict", verdictCode); if (supplier) query.set("supplier", supplier); if (po) query.set("po", po); if (view === "all") query.set("view", "all"); if (criticality) query.set("criticality", criticality); if (confidentiality) query.set("confidentiality", confidentiality); if (deliverable) query.set("deliverable", deliverable);
@@ -243,13 +244,13 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
       sort={{ key: sort, dir }}
       userCanAct={!isReadOnly(user)} filters={{ q, terms, state, rev: revState, status: statusCode, verdict: verdictCode, supplier, po, discipline, docType, view, criticality, confidentiality, deliverable, on: dateOn, from: sp.from ?? "", to: sp.to ?? "" }} filterOptions={{ states: DOC_STATES.map((code) => ({ code, label: DOC_STATE_LABEL[code] ?? code })), revStates: [
       { code: "NONE", label: "No revision yet" },
-      { code: "IN_PREPARATION", label: REV_STATE_LABEL.IN_PREPARATION },
-      { code: "IN_REVIEW", label: REV_STATE_LABEL.IN_REVIEW },
-      { code: "NOT_RELEASED", label: REV_STATE_LABEL.NOT_RELEASED },
+      { code: "IN_PREPARATION", label: names.IN_PREPARATION },
+      { code: "IN_REVIEW", label: names.IN_REVIEW },
+      { code: "NOT_RELEASED", label: names.NOT_RELEASED },
       { code: "FOR_RELEASE", label: "Reviewed" },
-      { code: "RELEASED", label: together ? REV_STATE_LABEL.RELEASED : "Released or issued" },
-      { code: "SUPERSEDED", label: REV_STATE_LABEL.SUPERSEDED },
-      { code: "VOID", label: REV_STATE_LABEL.VOID },
+      { code: "RELEASED", label: together ? names.RELEASED_ISSUED : `${names.RELEASED} or ${names.ISSUED.toLowerCase()}` },
+      { code: "SUPERSEDED", label: names.SUPERSEDED },
+      { code: "VOID", label: names.VOID },
     ], statuses: statuses.map((item) => ({ code: item.code, label: `${item.code} — ${item.label}` })), verdicts: verdictSet.map((item) => ({ code: item.code, label: `${item.code} — ${item.label}` })), suppliers: supplierCodes.map((item) => ({ code: item.code, label: item.label })), pos: poCodes.map((item) => ({ code: item.code, label: item.label })), disciplines: disciplines.filter((item) => usedDisciplines.has(item.code)).map((item) => ({ code: item.code, label: item.status === "RETIRED" ? `${item.label} (retired)` : item.label })), types: types.filter((item) => usedTypes.has(item.code)).map((item) => ({ code: item.code, label: item.status === "RETIRED" ? `${item.label} (retired)` : item.label })), criticalities: criticalities.map((item) => ({ code: item.code, label: item.label })), deliverables: deliverableTypes.map((item) => ({ code: item.code, label: item.label })), confidentialities: confidentialities.map((item) => ({ code: item.code, label: item.label.split(" — ")[0] })), dateFields: DATE_FIELDS.map((field) => ({ code: field.key, label: field.label })) }} exportHref={`/api/register/export${query.size ? `?${query.toString()}` : ""}`} />
   </div>;
 }

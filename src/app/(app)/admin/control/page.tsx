@@ -12,7 +12,8 @@ import {
   type ControlMode,
   type ProjectMode,
 } from "@/lib/control-activities";
-import { setControlActivitiesAction, setPolicyAction } from "@/lib/actions/control-activities";
+import { setControlActivitiesAction, setPolicyAction, setStateNamesAction } from "@/lib/actions/control-activities";
+import { STATE_NAMES, STATE_NAME_MAX, stateNames } from "@/lib/state-names";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Who does what" };
@@ -32,7 +33,7 @@ export default async function ControlActivitiesPage() {
   const { user: me } = ctx;
   const page = SETUP_PAGES.find((one) => one.href === "/admin/control")!;
   if (!maySetup(me, page)) return <PageHeader title="Who does what" subtitle="Administrators only." />;
-  const [{ follows, projectMode, set, rows }, chosen] = await Promise.all([controlSettings(ctx), policies(ctx)]);
+  const [{ follows, projectMode, set, rows }, chosen, names] = await Promise.all([controlSettings(ctx), policies(ctx), stateNames(ctx)]);
 
   return (
     <div className="space-y-4">
@@ -137,6 +138,38 @@ export default async function ControlActivitiesPage() {
               </fieldset>
             ))}
           </div>
+        </ActionForm>
+      </Card>
+
+      {/* The organization's words for the states. What each one does is not
+          on offer — only what it is called. */}
+      <Card
+        id="state-names"
+        title="What the states are called"
+        description="Rename any state to the word your organization uses. Only the name changes — the states, their order and what each one does stay as they are. Leave a name empty to go back to the default."
+      >
+        <ActionForm action={setStateNamesAction} submitLabel="Save names">
+          <ul className="divide-y divide-line rounded-xl border border-line">
+            {STATE_NAMES.map((one) => (
+              <li key={one.code} className="grid grid-cols-1 items-center gap-x-4 gap-y-1.5 px-3.5 py-2.5 sm:grid-cols-[minmax(0,1fr)_16rem]">
+                <div className="min-w-0">
+                  <p className="text-[13px] font-medium text-slate-900">
+                    {one.default}
+                    {names[one.code] !== one.default ? <span className="ml-2 text-[11px] font-normal text-brand-ink">renamed</span> : null}
+                  </p>
+                  <p className="text-xs leading-5 text-slate-500">{one.means}</p>
+                </div>
+                <input
+                  name={`name:${one.code}`}
+                  defaultValue={names[one.code] !== one.default ? names[one.code] : ""}
+                  placeholder={one.default}
+                  maxLength={STATE_NAME_MAX}
+                  aria-label={`Name for ${one.default}`}
+                  className={inputCls}
+                />
+              </li>
+            ))}
+          </ul>
         </ActionForm>
       </Card>
 

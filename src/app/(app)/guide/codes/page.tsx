@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { requireScope } from "@/lib/scope";
+import { stateNames, stateName } from "@/lib/state-names";
 import { getActiveSet } from "@/lib/config";
 import { PageHeader, Card, DataTable, Th, Td, Chip } from "@/components/ui";
-import { ADVICE_CODES, ADVICE_LABEL, ADVICE_MEANING, DOC_STATES, DOC_STATE_LABEL, DOC_STATE_COLOR, DOC_MEANING, REV_STATES, REV_STATE_LABEL, REV_STATE_COLOR, REV_MEANING, EMPTY_TITLE_WORDS, type DocState, type RevState } from "@/lib/standard";
+import { ADVICE_CODES, ADVICE_LABEL, ADVICE_MEANING, DOC_STATES, DOC_STATE_LABEL, DOC_STATE_COLOR, DOC_MEANING, REV_STATES, REV_STATE_COLOR, REV_MEANING, EMPTY_TITLE_WORDS, type DocState, type RevState } from "@/lib/standard";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { VERDICT_EFFECT, verdictEffect } from "@/lib/verdict-effect";
 
@@ -19,6 +20,7 @@ const CONSEQUENCE = Object.fromEntries(VERDICT_EFFECT.map((e) => [e.value, e.lab
 
 export default async function CodesPage() {
   const ctx = await requireScope();
+  const names = await stateNames(ctx);
   const [statuses, outcomes, advice, commentClasses, criticalities, confidentialities] = await Promise.all([
     getActiveSet("STATUSES"), getActiveSet("REVIEW_OUTCOMES"), getActiveSet("REVIEW_ADVICE"), getActiveSet("COMMENT_CLASSES"),
     getActiveSet("CRITICALITY"), getActiveSet("CONFIDENTIALITY"),
@@ -72,11 +74,11 @@ export default async function CodesPage() {
         </DataTable>
       </Card>
 
-      <Card id="revision" title="2 · Revision state — one revision of the content" description="Fixed. States only move forward. The register shows “No revision yet” for a document that has no revision at all.">
+      <Card id="revision" title="2 · Revision state — one revision of the content" description="Fixed — your organization may rename them, never change what they do. States only move forward. The register shows “No revision yet” for a document that has no revision at all.">
         <DataTable id="codes-rev-states" toolbar={false} head={<tr><Th>State</Th><Th>Means</Th><Th>How it gets there</Th></tr>}>
           {REV_STATES.map((s) => (
             <tr key={s}>
-              <Td className="whitespace-nowrap"><Chip className={REV_STATE_COLOR[s]}>{REV_STATE_LABEL[s]}</Chip></Td>
+              <Td className="whitespace-nowrap"><Chip className={REV_STATE_COLOR[s]}>{stateName(names, s)}</Chip></Td>
               <Td className="text-xs">{REV_MEANING[s].means}</Td>
               <Td className="text-xs">{REV_MEANING[s].how}</Td>
             </tr>

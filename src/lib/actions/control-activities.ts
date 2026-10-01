@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireAdminScope } from "@/lib/scope";
 import { audit } from "@/lib/audit";
+import { STATE_NAMES, STATE_NAME_MAX } from "@/lib/state-names";
 import {
   CONTROL_ACTIVITIES,
   MODE_LABEL,
@@ -100,4 +101,48 @@ export async function setOneControlActivityAction(_prev: State | undefined, form
   const changed = await put(key, value, activity.title);
   revalidatePath("/admin/control");
   return { message: changed ? `${activity.title}: ${MODE_LABEL[value].toLowerCase()}.` : "Nothing changed." };
+}
+
+/**
+ * What the organization calls each revision state. Only the name changes: the
+ * states, their order and what they do stay as they are. A name left empty, or
+ * set back to the default, goes back to the default.
+ */
+export async function setStateNamesAction(_prev: State | undefined, formData: FormData): Promise<State> {
+  const ctx = await requireAdminScope();
+  const { user, db, orgId } = ctx;
+  const before = new Map((await db.stateName.findMany({ select: { id: true, code: true, label: true } })).map((row) => [row.code, row]));
+  const taken = new Map<string, string>();
+  const changed: string[] = [];
+  const wanted = STATE_NAMES.map((one) => {
+    const asked = String(formData.get(`name:${one.code}`) ?? "").trim().replace(/\s+/g, " ");
+    return { one, label: asked || one.default };
+  });
+  for (const { one, label } of wanted) {
+    if (label.length > STATE_NAME_MAX) return { error: `Keep “${label}” under ${STATE_NAME_MAX} characters.` };
+    // Two states read the same would make the register lie about one of them.
+    const clash = taken.get(label.toLowerCase());
+    if (clash) return { error: `“${label}” is used twice — ${clash} and ${one.default} must read differently.` };
+    taken.set(label.toLowerCase(), one.default);
+  }
+  for (const { one, label } of wanted) {
+    const row = before.get(one.code);
+    const was = row?.label ?? one.default;
+    if (was === label) continue;
+    if (label === one.default) {
+      if (row) await db.stateName.delete({ where: { id: row.id } });
+    } else if (row) {
+      await db.stateName.update({ where: { id: row.id }, data: { label, setById: user.id, setByName: user.name } });
+    } else {
+      await db.stateName.create({ data: { orgId, code: one.code, label, setById: user.id, setByName: user.name } });
+    }
+    await audit({
+      tenant: ctx, actor: user, action: "STATE_RENAMED", entityType: "StateName",
+      entityId: one.code, entityLabel: one.default, oldValue: was, newValue: label,
+    });
+    changed.push(`${was} → ${label}`);
+  }
+  revalidatePath("/", "layout");
+  if (!changed.length) return { message: "Nothing changed." };
+  return { message: `Renamed: ${changed.join("; ")}.` };
 }

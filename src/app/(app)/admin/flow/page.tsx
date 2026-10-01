@@ -1,12 +1,13 @@
 import Link from "next/link";
-import { Fragment } from "react";
-import { ArrowDown, ChevronRight, Lock } from "lucide-react";
+import { Lock } from "lucide-react";
 import { SETUP_PAGES, maySetup } from "../setup-pages";
 import { requireScope } from "@/lib/scope";
 import { PageHeader, Chip, StateChip } from "@/components/ui";
 import { controlSettings, policies, PROJECT_MODE_LABEL, CONTROL_ACTIVITIES } from "@/lib/control-activities";
 import { holdersOf } from "@/lib/permissions";
-import { REV_STATE_COLOR, REV_STATE_LABEL, releasedLabel, type RevState } from "@/lib/standard";
+import { REV_STATE_COLOR, type RevState } from "@/lib/standard";
+import { stateNames, stateName } from "@/lib/state-names";
+import { SceneDeck, type Scene } from "./scene-deck";
 import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -27,6 +28,8 @@ type Fixed = { title: string; text: string };
 type Stage = {
   key: string;
   title: string;
+  /** A few words for the scene card. */
+  tagline: string;
   text: string;
   rail: string;
   /** The states a revision is in, or leaves in, at this step. */
@@ -45,6 +48,7 @@ type Stage = {
 const STAGES: Stage[] = [
   {
     key: "register",
+    tagline: "Numbered and classified",
     title: "Register",
     text: "The document is given its number and its classification, before anything is written in it.",
     rail: "rail-none",
@@ -58,6 +62,7 @@ const STAGES: Stage[] = [
   },
   {
     key: "prepare",
+    tagline: "Written by its author",
     title: "Prepare",
     text: "The author writes the revision and attaches its files, at the status it is meant for.",
     rail: "rail-prep",
@@ -71,6 +76,7 @@ const STAGES: Stage[] = [
   },
   {
     key: "review",
+    tagline: "Down its route",
     title: "Review",
     text: "The route the document matches sends it to its reviewers; each answers with a verdict or advice.",
     rail: "rail-review",
@@ -84,6 +90,7 @@ const STAGES: Stage[] = [
   },
   {
     key: "answer",
+    tagline: "The verdict reaches the author",
     title: "Answer returned",
     text: "The verdict reaches the author. Accepted goes on to release; sent back means a new revision.",
     rail: "rail-review",
@@ -97,6 +104,7 @@ const STAGES: Stage[] = [
   },
   {
     key: "release",
+    tagline: "In force",
     title: "Release",
     text: "The revision comes into force in the register, and the one before it is superseded.",
     rail: "rail-released",
@@ -113,6 +121,7 @@ const STAGES: Stage[] = [
   },
   {
     key: "issue",
+    tagline: "Sent out",
     title: "Issue",
     text: "The revision is sent out on a transmittal, to the people the distribution names.",
     rail: "rail-release",
@@ -126,6 +135,7 @@ const STAGES: Stage[] = [
   },
   {
     key: "receive",
+    tagline: "Taken in from outside",
     title: "Receive",
     text: "What arrives from outside is recorded, checked, and accepted or rejected.",
     rail: "rail-superseded",
@@ -151,7 +161,7 @@ export default async function ControlRoomPage() {
   const page = SETUP_PAGES.find((one) => one.href === "/admin/flow")!;
   if (!maySetup(me, page)) return <PageHeader title="Control room" subtitle="Administrators only." />;
 
-  const [settings, chosen, holders, sets, values, templates, schemes, rules] = await Promise.all([
+  const [settings, chosen, holders, sets, values, templates, schemes, rules, names] = await Promise.all([
     controlSettings(ctx),
     policies(ctx),
     holdersOf(ctx, "CONTROL"),
@@ -160,6 +170,7 @@ export default async function ControlRoomPage() {
     db.workflowTemplate.findMany({ where: { active: true }, select: { name: true, steps: true, outcomeSetKey: true } }),
     db.scheme.count({ where: { active: true } }),
     db.distributionRule.count(),
+    stateNames(ctx),
   ]);
 
   const gate = holders.length > 0;
@@ -188,7 +199,7 @@ export default async function ControlRoomPage() {
   };
 
   const stateLabel = (state: RevState) =>
-    state === "RELEASED" ? (together ? releasedLabel(true, true) : "Released, then Issued") : REV_STATE_LABEL[state];
+    state === "RELEASED" ? (together ? names.RELEASED_ISSUED : `${names.RELEASED}, then ${names.ISSUED.toLowerCase()}`) : stateName(names, state);
 
   // Release reads differently with and without somebody standing between the
   // route and the register; the gate is the control function itself.
@@ -199,6 +210,110 @@ export default async function ControlRoomPage() {
   const usedBy = new Map<string, string[]>();
   for (const stage of stages) for (const key of stage.sets) usedBy.set(key, [...(usedBy.get(key) ?? []), stage.title]);
   const unplaced = sets.filter((one) => !usedBy.has(one.key));
+
+  const panels = stages.map((stage, i) => {
+    const fixed = stage.key === "release" ? [releaseFixed, ...stage.fixed] : stage.fixed;
+    // Not released and Returned to review only exist where there is a gate.
+    const states = stage.states.filter((state) => gate || (state !== "NOT_RELEASED" && state !== "RETURNED"));
+    return (
+        <section key={stage.key} className={cn("register register-sheet register-sheet-open relative", stage.rail)}>
+          <span className="absolute inset-y-0 left-0 w-0.75 rounded-l-[0.875rem] bg-(--rail)" aria-hidden />
+          <header className="flex flex-wrap items-baseline gap-x-3 gap-y-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
+            <span className="font-mono text-[11px] text-slate-400">Scene {String(i + 1).padStart(2, "0")}</span>
+            <h2 className="text-sm font-semibold text-slate-900">{stage.title}</h2>
+            <span className="text-[11px] text-slate-500">{stage.text}</span>
+            {states.length ? (
+              <span className="flex flex-wrap items-center gap-1.5 sm:ml-auto">
+                {states.map((state) => <StateChip key={state} label={stateLabel(state)} color={REV_STATE_COLOR[state]} />)}
+                <Link href="/admin/control#state-names" className="text-[11px] font-semibold text-link hover:underline">rename</Link>
+              </span>
+            ) : null}
+          </header>
+
+          <div className="grid grid-cols-1 divide-y divide-line lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)] lg:divide-x lg:divide-y-0">
+            {/* Who carries it out, and what the organization chose. */}
+            <div className="space-y-3 px-5 py-3.5 sm:px-6">
+              <p className="stencil text-slate-500">Who does it</p>
+              {stage.acts.length || fixed.length ? (
+                <ul className="space-y-2.5">
+                  {stage.acts.map((key) => <ActLine key={key} act={key} row={actRow.get(key)} />)}
+                  {fixed.map((one) => <FixedLine key={one.title} {...one} />)}
+                </ul>
+              ) : (
+                <p className="text-xs text-slate-500">Whoever is doing the work — nothing here to switch.</p>
+              )}
+
+              {stage.policies.map((key) => {
+                const row = policyRow.get(key);
+                if (!row) return null;
+                const option = row.policy.options.find((one) => one.value === row.value);
+                return (
+                  <div key={key} className="border-t border-line pt-2.5">
+                    <p className="text-[11px] text-slate-500">{row.policy.title}</p>
+                    <p className="mt-0.5 flex flex-wrap items-baseline gap-x-2 text-[13px] font-medium text-slate-900">
+                      {option?.label.replace(/ — recommended$/, "")}
+                      <span className="text-[11px] font-normal text-slate-400">{row.set ? "chosen" : "default"}</span>
+                      <Link href="/admin/control" className="text-[11px] font-semibold text-link hover:underline">change</Link>
+                    </p>
+                  </div>
+                );
+              })}
+
+              {stage.branches.length ? (
+                <div className="border-t border-line pt-2.5">
+                  <p className="stencil mb-1.5 text-slate-500">Off this step</p>
+                  <ul className="space-y-2.5">
+                    {stage.branches.map((branch) => branch.act
+                      ? <ActLine key={branch.title} act={branch.act} row={actRow.get(branch.act)} />
+                      : <FixedLine key={branch.title} title={branch.title} text={`${branch.text} ${branch.fixed ?? ""}`.trim()} />)}
+                  </ul>
+                </div>
+              ) : null}
+            </div>
+
+            {/* The sets it draws from, and their values. */}
+            <div className="space-y-3 px-5 py-3.5 sm:px-6">
+              <p className="stencil text-slate-500">Sets it uses</p>
+              {stage.sets.length ? (
+                <ul className="space-y-3">
+                  {stage.sets.map((key) => (
+                    <SetLine key={key} setKey={key} set={setByKey.get(key)} values={values.filter((one) => one.setKey === key)} />
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-xs text-slate-500">None — this step reads what the earlier ones set.</p>
+              )}
+              {stage.extras.length ? (
+                <ul className="space-y-1 border-t border-line pt-2.5">
+                  {stage.extras.map((key) => (
+                    <li key={key} className="flex items-baseline gap-2 text-[13px]">
+                      <Link href={EXTRA[key].href} className="font-medium text-link hover:underline">{EXTRA[key].title}</Link>
+                      <span className="text-[11px] text-slate-500">{extraCount[key]}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+          </div>
+        </section>
+    );
+  });
+
+  const scenes: Scene[] = stages.map((stage) => {
+    const fixedCount = (stage.key === "release" ? 1 : 0) + stage.fixed.length;
+    return {
+      key: stage.key,
+      title: stage.title,
+      tagline: stage.tagline,
+      rail: stage.rail,
+      carriers: [
+        ...[...stage.acts, ...stage.branches.flatMap((b) => (b.act ? [b.act] : []))].map((key) => (actRow.get(key)?.controlDoes ? "control" : "work") as Scene["carriers"][number]),
+        ...Array.from({ length: fixedCount + stage.branches.filter((b) => !b.act).length }, () => "fixed" as const),
+      ],
+      states: stage.states,
+      sets: stage.sets.length,
+    };
+  });
 
   return (
     <div className="space-y-4">
@@ -222,119 +337,13 @@ export default async function ControlRoomPage() {
           </div>
           <div className="px-5 py-3 sm:px-6">
             <p className="stencil text-slate-500">Releasing</p>
-            <p className="mt-1 text-[13px] font-medium text-slate-900">{together ? "Released & issued, one act" : "Released, then issued"}</p>
+            <p className="mt-1 text-[13px] font-medium text-slate-900">{together ? `${names.RELEASED_ISSUED}, one act` : `${names.RELEASED}, then ${names.ISSUED.toLowerCase()}`}</p>
             <p className="text-[11px] text-slate-500">{policyRow.get("POLICY_RELEASE")?.set ? "Chosen by an administrator." : "The default."}</p>
           </div>
         </div>
       </section>
 
-      {/* The line itself, at a glance; each name jumps to its step. */}
-      <nav aria-label="The steps" className="flex flex-wrap items-center gap-y-2">
-        {stages.map((stage, i) => (
-          <Fragment key={stage.key}>
-            {i ? <ChevronRight className="mx-0.5 h-3.5 w-3.5 text-slate-400 sm:mx-1.5" aria-hidden /> : null}
-            <a href={`#${stage.key}`} className="rounded-md px-1.5 py-0.5 text-[12.5px] font-semibold text-slate-700 hover:bg-tint-soft hover:text-brand-ink">
-              <span className="mr-1 font-mono text-[11px] text-slate-400">{i + 1}</span>{stage.title}
-            </a>
-          </Fragment>
-        ))}
-      </nav>
-
-      <Legend />
-
-      <ol className="space-y-0">
-        {stages.map((stage, i) => {
-          const fixed = stage.key === "release" ? [releaseFixed, ...stage.fixed] : stage.fixed;
-          // Not released and Returned to review only exist where there is a gate.
-          const states = stage.states.filter((state) => gate || (state !== "NOT_RELEASED" && state !== "RETURNED"));
-          return (
-            <li key={stage.key} id={stage.key} className="scroll-mt-20">
-              {i ? (
-                <div className="flex h-7 items-center pl-7 text-slate-300" aria-hidden><ArrowDown className="h-4 w-4" /></div>
-              ) : null}
-              <section className={cn("register register-sheet register-sheet-open relative", stage.rail)}>
-                <span className="absolute inset-y-0 left-0 w-0.75 rounded-l-[0.875rem] bg-(--rail)" aria-hidden />
-                <header className="flex flex-wrap items-baseline gap-x-3 gap-y-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
-                  <span className="font-mono text-[11px] text-slate-400">{i + 1}</span>
-                  <h2 className="text-sm font-semibold text-slate-900">{stage.title}</h2>
-                  <span className="text-[11px] text-slate-500">{stage.text}</span>
-                  {states.length ? (
-                    <span className="flex flex-wrap items-center gap-1.5 sm:ml-auto">
-                      {states.map((state) => <StateChip key={state} label={stateLabel(state)} color={REV_STATE_COLOR[state]} />)}
-                    </span>
-                  ) : null}
-                </header>
-
-                <div className="grid grid-cols-1 divide-y divide-line lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)] lg:divide-x lg:divide-y-0">
-                  {/* Who carries it out, and what the organization chose. */}
-                  <div className="space-y-3 px-5 py-3.5 sm:px-6">
-                    <p className="stencil text-slate-500">Who does it</p>
-                    {stage.acts.length || fixed.length ? (
-                      <ul className="space-y-2.5">
-                        {stage.acts.map((key) => <ActLine key={key} act={key} row={actRow.get(key)} />)}
-                        {fixed.map((one) => <FixedLine key={one.title} {...one} />)}
-                      </ul>
-                    ) : (
-                      <p className="text-xs text-slate-500">Whoever is doing the work — nothing here to switch.</p>
-                    )}
-
-                    {stage.policies.map((key) => {
-                      const row = policyRow.get(key);
-                      if (!row) return null;
-                      const option = row.policy.options.find((one) => one.value === row.value);
-                      return (
-                        <div key={key} className="border-t border-line pt-2.5">
-                          <p className="text-[11px] text-slate-500">{row.policy.title}</p>
-                          <p className="mt-0.5 flex flex-wrap items-baseline gap-x-2 text-[13px] font-medium text-slate-900">
-                            {option?.label.replace(/ — recommended$/, "")}
-                            <span className="text-[11px] font-normal text-slate-400">{row.set ? "chosen" : "default"}</span>
-                            <Link href="/admin/control" className="text-[11px] font-semibold text-link hover:underline">change</Link>
-                          </p>
-                        </div>
-                      );
-                    })}
-
-                    {stage.branches.length ? (
-                      <div className="border-t border-line pt-2.5">
-                        <p className="stencil mb-1.5 text-slate-500">Off this step</p>
-                        <ul className="space-y-2.5">
-                          {stage.branches.map((branch) => branch.act
-                            ? <ActLine key={branch.title} act={branch.act} row={actRow.get(branch.act)} />
-                            : <FixedLine key={branch.title} title={branch.title} text={`${branch.text} ${branch.fixed ?? ""}`.trim()} />)}
-                        </ul>
-                      </div>
-                    ) : null}
-                  </div>
-
-                  {/* The sets it draws from, and their values. */}
-                  <div className="space-y-3 px-5 py-3.5 sm:px-6">
-                    <p className="stencil text-slate-500">Sets it uses</p>
-                    {stage.sets.length ? (
-                      <ul className="space-y-3">
-                        {stage.sets.map((key) => (
-                          <SetLine key={key} setKey={key} set={setByKey.get(key)} values={values.filter((one) => one.setKey === key)} />
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="text-xs text-slate-500">None — this step reads what the earlier ones set.</p>
-                    )}
-                    {stage.extras.length ? (
-                      <ul className="space-y-1 border-t border-line pt-2.5">
-                        {stage.extras.map((key) => (
-                          <li key={key} className="flex items-baseline gap-2 text-[13px]">
-                            <Link href={EXTRA[key].href} className="font-medium text-link hover:underline">{EXTRA[key].title}</Link>
-                            <span className="text-[11px] text-slate-500">{extraCount[key]}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    ) : null}
-                  </div>
-                </div>
-              </section>
-            </li>
-          );
-        })}
-      </ol>
+      <SceneDeck scenes={scenes} panels={panels} />
 
       {unplaced.length ? (
         <section className="register register-sheet register-sheet-open">
@@ -350,17 +359,6 @@ export default async function ControlRoomPage() {
         </section>
       ) : null}
     </div>
-  );
-}
-
-function Legend() {
-  return (
-    <p className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px] text-slate-500">
-      <span className="inline-flex items-center gap-1.5"><Carrier control /> Document Control carries it out</span>
-      <span className="inline-flex items-center gap-1.5"><Carrier control={false} /> the people doing the work do</span>
-      <span className="inline-flex items-center gap-1.5"><Chip className="bg-slate-50 text-slate-500 ring-slate-200"><Lock className="mr-1 h-3 w-3" />Fixed</Chip> not a choice</span>
-      <span className="inline-flex items-center gap-1.5"><code className="code-chip opacity-50 line-through">XX</code> switched off</span>
-    </p>
   );
 }
 
