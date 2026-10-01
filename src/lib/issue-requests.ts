@@ -480,6 +480,7 @@ export async function holdRevision(t: Tenant, revisionId: string, user: SessionU
   await t.db.revision.update({ where: { id: revisionId }, data: { heldAt, heldReason: reason, heldByName: user.name } });
   const { policy } = await import("./control-activities");
   if ((await policy(t, "POLICY_PDF_STAMP")) === "ON") await stampHold(t, revisionId, user, heldAt);
+  await tellHolders(t, revisionId, (label) => `${label} is on hold — not for use`, `${reason} Do not work from the copy you were sent until you are told the hold is lifted.`);
   const { audit } = await import("./audit");
   await audit({
     tenant: t, actor: user, action: "REVISION_HELD", entityType: "Revision", entityId: revisionId,
@@ -513,6 +514,7 @@ export async function liftHold(t: Tenant, revisionId: string, user: SessionUser)
     entityLabel: `${rev.document.docNumber} rev ${rev.value}`,
     detail: "Approved outside — the hold is lifted and it is in use again.",
   });
+  await tellHolders(t, revisionId, (label) => `${label} is back in use`, "The outside approval came back. The hold is lifted; the copy you were sent may be used again.");
   return { sent: await carryOutOpenRequests(t, revisionId, user) };
 }
 
@@ -537,6 +539,7 @@ export async function returnHeld(t: Tenant, revisionId: string, user: SessionUse
     },
   });
   await t.db.issueRequest.updateMany({ where: { revisionId, status: "OPEN", needsApproval: true }, data: { status: "CANCELLED" } });
+  await tellHolders(t, revisionId, (label) => `${label} was not approved — still not for use`, `${reason} It stays on hold, not for use; the next revision will replace it.`);
   await tellReturn(t, rev, reason, copyIds, user, "stays on hold, not for use");
 }
 
@@ -586,4 +589,23 @@ async function stampHold(t: Tenant, revisionId: string, user: SessionUser, heldA
   } catch {
     // the hold stands without the stamp; the record says it is not for use
   }
+}
+
+/**
+ * Everybody this revision has already reached: whoever an outgoing transmittal
+ * that carried it was addressed or copied to, and who has an account to be
+ * told in. They hold a copy, so a hold on it — and its end — is theirs to know.
+ */
+async function holders(t: Tenant, revisionId: string): Promise<string[]> {
+  const rows = await t.db.transmittalRecipient.findMany({
+    where: { userId: { not: null }, transmittal: { direction: "OUTGOING", status: { not: "DRAFT" }, items: { some: { revisionId } } } },
+    select: { userId: true },
+  });
+  return [...new Set(rows.map((one) => one.userId!))];
+}
+
+async function tellHolders(t: Tenant, revisionId: string, title: (label: string) => string, body: string) {
+  const rev = await t.db.revision.findUniqueOrThrow({ where: { id: revisionId }, include: { document: true } });
+  const { notifyMany } = await import("./audit");
+  await notifyMany(await holders(t, revisionId), "REVISION_HOLD", title(`${rev.document.docNumber} rev ${rev.value}`), body, `/documents/${rev.documentId}`, t);
 }

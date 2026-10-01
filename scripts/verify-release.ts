@@ -189,7 +189,9 @@ async function main() {
         await mkdir(pathMod.dirname(at), { recursive: true });
         await writeFile(at, await blank.save());
         await openApprovalStep(t, late.rev.id, actor);
+        const told = () => t.db.notification.count({ where: { userId: admin.id, type: "REVISION_HOLD", link: `/documents/${late.doc.id}` } });
         await holdRevision(t, late.rev.id, actor, party.name);
+        check("whoever it was sent to is told it is on hold", (await told()) === 1);
         const held = await t.db.revision.findUniqueOrThrow({ where: { id: late.rev.id } });
         check("it stays released, on hold, not for use", held.state === "RELEASED" && !!held.heldAt, held.heldReason ?? "");
         check("…and its viewable copy is stamped", !!held.renditionFileId && held.renditionFileId !== clean.renditionFileId);
@@ -204,6 +206,7 @@ async function main() {
           const lifted = await t.db.revision.findUniqueOrThrow({ where: { id: late.rev.id } });
           check("approved: lifting the hold puts it back in use", !lifted.heldAt);
           check("…with its unstamped copy back", lifted.renditionFileId === clean.renditionFileId);
+          check("…and whoever it was sent to is told it is back in use", (await told()) === 2);
           check("…and sends what waited for it", sent > 0, `${sent} transmittal(s)`);
         } else {
           let kept = "";
@@ -214,6 +217,7 @@ async function main() {
           check("…sent back, it stays on hold for good", !!stays.heldAt && /Not approved/.test(stays.heldReason ?? ""), stays.heldReason ?? "");
           const left = await t.db.issueRequest.count({ where: { id: asked.id, status: "OPEN" } });
           check("…and the request that waited is cancelled", left === 0);
+          check("…and whoever it was sent to is told it stays not for use", (await told()) === 2);
         }
       }
     } else {

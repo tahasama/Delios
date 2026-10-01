@@ -329,7 +329,8 @@ the route.
 
 Where a released and issued revision is found to need an outside approval it
 never had, it is put **on hold, not for use** from the moment it goes to that
-party, and stays released — people hold copies of it. It cannot be sent again
+party, and stays released — people hold copies of it. Everybody it was sent to
+is told, and told again when the hold ends either way. It cannot be sent again
 while on hold. An approval lets the control function lift the hold, and what
 was asked for it is then sent. A refusal leaves it on hold for good; it goes
 back with a reason, and the next revision replaces it.
@@ -346,8 +347,7 @@ back with a reason, and the next revision replaces it.
 **Clause:** §10.2 *Renditions*, §12.5.
 
 **Must say:** where the project chooses, a binding review verdict is stamped
-on the viewable PDF copy — top right of the first page: the review, the
-verdict, who gave it (and for which outside party), the date and time, and the
+on the viewable PDF copy — top right of the first page: the verdict, who gave it (and for which outside party), the date and time, and the
 reason — whether the review ran on a route or was opened from a received
 transmittal. A revision on hold is stamped ON HOLD — NOT FOR USE on every page.
 Each stamp makes a new copy; the copy as submitted is kept. Whether to stamp is

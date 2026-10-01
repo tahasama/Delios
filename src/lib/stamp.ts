@@ -82,7 +82,7 @@ export async function createPlaceholderRendition(info: StampInfo & { content: st
 }
 
 export type VerdictStamp = {
-  /** The review's own number, e.g. RV-0076. */
+  /** The review's own number, e.g. RV-0076 — kept in the record, not printed. */
   review: string | null;
   code: string;
   label: string;
@@ -138,7 +138,7 @@ export async function stampVerdict(source: Uint8Array, info: VerdictStamp): Prom
   const top = height - 34 - 12; // below the release title block
   page.drawRectangle({ x, y: top - boxH, width: boxW, height: boxH, color: rgb(1, 1, 1), opacity: 0.92, borderColor: ink, borderWidth: 1.4 });
   let y = top - pad - 7;
-  page.drawText(latin(`REVIEW${info.review ? `  ${info.review}` : ""}`), { x: x + pad, y, size: 7, font: bold, color: ink });
+  page.drawText("REVIEW", { x: x + pad, y, size: 7, font: bold, color: ink });
   y -= 15;
   page.drawText(latin(`${info.code} - ${info.label}`.slice(0, 48)), { x: x + pad, y, size: 11, font: bold, color: ink });
   y -= 13;
