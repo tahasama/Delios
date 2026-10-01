@@ -263,7 +263,7 @@ const STAGES: Stage[] = [
     rail: "rail-release",
     states: [],
     acts: ["ISSUE"],
-    policies: ["POLICY_READY"],
+    policies: ["POLICY_READY", "POLICY_NO_ISSUE"],
     sets: ["REASONS_FOR_ISSUE", "ISSUE_CODES"],
     fixed: [{ title: "To an organization not on the system", text: "One of our people sends it on and marks it sent, with the proof; until then it reads as not yet sent." }],
     branches: [{ title: "An action going ahead without its documents", text: "The day passes and something it needed is missing; the note says who decided and who owns the delay.", act: "ACTION_NOTE" }],

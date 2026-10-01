@@ -650,6 +650,18 @@ export async function recordStepOutcome(
   // Within the deciding step, whose verdict binds depends on how it decides:
   // serial and consolidated steps bind on their last person; the others on everyone.
   const binds = decides && bindsOnStep(step, user.id);
+  // Who receives it is checked before anything is written.
+  if (binds && !returnsToAuthor && request) {
+    const { noRecipients, noIssueRefusal } = await import("./issue-requests");
+    const refused = await noIssueRefusal(t, request);
+    if (refused) return { ok: false, error: refused };
+    if (request.give && !request.delegated && noRecipients(request.recipients)) {
+      return { ok: false, error: "Say who it goes to, or leave it to the author." };
+    }
+    if (request.give && request.needsApproval && !request.approverId) {
+      return { ok: false, error: "Say which party has to approve it before it is released." };
+    }
+  }
   // Every step says what the revision is issued for — not only the last one. A
   // step that keeps the status it arrived with says so on purpose, so nobody
   // passes a document on without having looked at what it is for.
@@ -675,13 +687,6 @@ export async function recordStepOutcome(
   // know who needs it, so they are asked while they are here. Saying "not now"
   // is an answer: the decision stands, and the record shows nobody asked.
   if (binds && !returnsToAuthor && request?.give) {
-    const { noRecipients } = await import("./issue-requests");
-    if (!request.delegated && noRecipients(request.recipients)) {
-      return { ok: false, error: "Say who it goes to, or leave it to the author, or untick \u201cask for it to be issued now\u201d." };
-    }
-    if (request.needsApproval && !request.approverId) {
-      return { ok: false, error: "Say which party has to approve it before it is released." };
-    }
     await t.db.issueRequest.create({
       data: {
         projectId,

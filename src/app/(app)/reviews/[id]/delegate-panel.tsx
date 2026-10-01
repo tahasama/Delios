@@ -25,91 +25,20 @@ export type DelegationRow = {
 };
 
 /**
- * Handing this step to somebody else.
- *
- * Only people the distribution matrix already names for the same act on this
- * kind of document are offered, so the list itself carries the rule: an
- * electrical technician never appears on an electrical drawing's review, however
- * the handover is asked for.
+ * The hand-overs on record for this step: who delegated it to whom, until
+ * when, flagged where the matrix would not have made it — and, for Document
+ * Control, the ones waiting to be put in force.
  */
-export function DelegatePanel({
-  cycleId, verb, candidates, throughControl, rows, controller, mayHandOver, off = false, strict = false,
-}: {
-  cycleId: string;
-  verb: "REVIEW" | "APPROVE";
-  candidates: { id: string; name: string; functionName: string; inMatrix: boolean }[];
-  /** The matrix is the only rule on this project: nobody else is offered. */
-  strict?: boolean;
-  /** Document Control carries the handover out on this project. */
-  throughControl: boolean;
+export function DelegatePanel({ rows, controller, off = false }: {
   rows: DelegationRow[];
   controller: boolean;
-  /** The viewer holds this step, so there is something of theirs to hand over. */
-  mayHandOver: boolean;
   /** The organization does not use hand-overs: none is asked for or put in force. */
   off?: boolean;
 }) {
   const open = rows.filter((row) => row.status === "OPEN");
   const active = rows.filter((row) => row.status === "ACTIVE");
   const answered = rows.filter((row) => row.status === "REFUSED" || row.status === "WITHDRAWN");
-  const act = verb === "APPROVE" ? "decide" : "advise";
-  const tomorrow = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-
-  if (!mayHandOver && !controller && !rows.length) return null;
-  // Left out, and nothing on record: there is nothing to say.
-  if (off && !rows.length) return null;
-
-  const form = candidates.length ? (
-    <ActionForm
-      action={delegateReviewAction}
-      submitLabel={throughControl ? "Ask Document Control" : "Hand it over"}
-      size="sm"
-      hidden={{ cycleId, verb }}
-    >
-      <SearchPick
-        single
-        name="toUserId"
-        items={candidates.map((one) => ({
-          id: one.id,
-          name: one.name,
-          detail: one.inMatrix ? one.functionName : `${one.functionName} · not in the matrix for this`,
-          note: one.inMatrix ? null : `The matrix does not name ${one.name} to ${act} on this kind of document. You can still choose them: it is flagged, and the record says you handed it to them.`,
-        }))}
-        label="Who answers it"
-        required
-        hint={strict ? "only people the matrix names for this" : "the matrix's people first — anyone else is flagged"}
-      />
-      <Field label="Until" required hint="a delegation without an end date is a transfer of the job">
-        <input type="date" name="endDate" required defaultValue={tomorrow} className={inputCls} />
-      </Field>
-      <Field label="Why" hint="optional — on leave, on site, no longer the right person">
-        <input name="reason" className={inputCls} />
-      </Field>
-      <p className="text-[11px] leading-4 text-slate-500">
-        {throughControl ? "Document Control puts it in force; until they do, the step is still yours." : "It takes effect at once."}
-        {" "}The record says you delegated it to them, and you answer for that choice.
-      </p>
-    </ActionForm>
-  ) : (
-    <p className="text-xs leading-5 text-slate-500">
-      Nobody else is named to {act} on this kind of document, and on this project the matrix is the only rule — so there is nobody this step can be handed to.
-    </p>
-  );
-  const offer = mayHandOver && !off && !rows.some((row) => row.status === "ACTIVE" || row.status === "OPEN");
-
-  // Nothing handed over yet: a button, and the form only when it is pressed.
-  if (!rows.length) {
-    if (!offer) return null;
-    return (
-      <details className="register register-sheet register-sheet-open">
-        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-3 sm:px-6">
-          <span className="text-[13px] text-slate-600">Can&rsquo;t answer it yourself?</span>
-          <span className="ask">Delegate</span>
-        </summary>
-        <div className="border-t border-line px-5 py-4 sm:px-6">{form}</div>
-      </details>
-    );
-  }
+  if (!rows.length) return null;
 
   return (
     <Card
@@ -160,13 +89,6 @@ export function DelegatePanel({
         </ul>
       ) : null}
 
-      {offer ? (
-        <details className="mt-1">
-          <summary className="ask cursor-pointer list-none">Delegate</summary>
-          <div className="mt-3">{form}</div>
-        </details>
-      ) : null}
-
       {answered.length ? (
         <ul className="mt-3 space-y-1 border-t border-line pt-3 text-[11px] text-slate-500">
           {answered.map((row) => (
@@ -177,5 +99,56 @@ export function DelegatePanel({
         </ul>
       ) : null}
     </Card>
+  );
+}
+
+/**
+ * The hand-over form on its own: opened from the answer card's Delegate
+ * button, in place of the verdict, so the step is either answered or handed on.
+ */
+export function DelegateForm({ cycleId, verb, candidates, throughControl, strict = false }: {
+  cycleId: string;
+  verb: "REVIEW" | "APPROVE";
+  candidates: { id: string; name: string; functionName: string; inMatrix: boolean }[];
+  throughControl: boolean;
+  strict?: boolean;
+}) {
+  const act = verb === "APPROVE" ? "decide" : "advise";
+  const tomorrow = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  return candidates.length ? (
+    <ActionForm
+      action={delegateReviewAction}
+      submitLabel={throughControl ? "Ask Document Control" : "Hand it over"}
+      size="sm"
+      hidden={{ cycleId, verb }}
+    >
+      <SearchPick
+        single
+        name="toUserId"
+        items={candidates.map((one) => ({
+          id: one.id,
+          name: one.name,
+          detail: one.inMatrix ? one.functionName : `${one.functionName} · not in the matrix for this`,
+          note: one.inMatrix ? null : `The matrix does not name ${one.name} to ${act} on this kind of document. You can still choose them: it is flagged, and the record says you handed it to them.`,
+        }))}
+        label="Who answers it"
+        required
+        hint={strict ? "only people the matrix names for this" : "the matrix's people first — anyone else is flagged"}
+      />
+      <Field label="Until" required hint="a delegation without an end date is a transfer of the job">
+        <input type="date" name="endDate" required defaultValue={tomorrow} className={inputCls} />
+      </Field>
+      <Field label="Why" hint="optional — on leave, on site, no longer the right person">
+        <input name="reason" className={inputCls} />
+      </Field>
+      <p className="text-[11px] leading-4 text-slate-500">
+        {throughControl ? "Document Control puts it in force; until they do, the step is still yours." : "It takes effect at once."}
+        {" "}The record says you delegated it to them, and you answer for that choice.
+      </p>
+    </ActionForm>
+  ) : (
+    <p className="text-xs leading-5 text-slate-500">
+      Nobody else is named to {act} on this kind of document, and on this project the matrix is the only rule — so there is nobody this step can be handed to.
+    </p>
   );
 }

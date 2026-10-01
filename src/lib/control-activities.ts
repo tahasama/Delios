@@ -270,6 +270,23 @@ export const POLICIES: Policy[] = [
     ],
   },
   {
+    key: "POLICY_NO_ISSUE",
+    title: "Released with nobody to send it to yet",
+    text: "Whether whoever decides a revision may say no issue is required for now, besides naming who receives it or leaving that to its author.",
+    options: [
+      {
+        value: "ALLOWED",
+        label: "Allowed — \u201cno issue required for now\u201d is offered",
+        text: "The revision is released and nobody is told; the document says it was not issued, and anybody with standing on it can ask for it to be sent later.",
+      },
+      {
+        value: "NEVER",
+        label: "Not allowed",
+        text: "Whoever decides either names who receives it or leaves that to its author. Nothing is released without somebody being responsible for sending it.",
+      },
+    ],
+  },
+  {
     key: "POLICY_MATRIX",
     title: "Who may be put on a review",
     text: "Whether the distribution matrix decides who can be put on a review step or handed one, or only recommends.",

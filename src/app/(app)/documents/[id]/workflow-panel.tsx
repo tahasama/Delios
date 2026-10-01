@@ -192,7 +192,7 @@ async function SendPanel({ doc, revId, value, hasFiles, user, lead, extra }: { d
               {statuses.map((one) => <option key={one.code} value={one.code}>{one.code} — {one.label}</option>)}
             </select>
           </Field>
-          <RequestIssue onDecision author={author} reasons={reasons.map((one) => ({ code: one.code, label: one.label }))} proposed={choices.proposed} others={choices.others} parties={choices.parties} />
+          <RequestIssue onDecision author={author} reasons={reasons.map((one) => ({ code: one.code, label: one.label }))} proposed={choices.proposed} others={choices.others} parties={choices.parties} ours={choices.ours} noIssue={choices.noIssue} />
         </ActionForm>
       ),
     }] : [];
@@ -317,7 +317,7 @@ async function RunActivePanel({ run, user, extra }: { run: { id: string; templat
           label: deciding ? "Give your verdict" : "Give your advice",
           body: (
             <ActionForm action={recordStepOutcomeAction} submitLabel={deciding ? "Give my verdict" : "Give my advice"} size="sm" hidden={{ runId: run.id }}>
-              <VerdictDecision deciding={deciding} advice={!deciding && activeCycle ? await myAdvice(ctx, activeCycle.id, user.id) : null} verdicts={decisionOptions(outcomes)} statuses={statusOptions(statuses, step.grantsStatuses)} carrying={carrying} laterSteps={laterSteps} request={nextStep ? <RequestIssue onDecision author={author} reasons={issueReasons.map((one) => ({ code: one.code, label: one.label }))} proposed={nextStep.proposed} others={nextStep.others} parties={nextStep.parties} /> : null} />
+              <VerdictDecision deciding={deciding} advice={!deciding && activeCycle ? await myAdvice(ctx, activeCycle.id, user.id) : null} verdicts={decisionOptions(outcomes)} statuses={statusOptions(statuses, step.grantsStatuses)} carrying={carrying} laterSteps={laterSteps} request={nextStep ? <RequestIssue onDecision author={author} reasons={issueReasons.map((one) => ({ code: one.code, label: one.label }))} proposed={nextStep.proposed} others={nextStep.others} parties={nextStep.parties} ours={nextStep.ours} noIssue={nextStep.noIssue} /> : null} />
             </ActionForm>
           ),
         });

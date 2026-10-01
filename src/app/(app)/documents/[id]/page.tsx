@@ -343,6 +343,7 @@ export default async function DocumentDetailPage({
                     proposed={askChoices.proposed}
                     others={askChoices.others}
                     parties={askChoices.parties}
+                    ours={askChoices.ours}
                   />
                 </ActionForm>
               </div>

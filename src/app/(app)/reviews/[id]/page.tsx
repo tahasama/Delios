@@ -9,7 +9,8 @@ import { fmtDate, fmtDateTime } from "@/lib/utils";
 import { myAdvice, dueState, getRunForRevision } from "@/lib/workflow";
 import { rewindRouteAction } from "@/lib/actions/workflow";
 import { requestChoices, authorOf, issuePolicy } from "@/lib/issue-requests";
-import { DelegatePanel, type DelegationRow } from "./delegate-panel";
+import { DelegatePanel, DelegateForm, type DelegationRow } from "./delegate-panel";
+import { AnswerCard } from "./answer-card";
 import { delegateCandidates, delegationFlag } from "@/lib/delegation";
 import { controlDoes, actIsOff, matrixBinds } from "@/lib/control-activities";
 import { RequestIssue } from "@/app/(app)/documents/[id]/request-issue";
@@ -309,20 +310,16 @@ export default async function ReviewCyclePage({ params }: { params: Promise<{ id
           ) : null}
 
           {cycle.status === "OPEN" ? (
-            <DelegatePanel
-              cycleId={cycle.id}
-              verb={handVerb}
-              candidates={handCandidates}
-              strict={handStrict}
-              throughControl={handThroughControl}
-              rows={handOvers}
-              controller={controller}
-              mayHandOver={assigned && !cycle.outcome}
-              off={handOff}
-            />
+            <DelegatePanel rows={handOvers} controller={controller} off={handOff} />
           ) : null}
 
-          <Card title={cycle.binding ? "Binding verdict" : "Advice"}>
+          <AnswerCard
+            title={cycle.binding ? "Binding verdict" : "Advice"}
+            answerLabel={cycle.binding ? "Give my verdict" : "Give my advice"}
+            delegate={cycle.status === "OPEN" && assigned && !cycle.outcome && !handOff && !handOvers.some((row) => row.status === "ACTIVE" || row.status === "OPEN")
+              ? <DelegateForm cycleId={cycle.id} verb={handVerb} candidates={handCandidates} throughControl={handThroughControl} strict={handStrict} />
+              : null}
+          >
             {cycle.outcome ? <div><p className="text-sm font-semibold text-slate-900">{cycle.binding ? <><span className="font-mono">{cycle.outcome}</span> · {verdictLabel(cycle.outcome)}</> : verdictLabel(cycle.outcome)}</p><p className="mt-1 text-xs leading-5 text-slate-500">{OUTCOME_CONSEQUENCES[cycle.outcome]?.blurb}</p>              {/* What the verdict said. A verdict that reads "Comments" and
                   shows no comments is not a record of anything. */}
               {cycle.comments.length ? (
@@ -346,7 +343,7 @@ export default async function ReviewCyclePage({ params }: { params: Promise<{ id
                     </li>
                   ))}
                 </ul>
-              ) : null}{canReturn ? <div className="mt-4 border-t border-line pt-4"><ActionForm action={returnToOriginatorAction} submitLabel="Return to author" size="sm" hidden={{ cycleId: cycle.id }}/></div> : null}</div> : <Guarded result={outcomeChecks!}><ActionForm action={recordOutcomeAction} submitLabel={byProxy && cycle.party ? `Record ${cycle.party.name}’s answer` : cycle.binding ? "Give my verdict" : "Give my advice"} hidden={{ cycleId: cycle.id }}><VerdictDecision deciding={cycle.binding} advice={cycle.binding ? null : await myAdvice(ctx, cycle.id, user.id)} verdicts={decisionOptions(outcomes)} statuses={statusOptions(statuses, mayDecideOn)} carrying={rev.statusCode} laterSteps={laterSteps} request={nextStep ? <RequestIssue onDecision author={author} reasons={issueReasons.map((one) => ({ code: one.code, label: one.label }))} proposed={nextStep.proposed} others={nextStep.others} parties={nextStep.parties} /> : null} />
+              ) : null}{canReturn ? <div className="mt-4 border-t border-line pt-4"><ActionForm action={returnToOriginatorAction} submitLabel="Return to author" size="sm" hidden={{ cycleId: cycle.id }}/></div> : null}</div> : <Guarded result={outcomeChecks!}><ActionForm action={recordOutcomeAction} submitLabel={byProxy && cycle.party ? `Record ${cycle.party.name}’s answer` : cycle.binding ? "Give my verdict" : "Give my advice"} hidden={{ cycleId: cycle.id }}><VerdictDecision deciding={cycle.binding} advice={cycle.binding ? null : await myAdvice(ctx, cycle.id, user.id)} verdicts={decisionOptions(outcomes)} statuses={statusOptions(statuses, mayDecideOn)} carrying={rev.statusCode} laterSteps={laterSteps} request={nextStep ? <RequestIssue onDecision author={author} reasons={issueReasons.map((one) => ({ code: one.code, label: one.label }))} proposed={nextStep.proposed} others={nextStep.others} parties={nextStep.parties} ours={nextStep.ours} noIssue={nextStep.noIssue} /> : null} />
               {byProxy && cycle.party ? (
                 <div className="mt-3 space-y-3 border-t border-line pt-3">
                   <p className="stencil text-slate-400">Recorded for {cycle.party.name}</p>
@@ -358,7 +355,7 @@ export default async function ReviewCyclePage({ params }: { params: Promise<{ id
                 </div>
               ) : null}</ActionForm></Guarded>}
             {cycle.outcome ? null : <p className="mt-2 text-xs leading-5 text-slate-500">{!cycle.issuedToReviewAt ? "Document Control sends it to the reviewers first." : ""}</p>}
-          </Card>
+          </AnswerCard>
 
           {!cycle.issuedToReviewAt ? <Card title="Send to reviewers">{mayIssueToReviewers ? <ActionForm action={issueToReviewAction} submitLabel="Send to reviewers" hidden={{ cycleId: cycle.id }}/> : <p className="text-xs text-slate-500">{issueIsControl ? "Waiting for Document Control." : "Waiting for whoever sent it for review."}</p>}</Card> : null}
 

@@ -54,8 +54,8 @@ export function recipientsFromForm(formData: FormData): RequestRecipients {
 
 /**
  * What a form says about a request, in the shape the engine stores. On the
- * deciding step the box is ticked by default: the moment of deciding is the
- * moment somebody knows who needs it. Unticking it is a deliberate "not now".
+ * deciding step the answer is one of three: who receives it, leave it to the
+ * author, or — where the project allows it — no issue required for now.
  */
 export function requestFromForm(formData: FormData) {
   const needsApproval = formData.get("needsApproval") === "on";
@@ -177,9 +177,10 @@ export async function issueGateIsControl(t: Tenant): Promise<boolean> {
  */
 export async function requestChoices(
   t: Tenant,
-  doc: { deliverableType: string; docType: string; discipline: string; criticality: string | null; confidentiality: string | null },
+  doc: { deliverableType: string; docType: string; discipline: string; criticality: string | null; confidentiality: string | null; originator?: string | null },
 ) {
   const { recipientsFor } = await import("./distribution");
+  const { policy } = await import("./control-activities");
   const onTheMatrix = await recipientsFor(t, doc);
   const proposedIds = new Set(onTheMatrix.map((one) => one.userId));
   const everyone = await t.db.user.findMany({
@@ -192,7 +193,18 @@ export async function requestChoices(
     proposed: onTheMatrix.map((one) => ({ id: one.userId, name: one.name, organization: one.functionName, basis: one.basis })),
     others: everyone.filter((person) => !proposedIds.has(person.id)).map((person) => ({ id: person.id, name: person.name, organization: named(person) })),
     parties: await t.db.party.findMany({ where: { isInternal: false, active: true }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
+    // Only a document we produced waits on somebody outside approving it.
+    ours: !doc.originator,
+    noIssue: (await policy(t, "POLICY_NO_ISSUE")) === "ALLOWED",
   };
+}
+
+/** Refused when "no issue required for now" was said and the project does not allow it. */
+export async function noIssueRefusal(t: Tenant, request: { give: boolean }): Promise<string | null> {
+  if (request.give) return null;
+  const { policy } = await import("./control-activities");
+  if ((await policy(t, "POLICY_NO_ISSUE")) === "ALLOWED") return null;
+  return "On this project a released revision always has somebody to send it to: name who receives it, or leave it to its author.";
 }
 
 /**

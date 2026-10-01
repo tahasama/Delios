@@ -98,6 +98,31 @@ export function VerdictDecision({ verdicts, statuses, deciding, carrying, laterS
         </Field>
       )}
 
+      {needsComment ? (
+        <Field
+          label={proceeds ? "What the next revision must fix" : "What must change"}
+          required
+          hint={`${verdict!.code} — ${verdict!.label.toLowerCase()}: say what, and where`}
+        >
+          <textarea
+            name="comment"
+            rows={3}
+            required
+            className={inputCls}
+            placeholder={proceeds ? "what to settle in the next revision" : "what must change before it comes back"}
+          />
+        </Field>
+      ) : null}
+
+      {/* A reservation on somebody else's answer is settled by that answer. */}
+      {needsComment && proceeds && laterSteps.length ? (
+        <Field label="What settles it" hint="a reservation on a later step is closed when that step answers — the revision does not go round again for it">
+          <select name="closesWithStep" defaultValue="" className={inputCls}>
+            <option value="">The next revision</option>
+            {laterSteps.map((step) => <option key={step.number} value={step.number}>{step.number}. {step.title}</option>)}
+          </select>
+        </Field>
+      ) : null}
       <>
           <Field
             label="Issued for"
@@ -135,31 +160,6 @@ export function VerdictDecision({ verdicts, statuses, deciding, carrying, laterS
           ) : null}
       </>
 
-      {needsComment ? (
-        <Field
-          label={proceeds ? "What the next revision must fix" : "What must change"}
-          required
-          hint={`${verdict!.code} — ${verdict!.label.toLowerCase()}: say what, and where`}
-        >
-          <textarea
-            name="comment"
-            rows={3}
-            required
-            className={inputCls}
-            placeholder={proceeds ? "what to settle in the next revision" : "what must change before it comes back"}
-          />
-        </Field>
-      ) : null}
-
-      {/* A reservation on somebody else's answer is settled by that answer. */}
-      {needsComment && proceeds && laterSteps.length ? (
-        <Field label="What settles it" hint="a reservation on a later step is closed when that step answers — the revision does not go round again for it">
-          <select name="closesWithStep" defaultValue="" className={inputCls}>
-            <option value="">The next revision</option>
-            {laterSteps.map((step) => <option key={step.number} value={step.number}>{step.number}. {step.title}</option>)}
-          </select>
-        </Field>
-      ) : null}
     </>
   );
 }
