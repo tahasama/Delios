@@ -17,6 +17,9 @@ import { Check, Minus } from "lucide-react";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Functions & permissions" };
 
+/** A list longer than this is shared on the page rather than repeated in each form. */
+const LONG = 30;
+
 function parseVerbs(json: string): Verb[] {
   try {
     const raw = JSON.parse(json) as unknown;
@@ -84,6 +87,12 @@ export default async function FunctionsPage() {
 
   return (
     <div className="space-y-4">
+      {/* The long lists, once for the whole page; every rule form points here. */}
+      {selectors.filter((sel) => sel.values.length > LONG).map((sel) => (
+        <datalist key={sel.name} id={`list-${sel.name}`}>
+          {sel.values.map((v) => <option key={v.code} value={v.code}>{v.label}</option>)}
+        </datalist>
+      ))}
       <PageHeader
         title="Functions & permissions"
         subtitle="Functions are the jobs people hold — Construction manager, HVAC technician, Project manager. What each may do comes from its rules here and in the distribution matrix; one function can create, review and approve."
@@ -187,11 +196,18 @@ export default async function FunctionsPage() {
                           <p className="text-[11px] text-slate-500">…on these documents (leave blank for all):</p>
                           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                             {selectors.map((sel) => (
-                              <Field key={sel.name} label={sel.label}>
-                                <select name={sel.name} className={inputCls} defaultValue="">
-                                  <option value="">Any</option>
-                                  {sel.values.map((v) => <option key={v.code} value={v.code}>{v.label}</option>)}
-                                </select>
+                              <Field key={sel.name} label={sel.label} hint={sel.values.length > LONG ? "type part of the code or name — empty for any" : undefined}>
+                                {/* A long list is written once on the page and shared;
+                                    repeating it in every function's form made the page
+                                    megabytes long. */}
+                                {sel.values.length > LONG ? (
+                                  <input name={sel.name} list={`list-${sel.name}`} className={inputCls} placeholder="Any" autoComplete="off" />
+                                ) : (
+                                  <select name={sel.name} className={inputCls} defaultValue="">
+                                    <option value="">Any</option>
+                                    {sel.values.map((v) => <option key={v.code} value={v.code}>{v.label}</option>)}
+                                  </select>
+                                )}
                               </Field>
                             ))}
                           </div>

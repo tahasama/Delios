@@ -151,6 +151,18 @@ export async function savePermissionRuleAction(
     verbs: JSON.stringify(verbs),
     note: blank("note"),
   };
+  // Every narrowing names a published code: a rule about a type that does not
+  // exist grants nothing, and says nothing true.
+  const published: [string | null, string, string][] = [
+    [data.deliverableType, "DELIVERABLE_TYPES", "deliverable type"], [data.docType, "DOCUMENT_TYPES", "document type"],
+    [data.discipline, "DISCIPLINES", "discipline"], [data.criticality, "CRITICALITY", "criticality"],
+    [data.confidentiality, "CONFIDENTIALITY", "confidentiality"],
+  ];
+  for (const [code, setKey, what] of published) {
+    if (code && !(await db.configValue.findFirst({ where: { setKey, code, status: "ACTIVE" }, select: { id: true } }))) {
+      return { error: `“${code}” is not a ${what} in the published list — choose one from it.` };
+    }
+  }
 
   if (ruleId) {
     const existing = await db.permissionRule.findFirst({ where: { id: ruleId } });
