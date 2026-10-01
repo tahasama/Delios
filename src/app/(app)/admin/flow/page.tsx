@@ -115,34 +115,20 @@ const STAGES: Stage[] = [
   },
   {
     key: "review",
-    tagline: "Down our route",
-    title: "Internal review",
-    text: "The route the document matches sends it to its reviewers; each answers with a verdict or advice.",
+    tagline: "Down its route",
+    title: "Review",
+    text: "One step: the route the document matches sends it to its reviewers — ours, and another organization's where the route names one, together or in turn as the route says — and each answers with a verdict or advice.",
     rail: "rail-review",
     states: ["IN_REVIEW"],
     acts: ["REVIEW_ISSUE"],
-    policies: [],
-    sets: ["REVIEW_OUTCOMES", "REVIEW_ADVICE", "COMMENT_CLASSES"],
-    fixed: [],
-    branches: [{ title: "Handing a review to somebody else", text: "A reviewer who cannot answer in time passes the step on.", act: "DELEGATE" }],
-    extras: ["routes"],
-  },
-  {
-    key: "outside",
-    tagline: "Another organization answers",
-    title: "Outside review",
-    text: "Another organization reviews it — as a step on the route, or on a transmittal sent for review.",
-    rail: "rail-review",
-    states: ["IN_REVIEW"],
-    acts: [],
     policies: ["POLICY_PDF_STAMP"],
-    sets: ["REVIEW_OUTCOMES", "COMMENT_CLASSES", "REASONS_FOR_ISSUE"],
+    sets: ["REVIEW_OUTCOMES", "REVIEW_ADVICE", "COMMENT_CLASSES"],
     fixed: [
-      { title: "As a step on the route", text: "A party with accounts here answers for itself. One that is not on the system is carried by its liaison — or Document Control — who sends the pack out and records what comes back." },
-      { title: "On a transmittal for review", text: "Sent for review or approval, with an answer due by the reason's period; their answer arrives as a reply, and the verdict is recorded against the revision." },
+      { title: "Outside reviewers on the route", text: "An organization with accounts here answers for itself, alongside ours. One that is not on the system is carried by its liaison — or Document Control — who sends the pack out and records what comes back." },
+      { title: "Or on a transmittal for review", text: "Sent for review or approval, with an answer due by the reason's period; their answer arrives as a reply, and the verdict is recorded against the revision." },
     ],
-    branches: [],
-    extras: ["parties", "routes"],
+    branches: [{ title: "Handing a review to somebody else", text: "A reviewer who cannot answer in time passes the step on.", act: "DELEGATE" }],
+    extras: ["routes", "parties"],
   },
   {
     key: "answer",
@@ -233,7 +219,7 @@ const STAGES: Stage[] = [
  * the flow. A column with two lanes runs side by side; a lane with a condition
  * happens only on some documents.
  */
-const FLOWS: { key: string; title: string; from: string; to: string; columns: { scene: string; optional?: string }[][]; notes?: Record<number, string> }[] = [
+const FLOWS: { key: string; title: string; from: string; to: string; columns: { scene: string; optional?: string; tagline?: string }[][] }[] = [
   {
     key: "produce",
     title: "Documents we produce",
@@ -242,14 +228,14 @@ const FLOWS: { key: string; title: string; from: string; to: string; columns: { 
     columns: [
       [{ scene: "register" }],
       [{ scene: "prepare" }],
-      // Ours is always reviewed by us; an outside review joins it on some.
-      [{ scene: "review" }, { scene: "outside", optional: "another organization reviews it too" }],
+      // One step. Ours always review it; another organization's reviewers are
+      // on the same step, alongside ours, when the route names them.
+      [{ scene: "review", tagline: "Ours always · outside reviewers alongside, when there are any" }],
       [{ scene: "answer" }],
       [{ scene: "approval", optional: "an outside approval is asked for" }],
       [{ scene: "release" }],
       [{ scene: "issue" }],
     ],
-    notes: { 2: "always ours · theirs alongside, when it happens" },
   },
   {
     key: "receive",
@@ -259,14 +245,13 @@ const FLOWS: { key: string; title: string; from: string; to: string; columns: { 
     columns: [
       [{ scene: "received" }],
       [{ scene: "theirs" }],
-      // What we receive is reviewed by us, by another organization, or both —
-      // the document decides, so neither lane is always there.
-      [{ scene: "review", optional: "we review it ourselves" }, { scene: "outside", optional: "another organization reviews it" }],
+      // One step, by us, by another organization, or both: the route the
+      // document matches decides who is on it.
+      [{ scene: "review", tagline: "Ours, another organization's, or both" }],
       [{ scene: "to-sender" }],
       [{ scene: "release", optional: "it is accepted for use here" }],
       [{ scene: "issue", optional: "it is passed on to others" }],
     ],
-    notes: { 2: "ours, theirs, or both" },
   },
 ];
 
@@ -447,7 +432,7 @@ export default async function ControlRoomPage() {
   const byKey = new Map(stages.map((stage) => [stage.key, stage]));
   const flows: Flow[] = FLOWS.map((flow) => ({
     ...flow,
-    columns: flow.columns.map((column) => column.map((lane) => ({ scene: sceneOf(byKey.get(lane.scene)!), optional: lane.optional }))),
+    columns: flow.columns.map((column) => column.map((lane) => ({ scene: { ...sceneOf(byKey.get(lane.scene)!), ...(lane.tagline ? { tagline: lane.tagline } : {}) }, optional: lane.optional }))),
   }));
 
   return (
