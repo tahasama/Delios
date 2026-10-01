@@ -2,7 +2,7 @@ import Link from "next/link";
 import { requireScope } from "@/lib/scope";
 import { PageHeader } from "@/components/ui";
 import { SendForReview } from "@/components/send-for-review-panel";
-import { SearchPick } from "@/components/search-pick";
+import { RevisionChecklist } from "@/components/revision-checklist";
 import { ArrowLeft } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -55,51 +55,43 @@ export default async function StartReviewPage({ searchParams }: { searchParams: 
       />
 
       <section className="register register-sheet register-sheet-open">
-        {band(1, "Which documents", "a revision being prepared, with its file attached")}
-        <div className="asking px-5 py-5 sm:px-6">
-          {chosen.length ? (
-            <div className="space-y-2">
-              <ul className="divide-y divide-line rounded-lg border border-line">
-                {chosen.map((r) => (
-                  <li key={r.id} className="px-3 py-2 text-[13px]">
-                    <Link href={`/documents/${r.documentId}`} className="doc-number">{r.document.docNumber}</Link>
-                    <span className="text-slate-500"> rev {r.value} — {r.document.title}</span>
-                    {!r.renditionFileId && !r.nativeFileId ? <span className="ml-2 text-[11px] font-semibold text-amber-700">no file yet — attach it before sending</span> : null}
-                  </li>
-                ))}
-              </ul>
-              <Link href="/reviews/send" className="text-[11px] font-semibold text-link hover:underline">Choose other documents</Link>
-            </div>
-          ) : ready.length ? (
-            // Choosing reloads this page with the documents named, so the
-            // routes offered are the ones that apply to all of them.
-            <form method="get" className="space-y-4">
-              <SearchPick
-                name="revision"
-                browse
-                items={ready.map((r) => ({
-                  id: r.id,
-                  name: `${r.document.docNumber} rev ${r.value}`,
-                  detail: r.document.title,
-                }))}
-                label="Documents"
-                required
-                hint="click to see them, or type part of a number or title — as many as go down the same route"
-                placeholder="e.g. 50-ME, ventilation…"
-              />
-              <div className="flex flex-wrap items-center gap-3">
+        {band(1, "Which documents", "tick what goes down the same route — a revision being prepared, with its file attached")}
+        {chosen.length ? (
+          <div className="asking space-y-2 px-5 py-5 sm:px-6">
+            <ul className="divide-y divide-line rounded-lg border border-line">
+              {chosen.map((r) => (
+                <li key={r.id} className="px-3 py-2 text-[13px]">
+                  <Link href={`/documents/${r.documentId}`} className="doc-number">{r.document.docNumber}</Link>
+                  <span className="text-slate-500"> rev {r.value} — {r.document.title}</span>
+                  {!r.renditionFileId && !r.nativeFileId ? <span className="ml-2 text-[11px] font-semibold text-amber-700">no file yet — attach it before sending</span> : null}
+                </li>
+              ))}
+            </ul>
+            <Link href="/reviews/send" className="text-[11px] font-semibold text-link hover:underline">Choose other documents</Link>
+          </div>
+        ) : ready.length ? (
+          // Ticking and going on reloads this page with the documents named, so
+          // the routes offered are the ones that apply to all of them.
+          <form method="get">
+            <RevisionChecklist
+              name="revision"
+              rows={ready.map((r) => ({ id: r.id, number: r.document.docNumber, rev: r.value, status: r.statusCode, title: r.document.title }))}
+            />
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line bg-tint-soft px-5 py-3 sm:px-6">
+              <Link href="/reviews" className="text-xs font-semibold text-slate-500 hover:text-slate-800">Cancel</Link>
+              <div className="flex items-center gap-3">
+                {waitingForFile ? <span className="text-[11px] text-slate-400">{waitingForFile} more being prepared without a file yet</span> : null}
                 <button type="submit" data-on="true" className="ask">Continue</button>
-                {waitingForFile ? <span className="text-[11px] text-slate-400">{waitingForFile} more being prepared without a file yet — attach it on the document to send it.</span> : null}
               </div>
-            </form>
-          ) : (
-            <p className="text-sm text-slate-500">
-              {waitingForFile
-                ? `${waitingForFile} revision${waitingForFile === 1 ? " is" : "s are"} being prepared, but none has its file yet. Attach the file on the document, then send it.`
-                : "No revision is being prepared, so there is nothing to send for review. A revision is started from its document."}
-            </p>
-          )}
-        </div>
+            </div>
+          </form>
+        ) : (
+          <p className="px-5 py-5 text-sm text-slate-500 sm:px-6">
+            {waitingForFile
+              ? `${waitingForFile} revision${waitingForFile === 1 ? " is" : "s are"} being prepared, but none has its file yet. Attach the file on the document, then send it.`
+              : "No revision is being prepared, so there is nothing to send for review. A revision is started from its document."}
+          </p>
+        )}
       </section>
 
       {chosen.length ? (
