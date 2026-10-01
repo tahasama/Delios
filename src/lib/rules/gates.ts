@@ -204,6 +204,10 @@ const releaseApproval: Gate = {
       orderBy: { decidedAt: "desc" },
     });
     if (approval) return ok(`Decided by ${approval.approverName}.`);
+    // A type the organization does not review has no verdict to wait for.
+    const { releasedWithoutReview } = await import("../review-need");
+    const unreviewed = await releasedWithoutReview(ctx, subject.revisionId);
+    if (unreviewed) return ok(`${unreviewed.docType} is not reviewed — released without a verdict.`);
     return block(
       "No binding verdict lets this revision proceed yet.",
  "Nothing is released until the review's deciding step gives a verdict that proceeds.",

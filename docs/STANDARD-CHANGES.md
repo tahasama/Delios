@@ -398,6 +398,31 @@ people doing the work).
 
 ---
 
+## 19 · A document type says whether it is reviewed
+
+**Clause:** §3.1 *Document types*, §7.1, §8.1.
+
+**Must say:** every document type is published with the answer to one
+question — is it reviewed before release? A type that is reviewed goes down a
+review route, as now. A type that is not goes from preparation straight to
+release: whoever would have sent it for review sets the status it is released
+at and who receives it, and from there it is any decided revision — an outside
+approval asked for opens first, and Document Control's gate publishes it.
+
+§8.1 asks for a recorded approval before release. For a type that is not
+reviewed there is none to record, and none is invented: the type's own rule
+stands in for it, and the release record says so. A revision that was sent
+down a route after all needs its approval like any other.
+
+**Default, and preference.** A type that says nothing is reviewed. Whether a
+type is reviewed is the organization's answer, given when the type is
+published.
+
+**Depends on it:** property `review` on `DOCUMENT_TYPES`; `typeSkipsReview`,
+`releasedWithoutReview`, `readyForRelease`, `submitForReleaseAction`.
+
+---
+
 ## Still open — decided in conversation, not yet built
 
 - **Escalation** where somebody refuses to acknowledge carrying an action

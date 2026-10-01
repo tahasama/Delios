@@ -4,7 +4,9 @@ import { revalidatePath } from "next/cache";
 import { requireScope } from "@/lib/scope";
 import { mayContributeToDocument } from "@/lib/auth";
 import { audit } from "@/lib/audit";
-import { startWorkflowRun, recordStepOutcome, recordStepApproval, normalizeRoute, rewindRoute, type WfStep } from "@/lib/workflow";
+import { startWorkflowRun, recordStepOutcome, recordStepApproval, normalizeRoute, rewindRoute, readyForRelease, type WfStep } from "@/lib/workflow";
+import { typeSkipsReview } from "@/lib/review-need";
+import { notifyMany } from "@/lib/audit";
 import { isReadOnly } from "@/lib/auth";
 import { hasVerb, isAdmin, isController } from "@/lib/auth";
 import { getActiveSet } from "@/lib/config";
@@ -428,3 +430,60 @@ export async function markDispatchedAction(_prev: { error?: string; ok?: string 
   return { ok: "Recorded as sent." };
 }
 
+/**
+ * A revision of a type the organization does not review, sent from preparation
+ * straight to release. Whoever would have sent it for review sends it here:
+ * they settle the status it is released at and, as the deciding step would,
+ * who receives it. From there it is any decided revision — an outside approval
+ * asked for opens first, and Document Control's gate publishes it.
+ */
+export async function submitForReleaseAction(_prev: { error?: string; ok?: string } | undefined, formData: FormData): Promise<{ error?: string; ok?: string }> {
+  const ctx = await requireScope();
+  const { user, db, projectId } = ctx;
+  if (isReadOnly(user)) return { error: "Viewers cannot release documents." };
+  const revisionId = String(formData.get("revisionId") ?? "");
+  const statusCode = String(formData.get("issuedFor") ?? "").trim();
+  const rev = await db.revision.findUnique({ where: { id: revisionId }, include: { document: true } });
+  if (!rev) return { error: "That revision no longer exists." };
+  const label = `${rev.document.docNumber} rev ${rev.value}`;
+  if (rev.state !== "IN_PREPARATION") return { error: `${label} is not being prepared.` };
+  if (!(await typeSkipsReview(ctx, rev.document.docType))) return { error: `${rev.document.docType} is reviewed before release — send it for review.` };
+  const allowed = mayContributeToDocument(user, rev.document) && (isController(user) || (!rev.document.originator && rev.document.createdById === user.id));
+  if (!allowed) return { error: `Only ${rev.document.originator ? "Document Control" : "its author or Document Control"} can send it on.` };
+  if (!rev.renditionFileId && !rev.nativeFileId) return { error: "Attach the file first — a PDF is what is released." };
+  const status = (await getActiveSet("STATUSES")).find((one) => one.code === statusCode);
+  if (!status) return { error: "Choose the status it is released at." };
+
+  // Who receives it, asked here as the deciding step would ask it.
+  const request = requestFromForm(formData);
+  if (request.give) {
+    const { noRecipients } = await import("@/lib/issue-requests");
+    if (!request.delegated && noRecipients(request.recipients)) return { error: "Say who it goes to, or leave it to the author, or untick \u201cask for it to be issued now\u201d." };
+    if (request.needsApproval && !request.approverId) return { error: "Say which party has to approve it before it is released." };
+  }
+
+  await db.revision.update({
+    where: { id: rev.id },
+    data: { state: "NOT_RELEASED", statusCode: status.code, statusSetAt: new Date(), statusSetByName: user.name, submittedAt: new Date() },
+  });
+  if (request.give) {
+    await db.issueRequest.create({
+      data: {
+        projectId, revisionId: rev.id, reason: request.reason, recipients: JSON.stringify(request.recipients),
+        note: request.note ?? null, delegated: request.delegated, needsApproval: !!request.needsApproval,
+        approverId: request.approverId ?? null, raisedById: user.id, raisedByName: user.name,
+      },
+    });
+    if (request.delegated) {
+      await notifyMany([rev.document.createdById], "ISSUE_DELEGATED", `Who should get ${label}?`, "It was left to you to say who this revision goes to. Ask for it when you know.", `/documents/${rev.documentId}`, ctx);
+    }
+  }
+  await audit({
+    tenant: ctx, actor: user, action: "SUBMITTED_FOR_RELEASE", entityType: "Revision", entityId: rev.id, entityLabel: label,
+    newValue: status.code, detail: `Not reviewed: document type ${rev.document.docType} goes from preparation straight to release.`,
+  });
+  await readyForRelease(ctx, rev.id, user, `${label} is a type that is not reviewed — sent on for release.`, "the document type, which is not reviewed");
+  revalidatePath(`/documents/${rev.documentId}`);
+  revalidatePath("/");
+  return { ok: "Sent on for release." };
+}

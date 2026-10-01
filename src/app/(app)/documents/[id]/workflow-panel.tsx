@@ -4,7 +4,8 @@ import { mayContributeToDocument, type SessionUser } from "@/lib/auth";
 import { Chip, Field, inputCls, btn } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { ActionForm } from "@/components/form";
-import { recordStepOutcomeAction } from "@/lib/actions/workflow";
+import { recordStepOutcomeAction, submitForReleaseAction } from "@/lib/actions/workflow";
+import { typeSkipsReview } from "@/lib/review-need";
 import { decisionOptions, statusOptions } from "@/lib/decision-options";
 import { requestChoices, authorOf, issuePolicy } from "@/lib/issue-requests";
 import { RequestIssue } from "./request-issue";
@@ -108,9 +109,10 @@ export async function WorkflowPanel({ doc, user, lead, extra: after }: { doc: Do
     );
   }
   if (revs.length > 0) {
+    const unreviewed = revs[0].state === "NOT_RELEASED" && (await typeSkipsReview(ctx, doc.docType));
     return (
       <Card title={revs[0].state === "NOT_RELEASED" ? "Next step: release" : revs[0].state === "IN_REVIEW" ? "In review" : "Not in use"} className={revs[0].state === "IN_REVIEW" || revs[0].state === "NOT_RELEASED" ? "border-brand-line/30 bg-tint-soft" : undefined}>
-        <p className="text-sm text-slate-700">{revs[0].state === "NOT_RELEASED" ? <>The route is finished. Rev {revs[0].value} is at <strong>{revs[0].statusCode}</strong> and is <strong>not released</strong> until Document Control publishes it.</> : revs[0].state === "IN_REVIEW" ? <>Rev {revs[0].value} is with its reviewers.</> : <>The latest revision (rev {revs[0].value}) is <strong>{revs[0].state.replaceAll("_", " ").toLowerCase()}</strong>.</>}</p>
+        <p className="text-sm text-slate-700">{revs[0].state === "NOT_RELEASED" ? <>{unreviewed ? `${doc.docType} is not reviewed.` : "The route is finished."} Rev {revs[0].value} is at <strong>{revs[0].statusCode}</strong> and is <strong>not released</strong> until Document Control publishes it.</> : revs[0].state === "IN_REVIEW" ? <>Rev {revs[0].value} is with its reviewers.</> : <>The latest revision (rev {revs[0].value}) is <strong>{revs[0].state.replaceAll("_", " ").toLowerCase()}</strong>.</>}</p>
         {extra}
       </Card>
     );
@@ -136,6 +138,38 @@ async function SendPanel({ doc, revId, value, hasFiles, user, lead, extra }: { d
       <Card title={`Rev ${value} is being prepared`}>
         <p className="text-sm text-slate-700">{external ? "Waiting for Document Control to send it for review." : "Waiting for the author to send it for review."}</p>
         {lead}
+        {extra}
+      </Card>
+    );
+  }
+  // A type the organization does not review goes from here straight to release:
+  // whoever would send it for review settles its status and who receives it.
+  const ctx = await requireScope();
+  if (await typeSkipsReview(ctx, doc.docType)) {
+    const full = await ctx.db.document.findUniqueOrThrow({ where: { id: doc.id } });
+    const [statuses, reasons, choices, author] = await Promise.all([
+      getActiveSet("STATUSES"),
+      getActiveSet("REASONS_FOR_ISSUE"),
+      requestChoices(ctx, full),
+      authorOf(ctx, revId),
+    ]);
+    return (
+      <Card title="Next step: send on for release" description={`${doc.docType} is not reviewed — it goes from Prepare straight to release.`} className="border-brand-line/30 bg-tint-soft">
+        <p className="text-sm text-slate-700"><strong>Rev {value}</strong> is being prepared{hasFiles ? " and has its file" : " — attach its file first: a PDF is what is released"}.</p>
+        {lead}
+        {hasFiles ? (
+          <Action label={<><Rocket className="h-4 w-4" /> Send on for release</>}>
+            <ActionForm action={submitForReleaseAction} submitLabel="Send on for release" hidden={{ revisionId: revId }}>
+              <Field label="Released at" required>
+                <select name="issuedFor" required defaultValue="" className={inputCls}>
+                  <option value="" disabled>Choose the status…</option>
+                  {statuses.map((one) => <option key={one.code} value={one.code}>{one.code} — {one.label}</option>)}
+                </select>
+              </Field>
+              <RequestIssue onDecision author={author} reasons={reasons.map((one) => ({ code: one.code, label: one.label }))} proposed={choices.proposed} others={choices.others} parties={choices.parties} />
+            </ActionForm>
+          </Action>
+        ) : null}
         {extra}
       </Card>
     );

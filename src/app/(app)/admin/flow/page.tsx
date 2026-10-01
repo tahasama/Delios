@@ -46,7 +46,7 @@ type Stage = {
   /** Roads off the main line, with their act where they have one. */
   branches: { title: string; text: string; act?: string; fixed?: string }[];
   /** Other configuration the step reads, with where it is kept. */
-  extras: ("numbering" | "routes" | "distribution" | "parties")[];
+  extras: ("numbering" | "routes" | "distribution" | "parties" | "unreviewed")[];
 };
 
 /**
@@ -130,7 +130,7 @@ const STAGES: Stage[] = [
       { title: "Or on a transmittal for review", text: "Sent for review or approval, with an answer due by the reason's period; their answer arrives as a reply, and the verdict is recorded against the revision." },
     ],
     branches: [{ title: "Handing a review to somebody else", text: "A reviewer who cannot answer in time passes the step on.", act: "DELEGATE" }],
-    extras: ["routes", "parties"],
+    extras: ["routes", "parties", "unreviewed"],
   },
   {
     key: "answer",
@@ -262,6 +262,7 @@ const EXTRA: Record<Stage["extras"][number], { title: string; href: string }> = 
   routes: { title: "Review routes", href: "/admin/workflow-templates" },
   distribution: { title: "Distribution rules", href: "/admin/controlled" },
   parties: { title: "Outside organizations", href: "/admin/parties" },
+  unreviewed: { title: "Document types not reviewed", href: "/admin/config?set=DOCUMENT_TYPES" },
 };
 
 export default async function ControlRoomPage() {
@@ -275,7 +276,7 @@ export default async function ControlRoomPage() {
     policies(ctx),
     holdersOf(ctx, "CONTROL"),
     db.configSet.findMany({ select: { key: true, title: true, description: true } }),
-    db.configValue.findMany({ select: { setKey: true, code: true, label: true, status: true }, orderBy: [{ sort: "asc" }, { code: "asc" }] }),
+    db.configValue.findMany({ select: { setKey: true, code: true, label: true, status: true, props: true }, orderBy: [{ sort: "asc" }, { code: "asc" }] }),
     db.workflowTemplate.findMany({ where: { active: true }, select: { name: true, steps: true, outcomeSetKey: true } }),
     db.scheme.count({ where: { active: true } }),
     db.distributionRule.count(),
@@ -306,6 +307,12 @@ export default async function ControlRoomPage() {
     numbering: `${schemes} in use`,
     routes: `${templates.length} live`,
     distribution: rules ? `${rules} rule${rules === 1 ? "" : "s"}` : "none yet",
+    unreviewed: (() => {
+      // A type says when it is published whether it is reviewed; one that is
+      // not goes from Prepare straight to release and never reaches this step.
+      const skipped = values.filter((one) => one.setKey === "DOCUMENT_TYPES" && one.status === "ACTIVE" && /"review"\s*:\s*false/.test(one.props ?? ""));
+      return skipped.length ? `${skipped.length} — ${skipped.slice(0, 6).map((one) => one.code).join(", ")}${skipped.length > 6 ? "…" : ""}: from Prepare straight to release` : "none — every type is reviewed";
+    })(),
     parties: (() => {
       const offline = parties.filter((one) => one.kind === "OFFLINE").length;
       return `${parties.length - offline} answer here · ${offline} not on the system`;

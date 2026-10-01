@@ -17,8 +17,15 @@ import type { ChoiceOption } from "./verdict-effect";
 import { VERDICT_EFFECT, verdictEffect } from "./verdict-effect";
 export { VERDICT_EFFECT, verdictEffect, VERDICT_EFFECT_SHORT } from "./verdict-effect";
 
+/** Whether a document type goes down a review route before it is released. */
+const REVIEW_NEED: ChoiceOption[] = [
+  { value: "YES", label: "Reviewed — it goes down a review route before release", sets: { review: true } },
+  { value: "NO", label: "Not reviewed — from Prepare straight to release", sets: { review: false } },
+];
+
 export const SET_PROP_FIELDS: Record<string, PropField[]> = {
   DOCUMENT_TYPES: [
+    { key: "review", label: "Reviewed before release", type: "choice", options: REVIEW_NEED, read: (props) => (props.review === false ? "NO" : "YES"), hint: "asked when the type is published; a type that is not reviewed goes from Prepare straight to release" },
     { key: "appliesTo", label: "Who produces it", type: "select", options: ["Supplier", "Non-supplier", "Unclassified"], hint: "supplier documents carry the supplier fields in their number" },
  { key: "describesAsset", label: "Describes equipment — link it to an asset", type: "bool", hint: "" },
   ],

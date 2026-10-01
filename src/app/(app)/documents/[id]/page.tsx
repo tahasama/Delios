@@ -13,6 +13,7 @@ import { ActionForm } from "@/components/form";
 import { DOC_STATE_LABEL, DOC_STATE_COLOR, REV_STATE_COLOR, revStateColor, type DocState, type RevState } from "@/lib/standard";
 import { stateNames, stateName } from "@/lib/state-names";
 import { revisionGround } from "@/lib/revision-ground";
+import { typeSkipsReview } from "@/lib/review-need";
 import { fmtDate, timeAgo, plain } from "@/lib/utils";
 import { getActiveSet, getSet, getValue } from "@/lib/config";
 import { updateDocumentAction, linkAssetAction, unlinkRelationshipAction, endDocumentStateAction } from "@/lib/actions/documents";
@@ -174,6 +175,8 @@ export default async function DocumentDetailPage({
   // Why the next revision may be started: asked for by the last verdict, or
   // not — and then whoever starts it says why.
   const ground = doc.isPlaceholder ? { kind: "FIRST" as const } : await revisionGround(ctx, doc.id);
+  // A type the organization does not review never goes down a route.
+  const reviewed = !(await typeSkipsReview(ctx, doc.docType));
   const sentOut = !!current && transmittalItems.some((item) => item.revisionId === current.id && item.transmittal.direction === "OUTGOING");
   // Only where releasing is issuing is a released revision nobody was sent a
   // breach to stamp; where they are two acts, the state says Released.
@@ -453,7 +456,7 @@ export default async function DocumentDetailPage({
                 </select>
               </Field>
               <Field label="File" hint="optional — a PDF shows in the viewer" className="sm:col-span-2"><input type="file" name="revisionFile" className="block w-full text-xs" /></Field>
-              {routes.length ? (
+              {routes.length && reviewed ? (
                 <Field label="Then" hint="needs the file above" className="sm:col-span-2">
                   <select name="sendTemplateId" className={inputCls} defaultValue="">
                     <option value="">Just create the revision</option>

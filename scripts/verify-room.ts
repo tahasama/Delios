@@ -9,6 +9,7 @@ import { tenantFor } from "../src/lib/tenant";
 import { SKIPPABLE, SKIP_KEY, actIsOff, controlDoes, controlSettings, CONTROL_ACTIVITIES } from "../src/lib/control-activities";
 import { stateNames, stateName, DEFAULT_STATE_NAMES, STATE_NAMES } from "../src/lib/state-names";
 import { REV_STATES } from "../src/lib/standard";
+import { typeSkipsReview } from "../src/lib/review-need";
 
 const db = new PrismaClient();
 let failures = 0;
@@ -21,6 +22,8 @@ function check(label: string, ok: boolean, detail = "") {
 async function removeOrg(orgId: string) {
   await db.controlSetting.deleteMany({ where: { project: { orgId } } });
   await db.stateName.deleteMany({ where: { orgId } });
+  await db.configValue.deleteMany({ where: { orgId } });
+  await db.configSet.deleteMany({ where: { orgId } });
   await db.project.deleteMany({ where: { orgId } });
   await db.organization.delete({ where: { id: orgId } });
 }
@@ -52,6 +55,18 @@ async function main() {
     check("an act that may not be skipped ignores a stray switch", !(await actIsOff(t, "VOID")));
     await db.controlSetting.create({ data: { projectId: project.id, key: SKIP_KEY("ACTION_NOTE"), mode: "OFF" } });
     check("the action note reads as left out on its own switch", (await actIsOff(t, "ACTION_NOTE")) && (await controlSettings(t)).rows.filter((row) => row.off).length === 2);
+
+    console.log("\nDocument types reviewed, or not\n");
+    await db.configSet.create({ data: { orgId: org.id, key: "DOCUMENT_TYPES", title: "Document types" } });
+    await db.configValue.createMany({ data: [
+      { orgId: org.id, setKey: "DOCUMENT_TYPES", code: "DWG", label: "Drawing", props: JSON.stringify({ appliesTo: "Non-supplier" }) },
+      { orgId: org.id, setKey: "DOCUMENT_TYPES", code: "MOM", label: "Minutes", props: JSON.stringify({ review: false }) },
+      { orgId: org.id, setKey: "DOCUMENT_TYPES", code: "SPC", label: "Specification", props: JSON.stringify({ review: true }) },
+    ] });
+    check("a type that says nothing is reviewed", !(await typeSkipsReview(t, "DWG")));
+    check("a type published as not reviewed skips review", await typeSkipsReview(t, "MOM"));
+    check("a type published as reviewed is reviewed", !(await typeSkipsReview(t, "SPC")));
+    check("an unknown type is reviewed", !(await typeSkipsReview(t, "XYZ")) && !(await typeSkipsReview(t, null)));
 
     console.log("\nWhat states are called\n");
     const defaults = await stateNames(t);

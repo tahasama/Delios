@@ -308,6 +308,9 @@ export async function startWorkflowRun(t: Tenant, revisionId: string, templateId
   const { db, projectId } = t;
   const rev = await db.revision.findUniqueOrThrow({ where: { id: revisionId }, include: { document: true } });
   if (rev.state !== "IN_PREPARATION") return { ok: false, error: `${rev.document.docNumber} rev ${rev.value} is not in preparation.` };
+  // A type the organization does not review has no route to go down.
+  const { typeSkipsReview } = await import("./review-need");
+  if (await typeSkipsReview(t, rev.document.docType)) return { ok: false, error: `${rev.document.docType} is not reviewed — it goes from preparation straight to release.` };
   if (!rev.renditionFileId && !rev.nativeFileId) {
     return { ok: false, error: `${rev.document.docNumber} rev ${rev.value} has no file. Attach what is to be reviewed first — a verdict on nothing is worth less than no verdict.` };
   }
@@ -405,38 +408,7 @@ async function advance(t: Tenant, runId: string, user: SessionUser) {
     await audit({ tenant: t, actor: user, action: "WORKFLOW_COMPLETED", entityType: "WorkflowRun", entityId: runId, entityLabel: `${rev.document.docNumber} rev ${rev.value}`, detail: "Binding verdict permits release — ready for release by the control function." });
     const contributorIds = await contributorRecipients(t, rev.document.createdById, rev.document.originator);
     await notifyMany(contributorIds, "WORKFLOW_DONE", `Workflow complete: ${rev.document.docNumber} rev ${rev.value}`, "All steps are done. The control function can now release it.", `/documents/${rev.documentId}`, t);
-    // Release is a step like any other, and an organization that has no control
-    // function does not have it. Where nobody holds Control — or where the
-    // project says it wants no gate — the binding verdict releases the revision
-    // at the status it decided on, and issues it as the decider asked.
-    // An outside party that has to approve it answers before anything is
-    // released: the step opens now, and the revision waits.
-    const { openApprovalStep } = await import("./issue-requests");
-    const outside = await openApprovalStep(t, run.revisionId, user);
-    if (outside.opened) {
-      await audit({
-        tenant: t, actor: user, action: "STEP_DISPATCHED", entityType: "Revision", entityId: run.revisionId,
-        entityLabel: `${rev.document.docNumber} rev ${rev.value}`,
-        detail: `Waiting on ${outside.party ?? "an outside party"} to approve it before it is released and issued.`,
-      });
-      await notifyMany(contributorIds, "WORKFLOW_DONE", `Waiting on ${outside.party ?? "an outside party"}: ${rev.document.docNumber} rev ${rev.value}`, "The route is done. It is released and issued when their approval comes back.", `/documents/${rev.documentId}`, t);
-      return;
-    }
-
-    const controllers = await holdersOf(t, "CONTROL");
-    const { issueGateIsControl } = await import("./issue-requests");
-    if (!controllers.length || !(await issueGateIsControl(t))) {
-      const { releaseRevision } = await import("./lifecycle");
-      try {
-        // Releasing is issuing; the act sends what the decider asked for.
-        await releaseRevision(t, run.revisionId, user, rev.statusCode ?? "");
-        await audit({ tenant: t, actor: user, action: "RELEASE", entityType: "Revision", entityId: run.revisionId, entityLabel: `${rev.document.docNumber} rev ${rev.value}`, detail: controllers.length ? "Released on the binding verdict: this project issues without a Document Control gate." : "Released on the binding verdict: this organization publishes no control function." });
-      } catch (e) {
-        await notifyMany(contributorIds, "RELEASE_BLOCKED", `Not released: ${rev.document.docNumber} rev ${rev.value}`, e instanceof Error ? e.message : "Release failed.", `/documents/${rev.documentId}`, t);
-      }
-      return;
-    }
-    await notifyMany(controllers.map((c) => c.id), "RELEASE_READY", `Ready to release: ${rev.document.docNumber} rev ${rev.value}`, `Workflow "${run.templateName}" completed.`, `/documents/${rev.documentId}`, t);
+    await readyForRelease(t, run.revisionId, user, `Workflow "${run.templateName}" completed.`);
     return;
   }
   steps[next].status = "active";
@@ -490,6 +462,51 @@ async function returnWorkflow(t: Tenant, runId: string, user: SessionUser, reaso
   await audit({ tenant: t, actor: user, action: "WORKFLOW_RETURNED", entityType: "WorkflowRun", entityId: runId, entityLabel: `${rev.document.docNumber} rev ${rev.value}`, detail: reason });
   const contributorIds = await contributorRecipients(t, rev.document.createdById, rev.document.originator);
  await notifyMany(contributorIds, "WORKFLOW_RETURNED", `Changes requested: ${rev.document.docNumber} rev ${rev.value}`, `${reason} — prepare the next revision.`, `/documents/${rev.documentId}`, t);
+}
+
+/**
+ * A revision whose content is settled — by its route's binding verdict, or by
+ * being a type that is not reviewed — on its way into the register. An outside
+ * approval asked for opens first and the revision waits; otherwise Document
+ * Control publishes it, or, where there is no gate, it is released at once at
+ * the status it carries and issued as asked. The revision is Not released here.
+ */
+export async function readyForRelease(t: Tenant, revisionId: string, user: SessionUser, why: string, basis = "the binding verdict") {
+  const { db } = t;
+  const rev = await db.revision.findUniqueOrThrow({ where: { id: revisionId }, include: { document: true } });
+  const contributorIds = await contributorRecipients(t, rev.document.createdById, rev.document.originator);
+  // Release is a step like any other, and an organization that has no control
+  // function does not have it. Where nobody holds Control — or where the
+  // project says it wants no gate — the binding verdict releases the revision
+  // at the status it decided on, and issues it as the decider asked.
+  // An outside party that has to approve it answers before anything is
+  // released: the step opens now, and the revision waits.
+  const { openApprovalStep } = await import("./issue-requests");
+  const outside = await openApprovalStep(t, revisionId, user);
+  if (outside.opened) {
+    await audit({
+      tenant: t, actor: user, action: "STEP_DISPATCHED", entityType: "Revision", entityId: revisionId,
+      entityLabel: `${rev.document.docNumber} rev ${rev.value}`,
+      detail: `Waiting on ${outside.party ?? "an outside party"} to approve it before it is released and issued.`,
+    });
+    await notifyMany(contributorIds, "WORKFLOW_DONE", `Waiting on ${outside.party ?? "an outside party"}: ${rev.document.docNumber} rev ${rev.value}`, "The route is done. It is released and issued when their approval comes back.", `/documents/${rev.documentId}`, t);
+    return;
+  }
+
+  const controllers = await holdersOf(t, "CONTROL");
+  const { issueGateIsControl } = await import("./issue-requests");
+  if (!controllers.length || !(await issueGateIsControl(t))) {
+    const { releaseRevision } = await import("./lifecycle");
+    try {
+      // Releasing is issuing; the act sends what the decider asked for.
+      await releaseRevision(t, revisionId, user, rev.statusCode ?? "");
+      await audit({ tenant: t, actor: user, action: "RELEASE", entityType: "Revision", entityId: revisionId, entityLabel: `${rev.document.docNumber} rev ${rev.value}`, detail: controllers.length ? `Released on ${basis}: this project issues without a Document Control gate.` : `Released on ${basis}: this organization publishes no control function.` });
+    } catch (e) {
+      await notifyMany(contributorIds, "RELEASE_BLOCKED", `Not released: ${rev.document.docNumber} rev ${rev.value}`, e instanceof Error ? e.message : "Release failed.", `/documents/${rev.documentId}`, t);
+    }
+    return;
+  }
+  await notifyMany(controllers.map((c) => c.id), "RELEASE_READY", `Ready to release: ${rev.document.docNumber} rev ${rev.value}`, why, `/documents/${rev.documentId}`, t);
 }
 
 async function contributorRecipients(t: Tenant, createdById: string, originator: string | null) {

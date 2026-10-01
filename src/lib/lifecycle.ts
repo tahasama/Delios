@@ -452,7 +452,11 @@ export async function releaseRevision(t: Tenant, revisionId: string, user: Sessi
  if (!status) throw new Error("Status is not in the published set.");
   // §8.1 — no release without recorded approval
   const approval = await db.approval.findFirst({ where: { revisionId }, orderBy: { decidedAt: "desc" } });
- if (!approval) throw new Error("Release blocked: no approval is recorded for this revision.");
+  // A type the organization does not review has no approval to record: the
+  // type's own rule stands in for it, and the record says so.
+  const { releasedWithoutReview } = await import("./review-need");
+  const unreviewed = !approval && !!(await releasedWithoutReview(t, revisionId));
+ if (!approval && !unreviewed) throw new Error("Release blocked: no approval is recorded for this revision.");
   // What releasing means is the project's own answer. Where it means released
   // and issued, somebody has to have said who receives it, and an outside
   // approval still to come holds it. Where releasing stands on its own, only
@@ -565,7 +569,7 @@ export async function releaseRevision(t: Tenant, revisionId: string, user: Sessi
     entityId: revisionId,
     entityLabel: label,
     newValue: `Released at ${status.code}, issued on ${issued} transmittal${issued === 1 ? "" : "s"}`,
-    detail: `Approved by ${approval.approverName} (matrix v${approval.matrixVersion}).${current ? ` Supersedes rev ${current.value}.` : ""}${execFlag ? " Status permits physical execution." : ""}`,
+    detail: `${approval ? `Approved by ${approval.approverName} (matrix v${approval.matrixVersion}).` : `Not reviewed: document type ${doc.docType} is released without review.`}${current ? ` Supersedes rev ${current.value}.` : ""}${execFlag ? " Status permits physical execution." : ""}`,
   });
   if (current) {
     const hist = await historicalRecipientsOfRevision(t, current.id);
