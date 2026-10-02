@@ -4,14 +4,15 @@ import Link from "next/link";
 import { saveRegisterView, deleteRegisterView } from "@/lib/actions/register-views";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowDown, ArrowLeftRight, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, Download, GitPullRequestArrow, Minus, PackagePlus, Pin, PinOff, Plus, Search, X } from "lucide-react";
+import { ArrowDown, ArrowLeftRight, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, Download, GitPullRequestArrow, Minus, PackagePlus, Pin, PinOff, Plus, Search, Send, X } from "lucide-react";
+import { sendSupplierFromRegisterAction as sendFromRegister } from "@/lib/actions/supplier";
 import { DataTable } from "@/components/data-table";
 import { DateWindow } from "@/components/date-window";
 import { Th, Td, Info } from "@/components/ui";
 import { useCardHeight } from "@/components/card-height";
 
 /** Available from the Columns menu; off until someone wants them. */
-const OPTIONAL = ["Document state", "Review verdict", "Originator", "Sub-project", "Contract", "Criticality", "Confidentiality", "Planned submission", "Issued", "Released", "Decided by", "In packages", "Kept for", "Produced by", "Revision started", "File added"];
+const OPTIONAL = ["Received from", "Document state", "Review verdict", "Originator", "Sub-project", "Contract", "Criticality", "Confidentiality", "Planned submission", "Issued", "Released", "Decided by", "In packages", "Kept for", "Produced by", "Revision started", "File added"];
 
 /** Which column each date filter talks about, so filtering by it shows it. */
 const DATE_COLUMN: Record<string, string> = {
@@ -21,7 +22,9 @@ const DATE_COLUMN: Record<string, string> = {
 
 type RegisterRow = {
   id: string; docNumber: string; title: string; deliverableType: string; docType: string; discipline: string;
-  originator: string | null; subProject: string | null; contractRef: string | null; criticality: string | null;
+  originator: string | null; subProject: string | null;
+  /** For an outside organization: who asked it of them. Their sendable revision, once a file is on it. */
+  receivedFrom?: string | null; sendRevisionId?: string | null; contractRef: string | null; criticality: string | null;
   confidentiality: string | null; retentionClass: string | null; retentionLabel: string | null; placeholder: boolean;
   docTypeLabel: string; disciplineLabel: string; deliverableLabel: string;
   docState: string; docStateLabel: string;
@@ -88,7 +91,9 @@ type Column = {
   cell: (row: RegisterRow, codes: Record<string, string>) => React.ReactNode;
 };
 
-export function DocumentRegister({ rows, total, userCanAct, filters, filterOptions, exportHref, plate, paging, codes, sort, views }: {
+export function DocumentRegister({ rows, total, userCanAct, filters, filterOptions, exportHref, plate, paging, codes, sort, views, supplier }: {
+  /** The reader is an outside organization: what they owe can be sent from here. */
+  supplier?: { to: string } | null;
   rows: RegisterRow[]; total: number; userCanAct: boolean;
   /** The questions this reader keeps, and the address each one asks. */
   views: { id: string; name: string; query: string }[];
@@ -160,6 +165,7 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
   // A filter whose column is hidden leaves the reader staring at rows with no
   // sign of why they match. Filtering by supplier shows the supplier column.
   const forced = [
+    supplier && "Received from",
     filters.state && "Document state",
     filters.verdict && "Review verdict",
     filters.status && "Released for",
@@ -550,6 +556,15 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
       <span className="px-2 font-mono text-sm tabular-nums">{allMatching ? total.toLocaleString("en-GB") : selected.length}<span className="ml-1.5 text-[10px] uppercase tracking-[0.12em] text-white/60">selected</span></span>
       {userCanAct ? (selectedRevisionIds.length ? <Link href={`/reviews/send?revisions=${encodeURIComponent(selectedRevisionIds.join(","))}`} className="inline-flex items-center gap-1.5 rounded-sm bg-[#d9a441] px-3 py-2 text-xs font-semibold text-brand-ink"><GitPullRequestArrow className="h-4 w-4" /> Send for review ({selectedRevisionIds.length})</Link> : <span className="inline-flex items-center gap-1.5 rounded-sm bg-white/10 px-3 py-2 text-xs font-semibold text-white/55" title="Only documents with a revision being prepared can be sent"><GitPullRequestArrow className="h-4 w-4" /> Nothing ready to send</span>) : null}
       {transmittableRows.length ? <Link href={transmittalHref} className="inline-flex items-center gap-1.5 rounded-sm bg-white/10 px-3 py-2 text-xs font-semibold hover:bg-white/15"><ArrowLeftRight className="h-4 w-4" /> Create transmittal ({transmittableRows.length})</Link> : <span className="inline-flex items-center gap-1.5 rounded-sm bg-white/10 px-3 py-2 text-xs font-semibold text-white/55" title="Only current released revisions may be sent on an outgoing transmittal"><ArrowLeftRight className="h-4 w-4" /> No released revision to transmit</span>}
+      {supplier ? (() => {
+        const sendable = selectedRows.map((row) => row.sendRevisionId).filter((id): id is string => !!id);
+        return sendable.length ? (
+          <form action={sendFromRegister}>
+            {sendable.map((id) => <input key={id} type="hidden" name="revisionId" value={id} />)}
+            <button type="submit" className="inline-flex items-center gap-1.5 rounded-sm bg-[#d9a441] px-3 py-2 text-xs font-semibold text-brand-ink"><Send className="h-4 w-4" /> Send to {supplier.to} ({sendable.length})</button>
+          </form>
+        ) : <span className="inline-flex items-center gap-1.5 rounded-sm bg-white/10 px-3 py-2 text-xs font-semibold text-white/55" title="Only documents with a file attached and not yet sent"><Send className="h-4 w-4" /> Nothing ready to send</span>;
+      })() : null}
       {userCanAct ? <Link href={`/packages/add?docs=${encodeURIComponent(selected.join(","))}`} className="inline-flex items-center gap-1.5 rounded-sm bg-white/10 px-3 py-2 text-xs font-semibold hover:bg-white/15"><PackagePlus className="h-4 w-4" /> Add to package</Link> : null}
       <a
         href={selectedExportHref}
@@ -626,6 +641,12 @@ The revision is not released, so this status is not in force.`} href={GUIDE.STAT
     note: "Who produces this kind of deliverable — our own engineering, a contractor, a vendor, the client. It decides which numbering scheme the document is numbered under.",
     cellClass: "max-w-40 truncate text-xs text-slate-600",
     cell: (row) => row.deliverableLabel,
+  },
+  {
+    key: "receivedFrom", label: "Received from",
+    note: "Who asked this document of you. They created the placeholder; you send the file.",
+    cellClass: "whitespace-nowrap text-xs text-slate-600",
+    cell: (row) => row.receivedFrom ?? <Muted />,
   },
   {
     key: "originator", sort: "originator",

@@ -37,11 +37,13 @@ export async function SupplierPackage({ pkg }: { pkg: { id: string; compositionO
   const rows = await supplierRows(ctx, pkg);
   const f = supplierFigures(rows);
   const org = (await ctx.db.scopeConfig.findFirst())?.organizationName ?? "us";
-  const canSendRow = (s: SupplierState) => isSupplier && WITH_SUPPLIER.includes(s);
+  // The supplier sends its own files; for a supplier not on the system,
+  // Document Control attaches what arrived, line by line, on their behalf.
+  const canSendRow = (s: SupplierState) => (isSupplier || staff) && WITH_SUPPLIER.includes(s);
 
   const table = (
     <div>
-      <DataTable className="rounded-none border-0 shadow-none" id={isSupplier ? "supplier-package-own" : "supplier-package"} head={<tr><Th>Document</Th><Th>Submit by</Th><Th>Status</Th><Th>{isSupplier ? "Your file" : "Next"}</Th></tr>}>
+      <DataTable className="rounded-none border-0 shadow-none" id={isSupplier ? "supplier-package-own" : "supplier-package"} head={<tr><Th>Document</Th><Th>Submit by</Th><Th>Status</Th><Th>{isSupplier ? "Your file" : "Next, or the file they sent"}</Th></tr>}>
           {rows.map((r) => (
             <tr key={r.doc.id}>
               <Td>
@@ -173,10 +175,13 @@ export async function SupplierPackage({ pkg }: { pkg: { id: string; compositionO
           <span className="stencil text-slate-600">{isSupplier ? "Send documents" : "Documents"}</span>
           <span className="text-[11px] text-slate-500">{f.pendingSupplier} with {isSupplier ? "you" : pkg.recipientName} · {f.pendingOurs} with {isSupplier ? org : "us"}</span>
         </div>
-        {isSupplier ? (
-          <ActionForm action={submitSupplierPackageAction} submitLabel={`Send to ${org}`} hidden={{ packageId: pkg.id }}>
+        {isSupplier || (staff && waiting) ? (
+          <ActionForm action={submitSupplierPackageAction} submitLabel={isSupplier ? `Send to ${org}` : `Record what ${pkg.recipientName} sent`} hidden={{ packageId: pkg.id }}>
             {table}
-            <div className="px-5 sm:px-6">{waiting ? <FileTally waiting={waiting} /> : <p className="text-[12px] text-slate-500">Nothing is waiting on you right now.</p>}</div>
+            <div className="space-y-1 px-5 sm:px-6">
+              {!isSupplier ? <p className="text-[12px] text-slate-500">Received outside the system? Attach each file to its line — the delivery list&apos;s titles say which is which. Files go in under our numbers; the supplier&apos;s own number can stay inside the document.</p> : null}
+              {waiting ? <FileTally waiting={waiting} who={isSupplier ? "you" : pkg.recipientName} /> : <p className="text-[12px] text-slate-500">Nothing is waiting on you right now.</p>}
+            </div>
           </ActionForm>
         ) : table}
       </section>

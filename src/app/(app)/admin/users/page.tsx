@@ -97,6 +97,12 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Field label="Their email" required><input type="email" name="email" required className={inputCls} placeholder="the address they sign in with" /></Field>
                 <Field label="Function here" required><select name="functionId" required className={inputCls} defaultValue=""><option value="" disabled>Choose…</option>{functionOptions}</select></Field>
+                <Field label="They represent" required hint="the organization they are on this project — a supplier, a client">
+                  <select name="partyId" required className={inputCls} defaultValue="">
+                    <option value="" disabled>Choose…</option>
+                    {externalParties.filter((p) => p.active).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  </select>
+                </Field>
                 {projectPicker}
               </div>
             </ActionForm>

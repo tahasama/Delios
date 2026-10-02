@@ -4,6 +4,7 @@ import { RegisterPlate } from "./register-plate";
 import { OUTCOME_CONSEQUENCES, DOC_STATES, DOC_STATE_LABEL, DOC_MEANING, REV_STATES, REV_MEANING, type DocState, type RevState } from "@/lib/standard";
 import { getSet } from "@/lib/config";
 import { DocumentRegister } from "./document-register";
+import { Banner } from "@/components/ui";
 import { registerWhere, REGISTER_SORTS, documentsForAssets, readSearch, readDay } from "@/lib/register-query";
 import { isReadOnly } from "@/lib/auth";
 
@@ -43,6 +44,8 @@ const DATE_FIELDS = [
   { key: "updated", label: "Changed" },
 ] as const;
 type Search = {
+  sent?: string;
+  sendError?: string;
   on?: string;
   from?: string;
   to?: string;
@@ -154,6 +157,8 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
   //   document state · revision state · review verdict · released for (status).
   // Older revisions and their history live on the document page; who is holding
   // a review up, and the comments on it, live on the review.
+  const supplierView = !user.isInternal && !!user.partyCode;
+  const hostName = supplierView ? (await db.scopeConfig.findFirst())?.organizationName ?? "Our client" : null;
   const all = docs.map((doc) => {
     const latest = doc.revisions[0] ?? null;
     const current = doc.revisions.find((revision) => revision.state === "RELEASED") ?? null;
@@ -199,6 +204,10 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
       revStarted: latest?.createdAt.toISOString() ?? null,
       // for actions on a selection, not for display
       hasReleased: !!current, reviewRevisionId: working?.id ?? null,
+      // An outside organization sees who asked it of them, and can send what
+      // has its file attached and is not yet on its way.
+      receivedFrom: supplierView && doc.originator === user.partyCode ? hostName : null,
+      sendRevisionId: supplierView && doc.originator === user.partyCode && working && (working.renditionFileId || working.nativeFileId) && !working.submittedAt ? working.id : null,
     };
   });
   const rows = all;
@@ -230,7 +239,10 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
 
 
   return <div className="space-y-4">
+    {sp.sent ? <Banner tone="good" title="Sent">{sp.sent}</Banner> : null}
+    {sp.sendError ? <Banner tone="warn" title="Not sent">{sp.sendError}</Banner> : null}
     <DocumentRegister
+      supplier={supplierView ? { to: hostName ?? "them" } : null}
       plate={<RegisterPlate project={{ code: project.code, name: project.name }} canCreate={!isReadOnly(user)} />}
       rows={rows}
       total={matchCount}

@@ -115,6 +115,20 @@ export const getScope = cache(async (): Promise<Scope | null> => {
   // Someone from another party is not staff: their register holds what their own
   // party produced and what was issued to them, and nothing else. Applied here,
   // so no page can forget it.
+  // Someone whose account lives in another organization is never staff here.
+  // The project says which of its organizations they represent; without that
+  // they see only what was issued to them.
+  const guest = user.orgId !== hostOrgId;
+  const represents = guest && chosen.partyId
+    ? await bootstrap.db.party.findFirst({ where: { id: chosen.partyId }, select: { id: true, code: true, name: true } })
+    : null;
+  if (guest) {
+    user.isInternal = false;
+    user.partyId = represents?.id ?? null;
+    user.partyCode = represents?.code ?? null;
+    user.partyName = represents?.name ?? user.partyName;
+    user.organization = represents?.name ?? user.organization;
+  }
   const party = user.partyCode
     ? await bootstrap.db.party.findFirst({ where: { code: user.partyCode }, select: { name: true } })
     : null;

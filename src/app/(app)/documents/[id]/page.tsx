@@ -31,6 +31,7 @@ import { setLegalHoldAction, disposeDocumentAction } from "@/lib/actions/retenti
 import { getRunForRevision } from "@/lib/workflow";
 import { WorkflowPanel } from "./workflow-panel";
 import type { StepItem } from "./next-step";
+import { SupplierDelivery } from "./supplier-delivery";
 import { Timeline } from "@/components/timeline";
 import { DocTabs } from "./doc-tabs";
 import { ArrowLeft, ChevronRight, Download, ExternalLink, FileText, Send } from "lucide-react";
@@ -525,7 +526,10 @@ export default async function DocumentDetailPage({
 
       {/* Where is it — always in view */}
       <section id="workflow" className="scroll-mt-28">
-        <WorkflowPanel doc={doc} user={user} lead={lead} extra={extra} />
+        {/* A supplier sees its own delivery: attach, then send. */}
+        {!user.isInternal && user.partyCode && doc.originator === user.partyCode
+          ? <SupplierDelivery documentId={doc.id} />
+          : <WorkflowPanel doc={doc} user={user} lead={lead} extra={extra} />}
       </section>
 
       {/* Everything else, one tab at a time */}

@@ -37,8 +37,13 @@ export async function inviteGuestAction(
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const functionId = String(formData.get("functionId") ?? "").trim();
   const projectIds = formData.getAll("projectIds").map(String).filter(Boolean);
+  const partyId = String(formData.get("partyId") ?? "").trim();
 
   if (!email) return { error: "Enter the email of the person you are inviting." };
+  // On this project they are one of our outside organizations — the one whose
+  // documents they deliver, and whose register they see — never staff.
+  const represents = partyId ? await db.party.findFirst({ where: { id: partyId, isInternal: false, active: true } }) : null;
+  if (!represents) return { error: "Choose the organization they represent here — add it in Organizations if it is missing." };
   if (!projectIds.length) return { error: "Choose at least one project — a guest is invited to a project, not to your organization." };
 
   const fn = await db.function.findFirst({ where: { id: functionId, active: true } });
@@ -79,9 +84,9 @@ export async function inviteGuestAction(
       where: { projectId_userId: { projectId: project.id, userId: guest.id } },
     });
     if (existing) {
-      await db.projectMembership.update({ where: { id: existing.id }, data: { functionId: fn.id, active: true } });
+      await db.projectMembership.update({ where: { id: existing.id }, data: { functionId: fn.id, active: true, partyId: represents.id } });
     } else {
-      await db.projectMembership.create({ data: { projectId: project.id, userId: guest.id, functionId: fn.id } });
+      await db.projectMembership.create({ data: { projectId: project.id, userId: guest.id, functionId: fn.id, partyId: represents.id } });
       added++;
     }
   }
@@ -100,7 +105,7 @@ export async function inviteGuestAction(
     entityId: guest.id,
     entityLabel: `${guest.name} (${guest.org.name})`,
     newValue: fn.name,
-    detail: `Invited to ${permitted.map((p) => p.code).join(", ")} as ${fn.name}. Their account remains with ${guest.org.name}.`,
+    detail: `Invited to ${permitted.map((p) => p.code).join(", ")} as ${fn.name}, representing ${represents.name}. Their account remains with ${guest.org.name}.`,
   });
 
   revalidatePath("/admin/users");

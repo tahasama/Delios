@@ -122,6 +122,9 @@ model ProjectMembership {
   // The department (discipline code) this person answers for on the project —
   // who receives the department's requirements call and confirms readiness.
   department String?
+  // Someone whose account lives in another organization: which of this
+  // project's organizations they represent here (a supplier, a client).
+  partyId    String?
   active     Boolean  @default(true)
   createdAt  DateTime @default(now())
 

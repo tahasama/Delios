@@ -7,7 +7,7 @@ import { useEffect, useRef, useState } from "react";
  * documents waiting on the supplier have a file attached, and how many stay
  * with them. Counts the file inputs of the form it sits in.
  */
-export function FileTally({ waiting }: { waiting: number }) {
+export function FileTally({ waiting, who = "you" }: { waiting: number; who?: string }) {
   const here = useRef<HTMLParagraphElement>(null);
   const [attached, setAttached] = useState(0);
   useEffect(() => {
@@ -22,7 +22,7 @@ export function FileTally({ waiting }: { waiting: number }) {
     <p ref={here} className="text-[12px] text-slate-600">
       {attached
         ? <><strong className="text-slate-800">{attached}</strong> of {waiting} ready to send{left ? <> · <span className="text-amber-700">{left} still without a file</span></> : " · nothing left out"}</>
-        : <>{waiting} document{waiting === 1 ? "" : "s"} waiting on you — attach a file next to each one you are sending.</>}
+        : <>{waiting} document{waiting === 1 ? "" : "s"} waiting on {who} — attach a file next to each one being sent.</>}
     </p>
   );
 }
