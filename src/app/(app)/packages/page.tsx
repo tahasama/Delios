@@ -84,7 +84,7 @@ export default async function PackagesPage({ searchParams }: { searchParams: Pro
                   const f = supplierStats.get(pkg.id)!;
                   return (
                     <tr key={pkg.id} className="hover:bg-tint-soft">
-                      <td className={td}><Link href={`/packages/${pkg.identifier}`} className="font-semibold text-brand-ink hover:underline">{pkg.recipientName}</Link><span className="block font-mono text-[11px] text-slate-400">{pkg.identifier}</span></td>
+                      <td className={td}><Link href={`/packages/${pkg.identifier}`} className="font-semibold text-brand-ink hover:underline">{pkg.title ?? pkg.recipientName}</Link><span className="block font-mono text-[11px] text-slate-400">{pkg.identifier}</span></td>
                       <td className={`${td} text-xs`}>{f.arrived} of {f.planned} <span className="text-slate-400">({f.submissionProgress}%)</span></td>
                       <td className={`${td} text-xs ${f.notArrivedLate ? "font-semibold text-red-700" : "text-slate-400"}`}>{f.notArrivedLate || "—"}</td>
                       <td className={`${td} text-xs`}>{f.pendingOurs} with us · {f.pendingSupplier} with them</td>

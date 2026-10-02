@@ -87,7 +87,15 @@ export async function addPackageMemberAction(_prev: { error?: string } | undefin
   const requiredStatus = formData.getAll("requiredStatus").map(String).filter(Boolean).join(",");
   const pkg = await db.package.findUniqueOrThrow({ where: { id: packageId }, include: { members: true } });
   if (pkg.closedAt) return { error: "The package is closed — its contents are fixed." };
-  if (pkg.category === "SUPPLIER") return { error: "A supplier package holds every document from that supplier automatically." };
+  if (pkg.category === "SUPPLIER") {
+    // Everything from the supplier is in it already; adding puts back what was taken out.
+    const back = documentIds;
+    if (!back.length) return { error: "Tick the documents to put back." };
+    await db.package.update({ where: { id: packageId }, data: { membershipExcluded: JSON.stringify(parseExcluded(pkg.membershipExcluded).filter((id) => !back.includes(id))) } });
+    await audit({ actor: user, action: "PACKAGE_MEMBER", entityType: "Package", entityId: pkg.identifier, entityLabel: pkg.identifier, detail: `${back.length} document(s) put back.` });
+    revalidatePath(`/packages/${pkg.identifier}`);
+    return {};
+  }
   // A defined package is composed by its owner (or Document Control) until it closes (§15.2).
   if (pkg.type === "DEFINED" && !ownerIds(pkg).includes(user.id) && !isController(user) && !isAdmin(user)) {
     return { error: `Only ${pkg.compositionOwnerName} or Document Control can change what is in this package.` };
@@ -246,19 +254,20 @@ export async function removePackageMemberAction(_prev: { error?: string } | unde
   if (isReadOnly(user)) return { error: "Viewers cannot change composition." };
   const packageId = String(formData.get("packageId") ?? "");
   const documentIds = formData.getAll("documentId").map(String).filter(Boolean);
-  const reason = String(formData.get("reason") ?? "").trim();
   const pkg = await db.package.findUniqueOrThrow({ where: { id: packageId }, include: { members: { include: { document: { select: { docNumber: true } } } } } });
   if (pkg.closedAt) return { error: "The package is delivered — its contents are fixed." };
   if (!ownerIds(pkg).includes(user.id) && !isController(user) && !isAdmin(user)) {
     return { error: `Only ${pkg.compositionOwnerName} or Document Control can change what is in this package.` };
   }
-  if (!reason) return { error: "Say why they are taken out — it goes on the record." };
-  const going = pkg.members.filter((m) => documentIds.includes(m.documentId));
+  // A supplier package holds no rows of its own: what is taken out is simply kept out.
+  const going = pkg.category === "SUPPLIER"
+    ? (await db.document.findMany({ where: { id: { in: documentIds }, originator: pkg.partyCode ?? "-" }, select: { id: true, docNumber: true } })).map((one) => ({ documentId: one.id, document: { docNumber: one.docNumber } }))
+    : pkg.members.filter((m) => documentIds.includes(m.documentId));
   if (!going.length) return { error: "Tick the documents to take out." };
   await db.packageMember.deleteMany({ where: { packageId, documentId: { in: going.map((m) => m.documentId) } } });
   const excluded = [...new Set([...parseExcluded(pkg.membershipExcluded), ...going.map((m) => m.documentId)])];
   await db.package.update({ where: { id: packageId }, data: { membershipExcluded: JSON.stringify(excluded), assessedAt: null, shortfall: null, shortfallIssuedAt: null, shortfallAcceptedBy: null } });
-  await audit({ actor: user, action: "PACKAGE_MEMBER", entityType: "Package", entityId: pkg.identifier, entityLabel: pkg.identifier, detail: `Taken out: ${going.map((m) => m.document.docNumber).join(", ")}. ${reason}` });
+  await audit({ actor: user, action: "PACKAGE_MEMBER", entityType: "Package", entityId: pkg.identifier, entityLabel: pkg.identifier, detail: `Taken out: ${going.map((m) => m.document.docNumber).join(", ")}.` });
   revalidatePath(`/packages/${pkg.identifier}`);
   return {};
 }
@@ -284,6 +293,46 @@ export async function setPackageRuleAction(_prev: { error?: string } | undefined
   await audit({ actor: user, action: "PACKAGE_RULE", entityType: "Package", entityId: pkg.identifier, entityLabel: pkg.identifier, oldValue: pkg.membershipRule, newValue: rule, detail: rule ? `Fills itself with ${rule}; ${joined} document${joined === 1 ? "" : "s"} joined.` : "No rule: documents are added by hand only." });
   revalidatePath(`/packages/${pkg.identifier}`);
   return {};
+}
+
+/** Rename a package, or change its description, while it is open. */
+export async function updatePackageAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
+  const ctx = await requireScope();
+  const { user, db } = ctx;
+  const packageId = String(formData.get("packageId") ?? "");
+  const title = String(formData.get("title") ?? "").trim();
+  const description = String(formData.get("description") ?? "").trim() || null;
+  const pkg = await db.package.findUniqueOrThrow({ where: { id: packageId } });
+  if (pkg.closedAt) return { error: "The package is delivered — it is kept as it was." };
+  if (!ownerIds(pkg).includes(user.id) && !isController(user) && !isAdmin(user)) {
+    return { error: `Only ${pkg.compositionOwnerName}, Document Control or an administrator changes this package.` };
+  }
+  if (!title) return { error: "Give the package a name." };
+  await db.package.update({ where: { id: packageId }, data: { title, description } });
+  await audit({ actor: user, action: "PACKAGE_EDITED", entityType: "Package", entityId: pkg.identifier, entityLabel: pkg.identifier, oldValue: pkg.title, newValue: title, detail: "Name or description changed." });
+  revalidatePath(`/packages/${pkg.identifier}`);
+  revalidatePath("/packages");
+  return {};
+}
+
+/**
+ * Delete a package that was never delivered. Its documents stay in the register;
+ * only the package goes. The number is not given out again.
+ */
+export async function deletePackageAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
+  const ctx = await requireScope();
+  const { user, db } = ctx;
+  const packageId = String(formData.get("packageId") ?? "");
+  const reason = String(formData.get("reason") ?? "").trim();
+  const pkg = await db.package.findUniqueOrThrow({ where: { id: packageId } });
+  if (!ownerIds(pkg).includes(user.id) && !isController(user) && !isAdmin(user)) return { error: "Whoever created the package, Document Control or an administrator deletes it." };
+  if (pkg.closedAt) return { error: "A delivered package is kept — it is the record of what was handed over." };
+  if (!reason) return { error: "Say why it is deleted — it goes on the record." };
+  await db.packageMember.deleteMany({ where: { packageId } });
+  await db.package.delete({ where: { id: packageId } });
+  await audit({ actor: user, action: "PACKAGE_DELETED", entityType: "Package", entityId: pkg.identifier, entityLabel: pkg.identifier, oldValue: pkg.title ?? pkg.recipientName, detail: reason });
+  revalidatePath("/packages");
+  redirect(`/packages?category=${pkg.category}`);
 }
 
 /** The acceptance authority accepts the delivered package: the last step. */

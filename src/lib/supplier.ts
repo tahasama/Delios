@@ -43,10 +43,27 @@ export type SupplierRow = {
   submissions: number;    // revisions ever submitted — 1 means first-time
 };
 
-export async function supplierRows(t: Tenant, pkg: { partyCode: string | null; completionDate: Date }): Promise<SupplierRow[]> {
+export async function supplierRows(t: Tenant, pkg: { partyCode: string | null; completionDate: Date; membershipFilter?: string | null; membershipExcluded?: string | null }): Promise<SupplierRow[]> {
   if (!pkg.partyCode) return [];
+  // Everything from the supplier, narrowed by the package's rule if it has one,
+  // less what was taken out by hand.
+  const { parseFilter, parseExcluded } = await import("./package-rule");
+  const filter = parseFilter(pkg.membershipFilter);
+  const excluded = parseExcluded(pkg.membershipExcluded);
+  const tagged = filter?.assetIds?.length
+    ? (await t.db.relationship.findMany({ where: { kind: "DOC_ASSET", toId: { in: filter.assetIds } }, select: { fromId: true } })).map((one) => one.fromId)
+    : null;
   const docs = await t.db.document.findMany({
-    where: { originator: pkg.partyCode, state: { notIn: ["CANCELLED", "WITHDRAWN"] } },
+    where: {
+      originator: pkg.partyCode,
+      state: { notIn: ["CANCELLED", "WITHDRAWN"] },
+      ...(filter?.disciplines?.length ? { discipline: { in: filter.disciplines } } : {}),
+      ...(filter?.docTypes?.length ? { docType: { in: filter.docTypes } } : {}),
+      AND: [
+        ...(tagged ? [{ id: { in: tagged } }] : []),
+        ...(excluded.length ? [{ id: { notIn: excluded } }] : []),
+      ],
+    },
     orderBy: { docNumber: "asc" },
     include: {
       // Needed-by dates from the approved requirements list are the supplier's baseline.

@@ -96,9 +96,10 @@ export async function matchingDocuments(t: Tenant, filter: PackageFilter): Promi
 export async function syncPackage(t: Tenant, packageId: string): Promise<number> {
   const pkg = await t.db.package.findFirst({
     where: { id: packageId },
-    select: { id: true, closedAt: true, ruleCeasedAt: true, membershipFilter: true, membershipExcluded: true, requiredStatus: true, members: { select: { documentId: true } } },
+    select: { id: true, category: true, closedAt: true, ruleCeasedAt: true, membershipFilter: true, membershipExcluded: true, requiredStatus: true, members: { select: { documentId: true } } },
   });
-  if (!pkg || pkg.closedAt || pkg.ruleCeasedAt) return 0;
+  // A supplier package is read from the supplier's documents, never stored.
+  if (!pkg || pkg.category === "SUPPLIER" || pkg.closedAt || pkg.ruleCeasedAt) return 0;
   const filter = parseFilter(pkg.membershipFilter);
   if (!filter) return 0;
   const have = new Set([...pkg.members.map((one) => one.documentId), ...parseExcluded(pkg.membershipExcluded)]);

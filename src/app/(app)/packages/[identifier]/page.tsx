@@ -9,6 +9,8 @@ import { syncPackage, parseFilter, meetsStatus, statusList, recipientIds, accept
 import { SearchPick } from "@/components/search-pick";
 import { isAdmin } from "@/lib/auth";
 import { RuleFields } from "../rule-fields";
+import { manageItems } from "../manage-items";
+import { isController } from "@/lib/auth";
 import { getActiveSet } from "@/lib/config";
 import { fmtDate, fmtDateTime, cn } from "@/lib/utils";
 import { ArrowLeft } from "lucide-react";
@@ -38,6 +40,7 @@ export default async function PackageDetailPage({ params, searchParams }: { para
   });
   if (!pkg) notFound();
   if (pkg.category === "SUPPLIER") return <SupplierPackage pkg={pkg} />;
+  const staff = isController(user) || isAdmin(user);
   const [statuses, reasons, candidates, delivery] = await Promise.all([
     getActiveSet("STATUSES"),
     getActiveSet("REASONS_FOR_ISSUE"),
@@ -139,7 +142,6 @@ export default async function PackageDetailPage({ params, searchParams }: { para
           <div className="-mx-5 border-y border-line sm:-mx-6">
             <RevisionChecklist name="documentId" rows={pkg.members.map((m) => ({ id: m.documentId, number: m.document.docNumber, rev: m.document.revisions[0]?.value ?? "—", status: m.document.revisions[0]?.statusCode ?? null, title: m.document.title }))} />
           </div>
-          <Field label="Why" required hint="goes on the record"><input name="reason" required className={inputCls} /></Field>
           {pkg.membershipRule ? <p className="text-[11px] text-slate-500">A document the rule matches stays out until someone adds it back by hand.</p> : null}
         </ActionForm>
       ),
@@ -154,6 +156,7 @@ export default async function PackageDetailPage({ params, searchParams }: { para
         </ActionForm>
       ),
     });
+    items.push(...manageItems(pkg, { mayEdit: staff || acceptorIds(pkg).includes(user.id) || pkg.compositionOwnerId === user.id || (pkg.compositionOwnerIds ?? "").includes(user.id), mayDelete: staff || pkg.compositionOwnerId === user.id || (pkg.compositionOwnerIds ?? "").includes(user.id) }));
   }
 
   return (
