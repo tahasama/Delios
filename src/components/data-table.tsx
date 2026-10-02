@@ -460,7 +460,10 @@ function exportShown(table: HTMLTableElement | null, name: string) {
   const text = (cell: Element) => {
     // A cell holding a list reads one item per line.
     const items = [...cell.querySelectorAll("li")];
-    const raw = items.length ? items.map((one) => (one as HTMLElement).innerText.trim()).join("\n") : (cell as HTMLElement).innerText.trim();
+    // Headers as written, not as the screen capitalises them.
+    const raw = cell.tagName === "TH"
+      ? (cell.textContent ?? "").replace(/\s+/g, " ").trim()
+      : items.length ? items.map((one) => (one as HTMLElement).innerText.trim()).join("\n") : (cell as HTMLElement).innerText.trim();
     return `"${raw.replace(/"/g, '""')}"`;
   };
   const lines = [...table.querySelectorAll("tr")].map((row) => [...row.children].filter(shown).map(text).join(","));

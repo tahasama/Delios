@@ -2,7 +2,7 @@ import Link from "next/link";
 import { requireScope } from "@/lib/scope";
 import { notFound } from "next/navigation";
 import { Timeline } from "@/components/timeline";
-import { Card, Chip, Info, Field, inputCls, Banner } from "@/components/ui";
+import { Card, Chip, Info, Field, inputCls, Banner, DataTable, Th, Td } from "@/components/ui";
 import { ActionForm } from "@/components/form";
 import { addPackageMemberAction, removePackageMemberAction, setPackageRuleAction, assessPackageAction, issueShortfallAction, closePackageAction, acceptShortfallAction, acceptPackageAction } from "@/lib/actions/planning";
 import { syncPackage, parseFilter, meetsStatus, statusList, recipientIds, acceptorIds } from "@/lib/package-rule";
@@ -52,6 +52,18 @@ export default async function PackageDetailPage({ params, searchParams }: { para
     }),
     db.transmittal.findMany({ where: { OR: [{ packageId: pkg.id }, ...(pkg.transmittalId ? [{ id: pkg.transmittalId }] : [])] }, orderBy: { number: "asc" }, select: { id: true, number: true } }),
   ]);
+  // Each document's latest revision and what its reviews said — the comments
+  // column shows those, and nothing from older revisions.
+  const latestRevs = await db.revision.findMany({
+    where: { documentId: { in: pkg.members.map((m) => m.documentId) } },
+    orderBy: { createdAt: "desc" },
+    select: { documentId: true, value: true, cycles: { orderBy: { sequence: "asc" }, select: { comments: { orderBy: { createdAt: "asc" }, select: { authorName: true, text: true, progressionPreventing: true, status: true } } } } },
+  });
+  const latestComments = new Map<string, { rev: string; comments: { by: string; text: string; blocking: boolean; settled: boolean }[] }>();
+  for (const one of latestRevs) {
+    if (latestComments.has(one.documentId)) continue;
+    latestComments.set(one.documentId, { rev: one.value, comments: one.cycles.flatMap((cy) => cy.comments.map((c) => ({ by: c.authorName, text: c.text, blocking: c.progressionPreventing, settled: c.status === "CLOSED" }))) });
+  }
   const shortfall: { docNumber: string; requiredStatus: string; currentStatus: string; reason: string; expectedDate: string | null }[] | null = pkg.shortfall ? JSON.parse(pkg.shortfall) : null;
   const isAcceptor = acceptorIds(pkg).includes(user.id);
   const overdue = pkg.completionDate < new Date() && !pkg.closedAt;
@@ -203,21 +215,34 @@ export default async function PackageDetailPage({ params, searchParams }: { para
             <span className="text-[11px] text-slate-500">{readyCount} of {total} released at the status they need{pkg.membershipRule && !pkg.closedAt ? ` · ${pkg.membershipRule} joins by itself` : ""}</span>
           </div>
           {total ? (
-            <ul className="divide-y divide-line">
+            <DataTable className="rounded-none border-0 shadow-none" id="delivery-package" exportName={pkg.identifier} defaultHidden={["Comments"]} head={<tr><Th>Document</Th><Th>Title</Th><Th>Has</Th><Th>Needs</Th><Th>Ready</Th><Th>Comments</Th></tr>}>
               {pkg.members.map((m) => {
                 const cur = m.document.revisions[0];
                 const ok = meetsStatus(cur?.statusCode, m.requiredStatus);
                 const why = shortfallFor.get(m.document.docNumber)?.reason;
+                const said = latestComments.get(m.documentId);
                 return (
-                  <li key={m.id} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 px-5 py-2.5 sm:grid-cols-[minmax(0,19rem)_minmax(0,1fr)_8rem_auto] sm:px-6">
-                    <Link href={`/documents/${m.documentId}`} className="doc-number truncate">{m.document.docNumber}</Link>
-                    <span className="hidden truncate text-[12.5px] text-slate-500 sm:block">{m.document.title}{why && !ok ? <span className="block text-[11px] text-amber-700">{why}</span> : null}</span>
-                    <span className="hidden text-xs text-slate-600 sm:block" title={statusMeaning.get(m.requiredStatus) ?? undefined}>{cur ? <>rev {cur.value} · {cur.statusCode}</> : "not released"} <span className="text-slate-400">/ {statusList(m.requiredStatus).join(" or ")}</span></span>
-                    {ok ? <Chip className="bg-emerald-100 text-emerald-800 ring-emerald-300">ready</Chip> : <Chip className="bg-amber-100 text-amber-800 ring-amber-300">not ready</Chip>}
-                  </li>
+                  <tr key={m.id}>
+                    <Td><Link href={`/documents/${m.documentId}`} className="doc-number">{m.document.docNumber}</Link></Td>
+                    <Td className="max-w-72 text-[12.5px] text-slate-500">{m.document.title}{why && !ok ? <span className="block text-[11px] text-amber-700">{why}</span> : null}</Td>
+                    <Td className="whitespace-nowrap text-xs text-slate-600">{cur ? <>rev {cur.value} · {cur.statusCode}</> : "not released"}</Td>
+                    <Td className="whitespace-nowrap text-xs text-slate-600" title={statusMeaning.get(m.requiredStatus) ?? undefined}>{statusList(m.requiredStatus).join(" or ")}</Td>
+                    <Td>{ok ? <Chip className="bg-emerald-100 text-emerald-800 ring-emerald-300">ready</Chip> : <Chip className="bg-amber-100 text-amber-800 ring-amber-300">not ready</Chip>}</Td>
+                    <Td className="min-w-64 max-w-md text-xs text-slate-600">
+                      {said?.comments.length ? (
+                        <ul className="space-y-1">
+                          {said.comments.map((one, i) => (
+                            <li key={i} className={one.blocking && !one.settled ? "text-red-700" : undefined}>
+                              <span className="font-mono text-slate-400">rev {said.rev} · </span><span className="font-semibold">{one.by}</span>{one.blocking ? <span className="text-[10px] uppercase tracking-wide"> · blocking</span> : null}: {one.text}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : <span className="text-slate-300">·</span>}
+                    </Td>
+                  </tr>
                 );
               })}
-            </ul>
+            </DataTable>
           ) : (
             <p className="px-5 py-6 text-center text-xs text-slate-400 sm:px-6">No documents yet. Add them from the next step above, or tick them in the document register.</p>
           )}

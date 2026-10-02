@@ -115,13 +115,9 @@ export async function supplierRows(t: Tenant, pkg: { partyCode: string | null; c
       outcome: cycle?.outcome ?? null,
       transmittal: incoming ? { id: incoming.id, number: incoming.number } : null,
       submissions: doc.revisions.filter((r) => r.submittedAt).length,
-      // The comments of the latest revision that was reviewed — after a
-      // rejection the new revision has none yet, and the supplier still works
-      // from what was said on the last one.
-      comments: (() => {
-        const reviewed = doc.revisions.find((one) => one.cycles.some((cy) => cy.comments.length));
-        return (reviewed?.cycles ?? []).slice().reverse().flatMap((cy) => cy.comments.map((one) => ({ by: one.authorName, text: one.text, blocking: one.progressionPreventing, settled: one.status === "CLOSED", review: cy.number, rev: reviewed!.value })));
-      })(),
+      // The comments of the latest revision's reviews — the ones its verdict
+      // rests on. A revision not yet reviewed has none, and shows none.
+      comments: (rev?.cycles ?? []).slice().reverse().flatMap((cy) => cy.comments.map((one) => ({ by: one.authorName, text: one.text, blocking: one.progressionPreventing, settled: one.status === "CLOSED", review: cy.number, rev: rev!.value }))),
     };
   });
 }
