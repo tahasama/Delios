@@ -132,7 +132,7 @@ export default async function PackagesPage({ searchParams }: { searchParams: Pro
               <Field label="PO" hint="optional — one package per PO"><input name="po" className={inputCls} /></Field>
               <Field label="Everything due by" required><input type="date" name="dueDate" required className={inputCls} /></Field>
               <Field label="Needed at status" required><select name="requiredStatus" required className={inputCls} defaultValue=""><option value="" disabled>Choose…</option>{statuses.map((item) => <option key={item.code} value={item.code}>{item.code} · {item.label}</option>)}</select></Field>
-              <SearchPick single name="acceptanceAuthorityId" required label="Accepted by" hint="someone other than you" items={users.filter((u) => u.id !== user.id).map((person) => ({ id: person.id, name: person.name }))} />
+              <SearchPick name="acceptanceAuthorityId" required label="Accepted by" hint="one or several, not you — any one of them accepts" items={users.filter((u) => u.id !== user.id).map((person) => ({ id: person.id, name: person.name }))} />
             </div>
             <p className="text-[11px] text-slate-500">Every placeholder whose supplier is this company is in the package automatically.</p>
           </ActionForm>
@@ -153,10 +153,10 @@ export default async function PackagesPage({ searchParams }: { searchParams: Pro
               <Field label="Due" required><input type="date" name="completionDate" required className={inputCls}/></Field>
               <Field label="Description" hint="optional — what it is for, anything the recipient should know" className="md:col-span-3"><textarea name="description" rows={2} className={inputCls}/></Field>
               <SearchPick browse name="recipientPartyIds" required label="Delivered to" hint="one or several — us too, for an internal handover" items={parties.map((p) => ({ id: p.id, name: p.isInternal ? `${p.name} (us)` : p.name }))} />
-              <Field label="Why they get it" required><select name="purpose" required className={inputCls} defaultValue=""><option value="" disabled>Choose…</option>{reasons.map((item) => <option key={item.code} value={item.code}>{item.label}</option>)}</select></Field>
+              <SearchPick browse name="purpose" required label="Why they get it" hint="one or several" items={reasons.map((item) => ({ id: item.code, name: item.label, detail: item.code }))} />
               <SearchPick browse name="requiredStatus" required label="Needed at" hint="one or several — ready at any of them" items={statuses.map((item) => ({ id: item.code, name: item.code, detail: item.label }))} />
-              <SearchPick single name="compositionOwnerId" required label="Put together by" items={users.map((person) => ({ id: person.id, name: person.name, detail: person.functionName }))} />
-              <SearchPick single name="acceptanceAuthorityId" required label="Accepted by" hint="someone else — accepts it at the end, and decides on anything missing" items={users.map((person) => ({ id: person.id, name: person.name, detail: person.functionName }))} />
+              <SearchPick name="compositionOwnerId" required label="Put together by" hint="one or several" items={users.map((person) => ({ id: person.id, name: person.name, detail: person.functionName }))} />
+              <SearchPick name="acceptanceAuthorityId" required label="Accepted by" hint="one or several, not those putting it together — any one of them accepts at the end and decides on anything missing" items={users.map((person) => ({ id: person.id, name: person.name, detail: person.functionName }))} />
             </div>
             <div className="rounded-lg bg-tint-soft px-4 py-3">
               <p className="mb-3 flex flex-wrap items-baseline gap-x-2"><span className="stencil text-slate-500">Fills itself with</span><span className="text-[11px] text-slate-400">optional — every document matching all you choose joins, new ones too; you can still add or take out by hand</span></p>

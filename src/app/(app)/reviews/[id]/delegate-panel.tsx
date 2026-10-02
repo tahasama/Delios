@@ -123,7 +123,6 @@ export function DelegateForm({ cycleId, verb, candidates, throughControl, strict
       hidden={{ cycleId, verb }}
     >
       <SearchPick
-        single
         name="toUserId"
         items={candidates.map((one) => ({
           id: one.id,
@@ -131,7 +130,7 @@ export function DelegateForm({ cycleId, verb, candidates, throughControl, strict
           detail: one.inMatrix ? one.functionName : `${one.functionName} · not in the matrix for this`,
           note: one.inMatrix ? null : `The matrix does not name ${one.name} to ${act} on this kind of document. You can still choose them: it is flagged, and the record says you handed it to them.`,
         }))}
-        label="Who answers it"
+        label="Who answers it" 
         required
         hint={strict ? "only people the matrix names for this" : "the matrix's people first — anyone else is flagged"}
       />

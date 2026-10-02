@@ -24,14 +24,15 @@ export async function createSupplierPackageAction(_prev: { error?: string } | un
   const po = String(formData.get("po") ?? "").trim() || null;
   const dueDate = String(formData.get("dueDate") ?? "");
   const requiredStatus = String(formData.get("requiredStatus") ?? "");
-  const acceptorId = String(formData.get("acceptanceAuthorityId") ?? "");
+  const acceptorList = formData.getAll("acceptanceAuthorityId").map(String).filter(Boolean);
   if (!partyCode) return { error: "Choose the supplier." };
   if (!dueDate) return { error: "Give the date everything is due." };
   if (!requiredStatus) return { error: "Choose the status the documents must reach." };
-  if (!acceptorId || acceptorId === user.id) return { error: "Choose who accepts the package — someone other than you." };
+  if (!acceptorList.length || acceptorList.includes(user.id)) return { error: "Choose who accepts the package — someone other than you." };
   const party = await db.party.findFirst({ where: { code: partyCode } });
   if (!party) return { error: "Unknown supplier." };
-  const acceptor = await db.user.findUniqueOrThrow({ where: { id: acceptorId } });
+  const acceptors = await db.user.findMany({ where: { id: { in: acceptorList } }, select: { id: true, name: true } });
+  if (!acceptors.length) return { error: "Those people are no longer on the project." };
   const identifier = `SP-${partyCode}${po ? `-${po}` : ""}`;
   if (await db.package.findFirst({ where: { identifier } })) return { error: `${identifier} already exists.` };
   await db.package.create({
@@ -41,7 +42,7 @@ export async function createSupplierPackageAction(_prev: { error?: string } | un
       membershipRule: `Every document from ${party.name}${po ? ` under PO ${po}` : ""}`,
       recipientName: party.name, completionDate: new Date(dueDate), requiredStatus,
       compositionOwnerId: user.id, compositionOwnerName: user.name,
-      acceptanceAuthorityId: acceptor.id, acceptanceAuthorityName: acceptor.name,
+      acceptanceAuthorityId: acceptors[0].id, acceptanceAuthorityName: acceptors.map((one) => one.name).join(", "), acceptanceAuthorityIds: JSON.stringify(acceptors.map((one) => one.id)),
     },
   });
   await audit({ actor: user, action: "PACKAGE_CREATED", entityType: "Package", entityId: identifier, entityLabel: identifier, detail: `Supplier package for ${party.name}.` });

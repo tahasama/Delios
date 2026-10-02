@@ -56,7 +56,6 @@ export function ReadersPanel({
             <ActionForm action={addDocumentReaderAction} submitLabel="Let them read it" size="sm" hidden={{ documentId }}>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <SearchPick
-                  single
                   name="userId"
                   items={candidates.map((one) => ({ id: one.id, name: one.name, detail: one.functionName ?? null }))}
                   label="Who"

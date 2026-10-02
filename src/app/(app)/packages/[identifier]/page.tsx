@@ -5,7 +5,7 @@ import { Timeline } from "@/components/timeline";
 import { Card, Chip, Info, Field, inputCls, Banner } from "@/components/ui";
 import { ActionForm } from "@/components/form";
 import { addPackageMemberAction, removePackageMemberAction, setPackageRuleAction, assessPackageAction, issueShortfallAction, closePackageAction, acceptShortfallAction, acceptPackageAction } from "@/lib/actions/planning";
-import { syncPackage, parseFilter, meetsStatus, statusList, recipientIds } from "@/lib/package-rule";
+import { syncPackage, parseFilter, meetsStatus, statusList, recipientIds, acceptorIds } from "@/lib/package-rule";
 import { SearchPick } from "@/components/search-pick";
 import { isAdmin } from "@/lib/auth";
 import { RuleFields } from "../rule-fields";
@@ -50,7 +50,7 @@ export default async function PackageDetailPage({ params, searchParams }: { para
     db.transmittal.findMany({ where: { OR: [{ packageId: pkg.id }, ...(pkg.transmittalId ? [{ id: pkg.transmittalId }] : [])] }, orderBy: { number: "asc" }, select: { id: true, number: true } }),
   ]);
   const shortfall: { docNumber: string; requiredStatus: string; currentStatus: string; reason: string; expectedDate: string | null }[] | null = pkg.shortfall ? JSON.parse(pkg.shortfall) : null;
-  const isAcceptor = user.id === pkg.acceptanceAuthorityId;
+  const isAcceptor = acceptorIds(pkg).includes(user.id);
   const overdue = pkg.completionDate < new Date() && !pkg.closedAt;
   const total = pkg.members.length;
   const readyCount = pkg.members.filter((member) => meetsStatus(member.document.revisions[0]?.statusCode, member.requiredStatus)).length;
@@ -59,7 +59,7 @@ export default async function PackageDetailPage({ params, searchParams }: { para
   const statusName = new Map(statuses.map((x) => [x.code, x.label]));
   const statusMeaning = new Map(statuses.map((x) => [x.code, typeof x.props.may === "string" ? `${x.label}: ${x.props.may}` : x.label]));
   const spell = (codes: string) => statusList(codes).map((code) => `${code}${statusName.get(code) ? ` (${statusName.get(code)!.toLowerCase()})` : ""}`).join(" or ");
-  const purpose = reasons.find((one) => one.code === pkg.purpose)?.label ?? pkg.purpose.toLowerCase();
+  const purpose = pkg.purpose.split(",").map((code) => reasons.find((one) => one.code === code)?.label ?? code.toLowerCase()).join(", ");
   const canAct = !isReadOnly(user) && !pkg.closedAt;
   const shortfallFor = new Map((shortfall ?? []).map((s) => [s.docNumber, s]));
   const waitingAcceptance = !!shortfall && !!pkg.shortfallIssuedAt && !pkg.shortfallAcceptedBy;

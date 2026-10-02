@@ -1230,6 +1230,9 @@ model Package {
   compositionOwnerName    String
   acceptanceAuthorityId   String // shall not be the composition owner (§15.5)
   acceptanceAuthorityName String
+  // Several people may share either role; the single columns keep the first.
+  compositionOwnerIds     String? // JSON
+  acceptanceAuthorityIds  String? // JSON — any one of them accepts
   closedAt                DateTime?
   closureNote             String?
   ruleCeasedAt            DateTime? // accumulated: rule ceased to admit members (§15.8)

@@ -35,29 +35,33 @@ export async function addDocumentReaderAction(_prev: State | undefined, formData
   const ctx = await requireScope();
   const { user, db, projectId } = ctx;
   const documentId = String(formData.get("documentId") ?? "");
-  const userId = String(formData.get("userId") ?? "");
+  // One person or several, each added on their own.
+  const userIds = [...new Set(formData.getAll("userId").map(String).filter(Boolean))];
   const reason = String(formData.get("reason") ?? "").trim() || null;
-  if (!userId) return { error: "Say who." };
+  if (!userIds.length) return { error: "Say who." };
   if (!(await mayName(ctx, user, documentId))) {
     return { error: "Only the person who registered this document, or whoever authored or uploaded a revision of it, says who may read it." };
   }
   const document = await db.document.findUnique({ where: { id: documentId }, select: { id: true, docNumber: true, title: true } });
   if (!document) return { error: "That document no longer exists." };
-  const reader = await db.user.findFirst({ where: { id: userId, active: true }, select: { id: true, name: true } });
-  if (!reader) return { error: "That person has no active account." };
-  const already = await db.documentAccess.findFirst({ where: { documentId, userId }, select: { id: true } });
-  if (already) return { message: `${reader.name} was already on the list.` };
-
-  await db.documentAccess.create({
-    data: { projectId, documentId, userId, addedById: user.id, addedByName: user.name, reason },
-  });
-  await audit({
-    tenant: ctx, actor: user, action: "ACCESS_GRANTED", entityType: "Document", entityId: documentId,
-    entityLabel: document.docNumber, newValue: reader.name, detail: reason ?? "Named as a reader of a closed document.",
-  });
-  await notify(reader.id, "ACCESS_GRANTED", `You may now read ${document.docNumber}`, document.title, `/documents/${documentId}`, ctx);
+  const readers = await db.user.findMany({ where: { id: { in: userIds }, active: true }, select: { id: true, name: true } });
+  if (!readers.length) return { error: "Those people have no active account." };
+  const added: string[] = [];
+  for (const reader of readers) {
+    const already = await db.documentAccess.findFirst({ where: { documentId, userId: reader.id }, select: { id: true } });
+    if (already) continue;
+    await db.documentAccess.create({
+      data: { projectId, documentId, userId: reader.id, addedById: user.id, addedByName: user.name, reason },
+    });
+    await audit({
+      tenant: ctx, actor: user, action: "ACCESS_GRANTED", entityType: "Document", entityId: documentId,
+      entityLabel: document.docNumber, newValue: reader.name, detail: reason ?? "Named as a reader of a closed document.",
+    });
+    await notify(reader.id, "ACCESS_GRANTED", `You may now read ${document.docNumber}`, document.title, `/documents/${documentId}`, ctx);
+    added.push(reader.name);
+  }
   revalidatePath(`/documents/${documentId}`);
-  return { message: `${reader.name} may read it.` };
+  return { message: added.length ? `${added.join(", ")} may read it.` : "They were already on the list." };
 }
 
 export async function removeDocumentReaderAction(_prev: State | undefined, formData: FormData): Promise<State> {

@@ -123,3 +123,15 @@ export function recipientIds(pkg: { recipientPartyIds: string | null; recipientP
   const many = parseExcluded(pkg.recipientPartyIds);
   return many.length ? many : pkg.recipientPartyId ? [pkg.recipientPartyId] : [];
 }
+
+/** Everyone who may accept the package — any one of them does. */
+export function acceptorIds(pkg: { acceptanceAuthorityIds: string | null; acceptanceAuthorityId: string }): string[] {
+  const many = parseExcluded(pkg.acceptanceAuthorityIds);
+  return many.length ? many : [pkg.acceptanceAuthorityId].filter(Boolean);
+}
+
+/** Everyone who puts the package together. */
+export function ownerIds(pkg: { compositionOwnerIds: string | null; compositionOwnerId: string }): string[] {
+  const many = parseExcluded(pkg.compositionOwnerIds);
+  return many.length ? many : [pkg.compositionOwnerId].filter(Boolean);
+}

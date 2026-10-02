@@ -23,19 +23,19 @@ type State = { error?: string; message?: string };
 /** What the form says, and the review it was raised from. */
 async function asked(formData: FormData) {
   const cycleId = String(formData.get("cycleId") ?? "") || null;
-  const toUserId = String(formData.get("toUserId") ?? "");
+  const toUserIds = [...new Set(formData.getAll("toUserId").map(String).filter(Boolean))];
   const verb = (String(formData.get("verb") ?? "REVIEW") === "APPROVE" ? "APPROVE" : "REVIEW") as Verb;
   const endDate = String(formData.get("endDate") ?? "");
   const reason = String(formData.get("reason") ?? "").trim() || null;
-  return { cycleId, toUserId, verb, endDate, reason };
+  return { cycleId, toUserIds, verb, endDate, reason };
 }
 
 export async function delegateReviewAction(_prev: State | undefined, formData: FormData): Promise<State> {
   const ctx = await requireScope();
   const { user, db, projectId } = ctx;
-  const { cycleId, toUserId, verb, endDate, reason } = await asked(formData);
+  const { cycleId, toUserIds, verb, endDate, reason } = await asked(formData);
   if (await actIsOff(ctx, "DELEGATE")) return { error: "Handing a review over is not used on this project: the step is answered by the person it was given to." };
-  if (!toUserId) return { error: "Say who takes it." };
+  if (!toUserIds.length) return { error: "Say who takes it." };
   if (!endDate) return { error: "A delegation ends on a date — say when (§8.5)." };
   const ends = new Date(`${endDate}T23:59:59`);
   if (Number.isNaN(ends.getTime())) return { error: "That is not a date." };
@@ -52,53 +52,58 @@ export async function delegateReviewAction(_prev: State | undefined, formData: F
   const target = cycle?.revision.document ?? null;
   if (!target) return { error: "A delegation is raised from a review." };
 
-  const takes = await db.user.findFirst({ where: { id: toUserId, active: true }, select: { id: true, name: true } });
-  if (!takes) return { error: "That person has no active account." };
+  // One person or several; any one of them may answer in the holder's place.
+  const people = await db.user.findMany({ where: { id: { in: toUserIds }, active: true }, select: { id: true, name: true } });
+  if (people.length < toUserIds.length) return { error: "Somebody chosen has no active account." };
 
   // Where the matrix is the only rule, only somebody it names for this act may
   // be handed the step; otherwise anyone on the project, flagged when the
   // matrix does not name them. Either way the record says who chose whom.
-  const refusal = await delegationRefusal(ctx, {
-    target, verb, fromUserId: user.id, fromName: user.name, toUserId: takes.id, toName: takes.name,
-  });
-  if (refusal) return { error: refusal };
-  const flag = await delegationFlag(ctx, { target, verb, toUserId: takes.id, toName: takes.name });
+  for (const takes of people) {
+    const refusal = await delegationRefusal(ctx, {
+      target, verb, fromUserId: user.id, fromName: user.name, toUserId: takes.id, toName: takes.name,
+    });
+    if (refusal) return { error: refusal };
+  }
 
   const throughControl = await controlDoes(ctx, "DELEGATE");
   const label = `${target.docNumber} rev ${cycle!.revision.value}`;
-  const row = await db.delegation.create({
-    data: {
-      projectId,
-      fromUserId: user.id,
-      toUserId: takes.id,
-      cycleId: cycle!.id,
-      verb,
-      scope: `${target.discipline} · ${target.docType}`,
-      endDate: ends,
-      reason,
-      status: throughControl ? "OPEN" : "ACTIVE",
-      askedById: user.id,
-      askedByName: user.name,
-      ...(throughControl ? {} : { grantedById: user.id, grantedByName: user.name, grantedAt: new Date() }),
-    },
-  });
-  await audit({
-    tenant: ctx, actor: user, action: throughControl ? "DELEGATION_REQUESTED" : "DELEGATION_GRANTED",
-    entityType: "Delegation", entityId: row.id, entityLabel: label,
-    newValue: `${user.name} → ${takes.name}`,
-    detail: `${user.name} delegated ${verb === "APPROVE" ? "the decision" : "their advice"} on ${label} to ${takes.name}, until ${endDate}, and answers for that choice.${reason ? ` ${reason}` : ""}${flag ? ` Flagged: ${flag}` : ""}`,
-  });
+  for (const takes of people) {
+    const flag = await delegationFlag(ctx, { target, verb, toUserId: takes.id, toName: takes.name });
+    const row = await db.delegation.create({
+      data: {
+        projectId,
+        fromUserId: user.id,
+        toUserId: takes.id,
+        cycleId: cycle!.id,
+        verb,
+        scope: `${target.discipline} · ${target.docType}`,
+        endDate: ends,
+        reason,
+        status: throughControl ? "OPEN" : "ACTIVE",
+        askedById: user.id,
+        askedByName: user.name,
+        ...(throughControl ? {} : { grantedById: user.id, grantedByName: user.name, grantedAt: new Date() }),
+      },
+    });
+    await audit({
+      tenant: ctx, actor: user, action: throughControl ? "DELEGATION_REQUESTED" : "DELEGATION_GRANTED",
+      entityType: "Delegation", entityId: row.id, entityLabel: label,
+      newValue: `${user.name} → ${takes.name}`,
+      detail: `${user.name} delegated ${verb === "APPROVE" ? "the decision" : "their advice"} on ${label} to ${takes.name}, until ${endDate}, and answers for that choice.${reason ? ` ${reason}` : ""}${flag ? ` Flagged: ${flag}` : ""}`,
+    });
+    if (!throughControl) await notify(takes.id, "DELEGATION_GRANTED", `You answer ${label} for ${user.name}`, `Until ${endDate}.`, `/reviews/${cycle!.id}`, ctx);
+  }
+  const names = people.map((one) => one.name).join(", ");
   if (throughControl) {
     const { holdersOf } = await import("@/lib/permissions");
     for (const one of await holdersOf(ctx, "CONTROL")) {
-      await notify(one.id, "DELEGATION_REQUESTED", `Delegation asked for on ${label}`, `${user.name} asks that ${takes.name} answer in their place.`, `/reviews/${cycle!.id}`, ctx);
+      await notify(one.id, "DELEGATION_REQUESTED", `Delegation asked for on ${label}`, `${user.name} asks that ${names} answer in their place.`, `/reviews/${cycle!.id}`, ctx);
     }
-  } else {
-    await notify(takes.id, "DELEGATION_GRANTED", `You answer ${label} for ${user.name}`, `Until ${endDate}.`, `/reviews/${cycle!.id}`, ctx);
   }
   revalidatePath(`/reviews/${cycle!.id}`);
   revalidatePath(`/documents/${target.id}`);
-  return { message: throughControl ? "Asked. Document Control puts it in force." : `${takes.name} answers it in your place.` };
+  return { message: throughControl ? "Asked. Document Control puts it in force." : `${names} ${people.length === 1 ? "answers" : "may answer"} it in your place.` };
 }
 
 /** Document Control puts an asked-for delegation in force. */
