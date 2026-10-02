@@ -17,6 +17,8 @@ import { DateWindow } from "@/components/date-window";
  * what is ticked is what the export writes.
  */
 export type ReviewRow = {
+  /** Every comment on the revision, from any of its reviews. */
+  comments?: { by: string; text: string; blocking: boolean; settled: boolean; review: string | null }[];
   id: string;
   number: string | null;
   documentId: string;
@@ -231,7 +233,7 @@ export function ReviewsRegister({ plate, rows, total, filters, filterOptions, fa
           <DataTable
             id="reviews"
             className="rounded-none border-0 shadow-none"
-            defaultHidden={["Opened by", "Closed", "Produced by", "Contract", "Type"]}
+            defaultHidden={["Opened by", "Closed", "Produced by", "Contract", "Type", "Comments"]}
             fill
             stretch={!!cardHeight}
             tools={
@@ -464,6 +466,20 @@ const COLUMNS: Column[] = [
   { key: "producedBy", label: "Produced by", cellClass: "whitespace-nowrap text-xs text-slate-600", cell: (row) => row.producedBy },
   { key: "from", label: "From", note: "The party the document came from. Blank when our own engineering produced it.", cellClass: "whitespace-nowrap text-xs text-slate-600", cell: (row) => row.from ?? <span className="text-slate-300">·</span> },
   { key: "contract", label: "Contract", cellClass: "whitespace-nowrap font-mono text-xs text-slate-700", cell: (row) => row.contract ?? <span className="text-slate-300">·</span> },
+  {
+    key: "comments", label: "Comments",
+    note: "Every comment made on this revision, in any of its reviews — what goes back to whoever sent the document.",
+    cellClass: "min-w-72 max-w-md text-xs text-slate-600",
+    cell: (row) => row.comments?.length ? (
+      <ul className="space-y-1">
+        {row.comments.map((one, i) => (
+          <li key={i} className={one.blocking && !one.settled ? "text-red-700" : undefined}>
+            <span className="font-semibold">{one.by}</span>{one.review ? <span className="text-slate-400"> · {one.review}</span> : null}{one.blocking ? <span className="text-[10px] uppercase tracking-wide"> · blocking{one.settled ? ", settled" : ""}</span> : null}: {one.text}
+          </li>
+        ))}
+      </ul>
+    ) : <span className="text-slate-300">·</span>,
+  },
   {
     key: "received", label: "Received",
     note: "The day this revision reached us — the day its submission arrived, or the date recorded on the document when it came from outside.",

@@ -44,12 +44,12 @@ export async function GET(req: Request, { params }: { params: Promise<{ kind: st
       },
       orderBy: { submittedAt: "desc" },
       include: {
-        revision: { select: { value: true, document: { select: { docNumber: true, title: true } } } },
+        revision: { select: { value: true, document: { select: { docNumber: true, title: true } }, cycles: { select: { number: true, comments: { orderBy: { createdAt: "asc" }, select: { authorName: true, text: true, progressionPreventing: true, status: true } } } } } },
         assignments: { orderBy: { order: "asc" } },
         comments: { where: { progressionPreventing: true, status: "OPEN" }, select: { id: true } },
       },
     });
-    rows = [["Review", "Document number", "Title", "Revision", "Kind", "Verdict", "Decided by", "Reviewers", "Opened", "Opened by", "Due", "Closed", "Blocking comments", "Status"]];
+    rows = [["Review", "Document number", "Title", "Revision", "Kind", "Verdict", "Decided by", "Reviewers", "Opened", "Opened by", "Due", "Closed", "Blocking comments", "Status", "Comments"]];
     for (const c of cycles) {
       rows.push([
         c.number ?? "", c.revision.document.docNumber, c.revision.document.title, c.revision.value,
@@ -58,6 +58,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ kind: st
         c.submittedAt.toISOString(), c.openedByName ?? "",
         c.dueAt?.toISOString() ?? "", c.outcomeAt?.toISOString() ?? "",
         c.comments.length, c.status,
+        // Every comment on the revision, one per line, for whoever sent it.
+        c.revision.cycles.flatMap((cy) => cy.comments.map((one) => `${one.authorName}${cy.number ? ` (${cy.number})` : ""}${one.progressionPreventing ? " [blocking]" : ""}: ${one.text}`)).join("\n"),
       ]);
     }
   } else if (kind === "review-matrix") {
@@ -163,6 +165,22 @@ export async function GET(req: Request, { params }: { params: Promise<{ kind: st
         rows.push([p.identifier, p.title ?? "", p.type, p.purpose, p.recipientName, p.completionDate.toISOString().slice(0, 10), p.requiredStatus, p.compositionOwnerName, p.acceptanceAuthorityName, p.closedAt?.toISOString().slice(0, 10) ?? "", m.document.docNumber, m.requiredStatus, cur?.statusCode ?? "not released"]);
       }
     }
+  } else if (kind === "supplier-package") {
+    // What goes back to a supplier: each document, where it stands, the verdict
+    // and every comment made on it — one line per comment.
+    const id = new URL(req.url).searchParams.get("id") ?? "";
+    const found = await db.package.findFirst({ where: { id, category: "SUPPLIER" } });
+    // A supplier reads its own package only.
+    const pkg = found && (ctx.user.isInternal || found.partyCode === ctx.user.partyCode) ? found : null;
+    const { supplierRows, STATE_LABEL } = await import("@/lib/supplier");
+    const list = pkg ? await supplierRows(ctx, pkg) : [];
+    rows = [["Document number", "Title", "Revision", "Where it stands", "Verdict", "Status", "Comment by", "Blocking", "Comment"]];
+    for (const r of list) {
+      const base = [r.doc.docNumber, r.doc.title, r.revision?.value ?? "", STATE_LABEL[r.state], r.outcome ?? "", r.revision?.statusCode ?? ""];
+      if (!r.comments.length) rows.push([...base, "", "", r.reason ?? ""]);
+      for (const one of r.comments) rows.push([...base, one.by, one.blocking ? "yes" : "no", one.text]);
+    }
+    name = pkg ? `${pkg.identifier}-outcomes` : "supplier-package";
   } else if (kind === "transmittals") {
     const ticked = (new URL(req.url).searchParams.get("ids") ?? "").split(",").map((one) => one.trim()).filter(Boolean);
     const list = await db.transmittal.findMany({

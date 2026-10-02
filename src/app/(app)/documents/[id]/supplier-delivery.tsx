@@ -3,6 +3,7 @@ import { ActionForm } from "@/components/form";
 import { attachSupplierFileAction, sendSupplierDocumentsAction } from "@/lib/actions/supplier";
 import { NextStepBody, StagePath, type StepItem } from "./next-step";
 import { cn } from "@/lib/utils";
+import { hasVerb } from "@/lib/auth";
 
 /**
  * What a supplier sees on a document it owes us: attach the file, then send it.
@@ -10,7 +11,9 @@ import { cn } from "@/lib/utils";
  * us — checked by Document Control, then reviewed.
  */
 export async function SupplierDelivery({ documentId }: { documentId: string }) {
-  const { db } = await requireScope();
+  const { db, user } = await requireScope();
+  // Read-only stays read-only: uploading is a right Document Control gives.
+  const mayUpload = hasVerb(user, "CREATE") || hasVerb(user, "REVISE");
   const org = (await db.scopeConfig.findFirst())?.organizationName ?? "us";
   const latest = await db.revision.findFirst({
     where: { documentId },
@@ -37,7 +40,7 @@ export async function SupplierDelivery({ documentId }: { documentId: string }) {
     : <>Reviewed and in use.</>;
 
   const items: StepItem[] = [];
-  if (waitingToSend && latest) items.push({
+  if (mayUpload && waitingToSend && latest) items.push({
     key: "send",
     primary: true,
     label: `Send to ${org}`,
@@ -47,7 +50,7 @@ export async function SupplierDelivery({ documentId }: { documentId: string }) {
       </ActionForm>
     ),
   });
-  if (toAttach) items.push({
+  if (mayUpload && toAttach) items.push({
     key: "attach",
     primary: !waitingToSend,
     open: at === 0,
@@ -67,7 +70,7 @@ export async function SupplierDelivery({ documentId }: { documentId: string }) {
         <span className="stencil text-slate-600">Your delivery</span>
         <span className="text-[11px] text-slate-500">asked of you by {org}</span>
       </div>
-      <NextStepBody items={items} status={<StagePath stages={["Attach", "Send", "Checked", "Reviewed"]} at={at} note={note} />} />
+      <NextStepBody items={items} status={<StagePath stages={["Attach", "Send", "Checked", "Reviewed"]} at={at} note={<>{note}{!mayUpload && at < 2 ? <span className="mt-1 block text-[12px] text-amber-700">Your access is read-only. Ask {org}&apos;s Document Control for the right to upload.</span> : null}</>} />} />
     </section>
   );
 }

@@ -93,7 +93,7 @@ type Column = {
 
 export function DocumentRegister({ rows, total, userCanAct, filters, filterOptions, exportHref, plate, paging, codes, sort, views, supplier }: {
   /** The reader is an outside organization: what they owe can be sent from here. */
-  supplier?: { to: string } | null;
+  supplier?: { to: string; readOnly?: boolean } | null;
   rows: RegisterRow[]; total: number; userCanAct: boolean;
   /** The questions this reader keeps, and the address each one asks. */
   views: { id: string; name: string; query: string }[];
@@ -556,7 +556,7 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
       <span className="px-2 font-mono text-sm tabular-nums">{allMatching ? total.toLocaleString("en-GB") : selected.length}<span className="ml-1.5 text-[10px] uppercase tracking-[0.12em] text-white/60">selected</span></span>
       {userCanAct ? (selectedRevisionIds.length ? <Link href={`/reviews/send?revisions=${encodeURIComponent(selectedRevisionIds.join(","))}`} className="inline-flex items-center gap-1.5 rounded-sm bg-[#d9a441] px-3 py-2 text-xs font-semibold text-brand-ink"><GitPullRequestArrow className="h-4 w-4" /> Send for review ({selectedRevisionIds.length})</Link> : <span className="inline-flex items-center gap-1.5 rounded-sm bg-white/10 px-3 py-2 text-xs font-semibold text-white/55" title="Only documents with a revision being prepared can be sent"><GitPullRequestArrow className="h-4 w-4" /> Nothing ready to send</span>) : null}
       {transmittableRows.length ? <Link href={transmittalHref} className="inline-flex items-center gap-1.5 rounded-sm bg-white/10 px-3 py-2 text-xs font-semibold hover:bg-white/15"><ArrowLeftRight className="h-4 w-4" /> Create transmittal ({transmittableRows.length})</Link> : <span className="inline-flex items-center gap-1.5 rounded-sm bg-white/10 px-3 py-2 text-xs font-semibold text-white/55" title="Only current released revisions may be sent on an outgoing transmittal"><ArrowLeftRight className="h-4 w-4" /> No released revision to transmit</span>}
-      {supplier ? (() => {
+      {supplier && !supplier.readOnly ? (() => {
         const sendable = selectedRows.map((row) => row.sendRevisionId).filter((id): id is string => !!id);
         return sendable.length ? (
           <form action={sendFromRegister}>

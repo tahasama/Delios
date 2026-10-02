@@ -172,6 +172,8 @@ export default async function ReviewsPage({ searchParams }: { searchParams: Prom
             // came from outside arrives through its package or a transmittal;
             // one of ours is simply written here.
             submittedAt: true, submittedByName: true,
+            // Every comment made on this revision, whichever review it was made in.
+            cycles: { select: { number: true, comments: { orderBy: { createdAt: "asc" }, select: { authorName: true, text: true, progressionPreventing: true, status: true } } } },
             document: {
               select: {
                 id: true, docNumber: true, title: true, discipline: true, docType: true,
@@ -302,6 +304,7 @@ export default async function ReviewsPage({ searchParams }: { searchParams: Prom
         : c.revision.document.receivedDate ? fmtDate(c.revision.document.receivedDate) : null,
       receivedFrom: c.revision.document.originator ?? c.revision.submittedByName,
       closedAt: c.outcomeAt ? fmtDate(c.outcomeAt) : null,
+      comments: c.revision.cycles.flatMap((cy) => cy.comments.map((one) => ({ by: one.authorName, text: one.text, blocking: one.progressionPreventing, settled: one.status === "CLOSED", review: cy.number }))),
     };
   });
 

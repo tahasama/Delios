@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requireScope } from "@/lib/scope";
-import { isController, isAdmin } from "@/lib/auth";
+import { isController, isAdmin, hasVerb } from "@/lib/auth";
 import { audit, notifyMany } from "@/lib/audit";
 import { saveUpload } from "@/lib/files";
 import { nextRevisionValue } from "@/lib/numbering";
@@ -62,6 +62,7 @@ export async function submitSupplierPackageAction(_prev: { error?: string; ok?: 
   if (!pkg?.partyCode) return { error: "This is not a supplier package." };
   const isStaff = isController(user) || isAdmin(user);
   if (!isStaff && user.partyCode !== pkg.partyCode) return { error: "Only this supplier can send documents in this package." };
+  if (!isStaff && !supplierMayUpload(user)) return { error: "Your access here is read-only. Ask Document Control for the right to upload." };
 
   const docs = await db.document.findMany({ where: { originator: pkg.partyCode }, include: SUPPLIER_DOC });
   const sent: { revisionId: string; label: string }[] = [];
@@ -71,6 +72,16 @@ export async function submitSupplierPackageAction(_prev: { error?: string; ok?: 
     sent.push(await attachFile(ctx, doc, upload, `package ${pkg.identifier}`));
   }
   if (!sent.length) return { error: "Attach at least one file." };
+  if (user.partyCode !== pkg.partyCode) {
+    // Document Control entering what the supplier sent by other means: the
+    // check was done outside, so nothing waits on it — the review starts now.
+    const now = new Date();
+    await db.revision.updateMany({ where: { id: { in: sent.map((one) => one.revisionId) } }, data: { submittedAt: now, submittedById: user.id, submittedByName: user.name, issueDate: now } });
+    const party = await db.party.findFirst({ where: { code: pkg.partyCode }, select: { name: true } });
+    await audit({ actor: user, action: "SUPPLIER_FILES_ENTERED", entityType: "Package", entityId: pkg.identifier, entityLabel: pkg.identifier, detail: `Received from ${party?.name ?? pkg.partyCode} outside the system and entered by ${user.name}: ${sent.map((s) => s.label).join(", ")}.` });
+    revalidatePath(`/packages/${pkg.identifier}`);
+    redirect(`/reviews/send?revisions=${sent.map((one) => one.revisionId).join(",")}`);
+  }
   const number = await sendRevisions(ctx, pkg.partyCode, sent, `through ${pkg.identifier}`);
   revalidatePath(`/packages/${pkg.identifier}`);
   revalidatePath("/");
@@ -88,7 +99,7 @@ export async function attachSupplierFileAction(_prev: { error?: string; ok?: str
   const upload = formData.get("file") as File | null;
   const doc = await db.document.findFirst({ where: { id: documentId }, include: SUPPLIER_DOC });
   if (!doc?.originator) return { error: "This is not a supplier's document." };
-  if (!mayDeliver(user, doc.originator)) return { error: "Only the supplier, or Document Control for them, attaches its file." };
+  if (!mayDeliver(user, doc.originator)) return { error: user.partyCode === doc.originator ? "Your access here is read-only. Ask Document Control for the right to upload." : "Only the supplier, or Document Control for them, attaches its file." };
   if (!upload || upload.size === 0) return { error: "Choose the file." };
   await attachFile(ctx, doc, upload, "its document page");
   revalidatePath(`/documents/${doc.id}`);
@@ -121,9 +132,18 @@ export async function sendSupplierDocumentsAction(_prev: { error?: string; ok?: 
 
 const SUPPLIER_DOC = { revisions: { orderBy: { createdAt: "desc" as const }, include: { transmittalItems: { include: { transmittal: true } } } } };
 
-/** The supplier itself, or Document Control acting for one that is not on the system. */
+/**
+ * The supplier itself — when its function lets it upload; read-only stays
+ * read-only until Document Control gives it that right — or Document Control
+ * acting for one that is not on the system.
+ */
 function mayDeliver(user: { partyCode: string | null; role: string; verbs?: string[] }, partyCode: string): boolean {
-  return user.partyCode === partyCode || isController(user as never) || isAdmin(user as never);
+  if (isController(user as never) || isAdmin(user as never)) return true;
+  return user.partyCode === partyCode && supplierMayUpload(user);
+}
+
+function supplierMayUpload(user: unknown): boolean {
+  return hasVerb(user as never, "CREATE") || hasVerb(user as never, "REVISE");
 }
 
 type SupplierDoc = {

@@ -4,6 +4,7 @@ import { RegisterPlate } from "./register-plate";
 import { OUTCOME_CONSEQUENCES, DOC_STATES, DOC_STATE_LABEL, DOC_MEANING, REV_STATES, REV_MEANING, type DocState, type RevState } from "@/lib/standard";
 import { getSet } from "@/lib/config";
 import { DocumentRegister } from "./document-register";
+import { hasVerb } from "@/lib/auth";
 import { Banner } from "@/components/ui";
 import { registerWhere, REGISTER_SORTS, documentsForAssets, readSearch, readDay } from "@/lib/register-query";
 import { isReadOnly } from "@/lib/auth";
@@ -242,7 +243,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
     {sp.sent ? <Banner tone="good" title="Sent">{sp.sent}</Banner> : null}
     {sp.sendError ? <Banner tone="warn" title="Not sent">{sp.sendError}</Banner> : null}
     <DocumentRegister
-      supplier={supplierView ? { to: hostName ?? "them" } : null}
+      supplier={supplierView && (hasVerb(user, "CREATE") || hasVerb(user, "REVISE")) ? { to: hostName ?? "them" } : supplierView ? { to: hostName ?? "them", readOnly: true } : null}
       plate={<RegisterPlate project={{ code: project.code, name: project.name }} canCreate={!isReadOnly(user)} />}
       rows={rows}
       total={matchCount}

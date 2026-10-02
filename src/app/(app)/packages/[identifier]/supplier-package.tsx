@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requireScope } from "@/lib/scope";
-import { isController, isAdmin } from "@/lib/auth";
+import { isController, isAdmin, hasVerb } from "@/lib/auth";
 import { Chip, DataTable, Th, Td } from "@/components/ui";
 import { FileTally } from "./file-tally";
 import { removePackageMemberAction, addPackageMemberAction, setPackageRuleAction } from "@/lib/actions/planning";
@@ -39,11 +39,12 @@ export async function SupplierPackage({ pkg }: { pkg: { id: string; compositionO
   const org = (await ctx.db.scopeConfig.findFirst())?.organizationName ?? "us";
   // The supplier sends its own files; for a supplier not on the system,
   // Document Control attaches what arrived, line by line, on their behalf.
-  const canSendRow = (s: SupplierState) => (isSupplier || staff) && WITH_SUPPLIER.includes(s);
+  const supplierMayUpload = isSupplier && (hasVerb(user, "CREATE") || hasVerb(user, "REVISE"));
+  const canSendRow = (s: SupplierState) => (supplierMayUpload || staff) && WITH_SUPPLIER.includes(s);
 
   const table = (
     <div>
-      <DataTable className="rounded-none border-0 shadow-none" id={isSupplier ? "supplier-package-own" : "supplier-package"} head={<tr><Th>Document</Th><Th>Submit by</Th><Th>Status</Th><Th>{isSupplier ? "Your file" : "Next, or the file they sent"}</Th></tr>}>
+      <DataTable className="rounded-none border-0 shadow-none" id={isSupplier ? "supplier-package-own" : "supplier-package"} defaultHidden={["Comments"]} head={<tr><Th>Document</Th><Th>Submit by</Th><Th>Status</Th><Th>Comments</Th><Th>{isSupplier ? "Your file" : "Next, or the file they sent"}</Th></tr>}>
           {rows.map((r) => (
             <tr key={r.doc.id}>
               <Td>
@@ -59,6 +60,17 @@ export async function SupplierPackage({ pkg }: { pkg: { id: string; compositionO
               <Td>
                 <Chip className={TONE[r.state]}>{STATE_LABEL[r.state]}{r.state === "RETURNED" && r.outcome ? ` · ${r.outcome}` : ""}</Chip>
                 {r.reason ? <p className="mt-1 max-w-72 text-[11px] text-slate-600">“{r.reason}”</p> : null}
+              </Td>
+              <Td className="min-w-64 max-w-md text-xs text-slate-600">
+                {r.comments.length ? (
+                  <ul className="space-y-1">
+                    {r.comments.map((one, i) => (
+                      <li key={i} className={one.blocking && !one.settled ? "text-red-700" : undefined}>
+                        <span className="font-semibold">{one.by}</span>{one.blocking ? <span className="text-[10px] uppercase tracking-wide"> · blocking</span> : null}: {one.text}
+                      </li>
+                    ))}
+                  </ul>
+                ) : <span className="text-slate-300">·</span>}
               </Td>
               <Td className="text-xs">
                 {canSendRow(r.state) ? (
@@ -147,6 +159,7 @@ export async function SupplierPackage({ pkg }: { pkg: { id: string; compositionO
           </div>
           <div className="flex shrink-0 items-center gap-2 lg:justify-end">
             {pkg.partyCode ? <a href={`/api/requirements/sheet?sender=${encodeURIComponent(pkg.partyCode)}`} className="ask inline-flex items-center gap-1.5"><Download className="h-3.5 w-3.5" /> Delivery list</a> : null}
+            <a href={`/api/export/supplier-package?id=${pkg.id}`} className="ask inline-flex items-center gap-1.5" title="Every document with its status, verdict and comments — the list that goes back to them"><Download className="h-3.5 w-3.5" /> Outcomes and comments</a>
             {staff ? <Link href="/packages" className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-semibold text-slate-500 hover:bg-slate-100"><ArrowLeft className="h-4 w-4" /> Packages</Link> : null}
           </div>
         </div>
@@ -175,11 +188,11 @@ export async function SupplierPackage({ pkg }: { pkg: { id: string; compositionO
           <span className="stencil text-slate-600">{isSupplier ? "Send documents" : "Documents"}</span>
           <span className="text-[11px] text-slate-500">{f.pendingSupplier} with {isSupplier ? "you" : pkg.recipientName} · {f.pendingOurs} with {isSupplier ? org : "us"}</span>
         </div>
-        {isSupplier || (staff && waiting) ? (
-          <ActionForm action={submitSupplierPackageAction} submitLabel={isSupplier ? `Send to ${org}` : `Record what ${pkg.recipientName} sent`} hidden={{ packageId: pkg.id }}>
+        {supplierMayUpload || (staff && waiting) ? (
+          <ActionForm action={submitSupplierPackageAction} submitLabel={isSupplier ? `Send to ${org}` : "Enter and send for review"} hidden={{ packageId: pkg.id }}>
             {table}
             <div className="space-y-1 px-5 sm:px-6">
-              {!isSupplier ? <p className="text-[12px] text-slate-500">Received outside the system? Attach each file to its line — the delivery list&apos;s titles say which is which. Files go in under our numbers; the supplier&apos;s own number can stay inside the document.</p> : null}
+              {!isSupplier ? <p className="text-[12px] text-slate-500">Received outside the system? Attach each file to its line — the delivery list&apos;s titles say which is which. Files go in under our numbers; the supplier&apos;s own number can stay inside the document. The review form opens next.</p> : null}
               {waiting ? <FileTally waiting={waiting} who={isSupplier ? "you" : pkg.recipientName} /> : <p className="text-[12px] text-slate-500">Nothing is waiting on you right now.</p>}
             </div>
           </ActionForm>

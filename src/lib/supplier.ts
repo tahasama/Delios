@@ -41,6 +41,8 @@ export type SupplierRow = {
   outcome: string | null; // review outcome code
   transmittal: { id: string; number: string } | null;
   submissions: number;    // revisions ever submitted — 1 means first-time
+  /** Every comment made on the revision, for the list that goes back to the supplier. */
+  comments: { by: string; text: string; blocking: boolean; settled: boolean; review: string | null }[];
 };
 
 export async function supplierRows(t: Tenant, pkg: { partyCode: string | null; completionDate: Date; membershipFilter?: string | null; membershipExcluded?: string | null }): Promise<SupplierRow[]> {
@@ -72,7 +74,8 @@ export async function supplierRows(t: Tenant, pkg: { partyCode: string | null; c
         orderBy: { createdAt: "desc" },
         include: {
           workflowRuns: { orderBy: { createdAt: "desc" }, take: 1 },
-          cycles: { orderBy: { sequence: "desc" }, take: 1 },
+          // Every review of the revision, with what was said — the latest decides the verdict.
+          cycles: { orderBy: { sequence: "desc" }, include: { comments: { orderBy: { createdAt: "asc" }, select: { authorName: true, text: true, progressionPreventing: true, status: true } } } },
           transmittalItems: { include: { transmittal: true } },
         },
       },
@@ -99,6 +102,8 @@ export async function supplierRows(t: Tenant, pkg: { partyCode: string | null; c
       else if (rev.submittedAt && incoming?.status === "REJECTED") { state = "REJECTED"; reason = incoming.rejectionReason; }
       else if (rev.submittedAt && incoming?.status === "ISSUED") state = "AWAITING_CHECK";
       else if (rev.submittedAt && incoming && incoming.status === "ACCEPTED") state = "TO_ROUTE";
+      // Entered by Document Control on the supplier's behalf: no transmittal, straight to review.
+      else if (rev.submittedAt && !incoming) state = "TO_ROUTE";
     }
     const arrivedOnTime = rev?.submittedAt ? rev.submittedAt.getTime() <= due.getTime() : null;
     const late = state === "NOT_SENT" ? due.getTime() < now : arrivedOnTime === false;
@@ -110,6 +115,7 @@ export async function supplierRows(t: Tenant, pkg: { partyCode: string | null; c
       outcome: cycle?.outcome ?? null,
       transmittal: incoming ? { id: incoming.id, number: incoming.number } : null,
       submissions: doc.revisions.filter((r) => r.submittedAt).length,
+      comments: (rev?.cycles ?? []).slice().reverse().flatMap((cy) => cy.comments.map((one) => ({ by: one.authorName, text: one.text, blocking: one.progressionPreventing, settled: one.status === "CLOSED", review: cy.number }))),
     };
   });
 }
