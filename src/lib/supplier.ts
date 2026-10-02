@@ -42,7 +42,7 @@ export type SupplierRow = {
   transmittal: { id: string; number: string } | null;
   submissions: number;    // revisions ever submitted — 1 means first-time
   /** Every comment made on the revision, for the list that goes back to the supplier. */
-  comments: { by: string; text: string; blocking: boolean; settled: boolean; review: string | null }[];
+  comments: { by: string; text: string; blocking: boolean; settled: boolean; review: string | null; rev: string }[];
 };
 
 export async function supplierRows(t: Tenant, pkg: { partyCode: string | null; completionDate: Date; membershipFilter?: string | null; membershipExcluded?: string | null }): Promise<SupplierRow[]> {
@@ -115,7 +115,13 @@ export async function supplierRows(t: Tenant, pkg: { partyCode: string | null; c
       outcome: cycle?.outcome ?? null,
       transmittal: incoming ? { id: incoming.id, number: incoming.number } : null,
       submissions: doc.revisions.filter((r) => r.submittedAt).length,
-      comments: (rev?.cycles ?? []).slice().reverse().flatMap((cy) => cy.comments.map((one) => ({ by: one.authorName, text: one.text, blocking: one.progressionPreventing, settled: one.status === "CLOSED", review: cy.number }))),
+      // The comments of the latest revision that was reviewed — after a
+      // rejection the new revision has none yet, and the supplier still works
+      // from what was said on the last one.
+      comments: (() => {
+        const reviewed = doc.revisions.find((one) => one.cycles.some((cy) => cy.comments.length));
+        return (reviewed?.cycles ?? []).slice().reverse().flatMap((cy) => cy.comments.map((one) => ({ by: one.authorName, text: one.text, blocking: one.progressionPreventing, settled: one.status === "CLOSED", review: cy.number, rev: reviewed!.value })));
+      })(),
     };
   });
 }

@@ -58,6 +58,8 @@ export type NavPermissions = {
   canControl: boolean;
   canConfigure: boolean;
   canCreate: boolean;
+  /** Someone from another organization: the menu holds only what concerns them. */
+  external?: boolean;
 };
 
 function primaryNav(p: NavPermissions): NavItem[] {
@@ -77,7 +79,8 @@ function primaryNav(p: NavPermissions): NavItem[] {
         label: "Transmittals",
         description: "Issue, receive, confirm",
         icon: ArrowLeftRight,
-        when: p.canTransmit || p.canControl,
+        // An outside reader always has the transmittals addressed to them.
+        when: p.canTransmit || p.canControl || p.external,
       },
     ] as NavItem[]
   ).filter((i) => i.when !== false);
@@ -88,11 +91,11 @@ function moreNav(p: NavPermissions): NavItem[] {
     [
       { href: "/reviews", label: "Reviews", icon: ClipboardCheck },
       { href: "/packages", label: "Packages", icon: FolderKanban },
-      { href: "/assets", label: "Assets & tags", icon: Boxes },
-      { href: "/distribution", label: "Distribution matrix", icon: Network, when: p.canRead },
-      { href: "/reports", label: "Reports", icon: ListChecks, when: p.canControl },
-      { href: "/conformance", label: "Assurance", icon: ShieldCheck, when: p.canControl },
-      { href: "/import", label: "Import & export", icon: Import, when: p.canCreate || p.canControl },
+      { href: "/assets", label: "Assets & tags", icon: Boxes, when: !p.external },
+      { href: "/distribution", label: "Distribution matrix", icon: Network, when: p.canRead && !p.external },
+      { href: "/reports", label: "Reports", icon: ListChecks, when: p.canControl && !p.external },
+      { href: "/conformance", label: "Assurance", icon: ShieldCheck, when: p.canControl && !p.external },
+      { href: "/import", label: "Import & export", icon: Import, when: (p.canCreate || p.canControl) && !p.external },
     ] as NavItem[]
   ).filter((i) => i.when !== false);
 }

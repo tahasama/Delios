@@ -26,9 +26,11 @@ export default async function PackagesPage({ searchParams }: { searchParams: Pro
   const supplierOnly = !user.isInternal;
   const requested = (await searchParams).category;
   // Activities live in Schedule & actions now; a package is what we receive from a supplier, or what we hand over.
-  const category = supplierOnly ? "SUPPLIER" : requested === "DELIVERY" ? "DELIVERY" : "SUPPLIER";
+  // Outside readers see the packages that concern them — theirs to deliver, or
+  // addressed to them — and nothing else; the tenant client sees to that.
+  const category = requested === "DELIVERY" ? "DELIVERY" : "SUPPLIER";
   const [pkgs, reasons, statuses, users] = await Promise.all([
-    db.package.findMany({ where: { category, ...(supplierOnly ? { partyCode: user.partyCode ?? "-" } : {}) }, orderBy: { completionDate: "asc" }, include: { members: { include: { document: { include: { revisions: { where: { state: "RELEASED" }, orderBy: { releasedAt: "desc" }, take: 1 } } } } } } }),
+    db.package.findMany({ where: { category }, orderBy: { completionDate: "asc" }, include: { members: { include: { document: { include: { revisions: { where: { state: "RELEASED" }, orderBy: { releasedAt: "desc" }, take: 1 } } } } } } }),
     getActiveSet("REASONS_FOR_ISSUE"), getActiveSet("STATUSES"),
     // Anyone on the project may put a package together or accept it.
     db.projectMembership.findMany({ where: { projectId: ctx.projectId, active: true, user: { active: true } }, orderBy: { user: { name: "asc" } }, select: { user: { select: { id: true, name: true } }, function: { select: { name: true } } } })
@@ -65,7 +67,7 @@ export default async function PackagesPage({ searchParams }: { searchParams: Pro
           <a href="/api/export/packages" className="ask inline-flex items-center gap-1.5"><Download className="h-3.5 w-3.5"/> Export CSV</a>
         </div>
         <p className="mt-1 max-w-2xl text-[11.5px] leading-4 text-slate-500">{supplierOnly ? "What your company is asked to send, and where each document stands." : here.says.charAt(0).toUpperCase() + here.says.slice(1) + "."}</p>
-        {supplierOnly ? null : (
+        {(
           <nav className="seg mt-3 w-fit max-w-full">
             {tabs.map((c) => (
               <Link key={c.code} href={`/packages?category=${c.code}`} aria-current={category === c.code ? "page" : undefined} className="segment">{c.label}</Link>

@@ -63,7 +63,8 @@ export default async function PackageDetailPage({ params, searchParams }: { para
   const statusMeaning = new Map(statuses.map((x) => [x.code, typeof x.props.may === "string" ? `${x.label}: ${x.props.may}` : x.label]));
   const spell = (codes: string) => statusList(codes).map((code) => `${code}${statusName.get(code) ? ` (${statusName.get(code)!.toLowerCase()})` : ""}`).join(" or ");
   const purpose = pkg.purpose.split(",").map((code) => reasons.find((one) => one.code === code)?.label ?? code.toLowerCase()).join(", ");
-  const canAct = !isReadOnly(user) && !pkg.closedAt;
+  // Only our own people compose and deliver; the organization it goes to reads it.
+  const canAct = user.isInternal && !isReadOnly(user) && !pkg.closedAt;
   const shortfallFor = new Map((shortfall ?? []).map((s) => [s.docNumber, s]));
   const waitingAcceptance = !!shortfall && !!pkg.shortfallIssuedAt && !pkg.shortfallAcceptedBy;
   const mayDeliver = !!pkg.assessedAt && (!shortfall || !!pkg.shortfallAcceptedBy);

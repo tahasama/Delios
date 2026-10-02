@@ -1,7 +1,7 @@
 import "server-only";
 import { cache } from "react";
 import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
+import { redirect, notFound } from "next/navigation";
 import { db } from "./db";
 import { getCurrentUser, atLeast, hasVerb, type SessionUser } from "./auth";
 import type { Role } from "./standard";
@@ -132,7 +132,7 @@ export const getScope = cache(async (): Promise<Scope | null> => {
   const party = user.partyCode
     ? await bootstrap.db.party.findFirst({ where: { code: user.partyCode }, select: { name: true } })
     : null;
-  const external = user.isInternal ? null : { partyCode: user.partyCode, userId: user.id, organization: party?.name ?? null };
+  const external = user.isInternal ? null : { partyCode: user.partyCode, userId: user.id, organization: party?.name ?? null, partyId: user.partyId ?? null };
   const scoped = scopedClient(hostOrgId, chosen.projectId, reader, external);
 
   // Authority is held per project, not globally: the same person may author on
@@ -169,6 +169,17 @@ export async function requireScope(): Promise<Scope> {
     }
     redirect("/no-project");
   }
+  return scope;
+}
+
+/**
+ * A section that belongs to our own organization — the matrix, assurance,
+ * reports, tags, settings. Someone from another organization never reaches it,
+ * whatever link they follow.
+ */
+export async function requireInternalScope(): Promise<Scope> {
+  const scope = await requireScope();
+  if (!scope.user.isInternal) notFound();
   return scope;
 }
 

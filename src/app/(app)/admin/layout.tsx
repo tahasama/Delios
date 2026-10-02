@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { requireInternalScope } from "@/lib/scope";
 import { ArrowLeft } from "lucide-react";
 import { SETUP_PAGES } from "./setup-pages";
 import { AdminCrumb } from "./crumb";
@@ -8,7 +9,9 @@ import { AdminCrumb } from "./crumb";
  * so a new screen cannot be added without its way back — which is how people
  * ended up several clicks deep with nothing but the browser's back button.
  */
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
+export default async function AdminLayout({ children }: { children: React.ReactNode }) {
+  // Settings are our own organization's; another organization never reaches them.
+  await requireInternalScope();
   return (
     <div className="space-y-3">
       <nav aria-label="Where you are" className="flex flex-wrap items-center gap-1.5 text-xs text-slate-500">

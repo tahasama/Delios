@@ -44,7 +44,7 @@ export async function SupplierPackage({ pkg }: { pkg: { id: string; compositionO
 
   const table = (
     <div>
-      <DataTable className="rounded-none border-0 shadow-none" id={isSupplier ? "supplier-package-own" : "supplier-package"} defaultHidden={["Comments"]} head={<tr><Th>Document</Th><Th>Submit by</Th><Th>Status</Th><Th>Comments</Th><Th>{isSupplier ? "Your file" : "Next, or the file they sent"}</Th></tr>}>
+      <DataTable className="rounded-none border-0 shadow-none" exportName={pkg.identifier} id={isSupplier ? "supplier-package-own" : "supplier-package"} defaultHidden={["Comments"]} head={<tr><Th>Document</Th><Th>Submit by</Th><Th>Status</Th><Th>Comments</Th><Th>{isSupplier ? "Your file" : "Next, or the file they sent"}</Th></tr>}>
           {rows.map((r) => (
             <tr key={r.doc.id}>
               <Td>
@@ -66,7 +66,7 @@ export async function SupplierPackage({ pkg }: { pkg: { id: string; compositionO
                   <ul className="space-y-1">
                     {r.comments.map((one, i) => (
                       <li key={i} className={one.blocking && !one.settled ? "text-red-700" : undefined}>
-                        <span className="font-semibold">{one.by}</span>{one.blocking ? <span className="text-[10px] uppercase tracking-wide"> · blocking</span> : null}: {one.text}
+                        <span className="font-mono text-slate-400">rev {one.rev} · </span><span className="font-semibold">{one.by}</span>{one.blocking ? <span className="text-[10px] uppercase tracking-wide"> · blocking</span> : null}: {one.text}
                       </li>
                     ))}
                   </ul>
@@ -159,7 +159,6 @@ export async function SupplierPackage({ pkg }: { pkg: { id: string; compositionO
           </div>
           <div className="flex shrink-0 items-center gap-2 lg:justify-end">
             {pkg.partyCode ? <a href={`/api/requirements/sheet?sender=${encodeURIComponent(pkg.partyCode)}`} className="ask inline-flex items-center gap-1.5"><Download className="h-3.5 w-3.5" /> Delivery list</a> : null}
-            <a href={`/api/export/supplier-package?id=${pkg.id}`} className="ask inline-flex items-center gap-1.5" title="Every document with its status, verdict and comments — the list that goes back to them"><Download className="h-3.5 w-3.5" /> Outcomes and comments</a>
             {staff ? <Link href="/packages" className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-semibold text-slate-500 hover:bg-slate-100"><ArrowLeft className="h-4 w-4" /> Packages</Link> : null}
           </div>
         </div>

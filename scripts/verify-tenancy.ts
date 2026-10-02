@@ -243,6 +243,20 @@ async function main() {
     check("another project of ours cannot either", (await t2.db.storedFile.findFirst({ where: { id: issuedFile.id } })) === null);
     await db.storedFile.deleteMany({ where: { id: { in: [issuedFile.id, strayFile.id] } } });
 
+    // Packages: theirs to deliver, or addressed to them — never anyone else's.
+    const pkgBase = { projectId: p1.id, purpose: "INFORMATION", type: "DEFINED", completionDate: new Date(), requiredStatus: "IFC", compositionOwnerId: "verify", compositionOwnerName: "verify", acceptanceAuthorityId: "verify", acceptanceAuthorityName: "verify" };
+    const own = await db.package.create({ data: { ...pkgBase, identifier: `VFY-SP-${stamp}`, category: "SUPPLIER", partyCode: party.code, recipientName: party.name } });
+    const toThem = await db.package.create({ data: { ...pkgBase, identifier: `VFY-PK-A-${stamp}`, category: "DELIVERY", recipientName: party.name, recipientPartyId: party.id, recipientPartyIds: JSON.stringify([party.id]) } });
+    const notThem = await db.package.create({ data: { ...pkgBase, identifier: `VFY-PK-B-${stamp}`, category: "DELIVERY", recipientName: "Somebody else" } });
+    const outsideWithParty = scopedClient(org.id, p1.id, null, { partyCode: party.code, userId: person.id, organization: party.name, partyId: party.id });
+    const seen = new Set((await outsideWithParty.package.findMany({ select: { id: true } })).map((one) => one.id));
+    check("they see their own supplier package", seen.has(own.id));
+    check("they see a delivery package addressed to them", seen.has(toThem.id));
+    check("they do not see a package that does not concern them", !seen.has(notThem.id));
+    await db.package.deleteMany({ where: { id: { in: [own.id, toThem.id, notThem.id] } } });
+    check("the audit log does not exist for them", (await outside.auditEvent.count()) === 0);
+    check("nor do internal issue requests", (await outside.issueRequest.count()) === 0);
+
     await db.transmittalItem.deleteMany({ where: { transmittalId: transmittal.id } });
     await db.transmittalRecipient.deleteMany({ where: { transmittalId: transmittal.id } });
     await db.transmittal.delete({ where: { id: transmittal.id } });

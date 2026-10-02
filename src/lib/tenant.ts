@@ -177,7 +177,7 @@ const CLOSED_MODELS: Record<string, (reader: Reader) => Record<string, unknown>>
  * what their own party produced, and what was issued to them on a transmittal.
  * Nothing else exists for them — in the register, in search, in exports.
  */
-export type ExternalReader = { partyCode: string | null; userId: string; organization: string | null };
+export type ExternalReader = { partyCode: string | null; userId: string; organization: string | null; partyId?: string | null };
 
 function externalDocumentFilter(reader: ExternalReader) {
   const addressedToThem = {
@@ -210,7 +210,58 @@ function externalTransmittalFilter(reader: ExternalReader) {
   };
 }
 
+/** A package is seen by the organization that made it and the one it concerns. */
+function externalPackageFilter(reader: ExternalReader) {
+  return {
+    OR: [
+      ...(reader.partyCode ? [{ category: "SUPPLIER", partyCode: reader.partyCode }] : []),
+      ...(reader.partyId ? [{ recipientPartyId: reader.partyId }, { recipientPartyIds: { contains: reader.partyId } }] : []),
+    ],
+  };
+}
+
+/** An action concerns them when it needs one of the documents they may see. */
+function externalActionFilter(reader: ExternalReader) {
+  return { entries: { some: { document: externalDocumentFilter(reader) } } };
+}
+
+/** Rows that never concern another organization: none of them reach it. */
+const NOTHING = { id: "__not_for_outside_readers__" };
+
 const EXTERNAL_MODELS: Record<string, (reader: ExternalReader) => Record<string, unknown>> = {
+  // Everything an outside reader reaches comes through what concerns them:
+  // documents their party produces or that were issued to them, transmittals
+  // they are on, packages they deliver or receive, actions that need their
+  // documents. The rest — the audit log, assurance, internal requests and
+  // calls — does not exist for them.
+  Package: externalPackageFilter,
+  PackageMember: (reader) => ({ package: externalPackageFilter(reader), document: externalDocumentFilter(reader) }),
+  ReviewAssignment: (reader) => ({ cycle: { revision: { document: externalDocumentFilter(reader) } } }),
+  ReviewComment: (reader) => ({ cycle: { revision: { document: externalDocumentFilter(reader) } } }),
+  WorkflowRun: (reader) => ({ revision: { document: externalDocumentFilter(reader) } }),
+  Approval: (reader) => ({ revision: { document: externalDocumentFilter(reader) } }),
+  RegisteredCopy: (reader) => ({ revision: { document: externalDocumentFilter(reader) } }),
+  DocumentSnapshot: (reader) => ({ document: externalDocumentFilter(reader) }),
+  TransmittalItem: (reader) => ({ transmittal: externalTransmittalFilter(reader) }),
+  TransmittalRecipient: (reader) => ({ transmittal: externalTransmittalFilter(reader) }),
+  Action: externalActionFilter,
+  BaselineEntry: (reader) => ({ document: externalDocumentFilter(reader) }),
+  ScheduleActivity: (reader) => ({ action: externalActionFilter(reader) }),
+  ActionNote: (reader) => ({ action: externalActionFilter(reader) }),
+  ReadinessConfirmation: (reader) => ({ action: externalActionFilter(reader) }),
+  SenderIssue: (reader) => (reader.partyCode ? { sender: reader.partyCode } : NOTHING),
+  Delegation: (reader) => ({ OR: [{ fromUserId: reader.userId }, { toUserId: reader.userId }] }),
+  DocumentAccess: (reader) => ({ userId: reader.userId }),
+  Notification: (reader) => ({ userId: reader.userId }),
+  IssueRequest: () => NOTHING,
+  RequirementCall: () => NOTHING,
+  AuditEvent: () => NOTHING,
+  Defect: () => NOTHING,
+  CheckRun: () => NOTHING,
+  CheckRunItem: () => NOTHING,
+  ObsolescenceRecord: () => NOTHING,
+  ExceptionEntry: () => NOTHING,
+  DistributionRule: () => NOTHING,
   Document: externalDocumentFilter,
   Revision: (reader) => ({ document: externalDocumentFilter(reader) }),
   ReviewCycle: (reader) => ({ revision: { document: externalDocumentFilter(reader) } }),

@@ -12,6 +12,11 @@ export async function GET(req: Request, { params }: { params: Promise<{ kind: st
   if (!ctx) return NextResponse.json({ error: "No active project" }, { status: 403 });
   const { db } = ctx;
   const { kind } = await params;
+  // Another organization extracts only the registers it can read — never
+  // settings, templates, people or the audit log.
+  if (!ctx.user.isInternal && !["documents", "reviews", "transmittals", "packages"].includes(kind)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
   const stamp = new Date();
 
   let rows: (string | number | null)[][] = [];
@@ -165,22 +170,6 @@ export async function GET(req: Request, { params }: { params: Promise<{ kind: st
         rows.push([p.identifier, p.title ?? "", p.type, p.purpose, p.recipientName, p.completionDate.toISOString().slice(0, 10), p.requiredStatus, p.compositionOwnerName, p.acceptanceAuthorityName, p.closedAt?.toISOString().slice(0, 10) ?? "", m.document.docNumber, m.requiredStatus, cur?.statusCode ?? "not released"]);
       }
     }
-  } else if (kind === "supplier-package") {
-    // What goes back to a supplier: each document, where it stands, the verdict
-    // and every comment made on it — one line per comment.
-    const id = new URL(req.url).searchParams.get("id") ?? "";
-    const found = await db.package.findFirst({ where: { id, category: "SUPPLIER" } });
-    // A supplier reads its own package only.
-    const pkg = found && (ctx.user.isInternal || found.partyCode === ctx.user.partyCode) ? found : null;
-    const { supplierRows, STATE_LABEL } = await import("@/lib/supplier");
-    const list = pkg ? await supplierRows(ctx, pkg) : [];
-    rows = [["Document number", "Title", "Revision", "Where it stands", "Verdict", "Status", "Comment by", "Blocking", "Comment"]];
-    for (const r of list) {
-      const base = [r.doc.docNumber, r.doc.title, r.revision?.value ?? "", STATE_LABEL[r.state], r.outcome ?? "", r.revision?.statusCode ?? ""];
-      if (!r.comments.length) rows.push([...base, "", "", r.reason ?? ""]);
-      for (const one of r.comments) rows.push([...base, one.by, one.blocking ? "yes" : "no", one.text]);
-    }
-    name = pkg ? `${pkg.identifier}-outcomes` : "supplier-package";
   } else if (kind === "transmittals") {
     const ticked = (new URL(req.url).searchParams.get("ids") ?? "").split(",").map((one) => one.trim()).filter(Boolean);
     const list = await db.transmittal.findMany({

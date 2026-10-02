@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown, ChevronUp, Columns3, GripVertical, RotateCcw, Check } from "lucide-react";
+import { ChevronDown, ChevronUp, Columns3, GripVertical, RotateCcw, Check, Download } from "lucide-react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 
@@ -63,7 +63,13 @@ export function DataTable({
   fill,
   capHeight,
   stretch,
+  exportName,
 }: {
+  /**
+   * Offers "Export" for a table that has no register export of its own: the
+   * columns that are showing and the rows as drawn, as a CSV named so.
+   */
+  exportName?: string;
   head: React.ReactNode;
   children: React.ReactNode;
   className?: string;
@@ -329,6 +335,11 @@ export function DataTable({
               </button>
             ) : null}
             {tools}
+            {exportName ? (
+              <button type="button" className="dt-tool" onClick={() => exportShown(tableRef.current, exportName)} title="The columns that are showing, as they read">
+                <Download className="h-3.5 w-3.5" /> Export
+              </button>
+            ) : null}
 
             <div className="relative" ref={menuRef}>
               <button
@@ -440,4 +451,23 @@ export function DataTable({
       </div>
     </div>
   );
+}
+
+/** The table as it is drawn — showing columns only — written as CSV and saved. */
+function exportShown(table: HTMLTableElement | null, name: string) {
+  if (!table) return;
+  const shown = (cell: Element) => getComputedStyle(cell).display !== "none";
+  const text = (cell: Element) => {
+    // A cell holding a list reads one item per line.
+    const items = [...cell.querySelectorAll("li")];
+    const raw = items.length ? items.map((one) => (one as HTMLElement).innerText.trim()).join("\n") : (cell as HTMLElement).innerText.trim();
+    return `"${raw.replace(/"/g, '""')}"`;
+  };
+  const lines = [...table.querySelectorAll("tr")].map((row) => [...row.children].filter(shown).map(text).join(","));
+  const blob = new Blob(["\ufeff" + lines.join("\r\n")], { type: "text/csv;charset=utf-8" });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = `${name}-${new Date().toISOString().slice(0, 10)}.csv`;
+  link.click();
+  URL.revokeObjectURL(link.href);
 }

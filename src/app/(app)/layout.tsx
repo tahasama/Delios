@@ -26,6 +26,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     // Settings opens for administrators and for anyone granted a settings verb.
     canConfigure: ctx.can("CONFIGURE") || ctx.can("MATRIX") || ctx.can("ROUTES"),
     canCreate: ctx.can("CREATE") && mayCreateDocument(user),
+    // Another organization on this project: only what concerns them.
+    external: !user.isInternal,
   };
 
   return (
