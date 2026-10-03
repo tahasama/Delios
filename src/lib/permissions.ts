@@ -142,6 +142,8 @@ export type DocumentClass = {
   discipline?: string | null;
   criticality?: string | null;
   confidentiality?: string | null;
+  /** The family the document type falls in, where the question knows it. */
+  family?: string | null;
 };
 
 export type Rule = {
@@ -150,6 +152,15 @@ export type Rule = {
   discipline: string | null;
   criticality: string | null;
   confidentiality: string | null;
+  /** The contract role this rule is for, or null for every role. */
+  projectRole: string | null;
+  /** The family this rule was written about, or null for every family. */
+  family: string | null;
+  /**
+   * That family's document types. Expanded where the rules are loaded, so a
+   * matrix kept per family stays one rule per family instead of one per type.
+   */
+  familyTypes: string[] | null;
   verbs: Verb[];
 };
 
@@ -160,6 +171,8 @@ export type Actor = {
   clearance: number;
   legacyRole: string;
   rules: Rule[];
+  /** The contract role of the project this actor is being judged on. */
+  projectRole: string | null;
   /** Confidentiality code → level, as this organization published it. */
   levels: Map<string, number>;
 };
@@ -179,10 +192,12 @@ function parseVerbs(json: string): Verb[] {
  * row and its handful of rules.
  */
 export async function loadActor(t: Tenant, functionId: string): Promise<Actor | null> {
-  const [fn, rules, confidentialityValues] = await Promise.all([
+  const [fn, rules, confidentialityValues, project, documentTypes] = await Promise.all([
     t.db.function.findFirst({ where: { id: functionId } }),
     t.db.permissionRule.findMany({ where: { functionId }, orderBy: { sort: "asc" } }),
     t.db.configValue.findMany({ where: { setKey: "CONFIDENTIALITY" }, select: { code: true, props: true } }),
+    t.db.project.findFirst({ where: { id: t.projectId }, select: { role: true } }),
+    t.db.configValue.findMany({ where: { setKey: "DOCUMENT_TYPES", status: "ACTIVE" }, select: { code: true, props: true } }),
   ]);
   if (!fn || !fn.active) return null;
 
@@ -197,6 +212,19 @@ export async function loadActor(t: Tenant, functionId: string): Promise<Actor | 
     }
   }
 
+  // Which types each family holds, read once, so a family rule can be answered
+  // without a second query per rule.
+  const inFamily = new Map<string, string[]>();
+  for (const type of documentTypes) {
+    let family: unknown;
+    if (type.props) {
+      try { family = (JSON.parse(type.props) as { family?: unknown }).family; } catch { /* not a declared family */ }
+    }
+    const code = typeof family === "string" ? family.trim().toUpperCase() : type.code.trim().charAt(0).toUpperCase();
+    if (!code) continue;
+    inFamily.set(code, [...(inFamily.get(code) ?? []), type.code]);
+  }
+
   return {
     functionId: fn.id,
     functionCode: fn.code,
@@ -204,18 +232,32 @@ export async function loadActor(t: Tenant, functionId: string): Promise<Actor | 
     clearance: fn.clearance,
     legacyRole: fn.legacyRole,
     levels,
+    projectRole: project?.role ?? null,
     rules: rules.map((r) => ({
       deliverableType: r.deliverableType,
       docType: r.docType,
       discipline: r.discipline,
       criticality: r.criticality,
       confidentiality: r.confidentiality,
+      projectRole: r.projectRole,
+      family: r.family,
+      familyTypes: r.family ? inFamily.get(r.family.trim().toUpperCase()) ?? [] : null,
       verbs: parseVerbs(r.verbs),
     })),
   };
 }
 
 // ── The decision ─────────────────────────────────────────────────────────────
+
+/**
+ * The rules in force where this actor is being judged. A rule that states a
+ * contract role belongs to projects of that role and to no others, so the
+ * narrowing happens before any question about a document class — including the
+ * "anywhere at all" questions, which pass no class.
+ */
+function inForce(actor: Actor): Rule[] {
+  return actor.rules.filter((r) => r.projectRole === null || r.projectRole === actor.projectRole);
+}
 
 /** A rule applies when every selector it states matches. A null states nothing. */
 function matches(rule: Rule, target: DocumentClass): boolean {
@@ -226,7 +268,14 @@ function matches(rule: Rule, target: DocumentClass): boolean {
     [rule.criticality, target.criticality],
     [rule.confidentiality, target.confidentiality],
   ];
-  return pairs.every(([selector, value]) => selector === null || selector === value);
+  if (!pairs.every(([selector, value]) => selector === null || selector === value)) return false;
+  // A rule written about a family applies to that family, and to the types in
+  // it. A question naming neither is not about one family, so it does not match.
+  if (rule.family) {
+    if (target.family) return target.family === rule.family;
+    return Boolean(target.docType && rule.familyTypes?.includes(target.docType));
+  }
+  return true;
 }
 
 /**
@@ -247,14 +296,16 @@ function matches(rule: Rule, target: DocumentClass): boolean {
  */
 export function can(actor: Actor | null, verb: Verb, target?: DocumentClass | null): boolean {
   if (!actor) return false;
-  const applicable = target ? actor.rules.filter((r) => matches(r, target)) : actor.rules;
+  const inRole = inForce(actor);
+  const applicable = target ? inRole.filter((r) => matches(r, target)) : inRole;
   return applicable.some((r) => implies(r.verbs, verb));
 }
 
 /** Every verb this actor holds against a class — for explaining a decision. */
 export function verbsFor(actor: Actor | null, target?: DocumentClass | null): Verb[] {
   if (!actor) return [];
-  const applicable = target ? actor.rules.filter((r) => matches(r, target)) : actor.rules;
+  const inRole = inForce(actor);
+  const applicable = target ? inRole.filter((r) => matches(r, target)) : inRole;
   const held = new Set<Verb>();
   for (const rule of applicable) for (const verb of rule.verbs) held.add(verb);
   return VERBS.filter((v) => held.has(v));

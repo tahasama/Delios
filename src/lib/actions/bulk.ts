@@ -7,7 +7,9 @@ import { allocateNumber, validateNumber } from "@/lib/numbering";
 import { getActiveSet } from "@/lib/config";
 import { isReadOnly } from "@/lib/auth";
 import { retentionFor } from "@/lib/retention";
-import { hashPassword } from "@/lib/auth";
+import { hashPassword, isAdmin } from "@/lib/auth";
+import { revalidatePath } from "next/cache";
+import { readSheet, applyChanges } from "@/lib/matrix-read";
 
 // Bulk in/out — document controllers live in spreadsheets. Templates, preview,
 // then execute. No one fills a form per line.
@@ -36,6 +38,11 @@ export async function importBulkAction(_prev: BulkResult | undefined, formData: 
   if (isReadOnly(user)) return { error: "Viewers cannot import." };
   const kind = String(formData.get("kind") ?? "");
   const dryRun = formData.get("dryRun") === "on";
+
+  // The matrix is a grid, not a list of records: its own reader, and only an
+  // administrator may apply it, because it says who approves what.
+  if (kind === "matrix") return importMatrix(ctx, formData, dryRun);
+
   const objects = await readUpload(formData);
   if ("error" in objects) return { error: objects.error };
 
@@ -48,10 +55,26 @@ export async function importBulkAction(_prev: BulkResult | undefined, formData: 
       getActiveSet("SUPPLIER_CODES"), getActiveSet("PURCHASE_ORDERS"), getActiveSet("CRITICALITY"), getActiveSet("CONFIDENTIALITY"), getActiveSet("RETENTION_CLASSES"),
     ]);
     const active = (set: { code: string }[], code: string) => set.some((v) => v.code === code);
+    const known = new Map((await db.document.findMany({ select: { docNumber: true, id: true } })).map((d) => [d.docNumber, d.id]));
+    // What the number is built from cannot be corrected here: the number would
+    // then say one thing and the record another, and a number is never rewritten.
+    const INSIDE_THE_NUMBER = ["Type", "Discipline", "Project", "SubProject", "Supplier"];
+    const CORRECTABLE = ["Title", "Criticality", "Confidentiality", "RetentionClass", "ContractRef", "AssetCode"];
     for (let i = 0; i < objects.length; i++) {
       const o = objects[i];
       const line = i + 2;
       const errs: string[] = [];
+      const number = GET(o, "Document Number");
+      if (number) {
+        // A row that names a document is a correction to that document.
+        if (!known.has(number)) { rows.push({ line, ok: false, message: `${number} is not in the register — leave the number empty to register it instead` }); continue; }
+        const locked = INSIDE_THE_NUMBER.filter((f) => GET(o, f));
+        if (locked.length) { rows.push({ line, ok: false, message: `${number}: ${locked.join(", ")} ${locked.length === 1 ? "is" : "are"} built into the number and cannot be corrected here. Withdraw it and register it again under the right number.` }); continue; }
+        const fields = CORRECTABLE.filter((f) => GET(o, f));
+        if (!fields.length) rows.push({ line, ok: false, message: `${number}: nothing to correct — fill one of ${CORRECTABLE.join(", ")}` });
+        else { valid++; rows.push({ line, ok: true, message: `Correct ${number}: ${fields.join(", ")}` }); }
+        continue;
+      }
       if (!GET(o, "Title")) errs.push("Title missing");
       if (!active(types, GET(o, "Type"))) errs.push(`Type "${GET(o, "Type")}" not published/active`);
       if (!active(disciplines, GET(o, "Discipline"))) errs.push(`Discipline "${GET(o, "Discipline")}" not active`);
@@ -83,21 +106,6 @@ export async function importBulkAction(_prev: BulkResult | undefined, formData: 
       else if (isNaN(new Date(GET(o, "Required By")).getTime())) errs.push("Required By is not a date (use YYYY-MM-DD)");
       if (errs.length) rows.push({ line, ok: false, message: errs.join("; ") });
       else { valid++; rows.push({ line, ok: true, message: `${GET(o, "Document Number")} → ${GET(o, "Required Status")} by ${GET(o, "Required By")}` }); }
-    }
-  } else if (kind === "metadata") {
-    const docs = await db.document.findMany({ select: { docNumber: true, id: true } });
-    const byNumber = new Map(docs.map((d) => [d.docNumber, d.id]));
-    for (let i = 0; i < objects.length; i++) {
-      const o = objects[i];
-      const line = i + 2;
-      const number = GET(o, "Document Number");
-      if (!number || !byNumber.has(number)) {
-        rows.push({ line, ok: false, message: `Document "${number || "(missing)"}" not in the register` });
-        continue;
-      }
-      const fields = ["Title", "DocType", "Discipline", "Criticality", "Confidentiality", "RetentionClass", "SubProject", "ContractRef"].filter((f) => GET(o, f));
-      if (!fields.length) rows.push({ line, ok: false, message: "No fields to update (fill at least one column)" });
-      else { valid++; rows.push({ line, ok: true, message: `Update ${number}: ${fields.join(", ")}` }); }
     }
   } else if (kind === "people") {
     // A whole team arrives at once, in a spreadsheet, like everything else here.
@@ -145,7 +153,24 @@ export async function importBulkAction(_prev: BulkResult | undefined, formData: 
     const report = rows.find((r) => r.line === line);
     if (report && !report.ok) continue;
     try {
-      if (kind === "deliverables") {
+      if (kind === "deliverables" && GET(o, "Document Number")) {
+        // A row naming a document corrects it; only what is not inside the
+        // number may change, which validation has already enforced.
+        const doc = await db.document.findFirstOrThrow({ where: { docNumber: GET(o, "Document Number") } });
+        const map: Record<string, string> = { Title: "title", Criticality: "criticality", Confidentiality: "confidentiality", RetentionClass: "retentionClass", ContractRef: "contractRef", AssetCode: "assetCode" };
+        const data: Record<string, unknown> = {};
+        for (const [col, field] of Object.entries(map)) {
+          const v = GET(o, col);
+          if (!v) continue;
+          const current = (doc as unknown as Record<string, unknown>)[field];
+          if (String(current ?? "") !== v) {
+            data[field] = v;
+            await audit({ actor: user, action: "METADATA_CHANGE", entityType: "Document", entityId: doc.id, entityLabel: doc.docNumber, field, oldValue: current == null ? null : String(current), newValue: v, detail: "Bulk deliverable list (4.9)." });
+          }
+        }
+        if (Object.keys(data).length) await db.document.update({ where: { id: doc.id }, data });
+        done++;
+      } else if (kind === "deliverables") {
         const producer = (GET(o, "Producer") || "ENG").toUpperCase();
         const fieldValues: Record<string, string> = {
           "Project code": GET(o, "Project"), Subproject: GET(o, "SubProject"), "Supplier code": GET(o, "Supplier"),
@@ -205,21 +230,6 @@ export async function importBulkAction(_prev: BulkResult | undefined, formData: 
         const report2 = rows.find((r) => r.line === line);
         if (report2) report2.message = `${created.name} added as ${fn.name} \u2014 first password: ${password}`;
         done++;
-      } else if (kind === "metadata") {
-        const doc = await db.document.findFirstOrThrow({ where: { docNumber: GET(o, "Document Number") } });
-        const map: Record<string, string> = { Title: "title", DocType: "docType", Discipline: "discipline", Criticality: "criticality", Confidentiality: "confidentiality", RetentionClass: "retentionClass", SubProject: "subProject", ContractRef: "contractRef" };
-        const data: Record<string, unknown> = {};
-        for (const [col, field] of Object.entries(map)) {
-          const v = GET(o, col);
-          if (!v) continue;
-          const current = (doc as unknown as Record<string, unknown>)[field];
-          if (String(current ?? "") !== v) {
-            data[field] = v;
-            await audit({ actor: user, action: "METADATA_CHANGE", entityType: "Document", entityId: doc.id, entityLabel: doc.docNumber, field, oldValue: current == null ? null : String(current), newValue: v, detail: "Bulk metadata import (4.9)." });
-          }
-        }
-        if (Object.keys(data).length) await db.document.update({ where: { id: doc.id }, data });
-        done++;
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : "failed";
@@ -230,6 +240,62 @@ export async function importBulkAction(_prev: BulkResult | undefined, formData: 
   return {
     ok: "Imported " + done + " of " + objects.length + " rows." + (failures.length ? " " + failures.length + " failed - see the report." : ""),
     rows, imported: done, failed: failures.length, dryRun: false,
+  };
+}
+
+/**
+ * A filled-in distribution matrix. Dry by default: the report is the change
+ * list, one line per cell that differs from what the matrix says today.
+ */
+async function importMatrix(ctx: Awaited<ReturnType<typeof requireScope>>, formData: FormData, dryRun: boolean): Promise<BulkResult> {
+  const { user, db } = ctx;
+  if (!isAdmin(user)) return { error: "Only an administrator may change the distribution matrix." };
+
+  const file = formData.get("file") as File | null;
+  if (!file || file.size === 0) return { error: "Choose the filled-in matrix file." };
+  const { changes, problems, unchanged } = await readSheet(ctx, await file.text());
+
+  const rows: BulkRowReport[] = [
+    ...problems.map((p) => ({ line: p.line, ok: false, message: p.message })),
+  ];
+
+  if (dryRun) {
+    for (const change of changes) {
+      rows.push({
+        line: change.line, ok: true,
+        message: `${change.functionCode} (${change.functionName}): ${change.from} becomes ${change.to} on ${change.label || "this class"}.`,
+      });
+    }
+    rows.sort((a, b) => a.line - b.line);
+    return {
+      ok: changes.length
+        ? `Dry run: ${changes.length} cell(s) would change, ${unchanged} already agree. Uncheck dry run to apply.`
+        : `Dry run: nothing would change — all ${unchanged} cell(s) already agree with the matrix.`,
+      rows, imported: 0, failed: problems.length, dryRun: true,
+    };
+  }
+
+  const applied = await applyChanges(ctx, changes);
+  rows.push(...applied.map((one) => ({ line: one.line, ok: one.ok, message: one.message, wrote: one.wrote })));
+  rows.sort((a, b) => a.line - b.line);
+  const wrote = applied.filter((one) => one.wrote).length;
+  const refused = applied.filter((one) => !one.ok).length;
+
+  if (wrote) {
+    await audit({
+      actor: user,
+      action: "MATRIX_IMPORTED",
+      entityType: "Project",
+      entityId: ctx.projectId,
+      entityLabel: ctx.project.code,
+      detail: `${wrote} cell(s) changed from a filled-in distribution matrix${refused ? `; ${refused} refused` : ""}.`,
+    });
+  }
+  // The matrix decides what every screen offers, so nothing cached survives it.
+  revalidatePath("/", "layout");
+  return {
+    ok: `${wrote} cell(s) changed.${refused ? ` ${refused} could not be changed here — see the report.` : ""}`,
+    rows, imported: wrote, failed: refused + problems.length, dryRun: false,
   };
 }
 

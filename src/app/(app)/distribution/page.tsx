@@ -1,11 +1,11 @@
+import { Fragment } from "react";
 import Link from "next/link";
 import { requireScope } from "@/lib/scope";
 import { isAdmin } from "@/lib/auth";
-import { PageHeader, Card, DataTable, Th, Td, Chip, Field, btn, inputCls } from "@/components/ui";
-import { ActionForm } from "@/components/form";
-import { saveDistributionRuleAction, deleteDistributionRuleAction } from "@/lib/actions/retention";
+import { PageHeader, Card, DataTable, Th, Td, btn, inputCls } from "@/components/ui";
 import { getActiveSet } from "@/lib/config";
-import { loadActor, verbsFor, type Verb } from "@/lib/permissions";
+import { MATRIX_CODES as CODE, buildSheet } from "@/lib/matrix-sheet";
+import { roleFor } from "@/lib/profiles/roles";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Distribution matrix" };
@@ -15,23 +15,12 @@ export const metadata = { title: "Distribution matrix" };
  * functions across the top, a code in each cell. Engineers read this shape
  * without being taught it, which is why it is the shape here — even though the
  * underlying data is the permission matrix rather than a separate list.
+ *
+ * The codes themselves live in `lib/matrix-sheet`, with the sheet people
+ * download: the page and the file have to say the same thing.
  */
-const CODE: { verb: Verb; letter: string; label: string; tone: string }[] = [
-  { verb: "APPROVE", letter: "A", label: "Approves", tone: "bg-brand text-white" },
-  { verb: "REVIEW", letter: "R", label: "Reviews", tone: "bg-[#3d6b99] text-white" },
-  { verb: "CONTROL", letter: "C", label: "Controls (custody, release)", tone: "bg-violet-600 text-white" },
-  { verb: "TRANSMIT", letter: "T", label: "Issues to other parties", tone: "bg-amber-500 text-white" },
-  { verb: "RECEIVE", letter: "I", label: "Receives for information", tone: "bg-emerald-100 text-emerald-900" },
-  { verb: "READ", letter: "·", label: "May read if they go looking", tone: "bg-slate-100 text-slate-500" },
-];
 
-/** The strongest code a function holds for a class — one letter, as a DDM does. */
-function codeFor(verbs: Verb[]): (typeof CODE)[number] | null {
-  for (const c of CODE) if (verbs.includes(c.verb)) return c;
-  return null;
-}
-
-type Search = { discipline?: string; type?: string; all?: string };
+type Search = { discipline?: string; type?: string; producer?: string; inuse?: string };
 
 export default async function AdminDistributionPage({ searchParams }: { searchParams: Promise<Search> }) {
   const sp = await searchParams;
@@ -42,40 +31,36 @@ export default async function AdminDistributionPage({ searchParams }: { searchPa
   if (!ctx.can("READ")) return <PageHeader title="Distribution matrix" subtitle={ctx.why("READ")} />;
   const mayEdit = isAdmin(me);
 
-  const [rules, deliverables, confs, docTypes, disciplines, users, functions, inRegister] = await Promise.all([
-    db.distributionRule.findMany({ orderBy: [{ deliverableType: "asc" }, { confidentiality: "asc" }] }),
-    getActiveSet("DELIVERABLE_TYPES"),
-    getActiveSet("CONFIDENTIALITY"),
+  const project = await db.project.findFirst({ where: { id: ctx.projectId }, select: { code: true, role: true } });
+  const role = roleFor(project?.role);
+  const [docTypes, disciplines, producers, functions] = await Promise.all([
     getActiveSet("DOCUMENT_TYPES"),
     getActiveSet("DISCIPLINES"),
-    db.user.findMany({ where: { active: true }, orderBy: { name: "asc" } }),
+    getActiveSet("DELIVERABLE_TYPES"),
     db.function.findMany({ where: { active: true }, orderBy: { sort: "asc" } }),
-    // Which document types this project actually holds. An organization may
-    // publish hundreds; showing all of them by default is a wall, not a matrix.
-    db.document.groupBy({ by: ["docType", "discipline"], _count: true }),
   ]);
-  const usedDisciplines = new Set(inRegister.map((r) => r.discipline));
-  // Disciplines named by a rule must stay choosable, or its effect cannot be seen.
-  for (const r of await db.permissionRule.findMany({ where: { discipline: { not: null } }, select: { discipline: true } })) if (r.discipline) usedDisciplines.add(r.discipline);
-  const nameOf = (id: string) => users.find((u) => u.id === id)?.name ?? id;
 
-  // Rows are disciplines: that is how an engineering organization distributes
-  // (the electrical lead approves electrical documents). Disciplines in use —
-  // documents or rules — by default; every published one on request.
-  const showAll = sp.all === "1";
+  // The matrix is agreed before the documents exist, so it shows every
+  // discipline by default: a row hidden because nothing has landed in it yet is
+  // a row nobody agrees, and that is the one the argument is about later.
+  const inUseOnly = sp.inuse === "1";
   const one = sp.discipline && disciplines.some((d) => d.code === sp.discipline) ? sp.discipline : null;
-  const rows = (one ? disciplines.filter((d) => d.code === one) : showAll ? disciplines : disciplines.filter((d) => usedDisciplines.has(d.code)));
-
-  // A rule narrowed to a document type still shows when that type is asked about.
   const docType = sp.type && docTypes.some((t) => t.code === sp.type) ? sp.type : null;
+  // Who produced it is a view on the grid, not a row axis: crossing it with
+  // discipline made hundreds of rows that said the same thing.
+  const producer = sp.producer && producers.some((p) => p.code === sp.producer) ? sp.producer : null;
 
-  const actors = await Promise.all(functions.map((f) => loadActor(ctx, f.id)));
-  const grid = rows.map((row) => ({
-    type: row,
-    cells: actors.map((actor) =>
-      codeFor(verbsFor(actor, { discipline: row.code, docType, confidentiality: "INTERNAL" })),
-    ),
-  }));
+  // The page reads the same sheet as the file people download and the reader
+  // that takes it back. It used to build its own grid, keyed on discipline
+  // alone — so a row written for "internal engineering, civil" existed in the
+  // rules and showed nowhere, because the page never asked who produced it.
+  const sheet = await buildSheet(ctx, { allDisciplines: !inUseOnly || Boolean(one), deliverableType: producer, docType });
+  const visible = sheet.rows.filter((row) => !one || row.discipline === one);
+  const toneOf = (letter: string) => CODE.find((c) => c.letter === letter) ?? null;
+  // "Civil — quality, inspection and certification" is built from two names;
+  // nested, each half is printed where it belongs.
+  const disciplineLabel = (row: { label: string }) => row.label.split(" — ")[0];
+  const familyLabel = (row: { label: string }) => row.label.split(" — ").slice(1).join(" — ");
 
   // How many people actually sit behind each function on this project.
   const holders = await db.projectMembership.groupBy({
@@ -92,13 +77,25 @@ export default async function AdminDistributionPage({ searchParams }: { searchPa
         subtitle="Who reviews, approves and receives each discipline's documents. Agreed before any document is sent, so nobody has to ask."
       />
       <p className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
-        Rows are disciplines, columns are functions; the letter says what that function does with that discipline's documents.
+        Rows are disciplines in their groups, columns are functions. Who produced it and which document type it is are views on the same grid — change them and the letters change.
+        <a href={`/api/export/matrix?${new URLSearchParams({ ...(producer ? { producer } : {}), ...(docType ? { type: docType } : {}), ...(inUseOnly ? {} : { all: "1" }) })}`} className="font-semibold text-link hover:underline">Download this view, filled in (CSV) →</a>
+        {mayEdit ? <Link href="/import?kind=matrix" className="font-semibold text-link hover:underline">Upload a filled-in one →</Link> : null}
         {mayEdit ? <Link href="/admin/functions" className="font-semibold text-link hover:underline">Change who does what →</Link> : <span className="text-slate-400">Read only — an administrator changes it.</span>}
       </p>
+      {role && role.code !== "GENERIC" ? (
+        <p className="rounded-xl bg-slate-50 px-3 py-2 text-xs text-slate-600">
+          On this project we are <span className="font-semibold text-slate-800">{role.label}</span>. {role.approval} Rows written for this role apply here and on no other kind of project.
+        </p>
+      ) : (
+        <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          This project does not say what we are contracted to do on it, so the matrix applies as published, with no role-specific rows.
+          {mayEdit ? <> <Link href="/admin/projects" className="font-semibold underline">State it in Projects</Link> and the starting matrix for that role is published with it.</> : null}
+        </p>
+      )}
 
       <Card
         title="Who gets what"
-        description={`${rows.length} discipline${rows.length === 1 ? "" : "s"} × ${functions.length} functions · ${docType ? `document type ${docType}` : "any document type"} · internal classification`}
+        description={`${visible.length} discipline${visible.length === 1 ? "" : "s"} × ${sheet.columns.length} functions · ${producer ? producers.find((p) => p.code === producer)!.label.toLowerCase() : "any producer"} · ${docType ? `document type ${docType}` : "any document type"} · internal classification`}
       >
         <form method="get" className="mb-4 flex flex-wrap items-end gap-3 rounded-xl bg-slate-50 px-3 py-3">
           <label className="text-xs">
@@ -109,6 +106,13 @@ export default async function AdminDistributionPage({ searchParams }: { searchPa
             </select>
           </label>
           <label className="text-xs">
+            <span className="mb-1 block font-medium text-slate-700">Who produced it</span>
+            <select name="producer" defaultValue={producer ?? ""} className={`${inputCls} py-1.5 text-xs`}>
+              <option value="">Any producer</option>
+              {producers.map((p) => <option key={p.code} value={p.code}>{p.code} — {p.label}</option>)}
+            </select>
+          </label>
+          <label className="text-xs">
             <span className="mb-1 block font-medium text-slate-700">Document type <span className="font-normal text-slate-400">— optional</span></span>
             <select name="type" defaultValue={docType ?? ""} className={`${inputCls} py-1.5 text-xs`}>
               <option value="">Any type</option>
@@ -116,8 +120,8 @@ export default async function AdminDistributionPage({ searchParams }: { searchPa
             </select>
           </label>
           <label className="flex items-center gap-2 pb-2 text-xs text-slate-600">
-            <input type="checkbox" name="all" value="1" defaultChecked={showAll} />
-            Show every published discipline ({disciplines.length})
+            <input type="checkbox" name="inuse" value="1" defaultChecked={inUseOnly} />
+            Only the disciplines this project already works in
           </label>
           <button type="submit" className={btn("secondary", "sm")}>Apply</button>
         </form>
@@ -140,38 +144,54 @@ export default async function AdminDistributionPage({ searchParams }: { searchPa
           head={
             <tr>
               <Th className="sticky left-0 z-4 min-w-55 align-bottom">Discipline</Th>
-              {functions.map((f) => (
-                <Th key={f.id} label={f.name} className="px-1.5 text-center align-bottom normal-case tracking-normal">
-                  <span className="mx-auto block whitespace-nowrap pb-1 text-[11px] font-semibold text-slate-600 [text-orientation:mixed] [writing-mode:vertical-rl] rotate-180">{f.name}</span>
-                  <span className="block text-[10px] font-normal text-slate-400" title="people holding this function">{holderCount.get(f.id) ?? 0}</span>
-                </Th>
-              ))}
+              {sheet.columns.map((column, i) => {
+                const fn = functions.find((f) => f.code === column.code);
+                return (
+                  <Th key={column.code} label={column.name} className="px-1.5 text-center align-bottom normal-case tracking-normal">
+                    <span className="mx-auto block whitespace-nowrap pb-1 text-[11px] font-semibold text-slate-600 [text-orientation:mixed] [writing-mode:vertical-rl] rotate-180">{column.name}</span>
+                    <span className="block text-[10px] font-normal text-slate-400" title="people holding this function">{fn ? holderCount.get(fn.id) ?? 0 : 0}</span>
+                  </Th>
+                );
+              })}
             </tr>
           }
         >
-          {grid.map(({ type, cells }) => (
-            <tr key={type.code}>
-              <Td className="sticky left-0 z-1 whitespace-nowrap bg-surface py-1.5 text-xs">
-                <span className="font-mono text-[11px] font-semibold text-slate-700">{type.code}</span>{" "}
-                <span className="text-slate-500">{type.label}</span>
+          {visible.map((row, index) => (
+            <Fragment key={`${row.discipline}|${row.family}`}>
+              {/* A discipline heads its families; without them it is the row itself. */}
+              {row.family && row.discipline !== visible[index - 1]?.discipline ? (
+                <tr>
+                  <Td colSpan={1 + sheet.columns.length} className="sticky left-0 bg-slate-50 py-1 pl-4 text-xs font-semibold text-slate-700">
+                    <span className="font-mono text-[11px] text-slate-400">{row.discipline}</span> {disciplineLabel(row)}
+                  </Td>
+                </tr>
+              ) : null}
+            <tr>
+              <Td className={`sticky left-0 z-1 whitespace-nowrap bg-surface py-1.5 text-xs ${row.family ? "pl-8" : ""}`}>
+                <span className="font-mono text-[11px] font-semibold text-slate-700">{row.family || row.discipline}</span>{" "}
+                <span className="text-slate-500">{row.family ? familyLabel(row) : row.label}</span>
               </Td>
-              {cells.map((cell, i) => (
-                <Td key={functions[i].id} className="px-1.5 py-1.5 text-center">
-                  {cell ? (
-                    <span title={`${functions[i].name} — ${cell.label} (${type.label})`} className={`inline-grid h-6 w-6 place-items-center rounded-md text-[11px] font-bold ${cell.tone}`}>
-                      {cell.letter}
-                    </span>
-                  ) : (
-                    <span className="text-slate-200">·</span>
-                  )}
-                </Td>
-              ))}
+              {row.cells.map((letter, i) => {
+                const cell = toneOf(letter);
+                return (
+                  <Td key={sheet.columns[i].code} className="px-1.5 py-1.5 text-center">
+                    {cell ? (
+                      <span title={`${sheet.columns[i].name} — ${cell.label} (${row.label})`} className={`inline-grid h-6 w-6 place-items-center rounded-md text-[11px] font-bold ${cell.tone}`}>
+                        {cell.letter}
+                      </span>
+                    ) : (
+                      <span className="text-slate-200" title={`${sheet.columns[i].name} — not distributed`}>–</span>
+                    )}
+                  </Td>
+                );
+              })}
             </tr>
+            </Fragment>
           ))}
         </DataTable>
-        {rows.length === 0 ? (
+        {visible.length === 0 ? (
           <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
-            No discipline is in use yet. Tick “Show every published discipline” to see the matrix against the whole list.
+            Nothing to show. Untick “Only the disciplines this project already works in” to see every published discipline.
           </p>
         ) : null}
       </Card>

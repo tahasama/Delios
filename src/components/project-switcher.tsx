@@ -2,6 +2,7 @@ import { FolderOpen, Check, ChevronDown } from "lucide-react";
 import { switchProjectAction } from "@/lib/actions/project";
 import type { ProjectSummary } from "@/lib/scope";
 import { ROLE_LABEL } from "@/lib/standard";
+import { roleFor } from "@/lib/profiles/roles";
 import type { Role } from "@/lib/standard";
 
 /**
@@ -31,6 +32,7 @@ export function ProjectSwitcher({
         <p className="truncate text-sm font-semibold text-slate-800">{current.name}</p>
         <p className="truncate text-xs text-slate-400">
           {organizationName} · {functionName ?? ROLE_LABEL[role] ?? role}
+          {current.role !== "GENERIC" ? ` · we are ${current.role}` : ""}
         </p>
       </div>
     );
@@ -46,6 +48,7 @@ export function ProjectSwitcher({
           <span className="block truncate text-sm font-semibold leading-tight text-slate-800">{current.name}</span>
           <span className="block truncate text-[11px] leading-tight text-slate-400">
             {current.code} · {functionName ?? ROLE_LABEL[role] ?? role}
+            {current.role !== "GENERIC" ? ` · we are ${current.role}` : ""}
           </span>
         </span>
         <ChevronDown className="h-3.5 w-3.5 shrink-0 text-slate-400 transition group-open:rotate-180" />
@@ -71,6 +74,11 @@ export function ProjectSwitcher({
                     {project.code}
                     {project.kind !== "GENERIC" ? ` · ${project.kind.toLowerCase()}` : ""}
                   </span>
+                  {project.role !== "GENERIC" ? (
+                    <span className="block truncate text-[11px] text-slate-500" title={roleFor(project.role)?.approval}>
+                      we are {roleFor(project.role)?.label ?? project.role}
+                    </span>
+                  ) : null}
                 </span>
                 {active ? <Check className="h-4 w-4 shrink-0 text-emerald-600" /> : null}
               </button>

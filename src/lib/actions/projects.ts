@@ -9,6 +9,8 @@ import { functionForRole } from "@/lib/bootstrap";
 import { db as bare } from "@/lib/db";
 import { tenantFor } from "@/lib/tenant";
 import { profileForKind, draftProfile, PROJECT_KINDS } from "@/lib/profiles";
+import { contractRoleOptions } from "@/lib/contract-roles";
+import { publishRoleMatrix } from "@/lib/profiles/publish-roles";
 
 export type ProjectState = { error?: string; ok?: string };
 
@@ -32,7 +34,9 @@ export async function createProjectAction(
   const name = String(formData.get("name") ?? "").trim();
   const code = String(formData.get("code") ?? "").trim().toUpperCase();
   const kind = String(formData.get("kind") ?? "GENERIC");
+  const role = String(formData.get("role") ?? "GENERIC");
   const startDate = String(formData.get("startDate") ?? "").trim();
+  const endDate = String(formData.get("endDate") ?? "").trim();
   const scopeStatement = String(formData.get("scopeStatement") ?? "").trim();
   const copyPeople = formData.get("copyPeople") === "on";
 
@@ -42,6 +46,14 @@ export async function createProjectAction(
   }
   if (!PROJECT_KINDS.some((k) => k.code === kind)) {
     return { error: "Choose a project type." };
+  }
+  const roleOptions = await contractRoleOptions(bare, orgId);
+  const chosenRole = roleOptions.find((r) => r.code === role);
+  if (!chosenRole) {
+    return { error: "Choose what this organization does on the project." };
+  }
+  if (startDate && endDate && endDate < startDate) {
+    return { error: "The end date cannot fall before the start date." };
   }
 
   const clash = await db.project.findFirst({ where: { orgId, code } });
@@ -55,7 +67,9 @@ export async function createProjectAction(
       code,
       name,
       kind,
+      role,
       startDate: startDate ? new Date(`${startDate}T00:00:00.000Z`) : new Date(),
+      endDate: endDate ? new Date(`${endDate}T00:00:00.000Z`) : null,
     },
   });
 
@@ -109,9 +123,24 @@ export async function createProjectAction(
   const profile = profileForKind(kind);
   const drafts = profile ? await draftProfile(tenantFor(orgId, project.id), profile) : { drafted: [], skipped: [] };
 
+  // The contract role brings its starting matrix: the outside functions it
+  // names, and rows that apply on projects of this role only. Seeded, never
+  // rewritten, so a matrix already corrected for this role is left alone.
+  const seeded = await publishRoleMatrix(bare, orgId, role);
+  if (seeded.rules) {
+    await audit({
+      actor: admin,
+      action: "MATRIX_ROLE_PUBLISHED",
+      entityType: "Project",
+      entityId: project.id,
+      entityLabel: `${code} — ${name}`,
+      detail: `${chosenRole.label} starting matrix published: ${seeded.rules} rule(s)${seeded.functions ? `, ${seeded.functions} function(s)` : ""}. Correct it through the matrix review route.`,
+    });
+  }
+
   revalidatePath("/admin/projects", "layout");
   return {
-    ok: `${code} opened${carried ? ` with ${carried} person(s) carried over` : ""}. Switch to it from the picker at the top left.${drafts.drafted.length ? ` The ${profile!.name} starter values are drafted for approval in Settings → Controlled changes (${drafts.drafted.join(", ")}).` : ""}`,
+    ok: `${code} opened${carried ? ` with ${carried} person(s) carried over` : ""}. Switch to it from the picker at the top left.${seeded.rules ? ` The ${chosenRole.label} starting matrix is published — ${seeded.rules} row(s) to check in the distribution matrix.` : ""}${drafts.drafted.length ? ` The ${profile!.name} starter values are drafted for approval in Settings → Controlled changes (${drafts.drafted.join(", ")}).` : ""}`,
   };
 }
 

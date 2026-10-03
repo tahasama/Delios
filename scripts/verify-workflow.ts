@@ -71,9 +71,26 @@ async function main() {
   }
 
   // The project's answer on the matrix, set for a check and put back after.
+  // The project may already have answered it — a real setting, made by a real
+  // administrator — so the answer is remembered and restored rather than
+  // assumed absent. One row per project and key, so this upserts.
+  const answeredBefore = await db.controlSetting.findFirst({ where: { projectId: p1.id, key: "POLICY_MATRIX" } });
   const strict = async (on: boolean) => {
-    await db.controlSetting.deleteMany({ where: { projectId: p1.id, key: "POLICY_MATRIX", setByName: "verify-workflow" } });
-    if (on) await db.controlSetting.create({ data: { projectId: p1.id, key: "POLICY_MATRIX", mode: "STRICT", setByName: "verify-workflow" } as never });
+    if (on) {
+      await db.controlSetting.upsert({
+        where: { projectId_key: { projectId: p1.id, key: "POLICY_MATRIX" } },
+        create: { projectId: p1.id, key: "POLICY_MATRIX", mode: "STRICT", setByName: "verify-workflow" },
+        update: { mode: "STRICT", setByName: "verify-workflow" },
+      });
+    } else if (answeredBefore) {
+      await db.controlSetting.upsert({
+        where: { projectId_key: { projectId: p1.id, key: "POLICY_MATRIX" } },
+        create: { projectId: p1.id, key: "POLICY_MATRIX", mode: answeredBefore.mode, setByName: answeredBefore.setByName },
+        update: { mode: answeredBefore.mode, setByName: answeredBefore.setByName },
+      });
+    } else {
+      await db.controlSetting.deleteMany({ where: { projectId: p1.id, key: "POLICY_MATRIX" } });
+    }
   };
 
   try {

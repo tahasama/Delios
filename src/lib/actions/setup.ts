@@ -3,6 +3,8 @@
 import { STANDARD_VERSION } from "@/lib/standard";
 
 import { profileForKind, publishProfile, PROJECT_KINDS } from "@/lib/profiles";
+import { isContractRole } from "@/lib/contract-roles";
+import { publishRoleMatrix } from "@/lib/profiles/publish-roles";
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -32,16 +34,18 @@ export async function openFirstProjectAction(
   const name = String(formData.get("name") ?? "").trim();
   const code = String(formData.get("code") ?? "").trim().toUpperCase();
   const kind = String(formData.get("kind") ?? "GENERIC");
+  const role = String(formData.get("role") ?? "GENERIC");
 
   if (!name) return { error: "Give the project a name people will recognise." };
   if (!CODE.test(code)) return { error: "The code is short and uppercase — letters, digits and hyphens, e.g. P1." };
   if (!PROJECT_KINDS.some((k) => k.code === kind)) return { error: "Choose a project type." };
+  if (!(await isContractRole(bare, orgId, role))) return { error: "Choose what this organization does on the project." };
 
   const clash = await bare.project.findFirst({ where: { orgId, code } });
   if (clash) return { error: `${code} is already used by “${clash.name}”.` };
 
   const project = await bare.project.create({
-    data: { orgId, code, name, kind, startDate: new Date() },
+    data: { orgId, code, name, kind, role, startDate: new Date() },
   });
 
   await bare.scopeConfig.create({
@@ -59,6 +63,9 @@ export async function openFirstProjectAction(
   // starter values are published with it, as they would have been at signup.
   const profile = profileForKind(kind);
   if (profile) await publishProfile(bare, orgId, profile, "add");
+
+  // What the organization does on the project brings its starting matrix.
+  await publishRoleMatrix(bare, orgId, role);
 
   // Everyone already in the organization joins, holding the function they were
   // given. Otherwise the people you just added would sit outside the first

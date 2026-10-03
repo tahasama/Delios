@@ -7,6 +7,8 @@ import { ActionForm } from "@/components/form";
 import { Field, inputCls, btn } from "@/components/ui";
 import { FolderPlus, UserPlus, Check, LogOut } from "lucide-react";
 import { PROJECT_KINDS } from "@/lib/profiles/kinds";
+import { contractRoleOptions } from "@/lib/contract-roles";
+import { db as bare } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Set up your organization" };
@@ -31,6 +33,7 @@ export default async function SetupPage() {
     db.configSet.count(),
   ]);
   const labelFor = (role: string) => functions.find((f) => f.legacyRole === role)?.name ?? role;
+  const roleOptions = await contractRoleOptions(bare, organization.id);
 
   return (
     <div className="min-h-screen bg-canvas">
@@ -137,6 +140,11 @@ export default async function SetupPage() {
                 <Field label="Type" hint="Affects defaults only, never the rules">
                   <select name="kind" className={inputCls} defaultValue="GENERIC">
                     {KINDS.map((k) => <option key={k.code} value={k.code}>{k.label}</option>)}
+                  </select>
+                </Field>
+                <Field label="What you do on it" hint="Decides where approval sits, and the matrix it starts from">
+                  <select name="role" className={inputCls} defaultValue="GENERIC">
+                    {roleOptions.map((r) => <option key={r.code} value={r.code}>{r.label}</option>)}
                   </select>
                 </Field>
                 <p className="text-[11px] text-slate-400">

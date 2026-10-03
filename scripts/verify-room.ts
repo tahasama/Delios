@@ -44,16 +44,16 @@ async function main() {
 
     check("nothing is left out until somebody says so", !(await actIsOff(t, "DELEGATE")));
     const before = await controlDoes(t, "DELEGATE");
-    await db.controlSetting.create({ data: { projectId: project.id, key: SKIP_KEY("DELEGATE"), mode: "OFF" } });
+    await db.controlSetting.upsert({ where: { projectId_key: { projectId: project.id, key: SKIP_KEY("DELEGATE") } }, create: { projectId: project.id, key: SKIP_KEY("DELEGATE"), mode: "OFF" }, update: { mode: "OFF" } });
     check("delegation reads as left out once switched off", await actIsOff(t, "DELEGATE"));
     check("leaving it out does not move who would carry it out", (await controlDoes(t, "DELEGATE")) === before);
     const rows = (await controlSettings(t)).rows;
     check("the settings screen sees it as skipped", rows.find((row) => row.activity.key === "DELEGATE")?.off === true);
     check("and only that act", rows.filter((row) => row.off).length === 1);
 
-    await db.controlSetting.create({ data: { projectId: project.id, key: SKIP_KEY("VOID"), mode: "OFF" } });
+    await db.controlSetting.upsert({ where: { projectId_key: { projectId: project.id, key: SKIP_KEY("VOID") } }, create: { projectId: project.id, key: SKIP_KEY("VOID"), mode: "OFF" }, update: { mode: "OFF" } });
     check("an act that may not be skipped ignores a stray switch", !(await actIsOff(t, "VOID")));
-    await db.controlSetting.create({ data: { projectId: project.id, key: SKIP_KEY("ACTION_NOTE"), mode: "OFF" } });
+    await db.controlSetting.upsert({ where: { projectId_key: { projectId: project.id, key: SKIP_KEY("ACTION_NOTE") } }, create: { projectId: project.id, key: SKIP_KEY("ACTION_NOTE"), mode: "OFF" }, update: { mode: "OFF" } });
     check("the action note reads as left out on its own switch", (await actIsOff(t, "ACTION_NOTE")) && (await controlSettings(t)).rows.filter((row) => row.off).length === 2);
 
     console.log("\nDocument types reviewed, or not\n");

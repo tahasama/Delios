@@ -6,6 +6,8 @@ import { createProjectAction, renameProjectAction, setProjectStatusAction, openP
 import { fmtDate } from "@/lib/utils";
 import { FolderOpen, ArrowRight } from "lucide-react";
 import { PROJECT_KINDS } from "@/lib/profiles/kinds";
+import { contractRoleOptions } from "@/lib/contract-roles";
+import { db as bare } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Projects" };
@@ -17,6 +19,7 @@ export default async function ProjectsPage() {
   const { db, user: me, orgId, projectId } = ctx;
   if (!isAdmin(me)) return <PageHeader title="Projects" subtitle="Administrators only." />;
 
+  const roleOptions = await contractRoleOptions(bare, ctx.orgId);
   const projects = await db.project.findMany({
     where: { orgId },
     orderBy: [{ status: "asc" }, { code: "asc" }],
@@ -40,6 +43,7 @@ export default async function ProjectsPage() {
               <Th>Code</Th>
               <Th>Name</Th>
               <Th>Type</Th>
+              <Th>Our role</Th>
               <Th>People</Th>
               <Th>Documents</Th>
               <Th>Started</Th>
@@ -56,9 +60,13 @@ export default async function ProjectsPage() {
                 {p.id === projectId ? <span className="ml-1.5 text-[11px] text-emerald-700">(open now)</span> : null}
               </Td>
               <Td className="text-xs text-slate-500">{p.kind.toLowerCase()}</Td>
+              <Td className="text-xs text-slate-500">{p.role === "GENERIC" ? <span className="text-slate-300">not stated</span> : p.role}</Td>
               <Td className="tabular-nums">{p._count.members}</Td>
               <Td className="tabular-nums">{p._count.documents}</Td>
-              <Td className="whitespace-nowrap text-xs text-slate-400">{fmtDate(p.startDate)}</Td>
+              <Td className="whitespace-nowrap text-xs text-slate-400">
+                {fmtDate(p.startDate)}
+                {p.endDate ? <span className="block text-slate-300">to {fmtDate(p.endDate)}</span> : null}
+              </Td>
               <Td>
                 {p.status === "ACTIVE" ? (
                   <Chip className="bg-emerald-100 text-emerald-800 ring-emerald-300">active</Chip>
@@ -128,10 +136,31 @@ export default async function ProjectsPage() {
                 {KINDS.map((k) => <option key={k.code} value={k.code}>{k.label}</option>)}
               </select>
             </Field>
+            <Field label="Our role on it" hint="Decides where approval sits, and the matrix it starts from">
+              <select name="role" className={inputCls} defaultValue="GENERIC">
+                {roleOptions.map((r) => <option key={r.code} value={r.code}>{r.label}</option>)}
+              </select>
+            </Field>
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Field label="Start date">
               <input type="date" name="startDate" className={inputCls} />
             </Field>
+            <Field label="End date" hint="Planned completion">
+              <input type="date" name="endDate" className={inputCls} />
+            </Field>
           </div>
+          <details className="rounded-xl bg-slate-50 px-3 py-2 text-xs text-slate-600">
+            <summary className="cursor-pointer font-medium text-slate-700">Where approval sits under each role</summary>
+            <dl className="mt-2 space-y-1.5">
+              {roleOptions.filter((r) => r.code !== "GENERIC").map((r) => (
+                <div key={r.code}>
+                  <dt className="font-semibold text-slate-700">{r.label}</dt>
+                  <dd className="text-slate-500">{r.approval}</dd>
+                </div>
+              ))}
+            </dl>
+          </details>
           <Field label="Scope statement" hint="What this project's conformance figure is measured against">
             <input
               name="scopeStatement"

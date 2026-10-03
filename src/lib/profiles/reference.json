@@ -48,202 +48,1972 @@
     {
       "key": "DOCUMENT_TYPES",
       "title": "Document types",
-      "description": "D.2 reference set — the organization publishes its own (add/import in Admin).",
+      "description": "Our own document types. What we produce carries a three-letter mnemonic (DWG, ITP); what a supplier delivers against a purchase order carries its family letter and a number (D101). Every type names its family, which is where the stamp rule is answered.",
       "values": [
+        {
+          "code": "COR",
+          "label": "Correspondence",
+          "sort": 0,
+          "props": {
+            "family": "A",
+            "appliesTo": "Non-supplier"
+          }
+        },
+        {
+          "code": "LET",
+          "label": "Letter",
+          "sort": 1,
+          "props": {
+            "family": "A",
+            "appliesTo": "Non-supplier"
+          }
+        },
+        {
+          "code": "MIN",
+          "label": "Meeting minutes",
+          "sort": 2,
+          "props": {
+            "family": "A",
+            "appliesTo": "Non-supplier"
+          }
+        },
+        {
+          "code": "RPT",
+          "label": "Report",
+          "sort": 3,
+          "props": {
+            "family": "A",
+            "appliesTo": "Non-supplier"
+          }
+        },
+        {
+          "code": "PLN",
+          "label": "Plan",
+          "sort": 4,
+          "props": {
+            "family": "A",
+            "appliesTo": "Non-supplier"
+          }
+        },
+        {
+          "code": "ORG",
+          "label": "Organisation chart",
+          "sort": 5,
+          "props": {
+            "family": "A",
+            "appliesTo": "Non-supplier"
+          }
+        },
+        {
+          "code": "PRG",
+          "label": "Programme",
+          "sort": 6,
+          "props": {
+            "family": "A",
+            "appliesTo": "Non-supplier"
+          }
+        },
+        {
+          "code": "RSK",
+          "label": "Risk register",
+          "sort": 7,
+          "props": {
+            "family": "A",
+            "appliesTo": "Non-supplier"
+          }
+        },
+        {
+          "code": "RFI",
+          "label": "Request for information",
+          "sort": 8,
+          "props": {
+            "family": "A",
+            "appliesTo": "Non-supplier"
+          }
+        },
+        {
+          "code": "VAR",
+          "label": "Variation request",
+          "sort": 9,
+          "props": {
+            "family": "A",
+            "appliesTo": "Non-supplier"
+          }
+        },
+        {
+          "code": "LST",
+          "label": "List",
+          "sort": 10,
+          "props": {
+            "family": "B",
+            "appliesTo": "Non-supplier"
+          }
+        },
+        {
+          "code": "IDX",
+          "label": "Index",
+          "sort": 11,
+          "props": {
+            "family": "B",
+            "appliesTo": "Non-supplier"
+          }
+        },
+        {
+          "code": "SCH",
+          "label": "Schedule",
+          "sort": 12,
+          "props": {
+            "family": "B",
+            "appliesTo": "Non-supplier"
+          }
+        },
+        {
+          "code": "BOM",
+          "label": "Bill of materials",
+          "sort": 13,
+          "props": {
+            "family": "B",
+            "appliesTo": "Non-supplier"
+          }
+        },
+        {
+          "code": "REG",
+          "label": "Register",
+          "sort": 14,
+          "props": {
+            "family": "B",
+            "appliesTo": "Non-supplier"
+          }
+        },
+        {
+          "code": "MTO",
+          "label": "Material take-off",
+          "sort": 15,
+          "props": {
+            "family": "B",
+            "appliesTo": "Non-supplier"
+          }
+        },
+        {
+          "code": "TAG",
+          "label": "Tag list",
+          "sort": 16,
+          "props": {
+            "family": "B",
+            "appliesTo": "Non-supplier"
+          }
+        },
+        {
+          "code": "CAL",
+          "label": "Calculation",
+          "sort": 17,
+          "props": {
+            "family": "C",
+            "appliesTo": "Non-supplier"
+          }
+        },
+        {
+          "code": "ANA",
+          "label": "Analysis",
+          "sort": 18,
+          "props": {
+            "family": "C",
+            "appliesTo": "Non-supplier"
+          }
+        },
+        {
+          "code": "SIZ",
+          "label": "Sizing note",
+          "sort": 19,
+          "props": {
+            "family": "C",
+            "appliesTo": "Non-supplier"
+          }
+        },
+        {
+          "code": "SIM",
+          "label": "Simulation",
+          "sort": 20,
+          "props": {
+            "family": "C",
+            "appliesTo": "Non-supplier"
+          }
+        },
+        {
+          "code": "SIL",
+          "label": "Safety integrity assessment",
+          "sort": 21,
+          "props": {
+            "family": "C",
+            "appliesTo": "Non-supplier"
+          }
+        },
+        {
+          "code": "LOD",
+          "label": "Load note",
+          "sort": 22,
+          "props": {
+            "family": "C",
+            "appliesTo": "Non-supplier"
+          }
+        },
         {
           "code": "DWG",
           "label": "Drawing",
+          "sort": 23,
           "props": {
+            "family": "D",
+            "appliesTo": "Non-supplier",
             "describesAsset": true
           }
         },
         {
-          "code": "DIA",
-          "label": "Diagram",
+          "code": "LAY",
+          "label": "Layout",
+          "sort": 24,
           "props": {
+            "family": "D",
+            "appliesTo": "Non-supplier",
+            "describesAsset": true
+          }
+        },
+        {
+          "code": "DET",
+          "label": "Detail drawing",
+          "sort": 25,
+          "props": {
+            "family": "D",
+            "appliesTo": "Non-supplier",
+            "describesAsset": true
+          }
+        },
+        {
+          "code": "SCM",
+          "label": "Schematic",
+          "sort": 26,
+          "props": {
+            "family": "D",
+            "appliesTo": "Non-supplier",
+            "describesAsset": true
+          }
+        },
+        {
+          "code": "PID",
+          "label": "Piping and instrumentation diagram",
+          "sort": 27,
+          "props": {
+            "family": "D",
+            "appliesTo": "Non-supplier",
+            "describesAsset": true
+          }
+        },
+        {
+          "code": "PFD",
+          "label": "Process flow diagram",
+          "sort": 28,
+          "props": {
+            "family": "D",
+            "appliesTo": "Non-supplier",
+            "describesAsset": true
+          }
+        },
+        {
+          "code": "SLD",
+          "label": "Single line diagram",
+          "sort": 29,
+          "props": {
+            "family": "D",
+            "appliesTo": "Non-supplier",
+            "describesAsset": true
+          }
+        },
+        {
+          "code": "ISO",
+          "label": "Isometric",
+          "sort": 30,
+          "props": {
+            "family": "D",
+            "appliesTo": "Non-supplier",
             "describesAsset": true
           }
         },
         {
           "code": "MDL",
           "label": "Model",
+          "sort": 31,
           "props": {
+            "family": "D",
+            "appliesTo": "Non-supplier",
+            "describesAsset": true
+          }
+        },
+        {
+          "code": "ASB",
+          "label": "As-built drawing",
+          "sort": 32,
+          "props": {
+            "family": "D",
+            "appliesTo": "Non-supplier",
+            "describesAsset": true
+          }
+        },
+        {
+          "code": "SHD",
+          "label": "Shop drawing",
+          "sort": 33,
+          "props": {
+            "family": "D",
+            "appliesTo": "Non-supplier",
             "describesAsset": true
           }
         },
         {
           "code": "DAT",
-          "label": "Datasheet",
+          "label": "Data sheet",
+          "sort": 34,
           "props": {
-            "describesAsset": true
+            "family": "E",
+            "appliesTo": "Non-supplier"
+          }
+        },
+        {
+          "code": "CRV",
+          "label": "Performance curve",
+          "sort": 35,
+          "props": {
+            "family": "E",
+            "appliesTo": "Non-supplier"
+          }
+        },
+        {
+          "code": "WGT",
+          "label": "Weight and centre of gravity",
+          "sort": 36,
+          "props": {
+            "family": "E",
+            "appliesTo": "Non-supplier"
+          }
+        },
+        {
+          "code": "EMI",
+          "label": "Emission data",
+          "sort": 37,
+          "props": {
+            "family": "E",
+            "appliesTo": "Non-supplier"
+          }
+        },
+        {
+          "code": "NPL",
+          "label": "Nameplate data",
+          "sort": 38,
+          "props": {
+            "family": "E",
+            "appliesTo": "Non-supplier"
           }
         },
         {
           "code": "SPC",
           "label": "Specification",
+          "sort": 39,
           "props": {
-            "describesAsset": true
+            "family": "F",
+            "appliesTo": "Non-supplier"
           }
         },
         {
-          "code": "CAL",
-          "label": "Calculation",
+          "code": "PHI",
+          "label": "Philosophy",
+          "sort": 40,
           "props": {
-            "describesAsset": true
+            "family": "F",
+            "appliesTo": "Non-supplier"
           }
-        },
-        {
-          "code": "SCH",
-          "label": "Schedule",
-          "props": {
-            "describesAsset": true
-          }
-        },
-        {
-          "code": "LST",
-          "label": "List",
-          "props": {
-            "describesAsset": true
-          }
-        },
-        {
-          "code": "RPT",
-          "label": "Report"
         },
         {
           "code": "STD",
-          "label": "Study"
+          "label": "Standard",
+          "sort": 41,
+          "props": {
+            "family": "F",
+            "appliesTo": "Non-supplier"
+          }
         },
         {
           "code": "PRO",
-          "label": "Procedure"
-        },
-        {
-          "code": "MST",
-          "label": "Method statement"
-        },
-        {
-          "code": "PLN",
-          "label": "Plan"
+          "label": "Procedure",
+          "sort": 42,
+          "props": {
+            "family": "F",
+            "appliesTo": "Non-supplier"
+          }
         },
         {
           "code": "MAN",
           "label": "Manual",
+          "sort": 43,
           "props": {
-            "describesAsset": true
+            "family": "F",
+            "appliesTo": "Non-supplier"
+          }
+        },
+        {
+          "code": "STU",
+          "label": "Study",
+          "sort": 44,
+          "props": {
+            "family": "F",
+            "appliesTo": "Non-supplier"
+          }
+        },
+        {
+          "code": "HAZ",
+          "label": "Hazard study",
+          "sort": 45,
+          "props": {
+            "family": "F",
+            "appliesTo": "Non-supplier"
+          }
+        },
+        {
+          "code": "SOW",
+          "label": "Scope of work",
+          "sort": 46,
+          "props": {
+            "family": "F",
+            "appliesTo": "Non-supplier"
+          }
+        },
+        {
+          "code": "ITP",
+          "label": "Inspection and test plan",
+          "sort": 47,
+          "props": {
+            "family": "G",
+            "appliesTo": "Non-supplier"
+          }
+        },
+        {
+          "code": "NCR",
+          "label": "Non-conformance report",
+          "sort": 48,
+          "props": {
+            "family": "G",
+            "appliesTo": "Non-supplier"
           }
         },
         {
           "code": "CER",
           "label": "Certificate",
+          "sort": 49,
           "props": {
-            "describesAsset": true
+            "family": "G",
+            "appliesTo": "Non-supplier"
           }
         },
         {
           "code": "TST",
           "label": "Test record",
+          "sort": 50,
           "props": {
-            "describesAsset": true
+            "family": "G",
+            "appliesTo": "Non-supplier"
           }
         },
         {
           "code": "INS",
           "label": "Inspection record",
+          "sort": 51,
           "props": {
-            "describesAsset": true
+            "family": "G",
+            "appliesTo": "Non-supplier"
+          }
+        },
+        {
+          "code": "WPS",
+          "label": "Welding procedure specification",
+          "sort": 52,
+          "props": {
+            "family": "G",
+            "appliesTo": "Non-supplier"
+          }
+        },
+        {
+          "code": "WPQ",
+          "label": "Welder qualification",
+          "sort": 53,
+          "props": {
+            "family": "G",
+            "appliesTo": "Non-supplier"
+          }
+        },
+        {
+          "code": "NDE",
+          "label": "Non-destructive examination report",
+          "sort": 54,
+          "props": {
+            "family": "G",
+            "appliesTo": "Non-supplier"
+          }
+        },
+        {
+          "code": "MTC",
+          "label": "Material certificate",
+          "sort": 55,
+          "props": {
+            "family": "G",
+            "appliesTo": "Non-supplier"
+          }
+        },
+        {
+          "code": "QAP",
+          "label": "Quality plan",
+          "sort": 56,
+          "props": {
+            "family": "G",
+            "appliesTo": "Non-supplier"
+          }
+        },
+        {
+          "code": "MRB",
+          "label": "Manufacturing record book",
+          "sort": 57,
+          "props": {
+            "family": "G",
+            "appliesTo": "Non-supplier"
           }
         },
         {
           "code": "SUR",
-          "label": "Survey"
+          "label": "Survey record",
+          "sort": 58,
+          "props": {
+            "family": "G",
+            "appliesTo": "Non-supplier"
+          }
         },
         {
-          "code": "FRM",
-          "label": "Form"
+          "code": "AUD",
+          "label": "Audit report",
+          "sort": 59,
+          "props": {
+            "family": "G",
+            "appliesTo": "Non-supplier"
+          }
         },
         {
-          "code": "MTX",
-          "label": "Matrix"
+          "code": "PCK",
+          "label": "Packing list",
+          "sort": 60,
+          "props": {
+            "family": "H",
+            "appliesTo": "Non-supplier"
+          }
         },
         {
-          "code": "REG",
-          "label": "Register"
+          "code": "SHP",
+          "label": "Shipping document",
+          "sort": 61,
+          "props": {
+            "family": "H",
+            "appliesTo": "Non-supplier"
+          }
         },
         {
-          "code": "COR",
-          "label": "Correspondence"
+          "code": "PRS",
+          "label": "Preservation procedure",
+          "sort": 62,
+          "props": {
+            "family": "H",
+            "appliesTo": "Non-supplier"
+          }
         },
         {
-          "code": "MIN",
-          "label": "Minutes"
+          "code": "STO",
+          "label": "Storage instruction",
+          "sort": 63,
+          "props": {
+            "family": "H",
+            "appliesTo": "Non-supplier"
+          }
+        },
+        {
+          "code": "IOM",
+          "label": "Operation and maintenance manual",
+          "sort": 64,
+          "props": {
+            "family": "J",
+            "appliesTo": "Non-supplier"
+          }
+        },
+        {
+          "code": "CMP",
+          "label": "Commissioning procedure",
+          "sort": 65,
+          "props": {
+            "family": "J",
+            "appliesTo": "Non-supplier"
+          }
+        },
+        {
+          "code": "SPL",
+          "label": "Spare parts list",
+          "sort": 66,
+          "props": {
+            "family": "J",
+            "appliesTo": "Non-supplier"
+          }
+        },
+        {
+          "code": "MSD",
+          "label": "Safety data sheet",
+          "sort": 67,
+          "props": {
+            "family": "J",
+            "appliesTo": "Non-supplier"
+          }
+        },
+        {
+          "code": "TLS",
+          "label": "Special tools list",
+          "sort": 68,
+          "props": {
+            "family": "J",
+            "appliesTo": "Non-supplier"
+          }
+        },
+        {
+          "code": "ERC",
+          "label": "Erection instruction",
+          "sort": 69,
+          "props": {
+            "family": "J",
+            "appliesTo": "Non-supplier"
+          }
+        },
+        {
+          "code": "PCH",
+          "label": "Punch list",
+          "sort": 70,
+          "props": {
+            "family": "J",
+            "appliesTo": "Non-supplier"
+          }
+        },
+        {
+          "code": "EQR",
+          "label": "Equipment register",
+          "sort": 71,
+          "props": {
+            "family": "Y",
+            "appliesTo": "Non-supplier"
+          }
+        },
+        {
+          "code": "TPL",
+          "label": "Template",
+          "sort": 72,
+          "props": {
+            "family": "Y",
+            "appliesTo": "Non-supplier"
+          }
+        },
+        {
+          "code": "ASR",
+          "label": "Asset register",
+          "sort": 73,
+          "props": {
+            "family": "Y",
+            "appliesTo": "Non-supplier"
+          }
+        },
+        {
+          "code": "A101",
+          "label": "Document schedule",
+          "sort": 74,
+          "props": {
+            "family": "A",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "A102",
+          "label": "Data requirements list",
+          "sort": 75,
+          "props": {
+            "family": "A",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "A103",
+          "label": "Progress report",
+          "sort": 76,
+          "props": {
+            "family": "A",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "A104",
+          "label": "Organisation chart",
+          "sort": 77,
+          "props": {
+            "family": "A",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "A105",
+          "label": "Sub-supplier list",
+          "sort": 78,
+          "props": {
+            "family": "A",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "A106",
+          "label": "Previous experience record",
+          "sort": 79,
+          "props": {
+            "family": "A",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "A107",
+          "label": "Quality manual",
+          "sort": 80,
+          "props": {
+            "family": "A",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "A108",
+          "label": "Contract correspondence",
+          "sort": 81,
+          "props": {
+            "family": "A",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "A109",
+          "label": "Variation request",
+          "sort": 82,
+          "props": {
+            "family": "A",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "A110",
+          "label": "Sub-order schedule",
+          "sort": 83,
+          "props": {
+            "family": "A",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "B101",
+          "label": "Equipment list",
+          "sort": 84,
+          "props": {
+            "family": "B",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "B102",
+          "label": "Cable schedule",
+          "sort": 85,
+          "props": {
+            "family": "B",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "B103",
+          "label": "Instrument index",
+          "sort": 86,
+          "props": {
+            "family": "B",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "B104",
+          "label": "Line list",
+          "sort": 87,
+          "props": {
+            "family": "B",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "B105",
+          "label": "Bill of materials",
+          "sort": 88,
+          "props": {
+            "family": "B",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "B106",
+          "label": "Junction box schedule",
+          "sort": 89,
+          "props": {
+            "family": "B",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "B107",
+          "label": "Input and output schedule",
+          "sort": 90,
+          "props": {
+            "family": "B",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "B108",
+          "label": "Set point schedule",
+          "sort": 91,
+          "props": {
+            "family": "B",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "B109",
+          "label": "Tie-in list",
+          "sort": 92,
+          "props": {
+            "family": "B",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "B110",
+          "label": "Material selection table",
+          "sort": 93,
+          "props": {
+            "family": "B",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "C101",
+          "label": "Civil calculation",
+          "sort": 94,
+          "props": {
+            "family": "C",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "C102",
+          "label": "Structural calculation",
+          "sort": 95,
+          "props": {
+            "family": "C",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "C103",
+          "label": "Mechanical calculation",
+          "sort": 96,
+          "props": {
+            "family": "C",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "C104",
+          "label": "Electrical calculation",
+          "sort": 97,
+          "props": {
+            "family": "C",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "C105",
+          "label": "Instrument calculation",
+          "sort": 98,
+          "props": {
+            "family": "C",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "C106",
+          "label": "Piping stress analysis",
+          "sort": 99,
+          "props": {
+            "family": "C",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "C107",
+          "label": "Pressure vessel design calculation",
+          "sort": 100,
+          "props": {
+            "family": "C",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "C108",
+          "label": "Noise and attenuation calculation",
+          "sort": 101,
+          "props": {
+            "family": "C",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "C109",
+          "label": "Lifting analysis",
+          "sort": 102,
+          "props": {
+            "family": "C",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "C110",
+          "label": "Heat and mass balance",
+          "sort": 103,
+          "props": {
+            "family": "C",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "C111",
+          "label": "Ventilation sizing",
+          "sort": 104,
+          "props": {
+            "family": "C",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "C112",
+          "label": "Safety integrity calculation",
+          "sort": 105,
+          "props": {
+            "family": "C",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "D101",
+          "label": "General arrangement drawing",
+          "sort": 106,
+          "props": {
+            "family": "D",
+            "appliesTo": "Supplier",
+            "describesAsset": true
+          }
+        },
+        {
+          "code": "D102",
+          "label": "Layout drawing",
+          "sort": 107,
+          "props": {
+            "family": "D",
+            "appliesTo": "Supplier",
+            "describesAsset": true
+          }
+        },
+        {
+          "code": "D103",
+          "label": "Detail drawing",
+          "sort": 108,
+          "props": {
+            "family": "D",
+            "appliesTo": "Supplier",
+            "describesAsset": true
+          }
+        },
+        {
+          "code": "D104",
+          "label": "Assembly drawing",
+          "sort": 109,
+          "props": {
+            "family": "D",
+            "appliesTo": "Supplier",
+            "describesAsset": true
+          }
+        },
+        {
+          "code": "D105",
+          "label": "Piping and instrumentation diagram",
+          "sort": 110,
+          "props": {
+            "family": "D",
+            "appliesTo": "Supplier",
+            "describesAsset": true
+          }
+        },
+        {
+          "code": "D106",
+          "label": "Process flow diagram",
+          "sort": 111,
+          "props": {
+            "family": "D",
+            "appliesTo": "Supplier",
+            "describesAsset": true
+          }
+        },
+        {
+          "code": "D107",
+          "label": "Single line diagram",
+          "sort": 112,
+          "props": {
+            "family": "D",
+            "appliesTo": "Supplier",
+            "describesAsset": true
+          }
+        },
+        {
+          "code": "D108",
+          "label": "Electrical schematic",
+          "sort": 113,
+          "props": {
+            "family": "D",
+            "appliesTo": "Supplier",
+            "describesAsset": true
+          }
+        },
+        {
+          "code": "D109",
+          "label": "Instrument loop drawing",
+          "sort": 114,
+          "props": {
+            "family": "D",
+            "appliesTo": "Supplier",
+            "describesAsset": true
+          }
+        },
+        {
+          "code": "D110",
+          "label": "Isometric drawing",
+          "sort": 115,
+          "props": {
+            "family": "D",
+            "appliesTo": "Supplier",
+            "describesAsset": true
+          }
+        },
+        {
+          "code": "D111",
+          "label": "Structural drawing",
+          "sort": 116,
+          "props": {
+            "family": "D",
+            "appliesTo": "Supplier",
+            "describesAsset": true
+          }
+        },
+        {
+          "code": "D112",
+          "label": "Civil drawing",
+          "sort": 117,
+          "props": {
+            "family": "D",
+            "appliesTo": "Supplier",
+            "describesAsset": true
+          }
+        },
+        {
+          "code": "D113",
+          "label": "Architectural drawing",
+          "sort": 118,
+          "props": {
+            "family": "D",
+            "appliesTo": "Supplier",
+            "describesAsset": true
+          }
+        },
+        {
+          "code": "D114",
+          "label": "Wiring and termination drawing",
+          "sort": 119,
+          "props": {
+            "family": "D",
+            "appliesTo": "Supplier",
+            "describesAsset": true
+          }
+        },
+        {
+          "code": "D115",
+          "label": "Shop fabrication drawing",
+          "sort": 120,
+          "props": {
+            "family": "D",
+            "appliesTo": "Supplier",
+            "describesAsset": true
+          }
+        },
+        {
+          "code": "D116",
+          "label": "Nameplate drawing",
+          "sort": 121,
+          "props": {
+            "family": "D",
+            "appliesTo": "Supplier",
+            "describesAsset": true
+          }
+        },
+        {
+          "code": "D117",
+          "label": "Lifting drawing",
+          "sort": 122,
+          "props": {
+            "family": "D",
+            "appliesTo": "Supplier",
+            "describesAsset": true
+          }
+        },
+        {
+          "code": "D118",
+          "label": "Logic diagram",
+          "sort": 123,
+          "props": {
+            "family": "D",
+            "appliesTo": "Supplier",
+            "describesAsset": true
+          }
+        },
+        {
+          "code": "D119",
+          "label": "Cause and effect diagram",
+          "sort": 124,
+          "props": {
+            "family": "D",
+            "appliesTo": "Supplier",
+            "describesAsset": true
+          }
+        },
+        {
+          "code": "D120",
+          "label": "Model file",
+          "sort": 125,
+          "props": {
+            "family": "D",
+            "appliesTo": "Supplier",
+            "describesAsset": true
+          }
+        },
+        {
+          "code": "E101",
+          "label": "Equipment data sheet",
+          "sort": 126,
+          "props": {
+            "family": "E",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "E102",
+          "label": "Instrument data sheet",
+          "sort": 127,
+          "props": {
+            "family": "E",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "E103",
+          "label": "Electrical equipment data sheet",
+          "sort": 128,
+          "props": {
+            "family": "E",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "E104",
+          "label": "Performance curve",
+          "sort": 129,
+          "props": {
+            "family": "E",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "E105",
+          "label": "Motor performance data",
+          "sort": 130,
+          "props": {
+            "family": "E",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "E106",
+          "label": "Protection curve and rating",
+          "sort": 131,
+          "props": {
+            "family": "E",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "E107",
+          "label": "Noise level data sheet",
+          "sort": 132,
+          "props": {
+            "family": "E",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "E108",
+          "label": "Nozzle load data",
+          "sort": 133,
+          "props": {
+            "family": "E",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "E109",
+          "label": "Weight and centre of gravity data",
+          "sort": 134,
+          "props": {
+            "family": "E",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "E110",
+          "label": "Emission data",
+          "sort": 135,
+          "props": {
+            "family": "E",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "F101",
+          "label": "Technical specification",
+          "sort": 136,
+          "props": {
+            "family": "F",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "F102",
+          "label": "Control philosophy",
+          "sort": 137,
+          "props": {
+            "family": "F",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "F103",
+          "label": "Functional specification",
+          "sort": 138,
+          "props": {
+            "family": "F",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "F104",
+          "label": "Design report",
+          "sort": 139,
+          "props": {
+            "family": "F",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "F105",
+          "label": "Software listing",
+          "sort": 140,
+          "props": {
+            "family": "F",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "F106",
+          "label": "Painting and surface preparation specification",
+          "sort": 141,
+          "props": {
+            "family": "F",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "F107",
+          "label": "Reliability and availability report",
+          "sort": 142,
+          "props": {
+            "family": "F",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "F108",
+          "label": "Network address map",
+          "sort": 143,
+          "props": {
+            "family": "F",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "F109",
+          "label": "Control system configuration",
+          "sort": 144,
+          "props": {
+            "family": "F",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "F110",
+          "label": "Material requirement specification",
+          "sort": 145,
+          "props": {
+            "family": "F",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "G101",
+          "label": "Inspection and test plan",
+          "sort": 146,
+          "props": {
+            "family": "G",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "G102",
+          "label": "Inspection and test procedure",
+          "sort": 147,
+          "props": {
+            "family": "G",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "G103",
+          "label": "Inspection and test report",
+          "sort": 148,
+          "props": {
+            "family": "G",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "G104",
+          "label": "Certificate of compliance",
+          "sort": 149,
+          "props": {
+            "family": "G",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "G105",
+          "label": "Material certificate",
+          "sort": 150,
+          "props": {
+            "family": "G",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "G106",
+          "label": "Material traceability record",
+          "sort": 151,
+          "props": {
+            "family": "G",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "G107",
+          "label": "Heat treatment record",
+          "sort": 152,
+          "props": {
+            "family": "G",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "G108",
+          "label": "Pressure test report",
+          "sort": 153,
+          "props": {
+            "family": "G",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "G109",
+          "label": "Performance and acceptance test report",
+          "sort": 154,
+          "props": {
+            "family": "G",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "G110",
+          "label": "Non-destructive examination procedure",
+          "sort": 155,
+          "props": {
+            "family": "G",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "G111",
+          "label": "Non-destructive examination report",
+          "sort": 156,
+          "props": {
+            "family": "G",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "G112",
+          "label": "Welding procedure specification",
+          "sort": 157,
+          "props": {
+            "family": "G",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "G113",
+          "label": "Welding procedure qualification record",
+          "sort": 158,
+          "props": {
+            "family": "G",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "G114",
+          "label": "Welder qualification certificate",
+          "sort": 159,
+          "props": {
+            "family": "G",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "G115",
+          "label": "Calibration certificate",
+          "sort": 160,
+          "props": {
+            "family": "G",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "G116",
+          "label": "Hazardous area certificate",
+          "sort": 161,
+          "props": {
+            "family": "G",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "G117",
+          "label": "Lifting equipment certificate",
+          "sort": 162,
+          "props": {
+            "family": "G",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "G118",
+          "label": "Non-conformance report",
+          "sort": 163,
+          "props": {
+            "family": "G",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "G119",
+          "label": "Quality plan",
+          "sort": 164,
+          "props": {
+            "family": "G",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "G120",
+          "label": "Manufacturing record book",
+          "sort": 165,
+          "props": {
+            "family": "G",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "G121",
+          "label": "Dimensional report",
+          "sort": 166,
+          "props": {
+            "family": "G",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "G122",
+          "label": "Third-party validation report",
+          "sort": 167,
+          "props": {
+            "family": "G",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "H101",
+          "label": "Packing list",
+          "sort": 168,
+          "props": {
+            "family": "H",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "H102",
+          "label": "Shipping document",
+          "sort": 169,
+          "props": {
+            "family": "H",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "H103",
+          "label": "Hazardous material shipping certificate",
+          "sort": 170,
+          "props": {
+            "family": "H",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "H104",
+          "label": "Preservation and storage procedure",
+          "sort": 171,
+          "props": {
+            "family": "H",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "H105",
+          "label": "Handling and lifting procedure",
+          "sort": 172,
+          "props": {
+            "family": "H",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "J101",
+          "label": "Operation and maintenance manual",
+          "sort": 173,
+          "props": {
+            "family": "J",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "J102",
+          "label": "Installation procedure",
+          "sort": 174,
+          "props": {
+            "family": "J",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "J103",
+          "label": "Commissioning procedure",
+          "sort": 175,
+          "props": {
+            "family": "J",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "J104",
+          "label": "Erection drawing",
+          "sort": 176,
+          "props": {
+            "family": "J",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "J105",
+          "label": "Erection fastener schedule",
+          "sort": 177,
+          "props": {
+            "family": "J",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "J106",
+          "label": "Spare parts list - commissioning",
+          "sort": 178,
+          "props": {
+            "family": "J",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "J107",
+          "label": "Spare parts list - two year operation",
+          "sort": 179,
+          "props": {
+            "family": "J",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "J108",
+          "label": "Special tools and lifting devices list",
+          "sort": 180,
+          "props": {
+            "family": "J",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "J109",
+          "label": "Safety data sheet",
+          "sort": 181,
+          "props": {
+            "family": "J",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "J110",
+          "label": "Lubricant and utility requirement",
+          "sort": 182,
+          "props": {
+            "family": "J",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "Y101",
+          "label": "Mechanical equipment register",
+          "sort": 183,
+          "props": {
+            "family": "Y",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "Y102",
+          "label": "Electrical equipment register",
+          "sort": 184,
+          "props": {
+            "family": "Y",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "Y103",
+          "label": "Instrument equipment register",
+          "sort": 185,
+          "props": {
+            "family": "Y",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "Y104",
+          "label": "Civil and structural equipment register",
+          "sort": 186,
+          "props": {
+            "family": "Y",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "Y105",
+          "label": "HVAC equipment register",
+          "sort": 187,
+          "props": {
+            "family": "Y",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "Y106",
+          "label": "Safety equipment register",
+          "sort": 188,
+          "props": {
+            "family": "Y",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "Y107",
+          "label": "Packaged equipment register",
+          "sort": 189,
+          "props": {
+            "family": "Y",
+            "appliesTo": "Supplier"
+          }
+        },
+        {
+          "code": "Y108",
+          "label": "Telecommunication equipment register",
+          "sort": 190,
+          "props": {
+            "family": "Y",
+            "appliesTo": "Supplier"
+          }
         }
       ]
     },
     {
       "key": "DISCIPLINES",
       "title": "Disciplines",
-      "description": "D.3-style reference list — exactly one per document (§5.4). Replace with your own.",
+      "description": "The disciplines a project works in. These are the general ones, meant for any kind of project — building, energy, water, thermal, industrial. A project type adds its own, and an organization is free to publish its own instead.",
       "values": [
         {
           "code": "CI",
-          "label": "Civil"
+          "label": "Civil",
+          "sort": 0,
+          "props": {
+            "group": "ENG"
+          }
         },
         {
           "code": "ST",
-          "label": "Structural"
+          "label": "Structural",
+          "sort": 1,
+          "props": {
+            "group": "ENG"
+          }
         },
         {
           "code": "AR",
-          "label": "Architectural"
+          "label": "Architectural",
+          "sort": 2,
+          "props": {
+            "group": "ENG"
+          }
         },
         {
           "code": "ME",
-          "label": "Mechanical"
+          "label": "Mechanical",
+          "sort": 3,
+          "props": {
+            "group": "ENG"
+          }
         },
         {
           "code": "EL",
-          "label": "Electrical"
+          "label": "Electrical",
+          "sort": 4,
+          "props": {
+            "group": "ENG"
+          }
         },
         {
           "code": "IC",
-          "label": "Instrumentation & Control"
-        },
-        {
-          "code": "PI",
-          "label": "Piping"
+          "label": "Instrumentation and control",
+          "sort": 5,
+          "props": {
+            "group": "ENG"
+          }
         },
         {
           "code": "PR",
-          "label": "Process"
+          "label": "Process",
+          "sort": 6,
+          "props": {
+            "group": "ENG"
+          }
+        },
+        {
+          "code": "PI",
+          "label": "Piping",
+          "sort": 7,
+          "props": {
+            "group": "ENG"
+          }
         },
         {
           "code": "HV",
-          "label": "HVAC"
+          "label": "Heating, ventilation and air conditioning",
+          "sort": 8,
+          "props": {
+            "group": "ENG"
+          }
         },
         {
-          "code": "SA",
-          "label": "Safety"
+          "code": "PW",
+          "label": "Power systems",
+          "sort": 9,
+          "props": {
+            "group": "ENG"
+          }
         },
         {
           "code": "TE",
-          "label": "Telecommunications"
+          "label": "Telecommunications",
+          "sort": 10,
+          "props": {
+            "group": "ENG"
+          }
         },
         {
-          "code": "GE",
-          "label": "Geotechnical"
+          "code": "WW",
+          "label": "Water and wastewater",
+          "sort": 11,
+          "props": {
+            "group": "ENG"
+          }
         },
         {
-          "code": "EN",
-          "label": "Environmental"
+          "code": "GT",
+          "label": "Geotechnical",
+          "sort": 12,
+          "props": {
+            "group": "ENG"
+          }
+        },
+        {
+          "code": "SU",
+          "label": "Survey and topography",
+          "sort": 13,
+          "props": {
+            "group": "SITE"
+          }
+        },
+        {
+          "code": "MC",
+          "label": "Materials and corrosion",
+          "sort": 14,
+          "props": {
+            "group": "ENG"
+          }
+        },
+        {
+          "code": "HSE",
+          "label": "Health, safety and environment",
+          "sort": 15,
+          "props": {
+            "group": "QSE"
+          }
         },
         {
           "code": "QA",
-          "label": "QA/QC"
+          "label": "Quality assurance",
+          "sort": 16,
+          "props": {
+            "group": "QSE"
+          }
+        },
+        {
+          "code": "QC",
+          "label": "Quality control",
+          "props": {
+            "group": "QSE"
+          },
+          "sort": 17
         },
         {
           "code": "PM",
-          "label": "Project Management"
+          "label": "Project management",
+          "sort": 18,
+          "props": {
+            "group": "MGMT"
+          }
+        },
+        {
+          "code": "CM",
+          "label": "Construction management",
+          "sort": 19,
+          "props": {
+            "group": "SITE"
+          }
+        },
+        {
+          "code": "PC",
+          "label": "Project controls",
+          "sort": 20,
+          "props": {
+            "group": "MGMT"
+          }
+        },
+        {
+          "code": "CT",
+          "label": "Contracts and procurement",
+          "sort": 21,
+          "props": {
+            "group": "MGMT"
+          }
+        },
+        {
+          "code": "DC",
+          "label": "Document control",
+          "sort": 22,
+          "props": {
+            "group": "MGMT"
+          }
+        },
+        {
+          "code": "CO",
+          "label": "Commissioning and start-up",
+          "sort": 23,
+          "props": {
+            "group": "SITE"
+          }
+        },
+        {
+          "code": "OM",
+          "label": "Operations and maintenance",
+          "sort": 24,
+          "props": {
+            "group": "OPS"
+          }
+        },
+        {
+          "code": "GE",
+          "label": "General and multidiscipline",
+          "sort": 25,
+          "props": {
+            "group": "MGMT"
+          }
         }
       ]
     },
@@ -875,6 +2645,198 @@
           "label": "An answer was recorded in error",
           "props": {
             "meaning": "Somebody recorded a verdict on the wrong document, or against the wrong step."
+          }
+        }
+      ]
+    },
+    {
+      "key": "CONTRACT_ROLES",
+      "title": "Contract roles",
+      "description": "What this organization is contracted to do on a project. It decides where approval sits and the distribution matrix the project starts from.",
+      "values": [
+        {
+          "code": "GENERIC",
+          "label": "Not stated",
+          "props": {
+            "approval": "Whatever the published matrix says.",
+            "description": "No contract role declared. The matrix applies as published, with no role-specific rows."
+          }
+        },
+        {
+          "code": "EPC",
+          "label": "EPC — engineer, procure, construct",
+          "props": {
+            "approval": "With us. We approve our own engineering and our suppliers' data.",
+            "description": "We hold design and execution. Vendor data comes to us; the client receives."
+          }
+        },
+        {
+          "code": "EPCM",
+          "label": "EPCM — engineer, procure, construction management",
+          "props": {
+            "approval": "With us, for engineering and for what the contractor submits.",
+            "description": "We hold design and manage construction. The client keeps the commitment decisions, so there are two approval seats."
+          }
+        },
+        {
+          "code": "PMC",
+          "label": "PMC — project management consultancy",
+          "props": {
+            "approval": "Mostly outside us. The design office answers for its own content; the quality records stay ours.",
+            "description": "We manage for the client and review contractor documents. Technical accuracy stays with whoever produced it."
+          }
+        },
+        {
+          "code": "DESIGN",
+          "label": "Design office / architect",
+          "props": {
+            "approval": "Checked by us, approved by the client.",
+            "description": "We produce the design and check it internally. The approval that counts is the client's."
+          }
+        },
+        {
+          "code": "OWNER",
+          "label": "Owner / operator",
+          "props": {
+            "approval": "With us. Everything comes to us.",
+            "description": "We own the asset. Designers, contractors and suppliers all submit to us."
+          }
+        },
+        {
+          "code": "CM",
+          "label": "Construction management",
+          "props": {
+            "approval": "With us for execution and quality; design stays with the designer.",
+            "description": "We manage construction and hold no design."
+          }
+        }
+      ]
+    },
+    {
+      "key": "DOC_FAMILIES",
+      "title": "Document families",
+      "description": "The ten families every document type belongs to, keyed by the letter the supplier codes already carry. The family decides when an outside stamp is needed; the distribution matrix decides who gives it.",
+      "values": [
+        {
+          "code": "A",
+          "label": "Contract and project management",
+          "props": {
+            "description": "Supplier management, contract execution, progress, organisation charts.",
+            "stamp": "NONE"
+          }
+        },
+        {
+          "code": "B",
+          "label": "Lists, schedules and registers",
+          "props": {
+            "description": "Equipment lists, cable schedules, indexes, bills of material.",
+            "stamp": "NONE"
+          }
+        },
+        {
+          "code": "C",
+          "label": "Calculations and analysis",
+          "props": {
+            "description": "Structural, electrical, process, stress and safety calculations.",
+            "stamp": "BEFORE"
+          }
+        },
+        {
+          "code": "D",
+          "label": "Drawings, diagrams and models",
+          "props": {
+            "description": "Every drawing, schematic, diagram and CAD model.",
+            "stamp": "AFTER"
+          }
+        },
+        {
+          "code": "E",
+          "label": "Data sheets and performance data",
+          "props": {
+            "description": "Equipment data sheets, curves, emission and weight data.",
+            "stamp": "NONE"
+          }
+        },
+        {
+          "code": "F",
+          "label": "Specifications and design reports",
+          "props": {
+            "description": "Specifications, philosophies, design reports, software listings.",
+            "stamp": "NONE"
+          }
+        },
+        {
+          "code": "G",
+          "label": "Quality, inspection and certification",
+          "props": {
+            "description": "ITPs, certificates, NDE, welding, material traceability, test records.",
+            "stamp": "BEFORE"
+          }
+        },
+        {
+          "code": "H",
+          "label": "Packing, shipping and preservation",
+          "props": {
+            "description": "Shipping, packing, handling, preservation and storage.",
+            "stamp": "NONE"
+          }
+        },
+        {
+          "code": "J",
+          "label": "Installation, operation and maintenance",
+          "props": {
+            "description": "Commissioning procedures, O&M manuals, spare parts, MSDS.",
+            "stamp": "AFTER"
+          }
+        },
+        {
+          "code": "Y",
+          "label": "Equipment registers and templates",
+          "props": {
+            "description": "Registers and templates per equipment discipline.",
+            "stamp": "NONE"
+          }
+        }
+      ]
+    },
+    {
+      "key": "DISCIPLINE_GROUPS",
+      "title": "Discipline groups",
+      "description": "The handful of groups every discipline falls in. A new sector adds its disciplines under an existing group, and anything that reads groups keeps working without knowing they exist.",
+      "values": [
+        {
+          "code": "ENG",
+          "label": "Engineering design",
+          "props": {
+            "description": "What is designed: the disciplines that produce the technical content."
+          }
+        },
+        {
+          "code": "SITE",
+          "label": "Site and construction",
+          "props": {
+            "description": "Getting it built, surveyed, commissioned and handed over."
+          }
+        },
+        {
+          "code": "QSE",
+          "label": "Quality, safety and environment",
+          "props": {
+            "description": "What is checked, inspected and answered for."
+          }
+        },
+        {
+          "code": "MGMT",
+          "label": "Commercial and management",
+          "props": {
+            "description": "Running the project rather than designing it."
+          }
+        },
+        {
+          "code": "OPS",
+          "label": "Operations",
+          "props": {
+            "description": "Life after handover."
           }
         }
       ]

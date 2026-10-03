@@ -4,24 +4,104 @@
   "name": "Energy / power",
   "description": "Generation, transmission and renewables: single-line diagrams, protection settings, grid studies, energization.",
   "sets": [
-    { "key": "DISCIPLINES", "values": [
-      { "code": "PW", "label": "Power systems" },
-      { "code": "PT", "label": "Protection and control" },
-      { "code": "SB", "label": "Substations" },
-      { "code": "RN", "label": "Renewables" },
-      { "code": "GC", "label": "Grid connection" }
-    ] },
-    { "key": "DOCUMENT_TYPES", "values": [
-      { "code": "SLD", "label": "Single-line diagram" },
-      { "code": "CAB", "label": "Cable schedule" },
-      { "code": "PRS", "label": "Protection settings" },
-      { "code": "LFS", "label": "Load-flow / short-circuit study" },
-      { "code": "ERS", "label": "Earthing study" },
-      { "code": "GRC", "label": "Grid code compliance report" }
-    ] },
-    { "key": "PHASES", "values": [
-      { "code": "ENERGIZATION", "label": "Energization" },
-      { "code": "GRID_TESTING", "label": "Grid compliance testing" }
-    ] }
+    {
+      "key": "DISCIPLINES",
+      "values": [
+        {
+          "code": "PX",
+          "label": "Protection and control",
+          "props": {
+            "group": "ENG"
+          }
+        },
+        {
+          "code": "SB",
+          "label": "Substations",
+          "props": {
+            "group": "ENG"
+          }
+        },
+        {
+          "code": "GC",
+          "label": "Grid connection",
+          "props": {
+            "group": "ENG"
+          }
+        },
+        {
+          "code": "RN",
+          "label": "Renewable generation",
+          "props": {
+            "group": "ENG"
+          }
+        },
+        {
+          "code": "TH",
+          "label": "Thermal generation",
+          "props": {
+            "group": "ENG"
+          }
+        }
+      ]
+    },
+    {
+      "key": "DOCUMENT_TYPES",
+      "values": [
+        {
+          "code": "CAB",
+          "label": "Cable routing diagram",
+          "props": {
+            "family": "D",
+            "appliesTo": "Non-supplier",
+            "describesAsset": true
+          }
+        },
+        {
+          "code": "PSS",
+          "label": "Protection setting study",
+          "props": {
+            "family": "C",
+            "appliesTo": "Non-supplier"
+          }
+        },
+        {
+          "code": "LFS",
+          "label": "Load flow study",
+          "props": {
+            "family": "C",
+            "appliesTo": "Non-supplier"
+          }
+        },
+        {
+          "code": "ERS",
+          "label": "Earthing and lightning study",
+          "props": {
+            "family": "C",
+            "appliesTo": "Non-supplier"
+          }
+        },
+        {
+          "code": "GRC",
+          "label": "Grid code compliance report",
+          "props": {
+            "family": "F",
+            "appliesTo": "Non-supplier"
+          }
+        }
+      ]
+    },
+    {
+      "key": "PHASES",
+      "values": [
+        {
+          "code": "ENERGIZATION",
+          "label": "Energization"
+        },
+        {
+          "code": "GRID_TESTING",
+          "label": "Grid compliance testing"
+        }
+      ]
+    }
   ]
 }

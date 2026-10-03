@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { createSession, hashPassword } from "@/lib/auth";
 import { PROJECT_KINDS } from "@/lib/profiles/kinds";
+import { CONTRACT_ROLES } from "@/lib/profiles/roles";  // signup predates the organization, so the built-in list is all there is
+import { publishRoleMatrix } from "@/lib/profiles/publish-roles";
 import { publishReferenceConfiguration, publishFunctionCatalogue, functionForRole } from "@/lib/bootstrap";
 import { STANDARD_VERSION } from "@/lib/standard";
 
@@ -33,12 +35,13 @@ export async function signupAction(_prev: SignupState | undefined, formData: For
   const projectName = String(formData.get("projectName") ?? "").trim();
   const projectCode = String(formData.get("projectCode") ?? "").trim().toUpperCase();
   const projectKind = String(formData.get("projectKind") ?? "GENERIC");
+  const projectRole = String(formData.get("projectRole") ?? "GENERIC");
   const name = String(formData.get("name") ?? "").trim();
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
   const confirm = String(formData.get("confirm") ?? "");
 
-  const values = { organizationName, projectName, projectCode, projectKind, name, email };
+  const values = { organizationName, projectName, projectCode, projectKind, projectRole, name, email };
 
   if (!organizationName) return { error: "Your organization needs a name.", values };
   if (!name || !email) return { error: "Your name and email are required.", values };
@@ -52,6 +55,9 @@ export async function signupAction(_prev: SignupState | undefined, formData: For
     if (!projectName) return { error: "Name the project, or clear its code to skip it for now.", values };
     if (!/^[A-Z0-9][A-Z0-9-]{0,15}$/.test(projectCode)) {
       return { error: "The project code should be short: letters, digits and hyphens, e.g. “P1” or “NORTH-2”.", values };
+    }
+    if (!CONTRACT_ROLES.some((r) => r.code === projectRole)) {
+      return { error: "Choose what your organization does on this project.", values };
     }
     if (!PROJECT_KINDS.some((k) => k.code === projectKind)) {
       return { error: "Choose a project type.", values };
@@ -97,7 +103,7 @@ export async function signupAction(_prev: SignupState | undefined, formData: For
     let projectId: string | null = null;
     if (wantsProject) {
       const project = await tx.project.create({
-        data: { orgId: org.id, code: projectCode, name: projectName, kind: projectKind, startDate: new Date() },
+        data: { orgId: org.id, code: projectCode, name: projectName, kind: projectKind, role: projectRole, startDate: new Date() },
       });
       projectId = project.id;
       await tx.projectMembership.create({
@@ -122,6 +128,9 @@ export async function signupAction(_prev: SignupState | undefined, formData: For
   // Outside the transaction: this writes a few hundred rows and must not hold
   // a write lock on SQLite while it does.
   await publishReferenceConfiguration(db, created.orgId, wantsProject ? projectKind : undefined);
+
+  // The contract role's starting matrix, once the functions it extends exist.
+  if (wantsProject) await publishRoleMatrix(db, created.orgId, projectRole);
 
   await createSession(created.userId);
   // With no project there is nothing for the dashboard to show.

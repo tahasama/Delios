@@ -286,7 +286,29 @@ export const POLICIES: Policy[] = [
       },
     ],
   },
+  {
+    key: "POLICY_MATRIX_DETAIL",
+    title: "How fine the distribution matrix is cut",
+    text: "Whether one answer covers a whole discipline, or each kind of document in it is answered separately.",
+    options: [
+      {
+        value: "DISCIPLINE",
+        label: "One row per discipline — recommended",
+        text: "Whoever reviews the electrical documents reviews all of them. The matrix stays short enough that people read it, and a document type needing a different answer is still a rule of its own.",
+      },
+      {
+        value: "FAMILY",
+        label: "One row per discipline and document family",
+        text: "Electrical drawings, electrical calculations and electrical quality records are answered separately. Ten times the rows, for an organization whose contracts genuinely distribute them differently.",
+      },
+    ],
+  },
 ];
+
+/** How fine the distribution matrix is cut. */
+export async function matrixDetail(t: Tenant): Promise<"DISCIPLINE" | "FAMILY"> {
+  return (await policy(t, "POLICY_MATRIX_DETAIL")) === "FAMILY" ? "FAMILY" : "DISCIPLINE";
+}
 
 /** The matrix is the only rule for who reviews, decides or is handed a step. */
 export async function matrixBinds(t: Tenant): Promise<boolean> {

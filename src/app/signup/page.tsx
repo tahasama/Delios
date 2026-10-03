@@ -8,6 +8,7 @@ import { inputCls } from "@/components/ui";
 import { MissingSummary } from "@/components/form";
 import { collectInvalid, type MissingField } from "@/components/form-validation";
 import { PROJECT_KINDS } from "@/lib/profiles/kinds";
+import { CONTRACT_ROLES } from "@/lib/profiles/roles";
 
 const KINDS = PROJECT_KINDS;
 
@@ -119,6 +120,13 @@ export default function SignupPage() {
                   {KINDS.map((k) => <option key={k.code} value={k.code}>{k.label}</option>)}
                 </select>
                 <p className="mt-1 text-[11px] text-slate-400">Used for defaults only — it never changes how the rules behave.</p>
+              </div>
+              <div>
+                <label htmlFor="projectRole" className="mb-1 block text-xs font-medium text-slate-700">What your organization does on it</label>
+                <select id="projectRole" name="projectRole" defaultValue={v.projectRole ?? "GENERIC"} className={inputCls}>
+                  {CONTRACT_ROLES.map((r) => <option key={r.code} value={r.code}>{r.label}</option>)}
+                </select>
+                <p className="mt-1 text-[11px] text-slate-400">Decides where approval sits, and the distribution matrix this project starts from. Correctable afterwards.</p>
               </div>
             </fieldset>
 

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireAccessScope, requireAdminScope } from "@/lib/scope";
 import { audit } from "@/lib/audit";
 import { VERBS, type Verb } from "@/lib/permissions";
+import { CONTRACT_ROLES } from "@/lib/profiles/roles";
 
 const CODE = /^[A-Z0-9][A-Z0-9_-]{1,31}$/;
 
@@ -148,6 +149,7 @@ export async function savePermissionRuleAction(
     discipline: blank("discipline"),
     criticality: blank("criticality"),
     confidentiality: blank("confidentiality"),
+    projectRole: blank("projectRole"),
     verbs: JSON.stringify(verbs),
     note: blank("note"),
   };
@@ -158,6 +160,11 @@ export async function savePermissionRuleAction(
     [data.discipline, "DISCIPLINES", "discipline"], [data.criticality, "CRITICALITY", "criticality"],
     [data.confidentiality, "CONFIDENTIALITY", "confidentiality"],
   ];
+  // The contract role is not a published value set: it is the fixed list of
+  // things an organization can be contracted to do.
+  if (data.projectRole && !CONTRACT_ROLES.some((r) => r.code === data.projectRole)) {
+    return { error: `“${data.projectRole}” is not a contract role — leave it blank for every project.` };
+  }
   for (const [code, setKey, what] of published) {
     if (code && !(await db.configValue.findFirst({ where: { setKey, code, status: "ACTIVE" }, select: { id: true } }))) {
       return { error: `“${code}” is not a ${what} in the published list — choose one from it.` };
@@ -174,10 +181,11 @@ export async function savePermissionRuleAction(
 
   const selector = [data.deliverableType, data.docType, data.discipline, data.criticality, data.confidentiality]
     .filter(Boolean).join(" · ") || "any classification";
+  const whereRole = data.projectRole ? ` — on ${data.projectRole} projects only` : "";
   await audit({
     actor: admin, action: "PERMISSION_RULE_PUBLISHED", entityType: "Function", entityId: functionId, entityLabel: fn.name,
     newValue: verbs.join(", "),
- detail: `${fn.name} — ${selector}.`,
+ detail: `${fn.name} — ${selector}${whereRole}.`,
   });
   revalidatePath("/admin/functions");
   return { ok: "Rule published." };

@@ -12,6 +12,7 @@ import {
   toggleFunctionVerb,
 } from "@/lib/actions/functions";
 import { VERBS, VERB_LABEL, VERB_BLURB, type Verb } from "@/lib/permissions";
+import { CONTRACT_ROLES } from "@/lib/profiles/roles";
 import { Check, Minus } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -72,6 +73,10 @@ export default async function FunctionsPage() {
     { name: "docType", label: "Document type", values: docTypes },
     { name: "criticality", label: "Criticality", values: criticalities },
     { name: "confidentiality", label: "Confidentiality", values: confidentialities },
+    // Not a property of the document: what this organization is contracted to
+    // do on the project. A row stating one applies to projects of that role and
+    // to no other, which is how one matrix serves EPC and PMC work at once.
+    { name: "projectRole", label: "Only where our role is", values: CONTRACT_ROLES.filter((r) => r.code !== "GENERIC").map((r) => ({ code: r.code, label: r.label })) },
   ];
 
   const labelOf = (code: string | null) => {
@@ -83,7 +88,10 @@ export default async function FunctionsPage() {
     return code;
   };
   const scopeText = (rule: (typeof functions)[number]["rules"][number]) =>
-    [rule.deliverableType, rule.docType, rule.discipline, rule.criticality, rule.confidentiality].filter(Boolean).map(labelOf).join(" · ");
+    [
+      ...[rule.deliverableType, rule.docType, rule.discipline, rule.criticality, rule.confidentiality].filter(Boolean).map(labelOf),
+      ...(rule.projectRole ? [`${labelOf(rule.projectRole)} projects only`] : []),
+    ].join(" · ");
 
   return (
     <div className="space-y-4">

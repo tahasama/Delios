@@ -8,6 +8,8 @@ import {
 import { mayCreateDocument } from "@/lib/auth";
 import { Chip } from "@/components/ui";
 import { isAdmin, isController } from "@/lib/auth";
+import { contractRoleOptions } from "@/lib/contract-roles";
+import { db as bare } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Explore DELIOS" };
@@ -49,7 +51,7 @@ const SETUP: CapabilityItem[] = [
 ];
 
 export default async function GuidePage() {
-  const { user, db } = await requireScope();
+  const { user, db, orgId, project } = await requireScope();
   const canControl = isController(user);
   const canConfigure = isAdmin(user);
   const [documents, reviews, actions, transmittals] = await Promise.all([
@@ -58,6 +60,7 @@ export default async function GuidePage() {
     db.action.count(),
     db.transmittal.count(),
   ]);
+  const roleOptions = await contractRoleOptions(bare, orgId);
 
   return (
     <div className="space-y-8">
@@ -83,6 +86,36 @@ export default async function GuidePage() {
             <p className="mt-5 text-xs leading-5 text-[#a9c0d2]">Signed in as <strong className="text-white">{user.name}</strong>. The map only shows control and setup areas when your role may use them.</p>
           </div>
         </div>
+      </section>
+
+      <section>
+        <div className="mb-4">
+          <h2 className="mt-1 text-xl font-semibold text-slate-900">What we are contracted to do</h2>
+          <p className="mt-1 max-w-3xl text-sm text-slate-500">
+            Every project says what this organization does on it. That one answer decides where approval sits and which distribution
+            matrix the project starts from — {roleOptions.find((r) => r.code === project.role)?.label ?? "not stated"} on {project.code}.
+          </p>
+        </div>
+        <dl className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+          {roleOptions.filter((r) => r.code !== "GENERIC").map((r) => (
+            <div key={r.code} className={`rounded-2xl border px-4 py-3 ${r.code === project.role ? "border-link bg-tint" : "border-line bg-surface"}`}>
+              <dt className="flex items-baseline gap-2 text-sm font-semibold text-slate-900">
+                <span className="font-mono text-[11px] text-slate-400">{r.code}</span> {r.label}
+                {r.code === project.role ? <span className="text-[11px] font-semibold text-link">this project</span> : null}
+              </dt>
+              <dd className="mt-1 text-xs leading-5 text-slate-600">{r.description}</dd>
+              <dd className="mt-1 text-xs leading-5 text-slate-500"><span className="font-semibold text-slate-600">Approval:</span> {r.approval}</dd>
+            </div>
+          ))}
+        </dl>
+        {canConfigure ? (
+          <p className="mt-3 text-xs text-slate-500">
+            A role your contracts use that is not here is added like any other published list, with its own definition, in{" "}
+            <Link href="/admin/config" className="font-semibold text-link hover:underline">Settings → Published lists</Link> under
+            Contract roles. Only the ones above carry a starting matrix; one you add starts with no rows, and you write them in the{" "}
+            <Link href="/distribution" className="font-semibold text-link hover:underline">distribution matrix</Link>.
+          </p>
+        ) : null}
       </section>
 
       <CapabilitySection title="Do the work" description="The areas every project participant uses to find, create, review, issue and assemble information." items={DAILY} />

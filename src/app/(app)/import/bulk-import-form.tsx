@@ -1,17 +1,18 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { importBulkAction } from "@/lib/actions/bulk";
 import { Card, Chip, DataTable, Th, Td, btn, inputCls } from "@/components/ui";
+import { SetReplace } from "./set-replace";
 
 // What each activity needs is agreed through Schedule & actions — the
 // departments list it, and Document Control issues it. It is not imported here.
 const KINDS = [
   {
     key: "deliverables",
-    title: "Deliverable list → placeholder entries",
-    blurb: "Paste a whole deliverable list: one row per document. Each row becomes a register entry (placeholder) with its number allocated.",
-    columns: "Title, Producer (ENG/CTR/VND/TPY/CLT), Type, Discipline, Project, SubProject, Supplier, PO, Criticality, Confidentiality, RetentionClass, AssetCode, ReceivedDate",
+    title: "A deliverable list → the register",
+    blurb: "One row per document. A row with no document number is registered and given one; a row carrying a number corrects that document instead. What the number is built from — type, discipline, project, sub-project, supplier — cannot be corrected here, because the number would then disagree with the record.",
+    columns: "Document Number (only to correct), Title, Producer (ENG/CTR/VND/TPY/CLT), Type, Discipline, Project, SubProject, Supplier, PO, Criticality, Confidentiality, RetentionClass, AssetCode, ReceivedDate, ContractRef",
     template: "/api/export/template-deliverables",
   },
   {
@@ -22,16 +23,27 @@ const KINDS = [
     template: "/api/export/template-people",
   },
   {
-    key: "metadata",
-    title: "Metadata update in bulk",
-    blurb: "Correct many documents at once. Only the columns you fill are changed — every change is logged field-by-field.",
-    columns: "Document Number + any of: Title, DocType, Discipline, Criticality, Confidentiality, RetentionClass, SubProject, ContractRef",
-    template: "/api/export/template-metadata",
+    key: "matrix",
+    title: "A filled-in distribution matrix → who does what",
+    blurb: "Download the matrix, change the letters, upload it back. A dry run lists every cell that differs from what the matrix says today; applying it writes the rules. Administrators only.",
+    columns: "Keep the header row and the first four columns. A approves · R reviews · C controls · T issues · I receives · · may read · - not distributed",
+    template: "/api/export/matrix",
+  },
+  {
+    key: "sets",
+    title: "A published list → the list itself",
+    blurb: "Replace a whole list from a spreadsheet — disciplines, document types, statuses, any of them. You see what would be added, changed and retired before anything happens.",
+    columns: "Code, Label, Status, and whatever properties that list carries. Download it as it stands and edit that.",
+    template: "",
   },
 ];
 
-export function BulkImportForm({ initialKind }: { initialKind: string }) {
+export function BulkImportForm({ initialKind, sets }: { initialKind: string; sets: { key: string; title: string; count: number }[] }) {
   const [state, formAction, pending] = useActionState(importBulkAction, undefined);
+  const [kind, setKind] = useState(KINDS.some((k) => k.key === initialKind) ? initialKind : KINDS[0].key);
+  // A published list is replaced whole, with its own preview, so it shows the
+  // list chooser instead of the file box the row-by-row imports share.
+  const chooseAList = kind === "sets";
 
   return (
     <Card title="Import a spreadsheet">
@@ -40,8 +52,8 @@ export function BulkImportForm({ initialKind }: { initialKind: string }) {
           <span className="mb-1.5 block text-xs font-medium text-slate-700">What are you importing?</span>
           <div className="grid gap-2">
             {KINDS.map((k) => (
-              <label key={k.key} className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-line p-3 transition hover:border-brand-line/40">
-                <input type="radio" name="kind" value={k.key} defaultChecked={(initialKind || k.key) === k.key} className="mt-1" />
+              <label key={k.key} className={`flex cursor-pointer items-start gap-2.5 rounded-lg border p-3 transition ${kind === k.key ? "border-brand-line bg-tint-soft" : "border-line hover:border-brand-line/40"}`}>
+                <input type="radio" name="kind" value={k.key} checked={kind === k.key} onChange={() => setKind(k.key)} className="mt-1" />
                 <span>
                   <span className="block text-sm font-medium text-slate-800">{k.title}</span>
                   <span className="block text-xs text-slate-500">{k.blurb}</span>
@@ -51,20 +63,25 @@ export function BulkImportForm({ initialKind }: { initialKind: string }) {
             ))}
           </div>
         </div>
-        <label className="block">
-          <span className="mb-1 block text-xs font-medium text-slate-700">CSV file (download the template, fill it, keep the header row)</span>
-          <input type="file" name="file" accept=".csv,text/csv" required className={inputCls} />
-        </label>
-        <label className="flex items-center gap-2 text-sm text-slate-700">
-          <input type="checkbox" name="dryRun" defaultChecked />
-          Dry run — check the file without writing anything (recommended first)
-        </label>
-        {state?.error ? <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{state.error}</p> : null}
-        {state?.ok ? <p className="rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-700">{state.ok}</p> : null}
-        <button type="submit" disabled={pending} className={btn("primary")}>
-          {pending ? "Working…" : "Check file"}
-        </button>
+        {chooseAList ? null : (
+          <>
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium text-slate-700">CSV file (download the template, fill it, keep the header row)</span>
+              <input type="file" name="file" accept=".csv,text/csv" required className={inputCls} />
+            </label>
+            <label className="flex items-center gap-2 text-sm text-slate-700">
+              <input type="checkbox" name="dryRun" defaultChecked />
+              Dry run — check the file without writing anything (recommended first)
+            </label>
+            {state?.error ? <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{state.error}</p> : null}
+            {state?.ok ? <p className="rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-700">{state.ok}</p> : null}
+            <button type="submit" disabled={pending} className={btn("primary")}>
+              {pending ? "Working…" : "Check file"}
+            </button>
+          </>
+        )}
       </form>
+      {chooseAList ? <div className="mt-4 border-t border-line pt-4"><SetReplace sets={sets} /></div> : null}
 
       {state?.rows?.length ? (
         <div className="mt-5 border-t border-line pt-4">

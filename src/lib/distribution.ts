@@ -37,12 +37,13 @@ function parseVerbs(json: string): Verb[] {
  * Members of the current project only — distribution is a project act.
  */
 export async function recipientsFor(t: Tenant, target: DocumentClass): Promise<Recipient[]> {
-  const [memberships, confidentialityValues] = await Promise.all([
+  const [memberships, confidentialityValues, project] = await Promise.all([
     t.db.projectMembership.findMany({
       where: { projectId: t.projectId, active: true, user: { active: true }, function: { active: true } },
       include: { user: { select: { id: true, name: true, email: true } }, function: { include: { rules: true } } },
     }),
     t.db.configValue.findMany({ where: { setKey: "CONFIDENTIALITY" }, select: { code: true, props: true } }),
+    t.db.project.findFirst({ where: { id: t.projectId }, select: { role: true } }),
   ]);
 
   const levels = new Map<string, number>();
@@ -64,6 +65,11 @@ export async function recipientsFor(t: Tenant, target: DocumentClass): Promise<R
       discipline: r.discipline,
       criticality: r.criticality,
       confidentiality: r.confidentiality,
+      projectRole: r.projectRole,
+      // Distribution asks about a classification, never about one document, so
+      // a family rule is answered by loadActor and not here.
+      family: null,
+      familyTypes: null,
       verbs: parseVerbs(r.verbs),
     }));
     const actor = {
@@ -73,6 +79,7 @@ export async function recipientsFor(t: Tenant, target: DocumentClass): Promise<R
       clearance: m.function.clearance,
       legacyRole: m.function.legacyRole,
       levels,
+      projectRole: project?.role ?? null,
       rules,
     };
     if (!can(actor, "RECEIVE", target)) continue;

@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { getScope } from "@/lib/scope";
 import { getSessionUser } from "@/lib/auth";
 import { toCsv } from "@/lib/csv";
+import { buildSheet, sheetToRows } from "@/lib/matrix-sheet";
+import { roleLabel } from "@/lib/profiles/roles";
 
 // §16.6 — views are generated at time of use, carry a generation timestamp and
 // are never edited. Every register view can be extracted (CSV opens in Excel).
@@ -224,9 +226,14 @@ export async function GET(req: Request, { params }: { params: Promise<{ kind: st
     name = `value-set-${set.key.toLowerCase()}`;
   } else if (kind === "template-deliverables") {
     rows = [
-      ["Title", "Producer", "Type", "Discipline", "Project", "SubProject", "Supplier", "PO", "Criticality", "Confidentiality", "RetentionClass", "AssetCode", "ReceivedDate"],
-      ["Feed pump P-103 GA drawing", "ENG", "DSW", "ME", "P1001", "50", "", "", "QUALITY", "INTERNAL", "ASSET_LIFE", "P-101", ""],
-      ["Blower BL-301 datasheet (vendor)", "VND", "DAS", "ME", "P1001", "40", "ACME", "PO101", "QUALITY", "INTERNAL", "ASSET_LIFE", "BL-301", "2026-09-01"],
+      ["Document Number", "Title", "Producer", "Type", "Discipline", "Project", "SubProject", "Supplier", "PO", "Criticality", "Confidentiality", "RetentionClass", "AssetCode", "ReceivedDate", "ContractRef"],
+      // Leave the number empty and the row is registered, with its number allocated.
+      ["", "Feed pump P-103 GA drawing", "ENG", "DWG", "ME", "P1001", "50", "", "", "QUALITY", "INTERNAL", "ASSET_LIFE", "P-101", "", ""],
+      ["", "Blower BL-301 datasheet (vendor)", "VND", "DAT", "ME", "P1001", "40", "ACME", "PO101", "QUALITY", "INTERNAL", "ASSET_LIFE", "BL-301", "2026-09-01", ""],
+      // Give the number and the row corrects that document. Type, discipline,
+      // project, sub-project and supplier are built into the number, so they
+      // are left empty here.
+      ["P1001-50-ME-DWG-00001", "Feed pump P-103 — general arrangement", "", "", "", "", "", "", "", "SAFETY", "", "", "", "", "CTR-2026-11"],
     ];
     name = "template-deliverable-list";
   } else if (kind === "template-baseline") {
@@ -256,6 +263,27 @@ export async function GET(req: Request, { params }: { params: Promise<{ kind: st
       ["P1001-50-CI-DSW-00001", "Corrected title", "", "", "QUALITY", "", "", "60", ""],
     ];
     name = "template-metadata-update";
+  } else if (kind === "matrix") {
+    // The distribution matrix, pre-filled. Nobody should start from an empty
+    // template: a blank grid invites invented codes, and the file people edit
+    // has to be the matrix as it actually stands today.
+    const project = await db.project.findFirst({ where: { id: ctx.projectId }, select: { code: true, name: true, role: true } });
+    // The file is taken at the same view the page is showing, and every row
+    // carries it, so a file filled in for vendor documents cannot be read back
+    // as though it were about ours.
+    const view = new URL(req.url).searchParams;
+    const sheet = await buildSheet(ctx, {
+      allDisciplines: view.get("all") === "1",
+      deliverableType: view.get("producer"),
+      docType: view.get("type"),
+    });
+    rows = sheetToRows(sheet, {
+      projectCode: project?.code ?? "",
+      projectName: project?.name ?? "",
+      roleLabel: roleLabel(project?.role),
+      generatedAt: stamp,
+    });
+    name = `distribution-matrix-${project?.code ?? "project"}`;
   } else {
     return NextResponse.json({ error: "Unknown export kind" }, { status: 400 });
   }

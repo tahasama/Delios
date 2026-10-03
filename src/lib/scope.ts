@@ -27,6 +27,8 @@ export type ProjectSummary = {
   code: string;
   name: string;
   kind: string;
+  /** What this organization is contracted to do on it. */
+  role: string;
   status: string;
 };
 
@@ -54,7 +56,7 @@ export type Scope = Tenant & {
   why: (verb: Verb, target?: DocumentClass | null) => string;
 };
 
-const SUMMARY = { id: true, orgId: true, code: true, name: true, kind: true, status: true } as const;
+const SUMMARY = { id: true, orgId: true, code: true, name: true, kind: true, role: true, status: true } as const;
 
 /**
  * Resolve the scope for the current request. Returns null when there is no
@@ -71,7 +73,22 @@ export const getScope = cache(async (): Promise<Scope | null> => {
   });
   if (memberships.length === 0) return null;
 
+  // An administrator may open any project their organization runs, whether or
+  // not they were put on it: they can add themselves in People & access anyway,
+  // and a picker that offers one project is a dead end on a system built to run
+  // several. Joining happens on the switch, so there is still exactly one way to
+  // be in a project — a membership.
   const available = memberships.map((m) => m.project);
+  if (hasVerb(user, "CONFIGURE")) {
+    const held = new Set(available.map((p) => p.id));
+    const rest = await db.project.findMany({
+      where: { orgId: user.orgId, status: "ACTIVE", id: { notIn: [...held] } },
+      select: SUMMARY,
+      orderBy: { code: "asc" },
+    });
+    available.push(...rest);
+    available.sort((a, b) => a.code.localeCompare(b.code));
+  }
   const jar = await cookies();
   const wanted = jar.get(PROJECT_COOKIE)?.value;
   const chosen = memberships.find((m) => m.projectId === wanted) ?? memberships[0];
@@ -220,9 +237,26 @@ export function crossProject(): typeof db {
 // ── Project switching ────────────────────────────────────────────────────────
 
 export async function setActiveProject(projectId: string, userId: string) {
-  const membership = await db.projectMembership.findUnique({
+  let membership = await db.projectMembership.findUnique({
     where: { projectId_userId: { projectId, userId } },
   });
+  // An administrator opening a project of their own organization for the first
+  // time joins it, holding the Administrator function. Nobody else is admitted
+  // this way, so the cookie still cannot widen access for anyone else.
+  if (!membership) {
+    const user = await db.user.findUnique({ where: { id: userId }, select: { orgId: true, role: true, active: true } });
+    const project = await db.project.findUnique({ where: { id: projectId }, select: { orgId: true, status: true } });
+    const mayJoin =
+      user?.active && user.role === "ADMIN" && project?.status === "ACTIVE" && project.orgId === user.orgId;
+    if (mayJoin) {
+      const adminFunction = await db.function.findFirst({ where: { orgId: user.orgId, legacyRole: "ADMIN", active: true }, orderBy: { sort: "asc" } });
+      if (adminFunction) {
+        membership = await db.projectMembership.create({
+          data: { projectId, userId, functionId: adminFunction.id },
+        });
+      }
+    }
+  }
   if (!membership || !membership.active) return false;
   const jar = await cookies();
   jar.set(PROJECT_COOKIE, projectId, {

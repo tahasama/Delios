@@ -4,25 +4,122 @@
   "name": "Construction / buildings",
   "description": "Buildings and infrastructure: submittals, RFIs, shop drawings, inspection and test plans, handover and defects liability.",
   "sets": [
-    { "key": "DISCIPLINES", "values": [
-      { "code": "FP", "label": "Fire protection" },
-      { "code": "PB", "label": "Plumbing and drainage" },
-      { "code": "LS", "label": "Landscape" },
-      { "code": "IN", "label": "Interiors" },
-      { "code": "BM", "label": "BIM coordination" }
-    ] },
-    { "key": "DOCUMENT_TYPES", "values": [
-      { "code": "RFI", "label": "Request for information" },
-      { "code": "SUB", "label": "Submittal" },
-      { "code": "SHD", "label": "Shop drawing" },
-      { "code": "ITP", "label": "Inspection and test plan" },
-      { "code": "NCR", "label": "Non-conformance report" },
-      { "code": "ASB", "label": "As-built drawing" }
-    ] },
-    { "key": "PHASES", "values": [
-      { "code": "TENDER", "label": "Tender" },
-      { "code": "HANDOVER", "label": "Handover" },
-      { "code": "DLP", "label": "Defects liability" }
-    ] }
+    {
+      "key": "DISCIPLINES",
+      "values": [
+        {
+          "code": "VR",
+          "label": "External works and networks",
+          "props": {
+            "group": "ENG"
+          }
+        },
+        {
+          "code": "CF",
+          "label": "Strong current",
+          "props": {
+            "group": "ENG"
+          }
+        },
+        {
+          "code": "CW",
+          "label": "Weak current",
+          "props": {
+            "group": "ENG"
+          }
+        },
+        {
+          "code": "PL",
+          "label": "Plumbing and sanitary",
+          "props": {
+            "group": "ENG"
+          }
+        },
+        {
+          "code": "FP",
+          "label": "Fire protection",
+          "props": {
+            "group": "ENG"
+          }
+        },
+        {
+          "code": "FN",
+          "label": "Finishes and fit-out",
+          "props": {
+            "group": "ENG"
+          }
+        },
+        {
+          "code": "LA",
+          "label": "Landscaping",
+          "props": {
+            "group": "ENG"
+          }
+        }
+      ]
+    },
+    {
+      "key": "DOCUMENT_TYPES",
+      "values": [
+        {
+          "code": "SUB",
+          "label": "Submittal",
+          "props": {
+            "family": "A",
+            "appliesTo": "Non-supplier"
+          }
+        },
+        {
+          "code": "RBR",
+          "label": "Reinforcement bar bending schedule",
+          "props": {
+            "family": "D",
+            "appliesTo": "Non-supplier",
+            "describesAsset": true
+          }
+        },
+        {
+          "code": "CTC",
+          "label": "Control office visa",
+          "props": {
+            "family": "G",
+            "appliesTo": "Non-supplier"
+          }
+        },
+        {
+          "code": "MST",
+          "label": "Method statement",
+          "props": {
+            "family": "F",
+            "appliesTo": "Non-supplier"
+          }
+        },
+        {
+          "code": "HLD",
+          "label": "Hold point notification",
+          "props": {
+            "family": "G",
+            "appliesTo": "Non-supplier"
+          }
+        }
+      ]
+    },
+    {
+      "key": "PHASES",
+      "values": [
+        {
+          "code": "TENDER",
+          "label": "Tender"
+        },
+        {
+          "code": "HANDOVER",
+          "label": "Handover"
+        },
+        {
+          "code": "DLP",
+          "label": "Defects liability"
+        }
+      ]
+    }
   ]
 }

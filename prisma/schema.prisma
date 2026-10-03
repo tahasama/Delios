@@ -57,8 +57,13 @@ model Project {
   // Project type drives the seed profile only — never behaviour. The Standard
   // is domain-neutral (§1.2) and so is this column.
   kind          String         @default("GENERIC") // GENERIC | INDUSTRIAL | ENERGY | CONSTRUCTION
+  // What this organization is contracted to do on this project, which decides
+  // where approval sits and who the documents go out to. The sector above picks
+  // the vocabulary; this picks the distribution matrix. See lib/profiles/roles.
+  role          String         @default("GENERIC") // GENERIC | EPC | EPCM | PMC | DESIGN | OWNER | CM
   status        String         @default("ACTIVE") // ACTIVE | ARCHIVED
   startDate     DateTime?
+  endDate       DateTime?
   createdAt     DateTime       @default(now())
 
   members                ProjectMembership[]
@@ -182,6 +187,15 @@ model PermissionRule {
   discipline      String?
   criticality     String?
   confidentiality String?
+  // The contract role this rule is for, when it is only for one. The matrix is
+  // published once for the organization, but an organization that runs EPC and
+  // PMC projects does not approve the same things on both: a rule stating a
+  // role applies only on projects of that role, and a null one applies on all.
+  projectRole     String?
+  // A whole document family rather than one type — calculations, drawings,
+  // quality records. It is expanded to the family's types where the rules are
+  // loaded, so a matrix kept per family does not become a rule per type.
+  family          String?
   verbs           String // JSON array: READ CREATE REVISE REVIEW APPROVE TRANSMIT RECEIVE ACCEPT CONTROL CONFIGURE
   note            String?
   sort            Int          @default(0)

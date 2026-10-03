@@ -15,6 +15,33 @@ import { releaseRevision, recordReviewOutcome, openReviewCycle, issueToReview, r
 import { pendingIssue, settleApproval, openApprovalStep, holdRevision, liftHold, returnHeld, carryOutRequest } from "../src/lib/issue-requests";
 import type { SessionUser } from "../src/lib/auth";
 
+/**
+ * A project answer set for one check and put back after.
+ *
+ * The project may already have answered — a real setting, made by a real
+ * administrator. Deleting it afterwards would throw that answer away, and
+ * creating over it fails outright, so whatever was there is remembered and
+ * restored.
+ */
+async function withSetting<T>(projectId: string, key: string, mode: string, run: () => Promise<T>): Promise<T> {
+  const before = await db.controlSetting.findFirst({ where: { projectId, key } });
+  await db.controlSetting.upsert({
+    where: { projectId_key: { projectId, key } },
+    create: { projectId, key, mode, setByName: "verify" },
+    update: { mode, setByName: "verify" },
+  });
+  try {
+    return await run();
+  } finally {
+    if (before) {
+      await db.controlSetting.update({ where: { id: before.id }, data: { mode: before.mode, setByName: before.setByName } });
+    } else {
+      await db.controlSetting.deleteMany({ where: { projectId, key } });
+    }
+  }
+}
+
+
 const db = new PrismaClient();
 let failures = 0;
 
@@ -235,12 +262,9 @@ async function main() {
       const at = pathMod.join(process.cwd(), "uploads", copy.path);
       await mkdir(pathMod.dirname(at), { recursive: true });
       await writeFile(at, await blank.save());
-      if (!on) await db.controlSetting.create({ data: { projectId: project.id, key: "POLICY_PDF_STAMP", mode: "OFF", setByName: "verify" } });
-      try {
-        await recordReviewOutcome(t, stamped.cycle.id, actor, proceeds, "Checked against the datasheet — fit for purpose.", status.code);
-      } finally {
-        await db.controlSetting.deleteMany({ where: { projectId: project.id, key: "POLICY_PDF_STAMP" } });
-      }
+      const record = () => recordReviewOutcome(t, stamped.cycle.id, actor, proceeds, "Checked against the datasheet — fit for purpose.", status.code);
+      if (on) await record();
+      else await withSetting(project.id, "POLICY_PDF_STAMP", "OFF", record);
       const after = await t.db.revision.findUniqueOrThrow({ where: { id: stamped.rev.id } });
       if (on) {
         check("switched on: the binding verdict gets a stamped copy", after.renditionFileId !== before.renditionFileId);
@@ -256,8 +280,11 @@ async function main() {
     console.log("\nAn organization where releasing means go ahead\n");
     // The project may say that releasing stands on its own. Then nobody need
     // have said where it goes — but an approval asked for is still waited for.
-    await db.controlSetting.create({
-      data: { projectId: project.id, key: "POLICY_RELEASE", mode: "SEPARATE", setByName: "verify" },
+    const releaseBefore = await db.controlSetting.findFirst({ where: { projectId: project.id, key: "POLICY_RELEASE" } });
+    await db.controlSetting.upsert({
+      where: { projectId_key: { projectId: project.id, key: "POLICY_RELEASE" } },
+      create: { projectId: project.id, key: "POLICY_RELEASE", mode: "SEPARATE", setByName: "verify" },
+      update: { mode: "SEPARATE", setByName: "verify" },
     });
     try {
       const { issuePolicy } = await import("../src/lib/issue-requests");
@@ -272,7 +299,8 @@ async function main() {
       const carried = await t.db.transmittalItem.count({ where: { revisionId: fifth.rev.id } });
       check("…and nothing was sent", carried === 0, `${carried} item(s)`);
     } finally {
-      await db.controlSetting.deleteMany({ where: { projectId: project.id, key: "POLICY_RELEASE" } });
+      if (releaseBefore) await db.controlSetting.update({ where: { id: releaseBefore.id }, data: { mode: releaseBefore.mode, setByName: releaseBefore.setByName } });
+      else await db.controlSetting.deleteMany({ where: { projectId: project.id, key: "POLICY_RELEASE" } });
     }
 
     console.log("\nAn organization that counts the status alone\n");

@@ -62,6 +62,12 @@ export const SETUP_PAGES: SetupPage[] = [
     group: "Classification",
   },
   {
+    href: "/admin/families",
+    title: "Document families",
+    text: "The ten families every document type falls in, and when each one needs an outside stamp.",
+    group: "Classification",
+  },
+  {
     href: "/admin/numbering",
     title: "Numbering",
     text: "How document numbers are built, and which deliverable type uses which scheme.",

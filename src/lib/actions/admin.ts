@@ -509,6 +509,68 @@ export async function removeNumberingSchemeAction(formData: FormData) {
 }
 
 /** Delete a value that was never used (unused values only; in-use ones are retired, §4.7). */
+/**
+ * The same three things, to many rows at once. A set holds hundreds of values
+ * and retiring them one at a time is why nobody prunes a list that arrived from
+ * somewhere else.
+ *
+ * The rule that protects the register does not change in bulk: a value in use
+ * is retired, never deleted, whichever button was pressed. The report says how
+ * many went each way, so nobody has to guess what happened.
+ */
+export async function bulkValuesAction(formData: FormData) {
+  try {
+    const ctx = await requireScope();
+    const { user: admin, db, orgId } = ctx;
+    if (!isAdmin(admin)) return;
+    const op = String(formData.get("op") ?? "");
+    if (!["RETIRE", "REACTIVATE", "DELETE"].includes(op)) return;
+    const ids = formData.getAll("valueIds").map(String).filter(Boolean);
+    if (!ids.length) return;
+
+    const values = await db.configValue.findMany({ where: { id: { in: ids } } });
+    let deleted = 0;
+    let retired = 0;
+    let reactivated = 0;
+    for (const value of values) {
+      if (op === "REACTIVATE") {
+        await db.configValue.update({ where: { id: value.id }, data: { status: "ACTIVE" } });
+        reactivated++;
+        continue;
+      }
+      // Deleting something the register already carries would break it, so a
+      // value in use is retired whichever button was pressed.
+      const used = op === "DELETE" ? await configValueIsUsed(ctx, value.setKey, value.code) : true;
+      if (op === "DELETE" && !used) {
+        await db.configValue.delete({ where: { id: value.id } });
+        deleted++;
+      } else {
+        await db.configValue.update({ where: { id: value.id }, data: { status: "RETIRED" } });
+        retired++;
+      }
+    }
+
+    const sets = [...new Set(values.map((v) => v.setKey))];
+    for (const key of sets) {
+      await db.configSet.update({ where: { orgId_key: { orgId, key } }, data: { version: { increment: 1 } } });
+    }
+    await audit({
+      actor: admin,
+      action: op === "DELETE" ? "CONFIG_VALUE_DELETED" : "CONFIG_VALUE_RETIRED",
+      entityType: "ConfigSet",
+      entityId: sets.join(", "),
+      detail: [
+        deleted ? `${deleted} deleted` : "",
+        retired ? `${retired} retired` : "",
+        reactivated ? `${reactivated} reactivated` : "",
+      ].filter(Boolean).join(", ") + (op === "DELETE" && retired ? " — in use, so retired rather than deleted." : "."),
+    });
+    revalidatePath("/admin/config");
+  } catch {
+    // ignore
+  }
+}
+
 export async function deleteValueAction(formData: FormData) {
   try {
     const ctx = await requireScope();
@@ -532,24 +594,32 @@ export async function deleteValueAction(formData: FormData) {
 }
 
 /** Delete a whole set when it is unused by documents/workflows. */
-export async function deleteSetAction(formData: FormData) {
+/**
+ * Delete a whole set. It used to refuse in silence, which reads as a broken
+ * button: every refusal now says which thing is still pointing at the set.
+ */
+export async function deleteSetAction(_prev: { error?: string; ok?: string } | undefined, formData: FormData): Promise<{ error?: string; ok?: string }> {
   try {
     const ctx = await requireScope();
-  const { user: admin, db, projectId, orgId } = ctx;
-    if (!isAdmin(admin)) return;
+    const { user: admin, db, orgId } = ctx;
+    if (!isAdmin(admin)) return { error: "Administrators only." };
     const key = String(formData.get("key") ?? "");
     if (["STATUSES", "REVIEW_OUTCOMES", "REASONS_FOR_ISSUE", "COMMENT_CLASSES", "CRITICALITY", "CONFIDENTIALITY", "RETENTION_CLASSES"].includes(key)) {
-      return; // the Standard's operational sets cannot be deleted, only edited
+      return { error: `${key} is one of the sets the system runs on — its values can be edited, but the set itself stays.` };
     }
-    const usedByScheme = (await db.schemeField.count({ where: { valueSetKey: key } })) > 0;
-    const usedByWorkflow = (await db.workflowTemplate.count({ where: { outcomeSetKey: key } })) > 0;
-    if (usedByScheme || usedByWorkflow) return;
+    const scheme = await db.schemeField.findFirst({ where: { valueSetKey: key }, include: { scheme: { select: { name: true } } } });
+    if (scheme) return { error: `The numbering scheme “${scheme.scheme.name}” draws a field from this set. Change that field first.` };
+    const workflow = await db.workflowTemplate.findFirst({ where: { outcomeSetKey: key }, select: { name: true } });
+    if (workflow) return { error: `The review route “${workflow.name}” uses this set for its verdicts. Point it at another set first.` };
+
+    const count = await db.configValue.count({ where: { setKey: key } });
     await db.configValue.deleteMany({ where: { setKey: key } });
     await db.configSet.delete({ where: { orgId_key: { orgId, key } } });
-    await audit({ actor: admin, action: "CONFIG_SET_DELETED", entityType: "ConfigSet", entityId: key, detail: "Unused set deleted by the organization." });
+    await audit({ actor: admin, action: "CONFIG_SET_DELETED", entityType: "ConfigSet", entityId: key, detail: `Deleted with ${count} value(s).` });
     revalidatePath("/admin/config");
-  } catch {
-    // ignore
+    return { ok: `${key} deleted.` };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Could not delete that set." };
   }
 }
 
