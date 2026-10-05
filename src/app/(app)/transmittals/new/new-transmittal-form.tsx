@@ -5,6 +5,8 @@ import Link from "next/link";
 import { ActionForm } from "@/components/form";
 import { createTransmittalAction } from "@/lib/actions/transmittals";
 import { RecipientPicker, type Company } from "./recipient-picker";
+import type { OwnField } from "@/lib/field-policy";
+import { OwnFields } from "@/app/(app)/documents/new/own-fields";
 import { cn } from "@/lib/utils";
 import { ArrowDownLeft, ArrowUpRight, Search } from "lucide-react";
 
@@ -66,7 +68,7 @@ const field = "plain w-full py-1.5 text-[13px]";
  * only released revisions, and a received transmittal has no subject of ours.
  */
 export function NewTransmittalForm({
-  reasons, revisions, companies, ourOrganization, defaultDirection, preselectedRevisionIds, prefill,
+  reasons, revisions, companies, ourOrganization, defaultDirection, preselectedRevisionIds, prefill, fields, labels, ownFields,
 }: {
   reasons: Opt[];
   revisions: RevOpt[];
@@ -78,6 +80,12 @@ export function NewTransmittalForm({
   defaultDirection: "OUTGOING" | "INCOMING";
   preselectedRevisionIds?: string[];
   prefill?: Prefill;
+  /** What this organization asks for: must be filled, may be left, or not asked. */
+  fields: Record<string, "REQUIRED" | "OPTIONAL" | "OFF">;
+  /** Its own words for them. */
+  labels: Record<string, string>;
+  /** The fields it added for itself. */
+  ownFields: OwnField[];
 }) {
   const [step, setStep] = useState(1);
   const [direction, setDirection] = useState(defaultDirection);
@@ -93,6 +101,11 @@ export function NewTransmittalForm({
   const [people, setPeople] = useState(0);
   const [files, setFiles] = useState(0);
   const countPeople = useCallback((n: number) => setPeople(n), []);
+
+  /** Whether a field is asked at all here, and whether it is insisted on. */
+  const asks = (key: string) => fields[key] !== "OFF";
+  const must = (key: string) => fields[key] === "REQUIRED";
+  const says = (key: string, fallback: string) => labels[key] ?? fallback;
 
   const outgoing = direction === "OUTGOING";
   const needsReview = reasons.find((r) => r.code === reasonCode)?.props.reviewCycle === true;
@@ -236,7 +249,7 @@ export function NewTransmittalForm({
                   <input name="issuingParty" required className={field} placeholder="Company name" value={party} onChange={(e) => setParty(e.target.value)} />
                 </Ask>
               )}
-              <Ask label="Why" required hint={outgoing ? "what they should do with it" : "what they sent it for"} className="lg:col-span-2">
+              <Ask label={says("reason", "Why")} required hint={outgoing ? "what they should do with it" : "what they sent it for"} className="lg:col-span-2">
                 <select name="reasonForIssue" required className={field} value={reasonCode} onChange={(e) => setReasonCode(e.target.value)}>
                   <option value="" disabled>Choose…</option>
                   {reasons.map((r) => <option key={r.code} value={r.code}>{r.label}</option>)}
@@ -308,12 +321,17 @@ export function NewTransmittalForm({
           <div className="asking grid grid-cols-1 gap-y-4 border-t border-line px-5 py-5 sm:px-6">
             {outgoing ? (
               <>
-                <Ask label="Subject" required hint="what the recipient reads first">
-                  <input name="subject" required className={field} value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Pump house — ventilation layout, rev B for construction" />
-                </Ask>
-                <Ask label="Message" hint="optional — anything they should know about these documents">
-                  <textarea name="message" rows={4} className={field} value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Please find enclosed…" />
-                </Ask>
+                {asks("subject") ? (
+                  <Ask label={says("subject", "Subject")} required={must("subject")} hint="what the recipient reads first">
+                    <input name="subject" required={must("subject")} className={field} value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Pump house — ventilation layout, rev B for construction" />
+                  </Ask>
+                ) : null}
+                {asks("message") ? (
+                  <Ask label={says("message", "Message")} required={must("message")} hint={must("message") ? "what they should know about these documents" : "optional — anything they should know about these documents"}>
+                    <textarea name="message" rows={4} required={must("message")} className={field} value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Please find enclosed…" />
+                  </Ask>
+                ) : null}
+                <OwnFields fields={ownFields} />
               </>
             ) : (
               <>
@@ -326,9 +344,11 @@ export function NewTransmittalForm({
                   className="plain w-full py-1.5 text-[12px] text-slate-500 file:mr-2 file:rounded file:border-0 file:bg-canvas-deep file:px-2 file:py-0.5 file:text-[11px] file:font-semibold file:text-slate-700"
                 />
               </Ask>
-              <Ask label="Message" hint="optional — what they say it is for, in their words">
-                <textarea name="message" rows={3} className={field} value={message} onChange={(e) => setMessage(e.target.value)} />
-              </Ask>
+              {asks("message") ? (
+                <Ask label={says("message", "Message")} required={must("message")} hint="what they say it is for, in their words">
+                  <textarea name="message" rows={3} required={must("message")} className={field} value={message} onChange={(e) => setMessage(e.target.value)} />
+                </Ask>
+              ) : null}
               </>
             )}
           </div>

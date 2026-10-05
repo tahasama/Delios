@@ -3,6 +3,8 @@ import { SETUP_PAGES, maySetup } from "../setup-pages";
 import { requireScope } from "@/lib/scope";
 import { PageHeader, Card, DataTable, Th, Td, Chip, Field, inputCls } from "@/components/ui";
 import { ActionForm } from "@/components/form";
+import { Asked, Added } from "@/components/policy-fields";
+import { formPolicy } from "@/lib/field-policy";
 import { savePartyAction, deletePartyAction } from "@/lib/actions/workflow";
 import { PartyKindFields } from "./party-fields";
 import { PARTY_KINDS } from "@/lib/party-kinds";
@@ -12,7 +14,9 @@ export const metadata = { title: "Organizations" };
 
 // §0.3 — our organization and the external parties it exchanges information with.
 export default async function AdminPartiesPage() {
-  const { user: me, db } = await requireScope();
+  const ctx = await requireScope();
+  const { user: me, db } = ctx;
+  const policy = await formPolicy(ctx, "PARTY");
   if (!maySetup(me, SETUP_PAGES.find((p) => p.href === "/settings/parties")!)) return <PageHeader title="Organizations" subtitle="Administrators and the control function." />;
   const [parties] = await Promise.all([
     db.party.findMany({ orderBy: [{ isInternal: "desc" }, { name: "asc" }], include: { _count: { select: { users: true } }, contact: { select: { id: true, name: true, email: true } }, backup: { select: { id: true, name: true } } } }),
@@ -107,12 +111,13 @@ export default async function AdminPartiesPage() {
               Another organization you exchange documents with. Yours is already here, registered once at setup.
             </p>
             <div className="grid gap-3 sm:grid-cols-2">
-              <Field label="Code" required hint="short, unique — e.g. Acme Pumps">
-                <input name="code" required maxLength={20} className={inputCls} />
-              </Field>
-              <Field label="Name" required>
-                <input name="name" required className={inputCls} />
-              </Field>
+              <Asked policy={policy} field="code" hint="short, unique — e.g. Acme Pumps">
+                {({ required }) => <input name="code" required={required} maxLength={20} className={inputCls} />}
+              </Asked>
+              <Asked policy={policy} field="name">
+                {({ required }) => <input name="name" required={required} className={inputCls} />}
+              </Asked>
+              <Added fields={policy.own} />
             </div>
             <PartyKindFields kind="OFFLINE" contactId="" backupId="" liaisonFunction="" people={[]} functions={functions} />
             <p className="text-[11px] leading-4 text-slate-400">

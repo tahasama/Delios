@@ -437,6 +437,16 @@ export async function seedDemoProject(db: PrismaClient, orgId: string, projectId
   await db.baselineEntry.create({ data: { projectId, actionId: a0031.id, documentId: man.id, requiredStatus: "AB", requiredBy: d(50), createdByName: users.controller.name } });
   await db.baselineEntry.create({ data: { projectId, actionId: a0044.id, documentId: spc.id, requiredStatus: "AFC", requiredBy: d(14), createdByName: users.controller.name } });
 
+  // The schedule filters on counters kept against the action — what it needs,
+  // what it has, when the next one is owed. The application writes them back
+  // whenever a line changes; a seed that writes the lines directly has to do
+  // the same, or every activity reads as needing nothing.
+  const { restateAction } = await import("../src/lib/action-readiness");
+  const t = tenantFor(orgId, projectId);
+  for (const action of await db.action.findMany({ where: { projectId }, select: { id: true } })) {
+    await restateAction(t, action.id);
+  }
+
   const scheduleV1 = await db.scheduleVersion.create({
     data: { projectId,
       sourceName: "Corporate Primavera programme",

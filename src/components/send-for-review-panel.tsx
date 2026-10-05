@@ -1,4 +1,5 @@
 import { requireScope } from "@/lib/scope";
+import { formPolicy } from "@/lib/field-policy";
 import { eligiblePeople, proposeForStep, normalizeRoute, type WfStep } from "@/lib/workflow";
 import { SendForReviewForm, type SendRoute } from "./send-for-review";
 import { verdictSets } from "@/lib/verdict-sets";
@@ -10,6 +11,7 @@ import { matrixBinds } from "@/lib/control-activities";
  */
 export async function SendForReview({ revisionIds }: { revisionIds: string[] }) {
   const ctx = await requireScope();
+  const policy = await formPolicy(ctx, "REVIEW");
   const { db } = ctx;
   const revisions = await db.revision.findMany({ where: { id: { in: revisionIds } }, include: { document: true } });
   const docs = revisions.map((r) => r.document);
@@ -76,5 +78,5 @@ export async function SendForReview({ revisionIds }: { revisionIds: string[] }) 
   const pool = (named: { id: string; name: string; functionName: string }[]) => strict
     ? named.map(person)
     : [...named.map(person), ...everyone.filter((one) => !named.some((n) => n.id === one.id)).map((one) => ({ ...one, inMatrix: false }))];
-  return <SendForReviewForm revisionIds={revisions.map((r) => r.id)} routes={routes} reviewers={pool(reviewers)} approvers={pool(approvers)} everyone={everyone} strict={strict} />;
+  return <SendForReviewForm revisionIds={revisions.map((r) => r.id)} routes={routes} reviewers={pool(reviewers)} approvers={pool(approvers)} everyone={everyone} strict={strict} ownFields={policy.own} />;
 }

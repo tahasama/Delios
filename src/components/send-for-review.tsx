@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { ActionForm } from "@/components/form";
+import type { OwnField } from "@/lib/field-policy";
+import { OwnFields } from "@/app/(app)/documents/new/own-fields";
 import { Field, inputCls } from "@/components/ui";
 import { sendForReviewAction } from "@/lib/actions/workflow";
 import { ArrowRight } from "lucide-react";
@@ -27,7 +29,7 @@ const MODE: Record<string, string> = {
  * assigns (by the documents' discipline when the route names nobody); the
  * sender removes or adds anyone the matrix allows.
  */
-export function SendForReviewForm({ revisionIds, routes, reviewers, approvers, everyone = [], strict = true }: {
+export function SendForReviewForm({ revisionIds, routes, reviewers, approvers, everyone = [], strict = true, ownFields = [] }: {
   revisionIds: string[];
   routes: SendRoute[];
   reviewers: SendPerson[];
@@ -36,6 +38,8 @@ export function SendForReviewForm({ revisionIds, routes, reviewers, approvers, e
   everyone?: SendPerson[];
   /** The matrix is the only rule; otherwise anyone may be added, flagged. */
   strict?: boolean;
+  /** Fields this organization added to the sending of a review. */
+  ownFields?: OwnField[];
 }) {
   const [routeId, setRouteId] = useState(routes.find((r) => r.isDefault)?.id ?? routes[0]?.id ?? "");
   const route = routes.find((r) => r.id === routeId);
@@ -50,6 +54,7 @@ export function SendForReviewForm({ revisionIds, routes, reviewers, approvers, e
         </select>
       </Field>
       {route?.description ? <p className="-mt-1 text-xs text-slate-500">{route.description}</p> : null}
+      <OwnFields fields={ownFields} />
       {route?.verdicts ? (
         <p className="text-[11px] text-slate-500">
           Reviewers answer with <strong className="text-slate-700">{route.verdicts.title}</strong>:{" "}

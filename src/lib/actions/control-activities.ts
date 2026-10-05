@@ -289,3 +289,14 @@ export async function removeOwnFieldAction(_prev: { error?: string; ok?: string 
   revalidatePath("/documents/new");
   return { ok: `${row.label} removed. It is no longer asked; what was already answered stays on the record.` };
 }
+
+/**
+ * Remove a field from the row it sits on.
+ *
+ * The same act as the one above, in the shape a button inside another form can
+ * call: the button carries the field's id as its own value, so one form can
+ * save every row or drop one without nesting a second form inside itself.
+ */
+export async function removeOwnFieldOnRow(formData: FormData): Promise<void> {
+  await removeOwnFieldAction(undefined, formData);
+}

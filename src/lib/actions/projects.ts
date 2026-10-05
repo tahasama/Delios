@@ -3,6 +3,7 @@
 import { STANDARD_VERSION } from "@/lib/standard";
 
 import { revalidatePath } from "next/cache";
+import { formPolicy, checkForm } from "@/lib/field-policy";
 import { requireAdminScope, setActiveProject } from "@/lib/scope";
 import { audit } from "@/lib/audit";
 import { functionForRole } from "@/lib/bootstrap";
@@ -56,6 +57,11 @@ export async function createProjectAction(
     return { error: "The end date cannot fall before the start date." };
   }
 
+  // What this organization asks of a project, and the fields it added itself.
+  const policy = await formPolicy(ctx, "PROJECT");
+  const asked = checkForm("PROJECT", policy, { code, name, kind, role, startDate, endDate, scopeStatement }, (n) => String(formData.get(n) ?? ""));
+  if (asked.error) return { error: asked.error };
+
   const clash = await db.project.findFirst({ where: { orgId, code } });
   if (clash) return { error: `${code} is already used by “${clash.name}”. Codes are unique within your organization.` };
 
@@ -70,6 +76,7 @@ export async function createProjectAction(
       role,
       startDate: startDate ? new Date(`${startDate}T00:00:00.000Z`) : new Date(),
       endDate: endDate ? new Date(`${endDate}T00:00:00.000Z`) : null,
+      extras: Object.keys(asked.extras).length ? JSON.stringify(asked.extras) : null,
     },
   });
 

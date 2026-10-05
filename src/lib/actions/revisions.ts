@@ -8,6 +8,7 @@ import { redirect } from "next/navigation";
 import { requireScope } from "@/lib/scope";
 import { revalidatePath } from "next/cache";
 import { isController, isAdmin, mayContributeToDocument } from "@/lib/auth";
+import { formPolicy, checkForm } from "@/lib/field-policy";
 import { audit, notifyMany } from "@/lib/audit";
 import { saveUpload } from "@/lib/files";
 import { parseSteps, recordStepOutcome } from "@/lib/workflow";
@@ -82,6 +83,18 @@ export async function prepareRevisionAction(_prev: { error?: string } | undefine
   const scope = await db.scopeConfig.findFirst();
   const value = nextRevisionValue(series as "DESIGN" | "EXECUTION", existing.map((e) => e.value), scope?.executionSeriesStart ?? 0);
 
+  // What this organization asks when a revision is started.
+  const policy = await formPolicy(ctx, "REVISION");
+  // The status is asked when the revision is released, not when it is started.
+  const asked = checkForm(
+    "REVISION",
+    policy,
+    { value, reasonForRevision, changeDescription, plannedSubmissionDate, phase },
+    (n) => String(formData.get(n) ?? ""),
+    ["value", "reasonForRevision", "changeDescription", "plannedSubmissionDate", "phase"],
+  );
+  if (asked.error) return { error: asked.error };
+
   const rev = await db.revision.create({
     data: { projectId,
       documentId,
@@ -90,6 +103,7 @@ export async function prepareRevisionAction(_prev: { error?: string } | undefine
       state: "IN_PREPARATION",
       reasonForRevision,
       changeDescription,
+      extras: Object.keys(asked.extras).length ? JSON.stringify(asked.extras) : null,
       authoredById: user.id,
       authoredByName: user.name,
       plannedSubmissionDate: plannedSubmissionDate ? new Date(plannedSubmissionDate) : null,

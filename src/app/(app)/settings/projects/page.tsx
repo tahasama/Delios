@@ -2,6 +2,8 @@ import { requireScope } from "@/lib/scope";
 import { isAdmin } from "@/lib/auth";
 import { PageHeader, Card, Chip, DataTable, Th, Td, Field, btn, inputCls } from "@/components/ui";
 import { ActionForm } from "@/components/form";
+import { Asked, Added } from "@/components/policy-fields";
+import { formPolicy } from "@/lib/field-policy";
 import { createProjectAction, renameProjectAction, setProjectStatusAction, openProjectAction } from "@/lib/actions/projects";
 import { fmtDate } from "@/lib/utils";
 import { FolderOpen, ArrowRight } from "lucide-react";
@@ -16,6 +18,7 @@ const KINDS = PROJECT_KINDS;
 
 export default async function ProjectsPage() {
   const ctx = await requireScope();
+  const policy = await formPolicy(ctx, "PROJECT");
   const { db, user: me, orgId, projectId } = ctx;
   if (!isAdmin(me)) return <PageHeader title="Projects" subtitle="Administrators only." />;
 
@@ -131,24 +134,28 @@ export default async function ProjectsPage() {
             </Field>
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <Field label="Type" hint="Affects defaults only, never the rules">
-              <select name="kind" className={inputCls} defaultValue="GENERIC">
-                {KINDS.map((k) => <option key={k.code} value={k.code}>{k.label}</option>)}
-              </select>
-            </Field>
-            <Field label="Our role on it" hint="Decides where approval sits, and the matrix it starts from">
-              <select name="role" className={inputCls} defaultValue="GENERIC">
-                {roleOptions.map((r) => <option key={r.code} value={r.code}>{r.label}</option>)}
-              </select>
-            </Field>
+            <Asked policy={policy} field="kind" hint="Affects defaults only, never the rules">
+              {({ required }) => (
+                <select name="kind" required={required} className={inputCls} defaultValue="GENERIC">
+                  {KINDS.map((k) => <option key={k.code} value={k.code}>{k.label}</option>)}
+                </select>
+              )}
+            </Asked>
+            <Asked policy={policy} field="role" hint="Decides where approval sits, and the matrix it starts from">
+              {({ required }) => (
+                <select name="role" required={required} className={inputCls} defaultValue="GENERIC">
+                  {roleOptions.map((r) => <option key={r.code} value={r.code}>{r.label}</option>)}
+                </select>
+              )}
+            </Asked>
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <Field label="Start date">
-              <input type="date" name="startDate" className={inputCls} />
-            </Field>
-            <Field label="End date" hint="Planned completion">
-              <input type="date" name="endDate" className={inputCls} />
-            </Field>
+            <Asked policy={policy} field="startDate">
+              {({ required }) => <input type="date" name="startDate" required={required} className={inputCls} />}
+            </Asked>
+            <Asked policy={policy} field="endDate" hint="Planned completion">
+              {({ required }) => <input type="date" name="endDate" required={required} className={inputCls} />}
+            </Asked>
           </div>
           <details className="rounded-xl border border-line bg-tint-soft px-3 py-2 text-[11.5px] leading-[1.45] text-slate-600">
             <summary className="cursor-pointer font-medium text-slate-700">Where approval sits under each role</summary>
@@ -161,13 +168,13 @@ export default async function ProjectsPage() {
               ))}
             </dl>
           </details>
-          <Field label="Scope statement" hint="What this project's conformance figure is measured against">
+          <Asked policy={policy} field="scopeStatement" className="sm:col-span-2">{({ required }) => (<span className="block">
             <input
               name="scopeStatement"
               className={inputCls}
               placeholder="Leave blank for the standard wording"
             />
-          </Field>
+          </span>)}</Asked>
           <label className="flex items-start gap-2 text-xs text-slate-600">
             <input type="checkbox" name="copyPeople" className="mt-0.5" defaultChecked />
             <span>
@@ -179,6 +186,7 @@ export default async function ProjectsPage() {
             <FolderOpen className="mt-0.5 h-3 w-3 shrink-0" />
             Value sets, numbering schemes and the permission matrix are shared — the new project uses them immediately.
           </p>
+          <Added fields={policy.own} className="sm:col-span-2" />
         </ActionForm>
       </div></details>
     </div>

@@ -228,6 +228,10 @@ export function PlanRegister({
       <div className="border-b border-line px-5 py-3 sm:px-6">{uploads}</div>
 
       <form
+        // Remounted whenever the answer changes, so Clear all empties the boxes
+        // as well as the query: an uncontrolled select keeps whatever the
+        // reader chose until React is given a reason to replace it.
+        key={`${filters.q}|${filters.code}|${filters.state}|${filters.happened}|${filters.discipline}|${filters.docType}|${filters.supplier}|${filters.on}|${filters.from}|${filters.to}`}
         action="/actions"
         onSubmit={(event) => {
           event.preventDefault();

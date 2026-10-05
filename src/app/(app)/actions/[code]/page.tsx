@@ -4,6 +4,7 @@ import { latenessOf } from "@/lib/action-lateness";
 import { carrierRefusal, actIsOff } from "@/lib/control-activities";
 import { readyReading, countingRevision, meetsRequirement } from "@/lib/readiness";
 import Link from "next/link";
+import { formPolicy } from "@/lib/field-policy";
 import { requireScope } from "@/lib/scope";
 import { notFound } from "next/navigation";
 import { Card, Chip, Banner } from "@/components/ui";
@@ -24,6 +25,7 @@ export const dynamic = "force-dynamic";
  */
 export default async function ActionDetailPage({ params, searchParams }: { params: Promise<{ code: string }>; searchParams: Promise<{ dept?: string }> }) {
   const ctx = await requireScope();
+  const readinessPolicy = await formPolicy(ctx, "ACTION");
   const { db } = ctx;
   const { code } = await params;
   const { dept } = await searchParams;
@@ -245,7 +247,7 @@ export default async function ActionDetailPage({ params, searchParams }: { param
                             </label>
                             <label className="min-w-0">
                               <span className="sr-only">Note</span>
-                              <input name="note" className="plain w-full" placeholder={missing.length ? `${missing.length} not ready — say what and why` : "Note — optional, unless you leave the box unticked"} />
+                              <input name="note" required={readinessPolicy.rules.note === "REQUIRED"} className="plain w-full" placeholder={missing.length ? `${missing.length} not ready — say what and why` : readinessPolicy.rules.note === "REQUIRED" ? `${readinessPolicy.labels.note} — this project asks for one every time` : "Note — optional, unless you leave the box unticked"} />
                             </label>
                             <button className="ask">Record</button>
                           </div>

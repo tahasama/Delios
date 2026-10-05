@@ -7,6 +7,7 @@ import { requireAdminScope, requireScope, crossProject, type Tenant } from "@/li
 import { redirect } from "next/navigation";
 import { isAdmin, hashPassword } from "@/lib/auth";
 import { audit } from "@/lib/audit";
+import { formPolicy, checkForm } from "@/lib/field-policy";
 import { ROLES } from "@/lib/standard";
 import { buildProps } from "@/lib/config-props";
 import { parseCsv, toObjects } from "@/lib/csv";
@@ -58,8 +59,17 @@ export async function createUserAction(_prev: { error?: string } | undefined, fo
     const permitted = await db.project.findMany({ where: { orgId, id: { in: projectIds } }, select: { id: true } });
     if (permitted.length !== projectIds.length) return { error: "One of those projects is not in your organization." };
 
+    // What this organization asks when it gives somebody access.
+    const policy = await formPolicy(ctx, "PERSON");
+    const asked = checkForm("PERSON", policy, { name, email, functionId, partyId, department: String(formData.get("department") ?? "") }, (n) => String(formData.get(n) ?? ""));
+    if (asked.error) return { error: asked.error };
+
     const created = await db.user.create({
-      data: { orgId, email, name, role, organization: party?.name ?? organization, partyId, passwordHash: await hashPassword(password), active: true },
+      data: {
+        orgId, email, name, role, organization: party?.name ?? organization, partyId,
+        passwordHash: await hashPassword(password), active: true,
+        extras: Object.keys(asked.extras).length ? JSON.stringify(asked.extras) : null,
+      },
     });
     if (permitted.length) {
       await db.projectMembership.createMany({
@@ -265,9 +275,13 @@ export async function addAssetAction(_prev: { error?: string; ok?: string } | un
     const area = String(formData.get("area") ?? "").trim() || null;
     const system = String(formData.get("system") ?? "").trim() || null;
     const unit = String(formData.get("unit") ?? "").trim() || null;
-    if (!code || !name) return { error: "A tag and a name are required." };
     if (await db.assetItem.findFirst({ where: { code } })) return { error: `${code} is already in the list.` };
-    const asset = await db.assetItem.create({ data: { projectId, code, name, area, system, unit } });
+    const policy = await formPolicy(ctx, "ASSET");
+    const asked = checkForm("ASSET", policy, { code, name, area, system, unit }, (n) => String(formData.get(n) ?? ""));
+    if (asked.error) return { error: asked.error };
+    const asset = await db.assetItem.create({
+      data: { projectId, code, name, area, system, unit, extras: Object.keys(asked.extras).length ? JSON.stringify(asked.extras) : null },
+    });
     await audit({ actor: user, action: "ASSET_ADDED", entityType: "AssetItem", entityId: asset.id, entityLabel: code, detail: name });
     revalidatePath("/assets");
     return { ok: `${code} added.` };

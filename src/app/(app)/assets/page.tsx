@@ -2,6 +2,8 @@ import Link from "next/link";
 import { requireScope } from "@/lib/scope";
 import { PageHeader, EmptyState, Card, Field, inputCls } from "@/components/ui";
 import { ActionForm } from "@/components/form";
+import { Asked, Added } from "@/components/policy-fields";
+import { formPolicy } from "@/lib/field-policy";
 import { addAssetAction, updateAssetAction, removeAssetAction } from "@/lib/actions/admin";
 
 export const dynamic = "force-dynamic";
@@ -13,6 +15,7 @@ export const metadata = { title: "Assets & tags" };
  */
 export default async function AssetsPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
   const ctx = await requireScope();
+  const policy = await formPolicy(ctx, "ASSET");
   const { db } = ctx;
   const keeper = ctx.can("CONTROL") || ctx.can("CONFIGURE");
   const q = ((await searchParams).q ?? "").trim();
@@ -38,11 +41,22 @@ export default async function AssetsPage({ searchParams }: { searchParams: Promi
           <div className="mt-3 max-w-3xl">
             <ActionForm action={addAssetAction} submitLabel="Add asset" size="sm">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                <Field label="Tag" required hint="as on the drawings, e.g. P-101"><input name="code" required className={`${inputCls} uppercase`} placeholder="P-101" /></Field>
-                <Field label="Name" required className="sm:col-span-2"><input name="name" required className={inputCls} placeholder="Feed pump" /></Field>
-                <Field label="Area"><input name="area" className={inputCls} placeholder="20" /></Field>
-                <Field label="System"><input name="system" className={inputCls} placeholder="Raw water feed" /></Field>
-                <Field label="Unit"><input name="unit" className={inputCls} placeholder="U-100" /></Field>
+                <Asked policy={policy} field="code" hint="as on the drawings, e.g. P-101">
+                  {({ required }) => <input name="code" required={required} className={`${inputCls} uppercase`} placeholder="P-101" />}
+                </Asked>
+                <Asked policy={policy} field="name" className="sm:col-span-2">
+                  {({ required }) => <input name="name" required={required} className={inputCls} placeholder="Feed pump" />}
+                </Asked>
+                <Asked policy={policy} field="area">
+                  {({ required }) => <input name="area" required={required} className={inputCls} placeholder="20" />}
+                </Asked>
+                <Asked policy={policy} field="system">
+                  {({ required }) => <input name="system" required={required} className={inputCls} placeholder="Raw water feed" />}
+                </Asked>
+                <Asked policy={policy} field="unit">
+                  {({ required }) => <input name="unit" required={required} className={inputCls} placeholder="U-100" />}
+                </Asked>
+                <Added fields={policy.own} />
               </div>
             </ActionForm>
           </div>

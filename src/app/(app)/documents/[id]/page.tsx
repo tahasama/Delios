@@ -10,11 +10,12 @@ import { Prisma } from "@prisma/client";
 import { isController, isAdmin, mayContributeToDocument } from "@/lib/auth";
 import { Chip, StateChip, Banner, btn, Field, inputCls } from "@/components/ui";
 import { ActionForm } from "@/components/form";
+import { Asked, Added } from "@/components/policy-fields";
 import { DOC_STATE_LABEL, DOC_STATE_COLOR, REV_STATE_COLOR, revStateColor, type DocState, type RevState } from "@/lib/standard";
 import { stateNames, stateName } from "@/lib/state-names";
 import { revisionGround } from "@/lib/revision-ground";
 import { typeSkipsReview } from "@/lib/review-need";
-import { ownFields, readExtras } from "@/lib/field-policy";
+import { ownFields, readExtras, formPolicy } from "@/lib/field-policy";
 import { fmtDate, timeAgo, plain } from "@/lib/utils";
 import { getActiveSet, getSet, getValue } from "@/lib/config";
 import { updateDocumentAction, linkAssetAction, unlinkRelationshipAction, endDocumentStateAction } from "@/lib/actions/documents";
@@ -232,6 +233,7 @@ export default async function DocumentDetailPage({
   const mine = cycles.filter((x) => x.rev.id === (shown?.id ?? ""));
 
   const own = await ownFields(ctx, "DOCUMENT");
+  const revisionPolicy = await formPolicy(ctx, "REVISION");
   const answers = readExtras(doc.extras);
 
   // Properties, each once, empty ones left out.
@@ -454,14 +456,21 @@ export default async function DocumentDetailPage({
                   <input name="reasonForRevision" required className={inputCls} />
                 </Field>
               )}
-              <Field label={doc.revisions.length ? "What changed" : "Description"} required className="sm:col-span-2"><input name="changeDescription" className={inputCls} defaultValue={doc.revisions.length ? "" : "Initial version"} /></Field>
-              <Field label="Due for submission"><input type="date" name="plannedSubmissionDate" className={inputCls} /></Field>
-              <Field label="Phase">
-                <select name="phase" className={inputCls} defaultValue="">
-                  <option value="">—</option>
-                  {phases.map((p) => <option key={p.code} value={p.code}>{p.label}</option>)}
-                </select>
-              </Field>
+              <Asked policy={revisionPolicy} field="changeDescription" className="sm:col-span-2">
+                {({ required }) => <input name="changeDescription" required={required} className={inputCls} defaultValue={doc.revisions.length ? "" : "Initial version"} />}
+              </Asked>
+              <Asked policy={revisionPolicy} field="plannedSubmissionDate">
+                {({ required }) => <input type="date" name="plannedSubmissionDate" required={required} className={inputCls} />}
+              </Asked>
+              <Asked policy={revisionPolicy} field="phase">
+                {({ required }) => (
+                  <select name="phase" required={required} className={inputCls} defaultValue="">
+                    <option value="" disabled={required}>—</option>
+                    {phases.map((p) => <option key={p.code} value={p.code}>{p.label}</option>)}
+                  </select>
+                )}
+              </Asked>
+              <Added fields={revisionPolicy.own} className="sm:col-span-2" />
               <Field label="File" hint="optional — a PDF shows in the viewer" className="sm:col-span-2"><input type="file" name="revisionFile" className="block w-full text-xs" /></Field>
               {routes.length && reviewed ? (
                 <Field label="Then" hint="needs the file above" className="sm:col-span-2">

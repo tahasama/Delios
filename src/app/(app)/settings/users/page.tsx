@@ -4,6 +4,8 @@ import { SETUP_PAGES, maySetup } from "../setup-pages";
 import { requireScope } from "@/lib/scope";
 import { PageHeader, DataTable, Th, Td, Chip, Card, Field, inputCls, btn } from "@/components/ui";
 import { ActionForm } from "@/components/form";
+import { Asked, Added } from "@/components/policy-fields";
+import { formPolicy } from "@/lib/field-policy";
 import { createUserAction, savePersonAction } from "@/lib/actions/admin";
 import { inviteGuestAction, createVisitorAction } from "@/lib/actions/guests";
 
@@ -11,7 +13,9 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "People & access" };
 
 export default async function AdminUsersPage({ searchParams }: { searchParams: Promise<{ org?: string; project?: string }> }) {
-  const { user: me, db, projectId, project } = await requireScope();
+  const ctx = await requireScope();
+  const { user: me, db, projectId, project } = ctx;
+  const policy = await formPolicy(ctx, "PERSON");
   const sp = await searchParams;
   if (!maySetup(me, SETUP_PAGES.find((p) => p.href === "/settings/users")!)) {
     return <PageHeader title="People & access" subtitle="Administrators and the control function." />;
@@ -77,17 +81,31 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
           <AddWay title="Someone in our organization" hint="They sign in straight away with the password you set.">
             <ActionForm action={createUserAction} submitLabel="Create account" size="sm">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <Field label="Full name" required><input name="name" required className={inputCls} /></Field>
-                <Field label="Email" required><input type="email" name="email" required className={inputCls} /></Field>
-                <Field label="Works for" required>
-                  <select name="partyId" required className={inputCls} defaultValue="">
-                    <option value="" disabled>Choose…</option>
-                    {parties.filter((party) => party.active).map((party) => <option key={party.id} value={party.id}>{party.name}</option>)}
-                  </select>
-                </Field>
-                <Field label="Function" required><select name="functionId" required className={inputCls} defaultValue=""><option value="" disabled>Choose…</option>{functionOptions}</select></Field>
+                <Asked policy={policy} field="name">
+                  {({ required }) => <input name="name" required={required} className={inputCls} />}
+                </Asked>
+                <Asked policy={policy} field="email">
+                  {({ required }) => <input type="email" name="email" required={required} className={inputCls} />}
+                </Asked>
+                <Asked policy={policy} field="partyId">
+                  {({ required }) => (
+                    <select name="partyId" required={required} className={inputCls} defaultValue="">
+                      <option value="" disabled={required}>Choose…</option>
+                      {parties.filter((party) => party.active).map((party) => <option key={party.id} value={party.id}>{party.name}</option>)}
+                    </select>
+                  )}
+                </Asked>
+                <Asked policy={policy} field="functionId">
+                  {({ required }) => (
+                    <select name="functionId" required={required} className={inputCls} defaultValue="">
+                      <option value="" disabled={required}>Choose…</option>
+                      {functionOptions}
+                    </select>
+                  )}
+                </Asked>
                 <Field label="Password" required><input name="password" required minLength={8} className={inputCls} placeholder="at least 8 characters" /></Field>
                 {projectPicker}
+                <Added fields={policy.own} />
               </div>
             </ActionForm>
           </AddWay>

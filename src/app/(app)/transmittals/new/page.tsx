@@ -1,4 +1,5 @@
 import { PageHeader } from "@/components/ui";
+import { formPolicy } from "@/lib/field-policy";
 import { requireScope } from "@/lib/scope";
 import { getActiveSet } from "@/lib/config";
 import { holdersOf } from "@/lib/permissions";
@@ -12,6 +13,7 @@ type Search = { doc?: string; docs?: string; direction?: string; revisions?: str
 
 export default async function NewTransmittalPage({ searchParams }: { searchParams: Promise<Search> }) {
   const ctx = await requireScope();
+  const policy = await formPolicy(ctx, "TRANSMITTAL");
   const { db } = ctx;
   const sp = await searchParams;
 
@@ -89,6 +91,9 @@ export default async function NewTransmittalPage({ searchParams }: { searchParam
         subtitle="Documents, or a letter, sent to named people — or something that reached us from outside, recorded so it enters the register."
       />
       <NewTransmittalForm
+        fields={policy.rules}
+        labels={policy.labels}
+        ownFields={policy.own}
         reasons={reasons.map((r) => ({ code: r.code, label: r.label, props: r.props }))}
         revisions={revisionRows.map((r) => ({
           id: r.id,

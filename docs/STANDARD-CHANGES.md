@@ -5,11 +5,11 @@ Standard v2** does not yet say, or says differently. None of these are screen
 design; each is a rule about how information is controlled, so the published
 document has to change before the application can claim conformance to it.
 
-Read with `docs/ROLLOUT.md` §6 — *When the Standard changes*: once the document
-is republished, `src/lib/checks/rules.ts` and `src/lib/checks/catalog.ts` are
-regenerated from it, every spine link whose rule or check moved goes to *review
-required*, and a new synchronized baseline is released. Never edit those two
-files by hand to match this list.
+Read with `docs/ROLLOUT.md` §6 — *When the Standard changes*. The catalogue is
+no longer generated from the document: `src/lib/checks/catalog.ts` is the
+application's own list of what it can answer (see §21 below), so a change here
+is a change to the published document, and only then — if it names something
+the register can settle — a change to the catalogue.
 
 Each entry says what the Standard holds today, what it must hold, and what in
 the application already depends on the change.
@@ -440,6 +440,139 @@ a supplement. A draft has not gone, so it is simply changed.
 **Depends on it:** `Transmittal.followsId`, `followKind` (SUPPLEMENT | REPLACES).
 
 ---
+
+---
+
+## 21 · The check catalogue is the application's, not an annex of the Standard
+
+**Clause:** Annex H, and §17 throughout.
+
+**Today:** the annex lists 274 defect checks for any document system, and the
+application is expected to run them.
+
+**Must say:** a conformance check is a question somebody can answer from the
+records that exist. The Standard states the conditions; each application
+declares which of them **it** can detect, and is measured on those. 97 survive
+here. The rest fall into two kinds, and the Standard should name both:
+
+- conditions the application **prevents** (§22), which cannot arise to be found;
+- conditions **no record could settle** — whether an unmarked copy was
+  circulated, whether a comment was answered on its substance — which belong to
+  an audit by hand, not to a page that reports a percentage.
+
+**Why:** a check that cannot fail and a check that can only fail teach people to
+ignore the page. Coverage rose from 51% to 100% by removing questions nobody
+could answer, and the measured figure now means *of what can go wrong here, how
+much is watched*.
+
+**Depends on it:** `src/lib/checks/catalog.ts`, the Assurance section.
+
+---
+
+## 22 · A condition the application refuses is not a check, and is not counted
+
+**Clause:** §17.4 *Integrity*, §17.7 *Qualified statements*.
+
+**Must say:** where the act that would create a condition is refused, the
+condition is stated as a **rule**, with the act that refuses it, and is excluded
+from the measurement. A document number cannot be typed; a revision cannot be
+released without approval, description and a fixed copy; information under legal
+hold cannot be destroyed. Twenty such rules are published beside the checks.
+
+**Why:** folding them into the percentage could only raise it and could never
+lower it, which makes the figure unfalsifiable — the one thing a conformance
+number must not be.
+
+**Depends on it:** `src/lib/checks/prevented.ts`, *Assurance → Default rules*.
+
+---
+
+## 23 · A published list has no editions; a value is retired, never edited
+
+**Clause:** §4.7 *Controlled value lists*.
+
+**Today:** value lists are versioned, and a document is said to be checked
+against the edition in force at its date.
+
+**Must say:** a list has live values and retired ones. A value the register has
+used is retired — it stays readable on every document that carries it and is
+offered to no new one — and is never edited or deleted. There is no edition to
+compare against, so no list version is published or stored.
+
+**Why:** an edition number implied a drift that cannot happen: approvals already
+record the authority matrix version in force when they were given, and the
+uploaded lists (schedule, departments, requirements) keep every past version
+with who approved it. A photograph of a rulebook that cannot move is a
+photograph of nothing — which is also why the traceability spine and its
+synchronized baseline were removed.
+
+**Depends on it:** the retire/reactivate actions, `ConfigValue.status`.
+
+---
+
+## 24 · What a form asks is the organization's; what makes a record controlled is not
+
+**Clause:** §1.3 *Local configuration*, §4.4 *Conditional fields*.
+
+**Must say:** an organization decides, for every form, **what it captures and
+what it calls it** — each field required, optional, or not asked — and may add
+fields of its own. It may not configure away what makes a record controlled: a
+document without a title, type or discipline, a transmittal without recipients
+or a reason, a review without a route. Each of those states its reason on the
+screen rather than being silently absent.
+
+Two things override the organization's answer, and only ever to make a field
+stricter: a numbering scheme that draws on a field, and the type-to-field
+matrix.
+
+**Depends on it:** `src/lib/field-policy.ts`, `FieldPolicy`, `CustomField`,
+*Settings → Forms & fields*; ten forms wired to it.
+
+---
+
+## 25 · Records other than documents are numbered by a published scheme
+
+**Clause:** §3 *Identification*, §11.1 *Transmittal*.
+
+**Must say:** transmittals, activities, reviews and packages are numbered the
+way a document is — by a scheme the organization publishes and routes — not by a
+rule buried in the code that raises them. A scheme for a record reads the record
+itself (project, sub-project, sender, receiver, reason, counter). Until one is
+routed, the short form (`TR-0001`) stands, and numbers already raised keep it.
+
+**Depends on it:** `src/lib/numbering-records.ts`, *Settings → Numbering*.
+
+---
+
+## 26 · A review's time belongs to the route, step by step
+
+**Clause:** §9.4 *Review period*.
+
+**Must say:** the working days a review has are set on the **route**, per step.
+The step's own date is what that reviewer must answer by; the review's date is
+every step's days added up, counted from the day it went out. Both are stated
+wherever reviews are listed, and never confused: a step answered on time inside
+a route that is overdue is a different fact from either on its own.
+
+**Depends on it:** the `days` on a route step, `ReviewCycle.dueAt`, the **Step
+due** and **Review due** columns.
+
+---
+
+## 27 · The Document Management Plan is generated from the configuration
+
+**Clause:** §1.6 *Conformance assessment statement*, Annex C.
+
+**Must say:** the plan a project publishes states how information is controlled.
+Where an application holds that configuration, the plan is **written from it** —
+numbering from the schemes, classification from the published lists, review from
+the routes, retention from the classes — so the plan and the behaviour cannot
+drift. What the application does not hold (cover page, client clauses, local
+conventions) stays in a document the organization registers and names as its
+plan.
+
+**Depends on it:** `src/app/(app)/settings/dmp/plan.tsx`,
+`ScopeConfig.dmpDocumentId`.
 
 ## Still open — decided in conversation, not yet built
 

@@ -3,13 +3,18 @@
 An internal **Electronic Document Management System** built directly on the
 **Document Management Standard v1** — *Rules · Routes · Checks* — by Taha Maatof.
 
-The system **is** the Standard:
+The Standard is where the rules came from; the application is what enforces
+them, in its own words:
 
 | Layer | In the product |
 |---|---|
-| **I · Rules** (Parts 0–17, Annexes A–F) | The enforced data model, configuration and permissions. Every "shall" that a system can enforce is enforced — numbering, revision series, forward-only states, approval authority, issue gates, search exclusion of obsolete revisions. |
-| **II · Routes** (Annex G) | The seven execution checklists are rendered live beside the workflows they govern (creating a document, revising, issuing, receiving, taking out of use, closing a package). Steps tick themselves as the system records the evidence. |
-| **III · Checks** (Annex H) | A conformance engine applies the defect-check catalogue against the register, records every finding with its fixed severity and owner, computes the **integrity figure** (§17.4), and raises the **warrant** when statements need qualifying (§17.7). |
+| **Rules** | The enforced data model, configuration and permissions. A document number cannot be typed, a revision cannot be released without its approval, description and fixed copy, information under a legal hold cannot be destroyed. 20 such conditions are listed on **Default rules**, each naming the act that refuses it. |
+| **Routes** | Execution checklists rendered live beside the workflows they govern (creating a document, revising, issuing, receiving, taking out of use, closing a package). Steps tick themselves as the system records the evidence. |
+| **Checks** | 97 questions the application can answer from its own records, run against the register. Each finding carries its severity, its owner and the document it is on; the result is the share of documents carrying nothing critical or major, measured against the project's own target. |
+
+Nothing is checked that the application prevents, and nothing is listed that no
+record could settle: a check that cannot fail, and a check that can only fail,
+both teach people to ignore the page.
 
 ## Stack
 
@@ -60,9 +65,10 @@ Demo passwords are all `demo1234`:
 Other scripts:
 
 ```bash
-npm run checks                # run the Annex H conformance engine from the CLI
-npm run defects-report        # open-defect summary by check
+npm run checks                # run the checks from the CLI, per project
+npm run defects-report        # open-finding summary by check
 npm run db:studio             # browse the database
+npx tsx scripts/restate-actions.ts   # rewrite what each activity is waiting for
 ```
 
 ## The demo project
@@ -83,11 +89,32 @@ re-run, or accept with reason/authority/review date — and watch the integrity
 figure respond. The warrant banner appears while integrity is below the published
 threshold (95%) or a Critical defect is open.
 
-## Configuration (Annex C)
+## Configuration
 
-Everything the Standard requires to be published lives under **Settings**.
-The eight-step **Scope & readiness** guide turns an incomplete or missing Document
-Management Plan into working configuration decisions, each read from live data.
+Everything an organization publishes lives under **`/settings`**, in five groups:
+
+| Group | Screens |
+|---|---|
+| **Organization** | Projects · Organizations · **The plan** |
+| **Classification** | Disciplines, types & sets · Document families · **Forms & fields** · Numbering |
+| **How work flows** | Control room (the flow, who carries each act, the project's policies, state names) · Review routes |
+| **Access** | Functions & permissions · People & access |
+| **Change & evidence** | Uploaded lists to decide · The log |
+
+**The plan** is this project's Document Management Plan, generated from the
+configuration itself — scope, numbering, classification, review and approval,
+release and issue, formats, retention, what is checked, and what is still to
+settle. Nothing on it is typed, so the plan and the behaviour cannot drift. An
+organization's own plan — cover page, client clauses, local conventions — is
+registered as a document and named on it.
+
+**Forms & fields** decides, for each of ten forms (document, revision,
+transmittal, review, readiness, package, project, organization, person,
+equipment), what each field is called, whether it is required, optional or not
+asked at all — and lets an organization add fields of its own, in the shape it
+likes. What the application computes with (the number is built from the type,
+the matrix answers by discipline, retention follows criticality) says so and
+stays as it is.
 Starting configuration is data, not code: `src/lib/profiles/reference.json` plus a
 starter profile per project type (industrial, energy, construction). See
 [docs/ROLLOUT.md](docs/ROLLOUT.md) for upgrading an installation and adding profiles.
@@ -139,10 +166,13 @@ prisma/schema.prisma        the register — seven linked record types (§16.3) 
 src/lib/standard.ts         fixed sets from the Standard (states, reasons, outcomes, exposures…)
 src/lib/lifecycle.ts        state machine: review custody points, approval, release, supersession, void
 src/lib/numbering.ts        scheme routing, validation, system allocation (§3.7)
-src/lib/checks/catalog.ts   Annex H — every check with its fixed severity, owner and clause
-src/lib/checks/runners.ts   automated evidence queries (Pass / Fail / Not checked / Not executable)
-src/lib/checks/engine.ts    runs the catalogue, maintains the defect register, computes integrity
-src/lib/routes.tsx          Annex G checklists, live in the UI
-src/app/(app)/…             dashboard, register, documents, reviews, transmittals, actions,
-                            packages, assets, exposures, conformance, reports, admin
+src/lib/checks/catalog.ts   the 97 checks: condition, how it is detected, severity, owner, moment
+src/lib/checks/runners.ts   one query per check, returning the items that fail
+src/lib/checks/engine.ts    runs the catalogue, maintains the findings, computes the result
+src/lib/checks/prevented.ts the 20 conditions the application refuses outright
+src/lib/field-policy.ts     what every form asks for, insists on, and calls it
+src/lib/action-readiness.ts what each activity is waiting for, written on the activity
+src/lib/routes.tsx          the execution checklists, live in the UI
+src/app/(app)/…             home, register, documents, reviews, transmittals, actions,
+                            packages, assets, distribution, conformance, reports, settings
 ```

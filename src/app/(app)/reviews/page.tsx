@@ -2,7 +2,7 @@ import { isReadOnly } from "@/lib/auth";
 import { Prisma } from "@prisma/client";
 import { after } from "next/server";
 import { requireScope } from "@/lib/scope";
-import { dueState } from "@/lib/workflow";
+import { addWorkingDays, dueState } from "@/lib/workflow";
 import { warnLateReviews } from "@/lib/review-risk";
 import { getSet } from "@/lib/config";
 import { readSearch } from "@/lib/register-query";
@@ -196,6 +196,32 @@ export default async function ReviewsPage({ searchParams }: { searchParams: Prom
     // organization publishes.
     db.document.groupBy({ by: ["discipline", "docType"] }),
   ]);
+  // What the whole route was given, as against what this step has. A route is
+  // a list of steps with working days against them; the review is due when the
+  // last of them is, counted from the day it went out.
+  const runs = cycles.length
+    ? await db.workflowRun.findMany({
+        where: { revisionId: { in: [...new Set(cycles.map((c) => c.revisionId))] } },
+        orderBy: { createdAt: "desc" },
+        select: { revisionId: true, steps: true, createdAt: true, templateName: true },
+      })
+    : [];
+  const routeOf = new Map<string, { days: number; dueAt: Date | null; name: string }>();
+  for (const run of runs) {
+    if (routeOf.has(run.revisionId)) continue; // the newest run answers for the revision
+    let days = 0;
+    try {
+      for (const step of JSON.parse(run.steps) as { days?: number }[]) days += Number(step.days ?? 0);
+    } catch {
+      days = 0;
+    }
+    routeOf.set(run.revisionId, {
+      days,
+      dueAt: days ? addWorkingDays(run.createdAt, days) : null,
+      name: run.templateName,
+    });
+  }
+
   const disciplineLabel = new Map(disciplines.map((one) => [one.code, one.label]));
   const typeLabel = new Map(types.map((one) => [one.code, one.label]));
   const deliverableLabel = new Map(deliverables.map((one) => [one.code, one.label]));
@@ -267,6 +293,8 @@ export default async function ReviewsPage({ searchParams }: { searchParams: Prom
     // not ours: their verdict never changes it, a new revision answers it.
     const postRelease = !!c.revision.releasedAt && c.submittedAt > c.revision.releasedAt;
     const state = dueState(c.dueAt, c.status !== "OPEN");
+    const route = routeOf.get(c.revisionId) ?? null;
+    const routeState = dueState(route?.dueAt ?? null, c.status !== "OPEN");
     const waitingOn = c.assignments.filter((a) => !a.completedAt);
     const late = c.status === "OPEN" && state !== "on time" && c.dueAt;
     return {
@@ -285,6 +313,10 @@ export default async function ReviewsPage({ searchParams }: { searchParams: Prom
       reviewers: c.assignments.map((a) => ({ name: a.userName, done: !!a.completedAt })),
       doneCount: c.assignments.filter((a) => a.completedAt).length,
       dueAt: c.dueAt ? fmtDate(c.dueAt) : null,
+      routeName: route?.name ?? null,
+      routeDays: route?.days ?? null,
+      routeDueAt: route?.dueAt ? fmtDate(route.dueAt) : null,
+      routeDueState: routeState,
       dueState: state,
       notifyHref: late
         ? `/transmittals/new?revisions=${c.revision.id}&users=${waitingOn.map((a) => a.userId).join(",")}&reason=REVIEW&subject=${encodeURIComponent(`${c.revision.document.docNumber} rev ${c.revision.value} — review still open`)}&message=${encodeURIComponent(`This review was due on ${fmtDate(c.dueAt!)}. Please answer it.${c.riskNotifiedAt ? ` An automatic warning went out on ${fmtDate(c.riskNotifiedAt)}.` : ""}`)}`

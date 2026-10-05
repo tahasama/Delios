@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireScope } from "@/lib/scope";
+import { formPolicy, checkForm } from "@/lib/field-policy";
 import { audit, notifyMany } from "@/lib/audit";
 import { departmentRows, departmentMembers, senderRecipients, senderRows, isDepartmentSender } from "@/lib/requirements-process";
 import { departmentsOf, daysBefore, DEFAULT_LEAD_DAYS } from "@/lib/schedule";
@@ -146,6 +147,12 @@ export async function confirmReadinessAction(_prev: State | undefined, formData:
     return { error: `${missing.length} document${missing.length === 1 ? " is" : "s are"} not at the required status (${missing.map((e) => e.document.docNumber).join(", ")}). Say why the activity can still go ahead, or declare them missing.` };
   }
   if (!available && !note) return { error: "Say what is missing — Document Control is alerted." };
+
+  // What this organization asks of whoever confirms readiness. The two rules
+  // above stand whatever it says: a shortfall is explained, always.
+  const policy = await formPolicy(ctx, "ACTION");
+  const asked = checkForm("ACTION", policy, { available: available ? "yes" : "no", note }, (n) => String(formData.get(n) ?? ""));
+  if (asked.error) return { error: asked.error };
 
   await db.readinessConfirmation.upsert({
     where: { actionId_department: { actionId, department } },

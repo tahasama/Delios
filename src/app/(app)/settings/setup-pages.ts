@@ -50,8 +50,8 @@ export const SETUP_PAGES: SetupPage[] = [
   },
   {
     href: "/settings/dmp",
-    title: "Scope & readiness",
-    text: "What is set up, what is still missing, the scope statement and agreed exceptions.",
+    title: "The plan",
+    text: "This project's document management plan, written from what is configured — printable, with the scope statement, what is still to settle and any agreed departures.",
     group: "Organization",
   },
 

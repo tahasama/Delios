@@ -17,6 +17,11 @@ import { DateWindow } from "@/components/date-window";
  * what is ticked is what the export writes.
  */
 export type ReviewRow = {
+  /** The route this review runs, and the time the whole of it was given. */
+  routeName?: string | null;
+  routeDays?: number | null;
+  routeDueAt?: string | null;
+  routeDueState?: "none" | "on time" | "at risk" | "overdue";
   /** Every comment on the revision, from any of its reviews. */
   comments?: { by: string; text: string; blocking: boolean; settled: boolean; review: string | null }[];
   id: string;
@@ -443,8 +448,8 @@ const COLUMNS: Column[] = [
     ),
   },
   {
-    key: "due", label: "Due", sort: "due",
-    note: "When this step has to be answered. It comes from the days the route gives the step.",
+    key: "due", label: "Step due", sort: "due",
+    note: "When this step has to be answered. It comes from the working days the route gives this step — not the whole review.",
     headClass: "text-right", cellClass: "whitespace-nowrap text-right text-xs tabular-nums",
     cell: (row) =>
       row.dueAt ? (
@@ -457,6 +462,22 @@ const COLUMNS: Column[] = [
           {row.warnedAt ? <span className="block font-sans text-[10px] text-slate-400">warned {row.warnedAt}</span> : null}
         </>
       ) : <span className="text-slate-300" title="The route gives this step no time limit">—</span>,
+  },
+  {
+    key: "routeDue", label: "Review due",
+    note: "When the whole route is due: every step's working days added up, counted from the day it went out. The step above is only this step.",
+    headClass: "text-right", cellClass: "whitespace-nowrap text-right text-xs tabular-nums",
+    cell: (row) =>
+      row.routeDueAt ? (
+        <>
+          <span className={row.routeDueState === "overdue" ? "font-semibold text-red-700" : row.routeDueState === "at risk" ? "font-semibold text-amber-700" : "text-slate-500"}>{row.routeDueAt}</span>
+          <span className="block font-sans text-[11px] text-slate-400">
+            {row.routeDays} working day{row.routeDays === 1 ? "" : "s"}{row.routeName ? ` · ${row.routeName}` : ""}
+          </span>
+        </>
+      ) : (
+        <span className="text-slate-300" title={row.routeName ? `${row.routeName} gives its steps no time limits` : "No route behind this review"}>—</span>
+      ),
   },
   { key: "opened", label: "Opened", sort: "opened", headClass: "text-right", cellClass: "whitespace-nowrap text-right text-xs tabular-nums text-slate-500", cell: (row) => row.openedAt },
   { key: "openedBy", label: "Opened by", cellClass: "whitespace-nowrap text-xs text-slate-500", cell: (row) => row.openedBy ?? <span className="text-slate-300">·</span> },

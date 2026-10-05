@@ -3,7 +3,7 @@ import { requireScope } from "@/lib/scope";
 import { isAdmin } from "@/lib/auth";
 import { PageHeader, Card, Chip, inputCls } from "@/components/ui";
 import { ActionForm } from "@/components/form";
-import { setFieldPolicyAction, addOwnFieldAction, removeOwnFieldAction } from "@/lib/actions/control-activities";
+import { setFieldPolicyAction, addOwnFieldAction, removeOwnFieldOnRow } from "@/lib/actions/control-activities";
 import {
   KINDS, KIND_LABEL, KIND_TAB, KIND_TEXT, RULE_LABEL, CONTROL_LABEL, fieldsOf, allFieldRules,
   type FieldKind, type FieldRule, type Control,
@@ -170,12 +170,24 @@ export default async function FieldsPage({ searchParams }: { searchParams: Promi
                     <span className="sr-only">What {field.label} is called</span>
                     <input name={`own-label:${field.id}`} defaultValue={field.label} maxLength={60} className={inputCls} />
                   </label>
-                  <label className="min-w-0">
-                    <span className="sr-only">Whether {field.label} must be filled</span>
-                    <select name={`own-rule:${field.id}`} defaultValue={field.rule} className={inputCls}>
-                      {RULES.map((one) => <option key={one} value={one}>{RULE_LABEL[one]}</option>)}
-                    </select>
-                  </label>
+                  <div className="min-w-0">
+                    <label className="block">
+                      <span className="sr-only">Whether {field.label} must be filled</span>
+                      <select name={`own-rule:${field.id}`} defaultValue={field.rule} className={inputCls}>
+                        {RULES.map((one) => <option key={one} value={one}>{RULE_LABEL[one]}</option>)}
+                      </select>
+                    </label>
+                    {/* The button carries the field's id as its own value, so one
+                        form saves every row and still drops a single one. */}
+                    <button
+                      formAction={removeOwnFieldOnRow}
+                      name="id"
+                      value={field.id}
+                      className="mt-1.5 text-[11px] font-medium text-slate-400 underline-offset-2 hover:text-red-700 hover:underline"
+                    >
+                      Remove this field
+                    </button>
+                  </div>
                 </li>
               ))}
             </ul>
@@ -223,24 +235,10 @@ export default async function FieldsPage({ searchParams }: { searchParams: Promi
           </ActionForm>
 
           {mine.length ? (
-            <div className="mt-4 border-t border-line pt-3">
-              <p className="stencil mb-1.5 text-slate-400">Remove one</p>
-              <div className="flex flex-wrap gap-2">
-                {mine.map((field) => (
-                  <ActionForm
-                    key={field.id}
-                    action={removeOwnFieldAction}
-                    submitLabel={`Remove ${field.label}`}
-                    size="sm"
-                    variant="secondary"
-                    hidden={{ id: field.id }}
-                  />
-                ))}
-              </div>
-              <p className="mt-2 text-[11px] leading-4 text-slate-400">
-                It stops being asked. Answers already given stay on the records that carry them.
-              </p>
-            </div>
+            <p className="mt-3 border-t border-line pt-3 text-[11px] leading-4 text-slate-400">
+              To take one away, use <span className="font-medium text-slate-500">Remove this field</span> on its row above. It
+              stops being asked at once; answers already given stay on the records that carry them.
+            </p>
           ) : null}
         </Card>
 

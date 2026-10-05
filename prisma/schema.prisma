@@ -48,6 +48,8 @@ model Organization {
 }
 
 model Project {
+  /// Answers to the fields this organization added for itself, as JSON.
+  extras           String?
   issueRequests IssueRequest[]
   id            String         @id @default(cuid())
   orgId         String
@@ -281,6 +283,8 @@ model ControlledVersion {
 // ── People & authority ────────────────────────────────────────────────────────
 
 model User {
+  /// Answers to the fields this organization added for itself, as JSON.
+  extras           String?
   id             String              @id @default(cuid())
   orgId          String
   org            Organization        @relation(fields: [orgId], references: [id], onDelete: Cascade)
@@ -626,6 +630,8 @@ model Document {
 // ── Record type 2 · Revision (Parts 6–10) ────────────────────────────────────
 
 model Revision {
+  /// Answers to the fields this organization added for itself, as JSON.
+  extras           String?
   id                    String            @id @default(cuid())
   projectId             String
   project               Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -757,6 +763,8 @@ model Approval {
 // ── Record type 3 · Review cycle (Part 9) ────────────────────────────────────
 
 model ReviewCycle {
+  /// Answers to the fields this organization added for itself, as JSON.
+  extras           String?
   id                     String             @id @default(cuid())
   // A review is a record like a transmittal or an action, so it carries a
   // number of its own: what people say on the phone, and what a column shows.
@@ -875,6 +883,8 @@ model ReviewComment {
 // ── Record type 4 · Transmittal (Part 11) ────────────────────────────────────
 
 model Transmittal {
+  /// Answers to the fields this organization added for itself, as JSON.
+  extras           String?
   issueRequests       IssueRequest[]
   id                  String                 @id @default(cuid())
   projectId           String
@@ -1018,6 +1028,8 @@ model RegisteredCopy {
 // ── Record type 5 · Baseline (Part 14) ───────────────────────────────────────
 
 model Action {
+  /// Answers to the fields this organization added for itself, as JSON.
+  extras           String?
   id                 String                  @id @default(cuid())
   projectId          String
   project            Project                 @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -1231,6 +1243,8 @@ model ScheduleActivity {
 // ── Record type 6 · Package (Part 15) ────────────────────────────────────────
 
 model Package {
+  /// Answers to the fields this organization added for itself, as JSON.
+  extras           String?
   id                      String          @id @default(cuid())
   projectId               String
   project                 Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -1318,6 +1332,8 @@ model Relationship {
 
 // Asset breakdown for object association (§5.8)
 model AssetItem {
+  /// Answers to the fields this organization added for itself, as JSON.
+  extras           String?
   id        String  @id @default(cuid())
   projectId String
   project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -1653,6 +1669,8 @@ model WorkflowRun {
 
 // §0.3 — parties: our organization and external organizations
 model Party {
+  /// Answers to the fields this organization added for itself, as JSON.
+  extras           String?
   id               String        @id @default(cuid())
   orgId            String
   org              Organization  @relation(fields: [orgId], references: [id], onDelete: Cascade)

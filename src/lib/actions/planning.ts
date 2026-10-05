@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { requireScope } from "@/lib/scope";
 import { revalidatePath } from "next/cache";
 import { isController, isAdmin } from "@/lib/auth";
+import { formPolicy, checkForm } from "@/lib/field-policy";
 import { audit, notify } from "@/lib/audit";
 import { isReadOnly } from "@/lib/auth";
 import { filterFromForm, isEmpty, describeFilter, syncPackage, parseExcluded, meetsStatus, recipientIds, acceptorIds, ownerIds } from "@/lib/package-rule";
@@ -62,9 +63,20 @@ export async function createPackageAction(_prev: { error?: string } | undefined,
   if (!owners.length || !acceptors.length) return { error: "Those people are no longer on the project." };
   const owner = { name: owners.map((one) => one.name).join(", ") };
   const acceptor = { name: acceptors.map((one) => one.name).join(", ") };
+  // What this organization asks when a package is put together.
+  const policy = await formPolicy(ctx, "PACKAGE");
+  const asked = checkForm(
+    "PACKAGE",
+    policy,
+    { title, description, completionDate, requiredStatus, acceptanceAuthorityId: acceptors[0]?.id ?? "", po: String(formData.get("po") ?? "") },
+    (n) => String(formData.get(n) ?? ""),
+  );
+  if (asked.error) return { error: asked.error };
+
   const created = await db.package.create({
     data: {
       projectId,
+      extras: Object.keys(asked.extras).length ? JSON.stringify(asked.extras) : null,
       membershipFilter: membershipRule ? JSON.stringify(filter) : null,
       identifier, title, description, purpose, type, membershipRule, recipientName,
       recipientPartyId: recipients[0]?.id ?? null, recipientPartyIds: JSON.stringify(recipients.map((one) => one.id)),

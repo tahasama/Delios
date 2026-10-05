@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireScope } from "@/lib/scope";
 import { mayContributeToDocument } from "@/lib/auth";
+import { formPolicy, checkForm } from "@/lib/field-policy";
 import { audit } from "@/lib/audit";
 import { startWorkflowRun, recordStepOutcome, recordStepApproval, normalizeRoute, rewindRoute, readyForRelease, type WfStep } from "@/lib/workflow";
 import { typeSkipsReview } from "@/lib/review-need";
@@ -111,6 +112,12 @@ export async function sendForReviewAction(_prev: { error?: string; ok?: string }
   const stepCount = (JSON.parse(template.steps) as unknown[]).length;
   for (let i = 0; i < stepCount; i++) if (!overrides[i]?.length) return { error: `Choose at least one person for step ${i + 1}.` };
 
+  // What this organization asks of whoever sends a revision out.
+  const policy = await formPolicy(ctx, "REVIEW");
+  const asked = checkForm("REVIEW", policy, { route: templateId, steps: overrides, copies: [] }, (n) => String(formData.get(n) ?? ""), ["route"]);
+  if (asked.error) return { error: asked.error };
+  const extras = Object.keys(asked.extras).length ? JSON.stringify(asked.extras) : null;
+
   const sent: string[] = [];
   const failed: string[] = [];
   const isStaff = isController(user);
@@ -129,6 +136,12 @@ export async function sendForReviewAction(_prev: { error?: string; ok?: string }
     if (!allowed) { failed.push(`${label}: only ${rev.document.originator ? "Document Control" : "its author or Document Control"} can send it`); continue; }
     const res = await startWorkflowRun(ctx, rid, templateId, user, overrides);
     if (res.ok) {
+      // The answers to this organization's own fields belong to the cycle that
+      // just went out, which is the newest one on the revision.
+      if (extras) {
+        const cycle = await db.reviewCycle.findFirst({ where: { revisionId: rid }, orderBy: { createdAt: "desc" }, select: { id: true } });
+        if (cycle) await db.reviewCycle.update({ where: { id: cycle.id }, data: { extras } });
+      }
       sent.push(label);
       revalidatePath(`/documents/${rev.documentId}`);
       if (copied.length) {
@@ -297,10 +310,20 @@ export async function savePartyAction(_prev: { error?: string } | undefined, for
         await audit({ actor: admin, action: active ? "PARTY_UPDATED" : "PARTY_REVOKED", entityType: "Party", entityId: party.code, entityLabel: name, oldValue: `${party.name}${party.active ? "" : " (revoked)"}`, newValue: `${name}${active ? "" : " (revoked)"}`, detail: active ? undefined : "Access revoked: its people can no longer sign in." });
       }
     } else {
-      if (!code || !name) return { error: "Code and name are required." };
+      // What this organization asks of an organization it adds, and the fields
+      // it added for itself.
+      const policy = await formPolicy(ctx, "PARTY");
+      const asked = checkForm("PARTY", policy, { code, name, kind, contactId, backupId, liaisonFunction }, (n) => String(formData.get(n) ?? ""));
+      if (asked.error) return { error: asked.error };
       // A new party has no people yet, so the contact is named from its own
       // people once they exist — not borrowed from ours.
-      await db.party.create({ data: { orgId, code, name, isInternal, contactId, backupId, kind, participation, evidenceRequired: evidenceRequiredForKind } });
+      await db.party.create({
+        data: {
+          orgId, code, name, isInternal, contactId, backupId, kind, participation,
+          evidenceRequired: evidenceRequiredForKind,
+          extras: Object.keys(asked.extras).length ? JSON.stringify(asked.extras) : null,
+        },
+      });
     }
     revalidatePath("/settings/parties");
     revalidatePath("/settings/users");

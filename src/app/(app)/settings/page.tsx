@@ -70,7 +70,7 @@ export default async function AdminPage() {
   const figure: Record<string, { text: string; attention?: boolean }> = {
     "/settings/projects": { text: plural(projects, "active project") },
     "/settings/parties": { text: plural(parties, "party", "parties") },
-    "/settings/dmp": { text: "readiness checklist" },
+    "/settings/dmp": { text: "generated from the configuration" },
     "/settings/config": { text: plural(sets, "value set") },
     "/settings/families": { text: plural(familyList.length, "family", "families") },
     "/settings/flow": { text: acts ? "set by an administrator" : "read from the project" },

@@ -23,7 +23,7 @@ export const KIND_LABEL: Record<FieldKind, string> = {
   REVISION: "Starting a revision",
   TRANSMITTAL: "Raising a transmittal",
   REVIEW: "Sending something for review",
-  ACTION: "An activity on the schedule",
+  ACTION: "Saying an activity is ready",
   PACKAGE: "Putting a package together",
   PROJECT: "Opening a project",
   PARTY: "Adding an organization",
@@ -37,7 +37,7 @@ export const KIND_TAB: Record<FieldKind, string> = {
   REVISION: "Revision",
   TRANSMITTAL: "Transmittal",
   REVIEW: "Review",
-  ACTION: "Activity",
+  ACTION: "Readiness",
   PACKAGE: "Package",
   PROJECT: "Project",
   PARTY: "Organization",
@@ -50,8 +50,8 @@ export const KIND_TEXT: Record<FieldKind, string> = {
   DOCUMENT: "What is asked when something enters the register.",
   REVISION: "What is asked when a new revision of a document is started.",
   TRANSMITTAL: "What is asked when documents are sent out or booked in.",
-  REVIEW: "What is asked when a revision goes to its reviewers.",
-  ACTION: "What is asked of an activity the schedule drives.",
+  REVIEW: "What is asked when a revision goes to its reviewers. The route decides the steps; a field of your own can ask the sender anything else.",
+  ACTION: "What is asked of whoever confirms an activity has what it needs. The activity itself comes from the uploaded schedule, not from a form.",
   PACKAGE: "What is asked when documents are gathered to be handed over together.",
   PROJECT: "What is asked when a project is opened.",
   PARTY: "What is asked of an organization you exchange information with.",
@@ -119,6 +119,14 @@ export const FIELDS: FieldDef[] = [
   { control: "DATE", kind: "DOCUMENT", key: "plannedDate", label: "Planned submission", text: "When it is promised.", fallback: "OPTIONAL" },
   { control: "FILE", kind: "DOCUMENT", key: "file", label: "The file", text: "Attached as it is registered, rather than later.", fallback: "OPTIONAL" },
 
+  // ── Starting a revision ──
+  { control: "TEXT", kind: "REVISION", key: "value", label: "Revision", text: "Its place in the published series.", fallback: "REQUIRED", fixed: "The series decides it; it is never typed." },
+  { control: "TEXT", kind: "REVISION", key: "reasonForRevision", label: "Reason", text: "Why there is a new revision at all.", fallback: "REQUIRED", fixed: "A revision nobody asked for, with no reason recorded, is how a register loses its thread." },
+  { control: "LONG_TEXT", kind: "REVISION", key: "changeDescription", label: "What changed", text: "What is different from the last one — not a restatement of the reason.", fallback: "REQUIRED" },
+  { control: "CHOICE", setKey: "STATUSES", computedBy: "What may be built from it, and whether work may proceed, follow from the status.", kind: "REVISION", key: "statusCode", label: "Released as", text: "The status it carries once released. Asked at release, not when it is started.", fallback: "REQUIRED" },
+  { control: "DATE", kind: "REVISION", key: "plannedSubmissionDate", label: "Due for submission", text: "When it is promised.", fallback: "OPTIONAL" },
+  { control: "CHOICE", setKey: "PHASES", kind: "REVISION", key: "phase", label: "Phase", text: "The stage of the project it belongs to.", fallback: "OPTIONAL" },
+
   // ── Raising a transmittal ──
   { control: "PEOPLE", kind: "TRANSMITTAL", key: "recipients", label: "Recipients", text: "Who it goes to, by name.", fallback: "REQUIRED", fixed: "An issue nobody received is not an issue." },
   { control: "CHOICE", setKey: "REASONS_FOR_ISSUE", computedBy: "Whether a response is owed, and what status the documents must carry, follow from it.", kind: "TRANSMITTAL", key: "reason", label: "Reason for issue", text: "What they should do with it.", fallback: "REQUIRED", fixed: "The reason decides whether a response is owed and what the status must carry." },
@@ -130,28 +138,20 @@ export const FIELDS: FieldDef[] = [
 
   // ── Sending something for review ──
   { control: "CHOICE", computedBy: "The route is the steps themselves.", kind: "REVIEW", key: "route", label: "Route", text: "Which sequence of reviewers it goes through.", fallback: "REQUIRED", fixed: "A review with no route has no steps to answer." },
-  { control: "DATE", kind: "REVIEW", key: "dueDate", label: "Due by", text: "When the verdict is expected.", fallback: "OPTIONAL" },
-  { control: "LONG_TEXT", kind: "REVIEW", key: "note", label: "Note to reviewers", text: "What to look at, or what changed since last time.", fallback: "OPTIONAL" },
+  { control: "PEOPLE", kind: "REVIEW", key: "steps", label: "Who answers each step", text: "The people the route puts on it, from those the matrix allows.", fallback: "REQUIRED", fixed: "A step with nobody on it is never answered." },
+  { control: "PEOPLE", kind: "REVIEW", key: "copies", label: "Copied in", text: "Told it went out, never asked to answer.", fallback: "OPTIONAL", fixed: "Nothing waits on them, so nothing can be insisted on." },
 
-  // ── An activity on the schedule ──
-  { control: "CHOICE", setKey: "DEPARTMENTS", kind: "ACTION", key: "department", label: "Department", text: "Who answers for the activity and confirms readiness.", fallback: "OPTIONAL" },
-  { control: "NUMBER", kind: "ACTION", key: "leadTime", label: "Lead time", text: "How long before the activity its documents are needed.", fallback: "OPTIONAL" },
-  { control: "LONG_TEXT", kind: "ACTION", key: "note", label: "Note", text: "Anything the schedule does not say.", fallback: "OPTIONAL" },
-  // ── Starting a revision ──
-  { control: "TEXT", kind: "REVISION", key: "value", label: "Revision", text: "Its place in the published series.", fallback: "REQUIRED", fixed: "The series decides it; it is not typed." },
-  { control: "TEXT", kind: "REVISION", key: "reasonForRevision", label: "Reason", text: "Why there is a new revision at all.", fallback: "REQUIRED", fixed: "A revision nobody asked for, with no reason recorded, is how a register loses its thread." },
-  { control: "LONG_TEXT", kind: "REVISION", key: "changeDescription", label: "What changed", text: "What is different from the last one — not a restatement of the reason.", fallback: "REQUIRED" },
-  { control: "CHOICE", setKey: "STATUSES", computedBy: "What may be built from it, and whether work may proceed, follow from the status.", kind: "REVISION", key: "statusCode", label: "Released as", text: "The status it carries once released.", fallback: "REQUIRED" },
-  { control: "DATE", kind: "REVISION", key: "plannedSubmissionDate", label: "Due for submission", text: "When it is promised.", fallback: "OPTIONAL" },
-  { control: "CHOICE", setKey: "PHASES", kind: "REVISION", key: "phase", label: "Phase", text: "The stage of the project it belongs to.", fallback: "OPTIONAL" },
+  // ── Saying an activity is ready ──
+  { control: "YES_NO", kind: "ACTION", key: "available", label: "Is it ready", text: "Whether the documents the activity needs are in hand.", fallback: "REQUIRED", fixed: "It is the answer itself." },
+  { control: "TEXT", kind: "ACTION", key: "note", label: "Note", text: "What is short, and why it went ahead anyway. Read back on the activity and in the log.", fallback: "OPTIONAL" },
 
   // ── Putting a package together ──
-  { control: "TEXT", kind: "PACKAGE", key: "name", label: "Name", text: "What the package is called.", fallback: "REQUIRED", fixed: "A package nobody can name cannot be handed to anybody." },
-  { control: "CHOICE", setKey: "PACKAGE_TYPES", kind: "PACKAGE", key: "type", label: "Kind of package", text: "Fixed contents agreed in advance, or gathered as the work produces them.", fallback: "REQUIRED" },
-  { control: "CHOICE", setKey: "STATUSES", kind: "PACKAGE", key: "requiredStatus", label: "Needed at", text: "The status a document must carry to count as in the package.", fallback: "OPTIONAL" },
-  { control: "DATE", kind: "PACKAGE", key: "completionDate", label: "Complete by", text: "When the package is due whole.", fallback: "OPTIONAL" },
-  { control: "PEOPLE", kind: "PACKAGE", key: "owner", label: "Composition owner", text: "Who answers for what goes in it.", fallback: "OPTIONAL" },
-  { control: "LONG_TEXT", kind: "PACKAGE", key: "note", label: "Note", text: "Anything the name does not say.", fallback: "OPTIONAL" },
+  { control: "TEXT", kind: "PACKAGE", key: "title", label: "Title", text: "What the package is called.", fallback: "REQUIRED", fixed: "A package nobody can name cannot be handed to anybody." },
+  { control: "LONG_TEXT", kind: "PACKAGE", key: "description", label: "Description", text: "What it is for, and anything the recipient should know.", fallback: "OPTIONAL" },
+  { control: "DATE", kind: "PACKAGE", key: "completionDate", label: "Due", text: "When the package is wanted whole.", fallback: "REQUIRED" },
+  { control: "CHOICE", setKey: "STATUSES", computedBy: "Whether a document counts as delivered is read from the status it carries.", kind: "PACKAGE", key: "requiredStatus", label: "Needed at status", text: "What a document must carry to count as in the package.", fallback: "REQUIRED" },
+  { control: "PEOPLE", kind: "PACKAGE", key: "acceptanceAuthorityId", label: "Accepted by", text: "Who accepts it, which may not be whoever fills it.", fallback: "REQUIRED", fixed: "Filling a package and accepting it are two acts, and never one person's." },
+  { control: "TEXT", kind: "PACKAGE", key: "po", label: "Contract or purchase order", text: "Where one package is kept per order.", fallback: "OPTIONAL" },
 
   // ── Opening a project ──
   { control: "TEXT", kind: "PROJECT", key: "code", label: "Code", text: "The short code every number on the project begins with.", fallback: "REQUIRED", fixed: "Numbers are built from it, so it cannot be left out or changed later." },
@@ -165,9 +165,10 @@ export const FIELDS: FieldDef[] = [
   // ── Adding an organization ──
   { control: "TEXT", kind: "PARTY", key: "code", label: "Code", text: "The short code that stands for them in a document number.", fallback: "REQUIRED", fixed: "Supplier numbers are built from it." },
   { control: "TEXT", kind: "PARTY", key: "name", label: "Name", text: "Their name as it appears on a transmittal.", fallback: "REQUIRED", fixed: "A transmittal has to say who it is addressed to." },
-  { control: "CHOICE", setKey: "PARTY_KINDS", kind: "PARTY", key: "kind", label: "What they are to us", text: "Client, contractor, vendor, authority.", fallback: "OPTIONAL" },
-  { control: "TEXT", kind: "PARTY", key: "contact", label: "Main contact", text: "Who to write to when nothing else says.", fallback: "OPTIONAL" },
-  { control: "TEXT", kind: "PARTY", key: "address", label: "Address", text: "Where formal correspondence goes.", fallback: "OPTIONAL" },
+  { control: "CHOICE", setKey: "PARTY_KINDS", kind: "PARTY", key: "kind", label: "How they work with us", text: "Client, contractor, vendor, authority.", fallback: "OPTIONAL" },
+  { control: "PEOPLE", kind: "PARTY", key: "contactId", label: "Who answers for it", text: "The person transmittals are addressed to when nothing else says.", fallback: "OPTIONAL" },
+  { control: "PEOPLE", kind: "PARTY", key: "backupId", label: "Backup", text: "Who answers when the first is away.", fallback: "OPTIONAL" },
+  { control: "CHOICE", kind: "PARTY", key: "liaisonFunction", label: "Who carries it", text: "The function on our side that deals with them.", fallback: "OPTIONAL" },
 
   // ── Adding a person ──
   { control: "TEXT", kind: "PERSON", key: "name", label: "Full name", text: "As it should appear against their decisions.", fallback: "REQUIRED", fixed: "Every approval and verdict carries the name of whoever gave it." },
@@ -175,7 +176,6 @@ export const FIELDS: FieldDef[] = [
   { control: "CHOICE", computedBy: "What they may do is read from the function they hold.", kind: "PERSON", key: "functionId", label: "Function", text: "The job they do on the project.", fallback: "REQUIRED" },
   { control: "CHOICE", computedBy: "An outside reader sees only what was issued to their organization.", kind: "PERSON", key: "partyId", label: "Works for", text: "The organization they belong to.", fallback: "REQUIRED" },
   { control: "CHOICE", setKey: "DEPARTMENTS", kind: "PERSON", key: "department", label: "Department", text: "Which department they answer for. Departments receive requirements calls and confirm readiness.", fallback: "OPTIONAL" },
-  { control: "TEXT", kind: "PERSON", key: "phone", label: "Telephone", text: "For when a transmittal cannot wait.", fallback: "OPTIONAL" },
 
   // ── Adding equipment ──
   { control: "TEXT", kind: "ASSET", key: "code", label: "Tag", text: "The tag number the plant knows it by.", fallback: "REQUIRED", fixed: "Documents are associated with equipment by tag." },
@@ -298,12 +298,51 @@ export async function allFieldRules(t: Tenant): Promise<Record<FieldKind, Rules>
  * The caller passes what it has; anything the organization insists on and the
  * form did not carry comes back by its own label, ready to be said out loud.
  */
-export function missingRequired(rules: Rules, kind: FieldKind, values: Record<string, unknown>): string[] {
+export function missingRequired(rules: Rules, kind: FieldKind, values: Record<string, unknown>, only?: string[]): string[] {
   return fieldsOf(kind)
+    .filter((f) => !only || only.includes(f.key))
     .filter((f) => rules[f.key] === "REQUIRED")
     .filter((f) => {
       const v = values[f.key];
       return v === undefined || v === null || (typeof v === "string" && !v.trim()) || (Array.isArray(v) && !v.length);
     })
     .map((f) => f.label.toLowerCase());
+}
+
+/**
+ * Everything a form needs to draw itself, in one call: what is asked, what it
+ * is called here, and the fields this organization added.
+ */
+export async function formPolicy(t: Tenant, kind: FieldKind): Promise<{ rules: Rules; labels: Record<string, string>; own: OwnField[] }> {
+  const [rules, labels, own] = await Promise.all([fieldRules(t, kind), fieldLabels(t, kind), ownFields(t, kind)]);
+  return { rules, labels, own };
+}
+
+/**
+ * What a server action has to refuse, for one form: the application's fields
+ * this organization insists on, and its own fields it insists on. The answers
+ * to keep come back with them, ready to be stored beside the record.
+ */
+export function checkForm(
+  kind: FieldKind,
+  policy: { rules: Rules; own: OwnField[] },
+  values: Record<string, unknown>,
+  get: (name: string) => string,
+  /**
+   * The fields this particular act asks for, where one kind is filled in by
+   * more than one act — a revision is started with its reason, and released at
+   * a status later. Left out, every field of the kind is checked.
+   */
+  only?: string[],
+): { error?: string; extras: Record<string, string> } {
+  const short = missingRequired(policy.rules, kind, values, only);
+  const answered = takeExtras(policy.own, get);
+  const missing = [...short, ...answered.missing];
+  if (missing.length) {
+    return {
+      error: `This organization asks for ${missing.join(", ")}. Fill ${missing.length === 1 ? "it" : "them"} in, or change what the form asks in Settings → Forms & fields.`,
+      extras: answered.extras,
+    };
+  }
+  return { extras: answered.extras };
 }

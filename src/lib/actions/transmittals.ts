@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { requireScope } from "@/lib/scope";
 import { revalidatePath } from "next/cache";
 import { isController, isAdmin } from "@/lib/auth";
+import { formPolicy, checkForm } from "@/lib/field-policy";
 import { audit, notify, notifyMany } from "@/lib/audit";
 import { getActiveSet } from "@/lib/config";
 import { issueGateError, openReviewCycle } from "@/lib/lifecycle";
@@ -133,9 +134,24 @@ export async function createTransmittalAction(_prev: { error?: string } | undefi
     reason: reasonForIssue,
   });
 
+  // What this organization asks when a transmittal is raised.
+  const policy = await formPolicy(ctx, "TRANSMITTAL");
+  const asked = checkForm(
+    "TRANSMITTAL",
+    policy,
+    {
+      recipients: [...recipientUsers, ...offline], reason: reasonForIssue, subject, message,
+      cc: copyUsers, files: "", responseBy: responsePeriodDays ? String(responsePeriodDays) : "",
+    },
+    (n) => String(formData.get(n) ?? ""),
+    ["reason", "subject", "message", "responseBy"],
+  );
+  if (asked.error) return { error: asked.error };
+
   const t = await db.transmittal.create({
     data: {
       projectId,
+      extras: Object.keys(asked.extras).length ? JSON.stringify(asked.extras) : null,
       number: transmittalNumber,
       direction,
       reasonForIssue,

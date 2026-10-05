@@ -2,6 +2,8 @@ import Link from "next/link";
 import { requireScope } from "@/lib/scope";
 import { Field, inputCls, Info } from "@/components/ui";
 import { ActionForm } from "@/components/form";
+import { Asked, Added } from "@/components/policy-fields";
+import { formPolicy } from "@/lib/field-policy";
 import { createPackageAction } from "@/lib/actions/planning";
 import { createSupplierPackageAction } from "@/lib/actions/supplier";
 import { supplierRows, supplierFigures } from "@/lib/supplier";
@@ -20,6 +22,7 @@ export const metadata = { title: "Packages" };
 
 export default async function PackagesPage({ searchParams }: { searchParams: Promise<{ category?: string }> }) {
   const ctx = await requireScope();
+  const packagePolicy = await formPolicy(ctx, "PACKAGE");
   const { user, db } = ctx;
   const staff = isController(user) || isAdmin(user);
   // A supplier only ever sees its own package.
@@ -151,9 +154,16 @@ export default async function PackagesPage({ searchParams }: { searchParams: Pro
         <div className="border-t border-line px-5 py-4 sm:px-6">
           <ActionForm action={createPackageAction} submitLabel="Create package">
             <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-              <Field label="Title" required hint="numbered PK-… when created" className="md:col-span-2"><input name="title" required className={inputCls} placeholder="Operations handover — pump house"/></Field>
-              <Field label="Due" required><input type="date" name="completionDate" required className={inputCls}/></Field>
-              <Field label="Description" hint="optional — what it is for, anything the recipient should know" className="md:col-span-3"><textarea name="description" rows={2} className={inputCls}/></Field>
+              <Asked policy={packagePolicy} field="title" hint="numbered PK-… when created" className="md:col-span-2">
+                {({ required }) => <input name="title" required={required} className={inputCls} placeholder="Operations handover — pump house" />}
+              </Asked>
+              <Asked policy={packagePolicy} field="completionDate">
+                {({ required }) => <input type="date" name="completionDate" required={required} className={inputCls} />}
+              </Asked>
+              <Asked policy={packagePolicy} field="description" hint="what it is for, anything the recipient should know" className="md:col-span-3">
+                {({ required }) => <textarea name="description" required={required} rows={2} className={inputCls} />}
+              </Asked>
+              <Added fields={packagePolicy.own} />
               <SearchPick browse name="recipientPartyIds" required label="Delivered to" hint="one or several — us too, for an internal handover" items={parties.map((p) => ({ id: p.id, name: p.isInternal ? `${p.name} (us)` : p.name }))} />
               <SearchPick browse name="purpose" required label="Why they get it" hint="one or several" items={reasons.map((item) => ({ id: item.code, name: item.label, detail: item.code }))} />
               <SearchPick browse name="requiredStatus" required label="Needed at" hint="one or several — ready at any of them" items={statuses.map((item) => ({ id: item.code, name: item.code, detail: item.label }))} />
