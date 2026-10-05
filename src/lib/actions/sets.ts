@@ -48,6 +48,6 @@ export async function applySetUploadAction(_prev: SetUploadState | undefined, fo
   if (!recheck.ok) return { error: "The preview no longer checks out — upload the file again.", issues: recheck.issues };
   const { summary } = await valueSet.apply(ctx, recheck.payload, setKey, fileName);
   await audit({ actor: ctx.user, action: "CONFIG_SET_UPLOADED", entityType: "ConfigSet", entityId: setKey, entityLabel: setKey, detail: `${fileName}: ${summary}` });
-  revalidatePath("/admin/config");
+  revalidatePath("/settings/config");
   return { ok: `${setKey} updated from ${fileName}: ${summary}` };
 }

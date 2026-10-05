@@ -16,8 +16,8 @@ const RANK: Record<string, number> = { CRITICAL: 0, MAJOR: 1, MINOR: 2, ADVISORY
 function fixFor(checkId: string, documentId: string | null): { label: string; href: string } {
   const family = checkId.split("-")[0];
   if (!documentId) {
-    if (family === "SC" || family === "CF") return { label: "Scope & readiness", href: "/admin/dmp" };
-    return { label: "Settings", href: "/admin" };
+    if (family === "SC" || family === "CF") return { label: "Scope & readiness", href: "/settings/dmp" };
+    return { label: "Settings", href: "/settings" };
   }
   const doc = `/documents/${documentId}`;
   switch (family) {

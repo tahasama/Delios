@@ -108,7 +108,7 @@ export async function inviteGuestAction(
     detail: `Invited to ${permitted.map((p) => p.code).join(", ")} as ${fn.name}, representing ${represents.name}. Their account remains with ${guest.org.name}.`,
   });
 
-  revalidatePath("/admin/users");
+  revalidatePath("/settings/users");
   return {
     ok: `${guest.name} of ${guest.org.name} can now reach ${permitted.map((p) => p.code).join(", ")} as ${fn.name}${added === 0 ? " (membership updated)" : ""}.`,
   };
@@ -179,7 +179,7 @@ export async function createVisitorAction(
     detail: `Visitor account created in your organization for ${party.name}; ${permitted.map((p) => p.code).join(", ")} as ${fn.name}. Deactivate it when they leave.`,
   });
 
-  revalidatePath("/admin/users");
+  revalidatePath("/settings/users");
   return { ok: `${name} of ${party.name} can sign in now as ${fn.name}. Give them the password yourself — nothing is emailed.` };
 }
 
@@ -211,6 +211,6 @@ export async function removeFromProjectAction(
     oldValue: membership.function.name,
     detail: `Removed from ${membership.project.code}. Their account with ${membership.user.org.name} is untouched.`,
   });
-  revalidatePath("/admin/users");
+  revalidatePath("/settings/users");
   return { ok: `${membership.user.name} removed from ${membership.project.code}.` };
 }

@@ -80,7 +80,7 @@ export default async function AdminDistributionPage({ searchParams }: { searchPa
         Rows are disciplines in their groups, columns are functions. Who produced it and which document type it is are views on the same grid — change them and the letters change.
         <a href={`/api/export/matrix?${new URLSearchParams({ ...(producer ? { producer } : {}), ...(docType ? { type: docType } : {}), ...(inUseOnly ? {} : { all: "1" }) })}`} className="font-semibold text-link hover:underline">Download this view, filled in (CSV) →</a>
         {mayEdit ? <Link href="/import?kind=matrix" className="font-semibold text-link hover:underline">Upload a filled-in one →</Link> : null}
-        {mayEdit ? <Link href="/admin/functions" className="font-semibold text-link hover:underline">Change who does what →</Link> : <span className="text-slate-400">Read only — an administrator changes it.</span>}
+        {mayEdit ? <Link href="/settings/functions" className="font-semibold text-link hover:underline">Change who does what →</Link> : <span className="text-slate-400">Read only — an administrator changes it.</span>}
       </p>
       {role && role.code !== "GENERIC" ? (
         <p className="rounded-xl bg-slate-50 px-3 py-2 text-xs text-slate-600">
@@ -89,7 +89,7 @@ export default async function AdminDistributionPage({ searchParams }: { searchPa
       ) : (
         <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800">
           This project does not say what we are contracted to do on it, so the matrix applies as published, with no role-specific rows.
-          {mayEdit ? <> <Link href="/admin/projects" className="font-semibold underline">State it in Projects</Link> and the starting matrix for that role is published with it.</> : null}
+          {mayEdit ? <> <Link href="/settings/projects" className="font-semibold underline">State it in Projects</Link> and the starting matrix for that role is published with it.</> : null}
         </p>
       )}
 

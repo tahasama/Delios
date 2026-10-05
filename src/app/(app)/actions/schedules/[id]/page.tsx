@@ -52,7 +52,7 @@ export default async function ScheduleVersionDetailPage({ params }: { params: Pr
         </section>
         <section className={`min-w-82.5 rounded-2xl border p-6 shadow-sm ${version.status === "DRAFT" ? "border-amber-200 bg-amber-50" : "border-emerald-200 bg-emerald-50"}`}>
           <div className="flex items-center gap-3">{version.status === "DRAFT" ? <CircleAlert className="h-5 w-5 text-amber-700" /> : <CalendarCheck2 className="h-5 w-5 text-emerald-700" />}<div><p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Status</p><p className="mt-1 text-sm font-semibold text-slate-900">{version.status === "DRAFT" ? "Draft—live dates unchanged" : version.status === "PUBLISHED" ? "Published to live actions" : "Superseded history"}</p></div></div>
-          {version.status === "DRAFT" ? <p className="mt-5 text-xs text-slate-600">Approve it in <Link href="/admin/controlled" className="font-semibold text-link">Controlled changes</Link> — the decision is recorded there with its reason.</p> : null}
+          {version.status === "DRAFT" ? <p className="mt-5 text-xs text-slate-600">Approve it in <Link href="/settings/controlled" className="font-semibold text-link">Controlled changes</Link> — the decision is recorded there with its reason.</p> : null}
           {version.publishedAt ? <p className="mt-4 text-xs text-slate-500">Published {fmtDate(version.publishedAt)} by {version.publishedByName}</p> : null}
         </section>
       </div>

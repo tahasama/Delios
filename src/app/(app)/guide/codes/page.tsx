@@ -192,8 +192,8 @@ export default async function CodesPage() {
           </p>
           {canEdit ? (
             <p className="flex flex-wrap gap-3 pt-1 text-xs font-semibold">
-              <Link href="/admin/config?set=STATUSES" className="text-link hover:underline">Edit status codes →</Link>
-              <Link href="/admin/config?set=REVIEW_OUTCOMES" className="text-link hover:underline">Edit review outcomes →</Link>
+              <Link href="/settings/config?set=STATUSES" className="text-link hover:underline">Edit status codes →</Link>
+              <Link href="/settings/config?set=REVIEW_OUTCOMES" className="text-link hover:underline">Edit review outcomes →</Link>
             </p>
           ) : null}
         </div>

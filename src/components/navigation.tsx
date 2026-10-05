@@ -230,14 +230,14 @@ function SidebarBody({ perms, onNavigate, onTip }: { perms: NavPermissions; onNa
       <div className="mt-4 space-y-2">
         {perms.canConfigure ? (
           <Link
-            href="/admin"
+            href="/settings"
             onClick={onNavigate}
             aria-label="Settings"
             onMouseEnter={(e) => tipFor(e, "Settings", onTip)}
             onMouseLeave={() => onTip?.(null)}
             className={cn(
               "flex items-center gap-2 rounded-xl px-3 py-2.5 text-xs font-semibold transition rail:justify-center rail:px-0",
-              pathname.startsWith("/admin") ? "bg-white/10 text-white" : "text-slate-400 hover:bg-white/5 hover:text-white",
+              pathname.startsWith("/settings") ? "bg-white/10 text-white" : "text-slate-400 hover:bg-white/5 hover:text-white",
             )}
           >
             <Settings className="h-4 w-4 shrink-0" /> <span className="rail:hidden">Settings</span>

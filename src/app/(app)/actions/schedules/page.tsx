@@ -38,7 +38,7 @@ export default async function ScheduleVersionsPage() {
           <header className="border-b border-line px-6 py-5"><div className="flex items-center gap-2"><FileUp className="h-4 w-4 text-link" /><h2 className="text-base font-semibold text-slate-900">Import a schedule update</h2></div><p className="mt-1 text-xs text-slate-500">A schedule change is issued formally and approved by someone other than whoever uploaded it.</p></header>
           <div className="px-6 py-5">
             <p className="text-sm text-slate-600">Schedule imports go through <strong>Controlled changes</strong>, together with every other configuration that arrives as a file. You upload it, see exactly which action dates would move, and an approver decides.</p>
-            <Link href="/admin/controlled" className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-link">Open controlled changes <ArrowRight className="h-4 w-4" /></Link>
+            <Link href="/settings/controlled" className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-link">Open controlled changes <ArrowRight className="h-4 w-4" /></Link>
           </div>
         </section>
 

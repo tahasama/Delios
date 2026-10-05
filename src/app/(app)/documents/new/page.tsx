@@ -1,3 +1,4 @@
+import { fieldRules, fieldLabels, ownFields } from "@/lib/field-policy";
 import { getActiveSet } from "@/lib/config";
 import { requireScope } from "@/lib/scope";
 import { mayCreateDocument } from "@/lib/auth";
@@ -8,7 +9,8 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "Create document" };
 
 export default async function NewDocumentPage({ searchParams }: { searchParams: Promise<{ received?: string; fromFile?: string }> }) {
-  const { user, db, project } = await requireScope();
+  const ctx = await requireScope();
+  const { user, db, project } = ctx;
   const sp = await searchParams;
   const received = sp.received === "1" || !!sp.fromFile;
   // A file kept with a received transmittal, being made a register document.
@@ -33,6 +35,7 @@ export default async function NewDocumentPage({ searchParams }: { searchParams: 
   ]);
   // Which value sets each producer's numbering scheme needs, so the form can
   // mark exactly those fields as required instead of failing on submit.
+  const [fields, labels, own] = await Promise.all([fieldRules(ctx, "DOCUMENT"), fieldLabels(ctx, "DOCUMENT"), ownFields(ctx, "DOCUMENT")]);
   const [routings, schemes] = await Promise.all([
     db.schemeRouting.findMany({ where: { status: "ACTIVE" } }),
     db.scheme.findMany({ include: { fields: true } }),
@@ -77,6 +80,9 @@ export default async function NewDocumentPage({ searchParams }: { searchParams: 
         subtitle={received ? "Register what arrived and send it for approval in one go." : "The number is assigned when you finish."}
       />
       <NewDocumentForm
+        fields={fields}
+        labels={labels}
+        ownFields={own}
         received={received}
         fromFile={fromFile}
         routes={routes}

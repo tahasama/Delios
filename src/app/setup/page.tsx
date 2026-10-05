@@ -158,7 +158,7 @@ export default async function SetupPage() {
         </div>
 
         <p className="text-center text-[11px] text-slate-400">
-          Prefer to look around first? <Link href="/admin/config" className="font-semibold text-link hover:underline">Review the published configuration</Link>{" "}
+          Prefer to look around first? <Link href="/settings/config" className="font-semibold text-link hover:underline">Review the published configuration</Link>{" "}
           — though most of the app needs a project before it has anything to show.
         </p>
       </main>

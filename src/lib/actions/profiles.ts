@@ -16,7 +16,7 @@ export async function draftProfileAction(_prev: State | undefined, formData: For
   const { drafted, skipped } = await draftProfile(ctx, profile);
   if (!drafted.length) return { error: skipped.length ? `A change to ${skipped.join(", ")} is already waiting — decide on it first.` : "Nothing to add: every value is already published." };
   await audit({ actor: ctx.user, action: "PROFILE_DRAFTED", entityType: "ControlledSet", entityId: profile.id, entityLabel: profile.name, detail: `Drafted additions to ${drafted.join(", ")}` });
-  revalidatePath("/admin/dmp");
-  revalidatePath("/admin/controlled");
+  revalidatePath("/settings/dmp");
+  revalidatePath("/settings/controlled");
   return { ok: `Drafted: ${drafted.join(", ")}. Submit them in Controlled changes; another administrator approves.${skipped.length ? ` Skipped ${skipped.join(", ")} — a change is already waiting there.` : ""}` };
 }

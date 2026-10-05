@@ -627,7 +627,7 @@ export default async function TransmittalDetailPage({ params, searchParams }: { 
                 {/* The project's log is Document Control's; the audit trail is
                     the administrator's. Nobody is shown a door they cannot open. */}
                 <Link href={`/?view=log&q=${encodeURIComponent(t.number)}`} className="text-link hover:underline" title="What has happened to this transmittal, in the project's own log">Log &rarr;</Link>
-                {isAdmin(user) ? <Link href={`/admin/audit?q=${encodeURIComponent(t.number)}`} className="text-link hover:underline" title="Every recorded act on this transmittal, in the audit trail">Audit &rarr;</Link> : null}
+                {isAdmin(user) ? <Link href={`/settings/audit?q=${encodeURIComponent(t.number)}`} className="text-link hover:underline" title="Every recorded act on this transmittal, in the audit trail">Audit &rarr;</Link> : null}
               </span>
             ) : undefined}
           >

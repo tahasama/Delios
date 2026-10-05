@@ -74,7 +74,7 @@ export async function createFunctionAction(
     actor: admin, action: "FUNCTION_PUBLISHED", entityType: "Function", entityId: fn.id, entityLabel: name,
  detail: `${verbs.length ? verbs.join(", ") : "No verbs yet"}.`,
   });
-  revalidatePath("/admin/functions");
+  revalidatePath("/settings/functions");
   return { ok: `${name} published.` };
 }
 
@@ -112,7 +112,7 @@ export async function updateFunctionAction(
     oldValue: fn.active ? "active" : "retired",
     newValue: active ? "active" : "retired",
   });
-  revalidatePath("/admin/functions");
+  revalidatePath("/settings/functions");
   return { ok: "Saved." };
 }
 
@@ -187,7 +187,7 @@ export async function savePermissionRuleAction(
     newValue: verbs.join(", "),
  detail: `${fn.name} — ${selector}${whereRole}.`,
   });
-  revalidatePath("/admin/functions");
+  revalidatePath("/settings/functions");
   return { ok: "Rule published." };
 }
 
@@ -209,7 +209,7 @@ export async function deletePermissionRuleAction(
     actor: admin, action: "PERMISSION_RULE_WITHDRAWN", entityType: "Function", entityId: rule.functionId,
     entityLabel: rule.function.name, oldValue: rule.verbs,
   });
-  revalidatePath("/admin/functions");
+  revalidatePath("/settings/functions");
   return { ok: "Rule withdrawn." };
 }
 
@@ -250,7 +250,7 @@ export async function toggleFunctionVerbAction(_prev: { error?: string; ok?: str
     actor: admin, action: "PERMISSION_RULE_PUBLISHED", entityType: "Function", entityId: functionId, entityLabel: fn.name,
     newValue: next.join(", "), detail: `${has ? "Removed" : "Granted"} ${verb} for every document.`,
   });
-  revalidatePath("/admin/functions");
+  revalidatePath("/settings/functions");
   revalidatePath("/distribution");
   return { ok: `${fn.name}: ${has ? "removed" : "granted"} ${verb.toLowerCase()}.` };
 }

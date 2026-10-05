@@ -1,7 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireAdminScope } from "@/lib/scope";
+import { requireAdminScope, requireScope } from "@/lib/scope";
+import { isAdmin } from "@/lib/auth";
+import { KINDS, KIND_LABEL, fieldsOf, keyFromLabel, type FieldKind, type Control } from "@/lib/field-policy";
 import { audit } from "@/lib/audit";
 import { STATE_NAMES, STATE_NAME_MAX } from "@/lib/state-names";
 import {
@@ -66,8 +68,8 @@ export async function setControlActivitiesAction(_prev: State | undefined, formD
       if (await put(activity.key, value, activity.title)) changed = true;
     }
   }
-  revalidatePath("/admin/control");
-  revalidatePath("/admin/flow");
+  revalidatePath("/settings/control");
+  revalidatePath("/settings/flow");
   if (!changed) return { ok: "Nothing changed." };
   return {
     ok: asked === "CUSTOM"
@@ -90,8 +92,8 @@ export async function setPolicyAction(_prev: State | undefined, formData: FormDa
       changed.push(one.options.find((option) => option.value === asked)!.label.toLowerCase());
     }
   }
-  revalidatePath("/admin/control");
-  revalidatePath("/admin/flow");
+  revalidatePath("/settings/control");
+  revalidatePath("/settings/flow");
   if (!changed.length) return { ok: "Nothing changed." };
   return { ok: `Saved: ${changed.join("; ")}.` };
 }
@@ -107,8 +109,8 @@ export async function setOneControlActivityAction(_prev: State | undefined, form
   if (value === "OFF") {
     if (!SKIPPABLE[key]) return { error: `${activity.title} cannot be left out.` };
     const changed = await put(SKIP_KEY(key), "OFF", `${activity.title} — left out`);
-    revalidatePath("/admin/control");
-    revalidatePath("/admin/flow");
+    revalidatePath("/settings/control");
+    revalidatePath("/settings/flow");
     return { ok: changed ? `${activity.title}: left out.` : "Nothing changed." };
   }
   if (!ACT_MODES.includes(value)) return { error: "Choose who carries it out." };
@@ -125,8 +127,8 @@ export async function setOneControlActivityAction(_prev: State | undefined, form
   }
   await put(PROJECT_KEY, "CUSTOM", "Who carries out the acts of document control");
   const changed = (await put(key, value, activity.title)) || wasOff;
-  revalidatePath("/admin/control");
-  revalidatePath("/admin/flow");
+  revalidatePath("/settings/control");
+  revalidatePath("/settings/flow");
   return { ok: changed ? `${activity.title}: ${MODE_LABEL[value].toLowerCase()}.` : "Nothing changed." };
 }
 
@@ -172,4 +174,118 @@ export async function setStateNamesAction(_prev: State | undefined, formData: Fo
   revalidatePath("/", "layout");
   if (!changed.length) return { ok: "Nothing changed." };
   return { ok: `Renamed: ${changed.join("; ")}.` };
+}
+
+/**
+ * What the forms ask for.
+ *
+ * One kind at a time, so an administrator saves the document form without
+ * touching the transmittal one. A field the application does not let an
+ * organization weaken is ignored even if it arrives in the post.
+ */
+export async function setFieldPolicyAction(_prev: { error?: string; ok?: string } | undefined, formData: FormData): Promise<{ error?: string; ok?: string }> {
+  const ctx = await requireScope();
+  const { user, db, orgId } = ctx;
+  if (!isAdmin(user)) return { error: "Only an administrator decides what the forms ask for." };
+  const kind = String(formData.get("kind") ?? "") as FieldKind;
+  if (!KINDS.includes(kind)) return { error: "No such form." };
+
+  let changed = 0;
+  for (const field of fieldsOf(kind)) {
+    const before = await db.fieldPolicy.findFirst({ where: { kind, field: field.key } });
+    // A fixed field keeps its rule; its name is still the organization's to give.
+    const said = field.fixed ? before?.rule ?? field.fallback : String(formData.get(`rule:${field.key}`) ?? "");
+    if (!["REQUIRED", "OPTIONAL", "OFF"].includes(said)) continue;
+    const typed = String(formData.get(`label:${field.key}`) ?? "").trim();
+    const label = !typed || typed === field.label ? null : typed.slice(0, 60);
+    if ((before?.rule ?? field.fallback) === said && (before?.label ?? null) === label) continue;
+    await db.fieldPolicy.upsert({
+      where: { orgId_kind_field: { orgId, kind, field: field.key } },
+      update: { rule: said, label, setByName: user.name, setAt: new Date() },
+      create: { orgId, kind, field: field.key, rule: said, label, setByName: user.name },
+    });
+    changed++;
+  }
+  // The organization's own fields are saved from the same form.
+  for (const own of await db.customField.findMany({ where: { kind } })) {
+    const rule = String(formData.get(`own-rule:${own.id}`) ?? "");
+    const label = String(formData.get(`own-label:${own.id}`) ?? "").trim();
+    const inRegister = formData.get(`own-register:${own.id}`) === "on";
+    if (!["REQUIRED", "OPTIONAL", "OFF"].includes(rule) || !label) continue;
+    if (rule === own.rule && label === own.label && inRegister === own.inRegister) continue;
+    await db.customField.update({ where: { id: own.id }, data: { rule, label: label.slice(0, 60), inRegister } });
+    changed++;
+  }
+  if (changed) {
+    await audit({
+      actor: user,
+      action: "FIELDS_SET",
+      entityType: "FieldPolicy",
+      entityId: kind,
+      entityLabel: KIND_LABEL[kind],
+      detail: `${changed} field${changed === 1 ? "" : "s"} changed on ${KIND_LABEL[kind].toLowerCase()}.`,
+    });
+  }
+  revalidatePath("/settings/fields");
+  revalidatePath("/documents/new");
+  revalidatePath("/transmittals/new");
+  return { ok: changed ? `Saved — ${changed} field${changed === 1 ? "" : "s"} changed.` : "Nothing changed." };
+}
+
+/**
+ * A field of the organization's own.
+ *
+ * Nothing in the application computes with it: it is asked on the form, kept
+ * with the record, and read back on the detail page, the register and the
+ * export. That is the whole of its life, which is why adding one is safe.
+ */
+export async function addOwnFieldAction(_prev: { error?: string; ok?: string } | undefined, formData: FormData): Promise<{ error?: string; ok?: string }> {
+  const ctx = await requireScope();
+  const { user, db, orgId } = ctx;
+  if (!isAdmin(user)) return { error: "Only an administrator adds a field." };
+  const kind = String(formData.get("kind") ?? "") as FieldKind;
+  if (!KINDS.includes(kind)) return { error: "No such form." };
+  const label = String(formData.get("label") ?? "").trim();
+  const control = String(formData.get("control") ?? "") as Control;
+  const setKey = String(formData.get("setKey") ?? "").trim() || null;
+  const rule = String(formData.get("rule") ?? "OPTIONAL");
+  const help = String(formData.get("help") ?? "").trim() || null;
+  const inRegister = formData.get("inRegister") === "on";
+
+  if (!label) return { error: "Give the field a name — it is what people filling the form will read." };
+  if (!["TEXT", "LONG_TEXT", "NUMBER", "DATE", "YES_NO", "CHOICE"].includes(control)) return { error: "Say what kind of answer it takes." };
+  if (control === "CHOICE" && !setKey) return { error: "A field chosen from a list needs the list it draws from." };
+  if (!["REQUIRED", "OPTIONAL", "OFF"].includes(rule)) return { error: "Say whether it must be filled." };
+
+  const existing = await db.customField.findMany({ where: { kind }, select: { key: true } });
+  const key = keyFromLabel(label, existing.map((e) => e.key));
+  const position = await db.customField.count({ where: { kind } });
+  await db.customField.create({
+    data: { orgId, kind, key, label: label.slice(0, 60), control, setKey: control === "CHOICE" ? setKey : null, rule, help, position, inRegister, addedByName: user.name },
+  });
+  await audit({
+    actor: user, action: "FIELD_ADDED", entityType: "CustomField", entityId: key, entityLabel: label,
+    detail: `Added to ${KIND_LABEL[kind].toLowerCase()} — ${control.toLowerCase().replace("_", " ")}${setKey ? ` from ${setKey}` : ""}.`,
+  });
+  revalidatePath("/settings/fields");
+  revalidatePath("/documents/new");
+  return { ok: `${label} added.` };
+}
+
+/** Remove a field the organization added. Answers already given are left where they are. */
+export async function removeOwnFieldAction(_prev: { error?: string; ok?: string } | undefined, formData: FormData): Promise<{ error?: string; ok?: string }> {
+  const ctx = await requireScope();
+  const { user, db } = ctx;
+  if (!isAdmin(user)) return { error: "Only an administrator removes a field." };
+  const id = String(formData.get("id") ?? "");
+  const row = await db.customField.findFirst({ where: { id } });
+  if (!row) return { error: "No such field." };
+  await db.customField.delete({ where: { id } });
+  await audit({
+    actor: user, action: "FIELD_REMOVED", entityType: "CustomField", entityId: row.key, entityLabel: row.label,
+    detail: "Removed from the form. Answers already given stay with the records that carry them.",
+  });
+  revalidatePath("/settings/fields");
+  revalidatePath("/documents/new");
+  return { ok: `${row.label} removed. It is no longer asked; what was already answered stays on the record.` };
 }

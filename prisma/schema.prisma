@@ -34,13 +34,13 @@ model Organization {
   users             User[]
   parties           Party[]
   configSets        ConfigSet[]
+  fieldPolicies     FieldPolicy[]
+  customFields      CustomField[]
   configValues      ConfigValue[]
   schemes           Scheme[]
   schemeRoutings    SchemeRouting[]
   authorityRows     AuthorityRow[]
   workflowTemplates WorkflowTemplate[]
-  spineLinks        SpineLink[]
-  spineBaselines    SpineBaseline[]
   functions         Function[]
   permissionRules   PermissionRule[]
   controlledSets    ControlledSet[]
@@ -537,6 +537,9 @@ model NumberCounter {
 
 model Document {
   id               String    @id @default(cuid())
+  /// Answers to the fields this organization added for itself, as JSON keyed by
+  /// the field. The application computes with nothing in here.
+  extras           String?
   projectId        String
   project          Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
   docNumber        String // assigned once, never reused (§3.1)
@@ -1558,52 +1561,52 @@ model NumberRange {
   @@index([projectId])
 }
 
-// Annex F — traceability spine: Rule ↔ Check ↔ Route linkage with synchronization
-// states; a Rule change puts its links into review (F.4/F.5).
-// Annex F — the Traceability Spine: one row per relationship between a Rule
-// and the Check that verifies it or the Route step that applies it (F.2, F.3).
-// A row records the versions it was last reviewed against; when a linked
-// item's current version differs, the relationship is Review required (F.4).
-model SpineLink {
-  id             String       @id @default(cuid())
-  orgId          String
-  org            Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  ruleId         String // clause reference, e.g. "§3.1" or "F.5"
-  kind           String // CHECK | ROUTE
-  target         String // check ID ("ID-01"), route step ("G.3/4"), or "" for a Rule no Route applies
-  alignment      String       @default("ALIGNED") // ALIGNED | REVIEW_REQUIRED | GAP | NOT_APPLICABLE | WITHDRAWN
-  reason         String?
-  owner          String? // accountable review owner (Annex H owner code or function)
-  ruleVersion    String?
-  targetVersion  String?
-  reviewedAt     DateTime?
-  reviewedByName String?
-  changeRef      String?
-  updatedAt      DateTime     @updatedAt
+/// Which fields a form asks for, and which it insists on. One row per field an
+/// organization has answered; everything else keeps the application's own
+/// answer, and a field that is not negotiable is never read from here.
+model FieldPolicy {
+  id        String       @id @default(cuid())
+  orgId     String
+  org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  kind      String // DOCUMENT | TRANSMITTAL | REVIEW | ACTION
+  field     String
+  rule      String // REQUIRED | OPTIONAL | OFF
+  /// The organization's own word for it, where the application's word is not theirs.
+  label     String?
+  setByName String
+  setAt     DateTime     @default(now())
 
-  @@unique([orgId, ruleId, kind, target])
+  @@unique([orgId, kind, field])
   @@index([orgId])
 }
 
-// A released synchronized baseline of the spine (F.5 rule 5): recorded only
-// when no Gap or Review required remained, with the counts it was released at.
-model SpineBaseline {
-  id              String       @id @default(cuid())
-  orgId           String
-  org             Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  label           String
-  standardVersion String
-  links           Int
-  aligned         Int
-  notApplicable   Int
-  withdrawn       Int
-  unresolved      Int          @default(0)
-  note            String?
-  releasedAt      DateTime     @default(now())
-  releasedById    String
-  releasedByName  String
+/// A field an organization added for itself.
+///
+/// It is kept apart from the fields the application computes with: nothing here
+/// decides a number, a route, an authority or a retention period, so adding one
+/// cannot break any of them. The value is stored with the record it was asked
+/// on, and read back on the form, the detail page and the export.
+model CustomField {
+  id        String       @id @default(cuid())
+  orgId     String
+  org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  kind      String // DOCUMENT | TRANSMITTAL | REVIEW | ACTION
+  /// Stable key the value is stored under; made from the label, never reused.
+  key       String
+  label     String
+  /// TEXT | LONG_TEXT | NUMBER | DATE | YES_NO | CHOICE
+  control   String
+  /// For CHOICE: the published list it draws from.
+  setKey    String?
+  rule      String       @default("OPTIONAL") // REQUIRED | OPTIONAL | OFF
+  help      String?
+  position  Int          @default(0)
+  /// Shown as a column in the register and carried into the export.
+  inRegister Boolean     @default(false)
+  addedByName String
+  addedAt   DateTime     @default(now())
 
-  @@unique([orgId, label])
+  @@unique([orgId, kind, key])
   @@index([orgId])
 }
 

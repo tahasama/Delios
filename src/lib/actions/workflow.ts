@@ -64,7 +64,7 @@ export async function saveTemplateAction(_prev: { error?: string } | undefined, 
       await db.workflowTemplate.create({ data: { orgId, id: `${name.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 40)}-${Date.now().toString(36)}`, name, description, classes, steps: JSON.stringify(steps), outcomeSetKey, isDefault, createdByName: admin.name } });
     }
     await audit({ actor: admin, action: "TEMPLATE_SAVED", entityType: "WorkflowTemplate", entityId: id || name, entityLabel: name, detail: `${(steps as unknown[]).length} step(s), outcome set ${outcomeSetKey}.` });
-    revalidatePath("/admin/workflow-templates");
+    revalidatePath("/settings/workflow-templates");
     return {};
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Failed." };
@@ -81,7 +81,7 @@ export async function deleteTemplateAction(formData: FormData) {
       await db.workflowTemplate.delete({ where: { id } }).catch(() => undefined);
     });
     await audit({ actor: admin, action: "TEMPLATE_REMOVED", entityType: "WorkflowTemplate", entityId: id });
-    revalidatePath("/admin/workflow-templates");
+    revalidatePath("/settings/workflow-templates");
   } catch {
     // ignore
   }
@@ -241,7 +241,7 @@ export async function deletePartyAction(_prev: { error?: string } | undefined, f
 
   await db.party.delete({ where: { id } });
   await audit({ actor: admin, action: "PARTY_REMOVED", entityType: "Party", entityId: party.code, entityLabel: party.name, detail: "Removed: it never held a person, a step, a document or a transmittal." });
-  revalidatePath("/admin/parties");
+  revalidatePath("/settings/parties");
   return {};
 }
 
@@ -302,8 +302,8 @@ export async function savePartyAction(_prev: { error?: string } | undefined, for
       // people once they exist — not borrowed from ours.
       await db.party.create({ data: { orgId, code, name, isInternal, contactId, backupId, kind, participation, evidenceRequired: evidenceRequiredForKind } });
     }
-    revalidatePath("/admin/parties");
-    revalidatePath("/admin/users");
+    revalidatePath("/settings/parties");
+    revalidatePath("/settings/users");
     return {};
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Failed." };
@@ -321,7 +321,7 @@ export async function setUserPartyAction(_prev: { error?: string } | undefined, 
     const party = partyId ? await db.party.findUnique({ where: { id: partyId } }) : null;
     await db.user.update({ where: { id: userId }, data: { partyId, organization: party?.name ?? user.organization } });
     await audit({ actor: admin, action: "USER_UPDATED", entityType: "User", entityId: user.email, entityLabel: user.name, field: "party", oldValue: user.party?.name ?? user.organization ?? "—", newValue: party?.name ?? "—" });
-    revalidatePath("/admin/users");
+    revalidatePath("/settings/users");
     return {};
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Failed." };

@@ -8,6 +8,8 @@ import { createDocumentAction } from "@/lib/actions/documents";
 import { cn } from "@/lib/utils";
 import { AlertTriangle } from "lucide-react";
 import { isEmptyTitle } from "@/lib/standard";
+import type { OwnField } from "@/lib/field-policy";
+import { OwnFields } from "./own-fields";
 
 type Opt = { code: string; label: string; meaning?: string | null; appliesTo?: string | null };
 
@@ -42,7 +44,7 @@ function Ask({ label, hint, required, children, className }: { label: string; hi
  * it is comes with the file.
  */
 export function NewDocumentForm({
-  received, fromFile, routes, numberingSets, deliverableTypes, docTypes, disciplines, currentProject, subprojects, suppliers, pos, criticalities, confidentialities, retentionClasses, defaultConfidentiality,
+  received, fromFile, routes, numberingSets, deliverableTypes, docTypes, disciplines, currentProject, subprojects, suppliers, pos, criticalities, confidentialities, retentionClasses, defaultConfidentiality, fields, ownFields, labels,
 }: {
   received: boolean;
   /** A file that came with a received transmittal, used instead of an upload. */
@@ -53,6 +55,12 @@ export function NewDocumentForm({
   currentProject: { code: string; name: string };
   deliverableTypes: Opt[]; docTypes: Opt[]; disciplines: Opt[]; subprojects: Opt[]; suppliers: Opt[]; pos: Opt[]; criticalities: Opt[]; confidentialities: Opt[]; retentionClasses: Opt[];
   defaultConfidentiality: string | null;
+  /** What this organization asks for: must be filled, may be left, or not asked. */
+  fields: Record<string, "REQUIRED" | "OPTIONAL" | "OFF">;
+  /** Fields the organization added for itself. */
+  ownFields: OwnField[];
+  /** Its own words for the application's fields. */
+  labels: Record<string, string>;
 }) {
   const [step, setStep] = useState(1);
   const [producer, setProducer] = useState(received ? "VND" : "");
@@ -67,6 +75,13 @@ export function NewDocumentForm({
   const emptyTitle = title.trim().length > 0 && isEmptyTitle(title);
   const meaningOf = (options: Opt[], code: string) => options.find((o) => o.code === code)?.meaning ?? null;
   const needs = (setKey: string) => (numberingSets[producer] ?? []).includes(setKey);
+  /**
+   * Whether a field is asked at all, and whether it is insisted on. The number
+   * wins where it draws on the field: a scheme that prints the supplier code
+   * cannot be served by a blank supplier, whatever the form policy says.
+   */
+  const asks = (key: string) => fields[key] !== "OFF";
+  const must = (key: string, byNumber = false) => byNumber || fields[key] === "REQUIRED";
   const external = producer === "CTR" || producer === "VND" || producer === "TPY" || producer === "CLT";
   const docTypeLabel = docTypes.find((t) => t.code === docType)?.label ?? docType;
   // Each type says who produces it. Once the producer is chosen, the list is
@@ -203,7 +218,7 @@ export function NewDocumentForm({
         <section className={cn("register register-sheet register-sheet-open", !received && step !== 2 && "hidden")}>
           {received ? null : band(2, `${docTypeLabel || "the document"} · ${disciplineLabel || "—"} — its title, where it sits, and how it is kept`)}
           <div className="asking grid grid-cols-1 gap-x-6 gap-y-4 px-5 py-5 sm:grid-cols-2 sm:px-6">
-            <Ask label="Title" required hint="what it is about, in the words someone searching would use" className="sm:col-span-2">
+            <Ask label={labels["title"]} required hint="what it is about, in the words someone searching would use" className="sm:col-span-2">
               <input name="title" required maxLength={200} value={title} onChange={(e) => setTitle(e.target.value)} className={field} aria-invalid={emptyTitle} placeholder="e.g. Feed pump P-101 general arrangement and dimensions" />
               {emptyTitle ? (
                 <span className="mt-1.5 flex items-start gap-1.5 rounded-lg bg-amber-50 px-2.5 py-2 text-[11px] text-amber-800 ring-1 ring-amber-200">
@@ -222,55 +237,69 @@ export function NewDocumentForm({
               <p className="py-1.5 text-[13px] font-medium text-slate-700">{currentProject.code} — {currentProject.name}</p>
               <span className="block text-[11px] text-slate-400">Switch project in the header to register somewhere else.</span>
             </div>
-            <Ask label="Sub-project" required={needs("SUBPROJECTS")} hint={subprojects.length ? undefined : "none defined for this project"}>
-              <select name="subProject" required={needs("SUBPROJECTS")} className={field} defaultValue="">
-                <option value="" disabled={needs("SUBPROJECTS")}>{needs("SUBPROJECTS") ? "Choose…" : "—"}</option>
-                {subprojects.map((o) => <option key={o.code} value={o.code}>{o.code} — {o.label}</option>)}
-              </select>
-            </Ask>
+            {asks("subProject") || needs("SUBPROJECTS") ? (
+              <Ask label={labels["subProject"]} required={must("subProject", needs("SUBPROJECTS"))} hint={subprojects.length ? undefined : "none defined for this project"}>
+                <select name="subProject" required={must("subProject", needs("SUBPROJECTS"))} className={field} defaultValue="">
+                  <option value="" disabled={must("subProject", needs("SUBPROJECTS"))}>{must("subProject", needs("SUBPROJECTS")) ? "Choose…" : "—"}</option>
+                  {subprojects.map((o) => <option key={o.code} value={o.code}>{o.code} — {o.label}</option>)}
+                </select>
+              </Ask>
+            ) : null}
             {external ? (
               <>
-                <Ask label="Supplier" required={needs("SUPPLIER_CODES")}>
-                  <select name="originator" required={needs("SUPPLIER_CODES")} className={field} defaultValue="">
-                    <option value="" disabled={needs("SUPPLIER_CODES")}>{needs("SUPPLIER_CODES") ? "Choose…" : "—"}</option>
-                    {suppliers.map((o) => <option key={o.code} value={o.code}>{o.label}</option>)}
-                  </select>
-                </Ask>
-                <Ask label="Contract or purchase order" required={needs("PURCHASE_ORDERS")}>
-                  <select name="contractRef" required={needs("PURCHASE_ORDERS")} className={field} defaultValue="">
-                    <option value="" disabled={needs("PURCHASE_ORDERS")}>{needs("PURCHASE_ORDERS") ? "Choose…" : "—"}</option>
-                    {pos.map((o) => <option key={o.code} value={o.code}>{o.code} — {o.label}</option>)}
-                  </select>
-                </Ask>
-                <Ask label="Date received">
-                  <input type="date" name="receivedDate" className={field} defaultValue={received ? new Date().toISOString().slice(0, 10) : undefined} />
-                </Ask>
+                {asks("originator") || needs("SUPPLIER_CODES") ? (
+                  <Ask label={labels["originator"]} required={must("originator", needs("SUPPLIER_CODES"))}>
+                    <select name="originator" required={must("originator", needs("SUPPLIER_CODES"))} className={field} defaultValue="">
+                      <option value="" disabled={must("originator", needs("SUPPLIER_CODES"))}>{must("originator", needs("SUPPLIER_CODES")) ? "Choose…" : "—"}</option>
+                      {suppliers.map((o) => <option key={o.code} value={o.code}>{o.label}</option>)}
+                    </select>
+                  </Ask>
+                ) : null}
+                {asks("contractRef") || needs("PURCHASE_ORDERS") ? (
+                  <Ask label={labels["contractRef"]} required={must("contractRef", needs("PURCHASE_ORDERS"))}>
+                    <select name="contractRef" required={must("contractRef", needs("PURCHASE_ORDERS"))} className={field} defaultValue="">
+                      <option value="" disabled={must("contractRef", needs("PURCHASE_ORDERS"))}>{must("contractRef", needs("PURCHASE_ORDERS")) ? "Choose…" : "—"}</option>
+                      {pos.map((o) => <option key={o.code} value={o.code}>{o.code} — {o.label}</option>)}
+                    </select>
+                  </Ask>
+                ) : null}
+                {asks("receivedDate") ? (
+                  <Ask label={labels["receivedDate"]} required={must("receivedDate")}>
+                    <input type="date" name="receivedDate" required={must("receivedDate")} className={field} defaultValue={received ? new Date().toISOString().slice(0, 10) : undefined} />
+                  </Ask>
+                ) : null}
               </>
             ) : null}
-            <Ask label="Criticality" required hint="how serious an error in it would be">
+            <Ask label={labels["criticality"]} required hint="how serious an error in it would be">
               <select name="criticality" required className={field} value={criticality} onChange={(e) => setCriticality(e.target.value)}>
                 <option value="" disabled>Choose…</option>
                 {criticalities.map((o) => <option key={o.code} value={o.code}>{o.label}</option>)}
               </select>
               {meaningOf(criticalities, criticality) ? <span className="mt-1 block text-[11px] text-slate-500">{meaningOf(criticalities, criticality)}</span> : null}
             </Ask>
-            <Ask label="Who may see it?">
+            {asks("confidentiality") ? (
+            <Ask label={labels["confidentiality"]} required={must("confidentiality")}>
               <select name="confidentiality" className={field} value={confidentiality} onChange={(e) => setConfidentiality(e.target.value)}>
                 {confidentialities.map((o) => <option key={o.code} value={o.code}>{o.label}</option>)}
               </select>
               {meaningOf(confidentialities, confidentiality) ? <span className="mt-1 block text-[11px] text-slate-500">{meaningOf(confidentialities, confidentiality)}</span> : null}
             </Ask>
-            <Ask label="Keep it for" hint="automatic follows the criticality">
-              <select name="retentionClass" className={field} defaultValue="">
-                <option value="">Automatic</option>
-                {retentionClasses.map((o) => <option key={o.code} value={o.code}>{o.label}</option>)}
-              </select>
-            </Ask>
-            {received ? null : (
-              <Ask label="File" hint="optional — you can attach it later">
+            ) : null}
+            {asks("retentionClass") ? (
+              <Ask label={labels["retentionClass"]} required={must("retentionClass")} hint="automatic follows the criticality">
+                <select name="retentionClass" required={must("retentionClass")} className={field} defaultValue="">
+                  <option value="">Automatic</option>
+                  {retentionClasses.map((o) => <option key={o.code} value={o.code}>{o.label}</option>)}
+                </select>
+              </Ask>
+            ) : null}
+            {received || !asks("file") ? null : (
+              <Ask label={labels["file"]} required={must("file")} hint={must("file") ? "this project registers nothing without its file" : "optional — you can attach it later"}>
                 <input type="file" name="nativeFile" className={cn(field, "text-[12px] text-slate-500 file:mr-2 file:rounded file:border-0 file:bg-canvas-deep file:px-2 file:py-0.5 file:text-[11px] file:font-semibold file:text-slate-700")} onChange={(e) => setHasFile(!!e.target.files?.length)} />
               </Ask>
             )}
+            <OwnFields fields={ownFields} />
+
             <Ask
               label="After it is registered"
               className="sm:col-span-2"

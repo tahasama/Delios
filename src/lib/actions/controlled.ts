@@ -99,7 +99,7 @@ export async function uploadControlledVersionAction(
     entityLabel: `${handler.title} ${versionLabel}`,
     detail: `${parsed.rowCount} row(s); ${summariseDiff(diff)}. Held as a draft — nothing is in force yet.`,
   });
-  revalidatePath("/admin/controlled");
+  revalidatePath("/settings/controlled");
   return { ok: `${versionLabel} uploaded as a draft: ${summariseDiff(diff)}. ${handler.ownerApproves ? "Check the change, then approve it." : "Review the change, then submit it for approval."}` };
 }
 
@@ -132,7 +132,7 @@ export async function submitControlledVersionAction(
     "CONTROLLED_SUBMITTED",
     `${handler.title} ${version.versionLabel} awaits approval`,
     `${user.name} submitted a change of ${version.rowCount} row(s).`,
-    "/admin/controlled",
+    "/settings/controlled",
   );
 
   await audit({
@@ -140,7 +140,7 @@ export async function submitControlledVersionAction(
     entityLabel: `${handler.title} ${version.versionLabel}`,
     detail: `Submitted for approval by ${handler.approverHint} (${handler.clause}).`,
   });
-  revalidatePath("/admin/controlled");
+  revalidatePath("/settings/controlled");
   return { ok: `${version.versionLabel} submitted for approval.` };
 }
 
@@ -192,13 +192,13 @@ export async function decideControlledVersionAction(
     });
     if (version.submittedById) {
       await notifyMany([version.submittedById], "CONTROLLED_REJECTED",
-        `${handler.title} ${version.versionLabel} was not approved`, reason, "/admin/controlled");
+        `${handler.title} ${version.versionLabel} was not approved`, reason, "/settings/controlled");
     }
     await audit({
       actor: user, action: "CONTROLLED_VERSION_REJECTED", entityType: "ControlledVersion", entityId: versionId,
       entityLabel: `${handler.title} ${version.versionLabel}`, detail: reason,
     });
-    revalidatePath("/admin/controlled");
+    revalidatePath("/settings/controlled");
     return { ok: `${version.versionLabel} rejected. Nothing changed.` };
   }
 
@@ -232,7 +232,7 @@ export async function decideControlledVersionAction(
 
   if (version.submittedById && version.submittedById !== user.id) {
     await notifyMany([version.submittedById], "CONTROLLED_APPROVED",
-      `${handler.title} ${version.versionLabel} approved`, result.summary, "/admin/controlled");
+      `${handler.title} ${version.versionLabel} approved`, result.summary, "/settings/controlled");
   }
   await audit({
     actor: user, action: "CONTROLLED_VERSION_APPROVED", entityType: "ControlledVersion", entityId: versionId,
@@ -241,9 +241,9 @@ export async function decideControlledVersionAction(
     detail: `Approved by ${user.name}${reason ? ` — ${reason}` : ""}. ${result.summary} (${handler.clause}).`,
   });
 
-  revalidatePath("/admin/controlled");
-  revalidatePath("/admin/functions");
-  revalidatePath("/admin/config");
+  revalidatePath("/settings/controlled");
+  revalidatePath("/settings/functions");
+  revalidatePath("/settings/config");
   revalidatePath("/actions");
   revalidatePath("/actions/requirements");
   return { ok: `${version.versionLabel} approved and in force. ${result.summary}` };
@@ -271,7 +271,7 @@ export async function discardControlledVersionAction(
     actor: user, action: "CONTROLLED_VERSION_DISCARDED", entityType: "ControlledVersion", entityId: versionId,
     entityLabel: `${version.set.title} ${version.versionLabel}`, detail: "Draft discarded before submission.",
   });
-  revalidatePath("/admin/controlled");
+  revalidatePath("/settings/controlled");
   return { ok: `Draft ${version.versionLabel} discarded.` };
 }
 

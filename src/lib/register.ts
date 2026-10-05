@@ -34,6 +34,8 @@ export type RegisterInput = {
   plannedDate?: Date | null;
   assetCode?: string | null;
   kind?: "DOCUMENT" | "RECORD";
+  /** Answers to the fields this organization added for itself. */
+  extras?: Record<string, string>;
   /** Where it came from, for the audit entry. */
   how?: string;
   /** When it was registered, where that is not now — a demo with a history. */
@@ -83,6 +85,7 @@ export async function registerDocument(t: Tenant, user: SessionUser, input: Regi
       createdById: user.id,
       createdByName: user.name,
       receivedDate: input.receivedDate ?? null,
+      extras: input.extras && Object.keys(input.extras).length ? JSON.stringify(input.extras) : null,
       plannedDate: input.plannedDate ?? null,
       latestPlannedAt: input.plannedDate ?? null,
       ...(input.at ? { createdAt: input.at, createdDate: input.at } : {}),

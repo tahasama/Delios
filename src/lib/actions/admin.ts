@@ -67,7 +67,7 @@ export async function createUserAction(_prev: { error?: string } | undefined, fo
       });
     }
     await audit({ actor: admin, action: "USER_CREATED", entityType: "User", entityId: email, entityLabel: name, newValue: fn.name, detail: `Added to ${permitted.length} project(s) as ${fn.name}.` });
-    revalidatePath("/admin/users");
+    revalidatePath("/settings/users");
     return {};
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Failed." };
@@ -119,7 +119,7 @@ export async function updateUserAction(_prev: { error?: string } | undefined, fo
       newValue: `${fn?.name ?? membership?.function.name ?? "—"}/${active}`,
       detail: fn ? `Function on ${ctx.project.code} set to ${fn.name}.` : undefined,
     });
-    revalidatePath("/admin/users");
+    revalidatePath("/settings/users");
     return {};
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Failed." };
@@ -146,7 +146,7 @@ export async function addConfigValueAction(_prev: { error?: string } | undefined
     await db.configValue.create({ data: { orgId, setKey, code, label, sort: count, props } });
     await db.configSet.update({ where: { orgId_key: { orgId, key: setKey } }, data: { version: { increment: 1 } } });
  await audit({ actor: admin, action: "CONFIG_VALUE_ADDED", entityType: "ConfigValue", entityId: `${setKey}.${code}`, entityLabel: label, detail: `Set "${setKey}" — version incremented.` });
-    revalidatePath("/admin/config");
+    revalidatePath("/settings/config");
     return {};
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Failed." };
@@ -168,7 +168,7 @@ export async function createConfigSetAction(_prev: { error?: string } | undefine
     const group = String(formData.get("group") ?? "").trim() || null;
     await db.configSet.create({ data: { orgId, key, title, description, group, version: 1 } });
  await audit({ actor: admin, action: "CONFIG_SET_CREATED", entityType: "ConfigSet", entityId: key, entityLabel: title, detail: "Organization-defined value set published." });
-    revalidatePath("/admin/config");
+    revalidatePath("/settings/config");
     return {};
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Failed." };
@@ -196,7 +196,7 @@ export async function updateValuePropsAction(_prev: { error?: string } | undefin
     await db.configValue.update({ where: { id: valueId }, data: { code: code || value.code, label: label || value.label, props } });
     await db.configSet.update({ where: { orgId_key: { orgId, key: setKey } }, data: { version: { increment: 1 } } });
  await audit({ actor: admin, action: "CONFIG_VALUE_UPDATED", entityType: "ConfigValue", entityId: `${setKey}.${value.code}`, newValue: props, detail: `Properties of ${value.code} changed; set version incremented.` });
-    revalidatePath("/admin/config");
+    revalidatePath("/settings/config");
     return {};
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Failed." };
@@ -214,7 +214,7 @@ export async function retireConfigValueAction(formData: FormData) {
     await db.configValue.update({ where: { id: valueId }, data: { status: next } });
     await db.configSet.update({ where: { orgId_key: { orgId, key: value.setKey } }, data: { version: { increment: 1 } } });
     await audit({ actor: admin, action: "CONFIG_VALUE_RETIRED", entityType: "ConfigValue", entityId: `${value.setKey}.${value.code}`, oldValue: value.status, newValue: next });
-    revalidatePath("/admin/config");
+    revalidatePath("/settings/config");
   } catch {
     // ignore
   }
@@ -238,7 +238,7 @@ export async function setScopeAction(_prev: { error?: string } | undefined, form
       await db.scopeConfig.create({ data: { projectId, organizationName, scopeStatement, assessmentLevel, standardVersion: STANDARD_VERSION, effectiveDate: new Date(), integrityThreshold, measurementIntervalDays } });
     }
  await audit({ actor: admin, action: "SCOPE_UPDATED", entityType: "ScopeConfig", entityId: "scope", detail: "Scope & conformance statement updated." });
-    revalidatePath("/admin");
+    revalidatePath("/settings");
     return {};
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Failed." };
@@ -334,7 +334,7 @@ export async function addExceptionAction(_prev: { error?: string } | undefined, 
  if (!item || !clauses || !reason || !authority || !startDate) return { error: "An exception records what is exempt, clauses, reason, granting authority and dates." };
     await db.exceptionEntry.create({ data: { projectId, item, clauses, reason, authority, startDate: new Date(startDate), reviewPoint: reviewPoint ? new Date(reviewPoint) : null } });
  await audit({ actor: admin, action: "EXCEPTION_GRANTED", entityType: "ExceptionEntry", entityId: item, detail: `Clauses ${clauses} — ${authority}. Unpublished exemptions are non-conformances.` });
-    revalidatePath("/admin");
+    revalidatePath("/settings");
     return {};
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Failed." };
@@ -354,7 +354,7 @@ export async function issueNumberRangeAction(_prev: { error?: string } | undefin
     if (!Number.isFinite(from) || !Number.isFinite(to) || from < 1 || to < from) return { error: "The range must be from ≤ to, starting at 1." };
     await db.numberRange.create({ data: { projectId, prefix, from, to, lastIssued: from - 1, issuedTo } });
  await audit({ actor: admin, action: "RANGE_ISSUED", entityType: "NumberRange", entityId: `${prefix} ${from}-${to}`, entityLabel: issuedTo, detail: "Range issued to a named party; numbers drawn down from it." });
-    revalidatePath("/admin/numbering");
+    revalidatePath("/settings/numbering");
     return {};
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Failed." };
@@ -388,10 +388,10 @@ export async function updateConfigSetAction(_prev: { error?: string; ok?: string
       ]);
     }
     await audit({ actor: admin, action: "CONFIG_SET_UPDATED", entityType: "ConfigSet", entityId: key, entityLabel: title, oldValue: oldKey, newValue: key, detail: "Set definition and references updated atomically." });
-    revalidatePath("/admin/config");
-    revalidatePath("/admin/numbering");
-    revalidatePath("/admin/workflow-templates");
-    if (key !== oldKey) redirect(`/admin/config?set=${encodeURIComponent(key)}`);
+    revalidatePath("/settings/config");
+    revalidatePath("/settings/numbering");
+    revalidatePath("/settings/workflow-templates");
+    if (key !== oldKey) redirect(`/settings/config?set=${encodeURIComponent(key)}`);
     return { ok: `Published ${title} as ${key}.` };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Could not update the set." };
@@ -432,7 +432,7 @@ export async function moveConfigValueAction(formData: FormData) {
       db.configSet.update({ where: { orgId_key: { orgId, key: value.setKey } }, data: { version: { increment: 1 } } }),
     ]);
  await audit({ actor: admin, action: "CONFIG_VALUE_REORDERED", entityType: "ConfigValue", entityId: `${value.setKey}.${value.code}`, entityLabel: value.label, detail: `Moved ${direction}; set version incremented.` });
-    revalidatePath("/admin/config");
+    revalidatePath("/settings/config");
   } catch {
     // The configuration screen remains usable; ActionForm surfaces edits that need validation.
   }
@@ -468,7 +468,7 @@ export async function saveNumberingSchemeAction(_prev: { error?: string; ok?: st
     await db.schemeField.deleteMany({ where: { schemeId: scheme.id } });
     await db.schemeField.createMany({ data: labels.map((label, index) => ({ schemeId: scheme.id, position: index + 1, label, valueSetKey: setKeys[index] || null, rule: rules[index] || null })) });
     await audit({ actor: admin, action: "NUMBERING_SCHEME_SAVED", entityType: "Scheme", entityId: scheme.id, entityLabel: name, detail: `${labels.length} fields; delimiter "${delimiter}".` });
-    revalidatePath("/admin/numbering");
+    revalidatePath("/settings/numbering");
     return { ok: `Published ${name}.` };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Could not save the numbering scheme." };
@@ -489,7 +489,7 @@ export async function saveSchemeRoutingAction(_prev: { error?: string; ok?: stri
     const before = await db.schemeRouting.findFirst({ where: { deliverableType } });
     await db.schemeRouting.upsert({ where: { orgId_deliverableType: { orgId, deliverableType } }, update: { schemeName, status }, create: { orgId, deliverableType, schemeName, status } });
  await audit({ actor: admin, action: "SCHEME_ROUTED", entityType: "SchemeRouting", entityId: deliverableType, entityLabel: deliverableType, oldValue: before ? `${before.schemeName} (${before.status.toLowerCase()})`: undefined, newValue: `${schemeName} (${status.toLowerCase()})`, detail: before && before.schemeName !== schemeName ? "Numbers already issued keep the scheme they were issued under.": undefined });
-    revalidatePath("/admin/numbering");
+    revalidatePath("/settings/numbering");
     return { ok: status === "ACTIVE" ? `${deliverableType} now uses ${schemeName}.` : `Numbering for ${deliverableType} switched off — no new numbers of this type.` };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Could not publish the routing rule." };
@@ -507,7 +507,7 @@ export async function removeNumberingSchemeAction(formData: FormData) {
   await db.schemeField.deleteMany({ where: { schemeId: id } });
   await db.scheme.delete({ where: { id } });
   await audit({ actor: admin, action: "NUMBERING_SCHEME_REMOVED", entityType: "Scheme", entityId: id, entityLabel: scheme.name, detail: "Unused scheme removed." });
-  revalidatePath("/admin/numbering");
+  revalidatePath("/settings/numbering");
 }
 
 /** Delete a value that was never used (unused values only; in-use ones are retired, §4.7). */
@@ -567,7 +567,7 @@ export async function bulkValuesAction(formData: FormData) {
         reactivated ? `${reactivated} reactivated` : "",
       ].filter(Boolean).join(", ") + (op === "DELETE" && retired ? " — in use, so retired rather than deleted." : "."),
     });
-    revalidatePath("/admin/config");
+    revalidatePath("/settings/config");
   } catch {
     // ignore
   }
@@ -589,7 +589,7 @@ export async function deleteValueAction(formData: FormData) {
       await audit({ actor: admin, action: "CONFIG_VALUE_DELETED", entityType: "ConfigValue", entityId: `${value.setKey}.${value.code}`, detail: "Never used — deleted." });
     }
     await db.configSet.update({ where: { orgId_key: { orgId, key: value.setKey } }, data: { version: { increment: 1 } } });
-    revalidatePath("/admin/config");
+    revalidatePath("/settings/config");
   } catch {
     // ignore
   }
@@ -618,7 +618,7 @@ export async function deleteSetAction(_prev: { error?: string; ok?: string } | u
     await db.configValue.deleteMany({ where: { setKey: key } });
     await db.configSet.delete({ where: { orgId_key: { orgId, key } } });
     await audit({ actor: admin, action: "CONFIG_SET_DELETED", entityType: "ConfigSet", entityId: key, detail: `Deleted with ${count} value(s).` });
-    revalidatePath("/admin/config");
+    revalidatePath("/settings/config");
     return { ok: `${key} deleted.` };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Could not delete that set." };
@@ -689,7 +689,7 @@ export async function savePersonAction(_prev: { error?: string; ok?: string } | 
   if (changes.length) {
     await audit({ actor: admin, action: "PERSON_UPDATED", entityType: "User", entityId: target.email, entityLabel: target.name, detail: changes.join("; ") });
   }
-  revalidatePath("/admin/users");
+  revalidatePath("/settings/users");
   return { ok: changes.length ? `${name || target.name}: ${changes.join("; ")}.` : "Nothing changed." };
 }
 

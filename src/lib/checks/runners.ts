@@ -6,8 +6,9 @@ import type { Tenant, ScopedDb } from "@/lib/tenant";
 import { UPLOAD_ROOT } from "@/lib/files";
 import { ADVICE_CODES, REV_STATES, DOC_STATES, EXCLUDED_REV_LETTERS, isEmptyTitle } from "@/lib/standard";
 
-// Annex H runners — each returns the failing items for its check, or the
-// special strings NOT_CHECKED / NOT_EXECUTABLE. Evidence only; no judgement (§17.1).
+// One runner per check: it returns the items that fail, and nothing else. A
+// runner reports what the records say; what follows from that is the reader's,
+// not the application's.
 
 export type Failure = {
   entityKey: string;
@@ -46,7 +47,6 @@ async function approveRules(ctx: Ctx) {
   const rules = await ctx.db.permissionRule.findMany({ select: { verbs: true, criticality: true, docType: true, discipline: true } });
   return rules.filter((r) => r.verbs.includes('"APPROVE"') || r.verbs.includes('"CONFIGURE"'));
 }
-const spine = (key: string, description: string): Failure => ({ entityKey: `spine:${key}`, entityType: "Spine", entityLabel: "Traceability Spine", description });
 const org = (description: string): Failure => ({ entityKey: "config", entityType: "Organization", entityLabel: "Organization", description });
 
 function partsOf(docNumber: string, delimiter: string): string[] {
@@ -781,7 +781,6 @@ export const RUNNERS: Runners = {
  return missing.length ? [cfg(`Distribution rules not published for deliverable types in use: ${missing.map((m) => m.deliverableType).join(", ")}.`)]: [];
   },
 
-  // ── Spine (Annex F) ── automation reports synchronization; it decides nothing (F.6).
 };
 
 function safeName(relPath: string): string {

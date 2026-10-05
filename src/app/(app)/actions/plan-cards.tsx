@@ -34,7 +34,7 @@ export async function PlanCards() {
         return (
           <Link
             key={kind}
-            href={`/admin/controlled/${kind}`}
+            href={`/settings/controlled/${kind}`}
             className="group flex items-center gap-2 rounded-lg border border-line bg-canvas px-2.5 py-1.5 text-left transition hover:border-brand-line/50 hover:bg-surface"
           >
             <Icon className="h-3.5 w-3.5 shrink-0 text-brand-ink" />

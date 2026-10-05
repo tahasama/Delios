@@ -77,7 +77,7 @@ export default async function RequirementsPage() {
         actions={
           <div className="flex gap-2">
             <a href="/api/controlled/current/ACTION_DEPARTMENTS" className={btn("secondary", "sm")}><Download className="h-4 w-4" /> Download list</a>
-            {plan ? <Link href="/admin/controlled/ACTION_DEPARTMENTS" className={btn(tagged < actions.length ? "primary" : "secondary", "sm")}><Upload className="h-4 w-4" /> Upload</Link> : null}
+            {plan ? <Link href="/settings/controlled/ACTION_DEPARTMENTS" className={btn(tagged < actions.length ? "primary" : "secondary", "sm")}><Upload className="h-4 w-4" /> Upload</Link> : null}
           </div>
         }
       >
@@ -99,7 +99,7 @@ export default async function RequirementsPage() {
       <Card
         title="2 · Ask the departments"
         description="Each department fills its sheet — documents needed, from whom, by when (5 working days before the activity unless it says otherwise)"
-        actions={control ? <Link href="/admin/controlled/DOCUMENT_REQUIREMENTS" className={btn("secondary", "sm")}><Upload className="h-4 w-4" /> Upload filled list</Link> : undefined}
+        actions={control ? <Link href="/settings/controlled/DOCUMENT_REQUIREMENTS" className={btn("secondary", "sm")}><Upload className="h-4 w-4" /> Upload filled list</Link> : undefined}
       >
         <p className="mb-2 text-[11px] leading-5 text-slate-500">
           <strong className="font-semibold text-slate-600">Two ways.</strong> Ask the departments here: each is issued its own

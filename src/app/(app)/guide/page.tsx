@@ -42,12 +42,12 @@ const CONTROL: CapabilityItem[] = [
 ];
 
 const SETUP: CapabilityItem[] = [
-  { href: "/admin/dmp", title: "Set the project up", text: "Work through what a project needs — scope, people, lists, numbering, routes — in the order it is decided.", icon: Settings },
-  { href: "/admin/config", title: "Disciplines, types and sets", text: "Define the codes and behavior that belong to your organization—not to the software vendor.", icon: Tags },
-  { href: "/admin/workflow-templates", title: "Review routes", text: "Build review and approval routes, participant modes and applicable document classes.", icon: Workflow },
-  { href: "/admin/numbering", title: "Numbering", text: "Define schemes, fields, routing and issued number ranges.", icon: FileText },
-  { href: "/admin/parties", title: "Organizations and suppliers", text: "Separate your organization from external parties and group people correctly.", icon: Network },
-  { href: "/admin/users", title: "People and access", text: "Assign accountability and access without confusing job title with workflow action.", icon: Users },
+  { href: "/settings/dmp", title: "Set the project up", text: "Work through what a project needs — scope, people, lists, numbering, routes — in the order it is decided.", icon: Settings },
+  { href: "/settings/config", title: "Disciplines, types and sets", text: "Define the codes and behavior that belong to your organization—not to the software vendor.", icon: Tags },
+  { href: "/settings/workflow-templates", title: "Review routes", text: "Build review and approval routes, participant modes and applicable document classes.", icon: Workflow },
+  { href: "/settings/numbering", title: "Numbering", text: "Define schemes, fields, routing and issued number ranges.", icon: FileText },
+  { href: "/settings/parties", title: "Organizations and suppliers", text: "Separate your organization from external parties and group people correctly.", icon: Network },
+  { href: "/settings/users", title: "People and access", text: "Assign accountability and access without confusing job title with workflow action.", icon: Users },
 ];
 
 export default async function GuidePage() {
@@ -111,7 +111,7 @@ export default async function GuidePage() {
         {canConfigure ? (
           <p className="mt-3 text-xs text-slate-500">
             A role your contracts use that is not here is added like any other published list, with its own definition, in{" "}
-            <Link href="/admin/config" className="font-semibold text-link hover:underline">Settings → Published lists</Link> under
+            <Link href="/settings/config" className="font-semibold text-link hover:underline">Settings → Published lists</Link> under
             Contract roles. Only the ones above carry a starting matrix; one you add starts with no rows, and you write them in the{" "}
             <Link href="/distribution" className="font-semibold text-link hover:underline">distribution matrix</Link>.
           </p>

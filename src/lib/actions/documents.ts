@@ -14,6 +14,7 @@ import { saveUpload } from "@/lib/files";
 import { isReadOnly } from "@/lib/auth";
 import { retentionFor } from "@/lib/retention";
 import { registerDocument } from "@/lib/register";
+import { fieldRules, missingRequired, ownFields, takeExtras } from "@/lib/field-policy";
 
 // G.1 — Creating a new document. "No controlled information shall be produced
 // without a register entry" (§3.9). Number is system-generated (§3.7).
@@ -88,6 +89,31 @@ export async function createDocumentAction(_prev: { error?: string } | undefined
   if (missingConditional.length) {
  return { error: `A document from another party needs ${missingConditional.join(" and ")} before it can be registered.` };
   }
+
+  // What this organization has said its own form insists on. The screen asks
+  // for exactly these, but the screen is not the gate: an importer, a script or
+  // a stale tab arrives here too.
+  const asked = await fieldRules(ctx, "DOCUMENT");
+  const shortOf = missingRequired(asked, "DOCUMENT", {
+    subProject, originator, contractRef, receivedDate, criticality, confidentiality,
+    retentionClass: chosenRetention,
+    plannedDate: String(formData.get("plannedDate") ?? ""),
+    assetCode: String(formData.get("assetCode") ?? ""),
+    file: (formData.get("nativeFile") as File | null)?.size ? "yes" : "",
+    title, docType, discipline,
+  });
+  if (shortOf.length) {
+ return { error: `This organization registers nothing without ${shortOf.join(", ")}. Fill ${shortOf.length === 1 ? "it" : "them"} in, or change what the form asks for in Settings → Forms & fields.` };
+  }
+
+  // The fields this organization added for itself. They are kept with the
+  // document and computed with nowhere, so they are read last and refused for
+  // one reason only: the organization said they must be filled.
+  const own = await ownFields(ctx, "DOCUMENT");
+  const answered = takeExtras(own, (name) => String(formData.get(name) ?? ""));
+  if (answered.missing.length) {
+ return { error: `${answered.missing.join(", ")} ${answered.missing.length === 1 ? "is" : "are"} asked of every document here.` };
+  }
   const external = req("receivedDate") !== "na";
   // The act itself lives in lib/register, so the importer and the demo seeds
   // register a document exactly as this form does.
@@ -99,6 +125,7 @@ export async function createDocumentAction(_prev: { error?: string } | undefined
       originator, subProject, contractRef, criticality,
       confidentiality, retentionClass: chosenRetention,
       receivedDate: external && receivedDate ? new Date(receivedDate) : null,
+      extras: answered.extras,
       kind,
     });
   } catch (e) {

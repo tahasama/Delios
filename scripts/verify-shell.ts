@@ -30,7 +30,7 @@ function routes(dir: string, prefix = ""): string[] {
 function main() {
   const all = routes(APP).filter((r) => !r.includes("["));
   const nav = readFileSync("src/components/navigation.tsx", "utf-8");
-  const setup = readFileSync(`${APP}/admin/setup-pages.ts`, "utf-8");
+  const setup = readFileSync(`${APP}/settings/setup-pages.ts`, "utf-8");
 
   // Links appear both as object properties (nav tables) and as JSX attributes
   // (the Settings and Help links), so read both forms.
@@ -44,6 +44,7 @@ function main() {
     "/documents/new",
     "/transmittals/new",
     "/conformance",
+    "/settings/control",
     "/conformance/rules",
     "/conformance/statement",
     "/exposures",
@@ -92,11 +93,13 @@ function main() {
   check("content padding shrinks on phones", /<main className="[^"]*px-4[^"]*lg:px-\d/.test(layout));
 
   console.log("\nSettings is generated, not hand-listed\n");
-  const adminPage = readFileSync(`${APP}/admin/page.tsx`, "utf-8");
+  const adminPage = readFileSync(`${APP}/settings/page.tsx`, "utf-8");
   check("the hub renders SETUP_PAGES", adminPage.includes("SETUP_PAGES.filter"));
   const setupCount = [...setup.matchAll(/href: "/g)].length;
-  check("every admin route is declared", setupCount >= all.filter((r) => r.startsWith("/admin")).length - 1,
-    `${setupCount} declared`);
+  // The hub itself is not one of its own cards, and an address kept alive only
+  // to forward somebody is not a screen.
+  const screens = all.filter((r) => r.startsWith("/settings") && r !== "/settings" && !reachedInline.has(r));
+  check("every settings screen is declared", setupCount >= screens.length, `${setupCount} declared, ${screens.length} built`);
 
   console.log(failures === 0 ? "\nAll shell checks passed.\n" : `\n${failures} check(s) FAILED.\n`);
   process.exit(failures === 0 ? 0 : 1);

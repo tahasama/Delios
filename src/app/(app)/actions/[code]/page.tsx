@@ -264,7 +264,7 @@ export default async function ActionDetailPage({ params, searchParams }: { param
           {short.length && action.riskNotifiedAt ? (
             <p className="border-t border-line px-5 py-2 text-[11px] text-slate-400 sm:px-6">
               Everyone concerned was warned automatically on {fmtDate(action.riskNotifiedAt)}.
-              {admin ? <> <Link href={`/admin/audit?q=${encodeURIComponent(action.code)}`} className="font-semibold text-link underline">Every notice sent &rarr;</Link></> : null}
+              {admin ? <> <Link href={`/settings/audit?q=${encodeURIComponent(action.code)}`} className="font-semibold text-link underline">Every notice sent &rarr;</Link></> : null}
             </p>
           ) : null}
         </section>

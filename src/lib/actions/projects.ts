@@ -138,7 +138,7 @@ export async function createProjectAction(
     });
   }
 
-  revalidatePath("/admin/projects", "layout");
+  revalidatePath("/settings/projects", "layout");
   return {
     ok: `${code} opened${carried ? ` with ${carried} person(s) carried over` : ""}. Switch to it from the picker at the top left.${seeded.rules ? ` The ${chosenRole.label} starting matrix is published — ${seeded.rules} row(s) to check in the distribution matrix.` : ""}${drafts.drafted.length ? ` The ${profile!.name} starter values are drafted for approval in Settings → Controlled changes (${drafts.drafted.join(", ")}).` : ""}`,
   };
@@ -175,7 +175,7 @@ export async function setProjectStatusAction(
     newValue: status,
  detail: "Archiving hides a project from the picker; its register is kept in full.",
   });
-  revalidatePath("/admin/projects", "layout");
+  revalidatePath("/settings/projects", "layout");
   return { ok: `${project.code} is now ${status.toLowerCase()}.` };
 }
 
@@ -213,7 +213,7 @@ export async function renameProjectAction(_prev: ProjectState | undefined, formD
     oldValue: `${project.code} — ${project.name}`, newValue: `${code} — ${name}`,
     detail: code !== project.code ? "Numbers already allocated keep the old code; new numbers use the new one." : "Name changed.",
   });
-  revalidatePath("/admin/projects");
+  revalidatePath("/settings/projects");
   revalidatePath("/");
   return { ok: code !== project.code ? `Renamed. New numbers will use ${code}; documents already numbered keep ${project.code}.` : "Renamed." };
 }

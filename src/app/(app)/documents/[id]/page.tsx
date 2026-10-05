@@ -14,6 +14,7 @@ import { DOC_STATE_LABEL, DOC_STATE_COLOR, REV_STATE_COLOR, revStateColor, type 
 import { stateNames, stateName } from "@/lib/state-names";
 import { revisionGround } from "@/lib/revision-ground";
 import { typeSkipsReview } from "@/lib/review-need";
+import { ownFields, readExtras } from "@/lib/field-policy";
 import { fmtDate, timeAgo, plain } from "@/lib/utils";
 import { getActiveSet, getSet, getValue } from "@/lib/config";
 import { updateDocumentAction, linkAssetAction, unlinkRelationshipAction, endDocumentStateAction } from "@/lib/actions/documents";
@@ -230,6 +231,9 @@ export default async function DocumentDetailPage({
   // This revision's own review steps and transmittals, for its progress line.
   const mine = cycles.filter((x) => x.rev.id === (shown?.id ?? ""));
 
+  const own = await ownFields(ctx, "DOCUMENT");
+  const answers = readExtras(doc.extras);
+
   // Properties, each once, empty ones left out.
   const details: [string, string | null][] = [
     ["Type", label(types, doc.docType)],
@@ -244,6 +248,15 @@ export default async function DocumentDetailPage({
     ["Received", doc.receivedDate ? fmtDate(doc.receivedDate) : null],
     ["Created", fmtDate(doc.createdDate)],
     ["Previous number", doc.previousId],
+    // Whatever this organization asks for itself, read back under its own name.
+    ...own.map((field): [string, string | null] => {
+      const held = answers[field.key];
+      if (!held) return [field.label, null];
+      if (field.control === "YES_NO") return [field.label, held === "yes" ? "Yes" : "No"];
+      if (field.control === "DATE") return [field.label, fmtDate(new Date(held))];
+      const option = field.options?.find((o) => o.code === held);
+      return [field.label, option ? option.label : held];
+    }),
   ];
 
   // What the Next step card offers besides the review route itself.

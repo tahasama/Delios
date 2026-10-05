@@ -25,7 +25,7 @@ export async function saveDistributionRuleAction(_prev: { error?: string } | und
       create: { projectId, deliverableType, confidentiality, userIds: JSON.stringify(userIds), partyNames: partyNames.length ? JSON.stringify(partyNames) : null },
     });
  await audit({ actor: admin, action: "DISTRIBUTION_PUBLISHED", entityType: "DistributionRule", entityId: `${deliverableType}/${confidentiality}`, detail: "Distribution defined before issue, by classification and role." });
-    revalidatePath("/admin/parties"); revalidatePath("/distribution");
+    revalidatePath("/settings/parties"); revalidatePath("/distribution");
     return {};
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Failed." };
@@ -39,7 +39,7 @@ export async function deleteDistributionRuleAction(formData: FormData) {
     const id = String(formData.get("id") ?? "");
     await db.distributionRule.delete({ where: { id } });
     await audit({ actor: admin, action: "DISTRIBUTION_REMOVED", entityType: "DistributionRule", entityId: id });
-    revalidatePath("/admin/parties"); revalidatePath("/distribution");
+    revalidatePath("/settings/parties"); revalidatePath("/distribution");
   } catch {
     // ignore
   }
