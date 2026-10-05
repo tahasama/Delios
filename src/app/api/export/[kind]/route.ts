@@ -3,6 +3,8 @@ import { getScope } from "@/lib/scope";
 import { getSessionUser } from "@/lib/auth";
 import { toCsv } from "@/lib/csv";
 import { buildSheet, sheetToRows } from "@/lib/matrix-sheet";
+import { buildDeliverableWorkbook } from "@/lib/deliverable-workbook";
+import { buildSetsWorkbook } from "@/lib/sets-workbook";
 import { roleLabel } from "@/lib/profiles/roles";
 
 // §16.6 — views are generated at time of use, carry a generation timestamp and
@@ -224,7 +226,26 @@ export async function GET(req: Request, { params }: { params: Promise<{ kind: st
     rows = [["Code", "Label", "Status", "Sort", "Properties"]];
     for (const value of set.values) rows.push([value.code, value.label, value.status, value.sort, value.props ?? ""]);
     name = `value-set-${set.key.toLowerCase()}`;
+  } else if (kind === "template-sets") {
+    // Every published list, a tab each, so one download covers the lot.
+    const book = await buildSetsWorkbook(ctx);
+    return new NextResponse(new Uint8Array(book), {
+      headers: {
+        "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "Content-Disposition": `attachment; filename="published-lists-${stamp.toISOString().slice(0, 10)}.xlsx"`,
+      },
+    });
   } else if (kind === "template-deliverables") {
+    // A workbook, not a flat file: a sheet per deliverable type, each carrying
+    // only the columns that type has, with the published lists as dropdowns.
+    const book = await buildDeliverableWorkbook(ctx);
+    return new NextResponse(new Uint8Array(book), {
+      headers: {
+        "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "Content-Disposition": `attachment; filename="deliverable-list-${stamp.toISOString().slice(0, 10)}.xlsx"`,
+      },
+    });
+  } else if (kind === "template-deliverables-csv") {
     rows = [
       ["Document Number", "Title", "Producer", "Type", "Discipline", "Project", "SubProject", "Supplier", "PO", "Criticality", "Confidentiality", "RetentionClass", "AssetCode", "ReceivedDate", "ContractRef"],
       // Leave the number empty and the row is registered, with its number allocated.

@@ -45,7 +45,7 @@ export async function seedSecondOrganization(db: PrismaClient) {
       data: {
         projectId: project.id,
         organizationName: org.name,
-        scopeStatement: `All controlled information produced or received for ${project.name}, in any medium (§1.2).`,
+        scopeStatement: `All controlled information produced or received for ${project.name}, in any medium.`,
         assessmentLevel: "Core: identity and control",
         standardVersion: STANDARD_VERSION,
         effectiveDate: new Date(),

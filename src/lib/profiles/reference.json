@@ -1799,6 +1799,287 @@
             "family": "Y",
             "appliesTo": "Supplier"
           }
+        },
+        {
+          "code": "CNT",
+          "label": "Contract",
+          "sort": 191,
+          "props": {
+            "family": "A",
+            "appliesTo": "Non-supplier"
+          }
+        },
+        {
+          "code": "POD",
+          "label": "Purchase order",
+          "sort": 192,
+          "props": {
+            "family": "A",
+            "appliesTo": "Non-supplier"
+          }
+        },
+        {
+          "code": "REQ",
+          "label": "Requisition",
+          "sort": 193,
+          "props": {
+            "family": "A",
+            "appliesTo": "Non-supplier"
+          }
+        },
+        {
+          "code": "RFQ",
+          "label": "Request for quotation",
+          "sort": 194,
+          "props": {
+            "family": "A",
+            "appliesTo": "Non-supplier"
+          }
+        },
+        {
+          "code": "QTE",
+          "label": "Quotation",
+          "sort": 195,
+          "props": {
+            "family": "A",
+            "appliesTo": "Non-supplier"
+          }
+        },
+        {
+          "code": "TBE",
+          "label": "Technical bid evaluation",
+          "sort": 196,
+          "props": {
+            "family": "A",
+            "appliesTo": "Non-supplier"
+          }
+        },
+        {
+          "code": "CBE",
+          "label": "Commercial bid evaluation",
+          "sort": 197,
+          "props": {
+            "family": "A",
+            "appliesTo": "Non-supplier"
+          }
+        },
+        {
+          "code": "NOA",
+          "label": "Notice of award",
+          "sort": 198,
+          "props": {
+            "family": "A",
+            "appliesTo": "Non-supplier"
+          }
+        },
+        {
+          "code": "PCR",
+          "label": "Change request",
+          "sort": 199,
+          "props": {
+            "family": "A",
+            "appliesTo": "Non-supplier"
+          }
+        },
+        {
+          "code": "PAC",
+          "label": "Payment certificate",
+          "sort": 200,
+          "props": {
+            "family": "A",
+            "appliesTo": "Non-supplier"
+          }
+        },
+        {
+          "code": "CLR",
+          "label": "Clarification",
+          "sort": 201,
+          "props": {
+            "family": "A",
+            "appliesTo": "Non-supplier"
+          }
+        },
+        {
+          "code": "TQY",
+          "label": "Technical query",
+          "sort": 202,
+          "props": {
+            "family": "A",
+            "appliesTo": "Non-supplier"
+          }
+        },
+        {
+          "code": "PMT",
+          "label": "Permit",
+          "sort": 203,
+          "props": {
+            "family": "A",
+            "appliesTo": "Non-supplier"
+          }
+        },
+        {
+          "code": "EST",
+          "label": "Cost estimate",
+          "sort": 204,
+          "props": {
+            "family": "A",
+            "appliesTo": "Non-supplier"
+          }
+        },
+        {
+          "code": "PHT",
+          "label": "Photograph",
+          "sort": 205,
+          "props": {
+            "family": "A",
+            "appliesTo": "Non-supplier"
+          }
+        },
+        {
+          "code": "DSK",
+          "label": "Sketch",
+          "sort": 206,
+          "props": {
+            "family": "D",
+            "appliesTo": "Non-supplier",
+            "describesAsset": true
+          }
+        },
+        {
+          "code": "DHZ",
+          "label": "Hazardous area classification",
+          "sort": 207,
+          "props": {
+            "family": "D",
+            "appliesTo": "Non-supplier",
+            "describesAsset": true
+          }
+        },
+        {
+          "code": "BOD",
+          "label": "Basis of design",
+          "sort": 208,
+          "props": {
+            "family": "F",
+            "appliesTo": "Non-supplier"
+          }
+        },
+        {
+          "code": "JSA",
+          "label": "Job safety analysis",
+          "sort": 209,
+          "props": {
+            "family": "F",
+            "appliesTo": "Non-supplier"
+          }
+        },
+        {
+          "code": "FCN",
+          "label": "Field change notice",
+          "sort": 210,
+          "props": {
+            "family": "F",
+            "appliesTo": "Non-supplier"
+          }
+        },
+        {
+          "code": "ITR",
+          "label": "Inspection and test report",
+          "sort": 211,
+          "props": {
+            "family": "G",
+            "appliesTo": "Non-supplier"
+          }
+        },
+        {
+          "code": "FAT",
+          "label": "Factory acceptance test record",
+          "sort": 212,
+          "props": {
+            "family": "G",
+            "appliesTo": "Non-supplier"
+          }
+        },
+        {
+          "code": "CAR",
+          "label": "Corrective action request",
+          "sort": 213,
+          "props": {
+            "family": "G",
+            "appliesTo": "Non-supplier"
+          }
+        },
+        {
+          "code": "DEV",
+          "label": "Concession or deviation request",
+          "sort": 214,
+          "props": {
+            "family": "G",
+            "appliesTo": "Non-supplier"
+          }
+        },
+        {
+          "code": "RIN",
+          "label": "Request for inspection",
+          "sort": 215,
+          "props": {
+            "family": "G",
+            "appliesTo": "Non-supplier"
+          }
+        },
+        {
+          "code": "IRC",
+          "label": "Inspection release certificate",
+          "sort": 216,
+          "props": {
+            "family": "G",
+            "appliesTo": "Non-supplier"
+          }
+        },
+        {
+          "code": "CHK",
+          "label": "Checklist",
+          "sort": 217,
+          "props": {
+            "family": "G",
+            "appliesTo": "Non-supplier"
+          }
+        },
+        {
+          "code": "RCA",
+          "label": "Root cause analysis",
+          "sort": 218,
+          "props": {
+            "family": "G",
+            "appliesTo": "Non-supplier"
+          }
+        },
+        {
+          "code": "MRR",
+          "label": "Material receiving report",
+          "sort": 219,
+          "props": {
+            "family": "G",
+            "appliesTo": "Non-supplier"
+          }
+        },
+        {
+          "code": "HDD",
+          "label": "Handover dossier",
+          "sort": 220,
+          "props": {
+            "family": "J",
+            "appliesTo": "Non-supplier"
+          }
+        },
+        {
+          "code": "TRN",
+          "label": "Training material",
+          "sort": 221,
+          "props": {
+            "family": "J",
+            "appliesTo": "Non-supplier"
+          }
         }
       ]
     },

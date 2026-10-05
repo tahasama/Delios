@@ -13,6 +13,7 @@ import { getActiveSet } from "@/lib/config";
 import { saveUpload } from "@/lib/files";
 import { isReadOnly } from "@/lib/auth";
 import { retentionFor } from "@/lib/retention";
+import { registerDocument } from "@/lib/register";
 
 // G.1 — Creating a new document. "No controlled information shall be produced
 // without a register entry" (§3.9). Number is system-generated (§3.7).
@@ -67,13 +68,6 @@ export async function createDocumentAction(_prev: { error?: string } | undefined
     }
   }
 
-  let docNumber: string;
-  try {
-    const res = await allocateNumber(ctx, deliverableType, fieldValues);
-    docNumber = res.docNumber;
-  } catch (e) {
-    return { error: e instanceof Error ? e.message : "Could not allocate a document number." };
-  }
 
   // C.3.3 — the published type-to-field matrix decides which conditional fields this type requires
   const matrixRows = await db.configValue.findMany({ where: { setKey: "DELIVERABLE_TYPE_FIELDS" } });
@@ -95,37 +89,22 @@ export async function createDocumentAction(_prev: { error?: string } | undefined
  return { error: `A document from another party needs ${missingConditional.join(" and ")} before it can be registered.` };
   }
   const external = req("receivedDate") !== "na";
-  const retentionClass = chosenRetention ?? (await retentionFor(ctx, criticality));
-  const doc = await db.document.create({
-    data: {
-      projectId,
-      docNumber,
-      title,
-      deliverableType,
-      docType,
-      discipline,
-      originator,
-      subProject,
-      contractRef,
-      criticality,
-      confidentiality: confidentiality ?? "INTERNAL",
-      retentionClass,
-      state: "PLANNED",
-      kind,
-      isPlaceholder: true,
-      createdById: user.id,
-      createdByName: user.name,
+  // The act itself lives in lib/register, so the importer and the demo seeds
+  // register a document exactly as this form does.
+  let doc: { id: string; docNumber: string };
+  try {
+    doc = await registerDocument(ctx, user, {
+      title, deliverableType, docType, discipline,
+      projectCode: String(formData.get("projectCode") ?? ""),
+      originator, subProject, contractRef, criticality,
+      confidentiality, retentionClass: chosenRetention,
       receivedDate: external && receivedDate ? new Date(receivedDate) : null,
-    },
-  });
-  await audit({
-    actor: user,
-    action: "REGISTER_ENTRY",
-    entityType: "Document",
-    entityId: doc.id,
-    entityLabel: docNumber,
- detail: `Register entry created (${kind === "RECORD" ? "RECORD — fixed evidence, never revised": "document, placeholder"}; state Planned.8). Number ${docNumber} allocated by the system.`,
-  });
+      kind,
+    });
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Could not allocate a document number." };
+  }
+  const docNumber = doc.docNumber;
 
   // An initial file creates the first revision immediately. A PDF is the
   // viewable copy (rendition); anything else is the editable source.
@@ -159,7 +138,7 @@ export async function createDocumentAction(_prev: { error?: string } | undefined
           changeDescription: "Initial content",
           authoredById: user.id,
           authoredByName: user.name,
-          authoredByParty: doc.originator ?? null,
+          authoredByParty: originator,
           uploadedById: user.id,
           uploadedByName: user.name,
  authorizationReason: "Placeholder register entry — authorization for the first revision.",

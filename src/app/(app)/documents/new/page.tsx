@@ -65,6 +65,8 @@ export default async function NewDocumentPage({ searchParams }: { searchParams: 
     label: r.label,
     meaning: [r.props?.meaning, r.props?.basis, r.props?.may, r.props?.approval ? `approved by ${String(r.props.approval).toLowerCase()}` : null]
       .filter((x): x is string => typeof x === "string" && x.length > 0)[0] ?? null,
+    // Who produces this kind of document, where the value says so.
+    appliesTo: typeof r.props?.appliesTo === "string" ? r.props.appliesTo : null,
   }));
   const byName = (rows: { code: string; label: string; props?: Record<string, unknown> }[]) => toOpt(rows).sort((x, y) => x.label.localeCompare(y.label));
 

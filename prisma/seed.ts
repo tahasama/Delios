@@ -63,7 +63,7 @@ async function main() {
       id: `scope-${projectId}`,
       projectId,
       organizationName: "Our organization",
-      scopeStatement: "Whole organization — all controlled information produced or received, any medium (§1.2).",
+      scopeStatement: "Whole organization — all controlled information produced or received, any medium.",
       assessmentLevel: "Full",
       standardVersion: STANDARD_VERSION,
       effectiveDate: new Date(),

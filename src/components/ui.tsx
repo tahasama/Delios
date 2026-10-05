@@ -31,11 +31,14 @@ export function PageHeader({
   subtitle,
   actions,
   eyebrow,
+  children,
 }: {
   title: string;
   subtitle?: string;
   actions?: React.ReactNode;
   eyebrow?: string;
+  /** A figure the page is about, inside the title card rather than under it. */
+  children?: React.ReactNode;
 }) {
   return (
     <header className="register register-sheet register-sheet-open mb-4">
@@ -47,6 +50,7 @@ export function PageHeader({
         </div>
         {actions ? <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div> : null}
       </div>
+      {children ? <div className="border-t border-line px-5 py-4 sm:px-6">{children}</div> : null}
     </header>
   );
 }
@@ -190,12 +194,12 @@ export function Field({
     // The register's question: a stencil label with its hint beside it, and an
     // underlined field — the same everywhere a form asks something.
     <label className={cn("block min-w-0", className)}>
-      <span className="mb-1 flex flex-wrap items-baseline gap-x-2">
+      <span className="mb-1 block">
         <span className="stencil text-slate-500">
           {label}
           {required ? <span className="ml-0.5 text-red-500">*</span> : null}
         </span>
-        {hint ? <span className="text-[11px] leading-4 text-slate-400">{hint}</span> : null}
+        {hint ? <span className="ml-2 text-[11px] leading-4 text-slate-400">{hint}</span> : null}
       </span>
       {children}
     </label>

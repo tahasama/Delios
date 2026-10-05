@@ -10,6 +10,8 @@ import { retentionFor } from "@/lib/retention";
 import { hashPassword, isAdmin } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { readSheet, applyChanges } from "@/lib/matrix-read";
+import { propFieldsFor } from "@/lib/set-props";
+import { registerDocument } from "@/lib/register";
 
 // Bulk in/out — document controllers live in spreadsheets. Templates, preview,
 // then execute. No one fills a form per line.
@@ -17,9 +19,57 @@ import { readSheet, applyChanges } from "@/lib/matrix-read";
 export type BulkRowReport = { line: number; ok: boolean; message: string; wrote?: boolean };
 export type BulkResult = { error?: string; ok?: string; rows?: BulkRowReport[]; imported?: number; failed?: number; dryRun?: boolean };
 
+/**
+ * Read the upload, whichever of the two shapes it came in.
+ *
+ * A workbook carries one sheet per deliverable type, and the sheet name is what
+ * says who produced the documents on it — so the Producer column that a flat
+ * file needs does not exist there, and is filled in from the tab. A single-sheet
+ * CSV still works, because fixing forty rows should not need a workbook.
+ */
 async function readUpload(formData: FormData): Promise<Record<string, string>[] | { error: string }> {
   const file = formData.get("file") as File | null;
-  if (!file || file.size === 0) return { error: "Choose a CSV file to import." };
+  if (!file || file.size === 0) return { error: "Choose a file to import." };
+
+  if (/\.xlsx$/i.test(file.name)) {
+    const ExcelJS = (await import("exceljs")).default;
+    const book = new ExcelJS.Workbook();
+    await book.xlsx.load(await file.arrayBuffer());
+    const objects: Record<string, string>[] = [];
+    for (const sheet of book.worksheets) {
+      if (sheet.state === "veryHidden" || sheet.state === "hidden") continue;
+      // The tab is named "<code> — <label>"; the code before the dash is the
+      // deliverable type every row on it was produced under.
+      const producer = sheet.name.split("—")[0].trim().split(/\s/)[0].toUpperCase();
+      // Row 1 is the caption the template writes; row 2 holds the headings.
+      const headerRow = sheet.getRow(2);
+      const headers: string[] = [];
+      headerRow.eachCell({ includeEmpty: true }, (cell, column) => { headers[column] = String(cell.value ?? "").trim(); });
+      if (!headers.some((h) => h === "Title")) continue;
+      sheet.eachRow({ includeEmpty: false }, (row, index) => {
+        if (index <= 2) return;
+        const one: Record<string, string> = { Producer: producer };
+        let any = false;
+        row.eachCell({ includeEmpty: false }, (cell, column) => {
+          const key = headers[column];
+          if (!key) return;
+          const raw = cell.value;
+          const text =
+            raw instanceof Date ? raw.toISOString().slice(0, 10)
+            : raw && typeof raw === "object" && "text" in raw ? String((raw as { text: unknown }).text)
+            : raw && typeof raw === "object" && "result" in raw ? String((raw as { result: unknown }).result ?? "")
+            : raw == null ? ""
+            : String(raw);
+          one[key] = text.trim();
+          if (one[key]) any = true;
+        });
+        if (any) objects.push(one);
+      });
+    }
+    if (!objects.length) return { error: "No filled-in rows found in that workbook." };
+    return objects;
+  }
+
   const text = await file.text();
   const { objects } = toObjects(parseCsv(text));
   if (!objects.length) return { error: "The file has no data rows (only the header)." };
@@ -42,6 +92,7 @@ export async function importBulkAction(_prev: BulkResult | undefined, formData: 
   // The matrix is a grid, not a list of records: its own reader, and only an
   // administrator may apply it, because it says who approves what.
   if (kind === "matrix") return importMatrix(ctx, formData, dryRun);
+  if (kind === "sets") return importSets(ctx, formData, dryRun);
 
   const objects = await readUpload(formData);
   if ("error" in objects) return { error: objects.error };
@@ -59,7 +110,7 @@ export async function importBulkAction(_prev: BulkResult | undefined, formData: 
     // What the number is built from cannot be corrected here: the number would
     // then say one thing and the record another, and a number is never rewritten.
     const INSIDE_THE_NUMBER = ["Type", "Discipline", "Project", "SubProject", "Supplier"];
-    const CORRECTABLE = ["Title", "Criticality", "Confidentiality", "RetentionClass", "ContractRef", "AssetCode"];
+    const CORRECTABLE = ["Title", "Criticality", "Confidentiality", "RetentionClass", "ContractRef", "AssetCode", "PlannedDate", "ReceivedDate"];
     for (let i = 0; i < objects.length; i++) {
       const o = objects[i];
       const line = i + 2;
@@ -87,6 +138,12 @@ export async function importBulkAction(_prev: BulkResult | undefined, formData: 
       if (GET(o, "RetentionClass") && !active(retentions, GET(o, "RetentionClass"))) errs.push(`RetentionClass invalid`);
       const producer = (GET(o, "Producer") || "ENG").toUpperCase();
       if (external(producer) && !GET(o, "Supplier")) errs.push("External producer needs a Supplier code");
+      // A dry run that passes and a real import that fails is worse than no dry
+      // run at all: everything the write can refuse is refused here too.
+      for (const column of ["ReceivedDate", "PlannedDate"]) {
+        const given = GET(o, column);
+        if (given && isNaN(new Date(given).getTime())) errs.push(`${column} "${given}" is not a date — use YYYY-MM-DD`);
+      }
       if (errs.length) rows.push({ line, ok: false, message: errs.join("; ") });
       else { valid++; rows.push({ line, ok: true, message: `Will create placeholder: ${GET(o, "Producer") || "ENG"}/${GET(o, "Type")}/${GET(o, "Discipline")}` }); }
     }
@@ -157,11 +214,21 @@ export async function importBulkAction(_prev: BulkResult | undefined, formData: 
         // A row naming a document corrects it; only what is not inside the
         // number may change, which validation has already enforced.
         const doc = await db.document.findFirstOrThrow({ where: { docNumber: GET(o, "Document Number") } });
-        const map: Record<string, string> = { Title: "title", Criticality: "criticality", Confidentiality: "confidentiality", RetentionClass: "retentionClass", ContractRef: "contractRef", AssetCode: "assetCode" };
+        const map: Record<string, string> = { Title: "title", Criticality: "criticality", Confidentiality: "confidentiality", RetentionClass: "retentionClass", ContractRef: "contractRef", AssetCode: "assetCode", PlannedDate: "plannedDate", ReceivedDate: "receivedDate" };
+        const dates = new Set(["plannedDate", "receivedDate"]);
         const data: Record<string, unknown> = {};
         for (const [col, field] of Object.entries(map)) {
           const v = GET(o, col);
           if (!v) continue;
+          if (dates.has(field)) {
+            const current = (doc as unknown as Record<string, unknown>)[field] as Date | null;
+            const next = new Date(v);
+            if (current?.toISOString().slice(0, 10) === next.toISOString().slice(0, 10)) continue;
+            data[field] = next;
+            if (field === "plannedDate" && !doc.latestRevisionId) data.latestPlannedAt = next;
+            await audit({ actor: user, action: "METADATA_CHANGE", entityType: "Document", entityId: doc.id, entityLabel: doc.docNumber, field, oldValue: current ? current.toISOString().slice(0, 10) : null, newValue: v, detail: "Bulk deliverable list (4.9)." });
+            continue;
+          }
           const current = (doc as unknown as Record<string, unknown>)[field];
           if (String(current ?? "") !== v) {
             data[field] = v;
@@ -171,28 +238,25 @@ export async function importBulkAction(_prev: BulkResult | undefined, formData: 
         if (Object.keys(data).length) await db.document.update({ where: { id: doc.id }, data });
         done++;
       } else if (kind === "deliverables") {
+        // The same act as the form: one implementation, in lib/register.
         const producer = (GET(o, "Producer") || "ENG").toUpperCase();
-        const fieldValues: Record<string, string> = {
-          "Project code": GET(o, "Project"), Subproject: GET(o, "SubProject"), "Supplier code": GET(o, "Supplier"),
-          "Purchase order": GET(o, "PO"), Discipline: GET(o, "Discipline"), "Document type": GET(o, "Type"),
-        };
-        const { docNumber } = await allocateNumber(ctx, producer, fieldValues);
-        const doc = await db.document.create({
-          data: {
-            projectId,
-            docNumber, title: GET(o, "Title"), deliverableType: producer, docType: GET(o, "Type"), discipline: GET(o, "Discipline"),
-            originator: GET(o, "Supplier") || null, subProject: GET(o, "SubProject") || null, contractRef: GET(o, "PO") || null,
-            criticality: GET(o, "Criticality") || null, confidentiality: GET(o, "Confidentiality") || "INTERNAL",
-            retentionClass: GET(o, "RetentionClass") || (await retentionFor(ctx, GET(o, "Criticality") || null)), state: "PLANNED", isPlaceholder: true,
-            createdById: user.id, createdByName: user.name,
-            receivedDate: GET(o, "ReceivedDate") ? new Date(GET(o, "ReceivedDate")) : null,
-          },
+        await registerDocument(ctx, user, {
+          title: GET(o, "Title"),
+          deliverableType: producer,
+          docType: GET(o, "Type"),
+          discipline: GET(o, "Discipline"),
+          projectCode: GET(o, "Project"),
+          originator: GET(o, "Supplier") || null,
+          subProject: GET(o, "SubProject") || null,
+          contractRef: GET(o, "PO") || null,
+          criticality: GET(o, "Criticality") || null,
+          confidentiality: GET(o, "Confidentiality") || null,
+          retentionClass: GET(o, "RetentionClass") || null,
+          receivedDate: GET(o, "ReceivedDate") ? new Date(GET(o, "ReceivedDate")) : null,
+          plannedDate: GET(o, "PlannedDate") ? new Date(GET(o, "PlannedDate")) : null,
+          assetCode: GET(o, "AssetCode") || null,
+          how: "Registered from a deliverable list.",
         });
-        if (GET(o, "AssetCode")) {
-          const asset = await db.assetItem.findFirst({ where: { code: GET(o, "AssetCode") } });
-          if (asset) await db.relationship.create({ data: { projectId, kind: "DOC_ASSET", fromType: "Document", fromId: doc.id, toType: "AssetItem", toId: asset.id, createdById: user.id } });
-        }
-        await audit({ actor: user, action: "REGISTER_ENTRY", entityType: "Document", entityId: doc.id, entityLabel: docNumber, detail: "Bulk import: placeholder created from a deliverable list (16.8)." });
         done++;
       } else if (kind === "baseline") {
         let action = await db.action.findFirst({ where: { code: GET(o, "Action Code") } });
@@ -241,6 +305,129 @@ export async function importBulkAction(_prev: BulkResult | undefined, formData: 
     ok: "Imported " + done + " of " + objects.length + " rows." + (failures.length ? " " + failures.length + " failed - see the report." : ""),
     rows, imported: done, failed: failures.length, dryRun: false,
   };
+}
+
+/**
+ * Every published list, from one workbook.
+ *
+ * A tab is a set, named by its key. A row whose code exists is updated; a code
+ * that does not exist is published. A row that is simply absent is left alone —
+ * a workbook where somebody edited one tab must not retire everything missing
+ * from the other twenty, and retiring stays a deliberate act on the list's page.
+ */
+async function importSets(ctx: Awaited<ReturnType<typeof requireScope>>, formData: FormData, dryRun: boolean): Promise<BulkResult> {
+  const { user, db, orgId } = ctx;
+  if (!isAdmin(user)) return { error: "Only an administrator may publish a list." };
+
+  const file = formData.get("file") as File | null;
+  if (!file || file.size === 0) return { error: "Choose the filled-in workbook." };
+  if (!/\.xlsx$/i.test(file.name)) return { error: "Published lists come back as the workbook they were downloaded as (.xlsx)." };
+
+  const ExcelJS = (await import("exceljs")).default;
+  const book = new ExcelJS.Workbook();
+  await book.xlsx.load(await file.arrayBuffer());
+
+  const sets = new Map((await db.configSet.findMany({ select: { key: true, title: true } })).map((one) => [one.key, one.title] as const));
+  const rows: BulkRowReport[] = [];
+  const work: { setKey: string; code: string; label: string; status: string; props: string | null; existingId?: string; line: number }[] = [];
+  let line = 0;
+
+  for (const sheet of book.worksheets) {
+    const setKey = sheet.name.trim();
+    if (!sets.has(setKey)) continue;
+    const fields = propFieldsFor(setKey) ?? [];
+    const headers: string[] = [];
+    sheet.getRow(2).eachCell({ includeEmpty: true }, (cell, column) => { headers[column] = String(cell.value ?? "").trim(); });
+    if (headers[1] !== "Code") { rows.push({ line: ++line, ok: false, message: `${setKey}: the heading row is missing — download the workbook again.` }); continue; }
+
+    const existing = new Map(
+      (await db.configValue.findMany({ where: { orgId, setKey }, select: { id: true, code: true, label: true, status: true, props: true } }))
+        .map((one) => [one.code, one] as const),
+    );
+
+    sheet.eachRow({ includeEmpty: false }, (row, index) => {
+      if (index <= 2) return;
+      const text = (column: number) => {
+        const raw = row.getCell(column).value;
+        return raw == null ? "" : String(typeof raw === "object" && "text" in raw ? (raw as { text: unknown }).text : raw).trim();
+      };
+      const code = text(1);
+      const label = text(2);
+      if (!code && !label) return;
+      line++;
+      if (!code) { rows.push({ line, ok: false, message: `${setKey}: a row has a label and no code` }); return; }
+      if (!label) { rows.push({ line, ok: false, message: `${setKey} ${code}: a value needs a label` }); return; }
+
+      const status = text(3).toUpperCase() === "RETIRED" ? "RETIRED" : "ACTIVE";
+      const was = existing.get(code);
+      // Start from what the value already holds. A workbook that does not
+      // mention a property must not erase it — that is how an upload once wiped
+      // what every review verdict does.
+      const props: Record<string, unknown> = was?.props ? (() => {
+        try { return JSON.parse(was.props) as Record<string, unknown>; } catch { return {}; }
+      })() : {};
+      fields.forEach((field, offset) => {
+        const given = text(offset + 4);
+        if (!given) return;
+        if (field.type === "choice") {
+          // One answer, several stored values — the effect of a verdict sets
+          // both whether it proceeds and whether it is resubmitted.
+          const picked = field.options.find((one) => one.value === given);
+          if (picked) Object.assign(props, picked.sets);
+          return;
+        }
+        props[field.key] =
+          field.type === "bool" ? /^(yes|true|1)$/i.test(given)
+          : field.type === "int" ? Number(given)
+          : given;
+      });
+      const asJson = Object.keys(props).length ? JSON.stringify(props) : null;
+
+      if (!was) {
+        work.push({ setKey, code, label, status, props: asJson, line });
+        // Saying the status matters: a value published as retired is in the
+        // list but hidden behind the Active filter, which reads as nothing
+        // having happened at all.
+        rows.push({ line, ok: true, message: `${setKey}: publish ${code} — ${label}${status === "RETIRED" ? " · as RETIRED, so it stays hidden behind the Active filter" : ""}` });
+        return;
+      }
+      const changed = [
+        was.label !== label ? "label" : "",
+        was.status !== status ? "status" : "",
+        (was.props ?? null) !== asJson ? "properties" : "",
+      ].filter(Boolean);
+      if (!changed.length) return; // unchanged rows are not news
+      work.push({ setKey, code, label, status, props: asJson, existingId: was.id, line });
+      rows.push({ line, ok: true, message: `${setKey}: ${code} — ${changed.join(", ")} changed${was.status !== status ? ` (now ${status.toLowerCase()})` : ""}` });
+    });
+  }
+
+  if (!rows.length) return { ok: "Nothing in that workbook differs from what is published.", rows: [], imported: 0, failed: 0, dryRun };
+  if (dryRun) {
+    return {
+      ok: `Dry run: ${work.length} value(s) would change across ${new Set(work.map((w) => w.setKey)).size} list(s). Nothing else in those lists is touched.`,
+      rows, imported: 0, failed: rows.filter((r) => !r.ok).length, dryRun: true,
+    };
+  }
+
+  for (const one of work) {
+    if (one.existingId) {
+      await db.configValue.update({ where: { id: one.existingId }, data: { label: one.label, status: one.status, props: one.props } });
+    } else {
+      const count = await db.configValue.count({ where: { orgId, setKey: one.setKey } });
+      await db.configValue.create({ data: { orgId, setKey: one.setKey, code: one.code, label: one.label, status: one.status, props: one.props, sort: count } });
+    }
+  }
+  for (const setKey of new Set(work.map((w) => w.setKey))) {
+    await db.configSet.update({ where: { orgId_key: { orgId, key: setKey } }, data: { version: { increment: 1 } } });
+  }
+  await audit({
+    actor: user, action: "CONFIG_VALUE_PUBLISHED", entityType: "ConfigSet",
+    entityId: [...new Set(work.map((w) => w.setKey))].join(", "),
+    detail: `${work.filter((w) => !w.existingId).length} published, ${work.filter((w) => w.existingId).length} updated, from a workbook.`,
+  });
+  revalidatePath("/", "layout");
+  return { ok: `${work.length} value(s) published or updated.`, rows, imported: work.length, failed: rows.filter((r) => !r.ok).length, dryRun: false };
 }
 
 /**

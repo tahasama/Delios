@@ -27,6 +27,9 @@ type RegisterRow = {
   receivedFrom?: string | null; sendRevisionId?: string | null; contractRef: string | null; criticality: string | null;
   confidentiality: string | null; retentionClass: string | null; retentionLabel: string | null; placeholder: boolean;
   docTypeLabel: string; disciplineLabel: string; deliverableLabel: string;
+  /** What the newest revision serves, and the activities that list this document. */
+  phase: string | null; phaseLabel: string | null;
+  actions: { code: string; name: string }[];
   docState: string; docStateLabel: string;
   revision: string | null; revState: string | null; revStateLabel: string;
   verdict: string | null; verdictLabel: string | null;
@@ -50,7 +53,7 @@ export type Paging = {
   query: string;
 };
 
-type Filters = { q: string; terms: string[]; state: string; rev: string; status: string; verdict: string; supplier: string; po: string; discipline: string; docType: string; criticality: string; confidentiality: string; deliverable: string; view: string; on: string; from: string; to: string };
+type Filters = { q: string; terms: string[]; state: string; rev: string; status: string; verdict: string; supplier: string; po: string; discipline: string; docType: string; criticality: string; confidentiality: string; deliverable: string; phase: string; action: string; view: string; on: string; from: string; to: string };
 
 /** Where the guide explains each kind of code. */
 const GUIDE: Record<string, string> = {
@@ -105,7 +108,7 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
   /** The masthead, rendered on the server so it can read the project. */
   plate?: React.ReactNode;
   filters: Filters;
-  filterOptions: { states: Opt[]; revStates: Opt[]; statuses: Opt[]; verdicts: Opt[]; suppliers: Opt[]; pos: Opt[]; disciplines: Opt[]; types: Opt[]; criticalities: Opt[]; confidentialities: Opt[]; deliverables: Opt[]; dateFields: Opt[] };
+  filterOptions: { states: Opt[]; revStates: Opt[]; statuses: Opt[]; verdicts: Opt[]; suppliers: Opt[]; pos: Opt[]; disciplines: Opt[]; types: Opt[]; criticalities: Opt[]; confidentialities: Opt[]; deliverables: Opt[]; phases: Opt[]; actions: Opt[]; dateFields: Opt[] };
   exportHref: string;
 }) {
   const router = useRouter();
@@ -118,10 +121,10 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
   const [frozen, setFrozen] = useState(true);
   // The filters asked least often are folded away until somebody asks for them,
   // and unfold themselves whenever one of them is doing something.
-  const [extra, setExtra] = useState(!!filters.criticality || !!filters.confidentiality || !!filters.deliverable);
+  const [extra, setExtra] = useState(!!filters.criticality || !!filters.confidentiality || !!filters.deliverable || !!filters.phase || !!filters.action);
   useEffect(() => {
-    if (filters.criticality || filters.confidentiality || filters.deliverable) setExtra(true);
-  }, [filters.criticality, filters.confidentiality, filters.deliverable]);
+    if (filters.criticality || filters.confidentiality || filters.deliverable || filters.phase || filters.action) setExtra(true);
+  }, [filters.criticality, filters.confidentiality, filters.deliverable, filters.phase, filters.action]);
 
   // The order someone dragged their columns into, and whether they keep the
   // first column in view. Both are this browser's business, not the register's.
@@ -273,6 +276,8 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
   if (filters.criticality) facets.push({ key: "criticality", label: labelIn(filterOptions.criticalities, filters.criticality), without: drop("criticality") });
   if (filters.confidentiality) facets.push({ key: "confidentiality", label: labelIn(filterOptions.confidentialities, filters.confidentiality), without: drop("confidentiality") });
   if (filters.deliverable) facets.push({ key: "produced by", label: labelIn(filterOptions.deliverables, filters.deliverable), without: drop("deliverable") });
+  if (filters.phase) facets.push({ key: "phase", label: labelIn(filterOptions.phases, filters.phase), without: drop("phase") });
+  if (filters.action) facets.push({ key: "owed by", label: labelIn(filterOptions.actions, filters.action), without: drop("action") });
 
   return <>
     <section className="register register-sheet register-sheet-open mb-5">
@@ -345,6 +350,8 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
             <Filter name="criticality" value={filters.criticality} empty="Criticality" options={filterOptions.criticalities} />
             <Filter name="confidentiality" value={filters.confidentiality} empty="Confidentiality" options={filterOptions.confidentialities} />
             <Filter name="deliverable" value={filters.deliverable} empty="Produced by" options={filterOptions.deliverables} />
+            <Filter name="phase" value={filters.phase} empty="Phase" options={filterOptions.phases} />
+            {filterOptions.actions.length ? <Filter name="action" value={filters.action} empty="Owed by activity" options={filterOptions.actions} /> : null}
           </> : <>
             <input type="hidden" name="criticality" value={filters.criticality} />
             <input type="hidden" name="confidentiality" value={filters.confidentiality} />
@@ -635,6 +642,20 @@ The revision is not released, so this status is not in force.`} href={GUIDE.STAT
   { key: "created", sort: "created", label: "Created", headClass: "text-right", cellClass: "whitespace-nowrap text-right font-mono text-xs tabular-nums", cell: (row) => date(row.createdDate) },
   { key: "updated", sort: "updated", label: "Updated", headClass: "text-right", cellClass: "whitespace-nowrap text-right font-mono text-xs tabular-nums text-slate-500", cell: (row) => date(row.updatedAt) },
   { key: "discipline", sort: "discipline", label: "Discipline", cellClass: "whitespace-nowrap text-xs text-slate-600", cell: (row) => row.disciplineLabel },
+  {
+    key: "phase", sort: "phase", label: "Phase",
+    note: "Which phase the newest revision serves. A document spans several — issued for detail design, later as-built — so the phase belongs to the revision, not to the document.",
+    cellClass: "whitespace-nowrap text-xs text-slate-600",
+    cell: (row) => row.phaseLabel ?? <span className="text-slate-300">—</span>,
+  },
+  {
+    key: "owedBy", label: "Owed by",
+    note: "The scheduled activities that list this document. An activity owes many documents, and a document can be owed by more than one.",
+    cellClass: "text-xs text-slate-600",
+    cell: (row) => row.actions.length
+      ? <span className="flex flex-wrap gap-1">{row.actions.map((one) => <span key={one.code} title={one.name} className="whitespace-nowrap rounded-md bg-slate-100 px-1.5 py-0.5 font-mono text-[11px] font-medium text-slate-600">{one.code}</span>)}</span>
+      : <span className="text-slate-300">—</span>,
+  },
   { key: "docType", sort: "docType", label: "Type", cellClass: "max-w-48 truncate text-xs text-slate-600", cell: (row) => row.docTypeLabel },
   {
     key: "deliverable", sort: "deliverable", label: "Produced by",

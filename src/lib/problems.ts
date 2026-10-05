@@ -1,11 +1,12 @@
 import type { Tenant } from "./tenant";
 import { plain } from "./utils";
+import { CHECK_BY_ID, type Phase } from "./checks/catalog";
 
 /**
  * The check results turned into a work list: which documents have problems,
  * what each problem is in plain words, who fixes it, and where.
  */
-export type Problem = { id: string; checkId: string; severity: string; text: string; owner: string; fix: { label: string; href: string } };
+export type Problem = { id: string; checkId: string; severity: string; text: string; todo: string; owner: string; status: string; fix: { label: string; href: string } };
 export type ProblemDocument = { id: string; docNumber: string; title: string; worst: string; problems: Problem[] };
 
 export const OWNER_LABEL: Record<string, string> = { CF: "Document Control", OR: "Originator", RV: "Reviewer", OG: "Organization" };
@@ -31,6 +32,43 @@ function fixFor(checkId: string, documentId: string | null): { label: string; hr
   }
 }
 
+/**
+ * What to do about it, in the imperative.
+ *
+ * A finding says what is wrong; nobody can act on that alone. These are by
+ * family, because a family is one kind of fault with one kind of remedy, and
+ * 274 separate sentences would go stale the first time a check changed.
+ */
+const TODO: Record<string, string> = {
+  ID: "Open the document and correct how it is identified — its number, its type, or what it is about.",
+  MD: "Open the document and fill in what is missing from its description.",
+  CL: "Open the document and set the classification it should carry.",
+  RT: "Open the document and give it the retention it should be kept under.",
+  IO: "Decide what this is — a document that gets revised, or a record that does not — and register it as that.",
+  RV: "Open the revisions and put right what was recorded about this one.",
+  ST: "Open the revisions: the state it is in does not match what was done to it.",
+  FM: "Open the revisions and attach the file that is missing, in the form it should be kept.",
+  AP: "Open the reviews: it was released without the approval the rules require.",
+  RO: "Open the reviews and finish the route properly — the verdict, who gave it, or an open comment.",
+  IS: "Open what was sent out and correct the issue record.",
+  OB: "Somebody is holding a copy that is no longer current — tell them, or record that you did.",
+  DB: "The schedule still expects this document; settle whether it is owed or withdraw the need.",
+  PK: "Open the package and settle what belongs in it.",
+  SC: "An administrator has to publish or correct a setting before this can be right.",
+  CF: "An administrator has to publish or correct a setting before this can be right.",
+};
+
+/**
+ * What to do about a finding of this kind, in the imperative.
+ *
+ * A setting-up condition has the same remedy whatever family it was gathered
+ * under — somebody has to publish the thing — so the phase answers first.
+ */
+export function todoOf(checkId: string): string {
+  if (CHECK_BY_ID.get(checkId)?.phase === "SETUP") return "An administrator has to publish or correct a setting before this can be right.";
+  return TODO[checkId.split("-")[0]] ?? "Open it and put right what the check found.";
+}
+
 /** The finding's own sentence, without clause references and Standard jargon. */
 export function plainProblem(text: string): string {
   return plain(text).replace(/\s*—\s*structural contradiction/gi, "").replace(/\s*▲/g, "").replace(/\s*\/\s*[A-Z]{2}-\d{2}/g, "").replace(/\.$/, "") ;
@@ -46,7 +84,9 @@ export async function problemDocuments(t: Tenant, owner?: string) {
   for (const d of defects) {
     const p: Problem = {
       id: d.id, checkId: d.checkId, severity: d.severity, owner: OWNER_LABEL[d.ownerRole] ?? d.ownerRole,
-      text: plainProblem(d.description) + (d.status === "ACCEPTED" ? " (accepted, still counted)" : ""),
+      text: plainProblem(d.description),
+      todo: todoOf(d.checkId),
+      status: d.status,
       fix: fixFor(d.checkId, d.documentId),
     };
     if (!d.documentRef) { general.push(p); continue; }
@@ -59,4 +99,75 @@ export async function problemDocuments(t: Tenant, owner?: string) {
     .map((r) => ({ ...r, problems: r.problems.sort((a, b) => RANK[a.severity] - RANK[b.severity]) }))
     .sort((a, b) => RANK[a.worst] - RANK[b.worst] || b.problems.length - a.problems.length || a.docNumber.localeCompare(b.docNumber));
   return { documents, general: general.sort((a, b) => RANK[a.severity] - RANK[b.severity]) };
+}
+
+/**
+ * The same findings counted by what is wrong, not by which document has it.
+ *
+ * A register of ten thousand documents produces a list of documents nobody can
+ * read. Twenty-five kinds of problem, each with a count, is a page you can act
+ * on: you fix a kind of problem, not a document at a time.
+ */
+export type ProblemType = {
+  checkId: string;
+  phase: Phase;
+  severity: string;
+  /** What is wrong, in the words of the check. */
+  what: string;
+  /** What to do about it. */
+  todo: string;
+  owner: string;
+  documents: number;
+  findings: number;
+  accepted: number;
+};
+
+export async function problemTypes(t: Tenant, owner?: string): Promise<ProblemType[]> {
+  const defects = await t.db.defect.findMany({
+    where: { status: { in: ["OPEN", "ACCEPTED"] }, ...(owner ? { ownerRole: owner } : {}) },
+    select: { checkId: true, severity: true, ownerRole: true, documentId: true, status: true },
+  });
+  const byCheck = new Map<string, { severity: string; owner: string; docs: Set<string>; findings: number; accepted: number }>();
+  for (const d of defects) {
+    const row = byCheck.get(d.checkId) ?? { severity: d.severity, owner: OWNER_LABEL[d.ownerRole] ?? d.ownerRole, docs: new Set<string>(), findings: 0, accepted: 0 };
+    row.findings++;
+    if (d.status === "ACCEPTED") row.accepted++;
+    if (d.documentId) row.docs.add(d.documentId);
+    byCheck.set(d.checkId, row);
+  }
+  const out: ProblemType[] = [];
+  for (const [checkId, row] of byCheck) {
+    const meta = CHECK_BY_ID.get(checkId);
+    out.push({
+      checkId,
+      phase: meta?.phase ?? "RUNNING",
+      severity: row.severity,
+      what: plainProblem(meta?.condition ?? checkId),
+      todo: todoOf(checkId),
+      owner: row.owner,
+      documents: row.docs.size,
+      findings: row.findings,
+      accepted: row.accepted,
+    });
+  }
+  return out.sort((a, b) => RANK[a.severity] - RANK[b.severity] || b.findings - a.findings);
+}
+
+/** Every finding of one kind, newest first, for the drill-down. */
+export async function findingsOfType(t: Tenant, checkId: string, take = 200) {
+  const rows = await t.db.defect.findMany({
+    where: { checkId, status: { in: ["OPEN", "ACCEPTED"] } },
+    include: { documentRef: { select: { id: true, docNumber: true, title: true } } },
+    orderBy: { lastSeenAt: "desc" },
+    take,
+  });
+  return rows.map((d) => ({
+    id: d.id,
+    status: d.status,
+    severity: d.severity,
+    text: plainProblem(d.description),
+    label: d.entityLabel,
+    document: d.documentRef,
+    fix: fixFor(d.checkId, d.documentId),
+  }));
 }

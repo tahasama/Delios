@@ -7,9 +7,12 @@
 // outsiders were not. Re-running resets the example.
 import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
+import { registerDocument } from "../src/lib/register";
+import { tenantFor } from "../src/lib/tenant";
+import type { SessionUser } from "../src/lib/auth";
 
 const db = new PrismaClient();
-const DOC = "P1001-50-ME-DSW-09201";
+const TITLE = "Pump house — ventilation layout";
 const TAG = "[supersession demo]";
 
 async function nextTr(projectId: string) {
@@ -25,9 +28,11 @@ async function main() {
   const who = (email: string) => db.user.findFirstOrThrow({ where: { orgId: org.id, email } });
   const [author, approver, controller, reviewer] = await Promise.all([who("author@delios.local"), who("approver@delios.local"), who("controller@delios.local"), who("reviewer@delios.local")]);
   const pdf = await db.storedFile.findFirstOrThrow({ where: { projectId: p1.id, kind: "RENDITION" } });
+  const t = tenantFor(org.id, p1.id);
+  const asUser = (u: typeof author): SessionUser => ({ ...u, isInternal: true, partyCode: null } as unknown as SessionUser);
 
   // Reset a previous run: its transmittals first, then the document.
-  const old = await db.document.findFirst({ where: { projectId: p1.id, docNumber: DOC } });
+  const old = await db.document.findFirst({ where: { projectId: p1.id, title: TITLE } });
   if (old) {
     const revs = (await db.revision.findMany({ where: { documentId: old.id }, select: { id: true } })).map((r) => r.id);
     const items = await db.transmittalItem.findMany({ where: { revisionId: { in: revs } }, select: { transmittalId: true } });
@@ -44,15 +49,20 @@ async function main() {
     await db.document.delete({ where: { id: old.id } });
   }
 
-  const doc = await db.document.create({
-    data: {
-      projectId: p1.id, docNumber: DOC, title: "Pump house — ventilation layout", deliverableType: "ENG", docType: "DWG", discipline: "ME",
-      subProject: "50", criticality: "ROUTINE", confidentiality: "INTERNAL", retentionClass: "PROJECT_DURATION", state: "ACTIVE", isPlaceholder: false,
-      createdById: author.id, createdByName: author.name,
-    },
+  // Registered through the application's own path, so the number is one the
+  // system issued and the entry has a history. A hand-written number is exactly
+  // what the checks report as never issued.
+  const registered = await registerDocument(t, asUser(author), {
+    title: "Pump house — ventilation layout",
+    deliverableType: "ENG", docType: "DWG", discipline: "ME",
+    projectCode: "P1001", subProject: "50",
+    criticality: "ROUTINE", confidentiality: "INTERNAL", retentionClass: "PROJECT_DURATION",
+    how: "Supersession example.",
   });
+  const doc = await db.document.findUniqueOrThrow({ where: { id: registered.id } });
+  const DOC_NUMBER = registered.docNumber;
   const released = async (value: string, releasedAt: Date, state: "RELEASED" | "SUPERSEDED", reason: string) => {
-    const file = await db.storedFile.create({ data: { projectId: p1.id, path: pdf.path, name: `${DOC}_Rev-${value}.pdf`, size: pdf.size, mime: pdf.mime, sha256: pdf.sha256, kind: "RENDITION", uploadedById: author.id, uploadedByName: author.name } });
+    const file = await db.storedFile.create({ data: { projectId: p1.id, path: `${DOC_NUMBER}/${DOC_NUMBER}_Rev-${value}.pdf`, name: `${DOC_NUMBER}_Rev-${value}.pdf`, size: pdf.size, mime: pdf.mime, sha256: pdf.sha256, kind: "RENDITION", uploadedById: author.id, uploadedByName: author.name } });
     const rev = await db.revision.create({
       data: {
         projectId: p1.id, documentId: doc.id, value, series: "DESIGN", state, statusCode: "IFC", reasonForRevision: reason, changeDescription: reason,
@@ -75,7 +85,7 @@ async function main() {
     data: {
       projectId: p1.id, number, direction: "OUTGOING", reasonForIssue: "EXECUTION", dateOfIssue: new Date("2026-09-03T08:00:00Z"),
       issuingParty: "Our organization", status: "ISSUED", acceptanceNotes: `${TAG} Ventilation layout for installation.`,
-      subject: `For construction — ${DOC} rev ${revA.value}`,
+      subject: `For construction — ${DOC_NUMBER} rev ${revA.value}`,
       createdById: controller.id, createdByName: controller.name,
       items: { create: [{ projectId: p1.id, revisionId: revA.id }] },
       recipients: {
@@ -87,7 +97,7 @@ async function main() {
       },
     },
   });
-  console.log(`ready: ${DOC} rev A (on ${number}) replaced by rev B — S. Amrani and K. Idrissi not told`);
+  console.log(`ready: ${DOC_NUMBER} rev A (on ${number}) replaced by rev B — S. Amrani and K. Idrissi not told`);
   console.log(`       open Assurance → Out-of-date risks; document /documents/${doc.id} (rev B id ${revB.id})`);
 }
 

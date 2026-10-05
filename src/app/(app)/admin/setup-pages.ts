@@ -68,6 +68,12 @@ export const SETUP_PAGES: SetupPage[] = [
     group: "Classification",
   },
   {
+    href: "/conformance/checks",
+    title: "What is checked",
+    text: "Every question the application asks of its own register, and what the last run found.",
+    group: "Classification",
+  },
+  {
     href: "/admin/numbering",
     title: "Numbering",
     text: "How document numbers are built, and which deliverable type uses which scheme.",

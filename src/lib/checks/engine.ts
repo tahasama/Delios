@@ -6,10 +6,14 @@ import { audit } from "@/lib/audit";
 
 export type CheckOutcome = {
   checkId: string;
-  result: "PASS" | "FAIL" | "NOT_CHECKED" | "NOT_EXECUTABLE";
+  result: "PASS" | "FAIL" | "NEEDS_SETUP" | "BY_HAND" | "OFF" | "NOT_EXECUTABLE";
   failingCount: number;
   ms: number;
   failures?: Failure[];
+  /** What has to be set up, when that is the answer. */
+  needs?: string;
+  /** Why the organization switched it off, when it did. */
+  why?: string;
 };
 
 /**
@@ -24,14 +28,28 @@ export async function runAllChecks(t: Tenant, user: SessionUser | null): Promise
   const outcomes: CheckOutcome[] = [];
   const allFailures: { checkId: string; failure: Failure }[] = [];
 
+  // What this organization has switched off, and why.
+  const optOuts = new Map(
+    (await db.checkOptOut.findMany({ where: { projectId } })).map((one) => [one.checkId, one.reason] as const),
+  );
+
   for (const check of CATALOG) {
     const t0 = Date.now();
-    let result: RunResult;
+    const off = optOuts.get(check.id);
+    if (off !== undefined) {
+      outcomes.push({ checkId: check.id, result: "OFF", failingCount: 0, ms: 0, why: off });
+      continue;
+    }
     const runner = RUNNERS[check.id] ?? CONFIG_CHECKS[check.id];
+    if (!runner) {
+      // Nothing in the register can answer it, so it is somebody's to check.
+      outcomes.push({ checkId: check.id, result: "BY_HAND", failingCount: 0, ms: 0 });
+      continue;
+    }
+    let result: RunResult;
     try {
-      result = runner ? await runner(ctx) : "NOT_CHECKED";
+      result = await runner(ctx);
     } catch (e) {
-      // Evidence blocked by an execution problem → Not executable naming the blocker (§17.1)
       result = "NOT_EXECUTABLE";
       console.error(`Check ${check.id} failed to execute:`, e);
     }
@@ -39,16 +57,23 @@ export async function runAllChecks(t: Tenant, user: SessionUser | null): Promise
     if (Array.isArray(result)) {
       outcomes.push({ checkId: check.id, result: result.length ? "FAIL" : "PASS", failingCount: result.length, ms });
       for (const failure of result) allFailures.push({ checkId: check.id, failure });
+    } else if (result === "NOT_EXECUTABLE") {
+      outcomes.push({ checkId: check.id, result: "NOT_EXECUTABLE", failingCount: 0, ms });
+    } else if (result === "NOT_CHECKED") {
+      outcomes.push({ checkId: check.id, result: "BY_HAND", failingCount: 0, ms });
     } else {
-      outcomes.push({ checkId: check.id, result: result === "NOT_EXECUTABLE" ? "NOT_EXECUTABLE" : "NOT_CHECKED", failingCount: 0, ms });
+      outcomes.push({ checkId: check.id, result: "NEEDS_SETUP", failingCount: 0, ms, needs: result.needs });
     }
   }
 
   const executed = outcomes.filter((o) => o.result === "PASS" || o.result === "FAIL").length;
   const failed = outcomes.filter((o) => o.result === "FAIL").length;
-  const notChecked = outcomes.filter((o) => o.result === "NOT_CHECKED").length;
+  const notChecked = outcomes.filter((o) => o.result === "BY_HAND" || o.result === "NEEDS_SETUP").length;
   const notExecutable = outcomes.filter((o) => o.result === "NOT_EXECUTABLE").length;
-  const coverage = (executed / outcomes.length) * 100;
+  // Of what was actually asked, how much the register answered — switched-off
+  // checks are not a gap, so they are not in the denominator.
+  const asked = outcomes.filter((o) => o.result !== "OFF").length || 1;
+  const coverage = (executed / asked) * 100;
 
   // ── Defect register maintenance (§17.5, §17.6) ────────────────────────────
   const seen = new Set<string>();
@@ -81,14 +106,20 @@ export async function runAllChecks(t: Tenant, user: SessionUser | null): Promise
       });
     }
   }
-  // Close defects the re-run no longer returns (§17.6). A defect may only close
-  // when its check actually executed and stopped returning it — NOT_CHECKED /
-  // NOT_EXECUTABLE can never close anything.
+  // Close what this run no longer returns. A finding may close for two
+  // reasons: the check ran and stopped returning it, or the check is no longer
+  // being asked — switched off, or now somebody's to check by hand. A finding
+  // left open by a question nobody asks any more can never be cleared.
   const executedIds = new Set(outcomes.filter((o) => o.result === "PASS" || o.result === "FAIL").map((o) => o.checkId));
+  const retiredIds = new Set(outcomes.filter((o) => o.result === "OFF" || o.result === "BY_HAND").map((o) => o.checkId));
+  // A check dropped from the catalogue produces no outcome at all, so its
+  // findings would sit open for ever with nothing left to clear them.
+  const known = new Set(CATALOG.map((c) => c.id));
   const openDefects = await db.defect.findMany({ where: { status: { in: ["OPEN", "ACCEPTED"] } } });
   for (const d of openDefects) {
-    if (!executedIds.has(d.checkId)) continue;
-    if (!seen.has(`${d.checkId}::${d.entityKey}`)) {
+    const stale = retiredIds.has(d.checkId) || !known.has(d.checkId);
+    if (!stale && !executedIds.has(d.checkId)) continue;
+    if (stale || !seen.has(`${d.checkId}::${d.entityKey}`)) {
       await db.defect.update({ where: { id: d.id }, data: { status: "CLOSED", closedAt: new Date() } });
     }
   }
@@ -115,7 +146,7 @@ export async function runAllChecks(t: Tenant, user: SessionUser | null): Promise
       coverage: Math.round(coverage * 10) / 10,
       openCritical,
       durationMs: Date.now() - started,
-      items: { create: outcomes.map((o) => ({ projectId, checkId: o.checkId, result: o.result, failingCount: o.failingCount, ms: o.ms })) },
+      items: { create: outcomes.map((o) => ({ projectId, checkId: o.checkId, result: o.result, failingCount: o.failingCount, ms: o.ms, note: o.needs ?? o.why ?? null })) },
     },
   });
   await audit({
@@ -131,12 +162,12 @@ export async function runAllChecks(t: Tenant, user: SessionUser | null): Promise
 }
 
 /** Latest result per check for the catalogue view. */
-export async function latestResults(t: Tenant): Promise<Map<string, { result: string; failingCount: number; ranAt: Date }>> {
+export async function latestResults(t: Tenant): Promise<Map<string, { result: string; failingCount: number; ranAt: Date; note?: string | null }>> {
   const run = await t.db.checkRun.findFirst({ orderBy: { ranAt: "desc" }, include: { items: true } });
-  const map = new Map<string, { result: string; failingCount: number; ranAt: Date }>();
+  const map = new Map<string, { result: string; failingCount: number; ranAt: Date; note?: string | null }>();
   if (run) {
     for (const item of run.items) {
-      map.set(item.checkId, { result: item.result, failingCount: item.failingCount, ranAt: run.ranAt });
+      map.set(item.checkId, { result: item.result, failingCount: item.failingCount, ranAt: run.ranAt, note: item.note });
     }
   }
   return map;

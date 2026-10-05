@@ -50,18 +50,18 @@ export function SetNav({ groups, current, children }: { groups: SetNavGroup[]; c
       <div className="grid grid-cols-1 lg:grid-cols-[230px_minmax(0,1fr)]" role="tabpanel">
         <nav aria-label="Sets" className="border-b border-line p-2 lg:border-b-0 lg:border-r">
         <ul className="space-y-px">
-          {sets.map((s) => {
-            const on = s.key === current;
+          {sets.map((one) => {
+            const on = one.key === current;
             return (
-              <li key={s.key}>
+              <li key={one.key}>
                 <Link
                   replace
-                  href={`/admin/config?set=${s.key}`}
+                  href={`/admin/config?set=${one.key}`}
                   aria-current={on ? "page" : undefined}
                   className={`flex items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-[13px] ${on ? "bg-tint font-semibold text-brand-ink" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"}`}
                 >
-                  <span className="truncate">{s.title}</span>
-                  <span className={`shrink-0 text-[11px] tabular-nums ${on ? "text-brand-ink/70" : "text-slate-400"}`}>{s.count}</span>
+                  <span className="truncate">{one.title}</span>
+                  <span className={`shrink-0 text-[11px] tabular-nums ${on ? "text-brand-ink/70" : "text-slate-400"}`}>{one.count}</span>
                 </Link>
               </li>
             );

@@ -45,6 +45,8 @@ const DATE_FIELDS = [
   { key: "updated", label: "Changed" },
 ] as const;
 type Search = {
+  phase?: string;
+  action?: string;
   sent?: string;
   sendError?: string;
   on?: string;
@@ -109,11 +111,14 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
   const perPage = PAGE_SIZES.includes(Number(sp.per)) ? Number(sp.per) : 50;
   const page = Math.max(1, Number(sp.page) || 1);
 
-  const [matchCount, disciplines, types, statuses, verdictSet, supplierCodes, poCodes, criticalities, confidentialities, retentions, deliverableTypes, templates, inUse, views] =
+  const [matchCount, disciplines, types, statuses, verdictSet, supplierCodes, poCodes, criticalities, confidentialities, retentions, deliverableTypes, phases, actionCodes, templates, inUse, views] =
     await Promise.all([
       db.document.count({ where }),
       getSet("DISCIPLINES"), getSet("DOCUMENT_TYPES"), getSet("STATUSES"), getSet("REVIEW_OUTCOMES"), getSet("SUPPLIER_CODES"), getSet("PURCHASE_ORDERS"),
-      getSet("CRITICALITY"), getSet("CONFIDENTIALITY"), getSet("RETENTION_CLASSES"), getSet("DELIVERABLE_TYPES"),
+      getSet("CRITICALITY"), getSet("CONFIDENTIALITY"), getSet("RETENTION_CLASSES"), getSet("DELIVERABLE_TYPES"), getSet("PHASES"),
+      // Only the activities that actually owe something: an action nobody has
+      // listed a document against would filter to an empty register.
+      db.action.findMany({ where: { entries: { some: {} } }, select: { code: true, name: true }, orderBy: { code: "asc" } }),
       db.workflowTemplate.findMany({ where: { active: true }, orderBy: [{ isDefault: "desc" }, { name: "asc" }] }),
       // Filters offer what the register holds, not every value published.
       db.document.groupBy({ by: ["discipline", "docType"] }),
@@ -138,6 +143,10 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
         transmittalItems: { where: { transmittal: { direction: "OUTGOING" } }, select: { id: true }, take: 1 },
       } },
       _count: { select: { baselineEntries: true, packageMembers: true } },
+      // Which activities owe this document. Usually none or one, so the cost of
+      // carrying them is small and the register can finally be asked "what is
+      // owed against A0042".
+      baselineEntries: { select: { action: { select: { code: true, name: true } } }, orderBy: { requiredBy: "asc" }, take: 4 },
     },
   });
 
@@ -149,6 +158,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
   const retentionLabel = new Map(retentions.map((item) => [item.code, item.label]));
   const deliverableLabel = new Map(deliverableTypes.map((item) => [item.code, item.label]));
   const statusLabel = new Map(statuses.map((item) => [item.code, item.label]));
+  const phaseLabel = new Map(phases.map((item) => [item.code, item.label]));
   const publishedVerdicts = new Set(verdictSet.map((item) => item.code));
   const verdictLabel = new Map<string, string>([...Object.entries(OUTCOME_CONSEQUENCES).map(([k, v]) => [k, v.label] as [string, string]), ...verdictSet.map((item) => [item.code, item.label] as [string, string])]);
   const statusUse = new Map(statuses.map((item) => [item.code, [item.props.may ? `May: ${item.props.may}` : "", item.props.mayNot ? `May not: ${item.props.mayNot}` : ""].filter(Boolean).join("\n")]));
@@ -169,6 +179,9 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
     return {
       id: doc.id, docNumber: doc.docNumber, title: doc.title, deliverableType: doc.deliverableType,
       docType: doc.docType, discipline: doc.discipline,
+      phase: latest?.phase ?? null,
+      phaseLabel: latest?.phase ? phaseLabel.get(latest.phase) ?? latest.phase : null,
+      actions: doc.baselineEntries.map((entry) => ({ code: entry.action.code, name: entry.action.name })),
       deliverableLabel: deliverableLabel.get(doc.deliverableType) ?? pretty(doc.deliverableType), docTypeLabel: typeLabel.get(doc.docType) ?? doc.docType, disciplineLabel: disciplineLabel.get(doc.discipline) ?? doc.discipline, originator: doc.originator, subProject: doc.subProject,
       contractRef: doc.contractRef, criticality: doc.criticality, confidentiality: doc.confidentiality,
       retentionClass: doc.retentionClass,
@@ -251,7 +264,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
       paging={{ page: current, pages, perPage, sizes: PAGE_SIZES, from: matchCount ? (current - 1) * perPage + 1 : 0, to: Math.min(current * perPage, matchCount), query: query.toString() }}
       codes={codes}
       sort={{ key: sort, dir }}
-      userCanAct={!isReadOnly(user)} filters={{ q, terms, state, rev: revState, status: statusCode, verdict: verdictCode, supplier, po, discipline, docType, view, criticality, confidentiality, deliverable, on: dateOn, from: sp.from ?? "", to: sp.to ?? "" }} filterOptions={{ states: DOC_STATES.map((code) => ({ code, label: DOC_STATE_LABEL[code] ?? code })), revStates: [
+      userCanAct={!isReadOnly(user)} filters={{ q, terms, state, rev: revState, status: statusCode, verdict: verdictCode, supplier, po, discipline, docType, view, criticality, confidentiality, deliverable, phase: sp.phase ?? "", action: sp.action ?? "", on: dateOn, from: sp.from ?? "", to: sp.to ?? "" }} filterOptions={{ states: DOC_STATES.map((code) => ({ code, label: DOC_STATE_LABEL[code] ?? code })), revStates: [
       { code: "NONE", label: "No revision yet" },
       { code: "IN_PREPARATION", label: names.IN_PREPARATION },
       { code: "IN_REVIEW", label: names.IN_REVIEW },
@@ -260,7 +273,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
       { code: "RELEASED", label: together ? names.RELEASED_ISSUED : names.RELEASED },
       { code: "SUPERSEDED", label: names.SUPERSEDED },
       { code: "VOID", label: names.VOID },
-    ], statuses: statuses.map((item) => ({ code: item.code, label: `${item.code} — ${item.label}` })), verdicts: verdictSet.map((item) => ({ code: item.code, label: `${item.code} — ${item.label}` })), suppliers: supplierCodes.map((item) => ({ code: item.code, label: item.label })), pos: poCodes.map((item) => ({ code: item.code, label: item.label })), disciplines: disciplines.filter((item) => usedDisciplines.has(item.code)).map((item) => ({ code: item.code, label: item.status === "RETIRED" ? `${item.label} (retired)` : item.label })), types: types.filter((item) => usedTypes.has(item.code)).map((item) => ({ code: item.code, label: item.status === "RETIRED" ? `${item.label} (retired)` : item.label })), criticalities: criticalities.map((item) => ({ code: item.code, label: item.label })), deliverables: deliverableTypes.map((item) => ({ code: item.code, label: item.label })), confidentialities: confidentialities.map((item) => ({ code: item.code, label: item.label.split(" — ")[0] })), dateFields: DATE_FIELDS.map((field) => ({ code: field.key, label: field.label })) }} exportHref={`/api/register/export${query.size ? `?${query.toString()}` : ""}`} />
+    ], statuses: statuses.map((item) => ({ code: item.code, label: `${item.code} — ${item.label}` })), verdicts: verdictSet.map((item) => ({ code: item.code, label: `${item.code} — ${item.label}` })), suppliers: supplierCodes.map((item) => ({ code: item.code, label: item.label })), pos: poCodes.map((item) => ({ code: item.code, label: item.label })), disciplines: disciplines.filter((item) => usedDisciplines.has(item.code)).map((item) => ({ code: item.code, label: item.status === "RETIRED" ? `${item.label} (retired)` : item.label })), types: types.filter((item) => usedTypes.has(item.code)).map((item) => ({ code: item.code, label: item.status === "RETIRED" ? `${item.label} (retired)` : item.label })), criticalities: criticalities.map((item) => ({ code: item.code, label: item.label })), deliverables: deliverableTypes.map((item) => ({ code: item.code, label: item.label })), confidentialities: confidentialities.map((item) => ({ code: item.code, label: item.label.split(" — ")[0] })), phases: phases.map((item) => ({ code: item.code, label: item.label })), actions: actionCodes.map((item) => ({ code: item.code, label: `${item.code} — ${item.name}` })), dateFields: DATE_FIELDS.map((field) => ({ code: field.key, label: field.label })) }} exportHref={`/api/register/export${query.size ? `?${query.toString()}` : ""}`} />
   </div>;
 }
 

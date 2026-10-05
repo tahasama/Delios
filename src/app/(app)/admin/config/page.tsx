@@ -6,6 +6,7 @@ import { ActionForm } from "@/components/form";
 import { addConfigValueAction, retireConfigValueAction, createConfigSetAction, updateValuePropsAction, deleteValueAction, deleteSetAction, moveConfigValueAction, updateConfigSetAction, bulkValuesAction, } from "@/lib/actions/admin";
 import { getSets } from "@/lib/config";
 import { SET_PROP_FIELDS, parseProps, type PropField } from "@/lib/config-props";
+import { propFieldsFor } from "@/lib/set-props";
 import type { Tenant } from "@/lib/tenant";
 import { SelectAll } from "./select-all";
 import { DeleteSetButton } from "./delete-set";
@@ -84,18 +85,28 @@ export default async function AdminConfigPage({ searchParams }: { searchParams: 
     db.configValue.groupBy({ by: ["setKey"], where: { status: "ACTIVE" }, _count: true }),
     usage(ctx, currentKey),
   ]);
-  const propFields = SET_PROP_FIELDS[currentKey];
+  const propFields = propFieldsFor(currentKey);
   const values = allValues.filter((v) =>
     (show === "ALL" || v.status === show) &&
     (!q || v.code.toLowerCase().includes(q.toLowerCase()) || v.label.toLowerCase().includes(q.toLowerCase())),
   );
   const retiredCount = allValues.filter((v) => v.status === "RETIRED").length;
   const countOf = (key: string) => counts.find((c) => c.setKey === key)?._count ?? 0;
-  const known = new Set(GROUPS.flatMap((g) => g.keys));
-  const groups: SetNavGroup[] = [
-    ...GROUPS.map((g) => ({ title: g.title, sets: g.keys.map((k) => sets.find((s) => s.key === k)).filter((s): s is (typeof sets)[number] => !!s).map((s) => ({ key: s.key, title: s.title, count: countOf(s.key) })) })),
-    { title: "Other", sets: sets.filter((s) => !known.has(s.key)).map((s) => ({ key: s.key, title: s.title, count: countOf(s.key) })) },
-  ].filter((g) => g.sets.length);
+  // Where a set files: what it says about itself first, then the built-in map
+  // for the ones that shipped, then Other.
+  const headingOf = (one: (typeof sets)[number]) =>
+    one.group?.trim() || GROUPS.find((g) => g.keys.includes(one.key))?.title || "Other";
+  // A kind is any set other lists may serve: the ones that shipped, plus
+  // anything already serving as one.
+  const headings = [...GROUPS.map((g) => g.title), ...sets.map(headingOf).filter((h) => !GROUPS.some((g) => g.title === h) && h !== "Other"), "Other"];
+  const groups: SetNavGroup[] = [...new Set(headings)]
+    .map((title) => ({
+      title,
+      sets: sets
+        .filter((one) => headingOf(one) === title)
+        .map((one) => ({ key: one.key, title: one.title, count: countOf(one.key) })),
+    }))
+    .filter((g) => g.sets.length);
   const here = (extra: Record<string, string | undefined>) => {
     const p = new URLSearchParams({ set: currentKey, ...(q ? { q } : {}), ...(show !== "ACTIVE" ? { show } : {}) });
     for (const [k, v] of Object.entries(extra)) v === undefined ? p.delete(k) : p.set(k, v);
@@ -149,9 +160,15 @@ export default async function AdminConfigPage({ searchParams }: { searchParams: 
             {sp.panel === "new" ? (
               <Card title="New set" description="A list your organization needs that the starter sets do not cover — areas, systems, anything." actions={<Link href={here({ panel: undefined })} aria-label="Close" className="text-slate-400 hover:text-slate-700"><X className="h-4 w-4" /></Link>}>
                 <ActionForm action={createConfigSetAction} submitLabel="Create set" size="sm">
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  <div className="grid grid-cols-1 items-end gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
                     <Field label="Title" required><input name="title" required className={inputCls} placeholder="Areas" /></Field>
                     <Field label="Key" required hint="UPPER_SNAKE"><input name="key" required className={inputCls} placeholder="AREAS" /></Field>
+                    <Field label="Category">
+                      <select name="group" className={inputCls} defaultValue="">
+                        <option value="">Other</option>
+                        {[...new Set([...GROUPS.map((g) => g.title), ...sets.map((one) => one.group).filter((one): one is string => !!one)])].map((title) => <option key={title} value={title}>{title}</option>)}
+                      </select>
+                    </Field>
                     <Field label="Description"><input name="description" className={inputCls} placeholder="What the set is for" /></Field>
                   </div>
                 </ActionForm>
@@ -160,9 +177,15 @@ export default async function AdminConfigPage({ searchParams }: { searchParams: 
             {sp.panel === "details" ? (
               <Card title="Set details" actions={<Link href={here({ panel: undefined })} aria-label="Close" className="text-slate-400 hover:text-slate-700"><X className="h-4 w-4" /></Link>}>
                 <ActionForm action={updateConfigSetAction} submitLabel="Save set details" size="sm" hidden={{ oldKey: set.key }}>
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="grid grid-cols-1 items-end gap-x-4 gap-y-3 sm:grid-cols-2">
                     <Field label="Title" required><input name="title" required defaultValue={set.title} className={inputCls} /></Field>
                     <Field label="Key" required hint="changing it also updates numbering and route references"><input name="key" required defaultValue={set.key} className={inputCls} /></Field>
+                    <Field label="Category">
+                      <select name="group" defaultValue={set.group ?? ""} className={inputCls}>
+                        <option value="">Other</option>
+                        {[...new Set([...GROUPS.map((g) => g.title), ...(set.group ? [set.group] : [])])].map((title) => <option key={title} value={title}>{title}</option>)}
+                      </select>
+                    </Field>
                     <Field label="Description" className="sm:col-span-2"><input name="description" defaultValue={set.description ?? ""} className={inputCls} /></Field>
                   </div>
                 </ActionForm>

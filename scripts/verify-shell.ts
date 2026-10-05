@@ -43,11 +43,9 @@ function main() {
   const reachedInline = new Set([
     "/documents/new",
     "/transmittals/new",
-    "/conformance/checks",
-    "/conformance/defects",
+    "/conformance",
+    "/conformance/rules",
     "/conformance/statement",
-    "/conformance/traceability",
-    "/conformance/audit",
     "/exposures",
     "/actions/schedules",
     "/actions/requirements",

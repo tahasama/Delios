@@ -274,7 +274,7 @@ export default async function DocumentDetailPage({
       // was told. Every ask is here with what came of it, and anybody with
       // standing on the document may add another.
       ...(carrying && policy.asked && carrying.state !== "IN_REVIEW" && (carrying.state !== "NOT_RELEASED" || decisionFinal) ? [
-        { key: "send-out", label: `Sending rev ${carrying.value} out`, open: requests.some((one) => one.status === "OPEN") || (!!current && !sentOut), body: (<>
+        { key: "send-out", label: carrying.state === "RELEASED" ? `Sending rev ${carrying.value} out` : `Ask for rev ${carrying.value} to be sent`, open: requests.some((one) => one.status === "OPEN") || (!!current && !sentOut), body: (<>
           {requests.length ? (
             <ul className="space-y-2">
               {requests.map((one) => {

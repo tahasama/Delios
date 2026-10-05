@@ -23,6 +23,9 @@ export type RegisterSearch = {
   criticality?: string;
   confidentiality?: string;
   deliverable?: string;
+  phase?: string;
+  /** An action code: the documents that action owes. */
+  action?: string;
   on?: string;
   from?: string;
   to?: string;
@@ -137,6 +140,10 @@ export function registerWhere(sp: RegisterSearch, assetDocIds: string[] = []): P
       sp.criticality ? { criticality: sp.criticality } : {},
       sp.confidentiality ? { confidentiality: sp.confidentiality } : {},
       sp.deliverable ? { deliverableType: sp.deliverable } : {},
+      sp.phase ? { latestPhase: sp.phase } : {},
+      // What an action owes is a relation, not a column: one document can be
+      // owed by several actions, and one action owes many documents.
+      sp.action ? { baselineEntries: { some: { action: { code: sp.action } } } } : {},
       revStateWhere,
       sp.status ? { latestRevState: "RELEASED", latestStatusCode: sp.status } : {},
       sp.verdict ? { latestVerdict: sp.verdict } : {},
@@ -154,6 +161,7 @@ export const REGISTER_SORTS: Record<string, string> = {
   verdict: "latestVerdict", discipline: "discipline", docType: "docType", originator: "originator",
   subProject: "subProject", contract: "contractRef", criticality: "criticality",
   confidentiality: "confidentiality", retention: "retentionClass", deliverable: "deliverableType",
+  phase: "latestPhase",
   planned: "latestPlannedAt", issued: "latestIssueAt", released: "latestReleasedAt",
   updated: "updatedAt", created: "createdDate",
 };

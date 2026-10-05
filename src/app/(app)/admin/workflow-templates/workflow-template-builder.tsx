@@ -121,7 +121,7 @@ export function WorkflowTemplateBuilder({ id, name = "", description = "", class
           <input name="name" required defaultValue={name} className={inputCls} placeholder="Engineering drawings — lead engineer decides" />
         </Field>
         <Field label="When to use it"><input name="description" defaultValue={description} className={inputCls} placeholder="Tell the sender when this route is the right one" /></Field>
-        <Field label="Verdict list" hint="what the deciding step answers with; the steps before it always answer from the advice list">
+        <Field label="Verdict list" hint="what the deciding step answers with; the steps before it always answer from the advice list. Publish a list named for outcomes or verdicts and it appears here — one set of verdicts for engineering, another elsewhere.">
           <select name="outcomeSetKey" defaultValue={outcomeSetKey} className={inputCls}>
             {(outcomeSets.length ? outcomeSets : ["REVIEW_OUTCOMES"]).map((key) => <option key={key} value={key}>{key.replaceAll("_", " ").toLowerCase()}</option>)}
           </select>

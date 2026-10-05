@@ -45,7 +45,7 @@ export function fmtValue(row: ValueRow | null | undefined, code?: string | null)
   return code ?? "—";
 }
 
-export const getSets = cache(async (): Promise<{ key: string; title: string; description: string | null; version: number }[]> => {
+export const getSets = cache(async (): Promise<{ key: string; title: string; description: string | null; group: string | null; version: number }[]> => {
   const db = await cdb();
   return db.configSet.findMany({ orderBy: { key: "asc" } });
 });

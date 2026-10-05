@@ -1,33 +1,25 @@
 import Link from "next/link";
 
+/**
+ * Assurance read in the order it is lived: what the register is checked against
+ * and what that found, what may still be in use although it is out of date,
+ * what the application refuses outright, and the page that states all of it to
+ * somebody outside.
+ */
 const TABS = [
-  { href: "/conformance", label: "What to fix" },
-  { href: "/exposures", label: "Out-of-date risks" },
-  { href: "/conformance/audit", label: "For auditors" },
+  { href: "/conformance/checks", label: "What is checked", internal: true },
+  { href: "/conformance/rules", label: "Default rules", internal: true },
+  { href: "/conformance/statement", label: "Conformance", internal: false },
 ] as const;
 
-/** The auditor's tools sit behind one tab; each of their pages shows it as current. */
-const AUDIT_PAGES = ["/conformance/audit", "/conformance/defects", "/conformance/checks", "/conformance/traceability", "/conformance/statement"];
-
-/**
- * Assurance for everyday use is two questions — what must I fix, and what
- * out-of-date information may still be in use. The Standard's own instruments
- * (checks, traceability, the formal statement) are for audits and live apart.
- */
-export function AssuranceTabs({ current }: { current: string }) {
-  const active = AUDIT_PAGES.includes(current) ? "/conformance/audit" : current;
+export function AssuranceTabs({ current, internal = true }: { current: string; internal?: boolean }) {
   return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-      <nav className="seg w-fit max-w-full" aria-label="Assurance">
-        {TABS.map((t) => (
-          <Link key={t.href} href={t.href} aria-current={active === t.href ? "page" : undefined} className="segment">
-            {t.label}
-          </Link>
-        ))}
-      </nav>
-      {AUDIT_PAGES.includes(current) && current !== "/conformance/audit" ? (
-        <Link href="/conformance/audit" className="whitespace-nowrap text-xs text-slate-400 hover:text-slate-600">← all auditor tools</Link>
-      ) : null}
-    </div>
+    <nav className="seg w-fit max-w-full" aria-label="Assurance">
+      {TABS.filter((t) => internal || !t.internal).map((t) => (
+        <Link key={t.href} href={t.href} aria-current={current === t.href ? "page" : undefined} className="segment">
+          {t.label}
+        </Link>
+      ))}
+    </nav>
   );
 }

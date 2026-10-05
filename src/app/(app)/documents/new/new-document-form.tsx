@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 import { AlertTriangle } from "lucide-react";
 import { isEmptyTitle } from "@/lib/standard";
 
-type Opt = { code: string; label: string; meaning?: string | null };
+type Opt = { code: string; label: string; meaning?: string | null; appliesTo?: string | null };
 
 const PRODUCER_LABEL: Record<string, string> = {
   ENG: "Internal engineering",
@@ -69,6 +69,14 @@ export function NewDocumentForm({
   const needs = (setKey: string) => (numberingSets[producer] ?? []).includes(setKey);
   const external = producer === "CTR" || producer === "VND" || producer === "TPY" || producer === "CLT";
   const docTypeLabel = docTypes.find((t) => t.code === docType)?.label ?? docType;
+  // Each type says who produces it. Once the producer is chosen, the list is
+  // the types that belong to them — two hundred names narrows to the ones that
+  // can be right. A type that says nothing is offered either way.
+  const supplierDoc = producer !== "" && producer !== "ENG";
+  const typesForProducer = docTypes.filter((one) => {
+    if (!one.appliesTo || one.appliesTo === "Unclassified" || !producer) return true;
+    return supplierDoc ? one.appliesTo === "Supplier" : one.appliesTo === "Non-supplier";
+  });
   const disciplineLabel = disciplines.find((d) => d.code === discipline)?.label ?? discipline;
   const route = routes.find((r) => r.id === sendTo);
   const ready = Boolean(producer && docType && discipline);
@@ -158,10 +166,10 @@ export function NewDocumentForm({
                 single
                 name="docType"
                 browse
-                items={docTypes.map((o) => ({ id: o.code, name: o.label, detail: o.code }))}
+                items={typesForProducer.map((o) => ({ id: o.code, name: o.label, detail: o.code }))}
                 label="Type"
                 required
-                hint="click to see the list, or type to narrow it"
+                hint={producer ? `${typesForProducer.length} types ${supplierDoc ? "a supplier produces" : "we produce"} — click to see them, or type to narrow` : "click to see the list, or type to narrow it"}
                 placeholder="e.g. drawing, datasheet, DSW…"
                 onChange={(ids) => setDocType(ids[0] ?? "")}
               />

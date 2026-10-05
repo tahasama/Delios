@@ -1,5 +1,4 @@
 import { REFERENCE, profileForKind, publishProfile } from "./profiles";
-import { adoptReferenceSpine } from "./spine";
 import type { PrismaClient } from "@prisma/client";
 
 /**
@@ -13,8 +12,6 @@ import type { PrismaClient } from "@prisma/client";
  */
 export async function publishReferenceConfiguration(db: PrismaClient, orgId: string, projectKind?: string) {
   await publishFunctionCatalogue(db, orgId);
-  // Annex F: the Traceability Spine as the Standard publishes it.
-  await adoptReferenceSpine(db, orgId);
 
   // ── Annex D reference sets, then the project type's additions ──────────────
   // The lists live in src/lib/profiles/*.json: configuration as data.

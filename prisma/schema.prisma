@@ -95,6 +95,7 @@ model Project {
   auditEvents            AuditEvent[]
   defects                Defect[]
   checkRuns              CheckRun[]
+  checkOptOuts           CheckOptOut[]
   checkRunItems          CheckRunItem[]
   notifications          Notification[]
   obsolescenceRecords    ObsolescenceRecord[]
@@ -433,6 +434,9 @@ model ConfigSet {
   key         String
   title       String
   description String?
+  // Which heading it files under on the settings page. A set an organization
+  // publishes itself would otherwise always land in "Other".
+  group       String?
   version     Int           @default(1)
   values      ConfigValue[]
 
@@ -559,6 +563,10 @@ model Document {
   legacyScheme     String? // identification of pre-existing schemes (§3.8)
   createdDate      DateTime  @default(now()) // date created (§4.5)
   receivedDate     DateTime? // date received from external party (§4.5)
+  // When it is expected, before any revision of it exists. A revision carries
+  // its own plannedSubmissionDate; this is what a deliverable list says is due
+  // for a document nobody has started yet.
+  plannedDate      DateTime?
   appVersion       String? // authoring application+version for proprietary natives (§10.1)
   createdById      String
   createdByName    String
@@ -576,6 +584,10 @@ model Document {
   latestRevValue   String?
   latestRevState   String?
   latestStatusCode String?
+  // Which phase the newest revision serves. A document spans several — Rev A
+  // for detail design, Rev C as-built — so the phase is the revision's, and
+  // this is the register's copy of the latest one.
+  latestPhase      String?
   latestVerdict    String?
   latestRevAt      DateTime?
   latestFileAt     DateTime?
@@ -1401,6 +1413,28 @@ model Defect {
   @@index([projectId])
 }
 
+/**
+ * A check this organization has switched off, on its own responsibility.
+ *
+ * Not every check applies to every organization, and one that does not should
+ * stop producing findings rather than be ignored every week. Switching it off
+ * is a decision with a name and a reason against it, and the statement says how
+ * many were switched off.
+ */
+model CheckOptOut {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  checkId   String
+  reason    String
+  setById   String?
+  setByName String
+  setAt     DateTime @default(now())
+
+  @@unique([projectId, checkId])
+  @@index([projectId])
+}
+
 model CheckRun {
   id            String         @id @default(cuid())
   projectId     String
@@ -1429,7 +1463,9 @@ model CheckRunItem {
   runId        String
   run          CheckRun @relation(fields: [runId], references: [id])
   checkId      String
-  result       String // PASS FAIL NOT_CHECKED NOT_EXECUTABLE NOT_APPLICABLE
+  result       String // PASS FAIL NEEDS_SETUP BY_HAND OFF NOT_EXECUTABLE
+  // What has to be set up before it can run, or why it was switched off.
+  note         String?
   failingCount Int      @default(0)
   ms           Int?
 

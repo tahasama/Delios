@@ -35,6 +35,7 @@ export const ORG_SCOPED = new Set([
 ]);
 
 export const PROJECT_SCOPED = new Set([
+  "CheckOptOut",
   "Delegation",
   "IssueRequest",
   "ControlSetting",
@@ -477,12 +478,13 @@ export async function restateDocument(documentId: string) {
     where: { documentId },
     orderBy: { createdAt: "desc" },
     select: {
-      id: true, value: true, state: true, statusCode: true, createdAt: true,
+      id: true, value: true, state: true, statusCode: true, phase: true, createdAt: true,
       plannedSubmissionDate: true, issueDate: true, releasedAt: true,
       files: { orderBy: { createdAt: "desc" }, take: 1, select: { createdAt: true } },
       cycles: { where: { binding: true, outcome: { not: null } }, orderBy: { sequence: "desc" }, take: 1, select: { outcome: true } },
     },
   });
+  const planned = await db.document.findUnique({ where: { id: documentId }, select: { plannedDate: true } });
   await db.document.update({
     where: { id: documentId },
     data: {
@@ -490,10 +492,13 @@ export async function restateDocument(documentId: string) {
       latestRevValue: latest?.value ?? null,
       latestRevState: latest?.state ?? null,
       latestStatusCode: latest?.statusCode ?? null,
+      latestPhase: latest?.phase ?? null,
       latestVerdict: latest?.cycles[0]?.outcome ?? null,
       latestRevAt: latest?.createdAt ?? null,
       latestFileAt: latest?.files[0]?.createdAt ?? null,
-      latestPlannedAt: latest?.plannedSubmissionDate ?? null,
+      // A placeholder has no revision yet, so what the deliverable list said is
+      // due stands in until one exists.
+      latestPlannedAt: latest?.plannedSubmissionDate ?? planned?.plannedDate ?? null,
       latestIssueAt: latest?.issueDate ?? null,
       latestReleasedAt: latest?.releasedAt ?? null,
     },

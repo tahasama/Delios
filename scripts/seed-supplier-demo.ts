@@ -7,8 +7,8 @@ import { PrismaClient } from "@prisma/client";
 const db = new PrismaClient();
 
 const PLACEHOLDERS = [
-  { docNumber: "P1001-50-ACME-PO101-ME-DGA-00001", title: "Feed pump P-101 — general arrangement drawing", docType: "DGA" },
-  { docNumber: "P1001-50-ACME-PO101-ME-DAS-00002", title: "Feed pump P-101 — performance curves", docType: "DAS" },
+  { docNumber: "P1001-50-ACME-PO101-ME-DGA-00001", title: "Feed pump P-101 — general arrangement drawing", docType: "LAY" },
+  { docNumber: "P1001-50-ACME-PO101-ME-DAS-00002", title: "Feed pump P-101 — performance curves", docType: "DAT" },
 ];
 
 async function main() {

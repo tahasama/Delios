@@ -44,7 +44,7 @@ export default async function ExposuresPage() {
         subtitle="Replaced or withdrawn information that may still be in use, and who must act."
         actions={<Chip className={total > 0 ? "bg-amber-100 text-amber-800 ring-amber-300" : "bg-emerald-100 text-emerald-800 ring-emerald-300"}>{total} open</Chip>}
       />
-      <AssuranceTabs current="/exposures" />
+      <AssuranceTabs current="/conformance/checks" internal={user.isInternal} />
 
       {total === 0 ? <Banner tone="good" title="No exposures">Nobody holds a replaced revision without knowing, no work is blocked, and nothing withdrawn or voided is still relied on.</Banner> : null}
 

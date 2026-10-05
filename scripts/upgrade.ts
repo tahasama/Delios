@@ -1,7 +1,6 @@
 // Upgrade step, safe to run any number of times. For every organization:
 //  - publish any function from the default catalogue it does not have yet
 //    (e.g. Project manager); functions it already has are never touched;
-//  - give it the reference Traceability Spine if it has none (Annex F);
 //  - flag the document types that describe equipment (§5.8) and the default
 //    retention class, where the organization has not set them itself;
 //  - give every document without a retention class the one its criticality
@@ -18,7 +17,6 @@
 import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
 import { publishFunctionCatalogue } from "../src/lib/bootstrap";
-import { adoptReferenceSpine } from "../src/lib/spine";
 import { retentionFor } from "../src/lib/retention";
 import { tenantFor } from "../src/lib/tenant";
 import { REFERENCE, publishProfile } from "../src/lib/profiles";
@@ -31,7 +29,7 @@ async function main() {
     const before = await db.function.count({ where: { orgId: o.id } });
     await publishFunctionCatalogue(db, o.id);
     const added = (await db.function.count({ where: { orgId: o.id } })) - before;
-    const spine = (await db.spineLink.count({ where: { orgId: o.id } })) ? 0 : await adoptReferenceSpine(db, o.id, "Adopted at upgrade");
+    
     // Lists and values the reference has gained since this organization started.
     const setsBefore = await db.configSet.count({ where: { orgId: o.id } });
     const valuesBefore = await db.configValue.count({ where: { orgId: o.id } });
@@ -77,7 +75,7 @@ async function main() {
       const ids = steps.slice(0, -1).map((s) => s.cycleId).filter((id): id is string => !!id);
       if (ids.length) advisory += (await db.reviewCycle.updateMany({ where: { id: { in: ids }, binding: true }, data: { binding: false } })).count;
     }
-    console.log(`${o.slug}: ${added} function(s) added${spine ? `, ${spine} spine links adopted` : ""}${flagged ? `, ${flagged} value(s) flagged` : ""}${retained ? `, ${retained} retention class(es) set` : ""}${advisory ? `, ${advisory} route cycle(s) marked as advice` : ""}${lists ? `, ${lists} list(s) published` : ""}${newValues ? `, ${newValues} value(s) added` : ""}${relabelled ? `, ${relabelled} label(s) corrected` : ""}`);
+    console.log(`${o.slug}: ${added} function(s) added${flagged ? `, ${flagged} value(s) flagged` : ""}${retained ? `, ${retained} retention class(es) set` : ""}${advisory ? `, ${advisory} route cycle(s) marked as advice` : ""}${lists ? `, ${lists} list(s) published` : ""}${newValues ? `, ${newValues} value(s) added` : ""}${relabelled ? `, ${relabelled} label(s) corrected` : ""}`);
   }
 }
 

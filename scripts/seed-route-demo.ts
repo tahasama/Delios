@@ -8,7 +8,7 @@ const db = new PrismaClient();
 
 const DOCS = [
   { docNumber: "P1001-50-ME-CAL-09101", title: "Pump house — ventilation duct sizing calculation", docType: "CAL", discipline: "ME" },
-  { docNumber: "P1001-50-EL-DSW-09102", title: "Pump house — lighting layout drawing", docType: "DSW", discipline: "EL" },
+  { docNumber: "P1001-50-EL-DSW-09102", title: "Pump house — lighting layout drawing", docType: "DWG", discipline: "EL" },
 ];
 
 async function main() {

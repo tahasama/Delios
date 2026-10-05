@@ -513,6 +513,49 @@ summary::-webkit-details-marker {
   .no-print {
     display: none !important;
   }
+
+  /* A statement of conformance is one page or it is not a statement: whoever
+     receives it files one sheet. The sheet keeps its proportions — it is set
+     tighter, not shrunk — and nothing it holds may break across a page. */
+  @page {
+    size: A4 portrait;
+    margin: 12mm;
+  }
+  html,
+  body {
+    background: #ffffff !important;
+  }
+  .print-sheet {
+    font-size: 10px;
+    line-height: 1.35;
+  }
+  .print-sheet h1 {
+    font-size: 15px;
+  }
+  .print-sheet section {
+    margin-top: 8px;
+    break-inside: avoid;
+  }
+  .print-sheet td,
+  .print-sheet th {
+    padding-top: 2px !important;
+    padding-bottom: 2px !important;
+  }
+  /* The three figures keep their weight; it is the air around them that goes. */
+  .print-sheet .figure {
+    padding: 6px 8px;
+  }
+  .print-sheet .figure p:first-child {
+    font-size: 17px;
+  }
+  .print-sheet table {
+    break-inside: avoid;
+  }
+  .print-sheet p,
+  .print-sheet li {
+    orphans: 2;
+    widows: 2;
+  }
 }
 
 /* ── Tables ────────────────────────────────────────────────────────────────

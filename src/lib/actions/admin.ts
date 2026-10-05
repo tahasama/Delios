@@ -165,7 +165,8 @@ export async function createConfigSetAction(_prev: { error?: string } | undefine
     if (key.length > 40) return { error: "Keep the key under 40 characters." };
     const dup = await db.configSet.findFirst({ where: { key } });
     if (dup) return { error: "A set with that key already exists." };
-    await db.configSet.create({ data: { orgId, key, title, description, version: 1 } });
+    const group = String(formData.get("group") ?? "").trim() || null;
+    await db.configSet.create({ data: { orgId, key, title, description, group, version: 1 } });
  await audit({ actor: admin, action: "CONFIG_SET_CREATED", entityType: "ConfigSet", entityId: key, entityLabel: title, detail: "Organization-defined value set published." });
     revalidatePath("/admin/config");
     return {};
@@ -370,12 +371,13 @@ export async function updateConfigSetAction(_prev: { error?: string; ok?: string
     const key = String(formData.get("key") ?? "").trim().toUpperCase().replace(/[^A-Z0-9_]/g, "_");
     const title = String(formData.get("title") ?? "").trim();
     const description = String(formData.get("description") ?? "").trim() || null;
+    const group = formData.has("group") ? String(formData.get("group") ?? "").trim() || null : undefined;
     if (!oldKey || !key || !title) return { error: "Key and title are required." };
     const current = await db.configSet.findFirst({ where: { key: oldKey } });
     if (!current) return { error: "Set not found." };
     if (key !== oldKey && await db.configSet.findFirst({ where: { key } })) return { error: "Another set already uses that key." };
     if (key === oldKey) {
-      await db.configSet.update({ where: { orgId_key: { orgId, key: oldKey } }, data: { title, description, version: { increment: 1 } } });
+      await db.configSet.update({ where: { orgId_key: { orgId, key: oldKey } }, data: { title, description, ...(group === undefined ? {} : { group }), version: { increment: 1 } } });
     } else {
       await db.$transaction([
         db.configSet.create({ data: { orgId, key, title, description, version: current.version + 1 } }),

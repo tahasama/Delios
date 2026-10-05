@@ -1,20 +1,24 @@
 
 import { requireScope } from "@/lib/scope";
 import { PageHeader, Card, ButtonLink } from "@/components/ui";
+import { Download } from "lucide-react";
 import { BulkImportForm } from "./bulk-import-form";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Bulk import & export" };
 
 export default async function ImportPage({ searchParams }: { searchParams: Promise<{ kind?: string }> }) {
-  const { db } = await requireScope();
+  const ctx = await requireScope();
+  const { db } = ctx;
   const sp = await searchParams;
 
-  const published = await db.configSet.findMany({
-    select: { key: true, title: true, _count: { select: { values: true } } },
-    orderBy: { title: "asc" },
-  });
-  const sets = published.map((one) => ({ key: one.key, title: one.title, count: one._count.values }));
+  // Everything on this page changes the project wholesale — a register, a team,
+  // the matrix, a published list. Creating a document does not qualify someone
+  // to create accounts, so custody or configuration is the bar.
+  if (!ctx.can("CONTROL") && !ctx.can("CONFIGURE")) {
+    return <PageHeader title="Bulk import & export" subtitle={ctx.why("CONTROL")} />;
+  }
+
 
   const exports = [
     { kind: "documents", label: "Master register (all states)" },
@@ -30,31 +34,29 @@ export default async function ImportPage({ searchParams }: { searchParams: Promi
     <div className="space-y-5">
       <PageHeader
         title="Bulk import & export"
-        subtitle="Bring in a deliverable list or correct many documents at once, with every row checked before anything is committed."
+        subtitle="Bring a list in, or take one out. Every row is checked and shown to you before anything is written."
         actions={<ButtonLink href="/documents" variant="secondary">Back to register</ButtonLink>}
       />
 
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1fr_340px]">
-        <BulkImportForm initialKind={sp.kind ?? ""} sets={sets} />
+        <BulkImportForm initialKind={sp.kind ?? ""} />
 
         <div className="space-y-4">
-          <Card title="Templates" description="Download, fill the rows, keep the header.">
-            <ul className="space-y-2 text-sm">
-              <li><a href="/api/export/template-deliverables" className="font-medium text-brand-ink hover:underline">Deliverable list template</a></li>
-              <li className="hidden"><a href="/api/export/template-baseline">Baseline template</a></li>
-              <li><a href="/api/export/template-people" className="font-medium text-brand-ink hover:underline">People template</a></li>
-              <li><a href="/api/export/matrix" className="font-medium text-brand-ink hover:underline">Distribution matrix, filled in</a> <span className="text-xs text-slate-400">— not a blank template: it comes out as it stands today</span></li>
-            </ul>
-          </Card>
-          <Card title="Extract any view" description="Each file carries its generation timestamp.">
-            <ul className="space-y-2 text-sm">
+          <Card title="Take a copy out" description="Any register, as it stands. Each file carries the moment it was made.">
+            <ul className="-mx-2 text-sm">
               {exports.map((e) => (
                 <li key={e.kind}>
-                  <a href={`/api/export/${e.kind}`} className="font-medium text-brand-ink hover:underline">{e.label} ↓</a>
+                  <a
+                    href={`/api/export/${e.kind}`}
+                    className="flex items-center justify-between gap-3 rounded-lg px-2 py-2 text-slate-700 transition hover:bg-slate-50 hover:text-brand-ink"
+                  >
+                    <span className="min-w-0 text-[13px]">{e.label}</span>
+                    <Download className="h-3.5 w-3.5 shrink-0 text-slate-400" aria-hidden="true" />
+                  </a>
                 </li>
               ))}
             </ul>
-                      </Card>
+          </Card>
         </div>
       </div>
     </div>

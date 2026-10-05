@@ -272,11 +272,12 @@ export async function seedDemoProject(db: PrismaClient, orgId: string, projectId
   const fdnA = await mkRev(fdn.id, fdn.docNumber, { value: "A", state: "IN_REVIEW", reason: "First issue", change: "Foundations for pumps P-101/102", authorization: "Placeholder register entry (§16.8)" });
   await mkCycle(fdnA.id, fdn.id, fdn.docNumber, "A", { seq: 1, open: true });
 
-  // ── 3 · DELIBERATE DEFECT: released with no approval + blocking comment open + missing file ──
+  // ── 3 · DELIBERATE DEFECT: blocking comment left open on a released revision, and the file gone from the store ──
   const rebar = await mkDoc({ docNumber: "P1001-50-ST-DSW-00001", title: "Non-process building 50 — reinforcement arrangement, blower house slab", deliverableType: "ENG", docType: "DSW", discipline: "ST", assetCodes: ["BL-301"], createdBy: "author2", criticality: "SAFETY", retentionClass: "ASSET_LIFE" });
   const rebarA = await mkRev(rebar.id, rebar.docNumber, { value: "A", state: "RELEASED", statusCode: "IFC", reason: "First issue", change: "Slab reinforcement", releasedAt: d(-15), bogusFile: true });
-  void rebarA;
-  // no approval row — ST-07 / AP-01 ▲
+  // Released means approved: the application refuses a release with no approval
+  // recorded, so a demo without one shows a fault that could never happen here.
+  await mkApproval(rebarA.id, rebar.id, rebar.docNumber, "A", "approver");
   const rebarCycle = await mkCycle((await db.revision.findFirstOrThrow({ where: { documentId: rebar.id } })).id, rebar.id, rebar.docNumber, "A", { seq: 1, outcome: verdictCode("accept_with_comments"), blockingComment: true });
   void rebarCycle; // blocking comment left OPEN on a released revision — RO-14 ▲
 

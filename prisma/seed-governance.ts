@@ -1,6 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 
-/** One-off additions: C.7 format lists, C.3.3 type-to-field matrix, Annex F spine. */
+/** One-off additions: the format lists and the type-to-field matrix. */
 export async function seedGovernance(db: PrismaClient, orgId: string, projectId: string) {
   // ── C.7 format lists ──
   async function set(key: string, title: string, description: string, values: { code: string; label: string; props?: Record<string, unknown> }[]) {
@@ -29,8 +29,5 @@ export async function seedGovernance(db: PrismaClient, orgId: string, projectId:
     { code: "CLT", label: "Client", props: { originator: "na", po: "optional", receivedDate: "required", subProject: "optional" } },
   ]);
 
-  // ── Annex F spine — the reference links, per relationship ──
-  const { adoptReferenceSpine } = await import("../src/lib/spine");
-  await adoptReferenceSpine(db, orgId);
-  console.log("· Governance seed: format sets, type-to-field matrix, spine links.");
+  console.log("· Governance seed: format sets and the type-to-field matrix.");
 }

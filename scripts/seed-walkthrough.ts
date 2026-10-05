@@ -24,6 +24,7 @@ import { mkdir, writeFile } from "fs/promises";
 import path from "path";
 import { createHash } from "crypto";
 import type { SessionUser } from "../src/lib/auth";
+import { registerDocument, startRevision } from "../src/lib/register";
 
 const db = new PrismaClient();
 const PREFIX = "WALK";
@@ -83,6 +84,9 @@ async function main() {
     await db.transmittalRecipient.deleteMany({ where: { transmittalId: { in: tIds } } });
     await db.transmittal.deleteMany({ where: { id: { in: tIds } } });
     await db.documentSnapshot.deleteMany({ where: { documentId: { in: ids } } });
+    // The files go with the revisions they belonged to. Left behind they are a
+    // file the register does not know about, which is a finding of its own.
+    await db.storedFile.deleteMany({ where: { revisionId: { in: revIds } } });
     await db.revision.deleteMany({ where: { id: { in: revIds } } });
     await db.document.deleteMany({ where: { id: { in: ids } } });
   }
@@ -111,22 +115,29 @@ async function main() {
   };
   const toSite = { internalUserIds: site.map((one) => one.id), partyIds: [] };
 
+  // Registered the way the application registers one — the number allocated,
+  // the entry audited, the revision authorized and its start logged. A seed
+  // that writes the rows itself produces documents the checks rightly condemn.
   async function make(n: number, title: string, discipline: string, docType: string, deliverableType = "ENG", originator: string | null = null) {
-    const { docNumber } = await allocateNumber(t, deliverableType, {
-      "Project code": "P1001", Subproject: "50", Discipline: discipline, "Document type": docType,
-      "Supplier code": originator ?? "ACME", "Purchase order": "PO101",
+    const registered = await registerDocument(t, author, {
+      title: `${PREFIX} ${n} — ${title}`,
+      deliverableType, docType, discipline,
+      projectCode: "P1001", subProject: "50",
+      originator, contractRef: originator ? "PO101" : null,
+      criticality: "ROUTINE", confidentiality: "INTERNAL", retentionClass: "PROJECT_DURATION",
+      // A document from another party must say when it arrived, or it is a
+      // finding in its own right.
+      receivedDate: originator ? ago(19) : null,
+      at: ago(20), how: "Walkthrough example.",
     });
-    const doc = await t.db.document.create({
-      data: {
-        projectId: project.id, docNumber, title: `${PREFIX} ${n} — ${title}`, deliverableType, docType, discipline,
-        criticality: "ROUTINE", confidentiality: "INTERNAL", state: "ACTIVE", originator,
-        createdById: author.id, createdByName: author.name, createdDate: ago(20), retentionClass: "PROJECT_LIFE",
-      },
+    const rev = await startRevision(t, author, registered.id, {
+      value: "A",
+      reasonForRevision: "First issue",
+      authorizationReason: "First revision of a new register entry.",
+      at: ago(18),
     });
-    const rev = await t.db.revision.create({
-      data: { projectId: project.id, documentId: doc.id, value: "A", state: "IN_PREPARATION", createdAt: ago(18), reasonForRevision: "First issue" },
-    });
-    await attach(docNumber, rev.id, rev.value);
+    const doc = await t.db.document.findUniqueOrThrow({ where: { id: registered.id } });
+    await attach(registered.docNumber, rev.id, rev.value);
     return { doc, rev };
   }
 
@@ -172,7 +183,7 @@ async function main() {
   line.push(`WALK 3 ${w3.doc.docNumber} — decision step (approver@delios.local)`);
 
   // 4 — decided "to be IFC", not released
-  const w4 = await make(4, "Cable trench layout — decided, waiting to be released", "EL", "DSW");
+  const w4 = await make(4, "Cable trench layout — decided, waiting to be released", "EL", "DWG");
   const r4 = await startWorkflowRun(t, w4.rev.id, route.id, control, [[reviewer.id], [approver.id]]);
   if (!r4.ok) throw new Error(r4.error);
   await advise(r4.runId, "No comment.");
@@ -180,7 +191,7 @@ async function main() {
   line.push(`WALK 4 ${w4.doc.docNumber} — decided to be IFC, release it (controller@delios.local)`);
 
   // 5 — released at IFC, and sent to the site team in the same act
-  const w5 = await make(5, "Lighting layout — released and issued to site", "EL", "DSW");
+  const w5 = await make(5, "Lighting layout — released and issued to site", "EL", "DWG");
   const r5 = await startWorkflowRun(t, w5.rev.id, route.id, control, [[reviewer.id], [approver.id]]);
   if (!r5.ok) throw new Error(r5.error);
   await advise(r5.runId, "No comment.");
@@ -189,7 +200,7 @@ async function main() {
   line.push(`WALK 5 ${w5.doc.docNumber} — released IFC and issued to site (controller@delios.local)`);
 
   // 6 — released and issued to the client
-  const w6 = await make(6, "General arrangement — issued to the client", "ME", "DGA");
+  const w6 = await make(6, "General arrangement — issued to the client", "ME", "LAY");
   const r6 = await startWorkflowRun(t, w6.rev.id, route.id, control, [[reviewer.id], [approver.id]]);
   if (!r6.ok) throw new Error(r6.error);
   await advise(r6.runId, "No comment.");
@@ -210,7 +221,7 @@ async function main() {
   line.push(`WALK 6 ${w6.doc.docNumber} — issued on ${out.number} (client@delios.local)`);
 
   // 7 — arrived from a supplier, waiting to be checked
-  const w7 = await make(7, "Blower datasheet — arrived from the supplier", "ME", "DAS", "VND", "ACME");
+  const w7 = await make(7, "Blower datasheet — arrived from the supplier", "ME", "DAT", "VND", "ACME");
   const inbound = await t.db.transmittal.create({
     data: {
       projectId: project.id, number: `TR-W${(Date.now() + 1).toString(36).slice(-4).toUpperCase()}`, direction: "INCOMING", status: "ISSUED",

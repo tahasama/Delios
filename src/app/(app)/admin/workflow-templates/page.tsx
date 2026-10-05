@@ -6,6 +6,7 @@ import { WorkflowTemplateBuilder, type WorkflowBuilderStep } from "./workflow-te
 import { hasVerb } from "@/lib/auth";
 import { ArrowRight } from "lucide-react";
 import { verdictSets } from "@/lib/verdict-sets";
+import { isVerdictSet } from "@/lib/set-props";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Review routes" };
@@ -25,7 +26,9 @@ export default async function WorkflowTemplatesPage() {
     // supplier. How each of them answers is set in Parties & people.
     db.party.findMany({ where: { isInternal: false, active: true }, orderBy: { name: "asc" }, select: { id: true, name: true, participation: true } }),
   ]);
-  const outcomeSets = sets.filter((s) => s.key.includes("OUTCOME") || s.key.includes("REVIEW"));
+  // A route may answer from any verdict list the organization publishes — its
+  // own list for engineering, say — so this is not a fixed pair.
+  const outcomeSets = sets.filter((s) => isVerdictSet(s.key));
   // What each status lets a step do. The rules live in the status list, so a
   // route can only offer what the organization published.
   const statusChoices = (await getActiveSet("STATUSES")).map((value) => {

@@ -1,121 +1,235 @@
-import Link from "next/link";
 import { requireScope } from "@/lib/scope";
-import { PageHeader, ButtonLink } from "@/components/ui";
+import { PageHeader } from "@/components/ui";
 import { fmtDate, fmtDateTime } from "@/lib/utils";
 import { PrintButton } from "./print-button";
-import { effectiveSpine } from "@/lib/spine";
 import { AssuranceTabs } from "@/app/(app)/conformance/tabs";
+import { CATALOG, CHECK_BY_ID, PHASE_LABEL, type Phase } from "@/lib/checks/catalog";
+import { PREVENTED } from "@/lib/checks/prevented";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Conformance statement" };
+export const metadata = { title: "Conformance" };
 
-// §1.6 — the conformance assessment statement: issuing organization, recipient,
-// level, scope, version, date, integrity, counts by severity, open criticals,
-// coverage, plus the exceptions register it must be read with.
-export default async function StatementPage() {
+const PHASES: Phase[] = ["SETUP", "RUNNING", "HANDOVER"];
+const SEVERITIES = ["CRITICAL", "MAJOR", "MINOR", "ADVISORY"] as const;
+
+/**
+ * One page that answers, for somebody outside: how is this register controlled,
+ * and how do you know.
+ *
+ * It states what was asked, what was not asked and why, what was found, and
+ * what is still open — in that order, because a result nobody can place is
+ * worth nothing. Everything on it is read from the last run; nothing is typed.
+ */
+export default async function ConformancePage() {
   const ctx = await requireScope();
   const { db } = ctx;
-  const [scope, lastRun, defects, exceptions, docs, spine, baseline] = await Promise.all([
+  const [scope, project, lastRun, defects, exceptions, totalDocs, flawedDocs, optOuts] = await Promise.all([
     db.scopeConfig.findFirst(),
-    db.checkRun.findFirst({ orderBy: { ranAt: "desc" } }),
+    db.project.findFirst(),
+    db.checkRun.findFirst({ orderBy: { ranAt: "desc" }, include: { items: true } }),
     db.defect.findMany({ where: { status: { in: ["OPEN", "ACCEPTED"] } } }),
     db.exceptionEntry.findMany({ orderBy: { startDate: "desc" } }),
     db.document.count(),
-    effectiveSpine(ctx),
-    db.spineBaseline.findFirst({ orderBy: { releasedAt: "desc" } }),
+    db.document.count({ where: { defects: { some: { severity: { in: ["CRITICAL", "MAJOR"] }, status: { in: ["OPEN", "ACCEPTED"] } } } } }),
+    db.checkOptOut.findMany(),
   ]);
 
+  const threshold = scope?.integrityThreshold ?? 95;
+  const clear = totalDocs - flawedDocs;
+  const rate = totalDocs ? (clear / totalDocs) * 100 : 100;
+  const openCritical = defects.filter((d) => d.severity === "CRITICAL").length;
   const count = (sev: string, status: string) => defects.filter((d) => d.severity === sev && d.status === status).length;
-  const coverage = lastRun?.coverage ?? 0;
-  const qualified = coverage < 100;
+  const items = lastRun?.items ?? [];
+  const asked = items.filter((i) => i.result === "PASS" || i.result === "FAIL");
+  // A check the records cannot settle. It stays in the catalogue, and is said
+  // out loud here, because leaving it silent would overstate what was measured.
+  const byHand = items.filter((i) => i.result === "BY_HAND" || i.result === "NOT_EXECUTABLE");
+  const held = rate >= threshold && openCritical === 0;
+
+  const perPhase = PHASES.map((p) => {
+    const ids = CATALOG.filter((c) => c.phase === p).map((c) => c.id);
+    const mine = items.filter((i) => ids.includes(i.checkId));
+    return {
+      phase: p,
+      total: ids.length,
+      ran: mine.filter((i) => i.result === "PASS" || i.result === "FAIL").length,
+      failing: mine.filter((i) => i.result === "FAIL").length,
+      found: mine.reduce((n, i) => n + (i.result === "FAIL" ? i.failingCount : 0), 0),
+    };
+  });
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
-      <div className="flex items-center justify-between no-print">
-        <PageHeader title="Conformance assessment statement" subtitle="A formal, printable summary of the organization’s declared scope and measured control evidence." />
-        <div className="flex gap-2">
-          <PrintButton />
-        </div>
+    <div className="mx-auto max-w-3xl space-y-4">
+      <div className="no-print">
+        <PageHeader
+          title="Conformance"
+          subtitle="One page for somebody outside the project: what the register is checked against, what was found, and what is still open. Read from the last run — nothing on it is typed."
+          actions={<PrintButton />}
+        />
+        <AssuranceTabs current="/conformance/statement" />
       </div>
-      <div className="no-print"><AssuranceTabs current="/conformance/statement" /></div>
 
-      <article className="rounded-xl border border-line-strong bg-surface p-8 shadow-sm print:shadow-none">
+      <article className="print-sheet register register-sheet px-8 py-8 print:border-0 print:p-0 print:shadow-none">
         <header className="border-b border-line pb-4 text-center">
-          <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">Conformance assessment statement</p>
+          <p className="stencil text-slate-400">Statement of conformance</p>
           <h1 className="mt-2 text-xl font-semibold text-slate-900">{scope?.organizationName ?? "—"}</h1>
-          <p className="text-xs text-slate-500">Issued {fmtDate(new Date())} · recipient: <em>as addressed</em></p>
+          <p className="mt-0.5 text-xs text-slate-500">
+            {project ? `${project.name} (${project.code})` : "—"} · issued {fmtDate(new Date())} · recipient: <em>as addressed</em>
+          </p>
         </header>
 
-        <dl className="mt-6 space-y-3 text-sm">
-          <Row label="Scope assessed (§1.2)">{scope?.scopeStatement ?? "—"}</Row>
-          <Row label="Level (§1.5)">{scope?.assessmentLevel ?? "—"}</Row>
-          <Row label="Standard applied">{`Document Management Standard version ${scope?.standardVersion ?? "1.0"}`}</Row>
-          <Row label="Effective from (§1.9)">{scope ? fmtDate(scope.effectiveDate) : "—"}</Row>
-          <Row label="Assessment date">{lastRun ? fmtDateTime(lastRun.ranAt) : "no measurement"}</Row>
-          <Row label="Documents in scope">{docs}</Row>
-          <Row label="Integrity (§17.4)">
-            <strong>{lastRun ? `${lastRun.integrity.toFixed(1)}%` : "not measured"}</strong>
-            {qualified && lastRun ? <em className="ml-2 text-amber-700">qualified — check execution coverage {coverage.toFixed(0)}% is below 100%</em> : null}
-          </Row>
-          <Row label="Rules · Routes · Checks (Annex F)">
-            {baseline ? `Synchronized baseline ${baseline.label}, released ${fmtDate(baseline.releasedAt)}` : "No synchronized baseline released"}
-            {spine.releasable ? " · views reconcile" : <em className="ml-1 text-amber-700">· {spine.counts.GAP} Gap, {spine.counts.REVIEW_REQUIRED} Review required</em>}
-          </Row>
-          <Row label="Check execution coverage">{lastRun ? `${lastRun.executed} of ${lastRun.totalChecks} checks executed (${coverage.toFixed(0)}%)` : "—"}</Row>
-        </dl>
+        <Section title="What is covered">
+          <Row label="Scope">{scope?.scopeStatement ?? "—"}</Row>
+          <Row label="In force since">{scope ? fmtDate(scope.effectiveDate) : "—"}</Row>
+          <Row label="Documents covered">{totalDocs}</Row>
+          <Row label="Last checked">{lastRun ? `${fmtDateTime(lastRun.ranAt)}${lastRun.ranByName ? ` by ${lastRun.ranByName}` : ""}` : "never"}</Row>
+        </Section>
 
-        <h2 className="mt-8 text-sm font-semibold uppercase tracking-wide text-slate-500">Non-conformances by severity (§17.2)</h2>
-        <table className="mt-2 w-full text-sm">
-          <thead>
-            <tr className="border-b border-line text-left text-xs uppercase text-slate-400">
-              <th className="py-1.5">Severity</th><th className="py-1.5">Open</th><th className="py-1.5">Accepted (counted, §17.6)</th>
-            </tr>
-          </thead>
-          <tbody>
-            {["CRITICAL", "MAJOR", "MINOR", "ADVISORY"].map((sev) => (
-              <tr key={sev} className="border-b border-line">
-                <td className="py-1.5 font-medium">{sev}</td>
-                <td className="py-1.5 tabular-nums">{count(sev, "OPEN")}</td>
-                <td className="py-1.5 tabular-nums">{count(sev, "ACCEPTED")}</td>
+        <Section title="What was found">
+          <div className="grid gap-3 sm:grid-cols-3">
+            <Figure value={`${rate.toFixed(0)}%`} label="of documents carry nothing critical or major" note={`${clear} of ${totalDocs} · the project's target is ${threshold}%`} />
+            <Figure value={String(openCritical)} label={openCritical === 1 ? "critical finding still open" : "critical findings still open"} note="A critical is a condition the register cannot be relied on with." />
+            <Figure value={`${asked.length}/${CATALOG.length}`} label="checks asked and answered" note={optOuts.length || byHand.length ? [optOuts.length ? `${optOuts.length} not asked` : "", byHand.length ? `${byHand.length} answered by hand` : ""].filter(Boolean).join(" · ") + " — see below" : "Every check the application runs was asked."} />
+          </div>
+
+          <table className="mt-5 w-full text-sm">
+            <thead>
+              <tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-slate-400">
+                <th className="py-1.5 font-semibold">Severity</th>
+                <th className="py-1.5 font-semibold">Outstanding</th>
+                <th className="py-1.5 font-semibold">Accepted as it is</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-        <p className="mt-3 text-sm">
-          Open Critical non-conformances: <strong>{lastRun?.openCritical ?? defects.filter((d) => d.severity === "CRITICAL" && d.status !== "CLOSED").length}</strong>
-        </p>
-
-        {exceptions.length ? (
-          <>
-            <h2 className="mt-8 text-sm font-semibold uppercase tracking-wide text-slate-500">Exceptions in force (§1.10)</h2>
-            <ul className="mt-2 list-disc space-y-1 pl-5 text-sm">
-              {exceptions.map((e) => (
-                <li key={e.id}>{e.item} — clauses {e.clauses}: {e.reason} (granted by {e.authority}, from {fmtDate(e.startDate)}{e.reviewPoint ? `, review ${fmtDate(e.reviewPoint)}` : ""})</li>
+            </thead>
+            <tbody>
+              {SEVERITIES.map((sev) => (
+                <tr key={sev} className="border-b border-line">
+                  <td className="py-1.5 text-[13px] font-medium capitalize">{sev.toLowerCase()}</td>
+                  <td className="py-1.5 text-[13px] tabular-nums">{count(sev, "OPEN")}</td>
+                  <td className="py-1.5 text-[13px] tabular-nums">{count(sev, "ACCEPTED")}</td>
+                </tr>
               ))}
+            </tbody>
+          </table>
+          <p className="mt-2 text-[11px] leading-4 text-slate-500">
+            A finding accepted as it is has been judged not worth correcting, with a reason and a date to look again. It goes on being counted.
+          </p>
+        </Section>
+
+        <Section title="What was asked, and when">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-slate-400">
+                <th className="py-1.5 font-semibold">Moment</th>
+                <th className="py-1.5 font-semibold">Checks</th>
+                <th className="py-1.5 font-semibold">Answered</th>
+                <th className="py-1.5 font-semibold">Finding something</th>
+              </tr>
+            </thead>
+            <tbody>
+              {perPhase.map((p) => (
+                <tr key={p.phase} className="border-b border-line">
+                  <td className="py-1.5 text-[13px]">{PHASE_LABEL[p.phase]}</td>
+                  <td className="py-1.5 text-[13px] tabular-nums">{p.total}</td>
+                  <td className="py-1.5 text-[13px] tabular-nums">{p.ran}</td>
+                  <td className="py-1.5 text-[13px] tabular-nums">
+                    {p.failing}
+                    {p.found ? <span className="text-slate-400"> · {p.found} found</span> : null}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Section>
+
+        {byHand.length ? (
+          <Section title="Answered by hand">
+            <p className="mb-2 text-[11px] leading-4 text-slate-500">
+              Nothing in the records settles {byHand.length === 1 ? "this one" : "these"}, so the application does not pretend to. {byHand.length === 1 ? "It is" : "They are"} confirmed by whoever holds the evidence, outside the system.
+            </p>
+            <ul className="space-y-1.5">
+              {byHand.map((i) => {
+                const meta = CHECK_BY_ID.get(i.checkId);
+                return (
+                  <li key={i.id} className="text-[13px] leading-5">
+                    <span className="font-medium">{meta?.condition ?? i.checkId}</span>
+                    <span className="block text-[11px] leading-4 text-slate-500">
+                      {meta ? `${meta.method}. ` : ""}{i.note ?? "The register holds no record that would answer it."}
+                    </span>
+                  </li>
+                );
+              })}
             </ul>
-          </>
+          </Section>
         ) : null}
 
-        <p className="mt-8 border-t border-line pt-4 text-xs leading-relaxed text-slate-500">
-          This statement is backed by the Annex H check results recorded in the system on the assessment date. Where the integrity figure
-          is below the published threshold ({scope?.integrityThreshold ?? 95}%) or any Critical non-conformance is open, register-derived
-          statements of performance, completeness or readiness carry the integrity figure and the open Critical count (§17.7).
-          Accepted non-conformances continue to be counted (§17.6). Authorized representative: ____________________
+        {optOuts.length ? (
+          <Section title="Not asked, and why">
+            <ul className="space-y-1.5">
+              {optOuts.map((o) => (
+                <li key={o.id} className="text-[13px] leading-5">
+                  <span className="font-medium">{CHECK_BY_ID.get(o.checkId)?.condition ?? o.checkId}</span>
+                  <span className="block text-[11px] leading-4 text-slate-500">
+                    {o.reason} — decided by {o.setByName}, {fmtDate(o.setAt)}.
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </Section>
+        ) : null}
+
+        {exceptions.length ? (
+          <Section title="Exemptions in force">
+            <ul className="space-y-1.5">
+              {exceptions.map((e) => (
+                <li key={e.id} className="text-[13px] leading-5">
+                  <span className="font-medium">{e.item}</span>
+                  <span className="block text-[11px] leading-4 text-slate-500">
+                    {e.reason} — granted by {e.authority}, from {fmtDate(e.startDate)}
+                    {e.reviewPoint ? `, looked at again ${fmtDate(e.reviewPoint)}` : ""}.
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </Section>
+        ) : null}
+
+        <p className="mt-7 border-t border-line pt-4 text-[11px] leading-5 text-slate-500">
+          {held
+            ? `On the date above the register met the project's own condition: at least ${threshold}% of documents carrying nothing critical or major, and no critical finding open.`
+            : `On the date above the register did not meet the project's own condition — ${threshold}% of documents carrying nothing critical or major and no critical finding open. Any statement of progress, completeness or readiness drawn from this register should be read with the figures above.`}
+          {optOuts.length ? ` ${optOuts.length} check${optOuts.length === 1 ? " was" : "s were"} not asked, for the reasons given.` : ""}
+          {` A further ${PREVENTED.length} conditions are not measured, because the application refuses the act that would create them; nothing can carry what cannot arise.`}
+          {" "}Signed for the organization: ____________________
         </p>
       </article>
-
-      <p className="text-center text-xs text-slate-400 no-print">
-        Generated from the register — a view, timestamped at generation, never edited (§16.6). <Link href="/conformance/checks" className="underline">See the check results</Link>.
-      </p>
     </div>
+  );
+}
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="mt-7">
+      <h2 className="stencil mb-2 text-slate-500">{title}</h2>
+      {children}
+    </section>
   );
 }
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="grid grid-cols-[220px_1fr] gap-3 border-b border-line pb-2">
-      <dt className="text-xs font-medium uppercase tracking-wide text-slate-400">{label}</dt>
-      <dd className="text-sm text-slate-800">{children}</dd>
+    <div className="grid grid-cols-[10rem_1fr] gap-3 border-b border-line py-1.5">
+      <span className="text-[11px] uppercase tracking-wide text-slate-400">{label}</span>
+      <span className="text-[13px] text-slate-800">{children}</span>
+    </div>
+  );
+}
+
+function Figure({ value, label, note }: { value: string; label: string; note: string }) {
+  return (
+    <div className="figure rounded-xl border border-line bg-tint-soft px-4 py-3">
+      <p className="text-2xl font-semibold tabular-nums text-slate-900">{value}</p>
+      <p className="mt-0.5 text-[12px] leading-4 text-slate-700">{label}</p>
+      <p className="mt-1 text-[11px] leading-4 text-slate-400">{note}</p>
     </div>
   );
 }
