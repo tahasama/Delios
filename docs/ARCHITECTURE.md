@@ -5,11 +5,13 @@ prototype: it settled the logic (the rules, routes and checks, numbering,
 workflows, the permission matrix) and the screens. The production system is
 built fresh on the stack below and carries that logic over.
 
-The deciding requirements are performance, stability and cost. The app runs
-document control on projects worth millions; it must not crash, must not need
-constant debugging, and must not slow down or freeze as users grow. Every
-component below earns its place on those terms, and every component that is
-not needed yet is deferred until a measured trigger says so.
+The deciding requirements, in order, are performance, stability and cost. The
+app runs document control on projects worth millions; it must not crash, must
+not need constant debugging, and must not slow down or freeze as users grow.
+It must also start cheaply. This is a cost-efficient enterprise architecture:
+infrastructure is kept simple, every component earns its place, and anything
+not needed yet is deferred until a measured trigger says so, without closing
+the path to serious scale.
 
 ## The decision
 
@@ -18,19 +20,20 @@ not needed yet is deferred until a measured trigger says so.
 | Frontend | React + TypeScript, Vite single-page app, typed client generated from OpenAPI | — |
 | Backend | ASP.NET Core 10 (LTS), one modular monolith | A module becomes its own service only with a measured reason to scale it alone |
 | API | REST + OpenAPI | No GraphQL |
-| Database | PostgreSQL 17, EF Core, PgBouncer | Read replica when reports compete with writes |
-| Search | Postgres full-text search (`tsvector`) on metadata | Content search with Tika; OpenSearch only if Postgres search becomes slow |
-| Cache, locks, real-time | Redis (Valkey): HybridCache second level, distributed locks, rate limits, SignalR backplane | — |
-| Async work | RabbitMQ + MassTransit, retries and dead-letter queues | Kafka is not planned |
-| File storage | S3-compatible object storage (Hetzner Object Storage), presigned URLs | AWS S3 / Azure Blob if a client requires it; Garage or SeaweedFS on premises |
+| Database | PostgreSQL 17, EF Core, row-level security, PgBouncer | Standby replica (see High availability) |
+| Search | Postgres search on metadata only | OpenSearch only if Postgres search becomes slow |
+| Content extraction | Built but switched off (see Client content) | Activated per project at a client's written request |
+| Cache, locks, rate limits | Redis (Valkey) | — |
+| Async work | RabbitMQ + MassTransit, outbox, retries, dead-letter queues | Kafka is not planned |
+| File storage | S3-compatible object storage, versioning and object lock, presigned URLs | AWS S3 / Azure Blob if a client requires it |
 | Virus scan | ClamAV | — |
 | PDF | PdfSharp (MIT): release stamps, superseded watermarks | — |
-| OCR | Text-layer detection on upload only | OCR worker, started on demand (see below) |
+| Renditions | None generated: authors submit the PDF with the native file | — |
 | Authentication | OIDC/OAuth 2.0: ASP.NET Core Identity first (MFA, lockout, password policy) | Entra ID / Keycloak per client; SAML through Keycloak |
 | Audit | Append-only, hash-chained table | — |
 | Time | UTC everywhere, NodaTime, per-project time zone and working calendar | — |
 | Languages | i18n by message codes, RTL from day 1 | — |
-| Monitoring | Prometheus + Grafana, Serilog + Seq, health endpoints | Sentry if needed |
+| Observability | Serilog logs, Prometheus + Grafana metrics, health checks, error tracking (Sentry hosted or GlitchTip) | — |
 | Infrastructure | Docker Compose on one VPS | Load balancer and a second node (stage 2); Kubernetes (stage 3) |
 | Hosting | Hetzner VPS | AWS / Azure / client premises only when a contract requires it |
 
@@ -66,18 +69,39 @@ hand-build.
 - **Self-hosted MinIO.** In 2025 MinIO removed features from its free community
   edition and stopped publishing official builds. Any S3-compatible store works
   without code changes.
-- **OpenSearch, Tika and OCR on day 1.** Not needed at the planned volume; each
-  has a trigger below.
+- **Rendition conversion.** Converting DWG to PDF reliably needs a paid
+  licence, and conversion is a source of errors and load. Authors submit the
+  PDF alongside the native file; stamping and watermarks apply to that PDF.
+- **Thumbnails and previews.**
+- **Reading file contents.** See Client content.
+
+## What drives performance
+
+At this scale the language matters less than these rules, which apply
+throughout:
+
+1. Files live in object storage, never as database BLOBs.
+2. The browser transfers files directly to and from object storage.
+3. Processing is asynchronous; no request waits for it.
+4. The PostgreSQL data model is indexed for every filter the screens offer.
+5. API nodes are stateless.
+6. Configuration, permissions and lookup data are cached.
+7. Search runs on indexed metadata.
+8. Nothing heavy is generated during a request.
+9. Large lists are never loaded into the browser.
+10. Every list is paginated.
 
 ## Shape of the backend
 
 One ASP.NET Core solution, one deployable, with these modules. Each owns its
-folder and its tables and talks to the others only through interfaces:
+folder and its tables and talks to the others only through interfaces. The
+exact boundaries follow how the domain is built:
 
-- Organizations, users, roles, functions and the permission matrix
-- Document management: numbering, documents, revisions, files, lifecycle
-- Workflow
-- Review and approval
+- Identity and tenancy
+- Projects
+- Documents and revisions: numbering, files, lifecycle, release stamping
+- Workflows
+- Reviews and approvals, with comments
 - Transmittals and correspondence
 - Packages
 - Records and retention, including legal hold
@@ -89,80 +113,125 @@ folder and its tables and talks to the others only through interfaces:
 The same build runs in two roles:
 
 - **api** serves HTTP requests.
-- **worker** consumes the queues: virus scan, stamping, issue, email,
-  scheduled checks, and later text extraction and OCR.
+- **worker** consumes the queues: virus scan, file identification, stamping,
+  issue, email and scheduled checks.
 
 Each role scales on its own, so a burst of background work never slows the UI.
+If one area later needs to scale independently, it leaves the monolith along
+the lines it already has: document processing to a worker cluster, search to
+OpenSearch, notifications to their own worker.
+
+## Identity and tenancy
+
+```
+Tenant ── Users
+   └── Projects ── Membership (User × Project × Function/Role) ── Permissions
+```
+
+A user belongs to one tenant. Users are not under a project: a project
+membership grants them a function, and the function carries the permissions on
+that project. People from other organizations (contractor, supplier, client)
+take part in a project through their party, without becoming members of the
+tenant.
+
+Tenant isolation has two layers:
+
+- **Application:** EF Core applies a tenant filter to every query.
+- **Database:** PostgreSQL row-level security rejects any row of another
+  tenant, so a missed filter cannot leak data. The tenant is set with
+  `SET LOCAL` inside each transaction. This is required because PgBouncer
+  reuses connections across requests; a session-level setting could carry one
+  tenant's identity into another's request.
+
+## Document core
+
+Project, Document, Document Revision, File, Transmittal, Package, Workflow,
+Review, Approval, Comment, Audit Event.
+
+**A revision is never overwritten.** A change is a new revision. The same holds
+for files: the bucket has versioning and object lock, so not even a bug or an
+administrator can overwrite or delete a released file. Every file carries its
+SHA-256 checksum.
 
 ## The upload pipeline
 
 ```
 browser ──presigned PUT──► object storage
    │
-   └─ confirm ─► api ─► "file.uploaded" ─► RabbitMQ
-                                              │
-         ┌────────────────────────────────────┼─────────────────────┐
-         ▼                                    ▼                     ▼
-     virus scan                     text-layer detection      thumbnail
-   (ClamAV; a file is            (flags scanned files as      (preview)
-    not released until             "not searchable")
-    it passes)                                                      │
-                                                                    ▼
-                                                              notifications
+   └─ confirm ─► api: verify checksum, create revision (PROCESSING)
+                      and write the job to the outbox, in one transaction
+                          │
+                          ▼
+                      RabbitMQ ─► worker
+                                    ├── virus scan (ClamAV)
+                                    ├── file identification
+                                    ├── technical metadata
+                                    └── notifications
+                          │
+                          ▼
+                 revision READY
 ```
 
-Each step is its own consumer with retries and a dead-letter queue, so one bad
-file never blocks the others. File bytes never pass through the API: the
-browser uploads and downloads with presigned URLs. Every file carries its
-SHA-256 checksum.
+- Processing is not triggered by object-storage notifications: they differ by
+  provider and can be lost. The API writes the job in the same transaction as
+  the revision (the outbox pattern), so a job cannot be lost.
+- A revision in `PROCESSING` cannot be released or transmitted. It becomes
+  `READY` only when every step has passed; a file that fails the virus scan is
+  quarantined.
+- **Technical metadata** means file facts only: type, size, page count, sheet
+  size, PDF version, whether a text layer exists. Embedded properties such as
+  author names are not stored.
+- Each step is its own consumer with retries and a dead-letter queue, so one bad
+  file never blocks the others.
+- File bytes never pass through the API.
 
-## OCR on demand
+Downloads: the browser asks the API, the API checks the user's permission and
+the document's confidentiality, logs the download, and returns a short-lived
+signed URL to object storage.
 
-OCR turns scanned images into searchable text. Most engineering documents are
-born digital and do not need it; scanned archives do. It is therefore a feature
-switched on from the front end, not an always-running part of the system.
+## Client content
 
-1. **Detection, always on.** On every upload the worker checks whether the PDF
-   has a text layer and marks files without one as *scanned, not searchable*.
-2. **Visible in the UI.** A register filter shows scanned documents, and the
-   project shows how many cannot be searched.
-3. **Started by people, not by default.** The document controller or an
-   administrator chooses "Make searchable" on one document, on a selection or
-   filter (with the page count and an estimated duration), or turns on
-   "OCR scanned uploads automatically" for the project. Each request is
-   audited.
-4. **Background, low priority.** Jobs go to a separate `ocr` queue with live
-   progress, cancel and per-page retry.
-5. **Result.** The extracted text feeds Postgres full-text search.
+**The system does not read what is inside clients' files.** By policy, no text
+is extracted from file contents and nothing from inside a file is indexed.
+Search covers the register's metadata only.
 
-**The controlled original is never changed.** OCR text is stored separately,
-linked to the revision. A searchable PDF may be generated as a derived
-rendition, labelled as one; the released file and its checksum stay exactly as
-issued.
+Content extraction and OCR are nevertheless written, tested and shipped, but
+switched off. They are activated per project only when a client asks for them
+in writing, and the activation is recorded in the audit log. When active:
 
-Engine: OCRmyPDF (Tesseract) in its own container, with Arabic, English and
-French language packs. Handwriting and poor scans can be routed per job to a
-cloud OCR service (about $1.50 per 1,000 pages). Idle cost is nothing; a large
-archive can run on a large server rented by the hour and deleted afterwards.
+- **Text extraction** (Apache Tika server, its own container) feeds Postgres
+  full-text search for that project only, and the text stays inside that
+  tenant's data.
+- **OCR** (OCRmyPDF with Tesseract, its own container, Arabic, English and
+  French) makes scanned files searchable. It runs on demand: the document
+  controller or an administrator chooses "Make searchable" on one document, on
+  a selection or filter (with the page count and an estimated duration), or
+  turns on automatic OCR of scanned uploads for the project. Jobs run on a
+  separate low-priority `ocr` queue with live progress, cancel and per-page
+  retry.
+- **The controlled original is never changed.** Extracted text is stored
+  separately, linked to the revision; a searchable PDF, if produced, is a
+  labelled derived copy.
+- Switching it off deletes the project's extracted text.
+
+When inactive, these containers do not run and cost nothing.
 
 ## Running on more than one server
 
-The application is stateless from day 1, so adding a node is running another
-container:
+API nodes are completely interchangeable:
 
-- No local files: everything goes to object storage; workers use scratch space
-  only.
-- No in-memory sessions: access tokens are validated on any node; refresh
+- No local uploaded files: everything goes to object storage; workers use
+  scratch space only.
+- No local session state: access tokens are validated on any node; refresh
   tokens and revocations live in Postgres.
-- ASP.NET Core Data Protection keys are stored in Postgres or Redis, not on the
-  node's disk. Without this, a cookie issued by one node is rejected by another
-  and users are logged out at random.
+- No local application state. ASP.NET Core Data Protection keys are stored in
+  Postgres, not on the node's disk. Without this, a cookie issued by one node is
+  rejected by another and users are logged out at random.
 - Scheduled jobs run exactly once across nodes (MassTransit scheduler or a
   Postgres advisory lock).
-- SignalR uses the Redis backplane.
 
 ```
-users ─► load balancer (TLS) ─► api-1, api-2, … ─► PgBouncer ─► Postgres primary (+ replica)
+users ─► load balancer (TLS) ─► api-1, api-2, … ─► PgBouncer ─► Postgres primary ─► standby
                                      │
                                      └─► RabbitMQ ─► worker-1, worker-2, …
 ```
@@ -188,13 +257,37 @@ next step is due:
 When an alert keeps repeating, add a second API node and the load balancer.
 Because the app is stateless, that is a configuration change, not code work.
 
-## Caching
+## Redis
 
-HybridCache: an in-memory first level on each node, Redis as the shared second
-level, with invalidation across nodes. Only configuration, permissions and
-lookup data are cached. Document state is never cached; it is always read from
-Postgres. If Redis is down the application is slower but still correct,
-because Postgres is the source of truth.
+- Cache: HybridCache, with an in-memory first level on each node and Redis as
+  the shared second level, invalidated across nodes. Only configuration,
+  permissions and lookup data are cached. Document state is never cached.
+- Rate limiting shared across nodes.
+- Short-lived locks for operations that must not run twice at once. Document
+  numbering is also guarded by a unique constraint in Postgres.
+
+**Redis is never the source of truth.** Postgres is authoritative. If Redis is
+down the application is slower but still correct.
+
+## High availability and backups
+
+- **Postgres standby.** A streaming-replication standby is added as soon as the
+  first contract depends on the system, before the user count forces it.
+- **Database backups.** pgBackRest: a full backup weekly, an incremental daily,
+  and continuous WAL archiving for point-in-time recovery. Backups go to
+  storage at another provider or region and are kept 30–90 days.
+- **File backups.** The bucket is replicated to a second location. The
+  database alone cannot restore files.
+- **Restore drill.** Monthly, onto a spare server, against a written recovery
+  time target. A backup that has never been restored does not count.
+
+## Observability
+
+Application logs, metrics, health checks and error tracking, from day 1.
+
+Watched: CPU, RAM, disk, Postgres connections, Postgres query latency, RabbitMQ
+queue depth, worker failures, object storage failures, API response time,
+5xx rate, upload processing time.
 
 ## Languages
 
@@ -235,27 +328,20 @@ detectable.
 
 ## Reliability rules
 
-The framework is a minority of what keeps the system up. These apply
-everywhere:
-
 - Business rules are enforced as Postgres constraints as well as in code
   (unique document numbers, foreign keys, check constraints).
 - Every multi-step change runs in one transaction.
 - Concurrency tokens on revisions and other contested records, so two people
   cannot silently overwrite each other.
 - Write endpoints are idempotent, so a retried request is not applied twice.
-- Every list is paginated and every filter is indexed.
 - Tests run in CI on every change, against a real Postgres.
-- Backups are taken nightly with continuous WAL archiving, stored off site, and
-  restored on a schedule to prove they work.
 
 ## Storage estimate
 
 Per project: up to 10,000 documents at a median of 3.5 MB is 35 GB. With about
-3.5 revisions per document and about 1.5× for renditions, stamped copies and
-thumbnails, a project reaches roughly 150–200 GB. An off-site backup doubles
-it. Ten projects come to about 2–4 TB, around €15–25 a month on S3-compatible
-storage.
+3.5 revisions per document and the PDF submitted beside each native file, a
+project reaches roughly 150–200 GB. The replicated copy doubles it. Ten
+projects come to about 2–4 TB, around €15–25 a month on S3-compatible storage.
 
 ## Hosting
 
@@ -273,26 +359,45 @@ the same setup.
 
 | Stage | Setup | About €/month |
 |---|---|---|
-| 1. Pilot: one project, under 100 users | One 8 vCPU / 16 GB VPS running everything in Docker Compose, off-site backups | 40–60 |
-| 2. Production: several projects, hundreds of users | Load balancer, two API nodes, one worker, a separate database server with a replica, Redis, object storage, backups | 150–300 |
-| 3. Multi-client: thousands of users, high availability | More API and worker nodes, Postgres high availability, OpenSearch if needed, Kubernetes optional | 600–1,500 |
+| 0. Development and testing | Free tiers (see below) | 0 |
+| 1. Pilot: one project, under 100 users | One 8 vCPU / 16 GB VPS running everything in Docker Compose, object storage, off-site backups | 40–60 |
+| 2. Production: several projects, hundreds of users | Load balancer, two API nodes, one worker, a separate database server with a standby, Redis, object storage, backups | 150–300 |
+| 3. Multi-client: thousands of users | More API and worker nodes, Postgres high availability, OpenSearch if needed, Kubernetes optional | 600–1,500 |
 
 What raises cost, in order: high availability (everything doubled), managed
-cloud services, file storage and backups, OCR on large archives, OpenSearch,
-and download traffic on providers that charge for it. What keeps it down:
-staying on VPS hosting until a contract says otherwise, moving old revisions to
-cold storage, running OCR only where there is no text layer, adding each
-component only on its trigger, and serving every client from one deployment
-with tenant isolation in the database.
+cloud services, file storage and its replica, OpenSearch, and download traffic
+on providers that charge for it. What keeps it down: staying on VPS hosting
+until a contract says otherwise, moving old revisions to cold storage, adding
+each component only on its trigger, and serving every client from one
+deployment with tenant isolation in the database.
+
+## Testing for free
+
+- **Development:** the whole stack runs locally with Docker Compose, at no
+  cost. It needs about 8 GB of free RAM.
+- **An online test environment:** Oracle Cloud Always Free gives an ARM server
+  with 4 cores and 24 GB RAM, 200 GB of disk and S3-compatible object storage,
+  enough to run the full stack. Every image in the stack is published for ARM.
+  It needs a card for verification, free capacity is not always available in
+  every region, and an idle free server can be reclaimed, so it is for testing,
+  not for clients.
+- **Object storage alternative:** Cloudflare R2, 10 GB free with no download
+  charges.
+- **CI:** GitHub Actions free minutes.
+- **Error tracking and dashboards:** Sentry and Grafana Cloud free tiers.
+- **Load testing:** free servers do not show real performance. Before the
+  first client, rent a production-sized Hetzner server by the hour for a day of
+  load tests (a few euros) and delete it afterwards.
 
 ## Build plan
 
-1. **Skeleton.** Solution layout, Docker Compose (Postgres, Redis, RabbitMQ,
-   object storage, ClamAV), CI, health endpoints, logging, monitoring.
-2. **Core.** Tenancy, authentication, roles, functions and the permission
-   matrix, audit.
-3. **Documents.** Numbering, revisions, files and the upload pipeline,
-   lifecycle, release stamping.
-4. **Reviews and workflows, transmittals, packages.**
+1. **Platform foundation.** Solution layout, Docker Compose (Postgres, Redis,
+   RabbitMQ, object storage, ClamAV), CI/CD, logging, health checks, metrics.
+2. **Identity and tenancy.** Tenants, users, projects, memberships, functions
+   and the permission matrix, row-level security, audit.
+3. **Document core.** Numbering, documents, revisions, files and the upload
+   pipeline, lifecycle, release stamping.
+4. **Workflows, reviews and approvals, transmittals, packages.**
 5. **Checks engine, schedules, reports.**
 6. **React application**, built against the generated API client.
+7. **Content extraction and OCR**, switched off, ready for activation.
