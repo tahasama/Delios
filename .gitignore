@@ -33,6 +33,5 @@ prisma/dev.db-journal
 # typescript
 *.tsbuildinfo
 
-# legacy app (kept only in git history)
-/backend
+# legacy frontend (kept only in git history)
 /frontend

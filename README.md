@@ -25,6 +25,27 @@ both teach people to ignore the page.
 - **pdf-lib** — releases are stamped with number / revision / status / date (§10.2); superseded renditions are watermarked (§12.5)
 - Files stored under `./uploads`, served only through an authenticated, confidentiality-checked route handler with download logging
 
+## Backend (in progress)
+
+The production backend is being built in `backend/` (ASP.NET Core 10, PostgreSQL,
+Redis, RabbitMQ, S3-compatible storage, ClamAV). The decisions and the build
+plan are in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). The Next.js app below
+moves onto its API area by area.
+
+Requires Docker and the .NET 10 SDK.
+
+```bash
+docker compose -f deploy/compose.yaml up -d                 # Postgres, Redis, RabbitMQ, storage, ClamAV
+dotnet run --project backend/src/Delios.Host -- migrate     # apply database migrations
+dotnet run --project backend/src/Delios.Host                # API on http://localhost:5000
+dotnet test backend                                         # tests (start their own containers)
+
+docker compose -f deploy/compose.yaml --profile app up -d   # or everything in containers: API on :8080
+```
+
+Health: `/health/live` and `/health/ready`. Metrics: port 9091 (`/metrics`).
+Set `Delios__Role=worker` to run the same build as a queue worker.
+
 ## Running it
 
 The same commands work in PowerShell, cmd and bash.

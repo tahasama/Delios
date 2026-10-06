@@ -1,0 +1,121 @@
+# Development stack. Production uses managed object storage and its own secrets.
+#
+#   docker compose -f deploy/compose.yaml up -d                 dependencies only; run the API with dotnet run
+#   docker compose -f deploy/compose.yaml --profile app up -d   dependencies, migrations, API and worker
+
+name: delios
+
+x-backend: &backend
+  build: ../backend
+  image: delios-backend
+  restart: unless-stopped
+  environment: &backend-env
+    ASPNETCORE_ENVIRONMENT: Production
+    ConnectionStrings__Postgres: Host=postgres;Database=delios;Username=delios;Password=delios-dev
+    ConnectionStrings__Redis: valkey:6379
+    ConnectionStrings__RabbitMq: amqp://delios:delios-dev@rabbitmq:5672/
+    Storage__Endpoint: http://seaweedfs:8333
+    Storage__Bucket: delios
+    Storage__AccessKey: delios
+    Storage__SecretKey: delios-dev-secret
+    ClamAv__Host: clamav
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: delios
+      POSTGRES_USER: delios
+      POSTGRES_PASSWORD: delios-dev
+    ports: ["5432:5432"]
+    volumes: [postgres:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U delios -d delios"]
+      interval: 5s
+      retries: 10
+
+  valkey:
+    image: valkey/valkey:8-alpine
+    restart: unless-stopped
+    ports: ["6379:6379"]
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 5s
+      retries: 10
+
+  rabbitmq:
+    image: rabbitmq:4-management-alpine
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: delios
+      RABBITMQ_DEFAULT_PASS: delios-dev
+    ports: ["5672:5672", "15672:15672"]
+    volumes: [rabbitmq:/var/lib/rabbitmq]
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      retries: 10
+
+  # S3-compatible store for development only.
+  seaweedfs:
+    image: chrislusf/seaweedfs:latest
+    restart: unless-stopped
+    command: server -dir=/data -s3 -s3.config=/etc/seaweedfs/s3.json
+    ports: ["8333:8333"]
+    volumes:
+      - seaweedfs:/data
+      - ./seaweedfs/s3.json:/etc/seaweedfs/s3.json:ro
+
+  storage-init:
+    image: chrislusf/seaweedfs:latest
+    depends_on: [seaweedfs]
+    restart: on-failure
+    entrypoint:
+      - /bin/sh
+      - -c
+      - >-
+        sleep 5 &&
+        (echo 's3.bucket.list' | weed shell -master=seaweedfs:9333 | grep -qw delios ||
+        echo 's3.bucket.create -name delios' | weed shell -master=seaweedfs:9333 | grep -q 'created bucket')
+
+  clamav:
+    image: clamav/clamav:stable
+    restart: unless-stopped
+    ports: ["3310:3310"]
+    volumes: [clamav:/var/lib/clamav]
+
+  migrate:
+    <<: *backend
+    profiles: [app]
+    restart: "no"
+    command: ["migrate"]
+    healthcheck: { disable: true }
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  api:
+    <<: *backend
+    profiles: [app]
+    environment:
+      <<: *backend-env
+      Delios__Role: api
+    ports: ["8080:8080"]
+    depends_on: &after-migrate
+      migrate: { condition: service_completed_successfully }
+      valkey: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+
+  worker:
+    <<: *backend
+    profiles: [app]
+    environment:
+      <<: *backend-env
+      Delios__Role: worker
+    depends_on: *after-migrate
+
+volumes:
+  postgres:
+  rabbitmq:
+  seaweedfs:
+  clamav:

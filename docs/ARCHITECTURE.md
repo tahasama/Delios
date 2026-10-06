@@ -21,12 +21,12 @@ the path to serious scale.
 | Frontend | Next.js (React + TypeScript), UI only, typed client generated from OpenAPI | — |
 | Backend | ASP.NET Core 10 (LTS), one modular monolith | A module becomes its own service only with a measured reason to scale it alone |
 | API | REST + OpenAPI | No GraphQL |
-| Database | PostgreSQL 17, EF Core, row-level security, PgBouncer | Standby replica (see High availability) |
+| Database | PostgreSQL 17, EF Core, row-level security | PgBouncer with the second API node; standby replica (see High availability) |
 | Search | Postgres search on metadata only | OpenSearch only if Postgres search becomes slow |
 | Content extraction | Built but switched off (see Client content) | Activated per project at a client's written request |
 | Cache, locks, rate limits | Redis (Valkey) | — |
-| Async work | RabbitMQ + MassTransit, outbox, retries, dead-letter queues | Kafka is not planned |
-| File storage | S3-compatible object storage, versioning and object lock, presigned URLs | AWS S3 / Azure Blob if a client requires it |
+| Async work | RabbitMQ + Wolverine (MIT), EF Core outbox, retries, dead-letter queues | Kafka is not planned |
+| File storage | S3-compatible object storage, versioning and object lock, presigned URLs (SeaweedFS in development) | AWS S3 / Azure Blob if a client requires it |
 | Virus scan | ClamAV | — |
 | PDF | PdfSharp (MIT): release stamps, superseded watermarks | — |
 | Renditions | None generated: authors submit the PDF with the native file | — |
@@ -67,6 +67,10 @@ hand-build.
   in a register-and-workflow application.
 - **Kafka.** Built for very high-volume event streaming, which an EDMS does not
   have. RabbitMQ covers the job queues.
+- **MassTransit.** Version 9 requires a paid licence for business use, and the
+  free version 8 receives security patches only until the end of 2026.
+  Wolverine is MIT licensed and covers the same needs: RabbitMQ transport,
+  transactional outbox with EF Core, retries, scheduled messages.
 - **Self-hosted MinIO.** In 2025 MinIO removed features from its free community
   edition and stopped publishing official builds. Any S3-compatible store works
   without code changes.
@@ -240,8 +244,8 @@ API nodes are completely interchangeable:
 - No local application state. ASP.NET Core Data Protection keys are stored in
   Postgres, not on the node's disk. Without this, a cookie issued by one node is
   rejected by another and users are logged out at random.
-- Scheduled jobs run exactly once across nodes (MassTransit scheduler or a
-  Postgres advisory lock).
+- Scheduled jobs run exactly once across nodes (Wolverine scheduled messages or
+  a Postgres advisory lock).
 
 ```
 users ─► load balancer (TLS) ─► api-1, api-2, … ─► PgBouncer ─► Postgres primary ─► standby
@@ -251,6 +255,8 @@ users ─► load balancer (TLS) ─► api-1, api-2, … ─► PgBouncer ─�
 
 - **Load balancer:** Hetzner Load Balancer, or HAProxy/Caddy on a small VPS.
   No sticky sessions.
+- **PgBouncer** joins with the second node, so many nodes share a bounded set of
+  database connections. With one node, the Npgsql pool is enough.
 - **Health:** `/health/live` (process up) and `/health/ready` (database, Redis
   and RabbitMQ reachable). Only ready nodes receive traffic.
 - **Zero-downtime deploys:** rolling, one node at a time. Migrations are
