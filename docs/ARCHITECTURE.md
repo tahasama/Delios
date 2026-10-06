@@ -1,9 +1,10 @@
 # Architecture
 
-The production architecture for DELIOS. The current Next.js application is the
-prototype: it settled the logic (the rules, routes and checks, numbering,
-workflows, the permission matrix) and the screens. The production system is
-built fresh on the stack below and carries that logic over.
+The production architecture for DELIOS. The current Next.js application
+settled the logic (the rules, routes and checks, numbering, workflows, the
+permission matrix) and the screens. It stays as the frontend: its server
+actions and Prisma access are replaced, area by area, by calls to a new
+ASP.NET Core backend in `backend/`, which carries that logic over.
 
 The deciding requirements, in order, are performance, stability and cost. The
 app runs document control on projects worth millions; it must not crash, must
@@ -17,7 +18,7 @@ the path to serious scale.
 
 | Layer | Day 1 | Added later, on a trigger |
 |---|---|---|
-| Frontend | React + TypeScript, Vite single-page app, typed client generated from OpenAPI | — |
+| Frontend | Next.js (React + TypeScript), UI only, typed client generated from OpenAPI | — |
 | Backend | ASP.NET Core 10 (LTS), one modular monolith | A module becomes its own service only with a measured reason to scale it alone |
 | API | REST + OpenAPI | No GraphQL |
 | Database | PostgreSQL 17, EF Core, row-level security, PgBouncer | Standby replica (see High availability) |
@@ -90,6 +91,18 @@ throughout:
 8. Nothing heavy is generated during a request.
 9. Large lists are never loaded into the browser.
 10. Every list is paginated.
+
+## Frontend and backend together
+
+- Next.js renders the UI. It holds no business logic and no database access:
+  server actions and Prisma are removed as each area moves to the API.
+- Server components call the API on the server, forwarding the user's cookie,
+  so pages arrive rendered. Client components call it from the browser.
+- One domain behind Caddy: `/api` goes to ASP.NET Core, everything else to
+  Next.js. No CORS.
+- ASP.NET Core issues the session as an httpOnly, secure, same-site cookie.
+  No token is readable by JavaScript.
+- The Next.js server is stateless like the API nodes and scales the same way.
 
 ## Shape of the backend
 
@@ -399,5 +412,5 @@ deployment with tenant isolation in the database.
    pipeline, lifecycle, release stamping.
 4. **Workflows, reviews and approvals, transmittals, packages.**
 5. **Checks engine, schedules, reports.**
-6. **React application**, built against the generated API client.
+6. **Next.js moves onto the API**, area by area, through the generated client.
 7. **Content extraction and OCR**, switched off, ready for activation.
