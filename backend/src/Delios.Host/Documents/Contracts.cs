@@ -19,12 +19,17 @@ public sealed record DocumentSummary(
 
 public sealed record FileView(
     Guid Id, string Name, string Kind, string ContentType, long Size, string Sha256, string Status,
-    string? StatusDetail, string? DetectedType, DateTimeOffset CreatedAt, Guid? DerivedFromId);
+    string? StatusDetail, string? DetectedType, DateTimeOffset CreatedAt, Guid? DerivedFromId, int Submission);
+
+/// <summary>One set of files sent in under a revision, and Document Control's outcome on it.</summary>
+public sealed record SubmissionView(int Number, DateTimeOffset SubmittedAt, string SubmittedBy, string? Outcome, string? Note,
+    string? DecidedBy, DateTimeOffset? DecidedAt);
 
 public sealed record RevisionView(
     Guid Id, string Value, string Series, string State, string FilesState, string? ReasonForRevision,
     string? ChangeDescription, string AuthoredByName, DateTimeOffset CreatedAt, string? StatusCode,
-    DateTimeOffset? ReleasedAt, DateTimeOffset? SupersededAt, string? ReturnedReason, IReadOnlyList<FileView> Files);
+    DateTimeOffset? ReleasedAt, DateTimeOffset? SupersededAt, string? ReturnedReason, int Submission, string? ControlOutcome,
+    IReadOnlyList<SubmissionView> Submissions, IReadOnlyList<FileView> Files);
 
 public sealed record DocumentView(
     Guid Id, string Number, string Title, string DeliverableType, string DocType, string Discipline,

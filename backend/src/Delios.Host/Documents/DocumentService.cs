@@ -191,23 +191,8 @@ public sealed class DocumentService(
                 new { revision = latest.Value, state = latest.State }));
         }
 
-        var fileIds = request.FileIds?.Distinct().ToList() ?? [];
-        if (fileIds.Count is 0 or > 20)
-            return (null, Problems.Invalid("FILES_REQUIRED", "A revision carries between 1 and 20 files."));
-        var files = await db.StoredFiles
-            .Where(f => fileIds.Contains(f.Id) && f.DocumentId == document.Id && f.UploadedById == access.UserId
-                && f.Status == FileStatuses.AwaitingUpload)
-            .ToListAsync(cancellationToken);
-        if (files.Count != fileIds.Count)
-        {
-            return (null, Problems.Invalid("FILE_NOT_AVAILABLE",
-                "Some files were not requested for this document by you, or are already used.",
-                new { fileIds = fileIds.Except(files.Select(f => f.Id)) }));
-        }
-        foreach (var file in files)
-        {
-            if (await Uploads.ArrivedAsync(storage, file, cancellationToken) is { } missing) return (null, missing);
-        }
+        var (files, filesProblem) = await UploadedFilesAsync(access, document, request.FileIds, cancellationToken);
+        if (filesProblem is not null) return (null, filesProblem);
 
         var scheme = await RevisionSchemeForAsync(document.DeliverableType, cancellationToken);
         if (scheme is null)
@@ -243,14 +228,11 @@ public sealed class DocumentService(
             AuthoredByName = access.UserName,
             AuthoredByParty = access.PartyCode,
             CreatedAt = now,
+            State = await NeedsAcceptanceAsync(access, cancellationToken) ? RevisionStates.Received : RevisionStates.InPreparation,
+            Submissions = [new SubmissionRecord { Number = 1, SubmittedAt = now, SubmittedByName = access.UserName }],
         };
         db.Revisions.Add(revision);
-        foreach (var file in files)
-        {
-            file.RevisionId = revision.Id;
-            file.Status = FileStatuses.Processing;
-            db.Enqueue(FileUploaded.RoutingKey, new FileUploaded(file.TenantId, file.Id));
-        }
+        Bind(files!, revision);
         document.IsPlaceholder = false;
         document.LatestRevisionId = revision.Id;
         document.LatestRevisionValue = revision.Value;
@@ -259,11 +241,94 @@ public sealed class DocumentService(
         await db.SaveChangesAsync(cancellationToken);
 
         await audit.WriteAsync(new Actor(access.UserId, access.UserName), "REVISION_ESTABLISHED", "Revision", revision.Id,
-            $"{document.Number} rev {revision.Value}", $"{files.Count} file(s) uploaded; scanning before use.",
+            $"{document.Number} rev {revision.Value}", $"{files!.Count} file(s) uploaded; scanning before use.",
             document.ProjectId, cancellationToken);
-        revision.Files = files;
+        revision.Files = files!;
         return (revision, null);
     }
+
+    /// <summary>
+    /// Send corrected files for a revision Document Control returned without
+    /// asking for a new one. The returned submission is kept; this one replaces
+    /// it under the same revision value.
+    /// </summary>
+    public async Task<(Revision? Revision, IResult? Problem)> ResubmitAsync(
+        ProjectAccess access, Guid documentId, Guid revisionId, StartRevisionRequest request, CancellationToken cancellationToken)
+    {
+        var (document, problem) = await ContributableAsync(access, documentId, cancellationToken);
+        if (problem is not null) return (null, problem);
+        var revision = await db.Revisions.Include(r => r.Files)
+            .SingleOrDefaultAsync(r => r.Id == revisionId && r.DocumentId == documentId, cancellationToken);
+        if (revision is null) return (null, Problems.NotFound("REVISION_NOT_FOUND", "No such revision."));
+        if (revision.State != RevisionStates.Correcting)
+        {
+            return (null, Problems.Conflict("NOT_RETURNED_FOR_CORRECTION",
+                $"Revision {revision.Value} was not returned for a correction; it is {revision.State.ToLowerInvariant().Replace('_', ' ')}.",
+                new { state = revision.State }));
+        }
+        var (files, filesProblem) = await UploadedFilesAsync(access, document!, request.FileIds, cancellationToken);
+        if (filesProblem is not null) return (null, filesProblem);
+
+        var now = clock.GetCurrentInstant();
+        revision.Submission++;
+        revision.Submissions.Add(new SubmissionRecord { Number = revision.Submission, SubmittedAt = now, SubmittedByName = access.UserName });
+        revision.FilesState = FilesStates.Processing;
+        revision.State = await NeedsAcceptanceAsync(access, cancellationToken) ? RevisionStates.Received : RevisionStates.InPreparation;
+        revision.ReturnedAt = null;
+        revision.ReturnedReason = null;
+        Bind(files!, revision);
+        document!.LatestRevisionState = revision.State;
+        document.UpdatedAt = now;
+        await db.SaveChangesAsync(cancellationToken);
+        await audit.WriteAsync(new Actor(access.UserId, access.UserName), "RESUBMITTED", "Revision", revision.Id,
+            $"{document.Number} rev {revision.Value}", $"Submission {revision.Submission}: {files!.Count} corrected file(s).",
+            document.ProjectId, cancellationToken);
+        return (revision, null);
+    }
+
+    /// <summary>Files this person uploaded for the document and has not used yet, each arrived and as large as declared.</summary>
+    private async Task<(List<StoredFile>? Files, IResult? Problem)> UploadedFilesAsync(
+        ProjectAccess access, Document document, Guid[]? requested, CancellationToken cancellationToken)
+    {
+        var fileIds = requested?.Distinct().ToList() ?? [];
+        if (fileIds.Count is 0 or > 20)
+            return (null, Problems.Invalid("FILES_REQUIRED", "A revision carries between 1 and 20 files."));
+        var files = await db.StoredFiles
+            .Where(f => fileIds.Contains(f.Id) && f.DocumentId == document.Id && f.UploadedById == access.UserId
+                && f.Status == FileStatuses.AwaitingUpload && f.RevisionId == null)
+            .ToListAsync(cancellationToken);
+        if (files.Count != fileIds.Count)
+        {
+            return (null, Problems.Invalid("FILE_NOT_AVAILABLE",
+                "Some files were not requested for this document by you, or are already used.",
+                new { fileIds = fileIds.Except(files.Select(f => f.Id)) }));
+        }
+        foreach (var file in files)
+        {
+            if (await Uploads.ArrivedAsync(storage, file, cancellationToken) is { } missing) return (null, missing);
+        }
+        return (files, null);
+    }
+
+    private void Bind(List<StoredFile> files, Revision revision)
+    {
+        foreach (var file in files)
+        {
+            file.RevisionId = revision.Id;
+            file.Submission = revision.Submission;
+            file.Status = FileStatuses.Processing;
+            db.Enqueue(FileUploaded.RoutingKey, new FileUploaded(file.TenantId, file.Id));
+        }
+    }
+
+    /// <summary>
+    /// What another organization sends in is accepted by Document Control before
+    /// anybody reviews it. Where nobody holds that function there is nobody to
+    /// accept it, and it goes straight on.
+    /// </summary>
+    private async Task<bool> NeedsAcceptanceAsync(ProjectAccess access, CancellationToken cancellationToken) =>
+        !access.IsInternal && await db.Memberships.AnyAsync(m => m.ProjectId == access.Project.Id && m.Active && m.Function!.Active
+            && m.Function.Rules.Any(r => r.Verbs.Contains(Verbs.Control)), cancellationToken);
 
     /// <summary>
     /// Someone may add to a document when their function may create or revise it,

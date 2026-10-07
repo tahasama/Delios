@@ -18,9 +18,15 @@ public sealed record CloseCommentRequest(string? Resolution);
 /// <param name="EvidenceFileId">For a party answering by proxy: the proof of their answer.</param>
 public sealed record AnswerRequest(string? Verdict = null, string? Status = null, string? Note = null, IssueAsk? Issue = null,
     string? ForeignAnswer = null, Guid? EvidenceFileId = null);
-public sealed record ReleaseRequest(string? Status = null);
+/// <param name="Outcome">Document Control's outcome to record, from its own published set.</param>
+public sealed record ReleaseRequest(string? Status = null, string? Outcome = null);
 /// <param name="ToStep">Null sends the revision back to its author; a step number (from 1) sends the route back to that step.</param>
-public sealed record ReturnRequest(string? Note, int? ToStep = null, string? Reason = null);
+/// <param name="Outcome">
+/// Document Control's outcome, from its own published set. Whether the revision
+/// comes back corrected under the same value or is replaced by a new one follows
+/// from it, and from the verdict: one that asked for changes always needs a new revision.
+/// </param>
+public sealed record ReturnRequest(string? Note, int? ToStep = null, string? Reason = null, string? Outcome = null);
 public sealed record RewindRequest(int ToStep, string? Reason, string? Note);
 
 /// <summary>
@@ -31,7 +37,8 @@ public sealed record RewindRequest(int ToStep, string? Reason, string? Note);
 /// one, never corrected.
 /// </summary>
 public sealed class ReviewService(
-    DeliosDbContext db, Numbering numbering, AuditLog audit, IClock clock, TransmittalService transmittals)
+    DeliosDbContext db, Numbering numbering, AuditLog audit, IClock clock, TransmittalService transmittals,
+    ControlService control)
 {
     private const string Advice_None = "none", Advice_Some = "some", Advice_Blocking = "blocking";
 
@@ -89,7 +96,7 @@ public sealed class ReviewService(
             return Fail(Problems.Conflict("FILES_NOT_READY", "The revision's files have not all passed scanning.",
                 new { filesState = revision.FilesState }));
         }
-        if (!revision.Files.Any(f => f.Kind == FileKinds.Rendition && f.Status == FileStatuses.Clean))
+        if (!revision.Files.Any(f => f.Kind == FileKinds.Rendition && f.Status == FileStatuses.Clean && f.Submission == revision.Submission))
         {
             return Fail(Problems.Conflict("NO_RENDITION", "A review needs a PDF people can read. Upload one with the revision."));
         }
@@ -482,7 +489,10 @@ public sealed class ReviewService(
                 new { granted = review.GrantedStatus }));
         }
 
+        var (outcome, outcomeProblem) = ControlService.Pick(catalog, request.Outcome, ControlService.Release);
+        if (outcomeProblem is not null) return (null, outcomeProblem);
         await ReleaseCoreAsync(access, review, status, access.UserName, cancellationToken);
+        control.Record(await db.Revisions.SingleAsync(r => r.Id == review.RevisionId, cancellationToken), outcome, null, access.UserName);
         await db.SaveChangesAsync(cancellationToken);
         return (review, null);
     }
@@ -505,7 +515,28 @@ public sealed class ReviewService(
 
         if (request.ToStep is null)
         {
-            await ReturnToAuthorAsync(review, note, access.UserName, cancellationToken);
+            // Whatever the verdict, a problem Document Control finds in the submission
+            // comes back corrected under the same revision. A verdict that asked for
+            // changes is different: what the document says must change, so the next
+            // revision replaces it.
+            var catalog = await Catalog.LoadAsync(db, cancellationToken);
+            var changesAsked = review.State == ReviewStates.Decided && !Proceeds(catalog, review.Verdict!);
+            var revision = await db.Revisions.SingleAsync(r => r.Id == review.RevisionId, cancellationToken);
+            var fromOutside = revision.AuthoredByParty is { } party
+                && await db.Parties.AnyAsync(p => p.Code == party && !p.IsInternal, cancellationToken);
+            var (outcome, outcomeProblem) = ControlService.Pick(catalog, request.Outcome, ControlService.Return,
+                newRevision: request.Outcome is null ? changesAsked : null, to: fromOutside ? "sender" : "initiator");
+            if (outcomeProblem is not null) return (null, outcomeProblem);
+            if (changesAsked && outcome is not null && !ControlService.NeedsNewRevision(catalog, outcome))
+            {
+                return (null, Problems.Conflict("VERDICT_NEEDS_NEW_REVISION",
+                    $"Verdict {review.Verdict} asked for changes, so a new revision replaces this one. Choose an outcome that says so.",
+                    new { verdict = review.Verdict, outcome }));
+            }
+            var newRevision = changesAsked || (outcome is not null && ControlService.NeedsNewRevision(catalog, outcome));
+            if (newRevision) await ReturnToAuthorAsync(review, note, access.UserName, cancellationToken);
+            else await ReturnForCorrectionAsync(review, note, access.UserName, cancellationToken);
+            control.Record(revision, outcome, note, access.UserName);
         }
         else
         {
@@ -656,7 +687,13 @@ public sealed class ReviewService(
                 Proceeds(catalog, x.Verdict!) ? "READY_TO_RELEASE" : "SEND_BACK", null, null,
                 x.DecidedAt!.Value.ToDateTimeOffset())).ToList();
         }
-        return new { steps = mySteps, gate, issues = await transmittals.WorkAsync(access, cancellationToken) };
+        return new
+        {
+            steps = mySteps,
+            gate,
+            revisions = await control.WorkAsync(access, cancellationToken),
+            issues = await transmittals.WorkAsync(access, cancellationToken),
+        };
     }
 
     // ── Core moves ────────────────────────────────────────────────────────────
@@ -766,6 +803,34 @@ public sealed class ReviewService(
         await transmittals.LapseOpenAsync(revision.Id, by, cancellationToken);
         await audit.WriteAsync(Audit.Actor.System, "RETURNED_TO_AUTHOR", "Revision", revision.Id,
             $"{document.Number} rev {revision.Value}", $"{note} The next revision replaces it.", review.ProjectId, cancellationToken);
+    }
+
+    /// <summary>
+    /// Back to whoever sent it, to correct and send again under the same revision:
+    /// our initiator, or the organization that sent it in. Its review is closed;
+    /// once the corrected files are in, the route runs again from the start.
+    /// </summary>
+    private async Task ReturnForCorrectionAsync(Review review, string note, string by, CancellationToken cancellationToken)
+    {
+        var now = clock.GetCurrentInstant();
+        var revision = await db.Revisions.SingleAsync(r => r.Id == review.RevisionId, cancellationToken);
+        var document = await db.Documents.SingleAsync(d => d.Id == review.DocumentId, cancellationToken);
+        revision.State = RevisionStates.Correcting;
+        revision.ReturnedAt = now;
+        revision.ReturnedReason = note;
+        document.LatestRevisionState = RevisionStates.Correcting;
+        document.UpdatedAt = now;
+        review.State = ReviewStates.Returned;
+        review.ReturnNote = note;
+        review.ClosedAt = now;
+        review.ClosedByName = by;
+        foreach (var step in review.Steps.Where(s => s.State == StepStates.Open)) step.State = StepStates.Done;
+        await transmittals.LapseOpenAsync(revision.Id, by, cancellationToken);
+        var to = revision.AuthoredByParty is { } party
+            && await db.Parties.AnyAsync(p => p.Code == party && !p.IsInternal, cancellationToken) ? party : "its initiator";
+        await audit.WriteAsync(Audit.Actor.System, "RETURNED_FOR_CORRECTION", "Revision", revision.Id,
+            $"{document.Number} rev {revision.Value}",
+            $"Back to {to}: {note} Corrected files come back under rev {revision.Value}; no new revision.", review.ProjectId, cancellationToken);
     }
 
     private async Task<IResult?> SendBackToStepAsync(

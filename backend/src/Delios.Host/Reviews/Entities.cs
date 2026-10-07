@@ -208,4 +208,10 @@ public static class ReviewSets
     public const string CommentClasses = "COMMENT_CLASSES";
     /// <summary>Why a review is sent back to one of its steps.</summary>
     public const string ReturnReasons = "RETURN_REASONS";
+    /// <summary>
+    /// Document Control's own outcomes, never a review verdict. Props: act = accept
+    /// (on arrival) | return | release; newRevision (bool): whether what it returns
+    /// needs a new revision or comes back corrected under the same one.
+    /// </summary>
+    public const string ControlOutcomes = "CONTROL_OUTCOMES";
 }

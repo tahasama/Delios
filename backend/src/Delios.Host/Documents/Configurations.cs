@@ -128,6 +128,8 @@ internal sealed class RevisionConfiguration : IEntityTypeConfiguration<Revision>
         b.Property(x => x.StatusCode).HasMaxLength(64);
         b.Property(x => x.ReleasedByName).HasMaxLength(200);
         b.Property(x => x.ReturnedReason).HasMaxLength(2000);
+        b.Property(x => x.ControlOutcome).HasMaxLength(64);
+        b.OwnsMany(x => x.Submissions, s => s.ToJson());
         b.Property(x => x.CreatedAt).HasDefaultValueSql("now()");
         b.Property(x => x.Version).IsRowVersion();
     }

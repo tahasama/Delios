@@ -23,6 +23,7 @@ public static class DocumentEndpoints
         project.MapPost("/documents", RegisterAsync).AddEndpointFilter<IdempotencyFilter>();
         project.MapPost("/documents/{documentId:guid}/uploads", RequestUploadAsync);
         project.MapPost("/documents/{documentId:guid}/revisions", StartRevisionAsync).AddEndpointFilter<IdempotencyFilter>();
+        project.MapPost("/documents/{documentId:guid}/revisions/{revisionId:guid}/submissions", ResubmitAsync);
         project.MapGet("/files/{fileId:guid}/download", DownloadAsync);
     }
 
@@ -101,6 +102,15 @@ public static class DocumentEndpoints
             $"/api/projects/{access.Project.Id}/documents/{documentId}", View(revision!));
     }
 
+    private static async Task<IResult> ResubmitAsync(
+        Guid documentId, Guid revisionId, StartRevisionRequest request, HttpContext http, DocumentService documents,
+        CancellationToken cancellationToken)
+    {
+        var (revision, problem) = await documents.ResubmitAsync(ProjectAccessFilter.Of(http), documentId, revisionId, request,
+            cancellationToken);
+        return problem ?? Results.Ok(View(revision!));
+    }
+
     private static async Task<IResult> DownloadAsync(
         Guid fileId, HttpContext http, DeliosDbContext db, DocumentService documents, FileStorage storage, AuditLog audit,
         CancellationToken cancellationToken)
@@ -133,7 +143,9 @@ public static class DocumentEndpoints
     private static RevisionView View(Revision r) => new(
         r.Id, r.Value, r.Series, r.State, r.FilesState, r.ReasonForRevision, r.ChangeDescription, r.AuthoredByName,
         r.CreatedAt.ToDateTimeOffset(), r.StatusCode, r.ReleasedAt?.ToDateTimeOffset(), r.SupersededAt?.ToDateTimeOffset(),
-        r.ReturnedReason,
+        r.ReturnedReason, r.Submission, r.ControlOutcome,
+        r.Submissions.OrderBy(x => x.Number).Select(x => new SubmissionView(x.Number, x.SubmittedAt.ToDateTimeOffset(),
+            x.SubmittedByName, x.Outcome, x.Note, x.DecidedByName, x.DecidedAt?.ToDateTimeOffset())).ToList(),
         r.Files.Select(f => new FileView(f.Id, f.Name, f.Kind, f.ContentType, f.Size, f.Sha256, f.Status,
-            f.StatusDetail, f.DetectedType, f.CreatedAt.ToDateTimeOffset(), f.DerivedFromId)).ToList());
+            f.StatusDetail, f.DetectedType, f.CreatedAt.ToDateTimeOffset(), f.DerivedFromId, f.Submission)).ToList());
 }

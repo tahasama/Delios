@@ -84,7 +84,9 @@ public sealed class FileProcessor(
             return;
         }
         var revision = await db.Revisions.SingleAsync(r => r.Id == revisionId, cancellationToken);
-        var statuses = await db.StoredFiles.Where(f => f.RevisionId == revisionId && f.Kind != FileKinds.Evidence)
+        // Only the files of the revision's current submission say whether it is ready.
+        var statuses = await db.StoredFiles
+            .Where(f => f.RevisionId == revisionId && f.Kind != FileKinds.Evidence && f.Submission == revision.Submission)
             .Select(f => f.Status).ToListAsync(cancellationToken);
         var filesState = statuses.Any(s => s is FileStatuses.Infected or FileStatuses.Rejected) ? FilesStates.Rejected
             : statuses.All(s => s == FileStatuses.Clean) ? FilesStates.Ready

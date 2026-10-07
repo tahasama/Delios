@@ -38,7 +38,8 @@ public sealed class Stamping(
         var zone = DateTimeZoneProviders.Tzdb.GetZoneOrNull(project.TimeZone) ?? DateTimeZone.Utc;
         var released = DatePattern.Format((revision.ReleasedAt ?? clock.GetCurrentInstant()).InZone(zone).Date);
 
-        foreach (var rendition in revision.Files.Where(f => f.Kind == FileKinds.Rendition && f.Status == FileStatuses.Clean).ToList())
+        foreach (var rendition in revision.Files.Where(f => f.Kind == FileKinds.Rendition && f.Status == FileStatuses.Clean
+            && f.Submission == revision.Submission).ToList())
         {
             if (revision.Files.Any(f => f.DerivedFromId == rendition.Id && f.Kind == FileKinds.Stamped)) continue;
             await DeriveAsync(rendition, FileKinds.Stamped, document, revision, bytes => Stamp(bytes,
@@ -49,8 +50,13 @@ public sealed class Stamping(
         {
             var old = await db.Revisions.Include(r => r.Files).SingleAsync(r => r.Id == oldId, cancellationToken);
             // The copy people were reading: the stamped one where there is one.
-            var sources = old.Files.Where(f => f.Kind == FileKinds.Stamped && f.Status == FileStatuses.Clean).ToList();
-            if (sources.Count == 0) sources = old.Files.Where(f => f.Kind == FileKinds.Rendition && f.Status == FileStatuses.Clean).ToList();
+            var sources = old.Files.Where(f => f.Kind == FileKinds.Stamped && f.Status == FileStatuses.Clean
+                && f.Submission == old.Submission).ToList();
+            if (sources.Count == 0)
+            {
+                sources = old.Files.Where(f => f.Kind == FileKinds.Rendition && f.Status == FileStatuses.Clean
+                    && f.Submission == old.Submission).ToList();
+            }
             foreach (var source in sources)
             {
                 if (old.Files.Any(f => f.DerivedFromId == source.Id && f.Kind == FileKinds.Superseded)) continue;
@@ -102,6 +108,7 @@ public sealed class Stamping(
             Sha256 = Convert.ToHexStringLower(SHA256.HashData(derived)),
             Kind = kind,
             DerivedFromId = source.Id,
+            Submission = source.Submission,
             Status = FileStatuses.Clean,
             DetectedType = "application/pdf",
             UploadedByName = "System",

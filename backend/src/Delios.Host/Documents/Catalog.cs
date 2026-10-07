@@ -33,6 +33,14 @@ public sealed class Catalog
                     && p.ValueKind == JsonValueKind.String && p.GetString() == value)?.Code
             : null;
 
+    /// <summary>Every active value, in order, whose string property equals the one given.</summary>
+    public IReadOnlyList<string> CodesWhere(string setKey, string prop, string value) =>
+        _sets.TryGetValue(setKey, out var set)
+            ? set.Values.Where(v => v.Status == ValueStatus.Active).OrderBy(v => v.Sort)
+                .Where(v => v.Props?.RootElement.TryGetProperty(prop, out var p) == true
+                    && p.ValueKind == JsonValueKind.String && p.GetString() == value).Select(v => v.Code).ToList()
+            : [];
+
     /// <summary>The active value of a set flagged <c>"default": true</c>.</summary>
     public string? DefaultOf(string setKey) =>
         _sets.TryGetValue(setKey, out var set)

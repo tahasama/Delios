@@ -191,6 +191,15 @@ public sealed class Revision
     /// <summary>Sent back to its author: kept as submitted, replaced by the next revision.</summary>
     public Instant? ReturnedAt { get; set; }
     public string? ReturnedReason { get; set; }
+    /// <summary>
+    /// Which set of files is the revision's now. A submission Document Control
+    /// returned for a correction is replaced by the next one under the same
+    /// revision value; it is kept, never overwritten.
+    /// </summary>
+    public int Submission { get; set; } = 1;
+    /// <summary>Document Control's last outcome on it, from the organization's control outcomes. Not a review verdict.</summary>
+    public string? ControlOutcome { get; set; }
+    public List<SubmissionRecord> Submissions { get; set; } = [];
     public uint Version { get; set; }
     public List<StoredFile> Files { get; set; } = [];
 }
@@ -247,8 +256,24 @@ public sealed class RevisionSchemeRouting
     public RevisionScheme? Scheme { get; set; }
 }
 
+/// <summary>One set of files sent in under a revision, and what Document Control said of it.</summary>
+public sealed class SubmissionRecord
+{
+    public int Number { get; set; }
+    public Instant SubmittedAt { get; set; }
+    public required string SubmittedByName { get; set; }
+    public string? Outcome { get; set; }
+    public string? Note { get; set; }
+    public string? DecidedByName { get; set; }
+    public Instant? DecidedAt { get; set; }
+}
+
 public static class RevisionStates
 {
+    /// <summary>Sent in by another organization; Document Control accepts it before anybody reviews it.</summary>
+    public const string Received = "RECEIVED";
+    /// <summary>Document Control returned it for a correction that changes nothing it says: the same revision comes back.</summary>
+    public const string Correcting = "CORRECTING";
     public const string InPreparation = "IN_PREPARATION";
     public const string InReview = "IN_REVIEW";
     public const string Released = "RELEASED";
@@ -258,7 +283,7 @@ public static class RevisionStates
     public const string Void = "VOID";
 
     /// <summary>A revision still being worked on: no second one may start beside it.</summary>
-    public static bool InMotion(string state) => state is InPreparation or InReview;
+    public static bool InMotion(string state) => state is InPreparation or InReview or Received or Correcting;
 }
 
 public static class FilesStates
@@ -286,6 +311,8 @@ public sealed class StoredFile
     public string Kind { get; set; } = FileKinds.Native;
     /// <summary>For a stamped or watermarked copy: the file it was made from, which is never changed.</summary>
     public Guid? DerivedFromId { get; set; }
+    /// <summary>Which submission of its revision it belongs to.</summary>
+    public int Submission { get; set; } = 1;
     public string Status { get; set; } = FileStatuses.AwaitingUpload;
     /// <summary>What the bytes are, from their first bytes rather than the name.</summary>
     public string? DetectedType { get; set; }

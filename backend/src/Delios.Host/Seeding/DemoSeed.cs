@@ -29,6 +29,8 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
             await db.SaveChangesAsync(cancellationToken);
             issuing |= await EnsurePackageSetupAsync(existing.Id, cancellationToken);
             await db.SaveChangesAsync(cancellationToken);
+            issuing |= await EnsureControlSetupAsync(existing.Id, cancellationToken);
+            await db.SaveChangesAsync(cancellationToken);
             await upgrade.CommitAsync(cancellationToken);
             logger.LogInformation(reviews || issuing ? "The demo tenant exists; what it lacked was added" : "The demo tenant already exists; nothing to do");
             return;
@@ -88,6 +90,8 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
         await EnsureIssueSetupAsync(t, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         await EnsurePackageSetupAsync(t, cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
+        await EnsureControlSetupAsync(t, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         logger.LogInformation("Demo tenant '{Slug}' created; every password is {Password}", Slug, Password);
@@ -318,6 +322,25 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
         };
         db.NumberingSchemes.Add(scheme);
         db.SchemeRoutings.Add(new SchemeRouting { TenantId = t, DeliverableType = RecordKinds.Package, SchemeId = scheme.Id });
+        return true;
+    }
+
+    /// <summary>
+    /// Document Control's own outcomes, apart from review verdicts. Returning a
+    /// submission that is not in order keeps its revision; only the outcome for a
+    /// verdict that asked for changes needs a new one. The recommendation, as data.
+    /// </summary>
+    private async Task<bool> EnsureControlSetupAsync(Guid t, CancellationToken cancellationToken)
+    {
+        if (await db.ValueEntries.AnyAsync(v => v.SetKey == ReviewSets.ControlOutcomes, cancellationToken)) return false;
+        AddSet(t, ReviewSets.ControlOutcomes,
+        [
+            ("ACCEPTED", "Accepted", new { act = "accept" }),
+            ("RETURNED_TO_SENDER", "Returned to sender for correction", new { act = "return", to = "sender", newRevision = false }),
+            ("RETURNED_TO_INITIATOR", "Returned to initiator for correction", new { act = "return", to = "initiator", newRevision = false }),
+            ("RETURNED_FOR_REVISION", "Returned for a new revision", new { act = "return", newRevision = true }),
+            ("RELEASED", "Released", new { act = "release" }),
+        ]);
         return true;
     }
 

@@ -42,6 +42,7 @@ public static class ReviewEndpoints
         project.MapPost("/reviews/{reviewId:guid}/rewind", RewindAsync);
         project.MapPost("/reviews/{reviewId:guid}/dispatch", DispatchAsync);
         project.MapPost("/reviews/{reviewId:guid}/evidence", EvidenceAsync);
+        project.MapPost("/revisions/{revisionId:guid}/arrival", ArrivalAsync);
         project.MapGet("/work", WorkAsync);
     }
 
@@ -110,6 +111,13 @@ public static class ReviewEndpoints
     {
         var (ticket, problem) = await reviews.EvidenceAsync(ProjectAccessFilter.Of(http), reviewId, request, cancellationToken);
         return problem ?? Results.Ok(ticket);
+    }
+
+    private static async Task<IResult> ArrivalAsync(
+        Guid revisionId, ControlRequest request, HttpContext http, ControlService control, CancellationToken cancellationToken)
+    {
+        var (revision, problem) = await control.ArrivalAsync(ProjectAccessFilter.Of(http), revisionId, request, cancellationToken);
+        return problem ?? Results.Ok(new { revision!.Id, revision.Value, revision.State, revision.Submission, revision.ControlOutcome });
     }
 
     private static async Task<IResult> WorkAsync(HttpContext http, ReviewService reviews, CancellationToken cancellationToken) =>

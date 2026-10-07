@@ -97,6 +97,7 @@ public static class PlatformSetup
         services.AddScoped<Documents.FileProcessor>();
         services.AddScoped<Reviews.ReviewService>();
         services.AddScoped<Reviews.Stamping>();
+        services.AddScoped<Reviews.ControlService>();
         services.AddScoped<Transmittals.TransmittalService>();
         services.AddScoped<Packages.PackageService>();
         services.AddSingleton<Documents.IVirusScanner, Documents.ClamAvScanner>();

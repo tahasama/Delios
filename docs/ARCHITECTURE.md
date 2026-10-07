@@ -151,6 +151,11 @@ choice belongs to the organization. Each is data its administrator changes:
   deciding step's verdicts and which of them let a revision proceed, what an
   adviser's comments amount to, comment classes and which block the release,
   and the reasons a route may be sent back to a step.
+- **Document Control's outcomes**, apart from review verdicts: what each is for
+  (accepting on arrival, returning, releasing), who a return goes back to, and
+  whether it needs a new revision. The recommendation: a fault in the submission
+  comes back corrected under the same revision; a verdict asking for changes
+  needs a new one.
 - **Each project's working week**, which due dates are counted in.
 - **Review, transmittal and package numbers**, through the same numbering
   schemes as documents; a transmittal number may carry who sends and who
@@ -519,6 +524,10 @@ deployment with tenant isolation in the database.
      they need, a shortfall the acceptance authority accepts or not, delivery on
      one transmittal per organization carrying only what is ready, then
      acceptance. Delivering fixes the contents.
+   - Done: Document Control's check, apart from review verdicts: acceptance of
+     what other organizations send in before review, returns for correction
+     under the same revision (on arrival or at the gate, whatever the verdict),
+     submissions kept in order within a revision, and its own outcome list.
 5. **Checks engine, schedules, reports.**
 6. **Next.js moves onto the API**, area by area, through the generated client.
 7. **Content extraction and OCR**, switched off, ready for activation.
