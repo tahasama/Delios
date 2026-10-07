@@ -13,6 +13,7 @@ public sealed class DeliosFactory(IDictionary<string, string?> overrides) : WebA
     {
         ["Delios:Role"] = "api",
         ["Metrics:Port"] = "0",
+        ["Auth:SecureCookie"] = "false",
         ["ConnectionStrings:Postgres"] = "Host=127.0.0.1;Port=1;Database=x;Username=x;Password=x;Timeout=2",
         ["ConnectionStrings:Redis"] = "127.0.0.1:1,connectTimeout=500",
         ["ConnectionStrings:RabbitMq"] = "amqp://x:x@127.0.0.1:1/",

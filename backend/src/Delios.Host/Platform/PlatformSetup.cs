@@ -1,10 +1,21 @@
+using System.Net;
+using System.Threading.RateLimiting;
 using Amazon.Runtime;
 using Amazon.S3;
+using Delios.Host.Audit;
+using Delios.Host.Identity;
+using Delios.Host.Tenancy;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Caching.StackExchangeRedis;
 using Microsoft.Extensions.Options;
+using NodaTime;
 using Prometheus;
 using Serilog;
 using Serilog.Events;
@@ -26,6 +37,7 @@ public static class PlatformSetup
         AddValidated<ConnectionStringsOptions>(services, ConnectionStringsOptions.Section);
         AddValidated<StorageOptions>(services, StorageOptions.Section);
         AddValidated<ClamAvOptions>(services, ClamAvOptions.Section);
+        services.AddOptions<SessionCookieOptions>().BindConfiguration(SessionCookieOptions.Section);
 
         // Serilog writes the logs; other providers (Sentry) still receive them, the default console does not.
         builder.Logging.ClearProviders();
@@ -46,9 +58,14 @@ public static class PlatformSetup
             });
         }
 
+        services.AddSingleton<IClock>(NodaTime.SystemClock.Instance);
+        services.AddScoped<TenantContext>();
+        services.AddScoped<TenantTransactionInterceptor>();
         services.AddDbContext<DeliosDbContext>((sp, o) => o
-            .UseNpgsql(sp.GetRequiredService<IOptions<ConnectionStringsOptions>>().Value.Postgres)
-            .UseSnakeCaseNamingConvention());
+            .UseNpgsql(sp.GetRequiredService<IOptions<ConnectionStringsOptions>>().Value.Postgres,
+                npgsql => npgsql.UseNodaTime())
+            .UseSnakeCaseNamingConvention()
+            .AddInterceptors(sp.GetRequiredService<TenantTransactionInterceptor>()));
 
         services.AddDataProtection()
             .SetApplicationName("delios")
@@ -60,6 +77,40 @@ public static class PlatformSetup
                 sp.GetRequiredService<IOptions<ConnectionStringsOptions>>().Value.Redis);
             redis.AbortOnConnectFail = false;
             return ConnectionMultiplexer.Connect(redis);
+        });
+
+        // Cache: in memory on each node, Redis shared between nodes. Never the source of truth.
+        services.AddStackExchangeRedisCache(_ => { });
+        services.AddOptions<RedisCacheOptions>().Configure<IServiceProvider>((o, sp) =>
+            o.ConnectionMultiplexerFactory = () => Task.FromResult(sp.GetRequiredService<IConnectionMultiplexer>()));
+        services.AddHybridCache();
+
+        services.AddScoped<AuditLog>();
+        services.AddScoped<SessionStore>();
+        services.AddScoped<ProjectAccessLoader>();
+        services.AddScoped<Seeding.TenantSetup>();
+        services.AddScoped<Seeding.DemoSeed>();
+        services.AddSingleton<IPasswordHasher<User>, PasswordHasher<User>>();
+        services.AddAuthentication(SessionAuthenticationHandler.SchemeName)
+            .AddScheme<AuthenticationSchemeOptions, SessionAuthenticationHandler>(SessionAuthenticationHandler.SchemeName, null);
+        // Every endpoint requires a signed-in person unless it says otherwise.
+        services.AddAuthorizationBuilder()
+            .SetFallbackPolicy(new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build());
+        services.AddRateLimiter(o =>
+        {
+            o.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+            o.AddPolicy("sign-in", http => RateLimitPartition.GetFixedWindowLimiter(
+                http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                _ => new FixedWindowRateLimiterOptions { PermitLimit = 10, Window = TimeSpan.FromMinutes(1) }));
+        });
+        // The proxy in front (Caddy, the load balancer) sits on a private network.
+        services.Configure<ForwardedHeadersOptions>(o =>
+        {
+            o.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+            foreach (var network in new[] { "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16" })
+            {
+                o.KnownIPNetworks.Add(System.Net.IPNetwork.Parse(network));
+            }
         });
 
         services.AddSingleton<IAmazonS3>(sp =>
@@ -83,6 +134,7 @@ public static class PlatformSetup
         services.AddHealthChecks()
             .AddNpgSql(sp => sp.GetRequiredService<IOptions<ConnectionStringsOptions>>().Value.Postgres,
                 name: "postgres", tags: [Roles.Api, Roles.Worker])
+            .AddCheck<DatabaseRoleHealthCheck>("postgres-role", tags: [Roles.Api, Roles.Worker])
             .AddRedis(sp => sp.GetRequiredService<IConnectionMultiplexer>(),
                 name: "redis", tags: [Roles.Api])
             .Add(new HealthCheckRegistration("rabbitmq",
@@ -98,6 +150,7 @@ public static class PlatformSetup
         }
 
         services.AddProblemDetails();
+        services.AddValidation();
         services.AddOpenApi();
     }
 
@@ -105,6 +158,7 @@ public static class PlatformSetup
     {
         var role = app.Services.GetRequiredService<IOptions<DeliosOptions>>().Value.Role;
 
+        app.UseForwardedHeaders();
         app.UseSerilogRequestLogging(o => o.GetLevel = (http, _, ex) =>
             ex is not null || http.Response.StatusCode >= 500 ? LogEventLevel.Error
             : http.Request.Path.StartsWithSegments("/health") ? LogEventLevel.Verbose
@@ -112,21 +166,29 @@ public static class PlatformSetup
         app.UseExceptionHandler();
         app.UseStatusCodePages();
         app.UseHttpMetrics();
+        app.UseAuthentication();
+        app.UseAuthorization();
+        app.UseRateLimiter();
 
         app.MapHealthChecks("/health/live", new HealthCheckOptions
         {
             Predicate = _ => false,
             ResponseWriter = HealthResponse.WriteAsync,
-        });
+        }).AllowAnonymous();
         app.MapHealthChecks("/health/ready", new HealthCheckOptions
         {
             Predicate = check => check.Tags.Contains(role),
             ResponseWriter = HealthResponse.WriteAsync,
-        });
+        }).AllowAnonymous();
 
         if (app.Environment.IsDevelopment())
         {
-            app.MapOpenApi("/api/openapi/{documentName}.json");
+            app.MapOpenApi("/api/openapi/{documentName}.json").AllowAnonymous();
+        }
+
+        if (role == Roles.Api)
+        {
+            app.MapIdentityEndpoints();
         }
     }
 

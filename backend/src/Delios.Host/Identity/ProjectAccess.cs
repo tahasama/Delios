@@ -1,0 +1,78 @@
+using System.Security.Claims;
+using Delios.Host.Platform;
+using Microsoft.EntityFrameworkCore;
+
+namespace Delios.Host.Identity;
+
+/// <summary>The facts of a document the permission matrix selects on.</summary>
+public sealed record DocumentFacts(
+    string? DeliverableType, string? DocType, string? Discipline, string? Criticality, string? Confidentiality);
+
+/// <summary>
+/// What one person may do on one project: their function there, and the rules of
+/// the matrix that apply to this project's contract role.
+/// </summary>
+public sealed class ProjectAccess
+{
+    public required Project Project { get; init; }
+    public required Guid UserId { get; init; }
+    public required string UserName { get; init; }
+    public required Function Function { get; init; }
+    public required IReadOnlyList<PermissionRule> Rules { get; init; }
+    /// <summary>Our own staff, as opposed to someone representing another party.</summary>
+    public required bool IsInternal { get; init; }
+    public string? PartyCode { get; init; }
+
+    public IReadOnlySet<string> Verbs => Rules.SelectMany(r => r.Verbs).ToHashSet();
+
+    /// <summary>Held anywhere in the matrix, whatever the document.</summary>
+    public bool Holds(string verb) => Rules.Any(r => r.Verbs.Contains(verb));
+
+    /// <summary>Held by a rule whose selectors all match this document.</summary>
+    public bool Allows(string verb, DocumentFacts document) => Rules.Any(r =>
+        r.Verbs.Contains(verb)
+        && Matches(r.DeliverableType, document.DeliverableType)
+        && Matches(r.DocType, document.DocType)
+        && Matches(r.Discipline, document.Discipline)
+        && Matches(r.Criticality, document.Criticality)
+        && Matches(r.Confidentiality, document.Confidentiality));
+
+    private static bool Matches(string? selector, string? value) =>
+        selector is null || string.Equals(selector, value, StringComparison.Ordinal);
+}
+
+public sealed class ProjectAccessLoader(DeliosDbContext db)
+{
+    /// <summary>
+    /// Null when the person holds no active function on an active project, which
+    /// callers answer with 404: a project you are not on does not exist for you.
+    /// </summary>
+    public async Task<ProjectAccess?> LoadAsync(Guid projectId, ClaimsPrincipal principal, CancellationToken cancellationToken)
+    {
+        var userId = principal.UserId();
+        var membership = await db.Memberships.AsNoTracking()
+            .Include(m => m.Project)
+            .Include(m => m.Function!).ThenInclude(f => f.Rules)
+            .Where(m => m.ProjectId == projectId && m.UserId == userId && m.Active
+                && m.Function!.Active && m.Project!.Status == "ACTIVE")
+            .SingleOrDefaultAsync(cancellationToken);
+        if (membership is null) return null;
+
+        var party = await db.Users.AsNoTracking().Where(u => u.Id == userId)
+            .Select(u => u.Party == null ? null : new { u.Party.Code, u.Party.IsInternal })
+            .SingleAsync(cancellationToken);
+        var project = membership.Project!;
+        return new ProjectAccess
+        {
+            Project = project,
+            UserId = userId,
+            UserName = principal.Identity?.Name ?? "",
+            Function = membership.Function!,
+            Rules = membership.Function!.Rules
+                .Where(r => r.ProjectRole is null || r.ProjectRole == project.ContractRole)
+                .ToList(),
+            IsInternal = party is null || party.IsInternal,
+            PartyCode = party?.Code,
+        };
+    }
+}

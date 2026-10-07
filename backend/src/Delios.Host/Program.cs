@@ -19,11 +19,10 @@ try
 
     var app = builder.Build();
 
-    // Migrations run once, from a one-shot container, never on every node's start.
-    if (args.Contains(DatabaseMigrator.Command))
+    // Migrations and setup run once, from a one-shot container, never on every node's start.
+    if (Commands.IsCommand(args))
     {
-        await DatabaseMigrator.ApplyAsync(app.Services);
-        return 0;
+        return await Commands.RunAsync(app, args);
     }
 
     app.UsePlatform();

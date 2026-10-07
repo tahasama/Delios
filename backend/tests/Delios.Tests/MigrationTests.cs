@@ -1,23 +1,16 @@
 using Delios.Host.Platform;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
-using Testcontainers.PostgreSql;
 
 namespace Delios.Tests;
 
-public sealed class MigrationTests : IAsyncLifetime
+public sealed class MigrationTests(Infrastructure infrastructure) : IClassFixture<Infrastructure>
 {
-    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:17-alpine").Build();
-
-    public Task InitializeAsync() => _postgres.StartAsync();
-    public Task DisposeAsync() => _postgres.DisposeAsync().AsTask();
-
     [Fact]
     public async Task Migrations_apply_and_match_the_model()
     {
-        var settings = DeliosFactory.Unreachable();
-        settings["ConnectionStrings:Postgres"] = _postgres.GetConnectionString();
-        await using var factory = new DeliosFactory(settings);
+        await using var factory = new DeliosFactory(await infrastructure.SettingsAsync());
 
         await DatabaseMigrator.ApplyAsync(factory.Services);
 
@@ -25,6 +18,19 @@ public sealed class MigrationTests : IAsyncLifetime
         var db = scope.ServiceProvider.GetRequiredService<DeliosDbContext>();
         Assert.Empty(await db.Database.GetPendingMigrationsAsync());
         Assert.False(db.Database.HasPendingModelChanges(), "The model has changes no migration covers");
-        Assert.Equal(0, await db.DataProtectionKeys.CountAsync());
+    }
+
+    [Fact]
+    public async Task Migrations_can_be_rolled_back_to_the_start()
+    {
+        await using var factory = new DeliosFactory(await infrastructure.SettingsAsync());
+        await DatabaseMigrator.ApplyAsync(factory.Services);
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<DeliosDbContext>();
+        var migrator = db.GetInfrastructure().GetRequiredService<Microsoft.EntityFrameworkCore.Migrations.IMigrator>();
+        await migrator.MigrateAsync("0");
+
+        Assert.Empty(await db.Database.GetAppliedMigrationsAsync());
     }
 }
