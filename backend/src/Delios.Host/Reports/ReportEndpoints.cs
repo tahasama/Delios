@@ -93,7 +93,7 @@ public static class ReportEndpoints
     }
 
     /// <summary>Writes the report's list as a UTF-8 CSV file: a heading line, the column names, then the rows.</summary>
-    private static byte[] Csv(string heading, Report report)
+    internal static byte[] Csv(string heading, Report report)
     {
         static string Field(string text) =>
             text.IndexOfAny([',', '"', '\n', '\r']) >= 0 ? $"\"{text.Replace("\"", "\"\"")}\"" : text;
@@ -107,7 +107,7 @@ public static class ReportEndpoints
     }
 
     /// <summary>Writes the report's list as an Excel workbook: the heading in row 1, column names in row 3 (frozen), then the rows.</summary>
-    private static byte[] Excel(string heading, Report report)
+    internal static byte[] Excel(string heading, Report report)
     {
         using var workbook = new XLWorkbook();
         var sheet = workbook.AddWorksheet(report.Title.Length > 31 ? report.Title[..31] : report.Title);

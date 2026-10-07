@@ -306,6 +306,9 @@ public static class PlatformSetup
             Checks.CheckEndpoints.MapCheckEndpoints(app);
             Schedules.ScheduleEndpoints.MapScheduleEndpoints(app);
             Reports.ReportEndpoints.MapReportEndpoints(app);
+            Documents.RegisterEndpoints.MapRegisterEndpoints(app);
+            Documents.DocumentContextEndpoints.MapDocumentContextEndpoints(app);
+            Documents.ValueEndpoints.MapValueEndpoints(app);
         }
     }
 

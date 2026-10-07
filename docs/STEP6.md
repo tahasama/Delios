@@ -21,8 +21,13 @@ Each area: the screens, then any backend functions they need that do not exist y
 
 - [x] **Sign-in and the frame**: sign-in with organization and two-step code,
       sign-out, project picker, the menu, home ("waiting on you").
-- [ ] **Register**: documents list and search, a document's page, new document,
-      uploads, revisions, Document Control's check on arrival.
+- [x] **Register**: the register (search, every filter, sorting, page numbers,
+      saved views, export), a document's page (revisions and files, downloads,
+      reviews, transmittals, packages, activities, history), new document,
+      uploads straight to storage, starting a revision, sending corrected files,
+      Document Control's check on arrival, sending for review.
+      Not carried over (old-prototype ideas with no backend yet): phases, purchase
+      orders, "on hold", assets, document relationships, legal hold, reader grants.
 - [ ] **Reviews**: list, a review (answer, comments, verdict, release, return), send for review.
 - [ ] **Transmittals**: log, a transmittal, issue requests, sending, acknowledging, dispatch by proxy.
 - [ ] **Packages**
