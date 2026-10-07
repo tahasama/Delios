@@ -4,6 +4,7 @@ using Delios.Host.Platform;
 using Microsoft.EntityFrameworkCore;
 using NodaTime;
 using RabbitMQ.Client;
+using RabbitMQ.Client.Exceptions;
 
 namespace Delios.Host.Messaging;
 
@@ -80,14 +81,34 @@ public sealed class OutboxRelay(
         var channel = await ChannelAsync(cancellationToken);
         foreach (var message in batch)
         {
-            await channel.BasicPublishAsync(Topology.Exchange, message.RoutingKey, mandatory: true,
-                new BasicProperties
-                {
-                    Persistent = true,
-                    ContentType = "application/json",
-                    MessageId = message.Id.ToString(System.Globalization.CultureInfo.InvariantCulture),
-                },
-                Encoding.UTF8.GetBytes(message.Payload), cancellationToken);
+            var body = Encoding.UTF8.GetBytes(message.Payload);
+            var id = message.Id.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            try
+            {
+                await channel.BasicPublishAsync(Topology.Exchange, message.RoutingKey, mandatory: true,
+                    new BasicProperties { Persistent = true, ContentType = "application/json", MessageId = id },
+                    body, cancellationToken);
+            }
+            catch (PublishException e) when (e.IsReturn)
+            {
+                // No queue takes this routing key: a programming error. Retrying would block
+                // every message behind it, so it is parked for a person, with its key.
+                logger.LogError("Outbox message {MessageId} ({RoutingKey}) reached no queue; parked in {Queue}",
+                    id, message.RoutingKey, Topology.FilesDeadQueue);
+                await channel.BasicPublishAsync("", Topology.FilesDeadQueue, mandatory: true,
+                    new BasicProperties
+                    {
+                        Persistent = true,
+                        ContentType = "application/json",
+                        MessageId = id,
+                        Headers = new Dictionary<string, object?>
+                        {
+                            [Topology.RoutingKeyHeader] = message.RoutingKey,
+                            ["x-error"] = "No queue is bound to this routing key.",
+                        },
+                    },
+                    body, cancellationToken);
+            }
             message.SentAt = clock.GetCurrentInstant();
         }
         await db.SaveChangesAsync(cancellationToken);

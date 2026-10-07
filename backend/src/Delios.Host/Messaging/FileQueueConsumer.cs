@@ -91,14 +91,18 @@ public sealed class FileQueueConsumer(
             var attempt = Attempts(delivery.BasicProperties) + 1;
             if (attempt >= Topology.MaxAttempts)
             {
-                logger.LogError(ex, "File message failed {Attempts} times; parked in {Queue}", attempt, Topology.FilesDeadQueue);
+                logger.LogError(ex, "Message {RoutingKey} failed {Attempts} times; parked in {Queue}", delivery.RoutingKey, attempt, Topology.FilesDeadQueue);
                 Platform.AppMetrics.FileMessagesFailed.WithLabels("parked").Inc();
                 await channel.BasicPublishAsync("", Topology.FilesDeadQueue, mandatory: false,
                     new BasicProperties
                     {
                         Persistent = true,
                         ContentType = "application/json",
-                        Headers = new Dictionary<string, object?> { ["x-error"] = ex.Message },
+                        Headers = new Dictionary<string, object?>
+                        {
+                            [Topology.RoutingKeyHeader] = delivery.RoutingKey,
+                            ["x-error"] = ex.Message,
+                        },
                     },
                     delivery.Body, stoppingToken);
                 await channel.BasicAckAsync(delivery.DeliveryTag, multiple: false, stoppingToken);

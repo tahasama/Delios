@@ -60,6 +60,12 @@ public static class Topology
     public const string FilesRetryQueue = "delios.files.retry";
     /// <summary>Where a message from any work queue is parked after its last attempt.</summary>
     public const string FilesDeadQueue = "delios.files.dead";
+
+    /// <summary>
+    /// The header a parked message carries its original routing key in, so a person
+    /// knows what kind of work it was and can send it back where it belongs.
+    /// </summary>
+    public const string RoutingKeyHeader = "x-routing-key";
     /// <summary>How many times a message is tried before it is parked in the dead queue.</summary>
     public const int MaxAttempts = 5;
     /// <summary>How long a failed message waits in the retry queue before it is delivered again.</summary>
