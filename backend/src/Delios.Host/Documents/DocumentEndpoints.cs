@@ -1,4 +1,5 @@
 using Delios.Host.Audit;
+using Prometheus;
 using Delios.Host.Identity;
 using Delios.Host.Platform;
 using Delios.Host.Tenancy;
@@ -33,6 +34,7 @@ public static class DocumentEndpoints
         var access = ProjectAccessFilter.Of(http);
         if (!access.Holds(Verbs.Read)) return Problems.Forbidden("READ_NOT_ALLOWED", "Your function cannot read this register.");
         var size = Math.Clamp(limit ?? DefaultPageSize, 1, MaxPageSize);
+        using var timer = AppMetrics.RegisterQuerySeconds.WithLabels(string.IsNullOrWhiteSpace(q) ? "no" : "yes").NewTimer();
 
         var query = DocumentQueries.Visible(db, access, await documents.RestrictedAsync(cancellationToken)).AsNoTracking();
         if (!string.IsNullOrWhiteSpace(q))

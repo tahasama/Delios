@@ -1,4 +1,5 @@
 using Delios.Host.Audit;
+using Prometheus;
 using Delios.Host.Platform;
 using Delios.Host.Tenancy;
 using Microsoft.EntityFrameworkCore;
@@ -37,6 +38,7 @@ public sealed class FileProcessor(
         }
 
         // Scanning can take a while for a large file; no transaction is held meanwhile.
+        using var timer = AppMetrics.FileProcessingSeconds.NewTimer();
         ScanResult scan;
         string sha256, detected;
         long size;
@@ -65,6 +67,7 @@ public sealed class FileProcessor(
                 .SetProperty(x => x.DetectedType, detected)
                 .SetProperty(x => x.ScannedAt, now), cancellationToken);
         if (updated == 0) return;
+        AppMetrics.FilesProcessed.WithLabels(status).Inc();
 
         await audit.WriteAsync(Actor.System, status switch
         {

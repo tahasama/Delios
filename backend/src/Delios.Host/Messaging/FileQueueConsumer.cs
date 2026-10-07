@@ -59,6 +59,7 @@ public sealed class FileQueueConsumer(
             if (attempt >= Topology.MaxAttempts)
             {
                 logger.LogError(ex, "File message failed {Attempts} times; parked in {Queue}", attempt, Topology.FilesDeadQueue);
+                Platform.AppMetrics.FileMessagesFailed.WithLabels("parked").Inc();
                 await channel.BasicPublishAsync("", Topology.FilesDeadQueue, mandatory: false,
                     new BasicProperties
                     {
@@ -72,6 +73,7 @@ public sealed class FileQueueConsumer(
             else
             {
                 logger.LogWarning(ex, "File message failed (attempt {Attempt}); retrying in {Delay}", attempt, Topology.RetryDelay);
+                Platform.AppMetrics.FileMessagesFailed.WithLabels("retried").Inc();
                 await channel.BasicNackAsync(delivery.DeliveryTag, multiple: false, requeue: false, stoppingToken);
             }
         }

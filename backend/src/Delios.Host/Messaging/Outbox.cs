@@ -24,7 +24,9 @@ public sealed class OutboxRelay(
     : BackgroundService
 {
     private static readonly TimeSpan Idle = TimeSpan.FromSeconds(1);
+    private static readonly TimeSpan MeasureEvery = TimeSpan.FromSeconds(15);
     private IChannel? _channel;
+    private DateTime _measuredAt = DateTime.MinValue;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -33,6 +35,7 @@ public sealed class OutboxRelay(
             try
             {
                 if (await RelayBatchAsync(stoppingToken) == 0) await Task.Delay(Idle, stoppingToken);
+                if (DateTime.UtcNow - _measuredAt > MeasureEvery) await MeasureAsync(stoppingToken);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
@@ -74,6 +77,21 @@ public sealed class OutboxRelay(
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return batch.Count;
+    }
+
+    /// <summary>The backlog, for the alert that says the relay is stuck.</summary>
+    private async Task MeasureAsync(CancellationToken cancellationToken)
+    {
+        await using var scope = scopes.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<DeliosDbContext>();
+        var unsent = await db.OutboxMessages.Where(m => m.SentAt == null)
+            .GroupBy(_ => 1)
+            .Select(g => new { Count = g.Count(), Oldest = g.Min(m => m.CreatedAt) })
+            .SingleOrDefaultAsync(cancellationToken);
+        AppMetrics.OutboxUnsent.Set(unsent?.Count ?? 0);
+        AppMetrics.OutboxOldestUnsentSeconds.Set(
+            unsent is null ? 0 : (clock.GetCurrentInstant() - unsent.Oldest).TotalSeconds);
+        _measuredAt = DateTime.UtcNow;
     }
 
     private async Task<IChannel> ChannelAsync(CancellationToken cancellationToken)
