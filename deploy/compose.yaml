@@ -1,10 +1,11 @@
 # Development stack. Production uses managed object storage and its own secrets.
+# Every password comes from deploy/.env: create it once with  sh deploy/init-env.sh
 #
 #   docker compose -f deploy/compose.yaml up -d                 dependencies only; run the API with dotnet run
 #   docker compose -f deploy/compose.yaml --profile app up -d   dependencies, migrations, API and worker,
 #                                                                behind Caddy on :8080
 #   add --scale api=2 --scale worker=2                           more nodes; Caddy and Prometheus find them
-#   add --profile monitoring                                     Prometheus :9090, Alertmanager :9093, Grafana :3001
+#   add --profile monitoring                                     Prometheus :9090, Alertmanager :9093, Grafana :3301
 
 name: delios
 
@@ -15,17 +16,17 @@ x-backend: &backend
   environment: &backend-env
     ASPNETCORE_ENVIRONMENT: Development
     # DB_HOST=pgbouncer (with the pgbouncer profile) sends the app through the pool.
-    ConnectionStrings__Postgres: Host=${DB_HOST:-postgres};Database=delios;Username=delios;Password=delios-dev;${DB_OPTIONS:-}
+    ConnectionStrings__Postgres: Host=${DB_HOST:-postgres};Database=delios;Username=delios;Password=${DB_APP_PASSWORD:?run sh deploy/init-env.sh};${DB_OPTIONS:-}
     # Set to the standby's connection string to read register pages from it.
     ConnectionStrings__PostgresReadOnly: ${DB_READ_CONNECTION:-}
     ConnectionStrings__Redis: valkey:6379
-    ConnectionStrings__RabbitMq: amqp://delios:delios-dev@rabbitmq:5672/
+    ConnectionStrings__RabbitMq: amqp://delios:${RABBITMQ_PASSWORD:?run sh deploy/init-env.sh}@rabbitmq:5672/
     Storage__Endpoint: http://seaweedfs:8333
     # Presigned URLs are opened by the browser, which reaches storage on localhost.
     Storage__PublicEndpoint: http://localhost:8333
     Storage__Bucket: delios
-    Storage__AccessKey: delios
-    Storage__SecretKey: delios-dev-secret
+    Storage__AccessKey: ${STORAGE_ACCESS_KEY:?run sh deploy/init-env.sh}
+    Storage__SecretKey: ${STORAGE_SECRET_KEY:?run sh deploy/init-env.sh}
     ClamAv__Host: clamav
     # Plain HTTP on localhost; production sits behind TLS and keeps the default.
     Auth__SecureCookie: "false"
@@ -41,7 +42,11 @@ services:
     init: true
     environment: &postgres-env
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres-dev
+      POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:?run sh deploy/init-env.sh}
+      # Used only when the data volume is first created (initdb/01-roles.sh).
+      DB_APP_PASSWORD: ${DB_APP_PASSWORD:?run sh deploy/init-env.sh}
+      DB_MONITOR_PASSWORD: ${DB_MONITOR_PASSWORD:?run sh deploy/init-env.sh}
+      DB_REPLICATION_PASSWORD: ${DB_REPLICATION_PASSWORD:?run sh deploy/init-env.sh}
       BACKUP_REPO_TYPE: ${BACKUP_REPO_TYPE:-posix}
       BACKUP_CIPHER_PASS: ${BACKUP_CIPHER_PASS:-}
       BACKUP_S3_ENDPOINT: ${BACKUP_S3_ENDPOINT:-}
@@ -73,7 +78,7 @@ services:
     restart: unless-stopped
     environment:
       RABBITMQ_DEFAULT_USER: delios
-      RABBITMQ_DEFAULT_PASS: delios-dev
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?run sh deploy/init-env.sh}
     ports: ["5672:5672", "15672:15672"]
     volumes: [rabbitmq:/var/lib/rabbitmq]
     healthcheck:
@@ -85,11 +90,20 @@ services:
   seaweedfs:
     image: chrislusf/seaweedfs:latest
     restart: unless-stopped
-    command: server -dir=/data -s3 -s3.config=/etc/seaweedfs/s3.json
+    # The access keys come from deploy/.env; the config file is written at start.
+    environment:
+      STORAGE_ACCESS_KEY: ${STORAGE_ACCESS_KEY:?run sh deploy/init-env.sh}
+      STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY:?run sh deploy/init-env.sh}
+    entrypoint:
+      - /bin/sh
+      - -c
+      - >-
+        printf '{"identities":[{"name":"delios","credentials":[{"accessKey":"%s","secretKey":"%s"}],"actions":["Admin","Read","Write","List","Tagging"]}]}'
+        "$$STORAGE_ACCESS_KEY" "$$STORAGE_SECRET_KEY" > /tmp/s3.json &&
+        exec weed server -dir=/data -s3 -s3.config=/tmp/s3.json
     ports: ["8333:8333"]
     volumes:
       - seaweedfs:/data
-      - ./seaweedfs/s3.json:/etc/seaweedfs/s3.json:ro
 
   storage-init:
     image: chrislusf/seaweedfs:latest
@@ -125,7 +139,7 @@ services:
     environment:
       <<: *backend-env
       # Migrations always talk to Postgres directly, never through the pool.
-      ConnectionStrings__Postgres: Host=postgres;Database=delios;Username=delios;Password=delios-dev
+      ConnectionStrings__Postgres: Host=postgres;Database=delios;Username=delios;Password=${DB_APP_PASSWORD:?run sh deploy/init-env.sh}
     healthcheck: { disable: true }
     depends_on:
       postgres: { condition: service_healthy }
@@ -173,8 +187,8 @@ services:
       RCLONE_CONFIG_SOURCE_TYPE: s3
       RCLONE_CONFIG_SOURCE_PROVIDER: Other
       RCLONE_CONFIG_SOURCE_ENDPOINT: http://seaweedfs:8333
-      RCLONE_CONFIG_SOURCE_ACCESS_KEY_ID: delios
-      RCLONE_CONFIG_SOURCE_SECRET_ACCESS_KEY: delios-dev-secret
+      RCLONE_CONFIG_SOURCE_ACCESS_KEY_ID: ${STORAGE_ACCESS_KEY:?run sh deploy/init-env.sh}
+      RCLONE_CONFIG_SOURCE_SECRET_ACCESS_KEY: ${STORAGE_SECRET_KEY:?run sh deploy/init-env.sh}
       SOURCE_PATH: delios
       # Production: a second S3 remote (RCLONE_CONFIG_TARGET_TYPE=s3 and its keys).
       RCLONE_CONFIG_TARGET_TYPE: ${FILE_BACKUP_TARGET_TYPE:-local}
@@ -208,7 +222,7 @@ services:
       <<: *postgres-env
       DELIOS_PG_ROLE: standby
       PRIMARY_HOST: postgres
-      REPLICATION_PASSWORD: replicator-dev
+      REPLICATION_PASSWORD: ${DB_REPLICATION_PASSWORD:?run sh deploy/init-env.sh}
     ports: ["5433:5432"]
     volumes:
       - postgres-standby:/var/lib/postgresql/data
@@ -225,7 +239,7 @@ services:
     profiles: [standby]
     restart: unless-stopped
     environment:
-      DATA_SOURCE_NAME: postgresql://delios_monitor:monitor-dev@postgres-standby:5432/delios?sslmode=disable
+      DATA_SOURCE_NAME: postgresql://delios_monitor:${DB_MONITOR_PASSWORD:?run sh deploy/init-env.sh}@postgres-standby:5432/delios?sslmode=disable
 
   # ── Connection pool (switched on when DatabaseConnectionsHigh fires) ─────────
   # Many app nodes share a bounded set of Postgres connections. Transaction
@@ -236,7 +250,7 @@ services:
     profiles: [pgbouncer]
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgres://delios:delios-dev@postgres:5432/delios
+      DATABASE_URL: postgres://delios:${DB_APP_PASSWORD:?run sh deploy/init-env.sh}@postgres:5432/delios
       AUTH_TYPE: scram-sha-256
       POOL_MODE: transaction
       MAX_CLIENT_CONN: "2000"
@@ -278,9 +292,10 @@ services:
     profiles: [monitoring]
     restart: unless-stopped
     environment:
-      GF_SECURITY_ADMIN_PASSWORD: admin-dev
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?run sh deploy/init-env.sh}
       GF_USERS_ALLOW_SIGN_UP: "false"
-    ports: ["3001:3000"]
+    # 3301 rather than 3001, which other local apps often use.
+    ports: ["${GRAFANA_PORT:-3301}:3000"]
     volumes:
       - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
       - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
@@ -302,7 +317,7 @@ services:
     profiles: [monitoring]
     restart: unless-stopped
     environment:
-      DATA_SOURCE_NAME: postgresql://delios_monitor:monitor-dev@postgres:5432/delios?sslmode=disable
+      DATA_SOURCE_NAME: postgresql://delios_monitor:${DB_MONITOR_PASSWORD:?run sh deploy/init-env.sh}@postgres:5432/delios?sslmode=disable
 
   redis-exporter:
     image: oliver006/redis_exporter:latest

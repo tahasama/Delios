@@ -1,9 +1,0 @@
-{
-  "identities": [
-    {
-      "name": "delios",
-      "credentials": [{ "accessKey": "delios", "secretKey": "delios-dev-secret" }],
-      "actions": ["Admin", "Read", "Write", "List", "Tagging"]
-    }
-  ]
-}

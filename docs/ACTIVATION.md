@@ -5,8 +5,11 @@ When an alert says it is needed, this page says how to switch it on, and how to
 check it worked. Nothing here needs code changes.
 
 Commands assume the repository root. `C` below stands for
-`docker compose -f deploy/compose.yaml`. Settings go in `deploy/.env` (not
-committed), which Compose reads automatically.
+`docker compose -f deploy/compose.yaml`. Settings go in `deploy/.env` (never
+committed), which Compose reads automatically. `sh deploy/init-env.sh` creates
+it once with a random password for every service; Compose refuses to start
+without it. In production, keep a copy of it, and of `BACKUP_CIPHER_PASS`,
+somewhere other than the server.
 
 ## How you find out
 
@@ -18,7 +21,7 @@ C --profile app --profile monitoring up -d
 
 | Where | What |
 |---|---|
-| Grafana, http://localhost:3001 (admin / admin-dev) | The **DELIOS overview** dashboard: firing alerts at the top, then API, files and messages, database, backups and server |
+| Grafana, http://localhost:3301 (`admin`, password `GRAFANA_ADMIN_PASSWORD` in `deploy/.env`) | The **DELIOS overview** dashboard: firing alerts at the top, then API, files and messages, database, backups and server |
 | Alertmanager, http://localhost:9093 | Every alert currently firing |
 | Prometheus, http://localhost:9090 | The raw measurements and the alert rules |
 

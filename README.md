@@ -35,6 +35,7 @@ moves onto its API area by area.
 Everything runs in Docker; the .NET 10 SDK is needed only to work on the code.
 
 ```bash
+sh deploy/init-env.sh                                                         # once: random passwords into deploy/.env (never committed)
 docker compose -f deploy/compose.yaml --profile app up -d --build             # whole stack, API on :8080
 docker compose -f deploy/compose.yaml --profile app run --rm migrate seed-demo # demo tenant "demo", password demo1234
 ```
@@ -44,9 +45,11 @@ The demo people are admin, controller, engineer, approver, viewer (`@demo.local`
 and `supplier@acme.local`. The endpoints are listed at
 http://localhost:8080/api/openapi/v1.json.
 
-To work on the code, run only the dependencies in Docker and the API from the SDK:
+To work on the code, run only the dependencies in Docker and the API from the SDK
+(`init-env.sh` also stored the credentials as .NET user-secrets, outside the repository):
 
 ```bash
+sh deploy/init-env.sh
 docker compose -f deploy/compose.yaml up -d
 dotnet run --project backend/src/Delios.Host -- migrate
 dotnet run --project backend/src/Delios.Host -- seed-demo
@@ -57,7 +60,8 @@ dotnet test backend                                         # tests start their 
 After pulling changes that touch `deploy/postgres`, rebuild and recreate the
 database volume: `docker compose -f deploy/compose.yaml down -v`, then `up --build`.
 
-Add `--profile monitoring` for Grafana (http://localhost:3001, admin / admin-dev),
+Add `--profile monitoring` for Grafana (http://localhost:3301, user `admin`, password
+`GRAFANA_ADMIN_PASSWORD` in `deploy/.env`),
 Prometheus (:9090) and Alertmanager (:9093). Backups run from the start; the
 monthly restore drill is
 `docker compose -f deploy/compose.yaml --profile drill run --rm restore-drill`.
