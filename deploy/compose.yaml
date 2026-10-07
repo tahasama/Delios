@@ -182,7 +182,8 @@ services:
     image: rclone/rclone:latest
     profiles: [app]
     restart: unless-stopped
-    entrypoint: ["/bin/sh", "/backup.sh"]
+    # Line endings stripped: a Windows checkout may have turned them into CRLF.
+    entrypoint: ["/bin/sh", "-c", "tr -d '\\r' < /backup.sh > /tmp/backup.sh && exec sh /tmp/backup.sh"]
     environment:
       RCLONE_CONFIG_SOURCE_TYPE: s3
       RCLONE_CONFIG_SOURCE_PROVIDER: Other
