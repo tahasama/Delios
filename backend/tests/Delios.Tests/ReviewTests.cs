@@ -39,11 +39,24 @@ public static class Flow
         });
         var ticket = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.True(response.IsSuccessStatusCode, ticket.ToString());
-        using var raw = new HttpClient();
-        using var body = new ByteArrayContent(bytes);
-        body.Headers.ContentType = MediaTypeHeaderValue.Parse(contentType);
-        (await raw.PutAsync(new Uri(ticket.GetProperty("url").GetString()!), body)).EnsureSuccessStatusCode();
+        await PutAsync(ticket, bytes);
         return ticket.GetProperty("fileId").GetGuid();
+    }
+
+    /// <summary>Sends the bytes as a browser would: to the signed link, with every header the ticket names.</summary>
+    public static async Task PutAsync(JsonElement ticket, byte[] bytes)
+    {
+        using var raw = new HttpClient();
+        using var request = new HttpRequestMessage(HttpMethod.Put, ticket.GetProperty("url").GetString()) { Content = new ByteArrayContent(bytes) };
+        foreach (var header in ticket.GetProperty("headers").EnumerateObject())
+        {
+            if (header.Name.Equals("Content-Type", StringComparison.OrdinalIgnoreCase))
+                request.Content.Headers.ContentType = MediaTypeHeaderValue.Parse(header.Value.GetString()!);
+            else
+                request.Headers.Add(header.Name, header.Value.GetString());
+        }
+        using var response = await raw.SendAsync(request);
+        Assert.True(response.IsSuccessStatusCode, $"{(int)response.StatusCode} {await response.Content.ReadAsStringAsync()}");
     }
 
     /// <summary>Registers a drawing (or reuses one) and starts a revision with a PDF, then waits for its scan.</summary>

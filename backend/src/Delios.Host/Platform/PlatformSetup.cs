@@ -98,6 +98,14 @@ public static class PlatformSetup
         services.AddScoped<Documents.Numbering>();
         services.AddScoped<Documents.DocumentService>();
         services.AddScoped<Documents.FileStorage>();
+        if (config.GetSection(StorageOptions.Section).Get<StorageOptions>()?.UsesAzure == true)
+        {
+            services.AddSingleton<Documents.IObjectStore, Documents.AzureObjectStore>();
+        }
+        else
+        {
+            services.AddSingleton<Documents.IObjectStore, Documents.S3ObjectStore>();
+        }
         services.AddScoped<Documents.FileProcessor>();
         services.AddScoped<Reviews.ReviewService>();
         services.AddScoped<Reviews.Stamping>();

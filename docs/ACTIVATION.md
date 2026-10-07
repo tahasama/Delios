@@ -289,7 +289,37 @@ bring into search.
 project, and the search index drops it on its next pass. Files themselves
 are never changed. To uninstall: remove `EXTRACTION_URL` and stop the `tika` container.
 
+## Azure Blob Storage
+
+**When:** a client requires its files in Azure (often for data residency or its
+own Microsoft agreement), or the platform moves to Azure. Nothing else changes:
+the database, the keys files are stored under and every link the app hands out
+work the same way.
+
+1. In Azure, create a storage account (StorageV2; geo-redundant storage if the
+   client wants a second region) and a **private** container named `delios`.
+   Turn on blob soft delete and versioning: nothing is ever overwritten here, and
+   those keep a deleted blob recoverable.
+2. Allow browsers to upload and download directly: in the account's
+   *Resource sharing (CORS)* for Blob service, add your site address as allowed
+   origin, methods `GET, HEAD, PUT`, allowed headers `*`, exposed headers `*`.
+3. In `deploy/.env`:
+   ```
+   STORAGE_PROVIDER=azure
+   AZURE_STORAGE_CONNECTION_STRING=DefaultEndpointsProtocol=https;AccountName=...;AccountKey=...;EndpointSuffix=core.windows.net
+   ```
+   The account key signs short-lived links for one file and one permission at a time.
+4. Move the files already stored, keeping their keys (the database refers to them):
+   `rclone copy s3:delios azure:delios --immutable --checksum` from any machine
+   with both remotes configured (or AzCopy, which reads from S3 too).
+5. `docker compose ... up -d`. `/health/ready` on the worker checks the container.
+6. The second copy of files: set `FILE_BACKUP_SOURCE_TYPE=azureblob`,
+   `AZURE_STORAGE_ACCOUNT` and `AZURE_STORAGE_KEY`, and point the target at another
+   region or provider, as for S3.
+
+**To go back:** the same copy the other way, then `STORAGE_PROVIDER=s3`.
+
 ## Still to build
 
 These follow the product steps (see ARCHITECTURE.md "Build plan") and will get
-their own sections here: Azure Blob storage, Kubernetes.
+their own section here: Kubernetes.

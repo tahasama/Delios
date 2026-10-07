@@ -169,9 +169,8 @@ public sealed class DocumentService(
         db.StoredFiles.Add(file);
         await db.SaveChangesAsync(cancellationToken);
 
-        var (url, expires) = storage.PresignUpload(file.ObjectKey, contentType);
-        return (new UploadTicket(file.Id, "PUT", url, new Dictionary<string, string> { ["Content-Type"] = contentType },
-            expires.ToDateTimeOffset()), null);
+        var link = storage.PresignUpload(file.ObjectKey, contentType);
+        return (new UploadTicket(file.Id, "PUT", link.Url, link.Headers, link.ExpiresAt.ToDateTimeOffset()), null);
     }
 
     public async Task<(Revision? Revision, IResult? Problem)> StartRevisionAsync(

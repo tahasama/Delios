@@ -26,7 +26,7 @@ the path to serious scale.
 | Content extraction | Built and switched off: Tika with Tesseract, per-project switch, own queue (see Client content) | Activated per project at a client's written request |
 | Cache, locks, rate limits | Redis (Valkey) | — |
 | Async work | RabbitMQ (official client), a transactional outbox table, retry and dead-letter queues | Kafka is not planned |
-| File storage | S3-compatible object storage, versioning and object lock, presigned URLs (SeaweedFS in development) | AWS S3 / Azure Blob if a client requires it |
+| File storage | S3-compatible object storage, versioning and object lock, presigned URLs (SeaweedFS in development); Azure Blob Storage built in, chosen by one setting | AWS S3 or Azure Blob if a client requires it |
 | Virus scan | ClamAV | — |
 | PDF | PdfSharp (MIT): release stamps, superseded watermarks | — |
 | Renditions | None generated: authors submit the PDF with the native file | — |

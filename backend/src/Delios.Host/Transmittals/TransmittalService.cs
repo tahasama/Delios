@@ -468,9 +468,8 @@ public sealed class TransmittalService(
         file.ObjectKey = FileStorage.KeyFor(file.TenantId, file.ProjectId, file.Id);
         db.StoredFiles.Add(file);
         await db.SaveChangesAsync(cancellationToken);
-        var (url, expires) = storage.PresignUpload(file.ObjectKey, file.ContentType);
-        return (new UploadTicket(file.Id, "PUT", url, new Dictionary<string, string> { ["Content-Type"] = file.ContentType },
-            expires.ToDateTimeOffset()), null);
+        var link = storage.PresignUpload(file.ObjectKey, file.ContentType);
+        return (new UploadTicket(file.Id, "PUT", link.Url, link.Headers, link.ExpiresAt.ToDateTimeOffset()), null);
     }
 
     /// <summary>Puts uploaded proof to use and sends it for scanning. Null when it is fine.</summary>

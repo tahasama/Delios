@@ -55,16 +55,16 @@ public sealed class RabbitMqHealthCheck(IOptions<ConnectionStringsOptions> optio
     }
 }
 
-public sealed class ObjectStorageHealthCheck(IAmazonS3 s3, IOptions<StorageOptions> options) : IHealthCheck
+public sealed class ObjectStorageHealthCheck(Documents.IObjectStore store) : IHealthCheck
 {
     public async Task<HealthCheckResult> CheckHealthAsync(
         HealthCheckContext context, CancellationToken cancellationToken = default)
     {
         try
         {
-            return await AmazonS3Util.DoesS3BucketExistV2Async(s3, options.Value.Bucket)
+            return await store.ReachableAsync(cancellationToken)
                 ? HealthCheckResult.Healthy()
-                : HealthCheckResult.Unhealthy("The bucket does not exist");
+                : HealthCheckResult.Unhealthy("The bucket (or Azure container) does not exist");
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

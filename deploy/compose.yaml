@@ -21,6 +21,9 @@ x-backend: &backend
     ConnectionStrings__PostgresReadOnly: ${DB_READ_CONNECTION:-}
     ConnectionStrings__Redis: valkey:6379
     ConnectionStrings__RabbitMq: amqp://delios:${RABBITMQ_PASSWORD:?run sh deploy/init-env.sh}@rabbitmq:5672/
+    # s3 (SeaweedFS here, Hetzner or AWS in production) or azure (docs/ACTIVATION.md "Azure Blob Storage").
+    Storage__Provider: ${STORAGE_PROVIDER:-s3}
+    Storage__AzureConnectionString: ${AZURE_STORAGE_CONNECTION_STRING:-}
     Storage__Endpoint: http://seaweedfs:8333
     # Presigned URLs are opened by the browser, which reaches storage on localhost.
     Storage__PublicEndpoint: http://localhost:8333
@@ -194,7 +197,10 @@ services:
     # Line endings stripped: a Windows checkout may have turned them into CRLF.
     entrypoint: ["/bin/sh", "-c", "tr -d '\\r' < /backup.sh > /tmp/backup.sh && exec sh /tmp/backup.sh"]
     environment:
-      RCLONE_CONFIG_SOURCE_TYPE: s3
+      # azureblob when the files live in Azure (with the account name and key below).
+      RCLONE_CONFIG_SOURCE_TYPE: ${FILE_BACKUP_SOURCE_TYPE:-s3}
+      RCLONE_CONFIG_SOURCE_ACCOUNT: ${AZURE_STORAGE_ACCOUNT:-}
+      RCLONE_CONFIG_SOURCE_KEY: ${AZURE_STORAGE_KEY:-}
       RCLONE_CONFIG_SOURCE_PROVIDER: Other
       RCLONE_CONFIG_SOURCE_ENDPOINT: http://seaweedfs:8333
       RCLONE_CONFIG_SOURCE_ACCESS_KEY_ID: ${STORAGE_ACCESS_KEY:?run sh deploy/init-env.sh}
