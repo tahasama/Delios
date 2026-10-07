@@ -143,6 +143,43 @@ public sealed class RegisterTests(Infrastructure infrastructure) : IClassFixture
     }
 
     [Fact]
+    public async Task A_document_can_never_be_deleted_except_by_the_server_owner()
+    {
+        await using var app = await TestApp.StartAsync(infrastructure);
+        var client = await app.SignedInAsync("engineer@demo.local");
+        var project = await Api.ProjectIdAsync(client);
+        var id = (await Api.RegisterAsync(client, project, Api.Drawing())).GetProperty("id").GetGuid();
+
+        // The application's own database account: refused, and it cannot switch the protection off.
+        await using (var connection = new Npgsql.NpgsqlConnection(app.Settings["ConnectionStrings:Postgres"]))
+        {
+            await connection.OpenAsync();
+            // Acting for the organization, as the application does, so the row is visible to it.
+            await using var delete = new Npgsql.NpgsqlCommand(
+                $"SELECT set_config('app.tenant_id', (SELECT id::text FROM tenants LIMIT 1), false); DELETE FROM documents WHERE id = '{id}'", connection);
+            var refused = await Assert.ThrowsAsync<Npgsql.PostgresException>(() => delete.ExecuteNonQueryAsync());
+            Assert.Equal("23001", refused.SqlState);
+            await using var truncate = new Npgsql.NpgsqlCommand("TRUNCATE revisions CASCADE", connection);
+            Assert.Equal("23001", (await Assert.ThrowsAsync<Npgsql.PostgresException>(() => truncate.ExecuteNonQueryAsync())).SqlState);
+            await using var bypass = new Npgsql.NpgsqlCommand("SET session_replication_role = replica", connection);
+            Assert.Equal("42501", (await Assert.ThrowsAsync<Npgsql.PostgresException>(() => bypass.ExecuteNonQueryAsync())).SqlState);
+        }
+        Assert.Equal(1, (await client.GetFromJsonAsync<JsonElement>($"/api/projects/{project}/documents")).GetProperty("items").GetArrayLength());
+
+        // The server owner, as the database superuser, deliberately: allowed.
+        var owner = new Npgsql.NpgsqlConnectionStringBuilder(infrastructure.Postgres.GetConnectionString())
+        {
+            Database = new Npgsql.NpgsqlConnectionStringBuilder(app.Settings["ConnectionStrings:Postgres"]).Database,
+        };
+        await using (var connection = new Npgsql.NpgsqlConnection(owner.ToString()))
+        {
+            await connection.OpenAsync();
+            await using var delete = new Npgsql.NpgsqlCommand($"SET session_replication_role = replica; DELETE FROM documents WHERE id = '{id}'", connection);
+            Assert.Equal(1, await delete.ExecuteNonQueryAsync());
+        }
+    }
+
+    [Fact]
     public async Task A_retried_request_with_the_same_key_registers_once()
     {
         await using var app = await TestApp.StartAsync(infrastructure);

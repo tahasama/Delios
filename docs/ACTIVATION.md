@@ -378,3 +378,19 @@ object storage. Each is a connection string in the `delios-secrets` Secret.
 
 Monitoring: the pods carry `prometheus.io/scrape` annotations; point the cluster's
 Prometheus at them and load `deploy/monitoring/alerts.yml`.
+
+## Deleting a record (server owner only)
+
+Records are never deleted by the application: the database refuses it. The one
+exception is the server owner, for example a legal order to erase. As the
+database superuser (`postgres`), in one session:
+
+```sql
+BEGIN;
+SET LOCAL session_replication_role = replica;  -- switches triggers off for this transaction only
+DELETE FROM ... WHERE id = '...';
+COMMIT;
+```
+
+The application's own account cannot do this. Take a backup first, and write
+down why: the audit trail does not see a deletion made this way.

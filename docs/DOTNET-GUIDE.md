@@ -254,6 +254,7 @@ right-click the test, Debug. The test starts its own database and queue.
 | `Unable to resolve service for type X` at start-up | X is not registered in `PlatformSetup.cs` |
 | `42501: new row violates row-level security policy` | A write ran without the organization set (outside a request, the code must call `tenant.Set(...)` and open a transaction) |
 | `relation "x" does not exist` | Migrations have not run: `run --rm migrate` |
+| `… records are kept: they are never deleted` | Something tried to delete a document, revision, file, review or transmittal: the database refuses it, by design |
 | `The model for context has pending changes` (test) | An entity changed without a migration: add one |
 | 409 Conflict | The thing is no longer in a state that allows the action (already released, already sent…); the `code` says which |
 | 422 with `VALUE_NOT_PUBLISHED` | The value is not in the organization's list: publish it, or choose another |
