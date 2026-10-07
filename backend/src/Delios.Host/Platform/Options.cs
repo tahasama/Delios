@@ -25,6 +25,11 @@ public sealed class ConnectionStringsOptions
     public const string Section = "ConnectionStrings";
 
     [Required] public string Postgres { get; set; } = "";
+    /// <summary>
+    /// A read replica (the standby). When set, register pages read from it; when
+    /// empty or unreachable, they read from the primary.
+    /// </summary>
+    public string? PostgresReadOnly { get; set; }
     [Required] public string Redis { get; set; } = "";
     [Required] public string RabbitMq { get; set; } = "";
 }

@@ -307,6 +307,13 @@ next step is due:
 When an alert keeps repeating, add a second API node and the load balancer.
 Because the app is stateless, that is a configuration change, not code work.
 
+Every deferred component is built, tested and switched off. Each alert in
+`deploy/monitoring/alerts.yml` names the component it calls for, and
+[ACTIVATION.md](ACTIVATION.md) gives the steps to switch it on and check it:
+alert notifications, backups to off-site storage, the standby and its
+promotion, the read replica, PgBouncer, more API nodes and workers, several
+servers, the domain and HTTPS.
+
 ## Redis
 
 - Cache: HybridCache, with an in-memory first level on each node and Redis as
@@ -323,21 +330,35 @@ down the application is slower but still correct.
 
 - **Postgres standby.** A streaming-replication standby is added as soon as the
   first contract depends on the system, before the user count forces it.
-- **Database backups.** pgBackRest: a full backup weekly, an incremental daily,
-  and continuous WAL archiving for point-in-time recovery. Backups go to
-  storage at another provider or region and are kept 30–90 days.
-- **File backups.** The bucket is replicated to a second location. The
-  database alone cannot restore files.
-- **Restore drill.** Monthly, onto a spare server, against a written recovery
-  time target. A backup that has never been restored does not count.
+- **Database backups.** pgBackRest, inside the database image: a full backup
+  weekly, an incremental daily, and continuous WAL archiving, forced at least
+  every minute, for point-in-time recovery: a restore loses at most about a
+  minute. Backups are encrypted and go to storage at another provider or
+  region; four full backups are kept (about four weeks).
+- **File backups.** Every stored file is copied to a second location every six
+  hours, copy only: nothing deleted or changed at the source changes the copy.
+  The database alone cannot restore files.
+- **Restore drill.** Monthly, one command: restores the latest backup and every
+  archived log, then checks the tenants, the documents and every audit chain,
+  and records how long it took as the recovery time to expect. A backup that
+  has never been restored does not count; an alert fires after 35 days without
+  a passing drill.
+
+Each of these reports a metric, and an alert fires when it stops (backup too
+old, backup failed, archiving failing, file copy too old, standby lagging).
 
 ## Observability
 
 Application logs, metrics, health checks and error tracking, from day 1.
 
-Watched: CPU, RAM, disk, Postgres connections, Postgres query latency, RabbitMQ
-queue depth, worker failures, object storage failures, API response time,
-5xx rate, upload processing time.
+Watched: CPU, RAM, disk, Postgres connections, RabbitMQ queue depth, worker
+failures, API response time, 5xx rate, upload processing time, the outbox
+backlog, register search time, backup age, standby lag.
+
+Prometheus collects, Alertmanager notifies (email, Telegram, Slack or any
+webhook, chosen with one setting), Grafana shows the "DELIOS overview"
+dashboard. The alert rules have their own tests (`promtool test rules`), run
+in CI.
 
 ## Languages
 

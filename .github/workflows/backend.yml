@@ -34,6 +34,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: docker build -t delios-backend backend
+      - run: docker build -t delios-postgres deploy/postgres
       # Start the whole stack from the image just built and require every service to be healthy.
       - run: docker compose -f deploy/compose.yaml --profile app up -d --no-build
       - name: Wait for api and worker to be healthy
@@ -46,6 +47,24 @@ jobs:
             sleep 5
           done
           [ "$api" = healthy ] && [ "$worker" = healthy ]
-      - run: curl -fsS http://localhost:8080/health/ready
+      # Through Caddy: an API path without a session answers 401.
+      - run: test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/api/me)" = 401
+      - name: Wait for the first database backup
+        run: |
+          for i in $(seq 1 60); do
+            docker compose -f deploy/compose.yaml logs postgres | grep -q "backup-loop: full backup finished" && exit 0
+            sleep 5
+          done
+          docker compose -f deploy/compose.yaml logs postgres | tail -50
+          exit 1
+      - name: Restore drill against that backup
+        run: docker compose -f deploy/compose.yaml --profile drill run --rm restore-drill
+      - name: Validate monitoring configuration and alert rules
+        run: |
+          docker run --rm -v "$PWD/deploy/monitoring:/etc/prometheus" --entrypoint promtool prom/prometheus:latest check config /etc/prometheus/prometheus.yml
+          docker run --rm -v "$PWD/deploy/monitoring:/w" -w /w --entrypoint promtool prom/prometheus:latest test rules alerts.test.yml
+          for f in none email telegram slack webhook; do
+            docker run --rm -v "$PWD/deploy/monitoring/alertmanager:/etc/alertmanager" --entrypoint amtool prom/alertmanager:latest check-config /etc/alertmanager/$f.yml
+          done
       - if: failure()
         run: docker compose -f deploy/compose.yaml --profile app logs

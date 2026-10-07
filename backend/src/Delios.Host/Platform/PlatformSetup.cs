@@ -63,6 +63,7 @@ public static class PlatformSetup
         services.AddSingleton<IClock>(NodaTime.SystemClock.Instance);
         services.AddScoped<TenantContext>();
         services.AddScoped<TenantTransactionInterceptor>();
+        services.AddScoped<ReadDatabase>();
         services.AddDbContext<DeliosDbContext>((sp, o) => o
             .UseNpgsql(sp.GetRequiredService<IOptions<ConnectionStringsOptions>>().Value.Postgres,
                 npgsql => npgsql.UseNodaTime())
@@ -175,6 +176,13 @@ public static class PlatformSetup
         var role = app.Services.GetRequiredService<IOptions<DeliosOptions>>().Value.Role;
 
         app.UseForwardedHeaders();
+        // Which node answered: tells load-balancing problems apart from application ones.
+        var node = Environment.MachineName;
+        app.Use((http, next) =>
+        {
+            http.Response.Headers["X-Delios-Node"] = node;
+            return next(http);
+        });
         app.UseSerilogRequestLogging(o => o.GetLevel = (http, _, ex) =>
             ex is not null || http.Response.StatusCode >= 500 ? LogEventLevel.Error
             : http.Request.Path.StartsWithSegments("/health") ? LogEventLevel.Verbose

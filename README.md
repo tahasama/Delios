@@ -54,10 +54,17 @@ dotnet run --project backend/src/Delios.Host                # API on http://loca
 dotnet test backend                                         # tests start their own containers
 ```
 
-After pulling changes that touch `deploy/postgres`, recreate the database volume:
-`docker compose -f deploy/compose.yaml down -v`.
+After pulling changes that touch `deploy/postgres`, rebuild and recreate the
+database volume: `docker compose -f deploy/compose.yaml down -v`, then `up --build`.
 
-Health: `/health/live` and `/health/ready`. Metrics: port 9091 (`/metrics`).
+Add `--profile monitoring` for Grafana (http://localhost:3001, admin / admin-dev),
+Prometheus (:9090) and Alertmanager (:9093). Backups run from the start; the
+monthly restore drill is
+`docker compose -f deploy/compose.yaml --profile drill run --rm restore-drill`.
+Everything switched off until needed (standby, read replica, PgBouncer, more
+nodes, alert notifications) is in [docs/ACTIVATION.md](docs/ACTIVATION.md).
+
+Health: `/health/live` and `/health/ready` on each node (internal). Metrics: port 9091.
 Set `Delios__Role=worker` to run the same build as a queue worker.
 
 ## Running it

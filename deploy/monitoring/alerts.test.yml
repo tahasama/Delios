@@ -1,0 +1,67 @@
+# promtool test rules deploy/monitoring/alerts.test.yml
+# Proves the alerts fire on the conditions they describe.
+rule_files: [alerts.yml]
+evaluation_interval: 1m
+
+tests:
+  - interval: 1m
+    input_series:
+      - series: 'delios_outbox_oldest_unsent_seconds{instance="api-1"}'
+        values: '0 400x2000'
+      - series: 'pg_stat_activity_count{datname="delios"}'
+        values: '90x2000'
+      - series: 'pg_settings_max_connections'
+        values: '100x2000'
+      - series: 'rabbitmq_queue_messages{queue="delios.files.dead"}'
+        values: '0 0 2x10'
+      # The last backup finished at time 0 and none since: overdue once 26 hours pass.
+      - series: 'delios_backup_last_success_timestamp_seconds{type="any"}'
+        values: '0x2000'
+    alert_rule_test:
+      - eval_time: 1600m
+        alertname: BackupTooOld
+        exp_alerts:
+          - exp_labels: { severity: critical }
+            exp_annotations:
+              summary: "The last database backup finished more than 26 hours ago."
+              action: "Read the postgres container logs for 'backup-loop' errors."
+      - eval_time: 1500m
+        alertname: BackupTooOld
+        exp_alerts: []
+      - eval_time: 12m
+        alertname: OutboxStuck
+        exp_alerts:
+          - exp_labels: { severity: critical }
+            exp_annotations:
+              summary: "Messages have waited more than 5 minutes to reach RabbitMQ."
+              action: "Check RabbitMQ and the API logs for 'Outbox relay failed'."
+      - eval_time: 12m
+        alertname: DatabaseConnectionsHigh
+        exp_alerts:
+          - exp_labels: { severity: plan, switch: pgbouncer }
+            exp_annotations:
+              summary: "More than 80% of the database's connections are in use."
+              action: "ACTIVATION.md 'PgBouncer'."
+      - eval_time: 5m
+        alertname: FilesParked
+        exp_alerts:
+          - exp_labels: { severity: warning }
+            exp_annotations:
+              summary: "2 file(s) failed processing five times and are parked."
+              action: "Read the worker logs for the error; after fixing, move them back from delios.files.dead in the RabbitMQ console."
+
+  - interval: 1m
+    input_series:
+      - series: 'delios_outbox_oldest_unsent_seconds{instance="api-1"}'
+        values: '0x20'
+      - series: 'pg_stat_activity_count{datname="delios"}'
+        values: '20x20'
+      - series: 'pg_settings_max_connections'
+        values: '100x20'
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: OutboxStuck
+        exp_alerts: []
+      - eval_time: 15m
+        alertname: DatabaseConnectionsHigh
+        exp_alerts: []

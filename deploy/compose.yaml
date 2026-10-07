@@ -1,7 +1,10 @@
 # Development stack. Production uses managed object storage and its own secrets.
 #
 #   docker compose -f deploy/compose.yaml up -d                 dependencies only; run the API with dotnet run
-#   docker compose -f deploy/compose.yaml --profile app up -d   dependencies, migrations, API and worker
+#   docker compose -f deploy/compose.yaml --profile app up -d   dependencies, migrations, API and worker,
+#                                                                behind Caddy on :8080
+#   add --scale api=2 --scale worker=2                           more nodes; Caddy and Prometheus find them
+#   add --profile monitoring                                     Prometheus :9090, Alertmanager :9093, Grafana :3001
 
 name: delios
 
@@ -11,7 +14,10 @@ x-backend: &backend
   restart: unless-stopped
   environment: &backend-env
     ASPNETCORE_ENVIRONMENT: Development
-    ConnectionStrings__Postgres: Host=postgres;Database=delios;Username=delios;Password=delios-dev
+    # DB_HOST=pgbouncer (with the pgbouncer profile) sends the app through the pool.
+    ConnectionStrings__Postgres: Host=${DB_HOST:-postgres};Database=delios;Username=delios;Password=delios-dev;${DB_OPTIONS:-}
+    # Set to the standby's connection string to read register pages from it.
+    ConnectionStrings__PostgresReadOnly: ${DB_READ_CONNECTION:-}
     ConnectionStrings__Redis: valkey:6379
     ConnectionStrings__RabbitMq: amqp://delios:delios-dev@rabbitmq:5672/
     Storage__Endpoint: http://seaweedfs:8333
@@ -25,16 +31,29 @@ x-backend: &backend
     Auth__SecureCookie: "false"
 
 services:
+  # Postgres with continuous WAL archiving and scheduled backups (deploy/postgres).
+  # In development the backup repository is a volume; production points
+  # BACKUP_REPO_TYPE=s3 at storage with another provider or region.
   postgres:
-    image: postgres:17-alpine
+    build: ./postgres
+    image: delios-postgres
     restart: unless-stopped
-    environment:
+    init: true
+    environment: &postgres-env
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres-dev
+      BACKUP_REPO_TYPE: ${BACKUP_REPO_TYPE:-posix}
+      BACKUP_CIPHER_PASS: ${BACKUP_CIPHER_PASS:-}
+      BACKUP_S3_ENDPOINT: ${BACKUP_S3_ENDPOINT:-}
+      BACKUP_S3_BUCKET: ${BACKUP_S3_BUCKET:-}
+      BACKUP_S3_REGION: ${BACKUP_S3_REGION:-}
+      BACKUP_S3_KEY: ${BACKUP_S3_KEY:-}
+      BACKUP_S3_SECRET: ${BACKUP_S3_SECRET:-}
     ports: ["5432:5432"]
     volumes:
       - postgres:/var/lib/postgresql/data
-      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - pgbackrest:/var/lib/pgbackrest
+      - delios-metrics:/var/lib/delios-metrics
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U delios -d delios"]
       interval: 5s
@@ -103,17 +122,21 @@ services:
     profiles: [app]
     restart: "no"
     command: ["migrate"]
+    environment:
+      <<: *backend-env
+      # Migrations always talk to Postgres directly, never through the pool.
+      ConnectionStrings__Postgres: Host=postgres;Database=delios;Username=delios;Password=delios-dev
     healthcheck: { disable: true }
     depends_on:
       postgres: { condition: service_healthy }
 
+  # API nodes publish no port: everything comes through Caddy, so any number can run.
   api:
     <<: *backend
     profiles: [app]
     environment:
       <<: *backend-env
       Delios__Role: api
-    ports: ["8080:8080"]
     depends_on: &after-migrate
       migrate: { condition: service_completed_successfully }
       valkey: { condition: service_healthy }
@@ -127,7 +150,176 @@ services:
       Delios__Role: worker
     depends_on: *after-migrate
 
+  # The way in: load-balances the API nodes, and terminates TLS in production.
+  caddy:
+    image: caddy:2-alpine
+    profiles: [app]
+    restart: unless-stopped
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:-:80}
+    ports: ["8080:80", "8443:443"]
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy:/data
+    depends_on: [api]
+
+  # Copies every stored file to a second location, every 6 hours.
+  file-backup:
+    image: rclone/rclone:latest
+    profiles: [app]
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "/backup.sh"]
+    environment:
+      RCLONE_CONFIG_SOURCE_TYPE: s3
+      RCLONE_CONFIG_SOURCE_PROVIDER: Other
+      RCLONE_CONFIG_SOURCE_ENDPOINT: http://seaweedfs:8333
+      RCLONE_CONFIG_SOURCE_ACCESS_KEY_ID: delios
+      RCLONE_CONFIG_SOURCE_SECRET_ACCESS_KEY: delios-dev-secret
+      SOURCE_PATH: delios
+      # Production: a second S3 remote (RCLONE_CONFIG_TARGET_TYPE=s3 and its keys).
+      RCLONE_CONFIG_TARGET_TYPE: ${FILE_BACKUP_TARGET_TYPE:-local}
+      TARGET_PATH: ${FILE_BACKUP_TARGET_PATH:-/file-backup}
+    volumes:
+      - ./file-backup/backup.sh:/backup.sh:ro
+      - file-backup:/file-backup
+      - delios-metrics:/var/lib/delios-metrics
+    depends_on: [seaweedfs]
+
+  # ── Restore drill (run monthly) ─────────────────────────────────────────────
+  #   docker compose -f deploy/compose.yaml --profile drill run --rm restore-drill
+  restore-drill:
+    image: delios-postgres
+    profiles: [drill]
+    entrypoint: ["restore-drill.sh"]
+    environment: *postgres-env
+    volumes:
+      - pgbackrest:/var/lib/pgbackrest:ro
+      - delios-metrics:/var/lib/delios-metrics
+
+  # ── Standby (switched on before the first contract depends on the system) ───
+  # Follows the primary, read-only; serves as the read replica; promoted by hand
+  # when the primary is lost (docs/ACTIVATION.md "Promote the standby").
+  postgres-standby:
+    image: delios-postgres
+    profiles: [standby]
+    restart: unless-stopped
+    init: true
+    environment:
+      <<: *postgres-env
+      DELIOS_PG_ROLE: standby
+      PRIMARY_HOST: postgres
+      REPLICATION_PASSWORD: replicator-dev
+    ports: ["5433:5432"]
+    volumes:
+      - postgres-standby:/var/lib/postgresql/data
+      - pgbackrest:/var/lib/pgbackrest:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U delios -d delios"]
+      interval: 5s
+      retries: 30
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  postgres-exporter-standby:
+    image: prometheuscommunity/postgres-exporter:latest
+    profiles: [standby]
+    restart: unless-stopped
+    environment:
+      DATA_SOURCE_NAME: postgresql://delios_monitor:monitor-dev@postgres-standby:5432/delios?sslmode=disable
+
+  # ── Connection pool (switched on when DatabaseConnectionsHigh fires) ─────────
+  # Many app nodes share a bounded set of Postgres connections. Transaction
+  # pooling is safe here because the tenant is set per transaction (SET LOCAL).
+
+  pgbouncer:
+    image: edoburu/pgbouncer:latest
+    profiles: [pgbouncer]
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://delios:delios-dev@postgres:5432/delios
+      AUTH_TYPE: scram-sha-256
+      POOL_MODE: transaction
+      MAX_CLIENT_CONN: "2000"
+      DEFAULT_POOL_SIZE: "40"
+      MAX_PREPARED_STATEMENTS: "200"
+    ports: ["6432:5432"]
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  # ── Monitoring ──────────────────────────────────────────────────────────────
+  # How we know: metrics, alerts that say what to do, a dashboard. Alerts reach
+  # people once ALERT_CHANNEL is set (docs/ACTIVATION.md "Alert notifications").
+
+  prometheus:
+    image: prom/prometheus:latest
+    profiles: [monitoring]
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=30d
+    ports: ["9090:9090"]
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus:/prometheus
+
+  alertmanager:
+    image: prom/alertmanager:latest
+    profiles: [monitoring]
+    restart: unless-stopped
+    command: ["--config.file=/etc/alertmanager/${ALERT_CHANNEL:-none}.yml", "--storage.path=/alertmanager"]
+    ports: ["9093:9093"]
+    volumes:
+      - ./monitoring/alertmanager:/etc/alertmanager:ro
+      - alertmanager:/alertmanager
+
+  grafana:
+    image: grafana/grafana:latest
+    profiles: [monitoring]
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin-dev
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    ports: ["3001:3000"]
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana:/var/lib/grafana
+
+  node-exporter:
+    image: prom/node-exporter:latest
+    profiles: [monitoring]
+    restart: unless-stopped
+    command: ["--path.rootfs=/host", "--collector.textfile.directory=/textfile"]
+    pid: host
+    volumes:
+      - /:/host:ro
+      # Backup, file-copy and restore-drill results, written as metrics files.
+      - delios-metrics:/textfile:ro
+
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:latest
+    profiles: [monitoring]
+    restart: unless-stopped
+    environment:
+      DATA_SOURCE_NAME: postgresql://delios_monitor:monitor-dev@postgres:5432/delios?sslmode=disable
+
+  redis-exporter:
+    image: oliver006/redis_exporter:latest
+    profiles: [monitoring]
+    restart: unless-stopped
+    environment:
+      REDIS_ADDR: redis://valkey:6379
+
 volumes:
+  pgbackrest:
+  delios-metrics:
+  file-backup:
+  postgres-standby:
+  caddy:
+  prometheus:
+  alertmanager:
+  grafana:
   postgres:
   rabbitmq:
   seaweedfs:

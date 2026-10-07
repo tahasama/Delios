@@ -27,7 +27,7 @@ public static class DocumentEndpoints
     }
 
     private static async Task<IResult> ListAsync(
-        HttpContext http, DeliosDbContext db, DocumentService documents, CancellationToken cancellationToken,
+        HttpContext http, ReadDatabase reads, DocumentService documents, CancellationToken cancellationToken,
         string? after = null, int? limit = null, string? q = null,
         string? discipline = null, string? docType = null, string? state = null, string? originator = null)
     {
@@ -36,24 +36,28 @@ public static class DocumentEndpoints
         var size = Math.Clamp(limit ?? DefaultPageSize, 1, MaxPageSize);
         using var timer = AppMetrics.RegisterQuerySeconds.WithLabels(string.IsNullOrWhiteSpace(q) ? "no" : "yes").NewTimer();
 
-        var query = DocumentQueries.Visible(db, access, await documents.RestrictedAsync(cancellationToken)).AsNoTracking();
-        if (!string.IsNullOrWhiteSpace(q))
+        var restricted = await documents.RestrictedAsync(cancellationToken);
+        var rows = await reads.ReadAsync(source =>
         {
-            var pattern = "%" + q.Trim().Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_") + "%";
-            query = query.Where(d => EF.Functions.ILike(d.Number, pattern) || EF.Functions.ILike(d.Title, pattern));
-        }
-        if (discipline is not null) query = query.Where(d => d.Discipline == discipline);
-        if (docType is not null) query = query.Where(d => d.DocType == docType);
-        if (state is not null) query = query.Where(d => d.State == state);
-        if (originator is not null) query = query.Where(d => d.Originator == originator);
-        // Keyset paging on the number: page 1000 costs what page 1 costs.
-        if (after is not null) query = query.Where(d => string.Compare(d.Number, after) > 0);
+            var query = DocumentQueries.Visible(source, access, restricted).AsNoTracking();
+            if (!string.IsNullOrWhiteSpace(q))
+            {
+                var pattern = "%" + q.Trim().Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_") + "%";
+                query = query.Where(d => EF.Functions.ILike(d.Number, pattern) || EF.Functions.ILike(d.Title, pattern));
+            }
+            if (discipline is not null) query = query.Where(d => d.Discipline == discipline);
+            if (docType is not null) query = query.Where(d => d.DocType == docType);
+            if (state is not null) query = query.Where(d => d.State == state);
+            if (originator is not null) query = query.Where(d => d.Originator == originator);
+            // Keyset paging on the number: page 1000 costs what page 1 costs.
+            if (after is not null) query = query.Where(d => string.Compare(d.Number, after) > 0);
 
-        var rows = await query.OrderBy(d => d.Number).Take(size + 1)
-            .Select(d => new DocumentSummary(d.Id, d.Number, d.Title, d.DeliverableType, d.DocType, d.Discipline,
-                d.Originator, d.State, d.Kind, d.IsPlaceholder, d.Confidentiality, d.LatestRevisionValue,
-                d.LatestRevisionState, d.UpdatedAt.ToDateTimeOffset()))
-            .ToListAsync(cancellationToken);
+            return query.OrderBy(d => d.Number).Take(size + 1)
+                .Select(d => new DocumentSummary(d.Id, d.Number, d.Title, d.DeliverableType, d.DocType, d.Discipline,
+                    d.Originator, d.State, d.Kind, d.IsPlaceholder, d.Confidentiality, d.LatestRevisionValue,
+                    d.LatestRevisionState, d.UpdatedAt.ToDateTimeOffset()))
+                .ToListAsync(cancellationToken);
+        }, cancellationToken);
         var next = rows.Count > size ? rows[size - 1].Number : null;
         return Results.Ok(new DocumentPage(rows.Take(size).ToList(), next));
     }

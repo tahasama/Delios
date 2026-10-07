@@ -198,6 +198,44 @@ public sealed class RegisterReadTests(Infrastructure infrastructure) : IClassFix
     }
 
     [Fact]
+    public async Task With_a_replica_the_register_reads_from_it()
+    {
+        // A "replica" that is a separate, empty database: whatever the list shows came from it.
+        var replica = await infrastructure.NewDatabaseAsync();
+        await using (var empty = new DeliosFactory(new Dictionary<string, string?>(DeliosFactory.Unreachable())
+        {
+            ["ConnectionStrings:Postgres"] = replica,
+        }))
+        {
+            await Delios.Host.Platform.DatabaseMigrator.ApplyAsync(empty.Services);
+        }
+        await using var app = await TestApp.StartAsync(infrastructure, s => s["ConnectionStrings:PostgresReadOnly"] = replica);
+        var client = await app.SignedInAsync("engineer@demo.local");
+        var project = await Api.ProjectIdAsync(client);
+        var doc = await Api.RegisterAsync(client, project, Api.Drawing());
+
+        var page = await client.GetFromJsonAsync<JsonElement>($"/api/projects/{project}/documents");
+        using var direct = await client.GetAsync(new Uri($"/api/projects/{project}/documents/{doc.GetProperty("id").GetGuid()}", UriKind.Relative));
+
+        Assert.Equal(0, page.GetProperty("items").GetArrayLength());
+        Assert.Equal(HttpStatusCode.OK, direct.StatusCode);
+    }
+
+    [Fact]
+    public async Task An_unreachable_replica_falls_back_to_the_primary()
+    {
+        await using var app = await TestApp.StartAsync(infrastructure,
+            s => s["ConnectionStrings:PostgresReadOnly"] = "Host=127.0.0.1;Port=1;Database=x;Username=x;Password=x;Timeout=2");
+        var client = await app.SignedInAsync("engineer@demo.local");
+        var project = await Api.ProjectIdAsync(client);
+        await Api.RegisterAsync(client, project, Api.Drawing());
+
+        var page = await client.GetFromJsonAsync<JsonElement>($"/api/projects/{project}/documents");
+
+        Assert.Equal(1, page.GetProperty("items").GetArrayLength());
+    }
+
+    [Fact]
     public async Task A_confidential_document_is_read_by_its_creator_and_document_control_only()
     {
         await using var app = await TestApp.StartAsync(infrastructure);
