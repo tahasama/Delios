@@ -5,8 +5,10 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace Delios.Host.Reviews;
 
+/// <summary>Tells Entity Framework how to store <see cref="ReviewRoute"/>: name unique per tenant, patterns and steps kept as JSON columns on the route row.</summary>
 internal sealed class ReviewRouteConfiguration : IEntityTypeConfiguration<ReviewRoute>
 {
+    /// <summary>Called by Entity Framework when it builds the model (see <c>DeliosDbContext</c>).</summary>
     public void Configure(EntityTypeBuilder<ReviewRoute> b)
     {
         b.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
@@ -17,8 +19,10 @@ internal sealed class ReviewRouteConfiguration : IEntityTypeConfiguration<Review
     }
 }
 
+/// <summary>Tells Entity Framework how to store <see cref="Review"/>: its links, indexes, column lengths, and <c>Version</c> as a row version (a value that changes on every update, so two people saving the same review at once is detected).</summary>
 internal sealed class ReviewConfiguration : IEntityTypeConfiguration<Review>
 {
+    /// <summary>Called by Entity Framework when it builds the model.</summary>
     public void Configure(EntityTypeBuilder<Review> b)
     {
         b.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
@@ -43,8 +47,10 @@ internal sealed class ReviewConfiguration : IEntityTypeConfiguration<Review>
     }
 }
 
+/// <summary>Tells Entity Framework how to store <see cref="ReviewStep"/>: one row per step, unique by review and index; <c>ByProxy</c> is computed, not stored.</summary>
 internal sealed class ReviewStepConfiguration : IEntityTypeConfiguration<ReviewStep>
 {
+    /// <summary>Called by Entity Framework when it builds the model.</summary>
     public void Configure(EntityTypeBuilder<ReviewStep> b)
     {
         b.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
@@ -70,8 +76,10 @@ internal sealed class ReviewStepConfiguration : IEntityTypeConfiguration<ReviewS
     }
 }
 
+/// <summary>Tells Entity Framework how to store <see cref="ReviewParticipant"/>: a user sits at most once on a step.</summary>
 internal sealed class ReviewParticipantConfiguration : IEntityTypeConfiguration<ReviewParticipant>
 {
+    /// <summary>Called by Entity Framework when it builds the model.</summary>
     public void Configure(EntityTypeBuilder<ReviewParticipant> b)
     {
         b.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
@@ -84,8 +92,10 @@ internal sealed class ReviewParticipantConfiguration : IEntityTypeConfiguration<
     }
 }
 
+/// <summary>Tells Entity Framework how to store <see cref="ReviewComment"/>: column lengths, and the creation time set by the database.</summary>
 internal sealed class ReviewCommentConfiguration : IEntityTypeConfiguration<ReviewComment>
 {
+    /// <summary>Called by Entity Framework when it builds the model.</summary>
     public void Configure(EntityTypeBuilder<ReviewComment> b)
     {
         b.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);

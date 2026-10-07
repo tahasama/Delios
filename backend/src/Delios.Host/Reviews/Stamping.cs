@@ -23,10 +23,16 @@ namespace Delios.Host.Reviews;
 public sealed class Stamping(
     DeliosDbContext db, TenantContext tenant, FileStorage storage, AuditLog audit, IClock clock, ILogger<Stamping> logger)
 {
+    /// <summary>Date format printed on stamps, for example "07 Oct 2026".</summary>
     private static readonly LocalDatePattern DatePattern = LocalDatePattern.CreateWithInvariantCulture("dd MMM yyyy");
 
+    /// <summary>Runs once before the class is first used: tells the PDF library (PdfSharp) to load fonts from <see cref="EmbeddedFonts"/>, unless a resolver is already set.</summary>
     static Stamping() => GlobalFontSettings.FontResolver ??= new EmbeddedFonts();
 
+    /// <summary>
+    /// Handles a <see cref="RevisionReleased"/> message: in one transaction for the message's tenant, stamps each clean rendition of the released revision's current submission,
+    /// and watermarks the files of each superseded revision. Skips files already done, so a redelivered message does no harm. Called by the worker (<see cref="Messaging.FileQueueConsumer"/>) when a revision.released message arrives.
+    /// </summary>
     public async Task ProcessAsync(RevisionReleased message, CancellationToken cancellationToken)
     {
         tenant.Set(message.TenantId);
@@ -67,6 +73,10 @@ public sealed class Stamping(
         await transaction.CommitAsync(cancellationToken);
     }
 
+    /// <summary>
+    /// Reads <paramref name="source"/> from storage, applies <paramref name="transform"/> to its bytes, and saves the result as a new file of <paramref name="kind"/> derived from it, with an audit entry.
+    /// If the PDF cannot be marked, records STAMP_NOT_POSSIBLE in the audit log and returns without failing, since a retry would fail the same way.
+    /// </summary>
     private async Task DeriveAsync(
         StoredFile source, string kind, Document document, Revision revision, Func<byte[], byte[]> transform,
         CancellationToken cancellationToken)
@@ -177,9 +187,11 @@ public sealed class EmbeddedFonts : IFontResolver
 {
     public const string Family = "DejaVu Sans";
 
+    /// <summary>Called by PdfSharp to pick a font face: always DejaVu Sans, bold or regular (italic is ignored).</summary>
     public FontResolverInfo? ResolveTypeface(string familyName, bool bold, bool italic) =>
         new(bold ? "DejaVuSans-Bold" : "DejaVuSans");
 
+    /// <summary>Called by PdfSharp to get the bytes of a font face, read from the .ttf embedded in this assembly.</summary>
     public byte[]? GetFont(string faceName)
     {
         var assembly = Assembly.GetExecutingAssembly();

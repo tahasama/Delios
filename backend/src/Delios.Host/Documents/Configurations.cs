@@ -6,8 +6,13 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace Delios.Host.Documents;
 
+/// <summary>Tells Entity Framework Core (EF Core, the library that maps C# classes to database tables) how to store <see cref="ValueEntry"/>: one code per set per tenant, and column lengths.</summary>
 internal sealed class ValueEntryConfiguration : IEntityTypeConfiguration<ValueEntry>
 {
+    /// <summary>
+    /// Sets up the table: foreign keys, indexes, column lengths and defaults. Called by EF Core when it builds
+    /// the model, through <c>ApplyConfigurationsFromAssembly</c> in <c>DeliosDbContext</c>.
+    /// </summary>
     public void Configure(EntityTypeBuilder<ValueEntry> b)
     {
         b.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
@@ -19,8 +24,13 @@ internal sealed class ValueEntryConfiguration : IEntityTypeConfiguration<ValueEn
     }
 }
 
+/// <summary>Tells EF Core how to store <see cref="NumberingScheme"/>: unique name per tenant, fields kept as JSON in the row.</summary>
 internal sealed class NumberingSchemeConfiguration : IEntityTypeConfiguration<NumberingScheme>
 {
+    /// <summary>
+    /// Sets up the table: foreign keys, indexes, column lengths and defaults. Called by EF Core when it builds
+    /// the model, through <c>ApplyConfigurationsFromAssembly</c> in <c>DeliosDbContext</c>.
+    /// </summary>
     public void Configure(EntityTypeBuilder<NumberingScheme> b)
     {
         b.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
@@ -31,8 +41,13 @@ internal sealed class NumberingSchemeConfiguration : IEntityTypeConfiguration<Nu
     }
 }
 
+/// <summary>Tells EF Core how to store <see cref="SchemeRouting"/>: at most one numbering scheme per deliverable type per tenant.</summary>
 internal sealed class SchemeRoutingConfiguration : IEntityTypeConfiguration<SchemeRouting>
 {
+    /// <summary>
+    /// Sets up the table: foreign keys, indexes, column lengths and defaults. Called by EF Core when it builds
+    /// the model, through <c>ApplyConfigurationsFromAssembly</c> in <c>DeliosDbContext</c>.
+    /// </summary>
     public void Configure(EntityTypeBuilder<SchemeRouting> b)
     {
         b.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
@@ -42,8 +57,13 @@ internal sealed class SchemeRoutingConfiguration : IEntityTypeConfiguration<Sche
     }
 }
 
+/// <summary>Tells EF Core how to store <see cref="RevisionScheme"/>: unique name, one default per tenant, series kept as JSON.</summary>
 internal sealed class RevisionSchemeConfiguration : IEntityTypeConfiguration<RevisionScheme>
 {
+    /// <summary>
+    /// Sets up the table: foreign keys, indexes, column lengths and defaults. Called by EF Core when it builds
+    /// the model, through <c>ApplyConfigurationsFromAssembly</c> in <c>DeliosDbContext</c>.
+    /// </summary>
     public void Configure(EntityTypeBuilder<RevisionScheme> b)
     {
         b.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
@@ -55,8 +75,13 @@ internal sealed class RevisionSchemeConfiguration : IEntityTypeConfiguration<Rev
     }
 }
 
+/// <summary>Tells EF Core how to store <see cref="RevisionSchemeRouting"/>: at most one revision scheme per deliverable type per tenant.</summary>
 internal sealed class RevisionSchemeRoutingConfiguration : IEntityTypeConfiguration<RevisionSchemeRouting>
 {
+    /// <summary>
+    /// Sets up the table: foreign keys, indexes, column lengths and defaults. Called by EF Core when it builds
+    /// the model, through <c>ApplyConfigurationsFromAssembly</c> in <c>DeliosDbContext</c>.
+    /// </summary>
     public void Configure(EntityTypeBuilder<RevisionSchemeRouting> b)
     {
         b.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
@@ -66,8 +91,13 @@ internal sealed class RevisionSchemeRoutingConfiguration : IEntityTypeConfigurat
     }
 }
 
+/// <summary>Tells EF Core how to store <see cref="NumberCounter"/>: one counter row per project and number prefix.</summary>
 internal sealed class NumberCounterConfiguration : IEntityTypeConfiguration<NumberCounter>
 {
+    /// <summary>
+    /// Sets up the table: foreign keys, indexes, column lengths and defaults. Called by EF Core when it builds
+    /// the model, through <c>ApplyConfigurationsFromAssembly</c> in <c>DeliosDbContext</c>.
+    /// </summary>
     public void Configure(EntityTypeBuilder<NumberCounter> b)
     {
         b.HasKey(x => new { x.ProjectId, x.Prefix });
@@ -77,8 +107,13 @@ internal sealed class NumberCounterConfiguration : IEntityTypeConfiguration<Numb
     }
 }
 
+/// <summary>Tells EF Core how to store <see cref="Document"/>: unique number per project, indexes for the register filters, column lengths and the row version.</summary>
 internal sealed class DocumentConfiguration : IEntityTypeConfiguration<Document>
 {
+    /// <summary>
+    /// Sets up the table: foreign keys, indexes, column lengths and defaults. Called by EF Core when it builds
+    /// the model, through <c>ApplyConfigurationsFromAssembly</c> in <c>DeliosDbContext</c>.
+    /// </summary>
     public void Configure(EntityTypeBuilder<Document> b)
     {
         b.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
@@ -112,8 +147,13 @@ internal sealed class DocumentConfiguration : IEntityTypeConfiguration<Document>
     }
 }
 
+/// <summary>Tells EF Core how to store <see cref="Revision"/>: unique value per document, files linked by revision, submissions kept as JSON.</summary>
 internal sealed class RevisionConfiguration : IEntityTypeConfiguration<Revision>
 {
+    /// <summary>
+    /// Sets up the table: foreign keys, indexes, column lengths and defaults. Called by EF Core when it builds
+    /// the model, through <c>ApplyConfigurationsFromAssembly</c> in <c>DeliosDbContext</c>.
+    /// </summary>
     public void Configure(EntityTypeBuilder<Revision> b)
     {
         b.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
@@ -135,8 +175,13 @@ internal sealed class RevisionConfiguration : IEntityTypeConfiguration<Revision>
     }
 }
 
+/// <summary>Tells EF Core how to store <see cref="StoredFile"/>: a unique object key, look-up indexes and column lengths.</summary>
 internal sealed class StoredFileConfiguration : IEntityTypeConfiguration<StoredFile>
 {
+    /// <summary>
+    /// Sets up the table: foreign keys, indexes, column lengths and defaults. Called by EF Core when it builds
+    /// the model, through <c>ApplyConfigurationsFromAssembly</c> in <c>DeliosDbContext</c>.
+    /// </summary>
     public void Configure(EntityTypeBuilder<StoredFile> b)
     {
         b.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
@@ -157,8 +202,13 @@ internal sealed class StoredFileConfiguration : IEntityTypeConfiguration<StoredF
     }
 }
 
+/// <summary>Tells EF Core how to store <see cref="DocumentAccess"/>: each person named once per document.</summary>
 internal sealed class DocumentAccessConfiguration : IEntityTypeConfiguration<DocumentAccess>
 {
+    /// <summary>
+    /// Sets up the table: foreign keys, indexes, column lengths and defaults. Called by EF Core when it builds
+    /// the model, through <c>ApplyConfigurationsFromAssembly</c> in <c>DeliosDbContext</c>.
+    /// </summary>
     public void Configure(EntityTypeBuilder<DocumentAccess> b)
     {
         b.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
@@ -170,8 +220,13 @@ internal sealed class DocumentAccessConfiguration : IEntityTypeConfiguration<Doc
     }
 }
 
+/// <summary>Tells EF Core how to store <c>OutboxMessage</c>, the outbox table: messages saved with a change and sent to RabbitMQ afterwards by the outbox relay.</summary>
 internal sealed class OutboxMessageConfiguration : IEntityTypeConfiguration<OutboxMessage>
 {
+    /// <summary>
+    /// Sets up the table: foreign keys, indexes, column lengths and defaults. Called by EF Core when it builds
+    /// the model, through <c>ApplyConfigurationsFromAssembly</c> in <c>DeliosDbContext</c>.
+    /// </summary>
     public void Configure(EntityTypeBuilder<OutboxMessage> b)
     {
         b.Property(x => x.Id).UseIdentityAlwaysColumn();
@@ -183,8 +238,13 @@ internal sealed class OutboxMessageConfiguration : IEntityTypeConfiguration<Outb
     }
 }
 
+/// <summary>Tells EF Core how to store <c>IdempotencyRecord</c>: the saved first answer to a request, so a retry with the same <c>Idempotency-Key</c> is not done twice.</summary>
 internal sealed class IdempotencyRecordConfiguration : IEntityTypeConfiguration<IdempotencyRecord>
 {
+    /// <summary>
+    /// Sets up the table: foreign keys, indexes, column lengths and defaults. Called by EF Core when it builds
+    /// the model, through <c>ApplyConfigurationsFromAssembly</c> in <c>DeliosDbContext</c>.
+    /// </summary>
     public void Configure(EntityTypeBuilder<IdempotencyRecord> b)
     {
         b.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);

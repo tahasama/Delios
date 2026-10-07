@@ -22,6 +22,7 @@ public sealed class ReviewRoute
     public List<RouteStep> Steps { get; set; } = [];
 }
 
+/// <summary>Which documents a route serves, by document fields. A null field matches any value; set fields must all match. Stored as JSON on the route.</summary>
 public sealed class RoutePattern
 {
     public string? DeliverableType { get; set; }
@@ -31,6 +32,7 @@ public sealed class RoutePattern
     public string? Originator { get; set; }
 }
 
+/// <summary>One step of a published route: who answers it, how, and in how many days. Copied into a <see cref="ReviewStep"/> when a review starts. Stored as JSON on the route.</summary>
 public sealed class RouteStep
 {
     public required string Title { get; set; }
@@ -52,6 +54,7 @@ public sealed class RouteStep
     public string[] GrantsStatuses { get; set; } = [];
 }
 
+/// <summary>How many of a step's people must answer: ANY (the first answer closes the step) or ALL.</summary>
 public static class StepModes
 {
     public const string Any = "ANY";
@@ -69,7 +72,9 @@ public sealed class Review
     /// <summary>What people say on the phone: P1001-RV-0001.</summary>
     public required string Number { get; set; }
     public required string RouteName { get; set; }
+    /// <summary>One of <see cref="ReviewStates"/>.</summary>
     public string State { get; set; } = ReviewStates.InProgress;
+    /// <summary>Index (from 0) of the step that is open, or was open last.</summary>
     public int CurrentStep { get; set; }
     /// <summary>The deciding step's verdict and the status it granted.</summary>
     public string? Verdict { get; set; }
@@ -80,20 +85,26 @@ public sealed class Review
     public Instant? DecidedAt { get; set; }
     public Instant? ClosedAt { get; set; }
     public string? ClosedByName { get; set; }
+    /// <summary>Meant for the reason code when the review is sent back; nothing sets it at present.</summary>
     public string? ReturnReason { get; set; }
+    /// <summary>Why the revision was sent back to its author, when it was.</summary>
     public string? ReturnNote { get; set; }
+    /// <summary>Row version, changed by the database on each update; used to detect two saves of the same review at once.</summary>
     public uint Version { get; set; }
     public List<ReviewStep> Steps { get; set; } = [];
     public List<ReviewComment> Comments { get; set; } = [];
 }
 
+/// <summary>The states a <see cref="Review"/> moves through: IN_PROGRESS, DECIDED, then RELEASED or RETURNED.</summary>
 public static class ReviewStates
 {
     /// <summary>Steps are answering.</summary>
     public const string InProgress = "IN_PROGRESS";
     /// <summary>The deciding step has answered; Document Control releases or sends back.</summary>
     public const string Decided = "DECIDED";
+    /// <summary>Document Control released the revision; the review is closed.</summary>
     public const string Released = "RELEASED";
+    /// <summary>The revision was sent back to its author or sender; the review is closed.</summary>
     public const string Returned = "RETURNED";
 }
 
@@ -103,6 +114,7 @@ public sealed class ReviewStep
     public Guid Id { get; set; } = Guid.CreateVersion7();
     public Guid TenantId { get; set; }
     public Guid ReviewId { get; set; }
+    /// <summary>Position of the step in the route, from 0. Shown to people as Index + 1.</summary>
     public int Index { get; set; }
     public required string Title { get; set; }
     public string? FunctionCode { get; set; }
@@ -116,8 +128,10 @@ public sealed class ReviewStep
     public bool Deciding { get; set; }
     public int? Days { get; set; }
     public string[] GrantsStatuses { get; set; } = [];
+    /// <summary>One of <see cref="StepStates"/>.</summary>
     public string State { get; set; } = StepStates.Waiting;
     public Instant? OpenedAt { get; set; }
+    /// <summary>The date the step should be answered by, counted in working days; null when the step has no deadline or, by proxy, has not been sent yet.</summary>
     public LocalDate? DueDate { get; set; }
     public Instant? CompletedAt { get; set; }
     /// <summary>The step's answer: a verdict on the deciding step, the advice otherwise.</summary>
@@ -139,6 +153,7 @@ public sealed class ReviewStep
     public bool ByProxy => Participation == Participations.ByProxy;
 }
 
+/// <summary>The states of a <see cref="ReviewStep"/>: WAITING (not reached yet), OPEN (being answered) and DONE.</summary>
 public static class StepStates
 {
     public const string Waiting = "WAITING";
@@ -155,16 +170,19 @@ public sealed class ReviewParticipant
     public Guid UserId { get; set; }
     public required string UserName { get; set; }
     public string? Answer { get; set; }
+    /// <summary>On the deciding step, when the verdict lets the revision proceed: the status this person grants.</summary>
     public string? GrantedStatus { get; set; }
     public string? Note { get; set; }
     public Instant? AnsweredAt { get; set; }
 }
 
+/// <summary>A comment written on a review step. Blocking comments must be closed before release.</summary>
 public sealed class ReviewComment
 {
     public Guid Id { get; set; } = Guid.CreateVersion7();
     public Guid TenantId { get; set; }
     public Guid ReviewId { get; set; }
+    /// <summary>The step (from 0) it was written on.</summary>
     public int StepIndex { get; set; }
     public Guid AuthorId { get; set; }
     public required string AuthorName { get; set; }
@@ -175,7 +193,9 @@ public sealed class ReviewComment
     public bool Blocking { get; set; }
     /// <summary>REVISION: settled by the next revision. STEP: settled when a later step of this route answers.</summary>
     public string ClosesWith { get; set; } = CommentClosure.Revision;
+    /// <summary>When <c>ClosesWith</c> is STEP: the step number (from 1) whose answer settles it.</summary>
     public int? ClosesWithStep { get; set; }
+    /// <summary>One of <see cref="CommentStatuses"/>.</summary>
     public string Status { get; set; } = CommentStatuses.Open;
     public string? Resolution { get; set; }
     public Instant? ClosedAt { get; set; }
@@ -183,12 +203,14 @@ public sealed class ReviewComment
     public Instant CreatedAt { get; set; }
 }
 
+/// <summary>What settles a comment: the next revision (REVISION) or a later step of the same route (STEP).</summary>
 public static class CommentClosure
 {
     public const string Revision = "REVISION";
     public const string Step = "STEP";
 }
 
+/// <summary>Whether a comment is still open or has been closed.</summary>
 public static class CommentStatuses
 {
     public const string Open = "OPEN";

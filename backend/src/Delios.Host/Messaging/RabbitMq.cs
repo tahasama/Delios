@@ -7,9 +7,14 @@ namespace Delios.Host.Messaging;
 /// <summary>One connection per process, replaced when it drops.</summary>
 public sealed class RabbitMqConnection(IOptions<ConnectionStringsOptions> options) : IAsyncDisposable
 {
+    /// <summary>Lets only one caller at a time open a new connection.</summary>
     private readonly SemaphoreSlim _gate = new(1, 1);
     private IConnection? _connection;
 
+    /// <summary>
+    /// Returns the shared RabbitMQ connection, opening a new one if there is none or the old one has closed.
+    /// Called by <see cref="OutboxRelay"/> and <see cref="FileQueueConsumer"/> each time they need a channel.
+    /// </summary>
     public async Task<IConnection> GetAsync(CancellationToken cancellationToken)
     {
         if (_connection is { IsOpen: true } open) return open;
@@ -32,6 +37,7 @@ public sealed class RabbitMqConnection(IOptions<ConnectionStringsOptions> option
         }
     }
 
+    /// <summary>Closes the connection when the process shuts down.</summary>
     public async ValueTask DisposeAsync()
     {
         if (_connection is not null) await _connection.DisposeAsync();
@@ -46,13 +52,17 @@ public sealed class RabbitMqConnection(IOptions<ConnectionStringsOptions> option
 /// </summary>
 public static class Topology
 {
+    /// <summary>The main exchange (RabbitMQ's router) that the outbox publishes to; routes by routing key.</summary>
     public const string Exchange = "delios";
+    /// <summary>Exchange that failed messages are dead-lettered to; it routes them into the matching retry queue.</summary>
     public const string RetryExchange = "delios.retry";
     public const string FilesQueue = "delios.files";
     public const string FilesRetryQueue = "delios.files.retry";
     /// <summary>Where a message from any work queue is parked after its last attempt.</summary>
     public const string FilesDeadQueue = "delios.files.dead";
+    /// <summary>How many times a message is tried before it is parked in the dead queue.</summary>
     public const int MaxAttempts = 5;
+    /// <summary>How long a failed message waits in the retry queue before it is delivered again.</summary>
     public static readonly TimeSpan RetryDelay = TimeSpan.FromSeconds(30);
 
     /// <summary>Scanning uploads and stamping releases: what people wait for.</summary>
@@ -70,8 +80,14 @@ public static class Topology
     public static readonly WorkQueue Checks = new("delios.checks", "delios.checks.retry",
         [Host.Checks.CheckRunRequested.RoutingKey, Host.Schedules.ScheduleImportRequested.RoutingKey], Prefetch: 1);
 
+    /// <summary>Every work queue; the worker runs one <see cref="FileQueueConsumer"/> per entry.</summary>
     public static readonly WorkQueue[] Queues = [Files, Extraction, Checks];
 
+    /// <summary>
+    /// Creates the exchanges, the work queues with their retry queues and bindings, and the dead queue, if they do not exist yet.
+    /// A work queue dead-letters rejected messages to the retry exchange; a retry queue holds them for <see cref="RetryDelay"/>, then dead-letters them back to the main exchange.
+    /// Called by the relay and each consumer whenever they open a channel; declaring is safe to repeat.
+    /// </summary>
     public static async Task DeclareAsync(IChannel channel, CancellationToken cancellationToken)
     {
         await channel.ExchangeDeclareAsync(Exchange, ExchangeType.Direct, durable: true, cancellationToken: cancellationToken);

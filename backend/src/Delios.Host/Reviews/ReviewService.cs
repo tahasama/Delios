@@ -10,16 +10,22 @@ using NodaTime;
 
 namespace Delios.Host.Reviews;
 
+/// <summary>Body of the start-review request. <c>RouteId</c> picks a route; null takes the best route for the document.</summary>
 public sealed record StartReviewRequest(Guid? RouteId = null);
+/// <summary>Body of a new comment. <c>Class</c> is a published comment class code; <c>ClosesWithStep</c> (from 1) names a later step that settles it, or null when it is settled with the revision.</summary>
 public sealed record CommentRequest(string? Text, string? Class, int? ClosesWithStep = null);
+/// <summary>Body of the close-comment request: how the comment was settled (required).</summary>
 public sealed record CloseCommentRequest(string? Resolution);
+/// <summary>Body of an answer on the open step. <c>Verdict</c> and <c>Status</c> are used only on the deciding step; advisers' answers come from their comments.</summary>
 /// <param name="Issue">On the deciding step, with a verdict that lets the revision out: who it goes to once released.</param>
 /// <param name="ForeignAnswer">For a party answering by proxy: their answer as they wrote it.</param>
 /// <param name="EvidenceFileId">For a party answering by proxy: the proof of their answer.</param>
 public sealed record AnswerRequest(string? Verdict = null, string? Status = null, string? Note = null, IssueAsk? Issue = null,
     string? ForeignAnswer = null, Guid? EvidenceFileId = null);
+/// <summary>Body of a release request. <c>Status</c>, if given, must equal the status the deciding step granted.</summary>
 /// <param name="Outcome">Document Control's outcome to record, from its own published set.</param>
 public sealed record ReleaseRequest(string? Status = null, string? Outcome = null);
+/// <summary>Body of a return request: Document Control sends the revision back to its author, or the route back to a step. <c>Note</c> is required; <c>Reason</c> is required when going back to a step.</summary>
 /// <param name="ToStep">Null sends the revision back to its author; a step number (from 1) sends the route back to that step.</param>
 /// <param name="Outcome">
 /// Document Control's outcome, from its own published set. Whether the revision
@@ -27,6 +33,7 @@ public sealed record ReleaseRequest(string? Status = null, string? Outcome = nul
 /// from it, and from the verdict: one that asked for changes always needs a new revision.
 /// </param>
 public sealed record ReturnRequest(string? Note, int? ToStep = null, string? Reason = null, string? Outcome = null);
+/// <summary>Body of a rewind request: the earlier step (from 1) to go back to, a published return reason, and an optional note.</summary>
 public sealed record RewindRequest(int ToStep, string? Reason, string? Note);
 
 /// <summary>
@@ -40,6 +47,7 @@ public sealed class ReviewService(
     DeliosDbContext db, Numbering numbering, AuditLog audit, IClock clock, TransmittalService transmittals,
     ControlService control)
 {
+    /// <summary>Kinds of advice an advising step can give, worked out from the adviser's comments: none, some, or at least one blocking comment. Mapped to published advice codes by <see cref="AdviceCode"/>.</summary>
     private const string Advice_None = "none", Advice_Some = "some", Advice_Blocking = "blocking";
 
     // ── Routes ────────────────────────────────────────────────────────────────
@@ -72,6 +80,10 @@ public sealed class ReviewService(
 
     // ── Start ─────────────────────────────────────────────────────────────────
 
+    /// <summary>
+    /// Starts a review of a revision that is in preparation, after checking its files passed scanning, it has a readable PDF, a route serves the document, every step has someone to answer it and the deciding function may approve.
+    /// Creates the review and its steps from the route, opens step 1 and moves the revision to in-review. Called by the start endpoint in <see cref="ReviewEndpoints"/>.
+    /// </summary>
     public async Task<(Review? Review, IResult? Problem)> StartAsync(
         ProjectAccess access, Guid revisionId, StartReviewRequest request, CancellationToken cancellationToken)
     {
@@ -206,6 +218,10 @@ public sealed class ReviewService(
 
     // ── Comments ──────────────────────────────────────────────────────────────
 
+    /// <summary>
+    /// Adds a comment from someone on the open step. The class must be published; its <c>blocking</c> property decides whether the comment blocks release.
+    /// For a party answering by proxy, the step must have been dispatched first and the author name records both the party and who typed it.
+    /// </summary>
     public async Task<(ReviewComment? Comment, IResult? Problem)> CommentAsync(
         ProjectAccess access, Guid reviewId, CommentRequest request, CancellationToken cancellationToken)
     {
@@ -254,6 +270,7 @@ public sealed class ReviewService(
         return (comment, null);
     }
 
+    /// <summary>Closes an open comment with a resolution. Only its author or Document Control may close it. Returns null on success, or the problem.</summary>
     public async Task<IResult?> CloseCommentAsync(
         ProjectAccess access, Guid reviewId, Guid commentId, CloseCommentRequest request, CancellationToken cancellationToken)
     {
@@ -277,6 +294,10 @@ public sealed class ReviewService(
 
     // ── Answers ───────────────────────────────────────────────────────────────
 
+    /// <summary>
+    /// Records the caller's answer on the open step. On the deciding step the answer is a verdict (plus a status if it lets the revision proceed, and optionally who receives it once released);
+    /// on an advising step the answer is worked out from the caller's comments. Completes the step when everyone needed has answered.
+    /// </summary>
     public async Task<(Review? Review, IResult? Problem)> AnswerAsync(
         ProjectAccess access, Guid reviewId, AnswerRequest request, CancellationToken cancellationToken)
     {
@@ -396,6 +417,10 @@ public sealed class ReviewService(
         return (review, null);
     }
 
+    /// <summary>
+    /// Closes a step once answered: works out the step's answer (the most restrictive verdict, or the most severe advice), closes comments this step was named to settle, and opens the next step.
+    /// After the deciding step the review becomes decided; if the project has nobody with the Document Control role, it is released or returned automatically. Called by <see cref="AnswerAsync"/>.
+    /// </summary>
     private async Task CompleteStepAsync(
         ProjectAccess access, Review review, ReviewStep step, Catalog catalog, CancellationToken cancellationToken)
     {
@@ -456,6 +481,10 @@ public sealed class ReviewService(
 
     // ── Document Control's acts ───────────────────────────────────────────────
 
+    /// <summary>
+    /// Document Control releases a decided review whose verdict lets the revision proceed, when no blocking comment is open, at the status the deciding step granted.
+    /// Records Document Control's outcome on the revision. Called by the release endpoint.
+    /// </summary>
     public async Task<(Review? Review, IResult? Problem)> ReleaseAsync(
         ProjectAccess access, Guid reviewId, ReleaseRequest request, CancellationToken cancellationToken)
     {
@@ -497,6 +526,10 @@ public sealed class ReviewService(
         return (review, null);
     }
 
+    /// <summary>
+    /// Document Control sends a review back: with no <c>ToStep</c>, the revision goes back to its author (replaced by a new revision if the verdict asked for changes or the outcome says so, otherwise corrected under the same revision);
+    /// with a <c>ToStep</c>, the route restarts from that step. Called by the return endpoint.
+    /// </summary>
     public async Task<(Review? Review, IResult? Problem)> ReturnAsync(
         ProjectAccess access, Guid reviewId, ReturnRequest request, CancellationToken cancellationToken)
     {
@@ -636,6 +669,7 @@ public sealed class ReviewService(
 
     // ── Queues ────────────────────────────────────────────────────────────────
 
+    /// <summary>One entry in a person's review to-do list. <c>Kind</c> says what to do (for example ANSWER_STEP, DISPATCH_STEP, RECORD_ANSWER, READY_TO_RELEASE, SEND_BACK); <c>Since</c> is when it started waiting.</summary>
     public sealed record WorkItem(Guid ReviewId, string Number, Guid DocumentId, string DocumentNumber, string Title,
         string RevisionValue, string Kind, string? StepTitle, DateOnly? DueDate, DateTimeOffset Since);
 
@@ -698,6 +732,10 @@ public sealed class ReviewService(
 
     // ── Core moves ────────────────────────────────────────────────────────────
 
+    /// <summary>
+    /// Opens the step at <paramref name="index"/> (0-based): seats the people who answer it, sets its due date in working days, and makes it the review's current step.
+    /// For an outside party answering in the app, also raises a transmittal so they can read the revision.
+    /// </summary>
     private async Task OpenStepAsync(ProjectAccess access, Review review, int index, CancellationToken cancellationToken)
     {
         var project = access.Project;
@@ -735,6 +773,7 @@ public sealed class ReviewService(
         }
     }
 
+    /// <summary>Clears everything recorded about sending a step to an outside party and their answer, so the step starts fresh.</summary>
     private static void ClearExchange(ReviewStep step)
     {
         step.TransmittalId = null;
@@ -747,6 +786,10 @@ public sealed class ReviewService(
         step.EvidenceFileId = null;
     }
 
+    /// <summary>
+    /// Does the release itself: marks the revision released at the status, supersedes earlier released revisions, closes the review, and queues a <see cref="RevisionReleased"/> message in the outbox for stamping.
+    /// Also carries out the open issue requests (who receives it). <paramref name="by"/> is "System" when it happens automatically.
+    /// </summary>
     private async Task ReleaseCoreAsync(ProjectAccess access, Review review, string status, string by, CancellationToken cancellationToken)
     {
         var now = clock.GetCurrentInstant();
@@ -785,6 +828,7 @@ public sealed class ReviewService(
         }
     }
 
+    /// <summary>Closes the review and marks the revision returned: the author must make a new revision. Open steps end and open transmittals for the revision lapse.</summary>
     private async Task ReturnToAuthorAsync(Review review, string note, string by, CancellationToken cancellationToken)
     {
         var now = clock.GetCurrentInstant();
@@ -833,6 +877,10 @@ public sealed class ReviewService(
             $"Back to {to}: {note} Corrected files come back under rev {revision.Value}; no new revision.", review.ProjectId, cancellationToken);
     }
 
+    /// <summary>
+    /// Resets the step at <paramref name="index"/> (0-based) and every later step, clears the verdict, lapses open transmittals, and opens that step again.
+    /// With <paramref name="onlyAnswered"/> the target step must already be done (used by rewind). Returns null on success, or the problem. Called by <see cref="ReturnAsync"/> and <see cref="RewindAsync"/>.
+    /// </summary>
     private async Task<IResult?> SendBackToStepAsync(
         ProjectAccess access, Review review, int index, string? reason, string note, bool onlyAnswered,
         CancellationToken cancellationToken)
@@ -874,6 +922,7 @@ public sealed class ReviewService(
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
+    /// <summary>Loads a review of this project with its steps (in order), their participants and its comments, tracked so changes can be saved. Null if not found.</summary>
     private Task<Review?> LoadAsync(ProjectAccess access, Guid reviewId, CancellationToken cancellationToken) =>
         db.Reviews
             .Include(r => r.Steps.OrderBy(s => s.Index)).ThenInclude(s => s.Participants)
@@ -881,6 +930,7 @@ public sealed class ReviewService(
             .AsSplitQuery()
             .SingleOrDefaultAsync(r => r.Id == reviewId && r.ProjectId == access.Project.Id, cancellationToken);
 
+    /// <summary>Loads a review for display, or null if it does not exist or its document is not visible to the caller. Called by the get-review endpoint.</summary>
     public async Task<Review?> ReadAsync(ProjectAccess access, Guid reviewId, CancellationToken cancellationToken)
     {
         var review = await LoadAsync(access, reviewId, cancellationToken);
@@ -888,6 +938,7 @@ public sealed class ReviewService(
             ? review : null;
     }
 
+    /// <summary>The document if the caller may see it (taking restricted confidentiality levels into account), otherwise null.</summary>
     private async Task<Document?> VisibleDocumentAsync(ProjectAccess access, Guid documentId, CancellationToken cancellationToken)
     {
         var restricted = (await Catalog.LoadAsync(db, cancellationToken)).RestrictedLevels();
@@ -911,13 +962,16 @@ public sealed class ReviewService(
                       select u).ToListAsync(cancellationToken);
     }
 
+    /// <summary>Loads the document and revision a review is about.</summary>
     private async Task<(Document Document, Revision Revision)> SubjectAsync(Review review, CancellationToken cancellationToken) =>
         (await db.Documents.SingleAsync(d => d.Id == review.DocumentId, cancellationToken),
          await db.Revisions.SingleAsync(r => r.Id == review.RevisionId, cancellationToken));
 
+    /// <summary>The problem returned when someone tries to act on a by-proxy step before recording that it was sent to the party.</summary>
     private static IResult NotDispatched(ReviewStep step) => Problems.Conflict("NOT_DISPATCHED",
         $"Record that it went to {step.PartyName} first: what comes back is their answer to what was sent.");
 
+    /// <summary>Active users who hold the given function on the project, by name.</summary>
     private Task<List<User>> HoldersAsync(Guid projectId, string functionCode, CancellationToken cancellationToken) =>
         (from m in db.Memberships
          join u in db.Users on m.UserId equals u.Id
@@ -930,6 +984,7 @@ public sealed class ReviewService(
         db.Memberships.CountAsync(m => m.ProjectId == projectId && m.Active && m.Function!.Active
             && m.Function.Rules.Any(r => r.Verbs.Contains(Verbs.Control)), cancellationToken);
 
+    /// <summary>Whether the caller has the Document Control verb on the review's document.</summary>
     private async Task<bool> HoldsControlAsync(ProjectAccess access, Review review, CancellationToken cancellationToken)
     {
         var document = await db.Documents.AsNoTracking().SingleAsync(d => d.Id == review.DocumentId, cancellationToken);
@@ -944,21 +999,28 @@ public sealed class ReviewService(
         return review.Steps.Single(s => s.Deciding).Participants.Any(p => p.UserId == access.UserId);
     }
 
+    /// <summary>Whether a function, on this project, would allow the verb on a document with these facts. Used to check the deciding function may approve.</summary>
     private static bool Allows(Function function, Project project, string verb, DocumentFacts facts) =>
         ProjectAccess.OfFunction(project, function).Allows(verb, facts);
 
+    /// <summary>The review's step that is open now, or null when none is.</summary>
     private static ReviewStep? OpenStep(Review review) => review.Steps.SingleOrDefault(s => s.State == StepStates.Open);
+    /// <summary>Whether the user is one of the people answering the step.</summary>
     private static bool IsSeated(ReviewStep step, Guid userId) => step.Participants.Any(p => p.UserId == userId);
 
+    /// <summary>Whether a verdict lets the revision go on to release (its published <c>proceed</c> property is true).</summary>
     private static bool Proceeds(Catalog catalog, string verdict) =>
         catalog.Prop(ReviewSets.Verdicts, verdict, "proceed") is { ValueKind: JsonValueKind.True };
 
+    /// <summary>The published advice code for an advice kind (none, some, blocking); the kind in capitals when none is published.</summary>
     private static string AdviceCode(Catalog catalog, string kind) =>
         catalog.CodeWhere(ReviewSets.Advice, "comments", kind) ?? kind.ToUpperInvariant();
 
+    /// <summary>The advice kind (none, some, blocking) behind a published advice code; the code in lower case when it has none.</summary>
     private static string AdviceKind(Catalog catalog, string code) =>
         catalog.Prop(ReviewSets.Advice, code, "comments") is { ValueKind: JsonValueKind.String } k ? k.GetString()! : code.ToLowerInvariant();
 
+    /// <summary>Marks a comment closed with its resolution, the time and who closed it.</summary>
     private void Close(ReviewComment comment, string resolution, string by)
     {
         comment.Status = CommentStatuses.Closed;
@@ -967,12 +1029,20 @@ public sealed class ReviewService(
         comment.ClosedByName = by;
     }
 
+    /// <summary>Turns a state code such as IN_PREPARATION into words for messages ("in preparation").</summary>
     private static string Words(string state) => state.ToLowerInvariant().Replace('_', ' ');
+    /// <summary>The caller as the actor recorded in the audit log.</summary>
     private static Audit.Actor Actor(ProjectAccess access) => new(access.UserId, access.UserName);
+    /// <summary>The 404 problem for a review that does not exist or is not visible.</summary>
     private static IResult NotFound() => Problems.NotFound("REVIEW_NOT_FOUND", "No such review.");
+    /// <summary>Shorthand for returning a problem with no review.</summary>
     private static (Review?, IResult?) Fail(IResult problem) => (null, problem);
 }
 
+/// <summary>
+/// Message sent through the outbox when a revision is released. The worker (<see cref="Messaging.FileQueueConsumer"/>) hands it to <see cref="Stamping"/> and then to the schedule importer.
+/// <c>SupersededRevisionIds</c> are the earlier revisions this release replaced.
+/// </summary>
 public sealed record RevisionReleased(Guid TenantId, Guid RevisionId, Guid[] SupersededRevisionIds)
 {
     public const string RoutingKey = "revision.released";

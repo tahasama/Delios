@@ -15,10 +15,17 @@ public sealed class ReadDatabase(
     DeliosDbContext primary, TenantTransactionInterceptor tenant, IOptions<ConnectionStringsOptions> options,
     ILogger<ReadDatabase> logger)
 {
+    /// <summary>Connection string of the read replica (a read-only copy of the database), or null when none is configured.</summary>
     private readonly string? _replica = string.IsNullOrWhiteSpace(options.Value.PostgresReadOnly) ? null : options.Value.PostgresReadOnly;
 
+    /// <summary>True when a read replica connection string is configured.</summary>
     public bool HasReplica => _replica is not null;
 
+    /// <summary>
+    /// Runs <paramref name="query"/> on the replica inside its own transaction, so the tenant interceptor sets the tenant.
+    /// Falls back to the primary database when no replica is configured or the replica does not answer.
+    /// Used by list and report endpoints (for example in Documents and Reports).
+    /// </summary>
     public async Task<T> ReadAsync<T>(Func<DeliosDbContext, Task<T>> query, CancellationToken cancellationToken)
     {
         if (_replica is null) return await query(primary);

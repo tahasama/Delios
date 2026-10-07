@@ -9,6 +9,10 @@ namespace Delios.Host.Messaging;
 public sealed class FileQueueConsumer(
     IServiceScopeFactory scopes, RabbitMqConnection rabbit, ILogger<FileQueueConsumer> logger, WorkQueue queue) : BackgroundService
 {
+    /// <summary>
+    /// Runs for the life of the worker: connects to RabbitMQ, declares the queues, and consumes this queue until the channel closes.
+    /// Prefetch (how many unacknowledged messages RabbitMQ hands over at once) comes from the queue's settings. On any failure it waits 5 seconds and reconnects.
+    /// </summary>
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         while (!stoppingToken.IsCancellationRequested)
@@ -41,6 +45,10 @@ public sealed class FileQueueConsumer(
         }
     }
 
+    /// <summary>
+    /// Handles one delivered message: picks the handler by routing key, runs it in a fresh service scope, then acknowledges the message.
+    /// On failure it rejects the message so it goes to the retry queue, or, after <see cref="Topology.MaxAttempts"/> attempts, copies it to the dead queue (where failed messages are parked for a person) and acknowledges it.
+    /// </summary>
     private async Task HandleAsync(IChannel channel, BasicDeliverEventArgs delivery, CancellationToken stoppingToken)
     {
         try
@@ -104,6 +112,7 @@ public sealed class FileQueueConsumer(
         }
     }
 
+    /// <summary>Turns the message body (JSON) into the given message type; throws if the body is empty.</summary>
     private static T Read<T>(BasicDeliverEventArgs delivery) =>
         JsonSerializer.Deserialize<T>(delivery.Body.Span) ?? throw new InvalidOperationException("Empty message");
 

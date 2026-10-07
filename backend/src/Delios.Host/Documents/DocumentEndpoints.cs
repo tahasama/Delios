@@ -7,11 +7,21 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Delios.Host.Documents;
 
+/// <summary>
+/// The HTTP API of the document register: list, read, register, upload files, start and resubmit revisions,
+/// and download. Each handler checks access and then hands the work to <see cref="DocumentService"/>.
+/// </summary>
 public static class DocumentEndpoints
 {
+    /// <summary>Documents per page when the caller gives no <c>limit</c>.</summary>
     public const int DefaultPageSize = 50;
+    /// <summary>The largest <c>limit</c> a caller may ask for; larger values are lowered to this.</summary>
     public const int MaxPageSize = 200;
 
+    /// <summary>
+    /// Registers the document routes under <c>/api/projects/{projectId}</c>. Every route runs in one database
+    /// transaction and only after the project access check. Called at start-up from <c>PlatformSetup</c>.
+    /// </summary>
     public static void MapDocumentEndpoints(this IEndpointRouteBuilder app)
     {
         var project = app.MapGroup("/api/projects/{projectId:guid}").WithTags("Documents")
@@ -27,6 +37,10 @@ public static class DocumentEndpoints
         project.MapGet("/files/{fileId:guid}/download", DownloadAsync);
     }
 
+    /// <summary>
+    /// GET /documents: one page of the register the caller may see, filtered and searched by number or title.
+    /// Pages are keyed on the document number (<c>after</c>), so later pages are as fast as the first. Runs on the read replica when there is one.
+    /// </summary>
     private static async Task<IResult> ListAsync(
         HttpContext http, ReadDatabase reads, DocumentService documents, CancellationToken cancellationToken,
         string? after = null, int? limit = null, string? q = null,
@@ -63,6 +77,7 @@ public static class DocumentEndpoints
         return Results.Ok(new DocumentPage(rows.Take(size).ToList(), next));
     }
 
+    /// <summary>GET /documents/{documentId}: one document with all its revisions, submissions and files, if the caller may see it.</summary>
     private static async Task<IResult> GetAsync(
         Guid documentId, HttpContext http, DeliosDbContext db, DocumentService documents, CancellationToken cancellationToken)
     {
@@ -77,6 +92,10 @@ public static class DocumentEndpoints
         return document is null ? Problems.NotFound("DOCUMENT_NOT_FOUND", "No such document.") : Results.Ok(View(document));
     }
 
+    /// <summary>
+    /// POST /documents: registers a new document and returns it with 201 Created. A retried request with the same
+    /// <c>Idempotency-Key</c> header gets the first answer back instead of a second document.
+    /// </summary>
     private static async Task<IResult> RegisterAsync(
         RegisterDocumentRequest request, HttpContext http, DocumentService documents, CancellationToken cancellationToken)
     {
@@ -85,6 +104,7 @@ public static class DocumentEndpoints
         return problem ?? Results.Created($"/api/projects/{access.Project.Id}/documents/{document!.Id}", View(document));
     }
 
+    /// <summary>POST /documents/{documentId}/uploads: records a file the caller is about to upload and returns a signed upload link.</summary>
     private static async Task<IResult> RequestUploadAsync(
         Guid documentId, UploadRequest request, HttpContext http, DocumentService documents, CancellationToken cancellationToken)
     {
@@ -92,6 +112,7 @@ public static class DocumentEndpoints
         return problem ?? Results.Ok(ticket);
     }
 
+    /// <summary>POST /documents/{documentId}/revisions: starts a new revision from files already uploaded, and returns it.</summary>
     private static async Task<IResult> StartRevisionAsync(
         Guid documentId, StartRevisionRequest request, HttpContext http, DocumentService documents,
         CancellationToken cancellationToken)
@@ -102,6 +123,7 @@ public static class DocumentEndpoints
             $"/api/projects/{access.Project.Id}/documents/{documentId}", View(revision!));
     }
 
+    /// <summary>POST .../revisions/{revisionId}/submissions: sends corrected files for a revision Document Control returned.</summary>
     private static async Task<IResult> ResubmitAsync(
         Guid documentId, Guid revisionId, StartRevisionRequest request, HttpContext http, DocumentService documents,
         CancellationToken cancellationToken)
@@ -111,6 +133,10 @@ public static class DocumentEndpoints
         return problem ?? Results.Ok(View(revision!));
     }
 
+    /// <summary>
+    /// GET /files/{fileId}/download: returns a short-lived download link for a file that passed scanning,
+    /// if the caller may see its document. Every download is written to the audit trail.
+    /// </summary>
     private static async Task<IResult> DownloadAsync(
         Guid fileId, HttpContext http, DeliosDbContext db, DocumentService documents, FileStorage storage, AuditLog audit,
         CancellationToken cancellationToken)
@@ -134,12 +160,14 @@ public static class DocumentEndpoints
         return Results.Ok(new DownloadTicket(url, expires.ToDateTimeOffset()));
     }
 
+    /// <summary>Turns a document entity (database row) into the shape the API returns.</summary>
     private static DocumentView View(Document d) => new(
         d.Id, d.Number, d.Title, d.DeliverableType, d.DocType, d.Discipline, d.Originator, d.Subproject, d.ContractRef,
         d.Criticality, d.Confidentiality, d.RetentionClass, d.State, d.Kind, d.IsPlaceholder,
         d.ReceivedDate?.ToDateOnly(), d.PlannedDate?.ToDateOnly(), d.CreatedByName,
         d.CreatedAt.ToDateTimeOffset(), d.UpdatedAt.ToDateTimeOffset(), d.Revisions.Select(View).ToList());
 
+    /// <summary>Turns a revision entity, with its submissions and files, into the shape the API returns.</summary>
     private static RevisionView View(Revision r) => new(
         r.Id, r.Value, r.Series, r.State, r.FilesState, r.ReasonForRevision, r.ChangeDescription, r.AuthoredByName,
         r.CreatedAt.ToDateTimeOffset(), r.StatusCode, r.ReleasedAt?.ToDateTimeOffset(), r.SupersededAt?.ToDateTimeOffset(),

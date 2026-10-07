@@ -4,8 +4,10 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Delios.Host.Audit;
 
+/// <summary>Who did something, as written to the audit trail: a user's id and display name, or <see cref="Actor.System"/>.</summary>
 public sealed record Actor(Guid? Id, string Name)
 {
+    /// <summary>The actor used when the application acts by itself, such as the background worker scanning a file.</summary>
     public static readonly Actor System = new(null, "System");
 }
 
@@ -16,6 +18,11 @@ public sealed record Actor(Guid? Id, string Name)
 /// </summary>
 public sealed class AuditLog(DeliosDbContext db, TenantContext tenant)
 {
+    /// <summary>
+    /// Appends one event to the audit trail by calling the <c>audit_append</c> database function.
+    /// Called by the services right after they change something (registering a document, a download, a scan result).
+    /// It uses the request's open transaction, so if the change rolls back, the audit row does too.
+    /// </summary>
     public async Task WriteAsync(
         Actor actor, string action,
         string? entityType = null, Guid? entityId = null, string? entityLabel = null,

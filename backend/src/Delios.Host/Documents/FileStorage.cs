@@ -17,11 +17,17 @@ public sealed record SignedLink(string Url, Instant ExpiresAt, IReadOnlyDictiona
 /// <summary>Where file bytes live: an S3-compatible store or Azure Blob Storage, chosen by Storage:Provider.</summary>
 public interface IObjectStore
 {
+    /// <summary>Makes a signed link that lets a browser upload (PUT) the bytes for one key until <paramref name="expires"/>.</summary>
     SignedLink SignUpload(string key, string contentType, Instant expires);
+    /// <summary>Makes a signed link that lets a browser download one key, saved under <paramref name="fileName"/>, until <paramref name="expires"/>.</summary>
     string SignDownload(string key, string fileName, Instant expires);
+    /// <summary>The stored size in bytes, or null when nothing is stored under the key.</summary>
     Task<long?> SizeAsync(string key, CancellationToken cancellationToken);
+    /// <summary>Stores bytes the system made itself under a key.</summary>
     Task PutAsync(string key, byte[] content, string contentType, CancellationToken cancellationToken);
+    /// <summary>Opens the stored bytes for reading, from the start.</summary>
     Task<Stream> OpenReadAsync(string key, CancellationToken cancellationToken);
+    /// <summary>True when the store answers and the bucket or container exists. Used by the health check.</summary>
     Task<bool> ReachableAsync(CancellationToken cancellationToken);
 }
 
@@ -32,14 +38,19 @@ public interface IObjectStore
 /// </summary>
 public sealed class FileStorage(IObjectStore store, IClock clock)
 {
+    /// <summary>How long an upload link stays valid.</summary>
     public static readonly Duration UploadWindow = Duration.FromMinutes(15);
+    /// <summary>How long a download link stays valid.</summary>
     public static readonly Duration DownloadWindow = Duration.FromMinutes(5);
 
+    /// <summary>The object key for a new file: tenant id, project id and file id joined by "/". Each file gets its own key.</summary>
     public static string KeyFor(Guid tenantId, Guid projectId, Guid fileId) => $"{tenantId}/{projectId}/{fileId}";
 
+    /// <summary>A signed upload link for the key, valid for <see cref="UploadWindow"/>. Called by <see cref="DocumentService.RequestUploadAsync"/>.</summary>
     public SignedLink PresignUpload(string key, string contentType) =>
         store.SignUpload(key, contentType, clock.GetCurrentInstant() + UploadWindow);
 
+    /// <summary>A signed download link for the key, valid for <see cref="DownloadWindow"/>, and when it expires.</summary>
     public (string Url, Instant ExpiresAt) PresignDownload(string key, string fileName)
     {
         var expires = clock.GetCurrentInstant() + DownloadWindow;
@@ -53,8 +64,13 @@ public sealed class FileStorage(IObjectStore store, IClock clock)
     public Task PutAsync(string key, byte[] content, string contentType, CancellationToken cancellationToken) =>
         store.PutAsync(key, content, contentType, cancellationToken);
 
+    /// <summary>Opens the stored bytes for reading. Used by the worker to scan and check a file.</summary>
     public Task<Stream> OpenReadAsync(string key, CancellationToken cancellationToken) => store.OpenReadAsync(key, cancellationToken);
 
+    /// <summary>
+    /// The <c>Content-Disposition</c> header value that makes the browser save the file under its own name
+    /// (UTF-8 encoded, so any characters work).
+    /// </summary>
     public static string Attachment(string fileName) => $"attachment; filename*=UTF-8''{Uri.EscapeDataString(fileName)}";
 }
 
@@ -62,8 +78,10 @@ public sealed class FileStorage(IObjectStore store, IClock clock)
 public sealed class S3ObjectStore(IAmazonS3 s3, IOptions<StorageOptions> options) : IObjectStore
 {
     private readonly StorageOptions _options = options.Value;
+    /// <summary>A second S3 client used only to sign links, set to the public address the browser will use.</summary>
     private readonly Lazy<AmazonS3Client> _signer = new(() => Signer(options.Value));
 
+    /// <summary>A pre-signed PUT URL for the key. The browser must send the same <c>Content-Type</c>, which the link returns as a header.</summary>
     public SignedLink SignUpload(string key, string contentType, Instant expires)
     {
         var url = _signer.Value.GetPreSignedURL(new GetPreSignedUrlRequest
@@ -78,6 +96,7 @@ public sealed class S3ObjectStore(IAmazonS3 s3, IOptions<StorageOptions> options
         return new SignedLink(url, expires, new Dictionary<string, string> { ["Content-Type"] = contentType });
     }
 
+    /// <summary>A pre-signed GET URL for the key that tells the browser to save the file under its own name.</summary>
     public string SignDownload(string key, string fileName, Instant expires)
     {
         var request = new GetPreSignedUrlRequest
@@ -92,6 +111,7 @@ public sealed class S3ObjectStore(IAmazonS3 s3, IOptions<StorageOptions> options
         return _signer.Value.GetPreSignedURL(request);
     }
 
+    /// <summary>Asks S3 for the object's metadata (a HEAD request) and returns its size; null when it does not exist.</summary>
     public async Task<long?> SizeAsync(string key, CancellationToken cancellationToken)
     {
         try
@@ -105,6 +125,7 @@ public sealed class S3ObjectStore(IAmazonS3 s3, IOptions<StorageOptions> options
         }
     }
 
+    /// <summary>Uploads the bytes to the bucket under the key.</summary>
     public async Task PutAsync(string key, byte[] content, string contentType, CancellationToken cancellationToken)
     {
         using var body = new MemoryStream(content);
@@ -117,12 +138,15 @@ public sealed class S3ObjectStore(IAmazonS3 s3, IOptions<StorageOptions> options
         }, cancellationToken);
     }
 
+    /// <summary>Starts downloading the object and returns its body as a stream; the caller must dispose it.</summary>
     public async Task<Stream> OpenReadAsync(string key, CancellationToken cancellationToken) =>
         (await s3.GetObjectAsync(_options.Bucket, key, cancellationToken)).ResponseStream;
 
+    /// <summary>True when the configured bucket exists and answers.</summary>
     public Task<bool> ReachableAsync(CancellationToken cancellationToken) =>
         Amazon.S3.Util.AmazonS3Util.DoesS3BucketExistV2Async(s3, _options.Bucket);
 
+    /// <summary>HTTP or HTTPS, from how the endpoint address starts.</summary>
     private static Amazon.S3.Protocol Protocol(string endpoint) =>
         endpoint.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ? Amazon.S3.Protocol.HTTP : Amazon.S3.Protocol.HTTPS;
 
@@ -150,6 +174,10 @@ public sealed class AzureObjectStore(IOptions<StorageOptions> options) : IObject
 
     private BlobContainerClient Container => _container.Value;
 
+    /// <summary>
+    /// A SAS (shared access signature: a URL carrying its own time-limited permission) for creating and writing one blob.
+    /// The browser must also send <c>x-ms-blob-type: BlockBlob</c>, which the link returns as a header.
+    /// </summary>
     public SignedLink SignUpload(string key, string contentType, Instant expires)
     {
         var sas = new BlobSasBuilder(BlobSasPermissions.Create | BlobSasPermissions.Write, expires.ToDateTimeOffset())
@@ -165,6 +193,7 @@ public sealed class AzureObjectStore(IOptions<StorageOptions> options) : IObject
         });
     }
 
+    /// <summary>A read-only SAS URL for one blob that tells the browser to save the file under its own name.</summary>
     public string SignDownload(string key, string fileName, Instant expires)
     {
         var sas = new BlobSasBuilder(BlobSasPermissions.Read, expires.ToDateTimeOffset())
@@ -177,6 +206,7 @@ public sealed class AzureObjectStore(IOptions<StorageOptions> options) : IObject
         return Public(Container.GetBlobClient(key).GenerateSasUri(sas));
     }
 
+    /// <summary>Reads the blob's properties and returns its size; null when it does not exist.</summary>
     public async Task<long?> SizeAsync(string key, CancellationToken cancellationToken)
     {
         try
@@ -189,6 +219,7 @@ public sealed class AzureObjectStore(IOptions<StorageOptions> options) : IObject
         }
     }
 
+    /// <summary>Uploads the bytes as a new blob; fails if a blob already exists under the key.</summary>
     public async Task PutAsync(string key, byte[] content, string contentType, CancellationToken cancellationToken) =>
         // Never overwrites: a key is used once.
         await Container.GetBlobClient(key).UploadAsync(new BinaryData(content), new BlobUploadOptions
@@ -197,9 +228,11 @@ public sealed class AzureObjectStore(IOptions<StorageOptions> options) : IObject
             Conditions = new BlobRequestConditions { IfNoneMatch = Azure.ETag.All },
         }, cancellationToken);
 
+    /// <summary>Starts downloading the blob and returns its content as a stream; the caller must dispose it.</summary>
     public async Task<Stream> OpenReadAsync(string key, CancellationToken cancellationToken) =>
         (await Container.GetBlobClient(key).DownloadStreamingAsync(cancellationToken: cancellationToken)).Value.Content;
 
+    /// <summary>True when the configured container exists and answers.</summary>
     public async Task<bool> ReachableAsync(CancellationToken cancellationToken) =>
         (await Container.ExistsAsync(cancellationToken)).Value;
 

@@ -7,18 +7,23 @@ namespace Delios.Host.Documents;
 /// <summary>The tenant's published values, read once per request.</summary>
 public sealed class Catalog
 {
+    /// <summary>The values by set key, then by code.</summary>
     private readonly Dictionary<string, Dictionary<string, ValueEntry>> _sets;
 
+    /// <summary>Groups the loaded values by set and by code for quick look-ups.</summary>
     private Catalog(IEnumerable<ValueEntry> values) =>
         _sets = values.GroupBy(v => v.SetKey)
             .ToDictionary(g => g.Key, g => g.ToDictionary(v => v.Code, StringComparer.Ordinal));
 
+    /// <summary>Reads every value of the current tenant from the database. Called by <see cref="DocumentService"/> when it needs the lists.</summary>
     public static async Task<Catalog> LoadAsync(DeliosDbContext db, CancellationToken cancellationToken) =>
         new(await db.ValueEntries.AsNoTracking().ToListAsync(cancellationToken));
 
+    /// <summary>True when the code is in the set and still active (not retired).</summary>
     public bool IsActive(string setKey, string code) =>
         _sets.TryGetValue(setKey, out var set) && set.TryGetValue(code, out var v) && v.Status == ValueStatus.Active;
 
+    /// <summary>One property of a value's <c>Props</c> JSON, or null when the value or the property does not exist.</summary>
     public JsonElement? Prop(string setKey, string code, string prop) =>
         _sets.TryGetValue(setKey, out var set) && set.TryGetValue(code, out var v)
             && v.Props?.RootElement.TryGetProperty(prop, out var value) == true

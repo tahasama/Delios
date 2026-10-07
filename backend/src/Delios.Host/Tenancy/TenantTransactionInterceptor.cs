@@ -13,6 +13,7 @@ namespace Delios.Host.Tenancy;
 /// </summary>
 public sealed class TenantTransactionInterceptor(TenantContext tenant) : DbTransactionInterceptor
 {
+    /// <summary>Called by Entity Framework right after a transaction begins (synchronous path); sets the tenant on it.</summary>
     public override DbTransaction TransactionStarted(
         DbConnection connection, TransactionEndEventData eventData, DbTransaction result)
     {
@@ -21,6 +22,7 @@ public sealed class TenantTransactionInterceptor(TenantContext tenant) : DbTrans
         return result;
     }
 
+    /// <summary>Called by Entity Framework right after a transaction begins (async path); sets the tenant on it.</summary>
     public override async ValueTask<DbTransaction> TransactionStartedAsync(
         DbConnection connection, TransactionEndEventData eventData, DbTransaction result,
         CancellationToken cancellationToken = default)
@@ -30,6 +32,10 @@ public sealed class TenantTransactionInterceptor(TenantContext tenant) : DbTrans
         return result;
     }
 
+    /// <summary>
+    /// Builds the <c>set_config('app.tenant_id', ..., true)</c> command for the transaction, where <c>true</c> means "only until the transaction ends".
+    /// Returns null when no tenant is set, so nothing is run.
+    /// </summary>
     private NpgsqlCommand? Command(DbConnection connection, DbTransaction transaction)
     {
         if (tenant.TenantId is not { } id) return null;

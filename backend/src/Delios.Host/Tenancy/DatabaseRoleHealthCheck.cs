@@ -11,6 +11,10 @@ namespace Delios.Host.Tenancy;
 /// </summary>
 public sealed class DatabaseRoleHealthCheck(DeliosDbContext db) : IHealthCheck
 {
+    /// <summary>
+    /// Asks Postgres whether the role this node logs in as is a superuser or has BYPASSRLS.
+    /// Called by the health check endpoints (registered as "postgres-role"); returns Unhealthy if so, or if the role cannot be read.
+    /// </summary>
     public async Task<HealthCheckResult> CheckHealthAsync(
         HealthCheckContext context, CancellationToken cancellationToken = default)
     {

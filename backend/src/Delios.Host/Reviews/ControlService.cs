@@ -8,6 +8,7 @@ using NodaTime;
 
 namespace Delios.Host.Reviews;
 
+/// <summary>Body of the arrival request: Document Control's outcome code and an optional note (required when returning).</summary>
 /// <param name="Outcome">One of the organization's control outcomes; empty takes the first one that fits the act.</param>
 public sealed record ControlRequest(string? Outcome = null, string? Note = null);
 
@@ -20,6 +21,7 @@ public sealed record ControlRequest(string? Outcome = null, string? Note = null)
 /// </summary>
 public sealed class ControlService(DeliosDbContext db, AuditLog audit, IClock clock)
 {
+    /// <summary>The acts Document Control performs; a control outcome's published <c>act</c> property names one of them.</summary>
     public const string Accept = "accept", Return = "return", Release = "release";
 
     /// <summary>
@@ -50,9 +52,11 @@ public sealed class ControlService(DeliosDbContext db, AuditLog audit, IClock cl
         return (code, null);
     }
 
+    /// <summary>Who a control outcome sends the submission back to (its published <c>to</c> property: "sender" or "initiator"), or null when it does not say.</summary>
     private static string? To(Catalog catalog, string code) =>
         catalog.Prop(ReviewSets.ControlOutcomes, code, "to") is { ValueKind: JsonValueKind.String } t ? t.GetString() : null;
 
+    /// <summary>Whether a control outcome means a new revision must replace this one (its published <c>newRevision</c> property is true), rather than a correction under the same revision.</summary>
     public static bool NeedsNewRevision(Catalog catalog, string code) =>
         catalog.Prop(ReviewSets.ControlOutcomes, code, "newRevision") is { ValueKind: JsonValueKind.True };
 
@@ -126,6 +130,7 @@ public sealed class ControlService(DeliosDbContext db, AuditLog audit, IClock cl
         return (revision, null);
     }
 
+    /// <summary>One entry in a person's to-do list about a submission. <c>Kind</c> is ACCEPT_SUBMISSION or CORRECT_AND_RESUBMIT; <c>Note</c> is why it was returned.</summary>
     public sealed record RevisionWork(string Kind, Guid DocumentId, string DocumentNumber, string Title, Guid RevisionId,
         string Revision, int Submission, string? Note, DateTimeOffset Since);
 

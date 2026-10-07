@@ -9,6 +9,10 @@ namespace Delios.Host.Tenancy;
 /// </summary>
 public sealed class TransactionFilter(DeliosDbContext db) : IEndpointFilter
 {
+    /// <summary>
+    /// Starts a transaction, runs the endpoint, and commits unless the result has a status code of 400 or more.
+    /// If the endpoint throws or returns an error, the transaction is disposed without commit, which rolls it back.
+    /// </summary>
     public async ValueTask<object?> InvokeAsync(EndpointFilterInvocationContext context, EndpointFilterDelegate next)
     {
         var cancel = context.HttpContext.RequestAborted;

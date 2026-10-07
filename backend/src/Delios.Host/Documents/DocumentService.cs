@@ -17,6 +17,11 @@ public sealed class DocumentService(
     DeliosDbContext db, Numbering numbering, FileStorage storage, AuditLog audit, IClock clock,
     IOptions<StorageOptions> storageOptions)
 {
+    /// <summary>
+    /// Registers a new document: checks the title, the coded values and the fields the deliverable type requires,
+    /// checks the person may create it, allocates its number, saves it and writes the audit record.
+    /// Returns the document, or a problem response saying what to fix. Called by the POST /documents endpoint.
+    /// </summary>
     public async Task<(Document? Document, IResult? Problem)> RegisterAsync(
         ProjectAccess access, RegisterDocumentRequest request, CancellationToken cancellationToken)
     {
@@ -142,6 +147,10 @@ public sealed class DocumentService(
         return (document, null);
     }
 
+    /// <summary>
+    /// Records a file someone is about to upload to a document (status awaiting upload) and returns a signed link
+    /// the browser uses to send the bytes straight to object storage. The file is attached to a revision later.
+    /// </summary>
     public async Task<(UploadTicket? Ticket, IResult? Problem)> RequestUploadAsync(
         ProjectAccess access, Guid documentId, UploadRequest request, CancellationToken cancellationToken)
     {
@@ -173,6 +182,11 @@ public sealed class DocumentService(
         return (new UploadTicket(file.Id, "PUT", link.Url, link.Headers, link.ExpiresAt.ToDateTimeOffset()), null);
     }
 
+    /// <summary>
+    /// Starts the document's next revision from files already uploaded: works out its value from the revision scheme,
+    /// attaches the files and queues them for scanning. Refused while an earlier revision is still in motion,
+    /// and for a record that already has its one revision.
+    /// </summary>
     public async Task<(Revision? Revision, IResult? Problem)> StartRevisionAsync(
         ProjectAccess access, Guid documentId, StartRevisionRequest request, CancellationToken cancellationToken)
     {
@@ -309,6 +323,11 @@ public sealed class DocumentService(
         return (files, null);
     }
 
+    /// <summary>
+    /// Attaches the files to the revision's current submission, marks them as processing, and queues a
+    /// <see cref="FileUploaded"/> message for each through the outbox (a table of messages saved in the same
+    /// transaction and sent to the queue afterwards, so a message is never lost or sent for a change that rolled back).
+    /// </summary>
     private void Bind(List<StoredFile> files, Revision revision)
     {
         foreach (var file in files)
@@ -357,13 +376,20 @@ public sealed class DocumentService(
             .Select(r => r.Scheme).SingleOrDefaultAsync(cancellationToken)
         ?? await db.RevisionSchemes.AsNoTracking().SingleOrDefaultAsync(s => s.IsDefault, cancellationToken);
 
+    /// <summary>The confidentiality levels that restrict a document to named readers. Passed to <see cref="DocumentQueries.Visible"/>.</summary>
     public async Task<IReadOnlyList<string>> RestrictedAsync(CancellationToken cancellationToken) =>
         (await Catalog.LoadAsync(db, cancellationToken)).RestrictedLevels();
 
+    /// <summary>The trimmed text, or null when it is null, empty or only spaces.</summary>
     private static string? Blank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    /// <summary>Shorthand for returning a problem response with no document.</summary>
     private static (Document?, IResult?) Fail(IResult problem) => (null, problem);
 }
 
+/// <summary>
+/// Shared database queries for documents. Used by the endpoints and <see cref="DocumentService"/> so that
+/// every read applies the same visibility rules.
+/// </summary>
 public static class DocumentQueries
 {
     /// <summary>

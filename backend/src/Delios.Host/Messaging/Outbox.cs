@@ -7,6 +7,10 @@ using RabbitMQ.Client;
 
 namespace Delios.Host.Messaging;
 
+/// <summary>
+/// Helpers for the outbox: a database table of messages to send, written in the same transaction as the change they describe.
+/// Services call <see cref="Enqueue"/>; <see cref="OutboxRelay"/> later sends the rows to RabbitMQ.
+/// </summary>
 public static class Outbox
 {
     /// <summary>Adds a message to the caller's unit of work; it is sent only if that commits.</summary>
@@ -23,11 +27,18 @@ public sealed class OutboxRelay(
     IServiceScopeFactory scopes, RabbitMqConnection rabbit, IClock clock, ILogger<OutboxRelay> logger)
     : BackgroundService
 {
+    /// <summary>How long the relay sleeps when it found nothing to send.</summary>
     private static readonly TimeSpan Idle = TimeSpan.FromSeconds(1);
+    /// <summary>How often the relay updates the outbox backlog metrics.</summary>
     private static readonly TimeSpan MeasureEvery = TimeSpan.FromSeconds(15);
+    /// <summary>The RabbitMQ channel used for publishing, opened on first use and reopened after a failure; null when none is open.</summary>
     private IChannel? _channel;
     private DateTime _measuredAt = DateTime.MinValue;
 
+    /// <summary>
+    /// Runs for the life of the process: sends batches until the outbox is empty, then waits a second; refreshes the backlog metrics every 15 seconds.
+    /// On failure it drops the channel and retries after 5 seconds.
+    /// </summary>
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         while (!stoppingToken.IsCancellationRequested)
@@ -51,6 +62,11 @@ public sealed class OutboxRelay(
         }
     }
 
+    /// <summary>
+    /// Sends up to 100 unsent outbox messages to RabbitMQ and marks them sent, all in one transaction. Returns how many were sent.
+    /// <c>FOR UPDATE SKIP LOCKED</c> locks the rows it takes and skips rows another node has locked, so two nodes never send the same batch at once.
+    /// Called by <see cref="ExecuteAsync"/>.
+    /// </summary>
     public async Task<int> RelayBatchAsync(CancellationToken cancellationToken)
     {
         await using var scope = scopes.CreateAsyncScope();
@@ -94,6 +110,7 @@ public sealed class OutboxRelay(
         _measuredAt = DateTime.UtcNow;
     }
 
+    /// <summary>Returns the open publishing channel, or opens a new one with publisher confirms (the broker acknowledges each published message) and declares the exchanges and queues.</summary>
     private async Task<IChannel> ChannelAsync(CancellationToken cancellationToken)
     {
         if (_channel is { IsOpen: true }) return _channel;
@@ -105,6 +122,7 @@ public sealed class OutboxRelay(
         return _channel;
     }
 
+    /// <summary>Called by the host at shutdown: stops the loop, then closes the channel.</summary>
     public override async Task StopAsync(CancellationToken cancellationToken)
     {
         await base.StopAsync(cancellationToken);

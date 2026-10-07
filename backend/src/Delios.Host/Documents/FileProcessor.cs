@@ -7,8 +7,13 @@ using NodaTime;
 
 namespace Delios.Host.Documents;
 
+/// <summary>
+/// The message sent through the queue when a revision's files have been uploaded and need checking.
+/// Written to the outbox by <see cref="DocumentService"/>; read by the worker, which hands it to <see cref="FileProcessor"/>.
+/// </summary>
 public sealed record FileUploaded(Guid TenantId, Guid FileId)
 {
+    /// <summary>The routing key: the label RabbitMQ (the message broker) uses to deliver this message to the right queue.</summary>
     public const string RoutingKey = "file.uploaded";
 }
 
@@ -22,6 +27,12 @@ public sealed class FileProcessor(
     DeliosDbContext db, TenantContext tenant, FileStorage storage, IVirusScanner scanner,
     AuditLog audit, IClock clock, ILogger<FileProcessor> logger)
 {
+    /// <summary>
+    /// Checks one uploaded file and records the result, then updates its revision's files state
+    /// (processing, ready or rejected) once every file of the current submission is decided.
+    /// Called by <c>FileQueueConsumer</c> when a <c>file.uploaded</c> message arrives. The first, short transaction
+    /// exists only so the tenant is set for row-level security (the database rule that limits each query to one tenant's rows).
+    /// </summary>
     public async Task ProcessAsync(FileUploaded message, CancellationToken cancellationToken)
     {
         tenant.Set(message.TenantId);

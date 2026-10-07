@@ -2,6 +2,7 @@ using System.Globalization;
 
 namespace Delios.Host.Documents;
 
+/// <summary>Checks on document titles. Used by <see cref="DocumentService.RegisterAsync"/> to refuse titles that say nothing.</summary>
 public static class Titles
 {
     /// <summary>
@@ -16,10 +17,17 @@ public static class Titles
     }
 }
 
+/// <summary>
+/// The outcome of <see cref="RevisionValues.Next"/>: either the next revision value, or the reason there is none.
+/// Callers use a <c>switch</c> on the case to decide what to answer.
+/// </summary>
 public abstract record NextValue
 {
+    /// <summary>The next revision value to use, such as "B" or "02".</summary>
     public sealed record Value(string Text) : NextValue;
+    /// <summary>The series asked for is not one of the revision scheme's series.</summary>
     public sealed record UnknownSeries(string Series) : NextValue;
+    /// <summary>The scheme only moves forward, and the series asked for comes before the one the document is already in.</summary>
     public sealed record Backwards(string From, string To) : NextValue;
 }
 
@@ -29,6 +37,10 @@ public abstract record NextValue
 /// </summary>
 public static class RevisionValues
 {
+    /// <summary>
+    /// Works out the value the next revision of a document gets, skipping excluded letters and values already used.
+    /// Called by <see cref="DocumentService.StartRevisionAsync"/>.
+    /// </summary>
     /// <param name="existing">The document's revisions so far, oldest first: their series and value.</param>
     /// <param name="series">The series asked for, or null to continue the latest one (or start the first).</param>
     public static NextValue Next(RevisionScheme scheme, IReadOnlyList<(string Series, string Value)> existing, string? series)

@@ -4,6 +4,10 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Delios.Host.Documents;
 
+/// <summary>
+/// The facts a document number can be built from. Which of them are used, and in which order,
+/// is set by the numbering scheme routed to the deliverable type.
+/// </summary>
 public sealed record NumberFields(
     string ProjectCode, string? Subproject, string? Originator, string? ContractRef, string? Discipline, string? DocType,
     string? Sender = null, string? Receiver = null)
@@ -13,10 +17,14 @@ public sealed record NumberFields(
         new(projectCode, null, null, null, null, null, sender, receiver);
 }
 
+/// <summary>The outcome of <see cref="Numbering.AllocateAsync"/>: a number, or the reason none could be built.</summary>
 public abstract record Allocation
 {
+    /// <summary>The number was built and its sequence reserved.</summary>
     public sealed record Allocated(string Number) : Allocation;
+    /// <summary>No active numbering scheme is routed to this deliverable type.</summary>
     public sealed record NoScheme(string DeliverableType) : Allocation;
+    /// <summary>The scheme needs a field that was left empty; <c>Label</c> names it.</summary>
     public sealed record MissingField(string Label) : Allocation;
 }
 
@@ -26,6 +34,10 @@ public abstract record Allocation
 /// </summary>
 public sealed class Numbering(DeliosDbContext db)
 {
+    /// <summary>
+    /// Builds the next number for a new document from the scheme routed to its deliverable type, and reserves it.
+    /// Called by <see cref="DocumentService.RegisterAsync"/> and, for other records, by <see cref="RecordAsync"/>.
+    /// </summary>
     /// <param name="deliverableType">The deliverable type, or a <see cref="RecordKinds"/> value.</param>
     public async Task<Allocation> AllocateAsync(
         Guid tenantId, Guid projectId, string deliverableType, NumberFields fields, CancellationToken cancellationToken)
@@ -72,6 +84,10 @@ public sealed class Numbering(DeliosDbContext db)
             ? number
             : await NextAsync(tenantId, projectId, $"{fields.ProjectCode}-{marker}", "-", 4, cancellationToken);
 
+    /// <summary>
+    /// Takes the next sequence value for a prefix from the <c>number_counters</c> table and formats the full number,
+    /// zero-padded to <paramref name="digits"/>. The counter is created on first use.
+    /// </summary>
     private async Task<string> NextAsync(
         Guid tenantId, Guid projectId, string prefix, string delimiter, int digits, CancellationToken cancellationToken)
     {

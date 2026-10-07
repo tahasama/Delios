@@ -7,8 +7,13 @@ using Microsoft.Extensions.Options;
 
 namespace Delios.Host.Documents;
 
+/// <summary>The virus scanner's answer: whether the file is infected and, if so, the name of what was found.</summary>
 public sealed record ScanResult(bool Infected, string? Signature);
 
+/// <summary>
+/// Something that scans file bytes for viruses. <see cref="ClamAvScanner"/> is the real one; tests can swap in a fake.
+/// Used by <see cref="FileProcessor"/>.
+/// </summary>
 public interface IVirusScanner
 {
     /// <summary>Reads the stream to its end. Throws when the scanner could not decide.</summary>
@@ -18,6 +23,10 @@ public interface IVirusScanner
 /// <summary>Streams the file to clamd with INSTREAM; nothing is written to disk.</summary>
 public sealed class ClamAvScanner(IOptions<ClamAvOptions> options) : IVirusScanner
 {
+    /// <summary>
+    /// Opens a TCP connection to the clamd service, sends the bytes in chunks (each prefixed with its length, ending
+    /// with a zero length), then reads the reply: "... OK" means clean, "... FOUND" means infected; anything else throws.
+    /// </summary>
     public async Task<ScanResult> ScanAsync(Stream content, CancellationToken cancellationToken)
     {
         using var client = new TcpClient();
@@ -62,10 +71,14 @@ public sealed class HashingStream(Stream inner) : Stream
     private readonly byte[] _head = new byte[16];
     private int _headLength;
 
+    /// <summary>How many bytes have been read through the stream so far.</summary>
     public long BytesRead { get; private set; }
+    /// <summary>The first bytes read (up to 16), used by <see cref="FileSniffer"/> to tell the file type.</summary>
     public ReadOnlySpan<byte> Head => _head.AsSpan(0, _headLength);
+    /// <summary>The SHA-256 of everything read so far, as lowercase hexadecimal. Call it after reading to the end.</summary>
     public string Sha256Hex() => Convert.ToHexStringLower(_hash.GetCurrentHash());
 
+    /// <summary>Reads from the inner stream and records what passed through (hash, count, first bytes).</summary>
     public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
     {
         var read = await inner.ReadAsync(buffer, cancellationToken);
@@ -73,6 +86,7 @@ public sealed class HashingStream(Stream inner) : Stream
         return read;
     }
 
+    /// <summary>Reads from the inner stream and records what passed through (hash, count, first bytes).</summary>
     public override int Read(byte[] buffer, int offset, int count)
     {
         var read = inner.Read(buffer, offset, count);
@@ -80,6 +94,7 @@ public sealed class HashingStream(Stream inner) : Stream
         return read;
     }
 
+    /// <summary>Adds the bytes to the hash, keeps them if the first 16 bytes are not yet filled, and counts them.</summary>
     private void Track(ReadOnlySpan<byte> data)
     {
         _hash.AppendData(data);
@@ -97,11 +112,16 @@ public sealed class HashingStream(Stream inner) : Stream
     public override bool CanWrite => false;
     public override long Length => throw new NotSupportedException();
     public override long Position { get => BytesRead; set => throw new NotSupportedException(); }
+    /// <summary>Does nothing: the stream is read-only.</summary>
     public override void Flush() { }
+    /// <summary>Not supported: the stream is read once, from start to end.</summary>
     public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+    /// <summary>Not supported: the stream is read-only.</summary>
     public override void SetLength(long value) => throw new NotSupportedException();
+    /// <summary>Not supported: the stream is read-only.</summary>
     public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
 
+    /// <summary>Releases the hash and closes the inner stream along with this one.</summary>
     protected override void Dispose(bool disposing)
     {
         if (disposing)
@@ -116,6 +136,10 @@ public sealed class HashingStream(Stream inner) : Stream
 /// <summary>What a file is, from its first bytes. The name and declared type can say anything.</summary>
 public static class FileSniffer
 {
+    /// <summary>
+    /// Returns a content type (such as <c>application/pdf</c>) from the file's first bytes, its "magic number",
+    /// or <c>application/octet-stream</c> when none is recognised.
+    /// </summary>
     public static string Detect(ReadOnlySpan<byte> head) => head switch
     {
         [0x25, 0x50, 0x44, 0x46, ..] => "application/pdf",

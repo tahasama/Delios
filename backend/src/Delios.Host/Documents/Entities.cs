@@ -14,18 +14,22 @@ public sealed class ValueEntry
     public required string SetKey { get; set; }
     public required string Code { get; set; }
     public required string Label { get; set; }
+    /// <summary><c>ACTIVE</c> or <c>RETIRED</c>; see <see cref="ValueStatus"/>. Retired values stay on old documents but cannot be chosen.</summary>
     public string Status { get; set; } = ValueStatus.Active;
+    /// <summary>Display order within its set; lower comes first.</summary>
     public int Sort { get; set; }
     /// <summary>What a value means for the system, where it means something: a default flag, a mapping.</summary>
     public JsonDocument? Props { get; set; }
 }
 
+/// <summary>The states a <see cref="ValueEntry"/> can be in.</summary>
 public static class ValueStatus
 {
     public const string Active = "ACTIVE";
     public const string Retired = "RETIRED";
 }
 
+/// <summary>The keys of the value lists the organization controls, as stored in <see cref="ValueEntry.SetKey"/>.</summary>
 public static class ValueSets
 {
     public const string Disciplines = "DISCIPLINES";
@@ -48,9 +52,11 @@ public sealed class NumberingScheme
     public required string Name { get; set; }
     public string Delimiter { get; set; } = "-";
     public bool Active { get; set; } = true;
+    /// <summary>The parts of the number, in order. Stored as JSON inside the scheme's row.</summary>
     public List<SchemeField> Fields { get; set; } = [];
 }
 
+/// <summary>One part of a document number, such as the project code or the sequence. Belongs to a <see cref="NumberingScheme"/>.</summary>
 public sealed class SchemeField
 {
     public required string Label { get; set; }
@@ -62,6 +68,7 @@ public sealed class SchemeField
     public int? Digits { get; set; }
 }
 
+/// <summary>Where a <see cref="SchemeField"/> takes its text from. Read by <see cref="Numbering"/>.</summary>
 public static class FieldSources
 {
     public const string Project = "PROJECT";
@@ -105,9 +112,14 @@ public sealed class NumberCounter
     public Guid TenantId { get; set; }
     public Guid ProjectId { get; set; }
     public required string Prefix { get; set; }
+    /// <summary>The sequence number the next allocation for this prefix will get.</summary>
     public int Next { get; set; }
 }
 
+/// <summary>
+/// A document in the project's register: its number, title, coded facts and state, with its revisions.
+/// Created by <see cref="DocumentService.RegisterAsync"/>; stored in the <c>documents</c> table.
+/// </summary>
 public sealed class Document
 {
     public Guid Id { get; set; } = Guid.CreateVersion7();
@@ -127,6 +139,7 @@ public sealed class Document
     public string? Criticality { get; set; }
     public string? Confidentiality { get; set; }
     public string? RetentionClass { get; set; }
+    /// <summary>Where the document is in its life; see <see cref="DocumentStates"/>.</summary>
     public string State { get; set; } = DocumentStates.Planned;
     /// <summary>DOCUMENT is revised; RECORD is fixed evidence with one revision.</summary>
     public string Kind { get; set; } = DocumentKinds.Document;
@@ -146,9 +159,11 @@ public sealed class Document
     public uint Version { get; set; }
     public List<Revision> Revisions { get; set; } = [];
 
+    /// <summary>The facts that access rules are checked against. Worked out from the properties, not stored.</summary>
     public Identity.DocumentFacts Facts => new(DeliverableType, DocType, Discipline, Criticality, Confidentiality);
 }
 
+/// <summary>The states a <see cref="Document"/> can be in. New documents start as <see cref="Planned"/>.</summary>
 public static class DocumentStates
 {
     public const string Planned = "PLANNED";
@@ -158,12 +173,17 @@ public static class DocumentStates
     public const string Archived = "ARCHIVED";
 }
 
+/// <summary>Whether a register entry is a document that gets revised, or a record kept as fixed evidence.</summary>
 public static class DocumentKinds
 {
     public const string Document = "DOCUMENT";
     public const string Record = "RECORD";
 }
 
+/// <summary>
+/// One issue of a document (rev A, rev B...), with its files and the history of its submissions.
+/// Created by <see cref="DocumentService.StartRevisionAsync"/>; stored in the <c>revisions</c> table.
+/// </summary>
 public sealed class Revision
 {
     public Guid Id { get; set; } = Guid.CreateVersion7();
@@ -174,6 +194,7 @@ public sealed class Revision
     public required string Value { get; set; }
     /// <summary>The code of the series in the document's revision scheme this value belongs to.</summary>
     public required string Series { get; set; }
+    /// <summary>Where the revision is in its life; see <see cref="RevisionStates"/>.</summary>
     public string State { get; set; } = RevisionStates.InPreparation;
     /// <summary>Whether every file has passed scanning: PROCESSING, READY or REJECTED.</summary>
     public string FilesState { get; set; } = FilesStates.Processing;
@@ -181,6 +202,7 @@ public sealed class Revision
     public string? ChangeDescription { get; set; }
     public Guid AuthoredById { get; set; }
     public required string AuthoredByName { get; set; }
+    /// <summary>The party code of the author's organization when the author is from another party; null for our own people.</summary>
     public string? AuthoredByParty { get; set; }
     public Instant CreatedAt { get; set; }
     /// <summary>What the released revision is for (IFC, IFA…), from the organization's status list.</summary>
@@ -199,7 +221,12 @@ public sealed class Revision
     public int Submission { get; set; } = 1;
     /// <summary>Document Control's last outcome on it, from the organization's control outcomes. Not a review verdict.</summary>
     public string? ControlOutcome { get; set; }
+    /// <summary>Every submission so far, oldest first. Stored as JSON inside the revision's row.</summary>
     public List<SubmissionRecord> Submissions { get; set; } = [];
+    /// <summary>
+    /// Optimistic concurrency: Postgres' row version. If two people save the same revision at once,
+    /// the second save fails instead of silently overwriting the first.
+    /// </summary>
     public uint Version { get; set; }
     public List<StoredFile> Files { get; set; } = [];
 }
@@ -221,6 +248,7 @@ public sealed class RevisionScheme
     public List<RevisionSeriesRule> Series { get; set; } = [];
 }
 
+/// <summary>One series of a <see cref="RevisionScheme"/>: how its values look and where they start.</summary>
 public sealed class RevisionSeriesRule
 {
     /// <summary>Stable code stored on each revision: DESIGN, EXECUTION, CLIENT.</summary>
@@ -240,6 +268,7 @@ public sealed class RevisionSeriesRule
     public string[] ExcludedLetters { get; set; } = [];
 }
 
+/// <summary>Whether a revision series counts in letters or in numbers.</summary>
 public static class SeriesKinds
 {
     public const string Letters = "LETTERS";
@@ -262,12 +291,14 @@ public sealed class SubmissionRecord
     public int Number { get; set; }
     public Instant SubmittedAt { get; set; }
     public required string SubmittedByName { get; set; }
+    /// <summary>Document Control's outcome on this submission; null until decided.</summary>
     public string? Outcome { get; set; }
     public string? Note { get; set; }
     public string? DecidedByName { get; set; }
     public Instant? DecidedAt { get; set; }
 }
 
+/// <summary>The states a <see cref="Revision"/> can be in.</summary>
 public static class RevisionStates
 {
     /// <summary>Sent in by another organization; Document Control accepts it before anybody reviews it.</summary>
@@ -286,6 +317,7 @@ public static class RevisionStates
     public static bool InMotion(string state) => state is InPreparation or InReview or Received or Correcting;
 }
 
+/// <summary>Whether a revision's current files have all passed scanning. Set by <see cref="FileProcessor"/>.</summary>
 public static class FilesStates
 {
     public const string Processing = "PROCESSING";
@@ -300,7 +332,9 @@ public sealed class StoredFile
     public Guid TenantId { get; set; }
     public Guid ProjectId { get; set; }
     public Guid DocumentId { get; set; }
+    /// <summary>The revision the file is attached to; null while it is uploaded but not yet used.</summary>
     public Guid? RevisionId { get; set; }
+    /// <summary>Where the bytes are in object storage: tenant id / project id / file id. See <see cref="FileStorage.KeyFor"/>.</summary>
     public required string ObjectKey { get; set; }
     public required string Name { get; set; }
     public required string ContentType { get; set; }
@@ -313,16 +347,20 @@ public sealed class StoredFile
     public Guid? DerivedFromId { get; set; }
     /// <summary>Which submission of its revision it belongs to.</summary>
     public int Submission { get; set; } = 1;
+    /// <summary>Where the file is in upload and scanning; see <see cref="FileStatuses"/>.</summary>
     public string Status { get; set; } = FileStatuses.AwaitingUpload;
     /// <summary>What the bytes are, from their first bytes rather than the name.</summary>
     public string? DetectedType { get; set; }
+    /// <summary>Why the file was rejected or found infected; null otherwise.</summary>
     public string? StatusDetail { get; set; }
     public Guid UploadedById { get; set; }
     public required string UploadedByName { get; set; }
     public Instant CreatedAt { get; set; }
+    /// <summary>When the worker finished checking the file; null until then.</summary>
     public Instant? ScannedAt { get; set; }
 }
 
+/// <summary>What role a <see cref="StoredFile"/> plays for its revision.</summary>
 public static class FileKinds
 {
     public const string Native = "NATIVE";
@@ -335,6 +373,7 @@ public static class FileKinds
     public const string Evidence = "EVIDENCE";
 }
 
+/// <summary>The steps a <see cref="StoredFile"/> goes through: awaiting upload, processing (being scanned), then clean, infected or rejected.</summary>
 public static class FileStatuses
 {
     public const string AwaitingUpload = "AWAITING_UPLOAD";
@@ -351,6 +390,7 @@ public sealed class DocumentAccess
     public Guid TenantId { get; set; }
     public Guid DocumentId { get; set; }
     public Guid UserId { get; set; }
+    /// <summary>The user who gave this person access.</summary>
     public Guid AddedById { get; set; }
     public Instant CreatedAt { get; set; }
 }

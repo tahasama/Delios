@@ -6,8 +6,17 @@ namespace Delios.Host.Documents;
 /// <summary>The rules every upload meets, whatever it is for.</summary>
 public static partial class Uploads
 {
+    /// <summary>
+    /// The upload as the client described it, after cleaning: a safe file name, the content type,
+    /// the SHA-256 in lowercase, and whether it looks like a PDF.
+    /// </summary>
     public sealed record Declared(string Name, string ContentType, string Sha256, bool IsPdf);
 
+    /// <summary>
+    /// Validates what a client says it is about to upload (name, size, checksum) before any upload link is issued.
+    /// Returns the cleaned file description, or a problem response explaining what is wrong.
+    /// Called by <see cref="DocumentService.RequestUploadAsync"/> and by the transmittal upload in <c>TransmittalService</c>.
+    /// </summary>
     public static (Declared? File, IResult? Problem) Check(UploadRequest request, long maxBytes)
     {
         var name = Path.GetFileName(request.FileName?.Replace('\\', '/') ?? "").Trim();
@@ -37,6 +46,10 @@ public static partial class Uploads
         return null;
     }
 
+    /// <summary>
+    /// Matches exactly 64 lowercase hexadecimal characters, the text form of a SHA-256 hash.
+    /// The regular expression code is generated at build time.
+    /// </summary>
     [GeneratedRegex("^[0-9a-f]{64}$")]
     private static partial Regex Sha256Pattern();
 }
