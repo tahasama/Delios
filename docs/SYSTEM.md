@@ -25,13 +25,41 @@ How to switch anything on is in `docs/ACTIVATION.md`.
 | **Search** | Postgres: every word in the number or title, and inside files where reading is on | Ten thousand documents per project answer in milliseconds | Yes | Exact words only (no misspellings, no ranking): enough until projects grow or people ask for more | OpenSearch: ranked, forgiving, falls back to Postgres if down (alerts `RegisterSearchSlow`, `SearchIndexBehind`, `SearchFallingBack`) |
 | **Reading inside files, OCR** | Nothing runs: off by policy (client privacy) | — | On request only | Off until a client asks in writing | Apache Tika with Tesseract, per project: off, on demand, automatic; switching off deletes what was read |
 | **Stamping** | PDFsharp in the worker, fonts embedded | Released PDFs stamped (number, revision, status, date); superseded ones watermarked; originals never changed | Little | A PDF that cannot be opened is recorded once and the release stands | — |
+| **Numbering** | Schemes the organization builds from fields (project, discipline, type, sender, fixed text, sequence…), routed per deliverable type and per record kind (transmittals, reviews, packages) | Every number allocated by the system, never typed, never reused, never changed | Yes: any scheme, any time, as data | A record kind with no scheme still gets a plain number (P1001-TR-0001) so nothing is ever blocked | — |
+| **Revisions** | Revision schemes with series (A, B, C for design; 0, 1, 2 for execution), routed per deliverable type | One current revision per document; corrections Document Control asks for stay under the same revision as numbered submissions | Little | — | — |
+| **Reviews and approvals** | Routes the organization defines: steps by function or by outside party, days allowed, who decides, which statuses each step may grant; verdicts, advice, comment classes and return reasons from its own lists | Every review from submission to release; other organizations either in the app or by proxy, with their answer and proof recorded by Document Control | Yes: more step kinds as clients ask | — | — |
+| **Document Control's check** | Its own list of outcomes (accept, return to sender or initiator, return for a new revision, release), separate from review verdicts | What arrives from outside, and what reaches the release gate | Little | — | — |
+| **Transmittals and issue** | Issue requests, a distribution matrix, transmittal numbering, acknowledgement in the app; for outside parties working in their own systems, dispatch recorded with proof | Every issue, who received what and when, and what is still to send | Yes: e-mail delivery when wanted | Answers are tracked through review steps; a plain transmittal records acknowledgement, not an answer | — |
+| **Packages** | Sets of documents, filled by hand or by a rule, assessed against required statuses, delivered in one transmittal | Handover and construction sets; a shortfall goes only with its acceptance authority's agreement | Little | — | — |
 | **Checks** | 34 checks in the worker, nightly per project and on request | Integrity and coverage scores, a defect register that closes itself | Yes: more checks as modules are added | Only what the register can answer is checked | — |
 | **Schedules** | The schedule as a controlled document; its released Excel or CSV export read into activities by the worker | Activities, what each needs and for what, readiness, waivers, decisions, lateness | Yes: Primavera .xer if a client needs it | Exports only: the file must have an activity code, a name and a start column | — |
 | **Reports** | Five reports counted from the register when opened; CSV (ClosedXML for Excel) | Register status, deliveries, reviews waiting, transmittals, readiness | Yes: more reports, scheduled e-mailing | Counted live on every opening: fine to tens of thousands of documents per project | Reports read from the read replica once it is switched on, so they never slow the primary |
 | **Load balancing** | Caddy in front of the API nodes, HTTPS by itself once a domain is set | Any number of API nodes on one server | Yes | One server | Several servers behind a Hetzner Load Balancer |
 | **Hosting** | Docker Compose on one Hetzner VPS | Everything above | Yes | One server: cheapest, simplest, and enough for a pilot | Several servers; Kubernetes (manifests checked on every push) |
 | **Monitoring** | Prometheus, Alertmanager, Grafana; 25 alert rules, each saying what to do | Knowing a limit is near before people notice | Yes | Alerts go nowhere until a channel is set | Email, Telegram, Slack or webhook (go-live step 7) |
-| **Quality gate** | GitHub Actions: formatting, build, 93 tests against real Postgres, Redis, RabbitMQ and storage; image build, stack start, backup and restore drill, alert rule tests, Kubernetes validation | Every push | Yes | — | — |
+| **Quality gate** | GitHub Actions: formatting, build, 101 tests against real Postgres, Redis, RabbitMQ and storage; image build, stack start, backup and restore drill, alert rule tests, Kubernetes validation | Every push | Yes | — | — |
+
+## The libraries, and what each is for
+
+| Library | What it does here |
+|---|---|
+| ASP.NET Core (Minimal APIs) | Receives HTTP requests and sends answers; each endpoint is a small function mapped to a path |
+| Entity Framework Core + Npgsql | Reads and writes Postgres through C# classes; migrations change the database schema step by step |
+| EFCore.NamingConventions | Turns C# names (`DocumentId`) into Postgres ones (`document_id`) |
+| NodaTime | Dates and times without time-zone mistakes: a day on site is a `LocalDate`, a moment is an `Instant` |
+| RabbitMQ.Client | Sends work to the worker and receives it there |
+| AWSSDK.S3 / Azure.Storage.Blobs | Files in S3-compatible storage (SeaweedFS, Hetzner) or Azure; signed upload and download links |
+| PDFsharp | Stamps released PDFs and watermarks superseded ones |
+| ClosedXML | Reads schedule exports from Excel; writes report exports to Excel |
+| Microsoft.Extensions.Caching (Hybrid, Redis) | The shared cache in Valkey, with a fast copy in each node's memory |
+| DataProtection (stored in Postgres) | Encrypts secrets the app keeps: two-step sign-in keys, single sign-on state |
+| Microsoft.IdentityModel OpenID Connect | Talks to an organization's own sign-in provider for single sign-on |
+| Serilog | Writes logs as structured lines, one per request, readable by tools |
+| prometheus-net | Publishes the numbers the alerts watch |
+| AspNetCore.HealthChecks | Says whether the database and cache answer, for the load balancer and monitoring |
+| Sentry | Reports crashes to a Sentry account; off unless a key is set |
+| OpenAPI | Describes every endpoint at `/api/openapi/v1.json`; the frontend's client is generated from it |
+| xunit + Testcontainers (tests only) | Runs the tests against real Postgres, Valkey, RabbitMQ and storage started in Docker |
 
 ## What the organization decides
 
