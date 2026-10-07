@@ -47,10 +47,20 @@ public sealed class FileQueueConsumer(
     {
         try
         {
-            var message = JsonSerializer.Deserialize<FileUploaded>(delivery.Body.Span)
-                ?? throw new InvalidOperationException("Empty message");
             await using var scope = scopes.CreateAsyncScope();
-            await scope.ServiceProvider.GetRequiredService<FileProcessor>().ProcessAsync(message, stoppingToken);
+            switch (delivery.RoutingKey)
+            {
+                case FileUploaded.RoutingKey:
+                    await scope.ServiceProvider.GetRequiredService<FileProcessor>().ProcessAsync(
+                        Read<FileUploaded>(delivery), stoppingToken);
+                    break;
+                case Reviews.RevisionReleased.RoutingKey:
+                    await scope.ServiceProvider.GetRequiredService<Reviews.Stamping>().ProcessAsync(
+                        Read<Reviews.RevisionReleased>(delivery), stoppingToken);
+                    break;
+                default:
+                    throw new InvalidOperationException($"No handler for {delivery.RoutingKey}");
+            }
             await channel.BasicAckAsync(delivery.DeliveryTag, multiple: false, stoppingToken);
         }
         catch (Exception ex) when (!stoppingToken.IsCancellationRequested)
@@ -78,6 +88,9 @@ public sealed class FileQueueConsumer(
             }
         }
     }
+
+    private static T Read<T>(BasicDeliverEventArgs delivery) =>
+        JsonSerializer.Deserialize<T>(delivery.Body.Span) ?? throw new InvalidOperationException("Empty message");
 
     /// <summary>How many times the message has already been rejected from the files queue.</summary>
     private static int Attempts(IReadOnlyBasicProperties properties)

@@ -56,6 +56,8 @@ public sealed class Project
     public string Status { get; set; } = "ACTIVE";
     /// <summary>IANA time zone of the site. Due dates and working days are counted in it.</summary>
     public string TimeZone { get; set; } = "UTC";
+    /// <summary>The days the site does not work, ISO numbers (1 Monday … 7 Sunday). Due dates skip them.</summary>
+    public int[] WeekendDays { get; set; } = [6, 7];
     public Instant CreatedAt { get; set; }
 }
 

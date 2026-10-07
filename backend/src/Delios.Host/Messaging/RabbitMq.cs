@@ -54,6 +54,9 @@ public static class Topology
     public const int MaxAttempts = 5;
     public static readonly TimeSpan RetryDelay = TimeSpan.FromSeconds(30);
 
+    /// <summary>The kinds of work the files queue carries: scanning uploads, stamping releases.</summary>
+    public static readonly string[] WorkKeys = [Documents.FileUploaded.RoutingKey, Reviews.RevisionReleased.RoutingKey];
+
     public static async Task DeclareAsync(IChannel channel, CancellationToken cancellationToken)
     {
         await channel.ExchangeDeclareAsync(Exchange, ExchangeType.Direct, durable: true, cancellationToken: cancellationToken);
@@ -62,7 +65,10 @@ public static class Topology
         await channel.QueueDeclareAsync(FilesQueue, durable: true, exclusive: false, autoDelete: false,
             arguments: new Dictionary<string, object?> { ["x-dead-letter-exchange"] = RetryExchange },
             cancellationToken: cancellationToken);
-        await channel.QueueBindAsync(FilesQueue, Exchange, Documents.FileUploaded.RoutingKey, cancellationToken: cancellationToken);
+        foreach (var key in WorkKeys)
+        {
+            await channel.QueueBindAsync(FilesQueue, Exchange, key, cancellationToken: cancellationToken);
+        }
 
         await channel.QueueDeclareAsync(FilesRetryQueue, durable: true, exclusive: false, autoDelete: false,
             arguments: new Dictionary<string, object?>
@@ -71,7 +77,10 @@ public static class Topology
                 ["x-dead-letter-exchange"] = Exchange,
             },
             cancellationToken: cancellationToken);
-        await channel.QueueBindAsync(FilesRetryQueue, RetryExchange, Documents.FileUploaded.RoutingKey, cancellationToken: cancellationToken);
+        foreach (var key in WorkKeys)
+        {
+            await channel.QueueBindAsync(FilesRetryQueue, RetryExchange, key, cancellationToken: cancellationToken);
+        }
 
         await channel.QueueDeclareAsync(FilesDeadQueue, durable: true, exclusive: false, autoDelete: false,
             cancellationToken: cancellationToken);

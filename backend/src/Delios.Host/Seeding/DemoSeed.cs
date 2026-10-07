@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Delios.Host.Documents;
 using Delios.Host.Identity;
+using Delios.Host.Reviews;
 using Delios.Host.Platform;
 using Microsoft.EntityFrameworkCore;
 
@@ -10,16 +11,22 @@ namespace Delios.Host.Seeding;
 /// A demo tenant to try the system with: people in each function on one project.
 /// Every password is <c>demo1234</c>. Development only.
 /// </summary>
-public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, ILogger<DemoSeed> logger)
+public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.TenantContext tenantContext, ILogger<DemoSeed> logger)
 {
     public const string Slug = "demo";
     public const string Password = "demo1234";
 
     public async Task RunAsync(CancellationToken cancellationToken = default)
     {
-        if (await db.Tenants.AnyAsync(t => t.Slug == Slug, cancellationToken))
+        if (await db.Tenants.SingleOrDefaultAsync(t => t.Slug == Slug, cancellationToken) is { } existing)
         {
-            logger.LogInformation("The demo tenant already exists; nothing to do");
+            // A demo created by an earlier version gains what it lacks; nothing it has is touched.
+            tenantContext.Set(existing.Id);
+            await using var upgrade = await db.Database.BeginTransactionAsync(cancellationToken);
+            var added = await EnsureReviewSetupAsync(existing.Id, cancellationToken);
+            await db.SaveChangesAsync(cancellationToken);
+            await upgrade.CommitAsync(cancellationToken);
+            logger.LogInformation(added ? "The demo tenant exists; review settings added" : "The demo tenant already exists; nothing to do");
             return;
         }
 
@@ -72,6 +79,7 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, ILogger<Demo
         }
 
         AddConfiguration(t);
+        await EnsureReviewSetupAsync(t, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         logger.LogInformation("Demo tenant '{Slug}' created; every password is {Password}", Slug, Password);
@@ -80,22 +88,7 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, ILogger<Demo
     /// <summary>The published lists and numbering a project needs before its first document.</summary>
     private void AddConfiguration(Guid t)
     {
-        void Set(string key, params (string Code, string Label, object? Props)[] values)
-        {
-            var sort = 0;
-            foreach (var (code, label, props) in values)
-            {
-                db.ValueEntries.Add(new ValueEntry
-                {
-                    TenantId = t,
-                    SetKey = key,
-                    Code = code,
-                    Label = label,
-                    Sort = sort++,
-                    Props = props is null ? null : JsonSerializer.SerializeToDocument(props),
-                });
-            }
-        }
+        void Set(string key, params (string Code, string Label, object? Props)[] values) => AddSet(t, key, values);
 
         Set(ValueSets.Disciplines,
             ("CI", "Civil", null), ("EL", "Electrical", null), ("ME", "Mechanical", null), ("PR", "Process", null),
@@ -171,5 +164,84 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, ILogger<Demo
         db.SchemeRoutings.AddRange(
             new SchemeRouting { TenantId = t, DeliverableType = "ENG", SchemeId = internalScheme.Id },
             new SchemeRouting { TenantId = t, DeliverableType = "SUP", SchemeId = supplierScheme.Id });
+    }
+
+    /// <summary>
+    /// Reviews: what a released revision may be for, what a decider may say, what
+    /// an adviser's comments amount to, a route and the review numbers. The
+    /// recommendation, as data. Adds only what is missing.
+    /// </summary>
+    private async Task<bool> EnsureReviewSetupAsync(Guid t, CancellationToken cancellationToken)
+    {
+        if (await db.ReviewRoutes.AnyAsync(cancellationToken)) return false;
+        void Set(string key, params (string Code, string Label, object? Props)[] values) => AddSet(t, key, values);
+
+        var reviewScheme = new NumberingScheme
+        {
+            TenantId = t,
+            Name = "Reviews",
+            Fields =
+            [
+                new() { Label = "Project code", Source = FieldSources.Project },
+                new() { Label = "Record", Source = FieldSources.Fixed, Value = "RV" },
+                new() { Label = "Sequence", Source = FieldSources.Sequence, Digits = 4 },
+            ],
+        };
+        db.NumberingSchemes.Add(reviewScheme);
+        db.SchemeRoutings.Add(new SchemeRouting { TenantId = t, DeliverableType = RecordKinds.Review, SchemeId = reviewScheme.Id });
+
+        Set(ReviewSets.Statuses,
+            ("IFI", "Issued for information", new { executes = false }),
+            ("IFR", "Issued for review", new { executes = false }),
+            ("IFA", "Issued for approval", new { executes = false }),
+            ("IFC", "Issued for construction", new { executes = true }),
+            ("AFC", "Approved for construction", new { executes = true }));
+        Set(ReviewSets.Verdicts,
+            ("C1", "Accepted", new { proceed = true }),
+            ("C2", "Accepted with comments", new { proceed = true }),
+            ("C3", "Rejected: revise and resubmit", new { proceed = false }),
+            ("C4", "For information only", new { proceed = true }));
+        Set(ReviewSets.Advice,
+            ("NO_COMMENT", "No comment", new { comments = "none" }),
+            ("COMMENTS", "Comments, none blocking", new { comments = "some" }),
+            ("COMMENTS_BLOCKING", "Blocking comments", new { comments = "blocking" }));
+        Set(ReviewSets.CommentClasses,
+            ("BLOCKING", "Class 1: blocking", new { blocking = true }),
+            ("NON_BLOCKING", "Class 2: not blocking", new { blocking = false }));
+        Set(ReviewSets.ReturnReasons,
+            ("WRONG_FILE", "The wrong file was attached", null),
+            ("WRONG_PEOPLE", "The wrong people were on a step", null),
+            ("STEP_SKIPPED", "A step was missed", null),
+            ("ANSWER_IN_ERROR", "An answer was recorded in error", null));
+        db.ReviewRoutes.Add(new ReviewRoute
+        {
+            TenantId = t,
+            Name = "Discipline check, then approval",
+            IsDefault = true,
+            Description = "The discipline engineer checks; the approver decides.",
+            Steps =
+            [
+                new() { Title = "Discipline check", FunctionCode = "ENG", Days = 5 },
+                new() { Title = "Approval", FunctionCode = "APP", Days = 3, GrantsStatuses = ["IFI", "IFR", "IFA", "IFC", "AFC"] },
+            ],
+        });
+        return true;
+    }
+
+    private void AddSet(Guid t, string key, (string Code, string Label, object? Props)[] values)
+    {
+        var sort = 0;
+        foreach (var (code, label, props) in values)
+        {
+            db.ValueEntries.Add(new ValueEntry
+            {
+                TenantId = t,
+                SetKey = key,
+                Code = code,
+                Label = label,
+                Sort = sort++,
+                Props = props is null ? null : JsonSerializer.SerializeToDocument(props),
+            });
+        }
     }
 }

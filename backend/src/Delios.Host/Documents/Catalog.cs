@@ -25,6 +25,14 @@ public sealed class Catalog
             ? value
             : null;
 
+    /// <summary>The first active value whose string property equals the one given.</summary>
+    public string? CodeWhere(string setKey, string prop, string value) =>
+        _sets.TryGetValue(setKey, out var set)
+            ? set.Values.Where(v => v.Status == ValueStatus.Active).OrderBy(v => v.Sort)
+                .FirstOrDefault(v => v.Props?.RootElement.TryGetProperty(prop, out var p) == true
+                    && p.ValueKind == JsonValueKind.String && p.GetString() == value)?.Code
+            : null;
+
     /// <summary>The active value of a set flagged <c>"default": true</c>.</summary>
     public string? DefaultOf(string setKey) =>
         _sets.TryGetValue(setKey, out var set)

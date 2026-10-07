@@ -134,6 +134,15 @@ choice belongs to the organization. Each is data its administrator changes:
   to which, and the words that make a title generic.
 - **What each deliverable type requires** before it can be registered.
 - **Functions and the permission matrix.**
+- **Review routes:** steps in order, each answered by a function's holders on
+  the project (the first answer, or all of them), working days per step, which
+  documents the route serves, and which statuses its deciding step may grant.
+- **Review vocabulary:** the statuses a released revision may carry, the
+  deciding step's verdicts and which of them let a revision proceed, what an
+  adviser's comments amount to, comment classes and which block the release,
+  and the reasons a route may be sent back to a step.
+- **Each project's working week**, which due dates are counted in.
+- **Review numbers**, through the same numbering schemes as documents.
 
 What the Standard itself requires is enforced for everyone: a number is
 allocated by the system and never reused, a revision value is never reused on
@@ -474,6 +483,13 @@ deployment with tenant isolation in the database.
 4. **Workflows, reviews and approvals, release and stamping, transmittals,
    packages.** Release moved here from step 3: a revision is released only
    with its approval.
+   - Done: review routes (internal steps), advice read off comments, the
+     deciding step's verdict and granted status, reservations settled by a
+     later step, Document Control's release or return, rewinding a route to an
+     earlier step, supersession, stamped and SUPERSEDED-watermarked copies made
+     by the worker, the work queue.
+   - Next: issue requests and transmittals, steps answered by outside parties,
+     packages.
 5. **Checks engine, schedules, reports.**
 6. **Next.js moves onto the API**, area by area, through the generated client.
 7. **Content extraction and OCR**, switched off, ready for activation.

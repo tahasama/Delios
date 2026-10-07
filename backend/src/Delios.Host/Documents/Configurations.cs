@@ -125,6 +125,9 @@ internal sealed class RevisionConfiguration : IEntityTypeConfiguration<Revision>
         b.Property(x => x.FilesState).HasMaxLength(16);
         b.Property(x => x.AuthoredByName).HasMaxLength(200);
         b.Property(x => x.AuthoredByParty).HasMaxLength(32);
+        b.Property(x => x.StatusCode).HasMaxLength(64);
+        b.Property(x => x.ReleasedByName).HasMaxLength(200);
+        b.Property(x => x.ReturnedReason).HasMaxLength(2000);
         b.Property(x => x.CreatedAt).HasDefaultValueSql("now()");
         b.Property(x => x.Version).IsRowVersion();
     }
@@ -139,6 +142,7 @@ internal sealed class StoredFileConfiguration : IEntityTypeConfiguration<StoredF
         b.HasIndex(x => x.ObjectKey).IsUnique();
         b.HasIndex(x => x.DocumentId);
         b.HasIndex(x => x.RevisionId);
+        b.HasIndex(x => x.DerivedFromId);
         b.Property(x => x.ObjectKey).HasMaxLength(300);
         b.Property(x => x.Name).HasMaxLength(255);
         b.Property(x => x.ContentType).HasMaxLength(200);

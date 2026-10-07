@@ -67,6 +67,19 @@ public sealed class FileStorage(IAmazonS3 s3, IOptions<StorageOptions> options, 
         }
     }
 
+    /// <summary>Stores a file the system made itself, such as a stamped copy, under a new key.</summary>
+    public async Task PutAsync(string key, byte[] content, string contentType, CancellationToken cancellationToken)
+    {
+        using var body = new MemoryStream(content);
+        await s3.PutObjectAsync(new PutObjectRequest
+        {
+            BucketName = _options.Bucket,
+            Key = key,
+            InputStream = body,
+            ContentType = contentType,
+        }, cancellationToken);
+    }
+
     public async Task<Stream> OpenReadAsync(string key, CancellationToken cancellationToken)
     {
         var response = await s3.GetObjectAsync(_options.Bucket, key, cancellationToken);

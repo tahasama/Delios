@@ -5,7 +5,11 @@ using Microsoft.EntityFrameworkCore;
 namespace Delios.Host.Documents;
 
 public sealed record NumberFields(
-    string ProjectCode, string? Subproject, string? Originator, string? ContractRef, string Discipline, string DocType);
+    string ProjectCode, string? Subproject, string? Originator, string? ContractRef, string? Discipline, string? DocType)
+{
+    /// <summary>For records that are not documents: only the project and fixed fields apply.</summary>
+    public static NumberFields ForRecord(string projectCode) => new(projectCode, null, null, null, null, null);
+}
 
 public abstract record Allocation
 {
@@ -20,6 +24,7 @@ public abstract record Allocation
 /// </summary>
 public sealed class Numbering(DeliosDbContext db)
 {
+    /// <param name="deliverableType">The deliverable type, or a <see cref="RecordKinds"/> value.</param>
     public async Task<Allocation> AllocateAsync(
         Guid tenantId, Guid projectId, string deliverableType, NumberFields fields, CancellationToken cancellationToken)
     {
@@ -40,6 +45,7 @@ public sealed class Numbering(DeliosDbContext db)
                 FieldSources.ContractRef => fields.ContractRef,
                 FieldSources.Discipline => fields.Discipline,
                 FieldSources.DocType => fields.DocType,
+                FieldSources.Fixed => field.Value,
                 _ => null,
             };
             if (string.IsNullOrEmpty(value)) return new Allocation.MissingField(field.Label);

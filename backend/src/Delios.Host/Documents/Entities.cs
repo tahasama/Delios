@@ -56,6 +56,8 @@ public sealed class SchemeField
     public required string Label { get; set; }
     /// <summary>Which fact of the document fills it. See <see cref="FieldSources"/>.</summary>
     public required string Source { get; set; }
+    /// <summary>For a FIXED field: the text it always holds, such as RV for reviews.</summary>
+    public string? Value { get; set; }
     /// <summary>For the sequence: how many digits, zero-padded.</summary>
     public int? Digits { get; set; }
 }
@@ -69,6 +71,17 @@ public static class FieldSources
     public const string Discipline = "DISCIPLINE";
     public const string DocType = "DOC_TYPE";
     public const string Sequence = "SEQUENCE";
+    public const string Fixed = "FIXED";
+}
+
+/// <summary>
+/// Records other than documents that carry a number, routed to a scheme the
+/// same way a deliverable type is. The "@" keeps them apart from deliverable types.
+/// </summary>
+public static class RecordKinds
+{
+    public const string Review = "@REVIEW";
+    public const string Transmittal = "@TRANSMITTAL";
 }
 
 /// <summary>Which scheme numbers which deliverable type.</summary>
@@ -166,6 +179,14 @@ public sealed class Revision
     public required string AuthoredByName { get; set; }
     public string? AuthoredByParty { get; set; }
     public Instant CreatedAt { get; set; }
+    /// <summary>What the released revision is for (IFC, IFA…), from the organization's status list.</summary>
+    public string? StatusCode { get; set; }
+    public Instant? ReleasedAt { get; set; }
+    public string? ReleasedByName { get; set; }
+    public Instant? SupersededAt { get; set; }
+    /// <summary>Sent back to its author: kept as submitted, replaced by the next revision.</summary>
+    public Instant? ReturnedAt { get; set; }
+    public string? ReturnedReason { get; set; }
     public uint Version { get; set; }
     public List<StoredFile> Files { get; set; } = [];
 }
@@ -227,6 +248,8 @@ public static class RevisionStates
     public const string InPreparation = "IN_PREPARATION";
     public const string InReview = "IN_REVIEW";
     public const string Released = "RELEASED";
+    /// <summary>Reviewed and sent back to its author; the next revision replaces it.</summary>
+    public const string Returned = "RETURNED";
     public const string Superseded = "SUPERSEDED";
     public const string Void = "VOID";
 
@@ -255,8 +278,10 @@ public sealed class StoredFile
     public long Size { get; set; }
     /// <summary>SHA-256 the uploader declared, lowercase hex. The worker checks the stored bytes against it.</summary>
     public required string Sha256 { get; set; }
-    /// <summary>NATIVE (editable source) or RENDITION (the PDF people read).</summary>
+    /// <summary>NATIVE (editable source), RENDITION (the PDF people read), or a copy derived from one.</summary>
     public string Kind { get; set; } = FileKinds.Native;
+    /// <summary>For a stamped or watermarked copy: the file it was made from, which is never changed.</summary>
+    public Guid? DerivedFromId { get; set; }
     public string Status { get; set; } = FileStatuses.AwaitingUpload;
     /// <summary>What the bytes are, from their first bytes rather than the name.</summary>
     public string? DetectedType { get; set; }
@@ -271,6 +296,10 @@ public static class FileKinds
 {
     public const string Native = "NATIVE";
     public const string Rendition = "RENDITION";
+    /// <summary>The rendition with the release stamp: number, revision, status, date.</summary>
+    public const string Stamped = "STAMPED";
+    /// <summary>A stamped copy marked SUPERSEDED once a later revision is released.</summary>
+    public const string Superseded = "SUPERSEDED";
 }
 
 public static class FileStatuses

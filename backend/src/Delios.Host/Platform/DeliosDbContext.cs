@@ -2,6 +2,7 @@ using Delios.Host.Audit;
 using Delios.Host.Documents;
 using Delios.Host.Identity;
 using Delios.Host.Messaging;
+using Delios.Host.Reviews;
 using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
@@ -39,6 +40,25 @@ public sealed class DeliosDbContext(DbContextOptions<DeliosDbContext> options)
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
     public DbSet<IdempotencyRecord> IdempotencyRecords => Set<IdempotencyRecord>();
 
-    protected override void OnModelCreating(ModelBuilder modelBuilder) =>
+    public DbSet<ReviewRoute> ReviewRoutes => Set<ReviewRoute>();
+    public DbSet<Review> Reviews => Set<Review>();
+    public DbSet<ReviewStep> ReviewSteps => Set<ReviewStep>();
+    public DbSet<ReviewParticipant> ReviewParticipants => Set<ReviewParticipant>();
+    public DbSet<ReviewComment> ReviewComments => Set<ReviewComment>();
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(DeliosDbContext).Assembly);
+
+        // Every Guid id is made in code (Guid.CreateVersion7), never by the database.
+        // Saying so lets a new row reached through a navigation be inserted rather
+        // than mistaken for an existing one and updated.
+        foreach (var entity in modelBuilder.Model.GetEntityTypes())
+        {
+            if (entity.FindPrimaryKey()?.Properties is [{ ClrType: var type, Name: "Id" } id] && type == typeof(Guid))
+            {
+                id.ValueGenerated = Microsoft.EntityFrameworkCore.Metadata.ValueGenerated.Never;
+            }
+        }
+    }
 }

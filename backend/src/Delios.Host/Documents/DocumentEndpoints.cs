@@ -132,7 +132,8 @@ public static class DocumentEndpoints
 
     private static RevisionView View(Revision r) => new(
         r.Id, r.Value, r.Series, r.State, r.FilesState, r.ReasonForRevision, r.ChangeDescription, r.AuthoredByName,
-        r.CreatedAt.ToDateTimeOffset(),
+        r.CreatedAt.ToDateTimeOffset(), r.StatusCode, r.ReleasedAt?.ToDateTimeOffset(), r.SupersededAt?.ToDateTimeOffset(),
+        r.ReturnedReason,
         r.Files.Select(f => new FileView(f.Id, f.Name, f.Kind, f.ContentType, f.Size, f.Sha256, f.Status,
-            f.StatusDetail, f.DetectedType, f.CreatedAt.ToDateTimeOffset())).ToList());
+            f.StatusDetail, f.DetectedType, f.CreatedAt.ToDateTimeOffset(), f.DerivedFromId)).ToList());
 }

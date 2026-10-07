@@ -16,9 +16,12 @@ public sealed class Infrastructure : IAsyncLifetime
     public RedisContainer Redis { get; } = new RedisBuilder("valkey/valkey:8-alpine").Build();
     public RabbitMqContainer RabbitMq { get; } = new RabbitMqBuilder("rabbitmq:4-management-alpine").Build();
 
-    /// <summary>S3-compatible storage. With no identities configured it accepts any credentials.</summary>
+    /// <summary>S3-compatible storage, with one identity matching the test settings (key "x", secret "x").</summary>
     public IContainer Storage { get; } = new ContainerBuilder("chrislusf/seaweedfs:latest")
-        .WithCommand("server", "-dir=/data", "-s3")
+        .WithResourceMapping(System.Text.Encoding.UTF8.GetBytes(
+            """{"identities":[{"name":"test","credentials":[{"accessKey":"x","secretKey":"x"}],"actions":["Admin","Read","Write","List","Tagging"]}]}"""),
+            "/etc/seaweedfs/s3.json")
+        .WithCommand("server", "-dir=/data", "-s3", "-s3.config=/etc/seaweedfs/s3.json")
         .WithPortBinding(8333, true)
         .WithWaitStrategy(Wait.ForUnixContainer().UntilInternalTcpPortIsAvailable(8333))
         .Build();

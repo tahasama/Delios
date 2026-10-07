@@ -19,11 +19,12 @@ public sealed record DocumentSummary(
 
 public sealed record FileView(
     Guid Id, string Name, string Kind, string ContentType, long Size, string Sha256, string Status,
-    string? StatusDetail, string? DetectedType, DateTimeOffset CreatedAt);
+    string? StatusDetail, string? DetectedType, DateTimeOffset CreatedAt, Guid? DerivedFromId);
 
 public sealed record RevisionView(
     Guid Id, string Value, string Series, string State, string FilesState, string? ReasonForRevision,
-    string? ChangeDescription, string AuthoredByName, DateTimeOffset CreatedAt, IReadOnlyList<FileView> Files);
+    string? ChangeDescription, string AuthoredByName, DateTimeOffset CreatedAt, string? StatusCode,
+    DateTimeOffset? ReleasedAt, DateTimeOffset? SupersededAt, string? ReturnedReason, IReadOnlyList<FileView> Files);
 
 public sealed record DocumentView(
     Guid Id, string Number, string Title, string DeliverableType, string DocType, string Discipline,
