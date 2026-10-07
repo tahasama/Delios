@@ -25,6 +25,7 @@ import {
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { isMigrated } from "@/lib/migrated";
 
 /**
  * Five jobs, then two doors.
@@ -85,7 +86,7 @@ function primaryNav(p: NavPermissions): NavItem[] {
         when: p.canTransmit || p.canControl || p.external,
       },
     ] as NavItem[]
-  ).filter((i) => i.when !== false);
+  ).filter((i) => i.when !== false && isMigrated(i.href));
 }
 
 function moreNav(p: NavPermissions): NavItem[] {
@@ -99,7 +100,7 @@ function moreNav(p: NavPermissions): NavItem[] {
       { href: "/conformance/checks", label: "Assurance", icon: ShieldCheck, also: ["/conformance", "/exposures"], when: p.canControl && !p.external },
       { href: "/import", label: "Import & export", icon: Import, when: (p.canControl || p.canConfigure) && !p.external },
     ] as NavItem[]
-  ).filter((i) => i.when !== false);
+  ).filter((i) => i.when !== false && isMigrated(i.href));
 }
 
 function isActive(pathname: string, item: NavItem) {
@@ -228,7 +229,7 @@ function SidebarBody({ perms, onNavigate, onTip }: { perms: NavPermissions; onNa
       </nav>
 
       <div className="mt-4 space-y-2">
-        {perms.canConfigure ? (
+        {perms.canConfigure && isMigrated("/settings") ? (
           <Link
             href="/settings"
             onClick={onNavigate}
@@ -243,6 +244,7 @@ function SidebarBody({ perms, onNavigate, onTip }: { perms: NavPermissions; onNa
             <Settings className="h-4 w-4 shrink-0" /> <span className="rail:hidden">Settings</span>
           </Link>
         ) : null}
+        {isMigrated("/guide") ? (
         <Link
           href="/guide"
           onClick={onNavigate}
@@ -256,8 +258,9 @@ function SidebarBody({ perms, onNavigate, onTip }: { perms: NavPermissions; onNa
         >
           <BookOpen className="h-4 w-4 shrink-0" /> <span className="rail:hidden">Help &amp; orientation</span>
         </Link>
+        ) : null}
 
-        {perms.canCreate ? (
+        {perms.canCreate && isMigrated("/documents/new") ? (
           <Link
             href="/documents/new"
             onClick={onNavigate}
@@ -389,6 +392,7 @@ export function MobileNav({ perms }: { perms: NavPermissions }) {
 }
 
 export function SearchBox({ className }: { className?: string }) {
+  if (!isMigrated("/documents")) return null;
   return (
     <form action="/documents" className={cn("relative", className)}>
       <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />

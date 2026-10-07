@@ -1,36 +1,24 @@
-import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
-import { jwtVerify } from "jose";
+import { NextResponse, type NextRequest } from "next/server";
+import { isMigrated } from "@/lib/migrated";
 
-const secret = new TextEncoder().encode(process.env.SESSION_SECRET ?? "dev-secret");
-// Registering an organization is the one self-service path, so it must be
-// reachable without a session. Everything else needs one.
-const PUBLIC = ["/login", "/signup", "/_next", "/favicon", "/icon", "/robots.txt"];
-
-export async function middleware(req: NextRequest) {
-  const { pathname } = req.nextUrl;
-  if (PUBLIC.some((p) => pathname.startsWith(p))) {
-    return NextResponse.next();
+/**
+ * Before every page: no session cookie, off to sign in; a screen not yet on the
+ * new backend, back home. Whether the session is still valid is the backend's
+ * answer, checked by each page.
+ */
+export function middleware(request: NextRequest) {
+  const { pathname, search } = request.nextUrl;
+  const signedIn = request.cookies.has("delios_session");
+  if (!signedIn && pathname !== "/login") {
+    const login = new URL("/login", request.url);
+    if (pathname !== "/") login.searchParams.set("next", pathname + search);
+    return NextResponse.redirect(login);
   }
-  const token = req.cookies.get("edms_session")?.value;
-  let valid = false;
-  if (token) {
-    try {
-      await jwtVerify(token, secret);
-      valid = true;
-    } catch {
-      valid = false;
-    }
-  }
-  if (!valid) {
-    const url = req.nextUrl.clone();
-    url.pathname = "/login";
-    url.searchParams.set("next", pathname);
-    return NextResponse.redirect(url);
-  }
+  if (!isMigrated(pathname)) return NextResponse.redirect(new URL("/", request.url));
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: ["/((?!api/auth).*)"],
+  // Pages only: not Next's own files, images or the app's icons.
+  matcher: ["/((?!_next/|favicon|icon|apple-icon|.*\\.(?:png|jpg|svg|ico|css|js|woff2?)$).*)"],
 };

@@ -2,10 +2,9 @@
   "name": "delios-edms",
   "version": "1.0.0",
   "private": true,
-  "description": "Internal EDMS implementing the Document Management Standard (Rules · Routes · Checks), multi-project",
+  "description": "Internal EDMS implementing the Document Management Standard (Rules \u00b7 Routes \u00b7 Checks), multi-project",
   "scripts": {
     "postinstall": "prisma generate",
-    "predev": "prisma migrate deploy && prisma generate",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
