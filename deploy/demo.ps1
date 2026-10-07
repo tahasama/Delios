@@ -9,6 +9,15 @@ param(
     [string]$Password = 'demo1234'
 )
 $ErrorActionPreference = 'Stop'
+try { Invoke-WebRequest -Uri "$Api/api/me" -UseBasicParsing -ErrorAction Stop | Out-Null }
+catch {
+    if (-not $_.Exception.Response) {
+        Write-Host "Nothing answers at $Api. Start the backend first:" -ForegroundColor Yellow
+        Write-Host '  docker compose -f deploy/compose.yaml --profile app up -d --build'
+        Write-Host '  docker compose -f deploy/compose.yaml ps        (api and worker should say healthy)'
+        exit 1
+    }
+}
 $session = New-Object Microsoft.PowerShell.Commands.WebRequestSession
 function Step($text) { Write-Host "`n== $text" -ForegroundColor Cyan }
 function Call($method, $path, $body) {
@@ -33,11 +42,12 @@ Write-Host "$($doc.number)  $($doc.title)  state $($doc.state)"
 
 Step 'Upload a PDF straight to storage'
 $bytes = [System.Text.Encoding]::ASCII.GetBytes("%PDF-1.7`n$title`n%%EOF`n")
-$sha = -join ([System.Security.Cryptography.SHA256]::HashData($bytes) | ForEach-Object { $_.ToString('x2') })
+$hasher = [System.Security.Cryptography.SHA256]::Create()
+$sha = -join ($hasher.ComputeHash($bytes) | ForEach-Object { $_.ToString('x2') })
 $ticket = Call POST "/api/projects/$($project.id)/documents/$($doc.id)/uploads" @{
     fileName = 'GA.pdf'; size = $bytes.Length; contentType = 'application/pdf'; sha256 = $sha
 }
-Invoke-RestMethod -Method PUT -Uri $ticket.url -Body $bytes -ContentType 'application/pdf' | Out-Null
+Invoke-WebRequest -Method PUT -Uri $ticket.url -Body $bytes -ContentType 'application/pdf' -UseBasicParsing | Out-Null
 Write-Host "Stored as file $($ticket.fileId)"
 
 Step 'Start revision A with that file'
@@ -54,8 +64,10 @@ Write-Host "Revision $($current.value): files $($current.filesState); $($file.na
 
 Step 'Download it back'
 $link = Call GET "/api/projects/$($project.id)/files/$($ticket.fileId)/download"
-$back = (Invoke-WebRequest -Uri $link.url -UseBasicParsing).Content
-$same = [System.Text.Encoding]::ASCII.GetString($bytes) -eq [System.Text.Encoding]::ASCII.GetString($back)
+$saved = Join-Path ([System.IO.Path]::GetTempPath()) 'delios-demo.pdf'
+Invoke-WebRequest -Uri $link.url -OutFile $saved -UseBasicParsing
+$back = [System.IO.File]::ReadAllBytes($saved)
+$same = [System.Linq.Enumerable]::SequenceEqual([byte[]]$bytes, [byte[]]$back)
 Write-Host "Downloaded $($back.Length) bytes; identical to the upload: $same"
 
 Step 'The register'

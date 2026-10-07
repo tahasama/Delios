@@ -10,8 +10,11 @@ $envFile = Join-Path $PSScriptRoot '.env'
 
 function New-Secret {
     $chars = [char[]]'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
-    $bytes = [byte[]]::new(32)
-    [System.Security.Cryptography.RandomNumberGenerator]::Fill($bytes)
+    # Works in Windows PowerShell 5.1 as well as PowerShell 7.
+    $bytes = New-Object byte[] 32
+    $rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+    $rng.GetBytes($bytes)
+    $rng.Dispose()
     -join ($bytes | ForEach-Object { $chars[$_ % $chars.Length] })
 }
 
