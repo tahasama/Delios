@@ -61,7 +61,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
     actions: r.activities,
     docState: r.state, docStateLabel: DOCUMENT_STATES[r.state]?.label ?? r.state,
     revision: r.revision, revState: r.revisionState ?? "NONE", revStateLabel: REVISION_STATES[r.revisionState ?? "NONE"]?.label ?? r.revisionState ?? "",
-    verdict: r.verdict, verdictLabel: label("VERDICTS", r.verdict),
+    verdict: r.verdict, verdictLabel: label("REVIEW_OUTCOMES", r.verdict),
     releasedFor: r.releasedStatus, releasedForLabel: label("STATUSES", r.releasedStatus), releasedForUse: r.releasedStatus ? statusUse(r.releasedStatus) : null,
     proposedFor: r.proposedStatus, onHold: null,
     createdDate: r.createdAt, updatedAt: r.updatedAt, plannedSubmissionDate: r.plannedDate, issueDate: r.issuedAt, releasedAt: r.releasedAt,
@@ -74,7 +74,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
   // What each code means, for the hover note on the code itself: from the organization's own lists.
   const codes: Record<string, string> = {};
   for (const v of list("STATUSES")) codes[`STATUS|${v.code}`] = `${v.code}: ${v.label}${statusUse(v.code) ? `\n${statusUse(v.code)}` : ""}`;
-  for (const v of list("VERDICTS")) codes[`VERDICT|${v.code}`] = `${v.code}: ${v.label}`;
+  for (const v of list("REVIEW_OUTCOMES")) codes[`VERDICT|${v.code}`] = `${v.code}: ${v.label}`;
   for (const v of list("CRITICALITY")) {
     codes[`CRITICALITY|${v.code}`] = `${v.label}${typeof v.props?.retention === "string" ? `\nKept for: ${String(v.props.retention).replaceAll("_", " ").toLowerCase()}` : ""}`;
     codes[`CRITICALITY_SHORT|${v.code}`] = v.label.toLowerCase();
@@ -119,7 +119,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
           states: Object.entries(DOCUMENT_STATES).map(([code, s]) => ({ code, label: s.label })),
           revStates: Object.entries(REVISION_STATES).map(([code, s]) => ({ code, label: s.label })),
           statuses: list("STATUSES").map((v) => ({ code: v.code, label: `${v.code}: ${v.label}` })),
-          verdicts: list("VERDICTS").map((v) => ({ code: v.code, label: `${v.code}: ${v.label}` })),
+          verdicts: list("REVIEW_OUTCOMES").map((v) => ({ code: v.code, label: `${v.code}: ${v.label}` })),
           suppliers: register.lists.parties.map((p) => ({ code: p.code, label: p.name })),
           pos: [],
           disciplines: opts("DISCIPLINES", register.lists.usedDisciplines),

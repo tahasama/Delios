@@ -1009,6 +1009,19 @@ public sealed class ReviewService(
         ProjectAccess.OfFunction(project, function).Allows(verb, facts);
 
     /// <summary>The review's step that is open now, or null when none is.</summary>
+    /// <summary>What the caller may do on this review now: answer the open step, act as Document Control on it.</summary>
+    public sealed record ReviewMe(bool Seated, bool Answered, bool Control);
+
+    /// <summary>For the review page: whether the caller sits on the open step (and has answered), and whether they act for Document Control. Null when they cannot see it.</summary>
+    public async Task<ReviewMe?> MeAsync(ProjectAccess access, Guid reviewId, CancellationToken cancellationToken)
+    {
+        var review = await LoadAsync(access, reviewId, cancellationToken);
+        if (review is null) return null;
+        var step = OpenStep(review);
+        var seat = step?.Participants.FirstOrDefault(p => p.UserId == access.UserId);
+        return new ReviewMe(seat is not null, seat?.AnsweredAt is not null, await MayActForControlAsync(access, review, cancellationToken));
+    }
+
     private static ReviewStep? OpenStep(Review review) => review.Steps.SingleOrDefault(s => s.State == StepStates.Open);
     /// <summary>Whether the user is one of the people answering the step.</summary>
     private static bool IsSeated(ReviewStep step, Guid userId) => step.Participants.Any(p => p.UserId == userId);

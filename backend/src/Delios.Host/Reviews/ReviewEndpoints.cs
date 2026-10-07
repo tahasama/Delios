@@ -47,6 +47,7 @@ public static class ReviewEndpoints
         project.MapGet("/documents/{documentId:guid}/routes", RoutesAsync);
         project.MapPost("/revisions/{revisionId:guid}/reviews", StartAsync).AddEndpointFilter<IdempotencyFilter>();
         project.MapGet("/reviews/{reviewId:guid}", GetAsync);
+        project.MapGet("/reviews/{reviewId:guid}/me", MeAsync);
         project.MapPost("/reviews/{reviewId:guid}/comments", CommentAsync);
         project.MapPost("/reviews/{reviewId:guid}/comments/{commentId:guid}/close", CloseCommentAsync);
         project.MapPost("/reviews/{reviewId:guid}/answer", AnswerAsync);
@@ -85,6 +86,11 @@ public static class ReviewEndpoints
     }
 
     /// <summary>GET <c>/reviews/{reviewId}</c>: one review with its steps and comments, or 404.</summary>
+    /// <summary><c>GET /reviews/{reviewId}/me</c>: what the caller may do on this review now.</summary>
+    private static async Task<IResult> MeAsync(Guid reviewId, HttpContext http, ReviewService reviews, CancellationToken cancellationToken) =>
+        await reviews.MeAsync(ProjectAccessFilter.Of(http), reviewId, cancellationToken) is { } me
+            ? Results.Ok(me) : Problems.NotFound("REVIEW_NOT_FOUND", "No such review.");
+
     private static async Task<IResult> GetAsync(Guid reviewId, HttpContext http, ReviewService reviews, CancellationToken cancellationToken)
     {
         var review = await reviews.ReadAsync(ProjectAccessFilter.Of(http), reviewId, cancellationToken);

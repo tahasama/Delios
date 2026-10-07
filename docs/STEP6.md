@@ -28,7 +28,12 @@ Each area: the screens, then any backend functions they need that do not exist y
       Document Control's check on arrival, sending for review.
       Not carried over (old-prototype ideas with no backend yet): phases, purchase
       orders, "on hold", assets, document relationships, legal hold, reader grants.
-- [ ] **Reviews**: list, a review (answer, comments, verdict, release, return), send for review.
+- [x] **Reviews**: the list (filters, sorting, page numbers, export), a review
+      (the route step by step, comments and settling them, advice, verdict,
+      another organization's answer recorded by Document Control with proof,
+      release, sending back to the author or to a step, sending the route back),
+      sending several revisions for review at once.
+      Not carried over: delegating a step, review "kinds", automatic late warnings.
 - [ ] **Transmittals**: log, a transmittal, issue requests, sending, acknowledging, dispatch by proxy.
 - [ ] **Packages**
 - [ ] **Schedule and activities**: the schedule document, activities, needs, waivers, decisions, lateness.
@@ -47,4 +52,6 @@ Each area: the screens, then any backend functions they need that do not exist y
       backend or dropped, decided with the owner when its turn comes.
 - [ ] **Registering a new organization** (signup and first setup).
 - [ ] **The end**: the old Prisma code and database removed; the frontend runs in
-      Docker Compose beside the backend, behind the same address.
+      Docker Compose beside the backend, behind the same address, with the proxy
+      passing each person's address through (so the sign-in limit counts people,
+      not the frontend server).

@@ -81,6 +81,21 @@ public sealed class RegisterQueryTests(Infrastructure infrastructure) : IClassFi
         using (var hidden = await supplier.GetAsync($"{p}/documents/{released.Document}/context"))
             Assert.Equal(HttpStatusCode.NotFound, hidden.StatusCode);
 
+        // The reviews list: the released one is closed; a new one waits on the engineer.
+        var waiting = await Flow.RevisionAsync(engineer, (await Api.RegisterAsync(engineer, released.Project, Api.Drawing("Screen house plan"))).GetProperty("id").GetGuid());
+        var (_, started) = await Flow.PostAsync(engineer, $"{p}/revisions/{waiting.Revision}/reviews", new { });
+        var me = await GetAsync(engineer, $"{p}/reviews/{started.GetProperty("id").GetGuid()}/me");
+        Assert.Equal((true, false, false), (me.GetProperty("seated").GetBoolean(), me.GetProperty("answered").GetBoolean(), me.GetProperty("control").GetBoolean()));
+        Assert.True((await GetAsync(controller, $"{p}/reviews/{started.GetProperty("id").GetGuid()}/me")).GetProperty("control").GetBoolean());
+        var reviews = await GetAsync(engineer, $"{p}/reviews");
+        Assert.Equal(2, reviews.GetProperty("total").GetInt32());
+        var closed = (await GetAsync(engineer, $"{p}/reviews?status=CLOSED")).GetProperty("rows").EnumerateArray().Single();
+        Assert.Equal(("C1", "IFC", "Approver"), (closed.GetProperty("verdict").GetString(), closed.GetProperty("grantedStatus").GetString(), closed.GetProperty("decidedBy").GetString()));
+        var open = (await GetAsync(engineer, $"{p}/reviews?status=OPEN&q=screen house")).GetProperty("rows").EnumerateArray().Single();
+        Assert.Equal(("Eli Engineer", false), (open.GetProperty("reviewers")[0].GetProperty("name").GetString(), open.GetProperty("reviewers")[0].GetProperty("done").GetBoolean()));
+        Assert.Equal(2, Encoding.UTF8.GetString(await engineer.GetByteArrayAsync($"{p}/reviews/export?status=OPEN"))
+            .TrimStart('\uFEFF').ReplaceLineEndings("\n").Split('\n', StringSplitOptions.RemoveEmptyEntries).Length - 1);
+
         // The export carries the same rows.
         var csv = Encoding.UTF8.GetString(await engineer.GetByteArrayAsync($"{p}/register/export?format=csv&discipline=EL"));
         var lines = csv.TrimStart('﻿').ReplaceLineEndings("\n").Split('\n', StringSplitOptions.RemoveEmptyEntries);

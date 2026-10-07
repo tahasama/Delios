@@ -43,7 +43,7 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
   const [context, lists] = await Promise.all([
     api<DocumentContext>(projectPath(session, `/documents/${id}/context`)),
     api<Record<string, ListValue[]>>("/api/values", {
-      query: { sets: "DISCIPLINES,DOCUMENT_TYPES,DELIVERABLE_TYPES,CRITICALITY,CONFIDENTIALITY,RETENTION_CLASSES,STATUSES,VERDICTS,CONTROL_OUTCOMES,REASONS_FOR_ISSUE" },
+      query: { sets: "DISCIPLINES,DOCUMENT_TYPES,DELIVERABLE_TYPES,CRITICALITY,CONFIDENTIALITY,RETENTION_CLASSES,STATUSES,REVIEW_OUTCOMES,CONTROL_OUTCOMES,REASONS_FOR_ISSUE" },
     }),
   ]);
   const label = (set: string, code: string | null) => (code ? lists[set]?.find((v) => v.code === code)?.label ?? code : "—");

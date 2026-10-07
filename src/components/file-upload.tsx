@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Upload } from "lucide-react";
-import { requestUploadAction } from "@/lib/actions/document-acts";
+import { requestUploadAction, type UploadTarget } from "@/lib/actions/document-acts";
 import { btn } from "@/components/ui";
 
 /** The file's SHA-256 fingerprint, in hexadecimal: the backend checks the stored bytes against it. */
@@ -16,8 +16,9 @@ async function fingerprint(file: File): Promise<string> {
  * a short-lived upload link after checking its name, size and fingerprint; the
  * browser sends the bytes there. Then `onUploaded` receives the files' ids.
  */
-export function FileUpload({ documentId, label, onUploaded }: {
-  documentId: string;
+export function FileUpload({ target, label, onUploaded, multiple = true }: {
+  target: UploadTarget;
+  multiple?: boolean;
   label: string;
   onUploaded: (fileIds: string[]) => Promise<string | null>;
 }) {
@@ -32,7 +33,7 @@ export function FileUpload({ documentId, label, onUploaded }: {
       for (const [i, file] of files.entries()) {
         setBusy(`Checking ${file.name} (${i + 1} of ${files.length})…`);
         const sha256 = await fingerprint(file);
-        const asked = await requestUploadAction(documentId, { fileName: file.name, size: file.size, contentType: file.type || "application/octet-stream", sha256 });
+        const asked = await requestUploadAction(target, { fileName: file.name, size: file.size, contentType: file.type || "application/octet-stream", sha256 });
         if (!asked.ok) throw new Error(`${file.name}: ${asked.message}`);
         setBusy(`Uploading ${file.name} (${i + 1} of ${files.length})…`);
         const sent = await fetch(asked.ticket.url, { method: asked.ticket.method, headers: asked.ticket.headers, body: file });
@@ -52,7 +53,7 @@ export function FileUpload({ documentId, label, onUploaded }: {
 
   return (
     <div className="space-y-2">
-      <input type="file" multiple onChange={(e) => setFiles(Array.from(e.target.files ?? []))} className="block w-full text-xs text-slate-600 file:mr-3 file:rounded file:border-0 file:bg-tint file:px-3 file:py-1.5 file:text-xs file:font-semibold" />
+      <input type="file" multiple={multiple} onChange={(e) => setFiles(Array.from(e.target.files ?? []))} className="block w-full text-xs text-slate-600 file:mr-3 file:rounded file:border-0 file:bg-tint file:px-3 file:py-1.5 file:text-xs file:font-semibold" />
       {files.length ? <p className="text-[11px] text-slate-500">{files.map((f) => f.name).join(", ")}</p> : null}
       {error ? <p role="alert" className="rounded bg-red-50 px-3 py-2 text-xs text-red-700">{error}</p> : null}
       <button type="button" disabled={!files.length || !!busy} onClick={send} className={btn("primary", "sm")}>

@@ -127,3 +127,33 @@ export type DocumentContext = {
 
 /** GET /documents/{id}/routes (ReviewEndpoints RouteView). */
 export type RouteView = { id: string; name: string; description: string | null; isDefault: boolean; steps: { title: string }[] };
+
+/** GET /reviews (ReviewList.cs). */
+export type ReviewsPage = { total: number; page: number; pages: number; per: number; sizes: number[]; rows: ReviewListRow[] };
+
+export type ReviewListRow = {
+  id: string; number: string; documentId: string; documentNumber: string; title: string; revision: string; routeName: string;
+  state: string; open: boolean; currentStep: number | null; stepTitle: string | null; verdict: string | null; grantedStatus: string | null;
+  decidedBy: string | null; reviewers: { name: string; done: boolean }[]; dueDate: string | null; routeDueDate: string | null;
+  startedAt: string; startedBy: string; closedAt: string | null; discipline: string; docType: string; deliverableType: string;
+  originator: string | null; contractRef: string | null; receivedAt: string | null;
+  comments: { by: string; text: string; blocking: boolean; settled: boolean }[];
+};
+
+/** GET /reviews/{id} (ReviewEndpoints ReviewView). */
+export type ReviewView = {
+  id: string; number: string; documentId: string; revisionId: string; route: string; state: string; currentStep: number | null;
+  verdict: string | null; grantedStatus: string | null; startedBy: string; startedAt: string; decidedAt: string | null;
+  closedAt: string | null; closedBy: string | null; returnNote: string | null;
+  steps: {
+    number: number; title: string; function: string | null; party: string | null; participation: string | null; mode: string;
+    deciding: boolean; state: string; dueDate: string | null; answer: string | null; grantsStatuses: string[];
+    participants: { name: string; answer: string | null; grantedStatus: string | null; note: string | null; answeredAt: string | null }[];
+    transmittalId: string | null; dispatchedAt: string | null; dispatchChannel: string | null; dispatchRef: string | null;
+    dispatchedBy: string | null; foreignAnswer: string | null; recordedBy: string | null; evidenceFileId: string | null;
+  }[];
+  comments: { id: string; step: number; author: string; text: string; class: string; blocking: boolean; closesWith: string; closesWithStep: number | null; status: string; resolution: string | null; closedBy: string | null; createdAt: string }[];
+};
+
+/** GET /reviews/{id}/me. */
+export type ReviewMe = { seated: boolean; answered: boolean; control: boolean };

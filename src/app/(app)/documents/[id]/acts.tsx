@@ -28,7 +28,7 @@ export function StartRevision({ documentId, first }: { documentId: string; first
           <input className={inputCls} placeholder="What changed" value={change} onChange={(e) => setChange(e.target.value)} />
         </>
       ) : null}
-      <FileUpload documentId={documentId} label={first ? "Upload and start the first revision" : "Upload and start the next revision"}
+      <FileUpload target={{ documentId }} label={first ? "Upload and start the first revision" : "Upload and start the next revision"}
         onUploaded={async (ids) => {
           const r = await startRevisionAction(documentId, ids, reason, change);
           if (!r.ok) return r.message;
@@ -45,7 +45,7 @@ export function StartRevision({ documentId, first }: { documentId: string; first
 export function Resubmit({ documentId, revisionId }: { documentId: string; revisionId: string }) {
   const router = useRouter();
   return (
-    <FileUpload documentId={documentId} label="Upload the corrected files"
+    <FileUpload target={{ documentId }} label="Upload the corrected files"
       onUploaded={async (ids) => {
         const r = await resubmitAction(documentId, revisionId, ids);
         if (!r.ok) return r.message;
