@@ -29,6 +29,10 @@ public interface IObjectStore
     Task<Stream> OpenReadAsync(string key, CancellationToken cancellationToken);
     /// <summary>True when the store answers and the bucket or container exists. Used by the health check.</summary>
     Task<bool> ReachableAsync(CancellationToken cancellationToken);
+    /// <summary>Copies one object to another key inside the storage, without the bytes passing through the application.</summary>
+    Task CopyAsync(string from, string to, CancellationToken cancellationToken);
+    /// <summary>Deletes an object; nothing happens if it is not there.</summary>
+    Task DeleteAsync(string key, CancellationToken cancellationToken);
 }
 
 /// <summary>
@@ -46,9 +50,39 @@ public sealed class FileStorage(IObjectStore store, IClock clock)
     /// <summary>The object key for a new file: tenant id, project id and file id joined by "/". Each file gets its own key.</summary>
     public static string KeyFor(Guid tenantId, Guid projectId, Guid fileId) => $"{tenantId}/{projectId}/{fileId}";
 
-    /// <summary>A signed upload link for the key, valid for <see cref="UploadWindow"/>. Called by <see cref="DocumentService.RequestUploadAsync"/>.</summary>
+    /// <summary>
+    /// Where a browser uploads a file before it is scanned. The upload link writes
+    /// here, never to the file's own key: a link can be used again until it
+    /// expires, so the bytes people later download must sit where no link reaches.
+    /// </summary>
+    public static string IncomingKey(string key) => $"incoming/{key}";
+
+    /// <summary>A signed upload link for the key's incoming place, valid for <see cref="UploadWindow"/>. Called by <see cref="DocumentService.RequestUploadAsync"/>.</summary>
     public SignedLink PresignUpload(string key, string contentType) =>
-        store.SignUpload(key, contentType, clock.GetCurrentInstant() + UploadWindow);
+        store.SignUpload(IncomingKey(key), contentType, clock.GetCurrentInstant() + UploadWindow);
+
+    /// <summary>The size of what was uploaded for this key: still incoming, or already kept. Null when nothing arrived.</summary>
+    public async Task<long?> UploadedSizeAsync(string key, CancellationToken cancellationToken) =>
+        await store.SizeAsync(IncomingKey(key), cancellationToken) ?? await store.SizeAsync(key, cancellationToken);
+
+    /// <summary>
+    /// Moves an upload from its incoming place to the file's own key, which no
+    /// upload link can write, before it is scanned. What is scanned is then exactly
+    /// what is served. Called by the worker's file processing; safe to repeat.
+    /// </summary>
+    public async Task KeepAsync(string key, CancellationToken cancellationToken)
+    {
+        var incoming = IncomingKey(key);
+        if (await store.SizeAsync(incoming, cancellationToken) is not null)
+        {
+            await store.CopyAsync(incoming, key, cancellationToken);
+            await store.DeleteAsync(incoming, cancellationToken);
+        }
+        else if (await store.SizeAsync(key, cancellationToken) is null)
+        {
+            throw new InvalidOperationException($"Nothing was uploaded for {key}.");
+        }
+    }
 
     /// <summary>A signed download link for the key, valid for <see cref="DownloadWindow"/>, and when it expires.</summary>
     public (string Url, Instant ExpiresAt) PresignDownload(string key, string fileName)
@@ -146,6 +180,20 @@ public sealed class S3ObjectStore(IAmazonS3 s3, IOptions<StorageOptions> options
     public Task<bool> ReachableAsync(CancellationToken cancellationToken) =>
         Amazon.S3.Util.AmazonS3Util.DoesS3BucketExistV2Async(s3, _options.Bucket);
 
+    /// <summary>A server-side copy (files are at most 2 GB, inside the 5 GB a single copy allows).</summary>
+    public async Task CopyAsync(string from, string to, CancellationToken cancellationToken) =>
+        await s3.CopyObjectAsync(new CopyObjectRequest
+        {
+            SourceBucket = _options.Bucket,
+            SourceKey = from,
+            DestinationBucket = _options.Bucket,
+            DestinationKey = to,
+        }, cancellationToken);
+
+    /// <summary>Deletes an object; S3 answers the same whether it was there or not.</summary>
+    public async Task DeleteAsync(string key, CancellationToken cancellationToken) =>
+        await s3.DeleteObjectAsync(_options.Bucket, key, cancellationToken);
+
     /// <summary>HTTP or HTTPS, from how the endpoint address starts.</summary>
     private static Amazon.S3.Protocol Protocol(string endpoint) =>
         endpoint.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ? Amazon.S3.Protocol.HTTP : Amazon.S3.Protocol.HTTPS;
@@ -235,6 +283,26 @@ public sealed class AzureObjectStore(IOptions<StorageOptions> options) : IObject
     /// <summary>True when the configured container exists and answers.</summary>
     public async Task<bool> ReachableAsync(CancellationToken cancellationToken) =>
         (await Container.ExistsAsync(cancellationToken)).Value;
+
+    /// <summary>
+    /// Copies by streaming the blob through the worker, keeping its content type.
+    /// One extra read of each upload; it works the same on Azure and on its emulator,
+    /// which cannot fetch its own copy links.
+    /// </summary>
+    public async Task CopyAsync(string from, string to, CancellationToken cancellationToken)
+    {
+        var source = Container.GetBlobClient(from);
+        var properties = (await source.GetPropertiesAsync(cancellationToken: cancellationToken)).Value;
+        await using var content = await source.OpenReadAsync(cancellationToken: cancellationToken);
+        await Container.GetBlobClient(to).UploadAsync(content, new BlobUploadOptions
+        {
+            HttpHeaders = new BlobHttpHeaders { ContentType = properties.ContentType },
+        }, cancellationToken);
+    }
+
+    /// <summary>Deletes a blob if it is there.</summary>
+    public async Task DeleteAsync(string key, CancellationToken cancellationToken) =>
+        await Container.GetBlobClient(key).DeleteIfExistsAsync(cancellationToken: cancellationToken);
 
     /// <summary>The address the browser uses, where it differs from the app's (a local emulator in Docker).</summary>
     private string Public(Uri signed)

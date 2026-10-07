@@ -53,6 +53,8 @@ public sealed class FileProcessor(
         ScanResult scan;
         string sha256, detected;
         long size;
+        // First out of reach of the upload link, then scanned there: what is scanned is what is served.
+        await storage.KeepAsync(file.ObjectKey, cancellationToken);
         await using (var content = new HashingStream(await storage.OpenReadAsync(file.ObjectKey, cancellationToken)))
         {
             scan = await scanner.ScanAsync(content, cancellationToken);

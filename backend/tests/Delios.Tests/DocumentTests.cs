@@ -329,6 +329,38 @@ public sealed class RevisionTests(Infrastructure infrastructure) : IClassFixture
     }
 
     [Fact]
+    public async Task Reusing_an_upload_link_after_the_scan_cannot_change_what_is_downloaded()
+    {
+        await using var app = await TestApp.StartAsync(infrastructure);
+        app.StartWorker();
+        var client = await app.SignedInAsync("engineer@demo.local");
+        var project = await Api.ProjectIdAsync(client);
+        var doc = (await Api.RegisterAsync(client, project, Api.Drawing())).GetProperty("id").GetGuid();
+        using var requested = await client.PostAsJsonAsync($"/api/projects/{project}/documents/{doc}/uploads", new
+        {
+            fileName = "GA.pdf",
+            size = Pdf.Length,
+            contentType = "application/pdf",
+            sha256 = Convert.ToHexStringLower(SHA256.HashData(Pdf)),
+        });
+        var ticket = await requested.Content.ReadFromJsonAsync<JsonElement>();
+        await Flow.PutAsync(ticket, Pdf);
+        var fileId = ticket.GetProperty("fileId").GetGuid();
+        using (var started = await client.PostAsJsonAsync($"/api/projects/{project}/documents/{doc}/revisions", new { fileIds = new[] { fileId } }))
+            Assert.Equal(HttpStatusCode.Created, started.StatusCode);
+        Assert.Equal("READY", (await WaitForFilesAsync(client, project, doc)).GetProperty("filesState").GetString());
+
+        // The link is still valid: the same size, different bytes, sent again after the scan.
+        var swapped = Encoding.ASCII.GetBytes("%PDF-1.7\nSomething that was not scanned!\n%%EOF\n");
+        Assert.Equal(Pdf.Length, swapped.Length);
+        await Flow.PutAsync(ticket, swapped);
+
+        var download = await client.GetFromJsonAsync<JsonElement>($"/api/projects/{project}/files/{fileId}/download");
+        using var raw = new HttpClient();
+        Assert.Equal(Pdf, await raw.GetByteArrayAsync(new Uri(download.GetProperty("url").GetString()!)));
+    }
+
+    [Fact]
     public async Task An_infected_file_rejects_its_revision_and_cannot_be_downloaded()
     {
         await using var app = await TestApp.StartAsync(infrastructure);

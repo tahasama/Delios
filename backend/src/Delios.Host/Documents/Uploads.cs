@@ -28,6 +28,8 @@ public static partial class Uploads
         if (!Sha256Pattern().IsMatch(sha256))
             return (null, Problems.Invalid("FILE_CHECKSUM_INVALID", "The SHA-256 must be 64 hexadecimal characters."));
         var contentType = string.IsNullOrWhiteSpace(request.ContentType) ? "application/octet-stream" : request.ContentType.Trim();
+        if (contentType.Length > 200)
+            return (null, Problems.Invalid("CONTENT_TYPE_INVALID", "The content type is longer than 200 characters."));
         var isPdf = contentType == "application/pdf" || name.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase);
         return (new Declared(name, contentType, sha256, isPdf), null);
     }
@@ -35,7 +37,7 @@ public static partial class Uploads
     /// <summary>Null when the bytes are in storage and as many as were declared.</summary>
     public static async Task<IResult?> ArrivedAsync(FileStorage storage, StoredFile file, CancellationToken cancellationToken)
     {
-        var stored = await storage.SizeAsync(file.ObjectKey, cancellationToken);
+        var stored = await storage.UploadedSizeAsync(file.ObjectKey, cancellationToken);
         if (stored is null)
             return Problems.Invalid("FILE_NOT_UPLOADED", $"{file.Name} has not been uploaded yet.", new { fileId = file.Id });
         if (stored != file.Size)

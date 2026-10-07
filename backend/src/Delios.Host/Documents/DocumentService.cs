@@ -25,6 +25,8 @@ public sealed class DocumentService(
     public async Task<(Document? Document, IResult? Problem)> RegisterAsync(
         ProjectAccess access, RegisterDocumentRequest request, CancellationToken cancellationToken)
     {
+        // Values typed or pasted with spaces around them still match the published lists.
+        request = request with { DeliverableType = request.DeliverableType?.Trim(), DocType = request.DocType?.Trim(), Discipline = request.Discipline?.Trim() };
         var title = request.Title?.Trim() ?? "";
         if (title.Length == 0)
             return Fail(Problems.Invalid("TITLE_REQUIRED", "A descriptive title is required."));
