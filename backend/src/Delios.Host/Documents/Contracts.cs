@@ -8,7 +8,9 @@ public sealed record RegisterDocumentRequest(
 
 public sealed record UploadRequest(string? FileName, long Size, string? ContentType, string? Sha256);
 
-public sealed record StartRevisionRequest(Guid[]? FileIds, string? ReasonForRevision = null, string? ChangeDescription = null);
+/// <param name="Series">A series of the document's revision scheme; empty continues the latest one.</param>
+public sealed record StartRevisionRequest(
+    Guid[]? FileIds, string? ReasonForRevision = null, string? ChangeDescription = null, string? Series = null);
 
 public sealed record DocumentSummary(
     Guid Id, string Number, string Title, string DeliverableType, string DocType, string Discipline,

@@ -117,6 +117,28 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, ILogger<Demo
             ("PUBLIC", "Public", null), ("INTERNAL", "Internal", new { @default = true }),
             ("CONFIDENTIAL", "Confidential", new { restricted = true }));
 
+        // The recommendation, as data the administrator can change.
+        Set(ValueSets.GenericTitleWords, [.. new[]
+        {
+            "report", "drawing", "layout", "document", "specification", "spec", "sketch", "plan", "note", "memo",
+            "list", "schedule", "calculation", "datasheet", "procedure", "manual", "untitled", "test",
+        }.Select(w => (w, w, (object?)null))]);
+        db.RevisionSchemes.Add(new RevisionScheme
+        {
+            TenantId = t,
+            Name = "Recommended",
+            IsDefault = true,
+            Series =
+            [
+                new()
+                {
+                    Code = "DESIGN", Label = "Design", Kind = SeriesKinds.Letters, Start = "A",
+                    ExcludedLetters = ["I", "O", "Q", "S", "X", "Z"],
+                },
+                new() { Code = "EXECUTION", Label = "Execution", Kind = SeriesKinds.Numbers, Start = "0" },
+            ],
+        });
+
         var internalScheme = new NumberingScheme
         {
             TenantId = t,

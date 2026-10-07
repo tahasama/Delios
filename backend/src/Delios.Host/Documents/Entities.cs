@@ -36,6 +36,8 @@ public static class ValueSets
     public const string Criticality = "CRITICALITY";
     public const string Confidentiality = "CONFIDENTIALITY";
     public const string RetentionClasses = "RETENTION_CLASSES";
+    /// <summary>Words that, alone, make a title say nothing: "Drawing", "Report".</summary>
+    public const string GenericTitleWords = "GENERIC_TITLE_WORDS";
 }
 
 /// <summary>How document numbers are built: fields in order, joined by one delimiter.</summary>
@@ -153,7 +155,8 @@ public sealed class Revision
     public Guid DocumentId { get; set; }
     /// <summary>A, B, C… (design) or 0, 1, 2… (execution). Never reused, never in the number.</summary>
     public required string Value { get; set; }
-    public string Series { get; set; } = RevisionSeries.Design;
+    /// <summary>The code of the series in the document's revision scheme this value belongs to.</summary>
+    public required string Series { get; set; }
     public string State { get; set; } = RevisionStates.InPreparation;
     /// <summary>Whether every file has passed scanning: PROCESSING, READY or REJECTED.</summary>
     public string FilesState { get; set; } = FilesStates.Processing;
@@ -167,10 +170,56 @@ public sealed class Revision
     public List<StoredFile> Files { get; set; } = [];
 }
 
-public static class RevisionSeries
+/// <summary>
+/// How an organization names revisions: one or more series, each with its own
+/// format. A, B, C… then 0, 1, 2… is the recommendation; 1, 2, 3 throughout, or
+/// P1, P2 for a phase, A, B for design and CA, CB for the client, are equally valid.
+/// </summary>
+public sealed class RevisionScheme
 {
-    public const string Design = "DESIGN";
-    public const string Execution = "EXECUTION";
+    public Guid Id { get; set; } = Guid.CreateVersion7();
+    public Guid TenantId { get; set; }
+    public required string Name { get; set; }
+    /// <summary>Used for any deliverable type no routing names.</summary>
+    public bool IsDefault { get; set; }
+    /// <summary>A document may move to a later series but never back to an earlier one.</summary>
+    public bool ForwardOnly { get; set; } = true;
+    public List<RevisionSeriesRule> Series { get; set; } = [];
+}
+
+public sealed class RevisionSeriesRule
+{
+    /// <summary>Stable code stored on each revision: DESIGN, EXECUTION, CLIENT.</summary>
+    public required string Code { get; set; }
+    public required string Label { get; set; }
+    /// <summary>LETTERS (A, B… Z, AA) or NUMBERS (0, 1, 2…).</summary>
+    public required string Kind { get; set; }
+    /// <summary>Written before every value: "C" gives CA, CB; "P" gives P1, P2.</summary>
+    public string Prefix { get; set; } = "";
+    /// <summary>The first value without the prefix: "A", "1", "0".</summary>
+    public required string Start { get; set; }
+    /// <summary>NUMBERS only: pad with zeros to this width, so 3 gives 001.</summary>
+    public int Width { get; set; }
+    /// <summary>LETTERS only: a, b, c rather than A, B, C.</summary>
+    public bool Lowercase { get; set; }
+    /// <summary>LETTERS only: letters never used, because they read as digits or as each other.</summary>
+    public string[] ExcludedLetters { get; set; } = [];
+}
+
+public static class SeriesKinds
+{
+    public const string Letters = "LETTERS";
+    public const string Numbers = "NUMBERS";
+}
+
+/// <summary>Which revision scheme a deliverable type follows, when it is not the default.</summary>
+public sealed class RevisionSchemeRouting
+{
+    public Guid Id { get; set; } = Guid.CreateVersion7();
+    public Guid TenantId { get; set; }
+    public required string DeliverableType { get; set; }
+    public Guid SchemeId { get; set; }
+    public RevisionScheme? Scheme { get; set; }
 }
 
 public static class RevisionStates

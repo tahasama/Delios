@@ -326,6 +326,25 @@ public sealed class RevisionTests(Infrastructure infrastructure) : IClassFixture
     }
 
     [Fact]
+    public async Task A_revision_can_name_a_series_of_the_scheme()
+    {
+        await using var app = await TestApp.StartAsync(infrastructure);
+        var client = await app.SignedInAsync("engineer@demo.local");
+        var project = await Api.ProjectIdAsync(client);
+        var doc = (await Api.RegisterAsync(client, project, Api.Drawing())).GetProperty("id").GetGuid();
+
+        using var unknown = await client.PostAsJsonAsync($"/api/projects/{project}/documents/{doc}/revisions",
+            new { fileIds = new[] { await UploadAsync(client, project, doc, "GA-1.pdf", Pdf) }, series = "AS_BUILT" });
+        using var execution = await client.PostAsJsonAsync($"/api/projects/{project}/documents/{doc}/revisions",
+            new { fileIds = new[] { await UploadAsync(client, project, doc, "GA-2.pdf", Pdf) }, series = "EXECUTION" });
+        var revision = await execution.Content.ReadFromJsonAsync<JsonElement>();
+
+        Assert.Equal((HttpStatusCode.UnprocessableEntity, "REVISION_SERIES_UNKNOWN"), await Api.ProblemAsync(unknown));
+        Assert.Equal(HttpStatusCode.Created, execution.StatusCode);
+        Assert.Equal(("0", "EXECUTION"), (revision.GetProperty("value").GetString(), revision.GetProperty("series").GetString()));
+    }
+
+    [Fact]
     public async Task A_revision_cannot_start_before_its_file_has_arrived()
     {
         await using var app = await TestApp.StartAsync(infrastructure);
@@ -382,23 +401,81 @@ public sealed class RevisionTests(Infrastructure infrastructure) : IClassFixture
     }
 }
 
-public sealed class RuleTests
+public sealed class RevisionSchemeTests
 {
-    [Theory]
-    [InlineData(new string[0], "A")]
-    [InlineData(new[] { "A", "B", "C", "D", "E", "F", "G", "H" }, "J")]
-    [InlineData(new[] { "A", "B", "C", "D", "E", "F", "G", "H", "J", "K", "L", "M", "N", "P", "R", "T", "U", "V", "W", "Y" }, "AA")]
-    public void Design_revisions_skip_letters_that_read_as_digits(string[] existing, string next) =>
-        Assert.Equal(next, RevisionValues.Next(RevisionSeries.Design, existing));
+    private static RevisionSeriesRule Letters(string code, string prefix = "", string start = "A", params string[] excluded) =>
+        new() { Code = code, Label = code, Kind = SeriesKinds.Letters, Prefix = prefix, Start = start, ExcludedLetters = excluded };
+
+    private static RevisionSeriesRule Numbers(string code, string prefix = "", string start = "0", int width = 0) =>
+        new() { Code = code, Label = code, Kind = SeriesKinds.Numbers, Prefix = prefix, Start = start, Width = width };
+
+    private static readonly RevisionScheme Recommended = new()
+    {
+        Name = "Recommended",
+        Series = [Letters("DESIGN", excluded: ["I", "O", "Q", "S", "X", "Z"]), Numbers("EXECUTION")],
+    };
+
+    private static string Next(RevisionScheme scheme, string? series, params (string, string)[] existing) =>
+        Assert.IsType<NextValue.Value>(RevisionValues.Next(scheme, existing, series)).Text;
 
     [Fact]
-    public void Execution_revisions_count_from_the_published_start() =>
-        Assert.Equal("2", RevisionValues.Next(RevisionSeries.Execution, ["A", "B", "0", "1"]));
+    public void The_recommendation_skips_letters_that_read_as_digits()
+    {
+        Assert.Equal("A", Next(Recommended, null));
+        Assert.Equal("J", Next(Recommended, null, ("DESIGN", "H")));
+        Assert.Equal("AA", Next(Recommended, null, ("DESIGN", "Y")));
+        Assert.Equal("AB", Next(Recommended, null, ("DESIGN", "AA")));
+        Assert.Equal("0", Next(Recommended, "EXECUTION", ("DESIGN", "B")));
+        Assert.Equal("1", Next(Recommended, null, ("DESIGN", "B"), ("EXECUTION", "0")));
+    }
+
+    [Fact]
+    public void An_organization_can_number_every_revision_1_2_3()
+    {
+        var digits = new RevisionScheme { Name = "Digits", Series = [Numbers("ALL", start: "1")] };
+
+        Assert.Equal("1", Next(digits, null));
+        Assert.Equal("4", Next(digits, null, ("ALL", "1"), ("ALL", "2"), ("ALL", "3")));
+    }
+
+    [Fact]
+    public void Phases_design_and_client_can_each_have_their_own_series()
+    {
+        var scheme = new RevisionScheme
+        {
+            Name = "Phased",
+            ForwardOnly = false,
+            Series = [Numbers("PHASE", prefix: "P", start: "1", width: 2), Letters("DESIGN", start: "a"), Letters("CLIENT", prefix: "C")],
+        };
+        scheme.Series[1].Lowercase = true;
+
+        Assert.Equal("P01", Next(scheme, null));
+        Assert.Equal("P02", Next(scheme, "PHASE", ("PHASE", "P01")));
+        Assert.Equal("a", Next(scheme, "DESIGN", ("PHASE", "P01")));
+        Assert.Equal("b", Next(scheme, "DESIGN", ("PHASE", "P01"), ("DESIGN", "a")));
+        Assert.Equal("CA", Next(scheme, "CLIENT", ("DESIGN", "a")));
+        Assert.Equal("CB", Next(scheme, "CLIENT", ("DESIGN", "a"), ("CLIENT", "CA")));
+    }
+
+    [Fact]
+    public void A_forward_only_scheme_refuses_to_go_back_to_an_earlier_series() =>
+        Assert.IsType<NextValue.Backwards>(RevisionValues.Next(Recommended, [("EXECUTION", "0")], "DESIGN"));
+
+    [Fact]
+    public void A_series_the_scheme_does_not_have_is_refused() =>
+        Assert.IsType<NextValue.UnknownSeries>(RevisionValues.Next(Recommended, [], "AS_BUILT"));
+
+    [Theory]
+    [InlineData(SeriesKinds.Letters, "1")]
+    [InlineData(SeriesKinds.Numbers, "A")]
+    [InlineData("ROMAN", "I")]
+    public void A_series_that_cannot_produce_values_is_reported(string kind, string start) =>
+        Assert.NotNull(RevisionValues.Problem(new RevisionSeriesRule { Code = "X", Label = "X", Kind = kind, Start = start }));
 
     [Theory]
     [InlineData("Drawings", true)]
     [InlineData("  report ", true)]
     [InlineData("Pump room layout", false)]
-    public void Titles_that_only_name_the_type_are_generic(string title, bool generic) =>
-        Assert.Equal(generic, Titles.IsGeneric(title));
+    public void Titles_that_are_only_a_listed_word_are_generic(string title, bool generic) =>
+        Assert.Equal(generic, Titles.IsGeneric(title, new HashSet<string> { "drawing", "report" }));
 }

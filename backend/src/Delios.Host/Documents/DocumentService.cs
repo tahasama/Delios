@@ -24,9 +24,6 @@ public sealed partial class DocumentService(
         var title = request.Title?.Trim() ?? "";
         if (title.Length == 0)
             return Fail(Problems.Invalid("TITLE_REQUIRED", "A descriptive title is required."));
-        if (Titles.IsGeneric(title))
-            return Fail(Problems.Invalid("TITLE_GENERIC",
-                "The title only repeats the document type. Say what it shows, and of what.", new { title }));
         if (string.IsNullOrWhiteSpace(request.DeliverableType))
             return Fail(Problems.Invalid("DELIVERABLE_TYPE_REQUIRED", "Deliverable type is required: it picks the numbering scheme."));
         if (string.IsNullOrWhiteSpace(request.DocType))
@@ -35,6 +32,9 @@ public sealed partial class DocumentService(
             return Fail(Problems.Invalid("DISCIPLINE_REQUIRED", "Exactly one discipline is required."));
 
         var catalog = await Catalog.LoadAsync(db, cancellationToken);
+        if (Titles.IsGeneric(title, catalog.GenericTitleWords()))
+            return Fail(Problems.Invalid("TITLE_GENERIC",
+                "The title only repeats the document type. Say what it shows, and of what.", new { title }));
         var confidentiality = Blank(request.Confidentiality) ?? catalog.DefaultOf(ValueSets.Confidentiality);
         var facts = new DocumentFacts(request.DeliverableType, request.DocType, request.Discipline,
             Blank(request.Criticality), confidentiality);
@@ -226,13 +226,34 @@ public sealed partial class DocumentService(
             }
         }
 
+        var scheme = await RevisionSchemeForAsync(document.DeliverableType, cancellationToken);
+        if (scheme is null)
+        {
+            return (null, Problems.Invalid("NO_REVISION_SCHEME",
+                "No revision scheme applies to this deliverable type. An administrator sets one up.",
+                new { deliverableType = document.DeliverableType }));
+        }
+        var next = RevisionValues.Next(scheme, existing.Select(r => (r.Series, r.Value)).ToList(), Blank(request.Series));
+        switch (next)
+        {
+            case NextValue.UnknownSeries(var unknown):
+                return (null, Problems.Invalid("REVISION_SERIES_UNKNOWN",
+                    $"{unknown} is not a series of the {scheme.Name} revision scheme.",
+                    new { series = unknown, available = scheme.Series.Select(x => x.Code) }));
+            case NextValue.Backwards(var from, var to):
+                return (null, Problems.Conflict("REVISION_SERIES_BACKWARDS",
+                    $"The document is already in the {from} series and cannot go back to {to}.", new { from, to }));
+        }
+        var value = ((NextValue.Value)next).Text;
+
         var now = clock.GetCurrentInstant();
         var revision = new Revision
         {
             TenantId = document.TenantId,
             ProjectId = document.ProjectId,
             DocumentId = document.Id,
-            Value = RevisionValues.Next(RevisionSeries.Design, existing.Select(r => r.Value).ToList()),
+            Value = value,
+            Series = Blank(request.Series) ?? existing.LastOrDefault()?.Series ?? scheme.Series[0].Code,
             ReasonForRevision = Blank(request.ReasonForRevision) ?? (existing.Count == 0 ? "First issue" : null),
             ChangeDescription = Blank(request.ChangeDescription) ?? (existing.Count == 0 ? "Initial content" : null),
             AuthoredById = access.UserId,
@@ -282,6 +303,12 @@ public sealed partial class DocumentService(
         }
         return (document, null);
     }
+
+    /// <summary>The scheme routed to the deliverable type, else the organization's default.</summary>
+    private async Task<RevisionScheme?> RevisionSchemeForAsync(string deliverableType, CancellationToken cancellationToken) =>
+        await db.RevisionSchemeRoutings.AsNoTracking().Where(r => r.DeliverableType == deliverableType)
+            .Select(r => r.Scheme).SingleOrDefaultAsync(cancellationToken)
+        ?? await db.RevisionSchemes.AsNoTracking().SingleOrDefaultAsync(s => s.IsDefault, cancellationToken);
 
     public async Task<IReadOnlyList<string>> RestrictedAsync(CancellationToken cancellationToken) =>
         (await Catalog.LoadAsync(db, cancellationToken)).RestrictedLevels();

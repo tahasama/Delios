@@ -30,6 +30,8 @@ public sealed class DeliosDbContext(DbContextOptions<DeliosDbContext> options)
     public DbSet<NumberingScheme> NumberingSchemes => Set<NumberingScheme>();
     public DbSet<SchemeRouting> SchemeRoutings => Set<SchemeRouting>();
     public DbSet<NumberCounter> NumberCounters => Set<NumberCounter>();
+    public DbSet<RevisionScheme> RevisionSchemes => Set<RevisionScheme>();
+    public DbSet<RevisionSchemeRouting> RevisionSchemeRoutings => Set<RevisionSchemeRouting>();
     public DbSet<Document> Documents => Set<Document>();
     public DbSet<Revision> Revisions => Set<Revision>();
     public DbSet<StoredFile> StoredFiles => Set<StoredFile>();

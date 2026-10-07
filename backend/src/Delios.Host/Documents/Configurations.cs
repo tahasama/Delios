@@ -42,6 +42,30 @@ internal sealed class SchemeRoutingConfiguration : IEntityTypeConfiguration<Sche
     }
 }
 
+internal sealed class RevisionSchemeConfiguration : IEntityTypeConfiguration<RevisionScheme>
+{
+    public void Configure(EntityTypeBuilder<RevisionScheme> b)
+    {
+        b.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
+        b.HasIndex(x => new { x.TenantId, x.Name }).IsUnique();
+        // At most one default per organization.
+        b.HasIndex(x => x.TenantId).IsUnique().HasFilter("is_default").HasDatabaseName("ix_revision_schemes_one_default");
+        b.Property(x => x.Name).HasMaxLength(100);
+        b.OwnsMany(x => x.Series, s => s.ToJson());
+    }
+}
+
+internal sealed class RevisionSchemeRoutingConfiguration : IEntityTypeConfiguration<RevisionSchemeRouting>
+{
+    public void Configure(EntityTypeBuilder<RevisionSchemeRouting> b)
+    {
+        b.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
+        b.HasOne(x => x.Scheme).WithMany().HasForeignKey(x => x.SchemeId).OnDelete(DeleteBehavior.Restrict);
+        b.HasIndex(x => new { x.TenantId, x.DeliverableType }).IsUnique();
+        b.Property(x => x.DeliverableType).HasMaxLength(64);
+    }
+}
+
 internal sealed class NumberCounterConfiguration : IEntityTypeConfiguration<NumberCounter>
 {
     public void Configure(EntityTypeBuilder<NumberCounter> b)

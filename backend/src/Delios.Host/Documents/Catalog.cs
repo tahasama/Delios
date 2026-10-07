@@ -33,6 +33,12 @@ public sealed class Catalog
                     && d.ValueKind == JsonValueKind.True)?.Code
             : null;
 
+    /// <summary>The organization's words that, alone, make a title generic.</summary>
+    public IReadOnlySet<string> GenericTitleWords() =>
+        _sets.TryGetValue(ValueSets.GenericTitleWords, out var set)
+            ? set.Values.Where(v => v.Status == ValueStatus.Active).Select(v => v.Code.ToLowerInvariant()).ToHashSet()
+            : new HashSet<string>();
+
     /// <summary>Confidentiality levels read only by the people named on the document.</summary>
     public IReadOnlyList<string> RestrictedLevels() =>
         _sets.TryGetValue(ValueSets.Confidentiality, out var set)

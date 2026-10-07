@@ -116,6 +116,30 @@ throughout:
   No token is readable by JavaScript.
 - The Next.js server is stateless like the API nodes and scales the same way.
 
+## What each organization configures
+
+The application ships recommendations, never fixed choices, wherever the
+choice belongs to the organization. Each is data its administrator changes:
+
+- **Revision schemes:** one or more series per scheme, each letters or numbers,
+  with a prefix, a start, zero padding, lowercase and excluded letters; routed
+  by deliverable type, with a default. A, B, C… then 0, 1, 2… is the
+  recommendation; 1, 2, 3 throughout, or P01 for phases, a, b for design and
+  CA, CB for the client, are equally possible.
+- **Numbering schemes:** fields, order, delimiter and sequence width, routed by
+  deliverable type.
+- **Value lists:** disciplines, document and deliverable types, subprojects,
+  purchase orders, criticality, confidentiality (and which levels are
+  restricted to named readers), retention classes and which criticality maps
+  to which, and the words that make a title generic.
+- **What each deliverable type requires** before it can be registered.
+- **Functions and the permission matrix.**
+
+What the Standard itself requires is enforced for everyone: a number is
+allocated by the system and never reused, a revision value is never reused on
+a document, one revision of a document is in progress at a time, and a record
+is never revised.
+
 ## Shape of the backend
 
 One ASP.NET Core solution, one deployable, with these modules. Each owns its
