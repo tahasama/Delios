@@ -555,7 +555,13 @@ deployment with tenant isolation in the database.
      activity whose documents were missing come from the organization's own list
      (each says whether it "proceeds"). Lateness: the chain each document went
      through, and the first checkpoint that slipped. Four checks (SC-01..04).
-   - Next: reports.
+   - Done: reports. Register status, deliveries against plan (due: the planned
+     date or the first day an activity needs the document), reviews waiting,
+     the transmittal log (sent and received, and what each waits on), and
+     activity readiness. Each: headline figures, one chart, the list behind
+     them, CSV and Excel export of the same rows. Counted when opened, never
+     stored; labels from the organization's lists; windows (look-ahead, months,
+     review ages, on-time target) are the reader's to change.
    - Then, before step 6: a guided read of the backend for its owner, new to
      .NET: docs/SYSTEM.md completed for every aspect and tool; a beginner's
      guide (docs/DOTNET-GUIDE.md: endpoints, services, entities, migrations, a

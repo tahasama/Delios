@@ -290,6 +290,16 @@ foreach ($c in $catalog.checks | Where-Object { $_.result -eq 'FAIL' }) {
     Write-Host ("  {0} {1,-8} {2} ({3})" -f $c.id, $c.severity, $c.condition, $c.failing)
 }
 
+Step 'Reports: counted from the register now, exported as CSV or Excel'
+foreach ($r in (Call GET "/api/projects/$($project.id)/reports")) {
+    $report = Call GET "/api/projects/$($project.id)/reports/$($r.id)"
+    $figures = ($report.figures | ForEach-Object { "$($_.label) $($_.value)" }) -join ', '
+    Write-Host ('{0,-24} {1}' -f $report.title, $figures)
+}
+$csv = Join-Path ([IO.Path]::GetTempPath()) "$($project.code)-register.csv"
+Invoke-WebRequest -Uri "$Api/api/projects/$($project.id)/reports/register/export?format=csv" -WebSession $session -OutFile $csv -UseBasicParsing
+Write-Host "Register exported: $csv ($((Get-Content $csv).Count - 2) documents)"
+
 Step 'The register'
 foreach ($d in (Call GET "/api/projects/$($project.id)/documents").items) {
     Write-Host ('{0,-24} rev {1,-2} {2,-15} {3}' -f $d.number, $d.latestRevision, $d.latestRevisionState, $d.title)

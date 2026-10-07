@@ -101,6 +101,11 @@ public sealed class PackageTests(Infrastructure infrastructure) : IClassFixture<
         Assert.Equal("DELIVERED", delivered.GetProperty("state").GetString());
         var number = delivered.GetProperty("transmittals").EnumerateArray().Single().GetString();
         Assert.Equal("P1001-DEMO-NWU-TR-0001", number);
+        // The transmittal log says who it waits on: the client works in its own system, so Document Control sends it.
+        var report = await GetAsync(controller, $"/api/projects/{ready.Project}/reports/transmittals");
+        var line = report.GetProperty("rows").EnumerateArray().Single(r => r[0].GetProperty("text").GetString() == number);
+        Assert.Equal(("Out", "For execution", "Document Control: 1 to send"),
+            (line[1].GetProperty("text").GetString(), line[4].GetProperty("text").GetString(), line[7].GetProperty("text").GetString()));
 
         // One transmittal, carrying only what was ready; its contents are now fixed.
         var log = await GetAsync(controller, $"/api/projects/{ready.Project}/transmittals");

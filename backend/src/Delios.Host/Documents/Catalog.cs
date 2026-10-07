@@ -38,6 +38,10 @@ public sealed class Catalog
             ?? active.FirstOrDefault(v => v.Label.Equals(wanted, StringComparison.OrdinalIgnoreCase)))?.Code;
     }
 
+    /// <summary>What people read for a code: its label, or the code itself when it is not in the list.</summary>
+    public string Label(string setKey, string code) =>
+        _sets.TryGetValue(setKey, out var set) && set.TryGetValue(code, out var v) ? v.Label : code;
+
     /// <summary>The first active value whose string property equals the one given.</summary>
     public string? CodeWhere(string setKey, string prop, string value) =>
         _sets.TryGetValue(setKey, out var set)

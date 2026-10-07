@@ -211,6 +211,14 @@ public sealed class ScheduleTests(Infrastructure infrastructure) : IClassFixture
         Assert.Equal(DateOnly.FromDateTime(Today.AddDays(5)), moved.GetProperty("needs")[0].GetProperty("neededBy").Deserialize<DateOnly>());
         var (reread, rereadBody) = await Flow.PostAsync(controller, $"{p}/schedule/import", new { });
         Assert.Equal((HttpStatusCode.Conflict, "SCHEDULE_ALREADY_READ"), (reread, Flow.Code(rereadBody)));
+
+        // The look-ahead report: the same needs, in the organization's own words.
+        var report = await GetAsync(engineer, $"{p}/reports/readiness?horizonDays=60");
+        var lines = report.GetProperty("rows").EnumerateArray()
+            .Select(r => r.EnumerateArray().Select(c => c.GetProperty("text").GetString()).ToList()).ToList();
+        Assert.Equal([("A100", "For execution", "There"), ("A200", "For information", "Waived, still followed up")],
+            lines.Select(l => (l[0], l[4], l[7])));
+        Assert.Equal("Electrical", lines[1][3]);
     }
 
     [Fact]
