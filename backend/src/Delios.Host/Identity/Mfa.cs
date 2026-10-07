@@ -11,15 +11,27 @@ namespace Delios.Host.Identity;
 /// </summary>
 public sealed class Mfa(IDataProtectionProvider protection, IClock clock)
 {
+    /// <summary>How many one-time recovery codes are made when two-step sign-in is set up.</summary>
     public const int RecoveryCodes = 10;
+    /// <summary>How long the user has to type the code after the password was accepted.</summary>
     private static readonly TimeSpan ChallengeLifetime = TimeSpan.FromMinutes(5);
 
+    /// <summary>
+    /// Encrypts and decrypts users' authenticator secrets with ASP.NET Core Data Protection (the application's own encryption keys).
+    /// </summary>
     private IDataProtector Secrets => protection.CreateProtector("delios.mfa.secret");
+    /// <summary>
+    /// Seals the short-lived "password was right" proof so it cannot be read, forged or used after it expires.
+    /// </summary>
     private ITimeLimitedDataProtector Challenges => protection.CreateProtector("delios.mfa.challenge").ToTimeLimitedDataProtector();
 
     /// <summary>Proof that the password was right, good for five minutes, carried to the code step.</summary>
     public string Challenge(User user) => Challenges.Protect($"{user.TenantId:N}|{user.Id:N}", ChallengeLifetime);
 
+    /// <summary>
+    /// Opens a challenge made by <c>Challenge</c> and returns the tenant and user it is for, or null when it is missing, expired or tampered with.
+    /// Called by the code step of sign-in.
+    /// </summary>
     public (Guid TenantId, Guid UserId)? ReadChallenge(string? challenge)
     {
         if (string.IsNullOrEmpty(challenge)) return null;
@@ -73,6 +85,9 @@ public sealed class Mfa(IDataProtectionProvider protection, IClock clock)
         return true;
     }
 
+    /// <summary>
+    /// Turns two-step sign-in off for a user: removes the secret and all recovery codes. Used when an administrator resets it (AdminEndpoints).
+    /// </summary>
     public static void Disable(User user)
     {
         user.MfaSecretProtected = null;
@@ -81,9 +96,14 @@ public sealed class Mfa(IDataProtectionProvider protection, IClock clock)
         user.RecoveryCodeHashes = [];
     }
 
+    /// <summary>Decrypts the user's stored authenticator secret.</summary>
     private byte[] SecretOf(User user) => Convert.FromBase64String(Secrets.Unprotect(user.MfaSecretProtected!));
+    /// <summary>The current time from the injected clock (replaceable in tests).</summary>
     private DateTimeOffset Now => clock.GetCurrentInstant().ToDateTimeOffset();
 
+    /// <summary>
+    /// Hashes a recovery code with SHA-256 after dropping dashes and spaces and lower-casing it, so "ABCD-EFGH" and "abcdefgh" match.
+    /// </summary>
     private static string HashCode(string code) =>
         Convert.ToHexStringLower(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(
             new string(code.Where(char.IsLetterOrDigit).ToArray()).ToLowerInvariant())));

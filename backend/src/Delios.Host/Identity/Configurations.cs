@@ -4,8 +4,14 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace Delios.Host.Identity;
 
+/// <summary>
+/// Database mapping for organizations: the slug (short name used at sign-in) is unique.
+/// An <c>IEntityTypeConfiguration</c> tells Entity Framework Core (the library that maps C# classes to database tables) about
+/// column lengths, indexes, keys and defaults. These are picked up by <c>DeliosDbContext</c> and turned into migrations.
+/// </summary>
 internal sealed class TenantConfiguration : IEntityTypeConfiguration<Tenant>
 {
+    /// <summary>Called by Entity Framework Core when it builds the model, to set up the <c>Tenant</c> table.</summary>
     public void Configure(EntityTypeBuilder<Tenant> b)
     {
         b.HasIndex(x => x.Slug).IsUnique();
@@ -15,8 +21,14 @@ internal sealed class TenantConfiguration : IEntityTypeConfiguration<Tenant>
     }
 }
 
+/// <summary>
+/// Database mapping for single sign-on providers: at most one per tenant. Picked up by <c>DeliosDbContext</c>.
+/// </summary>
 internal sealed class IdentityProviderConfiguration : IEntityTypeConfiguration<IdentityProvider>
 {
+    /// <summary>
+    /// Called by Entity Framework Core when it builds the model, to set up the <c>IdentityProvider</c> table.
+    /// </summary>
     public void Configure(EntityTypeBuilder<IdentityProvider> b)
     {
         b.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
@@ -29,8 +41,12 @@ internal sealed class IdentityProviderConfiguration : IEntityTypeConfiguration<I
     }
 }
 
+/// <summary>
+/// Database mapping for parties (companies taking part in projects): the code is unique within a tenant. Picked up by <c>DeliosDbContext</c>.
+/// </summary>
 internal sealed class PartyConfiguration : IEntityTypeConfiguration<Party>
 {
+    /// <summary>Called by Entity Framework Core when it builds the model, to set up the <c>Party</c> table.</summary>
     public void Configure(EntityTypeBuilder<Party> b)
     {
         b.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
@@ -43,8 +59,12 @@ internal sealed class PartyConfiguration : IEntityTypeConfiguration<Party>
     }
 }
 
+/// <summary>
+/// Database mapping for users: the normalized email is unique within a tenant. Picked up by <c>DeliosDbContext</c>.
+/// </summary>
 internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
 {
+    /// <summary>Called by Entity Framework Core when it builds the model, to set up the <c>User</c> table.</summary>
     public void Configure(EntityTypeBuilder<User> b)
     {
         b.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
@@ -58,8 +78,10 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
     }
 }
 
+/// <summary>Database mapping for projects: the code is unique within a tenant. Picked up by <c>DeliosDbContext</c>.</summary>
 internal sealed class ProjectConfiguration : IEntityTypeConfiguration<Project>
 {
+    /// <summary>Called by Entity Framework Core when it builds the model, to set up the <c>Project</c> table.</summary>
     public void Configure(EntityTypeBuilder<Project> b)
     {
         b.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
@@ -74,8 +96,12 @@ internal sealed class ProjectConfiguration : IEntityTypeConfiguration<Project>
     }
 }
 
+/// <summary>
+/// Database mapping for functions (job roles that carry permission rules): deleting a function deletes its rules. Picked up by <c>DeliosDbContext</c>.
+/// </summary>
 internal sealed class FunctionConfiguration : IEntityTypeConfiguration<Function>
 {
+    /// <summary>Called by Entity Framework Core when it builds the model, to set up the <c>Function</c> table.</summary>
     public void Configure(EntityTypeBuilder<Function> b)
     {
         b.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
@@ -86,8 +112,10 @@ internal sealed class FunctionConfiguration : IEntityTypeConfiguration<Function>
     }
 }
 
+/// <summary>Database mapping for permission rules. Picked up by <c>DeliosDbContext</c>.</summary>
 internal sealed class PermissionRuleConfiguration : IEntityTypeConfiguration<PermissionRule>
 {
+    /// <summary>Called by Entity Framework Core when it builds the model, to set up the <c>PermissionRule</c> table.</summary>
     public void Configure(EntityTypeBuilder<PermissionRule> b)
     {
         b.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
@@ -95,8 +123,12 @@ internal sealed class PermissionRuleConfiguration : IEntityTypeConfiguration<Per
     }
 }
 
+/// <summary>
+/// Database mapping for project memberships: a user is on a project at most once. Picked up by <c>DeliosDbContext</c>.
+/// </summary>
 internal sealed class MembershipConfiguration : IEntityTypeConfiguration<Membership>
 {
+    /// <summary>Called by Entity Framework Core when it builds the model, to set up the <c>Membership</c> table.</summary>
     public void Configure(EntityTypeBuilder<Membership> b)
     {
         b.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
@@ -109,8 +141,12 @@ internal sealed class MembershipConfiguration : IEntityTypeConfiguration<Members
     }
 }
 
+/// <summary>
+/// Database mapping for sign-in sessions: the token hash is unique so a session can be found by it. Picked up by <c>DeliosDbContext</c>.
+/// </summary>
 internal sealed class SessionConfiguration : IEntityTypeConfiguration<Session>
 {
+    /// <summary>Called by Entity Framework Core when it builds the model, to set up the <c>Session</c> table.</summary>
     public void Configure(EntityTypeBuilder<Session> b)
     {
         b.HasIndex(x => x.TokenHash).IsUnique();
@@ -119,8 +155,12 @@ internal sealed class SessionConfiguration : IEntityTypeConfiguration<Session>
     }
 }
 
+/// <summary>
+/// Database mapping for audit log entries: the id is a database-generated increasing number. Picked up by <c>DeliosDbContext</c>.
+/// </summary>
 internal sealed class AuditEventConfiguration : IEntityTypeConfiguration<AuditEvent>
 {
+    /// <summary>Called by Entity Framework Core when it builds the model, to set up the <c>AuditEvent</c> table.</summary>
     public void Configure(EntityTypeBuilder<AuditEvent> b)
     {
         b.Property(x => x.Id).UseIdentityAlwaysColumn();

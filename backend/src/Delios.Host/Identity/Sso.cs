@@ -14,6 +14,7 @@ using Microsoft.IdentityModel.Tokens;
 
 namespace Delios.Host.Identity;
 
+/// <summary>Single sign-on settings read from the "Sso" section of the configuration.</summary>
 public sealed class SsoOptions
 {
     /// <summary>
@@ -32,14 +33,25 @@ public sealed class SsoOptions
 /// </summary>
 public sealed class OidcClient(IHttpClientFactory http, IOptions<SsoOptions> options)
 {
+    /// <summary>Name of the HTTP client (registered in PlatformSetup) used for all calls to identity providers.</summary>
     public const string HttpClientName = "sso";
+    /// <summary>
+    /// One cached configuration manager per provider address, so each provider's settings and signing keys are downloaded once and shared.
+    /// </summary>
     private readonly ConcurrentDictionary<string, ConfigurationManager<OpenIdConnectConfiguration>> _providers = new();
 
+    /// <summary>
+    /// Gets or creates the configuration manager for a provider address. It downloads the provider's discovery document
+    /// (<c>/.well-known/openid-configuration</c>) and keys, and requires HTTPS unless <c>AllowHttp</c> is set.
+    /// </summary>
     private ConfigurationManager<OpenIdConnectConfiguration> Manager(string authority) =>
         _providers.GetOrAdd(authority.TrimEnd('/'), a => new ConfigurationManager<OpenIdConnectConfiguration>(
             a + "/.well-known/openid-configuration", new OpenIdConnectConfigurationRetriever(),
             new HttpDocumentRetriever(http.CreateClient(HttpClientName)) { RequireHttps = !options.Value.AllowHttp }));
 
+    /// <summary>
+    /// Returns the provider's published OpenID Connect configuration (its endpoints and signing keys), from cache when possible.
+    /// </summary>
     public Task<OpenIdConnectConfiguration> ConfigurationAsync(string authority, CancellationToken cancellationToken) =>
         Manager(authority).GetConfigurationAsync(cancellationToken);
 
@@ -90,11 +102,21 @@ public sealed class OidcClient(IHttpClientFactory http, IOptions<SsoOptions> opt
 /// </summary>
 public static class SsoEndpoints
 {
+    /// <summary>Short-lived cookie that ties a single sign-on attempt to the browser that started it.</summary>
     public const string StateCookie = "delios_sso";
+    /// <summary>How long a started single sign-on attempt stays valid (10 minutes).</summary>
     private static readonly TimeSpan StateLifetime = TimeSpan.FromMinutes(10);
 
+    /// <summary>
+    /// What is remembered between the start of a single sign-on and the callback. It travels through the provider sealed
+    /// (encrypted and signed) in the OIDC <c>state</c> parameter. <c>Verifier</c> is the PKCE secret; <c>Binding</c> must match the state cookie.
+    /// </summary>
     private sealed record State(Guid TenantId, string Nonce, string Verifier, string Binding, string ReturnUrl);
 
+    /// <summary>
+    /// Registers the public single sign-on endpoints under <c>/api/auth/sso</c> (no sign-in needed; start and callback are rate limited).
+    /// Called once at start-up from PlatformSetup.
+    /// </summary>
     public static void MapSsoEndpoints(this IEndpointRouteBuilder app)
     {
         var sso = app.MapGroup("/api/auth/sso").WithTags("Auth").AllowAnonymous();
@@ -111,6 +133,11 @@ public static class SsoEndpoints
             : Results.Ok(new { name = provider.Name, passwordSignIn = organization!.PasswordSignIn });
     }
 
+    /// <summary>
+    /// <c>GET /api/auth/sso/start</c>: begins sign-in through the organization's identity provider by redirecting the browser to it.
+    /// Uses OIDC (OpenID Connect, the standard sign-in protocol on top of OAuth 2) with PKCE (Proof Key for Code Exchange: a one-time secret
+    /// that proves the same client starts and finishes the sign-in) and a nonce (a random value the provider repeats in its token, to stop replays).
+    /// </summary>
     private static async Task<IResult> StartAsync(
         string? tenant, string? returnUrl, HttpContext http, DeliosDbContext db, TenantContext tenants, OidcClient oidc,
         IDataProtectionProvider protection, IOptions<SsoOptions> options, IOptions<SessionCookieOptions> cookie,
@@ -148,6 +175,11 @@ public static class SsoEndpoints
         return Results.Redirect(Microsoft.AspNetCore.WebUtilities.QueryHelpers.AddQueryString(configuration.AuthorizationEndpoint, query));
     }
 
+    /// <summary>
+    /// <c>GET /api/auth/sso/callback</c>: where the identity provider sends the browser back after sign-in. Checks the sealed state and its cookie,
+    /// exchanges the code for an ID token, validates it (signature, nonce, verified email, allowed domain), finds the existing active account
+    /// with that email and starts a session. Any failure redirects to the sign-in page with an <c>sso_error</c> code and is logged.
+    /// </summary>
     private static async Task<IResult> CallbackAsync(
         string? code, string? state, string? error, HttpContext http, DeliosDbContext db, TenantContext tenants, OidcClient oidc,
         IDataProtectionProvider protection, SessionStore sessions, AuditLog audit, IOptions<SsoOptions> options,
@@ -214,6 +246,10 @@ public static class SsoEndpoints
         return Results.Redirect(payload.ReturnUrl);
     }
 
+    /// <summary>
+    /// Finds an active organization by its short name (slug) and its enabled identity provider, if any.
+    /// Sets the tenant first because the provider row is protected by the tenant's row-level security.
+    /// </summary>
     private static async Task<(Tenant? Organization, IdentityProvider? Provider)> FindAsync(
         string? slug, DeliosDbContext db, TenantContext tenants, CancellationToken cancellationToken)
     {
@@ -227,10 +263,19 @@ public static class SsoEndpoints
         return (organization, provider);
     }
 
+    /// <summary>
+    /// Encrypts and decrypts the stored provider client secret with ASP.NET Core Data Protection. Also used by AdminEndpoints when saving it.
+    /// </summary>
     public static IDataProtector SecretProtector(IDataProtectionProvider protection) => protection.CreateProtector("delios.sso.client-secret");
+    /// <summary>
+    /// Seals the sign-in state with a time limit, so it cannot be read, changed or reused after <c>StateLifetime</c>.
+    /// </summary>
     private static ITimeLimitedDataProtector Protector(IDataProtectionProvider protection) =>
         protection.CreateProtector("delios.sso.state").ToTimeLimitedDataProtector();
 
+    /// <summary>
+    /// Builds the callback address the provider sends the browser back to: <c>PublicUrl</c> when configured, otherwise this request's own scheme and host.
+    /// </summary>
     private static string CallbackUrl(HttpContext http, SsoOptions options) =>
         (string.IsNullOrEmpty(options.PublicUrl) ? $"{http.Request.Scheme}://{http.Request.Host}" : options.PublicUrl.TrimEnd('/'))
         + "/api/auth/sso/callback";
@@ -239,6 +284,8 @@ public static class SsoEndpoints
     private static string SafeReturnUrl(string? url) =>
         url is { Length: > 0 } && url[0] == '/' && !url.StartsWith("//") && !url.StartsWith("/\\") ? url : "/";
 
+    /// <summary>Returns a random URL-safe string made from the given number of random bytes.</summary>
     private static string Random(int bytes = 32) => Base64Url(RandomNumberGenerator.GetBytes(bytes));
+    /// <summary>Encodes bytes as Base64 that is safe in URLs (no padding, - and _ instead of + and /).</summary>
     private static string Base64Url(byte[] data) => Convert.ToBase64String(data).TrimEnd('=').Replace('+', '-').Replace('/', '_');
 }

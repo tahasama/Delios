@@ -25,8 +25,25 @@ using StackExchange.Redis;
 
 namespace Delios.Host.Platform;
 
+/// <summary>
+/// The application's wiring, in one place. <c>AddPlatform</c> registers every service before the app is built; <c>UsePlatform</c> sets up the
+/// request pipeline and maps the endpoints after it is built. Both are called from Program.cs. Start here to find where something is created or which URL goes where.
+/// </summary>
 public static class PlatformSetup
 {
+    /// <summary>
+    /// Registers the app's services. This is dependency injection (DI): instead of a class creating what it needs with <c>new</c>, it lists what it needs
+    /// in its constructor and ASP.NET Core supplies it. For that, each class is registered here with a lifetime: <c>AddSingleton</c> (one shared instance
+    /// for the whole process), <c>AddScoped</c> (one instance per HTTP request or per <c>CreateScope</c>) or <c>AddTransient</c> (a new one every time).
+    /// In order, it registers: settings (options) bound from configuration and validated at start-up; Serilog logging and, if configured, Sentry error
+    /// reporting; the clock, the tenant context and the database (<c>DeliosDbContext</c> on PostgreSQL with NodaTime dates, snake_case names and the
+    /// interceptor that applies the tenant's row-level security); Data Protection keys stored in the database; Redis and the two-level cache;
+    /// the identity, document, review, transmittal, search, extraction, check, schedule and report services; file storage (Azure or S3, chosen from
+    /// configuration); background services (hosted services: the outbox relay on the API, the queue consumers, search indexer and check scheduler on the worker);
+    /// session authentication with a rule that every endpoint needs a signed-in user unless marked <c>AllowAnonymous</c>; rate limits for sign-in and
+    /// single sign-on; trust of proxy headers from private networks; the S3 client; health checks tagged by role; the Prometheus metrics server; and
+    /// problem details, request validation and OpenAPI. Called once at start-up from Program.cs, for every process role and for one-off commands.
+    /// </summary>
     public static void AddPlatform(this WebApplicationBuilder builder)
     {
         var services = builder.Services;
@@ -219,6 +236,14 @@ public static class PlatformSetup
         services.AddOpenApi();
     }
 
+    /// <summary>
+    /// Builds the request pipeline (middleware: steps every HTTP request passes through, in this order) and maps the endpoints. In order: read the client's
+    /// real address and scheme from the proxy headers; add an <c>X-Delios-Node</c> response header naming the server; log each request; turn exceptions into
+    /// problem answers (400 for unreadable input, 500 otherwise); add bodies to bare error status codes; record HTTP metrics; sign the user in from the
+    /// session cookie (authentication), then check access (authorization); apply rate limits. Then it maps <c>/health/live</c> (the process is running) and
+    /// <c>/health/ready</c> (the services this role needs are reachable), the OpenAPI document in development, and, in the API role only, every feature's
+    /// endpoints. Called once from Program.cs after the app is built and when no one-off command was given.
+    /// </summary>
     public static void UsePlatform(this WebApplication app)
     {
         var role = app.Services.GetRequiredService<IOptions<DeliosOptions>>().Value.Role;
@@ -279,6 +304,10 @@ public static class PlatformSetup
         }
     }
 
+    /// <summary>
+    /// Binds a settings class to its configuration section, checks its validation attributes (such as <c>[Required]</c>) and runs that check at start-up,
+    /// so a missing or wrong setting stops the app at once instead of failing at first use.
+    /// </summary>
     private static void AddValidated<T>(IServiceCollection services, string section) where T : class =>
         services.AddOptions<T>().BindConfiguration(section).ValidateDataAnnotations().ValidateOnStart();
 }

@@ -8,14 +8,22 @@ namespace Delios.Host.Identity;
 /// </summary>
 public static class Totp
 {
+    /// <summary>Number of digits in a code.</summary>
     public const int Digits = 6;
+    /// <summary>How long one code is valid, in seconds (one "step").</summary>
     public const int StepSeconds = 30;
+    /// <summary>The Base32 alphabet (RFC 4648) that authenticator apps use for secrets.</summary>
     private const string Alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
 
+    /// <summary>Makes a new random 20-byte (160-bit) secret, the size authenticator apps expect for SHA-1.</summary>
     public static byte[] NewSecret() => RandomNumberGenerator.GetBytes(20);
 
+    /// <summary>Returns the step number for a moment: seconds since 1970 divided by <c>StepSeconds</c>.</summary>
     public static long StepAt(DateTimeOffset time) => time.ToUnixTimeSeconds() / StepSeconds;
 
+    /// <summary>
+    /// Computes the six-digit code for a secret and step, as defined by HOTP (RFC 4226): an HMAC-SHA-1 of the step number, cut down to six digits.
+    /// </summary>
     public static string Code(byte[] secret, long step)
     {
         Span<byte> counter = stackalloc byte[8];
@@ -47,6 +55,7 @@ public static class Totp
         return null;
     }
 
+    /// <summary>Encodes bytes as Base32 text without padding, the form a person types into an authenticator app.</summary>
     public static string Base32(byte[] data)
     {
         var output = new System.Text.StringBuilder();
@@ -65,6 +74,9 @@ public static class Totp
         return output.ToString();
     }
 
+    /// <summary>
+    /// Decodes Base32 text back to bytes, ignoring spaces, padding and letter case. Throws <c>FormatException</c> on any other character.
+    /// </summary>
     public static byte[] FromBase32(string text)
     {
         var bytes = new List<byte>();

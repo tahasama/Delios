@@ -16,13 +16,21 @@ public sealed record SessionInfo(Guid SessionId, Guid TenantId, Guid UserId, str
 /// </summary>
 public sealed class SessionStore(DeliosDbContext db, TenantContext tenant, HybridCache cache, IClock clock)
 {
+    /// <summary>How long a new or renewed session stays valid before the user has to sign in again (12 hours).</summary>
     public static readonly Duration Lifetime = Duration.FromHours(12);
+    /// <summary>
+    /// Cache settings for session checks: a result is reused for at most 30 seconds, both in this process's memory and in Redis.
+    /// </summary>
     private static readonly HybridCacheEntryOptions CacheFor = new()
     {
         Expiration = TimeSpan.FromSeconds(30),
         LocalCacheExpiration = TimeSpan.FromSeconds(30),
     };
 
+    /// <summary>
+    /// Starts a new session for a user who has just signed in: makes a random token, stores only its SHA-256 hash in the database and returns the token so the caller can put it in the session cookie.
+    /// Called by the sign-in endpoints (password, MFA and single sign-on).
+    /// </summary>
     public async Task<(string Token, Instant ExpiresAt)> CreateAsync(User user, CancellationToken cancellationToken)
     {
         var token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32))
@@ -39,6 +47,10 @@ public sealed class SessionStore(DeliosDbContext db, TenantContext tenant, Hybri
         return (token, expires);
     }
 
+    /// <summary>
+    /// Looks up the session for a cookie token and returns who it belongs to, or null when it is unknown, expired, revoked or the user or tenant is no longer active.
+    /// Called on every request by <c>SessionAuthenticationHandler</c>; results are cached (see <c>CacheFor</c>).
+    /// </summary>
     public async Task<SessionInfo?> FindAsync(string token, CancellationToken cancellationToken)
     {
         var hash = Hash(token);
@@ -58,6 +70,9 @@ public sealed class SessionStore(DeliosDbContext db, TenantContext tenant, Hybri
         return expires;
     }
 
+    /// <summary>
+    /// Ends a session (sign-out) by marking it revoked in the database and dropping it from the cache, so no node accepts it any more.
+    /// </summary>
     public async Task RevokeAsync(string token, CancellationToken cancellationToken)
     {
         var hash = Hash(token);
@@ -67,6 +82,9 @@ public sealed class SessionStore(DeliosDbContext db, TenantContext tenant, Hybri
         await cache.RemoveAsync(Key(hash), cancellationToken);
     }
 
+    /// <summary>
+    /// Reads the session, the user and the tenant from the database when the cache has no entry. Returns null when any of them is not valid.
+    /// </summary>
     private async Task<SessionInfo?> LoadAsync(byte[] hash, CancellationToken cancellationToken)
     {
         var now = clock.GetCurrentInstant();
@@ -90,6 +108,10 @@ public sealed class SessionStore(DeliosDbContext db, TenantContext tenant, Hybri
             : new SessionInfo(session.Id, session.TenantId, session.UserId, person.Name, person.IsAdmin, session.ExpiresAt.ToDateTimeOffset());
     }
 
+    /// <summary>
+    /// Hashes a token with SHA-256. Only hashes are stored, so a database leak does not reveal usable tokens.
+    /// </summary>
     private static byte[] Hash(string token) => SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(token));
+    /// <summary>Builds the cache key for a session from its token hash.</summary>
     private static string Key(byte[] hash) => "session:" + Convert.ToHexString(hash);
 }

@@ -15,8 +15,16 @@ namespace Delios.Host.Platform;
 /// </summary>
 public sealed class IdempotencyFilter(DeliosDbContext db, IOptions<JsonOptions> json) : IEndpointFilter
 {
+    /// <summary>
+    /// Name of the HTTP request header that carries the client's idempotency key (any unique string up to 100 characters).
+    /// </summary>
     public const string Header = "Idempotency-Key";
 
+    /// <summary>
+    /// Runs around the endpoint. Without the header the request runs as usual. With a key seen before for this user, it replays the stored answer
+    /// (or refuses if the key was used for a different request). Otherwise it runs the endpoint and, on a 2xx answer, stores it for later retries.
+    /// Attached to "create" endpoints with <c>.AddEndpointFilter&lt;IdempotencyFilter&gt;()</c>.
+    /// </summary>
     public async ValueTask<object?> InvokeAsync(EndpointFilterInvocationContext context, EndpointFilterDelegate next)
     {
         var http = context.HttpContext;
@@ -60,6 +68,9 @@ public sealed class IdempotencyFilter(DeliosDbContext db, IOptions<JsonOptions> 
         return result;
     }
 
+    /// <summary>
+    /// SHA-256 of the request body objects (the endpoint arguments whose type name ends in "Request"), to tell a true retry from a different request with the same key.
+    /// </summary>
     private string Hash(IEnumerable<object?> requests) => Convert.ToHexStringLower(SHA256.HashData(
         Encoding.UTF8.GetBytes(JsonSerializer.Serialize(requests, json.Value.SerializerOptions))));
 }

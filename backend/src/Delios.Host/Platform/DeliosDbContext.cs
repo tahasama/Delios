@@ -8,6 +8,11 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Delios.Host.Platform;
 
+/// <summary>
+/// The application's single Entity Framework Core <c>DbContext</c>: the object that opens database connections, turns LINQ queries into SQL
+/// and saves changes. Each <c>DbSet</c> property below is one table. Registered in PlatformSetup as one instance per HTTP request (scoped).
+/// It also stores the Data Protection keys (<c>IDataProtectionKeyContext</c>).
+/// </summary>
 public sealed class DeliosDbContext(DbContextOptions<DeliosDbContext> options)
     : DbContext(options), IDataProtectionKeyContext
 {
@@ -65,6 +70,10 @@ public sealed class DeliosDbContext(DbContextOptions<DeliosDbContext> options)
     public DbSet<Schedules.ActivityDecision> ActivityDecisions => Set<Schedules.ActivityDecision>();
     public DbSet<Packages.PackageMember> PackageMembers => Set<Packages.PackageMember>();
 
+    /// <summary>
+    /// Called once by Entity Framework Core when it first builds the model. Applies every <c>IEntityTypeConfiguration</c> class in this assembly
+    /// (the *Configuration classes in each feature folder), then marks every Guid <c>Id</c> as set by the application, not the database.
+    /// </summary>
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(DeliosDbContext).Assembly);

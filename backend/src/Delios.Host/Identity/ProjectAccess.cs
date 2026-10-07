@@ -21,8 +21,10 @@ public sealed class ProjectAccess
     public required IReadOnlyList<PermissionRule> Rules { get; init; }
     /// <summary>Our own staff, as opposed to someone representing another party.</summary>
     public required bool IsInternal { get; init; }
+    /// <summary>Code of the party this person represents. Null: our own organization.</summary>
     public string? PartyCode { get; init; }
 
+    /// <summary>Every verb this person holds anywhere on the project, without duplicates.</summary>
     public IReadOnlySet<string> Verbs => Rules.SelectMany(r => r.Verbs).ToHashSet();
 
     /// <summary>Held anywhere in the matrix, whatever the document.</summary>
@@ -48,10 +50,14 @@ public sealed class ProjectAccess
         Rules = function.Rules.Where(r => r.ProjectRole is null || r.ProjectRole == project.ContractRole).ToList(),
     };
 
+    /// <summary>A rule selector matches when it is null (any value) or exactly equal to the document's value.</summary>
     private static bool Matches(string? selector, string? value) =>
         selector is null || string.Equals(selector, value, StringComparison.Ordinal);
 }
 
+/// <summary>
+/// Loads a <c>ProjectAccess</c> from the database for the signed-in user. Used by <c>ProjectAccessFilter</c> on project endpoints.
+/// </summary>
 public sealed class ProjectAccessLoader(DeliosDbContext db)
 {
     /// <summary>

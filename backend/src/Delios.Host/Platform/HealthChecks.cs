@@ -16,9 +16,14 @@ namespace Delios.Host.Platform;
 public sealed class RabbitMqHealthCheck(IOptions<ConnectionStringsOptions> options)
     : IHealthCheck, IAsyncDisposable
 {
+    /// <summary>Lets only one check at a time open or replace the connection.</summary>
     private readonly SemaphoreSlim _gate = new(1, 1);
+    /// <summary>The connection kept open between checks. Null before the first check or after it dropped.</summary>
     private IConnection? _connection;
 
+    /// <summary>
+    /// Called by ASP.NET Core's health check system when a health endpoint is asked. Healthy when a RabbitMQ connection is open or can be opened.
+    /// </summary>
     public async Task<HealthCheckResult> CheckHealthAsync(
         HealthCheckContext context, CancellationToken cancellationToken = default)
     {
@@ -48,6 +53,7 @@ public sealed class RabbitMqHealthCheck(IOptions<ConnectionStringsOptions> optio
         }
     }
 
+    /// <summary>Closes the kept connection when the app shuts down.</summary>
     public async ValueTask DisposeAsync()
     {
         if (_connection is not null) await _connection.DisposeAsync();
@@ -55,8 +61,12 @@ public sealed class RabbitMqHealthCheck(IOptions<ConnectionStringsOptions> optio
     }
 }
 
+/// <summary>
+/// Health check for file storage (an S3-compatible bucket or an Azure Blob container): healthy when the bucket can be reached and exists.
+/// </summary>
 public sealed class ObjectStorageHealthCheck(Documents.IObjectStore store) : IHealthCheck
 {
+    /// <summary>Asks the object store whether the bucket is reachable. Called by ASP.NET Core's health check system.</summary>
     public async Task<HealthCheckResult> CheckHealthAsync(
         HealthCheckContext context, CancellationToken cancellationToken = default)
     {
@@ -76,6 +86,9 @@ public sealed class ObjectStorageHealthCheck(Documents.IObjectStore store) : IHe
 /// <summary>Sends clamd's PING and expects PONG.</summary>
 public sealed class ClamAvHealthCheck(IOptions<ClamAvOptions> options) : IHealthCheck
 {
+    /// <summary>
+    /// Opens a TCP connection to clamd (the ClamAV virus scanner service), sends PING and is healthy only when it answers PONG.
+    /// </summary>
     public async Task<HealthCheckResult> CheckHealthAsync(
         HealthCheckContext context, CancellationToken cancellationToken = default)
     {
@@ -103,6 +116,10 @@ public sealed class ClamAvHealthCheck(IOptions<ClamAvOptions> options) : IHealth
 /// <summary>Status per dependency, without exception details.</summary>
 public static class HealthResponse
 {
+    /// <summary>
+    /// Writes the health report as JSON: the overall status and one status per check, such as <c>{"status":"Healthy","checks":{"postgres":"Healthy"}}</c>.
+    /// Plugged into the health endpoints in PlatformSetup so that error details never leak to callers.
+    /// </summary>
     public static Task WriteAsync(HttpContext context, HealthReport report)
     {
         context.Response.ContentType = "application/json";

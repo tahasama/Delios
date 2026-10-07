@@ -6,8 +6,14 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Delios.Host.Identity;
 
+/// <summary>Body of <c>PUT /api/admin/security</c>. A null field means "leave this setting as it is".</summary>
 public sealed record SecurityPolicyRequest(bool? MfaRequired = null, bool? PasswordSignIn = null);
 
+/// <summary>
+/// Body of <c>PUT /api/admin/security/sso</c>: the organization's single sign-on provider settings.
+/// <c>Authority</c> is the provider's base address (its issuer); <c>Scopes</c> defaults to "openid profile email" when empty;
+/// <c>AllowedDomains</c> limits which email domains may sign in (empty means any).
+/// </summary>
 /// <param name="ClientSecret">Required the first time; left out afterwards, the stored one is kept.</param>
 public sealed record IdentityProviderRequest(
     string? Name, string? Authority, string? ClientId, string? ClientSecret = null, string[]? AllowedDomains = null,
@@ -16,6 +22,10 @@ public sealed record IdentityProviderRequest(
 /// <summary>How the organization's people sign in: the administrator's choices, switched on when wanted.</summary>
 public static class AdminEndpoints
 {
+    /// <summary>
+    /// Registers the administrator-only endpoints under <c>/api/admin</c>. Every request runs in a database transaction
+    /// (<c>TransactionFilter</c>) and is refused with 403 unless the caller is an administrator. Called once at start-up from PlatformSetup.
+    /// </summary>
     public static void MapAdminEndpoints(this IEndpointRouteBuilder app)
     {
         var admin = app.MapGroup("/api/admin").WithTags("Administration")
@@ -29,6 +39,10 @@ public static class AdminEndpoints
         admin.MapPost("/users/{userId:guid}/mfa/reset", ResetMfaAsync);
     }
 
+    /// <summary>
+    /// <c>GET /api/admin/security</c>: returns the organization's sign-in policy (MFA required, password sign-in allowed),
+    /// how many active people have set up two-step sign-in, and the single sign-on settings without the client secret.
+    /// </summary>
     private static async Task<IResult> GetAsync(HttpContext http, DeliosDbContext db, CancellationToken cancellationToken)
     {
         var organization = await db.Tenants.AsNoTracking().SingleAsync(t => t.Id == http.User.TenantId(), cancellationToken);
@@ -52,6 +66,10 @@ public static class AdminEndpoints
         });
     }
 
+    /// <summary>
+    /// <c>PUT /api/admin/security</c>: changes whether two-step sign-in (MFA) is required and whether password sign-in is allowed.
+    /// Password sign-in cannot be turned off unless an identity provider is enabled. The change is written to the audit log.
+    /// </summary>
     private static async Task<IResult> PolicyAsync(
         SecurityPolicyRequest request, HttpContext http, DeliosDbContext db, AuditLog audit, CancellationToken cancellationToken)
     {
@@ -70,6 +88,10 @@ public static class AdminEndpoints
         return Results.NoContent();
     }
 
+    /// <summary>
+    /// <c>PUT /api/admin/security/sso</c>: creates or updates the organization's OpenID Connect identity provider.
+    /// The client secret is encrypted with ASP.NET Core Data Protection before it is stored; turning the provider off turns password sign-in back on.
+    /// </summary>
     private static async Task<IResult> ProviderAsync(
         IdentityProviderRequest request, HttpContext http, DeliosDbContext db, IDataProtectionProvider protection,
         AuditLog audit, CancellationToken cancellationToken)

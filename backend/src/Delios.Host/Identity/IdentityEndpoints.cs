@@ -9,22 +9,39 @@ using NodaTime;
 
 namespace Delios.Host.Identity;
 
+/// <summary>Body of <c>POST /api/auth/sign-in</c>: the organization's short name (slug), the email and the password.</summary>
 public sealed record SignInRequest([Required] string Tenant, [Required] string Email, [Required] string Password);
+/// <summary>
+/// Body of the second sign-in step (<c>/api/auth/mfa</c>, <c>/mfa/setup</c>, <c>/mfa/confirm</c>): the challenge from <c>SignInStep</c> and, where needed, the six-digit or recovery code.
+/// </summary>
 public sealed record MfaRequest(string? Challenge, string? Code = null);
+/// <summary>
+/// Body of the signed-in user's own MFA endpoints under <c>/api/me/mfa</c>: a code from the authenticator app (or a recovery code).
+/// </summary>
 public sealed record CodeRequest(string? Code);
 
 /// <summary>The password was right; a second step is needed. NEXT is MFA_CODE, or MFA_SETUP where the organization requires it and the person has none yet.</summary>
 public sealed record SignInStep(string Next, string Challenge);
 
+/// <summary>
+/// Password sign-in, sign-out, the two-step sign-in (MFA, multi-factor authentication) steps, and <c>/api/me</c> (who am I and which projects am I on).
+/// The endpoint handlers are the private static methods below; <c>MapIdentityEndpoints</c> connects them to URLs.
+/// </summary>
 public static class IdentityEndpoints
 {
+    /// <summary>Wrong passwords or codes in a row before the account is locked.</summary>
     public const int MaxFailedSignIns = 5;
+    /// <summary>How long an account stays locked after too many failures.</summary>
     public static readonly Duration LockoutFor = Duration.FromMinutes(15);
 
     // Verified against when no such person exists, so a wrong email costs the
     // same time as a wrong password and does not reveal who has an account.
     private static readonly string DummyHash = new PasswordHasher<User>().HashPassword(null!, "not-a-password");
 
+    /// <summary>
+    /// Registers the sign-in endpoints under <c>/api/auth</c> (open to anyone, rate limited) and the signed-in user's endpoints under <c>/api/me</c>
+    /// (run in a database transaction by <c>TransactionFilter</c>). Called once at start-up from PlatformSetup.
+    /// </summary>
     public static void MapIdentityEndpoints(this IEndpointRouteBuilder app)
     {
         var auth = app.MapGroup("/api/auth").WithTags("Auth");
@@ -41,6 +58,11 @@ public static class IdentityEndpoints
         me.MapPost("/disable", MyMfaDisableAsync);
     }
 
+    /// <summary>
+    /// <c>POST /api/auth/sign-in</c>: checks the organization, email and password. Wrong answers count towards a 15-minute lockout and are audited.
+    /// When the password is right: refuses non-administrators if the organization allows single sign-on only; asks for the second step
+    /// (<c>SignInStep</c>) when two-step sign-in is on or required; otherwise starts a session and sets the cookie.
+    /// </summary>
     private static async Task<IResult> SignInAsync(
         SignInRequest request, HttpContext http, DeliosDbContext db, TenantContext tenant,
         SessionStore sessions, AuditLog audit, IClock clock, IPasswordHasher<User> hasher, Mfa mfa,
@@ -131,6 +153,9 @@ public static class IdentityEndpoints
 
     // ── Second step ───────────────────────────────────────────────────────────
 
+    /// <summary>
+    /// <c>POST /api/auth/mfa</c>: second sign-in step for someone who has two-step sign-in set up. A right code (or recovery code) starts a session.
+    /// </summary>
     private static async Task<IResult> MfaCodeAsync(
         MfaRequest request, HttpContext http, DeliosDbContext db, TenantContext tenant, Mfa mfa, SessionStore sessions,
         AuditLog audit, IClock clock, IOptions<SessionCookieOptions> cookie, CancellationToken cancellationToken) =>
@@ -142,6 +167,10 @@ public static class IdentityEndpoints
             return (true, Results.NoContent());
         }, audit);
 
+    /// <summary>
+    /// <c>POST /api/auth/mfa/setup</c>: during sign-in, for someone whose organization requires two-step sign-in but who has not set it up yet.
+    /// Returns a new secret and the <c>otpauth://</c> address to show as a QR code. A failure here does not count towards the lockout.
+    /// </summary>
     private static async Task<IResult> MfaSetupAsync(
         MfaRequest request, DeliosDbContext db, TenantContext tenant, Mfa mfa, AuditLog audit, IClock clock,
         CancellationToken cancellationToken) =>
@@ -152,6 +181,10 @@ public static class IdentityEndpoints
             return Task.FromResult((true, Results.Ok(new { secret, uri })));
         }, audit, countsAsFailure: false);
 
+    /// <summary>
+    /// <c>POST /api/auth/mfa/confirm</c>: finishes set-up during sign-in. A right code switches two-step sign-in on, starts a session
+    /// and returns the recovery codes (shown only this once).
+    /// </summary>
     private static async Task<IResult> MfaConfirmAsync(
         MfaRequest request, HttpContext http, DeliosDbContext db, TenantContext tenant, Mfa mfa, SessionStore sessions,
         AuditLog audit, IClock clock, IOptions<SessionCookieOptions> cookie, CancellationToken cancellationToken) =>
@@ -205,13 +238,18 @@ public static class IdentityEndpoints
         return result;
     }
 
+    /// <summary>The 401 answer when the challenge is missing, expired, or the person can no longer sign in.</summary>
     private static IResult ChallengeInvalid() => Problems.Problem(StatusCodes.Status401Unauthorized, "MFA_CHALLENGE_INVALID",
         "Sign in again: that step has expired.", null);
+    /// <summary>The 401 answer for a wrong authenticator or recovery code.</summary>
     private static IResult CodeWrong() => Problems.Problem(StatusCodes.Status401Unauthorized, "MFA_CODE_WRONG",
         "That code is not right.", null);
 
     // ── Your own second step ──────────────────────────────────────────────────
 
+    /// <summary>
+    /// <c>POST /api/me/mfa/setup</c>: a signed-in user starts setting up two-step sign-in. Returns the new secret and <c>otpauth://</c> address.
+    /// </summary>
     private static async Task<IResult> MyMfaSetupAsync(HttpContext http, DeliosDbContext db, Mfa mfa, CancellationToken cancellationToken)
     {
         var user = await db.Users.SingleAsync(u => u.Id == http.User.UserId(), cancellationToken);
@@ -222,6 +260,9 @@ public static class IdentityEndpoints
         return Results.Ok(new { secret, uri });
     }
 
+    /// <summary>
+    /// <c>POST /api/me/mfa/confirm</c>: a signed-in user confirms set-up with a code; returns the recovery codes, shown only this once.
+    /// </summary>
     private static async Task<IResult> MyMfaConfirmAsync(
         CodeRequest request, HttpContext http, DeliosDbContext db, Mfa mfa, AuditLog audit, CancellationToken cancellationToken)
     {
@@ -232,6 +273,9 @@ public static class IdentityEndpoints
         return Results.Ok(new { recoveryCodes = codes });
     }
 
+    /// <summary>
+    /// <c>POST /api/me/mfa/disable</c>: a signed-in user turns two-step sign-in off after giving a valid code. Refused when the organization requires it.
+    /// </summary>
     private static async Task<IResult> MyMfaDisableAsync(
         CodeRequest request, HttpContext http, DeliosDbContext db, Mfa mfa, AuditLog audit, CancellationToken cancellationToken)
     {
@@ -246,6 +290,9 @@ public static class IdentityEndpoints
         return Results.NoContent();
     }
 
+    /// <summary>
+    /// <c>POST /api/auth/sign-out</c>: ends the session in the database (on every server) and deletes the session cookie.
+    /// </summary>
     private static async Task<IResult> SignOutAsync(HttpContext http, SessionStore sessions, CancellationToken cancellationToken)
     {
         if (http.Request.Cookies.TryGetValue(SessionAuthenticationHandler.CookieName, out var token))
@@ -256,6 +303,9 @@ public static class IdentityEndpoints
         return Results.NoContent();
     }
 
+    /// <summary>
+    /// <c>GET /api/me</c>: who the signed-in user is, their organization, and the active projects they are on with their function and verbs there.
+    /// </summary>
     private static async Task<IResult> MeAsync(HttpContext http, DeliosDbContext db, CancellationToken cancellationToken)
     {
         var userId = http.User.UserId();

@@ -8,9 +8,16 @@ namespace Delios.Host.Platform;
 /// </summary>
 public static class Commands
 {
+    /// <summary>
+    /// True when the first command-line argument names one of these commands. Program.cs then runs the command instead of starting the web server.
+    /// </summary>
     public static bool IsCommand(string[] args) =>
         args.Length > 0 && args[0] is DatabaseMigrator.Command or "create-tenant" or "seed-demo" or "reindex";
 
+    /// <summary>
+    /// Runs the command named by the first argument and returns the process exit code (0 success, 2 wrong usage or refused).
+    /// Called from Program.cs after the app is built, so every service is available; the web server is not started.
+    /// </summary>
     public static async Task<int> RunAsync(WebApplication app, string[] args)
     {
         await using var scope = app.Services.CreateAsyncScope();
