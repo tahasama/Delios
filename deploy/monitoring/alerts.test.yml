@@ -47,8 +47,8 @@ tests:
         exp_alerts:
           - exp_labels: { severity: warning }
             exp_annotations:
-              summary: "2 file(s) failed processing five times and are parked."
-              action: "Read the worker logs for the error; after fixing, move them back from delios.files.dead in the RabbitMQ console."
+              summary: "2 message(s) are parked: failed five times, or reached no queue."
+              action: "Each carries x-routing-key (what work it was) and x-error. Read the worker or API logs for the error; after fixing, publish them back to the delios exchange with that routing key from the RabbitMQ console."
 
   - interval: 1m
     input_series:
