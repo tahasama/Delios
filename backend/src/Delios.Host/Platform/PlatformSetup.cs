@@ -41,8 +41,9 @@ public static class PlatformSetup
     /// the identity, document, review, transmittal, search, extraction, check, schedule and report services; file storage (Azure or S3, chosen from
     /// configuration); background services (hosted services: the outbox relay on the API, the queue consumers, search indexer and check scheduler on the worker);
     /// session authentication with a rule that every endpoint needs a signed-in user unless marked <c>AllowAnonymous</c>; rate limits for sign-in and
-    /// single sign-on; trust of proxy headers from private networks; the S3 client; health checks tagged by role; the Prometheus metrics server; and
-    /// problem details, request validation and OpenAPI. Called once at start-up from Program.cs, for every process role and for one-off commands.
+    /// single sign-on; trust of proxy headers from private networks; the S3 client; health checks tagged by role; the Prometheus metrics server
+    /// (Prometheus is the monitoring system that collects the numbers in <c>AppMetrics</c>); and problem details (the standard JSON error format),
+    /// request validation and OpenAPI (a machine-readable description of the API). Called once at start-up from Program.cs, for every process role and for one-off commands.
     /// </summary>
     public static void AddPlatform(this WebApplicationBuilder builder)
     {
