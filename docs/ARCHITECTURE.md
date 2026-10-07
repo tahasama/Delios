@@ -156,6 +156,8 @@ choice belongs to the organization. Each is data its administrator changes:
   whether it needs a new revision. The recommendation: a fault in the submission
   comes back corrected under the same revision; a verdict asking for changes
   needs a new one.
+- **Which checks each project answers to:** any check can be switched off for
+  a project, with the reason on the record.
 - **Each project's working week**, which due dates are counted in.
 - **Review, transmittal and package numbers**, through the same numbering
   schemes as documents; a transmittal number may carry who sends and who
@@ -531,5 +533,13 @@ deployment with tenant isolation in the database.
      under the same revision (on arrival or at the gate, whatever the verdict),
      submissions kept in order within a revision, and its own outcome list.
 5. **Checks engine, schedules, reports.**
+   - Done: the checks engine. 30 checks the register can answer from its own
+     records (setup, running, handover), each counting failing items; a defect
+     register that opens, closes by itself when the register is put right, and
+     reopens if the fault comes back; acceptance with a reason (still counted);
+     checks switched off per project with a reason; integrity (documents free of
+     Critical and Major defects) and coverage (checks answered of those asked).
+     Runs nightly per project on a queue of its own, and on Document Control's request.
+   - Next: schedules and requirements, then reports.
 6. **Next.js moves onto the API**, area by area, through the generated client.
 7. **Content extraction and OCR**, switched off, ready for activation.

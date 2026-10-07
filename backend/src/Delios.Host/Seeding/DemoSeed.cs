@@ -117,7 +117,8 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
             ("PROJECT_DURATION", "Project duration", new { @default = true }),
             ("LIFE_OF_ASSET", "Life of asset", null), ("PERMANENT", "Permanent", null));
         Set(ValueSets.Criticality,
-            ("A", "High", new { retention = "PERMANENT" }), ("B", "Medium", new { retention = "LIFE_OF_ASSET" }), ("C", "Low", null));
+            ("A", "High", new { retention = "PERMANENT" }), ("B", "Medium", new { retention = "LIFE_OF_ASSET" }),
+            ("C", "Low", new { retention = "PROJECT_DURATION" }));
         Set(ValueSets.Confidentiality,
             ("PUBLIC", "Public", null), ("INTERNAL", "Internal", new { @default = true }),
             ("CONFIDENTIAL", "Confidential", new { restricted = true }));

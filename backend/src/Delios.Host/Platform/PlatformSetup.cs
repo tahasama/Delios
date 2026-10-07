@@ -116,6 +116,7 @@ public static class PlatformSetup
         services.AddScoped<Search.SearchService>();
         services.AddOptions<Extraction.ExtractionOptions>().BindConfiguration(Extraction.ExtractionOptions.Section);
         services.AddScoped<Extraction.ExtractionProcessor>();
+        services.AddScoped<Checks.CheckEngine>();
         services.AddHttpClient(Extraction.ExtractionProcessor.HttpClientName, (sp, c) =>
             c.Timeout = TimeSpan.FromSeconds(sp.GetRequiredService<IOptions<Extraction.ExtractionOptions>>().Value.TimeoutSeconds));
         services.AddHttpClient<Search.OpenSearchClient>((sp, c) =>
@@ -138,6 +139,7 @@ public static class PlatformSetup
                     ActivatorUtilities.CreateInstance<Messaging.FileQueueConsumer>(sp, queue));
             }
             if (search.UsesOpenSearch) services.AddHostedService<Search.SearchIndexer>();
+            if (config.GetValue("Checks:Schedule", true)) services.AddHostedService<Checks.CheckScheduler>();
         }
         services.AddScoped<Seeding.TenantSetup>();
         services.AddScoped<Seeding.DemoSeed>();
@@ -269,6 +271,7 @@ public static class PlatformSetup
             Packages.PackageEndpoints.MapPackageEndpoints(app);
             Search.SearchEndpoints.MapSearchEndpoints(app);
             Extraction.ExtractionEndpoints.MapExtractionEndpoints(app);
+            Checks.CheckEndpoints.MapCheckEndpoints(app);
         }
     }
 

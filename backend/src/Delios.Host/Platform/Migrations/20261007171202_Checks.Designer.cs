@@ -4,6 +4,7 @@ using System.Text.Json;
 using Delios.Host.Platform;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using NodaTime;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
@@ -13,9 +14,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Delios.Host.Platform.Migrations
 {
     [DbContext(typeof(DeliosDbContext))]
-    partial class DeliosDbContextModelSnapshot : ModelSnapshot
+    [Migration("20261007171202_Checks")]
+    partial class Checks
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

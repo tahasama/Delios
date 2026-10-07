@@ -66,7 +66,11 @@ public static class Topology
     public static readonly WorkQueue Extraction = new("delios.extract", "delios.extract.retry",
         [Host.Extraction.FileExtract.RoutingKey], Prefetch: 1);
 
-    public static readonly WorkQueue[] Queues = [Files, Extraction];
+    /// <summary>A project's checks: a few seconds to minutes each, never in the way of uploads.</summary>
+    public static readonly WorkQueue Checks = new("delios.checks", "delios.checks.retry",
+        [Host.Checks.CheckRunRequested.RoutingKey], Prefetch: 1);
+
+    public static readonly WorkQueue[] Queues = [Files, Extraction, Checks];
 
     public static async Task DeclareAsync(IChannel channel, CancellationToken cancellationToken)
     {
