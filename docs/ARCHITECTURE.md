@@ -563,10 +563,13 @@ deployment with tenant isolation in the database.
      them, CSV and Excel export of the same rows. Counted when opened, never
      stored; labels from the organization's lists; windows (look-ahead, months,
      review ages, on-time target) are the reader's to change.
-   - Then, before step 6: a guided read of the backend for its owner, new to
+   - Done, before step 6: a guided read of the backend for its owner, new to
      .NET: docs/SYSTEM.md completed for every aspect and tool; a beginner's
      guide (docs/DOTNET-GUIDE.md: endpoints, services, entities, migrations, a
      request followed end to end, running, logs, debugging); and a plain-language
-     comment on every class and method saying what it is for and where it is called from.
+     comment on every class and method saying what it is for and where it is
+     called from. Reading every file for it surfaced edge cases, fixed with a
+     test each (uploads swapped after scanning, a stalled outbox, a stuck check
+     run, a review sent forward, a double-click race, sign-in answers).
 6. **Next.js moves onto the API**, area by area, through the generated client.
 7. **Content extraction and OCR**, switched off, ready for activation.
