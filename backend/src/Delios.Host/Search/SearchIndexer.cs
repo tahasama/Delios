@@ -42,6 +42,9 @@ public sealed class SearchIndexer(IServiceScopeFactory scopes, IOptions<SearchOp
 {
     /// <summary>Most documents sent to the index in one request.</summary>
     public const int Batch = 500;
+
+    /// <summary>How long after a change it is certain to be committed and visible; the mark stays this far behind.</summary>
+    private static readonly Duration Settle = Duration.FromMinutes(1);
     /// <summary>Most characters of file text sent per document; the rest is left out of the index.</summary>
     private const int MaxContent = 1_000_000;
 
@@ -128,16 +131,25 @@ public sealed class SearchIndexer(IServiceScopeFactory scopes, IOptions<SearchOp
             texts.GetValueOrDefault(d.Id))).ToList(), refresh, cancellationToken);
 
         // Moved only once the index has them: a failed pass sends the same documents again.
-        if (mark is null)
+        // And never past a minute ago: a change is stamped before its transaction commits,
+        // so a later-committing one could otherwise land behind the mark and be missed.
+        // Recent changes are simply sent again next pass; that does no harm.
+        var settled = SystemClock.Instance.GetCurrentInstant() - Settle;
+        var upTo = changed.LastOrDefault(d => d.UpdatedAt <= settled);
+        if (upTo is not null)
         {
-            mark = new SearchWatermark { TenantId = tenantId };
-            db.SearchWatermarks.Add(mark);
+            if (mark is null)
+            {
+                mark = new SearchWatermark { TenantId = tenantId };
+                db.SearchWatermarks.Add(mark);
+            }
+            mark.IndexedUpTo = upTo.UpdatedAt;
+            mark.LastId = upTo.Id;
+            await db.SaveChangesAsync(cancellationToken);
         }
-        mark.IndexedUpTo = changed[^1].UpdatedAt;
-        mark.LastId = changed[^1].Id;
-        await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
-        return changed.Count;
+        // Reaching recent changes means this pass has caught up.
+        return upTo == changed[^1] ? changed.Count : Math.Min(changed.Count, Batch - 1);
     }
 
     /// <summary>Cuts text to <c>MaxContent</c> characters.</summary>

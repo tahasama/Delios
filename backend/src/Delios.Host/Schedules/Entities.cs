@@ -36,6 +36,11 @@ public sealed class ScheduleColumns
     public string? Finish { get; set; }
     public string? Responsible { get; set; }
     public string? Departments { get; set; }
+    /// <summary>
+    /// How numeric dates like 03/04/2027 are read: "DMY" (day first, the default) or
+    /// "MDY" (month first, as US exports write them). Named dates (03-Apr-27) are never ambiguous.
+    /// </summary>
+    public string DateOrder { get; set; } = "DMY";
 }
 
 /// <summary>One released schedule revision read into activities, and what it changed.</summary>

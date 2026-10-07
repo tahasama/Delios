@@ -220,7 +220,7 @@ public static class CheckCatalog
                     .Select(r => Rev(ctx.DocumentOf(r), r)));
             }),
         new("RO-02", Phases.Running, "A verdict that is no longer published",
-            "Verdicts given on reviews still open or decided, against the published list", Severities.Major, "CF", async ctx =>
+            "Verdicts given on decided reviews, against the published list", Severities.Major, "CF", async ctx =>
             {
                 var given = await ctx.Db.Reviews.Where(r => r.ProjectId == ctx.Project.Id && r.Verdict != null && r.State == ReviewStates.Decided)
                     .Select(r => new { r.Id, r.Number, r.DocumentId, r.Verdict }).ToListAsync(ctx.CancellationToken);
@@ -317,7 +317,7 @@ public static class CheckCatalog
         new("SC-02", Phases.Running, "An activity started without its documents and nobody decided",
             "Activities past their start with a document still missing and no decision recorded", Severities.Major, "CF", async ctx =>
             {
-                var today = WorkingCalendar.Today(SystemClock.Instance, ctx.Project.TimeZone);
+                var today = ctx.Now.InZone(DateTimeZoneProviders.Tzdb.GetZoneOrNull(ctx.Project.TimeZone) ?? DateTimeZone.Utc).Date;
                 var started = await ctx.Db.Activities.AsNoTracking()
                     .Where(a => a.ProjectId == ctx.Project.Id && a.State == Schedules.ActivityStates.Active && a.Start != null && a.Start <= today
                         && a.MetCount + a.WaivedCount < a.NeedCount
@@ -329,7 +329,7 @@ public static class CheckCatalog
         new("SC-03", Phases.Running, "A waived document never came",
             "Waived needs whose activity has finished (or started, with no finish) and whose document is still not there", Severities.Minor, "OR", async ctx =>
             {
-                var today = WorkingCalendar.Today(SystemClock.Instance, ctx.Project.TimeZone);
+                var today = ctx.Now.InZone(DateTimeZoneProviders.Tzdb.GetZoneOrNull(ctx.Project.TimeZone) ?? DateTimeZone.Utc).Date;
                 var open = await (from n in ctx.Db.Requirements
                                   join a in ctx.Db.Activities on n.ActivityId equals a.Id
                                   where a.ProjectId == ctx.Project.Id && n.State == Schedules.RequirementStates.Waived
@@ -343,7 +343,7 @@ public static class CheckCatalog
         new("PK-06", Phases.Handover, "A package not assessed by its completion date",
             "Open packages past their completion date with no assessment since", Severities.Major, "CF", async ctx =>
             {
-                var today = WorkingCalendar.Today(SystemClock.Instance, ctx.Project.TimeZone);
+                var today = ctx.Now.InZone(DateTimeZoneProviders.Tzdb.GetZoneOrNull(ctx.Project.TimeZone) ?? DateTimeZone.Utc).Date;
                 var late = await ctx.Db.Packages.Where(p => p.ProjectId == ctx.Project.Id && p.State == Packages.PackageStates.Open
                     && p.CompletionDate != null && p.CompletionDate < today && p.AssessedAt == null).ToListAsync(ctx.CancellationToken);
                 return Fail(late.Select(p => new Failure($"package:{p.Id}", "Package", p.Id, null, $"{p.Number} {p.Title}",

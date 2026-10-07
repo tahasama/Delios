@@ -78,7 +78,7 @@ public sealed class PackageService(
         var known = await db.Parties.AsNoTracking().Where(p => recipients.Contains(p.Id) && p.Active).CountAsync(cancellationToken);
         if (known != recipients.Length)
             return Fail(Problems.Invalid("PARTY_UNKNOWN", "Some organizations named are not active parties."));
-        if (RuleProblem(catalog, request.Rule) is { } badRule) return Fail(badRule);
+        if ((RuleProblem(catalog, request.Rule) ?? await OriginatorsProblemAsync(request.Rule, cancellationToken)) is { } badRule) return Fail(badRule);
 
         var now = clock.GetCurrentInstant();
         var package = new Package
@@ -168,7 +168,8 @@ public sealed class PackageService(
     {
         var (package, problem) = await ComposableAsync(access, id, cancellationToken);
         if (problem is not null) return Fail(problem);
-        if (RuleProblem(await Catalog.LoadAsync(db, cancellationToken), request) is { } bad) return Fail(bad);
+        if ((RuleProblem(await Catalog.LoadAsync(db, cancellationToken), request) ?? await OriginatorsProblemAsync(request, cancellationToken)) is { } bad)
+            return Fail(bad);
         package!.Rule = ToRule(request);
         package.RuleCeasedAt = null;
         var joined = await SyncAsync(package, cancellationToken);
@@ -499,8 +500,19 @@ public sealed class PackageService(
 
     /// <summary>
     /// Checks the rule's deliverable types, disciplines and document types are published values. Returns the problem,
-    /// or null when fine. Originators are not checked.
+    /// or null when fine. Originators are checked by <see cref="OriginatorsProblemAsync"/>.
     /// </summary>
+    /// <summary>Checks the rule's originators are active parties, as a document's originator must be. Returns the problem, or null when fine.</summary>
+    private async Task<IResult?> OriginatorsProblemAsync(RuleRequest? rule, CancellationToken cancellationToken)
+    {
+        var named = rule?.Originators?.Distinct().ToList() ?? [];
+        if (named.Count == 0) return null;
+        var known = await db.Parties.Where(p => named.Contains(p.Code) && p.Active).Select(p => p.Code).ToListAsync(cancellationToken);
+        var unknown = named.Except(known).ToList();
+        return unknown.Count == 0 ? null
+            : Problems.Invalid("VALUE_NOT_PUBLISHED", $"{string.Join(", ", unknown)} is not an active party.", new { field = "rule.originators", value = unknown });
+    }
+
     private static IResult? RuleProblem(Catalog catalog, RuleRequest? rule)
     {
         if (rule is null) return null;

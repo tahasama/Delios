@@ -332,6 +332,7 @@ public sealed class ReportBuilder(IClock clock)
         ];
         var bars = new List<Bar>();
         var rows = new List<IReadOnlyList<Cell>>();
+        var late = 0;
         foreach (var a in activities)
         {
             var bar = new Bar(a.Code, []);
@@ -340,6 +341,7 @@ public sealed class ReportBuilder(IClock clock)
                 var key = n.State == RequirementStates.Met ? "met" : n.State == RequirementStates.Waived ? "waived"
                     : n.NeededBy is { } by && by < _today ? "late" : "coming";
                 bar.Add(key);
+                if (key == "late") late++;
                 var has = current.GetValueOrDefault(n.DocumentId);
                 rows.Add(
                 [
@@ -352,7 +354,6 @@ public sealed class ReportBuilder(IClock clock)
             if (bar.Values.Count > 0) bars.Add(bar);
         }
         var ready = activities.Count(a => ReadinessLabels.Of(a, _today, window) is ReadinessLabels.Ready or ReadinessLabels.ReadyWithWaivers);
-        var late = rows.Count(r => r[^1].Text == "Missing and late");
         return Make(ReportIds.Readiness, "Activity readiness", $"Are the activities of the next {options.HorizonDays} days covered by their documents?",
             "Look-ahead: for the site coordination or planning meeting.",
             [

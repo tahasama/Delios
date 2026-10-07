@@ -542,7 +542,8 @@ deployment with tenant isolation in the database.
      Runs nightly per project on a queue of its own, and on Document Control's request.
    - Done: schedules and requirements. The schedule is a controlled document:
      only a released revision is read, from its Excel (.xlsx) or CSV export,
-     columns found by heading (or named per project); each revision's changes are
+     columns found by heading (or named per project), numeric dates read day
+     first or month first as the project says; each revision's changes are
      kept (new, moved, changed, removed). Activities have a start and an optional
      finish. Each need names a document and what it serves (a reason for issue;
      one marked "executes" is met only at a status marked "executes"), counted

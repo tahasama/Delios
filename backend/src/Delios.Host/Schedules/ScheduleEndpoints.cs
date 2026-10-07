@@ -102,6 +102,8 @@ public static class ScheduleEndpoints
         if (document is null) return Problems.NotFound("DOCUMENT_NOT_FOUND", "No such document.");
         if (request.DefaultLeadDays is < 0 or > 365 || request.RiskWindowDays is < 0 or > 365)
             return Problems.Invalid("DAYS_INVALID", "Days are between 0 and 365.");
+        if (request.Columns is { DateOrder: var order } && order is not ("DMY" or "MDY"))
+            return Problems.Invalid("DATE_ORDER_INVALID", "Numeric dates are read day first (DMY) or month first (MDY).");
         var source = await db.ScheduleSources.SingleOrDefaultAsync(s => s.ProjectId == access.Project.Id, cancellationToken);
         if (source is null)
         {
@@ -325,6 +327,8 @@ public static class ScheduleEndpoints
             return Problems.Forbidden("DECISION_NOT_ALLOWED", "Your function does not record decisions about activities.");
         var activity = await db.Activities.AsNoTracking().SingleOrDefaultAsync(a => a.Id == activityId && a.ProjectId == access.Project.Id, cancellationToken);
         if (activity is null) return NotFound();
+        if (activity.State == ActivityStates.Removed)
+            return Problems.Conflict("ACTIVITY_REMOVED", "The schedule no longer has this activity: there is nothing to decide.");
         var decision = request.Decision ?? "";
         if (!(await Catalog.LoadAsync(db, cancellationToken)).IsActive(ScheduleSets.Decisions, decision))
             return Problems.Invalid("VALUE_NOT_PUBLISHED", $"{decision} is not a published activity decision.", new { field = "decision", value = decision });
@@ -361,6 +365,7 @@ public static class ScheduleEndpoints
     {
         var access = ProjectAccessFilter.Of(http);
         var today = WorkingCalendar.Today(clock, access.Project.TimeZone);
+        var zone = DateTimeZoneProviders.Tzdb.GetZoneOrNull(access.Project.TimeZone) ?? DateTimeZone.Utc;
         var activity = await db.Activities.AsNoTracking().Include(a => a.Requirements)
             .SingleOrDefaultAsync(a => a.Id == activityId && a.ProjectId == access.Project.Id, cancellationToken);
         if (activity is null) return NotFound();
@@ -382,26 +387,26 @@ public static class ScheduleEndpoints
             var external = revision?.AuthoredByParty is not null;
             var checkpoints = new List<Checkpoint>
             {
-                Point(today, external ? "Sent in by the supplier" : "Sent for review", "Submission due",
+                Point(today, zone, external ? "Sent in by the supplier" : "Sent for review", "Submission due",
                     due?.PlusDays(-routeDays), review?.StartedAt, external ? document.Originator ?? "the supplier" : revision?.AuthoredByName ?? "its author"),
             };
             foreach (var step in review?.Steps.OrderBy(s => s.Index) ?? Enumerable.Empty<ReviewStep>())
             {
-                checkpoints.Add(Point(today, step.PartyName is null ? $"Review step {step.Index + 1}: {step.Title}" : $"{step.PartyName}: {step.Title}",
+                checkpoints.Add(Point(today, zone, step.PartyName is null ? $"Review step {step.Index + 1}: {step.Title}" : $"{step.PartyName}: {step.Title}",
                     "Step due", step.DueDate, step.CompletedAt, step.PartyName ?? step.FunctionCode ?? "the step"));
             }
-            checkpoints.Add(Point(today, "Released", "Needed by", due, revision?.ReleasedAt, "Document Control"));
-            checkpoints.Add(Point(today, "Issued", "Needed by", due, issued, "Document Control"));
+            checkpoints.Add(Point(today, zone, "Released", "Needed by", due, revision?.ReleasedAt, "Document Control"));
+            checkpoints.Add(Point(today, zone, "Issued", "Needed by", due, issued, "Document Control"));
             result.Add(new NeedLateness(need.Id, document.Number, need.State, checkpoints, checkpoints.FirstOrDefault(c => c.Late)));
         }
         return Results.Ok(result);
     }
 
     /// <summary>Builds one checkpoint and decides whether it was late: done after its due day, or not done and the due day has passed.</summary>
-    private static Checkpoint Point(LocalDate today, string name, string deadline, LocalDate? due, Instant? at, string owedBy)
+    private static Checkpoint Point(LocalDate today, DateTimeZone zone, string name, string deadline, LocalDate? due, Instant? at, string owedBy)
     {
-        // Late: done after its day, or not done and its day has passed.
-        var day = at?.InUtc().Date ?? today;
+        // Late: done after its day, or not done and its day has passed. Days are the project's.
+        var day = at?.InZone(zone).Date ?? today;
         return new Checkpoint(name, deadline, due?.ToDateOnly(), at?.ToDateTimeOffset(), due is not null && day > due, owedBy);
     }
 

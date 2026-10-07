@@ -196,7 +196,7 @@ public sealed class ScheduleTests(Infrastructure infrastructure) : IClassFixture
         var second = await ScheduleRevisionAsync(engineer, project, schedule,
             "Activity ID;Activity Name;Start;Finish\n"
             + $"A100;Pour inlet base slab;{Day(12)};{Day(15)}\n"
-            + $"A200;Install switchgear;{Day(60)};{Day(70)}\n"
+            + $"a200;Install switchgear;{Day(60)};{Day(70)}\n"
             + $"A400;Commission pumps;{Day(90)};\n");
         await ReleaseAsync(engineer, approver, controller, project, second);
         var imports = await UntilAsync(controller, $"{p}/schedule", s => s.GetProperty("imports").GetArrayLength() == 2);
@@ -206,7 +206,12 @@ public sealed class ScheduleTests(Infrastructure infrastructure) : IClassFixture
             (latest.GetProperty("added").GetInt32(), latest.GetProperty("moved").GetInt32(), latest.GetProperty("removed").GetInt32(),
                 latest.GetProperty("changed").GetInt32()));
         var now = await GetAsync(engineer, $"{p}/activities");
-        Assert.Equal(["A100", "A200", "A400"], now.EnumerateArray().Select(x => x.GetProperty("code").GetString()).Order());
+        // "a200" is A200 written in another case: the same activity, not a new one.
+        Assert.Equal(["A100", "A200", "A400"], now.EnumerateArray().Select(x => x.GetProperty("code").GetString()!.ToUpperInvariant()).Order());
+        var gone = (await GetAsync(engineer, $"{p}/activities?includeRemoved=true")).EnumerateArray().Single(x => x.GetProperty("code").GetString() == "A300");
+        var (removed, removedBody) = await Flow.PostAsync(controller, $"{p}/activities/{gone.GetProperty("id").GetGuid()}/decisions",
+            new { decision = "CARRIED", responsibleName = "Site manager", reason = "Too late." });
+        Assert.Equal((HttpStatusCode.Conflict, "ACTIVITY_REMOVED"), (removed, Flow.Code(removedBody)));
         var moved = await GetAsync(engineer, a("A100"));
         Assert.Equal(DateOnly.FromDateTime(Today.AddDays(5)), moved.GetProperty("needs")[0].GetProperty("neededBy").Deserialize<DateOnly>());
         var (reread, rereadBody) = await Flow.PostAsync(controller, $"{p}/schedule/import", new { });
@@ -216,7 +221,7 @@ public sealed class ScheduleTests(Infrastructure infrastructure) : IClassFixture
         var report = await GetAsync(engineer, $"{p}/reports/readiness?horizonDays=60");
         var lines = report.GetProperty("rows").EnumerateArray()
             .Select(r => r.EnumerateArray().Select(c => c.GetProperty("text").GetString()).ToList()).ToList();
-        Assert.Equal([("A100", "For execution", "There"), ("A200", "For information", "Waived, still followed up")],
+        Assert.Equal([("A100", "For execution", "There"), ("a200", "For information", "Waived, still followed up")],
             lines.Select(l => (l[0], l[4], l[7])));
         Assert.Equal("Electrical", lines[1][3]);
     }
@@ -293,6 +298,18 @@ public sealed class ScheduleTests(Infrastructure infrastructure) : IClassFixture
             (activities[0].Code, activities[0].Name, activities[0].Start, activities[0].Finish));
         Assert.Equal(["Civil", "Survey"], activities[0].Departments);
         Assert.Null(activities[1].Start);
+    }
+
+    [Fact]
+    public void A_csv_field_may_hold_line_breaks_and_month_first_dates_are_read_when_the_project_says_so()
+    {
+        var csv = "Activity ID,Activity Name,Start\r\nA1,\"Pour slab,\r\nbay 1\",03/04/2027\r\nA2,Strike forms,12/31/2027\r\n";
+        var dayFirst = ScheduleReader.Read(new MemoryStream(Encoding.UTF8.GetBytes(csv)), "x.csv", new ScheduleColumns());
+        Assert.Contains("12/31/2027", dayFirst.Error);
+        var (activities, error) = ScheduleReader.Read(new MemoryStream(Encoding.UTF8.GetBytes(csv)), "x.csv", new ScheduleColumns { DateOrder = "MDY" });
+        Assert.Null(error);
+        Assert.Equal(("A1", "Pour slab,\r\nbay 1", new LocalDate(2027, 3, 4)), (activities![0].Code, activities[0].Name, activities[0].Start));
+        Assert.Equal(new LocalDate(2027, 12, 31), activities[1].Start);
     }
 
     [Theory]

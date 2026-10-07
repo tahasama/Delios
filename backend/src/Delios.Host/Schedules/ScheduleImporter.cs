@@ -117,7 +117,9 @@ public sealed class ScheduleImporter(
         }
         parsed = parsed.Select(p => p with { Departments = Disciplines(p.Departments) }).ToList();
 
-        var existing = await db.Activities.Where(a => a.ProjectId == revision.ProjectId).ToDictionaryAsync(a => a.Code, cancellationToken);
+        // Codes match whatever their letter case: "a100" in one revision is "A100" in the next.
+        var existing = (await db.Activities.Where(a => a.ProjectId == revision.ProjectId).ToListAsync(cancellationToken))
+            .ToDictionary(a => a.Code, StringComparer.OrdinalIgnoreCase);
         foreach (var row in parsed)
         {
             if (!existing.TryGetValue(row.Code, out var activity))
@@ -146,6 +148,7 @@ public sealed class ScheduleImporter(
             else if (changed) record.Changed++;
             else record.Unchanged++;
             if (moved || changed) record.Changes.Add(Change(row.Code, row.Name, moved ? "MOVED" : "CHANGED", activity, row));
+            activity.Code = row.Code;
             activity.Name = row.Name;
             activity.Start = row.Start;
             activity.Finish = row.Finish;

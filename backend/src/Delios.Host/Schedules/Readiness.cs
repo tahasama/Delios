@@ -84,7 +84,7 @@ public static class Readiness
         }
     }
 
-    /// <summary>Every active activity that needs this document: the ones its release may change.</summary>
+    /// <summary>Every activity (active or removed) that needs this document: the ones its release may change.</summary>
     public static Task<List<Guid>> NeedingAsync(DeliosDbContext db, Guid documentId, CancellationToken cancellationToken) =>
         db.Requirements.Where(r => r.DocumentId == documentId).Select(r => r.ActivityId).Distinct().ToListAsync(cancellationToken);
 
@@ -99,9 +99,9 @@ public static class Readiness
     /// </summary>
     public static bool Serves(Catalog catalog, Requirement need, string? status)
     {
-        if (status is null) return false;
-        if (need.RequiredStatuses.Length > 0) return need.RequiredStatuses.Contains(status);
+        if (need.RequiredStatuses.Length > 0) return status is not null && need.RequiredStatuses.Contains(status);
         var executes = catalog.Prop(TransmittalSets.Reasons, need.Purpose, "executes") is { ValueKind: JsonValueKind.True };
-        return !executes || catalog.Prop(ReviewSets.Statuses, status, "executes") is { ValueKind: JsonValueKind.True };
+        // Any release serves a purpose that does not execute, even one released without a status.
+        return !executes || (status is not null && catalog.Prop(ReviewSets.Statuses, status, "executes") is { ValueKind: JsonValueKind.True });
     }
 }

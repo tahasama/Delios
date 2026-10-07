@@ -27,12 +27,18 @@ public static class ScheduleReader
         ["departments"] = ["departments", "department", "disciplines", "discipline"],
     };
 
-    /// <summary>The date layouts accepted in the file. Day comes before month in the numeric ones.</summary>
-    private static readonly string[] DateFormats =
+    /// <summary>The date layouts that cannot be misread: month by name, or year first.</summary>
+    private static readonly string[] NamedFormats =
     [
         "dd-MMM-yy", "dd-MMM-yy HH:mm", "dd-MMM-yyyy", "dd-MMM-yyyy HH:mm", "yyyy-MM-dd", "yyyy-MM-dd HH:mm",
-        "yyyy-MM-ddTHH:mm:ss", "dd/MM/yyyy", "dd/MM/yyyy HH:mm", "d/M/yyyy", "dd.MM.yyyy", "d MMM yyyy", "MMM d, yyyy",
+        "yyyy-MM-ddTHH:mm:ss", "d MMM yyyy", "MMM d, yyyy",
     ];
+
+    /// <summary>Numeric layouts with the day first.</summary>
+    private static readonly string[] DayFirst = ["d/M/yyyy", "d/M/yyyy H:mm", "d.M.yyyy", "d-M-yyyy"];
+
+    /// <summary>Numeric layouts with the month first (US exports).</summary>
+    private static readonly string[] MonthFirst = ["M/d/yyyy", "M/d/yyyy H:mm", "M/d/yyyy h:mm tt", "M.d.yyyy", "M-d-yyyy"];
 
     /// <summary>True for file names this reader can read (.xlsx or .csv). Used by the importer to pick the file of a revision.</summary>
     public static bool CanRead(string fileName) =>
@@ -82,8 +88,9 @@ public static class ScheduleReader
                 var id = Cell(code);
                 if (id is null) continue;
                 if (!seen.Add(id)) return (null, $"Row {r + 1}: activity {id} appears twice.");
-                var (startDate, startOk) = ParseDate(Cell(start));
-                var (finishDate, finishOk) = ParseDate(Cell(finish));
+                var monthFirst = string.Equals(columns.DateOrder, "MDY", StringComparison.OrdinalIgnoreCase);
+                var (startDate, startOk) = ParseDate(Cell(start), monthFirst);
+                var (finishDate, finishOk) = ParseDate(Cell(finish), monthFirst);
                 if (!startOk) return (null, $"Row {r + 1}: '{Cell(start)}' is not a date.");
                 if (!finishOk) return (null, $"Row {r + 1}: '{Cell(finish)}' is not a date.");
                 activities.Add(new ParsedActivity(id, Cell(name) ?? id, startDate, finishDate, Cell(responsible),
@@ -115,48 +122,60 @@ public static class ScheduleReader
         return rows;
     }
 
-    /// <summary>Comma, semicolon or tab separated (whichever the heading line uses most), with quoted fields.</summary>
+    /// <summary>
+    /// Comma, semicolon or tab separated (whichever the heading line uses most), with
+    /// quoted fields. A quoted field may hold the separator, doubled quotes and line breaks.
+    /// </summary>
     private static List<string[]> ReadCsv(Stream content)
     {
         using var reader = new StreamReader(content, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
-        var lines = new List<string>();
-        while (reader.ReadLine() is { } line) lines.Add(line);
-        if (lines.Count == 0) return [];
-        var separator = new[] { ',', ';', '\t' }.MaxBy(s => lines[0].Count(c => c == s));
-        return lines.Select(line => SplitCsv(line, separator)).ToList();
-    }
+        var text = reader.ReadToEnd();
+        if (text.Length == 0) return [];
+        var firstLine = text.Split('\n', 2)[0];
+        var separator = new[] { ',', ';', '\t' }.MaxBy(s => firstLine.Count(c => c == s));
 
-    /// <summary>Splits one CSV line into fields, honouring double quotes and doubled quotes inside them.</summary>
-    private static string[] SplitCsv(string line, char separator)
-    {
+        var rows = new List<string[]>();
         var fields = new List<string>();
         var field = new StringBuilder();
         var quoted = false;
-        for (var i = 0; i < line.Length; i++)
+        for (var i = 0; i < text.Length; i++)
         {
-            var c = line[i];
+            var c = text[i];
             if (quoted)
             {
-                if (c == '"' && i + 1 < line.Length && line[i + 1] == '"') { field.Append('"'); i++; }
+                if (c == '"' && i + 1 < text.Length && text[i + 1] == '"') { field.Append('"'); i++; }
                 else if (c == '"') quoted = false;
                 else field.Append(c);
             }
             else if (c == '"') quoted = true;
             else if (c == separator) { fields.Add(field.ToString()); field.Clear(); }
+            else if (c is '\n' or '\r')
+            {
+                if (c == '\r' && i + 1 < text.Length && text[i + 1] == '\n') i++;
+                fields.Add(field.ToString());
+                field.Clear();
+                rows.Add([.. fields]);
+                fields.Clear();
+            }
             else field.Append(c);
         }
-        fields.Add(field.ToString());
-        return [.. fields];
+        if (field.Length > 0 || fields.Count > 0)
+        {
+            fields.Add(field.ToString());
+            rows.Add([.. fields]);
+        }
+        return rows;
     }
 
     /// <summary>Empty is fine (no date); anything else must be a date.</summary>
-    private static (LocalDate? Date, bool Ok) ParseDate(string? text)
+    private static (LocalDate? Date, bool Ok) ParseDate(string? text, bool monthFirst)
     {
         if (text is null) return (null, true);
         // P6 marks actual dates with " A" and constrained ones with "*".
         var cleaned = text.TrimEnd('*', ' ').Trim();
         if (cleaned.EndsWith(" A", StringComparison.Ordinal)) cleaned = cleaned[..^2].Trim();
-        if (DateTime.TryParseExact(cleaned, DateFormats, CultureInfo.InvariantCulture, DateTimeStyles.AllowWhiteSpaces, out var exact))
+        string[] formats = [.. NamedFormats, .. monthFirst ? MonthFirst : DayFirst];
+        if (DateTime.TryParseExact(cleaned, formats, CultureInfo.InvariantCulture, DateTimeStyles.AllowWhiteSpaces, out var exact))
             return (LocalDate.FromDateTime(exact), true);
         if (double.TryParse(cleaned, NumberStyles.Float, CultureInfo.InvariantCulture, out var serial) && serial is > 20000 and < 80000)
             return (LocalDate.FromDateTime(DateTime.FromOADate(serial)), true);

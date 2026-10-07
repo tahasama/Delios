@@ -135,6 +135,17 @@ public sealed class PackageTests(Infrastructure infrastructure) : IClassFixture<
         var (engineerId, approverId, _) = await PeopleAsync(engineer, project, first);
         var packages = $"/api/projects/{project}/packages";
 
+        var (stranger, strangerBody) = await Flow.PostAsync(engineer, packages, new
+        {
+            title = "From nobody",
+            reason = "RECORD",
+            requiredStatuses = new[] { "IFC" },
+            ownerIds = new[] { engineerId },
+            acceptorIds = new[] { approverId },
+            rule = new { originators = new[] { "NOT-A-PARTY" } },
+        });
+        Assert.Equal((HttpStatusCode.UnprocessableEntity, "VALUE_NOT_PUBLISHED"), (stranger, Flow.Code(strangerBody)));
+
         var (_, package) = await Flow.PostAsync(engineer, packages, new
         {
             title = "Electrical handover",

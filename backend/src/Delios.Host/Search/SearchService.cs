@@ -45,8 +45,9 @@ public sealed class SearchService(
                 var order = ranked.Select((id, i) => (id, i)).ToDictionary(x => x.id, x => x.i);
                 return new SearchResult(SearchOptions.OpenSearch, visible.OrderBy(d => order[d.Id]).Take(size).ToList());
             }
-            catch (Exception e) when (e is HttpRequestException or InvalidOperationException or TaskCanceledException
-                && !cancellationToken.IsCancellationRequested)
+            // Whatever goes wrong with the index (down, slow, an answer it cannot parse),
+            // the register still answers, from Postgres.
+            catch (Exception e) when (!cancellationToken.IsCancellationRequested)
             {
                 AppMetrics.SearchFallbacks.Inc();
                 logger.LogWarning(e, "Search index unavailable; answering from Postgres");
