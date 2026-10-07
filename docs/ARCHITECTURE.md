@@ -135,14 +135,25 @@ choice belongs to the organization. Each is data its administrator changes:
 - **What each deliverable type requires** before it can be registered.
 - **Functions and the permission matrix.**
 - **Review routes:** steps in order, each answered by a function's holders on
-  the project (the first answer, or all of them), working days per step, which
-  documents the route serves, and which statuses its deciding step may grant.
+  the project (the first answer, or all of them) or by an outside party (with
+  the reason for issue on the transmittal that carries it), working days per
+  step, which documents the route serves, and which statuses its deciding step
+  may grant.
+- **Outside parties:** whether each answers here with its own accounts or by
+  proxy (one of ours sends it and records the answer), which of our functions
+  carries the exchange (Document Control when none is named), their own system,
+  and whether an answer recorded for them must carry proof.
+- **Reasons for issue,** and for each whether a response is wanted and in how
+  many working days.
+- **Distribution:** who receives which documents is the permission matrix's
+  RECEIVE verb, not a second list. Sending outside it is allowed with a reason.
 - **Review vocabulary:** the statuses a released revision may carry, the
   deciding step's verdicts and which of them let a revision proceed, what an
   adviser's comments amount to, comment classes and which block the release,
   and the reasons a route may be sent back to a step.
 - **Each project's working week**, which due dates are counted in.
-- **Review numbers**, through the same numbering schemes as documents.
+- **Review and transmittal numbers**, through the same numbering schemes as
+  documents; a transmittal number may carry who sends and who receives it.
 
 What the Standard itself requires is enforced for everyone: a number is
 allocated by the system and never reused, a revision value is never reused on
@@ -488,8 +499,16 @@ deployment with tenant isolation in the database.
      later step, Document Control's release or return, rewinding a route to an
      earlier step, supersession, stamped and SUPERSEDED-watermarked copies made
      by the worker, the work queue.
-   - Next: issue requests and transmittals, steps answered by outside parties,
-     packages.
+   - Done: issue requests (anyone with standing asks, with a reason for issue;
+     the deciding step may ask with its verdict; the release carries them out;
+     where nobody holds Document Control, whoever asked sends it), recipients
+     proposed by the matrix with a reason required outside it, numbered
+     transmittals with read and acknowledgement evidence, the "released, never
+     sent" list, steps answered by outside parties either in the app (sent to
+     them on a transmittal, which is what lets them read it) or by proxy
+     (dispatch with channel and their reference, then their answer recorded
+     with their own wording and proof filed against the revision).
+   - Next: packages.
 5. **Checks engine, schedules, reports.**
 6. **Next.js moves onto the API**, area by area, through the generated client.
 7. **Content extraction and OCR**, switched off, ready for activation.

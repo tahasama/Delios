@@ -135,6 +135,81 @@ if ($stamped) {
     Write-Host "Revision $($current.value) is $($current.state) at $($current.statusCode); no stamped copy after 60 s. Is the worker running?" -ForegroundColor Yellow
 }
 
+Step 'Released, never sent: nobody has been told yet'
+$waiting = Call GET "/api/projects/$($project.id)/not-issued" $null $control
+$mine = $waiting | Where-Object { $_.revisionId -eq $revision.id }
+Write-Host "$($mine.documentNumber) rev $($mine.revision) at $($mine.status): not issued"
+
+Step 'The engineer asks for it to go to the viewers, for information'
+$distribution = Call GET "/api/projects/$($project.id)/documents/$($doc.id)/distribution"
+Write-Host "The matrix proposes: $(($distribution.proposed | ForEach-Object { $_.name }) -join ', ')"
+$viewer = $distribution.proposed | Where-Object { $_.name -eq 'Victor Viewer' }
+$asked = Call POST "/api/projects/$($project.id)/revisions/$($revision.id)/issue-requests" @{
+    reason = 'INFORMATION'; userIds = @($viewer.id); note = 'For the site file.'
+}
+Write-Host "Request $($asked.request.status): $($asked.request.reason), waiting for Document Control"
+
+Step 'Document Control sends it'
+$sent = Call POST "/api/projects/$($project.id)/issue-requests/$($asked.request.id)/carry-out" @{} $control
+Write-Host "Transmittal $($sent.transmittals -join ', ')"
+
+Step 'The viewer opens it and acknowledges it'
+$viewerSession = SignIn 'viewer@demo.local'
+$inbox = Call GET "/api/projects/$($project.id)/transmittals" $null $viewerSession
+$transmittal = Call POST "/api/projects/$($project.id)/transmittals/$($inbox[0].id)/acknowledge" @{} $viewerSession
+$r = $transmittal.recipients[0]
+Write-Host "$($transmittal.number) to $($r.name): opened $($r.openedAt), acknowledged $($r.acknowledgedAt)"
+
+Step 'A high-criticality drawing goes to the client for approval'
+function Upload($path, $name, [byte[]]$data, $as = $script:session) {
+    $hash = -join ($hasher.ComputeHash($data) | ForEach-Object { $_.ToString('x2') })
+    $t = Call POST $path @{ fileName = $name; size = $data.Length; contentType = 'application/pdf'; sha256 = $hash } $as
+    Invoke-WebRequest -Method PUT -Uri $t.url -Body $data -ContentType 'application/pdf' -UseBasicParsing | Out-Null
+    $t.fileId
+}
+$pfdTitle = "Inlet works process flow diagram $(Get-Date -Format 'HHmmss')"
+$pfd = Call POST "/api/projects/$($project.id)/documents" @{
+    title = $pfdTitle; deliverableType = 'ENG'; docType = 'DWG'; discipline = 'PR'; subproject = '20'; criticality = 'A'
+}
+[byte[]]$pfdBytes = New-Pdf $pfdTitle
+$pfdFile = Upload "/api/projects/$($project.id)/documents/$($pfd.id)/uploads" 'PFD.pdf' $pfdBytes
+$pfdRevision = Call POST "/api/projects/$($project.id)/documents/$($pfd.id)/revisions" @{ fileIds = @($pfdFile) }
+do {
+    Start-Sleep -Seconds 1
+    $current = (Call GET "/api/projects/$($project.id)/documents/$($pfd.id)").revisions[0]
+} while ($current.filesState -eq 'PROCESSING')
+$clientReview = Call POST "/api/projects/$($project.id)/revisions/$($pfdRevision.id)/reviews" @{}
+Write-Host "$($pfd.number): $($clientReview.number) on route '$($clientReview.route)'"
+foreach ($s in $clientReview.steps) {
+    $who = if ($s.party) { "$($s.party), $($s.participation)" } else { $s.function }
+    Write-Host ("  step {0}: {1} ({2})" -f $s.number, $s.title, $who)
+}
+$clientReview = Call POST "/api/projects/$($project.id)/reviews/$($clientReview.id)/answer" @{}
+
+Step 'The client works in its own portal: Document Control sends it and records that it went'
+$clientReview = Call POST "/api/projects/$($project.id)/reviews/$($clientReview.id)/dispatch" @{
+    channel = 'Client portal'; reference = 'NWU-SUB-0042'
+} $control
+$clientStep = $clientReview.steps[1]
+$carried = Call GET "/api/projects/$($project.id)/transmittals/$($clientStep.transmittalId)" $null $control
+Write-Host "Sent on $($carried.number) by $($clientStep.dispatchChannel), their reference $($clientStep.dispatchRef); answer due $($clientStep.dueDate)"
+
+Step "The client's answer comes back: Document Control records it, with their stamped copy as proof"
+[byte[]]$proofBytes = New-Pdf 'Northwater Utility - Code 1 - Approved'
+$proof = Upload "/api/projects/$($project.id)/reviews/$($clientReview.id)/evidence" 'client-stamped.pdf' $proofBytes $control
+$clientReview = Call POST "/api/projects/$($project.id)/reviews/$($clientReview.id)/answer" @{
+    verdict = 'C1'; status = 'AFC'; foreignAnswer = 'Code 1: approved'; evidenceFileId = $proof
+} $control
+$clientStep = $clientReview.steps[1]
+Write-Host "Verdict $($clientReview.verdict), granting $($clientReview.grantedStatus); they wrote '$($clientStep.foreignAnswer)'; recorded by $($clientStep.recordedBy)"
+$clientReview = Call POST "/api/projects/$($project.id)/reviews/$($clientReview.id)/release" @{} $control
+Write-Host "Released: $($clientReview.state)"
+
+Step 'The transmittal log'
+foreach ($t in (Call GET "/api/projects/$($project.id)/transmittals" $null $control)) {
+    Write-Host ('{0,-24} {1,-12} to {2}' -f $t.number, $t.reason, $t.to)
+}
+
 Step 'The register'
 foreach ($d in (Call GET "/api/projects/$($project.id)/documents").items) {
     Write-Host ('{0,-24} rev {1,-2} {2,-15} {3}' -f $d.number, $d.latestRevision, $d.latestRevisionState, $d.title)

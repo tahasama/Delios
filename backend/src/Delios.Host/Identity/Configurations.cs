@@ -23,6 +23,9 @@ internal sealed class PartyConfiguration : IEntityTypeConfiguration<Party>
         b.HasIndex(x => new { x.TenantId, x.Code }).IsUnique();
         b.Property(x => x.Code).HasMaxLength(32);
         b.Property(x => x.Name).HasMaxLength(200);
+        b.Property(x => x.Participation).HasMaxLength(16);
+        b.Property(x => x.CustodianFunction).HasMaxLength(32);
+        b.Property(x => x.ExternalSystem).HasMaxLength(200);
     }
 }
 

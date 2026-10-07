@@ -56,6 +56,17 @@ internal sealed class ReviewStepConfiguration : IEntityTypeConfiguration<ReviewS
         b.Property(x => x.Mode).HasMaxLength(8);
         b.Property(x => x.State).HasMaxLength(16);
         b.Property(x => x.Answer).HasMaxLength(64);
+        b.HasOne<Party>().WithMany().HasForeignKey(x => x.PartyId).OnDelete(DeleteBehavior.Restrict);
+        b.HasOne<StoredFile>().WithMany().HasForeignKey(x => x.EvidenceFileId).OnDelete(DeleteBehavior.Restrict);
+        b.Property(x => x.PartyName).HasMaxLength(200);
+        b.Property(x => x.Participation).HasMaxLength(16);
+        b.Property(x => x.Reason).HasMaxLength(64);
+        b.Property(x => x.DispatchChannel).HasMaxLength(64);
+        b.Property(x => x.DispatchRef).HasMaxLength(200);
+        b.Property(x => x.DispatchedByName).HasMaxLength(200);
+        b.Property(x => x.ForeignAnswer).HasMaxLength(200);
+        b.Property(x => x.RecordedByName).HasMaxLength(200);
+        b.Ignore(x => x.ByProxy);
     }
 }
 

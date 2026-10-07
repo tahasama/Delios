@@ -4,6 +4,7 @@ using Delios.Host.Documents;
 using Delios.Host.Identity;
 using Delios.Host.Messaging;
 using Delios.Host.Platform;
+using Delios.Host.Transmittals;
 using Microsoft.EntityFrameworkCore;
 using NodaTime;
 
@@ -12,7 +13,11 @@ namespace Delios.Host.Reviews;
 public sealed record StartReviewRequest(Guid? RouteId = null);
 public sealed record CommentRequest(string? Text, string? Class, int? ClosesWithStep = null);
 public sealed record CloseCommentRequest(string? Resolution);
-public sealed record AnswerRequest(string? Verdict = null, string? Status = null, string? Note = null);
+/// <param name="Issue">On the deciding step, with a verdict that lets the revision out: who it goes to once released.</param>
+/// <param name="ForeignAnswer">For a party answering by proxy: their answer as they wrote it.</param>
+/// <param name="EvidenceFileId">For a party answering by proxy: the proof of their answer.</param>
+public sealed record AnswerRequest(string? Verdict = null, string? Status = null, string? Note = null, IssueAsk? Issue = null,
+    string? ForeignAnswer = null, Guid? EvidenceFileId = null);
 public sealed record ReleaseRequest(string? Status = null);
 /// <param name="ToStep">Null sends the revision back to its author; a step number (from 1) sends the route back to that step.</param>
 public sealed record ReturnRequest(string? Note, int? ToStep = null, string? Reason = null);
@@ -26,7 +31,7 @@ public sealed record RewindRequest(int ToStep, string? Reason, string? Note);
 /// one, never corrected.
 /// </summary>
 public sealed class ReviewService(
-    DeliosDbContext db, Numbering numbering, AuditLog audit, IClock clock)
+    DeliosDbContext db, Numbering numbering, AuditLog audit, IClock clock, TransmittalService transmittals)
 {
     private const string Advice_None = "none", Advice_Some = "some", Advice_Blocking = "blocking";
 
@@ -98,26 +103,51 @@ public sealed class ReviewService(
                 : "That route does not serve this document."));
         }
 
-        // Every step must have someone to answer it, and the one who decides must
-        // be allowed to approve this document.
+        // Every step must have someone to answer it, a party's step a reason to
+        // send it to them, and the one who decides, if ours, must be allowed to
+        // approve this document. An outside party's approval is theirs to give.
+        var catalog = await Catalog.LoadAsync(db, cancellationToken);
+        var parties = await db.Parties.AsNoTracking().Where(p => p.Active && !p.IsInternal).ToDictionaryAsync(p => p.Code, cancellationToken);
         for (var i = 0; i < route.Steps.Count; i++)
         {
             var step = route.Steps[i];
-            if ((await HoldersAsync(access.Project.Id, step.FunctionCode, cancellationToken)).Count == 0)
+            Party? party = null;
+            if (step.PartyCode is { } code)
+            {
+                if (!parties.TryGetValue(code, out party))
+                {
+                    return Fail(Problems.Invalid("STEP_PARTY_UNKNOWN",
+                        $"Step {i + 1} ({step.Title}) names {code}, which is not an active outside party.",
+                        new { step = i + 1, party = code }));
+                }
+                if (step.Reason is null || !catalog.IsActive(TransmittalSets.Reasons, step.Reason))
+                {
+                    return Fail(Problems.Invalid("STEP_NEEDS_REASON",
+                        $"Step {i + 1} ({step.Title}) goes to {party.Name} by transmittal and needs a published reason for issue.",
+                        new { step = i + 1, reason = step.Reason }));
+                }
+            }
+            if ((await SeatsAsync(access.Project, step.FunctionCode, party, party?.Participation, cancellationToken)).Count == 0)
             {
                 return Fail(Problems.Invalid("STEP_HAS_NO_HOLDER",
-                    $"Nobody holds {step.FunctionCode} on this project, so step {i + 1} ({step.Title}) could not be answered.",
-                    new { step = i + 1, function = step.FunctionCode }));
+                    party is null ? $"Nobody holds {step.FunctionCode} on this project, so step {i + 1} ({step.Title}) could not be answered."
+                    : party.Participation == Participations.InApp
+                        ? $"Nobody from {party.Name} is on this project, so step {i + 1} ({step.Title}) could not be answered."
+                        : $"Nobody on this project carries the exchange with {party.Name}, so step {i + 1} ({step.Title}) could not be answered.",
+                    new { step = i + 1, function = step.FunctionCode, party = step.PartyCode }));
             }
         }
         var deciding = route.Steps[^1];
-        var decider = await db.Functions.AsNoTracking().Include(f => f.Rules)
-            .SingleOrDefaultAsync(f => f.Code == deciding.FunctionCode && f.Active, cancellationToken);
-        if (decider is null || !Allows(decider, access.Project, Verbs.Approve, document.Facts))
+        if (deciding.PartyCode is null)
         {
-            return Fail(Problems.Invalid("DECIDER_CANNOT_APPROVE",
-                $"The deciding step is answered by {deciding.FunctionCode}, which may not approve this document.",
-                new { function = deciding.FunctionCode }));
+            var decider = await db.Functions.AsNoTracking().Include(f => f.Rules)
+                .SingleOrDefaultAsync(f => f.Code == deciding.FunctionCode && f.Active, cancellationToken);
+            if (decider is null || !Allows(decider, access.Project, Verbs.Approve, document.Facts))
+            {
+                return Fail(Problems.Invalid("DECIDER_CANNOT_APPROVE",
+                    $"The deciding step is answered by {deciding.FunctionCode}, which may not approve this document.",
+                    new { function = deciding.FunctionCode }));
+            }
         }
 
         var number = await numbering.AllocateAsync(access.Project.TenantId, access.Project.Id, RecordKinds.Review,
@@ -134,20 +164,29 @@ public sealed class ReviewService(
             StartedById = access.UserId,
             StartedByName = access.UserName,
             StartedAt = now,
-            Steps = route.Steps.Select((s, i) => new ReviewStep
+            Steps = route.Steps.Select((s, i) =>
             {
-                TenantId = access.Project.TenantId,
-                Index = i,
-                Title = s.Title,
-                FunctionCode = s.FunctionCode,
-                Mode = s.Mode,
-                Deciding = i == route.Steps.Count - 1,
-                Days = s.Days,
-                GrantsStatuses = s.GrantsStatuses,
+                var party = s.PartyCode is null ? null : parties[s.PartyCode];
+                return new ReviewStep
+                {
+                    TenantId = access.Project.TenantId,
+                    Index = i,
+                    Title = s.Title,
+                    FunctionCode = party is null ? s.FunctionCode : null,
+                    PartyId = party?.Id,
+                    PartyName = party?.Name,
+                    Participation = party?.Participation,
+                    Reason = party is null ? null : s.Reason,
+                    // One of ours records the party's single answer.
+                    Mode = party?.Participation == Participations.ByProxy ? StepModes.Any : s.Mode,
+                    Deciding = i == route.Steps.Count - 1,
+                    Days = s.Days,
+                    GrantsStatuses = s.GrantsStatuses,
+                };
             }).ToList(),
         };
         db.Reviews.Add(review);
-        await OpenStepAsync(access.Project, review, 0, cancellationToken);
+        await OpenStepAsync(access, review, 0, cancellationToken);
 
         revision.State = RevisionStates.InReview;
         document.LatestRevisionState = RevisionStates.InReview;
@@ -170,6 +209,7 @@ public sealed class ReviewService(
         {
             return (null, Problems.Forbidden("NOT_ON_OPEN_STEP", "Only the people on the step that is open comment on it."));
         }
+        if (step.ByProxy && step.DispatchedAt is null) return (null, NotDispatched(step));
         var text = request.Text?.Trim() ?? "";
         if (text.Length == 0) return (null, Problems.Invalid("COMMENT_EMPTY", "A comment needs words."));
 
@@ -193,7 +233,8 @@ public sealed class ReviewService(
             ReviewId = review.Id,
             StepIndex = step.Index,
             AuthorId = access.UserId,
-            AuthorName = access.UserName,
+            // A party's comment, written down by one of ours: both are said.
+            AuthorName = step.ByProxy ? $"{step.PartyName} (recorded by {access.UserName})" : access.UserName,
             Text = text,
             Class = classCode,
             Blocking = blocking,
@@ -241,6 +282,17 @@ public sealed class ReviewService(
             return (null, Problems.Forbidden("NOT_ON_OPEN_STEP", "Only the people on the step that is open answer it."));
         }
         if (seat.AnsweredAt is not null) return (null, Problems.Conflict("ALREADY_ANSWERED", "You have answered this step."));
+        if (step.ByProxy)
+        {
+            if (step.DispatchedAt is null) return (null, NotDispatched(step));
+            var evidenceRequired = await db.Parties.AsNoTracking().Where(p => p.Id == step.PartyId)
+                .Select(p => p.EvidenceRequired).SingleAsync(cancellationToken);
+            if (evidenceRequired && request.EvidenceFileId is null)
+            {
+                return (null, Problems.Invalid("EVIDENCE_REQUIRED",
+                    $"An answer recorded for {step.PartyName} carries its proof: their stamped copy, or the message that brought it."));
+            }
+        }
 
         var catalog = await Catalog.LoadAsync(db, cancellationToken);
         string answer;
@@ -285,13 +337,47 @@ public sealed class ReviewService(
             answer = AdviceCode(catalog, kind);
         }
 
+        // Who it goes to once released: offered to whoever decides, because they are
+        // the likeliest to know. Leaving it out is an answer too.
+        IssueRequest? issue = null;
+        if (request.Issue is not null)
+        {
+            if (!step.Deciding || granted is null)
+            {
+                return (null, Problems.Invalid("ISSUE_ONLY_WITH_DECISION",
+                    "Who receives it is asked with a decision that lets the revision out."));
+            }
+            var (document, revision) = await SubjectAsync(review, cancellationToken);
+            var (asked, problem) = await transmittals.NewRequestAsync(access, document, revision, request.Issue, cancellationToken);
+            if (problem is not null) return (null, problem);
+            issue = asked;
+        }
+        if (request.EvidenceFileId is { } evidence)
+        {
+            if (!step.ByProxy) return (null, Problems.Invalid("EVIDENCE_ONLY_BY_PROXY", "Proof is filed with an answer recorded for a party."));
+            if (await transmittals.BindEvidenceAsync(access, evidence, review.RevisionId, cancellationToken) is { } bad) return (null, bad);
+        }
+
         var now = clock.GetCurrentInstant();
         seat.Answer = answer;
         seat.GrantedStatus = granted;
         seat.Note = request.Note?.Trim();
         seat.AnsweredAt = now;
+        if (step.ByProxy)
+        {
+            step.ForeignAnswer = request.ForeignAnswer?.Trim() is { Length: > 0 } theirs ? theirs : null;
+            step.RecordedByName = access.UserName;
+            step.EvidenceFileId = request.EvidenceFileId;
+        }
+        if (issue is not null)
+        {
+            db.IssueRequests.Add(issue);
+            // Saved now, so a release this answer brings about carries it out.
+            await db.SaveChangesAsync(cancellationToken);
+        }
         await audit.WriteAsync(Actor(access), step.Deciding ? "VERDICT" : "ADVICE", "Review", review.Id, review.Number,
-            $"Step {step.Index + 1} ({step.Title}): {answer}{(granted is null ? "" : $", granting {granted}")}.",
+            $"Step {step.Index + 1} ({step.Title}): {answer}{(granted is null ? "" : $", granting {granted}")}"
+            + (step.ByProxy ? $", recorded for {step.PartyName}{(step.ForeignAnswer is null ? "" : $" who wrote \"{step.ForeignAnswer}\"")}." : "."),
             review.ProjectId, cancellationToken);
 
         var complete = step.Mode == StepModes.Any || step.Participants.All(p => p.AnsweredAt is not null);
@@ -338,7 +424,7 @@ public sealed class ReviewService(
 
         if (!step.Deciding)
         {
-            await OpenStepAsync(access.Project, review, step.Index + 1, cancellationToken);
+            await OpenStepAsync(access, review, step.Index + 1, cancellationToken);
             return;
         }
 
@@ -457,6 +543,66 @@ public sealed class ReviewService(
         return (review, null);
     }
 
+    // ── A party answering by proxy ────────────────────────────────────────────
+
+    /// <summary>
+    /// One of ours records that the open step went to its party: when, how, their
+    /// reference. The step's clock runs from here, and the transmittal that
+    /// carried it is raised.
+    /// </summary>
+    public async Task<(Review? Review, IResult? Problem)> DispatchAsync(
+        ProjectAccess access, Guid reviewId, DispatchRequest request, CancellationToken cancellationToken)
+    {
+        var review = await LoadAsync(access, reviewId, cancellationToken);
+        if (review is null) return (null, NotFound());
+        var step = OpenStep(review);
+        if (review.State != ReviewStates.InProgress || step is null || !step.ByProxy || !IsSeated(step, access.UserId))
+        {
+            return (null, Problems.Forbidden("NOT_CUSTODIAN",
+                "Whoever carries the exchange with the party on the open step records that it went."));
+        }
+        if (step.DispatchedAt is not null) return (null, Problems.Conflict("ALREADY_DISPATCHED", "It is already recorded as sent."));
+        var channel = request.Channel?.Trim() ?? "";
+        if (channel.Length == 0) return (null, Problems.Invalid("CHANNEL_REQUIRED", "Say how it went: email, their portal, by hand."));
+        if (request.ProofFileId is { } proof
+            && await transmittals.BindEvidenceAsync(access, proof, review.RevisionId, cancellationToken) is { } bad) return (null, bad);
+
+        var project = access.Project;
+        var party = await db.Parties.AsNoTracking().SingleAsync(p => p.Id == step.PartyId, cancellationToken);
+        var (document, revision) = await SubjectAsync(review, cancellationToken);
+        step.DispatchedAt = clock.GetCurrentInstant();
+        step.DispatchChannel = channel;
+        step.DispatchRef = request.Reference?.Trim() is { Length: > 0 } reference ? reference : null;
+        step.DispatchedByName = access.UserName;
+        step.DueDate = step.Days is { } days
+            ? WorkingCalendar.AddWorkingDays(WorkingCalendar.Today(clock, project.TimeZone), days, project.WeekendDays) : null;
+        var transmittal = await transmittals.RaiseAsync(new TransmittalService.Raise(project, Actor(access), step.Reason!,
+            $"{TransmittalService.Label(document, revision)}: {step.Title}", null, party, party.Name, [(document, revision)],
+            [new TransmittalService.Addressee(null, party.Id, party.Name, party.Name)], ReviewStepId: step.Id,
+            ResponseDue: step.DueDate, Dispatched: request with { Channel = channel, Reference = step.DispatchRef }), cancellationToken);
+        step.TransmittalId = transmittal.Id;
+        await audit.WriteAsync(Actor(access), "STEP_DISPATCHED", "Review", review.Id, review.Number,
+            $"Step {step.Index + 1} ({step.Title}) sent to {party.Name} by {channel} on {transmittal.Number}"
+            + (step.DispatchRef is null ? "." : $", their reference {step.DispatchRef}."), review.ProjectId, cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
+        return (review, null);
+    }
+
+    /// <summary>Somewhere to upload a party's proof: their stamped copy, the message that carried their answer.</summary>
+    public async Task<(UploadTicket? Ticket, IResult? Problem)> EvidenceAsync(
+        ProjectAccess access, Guid reviewId, UploadRequest request, CancellationToken cancellationToken)
+    {
+        var review = await LoadAsync(access, reviewId, cancellationToken);
+        if (review is null) return (null, NotFound());
+        var step = OpenStep(review);
+        if (review.State != ReviewStates.InProgress || step is null || !step.ByProxy || !IsSeated(step, access.UserId))
+        {
+            return (null, Problems.Forbidden("NOT_CUSTODIAN",
+                "Whoever carries the exchange with the party on the open step files its proof."));
+        }
+        return await transmittals.EvidenceTicketAsync(access, review.DocumentId, review.RevisionId, request, cancellationToken);
+    }
+
     // ── Queues ────────────────────────────────────────────────────────────────
 
     public sealed record WorkItem(Guid ReviewId, string Number, Guid DocumentId, string DocumentNumber, string Title,
@@ -474,10 +620,25 @@ public sealed class ReviewService(
             join v in db.Revisions on r.RevisionId equals v.Id
             where p.UserId == me && p.AnsweredAt == null && s.State == StepStates.Open && r.ProjectId == access.Project.Id
             orderby s.OpenedAt
-            select new { r.Id, r.Number, DocumentId = d.Id, DocumentNumber = d.Number, d.Title, v.Value, Title2 = s.Title, s.DueDate, s.OpenedAt })
+            select new
+            {
+                r.Id,
+                r.Number,
+                DocumentId = d.Id,
+                DocumentNumber = d.Number,
+                d.Title,
+                v.Value,
+                Title2 = s.Title,
+                s.DueDate,
+                s.OpenedAt,
+                s.Participation,
+                s.DispatchedAt
+            })
             .ToListAsync(cancellationToken);
+        // A party's step answered by proxy is one task with two acts: send it, then record what came back.
         var mySteps = open.Select(x => new WorkItem(x.Id, x.Number, x.DocumentId, x.DocumentNumber, x.Title, x.Value,
-            "ANSWER_STEP", x.Title2, x.DueDate?.ToDateOnly(), x.OpenedAt!.Value.ToDateTimeOffset())).ToList();
+            x.Participation != Participations.ByProxy ? "ANSWER_STEP" : x.DispatchedAt is null ? "DISPATCH_STEP" : "RECORD_ANSWER",
+            x.Title2, x.DueDate?.ToDateOnly(), (x.DispatchedAt ?? x.OpenedAt)!.Value.ToDateTimeOffset())).ToList();
 
         List<WorkItem> gate = [];
         if (access.Holds(Verbs.Control))
@@ -495,21 +656,26 @@ public sealed class ReviewService(
                 Proceeds(catalog, x.Verdict!) ? "READY_TO_RELEASE" : "SEND_BACK", null, null,
                 x.DecidedAt!.Value.ToDateTimeOffset())).ToList();
         }
-        return new { steps = mySteps, gate };
+        return new { steps = mySteps, gate, issues = await transmittals.WorkAsync(access, cancellationToken) };
     }
 
     // ── Core moves ────────────────────────────────────────────────────────────
 
-    private async Task OpenStepAsync(Project project, Review review, int index, CancellationToken cancellationToken)
+    private async Task OpenStepAsync(ProjectAccess access, Review review, int index, CancellationToken cancellationToken)
     {
+        var project = access.Project;
         var step = review.Steps.Single(s => s.Index == index);
-        var holders = await HoldersAsync(project.Id, step.FunctionCode, cancellationToken);
+        var party = step.PartyId is { } partyId
+            ? await db.Parties.AsNoTracking().SingleAsync(p => p.Id == partyId, cancellationToken) : null;
+        var holders = await SeatsAsync(project, step.FunctionCode, party, step.Participation, cancellationToken);
         var today = WorkingCalendar.Today(clock, project.TimeZone);
         step.State = StepStates.Open;
         step.OpenedAt = clock.GetCurrentInstant();
-        step.DueDate = step.Days is { } days ? WorkingCalendar.AddWorkingDays(today, days, project.WeekendDays) : null;
+        // By proxy the clock starts when it goes to them, not before.
+        step.DueDate = step.Days is { } days && !step.ByProxy ? WorkingCalendar.AddWorkingDays(today, days, project.WeekendDays) : null;
         step.Answer = null;
         step.CompletedAt = null;
+        ClearExchange(step);
         step.Participants = holders.Select(h => new ReviewParticipant
         {
             TenantId = review.TenantId,
@@ -518,6 +684,30 @@ public sealed class ReviewService(
             UserName = h.Name,
         }).ToList();
         review.CurrentStep = index;
+
+        // A party answering here is sent the revision on a transmittal: that is what
+        // lets them read it, and the record that it went.
+        if (party is not null && !step.ByProxy)
+        {
+            var (document, revision) = await SubjectAsync(review, cancellationToken);
+            var transmittal = await transmittals.RaiseAsync(new TransmittalService.Raise(project, Actor(access), step.Reason!,
+                $"{TransmittalService.Label(document, revision)}: {step.Title}", null, party, party.Name, [(document, revision)],
+                holders.Select(h => new TransmittalService.Addressee(h.Id, party.Id, h.Name, party.Name)).ToList(),
+                ReviewStepId: step.Id, ResponseDue: step.DueDate), cancellationToken);
+            step.TransmittalId = transmittal.Id;
+        }
+    }
+
+    private static void ClearExchange(ReviewStep step)
+    {
+        step.TransmittalId = null;
+        step.DispatchedAt = null;
+        step.DispatchChannel = null;
+        step.DispatchRef = null;
+        step.DispatchedByName = null;
+        step.ForeignAnswer = null;
+        step.RecordedByName = null;
+        step.EvidenceFileId = null;
     }
 
     private async Task ReleaseCoreAsync(ProjectAccess access, Review review, string status, string by, CancellationToken cancellationToken)
@@ -547,6 +737,8 @@ public sealed class ReviewService(
 
         db.Enqueue(RevisionReleased.RoutingKey, new RevisionReleased(review.TenantId, revision.Id, earlier.Select(r => r.Id).ToArray()));
         var actor = by == "System" ? Audit.Actor.System : Actor(access);
+        // What was asked for it goes out with the release.
+        await transmittals.CarryOutOpenAsync(access.Project, actor, revision, document, cancellationToken);
         await audit.WriteAsync(actor, "RELEASED", "Revision", revision.Id, $"{document.Number} rev {revision.Value}",
             $"Released at {status} on review {review.Number}.", review.ProjectId, cancellationToken);
         foreach (var old in earlier)
@@ -571,6 +763,7 @@ public sealed class ReviewService(
         review.ClosedAt = now;
         review.ClosedByName = by;
         foreach (var step in review.Steps.Where(s => s.State == StepStates.Open)) step.State = StepStates.Done;
+        await transmittals.LapseOpenAsync(revision.Id, by, cancellationToken);
         await audit.WriteAsync(Audit.Actor.System, "RETURNED_TO_AUTHOR", "Revision", revision.Id,
             $"{document.Number} rev {revision.Value}", $"{note} The next revision replaces it.", review.ProjectId, cancellationToken);
     }
@@ -600,12 +793,15 @@ public sealed class ReviewService(
             s.State = StepStates.Waiting;
             s.Answer = null;
             s.CompletedAt = null;
+            ClearExchange(s);
         }
+        // A decision undone takes what it asked for with it.
+        await transmittals.LapseOpenAsync(review.RevisionId, access.UserName, cancellationToken);
         review.State = ReviewStates.InProgress;
         review.Verdict = null;
         review.GrantedStatus = null;
         review.DecidedAt = null;
-        await OpenStepAsync(access.Project, review, index, cancellationToken);
+        await OpenStepAsync(access, review, index, cancellationToken);
         await audit.WriteAsync(Actor(access), "REVIEW_SENT_BACK_TO_STEP", "Review", review.Id, review.Number,
             $"Back to step {index + 1} ({reason}). {note}".Trim(), review.ProjectId, cancellationToken);
         return null;
@@ -632,6 +828,30 @@ public sealed class ReviewService(
         var restricted = (await Catalog.LoadAsync(db, cancellationToken)).RestrictedLevels();
         return await DocumentQueries.Visible(db, access, restricted).SingleOrDefaultAsync(d => d.Id == documentId, cancellationToken);
     }
+
+    /// <summary>
+    /// Who sits on a step: the holders of its function; for a party answering here,
+    /// its people on the project; for one answering by proxy, whoever of ours carries
+    /// the exchange with it.
+    /// </summary>
+    private async Task<List<User>> SeatsAsync(
+        Project project, string? functionCode, Party? party, string? participation, CancellationToken cancellationToken)
+    {
+        if (party is null) return functionCode is null ? [] : await HoldersAsync(project.Id, functionCode, cancellationToken);
+        if (participation == Participations.ByProxy) return await transmittals.CustodiansAsync(project.Id, party, cancellationToken);
+        return await (from m in db.Memberships
+                      join u in db.Users on m.UserId equals u.Id
+                      where m.ProjectId == project.Id && m.Active && m.Function!.Active && u.Active && u.PartyId == party.Id
+                      orderby u.Name
+                      select u).ToListAsync(cancellationToken);
+    }
+
+    private async Task<(Document Document, Revision Revision)> SubjectAsync(Review review, CancellationToken cancellationToken) =>
+        (await db.Documents.SingleAsync(d => d.Id == review.DocumentId, cancellationToken),
+         await db.Revisions.SingleAsync(r => r.Id == review.RevisionId, cancellationToken));
+
+    private static IResult NotDispatched(ReviewStep step) => Problems.Conflict("NOT_DISPATCHED",
+        $"Record that it went to {step.PartyName} first: what comes back is their answer to what was sent.");
 
     private Task<List<User>> HoldersAsync(Guid projectId, string functionCode, CancellationToken cancellationToken) =>
         (from m in db.Memberships
@@ -660,15 +880,7 @@ public sealed class ReviewService(
     }
 
     private static bool Allows(Function function, Project project, string verb, DocumentFacts facts) =>
-        new ProjectAccess
-        {
-            Project = project,
-            UserId = Guid.Empty,
-            UserName = "",
-            Function = function,
-            IsInternal = true,
-            Rules = function.Rules.Where(r => r.ProjectRole is null || r.ProjectRole == project.ContractRole).ToList(),
-        }.Allows(verb, facts);
+        ProjectAccess.OfFunction(project, function).Allows(verb, facts);
 
     private static ReviewStep? OpenStep(Review review) => review.Steps.SingleOrDefault(s => s.State == StepStates.Open);
     private static bool IsSeated(ReviewStep step, Guid userId) => step.Participants.Any(p => p.UserId == userId);

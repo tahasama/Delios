@@ -10,8 +10,10 @@ public sealed record RouteView(Guid Id, string Name, string? Description, bool I
 
 public sealed record ParticipantView(string Name, string? Answer, string? GrantedStatus, string? Note, DateTimeOffset? AnsweredAt);
 
-public sealed record StepView(int Number, string Title, string Function, string Mode, bool Deciding, string State,
-    DateOnly? DueDate, string? Answer, IReadOnlyList<string> GrantsStatuses, IReadOnlyList<ParticipantView> Participants);
+public sealed record StepView(int Number, string Title, string? Function, string? Party, string? Participation, string Mode,
+    bool Deciding, string State, DateOnly? DueDate, string? Answer, IReadOnlyList<string> GrantsStatuses,
+    IReadOnlyList<ParticipantView> Participants, Guid? TransmittalId, DateTimeOffset? DispatchedAt, string? DispatchChannel,
+    string? DispatchRef, string? DispatchedBy, string? ForeignAnswer, string? RecordedBy, Guid? EvidenceFileId);
 
 public sealed record CommentView(Guid Id, int Step, string Author, string Text, string Class, bool Blocking,
     string ClosesWith, int? ClosesWithStep, string Status, string? Resolution, string? ClosedBy, DateTimeOffset CreatedAt);
@@ -38,6 +40,8 @@ public static class ReviewEndpoints
         project.MapPost("/reviews/{reviewId:guid}/release", ReleaseAsync);
         project.MapPost("/reviews/{reviewId:guid}/return", ReturnAsync);
         project.MapPost("/reviews/{reviewId:guid}/rewind", RewindAsync);
+        project.MapPost("/reviews/{reviewId:guid}/dispatch", DispatchAsync);
+        project.MapPost("/reviews/{reviewId:guid}/evidence", EvidenceAsync);
         project.MapGet("/work", WorkAsync);
     }
 
@@ -96,6 +100,18 @@ public static class ReviewEndpoints
         Guid reviewId, RewindRequest request, HttpContext http, ReviewService reviews, CancellationToken cancellationToken) =>
         Result(await reviews.RewindAsync(ProjectAccessFilter.Of(http), reviewId, request, cancellationToken));
 
+    private static async Task<IResult> DispatchAsync(
+        Guid reviewId, Transmittals.DispatchRequest request, HttpContext http, ReviewService reviews,
+        CancellationToken cancellationToken) =>
+        Result(await reviews.DispatchAsync(ProjectAccessFilter.Of(http), reviewId, request, cancellationToken));
+
+    private static async Task<IResult> EvidenceAsync(
+        Guid reviewId, UploadRequest request, HttpContext http, ReviewService reviews, CancellationToken cancellationToken)
+    {
+        var (ticket, problem) = await reviews.EvidenceAsync(ProjectAccessFilter.Of(http), reviewId, request, cancellationToken);
+        return problem ?? Results.Ok(ticket);
+    }
+
     private static async Task<IResult> WorkAsync(HttpContext http, ReviewService reviews, CancellationToken cancellationToken) =>
         Results.Ok(await reviews.WorkAsync(ProjectAccessFilter.Of(http), cancellationToken));
 
@@ -107,10 +123,12 @@ public static class ReviewEndpoints
         r.State == ReviewStates.InProgress ? r.CurrentStep + 1 : null, r.Verdict, r.GrantedStatus, r.StartedByName,
         r.StartedAt.ToDateTimeOffset(), r.DecidedAt?.ToDateTimeOffset(), r.ClosedAt?.ToDateTimeOffset(), r.ClosedByName,
         r.ReturnNote,
-        r.Steps.OrderBy(s => s.Index).Select(s => new StepView(s.Index + 1, s.Title, s.FunctionCode, s.Mode, s.Deciding,
-            s.State, s.DueDate?.ToDateOnly(), s.Answer, s.GrantsStatuses,
+        r.Steps.OrderBy(s => s.Index).Select(s => new StepView(s.Index + 1, s.Title, s.FunctionCode, s.PartyName,
+            s.Participation, s.Mode, s.Deciding, s.State, s.DueDate?.ToDateOnly(), s.Answer, s.GrantsStatuses,
             s.Participants.OrderBy(p => p.UserName).Select(p => new ParticipantView(p.UserName, p.Answer, p.GrantedStatus,
-                p.Note, p.AnsweredAt?.ToDateTimeOffset())).ToList())).ToList(),
+                p.Note, p.AnsweredAt?.ToDateTimeOffset())).ToList(),
+            s.TransmittalId, s.DispatchedAt?.ToDateTimeOffset(), s.DispatchChannel, s.DispatchRef, s.DispatchedByName,
+            s.ForeignAnswer, s.RecordedByName, s.EvidenceFileId)).ToList(),
         r.Comments.OrderBy(c => c.CreatedAt).Select(View).ToList());
 
     private static CommentView View(ReviewComment c) => new(

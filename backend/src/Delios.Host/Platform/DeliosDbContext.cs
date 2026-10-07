@@ -46,6 +46,11 @@ public sealed class DeliosDbContext(DbContextOptions<DeliosDbContext> options)
     public DbSet<ReviewParticipant> ReviewParticipants => Set<ReviewParticipant>();
     public DbSet<ReviewComment> ReviewComments => Set<ReviewComment>();
 
+    public DbSet<Transmittals.IssueRequest> IssueRequests => Set<Transmittals.IssueRequest>();
+    public DbSet<Transmittals.Transmittal> Transmittals => Set<Transmittals.Transmittal>();
+    public DbSet<Transmittals.TransmittalItem> TransmittalItems => Set<Transmittals.TransmittalItem>();
+    public DbSet<Transmittals.TransmittalRecipient> TransmittalRecipients => Set<Transmittals.TransmittalRecipient>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(DeliosDbContext).Assembly);

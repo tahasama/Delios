@@ -37,6 +37,17 @@ public sealed class ProjectAccess
         && Matches(r.Criticality, document.Criticality)
         && Matches(r.Confidentiality, document.Confidentiality));
 
+    /// <summary>What a function may do on a project, whoever holds it: for asking about someone other than the caller.</summary>
+    public static ProjectAccess OfFunction(Project project, Function function, Guid userId = default, string userName = "") => new()
+    {
+        Project = project,
+        UserId = userId,
+        UserName = userName,
+        Function = function,
+        IsInternal = true,
+        Rules = function.Rules.Where(r => r.ProjectRole is null || r.ProjectRole == project.ContractRole).ToList(),
+    };
+
     private static bool Matches(string? selector, string? value) =>
         selector is null || string.Equals(selector, value, StringComparison.Ordinal);
 }

@@ -72,6 +72,9 @@ public static class FieldSources
     public const string DocType = "DOC_TYPE";
     public const string Sequence = "SEQUENCE";
     public const string Fixed = "FIXED";
+    /// <summary>On a transmittal: the party code of who sends it, and of who receives it.</summary>
+    public const string Sender = "SENDER";
+    public const string Receiver = "RECEIVER";
 }
 
 /// <summary>
@@ -300,6 +303,8 @@ public static class FileKinds
     public const string Stamped = "STAMPED";
     /// <summary>A stamped copy marked SUPERSEDED once a later revision is released.</summary>
     public const string Superseded = "SUPERSEDED";
+    /// <summary>Proof filed against the revision: a party's returned stamped copy, the email that carried it.</summary>
+    public const string Evidence = "EVIDENCE";
 }
 
 public static class FileStatuses

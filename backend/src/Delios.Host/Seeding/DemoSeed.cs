@@ -23,10 +23,12 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
             // A demo created by an earlier version gains what it lacks; nothing it has is touched.
             tenantContext.Set(existing.Id);
             await using var upgrade = await db.Database.BeginTransactionAsync(cancellationToken);
-            var added = await EnsureReviewSetupAsync(existing.Id, cancellationToken);
+            var reviews = await EnsureReviewSetupAsync(existing.Id, cancellationToken);
+            await db.SaveChangesAsync(cancellationToken);
+            var issuing = await EnsureIssueSetupAsync(existing.Id, cancellationToken);
             await db.SaveChangesAsync(cancellationToken);
             await upgrade.CommitAsync(cancellationToken);
-            logger.LogInformation(added ? "The demo tenant exists; review settings added" : "The demo tenant already exists; nothing to do");
+            logger.LogInformation(reviews || issuing ? "The demo tenant exists; what it lacked was added" : "The demo tenant already exists; nothing to do");
             return;
         }
 
@@ -48,7 +50,7 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
         var control = Fn("DC", "Document Control", [.. Verbs.All]);
         var engineer = Fn("ENG", "Engineer", Verbs.Read, Verbs.Create, Verbs.Revise, Verbs.Review);
         var approver = Fn("APP", "Approver", Verbs.Read, Verbs.Review, Verbs.Approve);
-        var viewer = Fn("VIEW", "Viewer", Verbs.Read);
+        var viewer = Fn("VIEW", "Viewer", Verbs.Read, Verbs.Receive);
         var supplier = Fn("SUP", "Supplier", Verbs.Read, Verbs.Revise);
         db.Functions.AddRange(control, engineer, approver, viewer, supplier);
 
@@ -80,6 +82,8 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
 
         AddConfiguration(t);
         await EnsureReviewSetupAsync(t, cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
+        await EnsureIssueSetupAsync(t, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         logger.LogInformation("Demo tenant '{Slug}' created; every password is {Password}", Slug, Password);
@@ -225,6 +229,71 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
                 new() { Title = "Approval", FunctionCode = "APP", Days = 3, GrantsStatuses = ["IFI", "IFR", "IFA", "IFC", "AFC"] },
             ],
         });
+        return true;
+    }
+
+    /// <summary>
+    /// Issuing: why things are sent, transmittal numbers, a client that answers
+    /// by proxy and a route that ends with their approval. Adds only what is missing.
+    /// </summary>
+    private async Task<bool> EnsureIssueSetupAsync(Guid t, CancellationToken cancellationToken)
+    {
+        if (await db.ValueEntries.AnyAsync(v => v.SetKey == Transmittals.TransmittalSets.Reasons, cancellationToken)) return false;
+
+        AddSet(t, Transmittals.TransmittalSets.Reasons,
+        [
+            ("INFORMATION", "For information", new { response = false }),
+            ("REVIEW", "For review", new { response = true, responseDays = 10 }),
+            ("APPROVAL", "For approval", new { response = true, responseDays = 10 }),
+            ("PRICING", "For pricing", new { response = true, responseDays = 15 }),
+            ("EXECUTION", "For execution", new { response = false }),
+            ("RECORD", "For record", new { response = false }),
+        ]);
+        var scheme = new NumberingScheme
+        {
+            TenantId = t,
+            Name = "Transmittals",
+            Fields =
+            [
+                new() { Label = "Project code", Source = FieldSources.Project },
+                new() { Label = "From", Source = FieldSources.Sender },
+                new() { Label = "To", Source = FieldSources.Receiver },
+                new() { Label = "Record", Source = FieldSources.Fixed, Value = "TR" },
+                new() { Label = "Sequence", Source = FieldSources.Sequence, Digits = 4 },
+            ],
+        };
+        db.NumberingSchemes.Add(scheme);
+        db.SchemeRoutings.Add(new SchemeRouting { TenantId = t, DeliverableType = RecordKinds.Transmittal, SchemeId = scheme.Id });
+
+        // The client works in its own system: Document Control sends and records their answers.
+        db.Parties.Add(new Party
+        {
+            TenantId = t,
+            Code = "NWU",
+            Name = "Northwater Utility",
+            Participation = Participations.ByProxy,
+            ExternalSystem = "Client document portal",
+            EvidenceRequired = true,
+        });
+        db.ReviewRoutes.Add(new ReviewRoute
+        {
+            TenantId = t,
+            Name = "Discipline check, then client approval",
+            Description = "High-criticality documents: the discipline engineer checks, the client decides.",
+            Patterns = [new() { Criticality = "A" }],
+            Steps =
+            [
+                new() { Title = "Discipline check", FunctionCode = "ENG", Days = 5 },
+                new() { Title = "Client approval", PartyCode = "NWU", Reason = "APPROVAL", Days = 10, GrantsStatuses = ["AFC"] },
+            ],
+        });
+
+        // Viewers are on the distribution: the matrix says who receives what.
+        var viewer = await db.Functions.Include(f => f.Rules).SingleOrDefaultAsync(f => f.Code == "VIEW", cancellationToken);
+        if (viewer?.Rules.FirstOrDefault() is { } rule && !rule.Verbs.Contains(Verbs.Receive))
+        {
+            rule.Verbs = [.. rule.Verbs, Verbs.Receive];
+        }
         return true;
     }
 

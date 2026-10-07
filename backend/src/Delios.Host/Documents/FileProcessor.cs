@@ -76,8 +76,16 @@ public sealed class FileProcessor(
             _ => "FILE_REJECTED",
         }, "StoredFile", file.Id, file.Name, detail, file.ProjectId, cancellationToken);
 
+        // Evidence filed against a revision is scanned like anything else, but the
+        // revision's own readiness is about what was submitted, not what came back.
+        if (file.Kind == FileKinds.Evidence)
+        {
+            await transaction.CommitAsync(cancellationToken);
+            return;
+        }
         var revision = await db.Revisions.SingleAsync(r => r.Id == revisionId, cancellationToken);
-        var statuses = await db.StoredFiles.Where(f => f.RevisionId == revisionId).Select(f => f.Status).ToListAsync(cancellationToken);
+        var statuses = await db.StoredFiles.Where(f => f.RevisionId == revisionId && f.Kind != FileKinds.Evidence)
+            .Select(f => f.Status).ToListAsync(cancellationToken);
         var filesState = statuses.Any(s => s is FileStatuses.Infected or FileStatuses.Rejected) ? FilesStates.Rejected
             : statuses.All(s => s == FileStatuses.Clean) ? FilesStates.Ready
             : FilesStates.Processing;

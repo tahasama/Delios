@@ -22,6 +22,23 @@ public sealed class Party
     public bool IsInternal { get; set; }
     /// <summary>Revoking a party ends its people's access without deleting anything.</summary>
     public bool Active { get; set; } = true;
+    /// <summary>
+    /// How an outside party takes part. IN_APP: their people hold accounts and
+    /// answer here. BY_PROXY: one of ours carries the exchange and records their answer.
+    /// </summary>
+    public string Participation { get; set; } = Participations.InApp;
+    /// <summary>The function of ours that carries the exchange for a party that answers by proxy. Empty: Document Control.</summary>
+    public string? CustodianFunction { get; set; }
+    /// <summary>Their own EDMS or portal, where they impose one, so the record says where it went.</summary>
+    public string? ExternalSystem { get; set; }
+    /// <summary>Whether an answer recorded on their behalf must carry its proof.</summary>
+    public bool EvidenceRequired { get; set; } = true;
+}
+
+public static class Participations
+{
+    public const string InApp = "IN_APP";
+    public const string ByProxy = "BY_PROXY";
 }
 
 public sealed class User

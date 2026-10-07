@@ -1,4 +1,3 @@
-using System.Text.RegularExpressions;
 using Delios.Host.Audit;
 using Delios.Host.Identity;
 using Delios.Host.Messaging;
@@ -14,7 +13,7 @@ namespace Delios.Host.Documents;
 /// with its files. Every rule is checked here, not on the screen: an importer, a
 /// script or a stale tab arrives here too.
 /// </summary>
-public sealed partial class DocumentService(
+public sealed class DocumentService(
     DeliosDbContext db, Numbering numbering, FileStorage storage, AuditLog audit, IClock clock,
     IOptions<StorageOptions> storageOptions)
 {
@@ -149,18 +148,9 @@ public sealed partial class DocumentService(
         var (document, problem) = await ContributableAsync(access, documentId, cancellationToken);
         if (problem is not null) return (null, problem);
 
-        var name = Path.GetFileName(request.FileName?.Replace('\\', '/') ?? "").Trim();
-        if (name.Length is 0 or > 255)
-            return (null, Problems.Invalid("FILE_NAME_INVALID", "The file needs a name of up to 255 characters."));
-        var max = storageOptions.Value.MaxFileBytes;
-        if (request.Size <= 0 || request.Size > max)
-            return (null, Problems.Invalid("FILE_SIZE_INVALID", "The file is empty or larger than allowed.", new { max }));
-        var sha256 = request.Sha256?.Trim().ToLowerInvariant() ?? "";
-        if (!Sha256Pattern().IsMatch(sha256))
-            return (null, Problems.Invalid("FILE_CHECKSUM_INVALID", "The SHA-256 must be 64 hexadecimal characters."));
-
-        var contentType = string.IsNullOrWhiteSpace(request.ContentType) ? "application/octet-stream" : request.ContentType.Trim();
-        var isPdf = contentType == "application/pdf" || name.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase);
+        var (declared, invalid) = Uploads.Check(request, storageOptions.Value.MaxFileBytes);
+        if (invalid is not null) return (null, invalid);
+        var (name, contentType, sha256, isPdf) = declared!;
         var file = new StoredFile
         {
             TenantId = access.Project.TenantId,
@@ -216,14 +206,7 @@ public sealed partial class DocumentService(
         }
         foreach (var file in files)
         {
-            var stored = await storage.SizeAsync(file.ObjectKey, cancellationToken);
-            if (stored is null)
-                return (null, Problems.Invalid("FILE_NOT_UPLOADED", $"{file.Name} has not been uploaded yet.", new { fileId = file.Id }));
-            if (stored != file.Size)
-            {
-                return (null, Problems.Invalid("FILE_SIZE_MISMATCH",
-                    $"{file.Name} was declared as {file.Size} bytes but {stored} arrived.", new { fileId = file.Id }));
-            }
+            if (await Uploads.ArrivedAsync(storage, file, cancellationToken) is { } missing) return (null, missing);
         }
 
         var scheme = await RevisionSchemeForAsync(document.DeliverableType, cancellationToken);
@@ -315,30 +298,33 @@ public sealed partial class DocumentService(
 
     private static string? Blank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     private static (Document?, IResult?) Fail(IResult problem) => (null, problem);
-
-    [GeneratedRegex("^[0-9a-f]{64}$")]
-    private static partial Regex Sha256Pattern();
 }
 
 public static class DocumentQueries
 {
     /// <summary>
     /// The documents of the project this person may read. Another party sees what
-    /// it produces. A restricted confidentiality level is read by the people named
-    /// on the document, its creator, and Document Control.
+    /// it produces, and what was transmitted to its people. A restricted
+    /// confidentiality level is read by the people named on the document, its
+    /// creator, whoever it was transmitted to, and Document Control.
     /// </summary>
     public static IQueryable<Document> Visible(DeliosDbContext db, ProjectAccess access, IReadOnlyList<string> restricted)
     {
         var query = db.Documents.Where(d => d.ProjectId == access.Project.Id);
+        var me = access.UserId;
+        // What was sent to you, you can read: a transmittal names its readers.
+        var sentToMe = db.TransmittalItems
+            .Where(i => db.TransmittalRecipients.Any(r => r.TransmittalId == i.TransmittalId && r.UserId == me))
+            .Select(i => i.DocumentId);
         if (!access.IsInternal)
         {
-            query = query.Where(d => d.Originator == access.PartyCode);
+            query = query.Where(d => d.Originator == access.PartyCode || sentToMe.Contains(d.Id));
         }
         if (!access.Holds(Verbs.Control) && restricted.Count > 0)
         {
-            var me = access.UserId;
             query = query.Where(d => d.Confidentiality == null || !restricted.Contains(d.Confidentiality)
-                || d.CreatedById == me || db.DocumentAccess.Any(a => a.DocumentId == d.Id && a.UserId == me));
+                || d.CreatedById == me || db.DocumentAccess.Any(a => a.DocumentId == d.Id && a.UserId == me)
+                || sentToMe.Contains(d.Id));
         }
         return query;
     }

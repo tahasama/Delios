@@ -5,10 +5,12 @@ using Microsoft.EntityFrameworkCore;
 namespace Delios.Host.Documents;
 
 public sealed record NumberFields(
-    string ProjectCode, string? Subproject, string? Originator, string? ContractRef, string? Discipline, string? DocType)
+    string ProjectCode, string? Subproject, string? Originator, string? ContractRef, string? Discipline, string? DocType,
+    string? Sender = null, string? Receiver = null)
 {
-    /// <summary>For records that are not documents: only the project and fixed fields apply.</summary>
-    public static NumberFields ForRecord(string projectCode) => new(projectCode, null, null, null, null, null);
+    /// <summary>For records that are not documents: the project, fixed fields, and who sends to whom.</summary>
+    public static NumberFields ForRecord(string projectCode, string? sender = null, string? receiver = null) =>
+        new(projectCode, null, null, null, null, null, sender, receiver);
 }
 
 public abstract record Allocation
@@ -46,6 +48,8 @@ public sealed class Numbering(DeliosDbContext db)
                 FieldSources.Discipline => fields.Discipline,
                 FieldSources.DocType => fields.DocType,
                 FieldSources.Fixed => field.Value,
+                FieldSources.Sender => fields.Sender,
+                FieldSources.Receiver => fields.Receiver,
                 _ => null,
             };
             if (string.IsNullOrEmpty(value)) return new Allocation.MissingField(field.Label);

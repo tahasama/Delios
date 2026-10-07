@@ -1,3 +1,4 @@
+using Delios.Host.Identity;
 using NodaTime;
 
 namespace Delios.Host.Reviews;
@@ -33,8 +34,16 @@ public sealed class RoutePattern
 public sealed class RouteStep
 {
     public required string Title { get; set; }
-    /// <summary>The function whose holders on the project answer this step.</summary>
-    public required string FunctionCode { get; set; }
+    /// <summary>The function whose holders on the project answer this step. Empty when a party answers it.</summary>
+    public string? FunctionCode { get; set; }
+    /// <summary>
+    /// An organization outside our control that answers this step. The step then
+    /// travels by transmittal: to their people when they answer here, or carried
+    /// by one of ours, who records their answer, when they do not.
+    /// </summary>
+    public string? PartyCode { get; set; }
+    /// <summary>For a party's step: the reason for issue on the transmittal that carries it.</summary>
+    public string? Reason { get; set; }
     /// <summary>ANY: the first answer closes the step. ALL: every holder answers.</summary>
     public string Mode { get; set; } = StepModes.Any;
     /// <summary>Working days, in the project's calendar, the step has once it opens.</summary>
@@ -96,7 +105,13 @@ public sealed class ReviewStep
     public Guid ReviewId { get; set; }
     public int Index { get; set; }
     public required string Title { get; set; }
-    public required string FunctionCode { get; set; }
+    public string? FunctionCode { get; set; }
+    /// <summary>The outside party that answers, copied when the review starts.</summary>
+    public Guid? PartyId { get; set; }
+    public string? PartyName { get; set; }
+    /// <summary>IN_APP or BY_PROXY, as the party worked when the review started.</summary>
+    public string? Participation { get; set; }
+    public string? Reason { get; set; }
     public string Mode { get; set; } = StepModes.Any;
     public bool Deciding { get; set; }
     public int? Days { get; set; }
@@ -107,7 +122,21 @@ public sealed class ReviewStep
     public Instant? CompletedAt { get; set; }
     /// <summary>The step's answer: a verdict on the deciding step, the advice otherwise.</summary>
     public string? Answer { get; set; }
+    /// <summary>The transmittal that carried the step to the party.</summary>
+    public Guid? TransmittalId { get; set; }
+    /// <summary>By proxy: when it went to them, how, their reference, and which of us sent it. The clock runs from here.</summary>
+    public Instant? DispatchedAt { get; set; }
+    public string? DispatchChannel { get; set; }
+    public string? DispatchRef { get; set; }
+    public string? DispatchedByName { get; set; }
+    /// <summary>By proxy: their answer as they wrote it, who of ours recorded it, and its proof.</summary>
+    public string? ForeignAnswer { get; set; }
+    public string? RecordedByName { get; set; }
+    public Guid? EvidenceFileId { get; set; }
     public List<ReviewParticipant> Participants { get; set; } = [];
+
+    /// <summary>One of ours carries this step and records the party's answer.</summary>
+    public bool ByProxy => Participation == Participations.ByProxy;
 }
 
 public static class StepStates
