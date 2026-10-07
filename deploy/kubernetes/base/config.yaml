@@ -1,0 +1,16 @@
+# Settings that are not secret. Secrets (connection strings, keys) live in the
+# delios-secrets Secret, made from deploy/.env-style lines: see secrets.example.env.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: delios-config
+data:
+  ASPNETCORE_ENVIRONMENT: Production
+  Auth__SecureCookie: "true"
+  ClamAv__Host: clamav
+  ClamAv__Port: "3310"
+  Storage__Provider: s3
+  Storage__Region: us-east-1
+  Storage__Bucket: delios
+  Search__Provider: postgres
+  Metrics__Port: "9091"

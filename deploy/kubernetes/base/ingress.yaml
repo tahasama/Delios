@@ -1,0 +1,24 @@
+# HTTPS in front of the API. The host is set by the overlay; the certificate
+# comes from cert-manager. Files never pass through here: browsers send them to
+# object storage directly.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: delios
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts: [app.example.com]
+      secretName: delios-tls
+  rules:
+    - host: app.example.com
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend: { service: { name: api, port: { name: http } } }
+          - path: /health
+            pathType: Prefix
+            backend: { service: { name: api, port: { name: http } } }

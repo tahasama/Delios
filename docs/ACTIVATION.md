@@ -39,7 +39,7 @@ setting in `deploy/.env`, nothing in code.
    site, the first backup in the log, then the restore drill once.
 
 Everything else on this page (standby, read replica, PgBouncer, more nodes,
-OpenSearch, extraction, Azure, SSO, MFA) stays off until its own alert or a
+OpenSearch, extraction, Azure, SSO, MFA, Kubernetes) stays off until its own alert or a
 client asks; go-live does not need any of it.
 
 ## How you find out
@@ -350,7 +350,31 @@ work the same way.
 
 **To go back:** the same copy the other way, then `STORAGE_PROVIDER=s3`.
 
-## Still to build
+## Kubernetes
 
-These follow the product steps (see ARCHITECTURE.md "Build plan") and will get
-their own section here: Kubernetes.
+**When:** "Several servers" stops being enough: many app servers to keep in
+step, rolling releases without downtime, or a client whose platform is
+Kubernetes. Before that, Compose on one or a few servers is cheaper and simpler.
+
+What is ready in `deploy/kubernetes/`: the API (two or more pods, autoscaled on
+CPU, never all down during a release), the workers, ClamAV, the migration job and
+the HTTPS ingress, with health probes, resource limits and locked-down
+containers. The manifests are checked on every push.
+
+What the cluster connects to rather than runs: Postgres (a managed database, or
+the CloudNativePG operator with its own backups and standby), Redis, RabbitMQ and
+object storage. Each is a connection string in the `delios-secrets` Secret.
+
+1. A cluster with an ingress controller (ingress-nginx) and cert-manager with a
+   `letsencrypt` ClusterIssuer; Hetzner's managed Kubernetes or k3s on its servers.
+2. Push the backend image to a registry; set it in `overlays/production` with your
+   domain (copy the overlay per environment).
+3. `secrets.example.env` → `secrets.env` (never committed), filled in, then
+   `kubectl create secret generic delios-secrets -n delios --from-env-file=secrets.env`
+4. `kubectl apply -k deploy/kubernetes/overlays/production`; the `migrate` job runs
+   first; `kubectl -n delios wait --for=condition=complete job/migrate`.
+5. Each release: delete the finished `migrate` job, change the image tag, apply again.
+   Pods are replaced one at a time.
+
+Monitoring: the pods carry `prometheus.io/scrape` annotations; point the cluster's
+Prometheus at them and load `deploy/monitoring/alerts.yml`.

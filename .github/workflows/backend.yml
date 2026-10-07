@@ -28,6 +28,17 @@ jobs:
       # Integration tests start Postgres, Redis and RabbitMQ with Testcontainers.
       - run: dotnet test -c Release --no-build
 
+  kubernetes:
+    # Switched off in production until needed; checked on every push so it is ready when it is.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Render and validate the manifests
+        run: |
+          curl -sSL https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz | tar xz
+          kubectl kustomize deploy/kubernetes/overlays/production > rendered.yaml
+          ./kubeconform -strict -summary rendered.yaml
+
   image:
     runs-on: ubuntu-latest
     timeout-minutes: 20
