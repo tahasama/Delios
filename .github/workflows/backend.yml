@@ -69,6 +69,17 @@ jobs:
           done
           docker compose -f deploy/compose.yaml logs postgres | tail -50
           exit 1
+      - name: Archive everything written so far
+        # The first backup can finish before the migrations ran; a restore replays
+        # the archived log after it, so the schema must be archived before the drill.
+        run: |
+          c="docker compose -f deploy/compose.yaml exec -T postgres psql -U postgres -d delios -tAc"
+          seg=$($c "select pg_walfile_name(pg_switch_wal())")
+          for i in $(seq 1 30); do
+            [ "$($c "select coalesce(last_archived_wal >= '$seg', false) from pg_stat_archiver")" = t ] && exit 0
+            sleep 2
+          done
+          echo "WAL segment $seg was not archived"; exit 1
       - name: Restore drill against that backup
         run: docker compose -f deploy/compose.yaml --profile drill run --rm restore-drill
       - name: Validate monitoring configuration and alert rules

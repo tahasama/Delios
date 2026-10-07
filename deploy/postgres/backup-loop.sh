@@ -43,8 +43,21 @@ until pgbackrest --stanza=delios stanza-create; do
 done
 write_metrics
 
+# What the repository itself holds is the truth: a repository lost or replaced
+# (a new volume, a rebuilt server) must get a full backup now, not when a
+# remembered date says one is due, and the alerts must see that it has none.
+from_repository() {
+  info=$(pgbackrest --stanza=delios info --output=json 2>/dev/null) || return 0
+  set -- $(printf '%s' "$info" | tr ',{}[]' '\n\n\n\n\n' | awk -F: '
+    /^"stop":[0-9]+$/ { stop = $2 }
+    /^"type":"(full|diff|incr)"$/ { if ($2 == "\"full\"" && stop > full) full = stop; if (stop > any) any = stop }
+    END { print full + 0, any + 0 }')
+  last_full=$1; last_backup=$2
+}
+
 while true; do
   if pgbackrest --stanza=delios check >/dev/null 2>&1; then archive_ok=1; else archive_ok=0; fi
+  from_repository
 
   now=$(date +%s)
   type=""
