@@ -11,6 +11,37 @@ it once with a random password for every service; Compose refuses to start
 without it. In production, keep a copy of it, and of `BACKUP_CIPHER_PASS`,
 somewhere other than the server.
 
+## Go-live
+
+**Not before the owner declares their own testing of the finished backend and
+frontend positive.** Until then everything stays local: SeaweedFS for files,
+backups on the server's own disk, no domain, alerts nowhere. At go-live, every
+product switches together, from this list, in this order. Each step is a
+setting in `deploy/.env`, nothing in code.
+
+1. **Server:** a Hetzner VPS, Docker installed, the repository cloned, `sh deploy/init-env.sh`
+   run on it (new passwords, never the development ones). Keep a copy of `deploy/.env` off the server.
+2. **Mode:** `APP_ENVIRONMENT=Production`. Demo data is then refused.
+3. **Files:** a Hetzner Object Storage bucket (versioning on), then
+   `STORAGE_ENDPOINT=https://<region>.your-objectstorage.com`,
+   `STORAGE_PUBLIC_ENDPOINT` the same, `STORAGE_REGION=<region>`, `STORAGE_BUCKET=<bucket>`,
+   `STORAGE_ACCESS_KEY` and `STORAGE_SECRET_KEY` its keys. CORS on the bucket for the site
+   (`GET, HEAD, PUT`). If test files must be kept: `rclone copy` from SeaweedFS first.
+4. **Domain and HTTPS:** `SITE_ADDRESS=app.example.com`, `PUBLIC_URL=https://app.example.com`,
+   `SECURE_COOKIE=true`, ports 80 and 443 open ("Domain and HTTPS").
+5. **Database backups** off the server: `BACKUP_REPO_TYPE=s3` with `BACKUP_S3_*`
+   (another bucket, ideally another region) and a `BACKUP_CIPHER_PASS` kept off the server ("Backups").
+6. **Second copy of files:** `FILE_BACKUP_TARGET_TYPE=s3` and its target, another region or provider.
+7. **Alerts reach a person:** `ALERT_CHANNEL` and its secrets ("Alert notifications");
+   send yourself a test alert.
+8. **First organization:** `run --rm migrate create-tenant ...` (never `seed-demo`).
+9. **Check:** `/health/ready` on api and worker, an upload and download through the
+   site, the first backup in the log, then the restore drill once.
+
+Everything else on this page (standby, read replica, PgBouncer, more nodes,
+OpenSearch, extraction, Azure, SSO, MFA) stays off until its own alert or a
+client asks; go-live does not need any of it.
+
 ## How you find out
 
 Monitoring runs with the `monitoring` profile:
