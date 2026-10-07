@@ -43,6 +43,30 @@ public sealed class CheckTests(Infrastructure infrastructure) : IClassFixture<In
     }
 
     [Fact]
+    public async Task A_check_that_hits_a_database_error_is_marked_and_the_others_still_run()
+    {
+        await using var app = await TestApp.StartAsync(infrastructure);
+        app.StartWorker();
+        var controller = await app.SignedInAsync("controller@demo.local");
+        var project = await Api.ProjectIdAsync(controller);
+        // The schedule checks read this table; without it they fail inside the database.
+        await using (var connection = new Npgsql.NpgsqlConnection(app.Settings["ConnectionStrings:Postgres"]))
+        {
+            await connection.OpenAsync();
+            await using var rename = new Npgsql.NpgsqlCommand("ALTER TABLE schedule_sources RENAME TO schedule_sources_gone", connection);
+            await rename.ExecuteNonQueryAsync();
+        }
+
+        var run = await RunAsync(controller, project);
+
+        Assert.Equal("DONE", run.GetProperty("status").GetString());
+        Assert.Equal("NOT_EXECUTABLE", Result(run, "SC-01"));
+        // Checks after it in the list still ran on a usable transaction.
+        Assert.Equal("PASS", Result(run, "RG-01"));
+        Assert.Contains(Result(run, "PK-06"), new[] { "PASS", "FAIL" });
+    }
+
+    [Fact]
     public async Task The_checks_find_what_is_wrong_open_defects_and_score_the_register()
     {
         await using var app = await TestApp.StartAsync(infrastructure);

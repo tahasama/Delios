@@ -40,18 +40,26 @@ public sealed class CheckEngine(
         {
             await RunAsync(run, cancellationToken);
             run.Status = CheckRunStatuses.Done;
+            run.FinishedAt = clock.GetCurrentInstant();
+            await db.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
         }
         catch (Exception e) when (e is not OperationCanceledException)
         {
-            logger.LogError(e, "Check run {RunId} failed", run.Id);
+            // The transaction may be unusable after a database error: undo it, and
+            // record the failure in a fresh one so the run never stays RUNNING.
+            logger.LogError(e, "Check run {RunId} failed", message.RunId);
+            await transaction.RollbackAsync(cancellationToken);
             db.ChangeTracker.Clear();
-            run = await db.CheckRuns.SingleAsync(r => r.Id == message.RunId, cancellationToken);
-            run.Status = CheckRunStatuses.Failed;
-            run.Error = e.Message;
+            await using var record = await db.Database.BeginTransactionAsync(cancellationToken);
+            var failed = await db.CheckRuns.SingleAsync(r => r.Id == message.RunId, cancellationToken);
+            failed.Status = CheckRunStatuses.Failed;
+            failed.Error = e.Message.Length > 2000 ? e.Message[..2000] : e.Message;
+            failed.StartedAt ??= clock.GetCurrentInstant();
+            failed.FinishedAt = clock.GetCurrentInstant();
+            await db.SaveChangesAsync(cancellationToken);
+            await record.CommitAsync(cancellationToken);
         }
-        run.FinishedAt = clock.GetCurrentInstant();
-        await db.SaveChangesAsync(cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
     }
 
     /// <summary>
@@ -89,13 +97,19 @@ public sealed class CheckEngine(
             }
             var watch = Stopwatch.StartNew();
             Outcome outcome;
+            // A savepoint: a check that hits a database error is undone alone, and
+            // the transaction stays usable for the checks after it.
+            var transaction = db.Database.CurrentTransaction!;
+            await transaction.CreateSavepointAsync("check", cancellationToken);
             try
             {
                 outcome = await check.Run(context);
+                await transaction.ReleaseSavepointAsync("check", cancellationToken);
             }
             catch (Exception e) when (e is not OperationCanceledException)
             {
                 // One check that cannot run does not stop the others.
+                await transaction.RollbackToSavepointAsync("check", cancellationToken);
                 logger.LogWarning(e, "Check {CheckId} could not run", check.Id);
                 results.Add(new CheckResult { CheckId = check.Id, Result = "NOT_EXECUTABLE", Milliseconds = (int)watch.ElapsedMilliseconds, Note = e.Message });
                 continue;

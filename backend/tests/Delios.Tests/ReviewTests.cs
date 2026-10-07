@@ -277,6 +277,25 @@ public sealed class ReviewTests(Infrastructure infrastructure) : IClassFixture<I
     }
 
     [Fact]
+    public async Task Document_Control_cannot_send_a_route_forward_to_a_step_it_has_not_reached()
+    {
+        await using var app = await TestApp.StartAsync(infrastructure);
+        app.StartWorker();
+        var engineer = await app.SignedInAsync("engineer@demo.local");
+        var controller = await app.SignedInAsync("controller@demo.local");
+        var p = await Flow.RevisionAsync(engineer);
+        var id = (await StartAsync(engineer, p)).GetProperty("id").GetGuid();
+
+        // Step 1 is open; step 2 has not been reached. Opening it would leave two steps open.
+        var (ahead, aheadBody) = await Flow.PostAsync(controller, R(p, id, "/return"), new { note = "Skip ahead.", toStep = 2, reason = "WRONG_FILE" });
+        Assert.Equal((HttpStatusCode.UnprocessableEntity, "STEP_NOT_REACHED"), (ahead, Flow.Code(aheadBody)));
+        // The review carries on as it was.
+        var (answered, answer) = await Flow.PostAsync(engineer, R(p, id, "/answer"), new { });
+        Assert.True(answered == HttpStatusCode.OK, answer.ToString());
+        Assert.Equal(2, answer.GetProperty("currentStep").GetInt32());
+    }
+
+    [Fact]
     public async Task A_pdf_that_cannot_be_stamped_is_recorded_once_and_the_release_stands()
     {
         await using var app = await TestApp.StartAsync(infrastructure);

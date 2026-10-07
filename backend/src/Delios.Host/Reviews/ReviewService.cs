@@ -887,8 +887,12 @@ public sealed class ReviewService(
     {
         if (index < 0 || index >= review.Steps.Count)
             return Problems.Invalid("STEP_INVALID", "No such step on this route.");
-        if (onlyAnswered && review.Steps.Single(s => s.Index == index).State != StepStates.Done)
+        var target = review.Steps.Single(s => s.Index == index);
+        if (onlyAnswered && target.State != StepStates.Done)
             return Problems.Invalid("REWIND_FORWARD", "The route goes back only to a step that has already answered.");
+        // Never forward: a step not yet reached would open beside the one that is open.
+        if (target.State == StepStates.Waiting)
+            return Problems.Invalid("STEP_NOT_REACHED", "The route has not reached that step yet: send it back to the open step or an earlier one.");
         var catalog = await Catalog.LoadAsync(db, cancellationToken);
         if (reason is null || !catalog.IsActive(ReviewSets.ReturnReasons, reason))
         {
