@@ -55,6 +55,8 @@ public sealed class ScheduleImport
     public int Removed { get; set; }
     public int Unchanged { get; set; }
     public List<ActivityChange> Changes { get; set; } = [];
+    /// <summary>Department names in the file that are no published discipline: left off the activities, listed here to put right.</summary>
+    public string[] UnmatchedDepartments { get; set; } = [];
 }
 
 public static class ScheduleImportStatuses
@@ -92,7 +94,7 @@ public sealed class Activity
     public LocalDate? Start { get; set; }
     public LocalDate? Finish { get; set; }
     public string? Responsible { get; set; }
-    /// <summary>Discipline codes of the departments concerned.</summary>
+    /// <summary>The departments concerned. A department is a discipline: these are published discipline codes.</summary>
     public string[] Departments { get; set; } = [];
     public string State { get; set; } = ActivityStates.Active;
     public Guid? SourceRevisionId { get; set; }
@@ -137,7 +139,7 @@ public sealed class Requirement
     public LocalDate? FixedDate { get; set; }
     /// <summary>Worked out from the anchor whenever the schedule moves.</summary>
     public LocalDate? NeededBy { get; set; }
-    /// <summary>The department that owns the need: who may waive it.</summary>
+    /// <summary>The department (a published discipline) that owns the need: its members may waive it.</summary>
     public string? Department { get; set; }
     public string State { get; set; } = RequirementStates.Missing;
     /// <summary>When the document was first there for it.</summary>

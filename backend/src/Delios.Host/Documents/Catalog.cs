@@ -25,6 +25,19 @@ public sealed class Catalog
             ? value
             : null;
 
+    /// <summary>
+    /// The active value a person or a file names, by its code or its label, ignoring
+    /// case: "EL", "el" and "Electrical" all find EL. Null when nothing matches.
+    /// </summary>
+    public string? Find(string setKey, string? text)
+    {
+        var wanted = text?.Trim();
+        if (string.IsNullOrEmpty(wanted) || !_sets.TryGetValue(setKey, out var set)) return null;
+        var active = set.Values.Where(v => v.Status == ValueStatus.Active).OrderBy(v => v.Sort).ToList();
+        return (active.FirstOrDefault(v => v.Code.Equals(wanted, StringComparison.OrdinalIgnoreCase))
+            ?? active.FirstOrDefault(v => v.Label.Equals(wanted, StringComparison.OrdinalIgnoreCase)))?.Code;
+    }
+
     /// <summary>The first active value whose string property equals the one given.</summary>
     public string? CodeWhere(string setKey, string prop, string value) =>
         _sets.TryGetValue(setKey, out var set)

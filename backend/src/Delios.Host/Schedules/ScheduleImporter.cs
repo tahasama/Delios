@@ -101,6 +101,16 @@ public sealed class ScheduleImporter(
             return;
         }
 
+        // A department is a discipline: the file's names become discipline codes; the rest are listed, not guessed.
+        var catalog = await Catalog.LoadAsync(db, cancellationToken);
+        var unmatched = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
+        string[] Disciplines(string[] names)
+        {
+            foreach (var name in names.Where(n => catalog.Find(ValueSets.Disciplines, n) is null)) unmatched.Add(name);
+            return names.Select(n => catalog.Find(ValueSets.Disciplines, n)).OfType<string>().Distinct().ToArray();
+        }
+        parsed = parsed.Select(p => p with { Departments = Disciplines(p.Departments) }).ToList();
+
         var existing = await db.Activities.Where(a => a.ProjectId == revision.ProjectId).ToDictionaryAsync(a => a.Code, cancellationToken);
         foreach (var row in parsed)
         {
@@ -147,13 +157,15 @@ public sealed class ScheduleImporter(
             record.Removed++;
             record.Changes.Add(new ActivityChange { Code = gone.Code, Name = gone.Name, Type = "REMOVED", OldStart = gone.Start, OldFinish = gone.Finish });
         }
+        record.UnmatchedDepartments = [.. unmatched];
         await db.SaveChangesAsync(cancellationToken);
 
         // Dates moved: every need counted from them moves too.
         var all = await db.Activities.Where(a => a.ProjectId == revision.ProjectId).Select(a => a.Id).ToListAsync(cancellationToken);
         await Readiness.RestateAsync(db, clock, all, cancellationToken);
         await audit.WriteAsync(Actor.System, "SCHEDULE_READ", "Revision", revision.Id, label,
-            $"{parsed.Count} activities from {file.Name}: {record.Added} new, {record.Moved} moved, {record.Changed} changed, {record.Removed} removed.",
+            $"{parsed.Count} activities from {file.Name}: {record.Added} new, {record.Moved} moved, {record.Changed} changed, {record.Removed} removed."
+            + (unmatched.Count > 0 ? $" Not a discipline, left off: {string.Join(", ", unmatched)}." : ""),
             revision.ProjectId, cancellationToken);
         logger.LogInformation("Schedule {Label} read: {Count} activities", label, parsed.Count);
     }

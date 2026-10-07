@@ -549,7 +549,9 @@ deployment with tenant isolation in the database.
      from the start or the finish (a test result needed after the work), or on a
      fixed day. Readiness: ready, ready with waivers (green, still followed up),
      at risk, pending. A waiver is the concerned department's or Document
-     Control's, on their responsibility, always with a reason. Decisions about an
+     Control's, on their responsibility, always with a reason. A department is a
+     discipline (the published list, named by code or name); a schedule's
+     department that is no discipline is left off and listed on the import. Decisions about an
      activity whose documents were missing come from the organization's own list
      (each says whether it "proceeds"). Lateness: the chain each document went
      through, and the first checkpoint that slipped. Four checks (SC-01..04).

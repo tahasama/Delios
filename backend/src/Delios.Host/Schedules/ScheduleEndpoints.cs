@@ -132,7 +132,11 @@ public static class ScheduleEndpoints
         if (!includeRemoved) query = query.Where(a => a.State == ActivityStates.Active);
         if (from is { } f) query = query.Where(a => a.Start >= LocalDate.FromDateOnly(f));
         if (to is { } t) query = query.Where(a => a.Start <= LocalDate.FromDateOnly(t));
-        if (department is not null) query = query.Where(a => a.Departments.Contains(department));
+        if (department is not null)
+        {
+            var code = (await Catalog.LoadAsync(db, cancellationToken)).Find(ValueSets.Disciplines, department) ?? department;
+            query = query.Where(a => a.Departments.Contains(code));
+        }
         if (!string.IsNullOrWhiteSpace(q))
         {
             var pattern = "%" + q.Trim().Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_") + "%";
@@ -188,6 +192,14 @@ public static class ScheduleEndpoints
         if (anchor is not (Anchors.Start or Anchors.Finish)) return Problems.Invalid("ANCHOR_INVALID", "START or FINISH.");
         if (await db.Requirements.AnyAsync(r => r.ActivityId == activityId && r.DocumentId == document.Id && r.Purpose == purpose, cancellationToken))
             return Problems.Conflict("NEED_EXISTS", "The activity already needs that document for that purpose.");
+        // A department is a discipline.
+        string? department = null;
+        if (!string.IsNullOrWhiteSpace(request.Department))
+        {
+            department = catalog.Find(ValueSets.Disciplines, request.Department);
+            if (department is null)
+                return Problems.Invalid("VALUE_NOT_PUBLISHED", $"{request.Department} is not a published discipline.", new { field = "department", value = request.Department });
+        }
         var source = await db.ScheduleSources.AsNoTracking().SingleOrDefaultAsync(s => s.ProjectId == access.Project.Id, cancellationToken);
 
         var need = new Requirement
@@ -201,7 +213,7 @@ public static class ScheduleEndpoints
             Anchor = anchor,
             OffsetDays = request.OffsetDays ?? -(source?.DefaultLeadDays ?? 7),
             FixedDate = request.FixedDate is { } fixedDate ? LocalDate.FromDateOnly(fixedDate) : null,
-            Department = string.IsNullOrWhiteSpace(request.Department) ? null : request.Department.Trim().ToUpperInvariant(),
+            Department = department,
             CreatedByName = access.UserName,
             CreatedAt = clock.GetCurrentInstant(),
         };

@@ -95,16 +95,20 @@ public sealed class ScheduleTests(Infrastructure infrastructure) : IClassFixture
 
         var first = await ScheduleRevisionAsync(engineer, project, schedule,
             "Activity ID,Activity Name,Start,Finish,Responsible,Departments\n"
-            + $"A100,Pour inlet base slab,{Day(5)} A,{Day(8)},Site team,CIVIL\n"
-            + $"A200,Install switchgear,{Day(60)}*,{Day(70)},Electrical,ELEC\n"
-            + $"A300,Backfill and compact,{Day(30)},{Day(40)},Site team,\"CIVIL, QA\"\n");
+            + $"A100,Pour inlet base slab,{Day(5)} A,{Day(8)},Site team,Civil\n"
+            + $"A200,Install switchgear,{Day(60)}*,{Day(70)},Electrical,el\n"
+            + $"A300,Backfill and compact,{Day(30)},{Day(40)},Site team,\"CI, Quality\"\n");
         // Nothing is read before release: an unreleased schedule is not the plan.
         Assert.Empty((await GetAsync(engineer, $"{p}/activities")).EnumerateArray());
         await ReleaseAsync(engineer, approver, controller, project, first);
         var activities = await UntilAsync(engineer, $"{p}/activities", a => a.GetArrayLength() == 3);
         var a100 = ByCode(activities, "A100");
         Assert.Equal(DateOnly.FromDateTime(Today.AddDays(5)), a100.GetProperty("start").Deserialize<DateOnly>());
-        Assert.Equal(["CIVIL", "QA"], ByCode(activities, "A300").GetProperty("departments").EnumerateArray().Select(d => d.GetString()));
+        // A department is a discipline, named by code or by name; one that is not is left off and listed.
+        Assert.Equal(["CI"], ByCode(activities, "A300").GetProperty("departments").EnumerateArray().Select(d => d.GetString()));
+        Assert.Equal(["EL"], ByCode(activities, "A200").GetProperty("departments").EnumerateArray().Select(d => d.GetString()));
+        var firstRead = (await GetAsync(controller, $"{p}/schedule")).GetProperty("imports")[0];
+        Assert.Equal(["Quality"], firstRead.GetProperty("unmatchedDepartments").EnumerateArray().Select(d => d.GetString()));
         Assert.Equal("NONE", a100.GetProperty("readiness").GetString());
 
         // What each activity needs, and what for.
@@ -121,8 +125,12 @@ public sealed class ScheduleTests(Infrastructure infrastructure) : IClassFixture
         var (again, againBody) = await Flow.PostAsync(engineer, $"{a("A100")}/needs", new { documentId = slab, purpose = "EXECUTION" });
         Assert.Equal((HttpStatusCode.Conflict, "NEED_EXISTS"), (again, Flow.Code(againBody)));
 
+        var (plumbing, plumbingBody) = await Flow.PostAsync(engineer, $"{a("A200")}/needs",
+            new { documentId = layout, purpose = "INFORMATION", department = "Plumbing" });
+        Assert.Equal((HttpStatusCode.UnprocessableEntity, "VALUE_NOT_PUBLISHED"), (plumbing, Flow.Code(plumbingBody)));
         var (_, layoutNeed) = await Flow.PostAsync(engineer, $"{a("A200")}/needs",
-            new { documentId = layout, purpose = "INFORMATION", department = "elec" });
+            new { documentId = layout, purpose = "INFORMATION", department = "Electrical" });
+        Assert.Equal("EL", layoutNeed.GetProperty("needs")[0].GetProperty("department").GetString());
         Assert.Equal("PENDING", layoutNeed.GetProperty("activity").GetProperty("readiness").GetString());
 
         // A test result is needed after the work: counted from the finish.
@@ -147,7 +155,7 @@ public sealed class ScheduleTests(Infrastructure infrastructure) : IClassFixture
             scope.ServiceProvider.GetRequiredService<TenantContext>().Set(await db.Tenants.Select(t => t.Id).SingleAsync());
             await using var tx = await db.Database.BeginTransactionAsync();
             var engineerId = await db.Users.Where(u => u.Email == "engineer@demo.local").Select(u => u.Id).SingleAsync();
-            await db.Memberships.Where(m => m.UserId == engineerId).ExecuteUpdateAsync(m => m.SetProperty(x => x.Department, "ELEC"));
+            await db.Memberships.Where(m => m.UserId == engineerId).ExecuteUpdateAsync(m => m.SetProperty(x => x.Department, "EL"));
             await tx.CommitAsync();
         }
         var (silent, silentBody) = await Flow.PostAsync(engineer, waive, new { note = " " });
@@ -275,7 +283,7 @@ public sealed class ScheduleTests(Infrastructure infrastructure) : IClassFixture
         Assert.Equal(2, activities!.Count);
         Assert.Equal(("C-10", "Excavate", new LocalDate(2026, 11, 2), new LocalDate(2026, 11, 20)),
             (activities[0].Code, activities[0].Name, activities[0].Start, activities[0].Finish));
-        Assert.Equal(["CIVIL", "SURVEY"], activities[0].Departments);
+        Assert.Equal(["Civil", "Survey"], activities[0].Departments);
         Assert.Null(activities[1].Start);
     }
 

@@ -5,7 +5,7 @@ using NodaTime;
 
 namespace Delios.Host.Schedules;
 
-/// <summary>One activity as the schedule file states it.</summary>
+/// <summary>One activity as the schedule file states it; departments as the file names them.</summary>
 public sealed record ParsedActivity(string Code, string Name, LocalDate? Start, LocalDate? Finish, string? Responsible, string[] Departments);
 
 /// <summary>
@@ -85,7 +85,7 @@ public static class ScheduleReader
                 if (!finishOk) return (null, $"Row {r + 1}: '{Cell(finish)}' is not a date.");
                 activities.Add(new ParsedActivity(id, Cell(name) ?? id, startDate, finishDate, Cell(responsible),
                     (Cell(departments) ?? "").Split([',', ';', '|', '/'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                        .Select(d => d.ToUpperInvariant()).Distinct().ToArray()));
+                        .Distinct(StringComparer.OrdinalIgnoreCase).ToArray()));
             }
             return activities.Count == 0 ? (null, "The file has headings but no activities.") : (activities, null);
         }

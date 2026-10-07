@@ -243,9 +243,9 @@ $sch = Call POST "$p/documents" @{
 Call PUT "$p/schedule" @{ documentId = $sch.id } $control | Out-Null
 function Day($n) { (Get-Date).AddDays($n).ToString('dd-MMM-yy', [Globalization.CultureInfo]::InvariantCulture) }
 $csv = "Activity ID,Activity Name,Start,Finish,Responsible,Departments`n" +
-    "A100,Pour inlet base slab,$(Day 5),$(Day 8),Site team,CIVIL`n" +
-    "A200,Install switchgear,$(Day 60),$(Day 70),Electrical,ELEC`n" +
-    "A300,Backfill and compact,$(Day 30),$(Day 40),Site team,CIVIL`n"
+    "A100,Pour inlet base slab,$(Day 5),$(Day 8),Site team,Civil`n" +
+    "A200,Install switchgear,$(Day 60),$(Day 70),Electrical,Electrical`n" +
+    "A300,Backfill and compact,$(Day 30),$(Day 40),Site team,Civil`n"
 $schFiles = @(
     (Upload "$p/documents/$($sch.id)/uploads" 'Programme.pdf' (New-Pdf 'Construction programme')),
     (Upload "$p/documents/$($sch.id)/uploads" 'Programme.csv' ([Text.Encoding]::UTF8.GetBytes($csv)) $session 'text/csv'))
@@ -272,7 +272,7 @@ Call POST "$p/activities/$a100/needs" @{ documentId = $doc.id; purpose = 'EXECUT
 $layout = Call POST "$p/documents" @{
     title = "Switchroom layout $(Get-Date -Format 'HHmmss')"; deliverableType = 'ENG'; docType = 'DWG'; discipline = 'EL'; subproject = '20'
 }
-$need = Call POST "$p/activities/$a200/needs" @{ documentId = $layout.id; purpose = 'INFORMATION'; department = 'ELEC' }
+$need = Call POST "$p/activities/$a200/needs" @{ documentId = $layout.id; purpose = 'INFORMATION'; department = 'EL' }
 Call POST "$p/activities/$a200/needs/$(($need.needs | Where-Object { $_.documentId -eq $layout.id }).id)/waive" @{ note = 'Received by email; will be uploaded later.' } $control | Out-Null
 foreach ($a in (Call GET "$p/activities")) {
     Write-Host ('{0} {1,-24} starts {2}  {3,-18} {4}/{5} met, {6} waived' -f $a.code, $a.name, $a.start, $a.readiness, $a.met, $a.needs, $a.waived)
