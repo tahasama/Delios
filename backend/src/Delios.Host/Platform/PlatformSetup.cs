@@ -90,6 +90,10 @@ public static class PlatformSetup
 
         services.AddScoped<AuditLog>();
         services.AddScoped<SessionStore>();
+        services.AddScoped<Mfa>();
+        services.AddOptions<SsoOptions>().BindConfiguration("Sso");
+        services.AddHttpClient(OidcClient.HttpClientName, c => c.Timeout = TimeSpan.FromSeconds(15));
+        services.AddSingleton<OidcClient>();
         services.AddScoped<ProjectAccessLoader>();
         services.AddScoped<Documents.Numbering>();
         services.AddScoped<Documents.DocumentService>();
@@ -124,6 +128,10 @@ public static class PlatformSetup
             o.AddPolicy("sign-in", http => RateLimitPartition.GetFixedWindowLimiter(
                 http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
                 _ => new FixedWindowRateLimiterOptions { PermitLimit = 10, Window = TimeSpan.FromMinutes(1) }));
+            // Single sign-on is two requests per sign-in and guesses nothing: a looser bound.
+            o.AddPolicy("sso", http => RateLimitPartition.GetFixedWindowLimiter(
+                http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                _ => new FixedWindowRateLimiterOptions { PermitLimit = 60, Window = TimeSpan.FromMinutes(1) }));
         });
         // The proxy in front (Caddy, the load balancer) sits on a private network.
         services.Configure<ForwardedHeadersOptions>(o =>
@@ -222,6 +230,8 @@ public static class PlatformSetup
         if (role == Roles.Api)
         {
             app.MapIdentityEndpoints();
+            app.MapSsoEndpoints();
+            app.MapAdminEndpoints();
             Documents.DocumentEndpoints.MapDocumentEndpoints(app);
             Reviews.ReviewEndpoints.MapReviewEndpoints(app);
             Transmittals.TransmittalEndpoints.MapTransmittalEndpoints(app);

@@ -15,6 +15,20 @@ internal sealed class TenantConfiguration : IEntityTypeConfiguration<Tenant>
     }
 }
 
+internal sealed class IdentityProviderConfiguration : IEntityTypeConfiguration<IdentityProvider>
+{
+    public void Configure(EntityTypeBuilder<IdentityProvider> b)
+    {
+        b.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
+        b.HasIndex(x => x.TenantId).IsUnique();
+        b.Property(x => x.Name).HasMaxLength(100);
+        b.Property(x => x.Authority).HasMaxLength(500);
+        b.Property(x => x.ClientId).HasMaxLength(200);
+        b.Property(x => x.ClientSecretProtected).HasMaxLength(2000);
+        b.Property(x => x.Scopes).HasMaxLength(500);
+    }
+}
+
 internal sealed class PartyConfiguration : IEntityTypeConfiguration<Party>
 {
     public void Configure(EntityTypeBuilder<Party> b)
@@ -39,6 +53,7 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
         b.Property(x => x.Email).HasMaxLength(320);
         b.Property(x => x.NormalizedEmail).HasMaxLength(320);
         b.Property(x => x.Name).HasMaxLength(200);
+        b.Property(x => x.MfaSecretProtected).HasMaxLength(1000);
         b.Property(x => x.CreatedAt).HasDefaultValueSql("now()");
     }
 }

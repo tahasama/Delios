@@ -30,6 +30,8 @@ x-backend: &backend
     ClamAv__Host: clamav
     # Plain HTTP on localhost; production sits behind TLS and keeps the default.
     Auth__SecureCookie: "false"
+    # The address people reach the system at, for single sign-on to send them back to.
+    Sso__PublicUrl: ${PUBLIC_URL:-}
 
 services:
   # Postgres with continuous WAL archiving and scheduled backups (deploy/postgres).

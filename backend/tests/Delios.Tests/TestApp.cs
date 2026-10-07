@@ -12,11 +12,16 @@ public sealed class TestApp : IAsyncDisposable
     public required Dictionary<string, string?> Settings { get; init; }
     private DeliosFactory? _worker;
 
-    public static async Task<TestApp> StartAsync(Infrastructure infrastructure, Action<Dictionary<string, string?>>? configure = null)
+    public static async Task<TestApp> StartAsync(Infrastructure infrastructure, Action<Dictionary<string, string?>>? configure = null,
+        Action<IServiceCollection>? services = null)
     {
         var settings = await infrastructure.SettingsAsync();
         configure?.Invoke(settings);
-        var factory = new DeliosFactory(settings, FakeScanner.Use);
+        var factory = new DeliosFactory(settings, s =>
+        {
+            FakeScanner.Use(s);
+            services?.Invoke(s);
+        });
         await DatabaseMigrator.ApplyAsync(factory.Services);
         await using var scope = factory.Services.CreateAsyncScope();
         await scope.ServiceProvider.GetRequiredService<DemoSeed>().RunAsync();

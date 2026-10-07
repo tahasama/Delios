@@ -10,6 +10,35 @@ public sealed class Tenant
     public required string Name { get; set; }
     public bool Active { get; set; } = true;
     public Instant CreatedAt { get; set; }
+    /// <summary>Everyone signing in with a password must also give a code from their authenticator app.</summary>
+    public bool MfaRequired { get; set; }
+    /// <summary>
+    /// Off when the organization signs in through its own identity provider only.
+    /// Administrators keep their password, so a broken provider never locks everyone out.
+    /// </summary>
+    public bool PasswordSignIn { get; set; } = true;
+}
+
+/// <summary>
+/// The organization's own identity provider (Microsoft Entra ID, Google, Okta,
+/// Keycloak…), spoken to over OpenID Connect. People sign in there; we match
+/// them by email to an account that already exists here.
+/// </summary>
+public sealed class IdentityProvider
+{
+    public Guid Id { get; set; } = Guid.CreateVersion7();
+    public Guid TenantId { get; set; }
+    /// <summary>What the sign-in button says: "Sign in with Contoso".</summary>
+    public required string Name { get; set; }
+    /// <summary>The issuer, whose /.well-known/openid-configuration describes it.</summary>
+    public required string Authority { get; set; }
+    public required string ClientId { get; set; }
+    /// <summary>Encrypted with the application's data protection keys; never returned.</summary>
+    public required string ClientSecretProtected { get; set; }
+    public string Scopes { get; set; } = "openid profile email";
+    /// <summary>Only emails in these domains are accepted. Empty: any the provider vouches for.</summary>
+    public string[] AllowedDomains { get; set; } = [];
+    public bool Enabled { get; set; } = true;
 }
 
 /// <summary>An organization taking part in projects: ourselves, a contractor, a supplier, the client.</summary>
@@ -58,6 +87,13 @@ public sealed class User
     public bool IsAdmin { get; set; }
     public int FailedSignIns { get; set; }
     public Instant? LockedUntil { get; set; }
+    /// <summary>The authenticator secret, encrypted. Set at enrolment; in force once confirmed.</summary>
+    public string? MfaSecretProtected { get; set; }
+    public Instant? MfaEnabledAt { get; set; }
+    /// <summary>The last time step a code was accepted for: a code is used once.</summary>
+    public long? MfaLastStep { get; set; }
+    /// <summary>One-time codes for a lost phone, hashed. Each is removed when used.</summary>
+    public string[] RecoveryCodeHashes { get; set; } = [];
     public Instant CreatedAt { get; set; }
 }
 

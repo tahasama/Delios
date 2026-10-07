@@ -30,7 +30,7 @@ the path to serious scale.
 | Virus scan | ClamAV | — |
 | PDF | PdfSharp (MIT): release stamps, superseded watermarks | — |
 | Renditions | None generated: authors submit the PDF with the native file | — |
-| Authentication | Sessions in Postgres behind an httpOnly cookie; ASP.NET Core Identity's password hasher; lockout and rate limit | MFA; OIDC (Entra ID / Keycloak) per client; SAML through Keycloak |
+| Authentication | Sessions in Postgres behind an httpOnly cookie; ASP.NET Core Identity's password hasher; lockout and rate limit; two-step sign-in (authenticator codes, recovery codes), optional or required per organization; single sign-on over OpenID Connect per organization (built, switched on by its administrator) | SAML through Keycloak |
 | Audit | Append-only, hash-chained table | — |
 | Time | UTC everywhere, NodaTime, per-project time zone and working calendar | — |
 | Languages | i18n by message codes, RTL from day 1 | — |

@@ -188,8 +188,53 @@ In `deploy/.env`: `SITE_ADDRESS=app.example.com`, publish ports 80 and 443 in
 the `caddy` service, and set `Auth__SecureCookie` back to `true` (remove the
 override). Caddy obtains and renews the certificate itself.
 
+## Two-step sign-in (MFA)
+
+Built and on for anyone who wants it; required only when the organization says so.
+
+- **A person turns it on** for themselves: `POST /api/me/mfa/setup` gives the
+  secret and an `otpauth://` link to show as a QR code; `POST /api/me/mfa/confirm`
+  with a code from the app puts it in force and returns ten recovery codes, shown once.
+- **The organization requires it:** an administrator sends
+  `PUT /api/admin/security {"mfaRequired": true}`. Everyone without it enrols at
+  their next sign-in; nobody can turn it off while it is required.
+- **Lost phone, no recovery codes left:** an administrator calls
+  `POST /api/admin/users/{id}/mfa/reset`; the person enrols again next time.
+- **Watch:** `GET /api/admin/security` reports how many people have enrolled.
+  Wrong codes count towards the same lockout as wrong passwords, and appear in
+  the audit log as `MFA_FAILED`.
+
+## Single sign-on
+
+For an organization that wants its people to sign in with their company
+account (Microsoft Entra ID, Google Workspace, Okta, Keycloak; anything that
+speaks OpenID Connect). Nothing to install; it is configured per organization.
+
+1. In the identity provider, register an application (a "web" app, confidential
+   client) with the redirect address `https://<your domain>/api/auth/sso/callback`.
+   Note its issuer address, client id and client secret.
+2. In `deploy/.env` set `PUBLIC_URL=https://<your domain>`, then
+   `docker compose ... up -d` so the API knows its own address.
+3. An administrator sends:
+   ```
+   PUT /api/admin/security/sso
+   {"name": "Sign in with Contoso", "authority": "https://login.microsoftonline.com/<tenant-id>/v2.0",
+    "clientId": "...", "clientSecret": "...", "allowedDomains": ["contoso.com"]}
+   ```
+   The secret is stored encrypted and never shown again.
+4. The sign-in page asks `GET /api/auth/sso?tenant=<slug>` whether to show the
+   button, which leads to `/api/auth/sso/start?tenant=<slug>&returnUrl=/`.
+5. Once it works, optionally `PUT /api/admin/security {"passwordSignIn": false}`:
+   everyone then signs in through the provider. Administrators keep their
+   password (and two-step sign-in), so a broken provider never locks the
+   organization out; switching the provider off turns passwords back on.
+
+People are matched by email to accounts that already exist here; signing in
+creates nobody. Refusals land on `/sign-in?sso_error=<CODE>` (`SSO_NO_ACCOUNT`,
+`SSO_DOMAIN_NOT_ALLOWED`, `SSO_TOKEN_INVALID`…) and the reason is in the API log.
+
 ## Still to build
 
 These follow the product steps (see ARCHITECTURE.md "Build plan") and will get
-their own sections here: single sign-on and MFA, OpenSearch, content extraction
-and OCR, Azure Blob storage, Kubernetes.
+their own sections here: OpenSearch, content extraction and OCR, Azure Blob
+storage, Kubernetes.
