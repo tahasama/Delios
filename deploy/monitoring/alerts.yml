@@ -200,6 +200,24 @@ groups:
           summary: "Register searches take longer than 300 ms for one search in twenty."
           action: "First 'Read replica'; if searches stay slow, ACTIVATION.md 'OpenSearch'."
 
+      - alert: SearchIndexBehind
+        expr: |
+          max(delios_search_last_sync_timestamp_seconds) > 0
+            and time() - max(delios_search_last_sync_timestamp_seconds) > 300
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "The search index has not been brought up to date for over five minutes; new documents are not found by words."
+          action: "Check the opensearch container and the worker's log. Searches still answer from Postgres if the index is down."
+
+      - alert: SearchFallingBack
+        expr: increase(delios_search_fallbacks_total[15m]) > 0
+        for: 15m
+        labels: { severity: warning }
+        annotations:
+          summary: "Searches are answered from Postgres because the search index cannot be reached."
+          action: "docker compose ps opensearch; its log. ACTIVATION.md 'OpenSearch'."
+
       - alert: DiskFillsWithinAWeek
         expr: |
           predict_linear(node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs"}[6h], 7 * 24 * 3600) < 0

@@ -65,3 +65,20 @@ tests:
       - eval_time: 15m
         alertname: DatabaseConnectionsHigh
         exp_alerts: []
+
+  # The worker last synced the index at 60 s and never again: behind once five minutes pass, then five more.
+  - interval: 1m
+    input_series:
+      - series: 'delios_search_last_sync_timestamp_seconds{instance="worker-1"}'
+        values: '60x60'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: SearchIndexBehind
+        exp_alerts: []
+      - eval_time: 15m
+        alertname: SearchIndexBehind
+        exp_alerts:
+          - exp_labels: { severity: warning }
+            exp_annotations:
+              summary: "The search index has not been brought up to date for over five minutes; new documents are not found by words."
+              action: "Check the opensearch container and the worker's log. Searches still answer from Postgres if the index is down."

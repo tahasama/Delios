@@ -22,7 +22,7 @@ the path to serious scale.
 | Backend | ASP.NET Core 10 (LTS), one modular monolith | A module becomes its own service only with a measured reason to scale it alone |
 | API | REST + OpenAPI | No GraphQL |
 | Database | PostgreSQL 17, EF Core, row-level security | PgBouncer with the second API node; standby replica (see High availability) |
-| Search | Postgres search on metadata only | OpenSearch only if Postgres search becomes slow |
+| Search | Postgres search on register entries; OpenSearch built and switched off (ranked, forgiving; visibility still decided by Postgres; falls back to Postgres if unreachable) | Switch OpenSearch on when RegisterSearchSlow fires |
 | Content extraction | Built but switched off (see Client content) | Activated per project at a client's written request |
 | Cache, locks, rate limits | Redis (Valkey) | — |
 | Async work | RabbitMQ (official client), a transactional outbox table, retry and dead-letter queues | Kafka is not planned |

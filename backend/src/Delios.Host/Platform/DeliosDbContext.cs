@@ -53,6 +53,7 @@ public sealed class DeliosDbContext(DbContextOptions<DeliosDbContext> options)
     public DbSet<Transmittals.TransmittalRecipient> TransmittalRecipients => Set<Transmittals.TransmittalRecipient>();
 
     public DbSet<Packages.Package> Packages => Set<Packages.Package>();
+    public DbSet<Search.SearchWatermark> SearchWatermarks => Set<Search.SearchWatermark>();
     public DbSet<Packages.PackageMember> PackageMembers => Set<Packages.PackageMember>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

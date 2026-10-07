@@ -4,12 +4,12 @@ namespace Delios.Host.Platform;
 
 /// <summary>
 /// One-shot commands run with the same build and settings as the app:
-/// <c>migrate</c>, <c>create-tenant</c>, <c>seed-demo</c>.
+/// <c>migrate</c>, <c>create-tenant</c>, <c>seed-demo</c>, <c>reindex</c>.
 /// </summary>
 public static class Commands
 {
     public static bool IsCommand(string[] args) =>
-        args.Length > 0 && args[0] is DatabaseMigrator.Command or "create-tenant" or "seed-demo";
+        args.Length > 0 && args[0] is DatabaseMigrator.Command or "create-tenant" or "seed-demo" or "reindex";
 
     public static async Task<int> RunAsync(WebApplication app, string[] args)
     {
@@ -42,9 +42,22 @@ public static class Commands
                 await services.GetRequiredService<DemoSeed>().RunAsync();
                 return 0;
 
+            case "reindex":
+                // Drops the search index; the worker rebuilds it from the register within minutes.
+                var search = services.GetRequiredService<Microsoft.Extensions.Options.IOptions<Search.SearchOptions>>().Value;
+                if (!search.UsesOpenSearch)
+                {
+                    await Console.Error.WriteLineAsync("Search:Provider is postgres; there is no index to rebuild.");
+                    return 2;
+                }
+                await services.GetRequiredService<Search.OpenSearchClient>().DeleteIndexAsync(default);
+                await Search.SearchIndexer.ResetAsync(app.Services.GetRequiredService<IServiceScopeFactory>(), default);
+                await Console.Out.WriteLineAsync("Search index dropped; the worker rebuilds it from the register.");
+                return 0;
+
             default:
                 await Console.Error.WriteLineAsync(
-                    "Usage: migrate | create-tenant <slug> <name> <admin-email> <admin-name> | seed-demo");
+                    "Usage: migrate | create-tenant <slug> <name> <admin-email> <admin-name> | seed-demo | reindex");
                 return 2;
         }
     }

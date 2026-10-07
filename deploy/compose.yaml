@@ -32,6 +32,9 @@ x-backend: &backend
     Auth__SecureCookie: "false"
     # The address people reach the system at, for single sign-on to send them back to.
     Sso__PublicUrl: ${PUBLIC_URL:-}
+    # postgres until RegisterSearchSlow says otherwise; then opensearch (with the search profile).
+    Search__Provider: ${SEARCH_PROVIDER:-postgres}
+    Search__Url: http://opensearch:9200
 
 services:
   # Postgres with continuous WAL archiving and scheduled backups (deploy/postgres).
@@ -263,6 +266,26 @@ services:
     depends_on:
       postgres: { condition: service_healthy }
 
+  # ── Search index (switched on when RegisterSearchSlow fires) ────────────────
+  # Ranked, forgiving search over the register. Holds register entries only, not
+  # file content. Postgres stays the truth: the index is rebuilt from it.
+
+  opensearch:
+    image: opensearchproject/opensearch:2.19.2
+    profiles: [search]
+    restart: unless-stopped
+    environment:
+      discovery.type: single-node
+      # Reached only by the API and worker on the private network.
+      DISABLE_SECURITY_PLUGIN: "true"
+      DISABLE_INSTALL_DEMO_CONFIG: "true"
+      OPENSEARCH_JAVA_OPTS: -Xms${SEARCH_HEAP:-1g} -Xmx${SEARCH_HEAP:-1g}
+    volumes: [opensearch:/usr/share/opensearch/data]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:9200/_cluster/health || exit 1"]
+      interval: 10s
+      retries: 30
+
   # ── Monitoring ──────────────────────────────────────────────────────────────
   # How we know: metrics, alerts that say what to do, a dashboard. Alerts reach
   # people once ALERT_CHANNEL is set (docs/ACTIVATION.md "Alert notifications").
@@ -330,6 +353,7 @@ services:
       REDIS_ADDR: redis://valkey:6379
 
 volumes:
+  opensearch:
   pgbackrest:
   delios-metrics:
   file-backup:

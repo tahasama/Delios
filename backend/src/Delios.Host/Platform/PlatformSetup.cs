@@ -104,6 +104,14 @@ public static class PlatformSetup
         services.AddScoped<Reviews.ControlService>();
         services.AddScoped<Transmittals.TransmittalService>();
         services.AddScoped<Packages.PackageService>();
+        services.AddOptions<Search.SearchOptions>().BindConfiguration(Search.SearchOptions.Section);
+        services.AddScoped<Search.SearchService>();
+        services.AddHttpClient<Search.OpenSearchClient>((sp, c) =>
+        {
+            c.BaseAddress = new Uri(sp.GetRequiredService<IOptions<Search.SearchOptions>>().Value.Url.TrimEnd('/') + "/");
+            c.Timeout = TimeSpan.FromSeconds(10);
+        });
+        var search = config.GetSection(Search.SearchOptions.Section).Get<Search.SearchOptions>() ?? new();
         services.AddSingleton<Documents.IVirusScanner, Documents.ClamAvScanner>();
         services.AddSingleton<Messaging.RabbitMqConnection>();
         if (role == Roles.Api)
@@ -113,6 +121,7 @@ public static class PlatformSetup
         else
         {
             services.AddHostedService<Messaging.FileQueueConsumer>();
+            if (search.UsesOpenSearch) services.AddHostedService<Search.SearchIndexer>();
         }
         services.AddScoped<Seeding.TenantSetup>();
         services.AddScoped<Seeding.DemoSeed>();
@@ -171,6 +180,12 @@ public static class PlatformSetup
                 sp => sp.GetRequiredService<RabbitMqHealthCheck>(), null, [Roles.Api, Roles.Worker]))
             .AddCheck<ObjectStorageHealthCheck>("storage", tags: [Roles.Worker])
             .AddCheck<ClamAvHealthCheck>("clamav", tags: [Roles.Worker]);
+        if (search.UsesOpenSearch)
+        {
+            // Not fatal to the API, which falls back to Postgres; reported so somebody looks.
+            services.AddHealthChecks().AddCheck<Search.OpenSearchHealthCheck>("opensearch",
+                failureStatus: Microsoft.Extensions.Diagnostics.HealthChecks.HealthStatus.Degraded, tags: [Roles.Worker]);
+        }
 
         // Metrics are served on their own port, which is never published through the proxy.
         var metricsPort = config.GetValue("Metrics:Port", 9091);
@@ -236,6 +251,7 @@ public static class PlatformSetup
             Reviews.ReviewEndpoints.MapReviewEndpoints(app);
             Transmittals.TransmittalEndpoints.MapTransmittalEndpoints(app);
             Packages.PackageEndpoints.MapPackageEndpoints(app);
+            Search.SearchEndpoints.MapSearchEndpoints(app);
         }
     }
 

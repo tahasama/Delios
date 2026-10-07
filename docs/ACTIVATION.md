@@ -233,8 +233,32 @@ People are matched by email to accounts that already exist here; signing in
 creates nobody. Refusals land on `/sign-in?sso_error=<CODE>` (`SSO_NO_ACCOUNT`,
 `SSO_DOMAIN_NOT_ALLOWED`, `SSO_TOKEN_INVALID`…) and the reason is in the API log.
 
+## OpenSearch
+
+**When:** `RegisterSearchSlow` fires and the read replica did not cure it, or
+people want ranked, forgiving search (misspellings, best match first).
+
+Until then searches are answered by Postgres: every word must appear in the
+number or the title. With OpenSearch on, the same `GET /api/projects/{id}/search?q=`
+answers from the index; which documents a person may see is still decided by
+Postgres, so the index never widens anyone's view. It holds register entries only,
+never file content (that waits for content extraction, which is off).
+
+1. Give the server 2 GB more memory (the index uses `SEARCH_HEAP`, 1g by default).
+2. In `deploy/.env`: `SEARCH_PROVIDER=opensearch`.
+3. `docker compose -f deploy/compose.yaml --profile app --profile search up -d`
+4. The worker fills the index from the register by itself; `docker compose logs worker`
+   shows "Sent N document(s) to the search index". 10,000 documents take a minute or two.
+5. The search answer says `"provider": "opensearch"`.
+
+**If it breaks:** searches fall back to Postgres on their own; `SearchFallingBack`
+and `SearchIndexBehind` say so. To rebuild the index from scratch (after an
+upgrade, or if in doubt): `docker compose ... run --rm migrate reindex`.
+**To switch off:** `SEARCH_PROVIDER=postgres`, `up -d`; stop the `opensearch` container.
+The index is not backed up: it is rebuilt from the database.
+
 ## Still to build
 
 These follow the product steps (see ARCHITECTURE.md "Build plan") and will get
-their own sections here: OpenSearch, content extraction and OCR, Azure Blob
-storage, Kubernetes.
+their own sections here: content extraction and OCR, Azure Blob storage,
+Kubernetes.

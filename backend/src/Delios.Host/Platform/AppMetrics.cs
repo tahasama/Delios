@@ -33,4 +33,14 @@ public static class AppMetrics
             LabelNames = ["search"],
             Buckets = [0.005, 0.01, 0.025, 0.05, 0.1, 0.2, 0.3, 0.5, 1, 2, 5],
         });
+
+    public static readonly Histogram SearchSeconds = Metrics.CreateHistogram(
+        "delios_search_seconds", "Time to answer one search, by where it was answered.",
+        new HistogramConfiguration { LabelNames = ["provider"], Buckets = Histogram.ExponentialBuckets(0.005, 2, 12) });
+
+    public static readonly Counter SearchFallbacks = Metrics.CreateCounter(
+        "delios_search_fallbacks_total", "Searches answered from Postgres because the search index could not be reached.");
+
+    public static readonly Gauge SearchLastSync = Metrics.CreateGauge(
+        "delios_search_last_sync_timestamp_seconds", "When the worker last brought the search index up to date.");
 }
