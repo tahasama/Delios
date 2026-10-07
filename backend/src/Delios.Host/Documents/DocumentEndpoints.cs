@@ -70,6 +70,8 @@ public static class DocumentEndpoints
         var document = await DocumentQueries.Visible(db, access, await documents.RestrictedAsync(cancellationToken))
             .AsNoTracking()
             .Include(d => d.Revisions.OrderBy(r => r.CreatedAt)).ThenInclude(r => r.Files.OrderBy(f => f.Name))
+            // One query per collection: a single join would repeat every revision once per file.
+            .AsSplitQuery()
             .SingleOrDefaultAsync(d => d.Id == documentId, cancellationToken);
         return document is null ? Problems.NotFound("DOCUMENT_NOT_FOUND", "No such document.") : Results.Ok(View(document));
     }

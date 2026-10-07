@@ -34,6 +34,17 @@ moves onto its API area by area.
 
 Everything runs in Docker; the .NET 10 SDK is needed only to work on the code.
 
+On Windows (PowerShell):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File deploy\init-env.ps1                 # once: random passwords into deploy\.env (never committed)
+docker compose -f deploy/compose.yaml --profile app --profile monitoring up -d --build
+docker compose -f deploy/compose.yaml --profile app run --rm migrate seed-demo
+powershell -ExecutionPolicy Bypass -File deploy\demo.ps1                      # sign in, register, upload, scan, download
+```
+
+On macOS or Linux:
+
 ```bash
 sh deploy/init-env.sh                                                         # once: random passwords into deploy/.env (never committed)
 docker compose -f deploy/compose.yaml --profile app up -d --build             # whole stack, API on :8080
