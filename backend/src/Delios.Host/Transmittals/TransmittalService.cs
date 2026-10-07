@@ -147,6 +147,10 @@ public sealed class TransmittalService(
         }, null);
     }
 
+    /// <summary>
+    /// Carries out an open issue request on Document Control's say-so: checks the request is still open and the
+    /// revision released, then raises its transmittals. Called by the carry-out endpoint.
+    /// </summary>
     public async Task<(IssueRequest? Request, IReadOnlyList<Transmittal> Sent, IResult? Problem)> CarryOutAsync(
         ProjectAccess access, Guid requestId, CancellationToken cancellationToken)
     {
@@ -167,6 +171,10 @@ public sealed class TransmittalService(
         return (request, sent, null);
     }
 
+    /// <summary>
+    /// Withdraws an open issue request. Allowed to whoever raised it or anyone with the Control permission. Called by
+    /// the cancel endpoint.
+    /// </summary>
     public async Task<(IssueRequest? Request, IResult? Problem)> CancelAsync(
         ProjectAccess access, Guid requestId, CancellationToken cancellationToken)
     {
@@ -181,6 +189,10 @@ public sealed class TransmittalService(
         return (request, null);
     }
 
+    /// <summary>
+    /// Lists the issue requests for a revision, oldest first, each with the numbers of its transmittals. Returns null
+    /// when the revision is not visible to the caller.
+    /// </summary>
     public async Task<IReadOnlyList<IssueRequestView>?> RequestsForAsync(
         ProjectAccess access, Guid revisionId, CancellationToken cancellationToken)
     {
@@ -263,8 +275,17 @@ public sealed class TransmittalService(
 
     // ── Raising ───────────────────────────────────────────────────────────────
 
+    /// <summary>
+    /// Someone a transmittal is addressed to: a user (<c>UserId</c> set) or an organization with nobody here
+    /// (<c>UserId</c> empty, <c>PartyId</c> set).
+    /// </summary>
     public sealed record Addressee(Guid? UserId, Guid? PartyId, string Name, string? Organization);
 
+    /// <summary>
+    /// Everything needed to raise one transmittal. Built by issue requests, review steps sent to a party, and package
+    /// delivery, then passed to <c>RaiseAsync</c>. <c>Dispatched</c> is set when it was already sent outside the
+    /// system.
+    /// </summary>
     public sealed record Raise(
         Project Project, Actor Actor, string Reason, string Subject, string? Message, Party? To, string ToName,
         IReadOnlyList<(Document Document, Revision Revision)> Items, IReadOnlyList<Addressee> Recipients,
@@ -343,6 +364,9 @@ public sealed class TransmittalService(
 
     // ── Reading, acknowledging, dispatching ───────────────────────────────────
 
+    /// <summary>
+    /// The transmittals the caller may see, newest first, at most 200, with counts for the list page.
+    /// </summary>
     public async Task<IReadOnlyList<TransmittalSummary>> ListAsync(ProjectAccess access, CancellationToken cancellationToken)
     {
         var rows = await Visible(access).OrderByDescending(t => t.IssuedAt).Take(200)
@@ -380,6 +404,10 @@ public sealed class TransmittalService(
         return transmittal;
     }
 
+    /// <summary>
+    /// Records that the caller, a recipient, acknowledged the transmittal. Doing it twice changes nothing. Called by
+    /// the acknowledge endpoint.
+    /// </summary>
     public async Task<(Transmittal? Transmittal, IResult? Problem)> AcknowledgeAsync(
         ProjectAccess access, Guid id, CancellationToken cancellationToken)
     {
@@ -427,6 +455,10 @@ public sealed class TransmittalService(
         return (transmittal, null);
     }
 
+    /// <summary>
+    /// Gives an upload link for proof that a transmittal was sent to an outside organization. Only someone who carries
+    /// the exchange with one of its organizations may upload. The proof is filed against the first item's revision.
+    /// </summary>
     public async Task<(UploadTicket? Ticket, IResult? Problem)> TransmittalEvidenceAsync(
         ProjectAccess access, Guid id, UploadRequest request, CancellationToken cancellationToken)
     {
@@ -491,6 +523,9 @@ public sealed class TransmittalService(
 
     // ── Queues ────────────────────────────────────────────────────────────────
 
+    /// <summary>
+    /// One released revision that has never been sent to anyone, with how many issue requests are still open for it.
+    /// </summary>
     public sealed record NotIssued(Guid DocumentId, string DocumentNumber, string Title, Guid RevisionId, string Revision,
         string? Status, DateTimeOffset? ReleasedAt, int OpenRequests);
 
@@ -523,6 +558,10 @@ public sealed class TransmittalService(
             x.ReleasedAt?.ToDateTimeOffset(), x.Open)).ToList();
     }
 
+    /// <summary>
+    /// One task waiting for a person in issuing. <c>Kind</c> is CARRY_OUT_REQUEST, DISPATCH_TRANSMITTAL or
+    /// ACKNOWLEDGE_TRANSMITTAL; the ids say which record it points to.
+    /// </summary>
     public sealed record IssueWork(string Kind, Guid? RequestId, Guid? TransmittalId, Guid? RecipientId, string Label,
         string Reason, string? Who, DateOnly? DueDate, DateTimeOffset Since);
 
@@ -604,6 +643,10 @@ public sealed class TransmittalService(
     public async Task<bool> CarriesAsync(ProjectAccess access, Guid partyId, CancellationToken cancellationToken) =>
         (await CarriedPartiesAsync(access, cancellationToken)).Contains(partyId);
 
+    /// <summary>
+    /// The outside parties this person carries the exchange with: those whose custodian function is theirs, plus those
+    /// with no custodian when they hold Control. Empty for people outside our organization.
+    /// </summary>
     private async Task<List<Guid>> CarriedPartiesAsync(ProjectAccess access, CancellationToken cancellationToken)
     {
         if (!access.IsInternal) return [];
@@ -628,14 +671,20 @@ public sealed class TransmittalService(
         return await ours.OrderBy(x => x.u.Name).Select(x => x.u).ToListAsync(cancellationToken);
     }
 
+    /// <summary>Whether anyone active on the project holds the Control permission (Document Control).</summary>
     private Task<bool> AnyControlHolderAsync(Guid projectId, CancellationToken cancellationToken) =>
         db.Memberships.AnyAsync(m => m.ProjectId == projectId && m.Active && m.Function!.Active
             && m.Function.Rules.Any(r => r.Verbs.Contains(Verbs.Control)), cancellationToken);
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
+    /// <summary>
+    /// One active project member with their function (role) and whether they belong to our own organization
+    /// (<c>Internal</c>). Built by <c>MembersAsync</c>.
+    /// </summary>
     public sealed record Member(Guid UserId, string Name, Guid? PartyId, string? PartyName, bool Internal, Function Function)
     {
+        /// <summary>The member as shown in the distribution picker.</summary>
         public Person View() => new(UserId, Name, Function.Name, PartyName);
     }
 
@@ -661,6 +710,10 @@ public sealed class TransmittalService(
             .OrderBy(m => m.Name).ToList();
     }
 
+    /// <summary>
+    /// The transmittals this person may see: all of them for Document Control and senders; otherwise those they issued,
+    /// those sent to them, and those to parties whose custodian function is theirs.
+    /// </summary>
     private IQueryable<Transmittal> Visible(ProjectAccess access)
     {
         var query = db.Transmittals.Where(t => t.ProjectId == access.Project.Id);
@@ -672,6 +725,10 @@ public sealed class TransmittalService(
                 && db.Parties.Any(p => p.Id == r.PartyId && p.CustodianFunction == code))));
     }
 
+    /// <summary>
+    /// Loads an issue request with its document and revision. All three are null when the request is missing, in
+    /// another project, or its document is not visible to the caller.
+    /// </summary>
     private async Task<(IssueRequest?, Document?, Revision?)> LoadRequestAsync(
         ProjectAccess access, Guid requestId, CancellationToken cancellationToken)
     {
@@ -683,12 +740,17 @@ public sealed class TransmittalService(
         return (request, document, revision);
     }
 
+    /// <summary>The document when the caller may see it (respecting confidentiality levels), otherwise null.</summary>
     private async Task<Document?> VisibleDocumentAsync(ProjectAccess access, Guid documentId, CancellationToken cancellationToken)
     {
         var restricted = (await Catalog.LoadAsync(db, cancellationToken)).RestrictedLevels();
         return await DocumentQueries.Visible(db, access, restricted).SingleOrDefaultAsync(d => d.Id == documentId, cancellationToken);
     }
 
+    /// <summary>
+    /// Whether the revision's review is decided with a verdict that lets it proceed to release. Such a revision may
+    /// already be asked for.
+    /// </summary>
     private async Task<bool> DecidedToProceedAsync(Guid revisionId, CancellationToken cancellationToken)
     {
         var verdict = await db.Reviews.Where(r => r.RevisionId == revisionId && r.State == ReviewStates.Decided)
@@ -698,6 +760,9 @@ public sealed class TransmittalService(
         return catalog.Prop(ReviewSets.Verdicts, verdict, "proceed") is { ValueKind: JsonValueKind.True };
     }
 
+    /// <summary>
+    /// Marks an issue request as done or cancelled, with the time and who closed it. The caller saves the change.
+    /// </summary>
     private void Close(IssueRequest request, string status, string by)
     {
         request.Status = status;
@@ -705,12 +770,18 @@ public sealed class TransmittalService(
         request.ClosedByName = by;
     }
 
+    /// <summary>
+    /// Short label for a revision used in audit entries and subjects, for example P1001-ME-001 rev A.
+    /// </summary>
     public static string Label(Document document, Revision revision) => $"{document.Number} rev {revision.Value}";
 
+    /// <summary>Turns an <c>IssueRequest</c> entity into the shape returned to the browser.</summary>
     public static IssueRequestView View(IssueRequest r, IReadOnlyList<string> transmittals) => new(
         r.Id, r.RevisionId, r.Reason, r.UserIds, r.PartyIds, r.Note, r.OffDistributionReason, r.RaisedByName,
         r.RaisedAt.ToDateTimeOffset(), r.Status, r.ClosedAt?.ToDateTimeOffset(), r.ClosedByName, transmittals);
 
+    /// <summary>The 404 answer for a transmittal that does not exist or is not visible.</summary>
     private static IResult NotFound() => Problems.NotFound("TRANSMITTAL_NOT_FOUND", "No such transmittal.");
+    /// <summary>The 404 answer for an issue request that does not exist or is not visible.</summary>
     private static IResult RequestNotFound() => Problems.NotFound("ISSUE_REQUEST_NOT_FOUND", "No such request.");
 }

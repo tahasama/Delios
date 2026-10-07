@@ -27,17 +27,25 @@ public sealed class IssueRequest
     public Guid RaisedById { get; set; }
     public required string RaisedByName { get; set; }
     public Instant RaisedAt { get; set; }
+    /// <summary>One of <c>IssueRequestStatuses</c>: OPEN, DONE or CANCELLED.</summary>
     public string Status { get; set; } = IssueRequestStatuses.Open;
+    /// <summary>When it was carried out or cancelled; empty while it is still open.</summary>
     public Instant? ClosedAt { get; set; }
     public string? ClosedByName { get; set; }
+    /// <summary>
+    /// Row version kept by the database; EF Core uses it to detect two people changing the same request at once.
+    /// </summary>
     public uint Version { get; set; }
 }
 
+/// <summary>The values <c>IssueRequest.Status</c> can take.</summary>
 public static class IssueRequestStatuses
 {
+    /// <summary>Waiting to be carried out.</summary>
     public const string Open = "OPEN";
     /// <summary>Its transmittals exist.</summary>
     public const string Done = "DONE";
+    /// <summary>Withdrawn by a person, or lapsed because the revision went back to its author.</summary>
     public const string Cancelled = "CANCELLED";
 }
 
@@ -52,6 +60,7 @@ public sealed class Transmittal
     public Guid ProjectId { get; set; }
     /// <summary>What people quote: P1001-TR-0001. Never reused.</summary>
     public required string Number { get; set; }
+    /// <summary>Only OUTGOING exists today; see <c>TransmittalDirections</c>.</summary>
     public string Direction { get; set; } = TransmittalDirections.Outgoing;
     public required string Reason { get; set; }
     public required string Subject { get; set; }
@@ -60,6 +69,10 @@ public sealed class Transmittal
     public Guid? ToPartyId { get; set; }
     public required string ToName { get; set; }
     public bool ResponseRequired { get; set; }
+    /// <summary>
+    /// The date a response is due. Worked out in working days from the reason for issue when not given; empty when no
+    /// response is wanted.
+    /// </summary>
     public LocalDate? ResponseDue { get; set; }
     public Instant IssuedAt { get; set; }
     /// <summary>Empty when the system sent it on a release nobody had to make.</summary>
@@ -74,6 +87,7 @@ public sealed class Transmittal
     public List<TransmittalRecipient> Recipients { get; set; } = [];
 }
 
+/// <summary>The values <c>Transmittal.Direction</c> can take.</summary>
 public static class TransmittalDirections
 {
     public const string Outgoing = "OUTGOING";
@@ -89,6 +103,7 @@ public sealed class TransmittalItem
     public Guid RevisionId { get; set; }
     public required string DocumentNumber { get; set; }
     public required string Title { get; set; }
+    /// <summary>The revision label as it was when sent, for example A or 01.</summary>
     public required string RevisionValue { get; set; }
     /// <summary>The status it was released at; empty when it went for review before any release.</summary>
     public string? StatusCode { get; set; }
@@ -105,22 +120,31 @@ public sealed class TransmittalRecipient
     public Guid Id { get; set; } = Guid.CreateVersion7();
     public Guid TenantId { get; set; }
     public Guid TransmittalId { get; set; }
+    /// <summary>
+    /// Set when the recipient is a person with an account here; empty for an organization that receives it by proxy
+    /// (through one of our people).
+    /// </summary>
     public Guid? UserId { get; set; }
     public Guid? PartyId { get; set; }
     public required string Name { get; set; }
     public string? Organization { get; set; }
+    /// <summary>First time this person opened the transmittal; used as evidence it was read.</summary>
     public Instant? OpenedAt { get; set; }
     public Instant? AcknowledgedAt { get; set; }
     public Instant? DispatchedAt { get; set; }
+    /// <summary>How it was sent outside the system, for example email, their portal, by hand.</summary>
     public string? DispatchChannel { get; set; }
+    /// <summary>The other organization's own reference for it, if they gave one.</summary>
     public string? DispatchRef { get; set; }
     public string? DispatchedByName { get; set; }
+    /// <summary>The uploaded proof that it went (a stored file of kind Evidence).</summary>
     public Guid? ProofFileId { get; set; }
 
     /// <summary>Waiting for one of ours to send it outside the system.</summary>
     public bool AwaitsDispatch => UserId is null && DispatchedAt is null;
 }
 
+/// <summary>Names of the value sets (admin-managed lists of allowed codes) used by issuing.</summary>
 public static class TransmittalSets
 {
     /// <summary>Why a revision goes to someone. Props: response (bool), responseDays (working days).</summary>

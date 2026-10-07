@@ -6,6 +6,7 @@ using Microsoft.Extensions.Options;
 
 namespace Delios.Host.Search;
 
+/// <summary>Settings for search, read from the <c>Search</c> section of configuration.</summary>
 public sealed class SearchOptions
 {
     public const string Section = "Search";
@@ -14,11 +15,14 @@ public sealed class SearchOptions
 
     /// <summary>postgres (the default: the register's own indexes) or opensearch.</summary>
     public string Provider { get; set; } = Postgres;
+    /// <summary>Address of the OpenSearch server; used only when Provider is opensearch.</summary>
     public string Url { get; set; } = "http://opensearch:9200";
+    /// <summary>Name of the OpenSearch index that holds the documents.</summary>
     public string Index { get; set; } = "delios-documents";
     /// <summary>How often the worker sends what changed to the index.</summary>
     public int SyncSeconds { get; set; } = 10;
 
+    /// <summary>True when Provider is opensearch (any letter case).</summary>
     public bool UsesOpenSearch => string.Equals(Provider, OpenSearch, StringComparison.OrdinalIgnoreCase);
 }
 
@@ -31,6 +35,10 @@ public sealed record IndexedDocument(
 /// <summary>OpenSearch over its REST interface: no client library to keep in step with the server.</summary>
 public sealed class OpenSearchClient(HttpClient http, IOptions<SearchOptions> options)
 {
+    /// <summary>
+    /// A name for this client's HTTP connection. The client is registered as a typed HttpClient at startup, so this
+    /// constant does not appear to be used.
+    /// </summary>
     public const string HttpClientName = "opensearch";
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
     private string Index => options.Value.Index;
@@ -74,6 +82,9 @@ public sealed class OpenSearchClient(HttpClient http, IOptions<SearchOptions> op
             throw new InvalidOperationException($"Could not create index {Index}: {(int)put.StatusCode}");
     }
 
+    /// <summary>
+    /// Deletes the whole index. A missing index is not an error. Called by the <c>reindex</c> command line command.
+    /// </summary>
     public async Task DeleteIndexAsync(CancellationToken cancellationToken)
     {
         using var response = await http.DeleteAsync(Index, cancellationToken);
@@ -128,6 +139,7 @@ public sealed class OpenSearchClient(HttpClient http, IOptions<SearchOptions> op
         return JsonNode.Parse(text)!["hits"]!["hits"]!.AsArray().Select(h => Guid.Parse(h!["_id"]!.GetValue<string>())).ToList();
     }
 
+    /// <summary>Asks the cluster for its health. True for green or yellow, false for red or an error answer.</summary>
     public async Task<bool> HealthyAsync(CancellationToken cancellationToken)
     {
         using var response = await http.GetAsync("_cluster/health", cancellationToken);
@@ -136,12 +148,21 @@ public sealed class OpenSearchClient(HttpClient http, IOptions<SearchOptions> op
         return status is "green" or "yellow";
     }
 
+    /// <summary>Serializes an object to a JSON request body.</summary>
     private static StringContent JsonContent(object body) =>
         new(JsonSerializer.Serialize(body, Json), Encoding.UTF8, "application/json");
 }
 
+/// <summary>
+/// Health check for the OpenSearch cluster, reported on the app's health endpoint. Registered only when OpenSearch is
+/// switched on.
+/// </summary>
 public sealed class OpenSearchHealthCheck(OpenSearchClient client) : Microsoft.Extensions.Diagnostics.HealthChecks.IHealthCheck
 {
+    /// <summary>
+    /// Called by the health check system. Healthy when the cluster is green or yellow; otherwise reports the failure
+    /// status registered for this check.
+    /// </summary>
     public async Task<Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckResult> CheckHealthAsync(
         Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckContext context, CancellationToken cancellationToken = default)
     {

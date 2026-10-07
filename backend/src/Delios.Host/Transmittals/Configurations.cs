@@ -6,8 +6,13 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace Delios.Host.Transmittals;
 
+/// <summary>
+/// Entity Framework Core (EF Core, the database mapping library) setup for the <c>issue_requests</c> table: foreign
+/// keys, indexes, column lengths and the concurrency token.
+/// </summary>
 internal sealed class IssueRequestConfiguration : IEntityTypeConfiguration<IssueRequest>
 {
+    /// <summary>Called by EF Core when it builds the database model at startup and for migrations.</summary>
     public void Configure(EntityTypeBuilder<IssueRequest> b)
     {
         b.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
@@ -27,8 +32,13 @@ internal sealed class IssueRequestConfiguration : IEntityTypeConfiguration<Issue
     }
 }
 
+/// <summary>
+/// EF Core setup for the <c>transmittals</c> table: foreign keys, a unique number per project, indexes and column
+/// lengths.
+/// </summary>
 internal sealed class TransmittalConfiguration : IEntityTypeConfiguration<Transmittal>
 {
+    /// <summary>Called by EF Core when it builds the database model at startup and for migrations.</summary>
     public void Configure(EntityTypeBuilder<Transmittal> b)
     {
         b.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
@@ -55,8 +65,12 @@ internal sealed class TransmittalConfiguration : IEntityTypeConfiguration<Transm
     }
 }
 
+/// <summary>
+/// EF Core setup for the <c>transmittal_items</c> table (one row per revision sent on a transmittal).
+/// </summary>
 internal sealed class TransmittalItemConfiguration : IEntityTypeConfiguration<TransmittalItem>
 {
+    /// <summary>Called by EF Core when it builds the database model at startup and for migrations.</summary>
     public void Configure(EntityTypeBuilder<TransmittalItem> b)
     {
         b.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
@@ -72,8 +86,13 @@ internal sealed class TransmittalItemConfiguration : IEntityTypeConfiguration<Tr
     }
 }
 
+/// <summary>
+/// EF Core setup for the <c>transmittal_recipients</c> table. <c>AwaitsDispatch</c> is computed in code, so it is not
+/// stored.
+/// </summary>
 internal sealed class TransmittalRecipientConfiguration : IEntityTypeConfiguration<TransmittalRecipient>
 {
+    /// <summary>Called by EF Core when it builds the database model at startup and for migrations.</summary>
     public void Configure(EntityTypeBuilder<TransmittalRecipient> b)
     {
         b.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);

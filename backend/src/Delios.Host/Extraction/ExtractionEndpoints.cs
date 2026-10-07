@@ -9,6 +9,7 @@ using NodaTime;
 
 namespace Delios.Host.Extraction;
 
+/// <summary>Body of the admin request that sets a project's extraction mode: OFF, ON_DEMAND or AUTOMATIC.</summary>
 public sealed record ExtractionModeRequest(string? Mode);
 
 /// <summary>
@@ -18,6 +19,10 @@ public sealed record ExtractionModeRequest(string? Mode);
 /// </summary>
 public static class ExtractionEndpoints
 {
+    /// <summary>
+    /// Registers the extraction routes: asking for a revision or a whole project to be read, and the admin routes that
+    /// read and set the project's mode. Admin routes check the caller is an administrator.
+    /// </summary>
     public static void MapExtractionEndpoints(this IEndpointRouteBuilder app)
     {
         var project = app.MapGroup("/api/projects/{projectId:guid}").WithTags("Extraction")
@@ -35,6 +40,10 @@ public static class ExtractionEndpoints
         admin.MapPut("", ModeAsync);
     }
 
+    /// <summary>
+    /// POST extract for one revision: queues every clean, not-yet-read file of its current submission. Called when
+    /// somebody needs a scanned revision to become searchable.
+    /// </summary>
     private static async Task<IResult> RevisionAsync(
         Guid revisionId, HttpContext http, DeliosDbContext db, DocumentService documents, IOptions<ExtractionOptions> options,
         AuditLog audit, CancellationToken cancellationToken)
@@ -81,6 +90,10 @@ public static class ExtractionEndpoints
         return Results.Accepted(value: new { queued = files.Count });
     }
 
+    /// <summary>
+    /// Common checks before files are queued: the caller is internal with Read permission, the project's mode is not
+    /// OFF, and the extraction service is installed. Returns the problem, or null when fine.
+    /// </summary>
     private static async Task<IResult?> RefusedAsync(
         ProjectAccess access, DeliosDbContext db, ExtractionOptions options, CancellationToken cancellationToken)
     {
@@ -94,6 +107,10 @@ public static class ExtractionEndpoints
         return null;
     }
 
+    /// <summary>
+    /// Admin GET: the project's extraction mode, whether the extraction service is installed, and how many files have
+    /// been read.
+    /// </summary>
     private static async Task<IResult> StatusAsync(
         Guid projectId, DeliosDbContext db, IOptions<ExtractionOptions> options, CancellationToken cancellationToken)
     {

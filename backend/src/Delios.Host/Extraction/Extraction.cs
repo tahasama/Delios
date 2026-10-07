@@ -12,14 +12,20 @@ using Prometheus;
 
 namespace Delios.Host.Extraction;
 
+/// <summary>The values a project's extraction switch (<c>Project.ContentExtraction</c>) can take.</summary>
 public static class ExtractionModes
 {
+    /// <summary>Files are never read; any text already read is deleted when the switch is turned off.</summary>
     public const string Off = "OFF";
+    /// <summary>Files are read only when someone asks, for a revision or the whole project.</summary>
     public const string OnDemand = "ON_DEMAND";
+    /// <summary>Every new file is read as soon as the virus scan finds it clean.</summary>
     public const string Automatic = "AUTOMATIC";
+    /// <summary>All modes, for validation.</summary>
     public static readonly string[] All = [Off, OnDemand, Automatic];
 }
 
+/// <summary>Settings for reading text from files, from the <c>Extraction</c> section of configuration.</summary>
 public sealed class ExtractionOptions
 {
     public const string Section = "Extraction";
@@ -29,8 +35,10 @@ public sealed class ExtractionOptions
     public string OcrLanguages { get; set; } = "eng";
     /// <summary>Text kept per file; the rest is not searchable.</summary>
     public int MaxChars { get; set; } = 2_000_000;
+    /// <summary>How long to wait for the extraction service on one file, in seconds.</summary>
     public int TimeoutSeconds { get; set; } = 300;
 
+    /// <summary>True when a service address is set.</summary>
     public bool Installed => !string.IsNullOrWhiteSpace(Url);
 }
 
@@ -41,15 +49,23 @@ public sealed class FileText
     public Guid TenantId { get; set; }
     public Guid ProjectId { get; set; }
     public Guid DocumentId { get; set; }
+    /// <summary>The revision the file belongs to; empty for a file not attached to a revision.</summary>
     public Guid? RevisionId { get; set; }
     public required string Text { get; set; }
+    /// <summary>Length of <c>Text</c> in characters.</summary>
     public int Chars { get; set; }
+    /// <summary>True when the file had more text than <c>MaxChars</c> and the rest was cut off.</summary>
     public bool Truncated { get; set; }
     public Instant ExtractedAt { get; set; }
 }
 
+/// <summary>
+/// Entity Framework Core (EF Core, the database mapping library) setup for the <c>file_texts</c> table: one row per
+/// file, deleted with the file.
+/// </summary>
 internal sealed class FileTextConfiguration : IEntityTypeConfiguration<FileText>
 {
+    /// <summary>Called by EF Core when it builds the database model at startup and for migrations.</summary>
     public void Configure(EntityTypeBuilder<FileText> b)
     {
         b.HasKey(x => x.FileId);
@@ -61,8 +77,13 @@ internal sealed class FileTextConfiguration : IEntityTypeConfiguration<FileText>
     }
 }
 
+/// <summary>
+/// Queue message asking the worker to read the text of one file. Put on the queue by
+/// <c>ExtractionProcessor.Enqueue</c>.
+/// </summary>
 public sealed record FileExtract(Guid TenantId, Guid FileId)
 {
+    /// <summary>The queue routing key the worker listens on for this message.</summary>
     public const string RoutingKey = "file.extract";
 }
 
@@ -76,15 +97,27 @@ public sealed class ExtractionProcessor(
     DeliosDbContext db, TenantContext tenant, FileStorage storage, IHttpClientFactory http, IOptions<ExtractionOptions> options,
     AuditLog audit, IClock clock, ILogger<ExtractionProcessor> logger)
 {
+    /// <summary>Name of the HttpClient registered at startup for the extraction service, with its timeout.</summary>
     public const string HttpClientName = "extraction";
 
+    /// <summary>
+    /// Metric for Prometheus (the monitoring system) counting files processed, labelled by outcome: text, empty or
+    /// skipped.
+    /// </summary>
     public static readonly Counter Extracted = Metrics.CreateCounter(
         "delios_files_extracted_total", "Files whose text was read, by outcome.", new CounterConfiguration { LabelNames = ["outcome"] });
 
+    /// <summary>Metric for Prometheus (the monitoring system) timing how long one file takes to read.</summary>
     public static readonly Histogram Seconds = Metrics.CreateHistogram(
         "delios_extraction_seconds", "Time to read the text of one file, OCR included.",
         new HistogramConfiguration { Buckets = Histogram.ExponentialBuckets(0.1, 2, 13) });
 
+    /// <summary>
+    /// Reads the text of one file and stores it. Called by the worker when a file.extract message arrives. Skips the
+    /// file when already read, when the project's mode is OFF, when the file is not clean, or when no service is
+    /// installed. Sends the file to Apache Tika (a text extraction server), which uses OCR (optical character
+    /// recognition) on pages that are only images.
+    /// </summary>
     public async Task ProcessAsync(FileExtract message, CancellationToken cancellationToken)
     {
         tenant.Set(message.TenantId);
@@ -161,6 +194,9 @@ public sealed class ExtractionProcessor(
         logger.LogInformation("Read {Chars} characters from file {FileId}", text.Length, file.Id);
     }
 
+    /// <summary>
+    /// Reads the response body as text, stopping after <c>max</c> characters so a huge file cannot fill memory.
+    /// </summary>
     private static async Task<string> ReadCappedAsync(HttpResponseMessage response, int max, CancellationToken cancellationToken)
     {
         using var reader = new StreamReader(await response.Content.ReadAsStreamAsync(cancellationToken), Encoding.UTF8);
@@ -175,6 +211,10 @@ public sealed class ExtractionProcessor(
     public static bool Readable(StoredFile file) =>
         file.Status == FileStatuses.Clean && file.Kind is FileKinds.Native or FileKinds.Rendition;
 
+    /// <summary>
+    /// Puts a file.extract message on the queue (saved with the caller's database changes). Called by the extraction
+    /// endpoints and by the file scanner when the mode is AUTOMATIC.
+    /// </summary>
     public static void Enqueue(DeliosDbContext db, StoredFile file) =>
         db.Enqueue(FileExtract.RoutingKey, new FileExtract(file.TenantId, file.Id));
 }

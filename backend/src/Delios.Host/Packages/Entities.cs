@@ -31,17 +31,26 @@ public sealed class Package
     public Guid[] Excluded { get; set; } = [];
     /// <summary>The organizations it is delivered to; one transmittal each. Empty: handed over without one.</summary>
     public Guid[] RecipientPartyIds { get; set; } = [];
+    /// <summary>The people (user ids) who put the package together and deliver it.</summary>
     public Guid[] OwnerIds { get; set; } = [];
     /// <summary>Any one of them accepts. Never one of the owners.</summary>
     public Guid[] AcceptorIds { get; set; } = [];
+    /// <summary>One of <c>PackageStates</c>.</summary>
     public string State { get; set; } = PackageStates.Open;
+    /// <summary>
+    /// When readiness was last checked. Empty means not assessed since the last change to its contents.
+    /// </summary>
     public Instant? AssessedAt { get; set; }
+    /// <summary>Documents found not ready at the last assessment.</summary>
     public List<ShortfallLine> Shortfall { get; set; } = [];
+    /// <summary>When the shortfall was sent to the acceptance authority.</summary>
     public Instant? ShortfallIssuedAt { get; set; }
+    /// <summary>When the acceptance authority agreed it may go without the missing documents.</summary>
     public Instant? ShortfallAcceptedAt { get; set; }
     public string? ShortfallAcceptedByName { get; set; }
     /// <summary>The owners declared that the rule admits nothing more.</summary>
     public Instant? RuleCeasedAt { get; set; }
+    /// <summary>When it was delivered or closed. Its contents are fixed from then on.</summary>
     public Instant? ClosedAt { get; set; }
     public string? ClosedByName { get; set; }
     public string? ClosureNote { get; set; }
@@ -50,10 +59,17 @@ public sealed class Package
     public Guid CreatedById { get; set; }
     public required string CreatedByName { get; set; }
     public Instant CreatedAt { get; set; }
+    /// <summary>
+    /// Row version kept by the database; EF Core uses it to detect two people changing the same package at once.
+    /// </summary>
     public uint Version { get; set; }
     public List<PackageMember> Members { get; set; } = [];
 }
 
+/// <summary>
+/// Which documents a package takes in by itself. A document matches when it matches every list that is not empty; an
+/// empty list matches anything. Stored as JSON inside the package row.
+/// </summary>
 public sealed class PackageRule
 {
     public string[] DeliverableTypes { get; set; } = [];
@@ -61,6 +77,7 @@ public sealed class PackageRule
     public string[] DocTypes { get; set; } = [];
     public string[] Originators { get; set; } = [];
 
+    /// <summary>True when no list is filled in, which means there is no rule.</summary>
     public bool IsEmpty => DeliverableTypes.Length + Disciplines.Length + DocTypes.Length + Originators.Length == 0;
 }
 
@@ -69,20 +86,26 @@ public sealed class ShortfallLine
 {
     public Guid DocumentId { get; set; }
     public required string DocumentNumber { get; set; }
+    /// <summary>The statuses the document needed.</summary>
     public string[] Required { get; set; } = [];
+    /// <summary>The status of its released revision at the assessment; empty when nothing was released.</summary>
     public string? Current { get; set; }
 }
 
+/// <summary>The values <c>Package.State</c> can take.</summary>
 public static class PackageStates
 {
+    /// <summary>Being put together; documents can still be added and removed.</summary>
     public const string Open = "OPEN";
     /// <summary>Gone to its organizations on transmittals; waiting to be accepted.</summary>
     public const string Delivered = "DELIVERED";
     /// <summary>Closed with nobody to deliver it to.</summary>
     public const string Closed = "CLOSED";
+    /// <summary>The acceptance authority accepted it. Final.</summary>
     public const string Accepted = "ACCEPTED";
 }
 
+/// <summary>One document in a package, with any status requirement of its own.</summary>
 public sealed class PackageMember
 {
     public Guid Id { get; set; } = Guid.CreateVersion7();
@@ -91,6 +114,7 @@ public sealed class PackageMember
     public Guid DocumentId { get; set; }
     /// <summary>For this document only; empty means the package's.</summary>
     public string[] RequiredStatuses { get; set; } = [];
+    /// <summary>True when the rule brought it in; false when it was added by hand.</summary>
     public bool ByRule { get; set; }
     public Instant AddedAt { get; set; }
 }

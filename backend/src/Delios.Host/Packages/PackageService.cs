@@ -8,15 +8,25 @@ using NodaTime;
 
 namespace Delios.Host.Packages;
 
+/// <summary>The rule sent by the browser: lists of codes to match documents on. Every list may be left out.</summary>
 public sealed record RuleRequest(string[]? DeliverableTypes = null, string[]? Disciplines = null, string[]? DocTypes = null,
     string[]? Originators = null);
 
+/// <summary>Body of the create-package request.</summary>
 public sealed record CreatePackageRequest(
     string? Title, string? Reason, string[]? RequiredStatuses, Guid[]? OwnerIds, Guid[]? AcceptorIds,
     Guid[]? RecipientPartyIds = null, string? Description = null, DateOnly? CompletionDate = null, RuleRequest? Rule = null);
 
+/// <summary>
+/// Body for adding or removing documents. <c>RequiredStatuses</c> applies only to the documents being added.
+/// </summary>
 public sealed record MembersRequest(Guid[]? DocumentIds, string[]? RequiredStatuses = null);
+/// <summary>
+/// Body of the deliver request. <c>RuleCeased</c> must be true when the package has a rule: the owners confirm nothing
+/// more will join.
+/// </summary>
 public sealed record DeliverRequest(bool RuleCeased = false, string? Note = null);
+/// <summary>A request body that carries only an optional note for the audit log.</summary>
 public sealed record NoteRequest(string? Note = null);
 
 /// <summary>
@@ -29,6 +39,11 @@ public sealed class PackageService(
 {
     // ── Composing ─────────────────────────────────────────────────────────────
 
+    /// <summary>
+    /// Creates a package after checking the caller may, the reason and statuses are published values, owners and
+    /// acceptors are different people on the project, and the recipient organizations exist. Documents matching the
+    /// rule join at once.
+    /// </summary>
     public async Task<(Package? Package, IResult? Problem)> CreateAsync(
         ProjectAccess access, CreatePackageRequest request, CancellationToken cancellationToken)
     {
@@ -94,6 +109,10 @@ public sealed class PackageService(
         return (package, null);
     }
 
+    /// <summary>
+    /// Adds documents by hand. A document taken out earlier comes back and is no longer excluded. Any earlier
+    /// assessment is cleared.
+    /// </summary>
     public async Task<(Package? Package, IResult? Problem)> AddAsync(
         ProjectAccess access, Guid id, MembersRequest request, CancellationToken cancellationToken)
     {
@@ -163,6 +182,10 @@ public sealed class PackageService(
 
     // ── Readiness ─────────────────────────────────────────────────────────────
 
+    /// <summary>
+    /// One member's readiness: its released revision and status (empty when none), the statuses it needs, and whether
+    /// it is ready.
+    /// </summary>
     public sealed record Readiness(PackageMember Member, string DocumentNumber, string Title, string? Revision, string? Status,
         string[] Required, bool Ready, Guid? RevisionId);
 
@@ -211,6 +234,9 @@ public sealed class PackageService(
         return (package, null);
     }
 
+    /// <summary>
+    /// Sends the shortfall found by the last assessment to the acceptance authority for their decision.
+    /// </summary>
     public async Task<(Package? Package, IResult? Problem)> IssueShortfallAsync(ProjectAccess access, Guid id, CancellationToken cancellationToken)
     {
         var (package, problem) = await ComposableAsync(access, id, cancellationToken);
@@ -322,6 +348,7 @@ public sealed class PackageService(
         return (package, sent, null);
     }
 
+    /// <summary>The acceptance authority accepts a delivered or closed package. Never one of its owners.</summary>
     public async Task<(Package? Package, IResult? Problem)> AcceptAsync(
         ProjectAccess access, Guid id, NoteRequest request, CancellationToken cancellationToken)
     {
@@ -346,6 +373,10 @@ public sealed class PackageService(
 
     // ── Reading ───────────────────────────────────────────────────────────────
 
+    /// <summary>
+    /// The packages of the project, newest first, at most 500. Empty for people outside our organization or without the
+    /// Read permission.
+    /// </summary>
     public async Task<IReadOnlyList<PackageSummary>> ListAsync(ProjectAccess access, CancellationToken cancellationToken)
     {
         if (!access.IsInternal || !access.Holds(Verbs.Read)) return [];
@@ -380,6 +411,7 @@ public sealed class PackageService(
         return package;
     }
 
+    /// <summary>The numbers of the transmittals that delivered a package, in the order they were raised.</summary>
     public async Task<IReadOnlyList<string>> TransmittalNumbersAsync(Guid packageId, CancellationToken cancellationToken) =>
         await db.Transmittals.AsNoTracking().Where(t => t.PackageId == packageId).OrderBy(t => t.Id).Select(t => t.Number)
             .ToListAsync(cancellationToken);
@@ -405,6 +437,7 @@ public sealed class PackageService(
         return fresh.Count;
     }
 
+    /// <summary>Builds a new member row for a document. The caller adds it to the package.</summary>
     private PackageMember NewMember(Package package, Guid documentId, string[] required, bool byRule) => new()
     {
         TenantId = package.TenantId,
@@ -425,6 +458,10 @@ public sealed class PackageService(
         package.ShortfallAcceptedByName = null;
     }
 
+    /// <summary>
+    /// Loads a package the caller may change: they must be an owner or hold Control, and it must still be open.
+    /// Otherwise returns the problem to answer with.
+    /// </summary>
     private async Task<(Package?, IResult?)> ComposableAsync(ProjectAccess access, Guid id, CancellationToken cancellationToken)
     {
         var package = await LoadAsync(access, id, cancellationToken);
@@ -435,11 +472,19 @@ public sealed class PackageService(
         return (package, null);
     }
 
+    /// <summary>
+    /// Loads a package with its members, or null when it does not exist or the caller is outside our organization or
+    /// lacks the Read permission.
+    /// </summary>
     private Task<Package?> LoadAsync(ProjectAccess access, Guid id, CancellationToken cancellationToken) =>
         !access.IsInternal || !access.Holds(Verbs.Read)
             ? Task.FromResult<Package?>(null)
             : db.Packages.Include(p => p.Members).SingleOrDefaultAsync(p => p.Id == id && p.ProjectId == access.Project.Id, cancellationToken);
 
+    /// <summary>
+    /// Checks that every status given is a published status. Returns the problem, or null when fine. With
+    /// <c>required</c> true an empty list is also a problem.
+    /// </summary>
     private static IResult? StatusesProblem(Catalog catalog, string[]? statuses, bool required)
     {
         if (statuses is null || statuses.Length == 0)
@@ -452,6 +497,10 @@ public sealed class PackageService(
                 new { field = "requiredStatuses", value = unknown });
     }
 
+    /// <summary>
+    /// Checks the rule's deliverable types, disciplines and document types are published values. Returns the problem,
+    /// or null when fine. Originators are not checked.
+    /// </summary>
     private static IResult? RuleProblem(Catalog catalog, RuleRequest? rule)
     {
         if (rule is null) return null;
@@ -462,6 +511,9 @@ public sealed class PackageService(
             : Problems.Invalid("VALUE_NOT_PUBLISHED", $"{string.Join(", ", unknown)} is not a published value.", new { field = "rule", value = unknown });
     }
 
+    /// <summary>
+    /// Turns the request rule into the stored rule, removing duplicates. Returns null when nothing is filled in.
+    /// </summary>
     private static PackageRule? ToRule(RuleRequest? request)
     {
         if (request is null) return null;
@@ -475,10 +527,15 @@ public sealed class PackageService(
         return rule.IsEmpty ? null : rule;
     }
 
+    /// <summary>Trims text and turns empty or whitespace-only text into null.</summary>
     private static string? Blank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    /// <summary>The calling user as the audit log records them.</summary>
     private static Actor Actor(ProjectAccess access) => new(access.UserId, access.UserName);
+    /// <summary>The 404 answer for a package that does not exist or is not visible.</summary>
     private static IResult NotFound() => Problems.NotFound("PACKAGE_NOT_FOUND", "No such package.");
+    /// <summary>The 409 answer when a package has already been delivered, closed or accepted.</summary>
     private static IResult Closed(Package package) => Problems.Conflict("PACKAGE_CLOSED",
         "The package has gone; what it held is kept as it was.", new { state = package.State });
+    /// <summary>Shortcut for returning a problem with no package.</summary>
     private static (Package?, IResult?) Fail(IResult problem) => (null, problem);
 }

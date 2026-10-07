@@ -6,32 +6,69 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Delios.Host.Transmittals;
 
+/// <summary>
+/// A project member as shown when choosing who receives a revision: name, project function and organization.
+/// </summary>
 public sealed record Person(Guid Id, string Name, string Function, string? Organization);
+/// <summary>
+/// An outside organization (a party) that can be chosen as a recipient, with how it takes part on the project (in the
+/// app, or by proxy through one of our people).
+/// </summary>
 public sealed record PartyChoice(Guid Id, string Code, string Name, string Participation);
+/// <summary>
+/// Answer of the distribution endpoint: people proposed by the permission matrix, everyone else on the project, and the
+/// outside parties that can be chosen.
+/// </summary>
 public sealed record DistributionView(IReadOnlyList<Person> Proposed, IReadOnlyList<Person> Others, IReadOnlyList<PartyChoice> Parties);
 
+/// <summary>
+/// An issue request as returned to the browser, with the numbers of the transmittals that carried it out.
+/// </summary>
 public sealed record IssueRequestView(Guid Id, Guid RevisionId, string Reason, IReadOnlyList<Guid> UserIds,
     IReadOnlyList<Guid> PartyIds, string? Note, string? OffDistributionReason, string RaisedBy, DateTimeOffset RaisedAt,
     string Status, DateTimeOffset? ClosedAt, string? ClosedBy, IReadOnlyList<string> Transmittals);
 
+/// <summary>
+/// Answer after asking for or carrying out an issue request: the request and the numbers of any transmittals raised.
+/// </summary>
 public sealed record IssueOutcome(IssueRequestView Request, IReadOnlyList<string> Transmittals);
 
+/// <summary>
+/// One row of the transmittal list, with counts of items, recipients, acknowledgements and recipients still waiting to
+/// be sent it by hand.
+/// </summary>
 public sealed record TransmittalSummary(Guid Id, string Number, string Reason, string Subject, string To, DateTimeOffset IssuedAt,
     string IssuedBy, DateOnly? ResponseDue, int Items, int Recipients, int Acknowledged, int AwaitingDispatch);
 
+/// <summary>One revision listed on a transmittal, as returned to the browser.</summary>
 public sealed record TransmittalItemView(Guid DocumentId, Guid RevisionId, string DocumentNumber, string Title, string Revision,
     string? Status);
 
+/// <summary>
+/// One recipient of a transmittal as returned to the browser. <c>Person</c> is false for an organization that receives
+/// by proxy; the dispatch fields record how one of ours sent it outside the system.
+/// </summary>
 public sealed record RecipientView(Guid Id, string Name, string? Organization, bool Person, DateTimeOffset? OpenedAt,
     DateTimeOffset? AcknowledgedAt, DateTimeOffset? DispatchedAt, string? DispatchChannel, string? DispatchRef,
     string? DispatchedBy, Guid? ProofFileId);
 
+/// <summary>
+/// Full detail of one transmittal (a numbered record that documents were sent to someone), as returned to the browser.
+/// </summary>
 public sealed record TransmittalView(Guid Id, string Number, string Direction, string Reason, string Subject, string? Message,
     string To, bool ResponseRequired, DateOnly? ResponseDue, DateTimeOffset IssuedAt, string IssuedBy, Guid? IssueRequestId,
     Guid? ReviewStepId, IReadOnlyList<TransmittalItemView> Items, IReadOnlyList<RecipientView> Recipients);
 
+/// <summary>
+/// HTTP endpoints for issuing: distribution, issue requests, transmittals, acknowledgement, dispatch and proof upload.
+/// Mapped at startup; all logic lives in <c>TransmittalService</c>.
+/// </summary>
 public static class TransmittalEndpoints
 {
+    /// <summary>
+    /// Registers the transmittal routes under <c>/api/projects/{projectId}</c>. Every route runs in a database
+    /// transaction and checks the caller's access to the project first (endpoint filters).
+    /// </summary>
     public static void MapTransmittalEndpoints(this IEndpointRouteBuilder app)
     {
         var project = app.MapGroup("/api/projects/{projectId:guid}").WithTags("Transmittals")
@@ -51,6 +88,10 @@ public static class TransmittalEndpoints
         project.MapPost("/transmittals/{transmittalId:guid}/evidence", EvidenceAsync);
     }
 
+    /// <summary>
+    /// GET distribution: who should receive a document. Internal users only. Returns 404 when the document is not
+    /// visible to the caller.
+    /// </summary>
     private static async Task<IResult> DistributionAsync(
         Guid documentId, HttpContext http, DeliosDbContext db, DocumentService documents, TransmittalService transmittals,
         CancellationToken cancellationToken)
@@ -63,12 +104,19 @@ public static class TransmittalEndpoints
         return Results.Ok(await transmittals.DistributionAsync(access.Project, document, cancellationToken));
     }
 
+    /// <summary>
+    /// GET the issue requests raised for a revision. Returns 404 when the revision is not visible to the caller.
+    /// </summary>
     private static async Task<IResult> RequestsAsync(
         Guid revisionId, HttpContext http, TransmittalService transmittals, CancellationToken cancellationToken) =>
         await transmittals.RequestsForAsync(ProjectAccessFilter.Of(http), revisionId, cancellationToken) is { } list
             ? Results.Ok(list)
             : Problems.NotFound("REVISION_NOT_FOUND", "No such revision.");
 
+    /// <summary>
+    /// POST a new issue request (ask for a revision to be sent). May be carried out at once when the caller may send
+    /// it. Retried POSTs with the same idempotency key are answered once.
+    /// </summary>
     private static async Task<IResult> RequestAsync(
         Guid revisionId, IssueAsk ask, HttpContext http, TransmittalService transmittals, CancellationToken cancellationToken)
     {
@@ -78,6 +126,7 @@ public static class TransmittalEndpoints
             Outcome(request!, sent));
     }
 
+    /// <summary>POST carry-out: Document Control turns an open issue request into transmittals.</summary>
     private static async Task<IResult> CarryOutAsync(
         Guid requestId, HttpContext http, TransmittalService transmittals, CancellationToken cancellationToken)
     {
@@ -85,6 +134,9 @@ public static class TransmittalEndpoints
         return problem ?? Results.Ok(Outcome(request!, sent));
     }
 
+    /// <summary>
+    /// POST cancel: withdraws an open issue request. Allowed to whoever raised it or Document Control.
+    /// </summary>
     private static async Task<IResult> CancelAsync(
         Guid requestId, HttpContext http, TransmittalService transmittals, CancellationToken cancellationToken)
     {
@@ -92,6 +144,7 @@ public static class TransmittalEndpoints
         return problem ?? Results.Ok(TransmittalService.View(request!, []));
     }
 
+    /// <summary>GET not-issued: released revisions nobody has been sent yet. Internal users only.</summary>
     private static async Task<IResult> NotIssuedAsync(HttpContext http, TransmittalService transmittals, CancellationToken cancellationToken)
     {
         var access = ProjectAccessFilter.Of(http);
@@ -99,15 +152,18 @@ public static class TransmittalEndpoints
         return Results.Ok(await transmittals.NotIssuedAsync(access, cancellationToken));
     }
 
+    /// <summary>GET the list of transmittals the caller may see, newest first.</summary>
     private static async Task<IResult> ListAsync(HttpContext http, TransmittalService transmittals, CancellationToken cancellationToken) =>
         Results.Ok(await transmittals.ListAsync(ProjectAccessFilter.Of(http), cancellationToken));
 
+    /// <summary>GET one transmittal. Reading it records the caller's first opening when they are a recipient.</summary>
     private static async Task<IResult> GetAsync(
         Guid transmittalId, HttpContext http, TransmittalService transmittals, CancellationToken cancellationToken) =>
         await transmittals.ReadAsync(ProjectAccessFilter.Of(http), transmittalId, cancellationToken) is { } t
             ? Results.Ok(View(t))
             : Problems.NotFound("TRANSMITTAL_NOT_FOUND", "No such transmittal.");
 
+    /// <summary>POST acknowledge: a recipient confirms they received the transmittal.</summary>
     private static async Task<IResult> AcknowledgeAsync(
         Guid transmittalId, HttpContext http, TransmittalService transmittals, CancellationToken cancellationToken)
     {
@@ -115,6 +171,10 @@ public static class TransmittalEndpoints
         return problem ?? Results.Ok(View(t!));
     }
 
+    /// <summary>
+    /// POST dispatch: one of ours records that a transmittal went to an outside organization by email, portal or by
+    /// hand.
+    /// </summary>
     private static async Task<IResult> DispatchAsync(
         Guid transmittalId, Guid recipientId, DispatchRequest request, HttpContext http, TransmittalService transmittals,
         CancellationToken cancellationToken)
@@ -124,6 +184,9 @@ public static class TransmittalEndpoints
         return problem ?? Results.Ok(View(t!));
     }
 
+    /// <summary>
+    /// POST evidence: returns an upload link for proof that a transmittal was sent outside the system.
+    /// </summary>
     private static async Task<IResult> EvidenceAsync(
         Guid transmittalId, UploadRequest request, HttpContext http, TransmittalService transmittals,
         CancellationToken cancellationToken)
@@ -133,12 +196,17 @@ public static class TransmittalEndpoints
         return problem ?? Results.Ok(ticket);
     }
 
+    /// <summary>Builds the response body for an issue request and the transmittals it produced.</summary>
     private static IssueOutcome Outcome(IssueRequest request, IReadOnlyList<Transmittal> sent)
     {
         var numbers = sent.Select(t => t.Number).ToList();
         return new IssueOutcome(TransmittalService.View(request, numbers), numbers);
     }
 
+    /// <summary>
+    /// Turns a <c>Transmittal</c> database entity into the shape returned to the browser, items sorted by document
+    /// number and recipients by name. Also used by other modules.
+    /// </summary>
     public static TransmittalView View(Transmittal t) => new(
         t.Id, t.Number, t.Direction, t.Reason, t.Subject, t.Message, t.ToName, t.ResponseRequired, t.ResponseDue?.ToDateOnly(),
         t.IssuedAt.ToDateTimeOffset(), t.IssuedByName, t.IssueRequestId, t.ReviewStepId,

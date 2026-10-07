@@ -8,6 +8,7 @@ using Microsoft.Extensions.Options;
 
 namespace Delios.Host.Search;
 
+/// <summary>Answer of a search: which provider answered (postgres or opensearch) and the matching documents.</summary>
 public sealed record SearchResult(string Provider, IReadOnlyList<DocumentSummary> Items);
 
 /// <summary>
@@ -20,8 +21,14 @@ public sealed class SearchService(
     ReadDatabase reads, DocumentService documents, IServiceProvider services, IOptions<SearchOptions> options,
     ILogger<SearchService> logger)
 {
+    /// <summary>Most results one search returns.</summary>
     public const int MaxResults = 100;
 
+    /// <summary>
+    /// Finds documents in a project whose number, title or file text contain the words. Uses OpenSearch (a separate
+    /// search server) when switched on, then filters the hits through the register's visibility rules; otherwise, or
+    /// when the index fails, searches Postgres directly. Called by the search endpoint.
+    /// </summary>
     public async Task<SearchResult> SearchAsync(ProjectAccess access, string words, int limit, CancellationToken cancellationToken)
     {
         var size = Math.Clamp(limit, 1, MaxResults);
@@ -65,13 +72,21 @@ public sealed class SearchService(
         return new SearchResult(SearchOptions.Postgres, items);
     }
 
+    /// <summary>
+    /// How a document row becomes a <c>DocumentSummary</c>, written as an expression so EF Core can turn it into SQL.
+    /// </summary>
     private static readonly System.Linq.Expressions.Expression<Func<Document, DocumentSummary>> Summary = d => new DocumentSummary(
         d.Id, d.Number, d.Title, d.DeliverableType, d.DocType, d.Discipline, d.Originator, d.State, d.Kind, d.IsPlaceholder,
         d.Confidentiality, d.LatestRevisionValue, d.LatestRevisionState, d.UpdatedAt.ToDateTimeOffset());
 }
 
+/// <summary>The search HTTP endpoint. Mapped at startup.</summary>
 public static class SearchEndpoints
 {
+    /// <summary>
+    /// Registers <c>GET /api/projects/{projectId}/search?q=...&amp;limit=...</c>. The caller needs the Read permission
+    /// and at least two characters.
+    /// </summary>
     public static void MapSearchEndpoints(this IEndpointRouteBuilder app) =>
         app.MapGroup("/api/projects/{projectId:guid}").WithTags("Search")
             .AddEndpointFilter<TransactionFilter>()

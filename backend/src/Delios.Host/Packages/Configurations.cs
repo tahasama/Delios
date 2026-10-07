@@ -5,8 +5,13 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace Delios.Host.Packages;
 
+/// <summary>
+/// Entity Framework Core (EF Core, the database mapping library) setup for the <c>packages</c> table. The rule and the
+/// shortfall are stored as JSON columns inside the package row.
+/// </summary>
 internal sealed class PackageConfiguration : IEntityTypeConfiguration<Package>
 {
+    /// <summary>Called by EF Core when it builds the database model at startup and for migrations.</summary>
     public void Configure(EntityTypeBuilder<Package> b)
     {
         b.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
@@ -35,8 +40,10 @@ internal sealed class PackageConfiguration : IEntityTypeConfiguration<Package>
     }
 }
 
+/// <summary>EF Core setup for the <c>package_members</c> table: a document appears at most once per package.</summary>
 internal sealed class PackageMemberConfiguration : IEntityTypeConfiguration<PackageMember>
 {
+    /// <summary>Called by EF Core when it builds the database model at startup and for migrations.</summary>
     public void Configure(EntityTypeBuilder<PackageMember> b)
     {
         b.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);

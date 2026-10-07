@@ -12,13 +12,19 @@ namespace Delios.Host.Search;
 public sealed class SearchWatermark
 {
     public Guid TenantId { get; set; }
+    /// <summary>The <c>UpdatedAt</c> time of the last document sent to the index.</summary>
     public Instant IndexedUpTo { get; set; }
     /// <summary>Ties on the same instant are ordered by id, so none is skipped and none sent twice.</summary>
     public Guid LastId { get; set; }
 }
 
+/// <summary>
+/// Entity Framework Core (EF Core, the database mapping library) setup for the <c>search_watermarks</c> table: one row
+/// per organization.
+/// </summary>
 internal sealed class SearchWatermarkConfiguration : IEntityTypeConfiguration<SearchWatermark>
 {
+    /// <summary>Called by EF Core when it builds the database model at startup and for migrations.</summary>
     public void Configure(EntityTypeBuilder<SearchWatermark> b)
     {
         b.HasKey(x => x.TenantId);
@@ -34,9 +40,15 @@ internal sealed class SearchWatermarkConfiguration : IEntityTypeConfiguration<Se
 public sealed class SearchIndexer(IServiceScopeFactory scopes, IOptions<SearchOptions> options, ILogger<SearchIndexer> logger)
     : BackgroundService
 {
+    /// <summary>Most documents sent to the index in one request.</summary>
     public const int Batch = 500;
+    /// <summary>Most characters of file text sent per document; the rest is left out of the index.</summary>
     private const int MaxContent = 1_000_000;
 
+    /// <summary>
+    /// The worker's loop: makes sure the index exists, sends what changed, then waits <c>SyncSeconds</c> and repeats
+    /// until shutdown. Started by the host as a background service.
+    /// </summary>
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         while (!stoppingToken.IsCancellationRequested)
@@ -82,6 +94,11 @@ public sealed class SearchIndexer(IServiceScopeFactory scopes, IOptions<SearchOp
         return sent;
     }
 
+    /// <summary>
+    /// Sends the next batch of changed documents for one organization, with the text read from their latest revision's
+    /// files, then moves its watermark (the bookmark of how far it got). Returns how many were sent; fewer than
+    /// <c>Batch</c> means it has caught up.
+    /// </summary>
     private static async Task<int> SyncBatchAsync(
         IServiceScopeFactory scopes, OpenSearchClient client, Guid tenantId, bool refresh, CancellationToken cancellationToken)
     {
@@ -123,6 +140,7 @@ public sealed class SearchIndexer(IServiceScopeFactory scopes, IOptions<SearchOp
         return changed.Count;
     }
 
+    /// <summary>Cuts text to <c>MaxContent</c> characters.</summary>
     private static string Cap(string text) => text.Length > MaxContent ? text[..MaxContent] : text;
 
     /// <summary>Forget what was sent, so the next pass sends everything again.</summary>

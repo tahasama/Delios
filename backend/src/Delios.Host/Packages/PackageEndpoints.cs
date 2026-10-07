@@ -4,12 +4,21 @@ using Delios.Host.Identity;
 
 namespace Delios.Host.Packages;
 
+/// <summary>One row of the package list.</summary>
 public sealed record PackageSummary(Guid Id, string Number, string Title, string Reason, string State, int Members,
     bool HasRule, DateOnly? CompletionDate, DateTimeOffset CreatedAt);
 
+/// <summary>
+/// One document in a package as returned to the browser: its released revision and status, the statuses it needs,
+/// whether it is ready, and whether the rule brought it in.
+/// </summary>
 public sealed record MemberView(Guid DocumentId, string DocumentNumber, string Title, string? Revision, string? Status,
     IReadOnlyList<string> Required, bool Ready, bool ByRule);
 
+/// <summary>
+/// Full detail of one package as returned to the browser, including each member's readiness and the numbers of the
+/// transmittals that delivered it.
+/// </summary>
 public sealed record PackageView(Guid Id, string Number, string Title, string? Description, string Reason,
     IReadOnlyList<string> RequiredStatuses, DateOnly? CompletionDate, PackageRule? Rule, IReadOnlyList<Guid> Excluded,
     IReadOnlyList<Guid> RecipientPartyIds, IReadOnlyList<Guid> OwnerIds, IReadOnlyList<Guid> AcceptorIds, string State,
@@ -18,8 +27,16 @@ public sealed record PackageView(Guid Id, string Number, string Title, string? D
     string? ClosureNote, DateTimeOffset? AcceptedAt, string? AcceptedBy, string CreatedBy, IReadOnlyList<MemberView> Members,
     IReadOnlyList<string> Transmittals);
 
+/// <summary>
+/// HTTP endpoints for packages: list, create, read, add and remove documents, set the rule, assess, shortfall, deliver
+/// and accept. Mapped at startup; all logic lives in <c>PackageService</c>.
+/// </summary>
 public static class PackageEndpoints
 {
+    /// <summary>
+    /// Registers the package routes under <c>/api/projects/{projectId}/packages</c>. Every route runs in a database
+    /// transaction and checks the caller's access to the project first (endpoint filters).
+    /// </summary>
     public static void MapPackageEndpoints(this IEndpointRouteBuilder app)
     {
         var project = app.MapGroup("/api/projects/{projectId:guid}/packages").WithTags("Packages")
@@ -46,9 +63,11 @@ public static class PackageEndpoints
             Act(h, s, (a) => s.AcceptAsync(a, packageId, r, c)));
     }
 
+    /// <summary>GET the packages of the project, newest first.</summary>
     private static async Task<IResult> ListAsync(HttpContext http, PackageService packages, CancellationToken cancellationToken) =>
         Results.Ok(await packages.ListAsync(ProjectAccessFilter.Of(http), cancellationToken));
 
+    /// <summary>POST a new package. Retried POSTs with the same idempotency key are answered once.</summary>
     private static async Task<IResult> CreateAsync(
         CreatePackageRequest request, HttpContext http, PackageService packages, CancellationToken cancellationToken)
     {
@@ -58,11 +77,13 @@ public static class PackageEndpoints
             await ViewAsync(packages, package, cancellationToken));
     }
 
+    /// <summary>GET one package, brought up to date with its rule.</summary>
     private static async Task<IResult> GetAsync(Guid packageId, HttpContext http, PackageService packages, CancellationToken cancellationToken) =>
         await packages.ReadAsync(ProjectAccessFilter.Of(http), packageId, cancellationToken) is { } package
             ? Results.Ok(await ViewAsync(packages, package, cancellationToken))
             : Problems.NotFound("PACKAGE_NOT_FOUND", "No such package.");
 
+    /// <summary>POST deliver: sends the ready documents on transmittals and fixes the package's contents.</summary>
     private static async Task<IResult> DeliverAsync(
         Guid packageId, DeliverRequest request, HttpContext http, PackageService packages, CancellationToken cancellationToken)
     {
@@ -70,12 +91,19 @@ public static class PackageEndpoints
         return problem ?? Results.Ok(await ViewAsync(packages, package!, cancellationToken));
     }
 
+    /// <summary>
+    /// Shared body for the simple action endpoints: runs the service call with the caller's project access and returns
+    /// the updated package, or the problem it reported.
+    /// </summary>
     private static async Task<IResult> Act(HttpContext http, PackageService packages, Func<ProjectAccess, Task<(Package?, IResult?)>> act)
     {
         var (package, problem) = await act(ProjectAccessFilter.Of(http));
         return problem ?? Results.Ok(await ViewAsync(packages, package!, http.RequestAborted));
     }
 
+    /// <summary>
+    /// Builds the full package view, working out each member's readiness and looking up the transmittal numbers.
+    /// </summary>
     private static async Task<PackageView> ViewAsync(PackageService packages, Package p, CancellationToken cancellationToken)
     {
         var readiness = await packages.ReadinessAsync(p, cancellationToken);
