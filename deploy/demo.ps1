@@ -205,6 +205,31 @@ Write-Host "Verdict $($clientReview.verdict), granting $($clientReview.grantedSt
 $clientReview = Call POST "/api/projects/$($project.id)/reviews/$($clientReview.id)/release" @{} $control
 Write-Host "Released: $($clientReview.state)"
 
+Step 'A package: both drawings, delivered to the client together'
+$people = @($distribution.proposed) + @($distribution.others)
+$engineerId = ($people | Where-Object { $_.name -eq 'Eli Engineer' }).id
+$approverId = ($people | Where-Object { $_.name -eq 'Aisha Approver' }).id
+$clientId = ($distribution.parties | Where-Object { $_.code -eq 'NWU' }).id
+$package = Call POST "/api/projects/$($project.id)/packages" @{
+    title = 'Inlet works construction set'; reason = 'EXECUTION'; requiredStatuses = @('IFC', 'AFC')
+    ownerIds = @($engineerId); acceptorIds = @($approverId); recipientPartyIds = @($clientId)
+}
+$pk = "/api/projects/$($project.id)/packages/$($package.id)"
+$package = Call POST "$pk/members" @{ documentIds = @($doc.id, $pfd.id) }
+$package = Call POST "$pk/assess" @{}
+Write-Host "$($package.number) $($package.title): Eli puts it together, Aisha accepts it"
+foreach ($m in $package.members) { Write-Host ("  {0,-24} rev {1} at {2,-4} ready: {3}" -f $m.documentNumber, $m.revision, $m.status, $m.ready) }
+$package = Call POST "$pk/deliver" @{ note = 'Construction set for the inlet works.' }
+Write-Host "$($package.state) on $($package.transmittals -join ', ')"
+$work = Call GET "/api/projects/$($project.id)/work" $null $control
+$job = @($work.issues) | Where-Object { $_.kind -eq 'DISPATCH_TRANSMITTAL' -and $_.label -eq $package.transmittals[0] }
+Call POST "/api/projects/$($project.id)/transmittals/$($job.transmittalId)/recipients/$($job.recipientId)/dispatch" @{
+    channel = 'Client portal'; reference = 'NWU-SUB-0043'
+} $control | Out-Null
+Write-Host "Document Control recorded it went by the client portal"
+$package = Call POST "$pk/accept" @{} $approver
+Write-Host "$($package.state) by $($package.acceptedBy)"
+
 Step 'The transmittal log'
 foreach ($t in (Call GET "/api/projects/$($project.id)/transmittals" $null $control)) {
     Write-Host ('{0,-24} {1,-12} to {2}' -f $t.number, $t.reason, $t.to)

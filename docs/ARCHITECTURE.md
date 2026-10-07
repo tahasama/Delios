@@ -152,8 +152,14 @@ choice belongs to the organization. Each is data its administrator changes:
   adviser's comments amount to, comment classes and which block the release,
   and the reasons a route may be sent back to a step.
 - **Each project's working week**, which due dates are counted in.
-- **Review and transmittal numbers**, through the same numbering schemes as
-  documents; a transmittal number may carry who sends and who receives it.
+- **Review, transmittal and package numbers**, through the same numbering
+  schemes as documents; a transmittal number may carry who sends and who
+  receives it. Without a scheme a record is numbered P1001-TR-0001 (RV, PK…),
+  from the same counter, so numbers never repeat.
+- **Each package:** what it is for, the statuses its documents must reach, who
+  puts it together and who accepts it (never the same people), who it goes to,
+  and whether it fills itself by a rule (deliverable type, discipline, document
+  type, originator).
 
 What the Standard itself requires is enforced for everyone: a number is
 allocated by the system and never reused, a revision value is never reused on
@@ -508,7 +514,11 @@ deployment with tenant isolation in the database.
      them on a transmittal, which is what lets them read it) or by proxy
      (dispatch with channel and their reference, then their answer recorded
      with their own wording and proof filed against the revision).
-   - Next: packages.
+   - Done: packages, put together by hand or by a rule that keeps admitting
+     new documents (one taken out stays out), assessed against the statuses
+     they need, a shortfall the acceptance authority accepts or not, delivery on
+     one transmittal per organization carrying only what is ready, then
+     acceptance. Delivering fixes the contents.
 5. **Checks engine, schedules, reports.**
 6. **Next.js moves onto the API**, area by area, through the generated client.
 7. **Content extraction and OCR**, switched off, ready for activation.

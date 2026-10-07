@@ -268,7 +268,7 @@ public sealed class TransmittalService(
     public sealed record Raise(
         Project Project, Actor Actor, string Reason, string Subject, string? Message, Party? To, string ToName,
         IReadOnlyList<(Document Document, Revision Revision)> Items, IReadOnlyList<Addressee> Recipients,
-        Guid? IssueRequestId = null, Guid? ReviewStepId = null, LocalDate? ResponseDue = null,
+        Guid? IssueRequestId = null, Guid? ReviewStepId = null, LocalDate? ResponseDue = null, Guid? PackageId = null,
         DispatchRequest? Dispatched = null);
 
     /// <summary>A numbered transmittal. What it records is never changed afterwards.</summary>
@@ -278,10 +278,8 @@ public sealed class TransmittalService(
         var catalog = await Catalog.LoadAsync(db, cancellationToken);
         var ours = await db.Parties.AsNoTracking().Where(p => p.IsInternal && p.Active).OrderBy(p => p.Code)
             .Select(p => p.Code).FirstOrDefaultAsync(cancellationToken);
-        var allocated = await numbering.AllocateAsync(project.TenantId, project.Id, RecordKinds.Transmittal,
-            NumberFields.ForRecord(project.Code, ours, raise.To?.Code ?? ours), cancellationToken);
-        var number = allocated is Allocation.Allocated(var n) ? n
-            : $"{project.Code}-TR-{await db.Transmittals.CountAsync(t => t.ProjectId == project.Id, cancellationToken) + 1:0000}";
+        var number = await numbering.RecordAsync(project.TenantId, project.Id, RecordKinds.Transmittal,
+            NumberFields.ForRecord(project.Code, ours, raise.To?.Code ?? ours), "TR", cancellationToken);
 
         var now = clock.GetCurrentInstant();
         var responseRequired = catalog.Prop(TransmittalSets.Reasons, raise.Reason, "response") is { ValueKind: JsonValueKind.True };
@@ -309,6 +307,7 @@ public sealed class TransmittalService(
             IssuedByName = raise.Actor.Name,
             IssueRequestId = raise.IssueRequestId,
             ReviewStepId = raise.ReviewStepId,
+            PackageId = raise.PackageId,
         };
         transmittal.Items = raise.Items.Select(x => new TransmittalItem
         {

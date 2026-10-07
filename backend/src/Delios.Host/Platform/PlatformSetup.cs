@@ -98,6 +98,7 @@ public static class PlatformSetup
         services.AddScoped<Reviews.ReviewService>();
         services.AddScoped<Reviews.Stamping>();
         services.AddScoped<Transmittals.TransmittalService>();
+        services.AddScoped<Packages.PackageService>();
         services.AddSingleton<Documents.IVirusScanner, Documents.ClamAvScanner>();
         services.AddSingleton<Messaging.RabbitMqConnection>();
         if (role == Roles.Api)
@@ -223,6 +224,7 @@ public static class PlatformSetup
             Documents.DocumentEndpoints.MapDocumentEndpoints(app);
             Reviews.ReviewEndpoints.MapReviewEndpoints(app);
             Transmittals.TransmittalEndpoints.MapTransmittalEndpoints(app);
+            Packages.PackageEndpoints.MapPackageEndpoints(app);
         }
     }
 

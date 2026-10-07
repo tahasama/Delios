@@ -150,8 +150,8 @@ public sealed class ReviewService(
             }
         }
 
-        var number = await numbering.AllocateAsync(access.Project.TenantId, access.Project.Id, RecordKinds.Review,
-            NumberFields.ForRecord(access.Project.Code), cancellationToken);
+        var number = await numbering.RecordAsync(access.Project.TenantId, access.Project.Id, RecordKinds.Review,
+            NumberFields.ForRecord(access.Project.Code), "RV", cancellationToken);
         var now = clock.GetCurrentInstant();
         var review = new Review
         {
@@ -159,7 +159,7 @@ public sealed class ReviewService(
             ProjectId = access.Project.Id,
             DocumentId = document.Id,
             RevisionId = revision.Id,
-            Number = number is Allocation.Allocated(var n) ? n : await FallbackNumberAsync(access, cancellationToken),
+            Number = number,
             RouteName = route.Name,
             StartedById = access.UserId,
             StartedByName = access.UserName,
@@ -900,12 +900,6 @@ public sealed class ReviewService(
         comment.Resolution = resolution;
         comment.ClosedAt = clock.GetCurrentInstant();
         comment.ClosedByName = by;
-    }
-
-    private async Task<string> FallbackNumberAsync(ProjectAccess access, CancellationToken cancellationToken)
-    {
-        var count = await db.Reviews.CountAsync(r => r.ProjectId == access.Project.Id, cancellationToken);
-        return $"{access.Project.Code}-RV-{count + 1:0000}";
     }
 
     private static string Words(string state) => state.ToLowerInvariant().Replace('_', ' ');

@@ -65,9 +65,11 @@ public sealed class Transmittal
     /// <summary>Empty when the system sent it on a release nobody had to make.</summary>
     public Guid? IssuedById { get; set; }
     public required string IssuedByName { get; set; }
-    /// <summary>The request it carried out, or the review step it carried to a party.</summary>
+    /// <summary>The request it carried out, the review step it carried to a party, or the package it delivered.</summary>
     public Guid? IssueRequestId { get; set; }
     public Guid? ReviewStepId { get; set; }
+    /// <summary>The package it delivered.</summary>
+    public Guid? PackageId { get; set; }
     public List<TransmittalItem> Items { get; set; } = [];
     public List<TransmittalRecipient> Recipients { get; set; } = [];
 }

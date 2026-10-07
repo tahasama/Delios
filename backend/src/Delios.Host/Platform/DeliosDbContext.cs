@@ -51,6 +51,9 @@ public sealed class DeliosDbContext(DbContextOptions<DeliosDbContext> options)
     public DbSet<Transmittals.TransmittalItem> TransmittalItems => Set<Transmittals.TransmittalItem>();
     public DbSet<Transmittals.TransmittalRecipient> TransmittalRecipients => Set<Transmittals.TransmittalRecipient>();
 
+    public DbSet<Packages.Package> Packages => Set<Packages.Package>();
+    public DbSet<Packages.PackageMember> PackageMembers => Set<Packages.PackageMember>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(DeliosDbContext).Assembly);

@@ -27,6 +27,8 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
             await db.SaveChangesAsync(cancellationToken);
             var issuing = await EnsureIssueSetupAsync(existing.Id, cancellationToken);
             await db.SaveChangesAsync(cancellationToken);
+            issuing |= await EnsurePackageSetupAsync(existing.Id, cancellationToken);
+            await db.SaveChangesAsync(cancellationToken);
             await upgrade.CommitAsync(cancellationToken);
             logger.LogInformation(reviews || issuing ? "The demo tenant exists; what it lacked was added" : "The demo tenant already exists; nothing to do");
             return;
@@ -84,6 +86,8 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
         await EnsureReviewSetupAsync(t, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         await EnsureIssueSetupAsync(t, cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
+        await EnsurePackageSetupAsync(t, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         logger.LogInformation("Demo tenant '{Slug}' created; every password is {Password}", Slug, Password);
@@ -294,6 +298,26 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
         {
             rule.Verbs = [.. rule.Verbs, Verbs.Receive];
         }
+        return true;
+    }
+
+    /// <summary>Package numbers: P1001-PK-001. The recommendation, as data.</summary>
+    private async Task<bool> EnsurePackageSetupAsync(Guid t, CancellationToken cancellationToken)
+    {
+        if (await db.SchemeRoutings.AnyAsync(r => r.DeliverableType == RecordKinds.Package, cancellationToken)) return false;
+        var scheme = new NumberingScheme
+        {
+            TenantId = t,
+            Name = "Packages",
+            Fields =
+            [
+                new() { Label = "Project code", Source = FieldSources.Project },
+                new() { Label = "Record", Source = FieldSources.Fixed, Value = "PK" },
+                new() { Label = "Sequence", Source = FieldSources.Sequence, Digits = 3 },
+            ],
+        };
+        db.NumberingSchemes.Add(scheme);
+        db.SchemeRoutings.Add(new SchemeRouting { TenantId = t, DeliverableType = RecordKinds.Package, SchemeId = scheme.Id });
         return true;
     }
 

@@ -58,6 +58,23 @@ public sealed class Numbering(DeliosDbContext db)
 
         var prefix = string.Join(scheme.Delimiter, parts);
         var digits = scheme.Fields.Single(f => f.Source == FieldSources.Sequence).Digits ?? 5;
+        return new Allocation.Allocated(await NextAsync(tenantId, projectId, prefix, scheme.Delimiter, digits, cancellationToken));
+    }
+
+    /// <summary>
+    /// A record's number: from its scheme where the organization set one up, else
+    /// the project code, a short marker and a sequence (P1001-TR-0001). Either way
+    /// it comes from the same counter, so two at once never get the same one.
+    /// </summary>
+    public async Task<string> RecordAsync(
+        Guid tenantId, Guid projectId, string recordKind, NumberFields fields, string marker, CancellationToken cancellationToken) =>
+        await AllocateAsync(tenantId, projectId, recordKind, fields, cancellationToken) is Allocation.Allocated(var number)
+            ? number
+            : await NextAsync(tenantId, projectId, $"{fields.ProjectCode}-{marker}", "-", 4, cancellationToken);
+
+    private async Task<string> NextAsync(
+        Guid tenantId, Guid projectId, string prefix, string delimiter, int digits, CancellationToken cancellationToken)
+    {
         // One statement: two people registering at the same moment get different numbers.
         var sequence = await db.Database.SqlQuery<int>($"""
             INSERT INTO number_counters (tenant_id, project_id, prefix, next)
@@ -65,8 +82,6 @@ public sealed class Numbering(DeliosDbContext db)
             ON CONFLICT (project_id, prefix) DO UPDATE SET next = number_counters.next + 1
             RETURNING next - 1 AS "Value"
             """).ToListAsync(cancellationToken);
-
-        return new Allocation.Allocated(
-            prefix + scheme.Delimiter + sequence[0].ToString(CultureInfo.InvariantCulture).PadLeft(digits, '0'));
+        return prefix + delimiter + sequence[0].ToString(CultureInfo.InvariantCulture).PadLeft(digits, '0');
     }
 }

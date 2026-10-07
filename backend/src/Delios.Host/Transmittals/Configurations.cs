@@ -42,6 +42,8 @@ internal sealed class TransmittalConfiguration : IEntityTypeConfiguration<Transm
         b.HasIndex(x => new { x.ProjectId, x.IssuedAt });
         b.HasIndex(x => x.IssueRequestId);
         b.HasIndex(x => x.ReviewStepId);
+        b.HasOne<Packages.Package>().WithMany().HasForeignKey(x => x.PackageId).OnDelete(DeleteBehavior.Restrict);
+        b.HasIndex(x => x.PackageId);
         b.Property(x => x.Number).HasMaxLength(64);
         b.Property(x => x.Direction).HasMaxLength(16);
         b.Property(x => x.Reason).HasMaxLength(64);
