@@ -25,12 +25,12 @@ the path to serious scale.
 | Search | Postgres search on metadata only | OpenSearch only if Postgres search becomes slow |
 | Content extraction | Built but switched off (see Client content) | Activated per project at a client's written request |
 | Cache, locks, rate limits | Redis (Valkey) | — |
-| Async work | RabbitMQ + Wolverine (MIT), EF Core outbox, retries, dead-letter queues | Kafka is not planned |
+| Async work | RabbitMQ (official client), a transactional outbox table, retry and dead-letter queues | Kafka is not planned |
 | File storage | S3-compatible object storage, versioning and object lock, presigned URLs (SeaweedFS in development) | AWS S3 / Azure Blob if a client requires it |
 | Virus scan | ClamAV | — |
 | PDF | PdfSharp (MIT): release stamps, superseded watermarks | — |
 | Renditions | None generated: authors submit the PDF with the native file | — |
-| Authentication | OIDC/OAuth 2.0: ASP.NET Core Identity first (MFA, lockout, password policy) | Entra ID / Keycloak per client; SAML through Keycloak |
+| Authentication | Sessions in Postgres behind an httpOnly cookie; ASP.NET Core Identity's password hasher; lockout and rate limit | MFA; OIDC (Entra ID / Keycloak) per client; SAML through Keycloak |
 | Audit | Append-only, hash-chained table | — |
 | Time | UTC everywhere, NodaTime, per-project time zone and working calendar | — |
 | Languages | i18n by message codes, RTL from day 1 | — |
@@ -67,10 +67,18 @@ hand-build.
   in a register-and-workflow application.
 - **Kafka.** Built for very high-volume event streaming, which an EDMS does not
   have. RabbitMQ covers the job queues.
-- **MassTransit.** Version 9 requires a paid licence for business use, and the
-  free version 8 receives security patches only until the end of 2026.
-  Wolverine is MIT licensed and covers the same needs: RabbitMQ transport,
-  transactional outbox with EF Core, retries, scheduled messages.
+- **A messaging framework (MassTransit, Wolverine).** MassTransit 9 requires a
+  paid licence for business use, and its free version 8 receives security
+  patches only until the end of 2026. Wolverine runs its own transactions, which
+  conflicts with how row-level security is applied (`SET LOCAL` at the start of
+  every transaction we open). What we need is small and kept in plain view
+  instead: an outbox table written in the same transaction as the change, a
+  relay that publishes with broker confirms, and a consumer that retries through
+  a delay queue and parks repeated failures in a dead queue.
+- **ASP.NET Core Identity's user store.** Logins are per tenant (the same email
+  may exist in two organizations) and access comes from project memberships,
+  which Identity's global user table does not model. Its password hasher is
+  used; sessions, lockout and the matrix are ours.
 - **Self-hosted MinIO.** In 2025 MinIO removed features from its free community
   edition and stopped publishing official builds. Any S3-compatible store works
   without code changes.
@@ -244,8 +252,7 @@ API nodes are completely interchangeable:
 - No local application state. ASP.NET Core Data Protection keys are stored in
   Postgres, not on the node's disk. Without this, a cookie issued by one node is
   rejected by another and users are logged out at random.
-- Scheduled jobs run exactly once across nodes (Wolverine scheduled messages or
-  a Postgres advisory lock).
+- Scheduled jobs run exactly once across nodes (a Postgres advisory lock).
 
 ```
 users ─► load balancer (TLS) ─► api-1, api-2, … ─► PgBouncer ─► Postgres primary ─► standby
@@ -410,13 +417,18 @@ deployment with tenant isolation in the database.
 
 ## Build plan
 
-1. **Platform foundation.** Solution layout, Docker Compose (Postgres, Redis,
-   RabbitMQ, object storage, ClamAV), CI/CD, logging, health checks, metrics.
-2. **Identity and tenancy.** Tenants, users, projects, memberships, functions
-   and the permission matrix, row-level security, audit.
-3. **Document core.** Numbering, documents, revisions, files and the upload
-   pipeline, lifecycle, release stamping.
-4. **Workflows, reviews and approvals, transmittals, packages.**
+1. **Platform foundation.** Done. Solution layout, Docker Compose (Postgres,
+   Redis, RabbitMQ, object storage, ClamAV), CI, logging, health checks, metrics.
+2. **Identity and tenancy.** Done. Tenants, parties, users, projects,
+   memberships, functions and the permission matrix, sessions and lockout,
+   row-level security, hash-chained audit.
+3. **Document core.** Done. Value lists, numbering schemes and counters,
+   registration with the prototype's rules, confidentiality, keyset paging,
+   revisions, presigned upload, outbox, scanning and checksum verification,
+   download, idempotent writes.
+4. **Workflows, reviews and approvals, release and stamping, transmittals,
+   packages.** Release moved here from step 3: a revision is released only
+   with its approval.
 5. **Checks engine, schedules, reports.**
 6. **Next.js moves onto the API**, area by area, through the generated client.
 7. **Content extraction and OCR**, switched off, ready for activation.

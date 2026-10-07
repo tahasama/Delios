@@ -1,3 +1,7 @@
+using Amazon.Runtime;
+using Amazon.S3;
+using DotNet.Testcontainers.Builders;
+using DotNet.Testcontainers.Containers;
 using Npgsql;
 using Testcontainers.PostgreSql;
 using Testcontainers.RabbitMq;
@@ -11,6 +15,15 @@ public sealed class Infrastructure : IAsyncLifetime
     public PostgreSqlContainer Postgres { get; } = new PostgreSqlBuilder("postgres:17-alpine").Build();
     public RedisContainer Redis { get; } = new RedisBuilder("valkey/valkey:8-alpine").Build();
     public RabbitMqContainer RabbitMq { get; } = new RabbitMqBuilder("rabbitmq:4-management-alpine").Build();
+
+    /// <summary>S3-compatible storage. With no identities configured it accepts any credentials.</summary>
+    public IContainer Storage { get; } = new ContainerBuilder("chrislusf/seaweedfs:latest")
+        .WithCommand("server", "-dir=/data", "-s3")
+        .WithPortBinding(8333, true)
+        .WithWaitStrategy(Wait.ForUnixContainer().UntilInternalTcpPortIsAvailable(8333))
+        .Build();
+
+    public string StorageEndpoint => $"http://{Storage.Hostname}:{Storage.GetMappedPublicPort(8333)}";
 
     /// <summary>
     /// A fresh database owned by an ordinary role. The container's own user is a
@@ -42,16 +55,34 @@ public sealed class Infrastructure : IAsyncLifetime
         settings["ConnectionStrings:Postgres"] = await NewDatabaseAsync();
         settings["ConnectionStrings:Redis"] = Redis.GetConnectionString();
         settings["ConnectionStrings:RabbitMq"] = RabbitMq.GetConnectionString();
+        settings["Storage:Endpoint"] = StorageEndpoint;
         return settings;
     }
 
-    public Task InitializeAsync() =>
-        Task.WhenAll(Postgres.StartAsync(), Redis.StartAsync(), RabbitMq.StartAsync());
+    public async Task InitializeAsync()
+    {
+        await Task.WhenAll(Postgres.StartAsync(), Redis.StartAsync(), RabbitMq.StartAsync(), Storage.StartAsync());
+        using var s3 = new AmazonS3Client(new BasicAWSCredentials("x", "x"),
+            new AmazonS3Config { ServiceURL = StorageEndpoint, ForcePathStyle = true, AuthenticationRegion = "us-east-1" });
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                await s3.PutBucketAsync("delios");
+                return;
+            }
+            catch (Exception) when (attempt < 30)
+            {
+                await Task.Delay(500);
+            }
+        }
+    }
 
     public async Task DisposeAsync()
     {
         await Postgres.DisposeAsync();
         await Redis.DisposeAsync();
         await RabbitMq.DisposeAsync();
+        await Storage.DisposeAsync();
     }
 }

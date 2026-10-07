@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Delios.Tests;
 
@@ -7,7 +9,8 @@ namespace Delios.Tests;
 /// Starts the real host in memory. Settings point at nothing unless a test
 /// overrides them, so a test that needs a dependency must start one.
 /// </summary>
-public sealed class DeliosFactory(IDictionary<string, string?> overrides) : WebApplicationFactory<Program>
+public sealed class DeliosFactory(IDictionary<string, string?> overrides, Action<IServiceCollection>? services = null)
+    : WebApplicationFactory<Program>
 {
     public static Dictionary<string, string?> Unreachable() => new()
     {
@@ -32,5 +35,6 @@ public sealed class DeliosFactory(IDictionary<string, string?> overrides) : WebA
         {
             builder.UseSetting(key, value);
         }
+        if (services is not null) builder.ConfigureTestServices(services);
     }
 }

@@ -32,16 +32,30 @@ Redis, RabbitMQ, S3-compatible storage, ClamAV). The decisions and the build
 plan are in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). The Next.js app below
 moves onto its API area by area.
 
-Requires Docker and the .NET 10 SDK.
+Everything runs in Docker; the .NET 10 SDK is needed only to work on the code.
 
 ```bash
-docker compose -f deploy/compose.yaml up -d                 # Postgres, Redis, RabbitMQ, storage, ClamAV
-dotnet run --project backend/src/Delios.Host -- migrate     # apply database migrations
-dotnet run --project backend/src/Delios.Host                # API on http://localhost:5000
-dotnet test backend                                         # tests (start their own containers)
-
-docker compose -f deploy/compose.yaml --profile app up -d   # or everything in containers: API on :8080
+docker compose -f deploy/compose.yaml --profile app up -d --build             # whole stack, API on :8080
+docker compose -f deploy/compose.yaml --profile app run --rm migrate seed-demo # demo tenant "demo", password demo1234
 ```
+
+Sign in with `POST /api/auth/sign-in` and `{"tenant":"demo","email":"engineer@demo.local","password":"demo1234"}`.
+The demo people are admin, controller, engineer, approver, viewer (`@demo.local`)
+and `supplier@acme.local`. The endpoints are listed at
+http://localhost:8080/api/openapi/v1.json.
+
+To work on the code, run only the dependencies in Docker and the API from the SDK:
+
+```bash
+docker compose -f deploy/compose.yaml up -d
+dotnet run --project backend/src/Delios.Host -- migrate
+dotnet run --project backend/src/Delios.Host -- seed-demo
+dotnet run --project backend/src/Delios.Host                # API on http://localhost:5000
+dotnet test backend                                         # tests start their own containers
+```
+
+After pulling changes that touch `deploy/postgres`, recreate the database volume:
+`docker compose -f deploy/compose.yaml down -v`.
 
 Health: `/health/live` and `/health/ready`. Metrics: port 9091 (`/metrics`).
 Set `Delios__Role=worker` to run the same build as a queue worker.

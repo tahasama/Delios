@@ -35,6 +35,13 @@ public sealed class StorageOptions
     public const string Section = "Storage";
 
     [Required, Url] public string Endpoint { get; set; } = "";
+    /// <summary>
+    /// The address browsers use for presigned URLs, when it differs from the one
+    /// the app uses (in Docker, the app reaches storage by service name).
+    /// </summary>
+    [Url] public string? PublicEndpoint { get; set; }
+    /// <summary>The largest single upload accepted.</summary>
+    [Range(1, 5L * 1024 * 1024 * 1024)] public long MaxFileBytes { get; set; } = 2L * 1024 * 1024 * 1024;
     [Required] public string Bucket { get; set; } = "";
     [Required] public string AccessKey { get; set; } = "";
     [Required] public string SecretKey { get; set; } = "";

@@ -9,16 +9,26 @@ namespace Delios.Tests;
 public sealed class TestApp : IAsyncDisposable
 {
     public required DeliosFactory Factory { get; init; }
+    public required Dictionary<string, string?> Settings { get; init; }
+    private DeliosFactory? _worker;
 
     public static async Task<TestApp> StartAsync(Infrastructure infrastructure, Action<Dictionary<string, string?>>? configure = null)
     {
         var settings = await infrastructure.SettingsAsync();
         configure?.Invoke(settings);
-        var factory = new DeliosFactory(settings);
+        var factory = new DeliosFactory(settings, FakeScanner.Use);
         await DatabaseMigrator.ApplyAsync(factory.Services);
         await using var scope = factory.Services.CreateAsyncScope();
         await scope.ServiceProvider.GetRequiredService<DemoSeed>().RunAsync();
-        return new TestApp { Factory = factory };
+        return new TestApp { Factory = factory, Settings = settings };
+    }
+
+    /// <summary>Starts a worker on the same database, queue and storage.</summary>
+    public void StartWorker()
+    {
+        var settings = new Dictionary<string, string?>(Settings) { ["Delios:Role"] = "worker" };
+        _worker = new DeliosFactory(settings, FakeScanner.Use);
+        _ = _worker.Services;
     }
 
     public async Task<HttpClient> SignedInAsync(string email, string password = DemoSeed.Password, string tenant = DemoSeed.Slug)
@@ -31,5 +41,9 @@ public sealed class TestApp : IAsyncDisposable
 
     public T Scoped<T>(IServiceScope scope) where T : notnull => scope.ServiceProvider.GetRequiredService<T>();
 
-    public ValueTask DisposeAsync() => Factory.DisposeAsync();
+    public async ValueTask DisposeAsync()
+    {
+        if (_worker is not null) await _worker.DisposeAsync();
+        await Factory.DisposeAsync();
+    }
 }

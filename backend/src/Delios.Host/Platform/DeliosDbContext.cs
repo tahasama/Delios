@@ -1,5 +1,7 @@
 using Delios.Host.Audit;
+using Delios.Host.Documents;
 using Delios.Host.Identity;
+using Delios.Host.Messaging;
 using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
@@ -23,6 +25,17 @@ public sealed class DeliosDbContext(DbContextOptions<DeliosDbContext> options)
     public DbSet<Membership> Memberships => Set<Membership>();
     public DbSet<Session> Sessions => Set<Session>();
     public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
+
+    public DbSet<ValueEntry> ValueEntries => Set<ValueEntry>();
+    public DbSet<NumberingScheme> NumberingSchemes => Set<NumberingScheme>();
+    public DbSet<SchemeRouting> SchemeRoutings => Set<SchemeRouting>();
+    public DbSet<NumberCounter> NumberCounters => Set<NumberCounter>();
+    public DbSet<Document> Documents => Set<Document>();
+    public DbSet<Revision> Revisions => Set<Revision>();
+    public DbSet<StoredFile> StoredFiles => Set<StoredFile>();
+    public DbSet<DocumentAccess> DocumentAccess => Set<DocumentAccess>();
+    public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
+    public DbSet<IdempotencyRecord> IdempotencyRecords => Set<IdempotencyRecord>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder) =>
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(DeliosDbContext).Assembly);

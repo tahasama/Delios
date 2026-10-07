@@ -10,15 +10,19 @@ x-backend: &backend
   image: delios-backend
   restart: unless-stopped
   environment: &backend-env
-    ASPNETCORE_ENVIRONMENT: Production
+    ASPNETCORE_ENVIRONMENT: Development
     ConnectionStrings__Postgres: Host=postgres;Database=delios;Username=delios;Password=delios-dev
     ConnectionStrings__Redis: valkey:6379
     ConnectionStrings__RabbitMq: amqp://delios:delios-dev@rabbitmq:5672/
     Storage__Endpoint: http://seaweedfs:8333
+    # Presigned URLs are opened by the browser, which reaches storage on localhost.
+    Storage__PublicEndpoint: http://localhost:8333
     Storage__Bucket: delios
     Storage__AccessKey: delios
     Storage__SecretKey: delios-dev-secret
     ClamAv__Host: clamav
+    # Plain HTTP on localhost; production sits behind TLS and keeps the default.
+    Auth__SecureCookie: "false"
 
 services:
   postgres:
@@ -83,6 +87,14 @@ services:
   clamav:
     image: clamav/clamav:stable
     restart: unless-stopped
+    # clamd refuses streams over 25 MB by default; drawings and scans are larger.
+    entrypoint:
+      - /bin/sh
+      - -c
+      - >-
+        grep -q '^StreamMaxLength' /etc/clamav/clamd.conf ||
+        printf 'StreamMaxLength 2048M\nMaxFileSize 2048M\nMaxScanSize 4096M\n' >> /etc/clamav/clamd.conf;
+        exec /init
     ports: ["3310:3310"]
     volumes: [clamav:/var/lib/clamav]
 

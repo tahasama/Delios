@@ -8,9 +8,10 @@ if (args.Contains(HealthProbe.Command))
     return await HealthProbe.RunAsync();
 }
 
+// Reports failures before the host's own logging is up. The host never replaces it.
 Log.Logger = new LoggerConfiguration()
     .WriteTo.Console(new RenderedCompactJsonFormatter())
-    .CreateBootstrapLogger();
+    .CreateLogger();
 
 try
 {

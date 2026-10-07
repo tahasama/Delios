@@ -7,6 +7,7 @@ using Delios.Host.Identity;
 using Delios.Host.Tenancy;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.DataProtection;
@@ -47,6 +48,7 @@ public static class PlatformSetup
             .Enrich.FromLogContext()
             .Enrich.WithProperty("role", role)
             .WriteTo.Console(new RenderedCompactJsonFormatter()),
+            preserveStaticLogger: true,
             writeToProviders: true);
 
         if (!string.IsNullOrWhiteSpace(config["Sentry:Dsn"]))
@@ -88,6 +90,20 @@ public static class PlatformSetup
         services.AddScoped<AuditLog>();
         services.AddScoped<SessionStore>();
         services.AddScoped<ProjectAccessLoader>();
+        services.AddScoped<Documents.Numbering>();
+        services.AddScoped<Documents.DocumentService>();
+        services.AddScoped<Documents.FileStorage>();
+        services.AddScoped<Documents.FileProcessor>();
+        services.AddSingleton<Documents.IVirusScanner, Documents.ClamAvScanner>();
+        services.AddSingleton<Messaging.RabbitMqConnection>();
+        if (role == Roles.Api)
+        {
+            services.AddHostedService<Messaging.OutboxRelay>();
+        }
+        else
+        {
+            services.AddHostedService<Messaging.FileQueueConsumer>();
+        }
         services.AddScoped<Seeding.TenantSetup>();
         services.AddScoped<Seeding.DemoSeed>();
         services.AddSingleton<IPasswordHasher<User>, PasswordHasher<User>>();
@@ -163,7 +179,11 @@ public static class PlatformSetup
             ex is not null || http.Response.StatusCode >= 500 ? LogEventLevel.Error
             : http.Request.Path.StartsWithSegments("/health") ? LogEventLevel.Verbose
             : LogEventLevel.Information);
-        app.UseExceptionHandler();
+        // Unreadable input (bad JSON, a wrong type) is the caller's error, not the server's.
+        app.UseExceptionHandler(new ExceptionHandlerOptions
+        {
+            StatusCodeSelector = ex => ex is BadHttpRequestException bad ? bad.StatusCode : StatusCodes.Status500InternalServerError,
+        });
         app.UseStatusCodePages();
         app.UseHttpMetrics();
         app.UseAuthentication();
@@ -189,6 +209,7 @@ public static class PlatformSetup
         if (role == Roles.Api)
         {
             app.MapIdentityEndpoints();
+            Documents.DocumentEndpoints.MapDocumentEndpoints(app);
         }
     }
 

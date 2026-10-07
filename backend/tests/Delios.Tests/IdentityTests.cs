@@ -55,6 +55,18 @@ public sealed class IdentityTests(Infrastructure infrastructure) : IClassFixture
         Assert.Equal("SIGN_IN_FAILED", problem.GetProperty("code").GetString());
     }
 
+    [Theory]
+    [InlineData("{}")]
+    [InlineData("not json")]
+    public async Task Unreadable_input_is_a_bad_request_not_a_server_error(string body)
+    {
+        await using var app = await TestApp.StartAsync(infrastructure);
+        using var content = new StringContent(body, System.Text.Encoding.UTF8, "application/json");
+        using var response = await app.Factory.CreateClient().PostAsync(new Uri("/api/auth/sign-in", UriKind.Relative), content);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
     [Fact]
     public async Task Five_failures_lock_the_account_even_against_the_right_password()
     {
