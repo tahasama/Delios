@@ -541,5 +541,10 @@ deployment with tenant isolation in the database.
      Critical and Major defects) and coverage (checks answered of those asked).
      Runs nightly per project on a queue of its own, and on Document Control's request.
    - Next: schedules and requirements, then reports.
+   - Then, before step 6: a guided read of the backend for its owner, new to
+     .NET: docs/SYSTEM.md completed for every aspect and tool; a beginner's
+     guide (docs/DOTNET-GUIDE.md: endpoints, services, entities, migrations, a
+     request followed end to end, running, logs, debugging); and a plain-language
+     comment on every class and method saying what it is for and where it is called from.
 6. **Next.js moves onto the API**, area by area, through the generated client.
 7. **Content extraction and OCR**, switched off, ready for activation.
