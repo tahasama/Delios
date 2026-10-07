@@ -11,29 +11,41 @@ using NodaTime;
 
 namespace Delios.Host.Schedules;
 
+/// <summary>Request body for PUT /schedule: which document is the schedule, how to read its columns, and the default lead and risk-window days. Null fields keep their current value.</summary>
 public sealed record SourceRequest(Guid DocumentId, ScheduleColumns? Columns = null, int? DefaultLeadDays = null, int? RiskWindowDays = null);
 
+/// <summary>Request body for adding a need to an activity: which document, for what purpose, and when it is needed.</summary>
 /// <param name="OffsetDays">Days from the anchor: negative before, positive after. Empty: the project's lead before the start.</param>
 public sealed record NeedRequest(
     Guid DocumentId, string? Purpose, string[]? RequiredStatuses = null, string? Anchor = null, int? OffsetDays = null,
     DateOnly? FixedDate = null, string? Department = null);
 
+/// <summary>Request body for waiving a need: the note saying why the activity can go ahead without the document.</summary>
 public sealed record WaiverRequest(string? Note);
 
+/// <summary>Request body for recording what was decided about an activity whose documents were missing.</summary>
 public sealed record DecisionRequest(string? Decision, string? ResponsibleName, string? Reason, string? DelayOwedBy = null, string? DelayReason = null);
 
+/// <summary>One activity as the schedule list shows it: its dates, departments, readiness label and need counts.</summary>
 public sealed record ActivitySummary(Guid Id, string Code, string Name, DateOnly? Start, DateOnly? Finish, string? Responsible,
     IReadOnlyList<string> Departments, string State, string Readiness, int Needs, int Met, int Waived, DateOnly? NextNeededBy);
 
+/// <summary>One need of an activity as the activity page shows it: the document, its current revision and status, when it is needed, and its state or waiver.</summary>
 public sealed record NeedView(Guid Id, Guid DocumentId, string DocumentNumber, string Title, string? CurrentRevision, string? CurrentStatus,
     string Purpose, IReadOnlyList<string> RequiredStatuses, string Anchor, int OffsetDays, DateOnly? FixedDate, DateOnly? NeededBy,
     string? Department, string State, DateTimeOffset? MetAt, string? WaiverNote, string? WaivedBy, DateTimeOffset? WaivedAt);
 
+/// <summary>One recorded activity decision as the activity page shows it.</summary>
 public sealed record DecisionView(Guid Id, string Decision, DateOnly? PlannedStart, string ResponsibleName, string Reason,
     string? DelayOwedBy, string? DelayReason, string RecordedBy, DateTimeOffset RecordedAt);
 
+/// <summary>
+/// One step in a document's path to an activity (sent for review, each review step, released, issued): when it was due, when it happened,
+/// whether it was late, and who it was owed by.
+/// </summary>
 public sealed record Checkpoint(string Name, string Deadline, DateOnly? Due, DateTimeOffset? At, bool Late, string OwedBy);
 
+/// <summary>For one need, the checkpoints its document went through and the first late one (the cause of the delay), or null if none was late.</summary>
 public sealed record NeedLateness(Guid RequirementId, string DocumentNumber, string State, IReadOnlyList<Checkpoint> Checkpoints, Checkpoint? Cause);
 
 /// <summary>
@@ -42,6 +54,10 @@ public sealed record NeedLateness(Guid RequirementId, string DocumentNumber, str
 /// </summary>
 public static class ScheduleEndpoints
 {
+    /// <summary>
+    /// Registers the schedule, activity, need, waiver and decision URLs under /api/projects/{projectId}. Only the project's own (internal) people with read access may call them.
+    /// Called once at startup from PlatformSetup.
+    /// </summary>
     public static void MapScheduleEndpoints(this IEndpointRouteBuilder app)
     {
         var project = app.MapGroup("/api/projects/{projectId:guid}").WithTags("Schedule")
@@ -66,6 +82,7 @@ public static class ScheduleEndpoints
 
     // ── The schedule document ─────────────────────────────────────────────────
 
+    /// <summary>GET /schedule: returns the project's schedule settings (or null) and its 20 latest imports.</summary>
     private static async Task<IResult> SourceAsync(HttpContext http, DeliosDbContext db, CancellationToken cancellationToken)
     {
         var access = ProjectAccessFilter.Of(http);
@@ -121,6 +138,10 @@ public static class ScheduleEndpoints
 
     // ── Activities ────────────────────────────────────────────────────────────
 
+    /// <summary>
+    /// GET /activities: lists the project's activities by start date, at most 2000, filtered by readiness, start date range, department or a text search on code and name.
+    /// Removed activities are left out unless <paramref name="includeRemoved"/> is true.
+    /// </summary>
     private static async Task<IResult> ActivitiesAsync(
         HttpContext http, DeliosDbContext db, IClock clock, CancellationToken cancellationToken,
         string? readiness = null, DateOnly? from = null, DateOnly? to = null, string? department = null, string? q = null,
@@ -148,6 +169,7 @@ public static class ScheduleEndpoints
         return Results.Ok(views.ToList());
     }
 
+    /// <summary>GET /activities/{activityId}: one activity with its needs and recorded decisions. Also used by the other endpoints to send back the updated activity.</summary>
     private static async Task<IResult> ActivityAsync(
         Guid activityId, HttpContext http, DeliosDbContext db, IClock clock, CancellationToken cancellationToken)
     {
@@ -169,6 +191,10 @@ public static class ScheduleEndpoints
 
     // ── What an activity needs ────────────────────────────────────────────────
 
+    /// <summary>
+    /// POST /activities/{activityId}/needs: records that the activity needs a document for a given purpose (a published reason for issue),
+    /// checks the values given, then recomputes the activity's readiness. Without an offset the need falls the project's default lead days before the start.
+    /// </summary>
     private static async Task<IResult> AddNeedAsync(
         Guid activityId, NeedRequest request, HttpContext http, DeliosDbContext db, IClock clock, AuditLog audit,
         CancellationToken cancellationToken)
@@ -226,6 +252,7 @@ public static class ScheduleEndpoints
         return await ActivityAsync(activityId, http, db, clock, cancellationToken);
     }
 
+    /// <summary>DELETE /activities/{activityId}/needs/{needId}: removes a need (by whoever added it, or Document Control) and recomputes the activity's readiness.</summary>
     private static async Task<IResult> RemoveNeedAsync(
         Guid activityId, Guid needId, HttpContext http, DeliosDbContext db, IClock clock, AuditLog audit, CancellationToken cancellationToken)
     {
@@ -268,6 +295,7 @@ public static class ScheduleEndpoints
         return await ActivityAsync(activityId, http, db, clock, cancellationToken);
     }
 
+    /// <summary>DELETE /activities/{activityId}/needs/{needId}/waive: withdraws a waiver, so the need counts as missing again until its document comes.</summary>
     private static async Task<IResult> UnwaiveAsync(
         Guid activityId, Guid needId, HttpContext http, DeliosDbContext db, IClock clock, AuditLog audit, CancellationToken cancellationToken)
     {
@@ -369,6 +397,7 @@ public static class ScheduleEndpoints
         return Results.Ok(result);
     }
 
+    /// <summary>Builds one checkpoint and decides whether it was late: done after its due day, or not done and the due day has passed.</summary>
     private static Checkpoint Point(LocalDate today, string name, string deadline, LocalDate? due, Instant? at, string owedBy)
     {
         // Late: done after its day, or not done and its day has passed.
@@ -378,21 +407,25 @@ public static class ScheduleEndpoints
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
+    /// <summary>True when the caller may waive or un-waive this need: Document Control, or an active member of the department that owns the need.</summary>
     private static async Task<bool> MayWaiveAsync(DeliosDbContext db, ProjectAccess access, Requirement need, CancellationToken cancellationToken) =>
         access.Holds(Verbs.Control)
         || (need.Department is not null && await db.Memberships.AnyAsync(m => m.ProjectId == access.Project.Id && m.UserId == access.UserId
             && m.Active && m.Department == need.Department, cancellationToken));
 
+    /// <summary>Today's date in the project's time zone, and the project's risk window in days (14 when no schedule is set up).</summary>
     private static async Task<(LocalDate Today, int Window)> TodayAsync(DeliosDbContext db, IClock clock, Project project, CancellationToken cancellationToken)
     {
         var window = await db.ScheduleSources.Where(s => s.ProjectId == project.Id).Select(s => (int?)s.RiskWindowDays).SingleOrDefaultAsync(cancellationToken);
         return (WorkingCalendar.Today(clock, project.TimeZone), window ?? 14);
     }
 
+    /// <summary>Turns a stored activity into the list shape, adding its readiness label.</summary>
     private static ActivitySummary Summary(Activity a, LocalDate today, int window) => new(
         a.Id, a.Code, a.Name, a.Start?.ToDateOnly(), a.Finish?.ToDateOnly(), a.Responsible, a.Departments, a.State,
         ReadinessLabels.Of(a, today, window), a.NeedCount, a.MetCount, a.WaivedCount, a.NextNeededBy?.ToDateOnly());
 
+    /// <summary>Builds the views of an activity's needs, looking up each document and its current released revision, ordered by the day they are needed.</summary>
     private static async Task<List<NeedView>> NeedViewsAsync(DeliosDbContext db, IEnumerable<Requirement> needs, CancellationToken cancellationToken)
     {
         var list = needs.ToList();
@@ -406,5 +439,6 @@ public static class ScheduleEndpoints
             n.WaiverNote, n.WaivedByName, n.WaivedAt?.ToDateTimeOffset())).ToList();
     }
 
+    /// <summary>The standard "no such activity" 404 answer.</summary>
     private static IResult NotFound() => Problems.NotFound("ACTIVITY_NOT_FOUND", "No such activity.");
 }

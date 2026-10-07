@@ -12,6 +12,7 @@ namespace Delios.Host.Schedules;
 /// <summary>Asks the worker to read a released schedule revision into activities.</summary>
 public sealed record ScheduleImportRequested(Guid TenantId, Guid RevisionId)
 {
+    /// <summary>The queue name (routing key) this message is sent under.</summary>
     public const string RoutingKey = "schedule.import";
 }
 
@@ -63,6 +64,11 @@ public sealed class ScheduleImporter(
         await transaction.CommitAsync(cancellationToken);
     }
 
+    /// <summary>
+    /// Reads one schedule revision: picks its .xlsx or .csv file, parses the activities, maps department names to discipline codes,
+    /// then adds new activities, updates existing ones, marks missing ones removed, and records the changes in a <see cref="ScheduleImport"/>.
+    /// Ends by recomputing the readiness of every activity of the project, since moved dates move the needs.
+    /// </summary>
     private async Task ReadAsync(ScheduleSource source, Revision revision, CancellationToken cancellationToken)
     {
         var now = clock.GetCurrentInstant();
@@ -170,12 +176,14 @@ public sealed class ScheduleImporter(
         logger.LogInformation("Schedule {Label} read: {Count} activities", label, parsed.Count);
     }
 
+    /// <summary>Marks an import as failed with its reason, cut to 2000 characters to fit the database column.</summary>
     private static void Fail(ScheduleImport record, string error)
     {
         record.Status = ScheduleImportStatuses.Failed;
         record.Error = error.Length > 2000 ? error[..2000] : error;
     }
 
+    /// <summary>Builds one change-list entry for an activity, with its dates before (if it existed) and after.</summary>
     private static ActivityChange Change(string code, string name, string type, Activity? before, ParsedActivity after) => new()
     {
         Code = code,

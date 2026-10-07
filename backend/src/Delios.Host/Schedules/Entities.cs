@@ -28,6 +28,7 @@ public sealed class ScheduleSource
 /// <summary>The headings of the schedule export. Matched without regard to case or spacing.</summary>
 public sealed class ScheduleColumns
 {
+    /// <summary>The worksheet to read; null means the first one.</summary>
     public string? Sheet { get; set; }
     public string? Code { get; set; }
     public string? Name { get; set; }
@@ -43,22 +44,30 @@ public sealed class ScheduleImport
     public Guid Id { get; set; } = Guid.CreateVersion7();
     public Guid TenantId { get; set; }
     public Guid ProjectId { get; set; }
+    /// <summary>The released schedule revision that was read.</summary>
     public Guid RevisionId { get; set; }
+    /// <summary>The revision's label as people see it (for example "B" or "03").</summary>
     public required string RevisionValue { get; set; }
+    /// <summary>The stored file the activities were read from; null when no readable file was found.</summary>
     public Guid? FileId { get; set; }
+    /// <summary>DONE or FAILED (see <see cref="ScheduleImportStatuses"/>).</summary>
     public string Status { get; set; } = ScheduleImportStatuses.Done;
+    /// <summary>Why the import failed, when it did; null otherwise.</summary>
     public string? Error { get; set; }
     public Instant ImportedAt { get; set; }
+    /// <summary>How many activities were new in this revision. The next four counts work the same way for moved, changed, removed and unchanged ones.</summary>
     public int Added { get; set; }
     public int Moved { get; set; }
     public int Changed { get; set; }
     public int Removed { get; set; }
     public int Unchanged { get; set; }
+    /// <summary>The activity-by-activity list of what changed, stored as JSON inside the import's row.</summary>
     public List<ActivityChange> Changes { get; set; } = [];
     /// <summary>Department names in the file that are no published discipline: left off the activities, listed here to put right.</summary>
     public string[] UnmatchedDepartments { get; set; } = [];
 }
 
+/// <summary>The outcomes of reading a schedule revision: done, or failed.</summary>
 public static class ScheduleImportStatuses
 {
     public const string Done = "DONE";
@@ -66,6 +75,7 @@ public static class ScheduleImportStatuses
     public const string Failed = "FAILED";
 }
 
+/// <summary>One line in an import's change list: an activity that was added, moved, changed or removed, with its old and new dates.</summary>
 public sealed class ActivityChange
 {
     public required string Code { get; set; }
@@ -93,22 +103,29 @@ public sealed class Activity
     public required string Name { get; set; }
     public LocalDate? Start { get; set; }
     public LocalDate? Finish { get; set; }
+    /// <summary>The manager named in the schedule as responsible for the activity; null when the file gives none.</summary>
     public string? Responsible { get; set; }
     /// <summary>The departments concerned. A department is a discipline: these are published discipline codes.</summary>
     public string[] Departments { get; set; } = [];
+    /// <summary>ACTIVE, or REMOVED once a later schedule revision no longer lists it.</summary>
     public string State { get; set; } = ActivityStates.Active;
+    /// <summary>The schedule revision the activity was last read from.</summary>
     public Guid? SourceRevisionId { get; set; }
     public Instant UpdatedAt { get; set; }
     // What it is waiting for, kept on the activity so the schedule can be sorted
     // and filtered by it. Written by Readiness.RestateAsync; nothing here is a new fact.
+    /// <summary>How many documents the activity needs.</summary>
     public int NeedCount { get; set; }
+    /// <summary>How many of those documents are there and serve their purpose.</summary>
     public int MetCount { get; set; }
+    /// <summary>How many are still missing but were waived (accepted as not blocking).</summary>
     public int WaivedCount { get; set; }
     /// <summary>The earliest day a document still missing is owed.</summary>
     public LocalDate? NextNeededBy { get; set; }
     public List<Requirement> Requirements { get; set; } = [];
 }
 
+/// <summary>Whether an activity is still in the schedule (ACTIVE) or a later revision dropped it (REMOVED).</summary>
 public static class ActivityStates
 {
     public const string Active = "ACTIVE";
@@ -141,6 +158,7 @@ public sealed class Requirement
     public LocalDate? NeededBy { get; set; }
     /// <summary>The department (a published discipline) that owns the need: its members may waive it.</summary>
     public string? Department { get; set; }
+    /// <summary>MISSING, MET or WAIVED (see <see cref="RequirementStates"/>). Recomputed by <see cref="Readiness.RestateAsync"/>.</summary>
     public string State { get; set; } = RequirementStates.Missing;
     /// <summary>When the document was first there for it.</summary>
     public Instant? MetAt { get; set; }
@@ -156,12 +174,14 @@ public sealed class Requirement
     public Instant CreatedAt { get; set; }
 }
 
+/// <summary>Which date of the activity a need's due day is counted from: its start or its finish.</summary>
 public static class Anchors
 {
     public const string Start = "START";
     public const string Finish = "FINISH";
 }
 
+/// <summary>The states of a need. Missing: its document is not there yet. Met: it is there and serves the need. Waived: still missing, but someone accepted going on without it.</summary>
 public static class RequirementStates
 {
     public const string Missing = "MISSING";
@@ -182,24 +202,30 @@ public sealed class ActivityDecision
     public Guid ActivityId { get; set; }
     /// <summary>From the organization's list of activity decisions; whether it went ahead is that value's "proceeds".</summary>
     public required string Decision { get; set; }
+    /// <summary>The activity's planned start on the day the decision was recorded, kept even if the schedule later moves.</summary>
     public LocalDate? PlannedStart { get; set; }
     /// <summary>Who carries the decision: the manager the activity names.</summary>
     public required string ResponsibleName { get; set; }
     public required string Reason { get; set; }
+    /// <summary>If the activity was held up, the party whose late document caused it; null otherwise.</summary>
     public string? DelayOwedBy { get; set; }
+    /// <summary>Free-text explanation of the delay, if any.</summary>
     public string? DelayReason { get; set; }
     public required string RecordedByName { get; set; }
     public Instant RecordedAt { get; set; }
 }
 
+/// <summary>The names of the organization's lists of values that belong to the schedule feature.</summary>
 public static class ScheduleSets
 {
     /// <summary>What was decided about an activity whose documents were missing. Props: proceeds (bool: it went ahead).</summary>
     public const string Decisions = "ACTIVITY_DECISIONS";
 }
 
+/// <summary>Tells Entity Framework (the database mapping library) how to store <see cref="ScheduleSource"/>. A project has at most one schedule document.</summary>
 internal sealed class ScheduleSourceConfiguration : IEntityTypeConfiguration<ScheduleSource>
 {
+    /// <summary>Sets up the table mapping. Called by Entity Framework when it builds the database model.</summary>
     public void Configure(EntityTypeBuilder<ScheduleSource> b)
     {
         b.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
@@ -211,8 +237,10 @@ internal sealed class ScheduleSourceConfiguration : IEntityTypeConfiguration<Sch
     }
 }
 
+/// <summary>Tells Entity Framework how to store <see cref="ScheduleImport"/>. Each revision is read at most once; the change list is stored as JSON.</summary>
 internal sealed class ScheduleImportConfiguration : IEntityTypeConfiguration<ScheduleImport>
 {
+    /// <summary>Sets up the table mapping. Called by Entity Framework when it builds the database model.</summary>
     public void Configure(EntityTypeBuilder<ScheduleImport> b)
     {
         b.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
@@ -227,8 +255,10 @@ internal sealed class ScheduleImportConfiguration : IEntityTypeConfiguration<Sch
     }
 }
 
+/// <summary>Tells Entity Framework how to store <see cref="Activity"/>. Activity codes are unique within a project.</summary>
 internal sealed class ActivityConfiguration : IEntityTypeConfiguration<Activity>
 {
+    /// <summary>Sets up the table mapping. Called by Entity Framework when it builds the database model.</summary>
     public void Configure(EntityTypeBuilder<Activity> b)
     {
         b.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
@@ -244,8 +274,10 @@ internal sealed class ActivityConfiguration : IEntityTypeConfiguration<Activity>
     }
 }
 
+/// <summary>Tells Entity Framework how to store <see cref="Requirement"/>. An activity needs a given document for a given purpose at most once.</summary>
 internal sealed class RequirementConfiguration : IEntityTypeConfiguration<Requirement>
 {
+    /// <summary>Sets up the table mapping. Called by Entity Framework when it builds the database model.</summary>
     public void Configure(EntityTypeBuilder<Requirement> b)
     {
         b.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
@@ -263,8 +295,10 @@ internal sealed class RequirementConfiguration : IEntityTypeConfiguration<Requir
     }
 }
 
+/// <summary>Tells Entity Framework how to store <see cref="ActivityDecision"/>.</summary>
 internal sealed class ActivityDecisionConfiguration : IEntityTypeConfiguration<ActivityDecision>
 {
+    /// <summary>Sets up the table mapping. Called by Entity Framework when it builds the database model.</summary>
     public void Configure(EntityTypeBuilder<ActivityDecision> b)
     {
         b.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);

@@ -12,6 +12,7 @@ namespace Delios.Host.Reports;
 /// </summary>
 public static class ReportEndpoints
 {
+    /// <summary>The title and question of each report, for the list of reports.</summary>
     private static readonly Dictionary<string, (string Title, string Question)> Catalogue = new()
     {
         [ReportIds.Register] = ("Register status", "Where does every document stand?"),
@@ -21,6 +22,10 @@ public static class ReportEndpoints
         [ReportIds.Readiness] = ("Activity readiness", "Are the coming activities covered by their documents?"),
     };
 
+    /// <summary>
+    /// Registers the report URLs under /api/projects/{projectId}/reports: the list, one report, and its export. Only the project's own (internal) people with read access may call them.
+    /// Called once at startup from PlatformSetup.
+    /// </summary>
     public static void MapReportEndpoints(this IEndpointRouteBuilder app)
     {
         var project = app.MapGroup("/api/projects/{projectId:guid}/reports").WithTags("Reports")
@@ -35,6 +40,7 @@ public static class ReportEndpoints
         project.MapGet("/{reportId}/export", ExportAsync);
     }
 
+    /// <summary>GET /reports/{reportId}: counts one report now and returns it. The optional numbers override the report's default windows; <paramref name="q"/> filters the rows by text.</summary>
     private static async Task<IResult> ReportAsync(
         string reportId, HttpContext http, ReportBuilder builder, ReadDatabase reads, CancellationToken cancellationToken, string? q = null,
         int? horizonDays = null, int? months = null, int? warnDays = null, int? lateDays = null, int? turnaroundDays = null, int? onTimeTarget = null)
@@ -61,6 +67,7 @@ public static class ReportEndpoints
             : Results.File(Excel(heading, report), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"{name}.xlsx");
     }
 
+    /// <summary>Builds the report options from the query string, using the default for each value not given.</summary>
     private static ReportOptions Options(int? horizonDays, int? months, int? warnDays, int? lateDays, int? turnaroundDays, int? onTimeTarget)
     {
         var d = new ReportOptions();
@@ -68,6 +75,10 @@ public static class ReportEndpoints
             turnaroundDays ?? d.TurnaroundDays, onTimeTarget ?? d.OnTimeTarget);
     }
 
+    /// <summary>
+    /// Checks the report id and options, builds the report on the read database, and keeps only the rows containing the search text, if any.
+    /// Returns either the report or the error answer to send back. Shared by <see cref="ReportAsync"/> and <see cref="ExportAsync"/>.
+    /// </summary>
     private static async Task<(Report? Report, IResult? Problem)> BuildAsync(
         string reportId, HttpContext http, ReportBuilder builder, ReadDatabase reads, string? q, ReportOptions options, CancellationToken cancellationToken)
     {
@@ -81,6 +92,7 @@ public static class ReportEndpoints
             : report with { Rows = [.. report.Rows.Where(r => r.Any(c => c.Text.Contains(needle, StringComparison.OrdinalIgnoreCase)))] }, null);
     }
 
+    /// <summary>Writes the report's list as a UTF-8 CSV file: a heading line, the column names, then the rows.</summary>
     private static byte[] Csv(string heading, Report report)
     {
         static string Field(string text) =>
@@ -94,6 +106,7 @@ public static class ReportEndpoints
         return [.. Encoding.UTF8.GetPreamble(), .. Encoding.UTF8.GetBytes(csv.ToString())];
     }
 
+    /// <summary>Writes the report's list as an Excel workbook: the heading in row 1, column names in row 3 (frozen), then the rows.</summary>
     private static byte[] Excel(string heading, Report report)
     {
         using var workbook = new XLWorkbook();

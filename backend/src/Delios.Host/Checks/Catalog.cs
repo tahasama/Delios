@@ -11,11 +11,14 @@ using NodaTime;
 
 namespace Delios.Host.Checks;
 
+/// <summary>How serious a check's finding is, from most to least serious. Stored on each check and copied onto each defect it finds.</summary>
 public static class Severities
 {
+    /// <summary>The four severity codes. The defects list sorts by them in this order, and open Critical defects are counted on every run.</summary>
     public const string Critical = "CRITICAL", Major = "MAJOR", Minor = "MINOR", Advisory = "ADVISORY";
 }
 
+/// <summary>The stage of a project a check belongs to: setting it up, running it day to day, or handing it over. Shown on the checks page to group the checks.</summary>
 public static class Phases
 {
     /// <summary>What has to be published before the register can be trusted: an administrator's, once.</summary>
@@ -32,7 +35,9 @@ public sealed record Failure(string EntityKey, string EntityType, Guid? EntityId
 /// <summary>What a runner says: the failing items (none means it passed), or what must be set up before it can ask.</summary>
 public abstract record Outcome
 {
+    /// <summary>The check ran; it lists the items it found wrong. An empty list means it passed.</summary>
     public sealed record Ran(IReadOnlyList<Failure> Failures) : Outcome;
+    /// <summary>The check could not ask its question because something is not set up yet; <c>What</c> says what is missing.</summary>
     public sealed record NeedsSetup(string What) : Outcome;
 }
 
@@ -52,33 +57,50 @@ public sealed class CheckContext
 {
     public required DeliosDbContext Db { get; init; }
     public required Project Project { get; init; }
+    /// <summary>The organization's published lists of values (statuses, verdicts, deliverable types…) with their properties, for quick lookups.</summary>
     public required Catalog Values { get; init; }
+    /// <summary>Every entry of every list, including withdrawn ones; filter by status to get the published ones.</summary>
     public required IReadOnlyList<ValueEntry> ValueEntries { get; init; }
     public required FileStorage Storage { get; init; }
     public required AuditLog Audit { get; init; }
     public required IReadOnlyList<Document> Documents { get; init; }
     public required IReadOnlyList<Revision> Revisions { get; init; }
+    /// <summary>The moment the run started, so every check uses the same "now".</summary>
     public required Instant Now { get; init; }
     public CancellationToken CancellationToken { get; init; }
 
+    /// <summary>The project's released (current) revisions.</summary>
     public IEnumerable<Revision> Released => Revisions.Where(r => r.State == RevisionStates.Released);
+    /// <summary>Finds the document a revision belongs to, from the documents already loaded.</summary>
     public Document DocumentOf(Revision r) => Documents.First(d => d.Id == r.DocumentId);
 }
 
+/// <summary>
+/// The full list of checks (<see cref="All"/>) and the small helpers they use to build their results.
+/// The check engine runs every entry in <see cref="All"/>; the check endpoints list them and look one up by its id.
+/// </summary>
 public static class CheckCatalog
 {
+    /// <summary>The result of a check that found nothing wrong.</summary>
     private static Outcome Pass => new Outcome.Ran([]);
+    /// <summary>The result of a check that found these items wrong (an empty list still counts as a pass).</summary>
     private static Outcome Fail(IEnumerable<Failure> failures) => new Outcome.Ran(failures.ToList());
+    /// <summary>Builds a finding about a whole document, keyed "document:{id}" so it is recognised again on the next run.</summary>
     private static Failure Doc(Document d, string? description = null) =>
         new($"document:{d.Id}", "Document", d.Id, d.Id, $"{d.Number} {d.Title}", description);
+    /// <summary>Builds a finding about one revision of a document, keyed "revision:{id}".</summary>
     private static Failure Rev(Document d, Revision r, string? description = null) =>
         new($"revision:{r.Id}", "Revision", r.Id, d.Id, $"{d.Number} rev {r.Value}", description);
+    /// <summary>Builds a finding about the organization's or project's settings (a list of values, a scheme), not about a document.</summary>
     private static Failure Setting(string set, string label, string? description = null) =>
         new($"settings:{set}:{label}", "Settings", null, null, label, description);
 
+    /// <summary>True when the value <paramref name="code"/> in list <paramref name="set"/> carries the property <paramref name="prop"/>.</summary>
     private static bool Has(Catalog values, string set, string code, string prop) => values.Prop(set, code, prop) is not null;
+    /// <summary>The values of one list (for example the statuses) that are currently published, that is, in use.</summary>
     private static IReadOnlyList<ValueEntry> Active(CheckContext ctx, string set) => ctx.ValueEntries.Where(v => v.SetKey == set && v.Status == ValueStatus.Active).ToList();
 
+    /// <summary>Every check, in the order they run and are shown. Each entry gives its id, phase, condition (what it looks for), method (how), severity, owner and the code that runs it.</summary>
     public static readonly IReadOnlyList<CheckDef> All =
     [
         // ── Setting the project up ────────────────────────────────────────────
@@ -329,9 +351,12 @@ public static class CheckCatalog
             }),
     ];
 
+    /// <summary>The checks indexed by their id, for quick lookup by <see cref="Find"/>.</summary>
     private static readonly Dictionary<string, CheckDef> ById = All.ToDictionary(c => c.Id);
+    /// <summary>Finds a check by its id (for example "RV-08"), or null if there is none. Used by the endpoints that switch a check off.</summary>
     public static CheckDef? Find(string id) => ById.GetValueOrDefault(id);
 
+    /// <summary>True when the named document field is empty. Used by MD-03 to compare a document against the fields its deliverable type requires; an unknown field name counts as filled.</summary>
     private static bool Empty(Document d, string field) => field switch
     {
         "originator" => string.IsNullOrEmpty(d.Originator),
@@ -344,6 +369,7 @@ public static class CheckCatalog
         _ => false,
     };
 
+    /// <summary>The document's fields whose values must come from a published list, with the list each one draws from. Used by MD-06.</summary>
     private static IEnumerable<(string Name, string Set, string? Value)> Controlled(Document d) =>
     [
         ("Deliverable type", ValueSets.DeliverableTypes, d.DeliverableType),
@@ -365,6 +391,7 @@ public static class CheckCatalog
         return files.OrderBy(_ => Random.Shared.Next()).Take(size).ToList();
     }
 
+    /// <summary>Builds a finding about a stored file that is missing or changed, labelled with its document number and file name. Used by FM-06 and FM-07.</summary>
     private static Failure FileFailure(CheckContext ctx, StoredFile f, string description)
     {
         var document = ctx.Documents.FirstOrDefault(d => d.Id == f.DocumentId);

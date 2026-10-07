@@ -22,6 +22,10 @@ public static class ReadinessLabels
     /// <summary>Something is missing, but not yet near.</summary>
     public const string Pending = "PENDING";
 
+    /// <summary>
+    /// Works out an activity's readiness label from its stored counts. Used by the schedule endpoints when listing activities, and by the report builder.
+    /// <paramref name="riskWindowDays"/> is how many days ahead a missing document counts as at risk.
+    /// </summary>
     public static string Of(Activity a, LocalDate today, int riskWindowDays) =>
         a.NeedCount == 0 ? None
         : a.MetCount == a.NeedCount ? Ready
@@ -37,6 +41,10 @@ public static class ReadinessLabels
 /// </summary>
 public static class Readiness
 {
+    /// <summary>
+    /// Recomputes, for the given activities, each need's due day and state (met, missing or waived), and the totals stored on the activity.
+    /// Does not save: the caller saves the changes. Called by the schedule endpoints, the schedule importer and on document release.
+    /// </summary>
     public static async Task RestateAsync(DeliosDbContext db, IClock clock, IReadOnlyCollection<Guid> activityIds, CancellationToken cancellationToken)
     {
         if (activityIds.Count == 0) return;

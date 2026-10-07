@@ -16,6 +16,7 @@ public sealed record ParsedActivity(string Code, string Name, LocalDate? Start, 
 /// </summary>
 public static class ScheduleReader
 {
+    /// <summary>The usual column headings for each field, tried in order when the project has not named the column. Compared after <see cref="Normalize"/>.</summary>
     private static readonly Dictionary<string, string[]> Usual = new()
     {
         ["code"] = ["activity id", "activityid", "activity code", "task id", "code", "id", "unique id"],
@@ -26,12 +27,14 @@ public static class ScheduleReader
         ["departments"] = ["departments", "department", "disciplines", "discipline"],
     };
 
+    /// <summary>The date layouts accepted in the file. Day comes before month in the numeric ones.</summary>
     private static readonly string[] DateFormats =
     [
         "dd-MMM-yy", "dd-MMM-yy HH:mm", "dd-MMM-yyyy", "dd-MMM-yyyy HH:mm", "yyyy-MM-dd", "yyyy-MM-dd HH:mm",
         "yyyy-MM-ddTHH:mm:ss", "dd/MM/yyyy", "dd/MM/yyyy HH:mm", "d/M/yyyy", "dd.MM.yyyy", "d MMM yyyy", "MMM d, yyyy",
     ];
 
+    /// <summary>True for file names this reader can read (.xlsx or .csv). Used by the importer to pick the file of a revision.</summary>
     public static bool CanRead(string fileName) =>
         fileName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase) || fileName.EndsWith(".csv", StringComparison.OrdinalIgnoreCase);
 
@@ -92,6 +95,7 @@ public static class ScheduleReader
         return (null, "No heading row with an activity code and name was found in the first ten rows.");
     }
 
+    /// <summary>Reads every used row of the named worksheet (or the first one) as text. Real dates become yyyy-MM-dd; other cells keep their displayed text.</summary>
     private static List<string[]> ReadExcel(Stream content, string? sheetName)
     {
         using var copy = new MemoryStream();
@@ -122,6 +126,7 @@ public static class ScheduleReader
         return lines.Select(line => SplitCsv(line, separator)).ToList();
     }
 
+    /// <summary>Splits one CSV line into fields, honouring double quotes and doubled quotes inside them.</summary>
     private static string[] SplitCsv(string line, char separator)
     {
         var fields = new List<string>();
@@ -158,5 +163,6 @@ public static class ScheduleReader
         return (null, false);
     }
 
+    /// <summary>Lower-cases a heading and keeps only letters and digits, so "Activity ID" and "activity_id" match.</summary>
     private static string Normalize(string text) => new(text.ToLowerInvariant().Where(char.IsLetterOrDigit).ToArray());
 }

@@ -12,9 +12,15 @@ namespace Delios.Host.Checks;
 /// </summary>
 public sealed class CheckScheduler(IServiceScopeFactory scopes, ILogger<CheckScheduler> logger) : BackgroundService
 {
+    /// <summary>How often each project's checks run by themselves: once every 24 hours.</summary>
     public static readonly Duration Every = Duration.FromHours(24);
+    /// <summary>How long the scheduler waits between looking for projects that are due (10 minutes).</summary>
     private static readonly TimeSpan Pass = TimeSpan.FromMinutes(10);
 
+    /// <summary>
+    /// The background loop: waits 30 seconds after start-up, then every 10 minutes queues the checks of each project that is due.
+    /// Started by the .NET host when the worker starts; stops when the worker shuts down.
+    /// </summary>
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         // Let the rest of the worker come up first.
@@ -34,6 +40,10 @@ public sealed class CheckScheduler(IServiceScopeFactory scopes, ILogger<CheckSch
         }
     }
 
+    /// <summary>
+    /// Goes through every active project of every active tenant (customer organization) and queues a run for those with none in the last 24 hours.
+    /// Returns how many runs were queued.
+    /// </summary>
     public static async Task<int> QueueDueAsync(IServiceScopeFactory scopes, CancellationToken cancellationToken)
     {
         List<Guid> tenants;

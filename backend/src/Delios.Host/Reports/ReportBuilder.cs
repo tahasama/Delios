@@ -16,10 +16,13 @@ namespace Delios.Host.Reports;
 /// </summary>
 public sealed class ReportBuilder(IClock clock)
 {
+    /// <summary>The database and the project being reported on, set at the start of each <see cref="BuildAsync"/> call. The builder is created once per request, so these are not shared between requests.</summary>
     private DeliosDbContext db = null!;
     private Project _project = null!;
     private Catalog _catalog = null!;
+    /// <summary>The project's time zone; dates in the reports are shown in it.</summary>
     private DateTimeZone _zone = DateTimeZone.Utc;
+    /// <summary>Today's date in the project's time zone, fixed for the whole report.</summary>
     private LocalDate _today;
 
     /// <summary>Builds on the database given: the read replica when there is one, the primary otherwise.</summary>
@@ -43,6 +46,7 @@ public sealed class ReportBuilder(IClock clock)
 
     // ── Register status ───────────────────────────────────────────────────────
 
+    /// <summary>The "Register status" report: every document of the project with its stage (not started, in work, in review, released, out of use), charted by discipline.</summary>
     private async Task<Report> RegisterAsync(CancellationToken cancellationToken)
     {
         var docs = await db.Documents.AsNoTracking().Where(d => d.ProjectId == _project.Id).OrderBy(d => d.Number)
@@ -165,6 +169,10 @@ public sealed class ReportBuilder(IClock clock)
 
     // ── Reviews waiting ───────────────────────────────────────────────────────
 
+    /// <summary>
+    /// The "Reviews waiting" report: each open review step and who it waits on, with how many days it has waited, charted by reviewer and age.
+    /// Also gives the average turnaround (start to decision) of reviews decided in the chosen period.
+    /// </summary>
     private async Task<Report> ReviewsAsync(ReportOptions options, CancellationToken cancellationToken)
     {
         var open = await (from s in db.ReviewSteps.Include(s => s.Participants)
@@ -360,21 +368,27 @@ public sealed class ReportBuilder(IClock clock)
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
+    /// <summary>Puts the parts of a report together and stamps it with the time it was counted.</summary>
     private Report Make(string id, string title, string question, string audience, IReadOnlyList<Figure> figures, Chart chart,
         IReadOnlyList<string> columns, IReadOnlyList<IReadOnlyList<Cell>> rows, string empty) =>
         new(id, title, question, audience, figures, chart, columns, rows, empty, clock.GetCurrentInstant().ToDateTimeOffset());
 
+    /// <summary>A cell showing a document number that links to that document.</summary>
     private static Cell Doc(Guid id, string number) => new(number, Kind: "document", Id: id);
 
+    /// <summary>A cell showing a segment's label, coloured when the segment's tone is good, warn or bad.</summary>
     private static Cell Stage(Segment[] segments, string key)
     {
         var segment = segments.Single(s => s.Key == key);
         return new Cell(segment.Label, segment.Tone is "good" or "warn" or "bad" ? segment.Tone : null);
     }
 
+    /// <summary>Formats a moment as a yyyy-MM-dd date in the project's time zone; empty when there is none.</summary>
     private string Date(Instant? at) => at?.InZone(_zone).Date.ToString("yyyy-MM-dd", null) ?? "";
 
+    /// <summary><paramref name="part"/> as a whole-number percentage of <paramref name="whole"/>; 0 when the whole is 0.</summary>
     private static int Percent(int part, int whole) => whole == 0 ? 0 : (int)Math.Round(100.0 * part / whole);
 
+    /// <summary>The earlier of two optional dates, ignoring a missing one.</summary>
     private static LocalDate? Earliest(LocalDate? a, LocalDate? b) => a is null ? b : b is null ? a : LocalDate.Min(a.Value, b.Value);
 }

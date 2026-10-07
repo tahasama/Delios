@@ -8,8 +8,10 @@ using NodaTime;
 
 namespace Delios.Host.Checks;
 
+/// <summary>Message put on the queue when a check run is requested. The worker picks it up and hands it to <see cref="CheckEngine.ProcessAsync"/>.</summary>
 public sealed record CheckRunRequested(Guid TenantId, Guid RunId)
 {
+    /// <summary>The queue name (routing key) this message is sent under.</summary>
     public const string RoutingKey = "checks.run";
 }
 
@@ -22,6 +24,10 @@ public sealed record CheckRunRequested(Guid TenantId, Guid RunId)
 public sealed class CheckEngine(
     DeliosDbContext db, TenantContext tenant, FileStorage storage, AuditLog audit, IClock clock, ILogger<CheckEngine> logger)
 {
+    /// <summary>
+    /// Runs one queued check run inside a single database transaction: marks it running, runs every check, and marks it done or failed.
+    /// Called by the worker when a checks.run message arrives. Does nothing if the run is no longer queued (for example a duplicate message).
+    /// </summary>
     public async Task ProcessAsync(CheckRunRequested message, CancellationToken cancellationToken)
     {
         tenant.Set(message.TenantId);
@@ -48,6 +54,10 @@ public sealed class CheckEngine(
         await transaction.CommitAsync(cancellationToken);
     }
 
+    /// <summary>
+    /// Loads the project's documents and settings once, runs each check that is not switched off, updates the defect register, then works out the scores.
+    /// Integrity is the share of documents with no open Critical or Major defect; coverage is the share of asked checks that actually ran.
+    /// </summary>
     private async Task RunAsync(CheckRun run, CancellationToken cancellationToken)
     {
         var project = await db.Projects.AsNoTracking().SingleAsync(p => p.Id == run.ProjectId, cancellationToken);
@@ -130,6 +140,10 @@ public sealed class CheckEngine(
             project.Id, cancellationToken);
     }
 
+    /// <summary>
+    /// Keeps the defect register in step with what the checks just found: adds new findings, reopens closed ones that came back,
+    /// and closes those no longer returned (or whose check is no longer asked).
+    /// </summary>
     private async Task MaintainDefectsAsync(
         CheckRun run, List<CheckResult> results, List<(CheckDef Check, Failure Failure)> found, CancellationToken cancellationToken)
     {
@@ -190,5 +204,6 @@ public sealed class CheckEngine(
         }
     }
 
+    /// <summary>Shortens text to at most <paramref name="max"/> characters, ending with "…" when cut, so it fits its database column.</summary>
     private static string Cut(string text, int max) => text.Length <= max ? text : text[..(max - 1)] + "…";
 }

@@ -7,15 +7,19 @@ using NodaTime;
 
 namespace Delios.Host.Checks;
 
+/// <summary>Request body carrying a free-text reason. Used when switching a check off and when accepting a defect.</summary>
 public sealed record ReasonRequest(string? Reason);
 
+/// <summary>One check as the checks page shows it: its definition, its result in the last finished run, and the reason if the project switched it off.</summary>
 public sealed record CheckView(string Id, string Phase, string Condition, string Method, string Severity, string Owner,
     string? Result, int? Failing, string? Note, string? OffBecause);
 
+/// <summary>One check run as returned to the browser: who asked, when, the counts by result, the integrity and coverage scores, and each check's result.</summary>
 public sealed record RunView(Guid Id, string Status, string RequestedBy, DateTimeOffset RequestedAt, DateTimeOffset? FinishedAt,
     int Executed, int Passed, int Failed, int NeedsSetup, int Off, decimal Integrity, decimal Coverage, int OpenCritical,
     string? Error, IReadOnlyList<CheckResult> Results);
 
+/// <summary>One defect (a finding a check returned) as the defects list shows it.</summary>
 public sealed record DefectView(Guid Id, string CheckId, string Severity, string Owner, string EntityType, Guid? EntityId,
     Guid? DocumentId, string Label, string Description, string Status, DateTimeOffset FirstSeenAt, DateTimeOffset LastSeenAt,
     DateTimeOffset? ClosedAt, string? AcceptedReason, string? AcceptedBy);
@@ -23,6 +27,10 @@ public sealed record DefectView(Guid Id, string CheckId, string Severity, string
 /// <summary>The checks a project answers to, their last results, and the defects they found.</summary>
 public static class CheckEndpoints
 {
+    /// <summary>
+    /// Registers the check and defect URLs under /api/projects/{projectId}. Only the project's own (internal) people with read access may call them.
+    /// Called once at startup from PlatformSetup.
+    /// </summary>
     public static void MapCheckEndpoints(this IEndpointRouteBuilder app)
     {
         var project = app.MapGroup("/api/projects/{projectId:guid}").WithTags("Checks")
@@ -41,6 +49,7 @@ public static class CheckEndpoints
         project.MapPost("/defects/{defectId:guid}/accept", AcceptAsync);
     }
 
+    /// <summary>GET /checks: lists every check with its result from the last finished run and whether the project switched it off.</summary>
     private static async Task<IResult> CatalogAsync(HttpContext http, DeliosDbContext db, CancellationToken cancellationToken)
     {
         var access = ProjectAccessFilter.Of(http);
@@ -58,6 +67,7 @@ public static class CheckEndpoints
         });
     }
 
+    /// <summary>POST /checks/run: queues a check run now (Document Control only). The worker runs it; answers 409 if one is already queued or running.</summary>
     private static async Task<IResult> RunAsync(HttpContext http, DeliosDbContext db, IClock clock, CancellationToken cancellationToken)
     {
         var access = ProjectAccessFilter.Of(http);
@@ -69,6 +79,7 @@ public static class CheckEndpoints
             : Results.Accepted($"/api/projects/{access.Project.Id}/checks/runs/{run.Id}", View(run));
     }
 
+    /// <summary>GET /checks/runs/{runId}: returns one run, so the page can poll until it is done.</summary>
     private static async Task<IResult> GetRunAsync(Guid runId, HttpContext http, DeliosDbContext db, CancellationToken cancellationToken) =>
         await db.CheckRuns.AsNoTracking().SingleOrDefaultAsync(r => r.Id == runId && r.ProjectId == ProjectAccessFilter.Of(http).Project.Id,
             cancellationToken) is { } run
@@ -110,6 +121,7 @@ public static class CheckEndpoints
         return Results.NoContent();
     }
 
+    /// <summary>DELETE /checks/{checkId}/opt-out: switches a check back on for the project (Document Control only) and records that in the audit trail.</summary>
     private static async Task<IResult> OptInAsync(
         string checkId, HttpContext http, DeliosDbContext db, Audit.AuditLog audit, CancellationToken cancellationToken)
     {
@@ -124,6 +136,10 @@ public static class CheckEndpoints
         return Results.NoContent();
     }
 
+    /// <summary>
+    /// GET /defects: lists the project's defects, most serious first, at most 1000. Without a status filter it shows those not closed.
+    /// Defects on documents the caller may not see are left out.
+    /// </summary>
     private static async Task<IResult> DefectsAsync(
         HttpContext http, DeliosDbContext db, DocumentService documents, CancellationToken cancellationToken,
         string? status = null, string? severity = null, string? checkId = null, Guid? documentId = null)
@@ -163,10 +179,12 @@ public static class CheckEndpoints
         return Results.Ok(View(defect));
     }
 
+    /// <summary>Turns a stored check run into the shape sent to the browser. Also used by other endpoints that show the last run.</summary>
     public static RunView View(CheckRun r) => new(r.Id, r.Status, r.RequestedByName, r.RequestedAt.ToDateTimeOffset(),
         r.FinishedAt?.ToDateTimeOffset(), r.Executed, r.Passed, r.Failed, r.NeedsSetup, r.Off, r.Integrity, r.Coverage, r.OpenCritical,
         r.Error, r.Results);
 
+    /// <summary>Turns a stored defect into the shape sent to the browser.</summary>
     private static DefectView View(Defect d) => new(d.Id, d.CheckId, d.Severity, d.Owner, d.EntityType, d.EntityId, d.DocumentId,
         d.Label, d.Description, d.Status, d.FirstSeenAt.ToDateTimeOffset(), d.LastSeenAt.ToDateTimeOffset(), d.ClosedAt?.ToDateTimeOffset(),
         d.AcceptedReason, d.AcceptedByName);

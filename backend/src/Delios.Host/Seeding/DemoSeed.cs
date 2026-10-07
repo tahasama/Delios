@@ -13,9 +13,15 @@ namespace Delios.Host.Seeding;
 /// </summary>
 public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.TenantContext tenantContext, ILogger<DemoSeed> logger)
 {
+    /// <summary>The short name of the demo tenant.</summary>
     public const string Slug = "demo";
+    /// <summary>The password of every demo user.</summary>
     public const string Password = "demo1234";
 
+    /// <summary>
+    /// Creates the demo tenant with its parties, functions, project, people and settings. If it already exists, only adds the setup that later versions brought.
+    /// Called by the <c>seed-demo</c> command line command (refused in Production unless --force is given).
+    /// </summary>
     public async Task RunAsync(CancellationToken cancellationToken = default)
     {
         if (await db.Tenants.SingleOrDefaultAsync(t => t.Slug == Slug, cancellationToken) is { } existing)
@@ -378,6 +384,7 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
         return added;
     }
 
+    /// <summary>Adds a published list of values (for example the disciplines) with each value's code, label, sort order and optional properties stored as JSON.</summary>
     private void AddSet(Guid t, string key, (string Code, string Label, object? Props)[] values)
     {
         var sort = 0;

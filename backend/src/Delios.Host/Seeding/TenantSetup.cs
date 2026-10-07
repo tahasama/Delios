@@ -14,6 +14,10 @@ namespace Delios.Host.Seeding;
 public sealed class TenantSetup(
     DeliosDbContext db, TenantContext tenant, AuditLog audit, IPasswordHasher<User> hasher)
 {
+    /// <summary>
+    /// Creates a tenant (a customer organization, identified by its short <paramref name="slug"/>) and its first administrator, and records it in the audit trail.
+    /// Throws if the slug is already taken. Called by the <c>create-tenant</c> command line command and by the demo seed.
+    /// </summary>
     public async Task<Tenant> CreateAsync(
         string slug, string name, string adminEmail, string adminName, string adminPassword,
         CancellationToken cancellationToken = default)
@@ -39,6 +43,7 @@ public sealed class TenantSetup(
         return organization;
     }
 
+    /// <summary>Builds (but does not save) a user of the given tenant with a hashed password. Used here and by the demo seed to create its people.</summary>
     public User NewUser(Guid tenantId, string email, string name, string password, bool isAdmin = false, Guid? partyId = null)
     {
         var user = new User

@@ -9,9 +9,11 @@ public sealed record Segment(string Key, string Label, string Tone);
 /// <summary>One bar: how many items of each segment it holds.</summary>
 public sealed record Bar(string Label, Dictionary<string, int> Values)
 {
+    /// <summary>Adds one item to the given segment of this bar. Used by the report builder while it counts.</summary>
     public void Add(string segment) => Values[segment] = Values.GetValueOrDefault(segment) + 1;
 }
 
+/// <summary>The one stacked-bar chart a report shows: its title, its colours (segments) and its bars.</summary>
 public sealed record Chart(string Title, IReadOnlyList<Segment> Segments, IReadOnlyList<Bar> Bars);
 
 /// <summary>
@@ -20,6 +22,7 @@ public sealed record Chart(string Title, IReadOnlyList<Segment> Segments, IReadO
 /// </summary>
 public sealed record Cell(string Text, string? Tone = null, string? Kind = null, Guid? Id = null)
 {
+    /// <summary>Lets plain text be used wherever a cell is expected, as a cell with no tone and no link.</summary>
     public static implicit operator Cell(string text) => new(text);
 }
 
@@ -42,6 +45,7 @@ public sealed record Report(
 public sealed record ReportOptions(
     int HorizonDays = 30, int Months = 6, int WarnDays = 7, int LateDays = 14, int TurnaroundDays = 90, int OnTimeTarget = 80)
 {
+    /// <summary>Checks the options are in range. Returns a message saying what is wrong, or null when they are all valid. Called by the report endpoints before building.</summary>
     public string? Invalid() =>
         HorizonDays is < 1 or > 366 ? "horizonDays is between 1 and 366."
         : Months is < 1 or > 36 ? "months is between 1 and 36."
@@ -51,6 +55,7 @@ public sealed record ReportOptions(
         : null;
 }
 
+/// <summary>The ids of the reports, as used in the report URLs. <see cref="All"/> is the list the reports page shows, in order.</summary>
 public static class ReportIds
 {
     public const string Register = "register";
