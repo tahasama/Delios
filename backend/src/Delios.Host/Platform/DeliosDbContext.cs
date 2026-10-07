@@ -54,6 +54,7 @@ public sealed class DeliosDbContext(DbContextOptions<DeliosDbContext> options)
 
     public DbSet<Packages.Package> Packages => Set<Packages.Package>();
     public DbSet<Search.SearchWatermark> SearchWatermarks => Set<Search.SearchWatermark>();
+    public DbSet<Extraction.FileText> FileTexts => Set<Extraction.FileText>();
     public DbSet<Packages.PackageMember> PackageMembers => Set<Packages.PackageMember>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

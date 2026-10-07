@@ -69,6 +69,7 @@ internal sealed class ProjectConfiguration : IEntityTypeConfiguration<Project>
         b.Property(x => x.ContractRole).HasMaxLength(32);
         b.Property(x => x.Status).HasMaxLength(16);
         b.Property(x => x.TimeZone).HasMaxLength(64);
+        b.Property(x => x.ContentExtraction).HasMaxLength(16);
         b.Property(x => x.CreatedAt).HasDefaultValueSql("now()");
     }
 }

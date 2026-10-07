@@ -23,7 +23,7 @@ the path to serious scale.
 | API | REST + OpenAPI | No GraphQL |
 | Database | PostgreSQL 17, EF Core, row-level security | PgBouncer with the second API node; standby replica (see High availability) |
 | Search | Postgres search on register entries; OpenSearch built and switched off (ranked, forgiving; visibility still decided by Postgres; falls back to Postgres if unreachable) | Switch OpenSearch on when RegisterSearchSlow fires |
-| Content extraction | Built but switched off (see Client content) | Activated per project at a client's written request |
+| Content extraction | Built and switched off: Tika with Tesseract, per-project switch, own queue (see Client content) | Activated per project at a client's written request |
 | Cache, locks, rate limits | Redis (Valkey) | — |
 | Async work | RabbitMQ (official client), a transactional outbox table, retry and dead-letter queues | Kafka is not planned |
 | File storage | S3-compatible object storage, versioning and object lock, presigned URLs (SeaweedFS in development) | AWS S3 / Azure Blob if a client requires it |
@@ -279,20 +279,22 @@ Content extraction and OCR are nevertheless written, tested and shipped, but
 switched off. They are activated per project only when a client asks for them
 in writing, and the activation is recorded in the audit log. When active:
 
-- **Text extraction** (Apache Tika server, its own container) feeds Postgres
-  full-text search for that project only, and the text stays inside that
-  tenant's data.
-- **OCR** (OCRmyPDF with Tesseract, its own container, Arabic, English and
-  French) makes scanned files searchable. It runs on demand: the document
-  controller or an administrator chooses "Make searchable" on one document, on
-  a selection or filter (with the page count and an estimated duration), or
-  turns on automatic OCR of scanned uploads for the project. Jobs run on a
-  separate low-priority `ocr` queue with live progress, cancel and per-page
-  retry.
+- **Text extraction and OCR** (Apache Tika with Tesseract, one container of its
+  own) read the text layer of PDFs and Office files and OCR the pages that are
+  only images, in the languages the server is set for (`OCR_LANGUAGES`). The
+  text feeds the project's search (Postgres, or OpenSearch when on) and stays
+  inside that tenant's data, under row-level security. *Built.*
+- **Per project, three positions:** off; on demand (a revision, or Document
+  Control's "the whole project" for a scanned archive); automatic (every file
+  once it passes scanning). *Built.*
+- Jobs run on a queue of their own, one at a time, so they never hold up the
+  scanning of new uploads. *Built.* Live progress, cancel, page counts and
+  duration estimates are not built yet.
 - **The controlled original is never changed.** Extracted text is stored
-  separately, linked to the revision; a searchable PDF, if produced, is a
-  labelled derived copy.
-- Switching it off deletes the project's extracted text.
+  separately, linked to the file and revision. *Built.* A searchable-PDF derived
+  copy is not built yet.
+- Switching it off deletes the project's extracted text, and the search index
+  drops it on its next pass. *Built.*
 
 When inactive, these containers do not run and cost nothing.
 

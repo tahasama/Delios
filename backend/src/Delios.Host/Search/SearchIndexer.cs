@@ -35,6 +35,7 @@ public sealed class SearchIndexer(IServiceScopeFactory scopes, IOptions<SearchOp
     : BackgroundService
 {
     public const int Batch = 500;
+    private const int MaxContent = 1_000_000;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -97,9 +98,17 @@ public sealed class SearchIndexer(IServiceScopeFactory scopes, IOptions<SearchOp
             .ToListAsync(cancellationToken);
         if (changed.Count == 0) return 0;
 
+        // The text read from the latest revision's files, where the organization lets them be read.
+        var latest = changed.Where(d => d.LatestRevisionId != null).Select(d => d.LatestRevisionId!.Value).ToList();
+        var texts = (await db.FileTexts.AsNoTracking().Where(t => t.RevisionId != null && latest.Contains(t.RevisionId.Value))
+                .Select(t => new { t.DocumentId, t.RevisionId, t.Text }).ToListAsync(cancellationToken))
+            .GroupBy(t => t.DocumentId)
+            .ToDictionary(g => g.Key, g => Cap(string.Join('\n', g.Select(t => t.Text))));
+
         await client.BulkAsync(changed.Select(d => new IndexedDocument(d.Id, d.TenantId, d.ProjectId, d.Number, d.Title,
             d.DeliverableType, d.DocType, d.Discipline, d.Originator, d.Subproject, d.State, d.LatestRevisionValue,
-            d.LatestRevisionState, d.Confidentiality, d.UpdatedAt.ToDateTimeOffset())).ToList(), refresh, cancellationToken);
+            d.LatestRevisionState, d.Confidentiality, d.UpdatedAt.ToDateTimeOffset(),
+            texts.GetValueOrDefault(d.Id))).ToList(), refresh, cancellationToken);
 
         // Moved only once the index has them: a failed pass sends the same documents again.
         if (mark is null)
@@ -113,6 +122,8 @@ public sealed class SearchIndexer(IServiceScopeFactory scopes, IOptions<SearchOp
         await transaction.CommitAsync(cancellationToken);
         return changed.Count;
     }
+
+    private static string Cap(string text) => text.Length > MaxContent ? text[..MaxContent] : text;
 
     /// <summary>Forget what was sent, so the next pass sends everything again.</summary>
     public static async Task ResetAsync(IServiceScopeFactory scopes, CancellationToken cancellationToken)

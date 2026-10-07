@@ -257,8 +257,39 @@ upgrade, or if in doubt): `docker compose ... run --rm migrate reindex`.
 **To switch off:** `SEARCH_PROVIDER=postgres`, `up -d`; stop the `opensearch` container.
 The index is not backed up: it is rebuilt from the database.
 
+## Content extraction and OCR
+
+**Off, and twice so.** The service is not installed, and each project's switch
+is off: nothing inside any file is read until both are on. The switch is per
+project because the client decides, and one contractor works for clients who
+decide differently. Once on, a
+document is also found by words inside its latest revision's files, in Postgres
+search and in OpenSearch alike. Who may see a document is unchanged.
+
+**When:** a client asks to search inside documents, or has scanned archives to
+bring into search.
+
+1. Install the service (about 1.5 GB to download, 1 GB of memory): in
+   `deploy/.env` set `EXTRACTION_URL=http://tika:9998` and, for scanned pages in
+   other languages, `OCR_LANGUAGES=eng+fra` (Tesseract codes joined with `+`).
+2. `docker compose -f deploy/compose.yaml --profile app --profile extraction up -d`
+3. With the client's written agreement, an administrator sets the project:
+   `PUT /api/admin/projects/{projectId}/extraction {"mode": "ON_DEMAND"}` (read only
+   what somebody asks for) or `{"mode": "AUTOMATIC"}` (every file, once it passes
+   scanning). The change and who made it are in the audit log.
+   `GET` on the same address shows the mode, whether the service is installed,
+   and how many files have been read.
+4. On demand: `POST /api/projects/{id}/revisions/{revisionId}/extract` reads one
+   revision; Document Control's `POST /api/projects/{id}/extract` reads every file
+   of the project not read yet (a scanned archive at once). The worker does it in
+   the background, one file at a time on a queue of its own, so uploads are still
+   scanned straight away; scanned pages take seconds each.
+
+**Switching off** (`{"mode": "OFF"}`) deletes every text already read in that
+project, and the search index drops it on its next pass. Files themselves
+are never changed. To uninstall: remove `EXTRACTION_URL` and stop the `tika` container.
+
 ## Still to build
 
 These follow the product steps (see ARCHITECTURE.md "Build plan") and will get
-their own sections here: content extraction and OCR, Azure Blob storage,
-Kubernetes.
+their own sections here: Azure Blob storage, Kubernetes.

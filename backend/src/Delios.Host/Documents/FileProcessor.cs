@@ -68,6 +68,13 @@ public sealed class FileProcessor(
                 .SetProperty(x => x.ScannedAt, now), cancellationToken);
         if (updated == 0) return;
         AppMetrics.FilesProcessed.WithLabels(status).Inc();
+        // Read for search straight away only where the organization chose so.
+        if (status == FileStatuses.Clean && file.Kind is FileKinds.Native or FileKinds.Rendition
+            && await db.Projects.AnyAsync(p => p.Id == file.ProjectId && p.ContentExtraction == Extraction.ExtractionModes.Automatic, cancellationToken))
+        {
+            Extraction.ExtractionProcessor.Enqueue(db, file);
+            await db.SaveChangesAsync(cancellationToken);
+        }
 
         await audit.WriteAsync(Actor.System, status switch
         {

@@ -48,7 +48,8 @@ public sealed class SearchService(
 
         using var postgres = AppMetrics.RegisterQuerySeconds.WithLabels("yes").NewTimer();
         using var _ = AppMetrics.SearchSeconds.WithLabels(SearchOptions.Postgres).NewTimer();
-        // Every word must appear in the number or the title.
+        // Every word must appear in the number, the title, or (where the organization
+        // lets its files be read) the text of the latest revision.
         var terms = words.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Take(8)
             .Select(w => "%" + w.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_") + "%").ToList();
         var items = await reads.ReadAsync(source =>
@@ -56,7 +57,8 @@ public sealed class SearchService(
             var query = DocumentQueries.Visible(source, access, restricted).AsNoTracking();
             foreach (var term in terms)
             {
-                query = query.Where(d => EF.Functions.ILike(d.Number, term) || EF.Functions.ILike(d.Title, term));
+                query = query.Where(d => EF.Functions.ILike(d.Number, term) || EF.Functions.ILike(d.Title, term)
+                    || source.FileTexts.Any(t => t.DocumentId == d.Id && t.RevisionId == d.LatestRevisionId && EF.Functions.ILike(t.Text, term)));
             }
             return query.OrderBy(d => d.Number).Take(size).Select(Summary).ToListAsync(cancellationToken);
         }, cancellationToken);

@@ -106,6 +106,10 @@ public static class PlatformSetup
         services.AddScoped<Packages.PackageService>();
         services.AddOptions<Search.SearchOptions>().BindConfiguration(Search.SearchOptions.Section);
         services.AddScoped<Search.SearchService>();
+        services.AddOptions<Extraction.ExtractionOptions>().BindConfiguration(Extraction.ExtractionOptions.Section);
+        services.AddScoped<Extraction.ExtractionProcessor>();
+        services.AddHttpClient(Extraction.ExtractionProcessor.HttpClientName, (sp, c) =>
+            c.Timeout = TimeSpan.FromSeconds(sp.GetRequiredService<IOptions<Extraction.ExtractionOptions>>().Value.TimeoutSeconds));
         services.AddHttpClient<Search.OpenSearchClient>((sp, c) =>
         {
             c.BaseAddress = new Uri(sp.GetRequiredService<IOptions<Search.SearchOptions>>().Value.Url.TrimEnd('/') + "/");
@@ -120,7 +124,11 @@ public static class PlatformSetup
         }
         else
         {
-            services.AddHostedService<Messaging.FileQueueConsumer>();
+            foreach (var queue in Messaging.Topology.Queues)
+            {
+                services.AddSingleton<IHostedService>(sp =>
+                    ActivatorUtilities.CreateInstance<Messaging.FileQueueConsumer>(sp, queue));
+            }
             if (search.UsesOpenSearch) services.AddHostedService<Search.SearchIndexer>();
         }
         services.AddScoped<Seeding.TenantSetup>();
@@ -252,6 +260,7 @@ public static class PlatformSetup
             Transmittals.TransmittalEndpoints.MapTransmittalEndpoints(app);
             Packages.PackageEndpoints.MapPackageEndpoints(app);
             Search.SearchEndpoints.MapSearchEndpoints(app);
+            Extraction.ExtractionEndpoints.MapExtractionEndpoints(app);
         }
     }
 

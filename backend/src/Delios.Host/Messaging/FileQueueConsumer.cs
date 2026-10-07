@@ -5,12 +5,10 @@ using RabbitMQ.Client.Events;
 
 namespace Delios.Host.Messaging;
 
-/// <summary>The worker's loop over the files queue. Acknowledges only after the work committed.</summary>
+/// <summary>The worker's loop over one work queue. Acknowledges only after the work committed.</summary>
 public sealed class FileQueueConsumer(
-    IServiceScopeFactory scopes, RabbitMqConnection rabbit, ILogger<FileQueueConsumer> logger) : BackgroundService
+    IServiceScopeFactory scopes, RabbitMqConnection rabbit, ILogger<FileQueueConsumer> logger, WorkQueue queue) : BackgroundService
 {
-    private const ushort Prefetch = 4;
-
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         while (!stoppingToken.IsCancellationRequested)
@@ -20,14 +18,14 @@ public sealed class FileQueueConsumer(
                 var connection = await rabbit.GetAsync(stoppingToken);
                 await using var channel = await connection.CreateChannelAsync(cancellationToken: stoppingToken);
                 await Topology.DeclareAsync(channel, stoppingToken);
-                await channel.BasicQosAsync(0, Prefetch, global: false, stoppingToken);
+                await channel.BasicQosAsync(0, queue.Prefetch, global: false, stoppingToken);
 
                 var closed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
                 channel.ChannelShutdownAsync += (_, _) => { closed.TrySetResult(); return Task.CompletedTask; };
                 var consumer = new AsyncEventingBasicConsumer(channel);
                 consumer.ReceivedAsync += (_, delivery) => HandleAsync(channel, delivery, stoppingToken);
-                await channel.BasicConsumeAsync(Topology.FilesQueue, autoAck: false, consumer, stoppingToken);
-                logger.LogInformation("Consuming {Queue}", Topology.FilesQueue);
+                await channel.BasicConsumeAsync(queue.Name, autoAck: false, consumer, stoppingToken);
+                logger.LogInformation("Consuming {Queue}", queue.Name);
 
                 await closed.Task.WaitAsync(stoppingToken);
             }
@@ -57,6 +55,10 @@ public sealed class FileQueueConsumer(
                 case Reviews.RevisionReleased.RoutingKey:
                     await scope.ServiceProvider.GetRequiredService<Reviews.Stamping>().ProcessAsync(
                         Read<Reviews.RevisionReleased>(delivery), stoppingToken);
+                    break;
+                case Extraction.FileExtract.RoutingKey:
+                    await scope.ServiceProvider.GetRequiredService<Extraction.ExtractionProcessor>().ProcessAsync(
+                        Read<Extraction.FileExtract>(delivery), stoppingToken);
                     break;
                 default:
                     throw new InvalidOperationException($"No handler for {delivery.RoutingKey}");
@@ -92,14 +94,14 @@ public sealed class FileQueueConsumer(
     private static T Read<T>(BasicDeliverEventArgs delivery) =>
         JsonSerializer.Deserialize<T>(delivery.Body.Span) ?? throw new InvalidOperationException("Empty message");
 
-    /// <summary>How many times the message has already been rejected from the files queue.</summary>
-    private static int Attempts(IReadOnlyBasicProperties properties)
+    /// <summary>How many times the message has already been rejected from this queue.</summary>
+    private int Attempts(IReadOnlyBasicProperties properties)
     {
         if (properties.Headers?.TryGetValue("x-death", out var raw) != true || raw is not IEnumerable<object> deaths) return 0;
         foreach (var death in deaths.OfType<IDictionary<string, object?>>())
         {
-            var queue = death.TryGetValue("queue", out var q) && q is byte[] bytes ? System.Text.Encoding.UTF8.GetString(bytes) : null;
-            if (queue == Topology.FilesQueue && death.TryGetValue("count", out var count) && count is long n) return (int)n;
+            var name = death.TryGetValue("queue", out var q) && q is byte[] bytes ? System.Text.Encoding.UTF8.GetString(bytes) : null;
+            if (name == queue.Name && death.TryGetValue("count", out var count) && count is long n) return (int)n;
         }
         return 0;
     }

@@ -35,6 +35,10 @@ x-backend: &backend
     # postgres until RegisterSearchSlow says otherwise; then opensearch (with the search profile).
     Search__Provider: ${SEARCH_PROVIDER:-postgres}
     Search__Url: http://opensearch:9200
+    # Empty until the extraction profile runs; then http://tika:9998. Whether an
+    # organization's files are read is still its own switch (docs/ACTIVATION.md).
+    Extraction__Url: ${EXTRACTION_URL:-}
+    Extraction__OcrLanguages: ${OCR_LANGUAGES:-eng}
 
 services:
   # Postgres with continuous WAL archiving and scheduled backups (deploy/postgres).
@@ -285,6 +289,15 @@ services:
       test: ["CMD-SHELL", "curl -fs http://localhost:9200/_cluster/health || exit 1"]
       interval: 10s
       retries: 30
+
+  # ── Content extraction and OCR (installed when a client asks for it) ─────────
+  # Apache Tika with Tesseract: reads the text layer of PDFs and Office files, and
+  # OCRs pages that are only images. Reached by the worker alone.
+
+  tika:
+    image: apache/tika:3.2.3.0-full
+    profiles: [extraction]
+    restart: unless-stopped
 
   # ── Monitoring ──────────────────────────────────────────────────────────────
   # How we know: metrics, alerts that say what to do, a dashboard. Alerts reach

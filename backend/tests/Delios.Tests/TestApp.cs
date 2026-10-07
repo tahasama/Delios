@@ -10,6 +10,7 @@ public sealed class TestApp : IAsyncDisposable
 {
     public required DeliosFactory Factory { get; init; }
     public required Dictionary<string, string?> Settings { get; init; }
+    public Action<IServiceCollection>? Services { get; init; }
     private DeliosFactory? _worker;
 
     public static async Task<TestApp> StartAsync(Infrastructure infrastructure, Action<Dictionary<string, string?>>? configure = null,
@@ -25,14 +26,18 @@ public sealed class TestApp : IAsyncDisposable
         await DatabaseMigrator.ApplyAsync(factory.Services);
         await using var scope = factory.Services.CreateAsyncScope();
         await scope.ServiceProvider.GetRequiredService<DemoSeed>().RunAsync();
-        return new TestApp { Factory = factory, Settings = settings };
+        return new TestApp { Factory = factory, Settings = settings, Services = services };
     }
 
     /// <summary>Starts a worker on the same database, queue and storage.</summary>
     public void StartWorker()
     {
         var settings = new Dictionary<string, string?>(Settings) { ["Delios:Role"] = "worker" };
-        _worker = new DeliosFactory(settings, FakeScanner.Use);
+        _worker = new DeliosFactory(settings, s =>
+        {
+            FakeScanner.Use(s);
+            Services?.Invoke(s);
+        });
         _ = _worker.Services;
     }
 

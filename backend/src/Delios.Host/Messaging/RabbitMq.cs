@@ -50,39 +50,52 @@ public static class Topology
     public const string RetryExchange = "delios.retry";
     public const string FilesQueue = "delios.files";
     public const string FilesRetryQueue = "delios.files.retry";
+    /// <summary>Where a message from any work queue is parked after its last attempt.</summary>
     public const string FilesDeadQueue = "delios.files.dead";
     public const int MaxAttempts = 5;
     public static readonly TimeSpan RetryDelay = TimeSpan.FromSeconds(30);
 
-    /// <summary>The kinds of work the files queue carries: scanning uploads, stamping releases.</summary>
-    public static readonly string[] WorkKeys = [Documents.FileUploaded.RoutingKey, Reviews.RevisionReleased.RoutingKey];
+    /// <summary>Scanning uploads and stamping releases: what people wait for.</summary>
+    public static readonly WorkQueue Files = new(FilesQueue, FilesRetryQueue,
+        [Documents.FileUploaded.RoutingKey, Reviews.RevisionReleased.RoutingKey], Prefetch: 4);
+
+    /// <summary>
+    /// Reading text and OCR: slow, and nobody is waiting at a screen. A queue of
+    /// its own, one at a time, so a scanned archive never holds up a new upload's scan.
+    /// </summary>
+    public static readonly WorkQueue Extraction = new("delios.extract", "delios.extract.retry",
+        [Host.Extraction.FileExtract.RoutingKey], Prefetch: 1);
+
+    public static readonly WorkQueue[] Queues = [Files, Extraction];
 
     public static async Task DeclareAsync(IChannel channel, CancellationToken cancellationToken)
     {
         await channel.ExchangeDeclareAsync(Exchange, ExchangeType.Direct, durable: true, cancellationToken: cancellationToken);
         await channel.ExchangeDeclareAsync(RetryExchange, ExchangeType.Direct, durable: true, cancellationToken: cancellationToken);
 
-        await channel.QueueDeclareAsync(FilesQueue, durable: true, exclusive: false, autoDelete: false,
-            arguments: new Dictionary<string, object?> { ["x-dead-letter-exchange"] = RetryExchange },
-            cancellationToken: cancellationToken);
-        foreach (var key in WorkKeys)
+        foreach (var queue in Queues)
         {
-            await channel.QueueBindAsync(FilesQueue, Exchange, key, cancellationToken: cancellationToken);
-        }
-
-        await channel.QueueDeclareAsync(FilesRetryQueue, durable: true, exclusive: false, autoDelete: false,
-            arguments: new Dictionary<string, object?>
+            await channel.QueueDeclareAsync(queue.Name, durable: true, exclusive: false, autoDelete: false,
+                arguments: new Dictionary<string, object?> { ["x-dead-letter-exchange"] = RetryExchange },
+                cancellationToken: cancellationToken);
+            await channel.QueueDeclareAsync(queue.RetryName, durable: true, exclusive: false, autoDelete: false,
+                arguments: new Dictionary<string, object?>
+                {
+                    ["x-message-ttl"] = (int)RetryDelay.TotalMilliseconds,
+                    ["x-dead-letter-exchange"] = Exchange,
+                },
+                cancellationToken: cancellationToken);
+            foreach (var key in queue.Keys)
             {
-                ["x-message-ttl"] = (int)RetryDelay.TotalMilliseconds,
-                ["x-dead-letter-exchange"] = Exchange,
-            },
-            cancellationToken: cancellationToken);
-        foreach (var key in WorkKeys)
-        {
-            await channel.QueueBindAsync(FilesRetryQueue, RetryExchange, key, cancellationToken: cancellationToken);
+                await channel.QueueBindAsync(queue.Name, Exchange, key, cancellationToken: cancellationToken);
+                await channel.QueueBindAsync(queue.RetryName, RetryExchange, key, cancellationToken: cancellationToken);
+            }
         }
 
         await channel.QueueDeclareAsync(FilesDeadQueue, durable: true, exclusive: false, autoDelete: false,
             cancellationToken: cancellationToken);
     }
 }
+
+/// <summary>A queue the worker consumes, with its retry queue and the routing keys it carries.</summary>
+public sealed record WorkQueue(string Name, string RetryName, string[] Keys, ushort Prefetch);

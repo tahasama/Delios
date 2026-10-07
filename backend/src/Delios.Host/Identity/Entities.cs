@@ -111,6 +111,13 @@ public sealed class Project
     public string TimeZone { get; set; } = "UTC";
     /// <summary>The days the site does not work, ISO numbers (1 Monday … 7 Sunday). Due dates skip them.</summary>
     public int[] WeekendDays { get; set; } = [6, 7];
+    /// <summary>
+    /// Whether the system may read inside this project's files to search them:
+    /// OFF (the default; nothing is read), ON_DEMAND (only what somebody asks for),
+    /// AUTOMATIC (every file once it passes scanning). The project's client decides,
+    /// so it is set per project: one contractor works for clients who choose differently.
+    /// </summary>
+    public string ContentExtraction { get; set; } = "OFF";
     public Instant CreatedAt { get; set; }
 }
 
