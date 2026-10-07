@@ -12,7 +12,7 @@ namespace Delios.Tests;
 
 public sealed class CheckTests(Infrastructure infrastructure) : IClassFixture<Infrastructure>
 {
-    private static async Task<JsonElement> RunAsync(HttpClient controller, Guid project)
+    internal static async Task<JsonElement> RunAsync(HttpClient controller, Guid project)
     {
         var (status, run) = await Flow.PostAsync(controller, $"/api/projects/{project}/checks/run", new { });
         Assert.True(status == HttpStatusCode.Accepted, run.ToString());
@@ -26,7 +26,7 @@ public sealed class CheckTests(Infrastructure infrastructure) : IClassFixture<In
         throw new TimeoutException("The check run did not finish.");
     }
 
-    private static string? Result(JsonElement run, string checkId) =>
+    internal static string? Result(JsonElement run, string checkId) =>
         run.GetProperty("results").EnumerateArray().SingleOrDefault(r => r.GetProperty("checkId").GetString() == checkId) is var r
             && r.ValueKind == JsonValueKind.Object ? r.GetProperty("result").GetString() : null;
 

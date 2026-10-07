@@ -58,6 +58,11 @@ public sealed class DeliosDbContext(DbContextOptions<DeliosDbContext> options)
     public DbSet<Checks.CheckRun> CheckRuns => Set<Checks.CheckRun>();
     public DbSet<Checks.Defect> Defects => Set<Checks.Defect>();
     public DbSet<Checks.CheckOptOut> CheckOptOuts => Set<Checks.CheckOptOut>();
+    public DbSet<Schedules.ScheduleSource> ScheduleSources => Set<Schedules.ScheduleSource>();
+    public DbSet<Schedules.ScheduleImport> ScheduleImports => Set<Schedules.ScheduleImport>();
+    public DbSet<Schedules.Activity> Activities => Set<Schedules.Activity>();
+    public DbSet<Schedules.Requirement> Requirements => Set<Schedules.Requirement>();
+    public DbSet<Schedules.ActivityDecision> ActivityDecisions => Set<Schedules.ActivityDecision>();
     public DbSet<Packages.PackageMember> PackageMembers => Set<Packages.PackageMember>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

@@ -53,8 +53,17 @@ public sealed class FileQueueConsumer(
                         Read<FileUploaded>(delivery), stoppingToken);
                     break;
                 case Reviews.RevisionReleased.RoutingKey:
-                    await scope.ServiceProvider.GetRequiredService<Reviews.Stamping>().ProcessAsync(
-                        Read<Reviews.RevisionReleased>(delivery), stoppingToken);
+                    var released = Read<Reviews.RevisionReleased>(delivery);
+                    await scope.ServiceProvider.GetRequiredService<Reviews.Stamping>().ProcessAsync(released, stoppingToken);
+                    // Its own scope: stamping's unit of work is finished and committed.
+                    await using (var next = scopes.CreateAsyncScope())
+                    {
+                        await next.ServiceProvider.GetRequiredService<Schedules.ScheduleImporter>().OnReleasedAsync(released, stoppingToken);
+                    }
+                    break;
+                case Schedules.ScheduleImportRequested.RoutingKey:
+                    await scope.ServiceProvider.GetRequiredService<Schedules.ScheduleImporter>().OnRequestedAsync(
+                        Read<Schedules.ScheduleImportRequested>(delivery), stoppingToken);
                     break;
                 case Checks.CheckRunRequested.RoutingKey:
                     await scope.ServiceProvider.GetRequiredService<Checks.CheckEngine>().ProcessAsync(

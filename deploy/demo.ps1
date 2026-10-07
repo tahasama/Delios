@@ -161,10 +161,10 @@ $r = $transmittal.recipients[0]
 Write-Host "$($transmittal.number) to $($r.name): opened $($r.openedAt), acknowledged $($r.acknowledgedAt)"
 
 Step 'A high-criticality drawing goes to the client for approval'
-function Upload($path, $name, [byte[]]$data, $as = $script:session) {
+function Upload($path, $name, [byte[]]$data, $as = $script:session, $type = 'application/pdf') {
     $hash = -join ($hasher.ComputeHash($data) | ForEach-Object { $_.ToString('x2') })
-    $t = Call POST $path @{ fileName = $name; size = $data.Length; contentType = 'application/pdf'; sha256 = $hash } $as
-    Invoke-WebRequest -Method PUT -Uri $t.url -Body $data -ContentType 'application/pdf' -UseBasicParsing | Out-Null
+    $t = Call POST $path @{ fileName = $name; size = $data.Length; contentType = $type; sha256 = $hash } $as
+    Invoke-WebRequest -Method PUT -Uri $t.url -Body $data -ContentType $type -UseBasicParsing | Out-Null
     $t.fileId
 }
 $pfdTitle = "Inlet works process flow diagram $(Get-Date -Format 'HHmmss')"
@@ -233,6 +233,49 @@ Write-Host "$($package.state) by $($package.acceptedBy)"
 Step 'The transmittal log'
 foreach ($t in (Call GET "/api/projects/$($project.id)/transmittals" $null $control)) {
     Write-Host ('{0,-24} {1,-12} to {2}' -f $t.number, $t.reason, $t.to)
+}
+
+Step 'The schedule: a controlled document; once released, its export becomes activities'
+$p = "/api/projects/$($project.id)"
+$sch = Call POST "$p/documents" @{
+    title = "Construction programme $(Get-Date -Format 'HHmmss')"; deliverableType = 'ENG'; docType = 'SCH'; discipline = 'PM'; subproject = '00'
+}
+Call PUT "$p/schedule" @{ documentId = $sch.id } $control | Out-Null
+function Day($n) { (Get-Date).AddDays($n).ToString('dd-MMM-yy', [Globalization.CultureInfo]::InvariantCulture) }
+$csv = "Activity ID,Activity Name,Start,Finish,Responsible,Departments`n" +
+    "A100,Pour inlet base slab,$(Day 5),$(Day 8),Site team,CIVIL`n" +
+    "A200,Install switchgear,$(Day 60),$(Day 70),Electrical,ELEC`n" +
+    "A300,Backfill and compact,$(Day 30),$(Day 40),Site team,CIVIL`n"
+$schFiles = @(
+    (Upload "$p/documents/$($sch.id)/uploads" 'Programme.pdf' (New-Pdf 'Construction programme')),
+    (Upload "$p/documents/$($sch.id)/uploads" 'Programme.csv' ([Text.Encoding]::UTF8.GetBytes($csv)) $session 'text/csv'))
+$schRevision = Call POST "$p/documents/$($sch.id)/revisions" @{ fileIds = $schFiles }
+do {
+    Start-Sleep -Seconds 1
+    $current = (Call GET "$p/documents/$($sch.id)").revisions[0]
+} while ($current.filesState -eq 'PROCESSING')
+$schReview = Call POST "$p/revisions/$($schRevision.id)/reviews" @{}
+Call POST "$p/reviews/$($schReview.id)/answer" @{} | Out-Null
+Call POST "$p/reviews/$($schReview.id)/answer" @{ verdict = 'C1'; status = 'IFC' } $approver | Out-Null
+Call POST "$p/reviews/$($schReview.id)/release" @{} $control | Out-Null
+do {
+    Start-Sleep -Seconds 1
+    $read = (Call GET "$p/schedule" $null $control).imports | Where-Object { $_.revisionId -eq $schRevision.id }
+} while (-not $read)
+Write-Host "$($sch.number) rev $($read.revisionValue) read: $($read.added) new, $($read.moved) moved, $($read.removed) removed ($($read.status))"
+
+Step 'What the activities need, and what for'
+$activities = Call GET "$p/activities"
+$a100 = ($activities | Where-Object { $_.code -eq 'A100' }).id
+$a200 = ($activities | Where-Object { $_.code -eq 'A200' }).id
+Call POST "$p/activities/$a100/needs" @{ documentId = $doc.id; purpose = 'EXECUTION' } | Out-Null
+$layout = Call POST "$p/documents" @{
+    title = "Switchroom layout $(Get-Date -Format 'HHmmss')"; deliverableType = 'ENG'; docType = 'DWG'; discipline = 'EL'; subproject = '20'
+}
+$need = Call POST "$p/activities/$a200/needs" @{ documentId = $layout.id; purpose = 'INFORMATION'; department = 'ELEC' }
+Call POST "$p/activities/$a200/needs/$(($need.needs | Where-Object { $_.documentId -eq $layout.id }).id)/waive" @{ note = 'Received by email; will be uploaded later.' } $control | Out-Null
+foreach ($a in (Call GET "$p/activities")) {
+    Write-Host ('{0} {1,-24} starts {2}  {3,-18} {4}/{5} met, {6} waived' -f $a.code, $a.name, $a.start, $a.readiness, $a.met, $a.needs, $a.waived)
 }
 
 Step 'Document Control runs the checks over the register'

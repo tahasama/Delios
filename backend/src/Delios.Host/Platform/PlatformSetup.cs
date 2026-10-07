@@ -117,6 +117,7 @@ public static class PlatformSetup
         services.AddOptions<Extraction.ExtractionOptions>().BindConfiguration(Extraction.ExtractionOptions.Section);
         services.AddScoped<Extraction.ExtractionProcessor>();
         services.AddScoped<Checks.CheckEngine>();
+        services.AddScoped<Schedules.ScheduleImporter>();
         services.AddHttpClient(Extraction.ExtractionProcessor.HttpClientName, (sp, c) =>
             c.Timeout = TimeSpan.FromSeconds(sp.GetRequiredService<IOptions<Extraction.ExtractionOptions>>().Value.TimeoutSeconds));
         services.AddHttpClient<Search.OpenSearchClient>((sp, c) =>
@@ -272,6 +273,7 @@ public static class PlatformSetup
             Search.SearchEndpoints.MapSearchEndpoints(app);
             Extraction.ExtractionEndpoints.MapExtractionEndpoints(app);
             Checks.CheckEndpoints.MapCheckEndpoints(app);
+            Schedules.ScheduleEndpoints.MapScheduleEndpoints(app);
         }
     }
 

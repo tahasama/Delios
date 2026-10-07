@@ -533,14 +533,27 @@ deployment with tenant isolation in the database.
      under the same revision (on arrival or at the gate, whatever the verdict),
      submissions kept in order within a revision, and its own outcome list.
 5. **Checks engine, schedules, reports.**
-   - Done: the checks engine. 30 checks the register can answer from its own
+   - Done: the checks engine. 34 checks the register can answer from its own
      records (setup, running, handover), each counting failing items; a defect
      register that opens, closes by itself when the register is put right, and
      reopens if the fault comes back; acceptance with a reason (still counted);
      checks switched off per project with a reason; integrity (documents free of
      Critical and Major defects) and coverage (checks answered of those asked).
      Runs nightly per project on a queue of its own, and on Document Control's request.
-   - Next: schedules and requirements, then reports.
+   - Done: schedules and requirements. The schedule is a controlled document:
+     only a released revision is read, from its Excel (.xlsx) or CSV export,
+     columns found by heading (or named per project); each revision's changes are
+     kept (new, moved, changed, removed). Activities have a start and an optional
+     finish. Each need names a document and what it serves (a reason for issue;
+     one marked "executes" is met only at a status marked "executes"), counted
+     from the start or the finish (a test result needed after the work), or on a
+     fixed day. Readiness: ready, ready with waivers (green, still followed up),
+     at risk, pending. A waiver is the concerned department's or Document
+     Control's, on their responsibility, always with a reason. Decisions about an
+     activity whose documents were missing come from the organization's own list
+     (each says whether it "proceeds"). Lateness: the chain each document went
+     through, and the first checkpoint that slipped. Four checks (SC-01..04).
+   - Next: reports.
    - Then, before step 6: a guided read of the backend for its owner, new to
      .NET: docs/SYSTEM.md completed for every aspect and tool; a beginner's
      guide (docs/DOTNET-GUIDE.md: endpoints, services, entities, migrations, a

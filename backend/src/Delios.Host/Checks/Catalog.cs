@@ -269,6 +269,54 @@ public static class CheckCatalog
                     ? Fail([new Failure("audit:chain", "Audit", null, null, "Audit trail", $"The chain breaks at entry {at}: something was altered.")])
                     : Pass),
 
+        // ── The schedule ──────────────────────────────────────────────────────
+        new("SC-04", Phases.Setup, "A schedule is followed but no activity decisions are published",
+            "Projects with a schedule document have a list of decisions, each saying whether the activity went ahead", Severities.Major, "OG", async ctx =>
+            {
+                if (!await ctx.Db.ScheduleSources.AnyAsync(s => s.ProjectId == ctx.Project.Id, ctx.CancellationToken)) return Pass;
+                var decisions = Active(ctx, Schedules.ScheduleSets.Decisions);
+                if (decisions.Count == 0)
+                    return Fail([Setting(Schedules.ScheduleSets.Decisions, "Activity decisions", "Nothing can be recorded when an activity's documents are missing.")]);
+                return Fail(decisions.Where(d => !Has(ctx.Values, Schedules.ScheduleSets.Decisions, d.Code, "proceeds"))
+                    .Select(d => Setting(Schedules.ScheduleSets.Decisions, d.Code, $"{d.Label} does not say whether the activity went ahead.")));
+            }),
+        new("SC-01", Phases.Running, "The released schedule could not be read",
+            "The schedule document's current revision against what was read from it", Severities.Major, "CF", async ctx =>
+            {
+                var source = await ctx.Db.ScheduleSources.AsNoTracking().SingleOrDefaultAsync(s => s.ProjectId == ctx.Project.Id, ctx.CancellationToken);
+                if (source is null) return Pass;
+                var current = ctx.Released.FirstOrDefault(r => r.DocumentId == source.DocumentId);
+                if (current is null) return Pass;
+                var read = await ctx.Db.ScheduleImports.AsNoTracking().SingleOrDefaultAsync(i => i.RevisionId == current.Id, ctx.CancellationToken);
+                return read is { Status: Schedules.ScheduleImportStatuses.Failed }
+                    ? Fail([Rev(ctx.DocumentOf(current), current, $"Its activities were not read: {read.Error}")])
+                    : Pass;
+            }),
+        new("SC-02", Phases.Running, "An activity started without its documents and nobody decided",
+            "Activities past their start with a document still missing and no decision recorded", Severities.Major, "CF", async ctx =>
+            {
+                var today = WorkingCalendar.Today(SystemClock.Instance, ctx.Project.TimeZone);
+                var started = await ctx.Db.Activities.AsNoTracking()
+                    .Where(a => a.ProjectId == ctx.Project.Id && a.State == Schedules.ActivityStates.Active && a.Start != null && a.Start <= today
+                        && a.MetCount + a.WaivedCount < a.NeedCount
+                        && !ctx.Db.ActivityDecisions.Any(d => d.ActivityId == a.Id))
+                    .ToListAsync(ctx.CancellationToken);
+                return Fail(started.Select(a => new Failure($"activity:{a.Id}", "Activity", a.Id, null, $"{a.Code} {a.Name}",
+                    $"Started {a.Start}; {a.NeedCount - a.MetCount - a.WaivedCount} document(s) missing. Record whether it went ahead or stopped.")));
+            }),
+        new("SC-03", Phases.Running, "A waived document never came",
+            "Waived needs whose activity has finished (or started, with no finish) and whose document is still not there", Severities.Minor, "OR", async ctx =>
+            {
+                var today = WorkingCalendar.Today(SystemClock.Instance, ctx.Project.TimeZone);
+                var open = await (from n in ctx.Db.Requirements
+                                  join a in ctx.Db.Activities on n.ActivityId equals a.Id
+                                  where a.ProjectId == ctx.Project.Id && n.State == Schedules.RequirementStates.Waived
+                                      && (a.Finish ?? a.Start) != null && (a.Finish ?? a.Start) < today
+                                  select new { n.Id, n.DocumentId, n.WaiverNote, a.Code, a.Name }).ToListAsync(ctx.CancellationToken);
+                return Fail(open.Select(n => new Failure($"need:{n.Id}", "Activity", n.Id, n.DocumentId, $"{n.Code} {n.Name}",
+                    $"Waived: \"{n.WaiverNote}\". The document is still not there.")));
+            }),
+
         // ── Closing and handing over ──────────────────────────────────────────
         new("PK-06", Phases.Handover, "A package not assessed by its completion date",
             "Open packages past their completion date with no assessment since", Severities.Major, "CF", async ctx =>

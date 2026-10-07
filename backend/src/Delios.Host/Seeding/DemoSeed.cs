@@ -31,6 +31,8 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
             await db.SaveChangesAsync(cancellationToken);
             issuing |= await EnsureControlSetupAsync(existing.Id, cancellationToken);
             await db.SaveChangesAsync(cancellationToken);
+            issuing |= await EnsureScheduleSetupAsync(existing.Id, cancellationToken);
+            await db.SaveChangesAsync(cancellationToken);
             await upgrade.CommitAsync(cancellationToken);
             logger.LogInformation(reviews || issuing ? "The demo tenant exists; what it lacked was added" : "The demo tenant already exists; nothing to do");
             return;
@@ -92,6 +94,8 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
         await EnsurePackageSetupAsync(t, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         await EnsureControlSetupAsync(t, cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
+        await EnsureScheduleSetupAsync(t, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         logger.LogInformation("Demo tenant '{Slug}' created; every password is {Password}", Slug, Password);
@@ -255,7 +259,7 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
             ("REVIEW", "For review", new { response = true, responseDays = 10 }),
             ("APPROVAL", "For approval", new { response = true, responseDays = 10 }),
             ("PRICING", "For pricing", new { response = true, responseDays = 15 }),
-            ("EXECUTION", "For execution", new { response = false }),
+            ("EXECUTION", "For execution", new { response = false, executes = true }),
             ("RECORD", "For record", new { response = false }),
         ]);
         var scheme = new NumberingScheme
@@ -343,6 +347,35 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
             ("RELEASED", "Released", new { act = "release" }),
         ]);
         return true;
+    }
+
+    /// <summary>
+    /// Schedules: a document type for the schedule itself, "for execution" made to
+    /// mean a status that allows work, and the decisions taken about activities
+    /// whose documents were missing. Adds only what is missing.
+    /// </summary>
+    private async Task<bool> EnsureScheduleSetupAsync(Guid t, CancellationToken cancellationToken)
+    {
+        var added = false;
+        if (!await db.ValueEntries.AnyAsync(v => v.SetKey == ValueSets.DocumentTypes && v.Code == "SCH", cancellationToken))
+        {
+            var sort = await db.ValueEntries.Where(v => v.SetKey == ValueSets.DocumentTypes).MaxAsync(v => (int?)v.Sort, cancellationToken) ?? -1;
+            db.ValueEntries.Add(new ValueEntry { TenantId = t, SetKey = ValueSets.DocumentTypes, Code = "SCH", Label = "Schedule", Sort = sort + 1 });
+            var execution = await db.ValueEntries.SingleOrDefaultAsync(
+                v => v.SetKey == Transmittals.TransmittalSets.Reasons && v.Code == "EXECUTION", cancellationToken);
+            if (execution is not null) execution.Props = JsonSerializer.SerializeToDocument(new { response = false, executes = true });
+            added = true;
+        }
+        if (!await db.ValueEntries.AnyAsync(v => v.SetKey == Schedules.ScheduleSets.Decisions, cancellationToken))
+        {
+            AddSet(t, Schedules.ScheduleSets.Decisions,
+            [
+                ("CARRIED", "Went ahead without them", new { proceeds = true }),
+                ("STOPPED", "Stopped until they come", new { proceeds = false }),
+            ]);
+            added = true;
+        }
+        return added;
     }
 
     private void AddSet(Guid t, string key, (string Code, string Label, object? Props)[] values)
