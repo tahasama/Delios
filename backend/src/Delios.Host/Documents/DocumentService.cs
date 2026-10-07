@@ -348,7 +348,8 @@ public sealed class DocumentService(
     /// </summary>
     private async Task<bool> NeedsAcceptanceAsync(ProjectAccess access, CancellationToken cancellationToken) =>
         !access.IsInternal && await db.Memberships.AnyAsync(m => m.ProjectId == access.Project.Id && m.Active && m.Function!.Active
-            && m.Function.Rules.Any(r => r.Verbs.Contains(Verbs.Control)), cancellationToken);
+            && m.Function.Rules.Any(r => r.Verbs.Contains(Verbs.Control))
+            && db.Users.Any(u => u.Id == m.UserId && u.Active), cancellationToken);
 
     /// <summary>
     /// Someone may add to a document when their function may create or revise it,

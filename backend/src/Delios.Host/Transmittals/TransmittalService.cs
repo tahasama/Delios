@@ -674,7 +674,8 @@ public sealed class TransmittalService(
     /// <summary>Whether anyone active on the project holds the Control permission (Document Control).</summary>
     private Task<bool> AnyControlHolderAsync(Guid projectId, CancellationToken cancellationToken) =>
         db.Memberships.AnyAsync(m => m.ProjectId == projectId && m.Active && m.Function!.Active
-            && m.Function.Rules.Any(r => r.Verbs.Contains(Verbs.Control)), cancellationToken);
+            && m.Function.Rules.Any(r => r.Verbs.Contains(Verbs.Control))
+            && db.Users.Any(u => u.Id == m.UserId && u.Active), cancellationToken);
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 

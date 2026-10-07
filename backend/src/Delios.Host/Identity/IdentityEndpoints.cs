@@ -46,13 +46,15 @@ public static class IdentityEndpoints
     {
         var auth = app.MapGroup("/api/auth").WithTags("Auth");
         auth.MapPost("/sign-in", SignInAsync).AllowAnonymous().RequireRateLimiting("sign-in");
-        auth.MapPost("/sign-out", SignOutAsync);
+        // Open to anyone: a session that has already ended must still be able to clear its cookie.
+        auth.MapPost("/sign-out", SignOutAsync).AllowAnonymous();
         auth.MapPost("/mfa", MfaCodeAsync).AllowAnonymous().RequireRateLimiting("sign-in");
         auth.MapPost("/mfa/setup", MfaSetupAsync).AllowAnonymous().RequireRateLimiting("sign-in");
         auth.MapPost("/mfa/confirm", MfaConfirmAsync).AllowAnonymous().RequireRateLimiting("sign-in");
 
         app.MapGet("/api/me", MeAsync).WithTags("Auth").AddEndpointFilter<TransactionFilter>();
-        var me = app.MapGroup("/api/me/mfa").WithTags("Auth").AddEndpointFilter<TransactionFilter>();
+        // Codes are guessed no faster here than at sign-in.
+        var me = app.MapGroup("/api/me/mfa").WithTags("Auth").AddEndpointFilter<TransactionFilter>().RequireRateLimiting("my-codes");
         me.MapPost("/setup", MyMfaSetupAsync);
         me.MapPost("/confirm", MyMfaConfirmAsync);
         me.MapPost("/disable", MyMfaDisableAsync);
@@ -60,7 +62,8 @@ public static class IdentityEndpoints
 
     /// <summary>
     /// <c>POST /api/auth/sign-in</c>: checks the organization, email and password. Wrong answers count towards a 15-minute lockout and are audited.
-    /// When the password is right: refuses non-administrators if the organization allows single sign-on only; asks for the second step
+    /// Non-administrators of an organization that allows single sign-on only are refused before the password is checked.
+    /// When the password is right: asks for the second step
     /// (<c>SignInStep</c>) when two-step sign-in is on or required; otherwise starts a session and sets the cookie.
     /// </summary>
     private static async Task<IResult> SignInAsync(
@@ -84,6 +87,14 @@ public static class IdentityEndpoints
         var normalized = request.Email.Trim().ToUpperInvariant();
         var user = await db.Users.Include(u => u.Party)
             .SingleOrDefaultAsync(u => u.NormalizedEmail == normalized, cancellationToken);
+        // An organization that signs in through its own provider keeps passwords for
+        // administrators only. Said before the password is checked, so the answer never
+        // tells whether a password was right.
+        if (!organization.PasswordSignIn && user is not { IsAdmin: true })
+        {
+            return Problems.Problem(StatusCodes.Status403Forbidden, "PASSWORD_SIGN_IN_OFF",
+                "Your organization signs in through its own identity provider.", null);
+        }
         if (user is null || !user.Active || user.Party is { Active: false })
         {
             hasher.VerifyHashedPassword(null!, DummyHash, request.Password);
@@ -124,13 +135,6 @@ public static class IdentityEndpoints
         user.LockedUntil = null;
         await db.SaveChangesAsync(cancellationToken);
 
-        // An organization that signs in through its own provider keeps passwords for administrators only.
-        if (!organization.PasswordSignIn && !user.IsAdmin)
-        {
-            await transaction.CommitAsync(cancellationToken);
-            return Problems.Problem(StatusCodes.Status403Forbidden, "PASSWORD_SIGN_IN_OFF",
-                "Your organization signs in through its own identity provider.", null);
-        }
         if (user.MfaEnabledAt is not null || organization.MfaRequired)
         {
             await transaction.CommitAsync(cancellationToken);

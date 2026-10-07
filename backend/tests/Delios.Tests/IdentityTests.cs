@@ -97,6 +97,14 @@ public sealed class IdentityTests(Infrastructure infrastructure) : IClassFixture
 
         Assert.Equal(HttpStatusCode.NoContent, signOut.StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, me.StatusCode);
+
+        // A browser whose session already ended can still sign out, and its cookie is cleared.
+        using var stale = app.Factory.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions { HandleCookies = false });
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/auth/sign-out");
+        request.Headers.Add("Cookie", $"{Delios.Host.Identity.SessionAuthenticationHandler.CookieName}=ended-long-ago");
+        using var again = await stale.SendAsync(request);
+        Assert.Equal(HttpStatusCode.NoContent, again.StatusCode);
+        Assert.Contains(again.Headers.GetValues("Set-Cookie"), c => c.StartsWith(Delios.Host.Identity.SessionAuthenticationHandler.CookieName + "=;"));
     }
 
     [Fact]

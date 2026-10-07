@@ -179,6 +179,10 @@ public static class PlatformSetup
             o.AddPolicy("sso", http => RateLimitPartition.GetFixedWindowLimiter(
                 http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
                 _ => new FixedWindowRateLimiterOptions { PermitLimit = 60, Window = TimeSpan.FromMinutes(1) }));
+            // A signed-in person's own two-step codes: counted per person, so a stolen session cannot guess its way to switching them off.
+            o.AddPolicy("my-codes", http => RateLimitPartition.GetFixedWindowLimiter(
+                http.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                _ => new FixedWindowRateLimiterOptions { PermitLimit = 10, Window = TimeSpan.FromMinutes(1) }));
         });
         // The proxy in front (Caddy, the load balancer) sits on a private network.
         services.Configure<ForwardedHeadersOptions>(o =>

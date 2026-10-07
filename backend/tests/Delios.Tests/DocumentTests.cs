@@ -171,6 +171,19 @@ public sealed class RegisterTests(Infrastructure infrastructure) : IClassFixture
             (await again.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid());
         Assert.Equal((HttpStatusCode.UnprocessableEntity, "IDEMPOTENCY_KEY_REUSED"), await Api.ProblemAsync(other));
         Assert.Equal(1, page.GetProperty("items").GetArrayLength());
+
+        // A double click: the same request twice at the same moment still registers once.
+        async Task<HttpResponseMessage> SendKeyed(string key)
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Post, $"/api/projects/{project}/documents") { Content = JsonContent.Create(Api.Drawing("Pump bay plan")) };
+            request.Headers.Add("Idempotency-Key", key);
+            return await client.SendAsync(request);
+        }
+        var both = await Task.WhenAll(Enumerable.Range(0, 4).Select(_ => SendKeyed("key-2")));
+        Assert.All(both, r => Assert.Equal(HttpStatusCode.Created, r.StatusCode));
+        var ids = await Task.WhenAll(both.Select(async r => (await r.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid()));
+        Assert.Single(ids.Distinct());
+        foreach (var r in both) r.Dispose();
     }
 }
 

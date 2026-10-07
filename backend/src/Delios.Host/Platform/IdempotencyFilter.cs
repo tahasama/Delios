@@ -36,6 +36,9 @@ public sealed class IdempotencyFilter(DeliosDbContext db, IOptions<JsonOptions> 
         var requestHash = Hash(context.Arguments.Where(a => a?.GetType().Name.EndsWith("Request", StringComparison.Ordinal) == true));
         var userId = http.User.UserId();
 
+        // Two requests with the same key at once: the second waits here until the first
+        // commits, then finds its record and replays it, instead of doing the work twice.
+        await db.Database.ExecuteSqlAsync($"SELECT pg_advisory_xact_lock(hashtext({"idempotency:" + userId + ":" + key}))", http.RequestAborted);
         var earlier = await db.IdempotencyRecords.AsNoTracking()
             .SingleOrDefaultAsync(r => r.UserId == userId && r.Key == key, http.RequestAborted);
         if (earlier is not null)

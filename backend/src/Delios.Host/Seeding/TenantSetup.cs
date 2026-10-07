@@ -28,12 +28,13 @@ public sealed class TenantSetup(
             throw new InvalidOperationException($"A tenant called '{slug}' already exists.");
         }
 
+        // The organization and its administrator are created together or not at all,
+        // so a failure never leaves an organization nobody can sign in to.
         var organization = new Tenant { Slug = slug, Name = name };
-        db.Tenants.Add(organization);
-        await db.SaveChangesAsync(cancellationToken);
-
         tenant.Set(organization.Id);
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+        db.Tenants.Add(organization);
+        await db.SaveChangesAsync(cancellationToken);
         var admin = NewUser(organization.Id, adminEmail, adminName, adminPassword, isAdmin: true);
         db.Users.Add(admin);
         await db.SaveChangesAsync(cancellationToken);
