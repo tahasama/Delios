@@ -62,6 +62,17 @@ public sealed class Transmittal
     public required string Number { get; set; }
     /// <summary>Only OUTGOING exists today; see <c>TransmittalDirections</c>.</summary>
     public string Direction { get; set; } = TransmittalDirections.Outgoing;
+    /// <summary>Incoming: the organization that sent it. Its people see it.</summary>
+    public Guid? FromPartyId { get; set; }
+    /// <summary>Incoming: the sending organization's name as it was.</summary>
+    public string? FromName { get; set; }
+    /// <summary>Incoming: the sender's own number for it, when they quote one.</summary>
+    public string? TheirReference { get; set; }
+    /// <summary>
+    /// Incoming, recorded by Document Control for an organization that works in its own system: their covering
+    /// letter or e-mail, as proof of what came in.
+    /// </summary>
+    public Guid? ProofFileId { get; set; }
     public required string Reason { get; set; }
     public required string Subject { get; set; }
     public string? Message { get; set; }
@@ -91,6 +102,24 @@ public sealed class Transmittal
 public static class TransmittalDirections
 {
     public const string Outgoing = "OUTGOING";
+    /// <summary>Sent to us by another organization. Received the moment it is sent: that is its receipt.</summary>
+    public const string Incoming = "INCOMING";
+}
+
+/// <summary>The values <c>TransmittalItem.Kind</c> can take.</summary>
+public static class TransmittalItemKinds
+{
+    /// <summary>A revision as it stood when it went.</summary>
+    public const string Revision = "REVISION";
+    /// <summary>A placeholder a supplier is asked to fill, with its due date. No revision yet.</summary>
+    public const string Placeholder = "PLACEHOLDER";
+    /// <summary>Incoming: a placeholder filled, or a correction sent again. It made or updated a revision in our register.</summary>
+    public const string Submission = "SUBMISSION";
+    /// <summary>
+    /// Incoming: something not planned (an RFI, an NCR, minutes…), files with the sender's reference. It stays on the
+    /// transmittal until Document Control registers it.
+    /// </summary>
+    public const string Unplanned = "UNPLANNED";
 }
 
 /// <summary>One revision on a transmittal, as it stood when it went.</summary>
@@ -99,14 +128,31 @@ public sealed class TransmittalItem
     public Guid Id { get; set; } = Guid.CreateVersion7();
     public Guid TenantId { get; set; }
     public Guid TransmittalId { get; set; }
-    public Guid DocumentId { get; set; }
-    public Guid RevisionId { get; set; }
+    /// <summary>One of <c>TransmittalItemKinds</c>.</summary>
+    public string Kind { get; set; } = TransmittalItemKinds.Revision;
+    /// <summary>Empty for an unplanned item until it is registered.</summary>
+    public Guid? DocumentId { get; set; }
+    /// <summary>Empty for a placeholder and an unplanned item.</summary>
+    public Guid? RevisionId { get; set; }
+    /// <summary>Our number; for an unplanned item, the sender's reference (or empty).</summary>
     public required string DocumentNumber { get; set; }
     public required string Title { get; set; }
     /// <summary>The revision label as it was when sent, for example A or 01.</summary>
     public required string RevisionValue { get; set; }
-    /// <summary>The status it was released at; empty when it went for review before any release.</summary>
+    /// <summary>
+    /// The status it was released at; empty when it went for review before any release. Incoming: the status the
+    /// sender proposes (for review, for approval, for information…).
+    /// </summary>
     public string? StatusCode { get; set; }
+    /// <summary>A placeholder requested: when it is due.</summary>
+    public LocalDate? DueDate { get; set; }
+    /// <summary>Incoming submission: which submission of the revision this was (1, then 2 after a correction…).</summary>
+    public int? Submission { get; set; }
+    /// <summary>Unplanned: what the sender says it is, from the document types (RFI, NCR, MOM…).</summary>
+    public string? DocType { get; set; }
+    /// <summary>Unplanned: when Document Control put it in our register, and by whom. DocumentId is then set.</summary>
+    public Instant? RegisteredAt { get; set; }
+    public string? RegisteredByName { get; set; }
 }
 
 /// <summary>

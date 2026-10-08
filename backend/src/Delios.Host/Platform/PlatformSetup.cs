@@ -129,6 +129,7 @@ public static class PlatformSetup
         services.AddScoped<Reviews.Stamping>();
         services.AddScoped<Reviews.ControlService>();
         services.AddScoped<Transmittals.TransmittalService>();
+        services.AddScoped<Transmittals.IncomingService>();
         services.AddScoped<Packages.PackageService>();
         services.AddOptions<Search.SearchOptions>().BindConfiguration(Search.SearchOptions.Section);
         services.AddScoped<Search.SearchService>();

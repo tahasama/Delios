@@ -281,8 +281,8 @@ public static class CheckCatalog
                 var released = ctx.Released.Select(r => r.Id).ToList();
                 var sent = (await (from i in ctx.Db.TransmittalItems
                                    join t in ctx.Db.Transmittals on i.TransmittalId equals t.Id
-                                   where released.Contains(i.RevisionId) && t.ReviewStepId == null
-                                   select i.RevisionId).Distinct().ToListAsync(ctx.CancellationToken)).ToHashSet();
+                                   where i.RevisionId != null && released.Contains(i.RevisionId.Value) && t.ReviewStepId == null
+                                   select i.RevisionId!.Value).Distinct().ToListAsync(ctx.CancellationToken)).ToHashSet();
                 return Fail(ctx.Released.Where(r => !sent.Contains(r.Id)).Select(r => Rev(ctx.DocumentOf(r), r)));
             }),
         new("RG-01", Phases.Running, "The audit trail has a broken link",

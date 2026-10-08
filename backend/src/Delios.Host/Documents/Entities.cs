@@ -331,7 +331,10 @@ public sealed class StoredFile
     public Guid Id { get; set; } = Guid.CreateVersion7();
     public Guid TenantId { get; set; }
     public Guid ProjectId { get; set; }
-    public Guid DocumentId { get; set; }
+    /// <summary>Empty for a file that came in on a transmittal as something unplanned, until it is registered.</summary>
+    public Guid? DocumentId { get; set; }
+    /// <summary>The unplanned transmittal item the file came in on, if any.</summary>
+    public Guid? TransmittalItemId { get; set; }
     /// <summary>The revision the file is attached to; null while it is uploaded but not yet used.</summary>
     public Guid? RevisionId { get; set; }
     /// <summary>Where the bytes are in object storage: tenant id / project id / file id. See <see cref="FileStorage.KeyFor"/>.</summary>

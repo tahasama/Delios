@@ -6,14 +6,15 @@ namespace Delios.Host.Packages;
 
 /// <summary>One row of the package list.</summary>
 public sealed record PackageSummary(Guid Id, string Number, string Title, string Reason, string State, int Members,
-    bool HasRule, DateOnly? CompletionDate, DateTimeOffset CreatedAt);
+    bool HasRule, DateOnly? CompletionDate, DateTimeOffset CreatedAt, string Kind, string? Supplier, string? PurchaseOrder);
 
 /// <summary>
 /// One document in a package as returned to the browser: its released revision and status, the statuses it needs,
 /// whether it is ready, and whether the rule brought it in.
 /// </summary>
 public sealed record MemberView(Guid DocumentId, string DocumentNumber, string Title, string? Revision, string? Status,
-    IReadOnlyList<string> Required, bool Ready, bool ByRule);
+    IReadOnlyList<string> Required, bool Ready, bool ByRule, DateTimeOffset? RequestedAt, string? LatestRevision,
+    string? LatestState, DateOnly? DueDate);
 
 /// <summary>
 /// Full detail of one package as returned to the browser, including each member's readiness and the numbers of the
@@ -25,7 +26,10 @@ public sealed record PackageView(Guid Id, string Number, string Title, string? D
     DateTimeOffset? AssessedAt, IReadOnlyList<ShortfallLine> Shortfall, DateTimeOffset? ShortfallIssuedAt,
     DateTimeOffset? ShortfallAcceptedAt, string? ShortfallAcceptedBy, DateTimeOffset? ClosedAt, string? ClosedBy,
     string? ClosureNote, DateTimeOffset? AcceptedAt, string? AcceptedBy, string CreatedBy, IReadOnlyList<MemberView> Members,
-    IReadOnlyList<string> Transmittals);
+    IReadOnlyList<PackageTransmittal> Transmittals, string Kind, Guid? SupplierPartyId, string? Supplier, string? PurchaseOrder);
+
+/// <summary>A transmittal raised for a package: a delivery, a request to its supplier, or what the supplier sent back.</summary>
+public sealed record PackageTransmittal(Guid Id, string Number, string Direction, DateTimeOffset IssuedAt, int Items);
 
 /// <summary>
 /// HTTP endpoints for packages: list, create, read, add and remove documents, set the rule, assess, shortfall, deliver
@@ -61,6 +65,12 @@ public static class PackageEndpoints
         project.MapPost("/{packageId:guid}/deliver", DeliverAsync);
         project.MapPost("/{packageId:guid}/accept", (Guid packageId, NoteRequest r, HttpContext h, PackageService s, CancellationToken c) =>
             Act(h, s, (a) => s.AcceptAsync(a, packageId, r, c)));
+        project.MapPost("/{packageId:guid}/request", (Guid packageId, SupplyRequest r, HttpContext h, PackageService s, CancellationToken c) =>
+            Act(h, s, (a) => s.RequestAsync(a, packageId, r, c)));
+        project.MapPut("/{packageId:guid}", (Guid packageId, RenameRequest r, HttpContext h, PackageService s, CancellationToken c) =>
+            Act(h, s, (a) => s.RenameAsync(a, packageId, r, c)));
+        project.MapDelete("/{packageId:guid}", async (Guid packageId, HttpContext h, PackageService s, CancellationToken c) =>
+            await s.DeleteAsync(ProjectAccessFilter.Of(h), packageId, c) ?? Results.NoContent());
     }
 
     /// <summary>GET the packages of the project, newest first.</summary>
@@ -113,7 +123,9 @@ public static class PackageEndpoints
             p.ClosedAt?.ToDateTimeOffset(), p.ClosedByName, p.ClosureNote, p.AcceptedAt?.ToDateTimeOffset(), p.AcceptedByName,
             p.CreatedByName,
             readiness.Select(r => new MemberView(r.Member.DocumentId, r.DocumentNumber, r.Title, r.Revision, r.Status, r.Required,
-                r.Ready, r.Member.ByRule)).ToList(),
-            await packages.TransmittalNumbersAsync(p.Id, cancellationToken));
+                r.Ready, r.Member.ByRule, r.Member.RequestedAt?.ToDateTimeOffset(), r.LatestRevision, r.LatestState,
+                r.DueDate?.ToDateOnly())).ToList(),
+            await packages.TransmittalsAsync(p, cancellationToken), p.Kind, p.SupplierPartyId,
+            await packages.SupplierNameAsync(p, cancellationToken), p.PurchaseOrder);
     }
 }

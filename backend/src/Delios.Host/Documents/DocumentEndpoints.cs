@@ -138,15 +138,20 @@ public static class DocumentEndpoints
     /// if the caller may see its document. Every download is written to the audit trail.
     /// </summary>
     private static async Task<IResult> DownloadAsync(
-        Guid fileId, HttpContext http, DeliosDbContext db, DocumentService documents, FileStorage storage, AuditLog audit,
-        CancellationToken cancellationToken)
+        Guid fileId, HttpContext http, DeliosDbContext db, DocumentService documents, Transmittals.TransmittalService transmittals,
+        FileStorage storage, AuditLog audit, CancellationToken cancellationToken)
     {
         var access = ProjectAccessFilter.Of(http);
         if (!access.Holds(Verbs.Read)) return Problems.Forbidden("READ_NOT_ALLOWED", "Your function cannot read this register.");
         var file = await db.StoredFiles.AsNoTracking()
             .SingleOrDefaultAsync(f => f.Id == fileId && f.ProjectId == access.Project.Id, cancellationToken);
-        var visible = file is not null && await DocumentQueries.Visible(db, access, await documents.RestrictedAsync(cancellationToken))
-            .AnyAsync(d => d.Id == file.DocumentId, cancellationToken);
+        // A file of a document is read by whoever reads the document; one that came on a transmittal and belongs to
+        // no document yet (an unplanned item, a covering letter), by whoever sees that transmittal.
+        var visible = file is not null && (file.DocumentId is { } documentId
+            ? await DocumentQueries.Visible(db, access, await documents.RestrictedAsync(cancellationToken))
+                .AnyAsync(d => d.Id == documentId, cancellationToken)
+            : await transmittals.Visible(access).AnyAsync(t => t.ProofFileId == file.Id
+                || t.Items.Any(i => i.Id == file.TransmittalItemId), cancellationToken));
         if (file is null || !visible) return Problems.NotFound("FILE_NOT_FOUND", "No such file.");
         if (file.Status != FileStatuses.Clean)
         {

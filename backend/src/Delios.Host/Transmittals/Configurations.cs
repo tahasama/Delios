@@ -54,6 +54,11 @@ internal sealed class TransmittalConfiguration : IEntityTypeConfiguration<Transm
         b.HasIndex(x => x.ReviewStepId);
         b.HasOne<Packages.Package>().WithMany().HasForeignKey(x => x.PackageId).OnDelete(DeleteBehavior.Restrict);
         b.HasIndex(x => x.PackageId);
+        b.HasOne<Party>().WithMany().HasForeignKey(x => x.FromPartyId).OnDelete(DeleteBehavior.Restrict);
+        b.HasIndex(x => x.FromPartyId);
+        b.Property(x => x.FromName).HasMaxLength(200);
+        b.Property(x => x.TheirReference).HasMaxLength(128);
+        b.HasOne<StoredFile>().WithMany().HasForeignKey(x => x.ProofFileId).OnDelete(DeleteBehavior.Restrict);
         b.Property(x => x.Number).HasMaxLength(64);
         b.Property(x => x.Direction).HasMaxLength(16);
         b.Property(x => x.Reason).HasMaxLength(64);
@@ -83,6 +88,9 @@ internal sealed class TransmittalItemConfiguration : IEntityTypeConfiguration<Tr
         b.Property(x => x.Title).HasMaxLength(500);
         b.Property(x => x.RevisionValue).HasMaxLength(32);
         b.Property(x => x.StatusCode).HasMaxLength(64);
+        b.Property(x => x.Kind).HasMaxLength(32);
+        b.Property(x => x.DocType).HasMaxLength(64);
+        b.Property(x => x.RegisteredByName).HasMaxLength(200);
     }
 }
 

@@ -48,9 +48,15 @@ public sealed class ControlTests(Infrastructure infrastructure) : IClassFixture<
             receivedDate = "2026-10-01",
         })).GetProperty("id").GetGuid();
 
-        var p = await Flow.RevisionAsync(supplier, document);
+        // Starting a revision outside a transmittal is refused: what a supplier sends comes with a receipt.
+        var direct = await Flow.UploadAsync(supplier, project, document, "datasheet.pdf", Flow.Pdf(), "application/pdf");
+        var (outside, outsideBody) = await Flow.PostAsync(supplier, $"/api/projects/{project}/documents/{document}/revisions",
+            new { fileIds = new[] { direct } });
+        Assert.Equal((HttpStatusCode.Conflict, "SEND_ON_TRANSMITTAL"), (outside, Flow.Code(outsideBody)));
+        var (_, sent) = await Supply.SendAsync(supplier, project, document, direct, "IFR");
+        var p = new Prepared(project, document, Supply.RevisionOf(sent));
         var revision = await RevisionAsync(supplier, p);
-        Assert.Equal("RECEIVED", revision.GetProperty("state").GetString());
+        Assert.Equal(("RECEIVED", "IFR"), (revision.GetProperty("state").GetString(), revision.GetProperty("statusCode").GetString()));
 
         // Nobody reviews what Document Control has not accepted.
         var (early, earlyBody) = await Flow.PostAsync(controller, $"/api/projects/{project}/revisions/{p.Revision}/reviews", new { });
@@ -71,8 +77,10 @@ public sealed class ControlTests(Infrastructure infrastructure) : IClassFixture<
         Assert.Equal(("CORRECT_AND_RESUBMIT", "Not on the project datasheet template."), (task.GetProperty("kind").GetString(), task.GetProperty("note").GetString()));
 
         // The corrected file comes back under the same revision, as its second submission.
-        var (resubmitted, resubmittedBody) = await ResubmitAsync(supplier, p, "datasheet-template.pdf");
-        Assert.True(resubmitted == HttpStatusCode.OK, resubmittedBody.ToString());
+        var corrected = await Flow.UploadAsync(supplier, project, document, "datasheet-template.pdf", Flow.Pdf(), "application/pdf");
+        var (resubmitted, resubmittedBody) = await Supply.SendAsync(supplier, project, document, corrected, "IFR");
+        Assert.True(resubmitted == HttpStatusCode.Created, resubmittedBody.ToString());
+        Assert.Equal(2, resubmittedBody.GetProperty("items")[0].GetProperty("submission").GetInt32());
         revision = await RevisionAsync(supplier, p);
         Assert.Equal(("A", 2, "RECEIVED"), (revision.GetProperty("value").GetString(), revision.GetProperty("submission").GetInt32(),
             revision.GetProperty("state").GetString()));

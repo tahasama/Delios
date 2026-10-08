@@ -133,7 +133,7 @@ public sealed class ExtractionProcessor(
             if (done) return;
         }
         // Switched off since it was asked: nothing is read.
-        if (mode == ExtractionModes.Off || file is not { Status: FileStatuses.Clean } || !options.Value.Installed)
+        if (mode == ExtractionModes.Off || file is not { Status: FileStatuses.Clean, DocumentId: not null } || !options.Value.Installed)
         {
             Extracted.WithLabels("skipped").Inc();
             return;
@@ -175,7 +175,7 @@ public sealed class ExtractionProcessor(
             FileId = file.Id,
             TenantId = file.TenantId,
             ProjectId = file.ProjectId,
-            DocumentId = file.DocumentId,
+            DocumentId = file.DocumentId!.Value,
             RevisionId = file.RevisionId,
             Text = text,
             Chars = text.Length,
@@ -209,7 +209,7 @@ public sealed class ExtractionProcessor(
 
     /// <summary>Whether a file is something to read: what was submitted, not proof or stamped copies.</summary>
     public static bool Readable(StoredFile file) =>
-        file.Status == FileStatuses.Clean && file.Kind is FileKinds.Native or FileKinds.Rendition;
+        file.Status == FileStatuses.Clean && file.DocumentId is not null && file.Kind is FileKinds.Native or FileKinds.Rendition;
 
     /// <summary>
     /// Puts a file.extract message on the queue (saved with the caller's database changes). Called by the extraction

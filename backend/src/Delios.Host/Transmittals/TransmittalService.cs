@@ -354,7 +354,7 @@ public sealed class TransmittalService(
         Project Project, Actor Actor, string Reason, string Subject, string? Message, Party? To, string ToName,
         IReadOnlyList<(Document Document, Revision Revision)> Items, IReadOnlyList<Addressee> Recipients,
         Guid? IssueRequestId = null, Guid? ReviewStepId = null, LocalDate? ResponseDue = null, Guid? PackageId = null,
-        DispatchRequest? Dispatched = null);
+        DispatchRequest? Dispatched = null, IReadOnlyList<(Document Document, LocalDate? Due)>? Placeholders = null);
 
     /// <summary>A numbered transmittal. What it records is never changed afterwards.</summary>
     public async Task<Transmittal> RaiseAsync(Raise raise, CancellationToken cancellationToken)
@@ -405,6 +405,18 @@ public sealed class TransmittalService(
             RevisionValue = x.Revision.Value,
             StatusCode = x.Revision.StatusCode,
         }).ToList();
+        // Placeholders a supplier is asked to fill: no revision yet, a date each is due.
+        transmittal.Items.AddRange((raise.Placeholders ?? []).Select(x => new TransmittalItem
+        {
+            TenantId = project.TenantId,
+            TransmittalId = transmittal.Id,
+            Kind = TransmittalItemKinds.Placeholder,
+            DocumentId = x.Document.Id,
+            DocumentNumber = x.Document.Number,
+            Title = x.Document.Title,
+            RevisionValue = "",
+            DueDate = x.Due,
+        }));
         transmittal.Recipients = raise.Recipients.Select(a => new TransmittalRecipient
         {
             TenantId = project.TenantId,
@@ -421,7 +433,8 @@ public sealed class TransmittalService(
         }).ToList();
         db.Transmittals.Add(transmittal);
         await audit.WriteAsync(raise.Actor, "TRANSMITTAL_ISSUED", "Transmittal", transmittal.Id, number,
-            $"{raise.Reason} to {raise.ToName}: {string.Join(", ", transmittal.Items.Select(i => $"{i.DocumentNumber} rev {i.RevisionValue}"))}.",
+            $"{raise.Reason} to {raise.ToName}: {string.Join(", ", transmittal.Items.Select(i => i.Kind == TransmittalItemKinds.Placeholder
+                ? $"{i.DocumentNumber} (to send by {i.DueDate?.ToString("yyyy-MM-dd", null) ?? "no date"})" : $"{i.DocumentNumber} rev {i.RevisionValue}"))}.",
             project.Id, cancellationToken);
         return transmittal;
     }
@@ -537,11 +550,41 @@ public sealed class TransmittalService(
         return await EvidenceTicketAsync(access, item.DocumentId, item.RevisionId, request, cancellationToken);
     }
 
+    // ── Files carried ─────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// The files a transmittal's items carried: for a revision or a submission, the files of that revision as sent
+    /// (originals, not stamped copies); for an unplanned item, its own files.
+    /// </summary>
+    public async Task<List<StoredFile>> ItemFilesAsync(Transmittal transmittal, CancellationToken cancellationToken)
+    {
+        var revisions = transmittal.Items.Where(i => i.RevisionId != null).Select(i => i.RevisionId!.Value).ToList();
+        var items = transmittal.Items.Where(i => i.Kind == TransmittalItemKinds.Unplanned).Select(i => i.Id).ToList();
+        if (revisions.Count == 0 && items.Count == 0) return [];
+        return await db.StoredFiles.AsNoTracking()
+            .Where(f => (f.RevisionId != null && revisions.Contains(f.RevisionId.Value) && f.Kind != FileKinds.Evidence && f.DerivedFromId == null)
+                || (f.TransmittalItemId != null && items.Contains(f.TransmittalItemId.Value)))
+            .OrderBy(f => f.Name).ToListAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Which of <paramref name="files"/> one item carried. A submission carried the files of its own submission; a
+    /// revision sent out carried the files of its latest submission at the time, which are those of its last one.
+    /// </summary>
+    public static IEnumerable<StoredFile> FilesOf(TransmittalItem item, IReadOnlyList<StoredFile> files)
+    {
+        if (item.Kind == TransmittalItemKinds.Unplanned) return files.Where(f => f.TransmittalItemId == item.Id);
+        if (item.RevisionId is not { } revision) return [];
+        var mine = files.Where(f => f.RevisionId == revision).ToList();
+        var submission = item.Submission ?? (mine.Count == 0 ? 0 : mine.Max(f => f.Submission));
+        return mine.Where(f => f.Submission == submission);
+    }
+
     // ── Evidence ──────────────────────────────────────────────────────────────
 
     /// <summary>Somewhere to upload proof filed against a revision. It is scanned like any other file.</summary>
     public async Task<(UploadTicket? Ticket, IResult? Problem)> EvidenceTicketAsync(
-        ProjectAccess access, Guid documentId, Guid revisionId, UploadRequest request, CancellationToken cancellationToken)
+        ProjectAccess access, Guid? documentId, Guid? revisionId, UploadRequest request, CancellationToken cancellationToken)
     {
         var (declared, invalid) = Uploads.Check(request, storageOptions.Value.MaxFileBytes);
         if (invalid is not null) return (null, invalid);
@@ -569,7 +612,7 @@ public sealed class TransmittalService(
     }
 
     /// <summary>Puts uploaded proof to use and sends it for scanning. Null when it is fine.</summary>
-    public async Task<IResult?> BindEvidenceAsync(ProjectAccess access, Guid fileId, Guid revisionId, CancellationToken cancellationToken)
+    public async Task<IResult?> BindEvidenceAsync(ProjectAccess access, Guid fileId, Guid? revisionId, CancellationToken cancellationToken)
     {
         var file = await db.StoredFiles.SingleOrDefaultAsync(f => f.Id == fileId && f.RevisionId == revisionId
             && f.Kind == FileKinds.Evidence && f.UploadedById == access.UserId && f.Status == FileStatuses.AwaitingUpload,
@@ -627,7 +670,7 @@ public sealed class TransmittalService(
     /// ACKNOWLEDGE_TRANSMITTAL; the ids say which record it points to.
     /// </summary>
     public sealed record IssueWork(string Kind, Guid? RequestId, Guid? TransmittalId, Guid? RecipientId, string Label,
-        string Reason, string? Who, DateOnly? DueDate, DateTimeOffset Since);
+        string Reason, string? Who, DateOnly? DueDate, DateTimeOffset Since, Guid? DocumentId = null);
 
     /// <summary>
     /// What waits on this person in issuing: requests to carry out, organizations
@@ -663,6 +706,36 @@ public sealed class TransmittalService(
                 .ToListAsync(cancellationToken);
             work.AddRange(dispatch.Select(x => new IssueWork("DISPATCH_TRANSMITTAL", null, x.Id, x.RecipientId, x.Number,
                 x.Reason, x.Name, x.ResponseDue?.ToDateOnly(), x.IssuedAt.ToDateTimeOffset())));
+        }
+
+        // What came in unplanned waits for Document Control to put it in the register.
+        if (access.IsInternal && access.Holds(Verbs.Control))
+        {
+            var unplanned = await (
+                from i in db.TransmittalItems
+                join t in db.Transmittals on i.TransmittalId equals t.Id
+                where t.ProjectId == projectId && i.Kind == TransmittalItemKinds.Unplanned && i.RegisteredAt == null
+                orderby t.IssuedAt
+                select new { t.Id, i.DocumentNumber, i.Title, t.Number, t.FromName, t.IssuedAt }).ToListAsync(cancellationToken);
+            work.AddRange(unplanned.Select(x => new IssueWork("REGISTER_UNPLANNED", null, x.Id, null,
+                x.DocumentNumber.Length > 0 ? $"{x.DocumentNumber} {x.Title}" : x.Title, x.Number, x.FromName, null,
+                x.IssuedAt.ToDateTimeOffset())));
+        }
+
+        // Another organization: the placeholders it was asked for and has not sent yet, with when each is due.
+        if (!access.IsInternal && access.PartyCode is { } code)
+        {
+            var asked = await (
+                from i in db.TransmittalItems
+                join t in db.Transmittals on i.TransmittalId equals t.Id
+                join d in db.Documents on i.DocumentId equals d.Id
+                where t.ProjectId == projectId && i.Kind == TransmittalItemKinds.Placeholder && d.Originator == code
+                    && d.IsPlaceholder && (d.State == DocumentStates.Planned || d.State == DocumentStates.Active)
+                select new { t.Id, DocumentId = d.Id, d.Number, d.Title, Number_ = t.Number, i.DueDate, t.IssuedAt }).ToListAsync(cancellationToken);
+            work.AddRange(asked.GroupBy(x => x.DocumentId).Select(g => g.OrderByDescending(x => x.IssuedAt).First())
+                .OrderBy(x => x.DueDate ?? LocalDate.MaxIsoValue).ThenBy(x => x.Number)
+                .Select(x => new IssueWork("SEND_PLACEHOLDER", null, x.Id, null, $"{x.Number} {x.Title}", x.Number_, null,
+                    x.DueDate?.ToDateOnly(), x.IssuedAt.ToDateTimeOffset(), x.DocumentId)));
         }
 
         var me = access.UserId;
@@ -785,9 +858,13 @@ public sealed class TransmittalService(
         if (access.IsInternal && (access.Holds(Verbs.Control) || access.Holds(Verbs.Transmit))) return query;
         var me = access.UserId;
         var code = access.Function.Code;
+        var party = access.IsInternal ? null : access.PartyCode;
         return query.Where(t => t.IssuedById == me || t.Recipients.Any(r => r.UserId == me)
+            // What an organization sent us, its own people see.
+            || (party != null && t.FromPartyId != null && db.Parties.Any(p => p.Id == t.FromPartyId && p.Code == party))
             || (access.IsInternal && t.Recipients.Any(r => r.PartyId != null
-                && db.Parties.Any(p => p.Id == r.PartyId && p.CustodianFunction == code))));
+                && db.Parties.Any(p => p.Id == r.PartyId && p.CustodianFunction == code)))
+            || (access.IsInternal && t.FromPartyId != null && db.Parties.Any(p => p.Id == t.FromPartyId && p.CustodianFunction == code)));
     }
 
     /// <summary>

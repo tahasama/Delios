@@ -99,7 +99,7 @@ public sealed class PackageTests(Infrastructure infrastructure) : IClassFixture<
         var (deliveredStatus, delivered) = await Flow.PostAsync(engineer, $"{p}/deliver", new { note = "Sections to follow." });
         Assert.True(deliveredStatus == HttpStatusCode.OK, delivered.ToString());
         Assert.Equal("DELIVERED", delivered.GetProperty("state").GetString());
-        var number = delivered.GetProperty("transmittals").EnumerateArray().Single().GetString();
+        var number = delivered.GetProperty("transmittals").EnumerateArray().Single().GetProperty("number").GetString();
         Assert.Equal("P1001-DEMO-NWU-TR-0001", number);
         // The transmittal log says who it waits on: the client works in its own system, so Document Control sends it.
         var report = await GetAsync(controller, $"/api/projects/{ready.Project}/reports/transmittals");

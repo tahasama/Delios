@@ -40,9 +40,16 @@ public sealed record IssueOutcome(IssueRequestView Request, IReadOnlyList<string
 public sealed record TransmittalSummary(Guid Id, string Number, string Reason, string Subject, string To, DateTimeOffset IssuedAt,
     string IssuedBy, DateOnly? ResponseDue, int Items, int Recipients, int Acknowledged, int AwaitingDispatch);
 
-/// <summary>One revision listed on a transmittal, as returned to the browser.</summary>
-public sealed record TransmittalItemView(Guid DocumentId, Guid RevisionId, string DocumentNumber, string Title, string Revision,
-    string? Status);
+/// <summary>
+/// One item of a transmittal as returned to the browser: a revision, a placeholder asked for, a submission received,
+/// or something unplanned received. <c>Files</c> are those it carried, each with its SHA-256, the receipt's proof.
+/// </summary>
+public sealed record TransmittalItemView(Guid Id, string Kind, Guid? DocumentId, Guid? RevisionId, string DocumentNumber, string Title,
+    string Revision, string? Status, DateOnly? DueDate, int? Submission, string? DocType, DateTimeOffset? RegisteredAt,
+    string? RegisteredBy, IReadOnlyList<ItemFileView> Files);
+
+/// <summary>A file a transmittal item carried.</summary>
+public sealed record ItemFileView(Guid Id, string Name, long Size, string Sha256, string Status);
 
 /// <summary>
 /// One recipient of a transmittal as returned to the browser. <c>Person</c> is false for an organization that receives
@@ -57,7 +64,8 @@ public sealed record RecipientView(Guid Id, string Name, string? Organization, b
 /// </summary>
 public sealed record TransmittalView(Guid Id, string Number, string Direction, string Reason, string Subject, string? Message,
     string To, bool ResponseRequired, DateOnly? ResponseDue, DateTimeOffset IssuedAt, string IssuedBy, Guid? IssueRequestId,
-    Guid? ReviewStepId, IReadOnlyList<TransmittalItemView> Items, IReadOnlyList<RecipientView> Recipients);
+    Guid? ReviewStepId, IReadOnlyList<TransmittalItemView> Items, IReadOnlyList<RecipientView> Recipients,
+    string? From = null, string? TheirReference = null, Guid? ProofFileId = null, Guid? PackageId = null);
 
 /// <summary>
 /// HTTP endpoints for issuing: distribution, issue requests, transmittals, acknowledgement, dispatch and proof upload.
@@ -88,6 +96,14 @@ public static class TransmittalEndpoints
         project.MapPost("/transmittals/{transmittalId:guid}/acknowledge", AcknowledgeAsync);
         project.MapPost("/transmittals/{transmittalId:guid}/recipients/{recipientId:guid}/dispatch", DispatchAsync);
         project.MapPost("/transmittals/{transmittalId:guid}/evidence", EvidenceAsync);
+        project.MapPost("/incoming/uploads", async (LooseUploadRequest r, HttpContext h, IncomingService s, CancellationToken c) =>
+        {
+            var (ticket, problem) = await s.UploadAsync(ProjectAccessFilter.Of(h), r, c);
+            return problem ?? Results.Ok(ticket);
+        });
+        project.MapPost("/transmittals/incoming", SendIncomingAsync).AddEndpointFilter<IdempotencyFilter>();
+        project.MapPost("/transmittals/{transmittalId:guid}/items/{itemId:guid}/register", RegisterItemAsync);
+        project.MapGet("/transmittals/{transmittalId:guid}/receipt", ReceiptAsync);
     }
 
     /// <summary>
@@ -178,11 +194,40 @@ public static class TransmittalEndpoints
     private static async Task<IResult> ListAsync(HttpContext http, TransmittalService transmittals, CancellationToken cancellationToken) =>
         Results.Ok(await transmittals.ListAsync(ProjectAccessFilter.Of(http), cancellationToken));
 
+    /// <summary>
+    /// POST an incoming transmittal: another organization (or Document Control for one) sends filled placeholders,
+    /// corrections and unplanned items. 201 with the transmittal; it is received, and its receipt exists, from now.
+    /// </summary>
+    private static async Task<IResult> SendIncomingAsync(
+        IncomingRequest request, HttpContext http, IncomingService incoming, TransmittalService transmittals, CancellationToken cancellationToken)
+    {
+        var access = ProjectAccessFilter.Of(http);
+        var (t, problem) = await incoming.SendAsync(access, request, cancellationToken);
+        return problem ?? Results.Created($"/api/projects/{access.Project.Id}/transmittals/{t!.Id}",
+            View(t, await transmittals.ItemFilesAsync(t, cancellationToken)));
+    }
+
+    /// <summary>POST: Document Control puts an unplanned item of an incoming transmittal in the register, under our numbering.</summary>
+    private static async Task<IResult> RegisterItemAsync(
+        Guid transmittalId, Guid itemId, RegisterDocumentRequest request, HttpContext http, IncomingService incoming,
+        TransmittalService transmittals, CancellationToken cancellationToken)
+    {
+        var (t, problem) = await incoming.RegisterAsync(ProjectAccessFilter.Of(http), transmittalId, itemId, request, cancellationToken);
+        return problem ?? Results.Ok(View(t!, await transmittals.ItemFilesAsync(t!, cancellationToken)));
+    }
+
+    /// <summary>GET the receipt of an incoming transmittal, as a PDF.</summary>
+    private static async Task<IResult> ReceiptAsync(
+        Guid transmittalId, HttpContext http, IncomingService incoming, CancellationToken cancellationToken) =>
+        await incoming.ReceiptAsync(ProjectAccessFilter.Of(http), transmittalId, cancellationToken) is { } receipt
+            ? Results.File(receipt.Pdf, "application/pdf", $"Receipt {receipt.Number}.pdf")
+            : Problems.NotFound("TRANSMITTAL_NOT_FOUND", "No such incoming transmittal.");
+
     /// <summary>GET one transmittal. Reading it records the caller's first opening when they are a recipient.</summary>
     private static async Task<IResult> GetAsync(
         Guid transmittalId, HttpContext http, TransmittalService transmittals, CancellationToken cancellationToken) =>
         await transmittals.ReadAsync(ProjectAccessFilter.Of(http), transmittalId, cancellationToken) is { } t
-            ? Results.Ok(View(t))
+            ? Results.Ok(View(t, await transmittals.ItemFilesAsync(t, cancellationToken)))
             : Problems.NotFound("TRANSMITTAL_NOT_FOUND", "No such transmittal.");
 
     /// <summary>POST acknowledge: a recipient confirms they received the transmittal.</summary>
@@ -190,7 +235,7 @@ public static class TransmittalEndpoints
         Guid transmittalId, HttpContext http, TransmittalService transmittals, CancellationToken cancellationToken)
     {
         var (t, problem) = await transmittals.AcknowledgeAsync(ProjectAccessFilter.Of(http), transmittalId, cancellationToken);
-        return problem ?? Results.Ok(View(t!));
+        return problem ?? Results.Ok(View(t!, await transmittals.ItemFilesAsync(t!, cancellationToken)));
     }
 
     /// <summary>
@@ -203,7 +248,7 @@ public static class TransmittalEndpoints
     {
         var (t, problem) = await transmittals.DispatchAsync(ProjectAccessFilter.Of(http), transmittalId, recipientId, request,
             cancellationToken);
-        return problem ?? Results.Ok(View(t!));
+        return problem ?? Results.Ok(View(t!, await transmittals.ItemFilesAsync(t!, cancellationToken)));
     }
 
     /// <summary>
@@ -229,12 +274,16 @@ public static class TransmittalEndpoints
     /// Turns a <c>Transmittal</c> database entity into the shape returned to the browser, items sorted by document
     /// number and recipients by name. Also used by other modules.
     /// </summary>
-    public static TransmittalView View(Transmittal t) => new(
+    public static TransmittalView View(Transmittal t, IReadOnlyList<StoredFile>? files = null) => new(
         t.Id, t.Number, t.Direction, t.Reason, t.Subject, t.Message, t.ToName, t.ResponseRequired, t.ResponseDue?.ToDateOnly(),
         t.IssuedAt.ToDateTimeOffset(), t.IssuedByName, t.IssueRequestId, t.ReviewStepId,
-        t.Items.OrderBy(i => i.DocumentNumber).Select(i => new TransmittalItemView(i.DocumentId, i.RevisionId, i.DocumentNumber,
-            i.Title, i.RevisionValue, i.StatusCode)).ToList(),
+        t.Items.OrderBy(i => i.DocumentNumber).ThenBy(i => i.Title).Select(i => new TransmittalItemView(i.Id, i.Kind, i.DocumentId,
+            i.RevisionId, i.DocumentNumber, i.Title, i.RevisionValue, i.StatusCode, i.DueDate?.ToDateOnly(), i.Submission, i.DocType,
+            i.RegisteredAt?.ToDateTimeOffset(), i.RegisteredByName,
+            TransmittalService.FilesOf(i, files ?? []).Select(f => new ItemFileView(f.Id, f.Name, f.Size, f.Sha256, f.Status)).ToList()))
+            .ToList(),
         t.Recipients.OrderBy(r => r.Name).Select(r => new RecipientView(r.Id, r.Name, r.Organization, r.UserId is not null,
             r.OpenedAt?.ToDateTimeOffset(), r.AcknowledgedAt?.ToDateTimeOffset(), r.DispatchedAt?.ToDateTimeOffset(),
-            r.DispatchChannel, r.DispatchRef, r.DispatchedByName, r.ProofFileId)).ToList());
+            r.DispatchChannel, r.DispatchRef, r.DispatchedByName, r.ProofFileId)).ToList(),
+        t.FromName, t.TheirReference, t.ProofFileId, t.PackageId);
 }

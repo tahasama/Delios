@@ -190,6 +190,8 @@ internal sealed class StoredFileConfiguration : IEntityTypeConfiguration<StoredF
         b.HasIndex(x => x.DocumentId);
         b.HasIndex(x => x.RevisionId);
         b.HasIndex(x => x.DerivedFromId);
+        b.HasOne<Transmittals.TransmittalItem>().WithMany().HasForeignKey(x => x.TransmittalItemId).OnDelete(DeleteBehavior.Restrict);
+        b.HasIndex(x => x.TransmittalItemId);
         b.Property(x => x.ObjectKey).HasMaxLength(300);
         b.Property(x => x.Name).HasMaxLength(255);
         b.Property(x => x.ContentType).HasMaxLength(200);

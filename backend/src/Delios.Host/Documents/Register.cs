@@ -333,12 +333,13 @@ public static class RegisterEndpoints
                                  Decider = r.Steps.Where(s => s.Deciding).Select(s => s.PartyName ?? s.FunctionCode).FirstOrDefault(),
                              }).AsNoTracking().ToListAsync(cancellationToken);
         var functions = await db.Functions.AsNoTracking().ToDictionaryAsync(f => f.Code, f => f.Name, cancellationToken);
-        var files = await db.StoredFiles.AsNoTracking().Where(f => ids.Contains(f.DocumentId))
-            .GroupBy(f => f.DocumentId).Select(g => new { DocumentId = g.Key, At = g.Max(f => f.CreatedAt) }).ToDictionaryAsync(x => x.DocumentId, x => x.At, cancellationToken);
+        var files = await db.StoredFiles.AsNoTracking().Where(f => f.DocumentId != null && ids.Contains(f.DocumentId.Value))
+            .GroupBy(f => f.DocumentId!.Value).Select(g => new { DocumentId = g.Key, At = g.Max(f => f.CreatedAt) }).ToDictionaryAsync(x => x.DocumentId, x => x.At, cancellationToken);
         var issued = await (from i in db.TransmittalItems
                             join t in db.Transmittals on i.TransmittalId equals t.Id
-                            where ids.Contains(i.DocumentId) && t.ReviewStepId == null
-                            group t by i.DocumentId into g
+                            where i.DocumentId != null && ids.Contains(i.DocumentId.Value) && t.ReviewStepId == null
+                                && t.Direction == TransmittalDirections.Outgoing && i.Kind == TransmittalItemKinds.Revision
+                            group t by i.DocumentId!.Value into g
                             select new { DocumentId = g.Key, At = g.Min(t => t.IssuedAt) }).ToDictionaryAsync(x => x.DocumentId, x => x.At, cancellationToken);
         var packages = await db.PackageMembers.AsNoTracking().Where(m => ids.Contains(m.DocumentId))
             .GroupBy(m => m.DocumentId).Select(g => new { DocumentId = g.Key, Count = g.Count() }).ToDictionaryAsync(x => x.DocumentId, x => x.Count, cancellationToken);

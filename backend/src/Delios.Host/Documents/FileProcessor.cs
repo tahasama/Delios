@@ -42,7 +42,7 @@ public sealed class FileProcessor(
             file = await db.StoredFiles.AsNoTracking().SingleOrDefaultAsync(f => f.Id == message.FileId, cancellationToken);
             await read.CommitAsync(cancellationToken);
         }
-        if (file is not { Status: FileStatuses.Processing, RevisionId: { } revisionId })
+        if (file is not { Status: FileStatuses.Processing })
         {
             logger.LogInformation("File {FileId} is not waiting for processing; skipped", message.FileId);
             return;
@@ -70,7 +70,8 @@ public sealed class FileProcessor(
 
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         // Files of one revision finish one at a time, so the last one sees all the others.
-        await db.Database.ExecuteSqlAsync($"SELECT 1 FROM revisions WHERE id = {revisionId} FOR UPDATE", cancellationToken);
+        if (file.RevisionId is { } locked)
+            await db.Database.ExecuteSqlAsync($"SELECT 1 FROM revisions WHERE id = {locked} FOR UPDATE", cancellationToken);
         var now = clock.GetCurrentInstant();
         var updated = await db.StoredFiles
             .Where(f => f.Id == file.Id && f.Status == FileStatuses.Processing)
@@ -82,7 +83,7 @@ public sealed class FileProcessor(
         if (updated == 0) return;
         AppMetrics.FilesProcessed.WithLabels(status).Inc();
         // Read for search straight away only where the organization chose so.
-        if (status == FileStatuses.Clean && file.Kind is FileKinds.Native or FileKinds.Rendition
+        if (status == FileStatuses.Clean && file.DocumentId is not null && file.Kind is FileKinds.Native or FileKinds.Rendition
             && await db.Projects.AnyAsync(p => p.Id == file.ProjectId && p.ContentExtraction == Extraction.ExtractionModes.Automatic, cancellationToken))
         {
             Extraction.ExtractionProcessor.Enqueue(db, file);
@@ -98,7 +99,8 @@ public sealed class FileProcessor(
 
         // Evidence filed against a revision is scanned like anything else, but the
         // revision's own readiness is about what was submitted, not what came back.
-        if (file.Kind == FileKinds.Evidence)
+        // A file that came in unplanned on a transmittal has no revision at all yet.
+        if (file.Kind == FileKinds.Evidence || file.RevisionId is not { } revisionId)
         {
             await transaction.CommitAsync(cancellationToken);
             return;

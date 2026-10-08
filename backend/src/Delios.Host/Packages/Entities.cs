@@ -15,9 +15,15 @@ public sealed class Package
     public Guid ProjectId { get; set; }
     /// <summary>What people quote: P1001-PK-001. Never reused.</summary>
     public required string Number { get; set; }
+    /// <summary>One of <c>PackageKinds</c>: documents we deliver, or documents a supplier owes us.</summary>
+    public string Kind { get; set; } = PackageKinds.Delivery;
+    /// <summary>For a supply package: the supplier whose placeholders it holds. Its people see the package.</summary>
+    public Guid? SupplierPartyId { get; set; }
+    /// <summary>For a supply package: the purchase order it is under, as written on it. Optional.</summary>
+    public string? PurchaseOrder { get; set; }
     public required string Title { get; set; }
     public string? Description { get; set; }
-    /// <summary>From the published reasons for issue: what the delivery is for.</summary>
+    /// <summary>From the published reasons for issue: what the delivery is for, or what the supplier is asked for.</summary>
     public required string Reason { get; set; }
     /// <summary>A member is ready when its released status is any one of these.</summary>
     public string[] RequiredStatuses { get; set; } = [];
@@ -92,6 +98,15 @@ public sealed class ShortfallLine
     public string? Current { get; set; }
 }
 
+/// <summary>The values <c>Package.Kind</c> can take.</summary>
+public static class PackageKinds
+{
+    /// <summary>Documents we hand over to one or several organizations.</summary>
+    public const string Delivery = "DELIVERY";
+    /// <summary>Documents a supplier owes us: its placeholders, requested on transmittals and sent back on theirs.</summary>
+    public const string Supply = "SUPPLY";
+}
+
 /// <summary>The values <c>Package.State</c> can take.</summary>
 public static class PackageStates
 {
@@ -117,4 +132,6 @@ public sealed class PackageMember
     /// <summary>True when the rule brought it in; false when it was added by hand.</summary>
     public bool ByRule { get; set; }
     public Instant AddedAt { get; set; }
+    /// <summary>In a supply package: when the supplier was asked for it on a transmittal. Empty until then.</summary>
+    public Instant? RequestedAt { get; set; }
 }

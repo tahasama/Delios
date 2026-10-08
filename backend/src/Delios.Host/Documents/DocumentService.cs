@@ -156,7 +156,16 @@ public sealed class DocumentService(
     public async Task<(UploadTicket? Ticket, IResult? Problem)> RequestUploadAsync(
         ProjectAccess access, Guid documentId, UploadRequest request, CancellationToken cancellationToken)
     {
-        var (document, problem) = await ContributableAsync(access, documentId, cancellationToken);
+        // Another organization uploads here and then sends on a transmittal; Document Control may upload what such an
+        // organization sent outside the system, to record it for them.
+        var (document, problem) = await ContributableAsync(access, documentId, cancellationToken,
+            access.IsInternal ? null : new Incoming(null, null));
+        if (problem is not null && access.IsInternal && access.Holds(Verbs.Control)
+            && await db.Documents.Where(d => d.Id == documentId).Select(d => d.Originator).SingleOrDefaultAsync(cancellationToken) is { } originator
+            && await db.Parties.AnyAsync(p => p.Code == originator && !p.IsInternal, cancellationToken))
+        {
+            (document, problem) = await ContributableAsync(access, documentId, cancellationToken, new Incoming(null, originator));
+        }
         if (problem is not null) return (null, problem);
 
         var (declared, invalid) = Uploads.Check(request, storageOptions.Value.MaxFileBytes);
@@ -190,9 +199,10 @@ public sealed class DocumentService(
     /// and for a record that already has its one revision.
     /// </summary>
     public async Task<(Revision? Revision, IResult? Problem)> StartRevisionAsync(
-        ProjectAccess access, Guid documentId, StartRevisionRequest request, CancellationToken cancellationToken)
+        ProjectAccess access, Guid documentId, StartRevisionRequest request, CancellationToken cancellationToken,
+        Incoming? incoming = null)
     {
-        var (document, problem) = await ContributableAsync(access, documentId, cancellationToken);
+        var (document, problem) = await ContributableAsync(access, documentId, cancellationToken, incoming);
         if (problem is not null) return (null, problem);
 
         var existing = await db.Revisions.Where(r => r.DocumentId == document!.Id)
@@ -241,9 +251,10 @@ public sealed class DocumentService(
             ChangeDescription = Blank(request.ChangeDescription) ?? (existing.Count == 0 ? "Initial content" : null),
             AuthoredById = access.UserId,
             AuthoredByName = access.UserName,
-            AuthoredByParty = access.PartyCode,
+            AuthoredByParty = incoming?.OnBehalfOf ?? access.PartyCode,
             CreatedAt = now,
-            State = await NeedsAcceptanceAsync(access, cancellationToken) ? RevisionStates.Received : RevisionStates.InPreparation,
+            StatusCode = incoming?.Status,
+            State = await NeedsAcceptanceAsync(access, incoming, cancellationToken) ? RevisionStates.Received : RevisionStates.InPreparation,
             Submissions = [new SubmissionRecord { Number = 1, SubmittedAt = now, SubmittedByName = access.UserName }],
         };
         db.Revisions.Add(revision);
@@ -263,14 +274,68 @@ public sealed class DocumentService(
     }
 
     /// <summary>
+    /// Makes the first revision of a document just registered from files that came in unplanned on a transmittal and
+    /// were already scanned. Document Control registered it, so it needs no check on arrival: it is in preparation.
+    /// </summary>
+    public async Task<(Revision? Revision, IResult? Problem)> AdoptAsync(
+        ProjectAccess access, Document document, List<StoredFile> files, string? party, string? status, Instant sentAt, string sentBy,
+        CancellationToken cancellationToken)
+    {
+        var scheme = await RevisionSchemeForAsync(document.DeliverableType, cancellationToken);
+        if (scheme is null)
+        {
+            return (null, Problems.Invalid("NO_REVISION_SCHEME",
+                "No revision scheme applies to this deliverable type. An administrator sets one up.",
+                new { deliverableType = document.DeliverableType }));
+        }
+        var value = ((NextValue.Value)RevisionValues.Next(scheme, [], null)).Text;
+        var revision = new Revision
+        {
+            TenantId = document.TenantId,
+            ProjectId = document.ProjectId,
+            DocumentId = document.Id,
+            Value = value,
+            Series = scheme.Series[0].Code,
+            ReasonForRevision = "First issue",
+            ChangeDescription = "Received unplanned on a transmittal",
+            AuthoredById = access.UserId,
+            AuthoredByName = sentBy,
+            AuthoredByParty = party,
+            CreatedAt = clock.GetCurrentInstant(),
+            StatusCode = status,
+            State = RevisionStates.InPreparation,
+            FilesState = FilesStates.Ready,
+            Submissions = [new SubmissionRecord { Number = 1, SubmittedAt = sentAt, SubmittedByName = sentBy }],
+        };
+        db.Revisions.Add(revision);
+        foreach (var file in files)
+        {
+            file.DocumentId = document.Id;
+            file.RevisionId = revision.Id;
+            file.Submission = 1;
+        }
+        document.IsPlaceholder = false;
+        document.LatestRevisionId = revision.Id;
+        document.LatestRevisionValue = revision.Value;
+        document.LatestRevisionState = revision.State;
+        document.UpdatedAt = revision.CreatedAt;
+        await db.SaveChangesAsync(cancellationToken);
+        await audit.WriteAsync(new Actor(access.UserId, access.UserName), "REVISION_ESTABLISHED", "Revision", revision.Id,
+            $"{document.Number} rev {revision.Value}", $"{files.Count} file(s) received unplanned on a transmittal.",
+            document.ProjectId, cancellationToken);
+        return (revision, null);
+    }
+
+    /// <summary>
     /// Send corrected files for a revision Document Control returned without
     /// asking for a new one. The returned submission is kept; this one replaces
     /// it under the same revision value.
     /// </summary>
     public async Task<(Revision? Revision, IResult? Problem)> ResubmitAsync(
-        ProjectAccess access, Guid documentId, Guid revisionId, StartRevisionRequest request, CancellationToken cancellationToken)
+        ProjectAccess access, Guid documentId, Guid revisionId, StartRevisionRequest request, CancellationToken cancellationToken,
+        Incoming? incoming = null)
     {
-        var (document, problem) = await ContributableAsync(access, documentId, cancellationToken);
+        var (document, problem) = await ContributableAsync(access, documentId, cancellationToken, incoming);
         if (problem is not null) return (null, problem);
         var revision = await db.Revisions.Include(r => r.Files)
             .SingleOrDefaultAsync(r => r.Id == revisionId && r.DocumentId == documentId, cancellationToken);
@@ -288,7 +353,8 @@ public sealed class DocumentService(
         revision.Submission++;
         revision.Submissions.Add(new SubmissionRecord { Number = revision.Submission, SubmittedAt = now, SubmittedByName = access.UserName });
         revision.FilesState = FilesStates.Processing;
-        revision.State = await NeedsAcceptanceAsync(access, cancellationToken) ? RevisionStates.Received : RevisionStates.InPreparation;
+        revision.State = await NeedsAcceptanceAsync(access, incoming, cancellationToken) ? RevisionStates.Received : RevisionStates.InPreparation;
+        if (incoming?.Status is { } proposed) revision.StatusCode = proposed;
         revision.ReturnedAt = null;
         revision.ReturnedReason = null;
         Bind(files!, revision);
@@ -346,8 +412,8 @@ public sealed class DocumentService(
     /// anybody reviews it. Where nobody holds that function there is nobody to
     /// accept it, and it goes straight on.
     /// </summary>
-    private async Task<bool> NeedsAcceptanceAsync(ProjectAccess access, CancellationToken cancellationToken) =>
-        !access.IsInternal && await db.Memberships.AnyAsync(m => m.ProjectId == access.Project.Id && m.Active && m.Function!.Active
+    private async Task<bool> NeedsAcceptanceAsync(ProjectAccess access, Incoming? incoming, CancellationToken cancellationToken) =>
+        (!access.IsInternal || incoming?.OnBehalfOf is not null) && await db.Memberships.AnyAsync(m => m.ProjectId == access.Project.Id && m.Active && m.Function!.Active
             && m.Function.Rules.Any(r => r.Verbs.Contains(Verbs.Control))
             && db.Users.Any(u => u.Id == m.UserId && u.Active), cancellationToken);
 
@@ -356,13 +422,21 @@ public sealed class DocumentService(
     /// and, for another party, only on documents that party produces.
     /// </summary>
     private async Task<(Document? Document, IResult? Problem)> ContributableAsync(
-        ProjectAccess access, Guid documentId, CancellationToken cancellationToken)
+        ProjectAccess access, Guid documentId, CancellationToken cancellationToken, Incoming? incoming = null)
     {
         var document = await DocumentQueries.Visible(db, access, await RestrictedAsync(cancellationToken))
             .SingleOrDefaultAsync(d => d.Id == documentId, cancellationToken);
         if (document is null) return (null, Problems.NotFound("DOCUMENT_NOT_FOUND", "No such document."));
-        var may = (access.Allows(Verbs.Create, document.Facts) || access.Allows(Verbs.Revise, document.Facts))
-            && (access.IsInternal || document.Originator == access.PartyCode);
+        // Another organization sends on a transmittal, so that what came, and when, has a receipt.
+        if (!access.IsInternal && incoming is null)
+        {
+            return (null, Problems.Conflict("SEND_ON_TRANSMITTAL",
+                "Send it to us on a transmittal: fill the placeholder there, and you get a receipt."));
+        }
+        var may = incoming?.OnBehalfOf is { } party
+            ? access.Allows(Verbs.Control, document.Facts) && document.Originator == party
+            : (access.Allows(Verbs.Create, document.Facts) || access.Allows(Verbs.Revise, document.Facts))
+              && (access.IsInternal || document.Originator == access.PartyCode);
         if (!may)
             return (null, Problems.Forbidden("CONTRIBUTE_NOT_ALLOWED", "Your function on this project cannot add to this document."));
         if (document.State is not (DocumentStates.Planned or DocumentStates.Active))
@@ -388,6 +462,12 @@ public sealed class DocumentService(
     /// <summary>Shorthand for returning a problem response with no document.</summary>
     private static (Document?, IResult?) Fail(IResult problem) => (null, problem);
 }
+
+/// <summary>
+/// A revision coming in on an incoming transmittal: the status the sender proposes for it, and, when Document Control
+/// records it for an organization that works in its own system, that organization's code.
+/// </summary>
+public sealed record Incoming(string? Status, string? OnBehalfOf);
 
 /// <summary>
 /// Shared database queries for documents. Used by the endpoints and <see cref="DocumentService"/> so that
