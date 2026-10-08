@@ -26,7 +26,7 @@ public sealed record DispatchRequest(string? Channel, string? Reference = null, 
 /// </summary>
 public sealed class TransmittalService(
     DeliosDbContext db, Numbering numbering, AuditLog audit, FileStorage storage, IClock clock,
-    IOptions<StorageOptions> storageOptions)
+    IOptions<StorageOptions> storageOptions, Notifications.Notifier notifier)
 {
     // ── Distribution ──────────────────────────────────────────────────────────
 
@@ -87,6 +87,13 @@ public sealed class TransmittalService(
         {
             sent = await CarryOutAsync(access.Project, new Actor(access.UserId, access.UserName), request, revision, document,
                 cancellationToken);
+        }
+        else
+        {
+            // Not sent at once: Document Control sends it, so they are told what was asked for.
+            await notifier.NotifyAsync(document.TenantId, document.ProjectId, await notifier.ControlHoldersAsync(document.ProjectId, cancellationToken),
+                Notifications.NotificationKinds.IssueRequested, $"{Label(document, revision)}: asked to send it {request.Reason.ToLowerInvariant()}",
+                $"{access.UserName} asked.{(request.Note is null ? "" : $" {request.Note}")}", $"/documents/{document.Id}", cancellationToken);
         }
         await db.SaveChangesAsync(cancellationToken);
         return (request, sent, null);
@@ -437,6 +444,15 @@ public sealed class TransmittalService(
             $"{raise.Reason} to {raise.ToName}: {string.Join(", ", transmittal.Items.Select(i => i.Kind == TransmittalItemKinds.Placeholder
                 ? $"{i.DocumentNumber} (to send by {i.DueDate?.ToString("yyyy-MM-dd", null) ?? "no date"})" : $"{i.DocumentNumber} rev {i.RevisionValue}"))}.",
             project.Id, cancellationToken);
+        // The people it goes to who hold accounts are told, and emailed under the transmittal switch; an
+        // organization answering through one of ours is sent it by that person, as the dispatch records.
+        var listed = string.Join("\n", transmittal.Items.Select(i => i.Kind == TransmittalItemKinds.Placeholder
+            ? $"- {i.DocumentNumber} {i.Title} (to send by {i.DueDate?.ToString("yyyy-MM-dd", null) ?? "no date"})"
+            : $"- {i.DocumentNumber} rev {i.RevisionValue} {i.Title}{(i.StatusCode is null ? "" : $" ({i.StatusCode})")}"));
+        await notifier.NotifyAsync(project.TenantId, project.Id, raise.Recipients.Where(a => a.UserId is not null).Select(a => a.UserId!.Value),
+            Notifications.NotificationKinds.TransmittalReceived, $"{number}: {raise.Subject}",
+            $"{raise.Reason} from {raise.Actor.Name}{(due is null ? "" : $", answer by {due:yyyy-MM-dd}")}.\n{listed}{(raise.Message is null ? "" : $"\n\n{raise.Message}")}",
+            $"/transmittals/{transmittal.Id}", cancellationToken, Notifications.EmailKinds.Transmittal);
         return transmittal;
     }
 

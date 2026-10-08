@@ -42,7 +42,7 @@ public sealed record LooseUploadRequest(string? FileName, long Size, string? Con
 /// </summary>
 public sealed class IncomingService(
     DeliosDbContext db, DocumentService documents, TransmittalService transmittals, Numbering numbering, FileStorage storage,
-    AuditLog audit, IClock clock, IOptions<StorageOptions> storageOptions)
+    AuditLog audit, IClock clock, IOptions<StorageOptions> storageOptions, Notifications.Notifier notifier)
 {
     static IncomingService() => GlobalFontSettings.FontResolver ??= new EmbeddedFonts();
 
@@ -206,6 +206,11 @@ public sealed class IncomingService(
             $"From {party.Name}{(transmittal.TheirReference is null ? "" : $" (their {transmittal.TheirReference})")}: "
             + string.Join(", ", transmittal.Items.Select(Label)) + ".",
             access.Project.Id, cancellationToken);
+        // Document Control checks what arrived.
+        await notifier.NotifyAsync(access.Project.TenantId, access.Project.Id, await notifier.ControlHoldersAsync(access.Project.Id, cancellationToken),
+            Notifications.NotificationKinds.IncomingArrived, $"{transmittal.Number} from {party.Name}: {transmittal.Subject}",
+            string.Join("\n", transmittal.Items.Select(i => $"- {Label(i)}")), $"/transmittals/{transmittal.Id}", cancellationToken,
+            Notifications.EmailKinds.Transmittal);
         await db.SaveChangesAsync(cancellationToken);
         return (transmittal, null);
     }

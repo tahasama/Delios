@@ -45,7 +45,7 @@ public sealed record RewindRequest(int ToStep, string? Reason, string? Note);
 /// </summary>
 public sealed class ReviewService(
     DeliosDbContext db, Numbering numbering, AuditLog audit, IClock clock, TransmittalService transmittals,
-    ControlService control)
+    ControlService control, Notifications.Notifier notifier)
 {
     /// <summary>Kinds of advice an advising step can give, worked out from the adviser's comments: none, some, or at least one blocking comment. Mapped to published advice codes by <see cref="AdviceCode"/>.</summary>
     private const string Advice_None = "none", Advice_Some = "some", Advice_Blocking = "blocking";
@@ -465,6 +465,14 @@ public sealed class ReviewService(
         await audit.WriteAsync(Audit.Actor.System, "REVIEW_DECIDED", "Review", review.Id, review.Number,
             $"Verdict {review.Verdict}{(review.GrantedStatus is null ? "" : $", granting {review.GrantedStatus}")}.",
             review.ProjectId, cancellationToken);
+        // Whoever started it, and Document Control, who acts on the decision next.
+        var (decidedDocument, decidedRevision) = await SubjectAsync(review, cancellationToken);
+        var controllers = await db.Memberships.AsNoTracking()
+            .Where(m => m.ProjectId == review.ProjectId && m.Active && m.Function!.Active && m.Function.Rules.Any(r => r.Verbs.Contains(Verbs.Control)))
+            .Select(m => m.UserId).ToListAsync(cancellationToken);
+        await TellAsync(review, [review.StartedById, decidedRevision.AuthoredById, .. controllers], Notifications.NotificationKinds.ReviewDecided,
+            $"{TransmittalService.Label(decidedDocument, decidedRevision)} decided: {review.Verdict}",
+            $"Review {review.Number}{(review.GrantedStatus is null ? "" : $" grants {review.GrantedStatus}")}.", cancellationToken);
 
         // Where nobody holds the control function, the people doing the work take
         // its acts: a verdict that proceeds releases, one that does not returns.
@@ -765,6 +773,10 @@ public sealed class ReviewService(
             UserName = h.Name,
         }).ToList();
         review.CurrentStep = index;
+        var (subjectDocument, subjectRevision) = await SubjectAsync(review, cancellationToken);
+        await TellAsync(review, holders.Select(h => h.Id), Notifications.NotificationKinds.ReviewStep,
+            $"{TransmittalService.Label(subjectDocument, subjectRevision)} is waiting on you: {step.Title}",
+            $"Review {review.Number}, step {index + 1}{(step.DueDate is { } due ? $", due {due:yyyy-MM-dd}" : "")}.", cancellationToken);
 
         // A party answering here is sent the revision on a transmittal: that is what
         // lets them read it, and the record that it went.
@@ -778,6 +790,12 @@ public sealed class ReviewService(
             step.TransmittalId = transmittal.Id;
         }
     }
+
+    /// <summary>Tells these people about the review (and emails them, under the review email switch). Links to the review unless told otherwise.</summary>
+    private Task TellAsync(Review review, IEnumerable<Guid> userIds, string kind, string title, string? body, CancellationToken cancellationToken,
+        string? link = null) =>
+        notifier.NotifyAsync(review.TenantId, review.ProjectId, userIds, kind, title, body, link ?? $"/reviews/{review.Id}", cancellationToken,
+            Notifications.EmailKinds.Review);
 
     /// <summary>Clears everything recorded about sending a step to an outside party and their answer, so the step starts fresh.</summary>
     private static void ClearExchange(ReviewStep step)
@@ -827,6 +845,9 @@ public sealed class ReviewService(
         await transmittals.CarryOutOpenAsync(access.Project, actor, revision, document, cancellationToken);
         await audit.WriteAsync(actor, "RELEASED", "Revision", revision.Id, $"{document.Number} rev {revision.Value}",
             $"Released at {status} on review {review.Number}.", review.ProjectId, cancellationToken);
+        await TellAsync(review, [review.StartedById, revision.AuthoredById], Notifications.NotificationKinds.Released,
+            $"{TransmittalService.Label(document, revision)} released at {status}", $"Review {review.Number}.", cancellationToken,
+            $"/documents/{document.Id}");
         foreach (var old in earlier)
         {
             await audit.WriteAsync(actor, "SUPERSEDED", "Revision", old.Id, $"{document.Number} rev {old.Value}",
@@ -853,6 +874,8 @@ public sealed class ReviewService(
         await transmittals.LapseOpenAsync(revision.Id, by, cancellationToken);
         await audit.WriteAsync(Audit.Actor.System, "RETURNED_TO_AUTHOR", "Revision", revision.Id,
             $"{document.Number} rev {revision.Value}", $"{note} The next revision replaces it.", review.ProjectId, cancellationToken);
+        await TellAsync(review, [review.StartedById, revision.AuthoredById], Notifications.NotificationKinds.ReviewReturned,
+            $"{TransmittalService.Label(document, revision)} returned: a new revision is needed", note, cancellationToken, $"/documents/{document.Id}");
     }
 
     /// <summary>
@@ -881,6 +904,8 @@ public sealed class ReviewService(
         await audit.WriteAsync(Audit.Actor.System, "RETURNED_FOR_CORRECTION", "Revision", revision.Id,
             $"{document.Number} rev {revision.Value}",
             $"Back to {to}: {note} Corrected files come back under rev {revision.Value}; no new revision.", review.ProjectId, cancellationToken);
+        await TellAsync(review, [review.StartedById, revision.AuthoredById], Notifications.NotificationKinds.ReviewReturned,
+            $"{TransmittalService.Label(document, revision)} returned for correction", note, cancellationToken, $"/documents/{document.Id}");
     }
 
     /// <summary>

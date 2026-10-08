@@ -37,6 +37,18 @@ x-backend: &backend
     Auth__SecureCookie: ${SECURE_COOKIE:-false}
     # An organization may register itself from the sign-up page.
     SignUp__Enabled: ${SIGN_UP_ENABLED:-true}
+    # Email stays off until a mail server is named. Each kind has its own switch;
+    # with email off every message is still recorded in the outbox, marked OFF.
+    Email__Enabled: ${EMAIL_ENABLED:-false}
+    Email__Transmittals: ${EMAIL_TRANSMITTALS:-true}
+    Email__Reviews: ${EMAIL_REVIEWS:-true}
+    Email__Notifications: ${EMAIL_NOTIFICATIONS:-true}
+    Email__From: ${EMAIL_FROM:-delios@localhost}
+    Email__BaseUrl: ${PUBLIC_URL:-http://localhost:3000}
+    Email__Smtp__Host: ${SMTP_HOST:-}
+    Email__Smtp__Port: ${SMTP_PORT:-587}
+    Email__Smtp__User: ${SMTP_USER:-}
+    Email__Smtp__Password: ${SMTP_PASSWORD:-}
     # The address people reach the system at, for single sign-on to send them back to.
     Sso__PublicUrl: ${PUBLIC_URL:-}
     # postgres until RegisterSearchSlow says otherwise; then opensearch (with the search profile).

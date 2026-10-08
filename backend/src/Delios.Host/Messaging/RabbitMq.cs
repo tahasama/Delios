@@ -86,8 +86,12 @@ public static class Topology
     public static readonly WorkQueue Checks = new("delios.checks", "delios.checks.retry",
         [Host.Checks.CheckRunRequested.RoutingKey, Host.Schedules.ScheduleImportRequested.RoutingKey], Prefetch: 1);
 
+    /// <summary>Email: each one to the mail server on its own, apart from every other job.</summary>
+    public static readonly WorkQueue Mail = new("delios.mail", "delios.mail.retry",
+        [Host.Notifications.EmailRequested.RoutingKey], Prefetch: 4);
+
     /// <summary>Every work queue; the worker runs one <see cref="FileQueueConsumer"/> per entry.</summary>
-    public static readonly WorkQueue[] Queues = [Files, Extraction, Checks];
+    public static readonly WorkQueue[] Queues = [Files, Extraction, Checks, Mail];
 
     /// <summary>
     /// Creates the exchanges, the work queues with their retry queues and bindings, and the dead queue, if they do not exist yet.
