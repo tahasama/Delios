@@ -20,6 +20,15 @@ The old version stays on the main branch until the end.
 
 Each area: the screens, then any backend functions they need that do not exist yet.
 
+- [x] **Home**: the original page, unchanged, reading from the backend (work,
+      releases not sent, checks, schedule, the project's acts).
+      To decide with the owner, not on Home yet (no place in its design): review
+      steps answered by another organization (send it, record its answer),
+      issue requests to carry out, transmittals to send to an organization
+      outside the system, transmittals to acknowledge; the requirements process
+      (departments asked for their document lists); journal entries for acts
+      new since the old version (resubmitted, acknowledged, superseded, step
+      sent back, packages, supply requests, schedule decisions and reads).
 - [x] **Sign-in and the frame**: sign-in with email and password (the email
       says which organization: a person belongs to one) and two-step code,
       sign-out, project picker, the menu, home ("waiting on you").

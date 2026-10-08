@@ -311,6 +311,7 @@ public static class PlatformSetup
             Extraction.ExtractionEndpoints.MapExtractionEndpoints(app);
             Checks.CheckEndpoints.MapCheckEndpoints(app);
             Schedules.ScheduleEndpoints.MapScheduleEndpoints(app);
+            Audit.ActivityEndpoints.MapActivityEndpoints(app);
             Reports.ReportEndpoints.MapReportEndpoints(app);
             Documents.RegisterEndpoints.MapRegisterEndpoints(app);
             Documents.DocumentContextEndpoints.MapDocumentContextEndpoints(app);

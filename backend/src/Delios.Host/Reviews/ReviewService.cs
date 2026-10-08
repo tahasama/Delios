@@ -670,8 +670,13 @@ public sealed class ReviewService(
     // ── Queues ────────────────────────────────────────────────────────────────
 
     /// <summary>One entry in a person's review to-do list. <c>Kind</c> says what to do (for example ANSWER_STEP, DISPATCH_STEP, RECORD_ANSWER, READY_TO_RELEASE, SEND_BACK); <c>Since</c> is when it started waiting.</summary>
+    /// <summary>
+    /// One review waiting on someone. <c>Deciding</c>: their step gives the verdict (otherwise it is advice). On Document
+    /// Control's gate, <c>Verdict</c> and <c>Status</c> are what the review decided and the status it grants.
+    /// </summary>
     public sealed record WorkItem(Guid ReviewId, string Number, Guid DocumentId, string DocumentNumber, string Title,
-        string RevisionValue, string Kind, string? StepTitle, DateOnly? DueDate, DateTimeOffset Since);
+        string RevisionValue, string Kind, string? StepTitle, DateOnly? DueDate, DateTimeOffset Since, bool Deciding = false,
+        string? Verdict = null, string? Status = null);
 
     /// <summary>What this person has waiting: their open steps, and Document Control's gate.</summary>
     public async Task<object> WorkAsync(ProjectAccess access, CancellationToken cancellationToken)
@@ -697,13 +702,14 @@ public sealed class ReviewService(
                 s.DueDate,
                 s.OpenedAt,
                 s.Participation,
-                s.DispatchedAt
+                s.DispatchedAt,
+                s.Deciding
             })
             .ToListAsync(cancellationToken);
         // A party's step answered by proxy is one task with two acts: send it, then record what came back.
         var mySteps = open.Select(x => new WorkItem(x.Id, x.Number, x.DocumentId, x.DocumentNumber, x.Title, x.Value,
             x.Participation != Participations.ByProxy ? "ANSWER_STEP" : x.DispatchedAt is null ? "DISPATCH_STEP" : "RECORD_ANSWER",
-            x.Title2, x.DueDate?.ToDateOnly(), (x.DispatchedAt ?? x.OpenedAt)!.Value.ToDateTimeOffset())).ToList();
+            x.Title2, x.DueDate?.ToDateOnly(), (x.DispatchedAt ?? x.OpenedAt)!.Value.ToDateTimeOffset(), x.Deciding)).ToList();
 
         List<WorkItem> gate = [];
         if (access.Holds(Verbs.Control))
@@ -715,11 +721,11 @@ public sealed class ReviewService(
                 join v in db.Revisions on r.RevisionId equals v.Id
                 where r.ProjectId == access.Project.Id && r.State == ReviewStates.Decided
                 orderby r.DecidedAt
-                select new { r.Id, r.Number, DocumentId = d.Id, DocumentNumber = d.Number, d.Title, v.Value, r.Verdict, r.DecidedAt })
+                select new { r.Id, r.Number, DocumentId = d.Id, DocumentNumber = d.Number, d.Title, v.Value, r.Verdict, r.GrantedStatus, r.DecidedAt })
                 .ToListAsync(cancellationToken);
             gate = decided.Select(x => new WorkItem(x.Id, x.Number, x.DocumentId, x.DocumentNumber, x.Title, x.Value,
                 Proceeds(catalog, x.Verdict!) ? "READY_TO_RELEASE" : "SEND_BACK", null, null,
-                x.DecidedAt!.Value.ToDateTimeOffset())).ToList();
+                x.DecidedAt!.Value.ToDateTimeOffset(), true, x.Verdict, x.GrantedStatus)).ToList();
         }
         return new
         {

@@ -158,4 +158,31 @@ public sealed class ControlTests(Infrastructure infrastructure) : IClassFixture<
         var (corrected, correctedBody) = await ResubmitAsync(engineer, p);
         Assert.Equal((HttpStatusCode.Conflict, "NOT_RETURNED_FOR_CORRECTION"), (corrected, Flow.Code(correctedBody)));
     }
+
+    [Fact]
+    public async Task Home_reads_drafts_deciding_steps_and_the_projects_acts()
+    {
+        await using var app = await TestApp.StartAsync(infrastructure);
+        app.StartWorker();
+        var engineer = await app.SignedInAsync("engineer@demo.local");
+        var supplier = await app.SignedInAsync("supplier@acme.local");
+        var p = await Flow.RevisionAsync(engineer);
+
+        // The author's own revision in preparation is a draft on their Home.
+        var work = await engineer.GetFromJsonAsync<JsonElement>($"/api/projects/{p.Project}/work");
+        Assert.Contains(work.GetProperty("revisions").EnumerateArray(), w => w.GetProperty("kind").GetString() == "DRAFT"
+            && w.GetProperty("revisionId").GetGuid() == p.Revision);
+
+        // Sent for review: the engineer advises, the approver decides.
+        await Flow.PostAsync(engineer, $"/api/projects/{p.Project}/revisions/{p.Revision}/reviews", new { });
+        work = await engineer.GetFromJsonAsync<JsonElement>($"/api/projects/{p.Project}/work");
+        Assert.False(work.GetProperty("steps")[0].GetProperty("deciding").GetBoolean());
+        Assert.DoesNotContain(work.GetProperty("revisions").EnumerateArray(), w => w.GetProperty("kind").GetString() == "DRAFT");
+
+        // What the project did, for its own people only.
+        var acts = await engineer.GetFromJsonAsync<JsonElement>($"/api/projects/{p.Project}/activity");
+        Assert.Contains(acts.EnumerateArray(), a => a.GetProperty("action").GetString() == "REVIEW_STARTED");
+        Assert.DoesNotContain(acts.EnumerateArray(), a => a.GetProperty("action").GetString() == "DOWNLOAD");
+        Assert.Empty((await supplier.GetFromJsonAsync<JsonElement>($"/api/projects/{p.Project}/activity")).EnumerateArray());
+    }
 }

@@ -130,11 +130,20 @@ public sealed class ControlService(DeliosDbContext db, AuditLog audit, IClock cl
         return (revision, null);
     }
 
-    /// <summary>One entry in a person's to-do list about a submission. <c>Kind</c> is ACCEPT_SUBMISSION or CORRECT_AND_RESUBMIT; <c>Note</c> is why it was returned.</summary>
+    /// <summary>
+    /// One entry in a person's to-do list about a revision. <c>Kind</c>: ACCEPT_SUBMISSION (Document Control checks
+    /// what arrived), CORRECT_AND_RESUBMIT (returned to its sender for a correction), RETURNED_BY_REVIEW (its review
+    /// sent it back to its author; the next revision replaces it), TO_ROUTE (accepted from another organization, not
+    /// yet sent for review) or DRAFT (the author's own, in preparation). <c>Note</c> is why it was returned, or, for a
+    /// draft, where its files are (<c>FilesStates</c>).
+    /// </summary>
     public sealed record RevisionWork(string Kind, Guid DocumentId, string DocumentNumber, string Title, Guid RevisionId,
         string Revision, int Submission, string? Note, DateTimeOffset Since);
 
-    /// <summary>Submissions waiting for Document Control's acceptance, and returned ones waiting for this person's correction.</summary>
+    /// <summary>
+    /// What waits on this person about revisions: submissions to accept and accepted ones to send for review (Document
+    /// Control), returned ones to correct, revisions their review sent back, and their own drafts.
+    /// </summary>
     public async Task<IReadOnlyList<RevisionWork>> WorkAsync(ProjectAccess access, CancellationToken cancellationToken)
     {
         var projectId = access.Project.Id;
@@ -146,13 +155,50 @@ public sealed class ControlService(DeliosDbContext db, AuditLog audit, IClock cl
             join d in db.Documents on r.DocumentId equals d.Id
             where r.ProjectId == projectId
                 && ((control && r.State == RevisionStates.Received)
-                    || (r.State == RevisionStates.Correcting && (r.AuthoredById == me || (party != null && r.AuthoredByParty == party))))
+                    || (r.State == RevisionStates.Correcting && (r.AuthoredById == me || (party != null && r.AuthoredByParty == party)))
+                    || (r.State == RevisionStates.Returned && d.LatestRevisionId == r.Id && r.AuthoredById == me)
+                    || (r.State == RevisionStates.InPreparation && control && r.AuthoredByParty != null
+                        && db.Parties.Any(p => p.Code == r.AuthoredByParty && !p.IsInternal))
+                    || (r.State == RevisionStates.InPreparation && r.AuthoredById == me && party == null))
             orderby r.CreatedAt
-            select new { r.State, DocumentId = d.Id, d.Number, d.Title, r.Id, r.Value, r.Submission, r.ReturnedReason, r.ReturnedAt, r.CreatedAt })
+            select new
+            {
+                r.State,
+                DocumentId = d.Id,
+                d.Number,
+                d.Title,
+                r.Id,
+                r.Value,
+                r.Submission,
+                r.ReturnedReason,
+                r.ReturnedAt,
+                r.CreatedAt,
+                r.AuthoredById,
+                r.AuthoredByParty,
+                r.FilesState,
+                r.ControlOutcome
+            })
             .ToListAsync(cancellationToken);
-        return rows.Select(x => new RevisionWork(x.State == RevisionStates.Received ? "ACCEPT_SUBMISSION" : "CORRECT_AND_RESUBMIT",
-            x.DocumentId, x.Number, x.Title, x.Id, x.Value, x.Submission,
-            x.State == RevisionStates.Correcting ? x.ReturnedReason : null,
-            (x.State == RevisionStates.Correcting ? x.ReturnedAt ?? x.CreatedAt : x.CreatedAt).ToDateTimeOffset())).ToList();
+        var outside = (await db.Parties.AsNoTracking().Where(p => !p.IsInternal).Select(p => p.Code).ToListAsync(cancellationToken)).ToHashSet();
+        return rows.Select(x =>
+        {
+            var fromOutside = x.AuthoredByParty is { } code && outside.Contains(code);
+            var kind = x.State switch
+            {
+                RevisionStates.Received => "ACCEPT_SUBMISSION",
+                RevisionStates.Correcting => "CORRECT_AND_RESUBMIT",
+                RevisionStates.Returned => "RETURNED_BY_REVIEW",
+                _ => control && fromOutside ? "TO_ROUTE" : "DRAFT",
+            };
+            var note = kind switch
+            {
+                "CORRECT_AND_RESUBMIT" => x.ReturnedReason,
+                "RETURNED_BY_REVIEW" => x.ReturnedReason ?? x.ControlOutcome,
+                "DRAFT" => x.FilesState,
+                _ => null,
+            };
+            var since = kind is "CORRECT_AND_RESUBMIT" or "RETURNED_BY_REVIEW" ? x.ReturnedAt ?? x.CreatedAt : x.CreatedAt;
+            return new RevisionWork(kind, x.DocumentId, x.Number, x.Title, x.Id, x.Value, x.Submission, note, since.ToDateTimeOffset());
+        }).ToList();
     }
 }

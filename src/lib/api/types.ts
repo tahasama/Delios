@@ -41,10 +41,15 @@ export type WorkItem = {
   stepTitle: string | null;
   dueDate: string | null;
   since: string;
+  /** The person's step gives the verdict (otherwise it is advice). */
+  deciding: boolean;
+  /** On Document Control's gate: what the review decided, and the status it grants. */
+  verdict: string | null;
+  status: string | null;
 };
 
 export type RevisionWork = {
-  kind: "ACCEPT_SUBMISSION" | "CORRECT_AND_RESUBMIT";
+  kind: "ACCEPT_SUBMISSION" | "CORRECT_AND_RESUBMIT" | "RETURNED_BY_REVIEW" | "TO_ROUTE" | "DRAFT";
   documentId: string;
   documentNumber: string;
   title: string;
@@ -237,4 +242,13 @@ export type PackageView = {
   }[];
   transmittals: { id: string; number: string; direction: "OUTGOING" | "INCOMING"; issuedAt: string; items: number }[];
   kind: "DELIVERY" | "SUPPLY"; supplierPartyId: string | null; supplier: string | null; purchaseOrder: string | null;
+};
+
+/** GET /activity (ActivityEndpoints.cs): one act of the project, for Home's journal and log. */
+export type ActivityRow = { id: number; at: string; actorName: string; action: string; entityType: string | null; entityLabel: string | null; detail: string | null };
+
+/** GET /activities (ScheduleEndpoints.cs ActivitySummary). */
+export type ActivitySummary = {
+  id: string; code: string; name: string; start: string | null; finish: string | null; responsible: string | null;
+  departments: string[]; state: string; readiness: string; needs: number; met: number; waived: number; nextNeededBy: string | null;
 };
