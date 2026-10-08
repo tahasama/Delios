@@ -34,23 +34,35 @@ Each area: the screens, then any backend functions they need that do not exist y
       release, sending back to the author or to a step, sending the route back),
       sending several revisions for review at once.
       Not carried over: delegating a step, review "kinds", automatic late warnings.
-- [x] **Transmittals**: the log (what each still waits on, filters, sorting,
-      page numbers, export), a transmittal (what it carried, who has it,
-      acknowledging, recording dispatch to an organization outside with proof),
-      composing one directly, and on a document's page asking for an issue and
-      Document Control sending it.
-      Not carried over: incoming transmittals as a separate record (another
-      organization's submissions arrive as revisions, checked on arrival),
-      drafts, "notify again".
-- [x] **Packages**: the list, a new package (why, the statuses needed, who it
+- [x] **Transmittals**: the log (what each still waits on, both directions,
+      filters, sorting, page numbers, export), a transmittal (what it carried,
+      who has it, acknowledging, recording dispatch to an organization outside
+      with proof), composing one directly, and on a document's page asking for
+      an issue and Document Control sending it.
+      **Sent to us** (another organization, or Document Control recording for one
+      that works in its own system, with its covering letter): one incoming
+      transmittal, numbered in the sender's series, carrying filled placeholders
+      (each at the status it is sent for: our register is updated at once and
+      Document Control checks it on arrival), corrections, and unplanned items
+      (an RFI, an NCR, minutes) that wait until Document Control registers them
+      under our numbering. Received the moment it is sent: its receipt is a PDF
+      listing every file with its SHA-256. Another organization can no longer
+      start a revision any other way.
+      Not carried over: drafts, "notify again".
+- [x] **Packages**: two kinds.
+      *From suppliers*: one supplier (and one order, if it has several), filled
+      with its placeholders; its owners ask the supplier for them on one
+      transmittal (each with its due date; new placeholders on the next one);
+      the supplier's people see the package and send back on their own
+      transmittals; it shows, per document, its due date and what was sent.
+      *To deliver*: the list, a new package (why, the statuses needed, who it
       goes to, who puts it together and who accepts it, an optional rule it fills
-      itself by), a package (its documents and whether each is ready, adding and
-      taking out, the rule, checking readiness, sending what is missing to the
-      acceptance authority and their acceptance, delivering on transmittals,
-      accepting), and adding documents ticked in the register.
-      Not carried over: supplier packages (what a supplier owes us; their
-      submissions arrive as revisions instead), renaming a package, and deleting
-      one (records are kept).
+      itself by), adding and taking out, the rule, checking readiness, sending
+      what is missing to the acceptance authority and their acceptance,
+      delivering on transmittals, accepting, and adding documents ticked in the
+      register.
+      Both: renaming at any time; deleting only while empty and never sent (the
+      database enforces it).
 - [ ] **Schedule and activities**: the schedule document, activities, needs, waivers, decisions, lateness.
 - [ ] **Assurance**: checks and the defect register.
 - [ ] **Reports**

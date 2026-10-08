@@ -6,7 +6,7 @@ import type { Distribution, DocumentContext, DocumentView, IssueRequestView, Lis
 import { requireSession, projectPath } from "@/lib/session";
 import { isMigrated } from "@/lib/migrated";
 import { DOCUMENT_STATES, REVISION_STATES } from "@/lib/states";
-import { Card, Chip, KeyValue, PageHeader } from "@/components/ui";
+import { btn, Card, Chip, KeyValue, PageHeader } from "@/components/ui";
 import { Arrival, Resubmit, SendForReview, StartRevision } from "./acts";
 import { OpenRequest, RequestIssue } from "./issue";
 
@@ -52,7 +52,10 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
   const revisions = [...doc.revisions].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const latest = revisions[0] ?? null;
   const inMotion = latest && ["RECEIVED", "CORRECTING", "IN_PREPARATION", "IN_REVIEW"].includes(latest.state);
-  const contributes = session.can("CREATE") || session.can("REVISE");
+  // Another organization sends its files to us on a transmittal of its own (with a receipt), not from here.
+  const contributes = session.user.isInternal && (session.can("CREATE") || session.can("REVISE"));
+  const sendsToUs = !session.user.isInternal && doc.originator === session.user.party?.code
+    && (!inMotion || latest?.state === "CORRECTING") && doc.state !== "WITHDRAWN" && doc.state !== "CANCELLED" && doc.state !== "ARCHIVED";
   const control = session.can("CONTROL");
   const released = revisions.find((r) => r.state === "RELEASED") ?? null;
   const [distribution, requests] = released && session.user.isInternal
@@ -153,6 +156,13 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
             <Card title="Document Control: check what arrived" description="Before anyone reviews it">
               {latest.filesState === "PROCESSING" ? <p className="text-xs text-slate-500">The files are still being scanned.</p>
                 : <Arrival documentId={doc.id} revisionId={latest.id} outcomes={lists.CONTROL_OUTCOMES ?? []} />}
+            </Card>
+          ) : null}
+          {sendsToUs ? (
+            <Card title={latest?.state === "CORRECTING" ? "Send it corrected" : latest ? "Send the next revision" : "Fill it and send it"}
+              description="On a transmittal to us: you get a receipt">
+              {latest?.state === "CORRECTING" && latest.returnedReason ? <p className="mb-2 text-xs text-amber-800">{latest.returnedReason}</p> : null}
+              <Link href={`/transmittals/send?docs=${doc.id}`} className={btn("primary", "sm")}>Send to us</Link>
             </Card>
           ) : null}
           {latest?.state === "CORRECTING" && contributes ? (

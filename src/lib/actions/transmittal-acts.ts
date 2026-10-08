@@ -90,3 +90,56 @@ export async function issueRequestAction(_prev: ActResult | undefined, form: For
   revalidatePath(`/documents/${documentId}`);
   return { ok: true, message: what === "cancel" ? "Withdrawn." : "Sent." };
 }
+
+/** What another organization sends us, as the send form builds it. */
+export type IncomingPayload = {
+  reason: string; subject?: string; message?: string; theirReference?: string; fromPartyId?: string; proofFileId?: string;
+  planned: { documentId: string; fileIds: string[]; status: string }[];
+  unplanned: { title: string; docType?: string; reference?: string; fileIds: string[] }[];
+  formKey: string;
+};
+
+/**
+ * Sends to us on an incoming transmittal: filled placeholders at the status
+ * proposed, corrections, and unplanned items. It is received, with its
+ * receipt, the moment it is sent; opens it.
+ */
+export async function sendIncomingAction(payload: IncomingPayload): Promise<{ error: string }> {
+  const session = await requireSession();
+  let id: string;
+  try {
+    const sent = await api<{ id: string }>(projectPath(session, "/transmittals/incoming"), {
+      body: {
+        reason: payload.reason, subject: payload.subject || null, message: payload.message || null,
+        theirReference: payload.theirReference || null, fromPartyId: payload.fromPartyId || null, proofFileId: payload.proofFileId || null,
+        planned: payload.planned, unplanned: payload.unplanned.map((u) => ({ ...u, docType: u.docType || null, reference: u.reference || null })),
+      },
+      idempotencyKey: payload.formKey,
+    });
+    id = sent.id;
+  } catch (e) {
+    return { error: refusal(e).message };
+  }
+  revalidatePath("/transmittals");
+  revalidatePath("/");
+  redirect(`/transmittals/${id}`);
+}
+
+/** Document Control puts an unplanned item in the register, under our numbering. */
+export async function registerItemAction(_prev: ActResult | undefined, form: FormData): Promise<ActResult> {
+  const session = await requireSession();
+  const id = String(form.get("transmittalId"));
+  try {
+    await api(projectPath(session, `/transmittals/${id}/items/${form.get("itemId")}/register`), {
+      body: {
+        title: text(form, "title"), deliverableType: text(form, "deliverableType"), docType: text(form, "docType"),
+        discipline: text(form, "discipline"), subproject: text(form, "subproject"), contractRef: text(form, "contractRef"),
+        criticality: text(form, "criticality"), confidentiality: text(form, "confidentiality"),
+      },
+    });
+  } catch (e) {
+    return { ok: false, message: refusal(e).message };
+  }
+  revalidatePath(`/transmittals/${id}`);
+  return { ok: true, message: "Registered." };
+}

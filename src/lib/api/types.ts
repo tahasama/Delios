@@ -56,7 +56,7 @@ export type RevisionWork = {
 };
 
 export type IssueWork = {
-  kind: "CARRY_OUT_REQUEST" | "DISPATCH_TRANSMITTAL" | "ACKNOWLEDGE_TRANSMITTAL";
+  kind: "CARRY_OUT_REQUEST" | "DISPATCH_TRANSMITTAL" | "ACKNOWLEDGE_TRANSMITTAL" | "REGISTER_UNPLANNED" | "SEND_PLACEHOLDER";
   requestId: string | null;
   transmittalId: string | null;
   recipientId: string | null;
@@ -65,6 +65,8 @@ export type IssueWork = {
   who: string | null;
   dueDate: string | null;
   since: string;
+  /** SEND_PLACEHOLDER: the placeholder to fill. */
+  documentId: string | null;
 };
 
 /** A value of one of the organization's lists (Register.cs ListValue). */
@@ -163,16 +165,31 @@ export type ReviewMe = { seated: boolean; answered: boolean; control: boolean };
 export type TransmittalLog = { total: number; page: number; pages: number; per: number; sizes: number[]; rows: TransmittalLogRow[] };
 export type TransmittalLogRow = {
   id: string; number: string; subject: string; reason: string; toName: string; issuedBy: string; issuedAt: string; documents: number;
-  status: "TO_SEND" | "OVERDUE" | "AWAITING_REPLY" | "AWAITING_ACK" | "COMPLETE"; recipients: { id: string; name: string; seen: boolean }[];
+  status: "TO_SEND" | "OVERDUE" | "AWAITING_REPLY" | "AWAITING_ACK" | "TO_REGISTER" | "COMPLETE"; recipients: { id: string; name: string; seen: boolean }[];
   responseRequired: boolean; responseDue: string | null; forReview: boolean;
+  direction: "OUTGOING" | "INCOMING"; from: string | null; theirReference: string | null;
 };
 
 /** GET /transmittals/{id} (TransmittalEndpoints TransmittalView). */
 export type TransmittalView = {
   id: string; number: string; direction: string; reason: string; subject: string; message: string | null; to: string;
   responseRequired: boolean; responseDue: string | null; issuedAt: string; issuedBy: string; issueRequestId: string | null; reviewStepId: string | null;
-  items: { documentId: string; revisionId: string; documentNumber: string; title: string; revision: string; status: string | null }[];
+  items: TransmittalItem[];
   recipients: { id: string; name: string; organization: string | null; person: boolean; openedAt: string | null; acknowledgedAt: string | null; dispatchedAt: string | null; dispatchChannel: string | null; dispatchRef: string | null; dispatchedBy: string | null; proofFileId: string | null }[];
+  /** Incoming: the organization that sent it, its own reference, and (recorded for it) its covering letter. */
+  from: string | null; theirReference: string | null; proofFileId: string | null; packageId: string | null;
+};
+
+/**
+ * One item of a transmittal: a revision sent, a placeholder asked for (with its
+ * due date), a submission received (a filled placeholder or a correction), or
+ * something unplanned received that waits to be registered.
+ */
+export type TransmittalItem = {
+  id: string; kind: "REVISION" | "PLACEHOLDER" | "SUBMISSION" | "UNPLANNED";
+  documentId: string | null; revisionId: string | null; documentNumber: string; title: string; revision: string; status: string | null;
+  dueDate: string | null; submission: number | null; docType: string | null; registeredAt: string | null; registeredBy: string | null;
+  files: { id: string; name: string; size: number; sha256: string; status: string }[];
 };
 
 /** GET /addressees: who a transmittal can go to. */
@@ -198,6 +215,7 @@ export type Distribution = {
 export type PackageSummary = {
   id: string; number: string; title: string; reason: string; state: string; members: number;
   hasRule: boolean; completionDate: string | null; createdAt: string;
+  kind: "DELIVERY" | "SUPPLY"; supplier: string | null; purchaseOrder: string | null;
 };
 
 /** The rule a package fills itself by (Entities.cs PackageRule); empty lists mean any. */
@@ -212,6 +230,11 @@ export type PackageView = {
   shortfallIssuedAt: string | null; shortfallAcceptedAt: string | null; shortfallAcceptedBy: string | null;
   closedAt: string | null; closedBy: string | null; closureNote: string | null;
   acceptedAt: string | null; acceptedBy: string | null; createdBy: string;
-  members: { documentId: string; documentNumber: string; title: string; revision: string | null; status: string | null; required: string[]; ready: boolean; byRule: boolean }[];
-  transmittals: string[];
+  members: {
+    documentId: string; documentNumber: string; title: string; revision: string | null; status: string | null; required: string[]; ready: boolean; byRule: boolean;
+    /** Supply: when the supplier was asked for it; its latest revision and where that stands; when it is due. */
+    requestedAt: string | null; latestRevision: string | null; latestState: string | null; dueDate: string | null;
+  }[];
+  transmittals: { id: string; number: string; direction: "OUTGOING" | "INCOMING"; issuedAt: string; items: number }[];
+  kind: "DELIVERY" | "SUPPLY"; supplierPartyId: string | null; supplier: string | null; purchaseOrder: string | null;
 };

@@ -32,6 +32,7 @@ export async function createPackageAction(_prev: CreateState | undefined, form: 
         title: text(form, "title"), reason: text(form, "reason"), requiredStatuses: all(form, "requiredStatus"),
         ownerIds: all(form, "ownerId"), acceptorIds: all(form, "acceptorId"), recipientPartyIds: all(form, "partyId"),
         description: text(form, "description"), completionDate: text(form, "completionDate"), rule: rule(form),
+        kind: text(form, "kind") ?? "DELIVERY", supplierPartyId: text(form, "supplierPartyId"), purchaseOrder: text(form, "purchaseOrder"),
       },
       idempotencyKey: text(form, "formKey") ?? undefined,
     });
@@ -62,7 +63,7 @@ export async function addToPackageAction(_prev: CreateState | undefined, form: F
 const SAID: Record<string, string> = {
   add: "Added.", remove: "Taken out.", rule: "Rule saved.", assess: "Readiness checked.",
   "shortfall-issue": "Sent to the acceptance authority.", "shortfall-accept": "Accepted; it may be delivered.",
-  deliver: "Delivered.", accept: "Accepted.",
+  deliver: "Done.", accept: "Accepted.", request: "Asked: the supplier has it on a transmittal.", rename: "Saved.",
 };
 
 /** Every step on a package's page; the form says which in `what`. */
@@ -82,6 +83,8 @@ export async function packageAction(_prev: ActResult | undefined, form: FormData
       case "shortfall-accept": await api(at("/shortfall/accept"), { body: note }); break;
       case "deliver": await api(at("/deliver"), { body: { ruleCeased: form.get("ruleCeased") === "on", note: text(form, "note") } }); break;
       case "accept": await api(at("/accept"), { body: note }); break;
+      case "request": await api(at("/request"), { body: { message: text(form, "message") } }); break;
+      case "rename": await api(at(""), { method: "PUT", body: { title: text(form, "title"), description: text(form, "description") } }); break;
       default: return { ok: false, message: "Unknown step." };
     }
   } catch (e) {
@@ -90,4 +93,16 @@ export async function packageAction(_prev: ActResult | undefined, form: FormData
   revalidatePath(`/packages/${id}`);
   revalidatePath("/packages");
   return { ok: true, message: SAID[what] };
+}
+
+/** Deletes an empty package that never went out, then shows the list. */
+export async function deletePackageAction(_prev: ActResult | undefined, form: FormData): Promise<ActResult> {
+  const session = await requireSession();
+  try {
+    await api(projectPath(session, `/packages/${form.get("packageId")}`), { method: "DELETE" });
+  } catch (e) {
+    return { ok: false, message: refusal(e).message };
+  }
+  revalidatePath("/packages");
+  redirect("/packages");
 }

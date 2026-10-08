@@ -20,6 +20,8 @@ const ASK: Record<string, string> = {
   CARRY_OUT_REQUEST: "Someone asked for this to be issued",
   DISPATCH_TRANSMITTAL: "Send this transmittal and record how it went",
   ACKNOWLEDGE_TRANSMITTAL: "Open it and acknowledge it",
+  SEND_PLACEHOLDER: "Asked of you: fill it and send it",
+  REGISTER_UNPLANNED: "Received unplanned: put it in the register",
 };
 
 type Row = { key: string; what: string; label: string; detail: string; due: string | null; since: string; href: string | null };
@@ -45,8 +47,11 @@ export default async function HomePage() {
   const rows: Row[] = [
     ...work.steps.map((w) => ({ key: `s${w.reviewId}`, what: ASK[w.kind], label: `${w.documentNumber} rev ${w.revisionValue}`, detail: `${w.title} · ${w.number}${w.stepTitle ? ` · ${w.stepTitle}` : ""}`, due: w.dueDate, since: w.since, href: linkTo(`/reviews/${w.reviewId}`) })),
     ...work.gate.map((w) => ({ key: `g${w.reviewId}`, what: ASK[w.kind], label: `${w.documentNumber} rev ${w.revisionValue}`, detail: `${w.title} · ${w.number}`, due: null, since: w.since, href: linkTo(`/reviews/${w.reviewId}`) })),
-    ...work.revisions.map((w) => ({ key: `r${w.revisionId}`, what: ASK[w.kind], label: `${w.documentNumber} rev ${w.revision}`, detail: `${w.title}${w.note ? ` · ${w.note}` : ""}`, due: null, since: w.since, href: linkTo(`/documents/${w.documentId}`) })),
-    ...work.issues.map((w) => ({ key: `i${w.requestId ?? w.transmittalId}${w.recipientId ?? ""}`, what: ASK[w.kind], label: w.label, detail: [w.reason, w.who].filter(Boolean).join(" · "), due: w.dueDate, since: w.since, href: w.transmittalId ? linkTo(`/transmittals/${w.transmittalId}`) : null })),
+    // Another organization corrects on a transmittal of its own; we correct on the document.
+    ...work.revisions.map((w) => ({ key: `r${w.revisionId}`, what: ASK[w.kind], label: `${w.documentNumber} rev ${w.revision}`, detail: `${w.title}${w.note ? ` · ${w.note}` : ""}`, due: null, since: w.since,
+      href: linkTo(w.kind === "CORRECT_AND_RESUBMIT" && !session.user.isInternal ? `/transmittals/send?docs=${w.documentId}` : `/documents/${w.documentId}`) })),
+    ...work.issues.map((w) => ({ key: `i${w.requestId ?? w.transmittalId}${w.recipientId ?? ""}${w.documentId ?? ""}`, what: ASK[w.kind], label: w.label, detail: [w.reason, w.who].filter(Boolean).join(" · "), due: w.dueDate, since: w.since,
+      href: w.kind === "SEND_PLACEHOLDER" ? linkTo(`/transmittals/send?docs=${w.documentId}`) : w.transmittalId ? linkTo(`/transmittals/${w.transmittalId}`) : null })),
   ].sort((a, b) => a.since.localeCompare(b.since));
 
   return (

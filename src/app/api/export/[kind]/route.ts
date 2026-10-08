@@ -19,6 +19,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ kind
   if (!path) return NextResponse.json({ error: "No such export." }, { status: 404 });
   const query = new URL(request.url).searchParams;
   query.delete("cols");
+  // The transmittal log's direction filter is "way" in the address, "direction" to the backend.
+  if (query.has("way")) { query.set("direction", query.get("way")!); query.delete("way"); }
   if (!query.has("format")) query.set("format", "csv");
   const response = await apiFetch(`${projectPath(session, path)}?${query}`);
   return new NextResponse(response.body, {

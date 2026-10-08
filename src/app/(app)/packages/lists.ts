@@ -6,11 +6,12 @@ import type { RuleLists, Pick } from "./rule-fields";
 
 /** Everything the package screens choose from: the organization's lists, its suppliers, and the project's people. */
 export async function packageLists(session: Session) {
-  const sets = [LISTS.statuses, LISTS.reasonsForIssue, LISTS.disciplines, LISTS.documentTypes, LISTS.deliverableTypes];
+  const sets = [LISTS.statuses, LISTS.reasonsForIssue, LISTS.disciplines, LISTS.documentTypes, LISTS.deliverableTypes, LISTS.purchaseOrders];
   const [values, parties, addressees] = await Promise.all([
     api<Record<string, ListValue[]>>("/api/values", { query: { sets: sets.join(",") } }),
     api<{ code: string; name: string }[]>("/api/parties"),
-    api<Addressees>(projectPath(session, "/addressees")),
+    // Another organization's people do not choose our people; they read names only.
+    api<Addressees>(projectPath(session, "/addressees")).catch(() => ({ people: [], parties: [] }) as Addressees),
   ]);
   const active = (set: string): Pick[] => (values[set] ?? []).filter((v) => v.status === "ACTIVE").map((v) => ({ code: v.code, label: v.label }));
   const rule: RuleLists = {
@@ -18,7 +19,7 @@ export async function packageLists(session: Session) {
     originators: parties.map((p) => ({ code: p.code, label: p.name })),
   };
   return {
-    statuses: active(LISTS.statuses), reasons: active(LISTS.reasonsForIssue), rule,
+    statuses: active(LISTS.statuses), reasons: active(LISTS.reasonsForIssue), orders: active(LISTS.purchaseOrders), rule,
     people: addressees.people, parties: addressees.parties,
     /** Every label, retired ones too, for reading old packages. */
     label: (set: string, code: string) => values[set]?.find((v) => v.code === code)?.label ?? code,

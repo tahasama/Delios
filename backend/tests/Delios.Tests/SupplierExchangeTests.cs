@@ -24,8 +24,11 @@ public static class Supply
     {
         using var response = await client.PostAsJsonAsync($"/api/projects/{project}/incoming/uploads", new
         {
-            fileName = name, size = bytes.Length, contentType = "application/pdf",
-            sha256 = Convert.ToHexStringLower(SHA256.HashData(bytes)), proof,
+            fileName = name,
+            size = bytes.Length,
+            contentType = "application/pdf",
+            sha256 = Convert.ToHexStringLower(SHA256.HashData(bytes)),
+            proof,
         });
         var ticket = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.True(response.IsSuccessStatusCode, ticket.ToString());
@@ -38,8 +41,15 @@ public sealed class SupplierExchangeTests(Infrastructure infrastructure) : IClas
 {
     private static object Placeholder(string title) => new
     {
-        title, deliverableType = "SUP", docType = "DAS", discipline = "ME", subproject = "20", originator = "ACME",
-        contractRef = "PO101", receivedDate = "2026-10-01", plannedDate = "2026-11-02",
+        title,
+        deliverableType = "SUP",
+        docType = "DAS",
+        discipline = "ME",
+        subproject = "20",
+        originator = "ACME",
+        contractRef = "PO101",
+        receivedDate = "2026-10-01",
+        plannedDate = "2026-11-02",
     };
 
     private static async Task<(Guid Engineer, Guid Approver, Guid Acme)> PeopleAsync(HttpClient client, Guid project)
@@ -56,9 +66,15 @@ public sealed class SupplierExchangeTests(Infrastructure infrastructure) : IClas
         var (engineerId, approverId, acme) = await PeopleAsync(engineer, project);
         var (created, package) = await Flow.PostAsync(engineer, $"/api/projects/{project}/packages", new
         {
-            kind = "SUPPLY", supplierPartyId = acme, purchaseOrder = "PO101",
-            title = "Duty pumps vendor data", reason = "APPROVAL", requiredStatuses = new[] { "IFC", "AFC" },
-            ownerIds = new[] { engineerId }, acceptorIds = new[] { approverId }, completionDate = "2026-11-30",
+            kind = "SUPPLY",
+            supplierPartyId = acme,
+            purchaseOrder = "PO101",
+            title = "Duty pumps vendor data",
+            reason = "APPROVAL",
+            requiredStatuses = new[] { "IFC", "AFC" },
+            ownerIds = new[] { engineerId },
+            acceptorIds = new[] { approverId },
+            completionDate = "2026-11-30",
         });
         Assert.True(created == HttpStatusCode.Created, package.ToString());
         return package;
@@ -78,7 +94,12 @@ public sealed class SupplierExchangeTests(Infrastructure infrastructure) : IClas
         // Theirs, but under no order: not in a package for order PO101.
         var otherOrder = (await Api.RegisterAsync(controller, project, new
         {
-            title = "Sump pump datasheet", deliverableType = "ENG", docType = "DAS", discipline = "ME", subproject = "20", originator = "ACME",
+            title = "Sump pump datasheet",
+            deliverableType = "ENG",
+            docType = "DAS",
+            discipline = "ME",
+            subproject = "20",
+            originator = "ACME",
         })).GetProperty("id").GetGuid();
         var ours = (await Api.RegisterAsync(engineer, project, Api.Drawing())).GetProperty("id").GetGuid();
 
@@ -117,12 +138,15 @@ public sealed class SupplierExchangeTests(Infrastructure infrastructure) : IClas
         var rfi = await Supply.LooseAsync(supplier, project, "rfi-012.pdf", Flow.Pdf(2));
         var (bad, badBody) = await Flow.PostAsync(supplier, $"/api/projects/{project}/transmittals/incoming", new
         {
-            reason = "APPROVAL", planned = new[] { new { documentId = ours, fileIds = new[] { file }, status = "IFA" } },
+            reason = "APPROVAL",
+            planned = new[] { new { documentId = ours, fileIds = new[] { file }, status = "IFA" } },
         });
         Assert.Equal((HttpStatusCode.Forbidden, "NOT_THEIRS"), (bad, Flow.Code(badBody)));
         var (sent, incoming) = await Flow.PostAsync(supplier, $"/api/projects/{project}/transmittals/incoming", new
         {
-            reason = "APPROVAL", theirReference = "ACME-TR-0007", message = "Datasheet for approval, and a question.",
+            reason = "APPROVAL",
+            theirReference = "ACME-TR-0007",
+            message = "Datasheet for approval, and a question.",
             planned = new[] { new { documentId = datasheet, fileIds = new[] { file }, status = "IFA" } },
             unplanned = new[] { new { title = "RFI on the pump base plate", docType = "REP", reference = "ACME-RFI-012", fileIds = new[] { rfi } } },
         });
@@ -172,7 +196,10 @@ public sealed class SupplierExchangeTests(Infrastructure infrastructure) : IClas
         Assert.Equal((HttpStatusCode.Forbidden, "CONTROL_ONLY"), (notYours, Flow.Code(notYoursBody)));
         var (registered, registeredBody) = await Flow.PostAsync(controller, register, new
         {
-            deliverableType = "SUP", discipline = "ME", subproject = "20", contractRef = "PO101",
+            deliverableType = "SUP",
+            discipline = "ME",
+            subproject = "20",
+            contractRef = "PO101",
         });
         Assert.True(registered == HttpStatusCode.OK, registeredBody.ToString());
         var item = registeredBody.GetProperty("items").EnumerateArray().Single(x => x.GetProperty("kind").GetString() == "UNPLANNED");
@@ -185,8 +212,9 @@ public sealed class SupplierExchangeTests(Infrastructure infrastructure) : IClas
         var (twice, twiceBody) = await Flow.PostAsync(controller, register, new { deliverableType = "SUP", discipline = "ME", subproject = "20", contractRef = "PO101" });
         Assert.Equal((HttpStatusCode.Conflict, "ALREADY_REGISTERED"), (twice, Flow.Code(twiceBody)));
 
-        // The package shows the request and what came back.
+        // The package shows the request and what came back; what came unplanned is not something they owed.
         var now2 = await engineer.GetFromJsonAsync<JsonElement>(p);
+        Assert.Equal(2, now2.GetProperty("members").GetArrayLength());
         Assert.Equal(new[] { "OUTGOING", "INCOMING" }, now2.GetProperty("transmittals").EnumerateArray().Select(t => t.GetProperty("direction").GetString()));
         var member = now2.GetProperty("members").EnumerateArray().Single(m => m.GetProperty("documentId").GetGuid() == datasheet);
         Assert.Equal(("A", "RECEIVED"), (member.GetProperty("latestRevision").GetString(), member.GetProperty("latestState").GetString()));
@@ -207,7 +235,10 @@ public sealed class SupplierExchangeTests(Infrastructure infrastructure) : IClas
         var letter = await Supply.LooseAsync(controller, project, "covering-letter.pdf", Flow.Pdf(), proof: true);
         var body = new
         {
-            reason = "APPROVAL", theirReference = "ACME-TR-0008", fromPartyId = acme, proofFileId = letter,
+            reason = "APPROVAL",
+            theirReference = "ACME-TR-0008",
+            fromPartyId = acme,
+            proofFileId = letter,
             planned = new[] { new { documentId = datasheet, fileIds = new[] { file }, status = "IFA" } },
         };
         var (outsider, outsiderBody) = await Flow.PostAsync(engineer, $"/api/projects/{project}/transmittals/incoming", body);
@@ -231,8 +262,11 @@ public sealed class SupplierExchangeTests(Infrastructure infrastructure) : IClas
         var drawing = (await Api.RegisterAsync(engineer, project, Api.Drawing())).GetProperty("id").GetGuid();
         var (_, package) = await Flow.PostAsync(engineer, $"/api/projects/{project}/packages", new
         {
-            title = "Handover", reason = "EXECUTION", requiredStatuses = new[] { "IFC" },
-            ownerIds = new[] { engineerId }, acceptorIds = new[] { approverId },
+            title = "Handover",
+            reason = "EXECUTION",
+            requiredStatuses = new[] { "IFC" },
+            ownerIds = new[] { engineerId },
+            acceptorIds = new[] { approverId },
         });
         var p = $"/api/projects/{project}/packages/{package.GetProperty("id").GetGuid()}";
 

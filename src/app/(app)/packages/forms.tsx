@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { addToPackageAction, createPackageAction, packageAction } from "@/lib/actions/package-acts";
+import { addToPackageAction, createPackageAction, deletePackageAction, packageAction } from "@/lib/actions/package-acts";
 import { SearchPick } from "@/components/search-pick";
 import { btn, Field, inputCls } from "@/components/ui";
 import { RuleFields, type Pick, type RuleLists } from "./rule-fields";
@@ -83,3 +83,57 @@ export function Step({ packageId, what, label, children, variant = "primary" }: 
   );
 }
 
+
+/**
+ * A new supply package: what one supplier owes us, under one order if it has
+ * several. It fills itself with that supplier's placeholders (and, if chosen,
+ * only some types of them); its owners then ask the supplier for them.
+ */
+export function SupplyForm({ statuses, reasons, people, suppliers, orders, rule, me }: {
+  statuses: Pick[]; reasons: Pick[]; people: Person[]; suppliers: Party[]; orders: Pick[]; rule: RuleLists; me: string;
+}) {
+  const [state, act, pending] = useActionState(createPackageAction, undefined);
+  const [formKey] = useState(() => crypto.randomUUID());
+  const who = people.map((p) => ({ id: p.id, name: p.name, detail: p.function }));
+  return (
+    <form action={act} className="space-y-4">
+      <input type="hidden" name="formKey" value={formKey} />
+      <input type="hidden" name="kind" value="SUPPLY" />
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        <Field label="Supplier" required>
+          <select name="supplierPartyId" required className={inputCls} defaultValue=""><option value="" disabled>Choose…</option>{suppliers.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
+        </Field>
+        <Field label="Purchase order" hint="optional — only what that order covers">
+          <select name="purchaseOrder" className={inputCls} defaultValue=""><option value="">Any</option>{orders.map((o) => <option key={o.code} value={o.code}>{o.code} · {o.label}</option>)}</select>
+        </Field>
+        <Field label="Everything due by" hint="a placeholder's own date comes first"><input type="date" name="completionDate" className={inputCls} /></Field>
+        <Field label="Title" required className="md:col-span-2"><input name="title" required className={inputCls} placeholder="Duty pumps vendor data" /></Field>
+        <Field label="Asked for" required>
+          <select name="reason" required className={inputCls} defaultValue=""><option value="" disabled>Choose…</option>{reasons.map((r) => <option key={r.code} value={r.code}>{r.label}</option>)}</select>
+        </Field>
+        <Field label="Description" hint="optional" className="md:col-span-3"><textarea name="description" rows={2} className={inputCls} /></Field>
+        <SearchPick browse name="requiredStatus" required label="Complete at" hint="the status each document must reach" items={statusItems(statuses)} />
+        <SearchPick name="ownerId" required label="Followed by" hint="ours, one or several" initial={[me]} items={who} />
+        <SearchPick name="acceptorId" required label="Accepted by" hint="not those following it" items={who} />
+      </div>
+      <div className="rounded-lg bg-tint-soft px-4 py-3">
+        <p className="mb-3 flex flex-wrap items-baseline gap-x-2"><span className="stencil text-slate-500">Only these</span><span className="text-[11px] text-slate-400">optional — otherwise every placeholder of the supplier joins, new ones too</span></p>
+        <RuleFields lists={rule} supply />
+      </div>
+      <Problem message={state?.error} />
+      <button type="submit" disabled={pending} className={btn("primary")}>{pending ? "Creating…" : "Create supply package"}</button>
+    </form>
+  );
+}
+
+/** Deleting a package: only an empty one that never went out; the backend refuses anything else. */
+export function DeletePackage({ packageId }: { packageId: string }) {
+  const [state, act, pending] = useActionState(deletePackageAction, undefined);
+  return (
+    <form action={act} onSubmit={(e) => { if (!confirm("Delete this empty package? Its number is not given out again.")) e.preventDefault(); }} className="space-y-2">
+      <input type="hidden" name="packageId" value={packageId} />
+      {state && !state.ok ? <p role="alert" className="rounded bg-red-50 px-3 py-2 text-xs text-red-700">{state.message}</p> : null}
+      <button type="submit" disabled={pending} className={btn("danger", "sm")}>{pending ? "…" : "Delete the package"}</button>
+    </form>
+  );
+}

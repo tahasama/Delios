@@ -20,7 +20,8 @@ export function FileUpload({ target, label, onUploaded, multiple = true }: {
   target: UploadTarget;
   multiple?: boolean;
   label: string;
-  onUploaded: (fileIds: string[]) => Promise<string | null>;
+  /** Told the uploaded files' ids, and their names, in the same order. */
+  onUploaded: (fileIds: string[], names: string[]) => Promise<string | null>;
 }) {
   const [files, setFiles] = useState<File[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
@@ -41,7 +42,7 @@ export function FileUpload({ target, label, onUploaded, multiple = true }: {
         ids.push(asked.ticket.fileId);
       }
       setBusy("Recording…");
-      const problem = await onUploaded(ids);
+      const problem = await onUploaded(ids, files.map((f) => f.name));
       if (problem) throw new Error(problem);
       setFiles([]);
     } catch (e) {

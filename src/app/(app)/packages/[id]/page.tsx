@@ -5,10 +5,10 @@ import { api, ApiProblem } from "@/lib/api/client";
 import type { PackageView, RegisterPage } from "@/lib/api/types";
 import { requireSession, projectPath } from "@/lib/session";
 import { LISTS } from "@/lib/lists";
-import { Card, Field, inputCls, KeyValue } from "@/components/ui";
+import { btn, Card, Field, inputCls, KeyValue } from "@/components/ui";
 import { SearchPick } from "@/components/search-pick";
 import { packageLists } from "../lists";
-import { Step } from "../forms";
+import { DeletePackage, Step } from "../forms";
 import { RuleFields } from "../rule-fields";
 import { day, PACKAGE_STATES } from "../states";
 
@@ -35,6 +35,8 @@ export default async function PackagePage({ params }: { params: Promise<{ id: st
   const open = p.state === "OPEN";
   const owns = open && session.user.isInternal && (p.ownerIds.includes(me) || session.can("CONTROL"));
   const accepts = p.acceptorIds.includes(me);
+  const supply = p.kind === "SUPPLY";
+  const mayEdit = session.user.isInternal && (p.ownerIds.includes(me) || session.can("CONTROL"));
   const [lists, register] = await Promise.all([
     packageLists(session),
     owns ? api<RegisterPage>(projectPath(session, "/register"), { query: { per: 250, sort: "docNumber", dir: "asc" } }) : null,
@@ -43,7 +45,11 @@ export default async function PackagePage({ params }: { params: Promise<{ id: st
   const party = new Map(lists.parties.map((x) => [x.id, x.name]));
   const names = (ids: string[], from: Map<string, string>) => ids.map((x) => from.get(x) ?? "someone no longer on the project").join(", ");
   const inside = new Set(p.members.map((m) => m.documentId));
-  const candidates = (register?.rows ?? []).filter((r) => !inside.has(r.id));
+  const supplierCode = lists.parties.find((x) => x.id === p.supplierPartyId)?.code;
+  // A supply package holds only what its supplier produces.
+  const candidates = (register?.rows ?? []).filter((r) => !inside.has(r.id) && (!supply || r.originator === supplierCode));
+  const unasked = supply ? p.members.filter((m) => !m.requestedAt).length : 0;
+  const sent = p.members.filter((m) => m.latestRevision).length;
   const ready = p.members.filter((m) => m.ready).length;
   const missing = p.shortfall.length > 0;
   const mayDeliver = !!p.assessedAt && (!missing || !!p.shortfallAcceptedAt) && (ready > 0 || !p.recipientPartyIds.length);
@@ -55,7 +61,9 @@ export default async function PackagePage({ params }: { params: Promise<{ id: st
     : null;
 
   const next = p.state === "ACCEPTED" ? `Accepted by ${p.acceptedBy} on ${day(p.acceptedAt)}.`
-    : !open ? `Delivered ${day(p.closedAt)}. Waiting for ${names(p.acceptorIds, person)} to accept it.`
+    : !open ? `${supply ? "Closed" : "Delivered"} ${day(p.closedAt)}. Waiting for ${names(p.acceptorIds, person)} to accept it.`
+    : supply && unasked ? `${unasked} document${unasked === 1 ? "" : "s"} not asked of ${p.supplier} yet. ${sent} of ${p.members.length} sent so far.`
+    : supply && !mayDeliver && !missing ? `${p.supplier} has been asked for everything. ${sent} of ${p.members.length} sent; ${ready} at the status needed.`
     : missing && !p.shortfallIssuedAt ? `${ready} of ${p.members.length} ready. Send what is missing to ${names(p.acceptorIds, person)} before delivering.`
     : missing && !p.shortfallAcceptedAt ? `${ready} of ${p.members.length} ready. Waiting for ${names(p.acceptorIds, person)} to accept what is missing.`
     : mayDeliver ? `${ready} of ${p.members.length} ready. It can be delivered.`
@@ -69,7 +77,7 @@ export default async function PackagePage({ params }: { params: Promise<{ id: st
           <div className="min-w-0 flex-1">
             <p className="font-mono text-[12.5px] font-semibold tracking-tight text-slate-500">{p.number}</p>
             <h1 className="plate-name mt-1 min-w-0">{p.title}</h1>
-            <p className="plate-meta mt-2">{lists.label(LISTS.reasonsForIssue, p.reason)} · needed at {p.requiredStatuses.join(" or ")}{p.completionDate ? ` · by ${day(p.completionDate)}` : ""}</p>
+            <p className="plate-meta mt-2">{supply ? `From ${p.supplier}${p.purchaseOrder ? `, order ${p.purchaseOrder}` : ""} · ` : ""}{lists.label(LISTS.reasonsForIssue, p.reason)} · {supply ? "complete at" : "needed at"} {p.requiredStatuses.join(" or ")}{p.completionDate ? ` · by ${day(p.completionDate)}` : ""}</p>
             {p.description ? <p className="mt-1.5 max-w-3xl text-[13px] leading-5 text-slate-600">{p.description}</p> : null}
           </div>
           <div className="flex shrink-0 items-center gap-2 lg:justify-end">
@@ -94,6 +102,15 @@ export default async function PackagePage({ params }: { params: Promise<{ id: st
               <Field label="Note" hint="optional"><input name="note" className={inputCls} /></Field>
             </Step>
           ) : null}
+          {!session.user.isInternal && supply && open ? (
+            <Link href="/transmittals/send" className={btn("primary", "sm")}>Send documents to us</Link>
+          ) : null}
+          {owns && supply && unasked ? (
+            <Step packageId={p.id} what="request" label={`Ask ${p.supplier} for ${unasked} document${unasked === 1 ? "" : "s"}`}>
+              <p className="text-xs text-slate-500">One transmittal to {p.supplier}, listing each placeholder with the date it is due. They fill them and send them back on a transmittal of theirs.</p>
+              <Field label="Message" hint="optional"><input name="message" className={inputCls} /></Field>
+            </Step>
+          ) : null}
           {owns ? (
             <>
               {p.members.length ? <Step packageId={p.id} what="assess" label={p.assessedAt ? "Check readiness again" : "Check readiness"} variant={p.assessedAt ? "secondary" : "primary"}>
@@ -102,10 +119,11 @@ export default async function PackagePage({ params }: { params: Promise<{ id: st
               {missing && !p.shortfallIssuedAt ? <Step packageId={p.id} what="shortfall-issue" label="Send what is missing">
                 <p className="text-xs text-slate-500">{names(p.acceptorIds, person)} decide whether it may be delivered without them.</p>
               </Step> : null}
-              {mayDeliver ? <Step packageId={p.id} what="deliver" label={p.recipientPartyIds.length ? `Deliver ${ready} document${ready === 1 ? "" : "s"}` : "Close the package"}>
-                <p className="text-xs text-slate-500">{p.recipientPartyIds.length ? `The ready documents go on transmittals to ${names(p.recipientPartyIds, party)}.` : "It names no organization, so nothing is sent: closing records that it was handed over."}</p>
+              {mayDeliver ? <Step packageId={p.id} what="deliver" label={supply ? "Close it: everything needed is here" : p.recipientPartyIds.length ? `Deliver ${ready} document${ready === 1 ? "" : "s"}` : "Close the package"}>
+                <p className="text-xs text-slate-500">{supply ? `What ${p.supplier} owed is here at the status needed (or its acceptance authority agreed to go without the rest). ${names(p.acceptorIds, person)} then accept it.`
+                  : p.recipientPartyIds.length ? `The ready documents go on transmittals to ${names(p.recipientPartyIds, party)}.` : "It names no organization, so nothing is sent: closing records that it was handed over."}</p>
                 {rule ? <label className="flex items-center gap-2 text-xs text-slate-600"><input type="checkbox" name="ruleCeased" /> No more documents will join by the rule</label> : null}
-                <Field label="Message" hint="optional — it goes on the transmittal"><input name="note" className={inputCls} /></Field>
+                <Field label={supply ? "Note" : "Message"} hint={supply ? "optional" : "optional — it goes on the transmittal"}><input name="note" className={inputCls} /></Field>
               </Step> : null}
             </>
           ) : null}
@@ -120,11 +138,15 @@ export default async function PackagePage({ params }: { params: Promise<{ id: st
           </div>
           {p.members.length ? (
             <table className="w-full text-[13px]">
-              <thead className="border-b border-line"><tr className="text-left text-slate-500"><th className="stencil px-5 py-2 font-normal">Document</th><th className="stencil px-3 py-2 font-normal">Has</th><th className="stencil px-3 py-2 font-normal">Needs</th><th className="stencil px-3 py-2 font-normal">Ready</th></tr></thead>
+              <thead className="border-b border-line"><tr className="text-left text-slate-500"><th className="stencil px-5 py-2 font-normal">Document</th>{supply ? <><th className="stencil px-3 py-2 font-normal">Due</th><th className="stencil px-3 py-2 font-normal">Sent</th></> : null}<th className="stencil px-3 py-2 font-normal">Has</th><th className="stencil px-3 py-2 font-normal">Needs</th><th className="stencil px-3 py-2 font-normal">Ready</th></tr></thead>
               <tbody className="divide-y divide-line">
                 {p.members.map((m) => (
                   <tr key={m.documentId}>
                     <td className="px-5 py-2"><Link href={`/documents/${m.documentId}`} className="doc-number">{m.documentNumber}</Link><span className="block text-xs text-slate-500">{m.title}{m.byRule ? " · by the rule" : ""}</span></td>
+                    {supply ? <>
+                      <td className="px-3 py-2 text-xs text-slate-600">{m.dueDate ? day(m.dueDate) : "—"}{m.requestedAt ? null : <span className="block text-[11px] text-amber-700">not asked yet</span>}</td>
+                      <td className="px-3 py-2 text-xs text-slate-600">{m.latestRevision ? `rev ${m.latestRevision} · ${(m.latestState ?? "").replaceAll("_", " ").toLowerCase()}` : "nothing yet"}</td>
+                    </> : null}
                     <td className="px-3 py-2 text-xs text-slate-600">{m.revision ? `rev ${m.revision} · ${m.status ?? ""}` : "not released"}</td>
                     <td className="px-3 py-2 text-xs text-slate-600">{m.required.join(" or ")}</td>
                     <td className="px-3 py-2">{m.ready ? <span className="rounded-md bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">ready</span> : <span className="rounded-md bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800">not ready</span>}</td>
@@ -137,14 +159,15 @@ export default async function PackagePage({ params }: { params: Promise<{ id: st
 
         <Card title="About">
           <KeyValue items={[
-            { label: "Put together by", value: names(p.ownerIds, person) },
+            ...(supply ? [{ label: "Supplier", value: p.supplier ?? "" }, { label: "Order", value: p.purchaseOrder ?? "any" }] : []),
+            { label: supply ? "Followed by" : "Put together by", value: names(p.ownerIds, person) },
             { label: "Accepted by", value: names(p.acceptorIds, person) },
-            { label: "Delivered to", value: p.recipientPartyIds.length ? names(p.recipientPartyIds, party) : "nobody: closed when done" },
+            ...(supply ? [] : [{ label: "Delivered to", value: p.recipientPartyIds.length ? names(p.recipientPartyIds, party) : "nobody: closed when done" }]),
             { label: "Fills itself with", value: rule ?? "nothing: by hand" },
             { label: "Created by", value: p.createdBy },
             ...(p.shortfallAcceptedBy ? [{ label: "Missing accepted by", value: `${p.shortfallAcceptedBy}, ${day(p.shortfallAcceptedAt)}` }] : []),
             ...(p.closedBy ? [{ label: "Delivered by", value: `${p.closedBy}, ${day(p.closedAt)}` }] : []),
-            ...(p.transmittals.length ? [{ label: "Transmittals", value: p.transmittals.join(", ") }] : []),
+            ...(p.transmittals.length ? [{ label: "Transmittals", value: <span className="space-y-0.5">{p.transmittals.map((t) => <Link key={t.id} href={`/transmittals/${t.id}`} className="block font-mono text-xs font-semibold text-link hover:underline">{t.number}<span className="font-sans font-normal text-slate-500"> · {t.direction === "INCOMING" ? "from them" : supply ? "asked" : "sent"} {day(t.issuedAt)}</span></Link>)}</span> }] : []),
             ...(p.closureNote ? [{ label: "Message", value: p.closureNote }] : []),
           ]} />
         </Card>
@@ -176,12 +199,28 @@ export default async function PackagePage({ params }: { params: Promise<{ id: st
               </Step>
             </Card>
           ) : null}
-          <Card title={rule ? "Change the rule" : "Fill it by a rule"}>
+          <Card title={supply ? "Which of their documents" : rule ? "Change the rule" : "Fill it by a rule"}>
             <Step packageId={p.id} what="rule" label="Save the rule" variant="secondary">
               <p className="text-xs text-slate-500">Every document matching all you choose joins, new ones too, until it is delivered. Clear every choice to fill it by hand only.</p>
-              <RuleFields lists={lists.rule} initial={p.rule} />
+              <RuleFields lists={lists.rule} initial={p.rule} supply={supply} />
             </Step>
           </Card>
+        </div>
+      ) : null}
+
+      {mayEdit ? (
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <Card title="Name and description">
+            <Step packageId={p.id} what="rename" label="Save" variant="secondary">
+              <Field label="Title" required><input name="title" required defaultValue={p.title} className={inputCls} /></Field>
+              <Field label="Description" hint="optional"><textarea name="description" rows={2} defaultValue={p.description ?? ""} className={inputCls} /></Field>
+            </Step>
+          </Card>
+          {open && !p.members.length && !p.transmittals.length ? (
+            <Card title="Delete it" description="Only an empty package that never went out">
+              <DeletePackage packageId={p.id} />
+            </Card>
+          ) : null}
         </div>
       ) : null}
     </div>

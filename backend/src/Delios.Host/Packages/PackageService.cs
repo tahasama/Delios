@@ -564,6 +564,9 @@ public sealed class PackageService(
         if (rule.Originators.Length > 0) query = query.Where(d => d.Originator != null && rule.Originators.Contains(d.Originator));
         // A supplier with several orders: each supply package holds what its own order covers.
         if (package.Kind == PackageKinds.Supply && package.PurchaseOrder is { } order) query = query.Where(d => d.ContractRef == order);
+        // What a supplier owes is what was planned; something it sent unplanned (an RFI, an NCR) and we registered is not.
+        if (package.Kind == PackageKinds.Supply)
+            query = query.Where(d => !db.TransmittalItems.Any(i => i.DocumentId == d.Id && i.Kind == TransmittalItemKinds.Unplanned));
         var have = package.Members.Select(m => m.DocumentId).Concat(package.Excluded).ToList();
         var fresh = await query.Where(d => !have.Contains(d.Id)).Select(d => d.Id).ToListAsync(cancellationToken);
         foreach (var documentId in fresh) package.Members.Add(NewMember(package, documentId, [], byRule: true));

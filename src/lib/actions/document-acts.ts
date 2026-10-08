@@ -16,17 +16,23 @@ export type ActResult = { ok: true; message?: string } | { ok: false; message: s
 
 export type UploadTicket = { fileId: string; method: string; url: string; headers: Record<string, string>; expiresAt: string };
 
-/** Where an upload goes: a document's next files, or the proof of another organization's answer on a review. */
-export type UploadTarget = { documentId: string } | { reviewId: string } | { transmittalId: string };
+/**
+ * Where an upload goes: a document's next files, the proof of another
+ * organization's answer on a review or of a dispatch, or a file sent to us that
+ * belongs to no document yet (an unplanned item's, or, `proof`, a covering letter).
+ */
+export type UploadTarget = { documentId: string } | { reviewId: string } | { transmittalId: string } | { loose: true; proof?: boolean };
 
 /** An upload link for one file, after the backend has checked its name, size and fingerprint. */
 export async function requestUploadAction(target: UploadTarget, file: { fileName: string; size: number; contentType: string; sha256: string }):
   Promise<{ ok: true; ticket: UploadTicket } | { ok: false; message: string }> {
   const session = await requireSession();
   const path = "documentId" in target ? `/documents/${target.documentId}/uploads`
-    : "reviewId" in target ? `/reviews/${target.reviewId}/evidence` : `/transmittals/${target.transmittalId}/evidence`;
+    : "reviewId" in target ? `/reviews/${target.reviewId}/evidence`
+    : "transmittalId" in target ? `/transmittals/${target.transmittalId}/evidence` : "/incoming/uploads";
+  const body = "loose" in target ? { ...file, proof: !!target.proof } : file;
   try {
-    return { ok: true, ticket: await api<UploadTicket>(projectPath(session, path), { body: file }) };
+    return { ok: true, ticket: await api<UploadTicket>(projectPath(session, path), { body }) };
   } catch (e) {
     return { ok: false, message: refusal(e).message };
   }

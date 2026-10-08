@@ -4,7 +4,7 @@ import { useActionState, useState } from "react";
 import { FileUpload } from "@/components/file-upload";
 import { btn, inputCls } from "@/components/ui";
 import type { ActResult } from "@/lib/actions/document-acts";
-import { acknowledgeAction, dispatchRecipientAction } from "@/lib/actions/transmittal-acts";
+import { acknowledgeAction, dispatchRecipientAction, registerItemAction } from "@/lib/actions/transmittal-acts";
 
 function Result({ state }: { state: ActResult | undefined }) {
   if (!state) return null;
@@ -45,5 +45,40 @@ export function Dispatch({ transmittalId, recipientId, name }: { transmittalId: 
         <button type="submit" disabled={pending} className={btn("primary", "sm")}>{pending ? "…" : `Record it as sent to ${name}`}</button>
       </form>
     </div>
+  );
+}
+
+type Pick = { code: string; label: string };
+
+/**
+ * Document Control puts something that came unplanned into our register: it
+ * gets our number from what is chosen here; it is originated by the sender.
+ */
+export function RegisterItem({ transmittalId, itemId, title, docType, lists }: {
+  transmittalId: string; itemId: string; title: string; docType: string | null;
+  lists: { deliverableTypes: Pick[]; docTypes: Pick[]; disciplines: Pick[]; subprojects: Pick[]; orders: Pick[] };
+}) {
+  const [state, act, pending] = useActionState(registerItemAction, undefined);
+  const select = (name: string, list: Pick[], value?: string | null, blank?: string) => (
+    <select name={name} defaultValue={value ?? (blank === undefined ? list[0]?.code : "")} className={inputCls}>
+      {blank !== undefined ? <option value="">{blank}</option> : null}
+      {list.map((v) => <option key={v.code} value={v.code}>{v.label}</option>)}
+    </select>
+  );
+  return (
+    <form action={act} className="space-y-2">
+      <input type="hidden" name="transmittalId" value={transmittalId} />
+      <input type="hidden" name="itemId" value={itemId} />
+      <input name="title" defaultValue={title} className={inputCls} aria-label="Title" />
+      <div className="grid gap-2 sm:grid-cols-2">
+        <label className="text-[11px] text-slate-500">Deliverable type{select("deliverableType", lists.deliverableTypes)}</label>
+        <label className="text-[11px] text-slate-500">Document type{select("docType", lists.docTypes, docType)}</label>
+        <label className="text-[11px] text-slate-500">Discipline{select("discipline", lists.disciplines)}</label>
+        <label className="text-[11px] text-slate-500">Subproject{select("subproject", lists.subprojects, null, "—")}</label>
+        <label className="text-[11px] text-slate-500">Purchase order{select("contractRef", lists.orders, null, "—")}</label>
+      </div>
+      <Result state={state} />
+      <button type="submit" disabled={pending} className={btn("primary", "sm")}>{pending ? "…" : "Register it under our numbering"}</button>
+    </form>
   );
 }
