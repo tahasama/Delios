@@ -1,184 +1,73 @@
 import Link from "next/link";
-import { requireScope } from "@/lib/scope";
-import { Field, inputCls, Info } from "@/components/ui";
-import { ActionForm } from "@/components/form";
-import { Asked, Added } from "@/components/policy-fields";
-import { formPolicy } from "@/lib/field-policy";
-import { createPackageAction } from "@/lib/actions/planning";
-import { createSupplierPackageAction } from "@/lib/actions/supplier";
-import { supplierRows, supplierFigures } from "@/lib/supplier";
-import { isController, isAdmin } from "@/lib/auth";
-import { departmentsOf } from "@/lib/schedule";
-import { getActiveSet } from "@/lib/config";
-import { fmtDate } from "@/lib/utils";
-import { Download } from "lucide-react";
-import { isReadOnly } from "@/lib/auth";
-import { SearchPick } from "@/components/search-pick";
-import { RuleFields } from "./rule-fields";
-import { meetsStatus, statusList } from "@/lib/package-rule";
+import { api } from "@/lib/api/client";
+import type { ListValue, PackageSummary } from "@/lib/api/types";
+import { requireSession, projectPath } from "@/lib/session";
+import { LISTS } from "@/lib/lists";
+import { packageLists } from "./lists";
+import { CreateForm } from "./forms";
+import { day, PACKAGE_STATES } from "./states";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Packages" };
 
-export default async function PackagesPage({ searchParams }: { searchParams: Promise<{ category?: string }> }) {
-  const ctx = await requireScope();
-  const packagePolicy = await formPolicy(ctx, "PACKAGE");
-  const { user, db } = ctx;
-  const staff = isController(user) || isAdmin(user);
-  // A supplier only ever sees its own package.
-  const supplierOnly = !user.isInternal;
-  const requested = (await searchParams).category;
-  // Activities live in Schedule & actions now; a package is what we receive from a supplier, or what we hand over.
-  // Outside readers see the packages that concern them — theirs to deliver, or
-  // addressed to them — and nothing else; the tenant client sees to that.
-  const category = requested === "DELIVERY" ? "DELIVERY" : "SUPPLIER";
-  const [pkgs, reasons, statuses, users] = await Promise.all([
-    db.package.findMany({ where: { category }, orderBy: { completionDate: "asc" }, include: { members: { include: { document: { include: { revisions: { where: { state: "RELEASED" }, orderBy: { releasedAt: "desc" }, take: 1 } } } } } } }),
-    getActiveSet("REASONS_FOR_ISSUE"), getActiveSet("STATUSES"),
-    // Anyone on the project may put a package together or accept it.
-    db.projectMembership.findMany({ where: { projectId: ctx.projectId, active: true, user: { active: true } }, orderBy: { user: { name: "asc" } }, select: { user: { select: { id: true, name: true } }, function: { select: { name: true } } } })
-      .then((rows) => rows.map((one) => ({ id: one.user.id, name: one.user.name, functionName: one.function?.name ?? "" }))),
+/**
+ * Packages: documents we hand to one or several organizations together, each
+ * at a status, by a date. Put together, checked, delivered on transmittals,
+ * then accepted.
+ */
+export default async function PackagesPage() {
+  const session = await requireSession();
+  const mayCreate = session.user.isInternal && (session.can("CREATE") || session.can("TRANSMIT") || session.can("CONTROL"));
+  const [packages, lists, reasons] = await Promise.all([
+    api<PackageSummary[]>(projectPath(session, "/packages")),
+    mayCreate ? packageLists(session) : null,
+    api<Record<string, ListValue[]>>("/api/values", { query: { sets: LISTS.reasonsForIssue } }),
   ]);
-  // A status code on its own says nothing to a newcomer: AB is "as-built".
-  const statusMeaning = new Map(statuses.map((s) => [s.code, typeof s.props.may === "string" ? `${s.label}: ${s.props.may}` : s.label]));
-  // Our own organization first: a package may be an internal handover.
-  const parties = supplierOnly ? [] : await db.party.findMany({ where: { OR: [{ active: true }, { isInternal: true }] }, orderBy: [{ isInternal: "desc" }, { name: "asc" }] });
-  const supplierStats = new Map<string, ReturnType<typeof supplierFigures>>();
-  if (category === "SUPPLIER") for (const p of pkgs) supplierStats.set(p.id, supplierFigures(await supplierRows(ctx, p)));
-  // "For the schedule": each action's documents, read as a package.
-  const rows = pkgs.map((pkg) => {
-    const ready = pkg.members.filter((member) => meetsStatus(member.document.revisions[0]?.statusCode, member.requiredStatus)).length;
-    const total = pkg.members.length;
-    const days = Math.ceil((pkg.completionDate.getTime() - Date.now()) / 86_400_000);
-    const state = pkg.acceptedAt ? "ACCEPTED" : pkg.closedAt ? "CLOSED" : pkg.shortfall ? "SHORTFALL" : pkg.assessedAt ? "READY" : days < 0 ? "OVERDUE" : "OPEN";
-    return { ...pkg, ready, total, days, state };
-  });
-
-  const tabs = [
-    { code: "SUPPLIER", label: "From suppliers", says: "everything a supplier owes us; they send from it" },
-    { code: "DELIVERY", label: "To deliver", says: "documents we hand to an organization by a date, on one transmittal" },
-  ] as const;
-  const here = tabs.find((one) => one.code === category)!;
+  const reason = (code: string) => reasons[LISTS.reasonsForIssue]?.find((v) => v.code === code)?.label ?? code;
   const th = "stencil px-3 py-2 text-left font-normal text-slate-500 first:pl-5 sm:first:pl-6";
   const td = "px-3 py-2.5 align-top first:pl-5 sm:first:pl-6";
+  const today = new Date().toISOString().slice(0, 10);
 
   return <div className="space-y-4">
     <section className="register register-sheet register-sheet-open">
       <div className="border-b border-line px-5 pt-6 pb-3 sm:px-6">
-        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-          <h1 className="plate-title min-w-0 text-slate-950">Packages</h1>
-          <a href="/api/export/packages" className="ask inline-flex items-center gap-1.5"><Download className="h-3.5 w-3.5"/> Export CSV</a>
-        </div>
-        <p className="mt-1 max-w-2xl text-[11.5px] leading-4 text-slate-500">{supplierOnly ? "What your company is asked to send, and where each document stands." : here.says.charAt(0).toUpperCase() + here.says.slice(1) + "."}</p>
-        {(
-          <nav className="seg mt-3 w-fit max-w-full">
-            {tabs.map((c) => (
-              <Link key={c.code} href={`/packages?category=${c.code}`} aria-current={category === c.code ? "page" : undefined} className="segment">{c.label}</Link>
-            ))}
-          </nav>
-        )}
+        <h1 className="plate-title min-w-0 text-slate-950">Packages</h1>
+        <p className="mt-1 max-w-2xl text-[11.5px] leading-4 text-slate-500">Documents we hand over together, each at the status it needs, by a date.</p>
       </div>
-
-      {category === "SUPPLIER" ? (
-        rows.length ? (
-          <div className="overflow-x-auto">
-            <table className="w-full text-[13px]">
-              <thead className="border-b border-line bg-tint-soft"><tr><th className={th}>Supplier</th><th className={th}>Sent</th><th className={th}>Overdue</th><th className={th}>Waiting on</th><th className={th}>Due</th></tr></thead>
-              <tbody className="divide-y divide-line">
-                {rows.map((pkg) => {
-                  const f = supplierStats.get(pkg.id)!;
-                  return (
-                    <tr key={pkg.id} className="hover:bg-tint-soft">
-                      <td className={td}><Link href={`/packages/${pkg.identifier}`} className="font-semibold text-brand-ink hover:underline">{pkg.title ?? pkg.recipientName}</Link><span className="block font-mono text-[11px] text-slate-400">{pkg.identifier}</span></td>
-                      <td className={`${td} text-xs`}>{f.arrived} of {f.planned} <span className="text-slate-400">({f.submissionProgress}%)</span></td>
-                      <td className={`${td} text-xs ${f.notArrivedLate ? "font-semibold text-red-700" : "text-slate-400"}`}>{f.notArrivedLate || "—"}</td>
-                      <td className={`${td} text-xs`}>{f.pendingOurs} with us · {f.pendingSupplier} with them</td>
-                      <td className={`${td} whitespace-nowrap text-xs`}>{fmtDate(pkg.completionDate)}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        ) : <p className="px-5 py-8 text-center text-sm text-slate-400 sm:px-6">{supplierOnly ? "Nothing is expected from you yet. When documents are requested from your company they appear here." : "No supplier packages yet. One lists every document you expect from one supplier; they send from it."}</p>
-      ) : rows.length ? (
+      {packages.length ? (
         <div className="overflow-x-auto">
           <table className="w-full text-[13px]">
-            <thead className="border-b border-line bg-tint-soft"><tr><th className={th}>Package</th><th className={th}>State</th><th className={th}>Ready <Info>Ready: the document&apos;s current released revision carries the status the package asks for.</Info></th><th className={th}>Due</th><th className={th}>Accepted by</th></tr></thead>
+            <thead className="border-b border-line bg-tint-soft"><tr><th className={th}>Package</th><th className={th}>State</th><th className={th}>Documents</th><th className={th}>Why</th><th className={th}>Due</th></tr></thead>
             <tbody className="divide-y divide-line">
-              {rows.map((pkg) => {
-                const percent = pkg.total ? Math.round(pkg.ready / pkg.total * 100) : 0;
+              {packages.map((p) => {
+                const state = PACKAGE_STATES[p.state] ?? { label: p.state.toLowerCase(), tone: "bg-slate-100 text-slate-600" };
+                const late = p.state === "OPEN" && !!p.completionDate && p.completionDate < today;
                 return (
-                  <tr key={pkg.id} className="hover:bg-tint-soft">
-                    <td className={td}><Link href={`/packages/${pkg.identifier}`} className="font-mono text-[13px] font-semibold text-brand-ink hover:underline">{pkg.identifier}</Link><span className="block max-w-80 truncate text-[13px] text-slate-800">{pkg.title ?? `Delivery to ${pkg.recipientName}`}</span><span className="block max-w-80 truncate text-xs text-slate-500">to {pkg.recipientName}</span></td>
-                    <td className={td}><Status state={pkg.state}/></td>
-                    <td className={td}><div className="flex items-center gap-2"><div className="h-1.5 w-20 overflow-hidden rounded-full bg-canvas-deep"><div className={`h-full rounded-full ${percent === 100 ? "bg-emerald-500" : "bg-[#d9a441]"}`} style={{ width: `${percent}%` }}/></div><span className="text-xs text-slate-600">{pkg.ready} of {pkg.total} at {statusList(pkg.requiredStatus).join(" or ")}<Info>{statusList(pkg.requiredStatus).map((code) => `${code} — ${statusMeaning.get(code) ?? code}`).join("\n")}</Info></span></div></td>
-                    <td className={`${td} whitespace-nowrap text-xs`}>{fmtDate(pkg.completionDate)}{!pkg.closedAt ? <span className={`block text-[11px] ${pkg.days < 0 ? "text-red-700" : "text-slate-400"}`}>{pkg.days < 0 ? `${Math.abs(pkg.days)} days late` : `in ${pkg.days} days`}</span> : null}</td>
-                    <td className={`${td} text-xs`}>{pkg.acceptanceAuthorityName}</td>
+                  <tr key={p.id} className="hover:bg-tint-soft">
+                    <td className={td}><Link href={`/packages/${p.id}`} className="font-mono text-[13px] font-semibold text-brand-ink hover:underline">{p.number}</Link><span className="block max-w-80 truncate text-[13px] text-slate-800">{p.title}</span></td>
+                    <td className={td}><span className={`rounded-md px-2 py-0.5 text-[10px] font-bold ${late ? "bg-red-100 text-red-800" : state.tone}`}>{late ? "overdue" : state.label}</span></td>
+                    <td className={`${td} text-xs`}>{p.members}{p.hasRule ? <span className="block text-[11px] text-slate-400">fills itself by a rule</span> : null}</td>
+                    <td className={`${td} text-xs`}>{reason(p.reason)}</td>
+                    <td className={`${td} whitespace-nowrap text-xs ${late ? "font-semibold text-red-700" : ""}`}>{day(p.completionDate) || "—"}</td>
                   </tr>
                 );
               })}
             </tbody>
           </table>
         </div>
-      ) : <p className="px-5 py-8 text-center text-sm text-slate-400 sm:px-6">No delivery packages yet. One groups documents we hand to an organization together by a date.</p>}
+      ) : <p className="px-5 py-8 text-center text-sm text-slate-400 sm:px-6">No packages yet. One groups documents we hand to an organization together by a date.</p>}
     </section>
 
-    {staff && category === "SUPPLIER" ? (
-      <details className="register register-sheet register-sheet-open">
-        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-3 sm:px-6">
-          <span className="text-[13px] text-slate-600">Expecting documents from a new supplier?</span>
-          <span className="ask">New supplier package</span>
-        </summary>
-        <div className="border-t border-line px-5 py-4 sm:px-6">
-          <ActionForm action={createSupplierPackageAction} submitLabel="Create">
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <Field label="Supplier" required><select name="partyCode" required className={inputCls} defaultValue=""><option value="" disabled>Choose…</option>{parties.filter((p) => !p.isInternal).map((p) => <option key={p.id} value={p.code}>{p.name}</option>)}</select></Field>
-              <Field label="PO" hint="optional — one package per PO"><input name="po" className={inputCls} /></Field>
-              <Field label="Everything due by" required><input type="date" name="dueDate" required className={inputCls} /></Field>
-              <Field label="Needed at status" required><select name="requiredStatus" required className={inputCls} defaultValue=""><option value="" disabled>Choose…</option>{statuses.map((item) => <option key={item.code} value={item.code}>{item.code} · {item.label}</option>)}</select></Field>
-              <SearchPick name="acceptanceAuthorityId" required label="Accepted by" hint="one or several, not you — any one of them accepts" items={users.filter((u) => u.id !== user.id).map((person) => ({ id: person.id, name: person.name }))} />
-            </div>
-            <p className="text-[11px] text-slate-500">Every placeholder whose supplier is this company is in the package automatically.</p>
-          </ActionForm>
-        </div>
-      </details>
-    ) : null}
-
-    {!isReadOnly(user) && category === "DELIVERY" ? (
+    {lists ? (
       <details className="register register-sheet register-sheet-open">
         <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-3 sm:px-6">
           <span className="text-[13px] text-slate-600">Documents to hand over together?</span>
-          <span className="ask">New delivery package</span>
+          <span className="ask">New package</span>
         </summary>
         <div className="border-t border-line px-5 py-4 sm:px-6">
-          <ActionForm action={createPackageAction} submitLabel="Create package">
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-              <Asked policy={packagePolicy} field="title" hint="numbered PK-… when created" className="md:col-span-2">
-                {({ required }) => <input name="title" required={required} className={inputCls} placeholder="Operations handover — pump house" />}
-              </Asked>
-              <Asked policy={packagePolicy} field="completionDate">
-                {({ required }) => <input type="date" name="completionDate" required={required} className={inputCls} />}
-              </Asked>
-              <Asked policy={packagePolicy} field="description" hint="what it is for, anything the recipient should know" className="md:col-span-3">
-                {({ required }) => <textarea name="description" required={required} rows={2} className={inputCls} />}
-              </Asked>
-              <Added fields={packagePolicy.own} />
-              <SearchPick browse name="recipientPartyIds" required label="Delivered to" hint="one or several — us too, for an internal handover" items={parties.map((p) => ({ id: p.id, name: p.isInternal ? `${p.name} (us)` : p.name }))} />
-              <SearchPick browse name="purpose" required label="Why they get it" hint="one or several" items={reasons.map((item) => ({ id: item.code, name: item.label, detail: item.code }))} />
-              <SearchPick browse name="requiredStatus" required label="Needed at" hint="one or several — ready at any of them" items={statuses.map((item) => ({ id: item.code, name: item.code, detail: item.label }))} />
-              <SearchPick name="compositionOwnerId" required label="Put together by" hint="one or several" items={users.map((person) => ({ id: person.id, name: person.name, detail: person.functionName }))} />
-              <SearchPick name="acceptanceAuthorityId" required label="Accepted by" hint="one or several, not those putting it together — any one of them accepts at the end and decides on anything missing" items={users.map((person) => ({ id: person.id, name: person.name, detail: person.functionName }))} />
-            </div>
-            <div className="rounded-lg bg-tint-soft px-4 py-3">
-              <p className="mb-3 flex flex-wrap items-baseline gap-x-2"><span className="stencil text-slate-500">Fills itself with</span><span className="text-[11px] text-slate-400">optional — every document matching all you choose joins, new ones too; you can still add or take out by hand</span></p>
-              <RuleFields />
-            </div>
-          </ActionForm>
+          <CreateForm statuses={lists.statuses} reasons={lists.reasons} people={lists.people} parties={lists.parties} rule={lists.rule} me={session.user.id} />
         </div>
       </details>
     ) : null}
   </div>;
 }
-
-function Status({ state }: { state: string }) { const cls = state === "READY" || state === "CLOSED" || state === "ACCEPTED" ? "bg-emerald-100 text-emerald-800" : state === "OVERDUE" ? "bg-red-100 text-red-800" : state === "SHORTFALL" ? "bg-amber-100 text-amber-800" : "bg-slate-100 text-slate-600"; return <span className={`rounded-md px-2 py-0.5 text-[10px] font-bold ${cls}`}>{state === "CLOSED" ? "delivered" : state.toLowerCase()}</span>; }

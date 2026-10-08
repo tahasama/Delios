@@ -42,7 +42,15 @@ Each area: the screens, then any backend functions they need that do not exist y
       Not carried over: incoming transmittals as a separate record (another
       organization's submissions arrive as revisions, checked on arrival),
       drafts, "notify again".
-- [ ] **Packages**
+- [x] **Packages**: the list, a new package (why, the statuses needed, who it
+      goes to, who puts it together and who accepts it, an optional rule it fills
+      itself by), a package (its documents and whether each is ready, adding and
+      taking out, the rule, checking readiness, sending what is missing to the
+      acceptance authority and their acceptance, delivering on transmittals,
+      accepting), and adding documents ticked in the register.
+      Not carried over: supplier packages (what a supplier owes us; their
+      submissions arrive as revisions instead), renaming a package, and deleting
+      one (records are kept).
 - [ ] **Schedule and activities**: the schedule document, activities, needs, waivers, decisions, lateness.
 - [ ] **Assurance**: checks and the defect register.
 - [ ] **Reports**

@@ -193,3 +193,25 @@ export type Distribution = {
   others: { id: string; name: string; function: string; organization: string | null }[];
   parties: { id: string; code: string; name: string; participation: string }[];
 };
+
+/** GET /packages (PackageEndpoints.cs PackageSummary). */
+export type PackageSummary = {
+  id: string; number: string; title: string; reason: string; state: string; members: number;
+  hasRule: boolean; completionDate: string | null; createdAt: string;
+};
+
+/** The rule a package fills itself by (Entities.cs PackageRule); empty lists mean any. */
+export type PackageRule = { deliverableTypes: string[]; disciplines: string[]; docTypes: string[]; originators: string[] };
+
+/** GET /packages/{id} (PackageEndpoints.cs PackageView). */
+export type PackageView = {
+  id: string; number: string; title: string; description: string | null; reason: string;
+  requiredStatuses: string[]; completionDate: string | null; rule: PackageRule | null; excluded: string[];
+  recipientPartyIds: string[]; ownerIds: string[]; acceptorIds: string[]; state: string;
+  assessedAt: string | null; shortfall: { documentId: string; documentNumber: string; required: string[]; current: string | null }[];
+  shortfallIssuedAt: string | null; shortfallAcceptedAt: string | null; shortfallAcceptedBy: string | null;
+  closedAt: string | null; closedBy: string | null; closureNote: string | null;
+  acceptedAt: string | null; acceptedBy: string | null; createdBy: string;
+  members: { documentId: string; documentNumber: string; title: string; revision: string | null; status: string | null; required: string[]; ready: boolean; byRule: boolean }[];
+  transmittals: string[];
+};
