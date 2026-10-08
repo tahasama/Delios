@@ -155,6 +155,9 @@ public sealed class SupplierExchangeTests(Infrastructure infrastructure) : IClas
         // The RFI waits on the transmittal until Document Control registers it, under our numbering.
         var work = await controller.GetFromJsonAsync<JsonElement>($"/api/projects/{project}/work");
         Assert.Contains(work.GetProperty("issues").EnumerateArray(), x => x.GetProperty("kind").GetString() == "REGISTER_UNPLANNED");
+        var log = await controller.GetFromJsonAsync<JsonElement>($"/api/projects/{project}/transmittals/log?direction=INCOMING&status=TO_REGISTER");
+        var row = log.GetProperty("rows").EnumerateArray().Single();
+        Assert.Equal(("Acme Pumps", "ACME-TR-0007"), (row.GetProperty("from").GetString(), row.GetProperty("theirReference").GetString()));
         var unplanned = items.Single(i => i.GetProperty("kind").GetString() == "UNPLANNED");
         Assert.Equal(("ACME-RFI-012", JsonValueKind.Null), (unplanned.GetProperty("documentNumber").GetString(), unplanned.GetProperty("documentId").ValueKind));
         for (var i = 0; i < 150; i++)

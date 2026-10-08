@@ -9,12 +9,13 @@ using NodaTime;
 namespace Delios.Host.Transmittals;
 
 /// <summary>The transmittal log's filters, as the address carries them. Every one is optional.</summary>
-/// <param name="Status">TO_SEND, OVERDUE, AWAITING_REPLY, AWAITING_ACK or COMPLETE: what it still waits on.</param>
-/// <param name="Party">An outside party's code: only what went to it.</param>
+/// <param name="Status">TO_SEND, OVERDUE, AWAITING_REPLY, AWAITING_ACK, TO_REGISTER or COMPLETE: what it still waits on.</param>
+/// <param name="Party">An outside party's code: only what went to it, or came from it.</param>
+/// <param name="Direction">OUTGOING (what we sent) or INCOMING (what was sent to us).</param>
 /// <param name="On">Which date the from/to window reads: issued (the default) or due.</param>
 public sealed record TransmittalFilter(
     string? Q = null, string? Status = null, string? Reason = null, string? Party = null, string? On = null, DateOnly? From = null,
-    DateOnly? To = null, string? Sort = null, string? Dir = null, string? Ids = null);
+    DateOnly? To = null, string? Sort = null, string? Dir = null, string? Ids = null, string? Direction = null);
 
 /// <summary>One recipient in a log row, and whether they have acknowledged it (or, for an organization outside, whether it went).</summary>
 public sealed record LogRecipient(Guid Id, string Name, bool Seen);
@@ -22,7 +23,8 @@ public sealed record LogRecipient(Guid Id, string Name, bool Seen);
 /// <summary>One row of the transmittal log.</summary>
 public sealed record LogRow(
     Guid Id, string Number, string Subject, string Reason, string ToName, string IssuedBy, DateTimeOffset IssuedAt, int Documents,
-    string Status, IReadOnlyList<LogRecipient> Recipients, bool ResponseRequired, DateOnly? ResponseDue, bool ForReview);
+    string Status, IReadOnlyList<LogRecipient> Recipients, bool ResponseRequired, DateOnly? ResponseDue, bool ForReview,
+    string Direction, string? From, string? TheirReference);
 
 /// <summary>
 /// The transmittal log: every transmittal the caller may see, with what each
@@ -33,6 +35,8 @@ public static class TransmittalLogEndpoints
     public static class States
     {
         public const string ToSend = "TO_SEND", Overdue = "OVERDUE", AwaitingReply = "AWAITING_REPLY", AwaitingAck = "AWAITING_ACK", Complete = "COMPLETE";
+        /// <summary>Incoming, with something unplanned Document Control has not registered yet.</summary>
+        public const string ToRegister = "TO_REGISTER";
     }
 
     public static void MapTransmittalLogEndpoints(this IEndpointRouteBuilder app)
@@ -72,9 +76,10 @@ public static class TransmittalLogEndpoints
             .Select(t => t.Id).ToListAsync(cancellationToken);
         var rows = await RowsAsync(db, ids, today, cancellationToken);
         var report = new Report("transmittals", "Transmittal log", "", "", [], new Chart("", [], []),
-            ["Transmittal", "Issued", "From", "To", "Reason", "Subject", "Documents", "State", "Answer due", "Acknowledged"],
+            ["Transmittal", "Direction", "Issued", "From", "To", "Their reference", "Reason", "Subject", "Documents", "State", "Answer due", "Acknowledged"],
             [.. rows.Select(r => (IReadOnlyList<Cell>)[
-                r.Number, r.IssuedAt.ToString("yyyy-MM-dd"), r.IssuedBy, r.ToName, r.Reason, r.Subject, r.Documents.ToString(), r.Status,
+                r.Number, r.Direction, r.IssuedAt.ToString("yyyy-MM-dd"), r.From ?? r.IssuedBy, r.ToName, r.TheirReference ?? "", r.Reason, r.Subject,
+                r.Documents.ToString(), r.Status,
                 r.ResponseDue?.ToString("yyyy-MM-dd") ?? "", $"{r.Recipients.Count(x => x.Seen)}/{r.Recipients.Count}"])],
             "", clock.GetCurrentInstant().ToDateTimeOffset());
         var heading = $"Transmittal log, {access.Project.Code}, counted {report.CountedAt:yyyy-MM-dd HH:mm} UTC";
@@ -107,6 +112,7 @@ public static class TransmittalLogEndpoints
                 {
                     var pattern = $"%{word.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_")}%";
                     all = all.And(t => EF.Functions.ILike(t.Number, pattern) || EF.Functions.ILike(t.Subject, pattern) || EF.Functions.ILike(t.ToName, pattern)
+                        || (t.FromName != null && EF.Functions.ILike(t.FromName, pattern)) || (t.TheirReference != null && EF.Functions.ILike(t.TheirReference, pattern))
                         || t.Items.Any(i => EF.Functions.ILike(i.DocumentNumber, pattern) || EF.Functions.ILike(i.Title, pattern)));
                 }
                 predicate = predicate.Or(all);
@@ -114,7 +120,10 @@ public static class TransmittalLogEndpoints
             query = query.Where(predicate);
         }
         if (!string.IsNullOrWhiteSpace(f.Reason)) query = query.Where(t => t.Reason == f.Reason);
-        if (!string.IsNullOrWhiteSpace(f.Party)) query = query.Where(t => db.Parties.Any(p => p.Id == t.ToPartyId && p.Code == f.Party));
+        if (!string.IsNullOrWhiteSpace(f.Party))
+            query = query.Where(t => db.Parties.Any(p => (p.Id == t.ToPartyId || p.Id == t.FromPartyId) && p.Code == f.Party));
+        if (f.Direction is TransmittalDirections.Outgoing or TransmittalDirections.Incoming) query = query.Where(t => t.Direction == f.Direction);
+        var unregistered = query.Where(t => t.Items.Any(i => i.Kind == TransmittalItemKinds.Unplanned && i.RegisteredAt == null));
         var toSend = query.Where(t => t.Recipients.Any(r => r.UserId == null && r.DispatchedAt == null));
         query = f.Status switch
         {
@@ -122,8 +131,10 @@ public static class TransmittalLogEndpoints
             States.Overdue => AnswerAwaited(db, query).Where(t => t.ResponseDue < today),
             States.AwaitingReply => AnswerAwaited(db, query).Where(t => t.ResponseDue == null || t.ResponseDue >= today),
             States.AwaitingAck => query.Where(t => t.Recipients.Any(r => r.UserId != null && r.AcknowledgedAt == null)),
+            States.ToRegister => unregistered,
             States.Complete => query.Where(t => !t.Recipients.Any(r => (r.UserId == null && r.DispatchedAt == null) || (r.UserId != null && r.AcknowledgedAt == null))
-                && !(t.ReviewStepId != null && t.ResponseRequired && db.ReviewSteps.Any(s => s.Id == t.ReviewStepId && s.CompletedAt == null))),
+                && !(t.ReviewStepId != null && t.ResponseRequired && db.ReviewSteps.Any(s => s.Id == t.ReviewStepId && s.CompletedAt == null))
+                && !t.Items.Any(i => i.Kind == TransmittalItemKinds.Unplanned && i.RegisteredAt == null)),
             _ => query,
         };
         if (f.From is not null || f.To is not null)
@@ -155,7 +166,7 @@ public static class TransmittalLogEndpoints
             "due" => By(t => t.ResponseDue),
             "reason" => By(t => t.Reason),
             "to" => By(t => t.ToName),
-            "from" => By(t => t.IssuedByName),
+            "from" => By(t => t.FromName ?? t.IssuedByName),
             "documents" => By(t => t.Items.Count),
             // What it waits on, most pressing first: to send, then to acknowledge, then nothing.
             "status" => By(t => t.Recipients.Any(r => r.UserId == null && r.DispatchedAt == null) ? 0
@@ -178,14 +189,15 @@ public static class TransmittalLogEndpoints
         {
             var t = list[id];
             var awaited = t.ReviewStepId is { } step && t.ResponseRequired && !answered.Contains(step);
-            var status = t.Recipients.Any(r => r.AwaitsDispatch) ? States.ToSend
+            var status = t.Items.Any(i => i.Kind == TransmittalItemKinds.Unplanned && i.RegisteredAt is null) ? States.ToRegister
+                : t.Recipients.Any(r => r.AwaitsDispatch) ? States.ToSend
                 : awaited && t.ResponseDue < today ? States.Overdue
                 : awaited ? States.AwaitingReply
                 : t.Recipients.Any(r => r.UserId != null && r.AcknowledgedAt is null) ? States.AwaitingAck
                 : States.Complete;
             return new LogRow(t.Id, t.Number, t.Subject, t.Reason, t.ToName, t.IssuedByName, t.IssuedAt.ToDateTimeOffset(), t.Items.Count, status,
                 t.Recipients.OrderBy(r => r.Name).Select(r => new LogRecipient(r.Id, r.Name, r.UserId is null ? r.DispatchedAt is not null : r.AcknowledgedAt is not null)).ToList(),
-                t.ResponseRequired, t.ResponseDue?.ToDateOnly(), t.ReviewStepId is not null);
+                t.ResponseRequired, t.ResponseDue?.ToDateOnly(), t.ReviewStepId is not null, t.Direction, t.FromName, t.TheirReference);
         }).ToList();
     }
 }
