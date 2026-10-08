@@ -83,6 +83,23 @@ public sealed class SessionStore(DeliosDbContext db, TenantContext tenant, Hybri
     }
 
     /// <summary>
+    /// Makes every node read a person's sessions afresh: after their rights changed, or, with <paramref name="revoke"/>,
+    /// ends them all (the person was switched off). Takes effect on the next request rather than when the cache runs out.
+    /// </summary>
+    public async Task ForgetAllAsync(Guid userId, bool revoke, CancellationToken cancellationToken)
+    {
+        var now = clock.GetCurrentInstant();
+        var hashes = await db.Sessions.Where(s => s.UserId == userId && s.RevokedAt == null && s.ExpiresAt > now)
+            .Select(s => s.TokenHash).ToListAsync(cancellationToken);
+        if (revoke)
+        {
+            await db.Sessions.Where(s => s.UserId == userId && s.RevokedAt == null)
+                .ExecuteUpdateAsync(s => s.SetProperty(x => x.RevokedAt, now), cancellationToken);
+        }
+        foreach (var hash in hashes) await cache.RemoveAsync(Key(hash), cancellationToken);
+    }
+
+    /// <summary>
     /// Reads the session, the user and the tenant from the database when the cache has no entry. Returns null when any of them is not valid.
     /// </summary>
     private async Task<SessionInfo?> LoadAsync(byte[] hash, CancellationToken cancellationToken)

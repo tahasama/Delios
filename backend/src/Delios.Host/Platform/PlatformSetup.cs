@@ -303,6 +303,8 @@ public static class PlatformSetup
             app.MapIdentityEndpoints();
             app.MapSsoEndpoints();
             app.MapAdminEndpoints();
+            app.MapDirectoryEndpoints();
+            Documents.CatalogAdminEndpoints.MapCatalogAdminEndpoints(app);
             Documents.DocumentEndpoints.MapDocumentEndpoints(app);
             Reviews.ReviewEndpoints.MapReviewEndpoints(app);
             Transmittals.TransmittalEndpoints.MapTransmittalEndpoints(app);

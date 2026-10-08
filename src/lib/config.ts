@@ -29,9 +29,29 @@ export function fmtValue(row: ValueRow | null | undefined, code?: string | null)
   return code ?? "—";
 }
 
-/** The published sets, as the backend keeps them. */
-export const getSets = cache(async (): Promise<{ key: string; title: string; description: string | null; group: string | null; version: number }[]> =>
-  api<{ key: string; title: string; description: string | null; group: string | null; version: number }[]>("/api/value-sets").catch(() => []));
+/** Where a set's title, description and group are kept: the organization's settings, one key per set. */
+export const SET_KEY = "SET:";
+export type SetInfo = { key: string; title: string; description: string | null; group: string | null; version: number };
+
+/**
+ * The published sets: every list that holds values, and every list an
+ * administrator named before giving it values. A list's name and description
+ * are the organization's settings; its values are the backend's.
+ */
+export const getSets = cache(async (): Promise<SetInfo[]> => {
+  const { orgSettings } = await import("./api/settings");
+  const [counted, named] = await Promise.all([
+    api<{ key: string; active: number; retired: number }[]>("/api/admin/value-sets").catch(() => []),
+    orgSettings().catch(() => new Map<string, string>()),
+  ]);
+  const keys = new Set([...counted.map((one) => one.key), ...[...named.keys()].filter((k) => k.startsWith(SET_KEY)).map((k) => k.slice(SET_KEY.length))]);
+  return [...keys].sort().map((key) => {
+    let info: { title?: string; description?: string | null; group?: string | null; version?: number } = {};
+    try { info = JSON.parse(named.get(SET_KEY + key) ?? "{}"); } catch { info = {}; }
+    const humane = key.replaceAll("_", " ").toLowerCase();
+    return { key, title: info.title ?? humane.charAt(0).toUpperCase() + humane.slice(1), description: info.description ?? null, group: info.group ?? null, version: info.version ?? 1 };
+  });
+});
 
 export async function isSetConfigured(setKey: string): Promise<boolean> {
   return (await readSet(setKey)).length > 0;

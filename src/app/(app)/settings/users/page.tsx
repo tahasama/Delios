@@ -8,13 +8,16 @@ import { Asked, Added } from "@/components/policy-fields";
 import { formPolicy } from "@/lib/field-policy";
 import { createUserAction, savePersonAction } from "@/lib/actions/admin";
 import { inviteGuestAction, createVisitorAction } from "@/lib/actions/guests";
+import { adminFunctions, adminParties, adminProjects, adminUsers } from "@/lib/api/admin";
+import { getMe } from "@/lib/api/me";
+import { getActiveSet } from "@/lib/config";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "People & access" };
 
 export default async function AdminUsersPage({ searchParams }: { searchParams: Promise<{ org?: string; project?: string }> }) {
   const ctx = await requireScope();
-  const { user: me, db, projectId, project } = ctx;
+  const { user: me, projectId, project } = ctx;
   const policy = await formPolicy(ctx, "PERSON");
   const sp = await searchParams;
   if (!maySetup(me, SETUP_PAGES.find((p) => p.href === "/settings/users")!)) {
@@ -22,32 +25,29 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
   }
   // Scoped to this administrator's organization: they can see and add people
   // here and nowhere else.
-  const [users, parties, projects, functions, disciplines, guests] = await Promise.all([
-    db.user.findMany({
-      orderBy: [{ active: "desc" }, { name: "asc" }],
-      include: {
-        party: true,
-        memberships: {
-          where: { active: true },
-          include: { project: { select: { code: true, name: true } }, function: { select: { name: true } } },
-        },
-      },
-    }),
-    db.party.findMany({ orderBy: [{ isInternal: "desc" }, { name: "asc" }] }),
-    db.project.findMany({ where: { orgId: me.orgId, status: "ACTIVE" }, orderBy: { code: "asc" } }),
-    db.function.findMany({ where: { active: true }, orderBy: { sort: "asc" } }),
-    db.configValue.findMany({ where: { setKey: "DISCIPLINES", status: "ACTIVE" }, orderBy: { label: "asc" }, select: { code: true, label: true } }),
-    // People on this organization's projects whose accounts live elsewhere.
-    db.projectMembership.findMany({
-      where: { active: true, project: { orgId: me.orgId }, user: { orgId: { not: me.orgId } } },
-      include: {
-        user: { select: { id: true, name: true, email: true, org: { select: { name: true } } } },
-        project: { select: { code: true, name: true } },
-        function: { select: { name: true } },
-      },
-      orderBy: { createdAt: "desc" },
-    }),
+  const [people, parties, projects, functions, disciplines, guests] = await Promise.all([
+    adminUsers(),
+    adminParties(),
+    // Document Control adds people to the projects it is on; an administrator to any.
+    adminProjects().catch(async () => (await getMe())?.projects ?? []).then((all) => all.filter((one) => one.status === "ACTIVE")),
+    adminFunctions().then((all) => all.filter((one) => one.active)),
+    getActiveSet("DISCIPLINES").then((all) => all.map((one) => ({ code: one.code, label: one.label })).sort((x, y) => x.label.localeCompare(y.label))),
+    // People on this organization's projects whose accounts live elsewhere: a person belongs to one organization.
+    Promise.resolve([] as {
+      id: string; projectId: string; functionId: string; department: string | null;
+      user: { id: string; name: string; email: string; org: { name: string } }; project: { code: string; name: string }; function: { name: string };
+    }[]),
   ]);
+  const users = [...people]
+    .sort((x, y) => Number(y.active) - Number(x.active) || x.name.localeCompare(y.name))
+    .map((one) => ({
+      ...one,
+      organization: null as string | null,
+      party: one.partyId ? { id: one.partyId, name: one.partyName ?? "", code: one.partyCode ?? "" } : null,
+      memberships: one.memberships.filter((seat) => seat.active).map((seat) => ({
+        ...seat, project: { code: seat.projectCode, name: seat.projectName }, function: { name: seat.functionName },
+      })),
+    }));
   const externalParties = parties.filter((p) => !p.isInternal);
   const deptLabel = (code: string) => disciplines.find((d) => d.code === code)?.label ?? code;
 
