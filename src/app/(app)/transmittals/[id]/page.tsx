@@ -22,6 +22,7 @@ import { Timeline } from "@/components/timeline";
 import { SendForReview } from "@/components/send-for-review-panel";
 import { ArrowLeft } from "lucide-react";
 import { getActiveSet } from "@/lib/config";
+import { carriersOf as carriersOfTransmittal, legacyTransmittal } from "@/lib/api/transmittals";
 
 export const dynamic = "force-dynamic";
 
@@ -40,58 +41,10 @@ export const dynamic = "force-dynamic";
  */
 export default async function TransmittalDetailPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ issueError?: string }> }) {
   const ctx = await requireScope();
-  const { user, db } = ctx;
+  const { user } = ctx;
   const { id } = await params;
   const sp = await searchParams;
-  const t = await db.transmittal.findUnique({
-    where: { id },
-    include: {
-      items: {
-        include: {
-          revision: {
-            include: {
-              files: { select: { id: true, name: true, kind: true, sha256: true } },
-              document: {
-                include: {
-                  revisions: { orderBy: { createdAt: "desc" }, take: 1, select: { value: true } },
-                  baselineEntries: { include: { action: { select: { code: true, name: true } } } },
-                },
-              },
-            },
-          },
-        },
-      },
-      recipients: {
-        orderBy: [{ kind: "asc" }, { name: "asc" }],
-        include: {
-          party: { select: { id: true, name: true, evidenceRequired: true, externalSystem: true } },
-          proof: { select: { id: true, name: true } },
-        },
-      },
-      // The thread: what this answers, and what has come back against it. An
-      // answer is a transmittal of its own, with its own number and its own
-      // enclosures, so it is linked to rather than copied in here.
-      inReplyTo: { select: { id: true, number: true, subject: true } },
-      // What this completes or corrects, and what was sent after it to complete
-      // or correct it. Each is its own transmittal; this one never changes.
-      follows: { select: { id: true, number: true, subject: true } },
-      followedBy: {
-        orderBy: { createdAt: "asc" },
-        select: { id: true, number: true, subject: true, followKind: true, status: true, dateOfIssue: true, _count: { select: { items: true, recipients: true } } },
-      },
-      answers: {
-        orderBy: { dateOfIssue: "asc" },
-        select: {
-          id: true, number: true, subject: true, dateOfIssue: true, status: true,
-          createdByName: true, issuingParty: true, direction: true,
-          _count: { select: { items: true } },
-        },
-      },
-      cycles: { select: { id: true, status: true, revisionId: true, submittedAt: true } },
-      files: { where: { kind: "ATTACHMENT" }, orderBy: { createdAt: "asc" } },
-      issueRequests: { select: { id: true, reason: true, note: true } },
-    },
-  });
+  const t = await legacyTransmittal(ctx, id);
   if (!t) notFound();
 
   const controller = isController(user) || isAdmin(user);
@@ -119,13 +72,7 @@ export default async function TransmittalDetailPage({ params, searchParams }: { 
   const mayNotify = controller && waiting.length > 0 && t.status !== "DRAFT";
   const issueCheck = t.status === "DRAFT" && controller ? await preflight("ISSUE", { transmittalId: t.id }) : null;
   // Who of ours carries each of those organizations, and whether that is you.
-  const { partyStepHolders } = await import("@/lib/workflow");
-  const carriersOf = new Map<string, { names: string; mine: boolean }>();
-  for (const partyId of new Set(t.recipients.filter(outside).map((one) => one.partyId!))) {
-    const held = await partyStepHolders(ctx, partyId);
-    const people = held.ids.length ? await db.user.findMany({ where: { id: { in: held.ids } }, select: { name: true } }) : [];
-    carriersOf.set(partyId, { names: people.map((one) => one.name).join(", ") || "Document Control", mine: controller || held.ids.includes(user.id) });
-  }
+  const carriersOf = await carriersOfTransmittal(ctx, t);
 
   const replyOverdue = !t.answers.length && t.responseRequired && !!t.responseDueDate && t.responseDueDate.getTime() < Date.now();
   // Anybody it reached may answer it — the people it was addressed to, the
@@ -134,21 +81,7 @@ export default async function TransmittalDetailPage({ params, searchParams }: { 
 
   // How often each of these documents has gone out before this transmittal —
   // the third issue of a drawing is a fact about the drawing, not a detail.
-  const documentIds = [...new Set(t.items.map((one) => one.revision.documentId))];
-  const earlier = documentIds.length
-    ? await db.transmittalItem.findMany({
-        where: {
-          revision: { documentId: { in: documentIds } },
-          transmittalId: { not: t.id },
-          transmittal: { dateOfIssue: { lt: t.dateOfIssue }, status: { not: "DRAFT" } },
-        },
-        select: { revision: { select: { documentId: true } } },
-      })
-    : [];
-  const sentBefore = new Map<string, number>();
-  for (const one of earlier) {
-    sentBefore.set(one.revision.documentId, (sentBefore.get(one.revision.documentId) ?? 0) + 1);
-  }
+  const sentBefore = t.sentBefore;
 
   const reason = (REASON_LABEL[t.reasonForIssue as ReasonForIssue] ?? t.reasonForIssue).toLowerCase();
   const statusColors: Record<string, string> = {

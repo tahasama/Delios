@@ -152,3 +152,33 @@ export function rulesBody(rules: AdminRule[]) {
     confidentiality: r.confidentiality, projectRole: r.projectRole,
   }));
 }
+
+// ── Organizations, as the organizations screen reads them ─────────────────────
+// Who answers for an organization (its contact and backup), and whether it is
+// a collaborator or a guest, are the organization's own answers: kept in its
+// settings under PARTY:<id>. How it takes part is the backend's.
+
+export const PARTY_KEY = "PARTY:";
+export type PartyAnswers = { kind?: string; contactId?: string | null; backupId?: string | null };
+
+export async function legacyParties() {
+  const { orgSettings } = await import("./settings");
+  const [parties, users, answers] = await Promise.all([adminParties(), adminUsers(), orgSettings()]);
+  const person = (id: string | null | undefined) => {
+    const one = id ? users.find((u) => u.id === id) : null;
+    return one ? { id: one.id, name: one.name, email: one.email } : null;
+  };
+  return [...parties]
+    .sort((a, b) => Number(b.isInternal) - Number(a.isInternal) || a.name.localeCompare(b.name))
+    .map((p) => {
+      let said: PartyAnswers = {};
+      try { said = JSON.parse(answers.get(PARTY_KEY + p.id) ?? "{}"); } catch { said = {}; }
+      const contact = person(said.contactId);
+      const backup = person(said.backupId);
+      return {
+        ...p, kind: p.participation === "BY_PROXY" ? "OFFLINE" : said.kind ?? "COLLABORATOR", liaisonFunction: p.custodianFunction,
+        contactId: contact?.id ?? null, backupId: backup?.id ?? null, contact, backup: backup ? { id: backup.id, name: backup.name } : null,
+        _count: { users: p.people },
+      };
+    });
+}

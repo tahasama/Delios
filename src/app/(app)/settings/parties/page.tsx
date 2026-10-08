@@ -8,6 +8,7 @@ import { formPolicy } from "@/lib/field-policy";
 import { savePartyAction, deletePartyAction } from "@/lib/actions/workflow";
 import { PartyKindFields } from "./party-fields";
 import { PARTY_KINDS } from "@/lib/party-kinds";
+import { adminFunctions, adminUsers, legacyParties } from "@/lib/api/admin";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Organizations" };
@@ -15,14 +16,15 @@ export const metadata = { title: "Organizations" };
 // §0.3 — our organization and the external parties it exchanges information with.
 export default async function AdminPartiesPage() {
   const ctx = await requireScope();
-  const { user: me, db } = ctx;
+  const { user: me } = ctx;
   const policy = await formPolicy(ctx, "PARTY");
   if (!maySetup(me, SETUP_PAGES.find((p) => p.href === "/settings/parties")!)) return <PageHeader title="Organizations" subtitle="Administrators and the control function." />;
   const [parties] = await Promise.all([
-    db.party.findMany({ orderBy: [{ isInternal: "desc" }, { name: "asc" }], include: { _count: { select: { users: true } }, contact: { select: { id: true, name: true, email: true } }, backup: { select: { id: true, name: true } } } }),
+    legacyParties(),
   ]);
-  const people = await db.user.findMany({ where: { active: true }, orderBy: { name: "asc" }, select: { id: true, name: true, email: true, partyId: true } });
-  const functions = await db.function.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } });
+  const people = (await adminUsers()).filter((one) => one.active).map((one) => ({ id: one.id, name: one.name, email: one.email, partyId: one.partyId }));
+  // A function is named on an organization by its code: the one that carries its exchange.
+  const functions = (await adminFunctions()).map((one) => ({ id: one.code, name: one.name })).sort((a, b) => a.name.localeCompare(b.name));
 
   const KINDS = PARTY_KINDS;
   /** How many people this organization has here. Everyone here signs in. */

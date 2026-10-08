@@ -19,8 +19,9 @@ public sealed record UpdateUserRequest(
 public sealed record CreateProjectRequest(string? Code, string? Name, string? ContractRole = null, string? TimeZone = null);
 
 /// <summary>Body of changing a project. A null field is left as it is.</summary>
+/// <remarks>A new <c>Code</c> shapes new numbers only; numbers already given keep the old one.</remarks>
 public sealed record UpdateProjectRequest(
-    string? Name = null, string? ContractRole = null, string? Status = null, string? TimeZone = null, int[]? WeekendDays = null);
+    string? Code = null, string? Name = null, string? ContractRole = null, string? Status = null, string? TimeZone = null, int[]? WeekendDays = null);
 
 /// <summary>Body of putting a person on a project, or changing their place on it: one function per person per project.</summary>
 public sealed record MembershipRequest(Guid UserId, Guid? FunctionId, string? Department = null, bool Active = true);
@@ -276,6 +277,14 @@ public static class DirectoryEndpoints
         var project = await db.Projects.SingleOrDefaultAsync(p => p.Id == projectId, cancellationToken);
         if (project is null) return Problems.NotFound("PROJECT_NOT_FOUND", "No such project.");
         var changes = new List<string>();
+        if (Blank(request.Code)?.ToUpperInvariant() is { } code && code != project.Code)
+        {
+            if (code.Length > 32) return Problems.Invalid("CODE_TOO_LONG", "A project code has at most 32 characters.");
+            if (await db.Projects.AnyAsync(p => p.Code == code && p.Id != projectId, cancellationToken))
+                return Problems.Conflict("PROJECT_CODE_TAKEN", $"{code} is already a project.");
+            changes.Add($"code {project.Code} → {code}; numbers already given keep {project.Code}");
+            project.Code = code;
+        }
         if (Blank(request.Name) is { } name && name != project.Name) { changes.Add($"name → {name}"); project.Name = name; }
         if (Blank(request.ContractRole)?.ToUpperInvariant() is { } role && role != project.ContractRole) { changes.Add($"contract role → {role}"); project.ContractRole = role; }
         if (Blank(request.Status)?.ToUpperInvariant() is { } status && status != project.Status)

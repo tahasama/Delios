@@ -6,6 +6,9 @@ import { api, projectPath, refusal } from "@/lib/api/client";
 import { backendRevision, backendReview } from "@/lib/api/legacy";
 import { upload, filesOf } from "@/lib/api/uploads";
 import { requestFromForm } from "@/lib/issue-requests";
+import { formPolicy, checkForm } from "@/lib/field-policy";
+import { setOrgSetting } from "@/lib/api/settings";
+import { adminParties, PARTY_KEY } from "@/lib/api/admin";
 
 /**
  * Review routes and the answers given on them. A run on these screens is the
@@ -109,17 +112,70 @@ export async function recordStepApprovalAction(_prev: Result | undefined, formDa
 
 // ── Parties (§0.3) ───────────────────────────────────────────────────────────
 
-/** Parties are set up in the backend's configuration; there is no screen-side editing of them yet. */
+/** A party is never deleted: revoking it ends its people's access and keeps every record meaning what it meant. */
 export async function deletePartyAction(_prev: { error?: string } | undefined, _formData: FormData): Promise<{ error?: string }> {
-  return { error: "Editing organizations here is not supported yet." };
+  return { error: "An organization is not removed: revoke its access instead, and the record keeps its name." };
 }
 
-export async function savePartyAction(_prev: { error?: string } | undefined, _formData: FormData): Promise<{ error?: string }> {
-  return { error: "Editing organizations here is not supported yet." };
+export async function savePartyAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
+  const ctx = await requireScope();
+  const id = text(formData, "id");
+  const code = text(formData, "code").toUpperCase();
+  const name = text(formData, "name");
+  const contactId = text(formData, "contactId") || null;
+  const backupId = text(formData, "backupId") || null;
+  // How this party takes part in a review route, and who carries it when they do not answer here.
+  const kind = ["COLLABORATOR", "GUEST", "OFFLINE"].includes(text(formData, "kind")) ? text(formData, "kind") : "COLLABORATOR";
+  const participation = kind === "OFFLINE" ? "BY_PROXY" : "IN_APP";
+  const custodianFunction = text(formData, "liaisonFunction");
+  if (contactId && backupId && contactId === backupId) return { error: "The backup has to be someone other than the contact." };
+  try {
+    let partyId = id;
+    if (id) {
+      const party = (await adminParties()).find((one) => one.id === id);
+      if (!party) return { error: "That party no longer exists." };
+      if (code && code !== party.code) return { error: "An organization's code does not change: documents and transmittals were issued under it." };
+      const active = formData.get("active") === "on";
+      if (!name) return { error: "A party needs a name." };
+      if (party.isInternal && !active) return { error: "Your own organization cannot be switched off." };
+      // Somebody has to answer for a party we exchange documents with.
+      if (!party.isInternal && active && !contactId) return { error: `Name the person who answers for ${name}. The backup is optional.` };
+      await api(`/api/admin/parties/${id}`, {
+        method: "PUT",
+        body: party.isInternal
+          ? { name, active }
+          : { name, active, participation, custodianFunction, evidenceRequired: kind === "OFFLINE" },
+      });
+    } else {
+      // What this organization asks of an organization it adds.
+      const policy = await formPolicy(ctx, "PARTY");
+      const asked = checkForm("PARTY", policy, { code, name, kind, contactId, backupId, liaisonFunction: custodianFunction || null }, (n) => String(formData.get(n) ?? ""));
+      if (asked.error) return { error: asked.error };
+      const created = await api<{ id: string }>("/api/admin/parties", {
+        body: { code, name, isInternal: false, participation, custodianFunction, evidenceRequired: kind === "OFFLINE" },
+      });
+      partyId = created.id;
+    }
+    await setOrgSetting(PARTY_KEY + partyId, JSON.stringify({ kind, contactId, backupId }));
+  } catch (e) {
+    return failed(e);
+  }
+  revalidatePath("/settings/parties");
+  revalidatePath("/settings/users");
+  return {};
 }
 
-export async function setUserPartyAction(_prev: { error?: string } | undefined, _formData: FormData): Promise<{ error?: string }> {
-  return { error: "Editing organizations here is not supported yet." };
+export async function setUserPartyAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
+  await requireScope();
+  const userId = text(formData, "userId");
+  const partyId = text(formData, "partyId") || null;
+  try {
+    await api(`/api/admin/users/${userId}`, { method: "PUT", body: partyId ? { partyId } : { clearParty: true } });
+  } catch (e) {
+    return failed(e);
+  }
+  revalidatePath("/settings/users");
+  return {};
 }
 
 /**

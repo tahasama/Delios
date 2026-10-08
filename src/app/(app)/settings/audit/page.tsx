@@ -4,6 +4,7 @@ import { isAdmin } from "@/lib/auth";
 import { PageHeader } from "@/components/ui";
 import { fmtDate, fmtDateTime } from "@/lib/utils";
 import { DateWindow } from "@/components/date-window";
+import { adminAudit } from "@/lib/api/admin";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "The log" };
@@ -76,7 +77,7 @@ function said(action: string): string {
 }
 
 export default async function AuditPage({ searchParams }: { searchParams: Promise<{ q?: string; family?: string; from?: string; to?: string }> }) {
-  const { user, db } = await requireScope();
+  const { user } = await requireScope();
   if (!isAdmin(user)) {
     return <PageHeader title="The log" subtitle="Administrators only. The evidence for a single act is shown on the thing it happened to — a document, an activity, a transmittal." />;
   }
@@ -88,21 +89,12 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
   const from = day(sp.from);
   const to = day(sp.to, true);
 
-  const [events, counts] = await Promise.all([
-    db.auditEvent.findMany({
-      where: {
-        AND: [
-          sp.q ? { OR: [{ entityLabel: { contains: sp.q } }, { actorName: { contains: sp.q } }, { detail: { contains: sp.q } }] } : {},
-          family ? { action: { in: family.actions } } : {},
-          from ? { ts: { gte: from } } : {},
-          to ? { ts: { lte: to } } : {},
-        ],
-      },
-      orderBy: { ts: "desc" },
-      take: 200,
-    }),
-    db.auditEvent.groupBy({ by: ["action"], _count: true }),
-  ]);
+  // The backend filters by words and dates; the family of act is picked from what comes back.
+  const page = await adminAudit({ q: sp.q, from: sp.from, to: sp.to, per: 200 });
+  const events = page.rows
+    .filter((e) => !family || family.actions.includes(e.action))
+    .map((e) => ({ ...e, id: String(e.id), ts: new Date(e.at), field: null as string | null, oldValue: null as string | null, newValue: null as string | null }));
+  const counts = page.actions.map((one) => ({ action: one.action, _count: one.count }));
 
   const countOf = (f: Family) => counts.filter((c) => f.actions.includes(c.action)).reduce((n, c) => n + c._count, 0);
   const total = counts.reduce((n, c) => n + c._count, 0);
