@@ -45,11 +45,9 @@ const FREEZE_KEY = "transmittals:frozen";
 
 const RAIL: Record<string, string> = {
   DRAFT: "rail-none", ISSUED: "rail-review", ACCEPTED: "rail-released", REJECTED: "rail-void", CLOSED: "rail-superseded",
-  TO_SEND: "rail-prep", OVERDUE: "rail-void", AWAITING_REPLY: "rail-review", AWAITING_ACK: "rail-review", COMPLETE: "rail-released",
 };
 const STATUS_INK: Record<string, string> = {
   DRAFT: "text-slate-500", ISSUED: "text-sky-700", ACCEPTED: "text-emerald-700", REJECTED: "text-red-700",
-  TO_SEND: "text-amber-700", OVERDUE: "text-red-700", AWAITING_REPLY: "text-sky-700", AWAITING_ACK: "text-sky-700", COMPLETE: "text-emerald-700",
 };
 
 type Column = {

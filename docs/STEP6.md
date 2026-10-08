@@ -5,6 +5,13 @@ Prisma database and asks the .NET backend instead. Screens not yet moved are
 hidden from the menu and closed (they send you home), so whatever you see works.
 The old version stays on the main branch until the end.
 
+> **Status (8 Oct):** the frontend is back exactly as it is on `main` (every file
+> under `src/`, `package.json`, `.env.example`), running on its own database as
+> before. The screens rebuilt during step 6 did not keep the owner's design and
+> were withdrawn. Connecting the frontend to the backend will be done without
+> changing any screen; how is to be agreed with the owner before any frontend
+> file is touched. Everything below describes backend work, which stays.
+
 ## Trying it yourself
 
 1. Backend, from the repository root (only the backend runs in Docker for now):

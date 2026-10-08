@@ -1,13 +1,16 @@
+import { readyReading, countingRevision, meetsRequirement } from "@/lib/readiness";
 import Link from "next/link";
 import { Count } from "./tally";
-import { api } from "@/lib/api/client";
-import type { ActivityRow, ActivitySummary, Work } from "@/lib/api/types";
-import { requireSession, projectPath } from "@/lib/session";
+import { requireScope } from "@/lib/scope";
+import { isController, isAdmin } from "@/lib/auth";
 import { fmtDate, fmtDateTime } from "@/lib/utils";
 import { DateWindow } from "@/components/date-window";
 import { Search } from "lucide-react";
+import { supplierRows, WITH_SUPPLIER, STATE_LABEL } from "@/lib/supplier";
+import { departmentsOf, daysBefore, DEFAULT_LEAD_DAYS } from "@/lib/schedule";
+import { departmentRows, senderRows, isDepartmentSender } from "@/lib/requirements-process";
+import { getActiveSet } from "@/lib/config";
 import { ArrowRight, CheckCheck, FileStack, Inbox, ListChecks, MessageSquare, PenLine, Plus, Send, Share2, Undo2, Upload } from "lucide-react";
-
 
 export const dynamic = "force-dynamic";
 
@@ -23,37 +26,81 @@ export const dynamic = "force-dynamic";
  */
 export default async function HomePage({ searchParams }: { searchParams: Promise<{ view?: string; kind?: string; from?: string; to?: string; q?: string }> }) {
   const sp = await searchParams;
-  // Everything this page shows comes from the backend; what it shows, and how, is unchanged.
-  const session = await requireSession();
-  const ctx = { project: session.project };
-  const controller = session.can("CONTROL") || session.user.isAdmin;
-  const user = {
-    id: session.user.id,
-    name: session.user.name,
-    isInternal: session.user.isInternal,
-    functionName: session.project.function.name as string | null,
-    partyName: session.user.party?.name ?? null,
-  };
+  const ctx = await requireScope();
+  const { user, db } = ctx;
+  const controller = isController(user) || isAdmin(user);
   // The whole log is Document Control's and the administrator's: they answer
   // for what the record says. Anybody else asking for it gets their own page.
   const view = sp.view === "log" && !controller ? undefined : sp.view;
-  const at = (iso: string | null | undefined) => (iso ? new Date(iso) : null);
-  const acts = (rows: ActivityRow[]) => rows.map((e) => ({ id: e.id, ts: new Date(e.at), action: ALIAS[e.action] ?? e.action, actorName: e.actorName, entityType: e.entityType, entityLabel: e.entityLabel, detail: e.detail }));
-  // The backend's names for the acts each kind of the journal covers.
-  const backendNames = (kinds: string[]) => Object.keys(ALIAS).filter((name) => kinds.includes(ALIAS[name])).concat(kinds).join(",");
+  // What counts as delivered for an action is the project's answer.
+  const reading = await readyReading(ctx);
 
-  const [work, checks, criticalDefects, activities, neverSent] = await Promise.all([
-    api<Work>(projectPath(session, "/work")),
-    controller ? api<{ lastRun: { integrity: number } | null }>(projectPath(session, "/checks")).catch(() => ({ lastRun: null })) : Promise.resolve({ lastRun: null }),
-    controller ? api<unknown[]>(projectPath(session, "/defects"), { query: { severity: "CRITICAL" } }).then((d) => d.length).catch(() => 0) : Promise.resolve(0),
-    user.isInternal ? api<ActivitySummary[]>(projectPath(session, "/activities")).catch(() => [] as ActivitySummary[]) : Promise.resolve([] as ActivitySummary[]),
-    // Released, and nobody was ever told. Not a decision anybody owes: whoever
-    // needed it sent did not ask, and this is where that stops being invisible.
-    controller
-      ? api<{ documentId: string; documentNumber: string; title: string; revisionId: string; revision: string; status: string | null; releasedAt: string | null }[]>(projectPath(session, "/not-issued")).catch(() => [])
-      : Promise.resolve([]),
+  const [assigned, returned, incoming, drafts, actions, lastRun, criticalDefects, totalDocs] = await Promise.all([
+    db.reviewAssignment.findMany({
+      where: { userId: user.id, completedAt: null, cycle: { status: "OPEN", issuedToReviewAt: { not: null } } },
+      include: { cycle: { include: { revision: { include: { document: true } } } } },
+      take: 50,
+    }),
+    db.reviewCycle.findMany({
+      where: { status: "CLOSED", outcome: { in: ["REVISE_AND_RESUBMIT", "APPROVED_WITH_COMMENTS", "REJECTED"] }, revision: { document: { createdById: user.id } }, returnedToOriginatorAt: { not: null } },
+      include: { revision: { include: { document: true } }, comments: { where: { progressionPreventing: true, status: "OPEN" } } },
+      orderBy: { returnedToOriginatorAt: "desc" },
+      take: 20,
+    }),
+    controller ? db.transmittal.findMany({ where: { direction: "INCOMING", status: "ISSUED" }, orderBy: { dateOfIssue: "asc" }, take: 20 }) : Promise.resolve([]),
+    db.revision.findMany({ where: { state: "IN_PREPARATION", submittedAt: null, document: { createdById: user.id } }, include: { document: true }, take: 50 }),
+    db.action.findMany({
+      orderBy: { scheduledDate: "asc" },
+      include: { entries: { include: { document: { include: { revisions: countingRevision(reading) } } } } },
+    }),
+    controller ? db.checkRun.findFirst({ orderBy: { ranAt: "desc" } }) : Promise.resolve(null),
+    controller ? db.defect.count({ where: { severity: "CRITICAL", status: { in: ["OPEN", "ACCEPTED"] } } }) : Promise.resolve(0),
+    controller ? db.document.count() : Promise.resolve(0),
   ]);
-  const lastRun = checks.lastRun;
+
+  // A supplier's work is its package: what it still owes, and what came back.
+  const supplierPkgs = !user.isInternal && user.partyCode
+    ? await db.package.findMany({ where: { category: "SUPPLIER", partyCode: user.partyCode } })
+    : [];
+  const owed: { pkg: string; rows: Awaited<ReturnType<typeof supplierRows>> }[] = [];
+  for (const p of supplierPkgs) owed.push({ pkg: p.identifier, rows: (await supplierRows(ctx, p)).filter((r) => WITH_SUPPLIER.includes(r.state)) });
+
+  // Decided by the reviewers, not yet released — and those the decision sent
+  // back. Whose desk a document is on differs by reader, so it lives here and
+  // not on the register, which is a record.
+  const decided = controller
+    ? await db.revision.findMany({
+        where: { state: "NOT_RELEASED" },
+        include: {
+          document: { select: { id: true, docNumber: true, title: true } },
+          cycles: { select: { id: true, binding: true, outcome: true } },
+        },
+        orderBy: { createdAt: "asc" },
+        take: 25,
+      })
+    : [];
+  const verdictValues = controller ? await getActiveSet("REVIEW_OUTCOMES") : [];
+  const lettsOut = (code: string | null | undefined) =>
+    !code || verdictValues.find((one) => one.code === code)?.props.proceed === true;
+  const withVerdict = decided.map((rev) => ({ ...rev, decidedAs: rev.cycles.find((c) => c.binding && c.outcome)?.outcome ?? null }));
+  const toRelease = withVerdict.filter((rev) => lettsOut(rev.decidedAs));
+  const held = withVerdict.filter((rev) => !lettsOut(rev.decidedAs));
+
+  // Released, and nobody was ever told. Not a decision anybody owes: whoever
+  // needed it sent did not ask, and this is where that stops being invisible.
+  const neverSent = controller
+    ? await db.revision.findMany({
+        where: { state: "RELEASED", transmittalItems: { none: { transmittal: { direction: "OUTGOING" } } } },
+        include: { document: { select: { id: true, docNumber: true, title: true } } },
+        orderBy: { releasedAt: "asc" },
+        take: 25,
+      })
+    : [];
+
+  // Accepted submissions Document Control still has to route.
+  const toRoute = controller
+    ? await db.transmittal.findMany({ where: { direction: "INCOMING", status: "ACCEPTED", items: { some: { revision: { state: "IN_PREPARATION" } } } }, orderBy: { dateOfIssue: "asc" }, take: 20 })
+    : [];
 
   // What moved while the reader was away: the last working day's worth of the
   // events that are news to somebody, not bookkeeping.
@@ -62,14 +109,22 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   // fact about the project, not about the person reading it; scoping the
   // record by department is how people stop trusting it, because each of them
   // ends up looking at a different project. What a reader may not see is
-  // already settled by the backend, not by this page.
+  // already settled by the scope, not by this page.
   const since = lastWorkingDay();
-  const news = acts(await api<ActivityRow[]>(projectPath(session, "/activity"), { query: { actions: backendNames(NEWS), since: since.toISOString(), take: 4 } }));
+  const news = await db.auditEvent.findMany({
+    where: { ts: { gte: since }, action: { in: NEWS } },
+    orderBy: { ts: "desc" },
+    take: 4,
+  });
   // A quiet day should not leave the panel empty or showing one lonely line:
   // when the last working day produced almost nothing, the journal reaches
   // further back and says so instead.
   const older = news.length < 4
-    ? acts(await api<ActivityRow[]>(projectPath(session, "/activity"), { query: { actions: backendNames(NEWS), before: since.toISOString(), take: 4 - news.length } }))
+    ? await db.auditEvent.findMany({
+        where: { ts: { lt: since }, action: { in: NEWS } },
+        orderBy: { ts: "desc" },
+        take: 4 - news.length,
+      })
     : [];
   const journal = [...news, ...older];
   // The whole log, when the reader asks for it. It carries the same kinds of
@@ -84,12 +139,18 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const to = startOfDay(sp.to, true);
   const asked = !!(kind || from || to || sp.q);
   const log = view === "log"
-    ? acts(await api<ActivityRow[]>(projectPath(session, "/activity"), {
-        query: {
-          actions: backendNames(kind ? NEWS.filter((one) => ACTIVITY[one].kind === kind) : NEWS),
-          from: sp.from || undefined, to: sp.to || undefined, q: sp.q || undefined, take: 60,
+    ? await db.auditEvent.findMany({
+        where: {
+          AND: [
+            { action: { in: kind ? NEWS.filter((one) => ACTIVITY[one].kind === kind) : NEWS } },
+            from ? { ts: { gte: from } } : {},
+            to ? { ts: { lte: to } } : {},
+            sp.q ? { OR: [{ entityLabel: { contains: sp.q } }, { actorName: { contains: sp.q } }, { detail: { contains: sp.q } }] } : {},
+          ],
         },
-      }))
+        orderBy: { ts: "desc" },
+        take: 60,
+      })
     : [];
   // An audit label reads "P1001-60-CI-SPC-00001 rev B — route name", and a
   // supplier's number runs half as long again. The panel measures its own
@@ -98,26 +159,67 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const widest = Math.max(20, ...journal.map((e) => read(e.entityLabel)?.number.length ?? 0));
   const room = widest <= 26;
 
+  // The requirements process: what is waiting on Document Control, and what
+  // is waiting on the department this person answers for.
+  const planning: { key: string; href: string; label: string; sub: string; cta: string; late?: boolean }[] = [];
+  if (user.isInternal) {
+    const me = await db.projectMembership.findFirst({ where: { projectId: ctx.projectId, userId: user.id, active: true } });
+    const control = ctx.can("CONTROL");
+    const untagged = actions.filter((a) => !departmentsOf(a).length).length;
+    if ((control || ctx.can("PLAN")) && untagged) planning.push({ key: "tag", href: "/actions/requirements", label: `${untagged} activit${untagged === 1 ? "y" : "ies"} without departments`, sub: "The project manager's departments list", cta: "Open" });
+    if (control || me?.department) {
+      for (const d of await departmentRows(ctx)) {
+        if (control && d.notIssued.length) planning.push({ key: `ask-${d.department}`, href: "/actions/requirements", label: `Ask ${d.department} for its documents`, sub: `${d.notIssued.length} activit${d.notIssued.length === 1 ? "y" : "ies"} not asked yet`, cta: "Issue" });
+        if (control && d.state === "OVERDUE" && d.call) planning.push({ key: `late-${d.department}`, href: "/actions/requirements", label: `${d.department} list overdue`, sub: `due ${fmtDate(d.call.dueAt)}${d.call.reminders ? ` · reminded ${d.call.reminders}×` : ""}`, cta: "Chase", late: true });
+        if (me?.department === d.department && d.call && !d.call.answeredAt) planning.push({ key: `fill-${d.department}`, href: `/api/requirements/sheet?dept=${d.department}`, label: `List the documents ${d.department} needs`, sub: `${d.call.actionCodes.split(",").length} activities · due ${fmtDate(d.call.dueAt)}`, cta: "Sheet", late: d.state === "OVERDUE" });
+      }
+    }
+    if (control) {
+      const toIssue = (await senderRows(ctx)).filter((r) => !r.lastIssue || r.changedSinceIssue);
+      if (toIssue.length) planning.push({ key: "issue", href: "/actions/requirements", label: `Issue the requirements to ${toIssue.length} sender${toIssue.length === 1 ? "" : "s"}`, sub: toIssue.map((r) => (isDepartmentSender(r.sender) ? r.sender.slice(5) : r.sender)).join(", "), cta: "Issue" });
+    }
+    if (me?.department) {
+      const confirmations = await db.readinessConfirmation.findMany({ where: { department: me.department }, select: { actionId: true } });
+      for (const a of actions) {
+        if (!a.scheduledDate || !departmentsOf(a).includes(me.department) || confirmations.some((c) => c.actionId === a.id)) continue;
+        if (daysBefore(a.scheduledDate, DEFAULT_LEAD_DAYS).getTime() > Date.now()) continue;
+        planning.push({ key: `confirm-${a.id}`, href: `/actions/${a.code}#confirm`, label: `Confirm ${me.department} documents for ${a.code}`, sub: `${a.name} · ${fmtDate(a.scheduledDate)}`, cta: "Confirm", late: a.scheduledDate.getTime() < Date.now() });
+      }
+    }
+  }
+
   // One list per kind of ask: advice on a route's earlier step, or the
   // binding verdict — the one decision, which is also the release approval.
-  const answering = work.steps.filter((w) => w.kind === "ANSWER_STEP");
-  const verdicts = answering.filter((w) => w.deciding);
-  const advice = answering.filter((w) => !w.deciding);
+  const verdicts = assigned.filter((a) => a.cycle.binding);
+  const advice = assigned.filter((a) => !a.cycle.binding);
 
   // Schedule activities whose documents will not be ready in time, for the
-  // people engaged in them. Document Control and the planners are engaged in
-  // all of them, because chasing the schedule is their work.
-  const wholeSchedule = controller || session.can("PLAN");
-  const atRisk = activities
+  // people engaged in them.
+  //
+  // Being engaged is not only a matter of which department an activity is
+  // tagged with — plenty of people hold no department at all. Somebody is
+  // engaged when the activity names their department, when they own it, or
+  // when they are writing or reviewing one of the documents it waits on.
+  // Document Control and the planners are engaged in all of them, because
+  // chasing the schedule is their work.
+  const engagedDocs = new Set<string>([
+    ...assigned.map((a) => a.cycle.revision.document.docNumber),
+    ...returned.map((c) => c.revision.document.docNumber),
+    ...drafts.map((rev) => rev.document.docNumber),
+    ...(await db.document.findMany({ where: { createdById: user.id }, select: { docNumber: true } })).map((d) => d.docNumber),
+  ]);
+  const wholeSchedule = controller || ctx.can("PLAN");
+  const atRisk = actions
     .map((a) => {
-      const total = a.needs;
-      const ready = a.met + a.waived;
-      const scheduledDate = at(a.start);
-      const late = scheduledDate ? scheduledDate.getTime() < Date.now() : false;
-      const mine = !!a.responsible && a.responsible === user.name;
-      return { id: a.id, code: a.code, name: a.name, scheduledDate, total, ready, short: total - ready, late, mine };
+      const short = a.entries.filter((e) => !meetsRequirement(e.document.revisions, e.requiredStatus));
+      const late = a.scheduledDate ? a.scheduledDate.getTime() < Date.now() : false;
+      const mine =
+        (!!user.department && departmentsOf(a).includes(user.department)) ||
+        (!!a.ownerName && a.ownerName === user.name) ||
+        a.entries.some((e) => engagedDocs.has(e.document.docNumber));
+      return { ...a, total: a.entries.length, ready: a.entries.length - short.length, short, late, mine };
     })
-    .filter((a) => a.total > 0 && a.short > 0 && a.scheduledDate)
+    .filter((a) => a.total > 0 && a.short.length && a.scheduledDate)
     .filter((a) => wholeSchedule || a.mine)
     // Newest first, deliberately. Sorted by how late they are, one activity
     // nobody intends to fix would sit at the top for months and hide every
@@ -125,69 +227,57 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
     // what the panel shows, and the standing failures are the schedule page's.
     .sort((a, b) => (b.scheduledDate?.getTime() ?? 0) - (a.scheduledDate?.getTime() ?? 0));
 
-  const revisionsOf = (kinds: string[]) => work.revisions.filter((w) => kinds.includes(w.kind));
-  const issuesOf = (kinds: string[]) => work.issues.filter((w) => kinds.includes(w.kind));
 
   // ── The rows, by queue ────────────────────────────────────────────────────
   const rows: Record<string, Row[]> = {
-    verdict: verdicts.map<Row>((w) => ({
-      href: `/reviews/${w.reviewId}`, code: w.documentNumber, rev: w.revisionValue, title: w.title,
-      tag: "binding", tone: "sky", at: at(w.since), cta: "Decide",
+    verdict: verdicts.map<Row>((a) => ({
+      href: `/reviews/${a.cycleId}`, code: a.cycle.revision.document.docNumber, rev: a.cycle.revision.value,
+      title: a.cycle.revision.document.title,
+      tag: "binding", tone: "sky",
+      at: a.cycle.issuedToReviewAt ?? a.cycle.submittedAt, cta: "Decide",
     })),
     release: [
-      ...work.gate.filter((w) => w.kind === "SEND_BACK").map<Row>((w) => ({
-        href: `/reviews/${w.reviewId}`, code: w.documentNumber, rev: w.revisionValue, title: w.title,
-        tag: w.verdict ?? "changes asked", tone: "amber", at: at(w.since), cta: "Send back",
+      ...held.map<Row>((rev) => ({
+        href: `/documents/${rev.documentId}`, code: rev.document.docNumber, rev: rev.value, title: rev.document.title,
+        tag: rev.decidedAs ?? "changes asked", tone: "amber", at: rev.statusSetAt, cta: "Send back",
       })),
-      ...work.gate.filter((w) => w.kind === "READY_TO_RELEASE").map<Row>((w) => ({
-        href: `/reviews/${w.reviewId}`, code: w.documentNumber, rev: w.revisionValue, title: w.title,
-        tag: w.status ?? "decided", tone: "emerald", at: at(w.since), cta: "Release",
-      })),
-    ],
-    returned: [
-      ...revisionsOf(["RETURNED_BY_REVIEW"]),
-      ...(user.isInternal ? revisionsOf(["CORRECT_AND_RESUBMIT"]) : []),
-    ].map<Row>((w) => ({
-      href: `/documents/${w.documentId}`, code: w.documentNumber, rev: w.revision, title: w.title,
-      tag: w.kind === "CORRECT_AND_RESUBMIT" ? "to correct" : "reviewed", tone: "amber", at: at(w.since), cta: "See comments",
-    })),
-    unsent: neverSent.map<Row>((r) => ({
-      href: `/documents/${r.documentId}`, code: r.documentNumber, rev: r.revision, title: r.title,
-      tag: r.status ?? "released", tone: "violet", at: at(r.releasedAt), cta: "Ask to send",
-    })),
-    owed: [
-      ...issuesOf(["SEND_PLACEHOLDER"]).map<Row>((w) => ({
-        href: `/transmittals/send?docs=${w.documentId}`, code: w.label.split(" ")[0], title: w.label.split(" ").slice(1).join(" "),
-        tag: "not sent", tone: w.dueDate && new Date(w.dueDate).getTime() < Date.now() ? "amber" : "plain", cta: "Upload",
-      })),
-      ...(user.isInternal ? [] : revisionsOf(["CORRECT_AND_RESUBMIT"])).map<Row>((w) => ({
-        href: `/transmittals/send?docs=${w.documentId}`, code: w.documentNumber, rev: w.revision, title: w.title,
-        tag: "returned", tone: "amber", at: at(w.since), cta: "Upload",
+      ...toRelease.map<Row>((rev) => ({
+        href: `/documents/${rev.documentId}`, code: rev.document.docNumber, rev: rev.value, title: rev.document.title,
+        tag: rev.statusCode ?? "decided", tone: "emerald", at: rev.statusSetAt, cta: "Release",
       })),
     ],
-    review: advice.map<Row>((w) => ({
-      href: `/reviews/${w.reviewId}`, code: w.documentNumber, rev: w.revisionValue, title: w.title,
-      tag: "advice", tone: "sky", at: at(w.since), cta: "Review",
+    returned: returned.map<Row>((c) => ({
+      href: `/reviews/${c.id}`, code: c.revision.document.docNumber, rev: c.revision.value, title: c.revision.document.title,
+      tag: c.outcome ?? "reviewed", tone: "amber", at: c.returnedToOriginatorAt, cta: "See comments",
     })),
-    incoming: [
-      ...revisionsOf(["ACCEPT_SUBMISSION"]).map<Row>((w) => ({
-        href: `/documents/${w.documentId}`, code: w.documentNumber, rev: w.revision, title: w.title,
-        tag: "received", tone: "sky", at: at(w.since), cta: "Check",
-      })),
-      ...issuesOf(["REGISTER_UNPLANNED"]).map<Row>((w) => ({
-        href: `/transmittals/${w.transmittalId}`, code: w.reason, title: `from ${w.who ?? "another organization"} · ${w.label}`,
-        tag: "unplanned", tone: "sky", at: at(w.since), cta: "Check",
-      })),
-    ],
-    route: revisionsOf(["TO_ROUTE"]).map<Row>((w) => ({
-      href: `/documents/${w.documentId}`, code: w.documentNumber, rev: w.revision, title: w.title,
-      tag: "accepted", tone: "emerald", at: at(w.since), cta: "Send for review",
+    unsent: neverSent.map<Row>((rev) => ({
+      href: `/documents/${rev.documentId}`, code: rev.document.docNumber, rev: rev.value, title: rev.document.title,
+      tag: rev.statusCode ?? "released", tone: "violet", at: rev.releasedAt, cta: "Ask to send",
     })),
-    // The requirements process has no counterpart in the backend yet.
-    requirements: [],
-    drafts: revisionsOf(["DRAFT"]).map<Row>((w) => ({
-      href: `/documents/${w.documentId}#workflow`, code: w.documentNumber, rev: w.revision, title: w.title,
-      tag: w.note === "READY" ? "file attached" : w.note === "REJECTED" ? "file refused" : "file scanning", tone: "plain", at: at(w.since), cta: "Continue",
+    owed: owed.flatMap<Row>((o) => o.rows.map((r) => ({
+      href: `/packages/${o.pkg}`, code: r.doc.docNumber, title: r.doc.title,
+      tag: STATE_LABEL[r.state], tone: r.late && r.state === "NOT_SENT" ? "amber" : "plain", cta: "Upload",
+    }))),
+    review: advice.map<Row>((a) => ({
+      href: `/reviews/${a.cycleId}`, code: a.cycle.revision.document.docNumber, rev: a.cycle.revision.value,
+      title: a.cycle.revision.document.title, tag: "advice", tone: "sky",
+      at: a.cycle.issuedToReviewAt ?? a.cycle.submittedAt, cta: "Review",
+    })),
+    incoming: incoming.map<Row>((t) => ({
+      href: `/transmittals/${t.id}`, code: t.number, title: `from ${t.issuingParty}`,
+      tag: "received", tone: "sky", at: t.dateOfIssue, cta: "Check",
+    })),
+    route: toRoute.map<Row>((t) => ({
+      href: `/transmittals/${t.id}`, code: t.number, title: `from ${t.issuingParty}`,
+      tag: "accepted", tone: "emerald", at: t.dateOfIssue, cta: "Send for review",
+    })),
+    requirements: planning.map<Row>((p) => ({
+      href: p.href, code: p.label, plain: true, title: p.sub,
+      tag: p.late ? "overdue" : "asked", tone: p.late ? "amber" : "plain", cta: p.cta,
+    })),
+    drafts: drafts.map<Row>((rev) => ({
+      href: `/documents/${rev.documentId}#workflow`, code: rev.document.docNumber, rev: rev.value, title: rev.document.title,
+      tag: rev.renditionFileId ? "file attached" : "no file", tone: "plain", at: rev.createdAt, cta: "Continue",
     })),
   };
 
@@ -570,23 +660,6 @@ const NEWS = Object.keys(ACTIVITY);
 
 /** The kinds of act, in the order they were named, each said once. */
 const KINDS = [...new Set(Object.values(ACTIVITY).map((one) => one.kind))];
-
-/**
- * The backend's names for acts the journal already knows, under the names the
- * journal uses. An act with no entry here is not shown.
- */
-const ALIAS: Record<string, string> = {
-  RELEASED: "RELEASE",
-  REVIEW_STARTED: "WORKFLOW_STARTED",
-  VERDICT: "REVIEW_OUTCOME",
-  REVIEW_DECIDED: "WORKFLOW_COMPLETED",
-  RETURNED_TO_AUTHOR: "WORKFLOW_RETURNED",
-  RETURNED_FOR_CORRECTION: "RELEASE_REFUSED",
-  SUBMISSION_ACCEPTED: "TRANSMITTAL_ACCEPTED",
-  TRANSMITTAL_ISSUED: "TRANSMITTAL_RAISED",
-  TRANSMITTAL_DISPATCHED: "TRANSMITTAL_SENT_ON",
-  UNPLANNED_REGISTERED: "TRANSMITTAL_FILE_REGISTERED",
-};
 
 /**
  * A date from the address, as the day it names. The end of a window is the end

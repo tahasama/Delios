@@ -1,138 +1,280 @@
-import { api } from "@/lib/api/client";
-import type { ListValue, RegisterPage } from "@/lib/api/types";
-import { requireSession, projectPath } from "@/lib/session";
-import { isMigrated } from "@/lib/migrated";
-import { DOCUMENT_STATES, REVISION_STATES } from "@/lib/states";
-import { Banner } from "@/components/ui";
+import { Prisma } from "@prisma/client";
+import { requireScope } from "@/lib/scope";
 import { RegisterPlate } from "./register-plate";
+import { OUTCOME_CONSEQUENCES, DOC_STATES, DOC_STATE_LABEL, DOC_MEANING, REV_STATES, REV_MEANING, type DocState, type RevState } from "@/lib/standard";
+import { getSet } from "@/lib/config";
 import { DocumentRegister } from "./document-register";
+import { hasVerb } from "@/lib/auth";
+import { Banner } from "@/components/ui";
+import { registerWhere, REGISTER_SORTS, documentsForAssets, readSearch, readDay } from "@/lib/register-query";
+import { isReadOnly } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Documents" };
 
-/** The dates the register can be filtered on, and what each is called. */
-const DATE_FIELDS = [
-  { code: "created", label: "Created" },
-  { code: "revStarted", label: "Revision started" },
-  { code: "fileAdded", label: "File added" },
-  { code: "planned", label: "Planned submission" },
-  { code: "issued", label: "Issued" },
-  { code: "released", label: "Released" },
-  { code: "updated", label: "Changed" },
-];
-
-/** The address's filters that the backend reads, passed on as they are. */
-const PASSED = ["q", "state", "rev", "status", "verdict", "supplier", "discipline", "docType", "criticality", "confidentiality", "deliverable", "action", "on", "from", "to", "view", "sort", "dir", "page", "per"] as const;
-type Search = Partial<Record<(typeof PASSED)[number] | "sent" | "sendError" | "po" | "phase", string>>;
+/** How many rows a page holds. 50 is the default: a screen and a half. */
+const PAGE_SIZES = [25, 50, 100, 250];
 
 /**
- * The document register: every controlled document on the project, one row
- * each, with the revision in hand now. The backend filters, sorts and pages;
- * this page turns its answer into the register's rows and hover notes.
+ * The function whose authority released a revision, as the register prints it.
+ * An approval records the function; records written before functions were named
+ * carry a bare role word instead, and those fall back to whatever the approver
+ * was called, with any role in brackets dropped — the bracket says nothing the
+ * column does not already say.
  */
-export default async function DocumentsPage({ searchParams }: { searchParams: Promise<Search> }) {
-  const session = await requireSession();
-  const sp = await searchParams;
-  const query: Record<string, string> = {};
-  for (const key of PASSED) if (sp[key]) query[key] = sp[key]!;
-  const [register, views] = await Promise.all([
-    api<RegisterPage>(projectPath(session, "/register"), { query }),
-    api<{ id: string; name: string; query: string }[]>(projectPath(session, "/register/views")),
-  ]);
-
-  const values = register.lists.values;
-  const list = (set: string): ListValue[] => values[set] ?? [];
-  const label = (set: string, code: string | null) => (code ? list(set).find((v) => v.code === code)?.label ?? code : null);
-  const statusUse = (code: string) => {
-    const props = list("STATUSES").find((v) => v.code === code)?.props;
-    return props && typeof props.executes === "boolean" ? (props.executes ? "Work may proceed on it" : "Not for construction or execution") : null;
-  };
-  const parties = new Map(register.lists.parties.map((p) => [p.code, p.name]));
-  const external = !session.user.isInternal;
-
-  const rows = register.rows.map((r) => ({
-    id: r.id, docNumber: r.number, title: r.title, deliverableType: r.deliverableType, docType: r.docType, discipline: r.discipline,
-    originator: r.originator ? parties.get(r.originator) ?? r.originator : null, subProject: r.subproject,
-    receivedFrom: external ? session.me.tenant.name : null, sendRevisionId: null,
-    contractRef: r.contractRef, criticality: r.criticality, confidentiality: r.confidentiality,
-    retentionClass: r.retentionClass, retentionLabel: label("RETENTION_CLASSES", r.retentionClass), placeholder: r.isPlaceholder,
-    docTypeLabel: label("DOCUMENT_TYPES", r.docType)!, disciplineLabel: label("DISCIPLINES", r.discipline)!, deliverableLabel: label("DELIVERABLE_TYPES", r.deliverableType)!,
-    phase: null, phaseLabel: null,
-    actions: r.activities,
-    docState: r.state, docStateLabel: DOCUMENT_STATES[r.state]?.label ?? r.state,
-    revision: r.revision, revState: r.revisionState ?? "NONE", revStateLabel: REVISION_STATES[r.revisionState ?? "NONE"]?.label ?? r.revisionState ?? "",
-    verdict: r.verdict, verdictLabel: label("REVIEW_OUTCOMES", r.verdict),
-    releasedFor: r.releasedStatus, releasedForLabel: label("STATUSES", r.releasedStatus), releasedForUse: r.releasedStatus ? statusUse(r.releasedStatus) : null,
-    proposedFor: r.proposedStatus, onHold: null,
-    createdDate: r.createdAt, updatedAt: r.updatedAt, plannedSubmissionDate: r.plannedDate, issueDate: r.issuedAt, releasedAt: r.releasedAt,
-    decidedBy: r.decidedBy, decidedByDelegated: false, packageCount: r.packages,
-    hasReleased: !!r.releasedStatus,
-    reviewRevisionId: r.revisionState === "IN_PREPARATION" ? r.latestRevisionId : null,
-    fileAdded: r.fileAddedAt, revStarted: r.revisionStartedAt,
-  }));
-
-  // What each code means, for the hover note on the code itself: from the organization's own lists.
-  const codes: Record<string, string> = {};
-  for (const v of list("STATUSES")) codes[`STATUS|${v.code}`] = `${v.code}: ${v.label}${statusUse(v.code) ? `\n${statusUse(v.code)}` : ""}`;
-  for (const v of list("REVIEW_OUTCOMES")) codes[`VERDICT|${v.code}`] = `${v.code}: ${v.label}`;
-  for (const v of list("CRITICALITY")) {
-    codes[`CRITICALITY|${v.code}`] = `${v.label}${typeof v.props?.retention === "string" ? `\nKept for: ${String(v.props.retention).replaceAll("_", " ").toLowerCase()}` : ""}`;
-    codes[`CRITICALITY_SHORT|${v.code}`] = v.label.toLowerCase();
-  }
-  for (const v of list("CONFIDENTIALITY")) {
-    codes[`CONFIDENTIALITY|${v.code}`] = v.label;
-    codes[`CONFIDENTIALITY_SHORT|${v.code}`] = v.label.toLowerCase();
-  }
-  for (const [code, s] of Object.entries(DOCUMENT_STATES)) codes[`DOC_STATE|${code}`] = `${s.label}: ${s.means}`;
-  for (const [code, s] of Object.entries(REVISION_STATES)) codes[`REV_STATE|${code}`] = `${s.label}: ${s.means}`;
-
-  const opts = (set: string, only?: string[]) =>
-    list(set).filter((v) => !only || only.includes(v.code)).map((v) => ({ code: v.code, label: v.status === "RETIRED" ? `${v.label} (retired)` : v.label }));
-  const filterQuery = new URLSearchParams(Object.entries(query).filter(([k]) => k !== "page" && k !== "per"));
-
-  return (
-    <div className="space-y-4">
-      {sp.sent ? <Banner tone="good" title="Sent">{sp.sent}</Banner> : null}
-      {sp.sendError ? <Banner tone="warn" title="Not sent">{sp.sendError}</Banner> : null}
-      <DocumentRegister
-        supplier={external ? { to: session.me.tenant.name, readOnly: true } : null}
-        plate={<RegisterPlate project={{ code: session.project.code, name: session.project.name }} canCreate={session.can("CREATE") && session.user.isInternal && isMigrated("/documents/new")} />}
-        rows={rows}
-        total={register.total}
-        views={views}
-        paging={{
-          page: register.page, pages: register.pages, perPage: register.per, sizes: register.sizes,
-          from: register.total ? (register.page - 1) * register.per + 1 : 0, to: Math.min(register.page * register.per, register.total),
-          query: filterQuery.toString(),
-        }}
-        codes={codes}
-        sort={{ key: sp.sort ?? "", dir: sp.dir === "asc" ? "asc" : "desc" }}
-        userCanAct={session.can("CREATE") || session.can("REVISE")}
-        filters={{
-          q: sp.q ?? "", terms: (sp.q ?? "").split(",").map((t) => t.trim()).filter(Boolean),
-          state: sp.state ?? "", rev: sp.rev ?? "", status: sp.status ?? "", verdict: sp.verdict ?? "", supplier: sp.supplier ?? "", po: "",
-          discipline: sp.discipline ?? "", docType: sp.docType ?? "", view: sp.view === "all" ? "all" : "current",
-          criticality: sp.criticality ?? "", confidentiality: sp.confidentiality ?? "", deliverable: sp.deliverable ?? "",
-          phase: "", action: sp.action ?? "", on: sp.on ?? "", from: sp.from ?? "", to: sp.to ?? "",
-        }}
-        filterOptions={{
-          states: Object.entries(DOCUMENT_STATES).map(([code, s]) => ({ code, label: s.label })),
-          revStates: Object.entries(REVISION_STATES).map(([code, s]) => ({ code, label: s.label })),
-          statuses: list("STATUSES").map((v) => ({ code: v.code, label: `${v.code}: ${v.label}` })),
-          verdicts: list("REVIEW_OUTCOMES").map((v) => ({ code: v.code, label: `${v.code}: ${v.label}` })),
-          suppliers: register.lists.parties.map((p) => ({ code: p.code, label: p.name })),
-          pos: [],
-          disciplines: opts("DISCIPLINES", register.lists.usedDisciplines),
-          types: opts("DOCUMENT_TYPES", register.lists.usedDocTypes),
-          criticalities: opts("CRITICALITY"),
-          confidentialities: opts("CONFIDENTIALITY"),
-          deliverables: opts("DELIVERABLE_TYPES"),
-          phases: [],
-          actions: register.lists.activities.map((a) => ({ code: a.code, label: `${a.code}: ${a.name}` })),
-          dateFields: DATE_FIELDS,
-        }}
-        exportHref={`/api/register/export${filterQuery.size ? `?${filterQuery}` : ""}`}
-      />
-    </div>
-  );
+function decidingFunction(role: string | null | undefined, person: string | null | undefined): string | null {
+  const clean = (value: string) => value.replace(/\s*\((?:by delegation|approver|reviewer|controller|admin[a-z]*)\)\s*/gi, "").trim();
+  const named = role && !/^[A-Z_]+$/.test(role) ? clean(role) : "";
+  if (named) return named;
+  const fallback = person ? clean(person) : "";
+  return fallback || null;
 }
+
+/**
+ * The dates the register holds about a document, and the one question people
+ * ask of them: what happened lately. A document carries more dates than a row
+ * can show, so the filter names the date rather than assuming one.
+ */
+const DATE_FIELDS = [
+  { key: "created", label: "Created" },
+  { key: "revStarted", label: "Revision started" },
+  { key: "fileAdded", label: "File added" },
+  { key: "planned", label: "Planned submission" },
+  { key: "issued", label: "Issued" },
+  { key: "released", label: "Released" },
+  { key: "updated", label: "Changed" },
+] as const;
+type Search = {
+  phase?: string;
+  action?: string;
+  sent?: string;
+  sendError?: string;
+  on?: string;
+  from?: string;
+  to?: string;
+  criticality?: string;
+  confidentiality?: string;
+  deliverable?: string;
+  sort?: string;
+  dir?: string;
+  page?: string;
+  per?: string; q?: string; state?: string; rev?: string; status?: string; verdict?: string; supplier?: string; po?: string; discipline?: string; docType?: string; view?: string };
+
+export default async function DocumentsPage({ searchParams }: { searchParams: Promise<Search> }) {
+  const scope = await requireScope();
+  const { user, db, project } = scope;
+  // Released and issued as one act, or as two in order: the project's answer.
+  const { policy } = await import("@/lib/control-activities");
+  const together = (await policy(scope, "POLICY_RELEASE")) === "TOGETHER";
+  // What this organization calls each state; the states themselves are fixed.
+  const { stateNames, stateName } = await import("@/lib/state-names");
+  const names = await stateNames(scope);
+  const sp = await searchParams;
+  const q = (sp.q ?? "").trim();
+  const searches = readSearch(q);
+  const terms = searches.map((search) => search.text);
+  const state = sp.state ?? "";
+  const discipline = sp.discipline ?? "";
+  const docType = sp.docType ?? "";
+  const revState = sp.rev ?? "";
+  const statusCode = sp.status ?? "";
+  const verdictCode = sp.verdict ?? "";
+  const supplier = sp.supplier ?? "";
+  const po = sp.po ?? "";
+  const view = sp.view === "all" ? "all" : "current";
+  // How serious it is and who may see it are properties of the document, so the
+  // register both shows them and narrows by them. What is waiting on whom is
+  // not: a queue belongs on Home, and the comments holding a review up belong
+  // on the review.
+  const criticality = sp.criticality ?? "";
+  const confidentiality = sp.confidentiality ?? "";
+  // Who produced it — internal engineering, a contractor, a vendor, the client.
+  // It decides the numbering scheme, so the register both shows it and narrows
+  // by it.
+  const deliverable = sp.deliverable ?? "";
+  // Which date, and between which two days. Every date the register already
+  // knows — nothing new is stored to make this work. Either end may be left
+  // open: "released, from 1 March" is a question people actually ask.
+  const dateOn = DATE_FIELDS.some((field) => field.key === sp.on) ? sp.on! : "";
+  const from = readDay(sp.from, false);
+  const to = readDay(sp.to, true);
+  const assetDocIds = await documentsForAssets(scope, searches.flatMap((search) => search.words));
+
+  const where = registerWhere(sp, assetDocIds);
+
+  const sort = sp.sort && REGISTER_SORTS[sp.sort] ? sp.sort : "";
+  const dir = sp.dir === "asc" ? "asc" : "desc";
+  const orderBy: Prisma.DocumentOrderByWithRelationInput = sort
+    ? ({ [REGISTER_SORTS[sort]]: dir } as Prisma.DocumentOrderByWithRelationInput)
+    : { updatedAt: "desc" };
+
+  const perPage = PAGE_SIZES.includes(Number(sp.per)) ? Number(sp.per) : 50;
+  const page = Math.max(1, Number(sp.page) || 1);
+
+  const [matchCount, disciplines, types, statuses, verdictSet, supplierCodes, poCodes, criticalities, confidentialities, retentions, deliverableTypes, phases, actionCodes, templates, inUse, views] =
+    await Promise.all([
+      db.document.count({ where }),
+      getSet("DISCIPLINES"), getSet("DOCUMENT_TYPES"), getSet("STATUSES"), getSet("REVIEW_OUTCOMES"), getSet("SUPPLIER_CODES"), getSet("PURCHASE_ORDERS"),
+      getSet("CRITICALITY"), getSet("CONFIDENTIALITY"), getSet("RETENTION_CLASSES"), getSet("DELIVERABLE_TYPES"), getSet("PHASES"),
+      // Only the activities that actually owe something: an action nobody has
+      // listed a document against would filter to an empty register.
+      db.action.findMany({ where: { entries: { some: {} } }, select: { code: true, name: true }, orderBy: { code: "asc" } }),
+      db.workflowTemplate.findMany({ where: { active: true }, orderBy: [{ isDefault: "desc" }, { name: "asc" }] }),
+      // Filters offer what the register holds, not every value published.
+      db.document.groupBy({ by: ["discipline", "docType"] }),
+      // The questions this reader keeps, oldest first so the list stays put.
+      db.registerView.findMany({ where: { userId: user.id }, orderBy: { createdAt: "asc" }, select: { id: true, name: true, query: true } }),
+    ]);
+
+  const pages = Math.max(1, Math.ceil(matchCount / perPage));
+  const current = Math.min(page, pages);
+
+  // The page itself, in full: the expensive includes touch fifty rows.
+  const docs = await db.document.findMany({
+    where,
+    orderBy,
+    skip: (current - 1) * perPage,
+    take: perPage,
+    include: {
+      revisions: { orderBy: { createdAt: "desc" }, include: {
+        files: { select: { createdAt: true } },
+        cycles: { orderBy: { sequence: "desc" } },
+        approvals: { where: { withdrawnAt: null }, orderBy: { decidedAt: "desc" }, take: 1 },
+        transmittalItems: { where: { transmittal: { direction: "OUTGOING" } }, select: { id: true }, take: 1 },
+      } },
+      _count: { select: { baselineEntries: true, packageMembers: true } },
+      // Which activities owe this document. Usually none or one, so the cost of
+      // carrying them is small and the register can finally be asked "what is
+      // owed against A0042".
+      baselineEntries: { select: { action: { select: { code: true, name: true } } }, orderBy: { requiredBy: "asc" }, take: 4 },
+    },
+  });
+
+  // Filters offer what the register holds, not every value the organisation publishes.
+  const usedDisciplines = new Set(inUse.map((d) => d.discipline));
+  const usedTypes = new Set(inUse.map((d) => d.docType));
+  const disciplineLabel = new Map(disciplines.map((d) => [d.code, d.label]));
+  const typeLabel = new Map(types.map((t) => [t.code, t.label]));
+  const retentionLabel = new Map(retentions.map((item) => [item.code, item.label]));
+  const deliverableLabel = new Map(deliverableTypes.map((item) => [item.code, item.label]));
+  const statusLabel = new Map(statuses.map((item) => [item.code, item.label]));
+  const phaseLabel = new Map(phases.map((item) => [item.code, item.label]));
+  const publishedVerdicts = new Set(verdictSet.map((item) => item.code));
+  const verdictLabel = new Map<string, string>([...Object.entries(OUTCOME_CONSEQUENCES).map(([k, v]) => [k, v.label] as [string, string]), ...verdictSet.map((item) => [item.code, item.label] as [string, string])]);
+  const statusUse = new Map(statuses.map((item) => [item.code, [item.props.may ? `May: ${item.props.may}` : "", item.props.mayNot ? `May not: ${item.props.mayNot}` : ""].filter(Boolean).join("\n")]));
+
+  // The register shows the revision being worked on — the latest one — and
+  // the four facts about it, each decided by someone different:
+  //   document state · revision state · review verdict · released for (status).
+  // Older revisions and their history live on the document page; who is holding
+  // a review up, and the comments on it, live on the review.
+  const supplierView = !user.isInternal && !!user.partyCode;
+  const hostName = supplierView ? (await db.scopeConfig.findFirst())?.organizationName ?? "Our client" : null;
+  const all = docs.map((doc) => {
+    const latest = doc.revisions[0] ?? null;
+    const current = doc.revisions.find((revision) => revision.state === "RELEASED") ?? null;
+    const working = doc.revisions.find((revision) => revision.state === "IN_PREPARATION") ?? null;
+    const decided = latest?.cycles.find((c) => c.binding && c.outcome) ?? null;
+    const released = latest?.state === "RELEASED" ? latest : null;
+    return {
+      id: doc.id, docNumber: doc.docNumber, title: doc.title, deliverableType: doc.deliverableType,
+      docType: doc.docType, discipline: doc.discipline,
+      phase: latest?.phase ?? null,
+      phaseLabel: latest?.phase ? phaseLabel.get(latest.phase) ?? latest.phase : null,
+      actions: doc.baselineEntries.map((entry) => ({ code: entry.action.code, name: entry.action.name })),
+      deliverableLabel: deliverableLabel.get(doc.deliverableType) ?? pretty(doc.deliverableType), docTypeLabel: typeLabel.get(doc.docType) ?? doc.docType, disciplineLabel: disciplineLabel.get(doc.discipline) ?? doc.discipline, originator: doc.originator, subProject: doc.subProject,
+      contractRef: doc.contractRef, criticality: doc.criticality, confidentiality: doc.confidentiality,
+      retentionClass: doc.retentionClass,
+      retentionLabel: doc.retentionClass ? retentionLabel.get(doc.retentionClass) ?? pretty(doc.retentionClass) : null,
+      placeholder: doc.isPlaceholder,
+      docState: doc.state, docStateLabel: DOC_STATE_LABEL[doc.state as DocState] ?? doc.state,
+      revision: latest?.value ?? null,
+      revState: latest?.state ?? null,
+      // Released, then held for an outside approval: on hold is what it is now.
+      revStateLabel: latest
+        ? stateName(names, latest.state, { together, held: !!latest.heldAt })
+        : "No revision yet",
+      onHold: released?.heldAt ? (released.heldReason ?? "On hold, not for use.") : null,
+      // A code is printed only when the organization publishes it. Records made
+      // before the list existed carry the Standard's own consequence names,
+      // which are sentences, not codes: those show their meaning alone.
+      verdict: decided?.outcome && publishedVerdicts.has(decided.outcome) ? decided.outcome : null,
+      verdictLabel: decided?.outcome ? verdictLabel.get(decided.outcome) ?? decided.outcome : null,
+      releasedFor: released?.statusCode ?? null,
+      // The status an unreleased revision carries. It is real, and it is not in
+      // force: the state column says so.
+      proposedFor: !released ? latest?.statusCode ?? null : null, releasedForLabel: released?.statusCode ? statusLabel.get(released.statusCode) ?? released.statusCode : null,
+      releasedForUse: released?.statusCode ? statusUse.get(released.statusCode) ?? null : null,
+      createdDate: doc.createdDate.toISOString(), updatedAt: doc.updatedAt.toISOString(),
+      plannedSubmissionDate: working?.plannedSubmissionDate?.toISOString() ?? latest?.plannedSubmissionDate?.toISOString() ?? null,
+      issueDate: released?.issueDate?.toISOString() ?? null, releasedAt: released?.releasedAt?.toISOString() ?? null,
+      // The function that decided, not the person. A delegation is the one
+      // exception worth a mark, because then the authority was borrowed.
+      decidedBy: latest?.approvals[0] ? decidingFunction(latest.approvals[0].approverRole, latest.approvals[0].approverName) : null,
+      decidedByDelegated: latest?.approvals[0]?.approverRole?.includes("by delegation") ?? false,
+      packageCount: doc._count.packageMembers,
+      // When the file on the current revision arrived, and when that revision started.
+      fileAdded: latest?.files?.slice().sort((a, b) => +b.createdAt - +a.createdAt)[0]?.createdAt.toISOString() ?? null,
+      revStarted: latest?.createdAt.toISOString() ?? null,
+      // for actions on a selection, not for display
+      hasReleased: !!current, reviewRevisionId: working?.id ?? null,
+      // An outside organization sees who asked it of them, and can send what
+      // has its file attached and is not yet on its way.
+      receivedFrom: supplierView && doc.originator === user.partyCode ? hostName : null,
+      sendRevisionId: supplierView && doc.originator === user.partyCode && working && (working.renditionFileId || working.nativeFileId) && !working.submittedAt ? working.id : null,
+    };
+  });
+  const rows = all;
+
+  // What each code means, for the hover note on the code itself. Built once,
+  // from the organization's own published lists — nothing is hard-coded here.
+  const codes: Record<string, string> = {};
+  for (const item of statuses) {
+    const may = typeof item.props.may === "string" ? `\nMay be used for: ${item.props.may}` : "";
+    const mayNot = typeof item.props.mayNot === "string" && item.props.mayNot !== "—" ? `\nMay not: ${item.props.mayNot}` : "";
+    codes[`STATUS|${item.code}`] = `${item.code} — ${item.label}${may}${mayNot}`;
+  }
+  for (const item of verdictSet) codes[`VERDICT|${item.code}`] = `${item.code} — ${item.label}`;
+  for (const item of criticalities) {
+    codes[`CRITICALITY|${item.code}`] = `${item.label}${typeof item.props.approval === "string" ? `\nApproved by: ${String(item.props.approval).toLowerCase()}` : ""}${typeof item.props.retention === "string" ? `\nKept for: ${String(item.props.retention).replaceAll("_", " ").toLowerCase()}` : ""}`;
+    codes[`CRITICALITY_SHORT|${item.code}`] = item.label.replace(/-critical$/i, "").toLowerCase();
+  }
+  for (const item of confidentialities) {
+    codes[`CONFIDENTIALITY|${item.code}`] = item.label;
+    codes[`CONFIDENTIALITY_SHORT|${item.code}`] = item.label.split(" — ")[0].toLowerCase();
+  }
+  for (const code of DOC_STATES) codes[`DOC_STATE|${code}`] = `${DOC_STATE_LABEL[code]} — ${DOC_MEANING[code].means}`;
+  for (const code of REV_STATES) codes[`REV_STATE|${code}`] = `${stateName(names, code)} — ${REV_MEANING[code].means}`;
+
+  const query = new URLSearchParams();
+  if (q) query.set("q", q); if (state) query.set("state", state); if (discipline) query.set("discipline", discipline); if (docType) query.set("docType", docType); if (revState) query.set("rev", revState); if (statusCode) query.set("status", statusCode); if (verdictCode) query.set("verdict", verdictCode); if (supplier) query.set("supplier", supplier); if (po) query.set("po", po); if (view === "all") query.set("view", "all"); if (criticality) query.set("criticality", criticality); if (confidentiality) query.set("confidentiality", confidentiality); if (deliverable) query.set("deliverable", deliverable);
+  if (dateOn) query.set("on", dateOn); if (sp.from) query.set("from", sp.from); if (sp.to) query.set("to", sp.to);
+  if (sort) { query.set("sort", sort); query.set("dir", dir); }
+
+
+  return <div className="space-y-4">
+    {sp.sent ? <Banner tone="good" title="Sent">{sp.sent}</Banner> : null}
+    {sp.sendError ? <Banner tone="warn" title="Not sent">{sp.sendError}</Banner> : null}
+    <DocumentRegister
+      supplier={supplierView && (hasVerb(user, "CREATE") || hasVerb(user, "REVISE")) ? { to: hostName ?? "them" } : supplierView ? { to: hostName ?? "them", readOnly: true } : null}
+      plate={<RegisterPlate project={{ code: project.code, name: project.name }} canCreate={!isReadOnly(user)} />}
+      rows={rows}
+      total={matchCount}
+      views={views}
+      paging={{ page: current, pages, perPage, sizes: PAGE_SIZES, from: matchCount ? (current - 1) * perPage + 1 : 0, to: Math.min(current * perPage, matchCount), query: query.toString() }}
+      codes={codes}
+      sort={{ key: sort, dir }}
+      userCanAct={!isReadOnly(user)} filters={{ q, terms, state, rev: revState, status: statusCode, verdict: verdictCode, supplier, po, discipline, docType, view, criticality, confidentiality, deliverable, phase: sp.phase ?? "", action: sp.action ?? "", on: dateOn, from: sp.from ?? "", to: sp.to ?? "" }} filterOptions={{ states: DOC_STATES.map((code) => ({ code, label: DOC_STATE_LABEL[code] ?? code })), revStates: [
+      { code: "NONE", label: "No revision yet" },
+      { code: "IN_PREPARATION", label: names.IN_PREPARATION },
+      { code: "IN_REVIEW", label: names.IN_REVIEW },
+      { code: "NOT_RELEASED", label: names.NOT_RELEASED },
+      { code: "FOR_RELEASE", label: "Reviewed" },
+      { code: "RELEASED", label: together ? names.RELEASED_ISSUED : names.RELEASED },
+      { code: "SUPERSEDED", label: names.SUPERSEDED },
+      { code: "VOID", label: names.VOID },
+    ], statuses: statuses.map((item) => ({ code: item.code, label: `${item.code} — ${item.label}` })), verdicts: verdictSet.map((item) => ({ code: item.code, label: `${item.code} — ${item.label}` })), suppliers: supplierCodes.map((item) => ({ code: item.code, label: item.label })), pos: poCodes.map((item) => ({ code: item.code, label: item.label })), disciplines: disciplines.filter((item) => usedDisciplines.has(item.code)).map((item) => ({ code: item.code, label: item.status === "RETIRED" ? `${item.label} (retired)` : item.label })), types: types.filter((item) => usedTypes.has(item.code)).map((item) => ({ code: item.code, label: item.status === "RETIRED" ? `${item.label} (retired)` : item.label })), criticalities: criticalities.map((item) => ({ code: item.code, label: item.label })), deliverables: deliverableTypes.map((item) => ({ code: item.code, label: item.label })), confidentialities: confidentialities.map((item) => ({ code: item.code, label: item.label.split(" — ")[0] })), phases: phases.map((item) => ({ code: item.code, label: item.label })), actions: actionCodes.map((item) => ({ code: item.code, label: `${item.code} — ${item.name}` })), dateFields: DATE_FIELDS.map((field) => ({ code: field.key, label: field.label })) }} exportHref={`/api/register/export${query.size ? `?${query.toString()}` : ""}`} />
+  </div>;
+}
+
+function pretty(value: string) { return value.replaceAll("_", " ").toLowerCase(); }

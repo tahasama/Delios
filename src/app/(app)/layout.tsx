@@ -1,33 +1,21 @@
-import { requireSession } from "@/lib/session";
+import { mayCreateDocument } from "@/lib/auth";
+import { requireScope } from "@/lib/scope";
 import { Sidebar, MobileNav, SearchBox } from "@/components/navigation";
 import { ProjectSwitcher } from "@/components/project-switcher";
-import { signOutAction as logoutAction } from "@/lib/actions/session";
+import { logoutAction } from "@/lib/actions/auth";
 import { Bell, BookOpen, ChevronDown, LogOut, UserRound } from "lucide-react";
 import Link from "next/link";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { ROLE_LABEL } from "@/lib/standard";
 import type { Role } from "@/lib/standard";
-import type { ProjectSummary } from "@/lib/scope";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  // Everything here comes from the backend; the frame itself is unchanged.
-  const session = await requireSession();
-  const toSummary = (p: { id: string; code: string; name: string }): ProjectSummary =>
-    ({ id: p.id, orgId: "", code: p.code, name: p.name, kind: "GENERIC", role: "GENERIC", status: "ACTIVE" });
-  const project = toSummary(session.project);
-  const available = session.projects.map(toSummary);
-  const role = "GENERIC" as Role;
-  const user = {
-    name: session.user.name,
-    functionName: session.project.function.name as string | null,
-    role: role as string,
-    organization: session.user.organization,
-  };
-  const ctx = { can: (verb: string) => session.user.isAdmin || session.can(verb) };
-  const mayCreateDocument = (u: { isInternal: boolean }) => u.isInternal;
-  // Notifications have no counterpart in the backend yet.
-  const unread = 0;
-  const scope = { organizationName: session.user.organization };
+  const ctx = await requireScope();
+  const { user, db, project, available, role } = ctx;
+  const [unread, scope] = await Promise.all([
+    db.notification.count({ where: { userId: user.id, read: false } }),
+    db.scopeConfig.findFirst(),
+  ]);
 
   // The navigation is built from what this person may actually do, so nobody
   // is offered a destination that will refuse them.
@@ -37,9 +25,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     canControl: ctx.can("CONTROL"),
     // Settings opens for administrators and for anyone granted a settings verb.
     canConfigure: ctx.can("CONFIGURE") || ctx.can("MATRIX") || ctx.can("ROUTES"),
-    canCreate: ctx.can("CREATE") && mayCreateDocument(session.user),
+    canCreate: ctx.can("CREATE") && mayCreateDocument(user),
     // Another organization on this project: only what concerns them.
-    external: !session.user.isInternal,
+    external: !user.isInternal,
   };
 
   return (

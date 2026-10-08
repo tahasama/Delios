@@ -1,8 +1,23 @@
 "use server";
 
-import { switchProjectAction as switchProject } from "./session";
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { requireUser } from "@/lib/auth";
+import { setActiveProject } from "@/lib/scope";
 
-/** Moves to another of the person's projects; the backend refuses one they are not on. */
+/**
+ * Move the session to another project. The switch is refused unless the user
+ * holds an active membership there, so the cookie can never widen access.
+ */
 export async function switchProjectAction(formData: FormData): Promise<void> {
-  await switchProject(formData);
+  const user = await requireUser();
+  const projectId = String(formData.get("projectId") ?? "");
+  if (!projectId) return;
+
+  const ok = await setActiveProject(projectId, user.id);
+  if (!ok) redirect("/?denied=1");
+
+  // Everything on screen belongs to the old project.
+  revalidatePath("/", "layout");
+  redirect("/");
 }
