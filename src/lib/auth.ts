@@ -1,20 +1,11 @@
 import { cache } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import bcrypt from "bcryptjs";
 import { getMe } from "./api/me";
 import type { Role } from "./standard";
 import { heldVerbs } from "./permissions";
 
 const COOKIE = "edms_session";
-const secret = new TextEncoder().encode(process.env.SESSION_SECRET ?? "dev-secret");
-
-export async function hashPassword(pw: string) {
-  return bcrypt.hash(pw, 10);
-}
-export async function verifyPassword(pw: string, hash: string) {
-  return bcrypt.compare(pw, hash);
-}
 
 /** Keeps the backend's session token in the browser's session cookie. */
 export async function createSession(token: string) {

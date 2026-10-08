@@ -5,7 +5,7 @@ import type { NextRequest } from "next/server";
 // reachable without a session. Everything else needs one.
 const PUBLIC = ["/login", "/signup", "/_next", "/favicon", "/icon", "/robots.txt"];
 
-export async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
   if (PUBLIC.some((p) => pathname.startsWith(p))) {
     return NextResponse.next();

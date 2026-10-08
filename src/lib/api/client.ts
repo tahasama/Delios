@@ -59,13 +59,19 @@ export async function apiFetch(path: string, options: ApiOptions = {}): Promise<
   if (forwarded) sendHeaders["X-Forwarded-For"] = forwarded;
   if (options.idempotencyKey) sendHeaders["Idempotency-Key"] = options.idempotencyKey;
   if (options.body !== undefined) sendHeaders["Content-Type"] = "application/json";
-  return fetch(url(path, options.query), {
+  const started = TRACE ? performance.now() : 0;
+  const response = await fetch(url(path, options.query), {
     method: options.method ?? (options.body === undefined ? "GET" : "POST"),
     headers: sendHeaders,
     body: options.body === undefined ? undefined : JSON.stringify(options.body),
     cache: "no-store",
   });
+  if (TRACE) console.log(`[api] ${response.status} ${Math.round(performance.now() - started)}ms ${options.method ?? "GET"} ${path}`);
+  return response;
 }
+
+/** DELIOS_API_TRACE=1 logs every backend call with its time, to see what a page waits on. */
+const TRACE = process.env.DELIOS_API_TRACE === "1";
 
 /** Reads a problem answer into an ApiProblem. */
 export async function problemOf(response: Response): Promise<ApiProblem> {
@@ -86,6 +92,35 @@ export async function api<T>(path: string, options: ApiOptions = {}): Promise<T>
   if (response.status === 204) return undefined as T;
   const text = await response.text();
   return (text ? JSON.parse(text) : undefined) as T;
+}
+
+/**
+ * A read that many parts of one page ask for — who is signed in, the value
+ * lists — answered once for that session for a few seconds rather than once per
+ * caller. Keyed by the session, so nobody ever reads another person's answer.
+ * Only for reads whose staleness of a few seconds cannot mislead.
+ */
+const shortLived = new Map<string, { until: number; value: Promise<unknown> }>();
+
+export async function apiShortLived<T>(path: string, ttlMs: number, options: Pick<ApiOptions, "query"> = {}): Promise<T> {
+  const session = (await cookies()).get(SESSION_COOKIE)?.value ?? "";
+  const key = `${session}\n${url(path, options.query)}`;
+  const now = Date.now();
+  const hit = shortLived.get(key);
+  if (hit && hit.until > now) return hit.value as Promise<T>;
+  const value = api<T>(path, options);
+  shortLived.set(key, { until: now + ttlMs, value });
+  value.catch(() => shortLived.delete(key));
+  if (shortLived.size > 2000) {
+    for (const [k, v] of shortLived) if (v.until <= now) shortLived.delete(k);
+  }
+  return value;
+}
+
+/** Forget the short-lived answers of this session: after an act that changes them. */
+export async function forgetShortLived(): Promise<void> {
+  const session = (await cookies()).get(SESSION_COOKIE)?.value ?? "";
+  for (const key of shortLived.keys()) if (key.startsWith(`${session}\n`)) shortLived.delete(key);
 }
 
 /** For actions: the problem's message to show, or rethrows anything that is not a refusal. */

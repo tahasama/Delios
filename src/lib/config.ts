@@ -1,13 +1,33 @@
 import { cache } from "react";
-import { api } from "./api/client";
+import { api, apiShortLived } from "./api/client";
 
 export type ValueRow = { code: string; label: string; status: string; props: Record<string, unknown> };
 
 // Value sets are published at organization level (Annex C — the configuration
 // gateway) and are the same for every project the organization runs. They are
 // read from the backend, which applies the organization.
+// The lists a page asks for in the same moment are fetched in one request, and
+// the answer is kept for a few seconds: a page reads a dozen lists, many twice.
+type RawRow = { code: string; label: string; status: string; props: Record<string, unknown> | null };
+let pending: { keys: Set<string>; answer: Promise<Record<string, RawRow[]>> } | null = null;
+
+function batched(setKey: string): Promise<Record<string, RawRow[]>> {
+  if (!pending) {
+    const keys = new Set<string>();
+    const answer = new Promise<Record<string, RawRow[]>>((resolve, reject) => {
+      queueMicrotask(() => {
+        pending = null;
+        apiShortLived<Record<string, RawRow[]>>("/api/values", 10_000, { query: { sets: [...keys].sort().join(",") } }).then(resolve, reject);
+      });
+    });
+    pending = { keys, answer };
+  }
+  pending.keys.add(setKey);
+  return pending.answer;
+}
+
 const readSet = cache(async (setKey: string): Promise<ValueRow[]> => {
-  const sets = await api<Record<string, { code: string; label: string; status: string; props: Record<string, unknown> | null }[]>>("/api/values", { query: { sets: setKey } });
+  const sets = await batched(setKey);
   return (sets[setKey] ?? []).map((row) => ({ code: row.code, label: row.label, status: row.status, props: row.props ?? {} }));
 });
 

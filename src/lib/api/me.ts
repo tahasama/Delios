@@ -1,7 +1,7 @@
 import "server-only";
 import { cache } from "react";
 import { cookies } from "next/headers";
-import { api, ApiProblem, SESSION_COOKIE } from "./client";
+import { api, apiShortLived, ApiProblem, SESSION_COOKIE } from "./client";
 
 /** A rule of the permission matrix as the backend holds it (the function's rows). */
 export type MeRule = {
@@ -26,7 +26,7 @@ export type Me = {
 export const getMe = cache(async (): Promise<Me | null> => {
   if (!(await cookies()).get(SESSION_COOKIE)?.value) return null;
   try {
-    return await api<Me>("/api/me");
+    return await apiShortLived<Me>("/api/me", 2000);
   } catch (e) {
     if (e instanceof ApiProblem && (e.status === 401 || e.status === 403)) return null;
     throw e;

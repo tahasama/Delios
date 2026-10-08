@@ -22,10 +22,10 @@ public static class ValueEndpoints
         Results.Ok(await db.Parties.AsNoTracking().Where(p => p.Active && !p.IsInternal).OrderBy(p => p.Name)
             .Select(p => new { p.Code, p.Name, p.Participation }).ToListAsync(cancellationToken));
 
-    /// <summary>The values of each list named (up to 20), in their published order, retired ones marked.</summary>
+    /// <summary>The values of each list named (up to 100), in their published order, retired ones marked.</summary>
     private static async Task<IResult> ValuesAsync(DeliosDbContext db, CancellationToken cancellationToken, string? sets = null)
     {
-        var names = (sets ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Take(20).ToList();
+        var names = (sets ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Take(100).ToList();
         var values = await db.ValueEntries.AsNoTracking().Where(v => names.Contains(v.SetKey)).OrderBy(v => v.Sort).ToListAsync(cancellationToken);
         return Results.Ok(names.ToDictionary(n => n, n => values.Where(v => v.SetKey == n)
             .Select(v => new ListValue(v.Code, v.Label, v.Status, v.Props?.RootElement.Clone())).ToList()));

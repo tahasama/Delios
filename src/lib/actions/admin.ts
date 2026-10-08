@@ -7,7 +7,7 @@ import { isAdmin } from "@/lib/auth";
 import { formPolicy, checkForm } from "@/lib/field-policy";
 import { buildProps } from "@/lib/config-props";
 import { getSet, getSets, SET_KEY } from "@/lib/config";
-import { api, refusal } from "@/lib/api/client";
+import { api, forgetShortLived, refusal } from "@/lib/api/client";
 import { setOrgSetting } from "@/lib/api/settings";
 import { adminNumbering, adminUsers, backendField, RECORD_KIND } from "@/lib/api/admin";
 
@@ -29,6 +29,8 @@ function valueRef(valueId: string): { setKey: string; code: string } {
 
 async function putValue(body: { setKey: string; code: string; label?: string; status?: string; sort?: number; props?: unknown }) {
   await api("/api/admin/values", { method: "PUT", body });
+  // The lists are read through a few-second cache: the person who changed one sees it at once.
+  await forgetShortLived();
 }
 
 export async function createUserAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
