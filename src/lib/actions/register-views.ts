@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireScope } from "@/lib/scope";
+import { api, projectPath, refusal } from "@/lib/api/client";
 
 /**
  * The register views somebody keeps.
@@ -12,7 +13,7 @@ import { requireScope } from "@/lib/scope";
  * question Document Control asks, and a shared list would fill with both.
  */
 export async function saveRegisterView(formData: FormData) {
-  const { user, projectId, db } = await requireScope();
+  const ctx = await requireScope();
   const name = String(formData.get("name") ?? "").trim().slice(0, 60);
   // Which page somebody happened to be on is not part of the question.
   const asked = new URLSearchParams(String(formData.get("query") ?? "").replace(/^\?/, ""));
@@ -22,20 +23,26 @@ export async function saveRegisterView(formData: FormData) {
 
   // Saving under a name that is taken replaces it: the reader is refining the
   // same view, not collecting duplicates of it.
-  await db.registerView.upsert({
-    where: { projectId_userId_name: { projectId, userId: user.id, name } },
-    update: { query },
-    create: { projectId, userId: user.id, name, query },
-  });
+  try {
+    await api(projectPath(ctx, "/register/views"), { method: "PUT", body: { name, query } });
+  } catch (e) {
+    // The form has nowhere to say why; the list simply stays as it was.
+    refusal(e);
+    return;
+  }
   revalidatePath("/documents");
 }
 
 export async function deleteRegisterView(formData: FormData) {
-  const { user, db } = await requireScope();
+  const ctx = await requireScope();
   const id = String(formData.get("id") ?? "");
-  const view = await db.registerView.findUnique({ where: { id }, select: { userId: true } });
-  // A view belongs to the person who kept it, and to nobody else.
-  if (!view || view.userId !== user.id) return;
-  await db.registerView.delete({ where: { id } });
+  // A view belongs to the person who kept it, and to nobody else: the backend
+  // removes only one of their own.
+  try {
+    await api(projectPath(ctx, `/register/views/${id}`), { method: "DELETE" });
+  } catch (e) {
+    refusal(e);
+    return;
+  }
   revalidatePath("/documents");
 }

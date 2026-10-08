@@ -1,4 +1,5 @@
 import type { Tenant } from "./tenant";
+import { legacyNumbering } from "./api/admin";
 
 // Document number construction & validation — Part 3, per the published scheme.
 // "A number is valid when it splits into its scheme fields in order, and every field
@@ -11,11 +12,15 @@ export type SchemeInfo = {
   fields: { position: number; label: string; valueSetKey: string | null; rule: string | null }[];
 };
 
-export async function getSchemeForDeliverable(t: Tenant, deliverableType: string): Promise<{ scheme: SchemeInfo; routed: boolean } | null> {
-  const { db } = t;
-  const routing = await db.schemeRouting.findFirst({ where: { deliverableType } });
+/**
+ * The scheme routed to a deliverable type, as Document Control keeps it. Only
+ * Document Control and administrators may read the schemes; anybody else gets none.
+ */
+export async function getSchemeForDeliverable(_t: Tenant, deliverableType: string): Promise<{ scheme: SchemeInfo; routed: boolean } | null> {
+  const numbering = await legacyNumbering().catch(() => null);
+  const routing = numbering?.routing.find((r) => r.deliverableType === deliverableType);
   if (!routing || routing.status !== "ACTIVE") return null;
-  const scheme = await db.scheme.findFirst({ where: { name: routing.schemeName }, include: { fields: { orderBy: { position: "asc" } } } });
+  const scheme = numbering?.schemes.find((sc) => sc.name === routing.schemeName);
   if (!scheme) return null;
   return {
     scheme: {
@@ -28,8 +33,9 @@ export async function getSchemeForDeliverable(t: Tenant, deliverableType: string
   };
 }
 
-export async function listSchemes(t: Tenant) {
-  return t.db.scheme.findMany({ include: { fields: { orderBy: { position: "asc" } } }, orderBy: { name: "asc" } });
+export async function listSchemes(_t: Tenant) {
+  const numbering = await legacyNumbering().catch(() => null);
+  return [...(numbering?.schemes ?? [])].sort((a, b) => a.name.localeCompare(b.name));
 }
 
 export type NumberIssue =
@@ -82,38 +88,17 @@ export function counterPrefix(scheme: SchemeInfo, fieldValues: Record<string, st
   return { prefix: parts.join(scheme.delimiter), number: "" };
 }
 
-/** Allocate the next document number for a field combination (§3.7 — system-generated). */
+/**
+ * Allocate the next document number for a field combination (§3.7 — system-generated).
+ * The backend allocates it, and only as it registers the document: a number is
+ * never handed out on its own.
+ */
 export async function allocateNumber(
-  t: Tenant,
-  deliverableType: string,
-  fieldValues: Record<string, string>
+  _t: Tenant,
+  _deliverableType: string,
+  _fieldValues: Record<string, string>
 ): Promise<{ docNumber: string; scheme: string }> {
-  const routed = await getSchemeForDeliverable(t, deliverableType);
-  if (!routed) throw new Error(`No numbering scheme is routed for deliverable type "${deliverableType}".`);
-  const { scheme } = routed;
-  const seqField = scheme.fields.find((f) => f.rule?.startsWith("COUNTER"));
-  const digits = seqField ? Number(seqField.rule?.match(/DIGITS\((\d+)\)/)?.[1] ?? 5) : 5;
-  const { prefix } = counterPrefix(scheme, fieldValues);
-  const { db, projectId } = t;
-  const seq = await db.$transaction(async (tx) => {
-    // §3.7 / B.1.7 — a range issued to a named party is drawn down first
-    const openRanges = await tx.numberRange.findMany({ where: { projectId, prefix, status: "OPEN" } });
-    const range = openRanges.find((r) => Math.max(r.lastIssued + 1, r.from) <= r.to);
-    if (range) {
-      const next = Math.max(range.lastIssued + 1, range.from);
-      const exhausted = next >= range.to;
-      await tx.numberRange.update({ where: { id: range.id }, data: { lastIssued: next, status: exhausted ? "EXHAUSTED" : "OPEN" } });
-      return next;
-    }
-    const existing = await tx.numberCounter.findUnique({ where: { projectId_prefix: { projectId, prefix } } });
-    if (existing) {
-      await tx.numberCounter.update({ where: { id: existing.id }, data: { next: { increment: 1 } } });
-      return existing.next;
-    }
-    await tx.numberCounter.create({ data: { projectId, prefix, next: 2 } });
-    return 1;
-  });
-  return { docNumber: `${prefix}${scheme.delimiter}${String(seq).padStart(digits, "0")}`, scheme: scheme.name };
+  throw new Error("Allocating a number on its own is not supported yet: the number is given when the document is registered.");
 }
 
 /** Next revision value in the applicable series (§6.2/§6.3), excluding I O Q S X Z. */

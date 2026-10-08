@@ -20,21 +20,13 @@ export async function readyReading(t: Tenant): Promise<ReadyReading> {
 }
 
 /**
- * The revision a requirement is judged against: the released one, or simply the
- * newest. One row either way — never the whole history of the document.
+ * Does this document meet what the action asks of it? The backend answers it
+ * (whether the released revision serves the need's purpose) and the revision
+ * carries that answer; without one, the status is compared as it always was.
  */
-export function countingRevision(reading: ReadyReading) {
-  // Written as a literal rather than through Prisma's argument type: the scoped
-  // client's own generics make that comparison cost more than it is worth.
-  return reading === "STATUS"
-    ? { orderBy: { createdAt: "desc" }, take: 1, select: { value: true, state: true, statusCode: true } } as const
-    : { where: { state: "RELEASED" }, orderBy: { releasedAt: "desc" }, take: 1, select: { value: true, state: true, statusCode: true } } as const;
-}
-
-/** Does this document meet what the action asks of it? */
 export function meetsRequirement(
-  revisions: { statusCode: string | null }[],
+  revisions: { statusCode: string | null; meets?: boolean }[],
   requiredStatus: string,
 ): boolean {
-  return revisions[0]?.statusCode === requiredStatus;
+  return revisions[0]?.meets ?? revisions[0]?.statusCode === requiredStatus;
 }

@@ -9,7 +9,6 @@ import { mayCreateDocument } from "@/lib/auth";
 import { Chip } from "@/components/ui";
 import { isAdmin, isController } from "@/lib/auth";
 import { contractRoleOptions } from "@/lib/contract-roles";
-import { db as bare } from "@/lib/db";
 import { api, projectPath } from "@/lib/api/client";
 import { documentCount } from "@/lib/api/conformance";
 
@@ -64,7 +63,7 @@ export default async function GuidePage() {
     api<unknown[]>(projectPath(ctx, "/activities")).then((rows) => rows.length).catch(() => 0),
     api<{ total: number }>(projectPath(ctx, "/transmittals/log"), { query: { per: 25 } }).then((page) => page.total).catch(() => 0),
   ]);
-  const roleOptions = await contractRoleOptions(bare, orgId);
+  const roleOptions = await contractRoleOptions();
 
   return (
     <div className="space-y-8">

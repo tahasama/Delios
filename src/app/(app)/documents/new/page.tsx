@@ -2,6 +2,7 @@ import { fieldRules, fieldLabels, ownFields } from "@/lib/field-policy";
 import { getActiveSet } from "@/lib/config";
 import { requireScope } from "@/lib/scope";
 import { mayCreateDocument } from "@/lib/auth";
+import { adminRoutes, legacyNumbering, orEmpty } from "@/lib/api/admin";
 import { Banner, PageHeader } from "@/components/ui";
 import { NewDocumentForm } from "./new-document-form";
 
@@ -10,13 +11,12 @@ export const metadata = { title: "Create document" };
 
 export default async function NewDocumentPage({ searchParams }: { searchParams: Promise<{ received?: string; fromFile?: string }> }) {
   const ctx = await requireScope();
-  const { user, db, project } = ctx;
+  const { user, project } = ctx;
   const sp = await searchParams;
   const received = sp.received === "1" || !!sp.fromFile;
   // A file kept with a received transmittal, being made a register document.
-  const kept = sp.fromFile
-    ? await db.storedFile.findFirst({ where: { id: sp.fromFile, kind: "ATTACHMENT" }, select: { id: true, name: true, transmittal: { select: { number: true } } } })
-    : null;
+  // The backend does not look a kept file up by its id (name, transmittal) yet.
+  const kept = null as { id: string; name: string; transmittal: { number: string } | null } | null;
   const fromFile = kept ? { id: kept.id, name: kept.name, transmittal: kept.transmittal?.number ?? null } : undefined;
   if (!mayCreateDocument(user)) {
     return <div><PageHeader title="Create a document" /><Banner tone="warn" title={user.isInternal ? "Read-only access" : "External party access"}>{user.isInternal ? "Your current access is read-only. Document Control can grant a contribution role when needed." : "External parties do not create register entries. Document Control creates and assigns a placeholder to your organization; you can then contribute files and revisions to that controlled entry."}</Banner></div>;
@@ -36,28 +36,25 @@ export default async function NewDocumentPage({ searchParams }: { searchParams: 
   // Which value sets each producer's numbering scheme needs, so the form can
   // mark exactly those fields as required instead of failing on submit.
   const [fields, labels, own] = await Promise.all([fieldRules(ctx, "DOCUMENT"), fieldLabels(ctx, "DOCUMENT"), ownFields(ctx, "DOCUMENT")]);
-  const [routings, schemes] = await Promise.all([
-    db.schemeRouting.findMany({ where: { status: "ACTIVE" } }),
-    db.scheme.findMany({ include: { fields: true } }),
-  ]);
+  // Numbering and routes are read where Document Control keeps them; anybody
+  // else gets none, and the backend still checks every value on submit.
+  const { routing, schemes } = await legacyNumbering().catch(() => ({ routing: [], schemes: [] }));
+  const routings = routing.filter((r) => r.status === "ACTIVE");
   const numberingSets: Record<string, string[]> = {};
   for (const r of routings) {
     const scheme = schemes.find((sc) => sc.name === r.schemeName);
     numberingSets[r.deliverableType] = (scheme?.fields ?? []).map((f) => f.valueSetKey).filter((k): k is string => !!k);
   }
   // Review routes, each described by who it goes to — people choose by that.
-  const [templates, people] = await Promise.all([
-    db.workflowTemplate.findMany({ where: { active: true }, orderBy: [{ isDefault: "desc" }, { name: "asc" }] }),
-    db.user.findMany({ select: { id: true, name: true } }),
-  ]);
-  const nameOf = new Map(people.map((p) => [p.id, p.name]));
+  const templates = (await orEmpty(adminRoutes)).filter((t) => t.active)
+    .sort((a, b) => Number(b.isDefault) - Number(a.isDefault) || a.name.localeCompare(b.name));
   const routes = templates.map((t) => {
-    const steps = JSON.parse(t.steps) as { act: string; participantIds: string[] }[];
+    const steps = t.steps;
     return {
       id: t.id,
       name: t.name,
       isDefault: t.isDefault,
-      path: steps.map((st) => `${st.act === "APPROVAL" ? "approve" : "review"}: ${st.participantIds.map((id) => nameOf.get(id) ?? "?").join(", ")}`).join(" → "),
+      path: steps.map((st, index) => `${index === steps.length - 1 ? "approve" : "review"}: ${st.title}`).join(" → "),
     };
   });
   const defaultConf = confidentialities.find((c) => c.props.default === true)?.code ?? null;

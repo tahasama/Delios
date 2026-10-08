@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { requireScope } from "@/lib/scope";
+import { scheduleVersions } from "@/lib/api/schedule";
 
 import { PageHeader, Chip } from "@/components/ui";
 import { fmtDate } from "@/lib/utils";
@@ -9,8 +10,7 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "Schedule versions" };
 
 export default async function ScheduleVersionsPage() {
-  const { db } = await requireScope();
-  const versions = await db.scheduleVersion.findMany({ orderBy: { importedAt: "desc" }, include: { _count: { select: { activities: true } } } });
+  const versions = await scheduleVersions(await requireScope());
   const published = versions.find((version) => version.status === "PUBLISHED");
 
   return (

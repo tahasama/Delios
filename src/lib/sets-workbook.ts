@@ -1,6 +1,7 @@
 import ExcelJS from "exceljs";
 import type { Tenant } from "./tenant";
 import { propFieldsFor, type PropField } from "./set-props";
+import { getSet, getSets } from "./config";
 
 /**
  * Every published list, as one workbook with a tab each.
@@ -40,21 +41,10 @@ function propText(field: PropField, props: Record<string, unknown>): string {
   return String(value);
 }
 
-function parse(props: string | null): Record<string, unknown> {
-  if (!props) return {};
-  try { return JSON.parse(props) as Record<string, unknown>; } catch { return {}; }
-}
-
-export async function buildSetsWorkbook(t: Tenant): Promise<Buffer> {
-  const [sets, values] = await Promise.all([
-    t.db.configSet.findMany({ select: { key: true, title: true, description: true }, orderBy: { title: "asc" } }),
-    t.db.configValue.findMany({
-      select: { setKey: true, code: true, label: true, status: true, props: true, sort: true },
-      orderBy: [{ sort: "asc" }, { code: "asc" }],
-    }),
-  ]);
-  const bySet = new Map<string, typeof values>();
-  for (const value of values) bySet.set(value.setKey, [...(bySet.get(value.setKey) ?? []), value]);
+export async function buildSetsWorkbook(_t: Tenant): Promise<Buffer> {
+  // Each list in its published order, as the backend gives it.
+  const sets = [...(await getSets())].sort((a, b) => a.title.localeCompare(b.title));
+  const bySet = new Map(await Promise.all(sets.map(async (set) => [set.key, await getSet(set.key)] as const)));
 
   const book = new ExcelJS.Workbook();
   book.creator = "DELIOS";
@@ -124,7 +114,7 @@ export async function buildSetsWorkbook(t: Tenant): Promise<Buffer> {
 
     rows.forEach((row, index) => {
       const at = index + 3;
-      const parsed = parse(row.props);
+      const parsed = row.props;
       sheet.getCell(at, 1).value = row.code;
       sheet.getCell(at, 2).value = row.label;
       sheet.getCell(at, 3).value = row.status;

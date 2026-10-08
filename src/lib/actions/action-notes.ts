@@ -3,8 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { requireScope } from "@/lib/scope";
 import { isController, isAdmin } from "@/lib/auth";
-import { audit } from "@/lib/audit";
 import { carrierRefusal, actIsOff } from "@/lib/control-activities";
+import { api, projectPath, refusal } from "@/lib/api/client";
+import { activityDetail, type ActivityDetail } from "@/lib/api/schedule";
 
 /**
  * What was decided about an action that did not have its documents.
@@ -19,7 +20,7 @@ type State = { error?: string; message?: string };
 
 export async function recordActionNoteAction(_prev: State | undefined, formData: FormData): Promise<State> {
   const ctx = await requireScope();
-  const { user, db, projectId } = ctx;
+  const { user } = ctx;
   const actionId = String(formData.get("actionId") ?? "");
   const decision = String(formData.get("decision") ?? "");
   const responsibleName = String(formData.get("responsibleName") ?? "").trim();
@@ -34,38 +35,25 @@ export async function recordActionNoteAction(_prev: State | undefined, formData:
   if (!responsibleName) return { error: "Name who carries this decision — the manager the action answers to." };
   if (!reason) return { error: "Say why. A decision with no reason on it is not a record of anything." };
 
-  const action = await db.action.findUnique({ where: { id: actionId }, select: { id: true, code: true, name: true, scheduledDate: true } });
+  const action = (await activityDetail(ctx, actionId))?.activity;
   if (!action) return { error: "That action no longer exists." };
 
-  const refusal = await carrierRefusal(ctx, "ACTION_NOTE", {
+  const refused = await carrierRefusal(ctx, "ACTION_NOTE", {
     control: isController(user) || isAdmin(user),
     standing: true,
   });
-  if (refusal) return { error: refusal };
+  if (refused) return { error: refused };
 
-  await db.actionNote.create({
-    data: {
-      projectId,
-      actionId,
-      decision,
-      // The day the action stood at when this was written. A later schedule
-      // moves the date, and the note has to keep the one it was written about.
-      plannedDate: action.scheduledDate,
-      responsibleName,
-      reason,
-      delayResponsible,
-      delayReason,
-      recordedById: user.id,
-      recordedByName: user.name,
-    },
-  });
-
-  await audit({
-    tenant: ctx, actor: user, action: decision === "CARRIED" ? "ACTION_CARRIED" : "ACTION_STOPPED",
-    entityType: "Action", entityId: actionId, entityLabel: `${action.code} — ${action.name}`,
-    newValue: responsibleName,
-    detail: `${decision === "CARRIED" ? "Carried out without all of its documents" : "Stopped for want of its documents"}: ${reason}${delayResponsible ? ` · delay owed by ${delayResponsible}${delayReason ? `: ${delayReason}` : ""}` : ""}`,
-  });
+  // The backend keeps the day the activity stood at when this was written, and
+  // records it in its audit trail.
+  try {
+    await api<ActivityDetail>(projectPath(ctx, `/activities/${actionId}/decisions`), {
+      method: "POST",
+      body: { decision, responsibleName, reason, delayOwedBy: delayResponsible, delayReason },
+    });
+  } catch (e) {
+    return { error: refusal(e).message };
+  }
 
   revalidatePath(`/actions/${action.code}`);
   return { message: decision === "CARRIED" ? "Recorded: it went ahead, and the record says on whose word." : "Recorded: it was stopped, and the record says why." };

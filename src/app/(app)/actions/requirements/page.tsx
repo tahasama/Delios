@@ -7,6 +7,9 @@ import { departmentRows, senderRows, clearance, isDepartmentSender, type CallSta
 import { businessDaysAfter, departmentsOf } from "@/lib/schedule";
 import { fmtDate } from "@/lib/utils";
 import { ArrowLeft, Download, Upload } from "lucide-react";
+import { getSet } from "@/lib/config";
+import { api } from "@/lib/api/client";
+import { legacyActions } from "@/lib/api/schedule";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Document requirements" };
@@ -25,21 +28,18 @@ const CALL_CHIP: Record<CallState, [string, string]> = {
  */
 export default async function RequirementsPage() {
   const ctx = await requireScope();
-  const { db, user } = ctx;
   const control = ctx.can("CONTROL");
   const plan = ctx.can("PLAN") || control;
 
   const [actions, depts, senders, disciplines, parties, pendingSets, me] = await Promise.all([
-    db.action.findMany({ orderBy: [{ scheduledDate: "asc" }, { code: "asc" }], include: { confirmations: true } }),
+    legacyActions(ctx),
     departmentRows(ctx),
     senderRows(ctx),
-    db.configValue.findMany({ where: { setKey: "DISCIPLINES" }, select: { code: true, label: true } }),
-    db.party.findMany({ select: { code: true, name: true } }),
-    db.controlledSet.findMany({
-      where: { projectId: ctx.projectId, kind: { in: ["ACTION_DEPARTMENTS", "DOCUMENT_REQUIREMENTS"] } },
-      include: { versions: { where: { state: { in: ["DRAFT", "SUBMITTED", "APPROVED"] } }, orderBy: { createdAt: "desc" } } },
-    }),
-    db.projectMembership.findFirst({ where: { projectId: ctx.projectId, userId: user.id, active: true } }),
+    getSet("DISCIPLINES"),
+    api<{ code: string; name: string }[]>("/api/parties").catch(() => [] as { code: string; name: string }[]),
+    // The backend keeps no controlled lists: nothing is uploaded or waiting.
+    Promise.resolve([] as { kind: string; versions: { state: string; versionLabel: string; decidedAt: Date | null }[] }[]),
+    Promise.resolve({ department: ctx.user.department ?? null }),
   ]);
   const deptName = (c: string) => disciplines.find((d) => d.code === c)?.label ?? c;
   const senderName = (s: string) => (isDepartmentSender(s) ? `${deptName(s.slice(5))} (us)` : parties.find((p) => p.code === s)?.name ?? s);

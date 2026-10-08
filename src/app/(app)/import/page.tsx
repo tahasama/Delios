@@ -9,7 +9,6 @@ export const metadata = { title: "Bulk import & export" };
 
 export default async function ImportPage({ searchParams }: { searchParams: Promise<{ kind?: string }> }) {
   const ctx = await requireScope();
-  const { db } = ctx;
   const sp = await searchParams;
 
   // Everything on this page changes the project wholesale — a register, a team,

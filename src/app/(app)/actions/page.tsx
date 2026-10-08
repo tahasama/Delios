@@ -1,11 +1,14 @@
-import type { Prisma } from "@prisma/client";
 import { requireScope } from "@/lib/scope";
 import { departmentsOf, daysBefore } from "@/lib/schedule";
 import { clearance } from "@/lib/requirements-process";
 import { readSearch, readDay } from "@/lib/register-query";
 import { PLAN_CARD_HEIGHT, PLAN_FIRST } from "@/lib/plan-card";
-import { readyReading, countingRevision, meetsRequirement } from "@/lib/readiness";
+import { meetsRequirement } from "@/lib/readiness";
 import { fmtDate } from "@/lib/utils";
+import { getSet } from "@/lib/config";
+import { api } from "@/lib/api/client";
+import { backendDocument } from "@/lib/api/legacy";
+import { legacyActions, scheduleSource, type LegacyAction } from "@/lib/api/schedule";
 import { after } from "next/server";
 import { warnOnceAtRisk } from "@/lib/risk-notice";
 import { PlanCards } from "./plan-cards";
@@ -32,20 +35,18 @@ const PAGE_SIZES = [25, 50, 100, 200];
 /** The only date an action has, so the window asks about it without asking which. */
 const DATE_FIELDS = [{ code: "date", label: "Action date" }];
 
-/** Ordered by a column, in SQL — nothing is sorted on a page of a longer list. */
-const SORTS: Record<string, Prisma.ActionOrderByWithRelationInput[]> = {
-  code: [{ code: "asc" }],
-  name: [{ name: "asc" }],
-  date: [{ scheduledDate: "asc" }, { code: "asc" }],
-  documents: [{ entries: { _count: "asc" } }, { code: "asc" }],
+/** Ordered by a column, ascending; an action with no date comes last. */
+const byCode = (a: LegacyAction, b: LegacyAction) => a.code.localeCompare(b.code);
+const SORTS: Record<string, (a: LegacyAction, b: LegacyAction) => number> = {
+  code: byCode,
+  name: (a, b) => a.name.localeCompare(b.name),
+  date: (a, b) => (a.scheduledDate?.getTime() ?? Infinity) - (b.scheduledDate?.getTime() ?? Infinity) || byCode(a, b),
+  documents: (a, b) => a.entries.length - b.entries.length || byCode(a, b),
 };
 
 /**
- * The five states, said in the database rather than in memory.
- *
- * Each is a shape of what the action already carries — how many documents it
- * needs, how many are met, and the day the next missing one is owed — so the
- * schedule filters, counts and pages on them without loading itself.
+ * The states, each a shape of what the action carries — how many documents it
+ * needs, how many are met, and the day the next missing one is owed.
  */
 const STATES = [
   { code: "DONE", label: "Done" },
@@ -93,13 +94,11 @@ const PLAN_STEPS = [5, 10, 25, 50, 100];
 
 export default async function ActionsPage({ searchParams }: { searchParams: Promise<Search> }) {
   const ctx = await requireScope();
-  const { db } = ctx;
   const sp = await searchParams;
   const view = sp.view === "table" ? "table" : "plan";
 
   const q = (sp.q ?? "").trim().slice(0, 200);
   const searches = readSearch(q);
-  const reading = await readyReading(ctx);
   const state = STATES.some((one) => one.code === sp.state) ? sp.state! : "";
   const happened = HAPPENED.some((one) => one.code === sp.happened) ? sp.happened! : "";
   const discipline = (sp.discipline ?? "").trim();
@@ -112,10 +111,7 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
 
   const sortKey = sp.sort && SORTS[sp.sort] ? sp.sort : "date";
   const dir = sp.dir === "desc" ? "desc" : "asc";
-  const orderBy = SORTS[sortKey].map((one) => {
-    const [field, value] = Object.entries(one)[0];
-    return { [field]: typeof value === "object" ? { _count: dir } : dir } as Prisma.ActionOrderByWithRelationInput;
-  });
+  const orderBy = (a: LegacyAction, b: LegacyAction) => (dir === "desc" ? -1 : 1) * SORTS[sortKey](a, b);
 
   const perPage = PAGE_SIZES.includes(Number(sp.per)) ? Number(sp.per) : 50;
   const page = Math.max(1, Number(sp.page) || 1);
@@ -130,136 +126,86 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
   const planFrom = fromDay ?? (windowed ? daysBefore(new Date(), PLAN_WINDOW_DAYS) : null);
   const planTo = toDay ?? (windowed ? daysBefore(new Date(), -PLAN_WINDOW_DAYS) : null);
 
-  // Which count says "met" is the project's reading; the rest of the shape is
-  // the same either way.
-  const met: "metIssuedCount" | "metStatusCount" = reading === "STATUS" ? "metStatusCount" : "metIssuedCount";
+  // What the backend says is met, counted on the action; the schedule is read
+  // whole and filtered here.
   const now = new Date();
   const risk = new Date(now.getTime() + RISK_DAYS * 86_400_000);
-  const shortOfWhatItNeeds = { NOT: { [met]: { equals: { _ref: "needCount", _container: "Action" } } } } as unknown as Prisma.ActionWhereInput;
-  const hasAll: Prisma.ActionWhereInput = { [met]: { equals: { _ref: "needCount", _container: "Action" } } } as unknown as Prisma.ActionWhereInput;
-  const STATE_WHERE: Record<string, Prisma.ActionWhereInput> = {
-    UNKNOWN: { needCount: 0 },
+  const met = (action: LegacyAction) => action.entries.filter((entry) => meetsRequirement(entry.document.revisions, entry.requiredStatus)).length;
+  const missingOn = (action: LegacyAction) => action.entries.filter((entry) => !meetsRequirement(entry.document.revisions, entry.requiredStatus));
+  const shortOfWhatItNeeds = (action: LegacyAction) => met(action) !== action.entries.length;
+  const hasAll = (action: LegacyAction) => met(action) === action.entries.length;
+  const before = (date: Date | null, than: Date) => !!date && date < than;
+  const nextNeededAt = (action: LegacyAction) => missingOn(action).map((one) => one.requiredBy).sort((x, y) => x.getTime() - y.getTime())[0] ?? null;
+  const afterTheDay = (action: LegacyAction) => !!action.lastMetAt && !!action.scheduledDate && action.lastMetAt > action.scheduledDate;
+  const STATE_WHERE: Record<string, (action: LegacyAction) => boolean> = {
+    UNKNOWN: (a) => a.entries.length === 0,
     // Everything arrived, but the last of it after the day of the work. It is
     // not done: done means they were there in time.
-    LATE_RECEIPT: {
-      needCount: { gt: 0 },
-      ...hasAll,
-      scheduledDate: { lt: now },
-      lastMetAt: { gt: { _ref: "scheduledDate", _container: "Action" } },
-    } as unknown as Prisma.ActionWhereInput,
-    DONE: {
-      needCount: { gt: 0 },
-      ...hasAll,
-      scheduledDate: { lt: now },
-      OR: [
-        { lastMetAt: null },
-        { lastMetAt: { lte: { _ref: "scheduledDate", _container: "Action" } } } as unknown as Prisma.ActionWhereInput,
-      ],
-    },
-    READY: { needCount: { gt: 0 }, ...hasAll, OR: [{ scheduledDate: null }, { scheduledDate: { gte: now } }] },
-    NOT_READY: { needCount: { gt: 0 }, ...shortOfWhatItNeeds, scheduledDate: { lt: now } },
-    AT_RISK: { needCount: { gt: 0 }, ...shortOfWhatItNeeds, scheduledDate: { gte: now }, nextNeededAt: { lte: risk } },
-    UPCOMING: {
-      needCount: { gt: 0 },
-      ...shortOfWhatItNeeds,
-      scheduledDate: { gte: now },
-      OR: [{ nextNeededAt: null }, { nextNeededAt: { gt: risk } }],
-    },
+    LATE_RECEIPT: (a) => a.entries.length > 0 && hasAll(a) && before(a.scheduledDate, now) && afterTheDay(a),
+    DONE: (a) => a.entries.length > 0 && hasAll(a) && before(a.scheduledDate, now) && !afterTheDay(a),
+    READY: (a) => a.entries.length > 0 && hasAll(a) && !before(a.scheduledDate, now),
+    NOT_READY: (a) => a.entries.length > 0 && shortOfWhatItNeeds(a) && before(a.scheduledDate, now),
+    AT_RISK: (a) => a.entries.length > 0 && shortOfWhatItNeeds(a) && !!a.scheduledDate && a.scheduledDate >= now && !!nextNeededAt(a) && nextNeededAt(a)! <= risk,
+    UPCOMING: (a) => a.entries.length > 0 && shortOfWhatItNeeds(a) && !!a.scheduledDate && a.scheduledDate >= now && (!nextNeededAt(a) || nextNeededAt(a)! > risk),
   };
 
   // The work happened without everything it needed: its day has passed and, on
   // that day, either something was still missing or the last of it had not yet
   // arrived. Both readings of "short on the day", in one clause.
-  const shortOnTheDay: Prisma.ActionWhereInput = {
-    needCount: { gt: 0 },
-    scheduledDate: { lt: now },
-    OR: [
-      shortOfWhatItNeeds,
-      { lastMetAt: { gt: { _ref: "scheduledDate", _container: "Action" } } } as unknown as Prisma.ActionWhereInput,
-    ],
-  };
-  const HAPPENED_WHERE: Record<string, Prisma.ActionWhereInput> = {
-    WITHOUT: { ...shortOnTheDay, NOT: { notes: { some: { decision: "STOPPED" } } } },
-    CARRIED: { ...shortOnTheDay, notes: { some: { decision: "CARRIED" } } },
-    NONE: { ...shortOnTheDay, notes: { none: {} } },
-    STOPPED: { notes: { some: { decision: "STOPPED" } } },
+  const shortOnTheDay = (a: LegacyAction) => a.entries.length > 0 && before(a.scheduledDate, now) && (shortOfWhatItNeeds(a) || afterTheDay(a));
+  const decided = (a: LegacyAction, decision: string) => a.notes.some((note) => note.decision === decision);
+  const HAPPENED_WHERE: Record<string, (action: LegacyAction) => boolean> = {
+    WITHOUT: (a) => shortOnTheDay(a) && !decided(a, "STOPPED"),
+    CARRIED: (a) => shortOnTheDay(a) && decided(a, "CARRIED"),
+    NONE: (a) => shortOnTheDay(a) && a.notes.length === 0,
+    STOPPED: (a) => decided(a, "STOPPED"),
   };
 
-  const where: Prisma.ActionWhereInput = {
-    AND: [
-      code ? { code } : {},
-      state ? STATE_WHERE[state] : {},
-      happened ? HAPPENED_WHERE[happened] : {},
-      // A discipline is what an action is tagged with and what a document
-      // belongs to — the same list, so the filter answers for both.
-      discipline
-        ? { OR: [{ departments: { contains: discipline } }, { entries: { some: { document: { discipline } } } }] }
-        : {},
-      // Type and supplier are facts about the documents an action needs, so an
-      // action matches when one of its documents does.
-      docType || supplier
-        ? {
-            entries: {
-              some: {
-                document: {
-                  ...(docType ? { docType } : {}),
-                  ...(supplier ? { originator: supplier } : {}),
-                },
-              },
-            },
-          }
-        : {},
-      planFrom || planTo
-        ? { scheduledDate: { ...(planFrom ? { gte: planFrom } : {}), ...(planTo ? { lte: planTo } : {}) } }
-        : {},
-      // A space narrows, a comma widens: every word of a part must be found
-      // somewhere on the action, and any part may be the one that matches.
-      ...(searches.length
-        ? [{
-            OR: searches.map((search) => ({
-              AND: search.words.map((word) => ({
-                OR: [
-                  { code: { startsWith: word } },
-                  { code: { contains: word } },
-                  { name: { contains: word } },
-                  { description: { contains: word } },
-                  { ownerName: { contains: word } },
-                  { scheduleRef: { contains: word } },
-                  { entries: { some: { document: { docNumber: { contains: word } } } } },
-                  { entries: { some: { document: { title: { contains: word } } } } },
-                ],
-              })),
-            })),
-          }]
-        : []),
-    ],
-  };
+  const has = (text: string | null | undefined, word: string) => !!text && text.toLowerCase().includes(word.toLowerCase());
+  const inWindow = (a: LegacyAction) =>
+    !(planFrom || planTo) || (!!a.scheduledDate && (!planFrom || a.scheduledDate >= planFrom) && (!planTo || a.scheduledDate <= planTo));
+  const outsideWindow = (a: LegacyAction) =>
+    (!code || a.code === code)
+    && (!state || STATE_WHERE[state](a))
+    && (!happened || HAPPENED_WHERE[happened](a))
+    // A discipline is what an action is tagged with and what a document
+    // belongs to — the same list, so the filter answers for both.
+    && (!discipline || departmentsOf(a).includes(discipline) || a.entries.some((e) => e.document.discipline === discipline))
+    // Type and supplier are facts about the documents an action needs, so an
+    // action matches when one of its documents does.
+    && (!(docType || supplier) || a.entries.some((e) => (!docType || e.document.docType === docType) && (!supplier || e.document.originator === supplier)))
+    // A space narrows, a comma widens: every word of a part must be found
+    // somewhere on the action, and any part may be the one that matches.
+    && (!searches.length || searches.some((search) => search.words.every((word) =>
+      has(a.code, word) || has(a.name, word) || has(a.description, word) || has(a.ownerName, word) || has(a.scheduleRef, word)
+      || a.entries.some((e) => has(e.document.docNumber, word) || has(e.document.title, word)))));
+  const where = (a: LegacyAction) => outsideWindow(a) && inWindow(a);
 
   // What the window holds, and what the schedule holds: a plan that says "of
   // 16" while the table says 33 is a page arguing with itself.
-  const outsideWindow: Prisma.ActionWhereInput = { AND: (where.AND as Prisma.ActionWhereInput[]).filter((one) => !("scheduledDate" in one)) };
-  const [matching, everywhere, actions, publishedVersion, draftCount, disciplineRows, typeRows, supplierRows, inUse] = await Promise.all([
-    db.action.count({ where }),
-    windowed ? db.action.count({ where: outsideWindow }) : Promise.resolve(0),
-    db.action.findMany({
-      where,
-      orderBy,
-      // The table pages through them; the plan draws as many as it has been
-      // asked for, and offers to draw more.
-      ...(view === "table" ? { skip: (page - 1) * perPage, take: perPage } : { take: shown }),
-      include: {
-        confirmations: true,
-        notes: { select: { decision: true } },
-        entries: { include: { document: { include: { revisions: countingRevision(reading) } } } },
-      },
-    }),
-    db.scheduleVersion.findFirst({ where: { status: "PUBLISHED" }, orderBy: { publishedAt: "desc" } }),
-    db.scheduleVersion.count({ where: { status: "DRAFT" } }),
-    db.configValue.findMany({ where: { setKey: "DISCIPLINES" }, select: { code: true, label: true } }),
-    db.configValue.findMany({ where: { setKey: "DOCUMENT_TYPES" }, select: { code: true, label: true } }),
-    db.configValue.findMany({ where: { setKey: "SUPPLIER_CODES" }, select: { code: true, label: true } }),
-    db.action.findMany({ orderBy: [{ scheduledDate: "asc" }, { code: "asc" }], select: { code: true, name: true, departments: true } }),
+  const [schedule, source, disciplineRows, typeRows, supplierRows] = await Promise.all([
+    legacyActions(ctx),
+    scheduleSource(ctx),
+    getSet("DISCIPLINES"),
+    getSet("DOCUMENT_TYPES"),
+    // Suppliers are the organizations the project deals with.
+    api<{ code: string; name: string }[]>("/api/parties").then((rows) => rows.map((one) => ({ code: one.code, label: one.name }))).catch(() => []),
   ]);
+  const found = schedule.filter(where).sort(orderBy);
+  const matching = found.length;
+  const everywhere = windowed ? schedule.filter(outsideWindow).length : 0;
+  // The table pages through them; the plan draws as many as it has been asked
+  // for, and offers to draw more.
+  const actions = view === "table" ? found.slice((page - 1) * perPage, page * perPage) : found.slice(0, shown);
+  // The schedule in force: the latest read of the schedule document, in force
+  // since its revision was released. Reads are not held for a decision.
+  const latest = source.imports.find((one) => one.status === "DONE") ?? null;
+  const releasedAt = latest && source.source
+    ? (await backendDocument(ctx, source.source.documentId))?.revisions.find((one) => one.id === latest.revisionId)?.releasedAt ?? null
+    : null;
+  const publishedVersion = latest ? { publishedAt: releasedAt ? new Date(releasedAt) : null } : null;
+  const draftCount = 0;
+  const inUse = [...schedule].sort(SORTS.date);
 
   const deptLabel = new Map(disciplineRows.map((one) => [one.code, one.label]));
   const rows = actions.map((action) => {

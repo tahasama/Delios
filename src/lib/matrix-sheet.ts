@@ -1,8 +1,12 @@
 import type { Tenant } from "./tenant";
-import { loadActor, verbsFor, type Actor, type Verb } from "./permissions";
+import { verbsFor, type Actor, type Verb } from "./permissions";
 
-import { families, typesByFamily } from "./families";
+import { familyOf, type Family } from "./families";
 import { matrixDetail } from "./control-activities";
+import { getActiveSet } from "./config";
+import { adminFunctions, orEmpty } from "./api/admin";
+import { getMe } from "./api/me";
+import { registerByNumber } from "./api/register";
 
 /**
  * The distribution matrix as a sheet: one row per class of document, one column
@@ -68,22 +72,27 @@ export async function buildSheet(
   t: Tenant,
   options: { allDisciplines?: boolean; deliverableType?: string | null; docType?: string | null } = {},
 ): Promise<Sheet> {
-  // The published lists are read straight from the tenant, not through the
-  // request-cached helper: this same builder has to run from a script, both to
-  // be verified and to read a filled-in sheet back.
-  const [functions, disciplines, rules, inRegister, published, detail] = await Promise.all([
-    t.db.function.findMany({ where: { active: true }, orderBy: { sort: "asc" } }),
-    t.db.configValue.findMany({
-      where: { setKey: "DISCIPLINES", status: "ACTIVE" },
-      orderBy: [{ sort: "asc" }, { code: "asc" }],
-      select: { code: true, label: true },
-    }),
-    t.db.permissionRule.findMany({ select: { discipline: true, family: true } }),
-    t.db.document.groupBy({ by: ["discipline", "docType"] }),
-    families(t),
+  // The published lists, the functions and their rules, and what the register
+  // holds, from the backend.
+  const [allFunctions, disciplines, inRegister, published, detail, types, levelValues, me] = await Promise.all([
+    // Only Document Control and administrators may read the functions; anybody else sees no columns.
+    orEmpty(adminFunctions),
+    getActiveSet("DISCIPLINES"),
+    registerByNumber(t).then((byNumber) => [...byNumber.values()].map((d) => ({ discipline: d.discipline, docType: d.docType }))),
+    getActiveSet("DOC_FAMILIES").then((rows) => rows.map((row): Family => ({
+      code: row.code, label: row.label,
+      description: typeof row.props.description === "string" ? row.props.description : "",
+      stamp: row.props.stamp === "BEFORE" || row.props.stamp === "AFTER" ? row.props.stamp : "NONE",
+    }))),
     matrixDetail(t),
+    getActiveSet("DOCUMENT_TYPES"),
+    getActiveSet("CONFIDENTIALITY"),
+    getMe(),
   ]);
-  const typeFamilies = await typesByFamily(t);
+  const functions = allFunctions.filter((f) => f.active);
+  // The backend's rules are cut by class, never by family.
+  const rules = functions.flatMap((f) => f.rules.map((r) => ({ discipline: r.discipline, family: null as string | null })));
+  const typeFamilies = types.map((type) => ({ code: type.code, family: familyOf(type.code, type.props, published) }));
   const familyOfType = new Map(typeFamilies.map((one) => [one.code, one.family?.code ?? ""] as const));
   // One row per discipline, or one per discipline and document family where the
   // organization has said its contracts distribute them differently.
@@ -107,7 +116,16 @@ export async function buildSheet(
   for (const row of inRegister) note(row.discipline, familyOfType.get(row.docType) ?? "");
   for (const rule of rules) if (rule.discipline && rule.family) note(rule.discipline, rule.family);
 
-  const actors: (Actor | null)[] = await Promise.all(functions.map((f) => loadActor(t, f.id)));
+  const levels = new Map<string, number>();
+  for (const value of levelValues) if (typeof value.props.level === "number") levels.set(value.code, value.props.level);
+  const projectRole = me?.projects.find((p) => p.id === t.projectId)?.contractRole ?? null;
+  const actors: (Actor | null)[] = functions.map((f) => ({
+    functionId: f.id, functionCode: f.code, functionName: f.name, clearance: 0, legacyRole: "VIEWER", levels, projectRole,
+    rules: f.rules.map((r) => ({
+      deliverableType: r.deliverableType, docType: r.docType, discipline: r.discipline, criticality: r.criticality,
+      confidentiality: r.confidentiality, projectRole: r.projectRole, family: null, familyTypes: null, verbs: r.verbs as Verb[],
+    })),
+  }));
   const columns = functions.map((f) => ({ code: f.code, name: f.name }));
 
   // The view the sheet is taken at. A row carries it, so a file filled in for

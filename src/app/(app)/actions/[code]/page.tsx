@@ -2,7 +2,7 @@ import { ActionNotes } from "./lateness";
 import { NeededTable, type NeededRow } from "./needed-table";
 import { latenessOf } from "@/lib/action-lateness";
 import { carrierRefusal, actIsOff } from "@/lib/control-activities";
-import { readyReading, countingRevision, meetsRequirement } from "@/lib/readiness";
+import { meetsRequirement } from "@/lib/readiness";
 import Link from "next/link";
 import { formPolicy } from "@/lib/field-policy";
 import { requireScope } from "@/lib/scope";
@@ -16,6 +16,10 @@ import { shortfall } from "@/lib/risk-notice";
 import { Timeline } from "@/components/timeline";
 import { fmtDate } from "@/lib/utils";
 import { ArrowLeft } from "lucide-react";
+import { getActiveSet } from "@/lib/config";
+import { api } from "@/lib/api/client";
+import { holders } from "@/lib/api/settings";
+import { legacyActionByCode } from "@/lib/api/schedule";
 
 export const dynamic = "force-dynamic";
 
@@ -26,27 +30,17 @@ export const dynamic = "force-dynamic";
 export default async function ActionDetailPage({ params, searchParams }: { params: Promise<{ code: string }>; searchParams: Promise<{ dept?: string }> }) {
   const ctx = await requireScope();
   const readinessPolicy = await formPolicy(ctx, "ACTION");
-  const { db } = ctx;
   const { code } = await params;
   const { dept } = await searchParams;
-  // What counts as delivered is the project's answer, and it decides which
-  // revision of each document is worth loading at all.
-  const reading = await readyReading(ctx);
-  const action = await db.action.findFirst({
-    where: { code },
-    include: {
-      entries: { include: { document: { include: { revisions: countingRevision(reading) } } } , orderBy: [{ department: "asc" }, { requiredBy: "asc" }] },
-      scheduleActivities: { include: { scheduleVersion: true }, orderBy: { scheduleVersion: { importedAt: "desc" } }, take: 1 },
-      confirmations: true,
-      notes: { orderBy: { createdAt: "desc" } },
-    },
-  });
+  const action = await legacyActionByCode(ctx, code);
   if (!action) notFound();
 
   const [disciplines, parties, functions] = await Promise.all([
-    db.configValue.findMany({ where: { setKey: "DISCIPLINES", status: "ACTIVE" }, orderBy: { label: "asc" }, select: { code: true, label: true } }),
-    db.configValue.findMany({ where: { setKey: "SUPPLIER_CODES" }, select: { code: true, label: true } }),
-    db.function.findMany({ select: { code: true, name: true } }),
+    getActiveSet("DISCIPLINES").then((rows) => [...rows].sort((a, b) => a.label.localeCompare(b.label))),
+    // Suppliers are the organizations the project deals with.
+    api<{ code: string; name: string }[]>("/api/parties").then((rows) => rows.map((one) => ({ code: one.code, label: one.name }))).catch(() => []),
+    // Who approves a document is not on a need in the backend: no function is named.
+    Promise.resolve([] as { code: string; name: string }[]),
   ]);
   const deptLabel = (c: string | null) => (c ? disciplines.find((d) => d.code === c)?.label ?? c : "—");
   const partyLabel = (c: string | null) => (c ? parties.find((p) => p.code === c)?.label ?? c : "Us");
@@ -56,7 +50,7 @@ export default async function ActionDetailPage({ params, searchParams }: { param
   const control = ctx.can("CONTROL");
   // Only administrators read the audit trail, so only they are sent to it.
   const admin = ctx.can("CONFIGURE");
-  const me = await db.projectMembership.findFirst({ where: { projectId: ctx.projectId, userId: ctx.user.id, active: true } });
+  const me = { department: ctx.user.department ?? null };
   const clear = clearance(action);
   // Confirmation opens with the review window: from submit-by to the activity.
   const confirmOpens = action.scheduledDate ? daysBefore(action.scheduledDate, DEFAULT_LEAD_DAYS) : null;
@@ -86,7 +80,9 @@ export default async function ActionDetailPage({ params, searchParams }: { param
   // Who is short, and the transmittal that tells them — the placeholder numbers
   // are named in it, and the sender adds anyone else who should see it.
   const short = shortfall(action).filter((s) => depts.includes(s.department));
-  const deptPeople = await db.projectMembership.findMany({ where: { projectId: ctx.projectId, active: true, department: { in: depts } }, select: { userId: true } });
+  // A department is a discipline: the people whose membership names one of them.
+  const deptPeople = (await holders(ctx.projectId, "READ").catch(() => []))
+    .filter((one) => !!one.department && depts.includes(one.department)).map((one) => ({ userId: one.id }));
   const remindHref = `/transmittals/new?${new URLSearchParams({
     reason: "INFORMATION",
     users: deptPeople.map((m) => m.userId).join(","),

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { requireScope } from "@/lib/scope";
+import { scheduleSource } from "@/lib/api/schedule";
 import { CalendarRange, ListChecks, Users, ArrowRight } from "lucide-react";
 
 /**
@@ -19,10 +20,15 @@ const KINDS = [
 
 export async function PlanCards() {
   const ctx = await requireScope();
-  const sets = await ctx.db.controlledSet.findMany({
-    where: { kind: { in: KINDS.map((k) => k.kind) } },
-    include: { versions: { select: { state: true } } },
-  });
+  // The backend keeps no controlled lists. The schedule is held once the
+  // schedule document has been read; departments come with it, and what each
+  // action needs is said on the action.
+  const { imports } = await scheduleSource(ctx);
+  const sets = [{
+    kind: "SCHEDULE",
+    projectId: ctx.projectId as string | null,
+    versions: imports.filter((one) => one.status === "DONE").map(() => ({ state: "APPROVED" })),
+  }];
 
   return (
     <div className="grid grid-cols-1 gap-2 md:grid-cols-3">

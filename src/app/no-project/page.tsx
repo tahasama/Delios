@@ -1,6 +1,5 @@
 import { requireUser } from "@/lib/auth";
 import { logoutAction } from "@/lib/actions/auth";
-import { crossProject } from "@/lib/scope";
 import { btn } from "@/components/ui";
 import { FolderOpen, LogOut } from "lucide-react";
 
@@ -15,14 +14,9 @@ export const metadata = { title: "No project" };
 export default async function NoProjectPage() {
   const user = await requireUser();
 
-  // Deliberately cross-project: naming the administrators is the whole point
-  // of this page, and the user has no project to be scoped to.
-  const admins = await crossProject().user.findMany({
-    where: { orgId: user.orgId, active: true, role: { in: ["ADMIN", "CONTROLLER"] } },
-    select: { name: true, email: true, role: true },
-    orderBy: { role: "asc" },
-    take: 5,
-  });
+  // Naming the administrators is the whole point of this page, but the backend
+  // names them only to administrators and Document Control, so none are listed.
+  const admins: { name: string; email: string; role: string }[] = [];
 
   return (
     <div className="grid min-h-screen place-items-center bg-canvas px-6">
