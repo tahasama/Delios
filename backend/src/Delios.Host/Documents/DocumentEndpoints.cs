@@ -32,6 +32,17 @@ public static class DocumentEndpoints
         project.MapGet("/documents/{documentId:guid}", GetAsync);
         project.MapPost("/documents", RegisterAsync).AddEndpointFilter<IdempotencyFilter>();
         project.MapPost("/documents/{documentId:guid}/uploads", RequestUploadAsync);
+        project.MapGet("/revisions/{revisionId:guid}", async (Guid revisionId, HttpContext h, DeliosDbContext db, DocumentService documents, CancellationToken c) =>
+        {
+            // A revision on its own, with the document it belongs to: for screens that hold only a revision's id.
+            var access = ProjectAccessFilter.Of(h);
+            var revision = await db.Revisions.AsNoTracking().SingleOrDefaultAsync(r => r.Id == revisionId && r.ProjectId == access.Project.Id, c);
+            var visible = revision is not null && await DocumentQueries.Visible(db, access, await documents.RestrictedAsync(c))
+                .AnyAsync(d => d.Id == revision.DocumentId, c);
+            return visible
+                ? Results.Ok(new { revision!.Id, revision.DocumentId, revision.Value, revision.State, revision.StatusCode, revision.AuthoredById, revision.AuthoredByName })
+                : Problems.NotFound("REVISION_NOT_FOUND", "No such revision.");
+        });
         project.MapPost("/documents/{documentId:guid}/revisions", StartRevisionAsync).AddEndpointFilter<IdempotencyFilter>();
         project.MapPost("/documents/{documentId:guid}/revisions/{revisionId:guid}/submissions", ResubmitAsync);
         project.MapGet("/files/{fileId:guid}/download", DownloadAsync);
@@ -170,7 +181,7 @@ public static class DocumentEndpoints
         d.Id, d.Number, d.Title, d.DeliverableType, d.DocType, d.Discipline, d.Originator, d.Subproject, d.ContractRef,
         d.Criticality, d.Confidentiality, d.RetentionClass, d.State, d.Kind, d.IsPlaceholder,
         d.ReceivedDate?.ToDateOnly(), d.PlannedDate?.ToDateOnly(), d.CreatedByName,
-        d.CreatedAt.ToDateTimeOffset(), d.UpdatedAt.ToDateTimeOffset(), d.Revisions.Select(View).ToList());
+        d.CreatedAt.ToDateTimeOffset(), d.UpdatedAt.ToDateTimeOffset(), d.Revisions.Select(View).ToList(), d.CreatedById);
 
     /// <summary>Turns a revision entity, with its submissions and files, into the shape the API returns.</summary>
     private static RevisionView View(Revision r) => new(
@@ -180,5 +191,6 @@ public static class DocumentEndpoints
         r.Submissions.OrderBy(x => x.Number).Select(x => new SubmissionView(x.Number, x.SubmittedAt.ToDateTimeOffset(),
             x.SubmittedByName, x.Outcome, x.Note, x.DecidedByName, x.DecidedAt?.ToDateTimeOffset())).ToList(),
         r.Files.Select(f => new FileView(f.Id, f.Name, f.Kind, f.ContentType, f.Size, f.Sha256, f.Status,
-            f.StatusDetail, f.DetectedType, f.CreatedAt.ToDateTimeOffset(), f.DerivedFromId, f.Submission)).ToList());
+            f.StatusDetail, f.DetectedType, f.CreatedAt.ToDateTimeOffset(), f.DerivedFromId, f.Submission)).ToList(),
+        r.AuthoredById, r.AuthoredByParty, r.ReleasedByName, r.ReturnedAt?.ToDateTimeOffset());
 }

@@ -347,7 +347,13 @@ public static class IdentityEndpoints
                 // The function's rows of the permission matrix, so the screens ask the same question the backend does.
                 Rules = m.Function.Rules.Select(r => new
                 {
-                    r.DeliverableType, r.DocType, r.Discipline, r.Criticality, r.Confidentiality, r.ProjectRole, r.Verbs,
+                    r.DeliverableType,
+                    r.DocType,
+                    r.Discipline,
+                    r.Criticality,
+                    r.Confidentiality,
+                    r.ProjectRole,
+                    r.Verbs,
                 }).ToList(),
             })
             .ToListAsync(cancellationToken);

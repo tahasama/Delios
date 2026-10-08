@@ -26,7 +26,8 @@ public sealed record DistributionView(IReadOnlyList<Person> Proposed, IReadOnlyL
 /// </summary>
 public sealed record IssueRequestView(Guid Id, Guid RevisionId, string Reason, IReadOnlyList<Guid> UserIds,
     IReadOnlyList<Guid> PartyIds, string? Note, string? OffDistributionReason, string RaisedBy, DateTimeOffset RaisedAt,
-    string Status, DateTimeOffset? ClosedAt, string? ClosedBy, IReadOnlyList<string> Transmittals);
+    string Status, DateTimeOffset? ClosedAt, string? ClosedBy, IReadOnlyList<string> Transmittals, Guid RaisedById = default,
+    IReadOnlyList<Guid>? TransmittalIds = null);
 
 /// <summary>
 /// Answer after asking for or carrying out an issue request: the request and the numbers of any transmittals raised.
@@ -85,6 +86,9 @@ public static class TransmittalEndpoints
 
         project.MapGet("/documents/{documentId:guid}/distribution", DistributionAsync);
         project.MapGet("/revisions/{revisionId:guid}/issue-requests", RequestsAsync);
+        project.MapGet("/revisions/{revisionId:guid}/standing", async (Guid revisionId, HttpContext h, TransmittalService s, CancellationToken c) =>
+            await s.StandingAsync(ProjectAccessFilter.Of(h), revisionId, c) is { } standing
+                ? Results.Ok(standing) : Problems.NotFound("REVISION_NOT_FOUND", "No such revision."));
         project.MapPost("/revisions/{revisionId:guid}/issue-requests", RequestAsync).AddEndpointFilter<IdempotencyFilter>();
         project.MapPost("/issue-requests/{requestId:guid}/carry-out", CarryOutAsync);
         project.MapPost("/issue-requests/{requestId:guid}/cancel", CancelAsync);

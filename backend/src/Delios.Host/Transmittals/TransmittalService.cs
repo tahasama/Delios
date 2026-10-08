@@ -203,8 +203,9 @@ public sealed class TransmittalService(
         var ids = requests.Select(r => r.Id).ToList();
         var numbers = await db.Transmittals.AsNoTracking().Where(t => t.IssueRequestId != null && ids.Contains(t.IssueRequestId.Value))
             .OrderBy(t => t.Id)
-            .Select(t => new { t.IssueRequestId, t.Number }).ToListAsync(cancellationToken);
-        return requests.Select(r => View(r, numbers.Where(n => n.IssueRequestId == r.Id).Select(n => n.Number).ToList())).ToList();
+            .Select(t => new { t.IssueRequestId, t.Number, t.Id }).ToListAsync(cancellationToken);
+        return requests.Select(r => View(r, numbers.Where(n => n.IssueRequestId == r.Id).Select(n => n.Number).ToList(),
+            numbers.Where(n => n.IssueRequestId == r.Id).Select(n => n.Id).ToList())).ToList();
     }
 
     /// <summary>
@@ -766,6 +767,28 @@ public sealed class TransmittalService(
             || db.ReviewSteps.Any(s => s.ReviewId == r.Id && s.Participants.Any(p => p.UserId == me))), cancellationToken);
     }
 
+    /// <summary>What a screen asks before offering to ask for a revision to be sent.</summary>
+    public sealed record Standing(bool MayRequest, bool LetsItOut, string? Author, Guid? AuthorId);
+
+    /// <summary>
+    /// Whether the caller has standing to ask for this revision to be sent, whether its decision lets it out at all,
+    /// and who wrote it. Null when the revision is not the caller's to see.
+    /// </summary>
+    public async Task<Standing?> StandingAsync(ProjectAccess access, Guid revisionId, CancellationToken cancellationToken)
+    {
+        var revision = await db.Revisions.AsNoTracking().SingleOrDefaultAsync(r => r.Id == revisionId, cancellationToken);
+        var document = revision is null ? null : await VisibleDocumentAsync(access, revision.DocumentId, cancellationToken);
+        if (revision is null || document is null) return null;
+        var decided = await db.Reviews.AsNoTracking().Where(r => r.RevisionId == revisionId && r.Verdict != null)
+            .OrderByDescending(r => r.DecidedAt).Select(r => r.Verdict).FirstOrDefaultAsync(cancellationToken);
+        var catalog = await Catalog.LoadAsync(db, cancellationToken);
+        var letsItOut = decided is null || catalog.Prop(ReviewSets.Verdicts, decided, "proceed") is { ValueKind: JsonValueKind.True };
+        var running = await db.Reviews.AnyAsync(r => r.RevisionId == revisionId && r.State == ReviewStates.InProgress, cancellationToken);
+        var settled = revision.State is RevisionStates.Released or RevisionStates.InReview or RevisionStates.InPreparation;
+        var may = settled && letsItOut && !running && await HasStandingAsync(access, document, revision, cancellationToken);
+        return new Standing(may, letsItOut, revision.AuthoredByName, revision.AuthoredById);
+    }
+
     /// <summary>
     /// Document Control sends. Where nobody on the project holds it, whoever asked
     /// sends it themselves.
@@ -918,9 +941,10 @@ public sealed class TransmittalService(
     public static string Label(Document document, Revision revision) => $"{document.Number} rev {revision.Value}";
 
     /// <summary>Turns an <c>IssueRequest</c> entity into the shape returned to the browser.</summary>
-    public static IssueRequestView View(IssueRequest r, IReadOnlyList<string> transmittals) => new(
+    public static IssueRequestView View(IssueRequest r, IReadOnlyList<string> transmittals, IReadOnlyList<Guid>? transmittalIds = null) => new(
         r.Id, r.RevisionId, r.Reason, r.UserIds, r.PartyIds, r.Note, r.OffDistributionReason, r.RaisedByName,
-        r.RaisedAt.ToDateTimeOffset(), r.Status, r.ClosedAt?.ToDateTimeOffset(), r.ClosedByName, transmittals);
+        r.RaisedAt.ToDateTimeOffset(), r.Status, r.ClosedAt?.ToDateTimeOffset(), r.ClosedByName, transmittals, r.RaisedById,
+        transmittalIds ?? []);
 
     /// <summary>The 404 answer for a transmittal that does not exist or is not visible.</summary>
     private static IResult NotFound() => Problems.NotFound("TRANSMITTAL_NOT_FOUND", "No such transmittal.");

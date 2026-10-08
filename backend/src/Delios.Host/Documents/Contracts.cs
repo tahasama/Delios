@@ -41,14 +41,15 @@ public sealed record RevisionView(
     Guid Id, string Value, string Series, string State, string FilesState, string? ReasonForRevision,
     string? ChangeDescription, string AuthoredByName, DateTimeOffset CreatedAt, string? StatusCode,
     DateTimeOffset? ReleasedAt, DateTimeOffset? SupersededAt, string? ReturnedReason, int Submission, string? ControlOutcome,
-    IReadOnlyList<SubmissionView> Submissions, IReadOnlyList<FileView> Files);
+    IReadOnlyList<SubmissionView> Submissions, IReadOnlyList<FileView> Files, Guid AuthoredById, string? AuthoredByParty,
+    string? ReleasedByName, DateTimeOffset? ReturnedAt);
 
 /// <summary>A full document as the API shows it, with every revision; returned by GET /documents/{id} and after changes.</summary>
 public sealed record DocumentView(
     Guid Id, string Number, string Title, string DeliverableType, string DocType, string Discipline,
     string? Originator, string? Subproject, string? ContractRef, string? Criticality, string? Confidentiality,
     string? RetentionClass, string State, string Kind, bool IsPlaceholder, DateOnly? ReceivedDate, DateOnly? PlannedDate,
-    string CreatedByName, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt, IReadOnlyList<RevisionView> Revisions);
+    string CreatedByName, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt, IReadOnlyList<RevisionView> Revisions, Guid CreatedById);
 
 /// <summary>One page of the register. <c>Next</c> is the value to pass as <c>after</c> for the next page; null on the last page.</summary>
 public sealed record DocumentPage(IReadOnlyList<DocumentSummary> Items, string? Next);

@@ -1,5 +1,9 @@
 import type { SessionUser } from "./auth";
 import type { Tenant } from "./tenant";
+import { api, projectPath } from "./api/client";
+import { holders } from "./api/settings";
+import { revisionStanding } from "./api/legacy";
+import type { Distribution } from "./api/types";
 import { holdersOf } from "./permissions";
 
 /**
@@ -83,34 +87,10 @@ export function noRecipients(one: RequestRecipients): boolean {
  * permission in the matrix — the matrix says who may see and approve documents
  * of a class; this says who is close enough to this one to know who needs it.
  */
-export async function mayRequestIssue(t: Tenant, revisionId: string, userId: string): Promise<boolean> {
-  const { db } = t;
-  const rev = await db.revision.findUnique({
-    where: { id: revisionId },
-    select: { state: true, authoredById: true, uploadedById: true, document: { select: { createdById: true } } },
-  });
-  if (!rev) return false;
-  // A revision that is not going anywhere has nobody to send it to: one sent
-  // back, one voided, and one whose decision asked for changes rather than
-  // letting it out.
-  if (rev.state === "RETURNED" || rev.state === "VOID" || rev.state === "SUPERSEDED") return false;
-  if (!(await decisionLetsItOut(t, revisionId))) return false;
-  // While a route is still running, the only person who may attach a request is
-  // the one deciding, and they do it with their verdict. Everybody else waits
-  // for the route to finish — including the Document Control step, where the
-  // route draws one — because until then nobody knows what it is being issued
-  // as.
-  const running = await db.workflowRun.findFirst({ where: { revisionId, status: "ACTIVE" }, select: { id: true } });
-  if (running) return false;
-  if (rev.authoredById === userId || rev.uploadedById === userId || rev.document.createdById === userId) return true;
-  // Whoever started the review, and anybody who sat on one of its steps.
-  const onTheRoute = await db.reviewCycle.findFirst({
-    where: { revisionId, OR: [{ openedById: userId }, { assignments: { some: { userId } } }] },
-    select: { id: true },
-  });
-  if (onTheRoute) return true;
-  const started = await db.workflowRun.findFirst({ where: { revisionId, startedById: userId }, select: { id: true } });
-  return !!started;
+export async function mayRequestIssue(t: Tenant, revisionId: string, _userId: string): Promise<boolean> {
+  // The backend decides standing: the revision is settled, its decision lets it
+  // out, no route is running, and the caller wrote it, sat on its route, or sends.
+  return (await revisionStanding(t, revisionId)).mayRequest;
 }
 
 /**
@@ -119,28 +99,12 @@ export async function mayRequestIssue(t: Tenant, revisionId: string, userId: str
  * decides is that nothing goes anywhere.
  */
 export async function decisionLetsItOut(t: Tenant, revisionId: string): Promise<boolean> {
-  const decided = await t.db.reviewCycle.findFirst({
-    where: { revisionId, binding: true, outcome: { not: null } },
-    orderBy: { sequence: "desc" },
-    select: { outcome: true, outcomeSetKey: true },
-  });
-  if (!decided?.outcome) return true;
-  const value = await t.db.configValue.findFirst({ where: { setKey: decided.outcomeSetKey ?? "REVIEW_OUTCOMES", code: decided.outcome, status: "ACTIVE" } });
-  if (!value) return true;
-  try {
-    return (JSON.parse(value.props ?? "{}") as { proceed?: boolean }).proceed === true;
-  } catch {
-    return true;
-  }
+  return (await revisionStanding(t, revisionId)).letsItOut;
 }
 
 /** Whoever wrote the revision, for the sentence that offers to leave it to them. */
 export async function authorOf(t: Tenant, revisionId: string): Promise<string | null> {
-  const rev = await t.db.revision.findUnique({
-    where: { id: revisionId },
-    select: { authoredByName: true, document: { select: { createdByName: true } } },
-  });
-  return rev?.authoredByName ?? rev?.document.createdByName ?? null;
+  return (await revisionStanding(t, revisionId)).author;
 }
 
 /**
@@ -158,8 +122,7 @@ export async function authorOf(t: Tenant, revisionId: string): Promise<string | 
  * business, and this reads it.
  */
 export async function hasControlFunction(t: Tenant): Promise<boolean> {
-  const { holdersOf } = await import("./permissions");
-  return (await holdersOf(t, "CONTROL")).length > 0;
+  return (await holders(t.projectId, "CONTROL")).length > 0;
 }
 
 /** @deprecated Read `hasControlFunction`; kept while callers are moved over. */
@@ -183,21 +146,14 @@ export async function issueGateIsControl(t: Tenant): Promise<boolean> {
  */
 export async function requestChoices(
   t: Tenant,
-  doc: { deliverableType: string; docType: string; discipline: string; criticality: string | null; confidentiality: string | null; originator?: string | null },
+  doc: { id?: string; deliverableType: string; docType: string; discipline: string; criticality: string | null; confidentiality: string | null; originator?: string | null },
 ) {
-  const { recipientsFor } = await import("./distribution");
-  const onTheMatrix = await recipientsFor(t, doc);
-  const proposedIds = new Set(onTheMatrix.map((one) => one.userId));
-  const everyone = await t.db.user.findMany({
-    where: { active: true, memberships: { some: { projectId: t.projectId, active: true } } },
-    orderBy: { name: "asc" },
-    select: { id: true, name: true, organization: true, party: { select: { name: true, isInternal: true } } },
-  });
-  const named = (person: (typeof everyone)[number]) => person.party?.name ?? person.organization ?? "Unassigned organization";
+  // Who the matrix proposes, everyone else on the project, and the organizations on it: the backend's distribution.
+  const found = await api<Distribution>(projectPath(t, `/documents/${doc.id}/distribution`));
   return {
-    proposed: onTheMatrix.map((one) => ({ id: one.userId, name: one.name, organization: one.functionName, basis: one.basis })),
-    others: everyone.filter((person) => !proposedIds.has(person.id)).map((person) => ({ id: person.id, name: person.name, organization: named(person) })),
-    parties: await t.db.party.findMany({ where: { isInternal: false, active: true }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
+    proposed: found.proposed.map((one) => ({ id: one.id, name: one.name, organization: one.function, basis: one.function })),
+    others: found.others.map((person) => ({ id: person.id, name: person.name, organization: person.organization ?? "Unassigned organization" })),
+    parties: found.parties.map((party) => ({ id: party.id, name: party.name })),
     // Only a document we produced waits on somebody outside approving it.
     ours: !doc.originator,
   };
@@ -325,42 +281,11 @@ export async function carryOutRequest(
  * on, because this refusal is what they will see.
  */
 export async function pendingIssue(
-  t: Tenant,
-  revisionId: string,
-  /**
-   * `recipients` false where the project releases without issuing: then nobody
-   * need have said where it goes, and only an outside approval holds it.
-   */
-  { recipients = true }: { recipients?: boolean } = {},
+  _t: Tenant,
+  _revisionId: string,
+  _options: { recipients?: boolean } = {},
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  const requests = await t.db.issueRequest.findMany({
-    where: { revisionId, status: "OPEN" },
-    include: { approver: { select: { name: true } } },
-  });
-  const waitingOnOutside = requests.find((one) => one.needsApproval);
-  if (waitingOnOutside) {
-    const answered = await t.db.reviewCycle.findFirst({ where: { issueRequestId: waitingOnOutside.id, status: "CLOSED" }, orderBy: { outcomeAt: "desc" } });
-    return {
-      ok: false,
-      error: answered
-        ? `Release blocked: ${waitingOnOutside.approver?.name ?? "the outside party"} did not approve this revision. Send it back.`
-        : `Release blocked: ${waitingOnOutside.approver?.name ?? "an outside party"} has to approve this revision first. Document Control releases and issues it when their answer comes back.`,
-    };
-  }
-  if (!recipients) return { ok: true };
-  if (!requests.length) {
-    return {
-      ok: false,
-      error: "Release blocked: nobody has said who this revision goes to. Releasing it is sending it, so say who receives it — our own people, an outside party, or both.",
-    };
-  }
-  const named = requests.find((one) => !one.delegated && !noRecipients(parseRecipients(one.recipients)));
-  if (!named) {
-    return {
-      ok: false,
-      error: "Release blocked: the choice of who receives this revision was left to whoever started the route, and they have not made it yet.",
-    };
-  }
+  // The backend refuses a release that is not ready, with its reason; there is no hold awaiting an outside approval.
   return { ok: true };
 }
 
@@ -458,21 +383,9 @@ export async function carryOutOpenRequests(t: Tenant, revisionId: string, user: 
  * ran.
  */
 export async function returnRecipients(t: Tenant, revisionId: string): Promise<{ ids: string[]; names: string }> {
-  const rev = await t.db.revision.findUniqueOrThrow({ where: { id: revisionId }, include: { document: true } });
-  const supplier = rev.document.originator
-    ? await t.db.party.findFirst({ where: { code: rev.document.originator, isInternal: false } })
-    : null;
-  let ids: string[] = [];
-  if (supplier) {
-    const { partyStepHolders } = await import("./workflow");
-    ids = (await partyStepHolders(t, supplier.id)).ids;
-  }
-  if (!ids.length) {
-    const run = await t.db.workflowRun.findFirst({ where: { revisionId }, orderBy: { createdAt: "desc" }, select: { startedById: true } });
-    ids = [run?.startedById ?? rev.document.createdById];
-  }
-  const people = await t.db.user.findMany({ where: { id: { in: ids } }, select: { name: true } });
-  return { ids, names: supplier ? `${supplier.name} (${people.map((one) => one.name).join(", ")})` : people.map((one) => one.name).join(", ") };
+  // It goes back to whoever wrote it; another organization's people get it through their own transmittal.
+  const standing = await revisionStanding(t, revisionId);
+  return { ids: standing.authorId ? [standing.authorId] : [], names: standing.author ?? "its author" };
 }
 
 /**

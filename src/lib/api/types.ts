@@ -113,6 +113,7 @@ export type DocumentView = {
   confidentiality: string | null; retentionClass: string | null; state: string; kind: string; isPlaceholder: boolean;
   receivedDate: string | null; plannedDate: string | null; createdByName: string; createdAt: string; updatedAt: string;
   revisions: RevisionView[];
+  createdById: string;
 };
 
 export type RevisionView = {
@@ -122,6 +123,7 @@ export type RevisionView = {
   controlOutcome: string | null;
   submissions: { number: number; submittedAt: string; submittedBy: string; outcome: string | null; note: string | null; decidedBy: string | null; decidedAt: string | null }[];
   files: { id: string; name: string; kind: string; contentType: string; size: number; sha256: string; status: string; statusDetail: string | null; detectedType: string | null; createdAt: string; derivedFromId: string | null; submission: number }[];
+  authoredById: string; authoredByParty: string | null; releasedByName: string | null; returnedAt: string | null;
 };
 
 /** GET /documents/{id}/context (DocumentContext.cs). */
@@ -207,6 +209,7 @@ export type Addressees = {
 export type IssueRequestView = {
   id: string; revisionId: string; reason: string; userIds: string[]; partyIds: string[]; note: string | null; offDistributionReason: string | null;
   raisedBy: string; raisedAt: string; status: string; closedAt: string | null; closedBy: string | null; transmittals: string[];
+  raisedById: string; transmittalIds: string[];
 };
 
 /** GET /documents/{id}/distribution (DistributionView): who the matrix proposes, everyone else, and the parties. */

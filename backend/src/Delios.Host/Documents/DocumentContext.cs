@@ -42,18 +42,46 @@ public static class DocumentContextEndpoints
                                   join t in db.Transmittals on i.TransmittalId equals t.Id
                                   where i.DocumentId == documentId
                                   orderby t.IssuedAt descending
-                                  select new { t.Id, t.Number, t.Reason, t.ToName, t.IssuedAt, Revision = i.RevisionValue, ForReview = t.ReviewStepId != null })
+                                  select new
+                                  {
+                                      t.Id,
+                                      t.Number,
+                                      t.Reason,
+                                      t.ToName,
+                                      t.IssuedAt,
+                                      Revision = i.RevisionValue,
+                                      ForReview = t.ReviewStepId != null,
+                                      t.Direction,
+                                      i.RevisionId,
+                                      t.FromName,
+                                      ItemKind = i.Kind
+                                  })
             .AsNoTracking().ToListAsync(cancellationToken);
         var packages = await (from m in db.PackageMembers
                               join p in db.Packages on m.PackageId equals p.Id
                               where m.DocumentId == documentId
                               orderby p.Number
-                              select new { p.Id, p.Number, p.Title, p.State }).AsNoTracking().ToListAsync(cancellationToken);
+                              select new
+                              {
+                                  p.Id,
+                                  p.Number,
+                                  p.Title,
+                                  p.State,
+                                  p.Kind,
+                                  Required = m.RequiredStatuses.Length > 0 ? m.RequiredStatuses : p.RequiredStatuses,
+                                  p.RecipientPartyIds,
+                                  p.SupplierPartyId
+                              }).AsNoTracking().ToListAsync(cancellationToken);
+        var partyNames = await db.Parties.AsNoTracking().ToDictionaryAsync(p => p.Id, p => p.Name, cancellationToken);
+        var transmittalIds = transmittals.Select(t => t.Id).Distinct().ToList();
+        var recipients = (await db.TransmittalRecipients.AsNoTracking().Where(r => transmittalIds.Contains(r.TransmittalId))
+            .Select(r => new { r.TransmittalId, r.Name, r.Organization, Person = r.UserId != null, r.OpenedAt, r.AcknowledgedAt, r.DispatchedAt })
+            .ToListAsync(cancellationToken)).ToLookup(r => r.TransmittalId);
         var activities = await (from n in db.Requirements
                                 join a in db.Activities on n.ActivityId equals a.Id
                                 where n.DocumentId == documentId && a.State == ActivityStates.Active
                                 orderby n.NeededBy
-                                select new { ActivityId = a.Id, a.Code, a.Name, n.Purpose, n.NeededBy, n.State, n.WaiverNote })
+                                select new { ActivityId = a.Id, a.Code, a.Name, n.Purpose, n.NeededBy, n.State, n.WaiverNote, NeedId = n.Id, n.RequiredStatuses, a.Start })
             .AsNoTracking().ToListAsync(cancellationToken);
         // The document's own events and its revisions'. Another organization sees what happened, not who did it inside.
         var history = await db.AuditEvents.AsNoTracking()
@@ -76,9 +104,53 @@ public static class DocumentContextEndpoints
                 StartedAt = r.StartedAt.ToDateTimeOffset(),
                 DecidedAt = r.DecidedAt?.ToDateTimeOffset()
             }),
-            transmittals = transmittals.Select(t => new { t.Id, t.Number, t.Reason, t.ToName, IssuedAt = t.IssuedAt.ToDateTimeOffset(), t.Revision, t.ForReview }),
-            packages,
-            activities = activities.Select(a => new { a.ActivityId, a.Code, a.Name, a.Purpose, NeededBy = a.NeededBy?.ToDateOnly(), a.State, a.WaiverNote }),
+            transmittals = transmittals.Select(t => new
+            {
+                t.Id,
+                t.Number,
+                t.Reason,
+                t.ToName,
+                IssuedAt = t.IssuedAt.ToDateTimeOffset(),
+                t.Revision,
+                t.ForReview,
+                t.Direction,
+                t.RevisionId,
+                t.FromName,
+                t.ItemKind,
+                Recipients = recipients[t.Id].Select(r => new
+                {
+                    r.Name,
+                    r.Organization,
+                    r.Person,
+                    OpenedAt = r.OpenedAt?.ToDateTimeOffset(),
+                    AcknowledgedAt = r.AcknowledgedAt?.ToDateTimeOffset(),
+                    DispatchedAt = r.DispatchedAt?.ToDateTimeOffset()
+                }),
+            }),
+            packages = packages.Select(p => new
+            {
+                p.Id,
+                p.Number,
+                p.Title,
+                p.State,
+                p.Kind,
+                Required = p.Required,
+                To = p.SupplierPartyId is { } supplier ? partyNames.GetValueOrDefault(supplier)
+                    : string.Join(", ", p.RecipientPartyIds.Select(id => partyNames.GetValueOrDefault(id)).Where(n => n != null)),
+            }),
+            activities = activities.Select(a => new
+            {
+                a.ActivityId,
+                a.Code,
+                a.Name,
+                a.Purpose,
+                NeededBy = a.NeededBy?.ToDateOnly(),
+                a.State,
+                a.WaiverNote,
+                a.NeedId,
+                a.RequiredStatuses,
+                Start = a.Start?.ToDateOnly()
+            }),
             history = history.Select(e => new { At = e.At.ToDateTimeOffset(), e.Actor, e.Action, e.EntityType, e.EntityLabel, e.Detail }),
         });
     }
