@@ -1,9 +1,9 @@
 import type { SessionUser } from "./auth";
 import type { Tenant } from "./tenant";
 import { api, projectPath } from "./api/client";
-import { holders } from "./api/settings";
+import { holders as holdersOfVerb } from "./api/settings";
 import { revisionStanding } from "./api/legacy";
-import type { Distribution } from "./api/types";
+import type { Distribution, IssueRequestView } from "./api/types";
 import { holdersOf } from "./permissions";
 
 /**
@@ -122,7 +122,7 @@ export async function authorOf(t: Tenant, revisionId: string): Promise<string | 
  * business, and this reads it.
  */
 export async function hasControlFunction(t: Tenant): Promise<boolean> {
-  return (await holders(t.projectId, "CONTROL")).length > 0;
+  return (await holdersOfVerb(t.projectId, "CONTROL")).length > 0;
 }
 
 /** @deprecated Read `hasControlFunction`; kept while callers are moved over. */
@@ -160,118 +160,6 @@ export async function requestChoices(
 }
 
 /**
- * Carry out one request: raise its transmittals and mark it done.
- *
- * One transmittal per destination, because that is what a recipient receives
- * and acknowledges: our own people in one, each outside organization in its own.
- */
-export async function carryOutRequest(
-  t: Tenant,
-  requestId: string,
-  actor: { id: string; name: string },
-): Promise<{ numbers: string[]; error?: string }> {
-  const { db, projectId } = t;
-  const request = await db.issueRequest.findUniqueOrThrow({
-    where: { id: requestId },
-    include: { revision: { include: { document: true } } },
-  });
-  if (request.status !== "OPEN") return { numbers: [], error: "That request has already been dealt with." };
-  if (request.revision.state !== "RELEASED") return { numbers: [], error: "Only a released revision can be issued." };
-  if (request.needsApproval) return { numbers: [], error: "It waits for the outside approval first." };
-  if (request.revision.heldAt) return { numbers: [], error: "It is on hold, not for use." };
-  const to = parseRecipients(request.recipients);
-  if (request.delegated || noRecipients(to)) return { numbers: [], error: "That request names nobody to send it to." };
-
-  const { nextRecordNumber } = await import("./numbering-records");
-  const { audit, notifyMany } = await import("./audit");
-  const [internal, project] = await Promise.all([
-    db.party.findFirst({ where: { isInternal: true }, select: { code: true, name: true } }),
-    db.project.findUnique({ where: { id: projectId }, select: { code: true } }),
-  ]);
-  const rev = request.revision;
-  const label = `${rev.document.docNumber} rev ${rev.value}`;
-  const numbers: string[] = [];
-  let firstId: string | null = null;
-
-  const raise = async (receiverCode: string | null, people: { name: string; organization: string | null; userId?: string }[]) => {
-    if (!people.length) return;
-    const number = await nextRecordNumber(
-      t,
-      "TRANSMITTAL",
-      { project: project?.code ?? "", sender: internal?.code ?? null, receiver: receiverCode, reason: request.reason },
-      "TR",
-    );
-    const raised = await db.transmittal.create({
-      data: {
-        projectId,
-        number,
-        direction: "OUTGOING",
-        reasonForIssue: request.reason,
-        dateOfIssue: new Date(),
-        issuingParty: internal?.name ?? "Our organization",
-        subject: `${label} — ${rev.statusCode ?? "issued"}`,
-        message: request.note,
-        status: "ISSUED",
-        createdById: actor.id,
-        createdByName: actor.name,
-        items: { create: [{ projectId, revisionId: rev.id }] },
-        recipients: { create: people.map((one) => ({ projectId, name: one.name, organization: one.organization, userId: one.userId })) },
-      },
-    });
-    numbers.push(number);
-    firstId = firstId ?? raised.id;
-    await notifyMany(
-      people.map((one) => one.userId).filter((id): id is string => !!id),
-      "TRANSMITTAL_RECEIVED",
-      `${label} — ${number}`,
-      `Issued to you: ${request.reason.toLowerCase()}.`,
-      `/documents/${rev.documentId}`,
-      t,
-    );
-  };
-
-  const people = await db.user.findMany({
-    where: { id: { in: to.internalUserIds } },
-    select: { id: true, name: true, organization: true, party: { select: { name: true } } },
-  });
-  await raise(
-    internal?.code ?? null,
-    people.map((one) => ({ name: one.name, organization: one.party?.name ?? one.organization ?? null, userId: one.id })),
-  );
-
-  for (const partyId of to.partyIds) {
-    const party = await db.party.findUnique({
-      where: { id: partyId },
-      select: { code: true, name: true, users: { where: { active: true }, select: { id: true, name: true } } },
-    });
-    if (!party) continue;
-    await raise(
-      party.code,
-      party.users.length
-        ? party.users.map((one) => ({ name: one.name, organization: party.name, userId: one.id }))
-        : [{ name: party.name, organization: party.name }],
-    );
-  }
-
-  await db.issueRequest.update({
-    where: { id: requestId },
-    data: { status: "DONE", carriedOutAt: new Date(), carriedOutBy: actor.name, transmittalId: firstId },
-  });
-  await audit({
-    tenant: t,
-    actor: actor as never,
-    action: "ISSUED",
-    entityType: "Revision",
-    entityId: rev.id,
-    entityLabel: label,
-    newValue: numbers.join(", "),
-    detail: `Issued as ${request.raisedByName} asked: ${numbers.length} transmittal${numbers.length === 1 ? "" : "s"}, ${request.reason.toLowerCase()}.`,
-  });
-  return { numbers };
-}
-
-/** Every open request on a revision, carried out in the order they were asked. */
-/**
  * Is this revision ready to be released — that is, does somebody's answer exist
  * about where it goes, and is nothing outside still to answer?
  *
@@ -290,93 +178,6 @@ export async function pendingIssue(
 }
 
 /**
- * Open the step that carries an outside approval, where a request asks for one.
- *
- * It is an ordinary step of the record — a party, a date, a verdict — so it is
- * dispatched, chased and answered like any other, and the revision stays not
- * released while it is open.
- */
-export async function openApprovalStep(
-  t: Tenant,
-  revisionId: string,
-  user: { id: string; name: string },
-): Promise<{ opened: boolean; party?: string }> {
-  const request = await t.db.issueRequest.findFirst({
-    where: { revisionId, status: "OPEN", needsApproval: true },
-    include: { approver: { select: { id: true, name: true } } },
-    orderBy: { raisedAt: "asc" },
-  });
-  if (!request?.approver) return { opened: false };
-  const already = await t.db.reviewCycle.findFirst({ where: { issueRequestId: request.id, status: "OPEN" } });
-  if (already) return { opened: true, party: request.approver.name };
-
-  const { reviewNumber } = await import("./workflow");
-  const sequence = (await t.db.reviewCycle.count({ where: { revisionId } })) + 1;
-  await t.db.reviewCycle.create({
-    data: {
-      projectId: t.projectId,
-      number: await reviewNumber(t),
-      revisionId,
-      issueRequestId: request.id,
-      partyId: request.approver.id,
-      mode: "PARALLEL",
-      sequence,
-      // Their answer is what releases the revision, so the step binds.
-      binding: true,
-      openedById: user.id,
-      openedByName: user.name,
-      submittedAt: new Date(),
-      receivedAt: new Date(),
-      status: "OPEN",
-    },
-  });
-  return { opened: true, party: request.approver.name };
-}
-
-/**
- * The outside party has answered. Like every decided revision, it goes to
- * Document Control: an approval lets them release and issue it — or lift the
- * hold on one already released — and a refusal leaves release blocked until
- * they send it back, with a reason, to whoever it goes back to.
- */
-export async function settleApproval(
-  t: Tenant,
-  cycleId: string,
-  /** Whoever wrote the answer down: the act is theirs, the verdict is the party's. */
-  user: SessionUser,
-  accepted: boolean,
-): Promise<{ released: boolean }> {
-  const cycle = await t.db.reviewCycle.findUnique({
-    where: { id: cycleId },
-    include: { revision: { include: { document: true } }, issueRequest: { include: { approver: { select: { name: true } } } } },
-  });
-  if (!cycle?.issueRequest) return { released: false };
-  const { audit, notifyMany } = await import("./audit");
-  const party = cycle.issueRequest.approver?.name ?? "The outside party";
-  const label = `${cycle.revision.document.docNumber} rev ${cycle.revision.value}`;
-  // Approved: the request is an ordinary one again. Refused: it stays waiting,
-  // which is what keeps release blocked until Document Control sends it back.
-  if (accepted) await t.db.issueRequest.update({ where: { id: cycle.issueRequest.id }, data: { needsApproval: false } });
-  const held = !!cycle.revision.heldAt;
-  const next = accepted ? (held ? "lift the hold" : "release and issue it") : "send it back";
-  await audit({
-    tenant: t, actor: user, action: accepted ? "OUTSIDE_APPROVED" : "OUTSIDE_REFUSED", entityType: "Revision", entityId: cycle.revisionId,
-    entityLabel: label, detail: `${party} ${accepted ? "approved it" : "did not approve it"} — with Document Control to ${next}.`,
-  });
-  const control = await holdersOf(t, "CONTROL");
-  await notifyMany(control.map((one) => one.id), accepted ? "OUTSIDE_APPROVED" : "OUTSIDE_REFUSED",
-    `${party} ${accepted ? "approved" : "did not approve"} ${label}`, `Yours to ${next}.`, `/documents/${cycle.revision.documentId}`, t);
-  return { released: false };
-}
-
-export async function carryOutOpenRequests(t: Tenant, revisionId: string, user: { id: string; name: string }): Promise<number> {
-  const open = await t.db.issueRequest.findMany({ where: { revisionId, status: "OPEN", delegated: false }, orderBy: { raisedAt: "asc" }, select: { id: true } });
-  let raised = 0;
-  for (const one of open) raised += (await carryOutRequest(t, one.id, user)).numbers.length;
-  return raised;
-}
-
-/**
  * Who a revision goes back to when it is sent back: the organization that
  * supplied it, where it came from outside (its people here, or our liaison for
  * them), and otherwise whoever started its route — the author where no route
@@ -388,145 +189,33 @@ export async function returnRecipients(t: Tenant, revisionId: string): Promise<{
   return { ids: standing.authorId ? [standing.authorId] : [], names: standing.author ?? "its author" };
 }
 
-/**
- * Put a released revision on hold, not for use, while an outside approval it
- * turned out to need is awaited. Idempotent: holding what is already held
- * changes nothing.
- */
-export async function holdRevision(t: Tenant, revisionId: string, user: SessionUser, partyName: string) {
-  const rev = await t.db.revision.findUniqueOrThrow({ where: { id: revisionId }, include: { document: true } });
-  if (rev.state !== "RELEASED" || rev.heldAt) return;
-  const reason = `Awaiting approval by ${partyName}.`;
-  const heldAt = new Date();
-  await t.db.revision.update({ where: { id: revisionId }, data: { heldAt, heldReason: reason, heldByName: user.name } });
-  const { policy } = await import("./control-activities");
-  if ((await policy(t, "POLICY_PDF_STAMP")) === "ON") await stampHold(t, revisionId, user, heldAt);
-  await tellHolders(t, revisionId, (label) => `${label} is on hold — not for use`, `${reason} Do not work from the copy you were sent until you are told the hold is lifted.`);
-  const { audit } = await import("./audit");
-  await audit({
-    tenant: t, actor: user, action: "REVISION_HELD", entityType: "Revision", entityId: revisionId,
-    entityLabel: `${rev.document.docNumber} rev ${rev.value}`,
-    detail: `On hold, not for use — ${reason}`,
+/** The requests on a revision, as the screens read them: who asked, for what, to whom, and the transmittal it went in. */
+export async function requestsOn(t: Tenant, revisionId: string) {
+  const rows = await api<IssueRequestView[]>(projectPath(t, `/revisions/${revisionId}/issue-requests`));
+  return rows.filter((one) => one.status !== "CANCELLED").map((one) => ({
+    id: one.id, revisionId: one.revisionId, reason: one.reason, status: one.status, note: one.note,
+    recipients: JSON.stringify({ internalUserIds: one.userIds, partyIds: one.partyIds }),
+    raisedById: one.raisedById, raisedByName: one.raisedBy, raisedAt: new Date(one.raisedAt),
+    carriedOutAt: one.status === "DONE" && one.closedAt ? new Date(one.closedAt) : null, carriedOutBy: one.status === "DONE" ? one.closedBy : null,
+    // Leaving it to the author, and an outside approval before release, are not kept by the backend.
+    delegated: false, needsApproval: false, approverId: null as string | null,
+    transmittal: one.transmittalIds[0] ? { id: one.transmittalIds[0], number: one.transmittals[0] ?? "" } : null,
+  }));
+}
+
+/** Ask for a revision to be sent. The backend checks standing; where nobody sends for the project, the asker's request goes at once. */
+export async function raiseRequest(t: Tenant, revisionId: string, asked: ReturnType<typeof requestFromForm>) {
+  return api<{ request: IssueRequestView; transmittals: string[] }>(projectPath(t, `/revisions/${revisionId}/issue-requests`), {
+    body: { reason: asked.reason, userIds: asked.recipients.internalUserIds, partyIds: asked.recipients.partyIds, note: asked.note },
   });
 }
 
-/**
- * The outside party approved a revision that was held for their answer:
- * Document Control lifts the hold, and whatever was asked for it is sent.
- */
-export async function liftHold(t: Tenant, revisionId: string, user: SessionUser): Promise<{ sent: number }> {
-  const rev = await t.db.revision.findUniqueOrThrow({ where: { id: revisionId }, include: { document: true } });
-  if (!rev.heldAt) throw new Error("This revision is not on hold.");
-  const pending = await pendingIssue(t, revisionId, { recipients: false });
-  if (!pending.ok) throw new Error(pending.error.replace("Release blocked", "The hold stays"));
-  // The viewable copy goes back to the one it had before the hold was stamped.
-  const before = await t.db.storedFile.findFirst({
-    where: { revisionId, kind: "RENDITION", createdAt: { lt: rev.heldAt } },
-    orderBy: { createdAt: "desc" },
-    select: { id: true },
-  });
-  await t.db.revision.update({
-    where: { id: revisionId },
-    data: { heldAt: null, heldReason: null, heldByName: null, ...(before ? { renditionFileId: before.id } : {}) },
-  });
-  const { audit } = await import("./audit");
-  await audit({
-    tenant: t, actor: user, action: "REVISION_HOLD_LIFTED", entityType: "Revision", entityId: revisionId,
-    entityLabel: `${rev.document.docNumber} rev ${rev.value}`,
-    detail: "Approved outside — the hold is lifted and it is in use again.",
-  });
-  await tellHolders(t, revisionId, (label) => `${label} is back in use`, "The outside approval came back. The hold is lifted; the copy you were sent may be used again.");
-  return { sent: await carryOutOpenRequests(t, revisionId, user) };
+/** Carry one request out: the backend raises its transmittals. */
+export async function carryOutRequest(t: Tenant, requestId: string) {
+  return api<{ request: IssueRequestView; transmittals: string[] }>(projectPath(t, `/issue-requests/${requestId}/carry-out`), { method: "POST" });
 }
 
-/**
- * The outside party refused a revision that was held for their answer. It
- * stays on hold, not for use, for good — people hold copies of it, and the
- * record says why they may not use them — and whoever it goes back to may
- * start the next revision.
- */
-export async function returnHeld(t: Tenant, revisionId: string, user: SessionUser, reason: string, copyIds: string[]) {
-  const rev = await t.db.revision.findUniqueOrThrow({ where: { id: revisionId }, include: { document: true } });
-  if (!rev.heldAt) throw new Error("This revision is not on hold.");
-  if (!reason.trim()) throw new Error("Say why it is going back — whoever gets it has to know what to do.");
-  await t.db.revision.update({
-    where: { id: revisionId },
-    data: {
-      heldReason: `Not approved outside — ${reason}`,
-      authorizationReason: `Sent back by the control function: ${reason}`,
-      authorizedById: user.id,
-      authorizedByName: user.name,
-      authorizedAt: new Date(),
-    },
-  });
-  await t.db.issueRequest.updateMany({ where: { revisionId, status: "OPEN", needsApproval: true }, data: { status: "CANCELLED" } });
-  await tellHolders(t, revisionId, (label) => `${label} was not approved — still not for use`, `${reason} It stays on hold, not for use; the next revision will replace it.`);
-  await tellReturn(t, rev, reason, copyIds, user, "stays on hold, not for use");
-}
-
-/** Tell whoever a revision goes back to, and whoever Document Control copies in. */
-export async function tellReturn(
-  t: Tenant,
-  rev: { id: string; value: string; documentId: string; document: { docNumber: string } },
-  reason: string,
-  copyIds: string[],
-  user: SessionUser,
-  what: string,
-) {
-  const to = await returnRecipients(t, rev.id);
-  const copies = copyIds.filter((id) => !to.ids.includes(id));
-  const copied = copies.length ? await t.db.user.findMany({ where: { id: { in: copies } }, select: { name: true } }) : [];
-  const { audit, notifyMany } = await import("./audit");
-  await audit({
-    tenant: t, actor: user, action: "RELEASE_REFUSED", entityType: "Revision", entityId: rev.id,
-    entityLabel: `${rev.document.docNumber} rev ${rev.value}`, newValue: to.names,
-    detail: `${reason} — back to ${to.names}${copied.length ? `; copied in: ${copied.map((one) => one.name).join(", ")}` : ""}. It ${what}.`,
-  });
-  await notifyMany(to.ids, "RELEASE_REFUSED", `Sent back to you: ${rev.document.docNumber} rev ${rev.value}`, `${reason} — it ${what}.`, `/documents/${rev.documentId}`, t);
-  await notifyMany(copies, "RELEASE_REFUSED", `Sent back: ${rev.document.docNumber} rev ${rev.value}`, `Back to ${to.names}. ${reason}`, `/documents/${rev.documentId}`, t);
-}
-
-/**
- * Stamp the viewable copy ON HOLD — NOT FOR USE, the way a superseded copy is
- * stamped: a new copy, kept beside the old one, which stays on record and comes
- * back when the hold is lifted. Best effort — the hold is the record's state
- * whether or not the PDF could be marked.
- */
-async function stampHold(t: Tenant, revisionId: string, user: SessionUser, heldAt: Date) {
-  try {
-    const rev = await t.db.revision.findUniqueOrThrow({ where: { id: revisionId }, include: { document: true } });
-    if (!rev.renditionFileId) return;
-    const row = await t.db.storedFile.findUnique({ where: { id: rev.renditionFileId } });
-    if (!row || row.mime !== "application/pdf") return;
-    const { readStored, saveBuffer } = await import("./files");
-    const { stampPdf } = await import("./stamp");
-    const marked = await stampPdf(new Uint8Array(await readStored(row.path)), {
-      docNumber: rev.document.docNumber, rev: rev.value, statusLabel: rev.statusCode ?? "On hold",
-      date: heldAt, state: "HELD", title: rev.document.title,
-    });
-    const made = await saveBuffer(t, marked, rev.document.docNumber, "RENDITION", rev.value, user.name, user.id);
-    await t.db.storedFile.update({ where: { id: made.id }, data: { revisionId, createdAt: new Date(heldAt.getTime() + 1) } });
-    await t.db.revision.update({ where: { id: revisionId }, data: { renditionFileId: made.id } });
-  } catch {
-    // the hold stands without the stamp; the record says it is not for use
-  }
-}
-
-/**
- * Everybody this revision has already reached: whoever an outgoing transmittal
- * that carried it was addressed or copied to, and who has an account to be
- * told in. They hold a copy, so a hold on it — and its end — is theirs to know.
- */
-async function holders(t: Tenant, revisionId: string): Promise<string[]> {
-  const rows = await t.db.transmittalRecipient.findMany({
-    where: { userId: { not: null }, transmittal: { direction: "OUTGOING", status: { not: "DRAFT" }, items: { some: { revisionId } } } },
-    select: { userId: true },
-  });
-  return [...new Set(rows.map((one) => one.userId!))];
-}
-
-async function tellHolders(t: Tenant, revisionId: string, title: (label: string) => string, body: string) {
-  const rev = await t.db.revision.findUniqueOrThrow({ where: { id: revisionId }, include: { document: true } });
-  const { notifyMany } = await import("./audit");
-  await notifyMany(await holders(t, revisionId), "REVISION_HOLD", title(`${rev.document.docNumber} rev ${rev.value}`), body, `/documents/${rev.documentId}`, t);
+/** Withdraw a request. */
+export async function cancelRequest(t: Tenant, requestId: string) {
+  return api<IssueRequestView>(projectPath(t, `/issue-requests/${requestId}/cancel`), { method: "POST" });
 }

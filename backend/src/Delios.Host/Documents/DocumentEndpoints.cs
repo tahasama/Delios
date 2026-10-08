@@ -45,6 +45,9 @@ public static class DocumentEndpoints
         });
         project.MapPost("/documents/{documentId:guid}/revisions", StartRevisionAsync).AddEndpointFilter<IdempotencyFilter>();
         project.MapPost("/documents/{documentId:guid}/revisions/{revisionId:guid}/submissions", ResubmitAsync);
+        project.MapPost("/documents/{documentId:guid}/revisions/{revisionId:guid}/files", AttachAsync);
+        project.MapPut("/documents/{documentId:guid}", UpdateAsync);
+        project.MapPost("/documents/{documentId:guid}/end", EndAsync);
         project.MapGet("/files/{fileId:guid}/download", DownloadAsync);
     }
 
@@ -140,6 +143,32 @@ public static class DocumentEndpoints
         CancellationToken cancellationToken)
     {
         var (revision, problem) = await documents.ResubmitAsync(ProjectAccessFilter.Of(http), documentId, revisionId, request,
+            cancellationToken);
+        return problem ?? Results.Ok(View(revision!));
+    }
+
+    /// <summary>PUT /documents/{documentId}: changes the document's metadata, each change audited.</summary>
+    private static async Task<IResult> UpdateAsync(
+        Guid documentId, UpdateDocumentRequest request, HttpContext http, DocumentService documents, CancellationToken cancellationToken)
+    {
+        var (_, problem) = await documents.UpdateAsync(ProjectAccessFilter.Of(http), documentId, request, cancellationToken);
+        return problem ?? Results.NoContent();
+    }
+
+    /// <summary>POST /documents/{documentId}/end: withdraws, cancels or archives the document, with the reason.</summary>
+    private static async Task<IResult> EndAsync(
+        Guid documentId, EndDocumentRequest request, HttpContext http, DocumentService documents, CancellationToken cancellationToken)
+    {
+        var (_, problem) = await documents.EndAsync(ProjectAccessFilter.Of(http), documentId, request, cancellationToken);
+        return problem ?? Results.NoContent();
+    }
+
+    /// <summary>POST .../revisions/{revisionId}/files: attaches files to a revision still in preparation.</summary>
+    private static async Task<IResult> AttachAsync(
+        Guid documentId, Guid revisionId, StartRevisionRequest request, HttpContext http, DocumentService documents,
+        CancellationToken cancellationToken)
+    {
+        var (revision, problem) = await documents.AttachAsync(ProjectAccessFilter.Of(http), documentId, revisionId, request,
             cancellationToken);
         return problem ?? Results.Ok(View(revision!));
     }

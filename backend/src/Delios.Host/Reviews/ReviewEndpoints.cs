@@ -10,7 +10,7 @@ namespace Delios.Host.Reviews;
 public sealed record RouteView(Guid Id, string Name, string? Description, bool IsDefault, IReadOnlyList<RouteStep> Steps);
 
 /// <summary>One person's answer on a review step, as shown inside a <see cref="StepView"/>.</summary>
-public sealed record ParticipantView(string Name, string? Answer, string? GrantedStatus, string? Note, DateTimeOffset? AnsweredAt);
+public sealed record ParticipantView(string Name, string? Answer, string? GrantedStatus, string? Note, DateTimeOffset? AnsweredAt, Guid UserId);
 
 /// <summary>One step of a review as sent to the client. <c>Number</c> counts from 1; the dispatch and foreign-answer fields are filled only for steps sent to another organization.</summary>
 public sealed record StepView(int Number, string Title, string? Function, string? Party, string? Participation, string Mode,
@@ -20,7 +20,7 @@ public sealed record StepView(int Number, string Title, string? Function, string
 
 /// <summary>A review comment as sent to the client. <c>Step</c> and <c>ClosesWithStep</c> count from 1.</summary>
 public sealed record CommentView(Guid Id, int Step, string Author, string Text, string Class, bool Blocking,
-    string ClosesWith, int? ClosesWithStep, string Status, string? Resolution, string? ClosedBy, DateTimeOffset CreatedAt);
+    string ClosesWith, int? ClosesWithStep, string Status, string? Resolution, string? ClosedBy, DateTimeOffset CreatedAt, Guid AuthorId);
 
 /// <summary>The full review as sent to the client: its state, its steps and its comments. Built by <see cref="ReviewEndpoints.View(Review)"/>.</summary>
 public sealed record ReviewView(Guid Id, string Number, Guid DocumentId, Guid RevisionId, string Route, string State,
@@ -174,7 +174,7 @@ public static class ReviewEndpoints
         r.Steps.OrderBy(s => s.Index).Select(s => new StepView(s.Index + 1, s.Title, s.FunctionCode, s.PartyName,
             s.Participation, s.Mode, s.Deciding, s.State, s.DueDate?.ToDateOnly(), s.Answer, s.GrantsStatuses,
             s.Participants.OrderBy(p => p.UserName).Select(p => new ParticipantView(p.UserName, p.Answer, p.GrantedStatus,
-                p.Note, p.AnsweredAt?.ToDateTimeOffset())).ToList(),
+                p.Note, p.AnsweredAt?.ToDateTimeOffset(), p.UserId)).ToList(),
             s.TransmittalId, s.DispatchedAt?.ToDateTimeOffset(), s.DispatchChannel, s.DispatchRef, s.DispatchedByName,
             s.ForeignAnswer, s.RecordedByName, s.EvidenceFileId)).ToList(),
         r.Comments.OrderBy(c => c.CreatedAt).Select(View).ToList());
@@ -182,5 +182,5 @@ public static class ReviewEndpoints
     /// <summary>Converts a review comment entity into the <see cref="CommentView"/> sent to clients.</summary>
     private static CommentView View(ReviewComment c) => new(
         c.Id, c.StepIndex + 1, c.AuthorName, c.Text, c.Class, c.Blocking, c.ClosesWith, c.ClosesWithStep, c.Status,
-        c.Resolution, c.ClosedByName, c.CreatedAt.ToDateTimeOffset());
+        c.Resolution, c.ClosedByName, c.CreatedAt.ToDateTimeOffset(), c.AuthorId);
 }

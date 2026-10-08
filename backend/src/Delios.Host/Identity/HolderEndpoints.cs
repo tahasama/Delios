@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Delios.Host.Identity;
 
 /// <summary>Someone on the project whose function grants a verb, as the screens list them.</summary>
-public sealed record HolderView(Guid Id, string Name, string FunctionName, string? Department, bool Internal);
+public sealed record HolderView(Guid Id, string Name, string FunctionName, string? Department, bool Internal, string FunctionCode);
 
 /// <summary>
 /// Who on a project holds a verb, optionally for one class of document: the replacement for "every user whose role is
@@ -41,6 +41,6 @@ public static class HolderEndpoints
                 return asked is null ? their.Holds(verb) : their.Allows(verb, facts);
             })
             .OrderBy(x => x.Name)
-            .Select(x => new HolderView(x.m.UserId, x.Name, x.m.Function!.Name, x.m.Department, x.Internal)));
+            .Select(x => new HolderView(x.m.UserId, x.Name, x.m.Function!.Name, x.m.Department, x.Internal, x.m.Function!.Code)));
     }
 }

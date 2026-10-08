@@ -122,12 +122,12 @@ export function cycleOf(review: ReviewView, sequence: number): LegacyCycle {
     outcomeByName: review.verdict ? decider : null, outcomeNote: review.returnNote, binding: review.steps.some((s) => s.deciding),
     partyId: null, dispatchedAt: date(deciding?.dispatchedAt ?? null), issueRequestId: null, createdAt: new Date(review.startedAt),
     comments: review.comments.map((c) => ({
-      id: c.id, cycleId: review.id, authorId: "", authorName: c.author, text: c.text, classification: c.class, progressionPreventing: c.blocking,
+      id: c.id, cycleId: review.id, authorId: c.authorId, authorName: c.author, text: c.text, classification: c.class, progressionPreventing: c.blocking,
       closesWith: c.closesWith, closesWithStep: c.closesWithStep, status: c.status, resolution: c.resolution, closedAt: null,
       reclassifiedAt: null, reclassifiedByName: null, originalProgressionPreventing: null, createdAt: new Date(c.createdAt),
     })),
     assignments: review.steps.flatMap((s, i) => s.participants.map((p, j) => ({
-      id: `${review.id}-${i}-${j}`, cycleId: review.id, userId: "", userName: p.name, order: s.number, completedAt: date(p.answeredAt),
+      id: `${review.id}-${i}-${j}`, cycleId: review.id, userId: p.userId, userName: p.name, order: s.number, completedAt: date(p.answeredAt),
     }))),
     review,
   };
@@ -164,7 +164,7 @@ export function revisionOf(documentId: string, r: RevisionView, reviews: ReviewV
       const deciding = one.steps.find((s) => s.deciding);
       const by = deciding?.participants.find((p) => p.answer && p.answer !== "NONE");
       return {
-        id: one.id, revisionId: r.id, approverId: "", approverName: by?.name ?? one.startedBy, approverRole: deciding?.function ?? deciding?.party ?? deciding?.title ?? "",
+        id: one.id, revisionId: r.id, approverId: by?.userId ?? "", approverName: by?.name ?? one.startedBy, approverRole: deciding?.function ?? deciding?.party ?? deciding?.title ?? "",
         matrixVersion: 0, decidedAt: new Date(one.decidedAt!), note: by?.note ?? null, withdrawnAt: null, withdrawnBy: null, withdrawnReason: null,
       };
     }),
@@ -208,3 +208,12 @@ export const backendRevision = cache(async (scope: Scope, revisionId: string) =>
 /** What the caller may do about sending a revision out, and who wrote it. */
 export const revisionStanding = cache(async (scope: Scope, revisionId: string) =>
   api<{ mayRequest: boolean; letsItOut: boolean; author: string | null; authorId: string | null }>(projectPath(scope, `/revisions/${revisionId}/standing`)));
+
+/** The review a revision is in, or was last in: the newest one. Null when it never went to review. */
+export async function reviewOfRevision(scope: Scope, revisionId: string): Promise<{ id: string; documentId: string; state: string } | null> {
+  const revision = await backendRevision(scope, revisionId);
+  const latest = (await documentContext(scope, revision.documentId)).reviews
+    .filter((one) => one.revisionId === revisionId)
+    .sort((a, b) => b.startedAt.localeCompare(a.startedAt))[0];
+  return latest ? { id: latest.id, documentId: revision.documentId, state: latest.state } : null;
+}

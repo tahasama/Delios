@@ -1,17 +1,15 @@
 import "server-only";
 import { requireScope, type Scope } from "../scope";
 import {
-  gatesFor,
   summarise,
   INTENT_VERB,
   INTENT_LABEL,
-  type GateContext,
   type GateLine,
   type Intent,
   type Preflight,
   type Subject,
 } from "./registry";
-import "./gates";
+import { backendDocument, backendRevision } from "../api/legacy";
 
 /**
  * Ask whether an act is allowed, before anyone commits to it.
@@ -25,20 +23,8 @@ import "./gates";
  * calls `enforce()` and refuses with the same words.
  */
 
-function contextFrom(scope: Scope): GateContext {
-  return {
-    orgId: scope.orgId,
-    projectId: scope.projectId,
-    db: scope.db,
-    user: scope.user,
-    can: scope.can,
-    why: scope.why,
-  };
-}
-
 export async function preflight(intent: Intent, subject: Subject, scope?: Scope): Promise<Preflight> {
   const ctx = scope ?? (await requireScope());
-  const gateCtx = contextFrom(ctx);
   const lines: GateLine[] = [];
 
   // The verb comes first: without it the rest of the checklist is noise, since
@@ -64,42 +50,19 @@ export async function preflight(intent: Intent, subject: Subject, scope?: Scope)
     message: `${ctx.actor.functionName} holds this.`,
   });
 
-  for (const gate of gatesFor(intent)) {
-    try {
-      const outcome = await gate.evaluate(gateCtx, subject);
-      lines.push({ id: gate.id, title: gate.title, clause: gate.clause, ...outcome });
-    } catch (e) {
-      // A gate that cannot answer must not be read as permission.
-      lines.push({
-        id: gate.id,
-        title: gate.title,
-        clause: gate.clause,
-        verdict: "BLOCK",
-        message: `This could not be checked: ${e instanceof Error ? e.message : "unknown error"}.`,
-        remedy: "Reload and try again; if it persists it is a fault worth reporting.",
-      });
-    }
-  }
-
+  // The rest of the checklist is the backend's: it refuses an act that is not
+  // ready, with the reason, when the act is attempted.
   return summarise(intent, lines);
 }
 
 /** The classification the permission matrix should be asked about. */
 async function classOf(scope: Scope, subject: Subject) {
-  if (subject.revisionId) {
-    const rev = await scope.db.revision.findFirst({
-      where: { id: subject.revisionId },
-      select: { document: { select: { deliverableType: true, docType: true, discipline: true, criticality: true, confidentiality: true } } },
-    });
-    return rev?.document ?? null;
-  }
-  if (subject.documentId) {
-    return scope.db.document.findFirst({
-      where: { id: subject.documentId },
-      select: { deliverableType: true, docType: true, discipline: true, criticality: true, confidentiality: true },
-    });
-  }
-  return null;
+  const documentId = subject.revisionId ? (await backendRevision(scope, subject.revisionId)).documentId : subject.documentId;
+  if (!documentId) return null;
+  const doc = await backendDocument(scope, documentId);
+  return doc
+    ? { deliverableType: doc.deliverableType, docType: doc.docType, discipline: doc.discipline, criticality: doc.criticality, confidentiality: doc.confidentiality }
+    : null;
 }
 
 /**

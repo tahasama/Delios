@@ -1,27 +1,22 @@
 "use server";
 
-import { carrierRefusal } from "@/lib/control-activities";
-import { startWorkflowRun } from "@/lib/workflow";
 import { redirect } from "next/navigation";
 import { requireScope } from "@/lib/scope";
 import { isEmptyTitle } from "@/lib/standard";
 import { revalidatePath } from "next/cache";
-import { isController, isAdmin, mayCreateDocument, mayContributeToDocument } from "@/lib/auth";
-import { audit } from "@/lib/audit";
-import { allocateNumber } from "@/lib/numbering";
-import { getActiveSet } from "@/lib/config";
-import { saveUpload } from "@/lib/files";
-import { isReadOnly } from "@/lib/auth";
-import { retentionFor } from "@/lib/retention";
-import { registerDocument } from "@/lib/register";
+import { mayCreateDocument } from "@/lib/auth";
+import { getActiveSet, getSet } from "@/lib/config";
 import { fieldRules, missingRequired, ownFields, takeExtras } from "@/lib/field-policy";
+import { api, projectPath, refusal } from "@/lib/api/client";
+import { backendDocument } from "@/lib/api/legacy";
+import { upload, filesOf } from "@/lib/api/uploads";
 
 // G.1 — Creating a new document. "No controlled information shall be produced
 // without a register entry" (§3.9). Number is system-generated (§3.7).
 
 export async function createDocumentAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
   const ctx = await requireScope();
-  const { user, db, projectId, orgId } = ctx;
+  const { user } = ctx;
   if (!mayCreateDocument(user)) return { error: user.isInternal ? "Read-only users cannot create documents." : "External parties cannot create register entries. Document Control must issue a placeholder to your organization first." };
 
   const title = String(formData.get("title") ?? "").trim();
@@ -71,12 +66,11 @@ export async function createDocumentAction(_prev: { error?: string } | undefined
 
 
   // C.3.3 — the published type-to-field matrix decides which conditional fields this type requires
-  const matrixRows = await db.configValue.findMany({ where: { setKey: "DELIVERABLE_TYPE_FIELDS" } });
+  const matrixRows = await getSet("DELIVERABLE_TYPE_FIELDS");
   const matrix = matrixRows.find((m) => m.code === deliverableType);
   const req = (f: string): "required" | "optional" | "na" => {
     if (!matrix) return externalList().includes(deliverableType) ? (f === "originator" || f === "receivedDate" ? "required" : "optional") : "optional";
-    const props = matrix.props ? (JSON.parse(matrix.props) as Record<string, string>) : {};
-    return (props[f] as "required" | "optional" | "na") ?? "optional";
+    return (matrix.props[f] as "required" | "optional" | "na") ?? "optional";
   };
   function externalList() {
     return ["CTR", "VND", "TPY", "CLT"];
@@ -114,91 +108,37 @@ export async function createDocumentAction(_prev: { error?: string } | undefined
   if (answered.missing.length) {
  return { error: `${answered.missing.join(", ")} ${answered.missing.length === 1 ? "is" : "are"} asked of every document here.` };
   }
-  const external = req("receivedDate") !== "na";
-  // The act itself lives in lib/register, so the importer and the demo seeds
-  // register a document exactly as this form does.
-  let doc: { id: string; docNumber: string };
+  // The backend allocates the number and checks every value again.
+  let doc: { id: string; number: string };
   try {
-    doc = await registerDocument(ctx, user, {
-      title, deliverableType, docType, discipline,
-      projectCode: String(formData.get("projectCode") ?? ""),
-      originator, subProject, contractRef, criticality,
-      confidentiality, retentionClass: chosenRetention,
-      receivedDate: external && receivedDate ? new Date(receivedDate) : null,
-      extras: answered.extras,
-      kind,
+    doc = await api<{ id: string; number: string }>(projectPath(ctx, "/documents"), {
+      body: {
+        title, deliverableType, docType, discipline, originator, subproject: subProject, contractRef, criticality,
+        confidentiality, retentionClass: chosenRetention, receivedDate, plannedDate: String(formData.get("plannedDate") ?? "") || null, kind,
+      },
+      idempotencyKey: String(formData.get("formKey") ?? "") || undefined,
     });
   } catch (e) {
-    return { error: e instanceof Error ? e.message : "Could not allocate a document number." };
+    return { error: refusal(e).message };
   }
-  const docNumber = doc.docNumber;
 
   // An initial file creates the first revision immediately. A PDF is the
   // viewable copy (rendition); anything else is the editable source.
-  let upload = kind === "DOCUMENT" ? (formData.get("nativeFile") as File | null) : null;
-  // Or a file kept with a received transmittal: the same bytes become the
-  // first revision, and the transmittal then lists the document it carried.
-  const fromFileId = String(formData.get("fromFileId") ?? "");
-  const kept = kind === "DOCUMENT" && !(upload && upload.size > 0) && fromFileId
-    ? await db.storedFile.findFirst({ where: { id: fromFileId, kind: "ATTACHMENT" }, include: { transmittal: { select: { number: true } } } })
-    : null;
-  if (kept) {
-    const { readStored } = await import("@/lib/files");
-    upload = new File([new Uint8Array(await readStored(kept.path))], kept.name, { type: kept.mime });
-  }
+  const file = kind === "DOCUMENT" ? filesOf(formData, "nativeFile")[0] : undefined;
   let sent: "yes" | "no" | string = "no";
-  if (upload && upload.size > 0) {
+  if (file) {
     try {
-      const isPdf = upload.type === "application/pdf" || upload.name.toLowerCase().endsWith(".pdf");
-      const fileKind = isPdf ? "RENDITION" : "NATIVE";
-      const saved = await saveUpload(ctx, upload, docNumber, fileKind, "A");
-      const file = await db.storedFile.create({
-        data: { projectId, path: saved.relPath, name: saved.name, size: saved.size, mime: saved.mime, sha256: saved.sha256, kind: fileKind, uploadedById: user.id, uploadedByName: user.name },
-      });
-      const rev = await db.revision.create({
-        data: { projectId,
-          documentId: doc.id,
-          value: "A",
-          series: "DESIGN",
-          state: "IN_PREPARATION",
-          reasonForRevision: "First issue",
-          changeDescription: "Initial content",
-          authoredById: user.id,
-          authoredByName: user.name,
-          authoredByParty: originator,
-          uploadedById: user.id,
-          uploadedByName: user.name,
- authorizationReason: "Placeholder register entry — authorization for the first revision.",
-          authorizedById: user.id,
-          authorizedByName: user.name,
-          authorizedAt: new Date(),
-          ...(isPdf ? { renditionFileId: file.id } : { nativeFileId: file.id }),
-        },
-      });
-      await db.storedFile.update({ where: { id: file.id }, data: { revisionId: rev.id } });
-      if (kept?.transmittalId) {
-        const listed = await db.transmittalItem.findFirst({ where: { transmittalId: kept.transmittalId, revisionId: rev.id } });
-        if (!listed) await db.transmittalItem.create({ data: { projectId, transmittalId: kept.transmittalId, revisionId: rev.id } });
-        await audit({
-          actor: user, action: "TRANSMITTAL_FILE_REGISTERED", entityType: "Transmittal", entityId: kept.transmittalId,
-          entityLabel: kept.transmittal?.number ?? docNumber, detail: `${kept.name}, kept with this transmittal, registered as ${docNumber} rev A.`,
-        });
-      }
-      await db.document.update({ where: { id: doc.id }, data: { isPlaceholder: false, appVersion: null } });
-      await audit({
-        actor: user,
-        action: "REVISION_ESTABLISHED",
-        entityType: "Revision",
-        entityId: rev.id,
-        entityLabel: `${docNumber} rev A`,
- detail: "First revision established with the initial file (placeholder authorization).",
-      });
-
+      const fileId = await upload(ctx, { documentId: doc.id }, file);
+      const rev = await api<{ id: string }>(projectPath(ctx, `/documents/${doc.id}/revisions`), { body: { fileIds: [fileId] } });
       // "Register & send": start the chosen review route straight away.
-      const templateId = String(formData.get("sendTemplateId") ?? "");
-      if (templateId) {
-        const res = await startWorkflowRun(ctx, rev.id, templateId, user);
-        sent = res.ok ? "yes" : res.error;
+      const routeId = String(formData.get("sendTemplateId") ?? "");
+      if (routeId) {
+        try {
+          await api(projectPath(ctx, `/revisions/${rev.id}/reviews`), { body: { routeId } });
+          sent = "yes";
+        } catch (e) {
+          sent = refusal(e).message;
+        }
       }
     } catch {
       // file failure must not lose the register entry — the author can attach from the page
@@ -216,112 +156,53 @@ const EDITABLE_FIELDS = [
 /** Metadata change — every change logged with field, previous value, date, person (§4.9). */
 export async function updateDocumentAction(_prev: { error?: string; ok?: string } | undefined, formData: FormData): Promise<{ error?: string; ok?: string }> {
   const ctx = await requireScope();
-  const { user, db, projectId, orgId } = ctx;
-  if (isReadOnly(user)) return { error: "Viewers cannot edit metadata." };
   const id = String(formData.get("id") ?? "");
-  const doc = await db.document.findUnique({ where: { id } });
-  if (!doc) return { error: "Document not found." };
-  if (!mayContributeToDocument(user, doc)) return { error: "You may update only documents assigned to your organization through their originator code." };
-
-  const changes: { field: string; oldValue: string | null; newValue: string | null }[] = [];
-  const data: Record<string, unknown> = {};
+  // Only fields actually submitted — absent fields are left untouched.
+  const changes: Record<string, string | null> = {};
   for (const field of EDITABLE_FIELDS) {
-    if (!formData.has(field)) continue; // only fields actually submitted — absent fields are left untouched
-    const raw = String(formData.get(field) ?? "");
-    let next: string | Date | null = raw || null;
-    if (field === "receivedDate" && raw) next = new Date(raw);
-    if (field === "confidentiality" && !raw) next = "INTERNAL";
-    const current = (doc as unknown as Record<string, unknown>)[field];
-    const currentStr = current instanceof Date ? current.toISOString().slice(0, 10) : current == null ? null : String(current);
-    const nextStr = next instanceof Date ? next.toISOString().slice(0, 10) : next;
-    if (currentStr !== nextStr) {
-      changes.push({ field, oldValue: currentStr, newValue: nextStr });
-      data[field] = next;
-    }
+    if (!formData.has(field)) continue;
+    const name = field === "subProject" ? "subproject" : field;
+    if (field === "appVersion" || field === "previousId" || field === "legacyScheme") continue; // not kept by the backend
+    changes[name] = String(formData.get(field) ?? "").trim() || null;
   }
-  if (!changes.length) return { ok: "No changes to record." };
-  if ("title" in data && typeof data.title === "string" && isEmptyTitle(data.title)) {
- return { error: "Generic titles are non-conformant." };
+  try {
+    const before = await backendDocument(ctx, id);
+    if (!before) return { error: "Document not found." };
+    const current: Record<string, string | null> = {
+      title: before.title, docType: before.docType, discipline: before.discipline, originator: before.originator, subproject: before.subproject,
+      contractRef: before.contractRef, criticality: before.criticality, confidentiality: before.confidentiality, retentionClass: before.retentionClass,
+      receivedDate: before.receivedDate,
+    };
+    const changed = Object.fromEntries(Object.entries(changes).filter(([field, value]) => (current[field] ?? null) !== value));
+    if (!Object.keys(changed).length) return { ok: "No changes to record." };
+    await api(projectPath(ctx, `/documents/${id}`), { method: "PUT", body: { changes: changed } });
+    revalidatePath(`/documents/${id}`);
+    const count = Object.keys(changed).length;
+    return { ok: `Saved — ${count} metadata change${count > 1 ? "s" : ""} logged.` };
+  } catch (e) {
+    return { error: refusal(e).message };
   }
-  await db.document.update({ where: { id }, data });
-  for (const c of changes) {
-    await audit({
-      actor: user,
-      action: "METADATA_CHANGE",
-      entityType: "Document",
-      entityId: id,
-      entityLabel: doc.docNumber,
-      field: c.field,
-      oldValue: c.oldValue,
-      newValue: c.newValue,
-    });
-  }
-  revalidatePath(`/documents/${id}`);
- return { ok: `Saved — ${changes.length} metadata change${changes.length > 1 ? "s": ""} logged.` };
 }
 
-/** Associate the document with the asset it describes (§5.8, many-to-many). */
-export async function linkAssetAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
-  const ctx = await requireScope();
-  const { user, db, projectId, orgId } = ctx;
-  const documentId = String(formData.get("documentId") ?? "");
-  const assetCode = String(formData.get("assetCode") ?? "").trim();
-  if (!assetCode) return { error: "Enter an asset code." };
-  const asset = await db.assetItem.findFirst({ where: { code: assetCode } });
-  if (!asset) return { error: `Asset "${assetCode}" is not in the asset breakdown (C.4.7).` };
-  const doc = await db.document.findUnique({ where: { id: documentId } });
-  if (!doc) return { error: "Document not found." };
-  if (!mayContributeToDocument(user, doc)) return { error: "You may change relationships only for documents assigned to your organization." };
-  const dup = await db.relationship.findFirst({ where: { kind: "DOC_ASSET", fromId: documentId, toId: asset.id } });
-  if (dup) return { error: "Already associated with this asset." };
-  await db.relationship.create({ data: { projectId, kind: "DOC_ASSET", fromType: "Document", fromId: documentId, toType: "AssetItem", toId: asset.id, createdById: user.id } });
-  await audit({
-    actor: user,
-    action: "RELATIONSHIP",
-    entityType: "Document",
-    entityId: documentId,
-    entityLabel: doc.docNumber,
- detail: `Associated with asset ${asset.code} — ${asset.name}.`,
-  });
-  revalidatePath(`/documents/${documentId}`);
-  return {};
+/** Associate the document with the asset it describes (§5.8): assets are not in the backend yet. */
+export async function linkAssetAction(_prev: { error?: string } | undefined, _formData: FormData): Promise<{ error?: string }> {
+  return { error: "Linking a document to an asset is not supported yet." };
 }
 
 export async function unlinkRelationshipAction(formData: FormData) {
-  const ctx = await requireScope();
-  const { user, db, projectId, orgId } = ctx;
-  const relId = String(formData.get("relationshipId") ?? "");
-  const documentId = String(formData.get("documentId") ?? "");
-  const rel = await db.relationship.findUnique({ where: { id: relId } });
-  const doc = await db.document.findUnique({ where: { id: documentId } });
-  if (!doc || !mayContributeToDocument(user, doc)) return;
-  if (rel && rel.fromType === "Document" && rel.fromId === documentId) {
-    await db.relationship.delete({ where: { id: relId } });
-    await audit({ actor: user, action: "RELATIONSHIP", entityType: "Document", entityId: documentId, entityLabel: doc.docNumber, detail: `Relationship ${rel.kind} removed.` });
-  }
-  revalidatePath(`/documents/${documentId}`);
+  revalidatePath(`/documents/${String(formData.get("documentId") ?? "")}`);
 }
 
 // End states (Part 12) — recorded with date and responsible authority (§12.1)
 export async function endDocumentStateAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
   const ctx = await requireScope();
-  const { user, db, projectId, orgId } = ctx;
   const documentId = String(formData.get("documentId") ?? "");
-  const registered = await db.document.findUnique({ where: { id: documentId }, select: { createdById: true } });
-  const cannotWithdraw = await carrierRefusal(ctx, "WITHDRAW", {
-    control: isController(user) || isAdmin(user),
-    standing: registered?.createdById === user.id,
-  });
-  if (cannotWithdraw) return { error: cannotWithdraw };
-  const kind = String(formData.get("kind") ?? "") as "WITHDRAWN" | "CANCELLED" | "ARCHIVED";
   const reason = String(formData.get("reason") ?? "").trim();
- if (!reason) return { error: "A reason is required — each end state is recorded with date and authority." };
-
-  const { endDocumentState } = await import("@/lib/lifecycle");
+  if (!reason) return { error: "A reason is required — each end state is recorded with date and authority." };
   try {
-    await endDocumentState(ctx, documentId, user, kind, reason);
+    await api(projectPath(ctx, `/documents/${documentId}/end`), { body: { state: String(formData.get("kind") ?? ""), reason } });
   } catch (e) {
-    return { error: e instanceof Error ? e.message : "Could not change state." };
+    return { error: refusal(e).message };
   }
   revalidatePath(`/documents/${documentId}`);
   redirect(`/documents/${documentId}`);

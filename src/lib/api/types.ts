@@ -136,7 +136,7 @@ export type DocumentContext = {
 };
 
 /** GET /documents/{id}/routes (ReviewEndpoints RouteView). */
-export type RouteView = { id: string; name: string; description: string | null; isDefault: boolean; steps: { title: string }[] };
+export type RouteView = { id: string; name: string; description: string | null; isDefault: boolean; steps: { title: string; functionCode: string | null; partyCode: string | null; mode: string; reason: string | null }[] };
 
 /** GET /reviews (ReviewList.cs). */
 export type ReviewsPage = { total: number; page: number; pages: number; per: number; sizes: number[]; rows: ReviewListRow[] };
@@ -158,11 +158,11 @@ export type ReviewView = {
   steps: {
     number: number; title: string; function: string | null; party: string | null; participation: string | null; mode: string;
     deciding: boolean; state: string; dueDate: string | null; answer: string | null; grantsStatuses: string[];
-    participants: { name: string; answer: string | null; grantedStatus: string | null; note: string | null; answeredAt: string | null }[];
+    participants: { name: string; answer: string | null; grantedStatus: string | null; note: string | null; answeredAt: string | null; userId: string }[];
     transmittalId: string | null; dispatchedAt: string | null; dispatchChannel: string | null; dispatchRef: string | null;
     dispatchedBy: string | null; foreignAnswer: string | null; recordedBy: string | null; evidenceFileId: string | null;
   }[];
-  comments: { id: string; step: number; author: string; text: string; class: string; blocking: boolean; closesWith: string; closesWithStep: number | null; status: string; resolution: string | null; closedBy: string | null; createdAt: string }[];
+  comments: { id: string; step: number; author: string; text: string; class: string; blocking: boolean; closesWith: string; closesWithStep: number | null; status: string; resolution: string | null; closedBy: string | null; createdAt: string; authorId: string }[];
 };
 
 /** GET /reviews/{id}/me. */

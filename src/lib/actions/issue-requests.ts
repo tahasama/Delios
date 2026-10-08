@@ -2,15 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import { requireScope } from "@/lib/scope";
-import { isController, isAdmin } from "@/lib/auth";
-import { audit, notify } from "@/lib/audit";
-import {
-  carryOutRequest,
-  issueGateIsControl,
-  mayRequestIssue,
-  noRecipients,
-  requestFromForm,
-} from "@/lib/issue-requests";
+import { refusal } from "@/lib/api/client";
+import { backendRevision } from "@/lib/api/legacy";
+import { cancelRequest, carryOutRequest, noRecipients, raiseRequest, requestFromForm } from "@/lib/issue-requests";
 
 /**
  * Asking for a revision to be sent somewhere, and carrying that out.
@@ -24,106 +18,51 @@ import {
 /** Raise a request against a revision, at any time. */
 export async function requestIssueAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
   const ctx = await requireScope();
-  const { user, db, projectId } = ctx;
   const revisionId = String(formData.get("revisionId") ?? "");
-  const rev = await db.revision.findUnique({ where: { id: revisionId }, include: { document: true } });
-  if (!rev) return { error: "That revision no longer exists." };
-  const standing = await mayRequestIssue(ctx, revisionId, user.id);
-  if (!standing && !isController(user) && !isAdmin(user)) {
-    return { error: "Only somebody who worked on this revision — its author, whoever uploaded it, whoever reviewed or decided it — asks for it to be sent." };
-  }
   const asked = requestFromForm(formData);
   if (!asked.delegated && noRecipients(asked.recipients)) {
     return { error: "Say who it goes to, or leave it to the author." };
   }
-  if (asked.needsApproval && !asked.approverId) {
-    return { error: "Say which party has to approve it before it is released." };
-  }
-  const request = await db.issueRequest.create({
-    data: {
-      projectId,
-      revisionId,
-      reason: asked.reason,
-      recipients: JSON.stringify(asked.recipients),
-      note: asked.note,
-      delegated: asked.delegated,
-      needsApproval: asked.needsApproval,
-      approverId: asked.approverId,
-      raisedById: user.id,
-      raisedByName: user.name,
-    },
-  });
-  await audit({
-    tenant: ctx, actor: user, action: "ISSUE_REQUESTED", entityType: "Revision", entityId: revisionId,
-    entityLabel: `${rev.document.docNumber} rev ${rev.value}`, newValue: asked.reason,
-    detail: asked.delegated ? "Left to the author to say who it goes to." : "Asked for it to be sent.",
-  });
-  if (asked.delegated) {
-    await notify(
-      rev.document.createdById,
-      "ISSUE_DELEGATED",
-      `Who should get ${rev.document.docNumber} rev ${rev.value}?`,
-      `${user.name} left it to you to say who this revision goes to.`,
-      `/documents/${rev.documentId}`,
-      ctx,
-    );
-  }
-  // Released already, and now found to need an outside approval: the approval
-  // step opens, and the revision is on hold, not for use, from the moment it
-  // goes to them — at once for a party answering here, when our liaison records
-  // it sent for one that is not.
-  if (rev.state === "RELEASED" && asked.needsApproval) {
-    const { openApprovalStep, holdRevision } = await import("@/lib/issue-requests");
-    const { partyStepHolders } = await import("@/lib/workflow");
-    const opened = await openApprovalStep(ctx, revisionId, user);
-    if (opened.opened && asked.approverId && !(await partyStepHolders(ctx, asked.approverId)).byProxy) {
-      await holdRevision(ctx, revisionId, user, opened.party ?? "the outside party");
-    }
+  if (asked.delegated) return { error: "Leaving it to the author to say who receives it is not supported yet." };
+  if (asked.needsApproval) return { error: "An outside approval before release is not supported yet." };
+  // The backend checks standing, records the request, and sends it at once
+  // where the revision is released and the asker is the one who sends.
+  try {
+    const rev = await backendRevision(ctx, revisionId);
+    await raiseRequest(ctx, revisionId, asked);
     revalidatePath(`/documents/${rev.documentId}`);
     return {};
+  } catch (e) {
+    return { error: refusal(e).message };
   }
-  // Where nobody stands between the ask and the send, the asker sends it.
-  if (rev.state === "RELEASED" && !(await issueGateIsControl(ctx)) && !asked.delegated) {
-    await carryOutRequest(ctx, request.id, user);
-  }
-  revalidatePath(`/documents/${rev.documentId}`);
-  return {};
 }
 
 /** Carry one request out: raise its transmittals. */
 export async function carryOutRequestAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
   const ctx = await requireScope();
-  const { user, db } = ctx;
   const requestId = String(formData.get("requestId") ?? "");
-  const request = await db.issueRequest.findUnique({ where: { id: requestId }, select: { revisionId: true, revision: { select: { documentId: true } } } });
-  if (!request) return { error: "That request no longer exists." };
-  // Document Control sends what was asked for. Where a project has no control
-  // function, whoever has standing on the document sends it themselves.
-  const control = isController(user) || isAdmin(user);
-  const allowed = control || (!(await issueGateIsControl(ctx)) && (await mayRequestIssue(ctx, request.revisionId, user.id)));
-  if (!allowed) return { error: "Document Control sends what was asked for." };
-  const { error } = await carryOutRequest(ctx, requestId, user);
-  if (error) return { error };
-  revalidatePath(`/documents/${request.revision.documentId}`);
-  return {};
+  // Document Control sends what was asked for; where a project has no control
+  // function, whoever has standing sends it. The backend decides.
+  try {
+    const { request } = await carryOutRequest(ctx, requestId);
+    const rev = await backendRevision(ctx, request.revisionId);
+    revalidatePath(`/documents/${rev.documentId}`);
+    return {};
+  } catch (e) {
+    return { error: refusal(e).message };
+  }
 }
 
 /** Withdraw a request that is no longer wanted. */
 export async function cancelRequestAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
   const ctx = await requireScope();
-  const { user, db } = ctx;
   const requestId = String(formData.get("requestId") ?? "");
-  const request = await db.issueRequest.findUnique({ where: { id: requestId }, include: { revision: { select: { documentId: true } } } });
-  if (!request) return { error: "That request no longer exists." };
-  if (request.status !== "OPEN") return { error: "That request has already been dealt with." };
-  if (request.raisedById !== user.id && !isController(user) && !isAdmin(user)) {
-    return { error: "A request is withdrawn by whoever asked, or by Document Control." };
+  try {
+    const request = await cancelRequest(ctx, requestId);
+    const rev = await backendRevision(ctx, request.revisionId);
+    revalidatePath(`/documents/${rev.documentId}`);
+    return {};
+  } catch (e) {
+    return { error: refusal(e).message };
   }
-  await db.issueRequest.update({ where: { id: requestId }, data: { status: "CANCELLED" } });
-  await audit({
-    tenant: ctx, actor: user, action: "ISSUE_REQUEST_CANCELLED", entityType: "Revision", entityId: request.revisionId,
-    detail: `Request raised by ${request.raisedByName} withdrawn.`,
-  });
-  revalidatePath(`/documents/${request.revision.documentId}`);
-  return {};
 }

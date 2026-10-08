@@ -26,7 +26,7 @@ export async function setOrgSetting(key: string, value: string | null) {
   await api(`/api/settings/${encodeURIComponent(key)}`, { method: "PUT", body: { value: value ?? "" } });
 }
 
-export type Holder = { id: string; name: string; functionName: string; department: string | null; internal: boolean };
+export type Holder = { id: string; name: string; functionName: string; department: string | null; internal: boolean; functionCode: string };
 
 /** Everyone on the project whose function grants `verb`, optionally for one class of document. */
 export const holders = cache(async (

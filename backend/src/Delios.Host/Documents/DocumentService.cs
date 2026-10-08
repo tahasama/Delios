@@ -150,6 +150,129 @@ public sealed class DocumentService(
     }
 
     /// <summary>
+    /// Changes a document's metadata. Each change is written to the audit trail with the field, the previous and the
+    /// new value. Coded values must be published; the title must say what the document is.
+    /// </summary>
+    public async Task<(Document? Document, IResult? Problem)> UpdateAsync(
+        ProjectAccess access, Guid documentId, UpdateDocumentRequest request, CancellationToken cancellationToken)
+    {
+        var document = await DocumentQueries.Visible(db, access, await RestrictedAsync(cancellationToken))
+            .SingleOrDefaultAsync(d => d.Id == documentId, cancellationToken);
+        if (document is null) return Fail(Problems.NotFound("DOCUMENT_NOT_FOUND", "No such document."));
+        if (!access.IsInternal || !(access.Allows(Verbs.Create, document.Facts) || access.Allows(Verbs.Revise, document.Facts)
+            || access.Allows(Verbs.Control, document.Facts)))
+            return Fail(Problems.Forbidden("EDIT_NOT_ALLOWED", "Your function on this project cannot change this document's details."));
+        if (document.State is not (DocumentStates.Planned or DocumentStates.Active))
+            return Fail(Problems.Conflict("DOCUMENT_NOT_OPEN", $"The document is {document.State.ToLowerInvariant()}.", new { state = document.State }));
+
+        var catalog = await Catalog.LoadAsync(db, cancellationToken);
+        var sets = new Dictionary<string, string>
+        {
+            ["docType"] = ValueSets.DocumentTypes,
+            ["discipline"] = ValueSets.Disciplines,
+            ["subproject"] = ValueSets.Subprojects,
+            ["contractRef"] = ValueSets.PurchaseOrders,
+            ["criticality"] = ValueSets.Criticality,
+            ["confidentiality"] = ValueSets.Confidentiality,
+            ["retentionClass"] = ValueSets.RetentionClasses,
+        };
+        var changes = new List<string>();
+        foreach (var (field, raw) in request.Changes ?? [])
+        {
+            var value = Blank(raw);
+            string? before;
+            switch (field)
+            {
+                case "title":
+                    if (value is null) return Fail(Problems.Invalid("TITLE_REQUIRED", "A descriptive title is required."));
+                    if (Titles.IsGeneric(value, catalog.GenericTitleWords()))
+                        return Fail(Problems.Invalid("TITLE_GENERIC", "The title only repeats the document type. Say what it shows, and of what.", new { title = value }));
+                    before = document.Title; document.Title = value; break;
+                case "docType" or "discipline":
+                    if (value is null) return Fail(Problems.Invalid("FIELD_REQUIRED", $"{field} is required.", new { field }));
+                    if (!catalog.IsActive(sets[field], value))
+                        return Fail(Problems.Invalid("VALUE_NOT_PUBLISHED", $"{value} is not a published {field}.", new { field, value }));
+                    if (field == "docType") { before = document.DocType; document.DocType = value; }
+                    else { before = document.Discipline; document.Discipline = value; }
+                    break;
+                case "subproject" or "contractRef" or "criticality" or "confidentiality" or "retentionClass":
+                    if (value is not null && !catalog.IsActive(sets[field], value))
+                        return Fail(Problems.Invalid("VALUE_NOT_PUBLISHED", $"{value} is not a published {field}.", new { field, value }));
+                    (before, value) = field switch
+                    {
+                        "subproject" => (document.Subproject, document.Subproject = value),
+                        "contractRef" => (document.ContractRef, document.ContractRef = value),
+                        "criticality" => (document.Criticality, document.Criticality = value),
+                        "confidentiality" => (document.Confidentiality, document.Confidentiality = value ?? catalog.DefaultOf(ValueSets.Confidentiality)),
+                        _ => (document.RetentionClass, document.RetentionClass = value),
+                    };
+                    break;
+                case "originator":
+                    if (value is not null && !await db.Parties.AnyAsync(p => p.Code == value && p.Active, cancellationToken))
+                        return Fail(Problems.Invalid("VALUE_NOT_PUBLISHED", $"{value} is not an active party.", new { field, value }));
+                    before = document.Originator; document.Originator = value; break;
+                case "receivedDate" or "plannedDate":
+                    LocalDate? date = null;
+                    if (value is not null)
+                    {
+                        if (!DateOnly.TryParse(value, System.Globalization.CultureInfo.InvariantCulture, out var parsed))
+                            return Fail(Problems.Invalid("DATE_INVALID", $"{value} is not a date.", new { field, value }));
+                        date = LocalDate.FromDateOnly(parsed);
+                    }
+                    if (field == "receivedDate") { before = document.ReceivedDate?.ToString(); document.ReceivedDate = date; }
+                    else { before = document.PlannedDate?.ToString(); document.PlannedDate = date; }
+                    value = date?.ToString();
+                    break;
+                default:
+                    return Fail(Problems.Invalid("FIELD_NOT_EDITABLE", $"{field} cannot be changed.", new { field }));
+            }
+            if (before != value) changes.Add($"{field}: {before ?? "—"} → {value ?? "—"}");
+        }
+        if (changes.Count == 0) return (document, null);
+        document.UpdatedAt = clock.GetCurrentInstant();
+        await db.SaveChangesAsync(cancellationToken);
+        foreach (var change in changes)
+        {
+            await audit.WriteAsync(new Actor(access.UserId, access.UserName), "METADATA_CHANGE", "Document", document.Id,
+                document.Number, change, document.ProjectId, cancellationToken);
+        }
+        return (document, null);
+    }
+
+    /// <summary>
+    /// Ends a document's life: withdrawn (no longer wanted), cancelled (never to be produced) or archived. Recorded
+    /// with the reason and who decided. Document Control decides, or whoever registered it.
+    /// </summary>
+    public async Task<(Document? Document, IResult? Problem)> EndAsync(
+        ProjectAccess access, Guid documentId, EndDocumentRequest request, CancellationToken cancellationToken)
+    {
+        var document = await DocumentQueries.Visible(db, access, await RestrictedAsync(cancellationToken))
+            .SingleOrDefaultAsync(d => d.Id == documentId, cancellationToken);
+        if (document is null) return Fail(Problems.NotFound("DOCUMENT_NOT_FOUND", "No such document."));
+        if (!access.Allows(Verbs.Control, document.Facts) && document.CreatedById != access.UserId)
+            return Fail(Problems.Forbidden("END_NOT_ALLOWED", "Document Control, or whoever registered it, ends a document."));
+        var state = request.State?.Trim().ToUpperInvariant();
+        if (state is not (DocumentStates.Withdrawn or DocumentStates.Cancelled or DocumentStates.Archived))
+            return Fail(Problems.Invalid("END_STATE_INVALID", "A document is withdrawn, cancelled or archived."));
+        var reason = Blank(request.Reason);
+        if (reason is null)
+            return Fail(Problems.Invalid("REASON_REQUIRED", "A reason is required: each end state is recorded with date and authority."));
+        if (document.State is not (DocumentStates.Planned or DocumentStates.Active))
+            return Fail(Problems.Conflict("DOCUMENT_NOT_OPEN", $"The document is already {document.State.ToLowerInvariant()}.", new { state = document.State }));
+        string[] moving = [RevisionStates.InPreparation, RevisionStates.InReview, RevisionStates.Received, RevisionStates.Correcting];
+        if (await db.Revisions.AnyAsync(r => r.DocumentId == document.Id && moving.Contains(r.State), cancellationToken)
+            && state != DocumentStates.Archived)
+            return Fail(Problems.Conflict("REVISION_IN_MOTION", "A revision of it is still in motion: finish it, or send it back, first."));
+        var before = document.State;
+        document.State = state;
+        document.UpdatedAt = clock.GetCurrentInstant();
+        await db.SaveChangesAsync(cancellationToken);
+        await audit.WriteAsync(new Actor(access.UserId, access.UserName), "STATE_TRANSITION", "Document", document.Id,
+            document.Number, $"{before} → {state}: {reason}", document.ProjectId, cancellationToken);
+        return (document, null);
+    }
+
+    /// <summary>
     /// Records a file someone is about to upload to a document (status awaiting upload) and returns a signed link
     /// the browser uses to send the bytes straight to object storage. The file is attached to a revision later.
     /// </summary>
@@ -216,7 +339,10 @@ public sealed class DocumentService(
                 new { revision = latest.Value, state = latest.State }));
         }
 
-        var (files, filesProblem) = await UploadedFilesAsync(access, document, request.FileIds, cancellationToken);
+        var later = request.FilesLater && (request.FileIds?.Length ?? 0) == 0;
+        var (files, filesProblem) = later
+            ? ([], null)
+            : await UploadedFilesAsync(access, document, request.FileIds, cancellationToken);
         if (filesProblem is not null) return (null, filesProblem);
 
         var scheme = await RevisionSchemeForAsync(document.DeliverableType, cancellationToken);
@@ -255,6 +381,7 @@ public sealed class DocumentService(
             CreatedAt = now,
             StatusCode = incoming?.Status,
             State = await NeedsAcceptanceAsync(access, incoming, cancellationToken) ? RevisionStates.Received : RevisionStates.InPreparation,
+            FilesState = later ? FilesStates.None : FilesStates.Processing,
             Submissions = [new SubmissionRecord { Number = 1, SubmittedAt = now, SubmittedByName = access.UserName }],
         };
         db.Revisions.Add(revision);
@@ -267,9 +394,39 @@ public sealed class DocumentService(
         await db.SaveChangesAsync(cancellationToken);
 
         await audit.WriteAsync(new Actor(access.UserId, access.UserName), "REVISION_ESTABLISHED", "Revision", revision.Id,
-            $"{document.Number} rev {revision.Value}", $"{files!.Count} file(s) uploaded; scanning before use.",
+            $"{document.Number} rev {revision.Value}",
+            later ? "Started; its files follow." : $"{files!.Count} file(s) uploaded; scanning before use.",
             document.ProjectId, cancellationToken);
         revision.Files = files!;
+        return (revision, null);
+    }
+
+    /// <summary>
+    /// Attaches files to a revision still in preparation, before it goes anywhere: a revision started ahead of its
+    /// files, or one whose author adds the source file to the PDF. They join its current submission and are scanned.
+    /// </summary>
+    public async Task<(Revision? Revision, IResult? Problem)> AttachAsync(
+        ProjectAccess access, Guid documentId, Guid revisionId, StartRevisionRequest request, CancellationToken cancellationToken)
+    {
+        var (document, problem) = await ContributableAsync(access, documentId, cancellationToken);
+        if (problem is not null) return (null, problem);
+        var revision = await db.Revisions.Include(r => r.Files)
+            .SingleOrDefaultAsync(r => r.Id == revisionId && r.DocumentId == documentId, cancellationToken);
+        if (revision is null) return (null, Problems.NotFound("REVISION_NOT_FOUND", "No such revision."));
+        if (revision.State != RevisionStates.InPreparation)
+        {
+            return (null, Problems.Conflict("REVISION_NOT_IN_PREPARATION",
+                $"Files are attached while a revision is in preparation; revision {revision.Value} is {revision.State.ToLowerInvariant().Replace('_', ' ')}. The next revision carries new files.",
+                new { state = revision.State }));
+        }
+        var (files, filesProblem) = await UploadedFilesAsync(access, document!, request.FileIds, cancellationToken);
+        if (filesProblem is not null) return (null, filesProblem);
+        Bind(files!, revision);
+        revision.FilesState = FilesStates.Processing;
+        document!.UpdatedAt = clock.GetCurrentInstant();
+        await db.SaveChangesAsync(cancellationToken);
+        await audit.WriteAsync(new Actor(access.UserId, access.UserName), "FILE_UPLOADED", "Revision", revision.Id,
+            $"{document.Number} rev {revision.Value}", string.Join(", ", files!.Select(f => f.Name)), document.ProjectId, cancellationToken);
         return (revision, null);
     }
 

@@ -4,6 +4,8 @@ import { attachSupplierFileAction, sendSupplierDocumentsAction } from "@/lib/act
 import { NextStepBody, StagePath, type StepItem } from "./next-step";
 import { cn } from "@/lib/utils";
 import { hasVerb } from "@/lib/auth";
+import { getMe } from "@/lib/api/me";
+import { legacyDocument, documentContext } from "@/lib/api/legacy";
 
 /**
  * What a supplier sees on a document it owes us: attach the file, then send it.
@@ -11,16 +13,18 @@ import { hasVerb } from "@/lib/auth";
  * us — checked by Document Control, then reviewed.
  */
 export async function SupplierDelivery({ documentId }: { documentId: string }) {
-  const { db, user } = await requireScope();
+  const ctx = await requireScope();
+  const { user } = ctx;
   // Read-only stays read-only: uploading is a right Document Control gives.
   const mayUpload = hasVerb(user, "CREATE") || hasVerb(user, "REVISE");
-  const org = (await db.scopeConfig.findFirst())?.organizationName ?? "us";
-  const latest = await db.revision.findFirst({
-    where: { documentId },
-    orderBy: { createdAt: "desc" },
-    include: { transmittalItems: { include: { transmittal: { select: { status: true, rejectionReason: true, number: true, direction: true } } } } },
-  });
-  const incoming = latest?.transmittalItems.map((i) => i.transmittal).filter((t) => t.direction === "INCOMING") ?? [];
+  const org = (await getMe())?.tenant.name ?? "us";
+  const latest = (await legacyDocument(ctx, documentId))?.revisions[0] ?? null;
+  const incoming = latest
+    ? (await documentContext(ctx, documentId)).transmittals
+        .filter((t) => t.revisionId === latest.id && t.direction === "INCOMING")
+        // A transmittal is not turned back in the backend; Document Control returns the revision for a correction.
+        .map((t) => ({ status: "SENT", rejectionReason: null as string | null, number: t.number, direction: t.direction }))
+    : [];
   const rejected = incoming.find((t) => t.status === "REJECTED") ?? null;
   const hasFile = !!(latest?.renditionFileId || latest?.nativeFileId);
   const preparing = !latest || latest.state === "IN_PREPARATION";

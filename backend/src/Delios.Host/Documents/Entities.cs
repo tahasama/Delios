@@ -323,6 +323,8 @@ public static class FilesStates
     public const string Processing = "PROCESSING";
     public const string Ready = "READY";
     public const string Rejected = "REJECTED";
+    /// <summary>Started ahead of its files: nothing to scan yet, and nothing to review.</summary>
+    public const string None = "NONE";
 }
 
 /// <summary>A file in object storage. Its key is never reused, so a stored file is never overwritten.</summary>

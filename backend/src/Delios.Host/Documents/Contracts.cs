@@ -10,6 +10,15 @@ public sealed record RegisterDocumentRequest(
     string? Criticality = null, string? Confidentiality = null, string? RetentionClass = null,
     DateOnly? ReceivedDate = null, DateOnly? PlannedDate = null, string? Kind = null);
 
+/// <summary>
+/// The JSON body that changes a document's metadata (PUT /documents/{id}): only the fields named in
+/// <c>Changes</c> change, an empty value clears an optional one. The number and deliverable type never change.
+/// </summary>
+public sealed record UpdateDocumentRequest(Dictionary<string, string?>? Changes);
+
+/// <summary>The JSON body that ends a document's life (POST /documents/{id}/end): WITHDRAWN, CANCELLED or ARCHIVED, and why.</summary>
+public sealed record EndDocumentRequest(string? State, string? Reason);
+
 /// <summary>The JSON body a client sends to ask for an upload link: the file's name, size in bytes, content type and SHA-256.</summary>
 public sealed record UploadRequest(string? FileName, long Size, string? ContentType, string? Sha256);
 
@@ -18,8 +27,10 @@ public sealed record UploadRequest(string? FileName, long Size, string? ContentT
 /// and, optionally, why the revision was made and what changed.
 /// </summary>
 /// <param name="Series">A series of the document's revision scheme; empty continues the latest one.</param>
+/// <param name="FilesLater">Start the revision now and attach its files afterwards (POST .../revisions/{id}/files).</param>
 public sealed record StartRevisionRequest(
-    Guid[]? FileIds, string? ReasonForRevision = null, string? ChangeDescription = null, string? Series = null);
+    Guid[]? FileIds, string? ReasonForRevision = null, string? ChangeDescription = null, string? Series = null,
+    bool FilesLater = false);
 
 /// <summary>One row of the document register list, as returned by GET /documents.</summary>
 public sealed record DocumentSummary(
