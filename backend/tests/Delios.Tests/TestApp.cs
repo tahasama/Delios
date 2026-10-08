@@ -41,10 +41,10 @@ public sealed class TestApp : IAsyncDisposable
         _ = _worker.Services;
     }
 
-    public async Task<HttpClient> SignedInAsync(string email, string password = DemoSeed.Password, string tenant = DemoSeed.Slug)
+    public async Task<HttpClient> SignedInAsync(string email, string password = DemoSeed.Password)
     {
         var client = Factory.CreateClient();
-        using var response = await client.PostAsJsonAsync("/api/auth/sign-in", new { tenant, email, password });
+        using var response = await client.PostAsJsonAsync("/api/auth/sign-in", new { email, password });
         response.EnsureSuccessStatusCode();
         return client;
     }

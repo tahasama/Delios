@@ -26,7 +26,7 @@ function Call($method, $path, $body, $as = $script:session) {
 }
 function SignIn($who) {
     $s = New-Object Microsoft.PowerShell.Commands.WebRequestSession
-    Call POST '/api/auth/sign-in' @{ tenant = 'demo'; email = $who; password = $Password } $s | Out-Null
+    Call POST '/api/auth/sign-in' @{ email = $who; password = $Password } $s | Out-Null
     $s
 }
 

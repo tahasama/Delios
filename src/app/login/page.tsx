@@ -1,5 +1,4 @@
 import { APP_NAME } from "@/lib/standard";
-import { lastOrganization } from "@/lib/actions/session";
 import { SignInForm } from "./form";
 
 export const dynamic = "force-dynamic";
@@ -45,7 +44,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
           </div>
           <h2 className="text-xl font-semibold text-slate-900">Sign in</h2>
           <p className="mt-1 text-sm text-slate-500">Use the account your administrator created for you.</p>
-          <SignInForm organization={await lastOrganization()} next={next} demo={process.env.NODE_ENV !== "production"} />
+          <SignInForm next={next} demo={process.env.NODE_ENV !== "production"} />
         </div>
       </div>
     </div>

@@ -30,6 +30,13 @@ public sealed class TenantSetup(
 
         // The organization and its administrator are created together or not at all,
         // so a failure never leaves an organization nobody can sign in to.
+        // A person belongs to one organization: their email signs them in to it alone.
+        var email = adminEmail.Trim().ToUpperInvariant();
+        if (await db.SignInNames.AnyAsync(n => n.NormalizedEmail == email, cancellationToken))
+        {
+            throw new InvalidOperationException($"{adminEmail} already belongs to an organization.");
+        }
+
         var organization = new Tenant { Slug = slug, Name = name };
         tenant.Set(organization.Id);
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);

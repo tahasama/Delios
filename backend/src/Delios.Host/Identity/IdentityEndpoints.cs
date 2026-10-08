@@ -9,8 +9,8 @@ using NodaTime;
 
 namespace Delios.Host.Identity;
 
-/// <summary>Body of <c>POST /api/auth/sign-in</c>: the organization's short name (slug), the email and the password.</summary>
-public sealed record SignInRequest([Required] string Tenant, [Required] string Email, [Required] string Password);
+/// <summary>Body of a sign-in: the email says which organization (a person belongs to one), the password proves it is them.</summary>
+public sealed record SignInRequest([Required] string Email, [Required] string Password);
 /// <summary>
 /// Body of the second sign-in step (<c>/api/auth/mfa</c>, <c>/mfa/setup</c>, <c>/mfa/confirm</c>): the challenge from <c>SignInStep</c> and, where needed, the six-digit or recovery code.
 /// </summary>
@@ -61,7 +61,7 @@ public static class IdentityEndpoints
     }
 
     /// <summary>
-    /// <c>POST /api/auth/sign-in</c>: checks the organization, email and password. Wrong answers count towards a 15-minute lockout and are audited.
+    /// <c>POST /api/auth/sign-in</c>: finds the person's organization from their email, then checks the password. Wrong answers count towards a 15-minute lockout and are audited.
     /// Non-administrators of an organization that allows single sign-on only are refused before the password is checked.
     /// When the password is right: asks for the second step
     /// (<c>SignInStep</c>) when two-step sign-in is on or required; otherwise starts a session and sets the cookie.
@@ -72,10 +72,13 @@ public static class IdentityEndpoints
         IOptions<SessionCookieOptions> cookie, CancellationToken cancellationToken)
     {
         var failed = Problems.Problem(StatusCodes.Status401Unauthorized, "SIGN_IN_FAILED",
-            "The organization, email or password is not right.", null);
+            "The email or password is not right.", null);
 
+        var normalized = request.Email.Trim().ToUpperInvariant();
+        // The email says which organization: a person belongs to exactly one.
         var organization = await db.Tenants.AsNoTracking()
-            .SingleOrDefaultAsync(t => t.Slug == request.Tenant.Trim().ToLowerInvariant() && t.Active, cancellationToken);
+            .Where(t => t.Active && db.SignInNames.Any(n => n.NormalizedEmail == normalized && n.TenantId == t.Id))
+            .SingleOrDefaultAsync(cancellationToken);
         if (organization is null)
         {
             hasher.VerifyHashedPassword(null!, DummyHash, request.Password);
@@ -84,7 +87,6 @@ public static class IdentityEndpoints
 
         tenant.Set(organization.Id);
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
-        var normalized = request.Email.Trim().ToUpperInvariant();
         var user = await db.Users.Include(u => u.Party)
             .SingleOrDefaultAsync(u => u.NormalizedEmail == normalized, cancellationToken);
         // An organization that signs in through its own provider keeps passwords for

@@ -7,19 +7,21 @@ The old version stays on the main branch until the end.
 
 ## Trying it yourself
 
-1. Backend, from `deploy/`: `docker compose --profile app up -d`, then
-   `docker compose --profile app run --rm migrate` and, once,
-   `docker compose --profile app run --rm migrate seed-demo`.
+1. Backend, from the repository root (only the backend runs in Docker for now):
+   `docker compose -f deploy/compose.yaml --profile app up -d --build`, then
+   `docker compose -f deploy/compose.yaml --profile app run --rm migrate` and, once,
+   `docker compose -f deploy/compose.yaml --profile app run --rm migrate seed-demo`.
 2. Frontend, from the repository root: copy `.env.example` to `.env`,
    `npm install` (first time), then `npm run dev`.
-3. Open http://localhost:3000. Organization `demo`, password `demo1234`, any of
+3. Open http://localhost:3000. Password `demo1234` for any of
    controller@ · engineer@ · approver@ · viewer@ · admin@demo.local, supplier@acme.local.
 
 ## Progress
 
 Each area: the screens, then any backend functions they need that do not exist yet.
 
-- [x] **Sign-in and the frame**: sign-in with organization and two-step code,
+- [x] **Sign-in and the frame**: sign-in with email and password (the email
+      says which organization: a person belongs to one) and two-step code,
       sign-out, project picker, the menu, home ("waiting on you").
 - [x] **Register**: the register (search, every filter, sorting, page numbers,
       saved views, export), a document's page (revisions and files, downloads,

@@ -126,7 +126,7 @@ public sealed class PgBouncerTests(Infrastructure infrastructure) : IClassFixtur
         await using var factory = await StartAsync();
         var client = factory.CreateClient();
         using var signIn = await client.PostAsJsonAsync("/api/auth/sign-in",
-            new { tenant = "demo", email = "engineer@demo.local", password = DemoSeed.Password });
+            new { email = "engineer@demo.local", password = DemoSeed.Password });
         signIn.EnsureSuccessStatusCode();
         var project = await Api.ProjectIdAsync(client);
 

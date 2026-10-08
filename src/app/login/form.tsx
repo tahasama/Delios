@@ -6,10 +6,10 @@ import { inputCls } from "@/components/ui";
 
 /**
  * Sign-in, in two steps when the person uses two-step sign-in: first the
- * organization, email and password; then the six-digit code (or, the first time
+ * email and password (the email says which organization); then the six-digit code (or, the first time
  * when the organization requires it, setting up the authenticator app).
  */
-export function SignInForm({ organization, next, demo }: { organization: string; next: string; demo: boolean }) {
+export function SignInForm({ next, demo }: { next: string; demo: boolean }) {
   const [state, signIn, signingIn] = useActionState<SignInState | undefined, FormData>(signInAction, undefined);
   const [codeState, sendCode, checking] = useActionState<SignInState | undefined, FormData>(
     (prev, form) => codeAction(prev ?? state, form),
@@ -58,10 +58,6 @@ export function SignInForm({ organization, next, demo }: { organization: string;
       <form action={signIn} className="mt-6 space-y-4">
         <input type="hidden" name="next" value={next} />
         <div>
-          <label htmlFor="organization" className="mb-1 block text-xs font-medium text-slate-700">Organization</label>
-          <input id="organization" name="organization" required autoComplete="organization" defaultValue={state?.organization ?? organization} className={inputCls} placeholder="your-organization" />
-        </div>
-        <div>
           <label htmlFor="email" className="mb-1 block text-xs font-medium text-slate-700">Email</label>
           <input id="email" name="email" type="email" autoComplete="email" required defaultValue={state?.email} className={inputCls} placeholder="you@company.com" />
         </div>
@@ -77,7 +73,7 @@ export function SignInForm({ organization, next, demo }: { organization: string;
       {demo ? (
         <div className="mt-8 rounded-xl border border-line bg-surface p-4 text-xs text-slate-500 shadow-sm">
           <p className="font-medium text-slate-700">Demo organization (local only)</p>
-          <p className="mt-1 font-mono text-[11px]">organization: demo · password: demo1234</p>
+          <p className="mt-1 font-mono text-[11px]">password: demo1234</p>
           <p className="mt-1 text-[11px]">controller@ · engineer@ · approver@ · viewer@ · admin@demo.local · supplier@acme.local</p>
         </div>
       ) : null}

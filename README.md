@@ -51,7 +51,7 @@ docker compose -f deploy/compose.yaml --profile app up -d --build             # 
 docker compose -f deploy/compose.yaml --profile app run --rm migrate seed-demo # demo tenant "demo", password demo1234
 ```
 
-Sign in with `POST /api/auth/sign-in` and `{"tenant":"demo","email":"engineer@demo.local","password":"demo1234"}`.
+Sign in with `POST /api/auth/sign-in` and `{"email":"engineer@demo.local","password":"demo1234"}` (the email says which organization: a person belongs to one).
 The demo people are admin, controller, engineer, approver, viewer (`@demo.local`)
 and `supplier@acme.local`. The endpoints are listed at
 http://localhost:8080/api/openapi/v1.json.

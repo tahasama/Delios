@@ -41,18 +41,35 @@ public sealed class IdentityTests(Infrastructure infrastructure) : IClassFixture
     }
 
     [Theory]
-    [InlineData("demo", "engineer@demo.local", "wrong-password")]
-    [InlineData("demo", "nobody@demo.local", "demo1234")]
-    [InlineData("other", "engineer@demo.local", "demo1234")]
-    public async Task A_wrong_tenant_email_or_password_gets_the_same_answer(string tenant, string email, string password)
+    [InlineData("engineer@demo.local", "wrong-password")]
+    [InlineData("nobody@demo.local", "demo1234")]
+    public async Task A_wrong_email_or_password_gets_the_same_answer(string email, string password)
     {
         await using var app = await TestApp.StartAsync(infrastructure);
         using var response = await app.Factory.CreateClient()
-            .PostAsJsonAsync("/api/auth/sign-in", new { tenant, email, password });
+            .PostAsJsonAsync("/api/auth/sign-in", new { email, password });
         var problem = await response.Content.ReadFromJsonAsync<JsonElement>();
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         Assert.Equal("SIGN_IN_FAILED", problem.GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task A_person_belongs_to_one_organization_and_their_email_alone_signs_them_in_to_it()
+    {
+        await using var app = await TestApp.StartAsync(infrastructure);
+        using (var scope = app.Factory.Services.CreateScope())
+        {
+            var setup = scope.ServiceProvider.GetRequiredService<TenantSetup>();
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                setup.CreateAsync("again", "Again Ltd", "Engineer@demo.local", "Eli Twice", "a-long-password"));
+            await setup.CreateAsync("second", "Second Ltd", "boss@second.local", "Bea Boss", "a-long-password");
+        }
+        var client = app.Factory.CreateClient();
+        using var signedIn = await client.PostAsJsonAsync("/api/auth/sign-in", new { email = "boss@second.local", password = "a-long-password" });
+        Assert.Equal(HttpStatusCode.NoContent, signedIn.StatusCode);
+        var me = await client.GetFromJsonAsync<JsonElement>("/api/me");
+        Assert.Equal("second", me.GetProperty("tenant").GetProperty("slug").GetString());
     }
 
     [Theory]
@@ -75,11 +92,11 @@ public sealed class IdentityTests(Infrastructure infrastructure) : IClassFixture
         for (var i = 0; i < IdentityEndpoints.MaxFailedSignIns; i++)
         {
             using var _ = await client.PostAsJsonAsync("/api/auth/sign-in",
-                new { tenant = "demo", email = "viewer@demo.local", password = "wrong" });
+                new { email = "viewer@demo.local", password = "wrong" });
         }
 
         using var response = await client.PostAsJsonAsync("/api/auth/sign-in",
-            new { tenant = "demo", email = "viewer@demo.local", password = DemoSeed.Password });
+            new { email = "viewer@demo.local", password = DemoSeed.Password });
         var problem = await response.Content.ReadFromJsonAsync<JsonElement>();
 
         Assert.Equal(HttpStatusCode.Locked, response.StatusCode);
@@ -122,7 +139,7 @@ public sealed class IdentityTests(Infrastructure infrastructure) : IClassFixture
         }
 
         using var response = await app.Factory.CreateClient().PostAsJsonAsync("/api/auth/sign-in",
-            new { tenant = "demo", email = "supplier@acme.local", password = DemoSeed.Password });
+            new { email = "supplier@acme.local", password = DemoSeed.Password });
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }

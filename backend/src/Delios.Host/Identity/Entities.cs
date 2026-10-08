@@ -25,6 +25,18 @@ public sealed class Tenant
 }
 
 /// <summary>
+/// Which organization an email belongs to, so people sign in with their email and password alone. A person belongs to
+/// one organization: the email is unique across all of them. Kept by a database trigger on <c>users</c>, outside
+/// row-level security (it is read before anyone is known); holds nothing but the email and the organization.
+/// </summary>
+public sealed class SignInName
+{
+    /// <summary>The email in upper case, as <c>User.NormalizedEmail</c>.</summary>
+    public required string NormalizedEmail { get; set; }
+    public Guid TenantId { get; set; }
+}
+
+/// <summary>
 /// The organization's own identity provider (Microsoft Entra ID, Google, Okta,
 /// Keycloak…), spoken to over OpenID Connect. People sign in there; we match
 /// them by email to an account that already exists here.

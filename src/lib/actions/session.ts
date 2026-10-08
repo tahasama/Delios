@@ -13,12 +13,8 @@ import { isMigrated } from "@/lib/migrated";
  * and keep the session cookie in the browser.
  */
 
-/** The organization last signed in to, offered again next time. */
-const ORGANIZATION_COOKIE = "edms_organization";
-
 export type SignInState = {
   error?: string;
-  organization?: string;
   email?: string;
   /** Set when the password was right and a code is needed next. */
   step?: SignInStep;
@@ -52,25 +48,28 @@ async function keepSession(response: Response): Promise<boolean> {
   return true;
 }
 
-/** Step one: organization, email and password. */
+/**
+ * Step one: email and password. A person belongs to one organization, so the
+ * email says which.
+ */
 export async function signInAction(_prev: SignInState | undefined, form: FormData): Promise<SignInState> {
-  const organization = String(form.get("organization") ?? "").trim();
   const email = String(form.get("email") ?? "").trim();
   const next = safeNext(form.get("next"));
-  const response = await apiFetch("/api/auth/sign-in", {
-    method: "POST",
-    body: { tenant: organization, email, password: String(form.get("password") ?? "") },
-  });
-  if (!response.ok) return { error: (await problemOf(response)).message, organization, email, next };
-  (await cookies()).set(ORGANIZATION_COOKIE, organization, { path: "/", maxAge: 60 * 60 * 24 * 365, sameSite: "lax" });
+  let response: Response;
+  try {
+    response = await apiFetch("/api/auth/sign-in", { method: "POST", body: { email, password: String(form.get("password") ?? "") } });
+  } catch {
+    return { error: `The server does not answer at ${process.env.DELIOS_API_URL ?? "http://localhost:8080"}. Is the backend running?`, email, next };
+  }
+  if (!response.ok) return { error: (await problemOf(response)).message, email, next };
   if (await keepSession(response)) redirect(next);
   const step = (await response.json()) as SignInStep;
   if (step.next === "MFA_SETUP") {
     const setup = await apiFetch("/api/auth/mfa/setup", { method: "POST", body: { challenge: step.challenge } });
-    if (!setup.ok) return { error: (await problemOf(setup)).message, organization, email, next };
-    return { step, setup: await setup.json(), organization, email, next };
+    if (!setup.ok) return { error: (await problemOf(setup)).message, email, next };
+    return { step, setup: await setup.json(), email, next };
   }
-  return { step, organization, email, next };
+  return { step, email, next };
 }
 
 /** Step two: the code from the authenticator app (or a recovery code), or the first code when setting it up. */
@@ -88,11 +87,6 @@ export async function codeAction(prev: SignInState | undefined, form: FormData):
     return { recoveryCodes, next: prev.next };
   }
   redirect(prev.next ?? "/");
-}
-
-/** The organization last used on this browser, to fill the field. */
-export async function lastOrganization(): Promise<string> {
-  return (await cookies()).get(ORGANIZATION_COOKIE)?.value ?? process.env.DELIOS_DEFAULT_ORGANIZATION ?? "";
 }
 
 /** Ends the session on the backend (on every server) and clears the cookie here. */

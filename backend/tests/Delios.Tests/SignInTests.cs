@@ -19,7 +19,7 @@ public sealed class SignInTests(Infrastructure infrastructure) : IClassFixture<I
         Totp.Code(Totp.FromBase32(secret), Totp.StepAt(DateTimeOffset.UtcNow) + stepsAhead);
 
     private static Task<HttpResponseMessage> PasswordAsync(HttpClient client, string email) =>
-        client.PostAsJsonAsync("/api/auth/sign-in", new { tenant = "demo", email, password = "demo1234" });
+        client.PostAsJsonAsync("/api/auth/sign-in", new { email, password = "demo1234" });
 
     private static async Task<JsonElement> JsonAsync(HttpResponseMessage response)
     {
@@ -143,7 +143,7 @@ public sealed class SignInTests(Infrastructure infrastructure) : IClassFixture<I
         Assert.Equal((HttpStatusCode.Forbidden, "PASSWORD_SIGN_IN_OFF"), (refused.StatusCode, Flow.Code(await JsonAsync(refused))));
         // The same answer with a wrong password: it never tells whether a password was right.
         using var guessed = await app.Factory.CreateClient().PostAsJsonAsync("/api/auth/sign-in",
-            new { tenant = "demo", email = "engineer@demo.local", password = "not-it" });
+            new { email = "engineer@demo.local", password = "not-it" });
         Assert.Equal((HttpStatusCode.Forbidden, "PASSWORD_SIGN_IN_OFF"), (guessed.StatusCode, Flow.Code(await JsonAsync(guessed))));
         await app.SignedInAsync("admin@demo.local");
     }

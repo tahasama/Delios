@@ -171,3 +171,15 @@ internal sealed class AuditEventConfiguration : IEntityTypeConfiguration<AuditEv
         b.Property(x => x.EntityType).HasMaxLength(64);
     }
 }
+
+/// <summary>EF Core mapping for <see cref="SignInName"/>: the email is the key. Not a tenant table (no row-level security).</summary>
+internal sealed class SignInNameConfiguration : IEntityTypeConfiguration<SignInName>
+{
+    /// <summary>Called by EF Core when it builds the database model at startup and for migrations.</summary>
+    public void Configure(EntityTypeBuilder<SignInName> b)
+    {
+        b.HasKey(x => x.NormalizedEmail);
+        b.Property(x => x.NormalizedEmail).HasMaxLength(320);
+        b.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
+    }
+}
