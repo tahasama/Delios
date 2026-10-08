@@ -90,36 +90,6 @@ export type WfStep = {
   grantsStatuses?: string[];
 };
 
-/**
- * Who answers an external step, in our system. A party with accounts here
- * answers for itself. A party without them is carried by its liaison — the
- * function named on the party, or the control function if none is — who sends
- * the pack out and records what comes back.
- */
-export async function partyStepHolders(t: Tenant, partyId: string): Promise<{ ids: string[]; byProxy: boolean; party: { id: string; name: string; participation: string } }> {
-  const party = await t.db.party.findUniqueOrThrow({ where: { id: partyId }, select: { id: true, name: true, kind: true, participation: true, liaisonFunction: true } });
-  // A collaborator or a guest holds accounts here and answers for itself;
-  // an organization that is not on the EDMS is carried by one of our people.
-  const answersHere = party.kind === "OFFLINE" ? false : party.kind === "COLLABORATOR" || party.kind === "GUEST" || party.participation === "IN_APP";
-  if (answersHere) {
-    const people = await t.db.user.findMany({ where: { partyId, active: true }, select: { id: true } });
-    if (people.length) return { ids: people.map((person) => person.id), byProxy: false, party };
-    // They are meant to answer here but hold no account yet: rather than a step
-    // nobody can act on, it is carried until their accounts exist.
-  }
-  // A function is held through a project membership, so the liaison is whoever
-  // holds that function on this project.
-  const liaison = party.liaisonFunction
-    ? await t.db.projectMembership.findMany({
-        where: { projectId: t.projectId, functionId: party.liaisonFunction, active: true, user: { active: true } },
-        select: { userId: true },
-      })
-    : [];
-  if (liaison.length) return { ids: liaison.map((seat) => seat.userId), byProxy: true, party };
-  const controllers = await holdersOf(t, "CONTROL");
-  return { ids: controllers.map((person) => person.id), byProxy: true, party };
-}
-
 /** Working days only: a review that opens on Friday is not late on Monday. */
 export function addWorkingDays(from: Date, days: number): Date {
   const out = new Date(from);

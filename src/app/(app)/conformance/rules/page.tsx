@@ -4,6 +4,7 @@ import { AssuranceTabs } from "@/app/(app)/conformance/tabs";
 import { PREVENTED } from "@/lib/checks/prevented";
 import { CATALOG } from "@/lib/checks/catalog";
 import { POLICIES, SKIPPABLE, SKIP_KEY, CONTROL_ACTIVITIES, policy } from "@/lib/control-activities";
+import { projectSettings } from "@/lib/api/settings";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Default rules" };
@@ -18,7 +19,6 @@ export const metadata = { title: "Default rules" };
  */
 export default async function DefaultRulesPage() {
   const ctx = await requireScope();
-  const { db } = ctx;
 
   const settled = await Promise.all(
     POLICIES.map(async (p) => {
@@ -28,7 +28,9 @@ export default async function DefaultRulesPage() {
     }),
   );
 
-  const skips = await db.controlSetting.findMany({ where: { key: { in: Object.keys(SKIPPABLE).map(SKIP_KEY) }, mode: "OFF" } });
+  // The project's answers live in its settings: SKIP:<act> is OFF where the act is switched off.
+  const answers = await projectSettings(ctx.projectId);
+  const skips = Object.keys(SKIPPABLE).map(SKIP_KEY).filter((key) => answers.get(key) === "OFF").map((key) => ({ key }));
   const switchedOff = skips
     .map((s) => {
       const key = s.key.replace("SKIP:", "");

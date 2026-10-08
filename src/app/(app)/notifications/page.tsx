@@ -7,9 +7,9 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "Notifications" };
 
 export default async function NotificationsPage() {
-  const { user, db } = await requireScope();
-  const list = await db.notification.findMany({ where: { userId: user.id }, orderBy: { createdAt: "desc" }, take: 60 });
-  await db.notification.updateMany({ where: { userId: user.id, read: false }, data: { read: true } });
+  await requireScope();
+  // The backend sends no notifications: there is nothing to list or mark read.
+  const list = [] as { id: string; title: string; body: string | null; link: string | null; read: boolean; createdAt: Date }[];
 
   return (
     <div className="space-y-4">

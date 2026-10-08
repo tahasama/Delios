@@ -8,16 +8,12 @@ export const dynamic = "force-dynamic";
 
 // §16.4 Q2 — all information for an asset in one query (B.3.6).
 export default async function AssetDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { db } = await requireScope();
-  const { id } = await params;
-  const asset = await db.assetItem.findUnique({ where: { id } });
+  await requireScope();
+  await params;
+  // Assets are not in the backend: no asset is found.
+  const asset = null as { id: string; code: string; name: string; area: string | null; system: string | null; unit: string | null } | null;
   if (!asset) notFound();
-  const rels = await db.relationship.findMany({ where: { kind: "DOC_ASSET", OR: [{ toId: id }, { fromId: id }] } });
-  const otherIds = rels.map((r) => (r.toId === id ? r.fromId : r.toId));
-  const docs = await db.document.findMany({
-    where: { id: { in: otherIds } },
-    include: { revisions: { where: { state: "RELEASED" }, orderBy: { releasedAt: "desc" }, take: 1 } },
-  });
+  const docs = [] as { id: string; docNumber: string; title: string; docType: string; discipline: string; state: string; revisions: { value: string; statusCode: string | null }[] }[];
 
   return (
     <div className="space-y-5">

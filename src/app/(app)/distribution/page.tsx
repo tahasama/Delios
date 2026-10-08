@@ -6,6 +6,8 @@ import { PageHeader, Card, DataTable, Th, Td, btn, inputCls } from "@/components
 import { getActiveSet } from "@/lib/config";
 import { MATRIX_CODES as CODE, buildSheet } from "@/lib/matrix-sheet";
 import { roleFor } from "@/lib/profiles/roles";
+import { adminFunctions, adminUsers, orEmpty } from "@/lib/api/admin";
+import { getMe } from "@/lib/api/me";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Distribution matrix" };
@@ -25,19 +27,23 @@ type Search = { discipline?: string; type?: string; producer?: string; inuse?: s
 export default async function AdminDistributionPage({ searchParams }: { searchParams: Promise<Search> }) {
   const sp = await searchParams;
   const ctx = await requireScope();
-  const { user: me, db } = ctx;
+  const { user: me } = ctx;
   // Everyone who may read the register may read the matrix: it says who reviews
   // and approves their documents. Changing it stays with administrators.
   if (!ctx.can("READ")) return <PageHeader title="Distribution matrix" subtitle={ctx.why("READ")} />;
   const mayEdit = isAdmin(me);
 
-  const project = await db.project.findFirst({ where: { id: ctx.projectId }, select: { code: true, role: true } });
+  const project = await getMe().then((who) => {
+    const one = who?.projects.find((p) => p.id === ctx.projectId);
+    return one ? { code: one.code, role: one.contractRole } : null;
+  });
   const role = roleFor(project?.role);
   const [docTypes, disciplines, producers, functions] = await Promise.all([
     getActiveSet("DOCUMENT_TYPES"),
     getActiveSet("DISCIPLINES"),
     getActiveSet("DELIVERABLE_TYPES"),
-    db.function.findMany({ where: { active: true }, orderBy: { sort: "asc" } }),
+    // Only Document Control and administrators may read the functions; anybody else sees no columns.
+    orEmpty(adminFunctions).then((rows) => rows.filter((f) => f.active)),
   ]);
 
   // The matrix is agreed before the documents exist, so it shows every
@@ -63,12 +69,9 @@ export default async function AdminDistributionPage({ searchParams }: { searchPa
   const familyLabel = (row: { label: string }) => row.label.split(" — ").slice(1).join(" — ");
 
   // How many people actually sit behind each function on this project.
-  const holders = await db.projectMembership.groupBy({
-    by: ["functionId"],
-    where: { projectId: ctx.projectId, active: true },
-    _count: true,
-  });
-  const holderCount = new Map(holders.map((h) => [h.functionId, h._count]));
+  const holders = (await orEmpty(adminUsers)).flatMap((u) => u.memberships.filter((m) => m.projectId === ctx.projectId && m.active && u.active));
+  const holderCount = new Map<string, number>();
+  for (const h of holders) holderCount.set(h.functionId, (holderCount.get(h.functionId) ?? 0) + 1);
 
   return (
     <div className="space-y-4">

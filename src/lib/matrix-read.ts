@@ -1,7 +1,11 @@
 import type { Tenant } from "./tenant";
 import { parseCsv } from "./csv";
 import { buildSheet, codeFor, EMPTY_CELL, MATRIX_CODES } from "./matrix-sheet";
-import { loadActor, verbsFor, type Verb } from "./permissions";
+import { verbsFor, type Actor, type Verb } from "./permissions";
+import { getActiveSet } from "./config";
+import { api, refusal } from "./api/client";
+import { adminFunctions, rulesBody, type AdminFunction, type AdminRule } from "./api/admin";
+import { getMe } from "./api/me";
 
 /**
  * Reading a filled-in distribution matrix back.
@@ -87,7 +91,7 @@ export async function readSheet(t: Tenant, text: string): Promise<ReadResult> {
 
   const sheet = await buildSheet(t, { allDisciplines: true });
   const known = new Map(sheet.columns.map((column) => [column.code, column] as const));
-  const functions = await t.db.function.findMany({ where: { active: true }, select: { id: true, code: true, name: true } });
+  const functions = (await adminFunctions()).filter((f) => f.active);
   const idOf = new Map(functions.map((f) => [f.code, f.id] as const));
 
   // Where each function sits in this file. Five leading columns describe the row.
@@ -108,9 +112,7 @@ export async function readSheet(t: Tenant, text: string): Promise<ReadResult> {
   }
 
   // What the matrix says today, one letter per function per class.
-  const actors = new Map(await Promise.all(
-    functions.map(async (f) => [f.code, await loadActor(t, f.id)] as const),
-  ));
+  const actors = await actorsOf(t, functions);
   const letterNow = (code: string, scope: { deliverableType: string | null; docType: string | null; discipline: string | null; family: string | null }) =>
     codeFor(verbsFor(actors.get(code) ?? null, { ...scope, confidentiality: "INTERNAL" }))?.letter ?? EMPTY_CELL;
 
@@ -157,62 +159,84 @@ export type ApplyReport = { line: number; ok: boolean; message: string; wrote: b
  * — and it is the same reason a blanket rule swamps a role's starting matrix.
  */
 export async function applyChanges(t: Tenant, changes: CellChange[]): Promise<ApplyReport[]> {
-  const project = await t.db.project.findFirst({ where: { id: t.projectId }, select: { role: true } });
-  const projectRole = project?.role && project.role !== "GENERIC" ? project.role : null;
-  const functions = await t.db.function.findMany({ where: { active: true }, select: { id: true, code: true } });
-  const idOf = new Map(functions.map((f) => [f.code, f.id] as const));
+  const me = await getMe();
+  const role = me?.projects.find((p) => p.id === t.projectId)?.contractRole ?? null;
+  const projectRole = role && role !== "GENERIC" ? role : null;
+  const functions = (await adminFunctions()).filter((f) => f.active);
+  // Each function's rows as they will be written back: the backend replaces them all at once.
+  const rowsOf = new Map(functions.map((f) => [f.code, { id: f.id, rules: [...f.rules], reports: [] as number[] }]));
   const out: ApplyReport[] = [];
 
   for (const change of changes) {
-    const functionId = idOf.get(change.functionCode);
-    if (!functionId) {
+    const fn = rowsOf.get(change.functionCode);
+    if (!fn) {
       out.push({ line: change.line, ok: false, wrote: false, message: `${change.functionCode} is no longer a published function.` });
       continue;
     }
-    const where = { functionId, projectRole, ...scopeOf(change), criticality: null, confidentiality: null };
-    const exact = await t.db.permissionRule.findFirst({ where });
+    if (change.family) {
+      out.push({ line: change.line, ok: false, wrote: false, message: `${change.functionCode}: a row cut by document family is not supported yet.` });
+      continue;
+    }
+    const scope = scopeOf(change);
+    const same = (r: AdminRule) => r.projectRole === projectRole && r.deliverableType === scope.deliverableType && r.docType === scope.docType
+      && r.discipline === scope.discipline && r.criticality === null && r.confidentiality === null;
+    const exact = fn.rules.findIndex(same);
 
     if (change.to === EMPTY_CELL) {
-      if (!exact) {
+      if (exact < 0) {
         out.push({
           line: change.line, ok: false, wrote: false,
           message: `${change.functionCode} keeps "${change.from}" on ${change.label || "this class"}: the grant comes from a broader rule, not from this row. Narrow that rule in People & access → Functions.`,
         });
         continue;
       }
-      await t.db.permissionRule.delete({ where: { id: exact.id } });
+      fn.rules.splice(exact, 1);
+      fn.reports.push(out.length);
       out.push({ line: change.line, ok: true, wrote: true, message: `${change.functionCode}: ${change.from} removed from ${change.label || "this class"}.` });
       continue;
     }
 
     const verbs = CELL_VERBS[change.to];
-    if (exact) {
-      // The note moves with the change: a row that came from a starting matrix
-      // and was then changed by hand must not still claim to be the former.
-      await t.db.permissionRule.update({
-        where: { id: exact.id },
-        data: { verbs: JSON.stringify(verbs), note: "Read from a filled-in distribution matrix." },
-      });
-    } else {
-      await t.db.permissionRule.create({
-        data: {
-          orgId: t.orgId,
-          functionId,
-          projectRole,
-          ...scopeOf(change),
-          verbs: JSON.stringify(verbs),
-          note: "Read from a filled-in distribution matrix.",
-          sort: 200,
-        },
-      });
-    }
+    const rule: AdminRule = {
+      id: "", verbs, projectRole, deliverableType: scope.deliverableType, docType: scope.docType, discipline: scope.discipline,
+      criticality: null, confidentiality: null,
+    };
+    if (exact >= 0) fn.rules[exact] = rule;
+    else fn.rules.push(rule);
+    fn.reports.push(out.length);
     out.push({
       line: change.line, ok: true, wrote: true,
       message: `${change.functionCode}: ${change.from} becomes ${change.to} on ${change.label || "this class"}.`,
     });
   }
 
+  // One write per function changed; a refusal marks every line it carried.
+  for (const [code, fn] of rowsOf) {
+    if (!fn.reports.length) continue;
+    try {
+      await api(`/api/admin/functions/${fn.id}`, { method: "PUT", body: { rules: rulesBody(fn.rules) } });
+    } catch (e) {
+      const { message } = refusal(e);
+      for (const index of fn.reports) out[index] = { ...out[index], ok: false, wrote: false, message: `${code}: ${message}` };
+    }
+  }
+
   return out;
+}
+
+/** What each function grants today, as the matrix reads it. */
+async function actorsOf(t: Tenant, functions: AdminFunction[]): Promise<Map<string, Actor>> {
+  const [levelValues, me] = await Promise.all([getActiveSet("CONFIDENTIALITY"), getMe()]);
+  const levels = new Map<string, number>();
+  for (const value of levelValues) if (typeof value.props.level === "number") levels.set(value.code, value.props.level);
+  const projectRole = me?.projects.find((p) => p.id === t.projectId)?.contractRole ?? null;
+  return new Map(functions.map((f) => [f.code, {
+    functionId: f.id, functionCode: f.code, functionName: f.name, clearance: 0, legacyRole: "VIEWER", levels, projectRole,
+    rules: f.rules.map((r) => ({
+      deliverableType: r.deliverableType, docType: r.docType, discipline: r.discipline, criticality: r.criticality,
+      confidentiality: r.confidentiality, projectRole: r.projectRole, family: null, familyTypes: null, verbs: r.verbs as Verb[],
+    })),
+  } as Actor] as const));
 }
 
 /** The letter-to-verbs convention, for the legend and the import screen. */

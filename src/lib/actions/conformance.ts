@@ -5,62 +5,67 @@ import { requireScope } from "@/lib/scope";
 import { isController, isAdmin } from "@/lib/auth";
 import { runAllChecks } from "@/lib/checks/engine";
 import { CHECK_BY_ID } from "@/lib/checks/catalog";
-import { audit, notify } from "@/lib/audit";
+import { api, projectPath, refusal } from "@/lib/api/client";
+import { runAndWait, CHECK_OFF_KEY, type DefectView } from "@/lib/api/conformance";
+import { setProjectSetting } from "@/lib/api/settings";
+
+/**
+ * The checks' acts. The backend runs the checks, keeps the defects and decides
+ * who may; these send what the form says and show its refusal word for word.
+ */
+
+type Result = { error?: string };
+const failed = (e: unknown): Result => ({ error: refusal(e).message });
 
 export async function runChecksAction(): Promise<void> {
   const ctx = await requireScope();
-  const { user, db, projectId, orgId } = ctx;
+  const { user } = ctx;
   if (!isController(user) && !isAdmin(user)) return;
-  await runAllChecks(ctx, user);
+  try {
+    await runAllChecks(ctx, user);
+  } catch (e) {
+    // Already queued or running: the page shows that run when it is done.
+    refusal(e);
+  }
   revalidatePath("/conformance");
   revalidatePath("/conformance/checks");
-  revalidatePath("/conformance");
   revalidatePath("/");
 }
 
-/** Accept an uncorrectable defect — reason, authority, review date; continues to be counted (§17.6). */
-export async function acceptDefectAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
+/** Accept a defect as it is, with the reason on the record; it continues to be counted. */
+export async function acceptDefectAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
   const ctx = await requireScope();
-  const { user, db, projectId, orgId } = ctx;
-  // C.11.5 — only the published acceptance authority may accept
-  if (!isController(user) && !isAdmin(user)) return { error: "Acceptance is only by the published authority (C.11.5)." };
   const defectId = String(formData.get("defectId") ?? "");
   const reason = String(formData.get("reason") ?? "").trim();
-  const reviewDate = String(formData.get("reviewDate") ?? "") || null;
- if (!reason) return { error: "Acceptance requires a recorded reason." };
-  if (!reviewDate) return { error: "An accepted defect carries a review date (CF-13)." };
-  const defect = await db.defect.findUniqueOrThrow({ where: { id: defectId } });
-  await db.defect.update({
-    where: { id: defectId },
-    data: { status: "ACCEPTED", acceptedByName: user.name, acceptedReason: reason, acceptedAt: new Date(), reviewDate: new Date(reviewDate) },
-  });
-  await audit({ actor: user, action: "DEFECT_ACCEPTED", entityType: "Defect", entityId: defectId, entityLabel: defect.checkId, newValue: reason, detail: `Accepted by ${user.name}; review date set; continues to be counted (CF-12).` });
+  if (!reason) return { error: "Acceptance requires a recorded reason." };
+  // The date to look at it again is not kept by the backend.
+  try {
+    await api(projectPath(ctx, `/defects/${defectId}/accept`), { body: { reason } });
+  } catch (e) {
+    return failed(e);
+  }
   revalidatePath("/conformance");
+  revalidatePath("/conformance/checks");
   return {};
 }
 
-/** A defect closes only when the re-run check no longer returns the item (§17.6). */
-export async function closeDefectAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
+/**
+ * A defect closes only when the checks, run again, no longer return the item.
+ * The backend closes it on that run; this runs them and says whether it did.
+ */
+export async function closeDefectAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
   const ctx = await requireScope();
-  const { user, db, projectId, orgId } = ctx;
-  if (!isController(user) && !isAdmin(user)) return { error: "Only the control function may record closure." };
   const defectId = String(formData.get("defectId") ?? "");
-  const defect = await db.defect.findUniqueOrThrow({ where: { id: defectId } });
-  const meta = CHECK_BY_ID.get(defect.checkId);
-  const runner = (await import("@/lib/checks/runners")).RUNNERS[defect.checkId];
-  if (runner) {
-    const checkCtx = await (async () => (await import("@/lib/checks/runners")).buildCtx(ctx))();
-    const result = await runner(checkCtx);
-    if (Array.isArray(result)) {
-      const still = result.find((f) => f.entityKey === defect.entityKey);
- if (still) return { error: `Closure refused — the check still returns this item. Correct the controlled source, then re-run ${defect.checkId}.` };
-    }
-  } else if (meta) {
- return { error: `${defect.checkId} is not automated — closure requires evidence of the re-run check.` };
+  try {
+    const run = await runAndWait(ctx);
+    if (run.status !== "DONE") return { error: run.error ?? "The checks are still running. Look again in a moment." };
+    const still = (await api<DefectView[]>(projectPath(ctx, "/defects"))).find((d) => d.id === defectId);
+    if (still) return { error: `Closure refused — the check still returns this item. Correct the controlled source, then re-run ${still.checkId}.` };
+  } catch (e) {
+    return failed(e);
   }
-  await db.defect.update({ where: { id: defectId }, data: { status: "CLOSED", closedAt: new Date() } });
- await audit({ actor: user, action: "DEFECT_CLOSED", entityType: "Defect", entityId: defectId, entityLabel: defect.checkId, detail: "Re-run check no longer returns the item." });
   revalidatePath("/conformance");
+  revalidatePath("/conformance/checks");
   return {};
 }
 
@@ -69,35 +74,37 @@ export async function closeDefectAction(_prev: { error?: string } | undefined, f
  *
  * An organization is answerable for its own register, so it may decide a check
  * does not apply to it — but only on the record: who decided, when, and why.
- * The engine stops asking, its findings close, and the catalogue says so.
+ * The backend stops asking, its findings close, and the catalogue says so.
  */
-export async function retireCheckAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
+export async function retireCheckAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
   const ctx = await requireScope();
-  const { user, db, projectId } = ctx;
-  if (!isAdmin(user)) return { error: "Only an administrator switches a check off." };
+  const { user } = ctx;
   const checkId = String(formData.get("checkId") ?? "");
   const reason = String(formData.get("reason") ?? "").trim();
   if (!CHECK_BY_ID.has(checkId)) return { error: "No such check." };
   if (reason.length < 10) return { error: "Say why it does not apply — the reason is the record." };
-  await db.checkOptOut.upsert({
-    where: { projectId_checkId: { projectId, checkId } },
-    update: { reason, setById: user.id, setByName: user.name, setAt: new Date() },
-    create: { projectId, checkId, reason, setById: user.id, setByName: user.name },
-  });
-  await audit({ actor: user, action: "CHECK_RETIRED", entityType: "Check", entityId: checkId, entityLabel: checkId, newValue: reason, detail: `${checkId} switched off: ${reason}` });
+  try {
+    await api(projectPath(ctx, `/checks/${checkId}/opt-out`), { method: "PUT", body: { reason } });
+    // Who decided and when: the backend keeps the reason only.
+    await setProjectSetting(ctx.projectId, CHECK_OFF_KEY + checkId, JSON.stringify({ by: user.name, at: new Date().toISOString() }));
+  } catch (e) {
+    return failed(e);
+  }
   revalidatePath("/conformance/checks");
   revalidatePath("/conformance");
   return {};
 }
 
 /** Ask it again. */
-export async function restoreCheckAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
+export async function restoreCheckAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
   const ctx = await requireScope();
-  const { user, db, projectId } = ctx;
-  if (!isAdmin(user)) return { error: "Only an administrator switches a check back on." };
   const checkId = String(formData.get("checkId") ?? "");
-  await db.checkOptOut.deleteMany({ where: { projectId, checkId } });
-  await audit({ actor: user, action: "CHECK_RESTORED", entityType: "Check", entityId: checkId, entityLabel: checkId, detail: `${checkId} switched back on. It is asked again at the next run.` });
+  try {
+    await api(projectPath(ctx, `/checks/${checkId}/opt-out`), { method: "DELETE" });
+    await setProjectSetting(ctx.projectId, CHECK_OFF_KEY + checkId, null);
+  } catch (e) {
+    return failed(e);
+  }
   revalidatePath("/conformance/checks");
   revalidatePath("/conformance");
   return {};

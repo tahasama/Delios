@@ -188,66 +188,6 @@ function parseVerbs(json: string): Verb[] {
   }
 }
 
-/**
- * Load the function and its rules. Cheap enough to do per request: one function
- * row and its handful of rules.
- */
-export async function loadActor(t: Tenant, functionId: string): Promise<Actor | null> {
-  const [fn, rules, confidentialityValues, project, documentTypes] = await Promise.all([
-    t.db.function.findFirst({ where: { id: functionId } }),
-    t.db.permissionRule.findMany({ where: { functionId }, orderBy: { sort: "asc" } }),
-    t.db.configValue.findMany({ where: { setKey: "CONFIDENTIALITY" }, select: { code: true, props: true } }),
-    t.db.project.findFirst({ where: { id: t.projectId }, select: { role: true } }),
-    t.db.configValue.findMany({ where: { setKey: "DOCUMENT_TYPES", status: "ACTIVE" }, select: { code: true, props: true } }),
-  ]);
-  if (!fn || !fn.active) return null;
-
-  const levels = new Map<string, number>();
-  for (const value of confidentialityValues) {
-    if (!value.props) continue;
-    try {
-      const level = (JSON.parse(value.props) as { level?: unknown }).level;
-      if (typeof level === "number") levels.set(value.code, level);
-    } catch {
-      /* a malformed property is simply not a declared level */
-    }
-  }
-
-  // Which types each family holds, read once, so a family rule can be answered
-  // without a second query per rule.
-  const inFamily = new Map<string, string[]>();
-  for (const type of documentTypes) {
-    let family: unknown;
-    if (type.props) {
-      try { family = (JSON.parse(type.props) as { family?: unknown }).family; } catch { /* not a declared family */ }
-    }
-    const code = typeof family === "string" ? family.trim().toUpperCase() : type.code.trim().charAt(0).toUpperCase();
-    if (!code) continue;
-    inFamily.set(code, [...(inFamily.get(code) ?? []), type.code]);
-  }
-
-  return {
-    functionId: fn.id,
-    functionCode: fn.code,
-    functionName: fn.name,
-    clearance: fn.clearance,
-    legacyRole: fn.legacyRole,
-    levels,
-    projectRole: project?.role ?? null,
-    rules: rules.map((r) => ({
-      deliverableType: r.deliverableType,
-      docType: r.docType,
-      discipline: r.discipline,
-      criticality: r.criticality,
-      confidentiality: r.confidentiality,
-      projectRole: r.projectRole,
-      family: r.family,
-      familyTypes: r.family ? inFamily.get(r.family.trim().toUpperCase()) ?? [] : null,
-      verbs: parseVerbs(r.verbs),
-    })),
-  };
-}
-
 // ── The decision ─────────────────────────────────────────────────────────────
 
 /**

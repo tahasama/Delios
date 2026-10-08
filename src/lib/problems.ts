@@ -1,6 +1,6 @@
-import type { Tenant } from "./tenant";
 import { plain } from "./utils";
 import { CHECK_BY_ID, type Phase } from "./checks/catalog";
+import { liveDefects, type DefectView } from "./api/conformance";
 
 /**
  * The check results turned into a work list: which documents have problems,
@@ -16,7 +16,8 @@ const RANK: Record<string, number> = { CRITICAL: 0, MAJOR: 1, MINOR: 2, ADVISORY
 function fixFor(checkId: string, documentId: string | null): { label: string; href: string } {
   const family = checkId.split("-")[0];
   if (!documentId) {
-    if (family === "SC" || family === "CF") return { label: "The plan", href: "/settings/dmp" };
+    if (family === "SC") return { label: "Schedule", href: "/actions" };
+    if (family === "CF") return { label: "The plan", href: "/settings/dmp" };
     return { label: "Settings", href: "/settings" };
   }
   const doc = `/documents/${documentId}`;
@@ -54,7 +55,7 @@ const TODO: Record<string, string> = {
   OB: "Somebody is holding a copy that is no longer current — tell them, or record that you did.",
   DB: "The schedule still expects this document; settle whether it is owed or withdraw the need.",
   PK: "Open the package and settle what belongs in it.",
-  SC: "An administrator has to publish or correct a setting before this can be right.",
+  SC: "Open the schedule and settle the activity: record a decision, or chase the document it is waiting for.",
   CF: "An administrator has to publish or correct a setting before this can be right.",
 };
 
@@ -74,11 +75,25 @@ export function plainProblem(text: string): string {
   return plain(text).replace(/\s*—\s*structural contradiction/gi, "").replace(/\s*▲/g, "").replace(/\s*\/\s*[A-Z]{2}-\d{2}/g, "").replace(/\.$/, "") ;
 }
 
-export async function problemDocuments(t: Tenant, owner?: string) {
-  const defects = await t.db.defect.findMany({
-    where: { status: { in: ["OPEN", "ACCEPTED"] }, ...(owner ? { ownerRole: owner } : {}) },
-    include: { documentRef: { select: { id: true, docNumber: true, title: true } } },
-  });
+/**
+ * A defect's document, read from its label: the backend labels a document's
+ * finding "number title", and a revision's "number rev X".
+ */
+function documentOf(d: DefectView): { id: string; docNumber: string; title: string } | null {
+  if (!d.documentId) return null;
+  const space = d.label.indexOf(" ");
+  return space < 0
+    ? { id: d.documentId, docNumber: d.label, title: "" }
+    : { id: d.documentId, docNumber: d.label.slice(0, space), title: d.label.slice(space + 1) };
+}
+
+/** The defects not closed, narrowed to one owner when asked. */
+async function defectsOf(t: { projectId: string }, owner?: string) {
+  return (await liveDefects(t.projectId)).filter((d) => !owner || d.owner === owner);
+}
+
+export async function problemDocuments(t: { projectId: string }, owner?: string) {
+  const defects = (await defectsOf(t, owner)).map((d) => ({ ...d, ownerRole: d.owner, documentRef: documentOf(d) }));
   const byDoc = new Map<string, ProblemDocument>();
   const general: Problem[] = [];
   for (const d of defects) {
@@ -122,11 +137,8 @@ export type ProblemType = {
   accepted: number;
 };
 
-export async function problemTypes(t: Tenant, owner?: string): Promise<ProblemType[]> {
-  const defects = await t.db.defect.findMany({
-    where: { status: { in: ["OPEN", "ACCEPTED"] }, ...(owner ? { ownerRole: owner } : {}) },
-    select: { checkId: true, severity: true, ownerRole: true, documentId: true, status: true },
-  });
+export async function problemTypes(t: { projectId: string }, owner?: string): Promise<ProblemType[]> {
+  const defects = (await defectsOf(t, owner)).map((d) => ({ checkId: d.checkId, severity: d.severity, ownerRole: d.owner, documentId: d.documentId, status: d.status }));
   const byCheck = new Map<string, { severity: string; owner: string; docs: Set<string>; findings: number; accepted: number }>();
   for (const d of defects) {
     const row = byCheck.get(d.checkId) ?? { severity: d.severity, owner: OWNER_LABEL[d.ownerRole] ?? d.ownerRole, docs: new Set<string>(), findings: 0, accepted: 0 };
@@ -154,20 +166,18 @@ export async function problemTypes(t: Tenant, owner?: string): Promise<ProblemTy
 }
 
 /** Every finding of one kind, newest first, for the drill-down. */
-export async function findingsOfType(t: Tenant, checkId: string, take = 200) {
-  const rows = await t.db.defect.findMany({
-    where: { checkId, status: { in: ["OPEN", "ACCEPTED"] } },
-    include: { documentRef: { select: { id: true, docNumber: true, title: true } } },
-    orderBy: { lastSeenAt: "desc" },
-    take,
-  });
+export async function findingsOfType(t: { projectId: string }, checkId: string, take = 200) {
+  const rows = (await defectsOf(t))
+    .filter((d) => d.checkId === checkId)
+    .sort((a, b) => b.lastSeenAt.localeCompare(a.lastSeenAt))
+    .slice(0, take);
   return rows.map((d) => ({
     id: d.id,
     status: d.status,
     severity: d.severity,
     text: plainProblem(d.description),
-    label: d.entityLabel,
-    document: d.documentRef,
+    label: d.label,
+    document: documentOf(d),
     fix: fixFor(d.checkId, d.documentId),
   }));
 }

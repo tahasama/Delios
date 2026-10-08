@@ -2,7 +2,8 @@ import Link from "next/link";
 import { requireScope } from "@/lib/scope";
 import { fmtDateTime } from "@/lib/utils";
 import { untoldRecipients } from "@/lib/supersession";
-import { haltedWhere } from "@/lib/halted";
+import { haltedRevisions } from "@/lib/halted";
+import { checksOf, documentCount, flawedDocuments, liveDefects, optOutsOf, scopeOf } from "@/lib/api/conformance";
 
 /**
  * How the register stands, in one line of figures.
@@ -13,19 +14,23 @@ import { haltedWhere } from "@/lib/halted";
  */
 export async function AssuranceFigure() {
   const ctx = await requireScope();
-  const { db } = ctx;
-  const [last, scope, totalDocs, flawedDocs, criticals, risks, switchedOff] = await Promise.all([
-    db.checkRun.findFirst({ orderBy: { ranAt: "desc" } }),
-    db.scopeConfig.findFirst(),
-    db.document.count(),
-    db.document.count({ where: { defects: { some: { severity: { in: ["CRITICAL", "MAJOR"] }, status: { in: ["OPEN", "ACCEPTED"] } } } } }),
-    db.defect.count({ where: { severity: "CRITICAL", status: { in: ["OPEN", "ACCEPTED"] } } }),
+  const [answer, scope, totalDocs, defects, risks, optOuts] = await Promise.all([
+    checksOf(ctx.projectId),
+    scopeOf(ctx.projectId),
+    documentCount(ctx.projectId),
+    liveDefects(ctx.projectId),
     Promise.all([
       untoldRecipients(ctx).then((u) => u.length),
-      haltedWhere(ctx).then((where) => db.revision.count({ where })),
+      haltedRevisions(ctx).then((rows) => rows.length),
     ]).then((n) => n.reduce((a, b) => a + b, 0)),
-    db.checkOptOut.count(),
+    optOutsOf(ctx.projectId),
   ]);
+  const last = answer.lastRun
+    ? { executed: answer.lastRun.executed, totalChecks: answer.lastRun.results.length, ranAt: answer.lastRun.finishedAt ?? answer.lastRun.requestedAt, ranByName: answer.lastRun.requestedBy }
+    : null;
+  const flawedDocs = flawedDocuments(defects);
+  const criticals = defects.filter((d) => d.severity === "CRITICAL").length;
+  const switchedOff = optOuts.length;
 
   if (!last) {
     return <p className="text-sm text-slate-600">Not checked yet. Run the checks to see what the register says about itself.</p>;

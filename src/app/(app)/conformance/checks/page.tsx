@@ -5,6 +5,7 @@ import { PageHeader, Card, inputCls } from "@/components/ui";
 import { ActionForm } from "@/components/form";
 import { FAMILY_TITLES, PHASE_LABEL, PHASE_BLURB, CATALOG, CHECK_BY_ID, type Phase, type CheckDef } from "@/lib/checks/catalog";
 import { latestResults } from "@/lib/checks/engine";
+import { optOutsOf } from "@/lib/api/conformance";
 import { AssuranceTabs } from "@/app/(app)/conformance/tabs";
 import { retireCheckAction, restoreCheckAction } from "@/lib/actions/conformance";
 import { OWNER_LABEL } from "@/lib/problems";
@@ -55,7 +56,7 @@ type Search = { phase?: string; family?: string; severity?: string; owner?: stri
 
 export default async function ChecksPage({ searchParams }: { searchParams: Promise<Search> }) {
   const ctx = await requireScope();
-  const { db, user } = ctx;
+  const { user } = ctx;
   const sp = await searchParams;
   const phase = PHASES.includes(sp.phase as Phase) ? (sp.phase as Phase) : null;
   const admin = isAdmin(user);
@@ -66,7 +67,7 @@ export default async function ChecksPage({ searchParams }: { searchParams: Promi
     return <OneKind ctx={ctx} checkId={sp.check} controller={controller} back="/conformance/checks?result=FAIL" />;
   }
 
-  const [results, optOuts] = await Promise.all([latestResults(ctx), db.checkOptOut.findMany()]);
+  const [results, optOuts] = await Promise.all([latestResults(ctx), optOutsOf(ctx.projectId)]);
   const off = new Map(optOuts.map((o) => [o.checkId, o]));
 
   const severity = SEVERITIES.includes(sp.severity ?? "") ? sp.severity! : null;
@@ -257,7 +258,7 @@ function CheckRow({
 }: {
   check: CheckDef;
   result?: { result: string; failingCount: number };
-  off?: { reason: string; setByName: string; setAt: Date };
+  off?: { reason: string; setByName: string; setAt: Date | null };
   admin: boolean;
 }) {
   const failing = !off && result?.result === "FAIL";

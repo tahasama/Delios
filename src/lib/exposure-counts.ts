@@ -1,7 +1,8 @@
-import type { Tenant } from "./tenant";
 import { EXPOSURES } from "./standard";
 import { untoldRecipients } from "./supersession";
-import { haltedWhere } from "./halted";
+import { haltedRevisions } from "./halted";
+import { api, projectPath } from "./api/client";
+import type { RegisterPage } from "./api/types";
 
 /**
  * The four out-of-date risks, counted.
@@ -14,18 +15,29 @@ import { haltedWhere } from "./halted";
  */
 export type OutOfDateRisk = { key: string; label: string; detail: string; who: string; count: number };
 
-export async function outOfDateRisks(t: Tenant): Promise<OutOfDateRisk[]> {
-  const [untold, blocked, orphaned, unresolvedVoid] = await Promise.all([
+/** A schedule need still waiting on a withdrawn document. */
+export type OrphanedNeed = { id: string; documentId: string; document: { docNumber: string }; action: { code: string; name: string } };
+
+/** Withdrawn documents that an activity of the schedule still needs, one line per activity. */
+export async function orphanedNeeds(t: { projectId: string }): Promise<OrphanedNeed[]> {
+  const page = await api<RegisterPage>(projectPath(t, "/register"), { query: { view: "all", state: "WITHDRAWN", per: 250 } });
+  return page.rows.flatMap((row) => row.activities.map((activity) => ({
+    id: `${row.id}:${activity.code}`, documentId: row.id, document: { docNumber: row.number }, action: activity,
+  })));
+}
+
+export async function outOfDateRisks(t: { projectId: string }): Promise<OutOfDateRisk[]> {
+  const [untold, blocked, orphaned] = await Promise.all([
     untoldRecipients(t).then((rows) => rows.length),
-    haltedWhere(t).then((where) => t.db.revision.count({ where })),
-    t.db.baselineEntry.count({ where: { document: { state: "WITHDRAWN" } } }),
-    t.db.revision.count({ where: { state: "VOID", voidReassessment: null } }),
+    haltedRevisions(t).then((rows) => rows.length),
+    orphanedNeeds(t).then((rows) => rows.length),
   ]);
   const counts: Record<string, number> = {
     UNPROPAGATED_SUPERSESSION: untold,
     BLOCKED_WORK: blocked,
     ORPHANED_WITHDRAWAL: orphaned,
-    UNRESOLVED_VOID: unresolvedVoid,
+    // A void revision's reassessment is not kept by the backend.
+    UNRESOLVED_VOID: 0,
   };
   return EXPOSURES.map((e) => ({ key: e.key, label: e.label, detail: e.detail, who: e.who, count: counts[e.key] ?? 0 })).filter((e) => e.count > 0);
 }

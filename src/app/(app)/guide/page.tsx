@@ -10,6 +10,8 @@ import { Chip } from "@/components/ui";
 import { isAdmin, isController } from "@/lib/auth";
 import { contractRoleOptions } from "@/lib/contract-roles";
 import { db as bare } from "@/lib/db";
+import { api, projectPath } from "@/lib/api/client";
+import { documentCount } from "@/lib/api/conformance";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Explore DELIOS" };
@@ -51,14 +53,16 @@ const SETUP: CapabilityItem[] = [
 ];
 
 export default async function GuidePage() {
-  const { user, db, orgId, project } = await requireScope();
+  const ctx = await requireScope();
+  const { user, orgId, project } = ctx;
   const canControl = isController(user);
   const canConfigure = isAdmin(user);
   const [documents, reviews, actions, transmittals] = await Promise.all([
-    db.document.count(),
-    db.reviewCycle.count({ where: { status: "OPEN" } }),
-    db.action.count(),
-    db.transmittal.count(),
+    // Whatever this person may not read counts as none.
+    documentCount(ctx.projectId).catch(() => 0),
+    api<{ total: number }>(projectPath(ctx, "/reviews"), { query: { status: "OPEN", per: 25 } }).then((page) => page.total).catch(() => 0),
+    api<unknown[]>(projectPath(ctx, "/activities")).then((rows) => rows.length).catch(() => 0),
+    api<{ total: number }>(projectPath(ctx, "/transmittals/log"), { query: { per: 25 } }).then((page) => page.total).catch(() => 0),
   ]);
   const roleOptions = await contractRoleOptions(bare, orgId);
 

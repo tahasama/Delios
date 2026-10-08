@@ -23,7 +23,6 @@ export default async function ReportsPage({
   searchParams: Promise<{ r?: string; rq?: string; asOf?: string }>;
 }) {
   const ctx = await requireScope();
-  const { db } = ctx;
   const sp = await searchParams;
   const current: ReportId = REPORT_IDS.includes(sp.r as ReportId) ? (sp.r as ReportId) : "register";
   const q = (sp.rq ?? "").trim();
@@ -32,19 +31,9 @@ export default async function ReportsPage({
 
   // Q8 — what was the current revision on a given date
   const asOf = sp.asOf ? new Date(sp.asOf) : null;
+  // The register as it stood on a past date is not answered by the backend.
   const historical = asOf
-    ? (await db.revision.findMany({
-        where: { releasedAt: { lte: asOf } },
-        include: { document: { select: { docNumber: true, title: true, state: true } } },
-        orderBy: { releasedAt: "desc" },
-      }))
-        .filter((r) => !r.supersededAt || r.supersededAt > asOf!)
-        .filter((r) => !r.voidedAt || r.voidedAt > asOf!) // voided later was still current on that date
-        .filter((r) => {
-          // withdrawn/cancelled/archived AFTER the date still existed then
-          const endStates: Record<string, Date | null> = {};
-          return true;
-        })
+    ? ([] as { id: string; value: string; statusCode: string | null; releasedAt: Date | null; document: { docNumber: string; title: string; state: string } }[])
     : [];
 
   return (

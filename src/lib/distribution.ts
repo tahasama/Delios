@@ -1,6 +1,6 @@
-import type { Tenant } from "./tenant";
-import { can, confidentialityLevel, type DocumentClass, type Rule, type Verb } from "./permissions";
-import { VERBS } from "./permissions";
+import { confidentialityLevel, type DocumentClass } from "./permissions";
+import { holders } from "./api/settings";
+import { adminUsers, orEmpty } from "./api/admin";
 
 /**
  * §11.8 — "The organization shall define, before issue, who receives which
@@ -23,76 +23,26 @@ export type Recipient = {
   basis: string;
 };
 
-function parseVerbs(json: string): Verb[] {
-  try {
-    const raw = JSON.parse(json) as unknown;
-    return Array.isArray(raw) ? VERBS.filter((v) => raw.includes(v)) : [];
-  } catch {
-    return [];
-  }
-}
-
 /**
- * Who should receive this class of information, derived from the matrix.
- * Members of the current project only — distribution is a project act.
+ * Who should receive this class of information, derived from the matrix: the
+ * backend's holders of RECEIVE for it, on the current project only —
+ * distribution is a project act.
  */
-export async function recipientsFor(t: Tenant, target: DocumentClass): Promise<Recipient[]> {
-  const [memberships, confidentialityValues, project] = await Promise.all([
-    t.db.projectMembership.findMany({
-      where: { projectId: t.projectId, active: true, user: { active: true }, function: { active: true } },
-      include: { user: { select: { id: true, name: true, email: true } }, function: { include: { rules: true } } },
-    }),
-    t.db.configValue.findMany({ where: { setKey: "CONFIDENTIALITY" }, select: { code: true, props: true } }),
-    t.db.project.findFirst({ where: { id: t.projectId }, select: { role: true } }),
+export async function recipientsFor(t: { projectId: string }, target: DocumentClass): Promise<Recipient[]> {
+  const [found, users] = await Promise.all([
+    holders(t.projectId, "RECEIVE", target.deliverableType, target.docType, target.discipline, target.criticality, target.confidentiality),
+    orEmpty(adminUsers),
   ]);
-
-  const levels = new Map<string, number>();
-  for (const value of confidentialityValues) {
-    if (!value.props) continue;
-    try {
-      const level = (JSON.parse(value.props) as { level?: unknown }).level;
-      if (typeof level === "number") levels.set(value.code, level);
-    } catch {
-      /* not a declared level */
-    }
-  }
-
-  const out: Recipient[] = [];
-  for (const m of memberships) {
-    const rules: Rule[] = m.function.rules.map((r) => ({
-      deliverableType: r.deliverableType,
-      docType: r.docType,
-      discipline: r.discipline,
-      criticality: r.criticality,
-      confidentiality: r.confidentiality,
-      projectRole: r.projectRole,
-      // Distribution asks about a classification, never about one document, so
-      // a family rule is answered by loadActor and not here.
-      family: null,
-      familyTypes: null,
-      verbs: parseVerbs(r.verbs),
-    }));
-    const actor = {
-      functionId: m.functionId,
-      functionCode: m.function.code,
-      functionName: m.function.name,
-      clearance: m.function.clearance,
-      legacyRole: m.function.legacyRole,
-      levels,
-      projectRole: project?.role ?? null,
-      rules,
-    };
-    if (!can(actor, "RECEIVE", target)) continue;
-    out.push({
-      userId: m.user.id,
-      name: m.user.name,
-      email: m.user.email,
-      functionName: m.function.name,
- basis: `${m.function.name} receives this classification`,
-    });
-  }
-
-  return out.sort((a, b) => a.functionName.localeCompare(b.functionName) || a.name.localeCompare(b.name));
+  const email = new Map(users.map((u) => [u.id, u.email] as const));
+  return found
+    .map((h) => ({
+      userId: h.id,
+      name: h.name,
+      email: email.get(h.id) ?? "",
+      functionName: h.functionName,
+      basis: `${h.functionName} receives this classification`,
+    }))
+    .sort((a, b) => a.functionName.localeCompare(b.functionName) || a.name.localeCompare(b.name));
 }
 
 /**
@@ -101,7 +51,7 @@ export async function recipientsFor(t: Tenant, target: DocumentClass): Promise<R
  * shall be recorded."
  */
 export async function offDistribution(
-  t: Tenant,
+  t: { projectId: string },
   target: DocumentClass,
   chosenUserIds: string[],
 ): Promise<Recipient[]> {
@@ -109,10 +59,7 @@ export async function offDistribution(
   const strangers = chosenUserIds.filter((id) => !onList.has(id));
   if (!strangers.length) return [];
 
-  const users = await t.db.user.findMany({
-    where: { id: { in: strangers } },
-    select: { id: true, name: true, email: true },
-  });
+  const users = (await orEmpty(adminUsers)).filter((u) => strangers.includes(u.id));
   return users.map((u) => ({
     userId: u.id,
     name: u.name,
