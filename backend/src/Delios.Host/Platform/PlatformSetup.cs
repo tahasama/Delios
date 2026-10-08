@@ -54,6 +54,11 @@ public static class PlatformSetup
         // A missing or malformed setting stops the process at start, not at first use.
         AddValidated<DeliosOptions>(services, DeliosOptions.Section);
         AddValidated<ConnectionStringsOptions>(services, ConnectionStringsOptions.Section);
+        services.PostConfigure<ConnectionStringsOptions>(o =>
+        {
+            o.Postgres = ConnectionStringsOptions.WithoutKerberos(o.Postgres);
+            o.PostgresReadOnly = ConnectionStringsOptions.WithoutKerberos(o.PostgresReadOnly);
+        });
         AddValidated<StorageOptions>(services, StorageOptions.Section);
         AddValidated<ClamAvOptions>(services, ClamAvOptions.Section);
         services.AddOptions<SessionCookieOptions>().BindConfiguration(SessionCookieOptions.Section);

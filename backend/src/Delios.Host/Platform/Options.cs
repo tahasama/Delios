@@ -38,6 +38,18 @@ public sealed class ConnectionStringsOptions
     /// empty or unreachable, they read from the primary.
     /// </summary>
     public string? PostgresReadOnly { get; set; }
+
+    /// <summary>
+    /// Turns off Postgres's Kerberos (GSS) encryption attempt unless the connection string asks for it. Nothing here
+    /// signs in with Kerberos, and the app's container has no Kerberos library: the attempt only printed
+    /// "Cannot load library libgssapi_krb5.so.2" on every start.
+    /// </summary>
+    public static string WithoutKerberos(string? connectionString)
+    {
+        if (string.IsNullOrWhiteSpace(connectionString) || connectionString.Contains("GSS", StringComparison.OrdinalIgnoreCase))
+            return connectionString!;
+        return new Npgsql.NpgsqlConnectionStringBuilder(connectionString) { GssEncryptionMode = Npgsql.GssEncryptionMode.Disable }.ConnectionString;
+    }
     /// <summary>Redis, used as the shared cache (for example for session checks). Required.</summary>
     [Required] public string Redis { get; set; } = "";
     /// <summary>RabbitMQ, the message queue between the API and the worker, as an <c>amqp://</c> URI. Required.</summary>
