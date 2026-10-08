@@ -310,6 +310,7 @@ public static class PlatformSetup
             Documents.DocumentContextEndpoints.MapDocumentContextEndpoints(app);
             Documents.ValueEndpoints.MapValueEndpoints(app);
             Reviews.ReviewListEndpoints.MapReviewListEndpoints(app);
+            Transmittals.TransmittalLogEndpoints.MapTransmittalLogEndpoints(app);
         }
     }
 

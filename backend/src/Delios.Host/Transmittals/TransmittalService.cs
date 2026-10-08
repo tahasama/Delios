@@ -273,6 +273,70 @@ public sealed class TransmittalService(
         return theirs.Count > 0 ? theirs : [new Addressee(null, party.Id, party.Name, party.Name)];
     }
 
+    // ── Composing ─────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Body of a transmittal Document Control composes itself: released revisions, the people and outside parties
+    /// it goes to, why (a reason for issue), a subject, a message, and when an answer is due if one is wanted.
+    /// </summary>
+    public sealed record ComposeRequest(
+        Guid[]? RevisionIds, Guid[]? UserIds, Guid[]? PartyIds, string? Reason, string? Subject = null, string? Message = null,
+        DateOnly? ResponseDue = null);
+
+    /// <summary>
+    /// Issues released revisions directly, without an issue request: one transmittal to the project's own people
+    /// chosen, and one to each outside party. Only those who may control or transmit every document do this.
+    /// </summary>
+    public async Task<(IReadOnlyList<Transmittal> Sent, IResult? Problem)> ComposeAsync(
+        ProjectAccess access, ComposeRequest request, CancellationToken cancellationToken)
+    {
+        var revisionIds = request.RevisionIds?.Distinct().ToList() ?? [];
+        if (revisionIds.Count is 0 or > 500) return ([], Problems.Invalid("ITEMS_REQUIRED", "Choose between 1 and 500 released revisions."));
+        var catalog = await Catalog.LoadAsync(db, cancellationToken);
+        var reason = request.Reason?.Trim() ?? "";
+        if (!catalog.IsActive(TransmittalSets.Reasons, reason))
+            return ([], Problems.Invalid("VALUE_NOT_PUBLISHED", $"{reason} is not a published reason for issue.", new { field = "reason", value = reason }));
+        var revisions = await db.Revisions.Where(r => revisionIds.Contains(r.Id) && r.ProjectId == access.Project.Id).ToListAsync(cancellationToken);
+        var documentIds = revisions.Select(r => r.DocumentId).ToList();
+        var documents = await DocumentQueries.Visible(db, access, catalog.RestrictedLevels())
+            .Where(d => documentIds.Contains(d.Id)).ToDictionaryAsync(d => d.Id, cancellationToken);
+        if (revisions.Count != revisionIds.Count || revisions.Any(r => !documents.ContainsKey(r.DocumentId)))
+            return ([], Problems.NotFound("REVISION_NOT_FOUND", "A revision chosen does not exist or is not yours to see."));
+        if (revisions.FirstOrDefault(r => r.State != RevisionStates.Released) is { } unreleased)
+            return ([], Problems.Conflict("NOT_RELEASED", $"{Label(documents[unreleased.DocumentId], unreleased)} is not released: only released revisions are issued."));
+        if (documents.Values.FirstOrDefault(d => !access.Allows(Verbs.Control, d.Facts) && !access.Allows(Verbs.Transmit, d.Facts)) is { } refused)
+            return ([], Problems.Forbidden("TRANSMIT_NOT_ALLOWED", $"Your function does not issue {refused.Number}."));
+
+        var members = await MembersAsync(access.Project, cancellationToken);
+        var userIds = request.UserIds?.Distinct().ToList() ?? [];
+        var people = members.Where(m => userIds.Contains(m.UserId)).Select(m => new Addressee(m.UserId, null, m.Name, m.PartyName)).ToList();
+        if (people.Count != userIds.Count) return ([], Problems.Invalid("RECIPIENT_UNKNOWN", "Someone chosen is not active on this project."));
+        var partyIds = request.PartyIds?.Distinct().ToList() ?? [];
+        var parties = await db.Parties.AsNoTracking().Where(p => partyIds.Contains(p.Id) && p.Active).OrderBy(p => p.Name).ToListAsync(cancellationToken);
+        if (parties.Count != partyIds.Count) return ([], Problems.Invalid("PARTY_UNKNOWN", "An organization chosen is not an active party."));
+        if (people.Count == 0 && parties.Count == 0) return ([], Problems.Invalid("RECIPIENTS_REQUIRED", "Choose who it goes to."));
+
+        var items = revisions.Select(r => (documents[r.DocumentId], r)).OrderBy(i => i.Item1.Number).ToList();
+        var subject = string.IsNullOrWhiteSpace(request.Subject)
+            ? items.Count == 1 ? $"{Label(items[0].Item1, items[0].r)}, {items[0].r.StatusCode}" : $"{items.Count} documents"
+            : request.Subject.Trim();
+        var message = string.IsNullOrWhiteSpace(request.Message) ? null : request.Message.Trim();
+        var due = request.ResponseDue is { } d ? LocalDate.FromDateOnly(d) : (LocalDate?)null;
+        var actor = new Actor(access.UserId, access.UserName);
+        var sent = new List<Transmittal>();
+        if (people.Count > 0)
+            sent.Add(await RaiseAsync(new Raise(access.Project, actor, reason, subject, message, null, "Internal distribution", items, people, ResponseDue: due), cancellationToken));
+        foreach (var party in parties)
+            sent.Add(await RaiseAsync(new Raise(access.Project, actor, reason, subject, message, party, party.Name, items, AddresseesOf(party, members), ResponseDue: due), cancellationToken));
+        foreach (var (document, revision) in items)
+        {
+            await audit.WriteAsync(actor, "ISSUED", "Revision", revision.Id, Label(document, revision),
+                $"Issued {reason}: {string.Join(", ", sent.Select(t => t.Number))}.", access.Project.Id, cancellationToken);
+        }
+        await db.SaveChangesAsync(cancellationToken);
+        return (sent, null);
+    }
+
     // ── Raising ───────────────────────────────────────────────────────────────
 
     /// <summary>
@@ -715,7 +779,7 @@ public sealed class TransmittalService(
     /// The transmittals this person may see: all of them for Document Control and senders; otherwise those they issued,
     /// those sent to them, and those to parties whose custodian function is theirs.
     /// </summary>
-    private IQueryable<Transmittal> Visible(ProjectAccess access)
+    public IQueryable<Transmittal> Visible(ProjectAccess access)
     {
         var query = db.Transmittals.Where(t => t.ProjectId == access.Project.Id);
         if (access.IsInternal && (access.Holds(Verbs.Control) || access.Holds(Verbs.Transmit))) return query;

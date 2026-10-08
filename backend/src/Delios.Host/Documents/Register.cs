@@ -43,17 +43,19 @@ internal sealed class RegisterViewConfiguration : IEntityTypeConfiguration<Regis
 /// <param name="On">Which date the from/to window reads: created, revStarted, fileAdded, planned, issued, released or updated.</param>
 /// <param name="View">"current" (the default) leaves out withdrawn, cancelled and archived documents; "all" keeps them.</param>
 /// <param name="Ids">Comma-separated document ids: only these (the rows someone selected).</param>
+/// <param name="Released">True: only documents with a current released revision (what can be issued).</param>
 public sealed record RegisterFilter(
     string? Q = null, string? State = null, string? Rev = null, string? Status = null, string? Verdict = null, string? Supplier = null,
     string? Discipline = null, string? DocType = null, string? Criticality = null, string? Confidentiality = null, string? Deliverable = null,
     string? Action = null, string? On = null, DateOnly? From = null, DateOnly? To = null, string? View = null, string? Sort = null, string? Dir = null,
-    string? Ids = null);
+    string? Ids = null, bool? Released = null);
 
 /// <summary>One row of the register: the document and the facts about its newest and its current revision.</summary>
 public sealed record RegisterRow(
     Guid Id, string Number, string Title, string DeliverableType, string DocType, string Discipline, string? Originator, string? Subproject,
     string? ContractRef, string? Criticality, string? Confidentiality, string? RetentionClass, bool IsPlaceholder, string State,
-    string? Revision, string? RevisionState, Guid? LatestRevisionId, string? ProposedStatus, string? ReleasedStatus, DateTimeOffset? ReleasedAt,
+    string? Revision, string? RevisionState, Guid? LatestRevisionId, Guid? ReleasedRevisionId, string? ReleasedRevision,
+    string? ProposedStatus, string? ReleasedStatus, DateTimeOffset? ReleasedAt,
     string? Verdict, string? DecidedBy, DateOnly? PlannedDate, DateTimeOffset? IssuedAt, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt,
     DateTimeOffset? RevisionStartedAt, DateTimeOffset? FileAddedAt, int Packages, IReadOnlyList<RegisterActivity> Activities);
 
@@ -234,6 +236,7 @@ public static class RegisterEndpoints
             }
             query = query.Where(predicate);
         }
+        if (f.Released == true) query = query.Where(d => db.Revisions.Any(r => r.DocumentId == d.Id && r.State == RevisionStates.Released));
         if (Has(f.State)) query = query.Where(d => d.State == f.State);
         if (f.Rev == "NONE") query = query.Where(d => d.LatestRevisionId == null);
         else if (Has(f.Rev)) query = query.Where(d => d.LatestRevisionState == f.Rev);
@@ -318,7 +321,7 @@ public static class RegisterEndpoints
         if (ids.Count == 0) return [];
         var docs = await db.Documents.AsNoTracking().Where(d => ids.Contains(d.Id)).ToDictionaryAsync(d => d.Id, cancellationToken);
         var revisions = await db.Revisions.AsNoTracking().Where(r => ids.Contains(r.DocumentId))
-            .Select(r => new { r.Id, r.DocumentId, r.State, r.StatusCode, r.ReleasedAt, r.CreatedAt }).ToListAsync(cancellationToken);
+            .Select(r => new { r.Id, r.DocumentId, r.Value, r.State, r.StatusCode, r.ReleasedAt, r.CreatedAt }).ToListAsync(cancellationToken);
         var latestIds = docs.Values.Where(d => d.LatestRevisionId != null).Select(d => d.LatestRevisionId!.Value).ToList();
         var decided = await (from r in db.Reviews
                              where latestIds.Contains(r.RevisionId) && r.Verdict != null
@@ -357,7 +360,7 @@ public static class RegisterEndpoints
             return new RegisterRow(
                 d.Id, d.Number, d.Title, d.DeliverableType, d.DocType, d.Discipline, d.Originator, d.Subproject, d.ContractRef, d.Criticality,
                 d.Confidentiality, d.RetentionClass, d.IsPlaceholder, d.State, d.LatestRevisionValue, d.LatestRevisionState, d.LatestRevisionId,
-                released is null ? latest?.StatusCode : null, released?.StatusCode, released?.ReleasedAt?.ToDateTimeOffset(),
+                released?.Id, released?.Value, released is null ? latest?.StatusCode : null, released?.StatusCode, released?.ReleasedAt?.ToDateTimeOffset(),
                 verdict?.Verdict, decider, d.PlannedDate?.ToDateOnly(), issued.TryGetValue(id, out var at) ? at.ToDateTimeOffset() : null,
                 d.CreatedAt.ToDateTimeOffset(), d.UpdatedAt.ToDateTimeOffset(), latest?.CreatedAt.ToDateTimeOffset(),
                 files.TryGetValue(id, out var added) ? added.ToDateTimeOffset() : null, packages.GetValueOrDefault(id),

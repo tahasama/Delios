@@ -2,12 +2,13 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Download } from "lucide-react";
 import { api, ApiProblem } from "@/lib/api/client";
-import type { DocumentContext, DocumentView, ListValue, RouteView } from "@/lib/api/types";
+import type { Distribution, DocumentContext, DocumentView, IssueRequestView, ListValue, RouteView } from "@/lib/api/types";
 import { requireSession, projectPath } from "@/lib/session";
 import { isMigrated } from "@/lib/migrated";
 import { DOCUMENT_STATES, REVISION_STATES } from "@/lib/states";
 import { Card, Chip, KeyValue, PageHeader } from "@/components/ui";
 import { Arrival, Resubmit, SendForReview, StartRevision } from "./acts";
+import { OpenRequest, RequestIssue } from "./issue";
 
 export const dynamic = "force-dynamic";
 
@@ -53,6 +54,14 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
   const inMotion = latest && ["RECEIVED", "CORRECTING", "IN_PREPARATION", "IN_REVIEW"].includes(latest.state);
   const contributes = session.can("CREATE") || session.can("REVISE");
   const control = session.can("CONTROL");
+  const released = revisions.find((r) => r.state === "RELEASED") ?? null;
+  const [distribution, requests] = released && session.user.isInternal
+    ? await Promise.all([
+        api<Distribution>(projectPath(session, `/documents/${id}/distribution`)).catch(() => null),
+        api<IssueRequestView[]>(projectPath(session, `/revisions/${released.id}/issue-requests`)).catch(() => [] as IssueRequestView[]),
+      ])
+    : [null, [] as IssueRequestView[]];
+  const openRequests = requests.filter((r) => r.status === "OPEN");
   const routes = latest?.state === "IN_PREPARATION" && latest.filesState === "READY" && contributes
     ? await api<RouteView[]>(projectPath(session, `/documents/${id}/routes`)).catch(() => [])
     : [];
@@ -163,6 +172,16 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
           {!inMotion && contributes && doc.state !== "WITHDRAWN" && doc.state !== "CANCELLED" && doc.state !== "ARCHIVED" ? (
             <Card title={latest ? "Next revision" : "First revision"}>
               <StartRevision documentId={doc.id} first={!latest} />
+            </Card>
+          ) : null}
+
+          {released && distribution ? (
+            <Card title="Issue it" description={`rev ${released.value}${released.statusCode ? ` · ${released.statusCode}` : ""}`}>
+              <div className="space-y-4">
+                {openRequests.map((r) => <OpenRequest key={r.id} documentId={doc.id} request={r} control={control || session.can("TRANSMIT")} reasonLabel={label("REASONS_FOR_ISSUE", r.reason)} />)}
+                <RequestIssue documentId={doc.id} revisionId={released.id} distribution={distribution}
+                  reasons={(lists.REASONS_FOR_ISSUE ?? []).filter((v) => v.status === "ACTIVE").map((v) => ({ code: v.code, label: v.label }))} />
+              </div>
             </Card>
           ) : null}
 

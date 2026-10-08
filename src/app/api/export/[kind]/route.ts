@@ -5,6 +5,7 @@ import { getSession, projectPath } from "@/lib/session";
 /** Which backend export each list's Export button asks for. Lists join as they move to the backend. */
 const EXPORTS: Record<string, string> = {
   reviews: "/reviews/export",
+  transmittals: "/transmittals/log/export",
 };
 
 /**

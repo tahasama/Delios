@@ -17,13 +17,14 @@ export type ActResult = { ok: true; message?: string } | { ok: false; message: s
 export type UploadTicket = { fileId: string; method: string; url: string; headers: Record<string, string>; expiresAt: string };
 
 /** Where an upload goes: a document's next files, or the proof of another organization's answer on a review. */
-export type UploadTarget = { documentId: string } | { reviewId: string };
+export type UploadTarget = { documentId: string } | { reviewId: string } | { transmittalId: string };
 
 /** An upload link for one file, after the backend has checked its name, size and fingerprint. */
 export async function requestUploadAction(target: UploadTarget, file: { fileName: string; size: number; contentType: string; sha256: string }):
   Promise<{ ok: true; ticket: UploadTicket } | { ok: false; message: string }> {
   const session = await requireSession();
-  const path = "documentId" in target ? `/documents/${target.documentId}/uploads` : `/reviews/${target.reviewId}/evidence`;
+  const path = "documentId" in target ? `/documents/${target.documentId}/uploads`
+    : "reviewId" in target ? `/reviews/${target.reviewId}/evidence` : `/transmittals/${target.transmittalId}/evidence`;
   try {
     return { ok: true, ticket: await api<UploadTicket>(projectPath(session, path), { body: file }) };
   } catch (e) {

@@ -82,6 +82,8 @@ public static class TransmittalEndpoints
         project.MapPost("/issue-requests/{requestId:guid}/cancel", CancelAsync);
         project.MapGet("/not-issued", NotIssuedAsync);
         project.MapGet("/transmittals", ListAsync);
+        project.MapPost("/transmittals", ComposeAsync).AddEndpointFilter<IdempotencyFilter>();
+        project.MapGet("/addressees", AddresseesAsync);
         project.MapGet("/transmittals/{transmittalId:guid}", GetAsync);
         project.MapPost("/transmittals/{transmittalId:guid}/acknowledge", AcknowledgeAsync);
         project.MapPost("/transmittals/{transmittalId:guid}/recipients/{recipientId:guid}/dispatch", DispatchAsync);
@@ -150,6 +152,26 @@ public static class TransmittalEndpoints
         var access = ProjectAccessFilter.Of(http);
         if (!access.IsInternal) return Problems.Forbidden("INTERNAL_ONLY", "The issue record is ours to read.");
         return Results.Ok(await transmittals.NotIssuedAsync(access, cancellationToken));
+    }
+
+    /// <summary><c>POST /transmittals</c>: Document Control issues released revisions directly; one transmittal per destination.</summary>
+    private static async Task<IResult> ComposeAsync(
+        TransmittalService.ComposeRequest request, HttpContext http, TransmittalService transmittals, CancellationToken cancellationToken)
+    {
+        var (sent, problem) = await transmittals.ComposeAsync(ProjectAccessFilter.Of(http), request, cancellationToken);
+        return problem ?? Results.Ok(sent.Select(t => new { t.Id, t.Number, t.ToName }));
+    }
+
+    /// <summary><c>GET /addressees</c>: who a transmittal can go to on this project: its active people and the outside parties.</summary>
+    private static async Task<IResult> AddresseesAsync(
+        HttpContext http, TransmittalService transmittals, DeliosDbContext db, CancellationToken cancellationToken)
+    {
+        var access = ProjectAccessFilter.Of(http);
+        if (!access.IsInternal) return Problems.Forbidden("INTERNAL_ONLY", "Only the project's own people issue transmittals.");
+        var members = await transmittals.MembersAsync(access.Project, cancellationToken);
+        var parties = await db.Parties.AsNoTracking().Where(p => p.Active && !p.IsInternal).OrderBy(p => p.Name)
+            .Select(p => new { p.Id, p.Code, p.Name, p.Participation }).ToListAsync(cancellationToken);
+        return Results.Ok(new { people = members.OrderBy(m => m.Name).Select(m => m.View()), parties });
     }
 
     /// <summary>GET the list of transmittals the caller may see, newest first.</summary>

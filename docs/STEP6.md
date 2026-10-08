@@ -34,7 +34,14 @@ Each area: the screens, then any backend functions they need that do not exist y
       release, sending back to the author or to a step, sending the route back),
       sending several revisions for review at once.
       Not carried over: delegating a step, review "kinds", automatic late warnings.
-- [ ] **Transmittals**: log, a transmittal, issue requests, sending, acknowledging, dispatch by proxy.
+- [x] **Transmittals**: the log (what each still waits on, filters, sorting,
+      page numbers, export), a transmittal (what it carried, who has it,
+      acknowledging, recording dispatch to an organization outside with proof),
+      composing one directly, and on a document's page asking for an issue and
+      Document Control sending it.
+      Not carried over: incoming transmittals as a separate record (another
+      organization's submissions arrive as revisions, checked on arrival),
+      drafts, "notify again".
 - [ ] **Packages**
 - [ ] **Schedule and activities**: the schedule document, activities, needs, waivers, decisions, lateness.
 - [ ] **Assurance**: checks and the defect register.

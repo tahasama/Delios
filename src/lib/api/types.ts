@@ -92,6 +92,7 @@ export type RegisterRow = {
   originator: string | null; subproject: string | null; contractRef: string | null; criticality: string | null;
   confidentiality: string | null; retentionClass: string | null; isPlaceholder: boolean; state: string;
   revision: string | null; revisionState: string | null; latestRevisionId: string | null;
+  releasedRevisionId: string | null; releasedRevision: string | null;
   proposedStatus: string | null; releasedStatus: string | null; releasedAt: string | null;
   verdict: string | null; decidedBy: string | null; plannedDate: string | null; issuedAt: string | null;
   createdAt: string; updatedAt: string; revisionStartedAt: string | null; fileAddedAt: string | null;
@@ -157,3 +158,38 @@ export type ReviewView = {
 
 /** GET /reviews/{id}/me. */
 export type ReviewMe = { seated: boolean; answered: boolean; control: boolean };
+
+/** GET /transmittals/log (TransmittalLog.cs). */
+export type TransmittalLog = { total: number; page: number; pages: number; per: number; sizes: number[]; rows: TransmittalLogRow[] };
+export type TransmittalLogRow = {
+  id: string; number: string; subject: string; reason: string; toName: string; issuedBy: string; issuedAt: string; documents: number;
+  status: "TO_SEND" | "OVERDUE" | "AWAITING_REPLY" | "AWAITING_ACK" | "COMPLETE"; recipients: { id: string; name: string; seen: boolean }[];
+  responseRequired: boolean; responseDue: string | null; forReview: boolean;
+};
+
+/** GET /transmittals/{id} (TransmittalEndpoints TransmittalView). */
+export type TransmittalView = {
+  id: string; number: string; direction: string; reason: string; subject: string; message: string | null; to: string;
+  responseRequired: boolean; responseDue: string | null; issuedAt: string; issuedBy: string; issueRequestId: string | null; reviewStepId: string | null;
+  items: { documentId: string; revisionId: string; documentNumber: string; title: string; revision: string; status: string | null }[];
+  recipients: { id: string; name: string; organization: string | null; person: boolean; openedAt: string | null; acknowledgedAt: string | null; dispatchedAt: string | null; dispatchChannel: string | null; dispatchRef: string | null; dispatchedBy: string | null; proofFileId: string | null }[];
+};
+
+/** GET /addressees: who a transmittal can go to. */
+export type Addressees = {
+  people: { id: string; name: string; function: string; organization: string | null }[];
+  parties: { id: string; code: string; name: string; participation: string }[];
+};
+
+/** GET /revisions/{id}/issue-requests (IssueRequestView). */
+export type IssueRequestView = {
+  id: string; revisionId: string; reason: string; userIds: string[]; partyIds: string[]; note: string | null; offDistributionReason: string | null;
+  raisedBy: string; raisedAt: string; status: string; closedAt: string | null; closedBy: string | null; transmittals: string[];
+};
+
+/** GET /documents/{id}/distribution (DistributionView): who the matrix proposes, everyone else, and the parties. */
+export type Distribution = {
+  proposed: { id: string; name: string; function: string; organization: string | null }[];
+  others: { id: string; name: string; function: string; organization: string | null }[];
+  parties: { id: string; code: string; name: string; participation: string }[];
+};
