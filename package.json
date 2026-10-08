@@ -4,40 +4,11 @@
   "private": true,
   "description": "Internal EDMS implementing the Document Management Standard (Rules · Routes · Checks), multi-project",
   "scripts": {
-    "postinstall": "prisma generate",
-    "predev": "prisma migrate deploy && prisma generate",
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
-    "db:migrate": "prisma migrate dev",
-    "db:push": "prisma db push",
-    "db:seed": "tsx prisma/seed.ts",
-    "db:seed:demo": "tsx prisma/seed.ts --demo",
-    "demo": "tsx prisma/seed.ts --demo && tsx scripts/upgrade.ts && tsx scripts/seed-supersession-demo.ts && tsx scripts/seed-schedule-demo.ts && tsx scripts/seed-requirements-demo.ts && tsx scripts/seed-dmp-demo.ts && tsx scripts/seed-review-demo.ts && tsx scripts/seed-walkthrough.ts && tsx scripts/issue-released.ts && tsx scripts/run-checks.ts",
-    "db:studio": "prisma studio",
-    "setup": "prisma migrate dev --name init && tsx prisma/seed.ts",
-    "checks": "tsx scripts/run-checks.ts",
-    "defects-report": "tsx scripts/defects-report.ts",
-    "history:backfill": "tsx scripts/backfill-document-snapshots.ts",
-    "import-workbook": "tsx prisma/import-workbook-cli.ts",
-    "upgrade": "tsx scripts/upgrade.ts",
-    "issue-released": "tsx scripts/issue-released.ts",
-    "verify:tenancy": "tsx scripts/verify-tenancy.ts",
-    "verify:permissions": "tsx scripts/verify-permissions.ts",
-    "verify": "tsx scripts/verify-tenancy.ts && tsx scripts/verify-permissions.ts && tsx scripts/verify-controlled.ts && tsx scripts/verify-preflight.ts && tsx scripts/verify-workflow.ts && tsx scripts/verify-release.ts && tsx scripts/verify-rollout.ts && tsx scripts/verify-shell.ts && tsx scripts/verify-room.ts",
-    "verify:release": "tsx scripts/verify-release.ts",
-    "verify:rollout": "tsx scripts/verify-rollout.ts",
-    "verify:controlled": "tsx scripts/verify-controlled.ts",
-    "verify:preflight": "tsx scripts/verify-preflight.ts",
-    "verify:shell": "tsx scripts/verify-shell.ts",
-    "verify:workflow": "tsx scripts/verify-workflow.ts",
-    "verify:room": "tsx scripts/verify-room.ts"
-  },
-  "prisma": {
-    "seed": "tsx prisma/seed.ts"
+    "start": "next start"
   },
   "dependencies": {
-    "@prisma/client": "^6.5.0",
     "bcryptjs": "^2.4.3",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
@@ -60,9 +31,7 @@
     "@types/node": "^22.10.5",
     "@types/react": "^19.0.4",
     "@types/react-dom": "^19.0.2",
-    "prisma": "^6.5.0",
     "tailwindcss": "^4.0.0",
-    "tsx": "^4.19.2",
     "typescript": "^5.7.3"
   }
 }

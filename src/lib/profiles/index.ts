@@ -1,4 +1,3 @@
-import type { PrismaClient } from "@prisma/client";
 import type { Tenant } from "../tenant";
 import { handlerFor, summariseDiff } from "../controlled/registry";
 import "../controlled/handlers";
@@ -28,33 +27,6 @@ export { PROJECT_KINDS } from "./kinds";
 
 export function profileForKind(kind: string | null | undefined): Profile | null {
   return PROFILES.find((p) => p.projectKind === kind) ?? null;
-}
-
-/**
- * Publish a profile's sets into a new organization, at birth, before anyone
- * else exists to approve a change. The reference sets upsert (they are the
- * definition); a project-type profile only creates values that are missing.
- */
-export async function publishProfile(db: PrismaClient, orgId: string, profile: Profile, mode: "define" | "add") {
-  for (const set of profile.sets) {
-    const existing = await db.configSet.findUnique({ where: { orgId_key: { orgId, key: set.key } } });
-    if (!existing) {
-      await db.configSet.create({ data: { orgId, key: set.key, title: set.title ?? set.key, description: set.description ?? null, version: 1 } });
-    } else if (mode === "define" && set.title) {
-      await db.configSet.update({ where: { id: existing.id }, data: { title: set.title, description: set.description ?? null } });
-    }
-    const count = await db.configValue.count({ where: { orgId, setKey: set.key } });
-    for (let i = 0; i < set.values.length; i++) {
-      const v = set.values[i];
-      const props = v.props ? JSON.stringify(v.props) : null;
-      const where = { orgId_setKey_code: { orgId, setKey: set.key, code: v.code } };
-      if (mode === "define") {
-        await db.configValue.upsert({ where, update: { label: v.label, sort: v.sort ?? i, props }, create: { orgId, setKey: set.key, code: v.code, label: v.label, sort: v.sort ?? i, props } });
-      } else if (!(await db.configValue.findUnique({ where }))) {
-        await db.configValue.create({ data: { orgId, setKey: set.key, code: v.code, label: v.label, sort: count + i, props } });
-      }
-    }
-  }
 }
 
 /** What a profile would still add to this organization's published sets. */

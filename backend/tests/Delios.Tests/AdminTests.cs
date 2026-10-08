@@ -24,7 +24,7 @@ public sealed class AdminTests(Infrastructure infrastructure) : IClassFixture<In
 
         // Only an administrator keeps the directory.
         var (refused, refusal) = await Flow.PostAsync(engineer, "/api/admin/users", new { name = "Nobody", email = "nobody@demo.local", password = "secret-123" });
-        Assert.Equal((HttpStatusCode.Forbidden, "ADMIN_ONLY"), (refused, Flow.Code(refusal)));
+        Assert.Equal((HttpStatusCode.Forbidden, "ADMIN_OR_CONTROL"), (refused, Flow.Code(refusal)));
 
         // An email signs one person in to one organization.
         var (taken, takenBody) = await Flow.PostAsync(admin, "/api/admin/users", new { name = "Twin", email = "Engineer@demo.local", password = "secret-123" });
@@ -180,5 +180,45 @@ public sealed class AdminTests(Infrastructure infrastructure) : IClassFixture<In
         var late = await Flow.UploadAsync(engineer, project, document, "GA-2.pdf", Flow.Pdf(2), "application/pdf");
         var (refused, refusedBody) = await Flow.PostAsync(engineer, $"{path}/revisions/{id}/files", new { fileIds = new[] { late } });
         Assert.Equal((HttpStatusCode.Conflict, "REVISION_NOT_IN_PREPARATION"), (refused, Flow.Code(refusedBody)));
+    }
+
+    [Fact]
+    public async Task An_organization_registers_itself_and_can_register_a_document_at_once()
+    {
+        await using var off = await TestApp.StartAsync(infrastructure);
+        var (closed, _) = await Flow.PostAsync(off.Factory.CreateClient(), "/api/auth/sign-up", new { organizationName = "Nope", name = "N", email = "n@nope.test", password = "secret-123" });
+        Assert.Equal(HttpStatusCode.NotFound, closed);
+
+        await using var app = await TestApp.StartAsync(infrastructure, settings => settings["SignUp:Enabled"] = "true");
+        var (taken, takenBody) = await Flow.PostAsync(app.Factory.CreateClient(), "/api/auth/sign-up", new
+        {
+            organizationName = "Twin Ltd",
+            name = "Twin",
+            email = "engineer@demo.local",
+            password = "secret-123",
+        });
+        Assert.Equal((HttpStatusCode.Conflict, "EMAIL_TAKEN"), (taken, Flow.Code(takenBody)));
+
+        var (made, madeBody) = await Flow.PostAsync(app.Factory.CreateClient(), "/api/auth/sign-up", new
+        {
+            organizationName = "Riverside Water",
+            name = "Rita River",
+            email = "rita@riverside.test",
+            password = "secret-123",
+            projectCode = "RW1",
+            projectName = "Riverside intake",
+        });
+        Assert.True(made == HttpStatusCode.NoContent, madeBody.ToString());
+        var rita = await app.SignedInAsync("rita@riverside.test", "secret-123");
+        var me = await rita.GetFromJsonAsync<JsonElement>("/api/me");
+        Assert.Equal("Riverside Water", me.GetProperty("tenant").GetProperty("name").GetString());
+        Assert.True(me.GetProperty("user").GetProperty("isAdmin").GetBoolean());
+        var project = me.GetProperty("projects").EnumerateArray().Single().GetProperty("id").GetGuid();
+
+        // The recommended configuration is in place: a document can be registered straight away, and nothing of the demo came with it.
+        var registered = await Api.RegisterAsync(rita, project, new { title = "Intake screen general arrangement", deliverableType = "ENG", docType = "DWG", discipline = "CI", subproject = "00" });
+        Assert.StartsWith("RW1-", registered.GetProperty("number").GetString());
+        var parties = await rita.GetFromJsonAsync<JsonElement>("/api/admin/parties");
+        Assert.Equal(["OUR-ORG"], parties.EnumerateArray().Select(p => p.GetProperty("code").GetString()));
     }
 }

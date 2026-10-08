@@ -52,19 +52,7 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
         var acme = new Party { TenantId = t, Code = "ACME", Name = "Acme Pumps" };
         db.Parties.AddRange(own, acme);
 
-        Function Fn(string code, string name, params string[] verbs) => new()
-        {
-            TenantId = t,
-            Code = code,
-            Name = name,
-            Rules = [new PermissionRule { TenantId = t, Verbs = verbs }],
-        };
-        var control = Fn("DC", "Document Control", [.. Verbs.All]);
-        var engineer = Fn("ENG", "Engineer", Verbs.Read, Verbs.Create, Verbs.Revise, Verbs.Review);
-        var approver = Fn("APP", "Approver", Verbs.Read, Verbs.Review, Verbs.Approve);
-        var viewer = Fn("VIEW", "Viewer", Verbs.Read, Verbs.Receive);
-        var supplier = Fn("SUP", "Supplier", Verbs.Read, Verbs.Revise);
-        db.Functions.AddRange(control, engineer, approver, viewer, supplier);
+        var (control, engineer, approver, viewer, supplier) = AddFunctions(t);
 
         var project = new Project
         {
@@ -107,8 +95,77 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
         logger.LogInformation("Demo tenant '{Slug}' created; every password is {Password}", Slug, Password);
     }
 
+    /// <summary>The recommended functions, each with one matrix row: Document Control may do everything.</summary>
+    private (Function Control, Function Engineer, Function Approver, Function Viewer, Function Supplier) AddFunctions(Guid t)
+    {
+        Function Fn(string code, string name, params string[] verbs) => new()
+        {
+            TenantId = t,
+            Code = code,
+            Name = name,
+            Rules = [new PermissionRule { TenantId = t, Verbs = verbs }],
+        };
+        var control = Fn("DC", "Document Control", [.. Verbs.All]);
+        var engineer = Fn("ENG", "Engineer", Verbs.Read, Verbs.Create, Verbs.Revise, Verbs.Review);
+        var approver = Fn("APP", "Approver", Verbs.Read, Verbs.Review, Verbs.Approve);
+        var viewer = Fn("VIEW", "Viewer", Verbs.Read, Verbs.Receive);
+        var supplier = Fn("SUP", "Supplier", Verbs.Read, Verbs.Revise);
+        db.Functions.AddRange(control, engineer, approver, viewer, supplier);
+        return (control, engineer, approver, viewer, supplier);
+    }
+
+    /// <summary>
+    /// An organization registering itself: the organization, its administrator, its own party, and the recommended
+    /// configuration the demo runs on (functions, lists, numbering, a review route, reasons for issue), without the
+    /// demo's people, parties or projects. With a project named, it is opened with the administrator on it as
+    /// Document Control. Called by <c>POST /api/auth/sign-up</c>.
+    /// </summary>
+    public async Task<(Tenant Tenant, Guid AdminId)> StartAsync(
+        string organizationName, string adminName, string email, string password, string? projectCode, string? projectName,
+        string? contractRole, CancellationToken cancellationToken)
+    {
+        var slugBase = new string(organizationName.ToLowerInvariant().Select(c => char.IsAsciiLetterOrDigit(c) ? c : '-').ToArray()).Trim('-');
+        if (slugBase.Length == 0 || slugBase is Slug or "admin" or "api") slugBase = $"org-{slugBase}".TrimEnd('-');
+        slugBase = slugBase[..Math.Min(slugBase.Length, 40)];
+        var slug = slugBase;
+        for (var n = 2; await db.Tenants.AnyAsync(x => x.Slug == slug, cancellationToken); n++) slug = $"{slugBase}-{n}";
+
+        var tenant = await setup.CreateAsync(slug, organizationName, email, adminName, password, cancellationToken);
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+        var t = tenant.Id;
+        var own = new Party { TenantId = t, Code = "OUR-ORG", Name = organizationName, IsInternal = true };
+        db.Parties.Add(own);
+        var (control, _, _, _, _) = AddFunctions(t);
+        var admin = await db.Users.SingleAsync(u => u.NormalizedEmail == email.Trim().ToUpperInvariant(), cancellationToken);
+        admin.PartyId = own.Id;
+        AddConfiguration(t, demo: false);
+        await EnsureReviewSetupAsync(t, cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
+        await EnsureIssueSetupAsync(t, cancellationToken, demo: false);
+        await db.SaveChangesAsync(cancellationToken);
+        await EnsurePackageSetupAsync(t, cancellationToken);
+        await EnsureControlSetupAsync(t, cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
+        await EnsureScheduleSetupAsync(t, cancellationToken);
+        if (!string.IsNullOrWhiteSpace(projectCode) && !string.IsNullOrWhiteSpace(projectName))
+        {
+            var project = new Project
+            {
+                TenantId = t,
+                Code = projectCode.Trim().ToUpperInvariant(),
+                Name = projectName.Trim(),
+                ContractRole = string.IsNullOrWhiteSpace(contractRole) ? "GENERIC" : contractRole.Trim().ToUpperInvariant(),
+            };
+            db.Projects.Add(project);
+            db.Memberships.Add(new Membership { TenantId = t, ProjectId = project.Id, UserId = admin.Id, FunctionId = control.Id });
+        }
+        await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return (tenant, admin.Id);
+    }
+
     /// <summary>The published lists and numbering a project needs before its first document.</summary>
-    private void AddConfiguration(Guid t)
+    private void AddConfiguration(Guid t, bool demo = true)
     {
         void Set(string key, params (string Code, string Label, object? Props)[] values) => AddSet(t, key, values);
 
@@ -121,8 +178,16 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
         Set(ValueSets.DeliverableTypes,
             ("ENG", "Engineering Document", null),
             ("SUP", "Supplier Data", new { required = new[] { "originator", "contractRef", "receivedDate" } }));
-        Set(ValueSets.Subprojects, ("00", "Project-wide", null), ("10", "General", null), ("20", "Inlet works", null));
-        Set(ValueSets.PurchaseOrders, ("PO101", "Acme Pumps: duty pumps", null));
+        if (demo)
+        {
+            Set(ValueSets.Subprojects, ("00", "Project-wide", null), ("10", "General", null), ("20", "Inlet works", null));
+            Set(ValueSets.PurchaseOrders, ("PO101", "Acme Pumps: duty pumps", null));
+        }
+        else
+        {
+            // A number is built from the sub-project, so there is always one to choose.
+            Set(ValueSets.Subprojects, ("00", "Project-wide", null));
+        }
         Set(ValueSets.RetentionClasses,
             ("PROJECT_DURATION", "Project duration", new { @default = true }),
             ("LIFE_OF_ASSET", "Life of asset", null), ("PERMANENT", "Permanent", null));
@@ -255,7 +320,7 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
     /// Issuing: why things are sent, transmittal numbers, a client that answers
     /// by proxy and a route that ends with their approval. Adds only what is missing.
     /// </summary>
-    private async Task<bool> EnsureIssueSetupAsync(Guid t, CancellationToken cancellationToken)
+    private async Task<bool> EnsureIssueSetupAsync(Guid t, CancellationToken cancellationToken, bool demo = true)
     {
         if (await db.ValueEntries.AnyAsync(v => v.SetKey == Transmittals.TransmittalSets.Reasons, cancellationToken)) return false;
 
@@ -285,6 +350,20 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
         db.SchemeRoutings.Add(new SchemeRouting { TenantId = t, DeliverableType = RecordKinds.Transmittal, SchemeId = scheme.Id });
 
         // The client works in its own system: Document Control sends and records their answers.
+        if (demo) AddDemoClient(t);
+
+        // Viewers are on the distribution: the matrix says who receives what.
+        var viewer = await db.Functions.Include(f => f.Rules).SingleOrDefaultAsync(f => f.Code == "VIEW", cancellationToken);
+        if (viewer?.Rules.FirstOrDefault() is { } rule && !rule.Verbs.Contains(Verbs.Receive))
+        {
+            rule.Verbs = [.. rule.Verbs, Verbs.Receive];
+        }
+        return true;
+    }
+
+    /// <summary>The demo's client, who answers by proxy, and the route that ends with their approval.</summary>
+    private void AddDemoClient(Guid t)
+    {
         db.Parties.Add(new Party
         {
             TenantId = t,
@@ -306,14 +385,6 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
                 new() { Title = "Client approval", PartyCode = "NWU", Reason = "APPROVAL", Days = 10, GrantsStatuses = ["AFC"] },
             ],
         });
-
-        // Viewers are on the distribution: the matrix says who receives what.
-        var viewer = await db.Functions.Include(f => f.Rules).SingleOrDefaultAsync(f => f.Code == "VIEW", cancellationToken);
-        if (viewer?.Rules.FirstOrDefault() is { } rule && !rule.Verbs.Contains(Verbs.Receive))
-        {
-            rule.Verbs = [.. rule.Verbs, Verbs.Receive];
-        }
-        return true;
     }
 
     /// <summary>Package numbers: P1001-PK-001. The recommendation, as data.</summary>

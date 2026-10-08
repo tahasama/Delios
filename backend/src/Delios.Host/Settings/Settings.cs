@@ -60,7 +60,7 @@ public static class SettingEndpoints
         org.MapPut("/{key}", async (string key, SettingRequest r, HttpContext h, DeliosDbContext db, AuditLog audit, IClock clock, CancellationToken c) =>
         {
             var me = await db.Users.AsNoTracking().SingleAsync(u => u.Id == h.User.UserId(), c);
-            if (!me.IsAdmin) return Problems.Forbidden("ADMIN_ONLY", "An administrator answers for the organization.");
+            if (!await Keepers.ConfiguresAsync(h)) return Problems.Forbidden("ADMIN_ONLY", "An administrator answers for the organization.");
             return await SetAsync(db, audit, clock, h.User.TenantId(), null, key, r.Value, me.Id, me.Name, c);
         });
 
@@ -71,8 +71,7 @@ public static class SettingEndpoints
         project.MapPut("/{key}", async (string key, SettingRequest r, HttpContext h, DeliosDbContext db, AuditLog audit, IClock clock, CancellationToken c) =>
         {
             var access = ProjectAccessFilter.Of(h);
-            var admin = await db.Users.AsNoTracking().AnyAsync(u => u.Id == access.UserId && u.IsAdmin, c);
-            if (!admin && !access.Holds(Verbs.Control))
+            if (!await Keepers.ConfiguresAsync(h) && !access.Holds(Verbs.Control))
                 return Problems.Forbidden("CONTROL_ONLY", "An administrator or Document Control answers for the project.");
             return await SetAsync(db, audit, clock, access.Project.TenantId, access.Project.Id, key, r.Value, access.UserId, access.UserName, c);
         });

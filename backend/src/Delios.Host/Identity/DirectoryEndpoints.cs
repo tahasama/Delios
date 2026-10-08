@@ -54,9 +54,7 @@ public static class DirectoryEndpoints
     {
         var admin = app.MapGroup("/api/admin").WithTags("Administration")
             .AddEndpointFilter<TransactionFilter>()
-            .AddEndpointFilter(async (context, next) => context.HttpContext.User.IsAdmin()
-                ? await next(context)
-                : Problems.Forbidden("ADMIN_ONLY", "Only an administrator changes the organization's projects."));
+            .AddEndpointFilter(Keepers.Configurers("Only an administrator changes the organization's projects."));
         admin.MapGet("/projects", ProjectsAsync);
         admin.MapPost("/projects", CreateProjectAsync);
         admin.MapPut("/projects/{projectId:guid}", UpdateProjectAsync);
@@ -132,7 +130,7 @@ public static class DirectoryEndpoints
         if (name is null || email is null) return Problems.Invalid("NAME_AND_EMAIL_REQUIRED", "Name and email are required.");
         if (!email.Contains('@') || email.Length > 254) return Problems.Invalid("EMAIL_INVALID", "Give a valid email address.");
         if ((request.Password ?? "").Length < 8) return Problems.Invalid("PASSWORD_TOO_SHORT", "A password has at least 8 characters.");
-        if (request.IsAdmin && !http.User.IsAdmin()) return Problems.Forbidden("ADMIN_ONLY", "Only an administrator makes somebody an administrator.");
+        if (request.IsAdmin && !await Keepers.ConfiguresAsync(http)) return Problems.Forbidden("ADMIN_ONLY", "Only an administrator makes somebody an administrator.");
         var normalized = email.ToUpperInvariant();
         if (await db.SignInNames.AnyAsync(n => n.NormalizedEmail == normalized, cancellationToken))
             return Problems.Conflict("EMAIL_TAKEN", $"{email} already signs somebody in.");
@@ -163,7 +161,7 @@ public static class DirectoryEndpoints
     {
         var user = await db.Users.SingleOrDefaultAsync(u => u.Id == userId, cancellationToken);
         if (user is null) return Problems.NotFound("USER_NOT_FOUND", "No such person.");
-        if (!http.User.IsAdmin() && (user.IsAdmin || request.IsAdmin is not null))
+        if (!await Keepers.ConfiguresAsync(http) && (user.IsAdmin || request.IsAdmin is not null))
             return Problems.Forbidden("ADMIN_ONLY", "Only an administrator changes an administrator, or makes one.");
         var self = userId == http.User.UserId();
         if (self && (request.Active == false || request.IsAdmin == false))
@@ -409,7 +407,7 @@ public static class DirectoryEndpoints
         if (request.Active is { } active && active != function.Active) { changes.Add(active ? "in use" : "out of use"); function.Active = active; }
         if (request.Rules is { } rules)
         {
-            if (!http.User.IsAdmin() && rules.Any(r => (r.Verbs ?? []).Contains(Verbs.Configure)))
+            if (!await Keepers.ConfiguresAsync(http) && rules.Any(r => (r.Verbs ?? []).Contains(Verbs.Configure)))
                 return Problems.Forbidden("ADMIN_ONLY", "Only an administrator gives a function the right to configure.");
             foreach (var rule in rules)
             {
@@ -531,12 +529,29 @@ public static class DirectoryEndpoints
 }
 
 /// <summary>Who keeps the directory day to day: an administrator, or anybody who holds Document Control on a project.</summary>
-internal static class Keepers
+public static class Keepers
 {
+    /// <summary>
+    /// Whether this person administers the organization: flagged an administrator, or holding the right to configure
+    /// through a function on one of its projects. The matrix decides, as it does for everything else.
+    /// </summary>
+    public static async Task<bool> ConfiguresAsync(HttpContext http)
+    {
+        if (http.User.IsAdmin()) return true;
+        var db = http.RequestServices.GetRequiredService<DeliosDbContext>();
+        var me = http.User.UserId();
+        return await db.Memberships.AnyAsync(m => m.UserId == me && m.Active && m.Function!.Active
+            && m.Function.Rules.Any(r => r.Verbs.Contains(Verbs.Configure)), http.RequestAborted);
+    }
+
+    /// <summary>An endpoint filter that lets through only those who administer the organization.</summary>
+    public static Func<EndpointFilterInvocationContext, EndpointFilterDelegate, ValueTask<object?>> Configurers(string refusal) => async (context, next) =>
+        await ConfiguresAsync(context.HttpContext) ? await next(context) : Problems.Forbidden("ADMIN_ONLY", refusal);
+
     public static async ValueTask<object?> Filter(EndpointFilterInvocationContext context, EndpointFilterDelegate next)
     {
         var http = context.HttpContext;
-        if (http.User.IsAdmin()) return await next(context);
+        if (await ConfiguresAsync(http)) return await next(context);
         var db = http.RequestServices.GetRequiredService<DeliosDbContext>();
         var me = http.User.UserId();
         var control = await db.Memberships.AnyAsync(m => m.UserId == me && m.Active && m.Function!.Active

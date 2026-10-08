@@ -1,11 +1,9 @@
 import "server-only";
-import { db } from "./db";
 
 import { SET_PROP_FIELDS } from "./set-props";
 export { SET_PROP_FIELDS } from "./set-props";
 export type { PropField } from "./set-props";
 export { VERDICT_EFFECT, verdictEffect, VERDICT_EFFECT_SHORT } from "./verdict-effect";
-
 
 /**
  * Build the JSON props blob from submitted form fields for a given set.
@@ -42,20 +40,3 @@ export function parseProps(raw: string | null): Record<string, unknown> {
   try { return JSON.parse(raw); } catch { return {}; }
 }
 
-/** The published review outcomes with their proceed/resubmission consequences (§9.3). */
-export async function outcomeConsequences(): Promise<Record<string, { proceed: boolean; resubmit: boolean; label: string }>> {
-  const rows = await db.configValue.findMany({ where: { setKey: "REVIEW_OUTCOMES", status: "ACTIVE" } });
-  const map: Record<string, { proceed: boolean; resubmit: boolean; label: string }> = {};
-  for (const r of rows) {
-    const p = parseProps(r.props);
-    map[r.code] = { proceed: p.proceed === true, resubmit: p.resubmit === true, label: r.label };
-  }
-  return map;
-}
-
-/** The published outcome for "changes requested" — proceed = false, resubmit = true. */
-export async function requestChangesOutcomeCode(): Promise<string | null> {
-  const map = await outcomeConsequences();
-  const code = Object.entries(map).find(([, c]) => !c.proceed && c.resubmit)?.[0];
-  return code ?? "REVISE_AND_RESUBMIT";
-}

@@ -35,6 +35,8 @@ x-backend: &backend
     ClamAv__Host: clamav
     # Plain HTTP on localhost; production sits behind TLS and keeps the default.
     Auth__SecureCookie: ${SECURE_COOKIE:-false}
+    # An organization may register itself from the sign-up page.
+    SignUp__Enabled: ${SIGN_UP_ENABLED:-true}
     # The address people reach the system at, for single sign-on to send them back to.
     Sso__PublicUrl: ${PUBLIC_URL:-}
     # postgres until RegisterSearchSlow says otherwise; then opensearch (with the search profile).

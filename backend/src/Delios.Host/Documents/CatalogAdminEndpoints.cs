@@ -38,9 +38,7 @@ public static class CatalogAdminEndpoints
     {
         var admin = app.MapGroup("/api/admin").WithTags("Administration")
             .AddEndpointFilter<TransactionFilter>()
-            .AddEndpointFilter(async (context, next) => context.HttpContext.User.IsAdmin()
-                ? await next(context)
-                : Problems.Forbidden("ADMIN_ONLY", "Only an administrator publishes the organization's lists and rules."));
+            .AddEndpointFilter(Keepers.Configurers("Only an administrator publishes the organization's lists and rules."));
         admin.MapGet("/value-sets", SetsAsync);
         admin.MapPut("/values", ValueAsync);
 

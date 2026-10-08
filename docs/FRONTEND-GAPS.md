@@ -1,9 +1,41 @@
 # Frontend on the backend: what the backend does not give yet
 
-The screens are the owner's, unchanged; only where their data comes from
-changed. Where a screen asks for something the backend has no counterpart for,
-it is listed here, by screen. Nothing on a screen was removed: an empty value
-reads as the screen already reads "nothing".
+Every screen is the owner's, unchanged: only where its data comes from
+changed (checked against `main` with `git diff`). Every page loads on the
+backend for Document Control, an engineer and a supplier. Where a screen asks
+for something the backend has no counterpart for, it reads as the screen
+already reads "nothing" (an empty list), and the act answers
+"… is not supported yet."
+
+## The biggest missing pieces
+1. **Notifications**: none are kept or sent; the bell shows no count and the page is empty.
+2. **Delegation** of a review step (ask, grant, refuse, end).
+3. **Holds** on a released revision awaiting an outside approval; **voiding** a revision and its reassessment.
+4. **Assets** (the tag list, and linking documents to tags).
+5. **Transmittals**: copies (CC), drafts, replies and follow-ups, "notify again", choosing the date sent or received, a letter with no documents.
+6. **Requirements calls** to departments, issuing to senders, readiness confirmations.
+7. **Uploaded lists for a decision** ("Controlled changes"): the backend's schedule import applies at once.
+8. **Releasing without review** for a document type that is not reviewed.
+9. **Comments**: taking back or changing one before the step is answered.
+10. **Snapshots** of a document at each recorded point (its "as it was" page is empty).
+11. **Readers of a closed document**, **legal hold**, **published exceptions**, **number ranges**.
+12. **Organization's own form fields** are asked but not stored with the record.
+
+## Added to the backend while connecting
+- Admin API for every Settings screen: people, projects and who is on them, functions and the matrix, organizations, value lists, numbering, review routes, the audit trail. Holders of Configure administer; Document Control keeps people, functions, organizations, numbering and routes.
+- Web sign-up: an organization registers itself with the recommended starter configuration (switch: `SignUp:Enabled`).
+- A revision can start ahead of its files and have them attached while in preparation.
+- Editing a document's details (each change audited); withdrawing, cancelling or archiving a document.
+- Review views carry who sat on each step and who wrote each comment; holders carry their function code; a project's code can change.
+- The organization's own answers with no table (list names, scope statement, state names, form rules, own fields, an organization's contact, a project's type and dates) live in the backend's settings store.
+
+## By area, in detail
+- [Reviews](gaps/reviews.md)
+- [Transmittals](gaps/transmittals.md)
+- [Packages](gaps/packages.md)
+- [Actions & schedules](gaps/actions.md)
+- [Conformance, reports and the smaller screens](gaps/conformance-reports.md)
+- [Registering, import and exports](gaps/register-import.md)
 
 ## Everywhere
 - Notifications: the bell shows no count; there are no notifications in the backend.

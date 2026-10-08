@@ -304,6 +304,7 @@ public static class PlatformSetup
             app.MapSsoEndpoints();
             app.MapAdminEndpoints();
             app.MapDirectoryEndpoints();
+            Seeding.SignUpEndpoints.MapSignUpEndpoints(app);
             Documents.CatalogAdminEndpoints.MapCatalogAdminEndpoints(app);
             Documents.DocumentEndpoints.MapDocumentEndpoints(app);
             Reviews.ReviewEndpoints.MapReviewEndpoints(app);

@@ -8,7 +8,8 @@ import { Field, inputCls, btn } from "@/components/ui";
 import { FolderPlus, UserPlus, Check, LogOut } from "lucide-react";
 import { PROJECT_KINDS } from "@/lib/profiles/kinds";
 import { contractRoleOptions } from "@/lib/contract-roles";
-import { db as bare } from "@/lib/db";
+import { adminFunctions, adminUsers } from "@/lib/api/admin";
+import { getSets } from "@/lib/config";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Set up your organization" };
@@ -22,18 +23,25 @@ const KINDS = PROJECT_KINDS;
  */
 export default async function SetupPage() {
   const scope = await requireOrgAdmin();
-  const { db, organization, user, projectCount } = scope;
+  const { organization, user, projectCount } = scope;
 
   // Once a project exists this page has no job.
   if (projectCount > 0) redirect("/");
 
   const [functions, people, configSets] = await Promise.all([
-    db.function.findMany({ where: { active: true }, orderBy: { sort: "asc" } }),
-    db.user.findMany({ where: { active: true }, orderBy: { createdAt: "asc" }, select: { id: true, name: true, email: true, role: true } }),
-    db.configSet.count(),
+    // The account-wide role a function stands for is read from what it may do.
+    adminFunctions().then((all) => all.filter((f) => f.active).map((f) => {
+      const verbs = new Set(f.rules.flatMap((r) => r.verbs));
+      const legacyRole = verbs.has("CONFIGURE") ? "ADMIN" : verbs.has("CONTROL") ? "CONTROLLER" : verbs.has("APPROVE") ? "APPROVER"
+        : verbs.has("REVIEW") ? "REVIEWER" : verbs.has("CREATE") || verbs.has("REVISE") ? "AUTHOR" : "VIEWER";
+      return { ...f, legacyRole };
+    })),
+    adminUsers().then((all) => all.filter((u) => u.active).sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+      .map((u) => ({ id: u.id, name: u.name, email: u.email, role: u.isAdmin ? "ADMIN" : "VIEWER" }))),
+    getSets().then((all) => all.length),
   ]);
   const labelFor = (role: string) => functions.find((f) => f.legacyRole === role)?.name ?? role;
-  const roleOptions = await contractRoleOptions(bare, organization.id);
+  const roleOptions = await contractRoleOptions();
 
   return (
     <div className="min-h-screen bg-canvas">

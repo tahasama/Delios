@@ -1,26 +1,12 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { db } from "@/lib/db";
-import { createSession, hashPassword } from "@/lib/auth";
+import { createSession } from "@/lib/auth";
+import { apiFetch, problemOf } from "@/lib/api/client";
 import { PROJECT_KINDS } from "@/lib/profiles/kinds";
 import { CONTRACT_ROLES } from "@/lib/profiles/roles";  // signup predates the organization, so the built-in list is all there is
-import { publishRoleMatrix } from "@/lib/profiles/publish-roles";
-import { publishReferenceConfiguration, publishFunctionCatalogue, functionForRole } from "@/lib/bootstrap";
-import { STANDARD_VERSION } from "@/lib/standard";
 
 export type SignupState = { error?: string; values?: Record<string, string> };
-
-const RESERVED = new Set(["admin", "api", "login", "signup", "app", "www", "static", "public", "no-project"]);
-
-function slugify(name: string): string {
-  return name
-    .toLowerCase()
-    .normalize("NFKD")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 40);
-}
 
 /**
  * The only self-service path into the system: registering an organization.
@@ -64,75 +50,27 @@ export async function signupAction(_prev: SignupState | undefined, formData: For
     }
   }
 
-  // A stable, readable identifier for the organization.
-  const base = slugify(organizationName) || "org";
-  let slug = RESERVED.has(base) ? `${base}-org` : base;
-  for (let n = 2; await db.organization.findUnique({ where: { slug } }); n++) {
-    slug = `${base}-${n}`;
-    if (n > 50) return { error: "Could not derive an identifier for that name — try a different one.", values };
-  }
-
-  const created = await db.$transaction(async (tx) => {
-    const org = await tx.organization.create({ data: { slug, name: organizationName } });
-
-    // The registrant's own organization, as a party (§0.3).
-    const party = await tx.party.create({
-      data: { orgId: org.id, code: "OUR-ORG", name: organizationName, isInternal: true },
-    });
-
-    const admin = await tx.user.create({
-      data: {
-        orgId: org.id,
-        email,
-        name,
-        role: "ADMIN",
-        partyId: party.id,
-        passwordHash: await hashPassword(password),
-        active: true,
+  // The backend creates the organization with the recommended configuration,
+  // opens the project if one was named, and signs the administrator in.
+  let response: Response;
+  try {
+    response = await apiFetch("/api/auth/sign-up", {
+      method: "POST",
+      body: {
+        organizationName, name, email, password,
+        projectCode: wantsProject ? projectCode : null, projectName: wantsProject ? projectName : null, contractRole: wantsProject ? projectRole : null,
       },
     });
-
-    // The catalogue must exist before anyone can hold a function.
-    await publishFunctionCatalogue(tx as unknown as typeof db, org.id);
-    const adminFunction = await functionForRole(tx as unknown as typeof db, org.id, "ADMIN");
-    if (!adminFunction) throw new Error("The Administrator function was not published.");
-
-    // A project only if one was named. Without it the administrator lands on
-    // the setup screen, where they can add people and open the first project
-    // when they have actually decided on it.
-    let projectId: string | null = null;
-    if (wantsProject) {
-      const project = await tx.project.create({
-        data: { orgId: org.id, code: projectCode, name: projectName, kind: projectKind, role: projectRole, startDate: new Date() },
-      });
-      projectId = project.id;
-      await tx.projectMembership.create({
-        data: { projectId: project.id, userId: admin.id, functionId: adminFunction.id },
-      });
-      // §1.6 — the scope statement the conformance figure is measured against.
-      await tx.scopeConfig.create({
-        data: {
-          projectId: project.id,
-          organizationName,
- scopeStatement: `All controlled information produced or received for ${projectName}, in any medium.`,
-          assessmentLevel: "Core: identity and control",
-          standardVersion: STANDARD_VERSION,
-          effectiveDate: new Date(),
-        },
-      });
-    }
-
-    return { orgId: org.id, userId: admin.id, projectId };
-  });
-
-  // Outside the transaction: this writes a few hundred rows and must not hold
-  // a write lock on SQLite while it does.
-  await publishReferenceConfiguration(db, created.orgId, wantsProject ? projectKind : undefined);
-
-  // The contract role's starting matrix, once the functions it extends exist.
-  if (wantsProject) await publishRoleMatrix(db, created.orgId, projectRole);
-
-  await createSession(created.userId);
+  } catch {
+    return { error: "The server does not answer. Try again in a moment.", values };
+  }
+  if (!response.ok) {
+    if (response.status === 404) return { error: "Registering an organization is switched off here. Ask the people who run this system.", values };
+    return { error: (await problemOf(response)).message, values };
+  }
+  const token = response.headers.getSetCookie().find((c) => c.startsWith("delios_session="))?.slice("delios_session=".length).split(";")[0];
+  if (!token) redirect("/login");
+  await createSession(token);
   // With no project there is nothing for the dashboard to show.
-  redirect(created.projectId ? "/" : "/setup");
+  redirect(wantsProject ? "/" : "/setup");
 }
