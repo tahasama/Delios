@@ -9,6 +9,10 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
+import { adminAudit, adminFunctions, adminNumbering, adminParties, adminProjects, adminRoutes, adminUsers, orEmpty } from "@/lib/api/admin";
+import { orgSettings, projectSettings } from "@/lib/api/settings";
+import { getSets } from "@/lib/config";
+
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Settings" };
 
@@ -52,18 +56,19 @@ export default async function AdminPage() {
 
   // One live figure per card, so the hub says what is there, not just where to go.
   const [projects, parties, sets, schemes, functions, people, rules, pending, routes, events, acts, fieldsSet] = await Promise.all([
-    db.project.count({ where: { orgId: ctx.orgId, status: "ACTIVE" } }),
-    db.party.count({ where: { active: true } }),
-    db.configSet.count(),
-    db.scheme.count({ where: { active: true } }),
-    db.function.count({ where: { active: true } }),
-    db.projectMembership.count({ where: { projectId: ctx.projectId, active: true } }),
-    db.permissionRule.count(),
-    db.controlledVersion.count({ where: { state: { in: ["DRAFT", "SUBMITTED"] }, set: { orgId: ctx.orgId } } }),
-    db.workflowTemplate.count({ where: { active: true } }),
-    db.auditEvent.count({ where: { ts: { gte: new Date(Date.now() - 7 * 86_400_000) } } }),
-    db.controlSetting.count(),
-    db.fieldPolicy.count(),
+    orEmpty(adminProjects).then((all) => all.filter((p) => p.status === "ACTIVE").length),
+    orEmpty(adminParties).then((all) => all.filter((p) => p.active).length),
+    getSets().then((all) => all.length),
+    adminNumbering().then((n) => n.schemes.filter((s) => s.active).length).catch(() => 0),
+    orEmpty(adminFunctions).then((all) => all.filter((f) => f.active).length),
+    orEmpty(adminUsers).then((all) => all.filter((u) => u.memberships.some((m) => m.projectId === ctx.projectId && m.active)).length),
+    orEmpty(adminFunctions).then((all) => all.reduce((n, f) => n + f.rules.length, 0)),
+    // Controlled changes to configuration are not kept by the backend.
+    Promise.resolve(0),
+    orEmpty(adminRoutes).then((all) => all.filter((r) => r.active).length),
+    adminAudit({ from: new Date(Date.now() - 7 * 86_400_000).toISOString().slice(0, 10), per: 10 }).then((page) => page.total).catch(() => 0),
+    projectSettings(ctx.projectId).then((all) => all.size).catch(() => 0),
+    orgSettings().then((all) => [...all.keys()].filter((k) => k.startsWith("FIELD_RULE:") || k.startsWith("FIELD_LABEL:")).length).catch(() => 0),
   ]);
   const familyList = await families(ctx);
   const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;

@@ -5,10 +5,11 @@ import { PageHeader, Card, Chip, inputCls } from "@/components/ui";
 import { ActionForm } from "@/components/form";
 import { setFieldPolicyAction, addOwnFieldAction, removeOwnFieldOnRow } from "@/lib/actions/control-activities";
 import {
-  KINDS, KIND_LABEL, KIND_TAB, KIND_TEXT, RULE_LABEL, CONTROL_LABEL, fieldsOf, allFieldRules,
+  KINDS, KIND_LABEL, KIND_TAB, KIND_TEXT, RULE_LABEL, CONTROL_LABEL, fieldsOf, allFieldRules, FIELD_LABEL_KEY, storedOwnFields,
   type FieldKind, type FieldRule, type Control,
 } from "@/lib/field-policy";
 import { getSets } from "@/lib/config";
+import { orgSettings } from "@/lib/api/settings";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Forms & fields" };
@@ -47,8 +48,12 @@ export default async function FieldsPage({ searchParams }: { searchParams: Promi
 
   const [rules, labels, own, sets] = await Promise.all([
     allFieldRules(ctx),
-    ctx.db.fieldPolicy.findMany(),
-    ctx.db.customField.findMany({ orderBy: [{ position: "asc" }, { addedAt: "asc" }] }),
+    // The organization's own words for fields, and the fields it added, are its settings.
+    orgSettings().then((all) => [...all.entries()].filter(([key]) => key.startsWith(FIELD_LABEL_KEY)).map(([key, label]) => {
+      const [kindOf, field] = key.slice(FIELD_LABEL_KEY.length).split(":");
+      return { kind: kindOf, field, label };
+    })),
+    Promise.all(KINDS.map(async (one) => (await storedOwnFields(one)).map((row) => ({ ...row, kind: one, addedByName: null as string | null })))).then((all) => all.flat()),
     getSets(),
   ]);
   const labelOf = (key: string, fallback: string) =>

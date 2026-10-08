@@ -14,7 +14,7 @@ export type ProjectState = { error?: string; ok?: string };
 const CODE = /^[A-Z0-9][A-Z0-9-]{0,15}$/;
 
 /** What a project says about itself that the backend has no column for: its type, dates and scope statement, in its settings. */
-export const PROJECT_INFO = "PROJECT_INFO";
+const PROJECT_INFO = "PROJECT_INFO";
 
 /**
  * Open a project. Everything controlled lives in one, so this is the act that

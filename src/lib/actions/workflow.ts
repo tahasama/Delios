@@ -8,7 +8,8 @@ import { upload, filesOf } from "@/lib/api/uploads";
 import { requestFromForm } from "@/lib/issue-requests";
 import { formPolicy, checkForm } from "@/lib/field-policy";
 import { setOrgSetting } from "@/lib/api/settings";
-import { adminParties, PARTY_KEY } from "@/lib/api/admin";
+import { adminParties, backendRoute, PARTY_KEY, type LegacyRouteStep } from "@/lib/api/admin";
+import { hasVerb } from "@/lib/auth";
 
 /**
  * Review routes and the answers given on them. A run on these screens is the
@@ -23,13 +24,45 @@ const text = (formData: FormData, name: string) => String(formData.get(name) ?? 
 
 // ── Workflow templates (organization-defined routing) ────────────────────────
 
-/** Routes are set up in the backend's configuration; there is no screen-side editing of them yet. */
-export async function saveTemplateAction(_prev: { error?: string } | undefined, _formData: FormData): Promise<{ error?: string }> {
-  return { error: "Editing review routes here is not supported yet." };
+export async function saveTemplateAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
+  const ctx = await requireScope();
+  if (!hasVerb(ctx.user, "ROUTES") && !ctx.can("CONTROL")) return { error: "Maintaining review routes needs the Review routes permission — an administrator grants it in the distribution matrix." };
+  const id = text(formData, "id");
+  const name = text(formData, "name");
+  const classes = text(formData, "classes") || "*";
+  if (!name) return { error: "Name is required." };
+  if (classes !== "*") {
+    try {
+      const parsed = JSON.parse(classes);
+      if (!Array.isArray(parsed) || !parsed.length) return { error: "Choose at least one document class or all documents." };
+    } catch {
+      return { error: "The document-class scope is invalid." };
+    }
+  }
+  if (text(formData, "outcomeSetKey") && text(formData, "outcomeSetKey") !== "REVIEW_OUTCOMES") {
+    return { error: "Every route decides from the review outcomes list: a route's own verdict list is not supported yet." };
+  }
+  let steps: LegacyRouteStep[];
+  try { steps = JSON.parse(String(formData.get("steps") ?? "[]")); } catch { return { error: "Steps are not valid JSON." }; }
+  if (!Array.isArray(steps) || steps.length === 0) return { error: "Add at least one step." };
+  const route = await backendRoute(classes, steps);
+  if ("error" in route) return { error: route.error };
+  const body = { name, description: text(formData, "description") || null, isDefault: formData.get("isDefault") === "on", ...route };
+  try {
+    if (id) await api(`/api/admin/routes/${id}`, { method: "PUT", body });
+    else await api("/api/admin/routes", { body });
+  } catch (e) {
+    return failed(e);
+  }
+  revalidatePath("/settings/workflow-templates");
+  return {};
 }
 
-export async function deleteTemplateAction(_prev: { error?: string } | undefined, _formData: FormData): Promise<{ error?: string }> {
-  return { error: "Editing review routes here is not supported yet." };
+/** A route is taken out of use, never deleted: reviews that ran on it keep its name. */
+export async function deleteTemplateAction(formData: FormData) {
+  await requireScope();
+  await api(`/api/admin/routes/${text(formData, "id")}`, { method: "PUT", body: { active: false } }).catch(() => undefined);
+  revalidatePath("/settings/workflow-templates");
 }
 
 /**

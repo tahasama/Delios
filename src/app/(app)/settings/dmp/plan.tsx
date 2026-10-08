@@ -46,21 +46,26 @@ function Line({ label, children }: { label: string; children: React.ReactNode })
   );
 }
 
+import { adminFunctions, legacyNumbering, legacyRoutes, orEmpty, scopeConfig } from "@/lib/api/admin";
+import { backendDocument } from "@/lib/api/legacy";
+
 export async function DocumentManagementPlan({ readiness }: { readiness: { title: string; done: boolean; todo: string }[] }) {
   const ctx = await requireScope();
-  const { db, project } = ctx;
+  const { project } = ctx;
 
   const [
     scope, sets, schemes, routings, templates, distribution, exceptions, chosen, settings, names,
     controlHolders, statuses, outcomes, retention, criticality, native, rendition, preservation, dmpDoc,
   ] = await Promise.all([
-    db.scopeConfig.findFirst(),
+    scopeConfig(ctx.projectId),
     getSets(),
-    db.scheme.findMany({ include: { fields: { orderBy: { position: "asc" } } }, orderBy: { name: "asc" } }),
-    db.schemeRouting.findMany({ orderBy: { deliverableType: "asc" } }),
-    db.workflowTemplate.findMany({ where: { active: true }, orderBy: [{ isDefault: "desc" }, { name: "asc" }] }),
-    db.distributionRule.findMany(),
-    db.exceptionEntry.findMany({ orderBy: { startDate: "desc" } }),
+    legacyNumbering().then((n) => n.schemes),
+    legacyNumbering().then((n) => n.routing),
+    legacyRoutes().then((all) => [...all].sort((a, b) => Number(b.isDefault) - Number(a.isDefault) || a.name.localeCompare(b.name))),
+    // Who receives what is the matrix's Receive rows.
+    orEmpty(adminFunctions).then((all) => all.flatMap((f) => f.rules.filter((r) => r.verbs.includes("RECEIVE")))),
+    // Published exceptions to the standard are not kept by the backend yet.
+    Promise.resolve([] as { id: string; item: string; clauses: string; reason: string; authority: string; startDate: Date; reviewPoint: Date | null }[]),
     policies(ctx),
     controlSettings(ctx),
     stateNames(ctx),
@@ -72,9 +77,10 @@ export async function DocumentManagementPlan({ readiness }: { readiness: { title
     getActiveSet("NATIVE_FORMATS"),
     getActiveSet("RENDITION_FORMATS"),
     getActiveSet("PRESERVATION_FORMATS"),
-    db.scopeConfig.findFirst().then(async (s) =>
-      s?.dmpDocumentId ? db.document.findFirst({ where: { id: s.dmpDocumentId }, select: { docNumber: true, title: true, latestRevValue: true } }) : null,
-    ),
+    scopeConfig(ctx.projectId).then(async (s) => {
+      const found = s?.dmpDocumentId ? await backendDocument(ctx, s.dmpDocumentId) : null;
+      return found ? { docNumber: found.number, title: found.title, latestRevValue: found.revisions.at(-1)?.value ?? null } : null;
+    }),
   ]);
 
   const outstanding = readiness.filter((r) => !r.done);

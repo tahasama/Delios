@@ -7,6 +7,7 @@ import { hasVerb } from "@/lib/auth";
 import { ArrowRight } from "lucide-react";
 import { verdictSets } from "@/lib/verdict-sets";
 import { isVerdictSet } from "@/lib/set-props";
+import { adminFunctions, adminParties, adminUsers, legacyRoutes } from "@/lib/api/admin";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Review routes" };
@@ -14,17 +15,21 @@ export const metadata = { title: "Review routes" };
 type Step = WorkflowBuilderStep;
 
 export default async function WorkflowTemplatesPage() {
-  const { user: me, db } = await requireScope();
+  const { user: me } = await requireScope();
   const admin = hasVerb(me, "ROUTES");
   const [templates, sets, users, classValues, functions, outsideParties] = await Promise.all([
-    db.workflowTemplate.findMany({ where: { active: true }, orderBy: { createdAt: "asc" } }),
+    legacyRoutes(),
     getSets(),
-    db.user.findMany({ where: { active: true }, orderBy: { name: "asc" }, include: { party: true } }),
-    db.configValue.findMany({ where: { setKey: { in: ["DOCUMENT_TYPES", "DISCIPLINES", "CRITICALITY", "DELIVERABLE_TYPES", "SUPPLIER_CODES"] }, status: "ACTIVE" }, orderBy: [{ sort: "asc" }, { label: "asc" }] }),
-    db.function.findMany({ where: { active: true }, orderBy: { sort: "asc" }, select: { id: true, name: true } }),
+    adminUsers().then((all) => all.filter((u) => u.active).map((u) => ({
+      id: u.id, name: u.name, role: "", party: u.partyId ? { name: u.partyName ?? "", isInternal: u.internal } : null,
+    }))),
+    Promise.all(["DOCUMENT_TYPES", "DISCIPLINES", "CRITICALITY", "DELIVERABLE_TYPES", "SUPPLIER_CODES"].map(async (setKey) =>
+      (await getActiveSet(setKey)).map((v) => ({ ...v, setKey })))).then((all) => all.flat()),
+    // A step names a function by its code.
+    adminFunctions().then((all) => all.filter((f) => f.active).map((f) => ({ id: f.code, name: f.name }))),
     // Parties that can hold a step of a route: a client, a control office, a
     // supplier. How each of them answers is set in Parties & people.
-    db.party.findMany({ where: { isInternal: false, active: true }, orderBy: { name: "asc" }, select: { id: true, name: true, participation: true } }),
+    adminParties().then((all) => all.filter((p) => !p.isInternal && p.active).map((p) => ({ id: p.id, name: p.name, participation: p.participation }))),
   ]);
   // A route may answer from any verdict list the organization publishes — its
   // own list for engineering, say — so this is not a fixed pair.
@@ -44,7 +49,7 @@ export default async function WorkflowTemplatesPage() {
     originators: classValues.filter((value) => value.setKey === "SUPPLIER_CODES").map(({ code, label }) => ({ code, label })),
   };
   const nameOf = (id: string) => users.find((u) => u.id === id)?.name ?? id;
-  const setViews = await verdictSets({ db }, templates.map((t) => t.outcomeSetKey ?? "REVIEW_OUTCOMES"));
+  const setViews = await verdictSets(null, templates.map((t) => t.outcomeSetKey ?? "REVIEW_OUTCOMES"));
 
   return (
     <div className="space-y-4">

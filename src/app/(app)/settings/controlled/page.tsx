@@ -6,6 +6,8 @@ import "@/lib/controlled/handlers";
 import { fmtDate } from "@/lib/utils";
 import { Grid3X3, CalendarRange, Tags, ArrowRight, CircleCheck, Clock, PencilLine } from "lucide-react";
 
+import { controlledSets } from "@/lib/api/admin";
+
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Controlled changes" };
 
@@ -27,7 +29,6 @@ function parseDiff(json: string | null): DiffLine[] {
 
 export default async function ControlledPage() {
   const ctx = await requireScope();
-  const { db } = ctx;
 
   const mayChange = ctx.can("CONFIGURE") || ctx.can("CONTROL");
   if (!mayChange && !ctx.can("CONFIGURE")) {
@@ -36,9 +37,7 @@ export default async function ControlledPage() {
 
   // Value sets are set up on their own page and agreed in the DMP.
   const handlers = allHandlers().filter((h) => !h.direct);
-  const sets = await db.controlledSet.findMany({
-    include: { versions: { orderBy: { createdAt: "desc" }, take: 20 } },
-  });
+  const sets = await controlledSets();
 
   const cards = handlers.map((handler) => {
     const mine = sets.filter(

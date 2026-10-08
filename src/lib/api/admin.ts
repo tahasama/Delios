@@ -182,3 +182,104 @@ export async function legacyParties() {
       };
     });
 }
+
+// ── Review routes, as the routes screen reads them ───────────────────────────
+// The screen's step names who answers by functions (by id), people or one
+// outside party; the backend's step is answered by the holders of one
+// function (by code) or by one party (by code), the first answer or all.
+
+export type LegacyRouteStep = {
+  act: "REVIEW" | "APPROVAL"; partyId?: string; mode: "ANY_OF" | "ALL_CONSOLIDATOR" | "SERIAL" | "ALL"; participantIds: string[];
+  functionIds?: string[]; title?: string; days?: number; grantsStatuses?: string[];
+};
+
+export async function legacyRoutes() {
+  const [routes, parties] = await Promise.all([adminRoutes(), adminParties()]);
+  return routes.filter((r) => r.active).map((r) => ({
+    id: r.id, name: r.name, description: r.description, isDefault: r.isDefault, outcomeSetKey: "REVIEW_OUTCOMES" as string | null, createdAt: new Date(0),
+    classes: r.patterns.length
+      ? JSON.stringify(r.patterns.map((p) => Object.fromEntries(Object.entries(p).filter(([, v]) => v))))
+      : "*",
+    steps: JSON.stringify(r.steps.map((s, i): LegacyRouteStep => ({
+      act: i === r.steps.length - 1 ? "APPROVAL" : "REVIEW",
+      partyId: s.partyCode ? parties.find((p) => p.code === s.partyCode)?.id : undefined,
+      mode: s.mode === "ALL" ? "ALL" : "ANY_OF",
+      participantIds: [],
+      functionIds: s.functionCode ? [s.functionCode] : [],
+      title: s.title,
+      days: s.days ?? undefined,
+      grantsStatuses: s.grantsStatuses,
+    }))),
+  }));
+}
+
+/** A screen route as the backend takes it; what the backend cannot say is reported, not dropped in silence. */
+export async function backendRoute(classes: string, steps: LegacyRouteStep[]): Promise<{ patterns: unknown[]; steps: unknown[] } | { error: string }> {
+  const parties = await adminParties();
+  if (steps.some((s) => s.participantIds.length)) return { error: "A step is answered by the holders of a function, or by an organization: naming people on a step is not supported yet." };
+  if (steps.some((s) => (s.functionIds ?? []).length > 1)) return { error: "A step is answered by the holders of one function: choose one per step." };
+  if (steps.some((s) => !s.partyId && !(s.functionIds ?? []).length)) return { error: "Say who answers each step: a function, or an outside organization." };
+  const patterns = classes === "*" ? [] : (JSON.parse(classes) as Record<string, string | undefined>[]).map((p) => ({
+    deliverableType: p.deliverableType || null, docType: p.docType || null, discipline: p.discipline || null, criticality: p.criticality || null,
+    originator: p.originator || null,
+  }));
+  return {
+    patterns,
+    steps: steps.map((s, i) => ({
+      title: s.title || (i === steps.length - 1 ? "Decision" : `Review ${i + 1}`),
+      functionCode: s.partyId ? null : s.functionIds![0],
+      partyCode: s.partyId ? parties.find((p) => p.id === s.partyId)?.code ?? null : null,
+      mode: s.mode === "ANY_OF" ? "ANY" : "ALL",
+      days: s.days ?? null,
+      grantsStatuses: s.grantsStatuses ?? [],
+    })),
+  };
+}
+
+// ── Controlled changes ────────────────────────────────────────────────────────
+// Uploaded lists waiting for a decision are not kept by the backend yet: there
+// are none, and the screens read that as "nothing uploaded".
+
+export type ControlledVersionRow = {
+  id: string; key: string; title: string; state: string; versionLabel: string; rowCount: number; decidedAt: Date | null; decidedByName: string | null;
+  decisionReason: string | null; createdAt: Date; submittedAt: Date | null; submittedById: string | null; submittedByName: string | null;
+  sourceName: string | null; notes: string | null; diff: string | null;
+};
+export type ControlledSetRow = { id: string; key: string; title: string; kind: string; projectId: string | null; versions: ControlledVersionRow[] };
+
+export async function controlledSets(_kind?: string): Promise<ControlledSetRow[]> {
+  return [];
+}
+
+// ── The scope statement ───────────────────────────────────────────────────────
+// The organization's statement of what it controls and how it is measured is
+// its own answer, kept in its settings (SCOPE); a project may state its own
+// scope (PROJECT_INFO), which then wins.
+
+export type ScopeConfig = {
+  organizationName: string; scopeStatement: string; assessmentLevel: string; standardVersion: string; effectiveDate: Date;
+  integrityThreshold: number; measurementIntervalDays: number; controlFunctionName: string | null; dmpDocumentId: string | null;
+};
+
+export async function scopeConfig(projectId?: string): Promise<ScopeConfig | null> {
+  const { orgSettings, projectSettings } = await import("./settings");
+  const { STANDARD_VERSION } = await import("../standard");
+  const { getMe } = await import("./me");
+  const [org, project, me] = await Promise.all([orgSettings(), projectId ? projectSettings(projectId) : Promise.resolve(new Map<string, string>()), getMe()]);
+  let said: Partial<Omit<ScopeConfig, "effectiveDate"> & { effectiveDate: string }> = {};
+  let own: { scopeStatement?: string } = {};
+  try { said = JSON.parse(org.get("SCOPE") ?? "{}"); } catch { said = {}; }
+  try { own = JSON.parse(project.get("PROJECT_INFO") ?? "{}"); } catch { own = {}; }
+  if (!org.get("SCOPE") && !own.scopeStatement) return null;
+  return {
+    organizationName: said.organizationName ?? me?.tenant.name ?? "",
+    scopeStatement: own.scopeStatement ?? said.scopeStatement ?? "",
+    assessmentLevel: said.assessmentLevel ?? "Full",
+    standardVersion: said.standardVersion ?? STANDARD_VERSION,
+    effectiveDate: new Date(said.effectiveDate ?? Date.now()),
+    integrityThreshold: said.integrityThreshold ?? 95,
+    measurementIntervalDays: said.measurementIntervalDays ?? 30,
+    controlFunctionName: said.controlFunctionName ?? null,
+    dmpDocumentId: said.dmpDocumentId ?? null,
+  };
+}
