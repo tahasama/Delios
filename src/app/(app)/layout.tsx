@@ -11,11 +11,10 @@ import type { Role } from "@/lib/standard";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const ctx = await requireScope();
-  const { user, db, project, available, role } = ctx;
-  const [unread, scope] = await Promise.all([
-    db.notification.count({ where: { userId: user.id, read: false } }),
-    db.scopeConfig.findFirst(),
-  ]);
+  const { user, project, available, role } = ctx;
+  // Notifications have no counterpart in the backend yet; the organization's name is the account's.
+  const unread = 0;
+  const scope = { organizationName: user.organization };
 
   // The navigation is built from what this person may actually do, so nobody
   // is offered a destination that will refuse them.

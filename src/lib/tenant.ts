@@ -525,7 +525,8 @@ export type ScopedDb = ReturnType<typeof scopedClient>;
 export type Tenant = {
   orgId: string;
   projectId: string;
-  db: ScopedDb;
+  /** The data comes from the backend now (`src/lib/api`); this marks what still reaches for the old client. */
+  db: { readonly movedToBackend: true };
 };
 
 /**

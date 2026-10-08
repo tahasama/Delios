@@ -26,6 +26,7 @@ public sealed class DeliosDbContext(DbContextOptions<DeliosDbContext> options)
     public DbSet<Party> Parties => Set<Party>();
     public DbSet<User> Users => Set<User>();
     public DbSet<SignInName> SignInNames => Set<SignInName>();
+    public DbSet<Settings.Setting> Settings => Set<Settings.Setting>();
     public DbSet<Project> Projects => Set<Project>();
     public DbSet<Function> Functions => Set<Function>();
     public DbSet<PermissionRule> PermissionRules => Set<PermissionRule>();

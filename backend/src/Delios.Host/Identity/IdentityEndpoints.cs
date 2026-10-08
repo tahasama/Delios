@@ -337,10 +337,18 @@ public static class IdentityEndpoints
                 m.Project.Code,
                 m.Project.Name,
                 m.Project.TimeZone,
-                Function = new { m.Function!.Code, m.Function.Name },
+                m.Project.ContractRole,
+                m.Project.Status,
+                m.Department,
+                Function = new { m.Function!.Id, m.Function.Code, m.Function.Name },
                 Verbs = m.Function.Rules
                     .Where(r => r.ProjectRole == null || r.ProjectRole == m.Project.ContractRole)
                     .SelectMany(r => r.Verbs).Distinct().ToList(),
+                // The function's rows of the permission matrix, so the screens ask the same question the backend does.
+                Rules = m.Function.Rules.Select(r => new
+                {
+                    r.DeliverableType, r.DocType, r.Discipline, r.Criticality, r.Confidentiality, r.ProjectRole, r.Verbs,
+                }).ToList(),
             })
             .ToListAsync(cancellationToken);
         return Results.Ok(new { user = me, tenant = organization, projects });

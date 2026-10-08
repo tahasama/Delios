@@ -1,5 +1,8 @@
 import { cache } from "react";
-import type { Tenant } from "./tenant";
+import { orgSettings } from "./api/settings";
+
+/** The organization setting that holds a state's name: STATE_NAME:RELEASED. */
+export const STATE_NAME_KEY = "STATE_NAME:";
 import { REV_STATE_LABEL, type RevState } from "./standard";
 
 /**
@@ -34,10 +37,12 @@ export const DEFAULT_STATE_NAMES = Object.fromEntries(STATE_NAMES.map((one) => [
 export const STATE_NAME_MAX = 40;
 
 /** This organization's names, read once a request. */
-export const stateNames = cache(async (t: Pick<Tenant, "db">): Promise<StateNames> => {
-  const rows = await t.db.stateName.findMany({ select: { code: true, label: true } });
+export const stateNames = cache(async (_t?: unknown): Promise<StateNames> => {
   const names = { ...DEFAULT_STATE_NAMES };
-  for (const row of rows) if (row.code in names && row.label.trim()) names[row.code as StateNameCode] = row.label.trim();
+  for (const [key, label] of await orgSettings()) {
+    const code = key.startsWith(STATE_NAME_KEY) ? key.slice(STATE_NAME_KEY.length) : "";
+    if (code in names && label.trim()) names[code as StateNameCode] = label.trim();
+  }
   return names;
 });
 

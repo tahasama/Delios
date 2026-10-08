@@ -1,4 +1,5 @@
 import type { Tenant } from "./tenant";
+import { holders } from "./api/settings";
 
 /**
  * What someone may do, decided by the function they hold on the project rather
@@ -331,16 +332,6 @@ export async function holdersOf(
   verb: Verb,
   target?: DocumentClass | null,
 ): Promise<{ id: string; name: string; functionName: string; department: string | null }[]> {
-  const members = await t.db.projectMembership.findMany({
-    where: { projectId: t.projectId, active: true, user: { active: true } },
-    include: { user: { select: { id: true, name: true } } },
-  });
-  const actors = new Map<string, Actor | null>();
-  const out: { id: string; name: string; functionName: string; department: string | null }[] = [];
-  for (const m of members) {
-    if (!actors.has(m.functionId)) actors.set(m.functionId, await loadActor(t, m.functionId));
-    const actor = actors.get(m.functionId)!;
-    if (can(actor, verb, target)) out.push({ id: m.user.id, name: m.user.name, functionName: actor!.functionName, department: m.department });
-  }
-  return out.sort((a, b) => a.name.localeCompare(b.name));
+  const found = await holders(t.projectId, verb, target?.deliverableType, target?.docType, target?.discipline, target?.criticality, target?.confidentiality);
+  return found.map((one) => ({ id: one.id, name: one.name, functionName: one.functionName, department: one.department }));
 }

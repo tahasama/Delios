@@ -48,7 +48,7 @@ public sealed record RegisterFilter(
     string? Q = null, string? State = null, string? Rev = null, string? Status = null, string? Verdict = null, string? Supplier = null,
     string? Discipline = null, string? DocType = null, string? Criticality = null, string? Confidentiality = null, string? Deliverable = null,
     string? Action = null, string? On = null, DateOnly? From = null, DateOnly? To = null, string? View = null, string? Sort = null, string? Dir = null,
-    string? Ids = null, bool? Released = null);
+    string? Ids = null, bool? Released = null, string? Po = null);
 
 /// <summary>One row of the register: the document and the facts about its newest and its current revision.</summary>
 public sealed record RegisterRow(
@@ -239,12 +239,17 @@ public static class RegisterEndpoints
         if (f.Released == true) query = query.Where(d => db.Revisions.Any(r => r.DocumentId == d.Id && r.State == RevisionStates.Released));
         if (Has(f.State)) query = query.Where(d => d.State == f.State);
         if (f.Rev == "NONE") query = query.Where(d => d.LatestRevisionId == null);
+        // Reviewed and not yet released: the route is finished, Document Control has not published it.
+        else if (f.Rev is "NOT_RELEASED" or "FOR_RELEASE")
+            query = query.Where(d => d.LatestRevisionState == RevisionStates.InReview
+                && db.Reviews.Any(r => r.RevisionId == d.LatestRevisionId && r.State == Reviews.ReviewStates.Decided));
         else if (Has(f.Rev)) query = query.Where(d => d.LatestRevisionState == f.Rev);
         if (Has(f.Status)) query = query.Where(d => db.Revisions.Any(r => r.DocumentId == d.Id && r.State == RevisionStates.Released && r.StatusCode == f.Status));
         if (Has(f.Verdict))
             query = query.Where(d => db.Reviews.Where(r => r.RevisionId == d.LatestRevisionId && r.Verdict != null)
                 .OrderByDescending(r => r.DecidedAt).Select(r => r.Verdict).FirstOrDefault() == f.Verdict);
         if (Has(f.Supplier)) query = query.Where(d => d.Originator == f.Supplier);
+        if (Has(f.Po)) query = query.Where(d => d.ContractRef == f.Po);
         if (Has(f.Discipline)) query = query.Where(d => d.Discipline == f.Discipline);
         if (Has(f.DocType)) query = query.Where(d => d.DocType == f.DocType);
         if (Has(f.Criticality)) query = query.Where(d => d.Criticality == f.Criticality);

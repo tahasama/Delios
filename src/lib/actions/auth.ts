@@ -1,10 +1,8 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { db } from "@/lib/db";
-import { createSession, destroySession, verifyPassword } from "@/lib/auth";
-import { audit } from "@/lib/audit";
-import { tenantFor } from "@/lib/tenant";
+import { createSession, destroySession } from "@/lib/auth";
+import { apiFetch, problemOf } from "@/lib/api/client";
 
 export type LoginState = {
   error?: string;
@@ -28,73 +26,33 @@ export type LoginState = {
 export async function loginAction(_prev: LoginState | undefined, formData: FormData): Promise<LoginState> {
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
-  const orgSlug = String(formData.get("org") ?? "").trim().toLowerCase();
   const next = String(formData.get("next") ?? "/");
   if (!email || !password) return { error: "Email and password are required." };
 
-  const candidates = await db.user.findMany({
-    where: {
-      email,
-      active: true,
-      org: { active: true, ...(orgSlug ? { slug: orgSlug } : {}) },
-      // Someone whose company's access was revoked cannot sign in.
-      OR: [{ partyId: null }, { party: { active: true } }],
-    },
-    include: { party: true, org: true },
-  });
-
-  const matched = [];
-  for (const candidate of candidates) {
-    if (await verifyPassword(password, candidate.passwordHash)) matched.push(candidate);
+  // The backend checks the password, the lockout and every limit, and records
+  // the sign-in. A person belongs to one organization, so the email says which.
+  let response: Response;
+  try {
+    response = await apiFetch("/api/auth/sign-in", { method: "POST", body: { email, password } });
+  } catch {
+    return { error: "The server does not answer. Try again in a moment.", email };
   }
-
-  if (matched.length === 0) {
-    // Same message whether the address is unknown, the password is wrong, or
-    // the account is in another organization.
-    return { error: "Those credentials do not match an active account.", email };
+  if (!response.ok) {
+    const problem = await problemOf(response);
+    return { error: problem.code === "SIGN_IN_FAILED" ? "Those credentials do not match an active account." : problem.message, email };
   }
-
-  if (matched.length > 1) {
-    return {
-      error: "That address has an account in more than one organization — choose which to sign in to.",
-      chooseOrg: matched.map((m) => ({ slug: m.org.slug, name: m.org.name })),
-      email,
-    };
+  const token = response.headers.getSetCookie().find((c) => c.startsWith("delios_session="))?.slice("delios_session=".length).split(";")[0];
+  if (!token) {
+    // A code from an authenticator app is asked next, and this page has no place for it.
+    return { error: "This account uses two-step sign-in, which this page does not ask for yet.", email };
   }
-
-  const user = matched[0];
-  await createSession(user.id);
-
-  // A login is an event in the organization, but audit rows live on a project,
-  // so it is recorded against the project the person is about to land in.
-  const membership = await db.projectMembership.findFirst({
-    where: { userId: user.id, active: true, project: { status: "ACTIVE" } },
-    orderBy: { project: { code: "asc" } },
-  });
-  if (membership) {
-    await audit({
-      tenant: tenantFor(user.orgId, membership.projectId),
-      actor: {
-        id: user.id,
-        orgId: user.orgId,
-        email: user.email,
-        name: user.name,
-        role: user.role as never,
-        organization: user.party?.name ?? user.organization,
-        partyId: user.partyId,
-        partyCode: user.party?.code ?? null,
-        partyName: user.party?.name ?? user.organization,
-        isInternal: user.party ? user.party.isInternal : true,
-      },
-      action: "LOGIN",
-      detail: `Signed in to ${user.org.name}.`,
-    });
-  }
+  await createSession(token);
 
   redirect(next.startsWith("/") ? next : "/");
 }
 
 export async function logoutAction() {
+  await apiFetch("/api/auth/sign-out", { method: "POST" }).catch(() => undefined);
   await destroySession();
   redirect("/login");
 }

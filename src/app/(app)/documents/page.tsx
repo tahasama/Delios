@@ -1,12 +1,14 @@
-import { Prisma } from "@prisma/client";
 import { requireScope } from "@/lib/scope";
+import { api, projectPath } from "@/lib/api/client";
+import { getMe } from "@/lib/api/me";
+import type { ActivitySummary, RegisterPage } from "@/lib/api/types";
 import { RegisterPlate } from "./register-plate";
 import { OUTCOME_CONSEQUENCES, DOC_STATES, DOC_STATE_LABEL, DOC_MEANING, REV_STATES, REV_MEANING, type DocState, type RevState } from "@/lib/standard";
 import { getSet } from "@/lib/config";
 import { DocumentRegister } from "./document-register";
 import { hasVerb } from "@/lib/auth";
 import { Banner } from "@/components/ui";
-import { registerWhere, REGISTER_SORTS, documentsForAssets, readSearch, readDay } from "@/lib/register-query";
+import { REGISTER_SORTS, readSearch } from "@/lib/register-query";
 import { isReadOnly } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -62,7 +64,7 @@ type Search = {
 
 export default async function DocumentsPage({ searchParams }: { searchParams: Promise<Search> }) {
   const scope = await requireScope();
-  const { user, db, project } = scope;
+  const { user, project } = scope;
   // Released and issued as one act, or as two in order: the project's answer.
   const { policy } = await import("@/lib/control-activities");
   const together = (await policy(scope, "POLICY_RELEASE")) === "TOGETHER";
@@ -96,69 +98,43 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
   // knows — nothing new is stored to make this work. Either end may be left
   // open: "released, from 1 March" is a question people actually ask.
   const dateOn = DATE_FIELDS.some((field) => field.key === sp.on) ? sp.on! : "";
-  const from = readDay(sp.from, false);
-  const to = readDay(sp.to, true);
-  const assetDocIds = await documentsForAssets(scope, searches.flatMap((search) => search.words));
-
-  const where = registerWhere(sp, assetDocIds);
 
   const sort = sp.sort && REGISTER_SORTS[sp.sort] ? sp.sort : "";
   const dir = sp.dir === "asc" ? "asc" : "desc";
-  const orderBy: Prisma.DocumentOrderByWithRelationInput = sort
-    ? ({ [REGISTER_SORTS[sort]]: dir } as Prisma.DocumentOrderByWithRelationInput)
-    : { updatedAt: "desc" };
 
   const perPage = PAGE_SIZES.includes(Number(sp.per)) ? Number(sp.per) : 50;
   const page = Math.max(1, Number(sp.page) || 1);
 
-  const [matchCount, disciplines, types, statuses, verdictSet, supplierCodes, poCodes, criticalities, confidentialities, retentions, deliverableTypes, phases, actionCodes, templates, inUse, views] =
+  // The register itself, filtered, sorted and cut into pages by the backend.
+  const [register, disciplines, types, statuses, verdictSet, supplierCodes, poCodes, criticalities, confidentialities, retentions, deliverableTypes, phases, activities, views] =
     await Promise.all([
-      db.document.count({ where }),
+      api<RegisterPage>(projectPath(scope, "/register"), {
+        query: {
+          q, state, rev: revState, status: statusCode, verdict: verdictCode, supplier, po, discipline, docType, criticality, confidentiality,
+          deliverable, action: sp.action ?? "", on: dateOn, from: sp.from ?? "", to: sp.to ?? "", view, sort, dir, page, per: perPage,
+        },
+      }),
       getSet("DISCIPLINES"), getSet("DOCUMENT_TYPES"), getSet("STATUSES"), getSet("REVIEW_OUTCOMES"), getSet("SUPPLIER_CODES"), getSet("PURCHASE_ORDERS"),
       getSet("CRITICALITY"), getSet("CONFIDENTIALITY"), getSet("RETENTION_CLASSES"), getSet("DELIVERABLE_TYPES"), getSet("PHASES"),
       // Only the activities that actually owe something: an action nobody has
       // listed a document against would filter to an empty register.
-      db.action.findMany({ where: { entries: { some: {} } }, select: { code: true, name: true }, orderBy: { code: "asc" } }),
-      db.workflowTemplate.findMany({ where: { active: true }, orderBy: [{ isDefault: "desc" }, { name: "asc" }] }),
-      // Filters offer what the register holds, not every value published.
-      db.document.groupBy({ by: ["discipline", "docType"] }),
+      api<ActivitySummary[]>(projectPath(scope, "/activities")).catch(() => [] as ActivitySummary[]),
       // The questions this reader keeps, oldest first so the list stays put.
-      db.registerView.findMany({ where: { userId: user.id }, orderBy: { createdAt: "asc" }, select: { id: true, name: true, query: true } }),
+      api<{ id: string; name: string; query: string; createdAt: string }[]>(projectPath(scope, "/register/views")).catch(() => []),
     ]);
-
-  const pages = Math.max(1, Math.ceil(matchCount / perPage));
-  const current = Math.min(page, pages);
-
-  // The page itself, in full: the expensive includes touch fifty rows.
-  const docs = await db.document.findMany({
-    where,
-    orderBy,
-    skip: (current - 1) * perPage,
-    take: perPage,
-    include: {
-      revisions: { orderBy: { createdAt: "desc" }, include: {
-        files: { select: { createdAt: true } },
-        cycles: { orderBy: { sequence: "desc" } },
-        approvals: { where: { withdrawnAt: null }, orderBy: { decidedAt: "desc" }, take: 1 },
-        transmittalItems: { where: { transmittal: { direction: "OUTGOING" } }, select: { id: true }, take: 1 },
-      } },
-      _count: { select: { baselineEntries: true, packageMembers: true } },
-      // Which activities owe this document. Usually none or one, so the cost of
-      // carrying them is small and the register can finally be asked "what is
-      // owed against A0042".
-      baselineEntries: { select: { action: { select: { code: true, name: true } } }, orderBy: { requiredBy: "asc" }, take: 4 },
-    },
-  });
+  const actionCodes = activities.filter((a) => a.needs > 0).sort((a, b) => a.code.localeCompare(b.code)).map((a) => ({ code: a.code, name: a.name }));
+  const matchCount = register.total;
+  const pages = Math.max(1, register.pages);
+  const current = Math.min(register.page, pages);
 
   // Filters offer what the register holds, not every value the organisation publishes.
-  const usedDisciplines = new Set(inUse.map((d) => d.discipline));
-  const usedTypes = new Set(inUse.map((d) => d.docType));
+  const usedDisciplines = new Set(register.lists.usedDisciplines);
+  const usedTypes = new Set(register.lists.usedDocTypes);
   const disciplineLabel = new Map(disciplines.map((d) => [d.code, d.label]));
   const typeLabel = new Map(types.map((t) => [t.code, t.label]));
   const retentionLabel = new Map(retentions.map((item) => [item.code, item.label]));
   const deliverableLabel = new Map(deliverableTypes.map((item) => [item.code, item.label]));
   const statusLabel = new Map(statuses.map((item) => [item.code, item.label]));
-  const phaseLabel = new Map(phases.map((item) => [item.code, item.label]));
   const publishedVerdicts = new Set(verdictSet.map((item) => item.code));
   const verdictLabel = new Map<string, string>([...Object.entries(OUTCOME_CONSEQUENCES).map(([k, v]) => [k, v.label] as [string, string]), ...verdictSet.map((item) => [item.code, item.label] as [string, string])]);
   const statusUse = new Map(statuses.map((item) => [item.code, [item.props.may ? `May: ${item.props.may}` : "", item.props.mayNot ? `May not: ${item.props.mayNot}` : ""].filter(Boolean).join("\n")]));
@@ -169,59 +145,55 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
   // Older revisions and their history live on the document page; who is holding
   // a review up, and the comments on it, live on the review.
   const supplierView = !user.isInternal && !!user.partyCode;
-  const hostName = supplierView ? (await db.scopeConfig.findFirst())?.organizationName ?? "Our client" : null;
-  const all = docs.map((doc) => {
-    const latest = doc.revisions[0] ?? null;
-    const current = doc.revisions.find((revision) => revision.state === "RELEASED") ?? null;
-    const working = doc.revisions.find((revision) => revision.state === "IN_PREPARATION") ?? null;
-    const decided = latest?.cycles.find((c) => c.binding && c.outcome) ?? null;
-    const released = latest?.state === "RELEASED" ? latest : null;
+  const hostName = supplierView ? (await getMe())?.tenant.name ?? "Our client" : null;
+  const all = register.rows.map((doc) => {
+    // A revision whose review is decided and not yet released reads as not released.
+    const latestState = doc.revisionState === "IN_REVIEW" && doc.verdict ? "NOT_RELEASED" : doc.revisionState;
+    const released = doc.revisionState === "RELEASED";
     return {
-      id: doc.id, docNumber: doc.docNumber, title: doc.title, deliverableType: doc.deliverableType,
+      id: doc.id, docNumber: doc.number, title: doc.title, deliverableType: doc.deliverableType,
       docType: doc.docType, discipline: doc.discipline,
-      phase: latest?.phase ?? null,
-      phaseLabel: latest?.phase ? phaseLabel.get(latest.phase) ?? latest.phase : null,
-      actions: doc.baselineEntries.map((entry) => ({ code: entry.action.code, name: entry.action.name })),
-      deliverableLabel: deliverableLabel.get(doc.deliverableType) ?? pretty(doc.deliverableType), docTypeLabel: typeLabel.get(doc.docType) ?? doc.docType, disciplineLabel: disciplineLabel.get(doc.discipline) ?? doc.discipline, originator: doc.originator, subProject: doc.subProject,
+      phase: null as string | null,
+      phaseLabel: null as string | null,
+      actions: doc.activities.map((entry) => ({ code: entry.code, name: entry.name })),
+      deliverableLabel: deliverableLabel.get(doc.deliverableType) ?? pretty(doc.deliverableType), docTypeLabel: typeLabel.get(doc.docType) ?? doc.docType, disciplineLabel: disciplineLabel.get(doc.discipline) ?? doc.discipline, originator: doc.originator, subProject: doc.subproject,
       contractRef: doc.contractRef, criticality: doc.criticality, confidentiality: doc.confidentiality,
       retentionClass: doc.retentionClass,
       retentionLabel: doc.retentionClass ? retentionLabel.get(doc.retentionClass) ?? pretty(doc.retentionClass) : null,
       placeholder: doc.isPlaceholder,
       docState: doc.state, docStateLabel: DOC_STATE_LABEL[doc.state as DocState] ?? doc.state,
-      revision: latest?.value ?? null,
-      revState: latest?.state ?? null,
-      // Released, then held for an outside approval: on hold is what it is now.
-      revStateLabel: latest
-        ? stateName(names, latest.state, { together, held: !!latest.heldAt })
+      revision: doc.revision,
+      revState: latestState,
+      revStateLabel: latestState
+        ? stateName(names, latestState, { together, held: false })
         : "No revision yet",
-      onHold: released?.heldAt ? (released.heldReason ?? "On hold, not for use.") : null,
+      onHold: null as string | null,
       // A code is printed only when the organization publishes it. Records made
       // before the list existed carry the Standard's own consequence names,
       // which are sentences, not codes: those show their meaning alone.
-      verdict: decided?.outcome && publishedVerdicts.has(decided.outcome) ? decided.outcome : null,
-      verdictLabel: decided?.outcome ? verdictLabel.get(decided.outcome) ?? decided.outcome : null,
-      releasedFor: released?.statusCode ?? null,
+      verdict: doc.verdict && publishedVerdicts.has(doc.verdict) ? doc.verdict : null,
+      verdictLabel: doc.verdict ? verdictLabel.get(doc.verdict) ?? doc.verdict : null,
+      releasedFor: released ? doc.releasedStatus : null,
       // The status an unreleased revision carries. It is real, and it is not in
       // force: the state column says so.
-      proposedFor: !released ? latest?.statusCode ?? null : null, releasedForLabel: released?.statusCode ? statusLabel.get(released.statusCode) ?? released.statusCode : null,
-      releasedForUse: released?.statusCode ? statusUse.get(released.statusCode) ?? null : null,
-      createdDate: doc.createdDate.toISOString(), updatedAt: doc.updatedAt.toISOString(),
-      plannedSubmissionDate: working?.plannedSubmissionDate?.toISOString() ?? latest?.plannedSubmissionDate?.toISOString() ?? null,
-      issueDate: released?.issueDate?.toISOString() ?? null, releasedAt: released?.releasedAt?.toISOString() ?? null,
-      // The function that decided, not the person. A delegation is the one
-      // exception worth a mark, because then the authority was borrowed.
-      decidedBy: latest?.approvals[0] ? decidingFunction(latest.approvals[0].approverRole, latest.approvals[0].approverName) : null,
-      decidedByDelegated: latest?.approvals[0]?.approverRole?.includes("by delegation") ?? false,
-      packageCount: doc._count.packageMembers,
+      proposedFor: !released ? doc.proposedStatus : null, releasedForLabel: released && doc.releasedStatus ? statusLabel.get(doc.releasedStatus) ?? doc.releasedStatus : null,
+      releasedForUse: released && doc.releasedStatus ? statusUse.get(doc.releasedStatus) ?? null : null,
+      createdDate: doc.createdAt, updatedAt: doc.updatedAt,
+      plannedSubmissionDate: doc.plannedDate,
+      issueDate: released ? doc.issuedAt : null, releasedAt: released ? doc.releasedAt : null,
+      // The function that decided, not the person.
+      decidedBy: doc.decidedBy ? decidingFunction(doc.decidedBy, null) : null,
+      decidedByDelegated: false,
+      packageCount: doc.packages,
       // When the file on the current revision arrived, and when that revision started.
-      fileAdded: latest?.files?.slice().sort((a, b) => +b.createdAt - +a.createdAt)[0]?.createdAt.toISOString() ?? null,
-      revStarted: latest?.createdAt.toISOString() ?? null,
+      fileAdded: doc.fileAddedAt,
+      revStarted: doc.revisionStartedAt,
       // for actions on a selection, not for display
-      hasReleased: !!current, reviewRevisionId: working?.id ?? null,
-      // An outside organization sees who asked it of them, and can send what
-      // has its file attached and is not yet on its way.
+      hasReleased: !!doc.releasedRevisionId, reviewRevisionId: doc.revisionState === "IN_PREPARATION" ? doc.latestRevisionId : null,
+      // An outside organization sees who asked it of them. What it sends goes on
+      // a transmittal of its own, so nothing is sent from the register.
       receivedFrom: supplierView && doc.originator === user.partyCode ? hostName : null,
-      sendRevisionId: supplierView && doc.originator === user.partyCode && working && (working.renditionFileId || working.nativeFileId) && !working.submittedAt ? working.id : null,
+      sendRevisionId: null as string | null,
     };
   });
   const rows = all;

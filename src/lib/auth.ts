@@ -2,8 +2,7 @@ import { cache } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import bcrypt from "bcryptjs";
-import { SignJWT, jwtVerify } from "jose";
-import { db } from "./db";
+import { getMe } from "./api/me";
 import type { Role } from "./standard";
 import { heldVerbs } from "./permissions";
 
@@ -17,12 +16,8 @@ export async function verifyPassword(pw: string, hash: string) {
   return bcrypt.compare(pw, hash);
 }
 
-export async function createSession(userId: string) {
-  const token = await new SignJWT({ uid: userId })
-    .setProtectedHeader({ alg: "HS256" })
-    .setIssuedAt()
-    .setExpirationTime("7d")
-    .sign(secret);
+/** Keeps the backend's session token in the browser's session cookie. */
+export async function createSession(token: string) {
   const jar = await cookies();
   jar.set(COOKIE, token, {
     httpOnly: true,
@@ -67,30 +62,21 @@ export function hasVerb(user: SessionUser | null | undefined, verb: string): boo
 }
 
 export const getCurrentUser = cache(async (): Promise<SessionUser | null> => {
-  const jar = await cookies();
-  const token = jar.get(COOKIE)?.value;
-  if (!token) return null;
-  try {
-    const { payload } = await jwtVerify(token, secret);
-    const uid = payload.uid as string;
-    const user = await db.user.findUnique({ where: { id: uid }, include: { party: true } });
-    // A revoked party ends an open session too, not just the next sign-in.
-    if (!user || !user.active || (user.party && !user.party.active)) return null;
-    return {
-      id: user.id,
-      orgId: user.orgId,
-      email: user.email,
-      name: user.name,
-      role: user.role as Role,
-      organization: user.party?.name ?? user.organization,
-      partyId: user.partyId,
-      partyCode: user.party?.code ?? null,
-      partyName: user.party?.name ?? user.organization,
-      isInternal: user.party ? user.party.isInternal : true,
-    };
-  } catch {
-    return null;
-  }
+  // The backend holds the session; a revoked party or a switched-off account ends it there.
+  const me = await getMe();
+  if (!me) return null;
+  return {
+    id: me.user.id,
+    orgId: me.tenant.slug,
+    email: me.user.email,
+    name: me.user.name,
+    role: (me.user.isAdmin ? "ADMIN" : "VIEWER") as Role,
+    organization: me.user.party?.name ?? me.tenant.name,
+    partyId: me.user.party?.code ?? null,
+    partyCode: me.user.party?.code ?? null,
+    partyName: me.user.party?.name ?? me.tenant.name,
+    isInternal: me.user.party ? me.user.party.isInternal : true,
+  };
 });
 
 export async function requireUser(): Promise<SessionUser> {
@@ -161,13 +147,9 @@ export async function getSessionUser(): Promise<SessionUser | null> {
   return getCurrentUser();
 }
 
+/** The session is the backend's: a token is good when the backend says who it belongs to. */
 export async function verifySessionToken(token: string): Promise<string | null> {
-  try {
-    const { payload } = await jwtVerify(token, secret);
-    return (payload.uid as string) ?? null;
-  } catch {
-    return null;
-  }
+  return token ? (await getCurrentUser())?.id ?? null : null;
 }
 
 export const SESSION_COOKIE = COOKIE;

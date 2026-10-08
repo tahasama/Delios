@@ -2,14 +2,11 @@ import "server-only";
 import { cache } from "react";
 import { cookies } from "next/headers";
 import { redirect, notFound } from "next/navigation";
-import { db } from "./db";
-import { getCurrentUser, atLeast, hasVerb, type SessionUser } from "./auth";
+import { getCurrentUser, atLeast, type SessionUser } from "./auth";
 import type { Role } from "./standard";
-import { scopedClient, type ScopedDb, type Tenant } from "./tenant";
-import { loadActor, can, verbsFor, explain, openConfidentiality, type Actor, type Verb, type DocumentClass } from "./permissions";
-
-export { scopedClient, tenantFor, ORG_SCOPED, PROJECT_SCOPED } from "./tenant";
-export type { ScopedDb, Tenant } from "./tenant";
+import { can, verbsFor, explain, type Actor, type Verb, type DocumentClass } from "./permissions";
+import { api } from "./api/client";
+import { getMe } from "./api/me";
 
 /**
  * The scope is the request-bound tenancy: who is signed in, which project they
@@ -32,7 +29,16 @@ export type ProjectSummary = {
   status: string;
 };
 
-export type Scope = Tenant & {
+/**
+ * The data used to come from a Prisma client narrowed to the scope. It comes
+ * from the backend now, through `api()` in `src/lib/api/client.ts`; this marks
+ * every place that still reaches for the old client.
+ */
+export type RemovedDb = { readonly movedToBackend: true };
+
+export type Scope = {
+  orgId: string;
+  projectId: string;
   user: SessionUser;
   project: ProjectSummary;
   /**
@@ -46,7 +52,7 @@ export type Scope = Tenant & {
   available: ProjectSummary[];
   /** True when the signed-in person's account lives in another organization. */
   isGuest: boolean;
-  db: ScopedDb;
+  db: RemovedDb;
   /** May the signed-in person do this, here? */
   can: (verb: Verb, target?: DocumentClass | null) => boolean;
   /** §5.7 — is this confidentiality within their clearance? */
@@ -56,117 +62,64 @@ export type Scope = Tenant & {
   why: (verb: Verb, target?: DocumentClass | null) => string;
 };
 
-const SUMMARY = { id: true, orgId: true, code: true, name: true, kind: true, role: true, status: true } as const;
+/** The old role name a function's verbs amount to, for the few screens that still speak in roles. */
+function legacyRoleOf(verbs: string[]): Role {
+  if (verbs.includes("CONFIGURE")) return "ADMIN" as Role;
+  if (verbs.includes("CONTROL")) return "CONTROLLER" as Role;
+  if (verbs.includes("APPROVE")) return "APPROVER" as Role;
+  if (verbs.includes("REVIEW")) return "REVIEWER" as Role;
+  if (verbs.includes("CREATE") || verbs.includes("REVISE")) return "AUTHOR" as Role;
+  return "VIEWER" as Role;
+}
 
 /**
- * Resolve the scope for the current request. Returns null when there is no
- * session, or when the user holds no active membership in any project.
+ * Resolve the scope for the current request, from the backend. Returns null
+ * when there is no session, or when the user holds no active membership in any
+ * project.
  */
 export const getScope = cache(async (): Promise<Scope | null> => {
-  const user = await getCurrentUser();
-  if (!user) return null;
+  const [me, user] = await Promise.all([getMe(), getCurrentUser()]);
+  if (!me || !user || me.projects.length === 0) return null;
 
-  const memberships = await db.projectMembership.findMany({
-    where: { userId: user.id, active: true, project: { status: "ACTIVE" } },
-    include: { project: { select: SUMMARY }, function: true },
-    orderBy: { project: { code: "asc" } },
-  });
-  if (memberships.length === 0) return null;
-
-  // An administrator may open any project their organization runs, whether or
-  // not they were put on it: they can add themselves in People & access anyway,
-  // and a picker that offers one project is a dead end on a system built to run
-  // several. Joining happens on the switch, so there is still exactly one way to
-  // be in a project — a membership.
-  const available = memberships.map((m) => m.project);
-  if (hasVerb(user, "CONFIGURE")) {
-    const held = new Set(available.map((p) => p.id));
-    const rest = await db.project.findMany({
-      where: { orgId: user.orgId, status: "ACTIVE", id: { notIn: [...held] } },
-      select: SUMMARY,
-      orderBy: { code: "asc" },
-    });
-    available.push(...rest);
-    available.sort((a, b) => a.code.localeCompare(b.code));
-  }
   const jar = await cookies();
   const wanted = jar.get(PROJECT_COOKIE)?.value;
-  const chosen = memberships.find((m) => m.projectId === wanted) ?? memberships[0];
+  const chosen = me.projects.find((p) => p.id === wanted) ?? me.projects[0];
+  const summary = (p: (typeof me.projects)[number]): ProjectSummary =>
+    ({ id: p.id, orgId: me.tenant.slug, code: p.code, name: p.name, kind: "GENERIC", role: p.contractRole, status: p.status });
+  const available = me.projects.map(summary);
 
-  // The organization axis comes from the *project*, not the person. Someone
-  // from another company invited onto this project works inside this
-  // organization's published configuration — its value sets, its numbering, its
-  // permission matrix — which is the only reading that makes sense. Their own
-  // organization is where their account lives, not where they are working.
-  const hostOrgId = chosen.project.orgId;
+  // Confidentiality levels, as this organization published them.
+  const values = await api<Record<string, { code: string; props: Record<string, unknown> | null }[]>>("/api/values", { query: { sets: "CONFIDENTIALITY" } })
+    .catch(() => ({} as Record<string, { code: string; props: Record<string, unknown> | null }[]>));
+  const levels = new Map<string, number>();
+  for (const value of values.CONFIDENTIALITY ?? []) if (typeof value.props?.level === "number") levels.set(value.code, value.props.level);
 
-  // Two clients, deliberately. The first is used only to read the function and
-  // the published confidentiality levels; the second is the one application
-  // code gets, and it already knows what this reader is cleared to see.
-  const bootstrap: Tenant = {
-    orgId: hostOrgId,
-    projectId: chosen.projectId,
-    db: scopedClient(hostOrgId, chosen.projectId),
+  const verbs = [...new Set(chosen.rules.flatMap((r) => r.verbs))];
+  const actor: Actor = {
+    functionId: chosen.function.id,
+    functionCode: chosen.function.code,
+    functionName: chosen.function.name,
+    clearance: 0,
+    legacyRole: legacyRoleOf(verbs),
+    levels,
+    projectRole: chosen.contractRole,
+    rules: chosen.rules.map((r) => ({
+      deliverableType: r.deliverableType, docType: r.docType, discipline: r.discipline, criticality: r.criticality,
+      confidentiality: r.confidentiality, projectRole: r.projectRole, family: null, familyTypes: null, verbs: r.verbs as Verb[],
+    })),
   };
-
-  // A membership always names a function, and a function the organization has
-  // retired leaves its holders with no authority rather than with the last
-  // authority they happened to have.
-  const actor = await loadActor(bootstrap, chosen.functionId);
-  if (!actor) return null;
-
-  const confidentialityValues = await bootstrap.db.configValue.findMany({
-    where: { setKey: "CONFIDENTIALITY" },
-    select: { code: true, props: true },
-  });
-  // Which levels are the ordinary register, and which are read only by the
-  // people named on the document. An administrator reads everything.
-  const openCodes = openConfidentiality(confidentialityValues.map((one) => {
-    let props: Record<string, unknown> = {};
-    if (one.props) {
-      try { props = JSON.parse(one.props) as Record<string, unknown>; } catch { /* a malformed prop is not a level */ }
-    }
-    return { code: one.code, props };
-  }));
-  const reader = { userId: user.id, everything: can(actor, "CONFIGURE"), openCodes };
-  // Someone from another party is not staff: their register holds what their own
-  // party produced and what was issued to them, and nothing else. Applied here,
-  // so no page can forget it.
-  // Someone whose account lives in another organization is never staff here.
-  // The project says which of its organizations they represent; without that
-  // they see only what was issued to them.
-  const guest = user.orgId !== hostOrgId;
-  const represents = guest && chosen.partyId
-    ? await bootstrap.db.party.findFirst({ where: { id: chosen.partyId }, select: { id: true, code: true, name: true } })
-    : null;
-  if (guest) {
-    user.isInternal = false;
-    user.partyId = represents?.id ?? null;
-    user.partyCode = represents?.code ?? null;
-    user.partyName = represents?.name ?? user.partyName;
-    user.organization = represents?.name ?? user.organization;
-  }
-  const party = user.partyCode
-    ? await bootstrap.db.party.findFirst({ where: { code: user.partyCode }, select: { name: true } })
-    : null;
-  const external = user.isInternal ? null : { partyCode: user.partyCode, userId: user.id, organization: party?.name ?? null, partyId: user.partyId ?? null };
-  const scoped = scopedClient(hostOrgId, chosen.projectId, reader, external);
-
-  // Authority is held per project, not globally: the same person may author on
-  // one project and control another (§1.4 — ownership is by role).
   const role = actor.legacyRole as Role;
-
-  const verbs = [...new Set(actor.rules.flatMap((r) => r.verbs))];
+  const held = [...new Set(actor.rules.filter((r) => r.projectRole === null || r.projectRole === chosen.contractRole).flatMap((r) => r.verbs))];
   return {
-    user: { ...user, role, verbs, functionName: actor.functionName, department: chosen.department ?? null },
-    orgId: hostOrgId,
-    projectId: chosen.projectId,
-    project: chosen.project,
+    user: { ...user, role, verbs: held, functionName: actor.functionName, department: chosen.department ?? null },
+    orgId: me.tenant.slug,
+    projectId: chosen.id,
+    project: summary(chosen),
     actor,
     role,
     available,
-    isGuest: user.orgId !== hostOrgId,
-    db: scoped,
+    isGuest: false,
+    db: { movedToBackend: true },
     can: (verb, target) => can(actor, verb, target),
     verbs: (target) => verbsFor(actor, target),
     why: (verb, target) => explain(actor, verb, target),
@@ -178,12 +131,6 @@ export async function requireScope(): Promise<Scope> {
   if (!scope) {
     const user = await getCurrentUser();
     if (!user) redirect("/login");
-    // An administrator whose organization has no project yet is not stuck —
-    // they are simply earlier in the process than this screen assumes.
-    if (hasVerb(user, "CONFIGURE")) {
-      const projects = await db.project.count({ where: { orgId: user.orgId, status: "ACTIVE" } });
-      if (projects === 0) redirect("/setup");
-    }
     redirect("/no-project");
   }
   return scope;
@@ -224,40 +171,12 @@ export async function requireAccessScope(): Promise<Scope> {
   return scope;
 }
 
-/**
- * Deliberate escape hatch for the few surfaces that are genuinely cross-project
- * (org administration, the project picker itself, login). Every call site is
- * meant to be reviewable: `grep -rn crossProject src`.
- */
-export function crossProject(): typeof db {
-  return db;
-}
-
-
 // ── Project switching ────────────────────────────────────────────────────────
 
-export async function setActiveProject(projectId: string, userId: string) {
-  let membership = await db.projectMembership.findUnique({
-    where: { projectId_userId: { projectId, userId } },
-  });
-  // An administrator opening a project of their own organization for the first
-  // time joins it, holding the Administrator function. Nobody else is admitted
-  // this way, so the cookie still cannot widen access for anyone else.
-  if (!membership) {
-    const user = await db.user.findUnique({ where: { id: userId }, select: { orgId: true, role: true, active: true } });
-    const project = await db.project.findUnique({ where: { id: projectId }, select: { orgId: true, status: true } });
-    const mayJoin =
-      user?.active && user.role === "ADMIN" && project?.status === "ACTIVE" && project.orgId === user.orgId;
-    if (mayJoin) {
-      const adminFunction = await db.function.findFirst({ where: { orgId: user.orgId, legacyRole: "ADMIN", active: true }, orderBy: { sort: "asc" } });
-      if (adminFunction) {
-        membership = await db.projectMembership.create({
-          data: { projectId, userId, functionId: adminFunction.id },
-        });
-      }
-    }
-  }
-  if (!membership || !membership.active) return false;
+export async function setActiveProject(projectId: string, _userId: string) {
+  // Only a project the backend says this person is on.
+  const me = await getMe();
+  if (!me?.projects.some((p) => p.id === projectId)) return false;
   const jar = await cookies();
   jar.set(PROJECT_COOKIE, projectId, {
     httpOnly: true,
@@ -267,6 +186,3 @@ export async function setActiveProject(projectId: string, userId: string) {
   });
   return true;
 }
-
-
-
