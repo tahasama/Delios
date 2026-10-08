@@ -130,3 +130,25 @@ export async function legacyNumbering() {
   }));
   return { schemes, routing };
 }
+
+// ── Functions, as the matrix screen reads them ───────────────────────────────
+
+/** Functions with their rows, in the screen's shapes: verbs as a JSON list, a holders count. */
+export async function legacyFunctions() {
+  const functions = await adminFunctions();
+  return [...functions]
+    .sort((a, b) => Number(b.active) - Number(a.active) || a.name.localeCompare(b.name))
+    .map((f) => ({
+      id: f.id, code: f.code, name: f.name, active: f.active, description: null as string | null, department: null as string | null, sort: 0,
+      _count: { memberships: f.holders },
+      rules: f.rules.map((r, sort) => ({ ...r, functionId: f.id, verbs: JSON.stringify(r.verbs), note: null as string | null, sort })),
+    }));
+}
+
+/** A function's rows as the backend takes them back. */
+export function rulesBody(rules: AdminRule[]) {
+  return rules.map((r) => ({
+    verbs: r.verbs, deliverableType: r.deliverableType, docType: r.docType, discipline: r.discipline, criticality: r.criticality,
+    confidentiality: r.confidentiality, projectRole: r.projectRole,
+  }));
+}

@@ -72,19 +72,10 @@ export function readDay(value: string | undefined, endOfDay: boolean): Date | nu
 /**
  * The documents an asset code names. A search term may be a tag number rather
  * than anything written on the document, and the register answers for both.
+ * Assets are not in the backend yet, so no tag names a document.
  */
-export async function documentsForAssets(t: Tenant, words: string[]): Promise<string[]> {
-  if (!words.length) return [];
-  const assets = await t.db.assetItem.findMany({
-    where: { OR: words.flatMap((word) => [{ code: { contains: word } }, { name: { contains: word } }]) },
-    select: { id: true },
-  });
-  if (!assets.length) return [];
-  const links = await t.db.relationship.findMany({
-    where: { kind: "DOC_ASSET", toId: { in: assets.map((asset) => asset.id) } },
-    select: { fromId: true },
-  });
-  return links.map((link) => link.fromId);
+export async function documentsForAssets(_t: Tenant, _words: string[]): Promise<string[]> {
+  return [];
 }
 
 /**

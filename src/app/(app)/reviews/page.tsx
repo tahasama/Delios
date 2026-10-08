@@ -1,11 +1,10 @@
 import { isReadOnly } from "@/lib/auth";
-import { Prisma } from "@prisma/client";
 import { after } from "next/server";
 import { requireScope } from "@/lib/scope";
-import { addWorkingDays, dueState } from "@/lib/workflow";
+import { dueState } from "@/lib/workflow";
 import { warnLateReviews } from "@/lib/review-risk";
 import { getSet } from "@/lib/config";
-import { readSearch } from "@/lib/register-query";
+import { reviewsPage, valuesInUse, waitingOn, dueDay, workingDaysBetween } from "@/lib/api/reviews";
 import { ReviewsRegister, type ReviewRow } from "./reviews-register";
 import { ReviewsPlate } from "./reviews-plate";
 import { fmtDate } from "@/lib/utils";
@@ -65,14 +64,12 @@ const VIEWS = [
  */
 export default async function ReviewsPage({ searchParams }: { searchParams: Promise<Search> }) {
   const ctx = await requireScope();
-  const { db } = ctx;
   // One automatic warning per review that is about to miss its date. After that
   // it is Document Control's call, and their chase is a transmittal.
   after(() => warnLateReviews(ctx).catch(() => {}));
   const sp = await searchParams;
   const status = VIEWS.some((v) => v.id === sp.status) ? sp.status! : "ALL";
   const q = (sp.q ?? "").trim();
-  const searches = readSearch(q);
   const kind = KINDS.some((one) => one.code === sp.kind) ? sp.kind! : "";
   const verdict = (sp.verdict ?? "").trim();
   const due = DUES.some((one) => one.code === sp.due) ? sp.due! : "";
@@ -85,106 +82,30 @@ export default async function ReviewsPage({ searchParams }: { searchParams: Prom
   const po = (sp.po ?? "").trim();
   const deliverable = (sp.deliverable ?? "").trim();
   const dateOn = DATE_COLUMN[sp.on ?? ""] ? sp.on! : "";
-  const from = readDay(sp.from, false);
-  const to = readDay(sp.to, true);
-  const soon = new Date(Date.now() + 3 * 86_400_000);
+  // A day the backend cannot read is no window at all, as it was before.
+  const from = dateOn && readDay(sp.from, false) ? sp.from! : "";
+  const to = dateOn && readDay(sp.to, true) ? sp.to! : "";
 
-  const where: Prisma.ReviewCycleWhereInput = {
-    AND: [
-      status === "ALL" ? {} : { status },
-      ...(searches.length
-        ? [{
-            OR: searches.map((search) => ({
-              AND: search.words.map((word) => ({
-                OR: [
-                  { number: { contains: word } },
-                  { outcome: { contains: word } },
-                  { outcomeByName: { contains: word } },
-                  { assignments: { some: { userName: { contains: word } } } },
-                  { revision: { value: word } },
-                  { revision: { document: { docNumber: { startsWith: word } } } },
-                  { revision: { document: { docNumber: { contains: word } } } },
-                  { revision: { document: { title: { contains: word } } } },
-                  { revision: { document: { originator: { contains: word } } } },
-                  { revision: { document: { contractRef: { contains: word } } } },
-                ],
-              })),
-            })),
-          }]
-        : []),
-      kind ? { binding: kind === "DECISION" } : {},
-      verdict ? { outcome: verdict } : {},
-      // What is late, and what is about to be: both are the date the route gave
-      // the step, read against today.
-      discipline || docType || supplier || po || deliverable
-        ? {
-            revision: {
-              document: {
-                ...(discipline ? { discipline } : {}),
-                ...(docType ? { docType } : {}),
-                ...(supplier ? { originator: supplier } : {}),
-                ...(po ? { contractRef: po } : {}),
-                ...(deliverable ? { deliverableType: deliverable } : {}),
-              },
-            },
-          }
-        : {},
-      due === "OVERDUE" ? { status: "OPEN", dueAt: { lt: new Date() } }
-        : due === "SOON" ? { status: "OPEN", dueAt: { gte: new Date(), lte: soon } }
-          : due === "NONE" ? { dueAt: null }
-            : {},
-      dateOn && (from || to)
-        ? ({ [DATE_COLUMN[dateOn]]: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } } as Prisma.ReviewCycleWhereInput)
-        : {},
-    ],
-  };
-  const SORTS: Record<string, Prisma.ReviewCycleOrderByWithRelationInput> = {
-    number: { number: dir },
-    document: { revision: { document: { docNumber: dir } } },
-    rev: { revision: { value: dir } },
-    kind: { binding: dir },
-    verdict: { outcome: dir },
-    due: { dueAt: dir },
-    opened: { submittedAt: dir },
-    closed: { outcomeAt: dir },
-    discipline: { revision: { document: { discipline: dir } } },
-    docType: { revision: { document: { docType: dir } } },
+  // The backend sorts by these. A review's number is given in the order reviews
+  // open, so it sorts as the day it opened; so does the document, for now.
+  const SORTS: Record<string, string> = {
+    number: "opened", document: "opened", rev: "rev", kind: "kind", verdict: "verdict", due: "due",
+    opened: "opened", closed: "closed", discipline: "discipline", docType: "docType",
   };
   const sort = sp.sort && SORTS[sp.sort] ? sp.sort : "";
-  const orderBy = sort ? SORTS[sort] : { submittedAt: "desc" as const };
   const perPage = PAGE_SIZES.includes(Number(sp.per)) ? Number(sp.per) : 50;
   const asked = Math.max(1, Number(sp.page) || 1);
-  const matching = await db.reviewCycle.count({ where });
-  const pages = Math.max(1, Math.ceil(matching / perPage));
-  const page = Math.min(asked, pages);
 
-  const [cycles, verdicts, adviceValues, disciplines, types, suppliers, pos, deliverables, inUse] = await Promise.all([
-    db.reviewCycle.findMany({
-      where,
-      orderBy,
-      skip: (page - 1) * perPage,
-      take: perPage,
-      include: {
-        revision: {
-          select: {
-            id: true, value: true, state: true, releasedAt: true,
-            // When this issue reached us, and who recorded it. A revision that
-            // came from outside arrives through its package or a transmittal;
-            // one of ours is simply written here.
-            submittedAt: true, submittedByName: true,
-            // Every comment made on this revision, whichever review it was made in.
-            cycles: { select: { number: true, comments: { orderBy: { createdAt: "asc" }, select: { authorName: true, text: true, progressionPreventing: true, status: true } } } },
-            document: {
-              select: {
-                id: true, docNumber: true, title: true, discipline: true, docType: true,
-                originator: true, contractRef: true, deliverableType: true, receivedDate: true,
-              },
-            },
-          },
-        },
-        assignments: { orderBy: { order: "asc" } },
-      },
-    }),
+  const [found, verdicts, adviceValues, disciplines, types, suppliers, pos, deliverables, inUse] = await Promise.all([
+    // Every review is a whole route that ends in its decision: none is advice alone.
+    kind === "ADVICE"
+      ? Promise.resolve({ total: 0, page: 1, pages: 1, per: perPage, sizes: PAGE_SIZES, rows: [] })
+      : reviewsPage(ctx, {
+          status: status === "ALL" ? "" : status, q, verdict, due, discipline, docType, supplier, deliverable,
+          on: from || to ? dateOn : "", from, to,
+          // Newest first unless a column is asked for, as the list always read.
+          sort: sort ? SORTS[sort] : "", dir: sort ? dir : "desc", page: asked, per: perPage,
+        }),
     getSet("REVIEW_OUTCOMES"),
     getSet("REVIEW_ADVICE"),
     getSet("DISCIPLINES"),
@@ -194,39 +115,21 @@ export default async function ReviewsPage({ searchParams }: { searchParams: Prom
     getSet("DELIVERABLE_TYPES"),
     // The choices offer what the reviews actually hold, not every value the
     // organization publishes.
-    db.document.groupBy({ by: ["discipline", "docType"] }),
+    valuesInUse(ctx),
   ]);
-  // What the whole route was given, as against what this step has. A route is
-  // a list of steps with working days against them; the review is due when the
-  // last of them is, counted from the day it went out.
-  const runs = cycles.length
-    ? await db.workflowRun.findMany({
-        where: { revisionId: { in: [...new Set(cycles.map((c) => c.revisionId))] } },
-        orderBy: { createdAt: "desc" },
-        select: { revisionId: true, steps: true, createdAt: true, templateName: true },
-      })
-    : [];
-  const routeOf = new Map<string, { days: number; dueAt: Date | null; name: string }>();
-  for (const run of runs) {
-    if (routeOf.has(run.revisionId)) continue; // the newest run answers for the revision
-    let days = 0;
-    try {
-      for (const step of JSON.parse(run.steps) as { days?: number }[]) days += Number(step.days ?? 0);
-    } catch {
-      days = 0;
-    }
-    routeOf.set(run.revisionId, {
-      days,
-      dueAt: days ? addWorkingDays(run.createdAt, days) : null,
-      name: run.templateName,
-    });
-  }
+  const matching = found.total;
+  const pages = Math.max(1, found.pages);
+  const page = Math.min(found.page, pages);
+  const cycles = found.rows;
+  // Whoever a late review still waits on, so a reminder can be addressed to them.
+  const lateOnes = cycles.filter((c) => c.open && c.dueDate && dueState(dueDay(c.dueDate), false) !== "on time");
+  const waiting = new Map(await Promise.all(lateOnes.map(async (c) => [c.id, await waitingOn(ctx, c.id)] as const)));
 
   const disciplineLabel = new Map(disciplines.map((one) => [one.code, one.label]));
   const typeLabel = new Map(types.map((one) => [one.code, one.label]));
   const deliverableLabel = new Map(deliverables.map((one) => [one.code, one.label]));
-  const usedDisciplines = new Set(inUse.map((one) => one.discipline));
-  const usedTypes = new Set(inUse.map((one) => one.docType));
+  const usedDisciplines = new Set(inUse.disciplines);
+  const usedTypes = new Set(inUse.docTypes);
   // Codes from the organization's list; older records may carry the Standard's
   // own consequence names (APPROVED, REVISE_AND_RESUBMIT…).
   const verdictLabel = new Map<string, string>([...Object.entries(OUTCOME_CONSEQUENCES).map(([k, v]) => [k, v.label] as [string, string]), ...verdicts.map((v) => [v.code, v.label] as [string, string]), ...Object.entries(ADVICE_LABEL).map(([code, label]) => [code, label] as [string, string]), ...adviceValues.map((v) => [v.code, v.label] as [string, string])]);
@@ -289,54 +192,52 @@ export default async function ReviewsPage({ searchParams }: { searchParams: Prom
   if (perPage !== 50) query.set("per", String(perPage));
 
   const rows: ReviewRow[] = cycles.map((c) => {
-    // A review that starts after its revision was released is the recipient's,
-    // not ours: their verdict never changes it, a new revision answers it.
-    const postRelease = !!c.revision.releasedAt && c.submittedAt > c.revision.releasedAt;
-    const state = dueState(c.dueAt, c.status !== "OPEN");
-    const route = routeOf.get(c.revisionId) ?? null;
-    const routeState = dueState(route?.dueAt ?? null, c.status !== "OPEN");
-    const waitingOn = c.assignments.filter((a) => !a.completedAt);
-    const late = c.status === "OPEN" && state !== "on time" && c.dueAt;
+    const dueAt = dueDay(c.dueDate);
+    const routeDueAt = dueDay(c.routeDueDate);
+    const state = dueState(dueAt, !c.open);
+    const routeState = dueState(routeDueAt, !c.open);
+    const late = c.open && state !== "on time" && dueAt;
+    const waitingOnStep = waiting.get(c.id);
     return {
       id: c.id,
       number: c.number,
-      documentId: c.revision.document.id,
-      docNumber: c.revision.document.docNumber,
-      title: c.revision.document.title,
-      revision: c.revision.value,
-      kind: postRelease ? "client review" : c.binding ? "decision" : "advice",
-      verdict: c.binding ? c.outcome : null,
-      verdictLabel: c.outcome ? verdictLabel.get(c.outcome) ?? c.outcome : null,
-      verdictProceeds: c.outcome && c.binding ? proceeds.get(c.outcome) ?? null : null,
-      decidedBy: c.outcomeByName,
-      open: c.status === "OPEN",
-      reviewers: c.assignments.map((a) => ({ name: a.userName, done: !!a.completedAt })),
-      doneCount: c.assignments.filter((a) => a.completedAt).length,
-      dueAt: c.dueAt ? fmtDate(c.dueAt) : null,
-      routeName: route?.name ?? null,
-      routeDays: route?.days ?? null,
-      routeDueAt: route?.dueAt ? fmtDate(route.dueAt) : null,
+      documentId: c.documentId,
+      docNumber: c.documentNumber,
+      title: c.title,
+      revision: c.revision,
+      // Every review is a route that ends in its decision.
+      kind: "decision",
+      verdict: c.verdict,
+      verdictLabel: c.verdict ? verdictLabel.get(c.verdict) ?? c.verdict : null,
+      verdictProceeds: c.verdict ? proceeds.get(c.verdict) ?? null : null,
+      decidedBy: c.decidedBy,
+      open: c.open,
+      reviewers: c.reviewers,
+      doneCount: c.reviewers.filter((a) => a.done).length,
+      dueAt: dueAt ? fmtDate(dueAt) : null,
+      routeName: c.routeName,
+      routeDays: routeDueAt ? workingDaysBetween(new Date(c.startedAt), routeDueAt) : null,
+      routeDueAt: routeDueAt ? fmtDate(routeDueAt) : null,
       routeDueState: routeState,
       dueState: state,
-      notifyHref: late
-        ? `/transmittals/new?revisions=${c.revision.id}&users=${waitingOn.map((a) => a.userId).join(",")}&reason=REVIEW&subject=${encodeURIComponent(`${c.revision.document.docNumber} rev ${c.revision.value} — review still open`)}&message=${encodeURIComponent(`This review was due on ${fmtDate(c.dueAt!)}. Please answer it.${c.riskNotifiedAt ? ` An automatic warning went out on ${fmtDate(c.riskNotifiedAt)}.` : ""}`)}`
+      notifyHref: late && waitingOnStep
+        ? `/transmittals/new?revisions=${waitingOnStep.revisionId}&users=${waitingOnStep.userIds.join(",")}&reason=REVIEW&subject=${encodeURIComponent(`${c.documentNumber} rev ${c.revision} — review still open`)}&message=${encodeURIComponent(`This review was due on ${fmtDate(dueAt!)}. Please answer it.`)}`
         : null,
-      warnedAt: c.riskNotifiedAt ? fmtDate(c.riskNotifiedAt) : null,
-      openedAt: fmtDate(c.submittedAt),
-      openedBy: c.openedByName,
-      discipline: disciplineLabel.get(c.revision.document.discipline) ?? c.revision.document.discipline,
-      docType: typeLabel.get(c.revision.document.docType) ?? c.revision.document.docType,
-      producedBy: deliverableLabel.get(c.revision.document.deliverableType) ?? c.revision.document.deliverableType,
-      from: c.revision.document.originator,
-      contract: c.revision.document.contractRef,
-      // The day the document reached us. Ours are written when the revision is
-      // opened; an outside one carries the day its submission arrived.
-      receivedAt: c.revision.submittedAt
-        ? fmtDate(c.revision.submittedAt)
-        : c.revision.document.receivedDate ? fmtDate(c.revision.document.receivedDate) : null,
-      receivedFrom: c.revision.document.originator ?? c.revision.submittedByName,
-      closedAt: c.outcomeAt ? fmtDate(c.outcomeAt) : null,
-      comments: c.revision.cycles.flatMap((cy) => cy.comments.map((one) => ({ by: one.authorName, text: one.text, blocking: one.progressionPreventing, settled: one.status === "CLOSED", review: cy.number }))),
+      // The backend sends no automatic warning, so none is on record.
+      warnedAt: null,
+      openedAt: fmtDate(c.startedAt),
+      openedBy: c.startedBy,
+      discipline: disciplineLabel.get(c.discipline) ?? c.discipline,
+      docType: typeLabel.get(c.docType) ?? c.docType,
+      producedBy: deliverableLabel.get(c.deliverableType) ?? c.deliverableType,
+      from: c.originator,
+      contract: c.contractRef,
+      // The day the document reached us: an outside one carries the day its
+      // submission arrived; ours are written here.
+      receivedAt: c.receivedAt ? fmtDate(c.receivedAt) : null,
+      receivedFrom: c.originator,
+      closedAt: c.closedAt ? fmtDate(c.closedAt) : null,
+      comments: c.comments.map((one) => ({ by: one.by, text: one.text, blocking: one.blocking, settled: one.settled, review: c.number })),
     };
   });
 

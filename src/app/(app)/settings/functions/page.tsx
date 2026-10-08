@@ -14,6 +14,7 @@ import {
 import { VERBS, VERB_LABEL, VERB_BLURB, type Verb } from "@/lib/permissions";
 import { CONTRACT_ROLES } from "@/lib/profiles/roles";
 import { Check, Minus } from "lucide-react";
+import { legacyFunctions } from "@/lib/api/admin";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Functions & permissions" };
@@ -31,7 +32,7 @@ function parseVerbs(json: string): Verb[] {
 }
 
 export default async function FunctionsPage() {
-  const { user: me, db } = await requireScope();
+  const { user: me } = await requireScope();
   if (!maySetup(me, SETUP_PAGES.find((p) => p.href === "/settings/functions")!)) {
     return <PageHeader title="Functions & permissions" subtitle="Administrators and the control function." />;
   }
@@ -40,13 +41,7 @@ export default async function FunctionsPage() {
   const mayChangeAdminFunctions = isAdmin(me);
 
   const [functions, disciplines, docTypes, deliverableTypes, criticalities, confidentialities] = await Promise.all([
-    db.function.findMany({
-      orderBy: [{ active: "desc" }, { sort: "asc" }],
-      include: {
-        rules: { orderBy: { sort: "asc" } },
-        _count: { select: { memberships: true } },
-      },
-    }),
+    legacyFunctions(),
     getActiveSet("DISCIPLINES"),
     getActiveSet("DOCUMENT_TYPES"),
     getActiveSet("DELIVERABLE_TYPES"),
