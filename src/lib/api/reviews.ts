@@ -4,6 +4,7 @@ import { api, apiFetch, ApiProblem, projectPath, type Query } from "./client";
 import { backendDocument, backendRevision, backendReview, legacyDocument, type LegacyDocument, type LegacyRevision } from "./legacy";
 import type { RegisterPage, ReviewsPage, ReviewView, TransmittalView } from "./types";
 import type { RunData, WfRuntimeStep } from "../workflow";
+import { getMe } from "./me";
 
 /**
  * The review screens were written against review cycles: one cycle per step of
@@ -84,6 +85,18 @@ async function fileName(scope: Scope, fileId: string): Promise<string | null> {
 
 export type ReviewCycle = Awaited<ReturnType<typeof readCycle>>;
 
+/**
+ * Somebody a step was handed to sits on it in its holder's place while the
+ * hand-over is in force: they are seated here as the holder is.
+ */
+async function standIn(scope: Scope, review: ReviewView, step: Step) {
+  if (step.state !== "OPEN") return [];
+  const me = await api<{ seated: boolean; answered: boolean; onBehalfOf: string | null }>(projectPath(scope, `/reviews/${review.id}/me`)).catch(() => null);
+  const who = me?.onBehalfOf ? (await getMe())?.user : null;
+  if (!me?.onBehalfOf || !who) return [];
+  return [{ id: `${review.id}-${step.number}-standin`, userId: who.id, userName: who.name, completedAt: me.answered ? new Date() : null }];
+}
+
 async function readCycle(scope: Scope, review: ReviewView) {
   const doc = (await legacyDocument(scope, review.documentId)) as LegacyDocument;
   const rev = doc.revisions.find((one) => one.id === review.revisionId) as LegacyRevision;
@@ -107,9 +120,9 @@ async function readCycle(scope: Scope, review: ReviewView) {
     issuedToReviewAt: new Date(review.startedAt) as Date | null, returnedFromReviewAt: review.decidedAt ? new Date(review.decidedAt) : null,
     returnedToOriginatorAt: review.state === "RETURNED" && review.closedAt ? new Date(review.closedAt) : null,
     comments: commentsOf(review, step.number),
-    assignments: step.participants.map((one, index) => ({
+    assignments: [...step.participants.map((one, index) => ({
       id: `${review.id}-${step.number}-${index}`, userId: one.userId, userName: one.name, completedAt: one.answeredAt ? new Date(one.answeredAt) : null,
-    })),
+    })), ...(await standIn(scope, review, step))],
     party: step.party ? { name: step.party, participation: step.participation ?? "IN_APP" } : null,
     dispatchedAt: step.dispatchedAt ? new Date(step.dispatchedAt) : null, dispatchChannel: step.dispatchChannel, dispatchRef: step.dispatchRef,
     transmittal,
@@ -117,8 +130,15 @@ async function readCycle(scope: Scope, review: ReviewView) {
   };
 }
 
+/** The review this request read as a cycle: the one a review page stands on. */
+const readThisRequest = cache(() => ({ id: null as string | null }));
+export function reviewOfRequest(): string | null {
+  return readThisRequest().id;
+}
+
 /** A review as the cycle of the step it stands at; null when it does not exist or is not the reader's to see. */
 export const reviewCycle = cache(async (scope: Scope, id: string): Promise<ReviewCycle | null> => {
+  readThisRequest().id = id;
   try {
     return await readCycle(scope, await backendReview(scope, id));
   } catch (e) {

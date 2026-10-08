@@ -96,14 +96,43 @@ export async function addCommentAction(_prev: Result | undefined, formData: Form
   return {};
 }
 
-/** Taking a comment back before the step is answered: the backend keeps every comment once written. */
-export async function removeCommentAction(_prev: Result | undefined, _formData: FormData): Promise<Result> {
-  return { error: "A comment cannot be taken back yet: close it with a resolution instead." };
+/** Taking a comment back before the step is answered: until then it is a draft. */
+export async function removeCommentAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
+  const ctx = await requireScope();
+  const commentId = text(formData, "commentId");
+  const cycleId = text(formData, "cycleId");
+  if (!cycleId) return { error: "Say which review the comment is on." };
+  try {
+    await api(projectPath(ctx, `/reviews/${cycleId}/comments/${commentId}`), { method: "DELETE" });
+  } catch (e) {
+    return failed(e);
+  }
+  revalidatePath(`/reviews/${cycleId}`);
+  return {};
 }
 
-/** Changing a comment before the step is answered: the backend keeps every comment as written. */
-export async function editCommentAction(_prev: Result | undefined, _formData: FormData): Promise<Result> {
-  return { error: "A comment cannot be changed yet: add another one, or close it with a resolution." };
+/**
+ * Change a comment that has not been given yet. Same rule as taking one back:
+ * until the step is answered it is a draft, and afterwards it is a record.
+ */
+export async function editCommentAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
+  const ctx = await requireScope();
+  const commentId = text(formData, "commentId");
+  const body = text(formData, "text");
+  if (!body) return { error: "A comment says something — write it, or take it back." };
+  const blocking = formData.get("blocking") === "on";
+  const classes = await getActiveSet("COMMENT_CLASSES");
+  const classification = classes.find((c) => (c.props.progressionPreventing === true || c.props.blocking === true) === blocking)?.code
+    ?? (blocking ? "BLOCKING" : "NON_BLOCKING");
+  const cycleId = text(formData, "cycleId");
+  if (!cycleId) return { error: "Say which review the comment is on." };
+  try {
+    await api(projectPath(ctx, `/reviews/${cycleId}/comments/${commentId}`), { method: "PUT", body: { text: body, class: classification } });
+  } catch (e) {
+    return failed(e);
+  }
+  revalidatePath(`/reviews/${cycleId}`);
+  return {};
 }
 
 /** Close a progression-preventing comment — only with a recorded resolution (§9.6). */

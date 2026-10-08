@@ -1,5 +1,8 @@
+import { cache } from "react";
 import type { Tenant } from "./tenant";
 import type { DocumentClass, Verb } from "./permissions";
+import { api, projectPath } from "./api/client";
+import { reviewOfRequest } from "./api/reviews";
 
 /**
  * Handing a review step to somebody else.
@@ -28,8 +31,8 @@ import type { DocumentClass, Verb } from "./permissions";
  * turn the exception into the habit. Where the route needs somebody the matrix
  * does not name, whoever configures the route adds them to the step.
  *
- * The backend keeps no delegations yet: nobody is offered, nothing is in
- * force, and a hand-over is refused as not supported.
+ * The backend keeps the hand-overs and applies these rules; the review a
+ * hand-over is raised from is the review the screens call a cycle.
  */
 
 /** The document facts the matrix reads. */
@@ -42,20 +45,42 @@ export type DelegationRecord = {
   fromUser: { name: string }; toUser: { name: string };
 };
 
+type BackendDelegation = {
+  id: string; step: number; fromUserId: string; fromName: string; toUserId: string; toName: string; verb: string; status: string;
+  endDate: string; reason: string | null; refusedReason: string | null; flag: string | null; askedBy: string; grantedBy: string | null;
+};
+
+/** The flags of the hand-overs read for this request, by who took them: the backend says them with each hand-over. */
+const flags = cache(() => new Map<string, string | null>());
+
 /** The hand-overs raised from a review, newest first. */
-export async function delegationsOn(_t: Tenant, _cycleId: string): Promise<DelegationRecord[]> {
-  return [];
+export async function delegationsOn(t: Tenant, cycleId: string): Promise<DelegationRecord[]> {
+  const rows = await api<BackendDelegation[]>(projectPath(t, `/reviews/${cycleId}/delegations`)).catch(() => [] as BackendDelegation[]);
+  for (const row of rows) if (!flags().has(row.toUserId)) flags().set(row.toUserId, row.flag);
+  return rows.map((row) => ({
+    id: row.id, fromUserId: row.fromUserId, toUserId: row.toUserId, verb: row.verb, status: row.status,
+    endDate: new Date(`${row.endDate}T23:59:59`), reason: row.reason, refusedReason: row.refusedReason,
+    askedByName: row.askedBy, grantedByName: row.grantedBy, fromUser: { name: row.fromName }, toUser: { name: row.toName },
+  }));
 }
+
+/** Who may take the open step of a review, as the backend offers them for the person asking. */
+const options = cache(async (t: Tenant, cycleId: string) =>
+  api<{ candidates: { id: string; name: string; functionName: string; inMatrix: boolean }[] }>(projectPath(t, `/reviews/${cycleId}/delegation-options`))
+    .then((one) => one.candidates).catch(() => []));
 
 /**
  * Who this person may hand a step of this kind to: those the matrix names,
  * and — unless it is the only rule — everybody else on the project, flagged.
+ * Asked of the review the page stands on.
  */
 export async function delegateCandidates(
-  _t: Tenant,
+  t: Tenant,
   _asked: { target: Target; verb: Verb; fromUserId: string },
+  cycleId?: string,
 ): Promise<{ id: string; name: string; functionName: string; inMatrix: boolean }[]> {
-  return [];
+  const id = cycleId ?? reviewOfRequest();
+  return id ? options(t, id) : [];
 }
 
 /**
@@ -64,14 +89,14 @@ export async function delegateCandidates(
  */
 export async function delegationFlag(
   _t: Tenant,
-  _asked: { target: Target; verb: Verb; toUserId: string; toName: string },
+  { toUserId }: { target: Target; verb: Verb; toUserId: string; toName: string },
 ): Promise<string | null> {
-  return null;
+  return flags().get(toUserId) ?? null;
 }
 
 /**
- * Why this delegation may not exist, or null when it may. One sentence, in the
- * words of the person who would read it.
+ * Why this delegation may not exist, or null when it may. The backend applies
+ * the rest of the rule when the hand-over is made.
  */
 export async function delegationRefusal(
   _t: Tenant,
@@ -79,13 +104,12 @@ export async function delegationRefusal(
     { target: Target; verb: Verb; fromUserId: string; fromName: string; toUserId: string; toName: string },
 ): Promise<string | null> {
   if (fromUserId === toUserId) return "A step cannot be handed to the person who already holds it.";
-  return "Delegation is not supported yet.";
+  return null;
 }
 
 /**
  * The delegation, if any, that lets `userId` act in somebody else's place here.
- * A delegation raised from one review covers that review only; one raised
- * without a review covers the class its scope names.
+ * The backend seats the person a step was handed to; this is not asked separately.
  */
 export async function delegationInForce(
   _t: Tenant,
@@ -101,11 +125,8 @@ export async function delegationInForce(
  */
 export async function mayAnswerCycle(
   t: Tenant,
-  { cycleId, userId }: { cycleId: string; userId: string; verb: Verb },
+  { cycleId }: { cycleId: string; userId: string; verb: Verb },
 ): Promise<{ ok: boolean; onBehalfOf: string | null }> {
-  const { backendReview } = await import("./api/legacy");
-  const review = await backendReview(t, cycleId).catch(() => null);
-  if (!review) return { ok: false, onBehalfOf: null };
-  const seated = review.steps.some((step) => step.participants.some((seat) => seat.userId === userId));
-  return { ok: seated, onBehalfOf: null };
+  const me = await api<{ seated: boolean; onBehalfOf: string | null }>(projectPath(t, `/reviews/${cycleId}/me`)).catch(() => null);
+  return { ok: !!me?.seated, onBehalfOf: me?.onBehalfOf ?? null };
 }

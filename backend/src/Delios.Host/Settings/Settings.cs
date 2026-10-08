@@ -113,3 +113,38 @@ public static class SettingEndpoints
         return Results.NoContent();
     }
 }
+
+/// <summary>
+/// The project's answers the backend acts on, read the way the screens read them: who carries out an act
+/// (<c>__ALL__</c> = CONTROL | SELF | CUSTOM, then the act's own key), whether an act is left out
+/// (<c>SKIP:{act}</c> = OFF), and a policy's chosen option.
+/// </summary>
+public static class ProjectAnswers
+{
+    private static Task<Dictionary<string, string>> AllAsync(DeliosDbContext db, Guid projectId, CancellationToken cancellationToken) =>
+        db.Set<Setting>().AsNoTracking().Where(s => s.ProjectId == projectId).ToDictionaryAsync(s => s.Key, s => s.Value, cancellationToken);
+
+    /// <summary>
+    /// Whether Document Control carries out this act on the project. Unanswered, it follows the project: Document
+    /// Control does it where somebody holds the control function.
+    /// </summary>
+    public static async Task<bool> ControlDoesAsync(DeliosDbContext db, Guid projectId, string act, CancellationToken cancellationToken)
+    {
+        var answers = await AllAsync(db, projectId, cancellationToken);
+        var all = answers.GetValueOrDefault("__ALL__");
+        if (all == "CONTROL") return true;
+        if (all == "SELF") return false;
+        if (all == "CUSTOM" && answers.GetValueOrDefault(act) is { } own && own is "CONTROL" or "SELF") return own == "CONTROL";
+        return await db.Memberships.AnyAsync(m => m.ProjectId == projectId && m.Active && m.Function!.Active
+            && m.Function.Rules.Any(r => r.Verbs.Contains(Verbs.Control))
+            && db.Users.Any(u => u.Id == m.UserId && u.Active), cancellationToken);
+    }
+
+    /// <summary>Whether the organization left this act out on the project.</summary>
+    public static async Task<bool> IsOffAsync(DeliosDbContext db, Guid projectId, string act, CancellationToken cancellationToken) =>
+        (await AllAsync(db, projectId, cancellationToken)).GetValueOrDefault($"SKIP:{act}") == "OFF";
+
+    /// <summary>The project's chosen option for a policy, or null when it has not chosen.</summary>
+    public static async Task<string?> PolicyAsync(DeliosDbContext db, Guid projectId, string key, CancellationToken cancellationToken) =>
+        (await AllAsync(db, projectId, cancellationToken)).GetValueOrDefault(key);
+}

@@ -174,6 +174,9 @@ public sealed class ReviewParticipant
     public string? GrantedStatus { get; set; }
     public string? Note { get; set; }
     public Instant? AnsweredAt { get; set; }
+    /// <summary>Set when somebody this person handed the step to answered in their place.</summary>
+    public Guid? AnsweredById { get; set; }
+    public string? AnsweredByName { get; set; }
 }
 
 /// <summary>A comment written on a review step. Blocking comments must be closed before release.</summary>
@@ -215,6 +218,54 @@ public static class CommentStatuses
 {
     public const string Open = "OPEN";
     public const string Closed = "CLOSED";
+    /// <summary>Taken back by its author before their step was answered. Kept, and no longer shown or counted.</summary>
+    public const string Withdrawn = "WITHDRAWN";
+}
+
+/// <summary>
+/// One person's step handed to somebody else until a date: the other person
+/// answers it in their place, and the record says both names. Raised from a
+/// review, it covers that review's step only.
+/// </summary>
+public sealed class ReviewDelegation
+{
+    public Guid Id { get; set; } = Guid.CreateVersion7();
+    public Guid TenantId { get; set; }
+    public Guid ProjectId { get; set; }
+    public Guid ReviewId { get; set; }
+    /// <summary>The step (from 0) it hands over.</summary>
+    public int StepIndex { get; set; }
+    public Guid FromUserId { get; set; }
+    public required string FromName { get; set; }
+    public Guid ToUserId { get; set; }
+    public required string ToName { get; set; }
+    /// <summary>REVIEW (advice) or APPROVE (the decision): what is handed over.</summary>
+    public required string Verb { get; set; }
+    /// <summary>The last day it is in force, in the project's calendar.</summary>
+    public LocalDate EndDate { get; set; }
+    public string? Reason { get; set; }
+    /// <summary>One of <see cref="DelegationStates"/>.</summary>
+    public string Status { get; set; } = DelegationStates.Active;
+    public string? RefusedReason { get; set; }
+    /// <summary>Why the matrix would not have made this hand-over, when it would not.</summary>
+    public string? Flag { get; set; }
+    public required string AskedByName { get; set; }
+    public string? GrantedByName { get; set; }
+    public Instant? GrantedAt { get; set; }
+    public Instant CreatedAt { get; set; }
+}
+
+/// <summary>Where a <see cref="ReviewDelegation"/> stands.</summary>
+public static class DelegationStates
+{
+    /// <summary>Asked for; Document Control has not put it in force.</summary>
+    public const string Open = "OPEN";
+    /// <summary>In force until its end date.</summary>
+    public const string Active = "ACTIVE";
+    /// <summary>Document Control declined it, with a reason.</summary>
+    public const string Refused = "REFUSED";
+    /// <summary>Ended before its date, by the person who gave it or by Document Control.</summary>
+    public const string Withdrawn = "WITHDRAWN";
 }
 
 /// <summary>Value lists a review reads, all the organization's to edit.</summary>

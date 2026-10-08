@@ -136,7 +136,8 @@ export function cycleOf(review: ReviewView, sequence: number): LegacyCycle {
 /** A revision as the old database held it. */
 export function revisionOf(documentId: string, r: RevisionView, reviews: ReviewView[], transmittals: ContextTransmittal[]): LegacyRevision {
   const mine = reviews.filter((one) => one.revisionId === r.id).sort((a, b) => a.startedAt.localeCompare(b.startedAt));
-  const cycles = mine.map((one, i) => cycleOf(one, i + 1));
+  // A type that is not reviewed goes on to release through a review with no steps: no cycle, and its rule stands in for an approval.
+  const cycles = mine.filter((one) => one.steps.length).map((one, i) => cycleOf(one, i + 1));
   const decided = mine.filter((one) => one.verdict).sort((a, b) => (b.decidedAt ?? "").localeCompare(a.decidedAt ?? ""));
   const pending = mine.some((one) => one.state === "DECIDED");
   // The files of the newest submission come first: that is what a screen reads as "the" file.
@@ -151,7 +152,7 @@ export function revisionOf(documentId: string, r: RevisionView, reviews: ReviewV
   return {
     id: r.id, documentId, value: r.value, series: r.series,
     state: r.state === "IN_REVIEW" && pending ? "NOT_RELEASED" : r.state,
-    statusCode: r.statusCode, statusSetAt: date(decided[0]?.decidedAt), statusSetByName: null, returnedAt: date(r.returnedAt), returnedReason: r.returnedReason,
+    statusCode: r.statusCode ?? mine.find((one) => one.state === "DECIDED")?.grantedStatus ?? null, statusSetAt: date(decided[0]?.decidedAt), statusSetByName: null, returnedAt: date(r.returnedAt), returnedReason: r.returnedReason,
     heldAt: null, heldReason: null, heldByName: null, phase: null, reasonForRevision: r.reasonForRevision, changeDescription: r.changeDescription,
     plannedSubmissionDate: null, issueDate: date(issued?.issuedAt), nativeFileId: current.find((f) => f.kind === "NATIVE")?.id ?? null,
     renditionFileId: current.find((f) => f.kind === "RENDITION")?.id ?? null, appVersion: null, authorizationReason: null, authorizedById: null,

@@ -33,6 +33,8 @@ public sealed record ReleaseRequest(string? Status = null, string? Outcome = nul
 /// from it, and from the verdict: one that asked for changes always needs a new revision.
 /// </param>
 public sealed record ReturnRequest(string? Note, int? ToStep = null, string? Reason = null, string? Outcome = null);
+/// <summary>Body of sending on for release a revision whose document type is not reviewed: the status it is released at, and who receives it.</summary>
+public sealed record SendOnRequest(string? Status, IssueAsk? Issue = null);
 /// <summary>Body of a rewind request: the earlier step (from 1) to go back to, a published return reason, and an optional note.</summary>
 public sealed record RewindRequest(int ToStep, string? Reason, string? Note);
 
@@ -228,10 +230,12 @@ public sealed class ReviewService(
         var review = await LoadAsync(access, reviewId, cancellationToken);
         if (review is null) return (null, NotFound());
         var step = OpenStep(review);
-        if (review.State != ReviewStates.InProgress || step is null || !IsSeated(step, access.UserId))
+        var seat = review.State == ReviewStates.InProgress && step is not null ? await SeatAsync(review, step, access, cancellationToken) : null;
+        if (step is null || seat is null)
         {
             return (null, Problems.Forbidden("NOT_ON_OPEN_STEP", "Only the people on the step that is open comment on it."));
         }
+        if (seat.AnsweredAt is not null) return (null, Problems.Conflict("ALREADY_ANSWERED", "This step is answered: what it says is settled."));
         if (step.ByProxy && step.DispatchedAt is null) return (null, NotDispatched(step));
         var text = request.Text?.Trim() ?? "";
         if (text.Length == 0) return (null, Problems.Invalid("COMMENT_EMPTY", "A comment needs words."));
@@ -257,7 +261,8 @@ public sealed class ReviewService(
             StepIndex = step.Index,
             AuthorId = access.UserId,
             // A party's comment, written down by one of ours: both are said.
-            AuthorName = step.ByProxy ? $"{step.PartyName} (recorded by {access.UserName})" : access.UserName,
+            AuthorName = step.ByProxy ? $"{step.PartyName} (recorded by {access.UserName})"
+                : seat.UserId == access.UserId ? access.UserName : $"{access.UserName} for {seat.UserName}",
             Text = text,
             Class = classCode,
             Blocking = blocking,
@@ -292,6 +297,69 @@ public sealed class ReviewService(
         return null;
     }
 
+    /// <summary>
+    /// Changes a comment its author wrote, while the step it was written on is open
+    /// and their seat has not answered: until then it is a draft, afterwards a record.
+    /// The words it had are kept in the audit trail.
+    /// </summary>
+    public async Task<IResult?> EditCommentAsync(
+        ProjectAccess access, Guid reviewId, Guid commentId, CommentRequest request, CancellationToken cancellationToken)
+    {
+        var (review, comment, problem) = await DraftCommentAsync(access, reviewId, commentId, "changed", cancellationToken);
+        if (problem is not null) return problem;
+        var text = request.Text?.Trim() ?? "";
+        if (text.Length == 0) return Problems.Invalid("COMMENT_EMPTY", "A comment says something: write it, or take it back.");
+        var catalog = await Catalog.LoadAsync(db, cancellationToken);
+        var classCode = request.Class ?? comment!.Class;
+        if (!catalog.IsActive(ReviewSets.CommentClasses, classCode))
+        {
+            return Problems.Invalid("VALUE_NOT_PUBLISHED", $"{classCode} is not a published comment class.", new { field = "class", value = classCode });
+        }
+        var was = comment!.Text;
+        comment.Text = text;
+        comment.Class = classCode;
+        comment.Blocking = catalog.Prop(ReviewSets.CommentClasses, classCode, "blocking") is { ValueKind: JsonValueKind.True };
+        await db.SaveChangesAsync(cancellationToken);
+        await audit.WriteAsync(Actor(access), "COMMENT_CHANGED", "Review", review!.Id, review.Number,
+            $"Before the step was answered. It said: \"{Clip(was)}\"", review.ProjectId, cancellationToken);
+        return null;
+    }
+
+    /// <summary>Takes a comment back, on the same terms as changing it. It is kept, marked withdrawn, and no longer shown or counted.</summary>
+    public async Task<IResult?> WithdrawCommentAsync(ProjectAccess access, Guid reviewId, Guid commentId, CancellationToken cancellationToken)
+    {
+        var (review, comment, problem) = await DraftCommentAsync(access, reviewId, commentId, "taken back", cancellationToken);
+        if (problem is not null) return problem;
+        comment!.Status = CommentStatuses.Withdrawn;
+        comment.ClosedAt = clock.GetCurrentInstant();
+        comment.ClosedByName = access.UserName;
+        await db.SaveChangesAsync(cancellationToken);
+        await audit.WriteAsync(Actor(access), "COMMENT_WITHDRAWN", "Review", review!.Id, review.Number,
+            $"Taken back before the step was answered: \"{Clip(comment.Text)}\"", review.ProjectId, cancellationToken);
+        return null;
+    }
+
+    /// <summary>The comment, when the caller wrote it and it is still a draft: its step open, their seat not answered.</summary>
+    private async Task<(Review? Review, ReviewComment? Comment, IResult? Problem)> DraftCommentAsync(
+        ProjectAccess access, Guid reviewId, Guid commentId, string act, CancellationToken cancellationToken)
+    {
+        var review = await LoadAsync(access, reviewId, cancellationToken);
+        var comment = review?.Comments.SingleOrDefault(c => c.Id == commentId && c.Status != CommentStatuses.Withdrawn);
+        if (review is null || comment is null) return (null, null, NotFound());
+        if (comment.AuthorId != access.UserId) return (null, null, Problems.Forbidden("NOT_AUTHOR", $"A comment is {act} by whoever wrote it."));
+        var step = OpenStep(review);
+        var seat = review.State == ReviewStates.InProgress && step is not null && step.Index == comment.StepIndex
+            ? await SeatAsync(review, step, access, cancellationToken) : null;
+        if (seat is null || seat.AnsweredAt is not null || comment.Status != CommentStatuses.Open)
+        {
+            return (null, null, Problems.Conflict("COMMENT_GIVEN",
+                $"This step has been answered. A comment in the record is settled by closing it with a resolution, not {act}."));
+        }
+        return (review, comment, null);
+    }
+
+    private static string Clip(string text) => text.Length <= 200 ? text : text[..200] + "…";
+
     // ── Answers ───────────────────────────────────────────────────────────────
 
     /// <summary>
@@ -304,8 +372,8 @@ public sealed class ReviewService(
         var review = await LoadAsync(access, reviewId, cancellationToken);
         if (review is null) return (null, NotFound());
         var step = OpenStep(review);
-        var seat = step?.Participants.SingleOrDefault(p => p.UserId == access.UserId);
-        if (review.State != ReviewStates.InProgress || step is null || seat is null)
+        var seat = review.State == ReviewStates.InProgress && step is not null ? await SeatAsync(review, step, access, cancellationToken) : null;
+        if (step is null || seat is null)
         {
             return (null, Problems.Forbidden("NOT_ON_OPEN_STEP", "Only the people on the step that is open answer it."));
         }
@@ -360,7 +428,8 @@ public sealed class ReviewService(
         else
         {
             // An adviser is not asked: the answer is already in what they wrote.
-            var mine = review.Comments.Where(c => c.StepIndex == step.Index && c.AuthorId == access.UserId).ToList();
+            var mine = review.Comments.Where(c => c.StepIndex == step.Index && c.Status != CommentStatuses.Withdrawn
+                && (c.AuthorId == access.UserId || c.AuthorId == seat.UserId)).ToList();
             var kind = mine.Any(c => c.Blocking) ? Advice_Blocking : mine.Count > 0 ? Advice_Some : Advice_None;
             answer = AdviceCode(catalog, kind);
         }
@@ -391,6 +460,12 @@ public sealed class ReviewService(
         seat.GrantedStatus = granted;
         seat.Note = request.Note?.Trim();
         seat.AnsweredAt = now;
+        var stoodIn = seat.UserId != access.UserId;
+        if (stoodIn)
+        {
+            seat.AnsweredById = access.UserId;
+            seat.AnsweredByName = access.UserName;
+        }
         if (step.ByProxy)
         {
             step.ForeignAnswer = request.ForeignAnswer?.Trim() is { Length: > 0 } theirs ? theirs : null;
@@ -405,6 +480,7 @@ public sealed class ReviewService(
         }
         await audit.WriteAsync(Actor(access), step.Deciding ? "VERDICT" : "ADVICE", "Review", review.Id, review.Number,
             $"Step {step.Index + 1} ({step.Title}): {answer}{(granted is null ? "" : $", granting {granted}")}"
+            + (stoodIn ? $", answered for {seat.UserName}, who handed the step over" : "")
             + (step.ByProxy ? $", recorded for {step.PartyName}{(step.ForeignAnswer is null ? "" : $" who wrote \"{step.ForeignAnswer}\"")}." : "."),
             review.ProjectId, cancellationToken);
 
@@ -487,6 +563,98 @@ public sealed class ReviewService(
         }
     }
 
+    // ── Not reviewed ──────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// A revision of a document type the organization does not review (its
+    /// published <c>review</c> property is false) goes from preparation straight to
+    /// release. Whoever would have sent it for review settles its status here, and
+    /// who receives it. It waits for Document Control as a decided review would, on
+    /// a review with no steps; where nobody holds that function, it is released at once.
+    /// </summary>
+    public async Task<(Review? Review, IResult? Problem)> SendOnAsync(
+        ProjectAccess access, Guid revisionId, SendOnRequest request, CancellationToken cancellationToken)
+    {
+        var revision = await db.Revisions.Include(r => r.Files).SingleOrDefaultAsync(r => r.Id == revisionId, cancellationToken);
+        var document = revision is null ? null : await VisibleDocumentAsync(access, revision.DocumentId, cancellationToken);
+        if (revision is null || document is null) return Fail(Problems.NotFound("REVISION_NOT_FOUND", "No such revision."));
+        if (!access.Allows(Verbs.Create, document.Facts) && !access.Allows(Verbs.Revise, document.Facts)
+            && revision.AuthoredById != access.UserId && !access.Allows(Verbs.Control, document.Facts))
+        {
+            return Fail(Problems.Forbidden("SEND_ON_NOT_ALLOWED", "Only the author, someone who may revise it, or Document Control sends it on."));
+        }
+        var catalog = await Catalog.LoadAsync(db, cancellationToken);
+        if (catalog.Prop(ValueSets.DocumentTypes, document.DocType, "review") is not { ValueKind: JsonValueKind.False })
+        {
+            return Fail(Problems.Conflict("TYPE_IS_REVIEWED", $"{document.DocType} is reviewed before release: send it for review.",
+                new { docType = document.DocType }));
+        }
+        if (revision.State != RevisionStates.InPreparation)
+        {
+            return Fail(Problems.Conflict("REVISION_NOT_IN_PREPARATION",
+                $"Revision {revision.Value} is {Words(revision.State)}; only a revision in preparation is sent on.", new { state = revision.State }));
+        }
+        if (revision.FilesState != FilesStates.Ready)
+        {
+            return Fail(Problems.Conflict("FILES_NOT_READY", "The revision's files have not all passed scanning.", new { filesState = revision.FilesState }));
+        }
+        if (!revision.Files.Any(f => f.Kind == FileKinds.Rendition && f.Status == FileStatuses.Clean && f.Submission == revision.Submission))
+        {
+            return Fail(Problems.Conflict("NO_RENDITION", "Attach the file first: a PDF is what is released."));
+        }
+        var status = request.Status?.Trim() ?? "";
+        if (!catalog.IsActive(ReviewSets.Statuses, status))
+        {
+            return Fail(Problems.Invalid("STATUS_REQUIRED", "Choose the status it is released at.", new { field = "status", value = status }));
+        }
+        if (request.Issue is not null)
+        {
+            var (asked, problem) = await transmittals.NewRequestAsync(access, document, revision, request.Issue, cancellationToken);
+            if (problem is not null) return Fail(problem);
+            db.IssueRequests.Add(asked!);
+        }
+
+        var now = clock.GetCurrentInstant();
+        var review = new Review
+        {
+            TenantId = access.Project.TenantId,
+            ProjectId = access.Project.Id,
+            DocumentId = document.Id,
+            RevisionId = revision.Id,
+            Number = await numbering.RecordAsync(access.Project.TenantId, access.Project.Id, RecordKinds.Review,
+                NumberFields.ForRecord(access.Project.Code), "RV", cancellationToken),
+            RouteName = "Not reviewed",
+            State = ReviewStates.Decided,
+            GrantedStatus = status,
+            StartedById = access.UserId,
+            StartedByName = access.UserName,
+            StartedAt = now,
+            DecidedAt = now,
+        };
+        db.Reviews.Add(review);
+        revision.State = RevisionStates.InReview;
+        document.LatestRevisionState = RevisionStates.InReview;
+        document.UpdatedAt = now;
+        await db.SaveChangesAsync(cancellationToken);
+        await audit.WriteAsync(Actor(access), "SENT_FOR_RELEASE", "Revision", revision.Id, $"{document.Number} rev {revision.Value}",
+            $"Not reviewed: document type {document.DocType} goes from preparation straight to release, at {status}.",
+            access.Project.Id, cancellationToken);
+
+        var controllers = await notifier.ControlHoldersAsync(access.Project.Id, cancellationToken);
+        if (controllers.Count == 0)
+        {
+            await ReleaseCoreAsync(access, review, status, "System", cancellationToken);
+        }
+        else
+        {
+            await TellAsync(review, controllers, Notifications.NotificationKinds.ReviewDecided,
+                $"{TransmittalService.Label(document, revision)} is ready to release at {status}",
+                $"{document.DocType} is not reviewed; {access.UserName} sent it on.", cancellationToken, $"/documents/{document.Id}");
+        }
+        await db.SaveChangesAsync(cancellationToken);
+        return (review, null);
+    }
+
     // ── Document Control's acts ───────────────────────────────────────────────
 
     /// <summary>
@@ -507,7 +675,7 @@ public sealed class ReviewService(
             return (null, Problems.Conflict("REVIEW_NOT_DECIDED", "Only a decided review is released.", new { state = review.State }));
         }
         var catalog = await Catalog.LoadAsync(db, cancellationToken);
-        if (!Proceeds(catalog, review.Verdict!))
+        if (review.Verdict is not null && !Proceeds(catalog, review.Verdict))
         {
             return (null, Problems.Conflict("VERDICT_DOES_NOT_PROCEED",
                 $"Verdict {review.Verdict} asks for changes: send the revision back instead.", new { verdict = review.Verdict }));
@@ -561,7 +729,7 @@ public sealed class ReviewService(
             // changes is different: what the document says must change, so the next
             // revision replaces it.
             var catalog = await Catalog.LoadAsync(db, cancellationToken);
-            var changesAsked = review.State == ReviewStates.Decided && !Proceeds(catalog, review.Verdict!);
+            var changesAsked = review.State == ReviewStates.Decided && review.Verdict is not null && !Proceeds(catalog, review.Verdict);
             var revision = await db.Revisions.SingleAsync(r => r.Id == review.RevisionId, cancellationToken);
             var fromOutside = revision.AuthoredByParty is { } party
                 && await db.Parties.AnyAsync(p => p.Code == party && !p.IsInternal, cancellationToken);
@@ -600,7 +768,7 @@ public sealed class ReviewService(
         var review = await LoadAsync(access, reviewId, cancellationToken);
         if (review is null) return (null, NotFound());
         var step = OpenStep(review);
-        if (review.State != ReviewStates.InProgress || step is null || !IsSeated(step, access.UserId))
+        if (review.State != ReviewStates.InProgress || step is null || await SeatAsync(review, step, access, cancellationToken) is null)
         {
             return (null, Problems.Forbidden("NOT_ON_OPEN_STEP", "Only the people on the step that is open send the route back."));
         }
@@ -628,7 +796,7 @@ public sealed class ReviewService(
         var review = await LoadAsync(access, reviewId, cancellationToken);
         if (review is null) return (null, NotFound());
         var step = OpenStep(review);
-        if (review.State != ReviewStates.InProgress || step is null || !step.ByProxy || !IsSeated(step, access.UserId))
+        if (review.State != ReviewStates.InProgress || step is null || !step.ByProxy || await SeatAsync(review, step, access, cancellationToken) is null)
         {
             return (null, Problems.Forbidden("NOT_CUSTODIAN",
                 "Whoever carries the exchange with the party on the open step records that it went."));
@@ -667,7 +835,7 @@ public sealed class ReviewService(
         var review = await LoadAsync(access, reviewId, cancellationToken);
         if (review is null) return (null, NotFound());
         var step = OpenStep(review);
-        if (review.State != ReviewStates.InProgress || step is null || !step.ByProxy || !IsSeated(step, access.UserId))
+        if (review.State != ReviewStates.InProgress || step is null || !step.ByProxy || await SeatAsync(review, step, access, cancellationToken) is null)
         {
             return (null, Problems.Forbidden("NOT_CUSTODIAN",
                 "Whoever carries the exchange with the party on the open step files its proof."));
@@ -690,13 +858,16 @@ public sealed class ReviewService(
     public async Task<object> WorkAsync(ProjectAccess access, CancellationToken cancellationToken)
     {
         var me = access.UserId;
+        var today = WorkingCalendar.Today(clock, access.Project.TimeZone);
         var open = await (
             from p in db.ReviewParticipants
             join s in db.ReviewSteps on p.StepId equals s.Id
             join r in db.Reviews on s.ReviewId equals r.Id
             join d in db.Documents on r.DocumentId equals d.Id
             join v in db.Revisions on r.RevisionId equals v.Id
-            where p.UserId == me && p.AnsweredAt == null && s.State == StepStates.Open && r.ProjectId == access.Project.Id
+            where (p.UserId == me || db.Set<ReviewDelegation>().Any(dl => dl.ReviewId == r.Id && dl.StepIndex == s.Index
+                    && dl.FromUserId == p.UserId && dl.ToUserId == me && dl.Status == DelegationStates.Active && dl.EndDate >= today))
+                && p.AnsweredAt == null && s.State == StepStates.Open && r.ProjectId == access.Project.Id
             orderby s.OpenedAt
             select new
             {
@@ -732,7 +903,7 @@ public sealed class ReviewService(
                 select new { r.Id, r.Number, DocumentId = d.Id, DocumentNumber = d.Number, d.Title, v.Value, r.Verdict, r.GrantedStatus, r.DecidedAt })
                 .ToListAsync(cancellationToken);
             gate = decided.Select(x => new WorkItem(x.Id, x.Number, x.DocumentId, x.DocumentNumber, x.Title, x.Value,
-                Proceeds(catalog, x.Verdict!) ? "READY_TO_RELEASE" : "SEND_BACK", null, null,
+                x.Verdict is null || Proceeds(catalog, x.Verdict) ? "READY_TO_RELEASE" : "SEND_BACK", null, null,
                 x.DecidedAt!.Value.ToDateTimeOffset(), true, x.Verdict, x.GrantedStatus)).ToList();
         }
         return new
@@ -1032,7 +1203,9 @@ public sealed class ReviewService(
     {
         if (await HoldsControlAsync(access, review, cancellationToken)) return true;
         if (await ControlHoldersAsync(access.Project.Id, cancellationToken) > 0) return false;
-        return review.Steps.Single(s => s.Deciding).Participants.Any(p => p.UserId == access.UserId);
+        // Not reviewed: whoever sent it on releases it.
+        return review.Steps.SingleOrDefault(s => s.Deciding)?.Participants.Any(p => p.UserId == access.UserId)
+            ?? review.StartedById == access.UserId;
     }
 
     /// <summary>Whether a function, on this project, would allow the verb on a document with these facts. Used to check the deciding function may approve.</summary>
@@ -1041,7 +1214,8 @@ public sealed class ReviewService(
 
     /// <summary>The review's step that is open now, or null when none is.</summary>
     /// <summary>What the caller may do on this review now: answer the open step, act as Document Control on it.</summary>
-    public sealed record ReviewMe(bool Seated, bool Answered, bool Control);
+    /// <param name="OnBehalfOf">When the caller answers in somebody else's place, by a hand-over in force: that person's name.</param>
+    public sealed record ReviewMe(bool Seated, bool Answered, bool Control, string? OnBehalfOf = null);
 
     /// <summary>For the review page: whether the caller sits on the open step (and has answered), and whether they act for Document Control. Null when they cannot see it.</summary>
     public async Task<ReviewMe?> MeAsync(ProjectAccess access, Guid reviewId, CancellationToken cancellationToken)
@@ -1049,13 +1223,27 @@ public sealed class ReviewService(
         var review = await LoadAsync(access, reviewId, cancellationToken);
         if (review is null) return null;
         var step = OpenStep(review);
-        var seat = step?.Participants.FirstOrDefault(p => p.UserId == access.UserId);
-        return new ReviewMe(seat is not null, seat?.AnsweredAt is not null, await MayActForControlAsync(access, review, cancellationToken));
+        var seat = step is null ? null : await SeatAsync(review, step, access, cancellationToken);
+        return new ReviewMe(seat is not null, seat?.AnsweredAt is not null, await MayActForControlAsync(access, review, cancellationToken),
+            seat is not null && seat.UserId != access.UserId ? seat.UserName : null);
     }
 
     private static ReviewStep? OpenStep(Review review) => review.Steps.SingleOrDefault(s => s.State == StepStates.Open);
-    /// <summary>Whether the user is one of the people answering the step.</summary>
-    private static bool IsSeated(ReviewStep step, Guid userId) => step.Participants.Any(p => p.UserId == userId);
+    /// <summary>
+    /// The seat the caller answers on this step: their own, or that of somebody who
+    /// handed the step to them by a hand-over in force today. Null when they have none.
+    /// </summary>
+    private async Task<ReviewParticipant?> SeatAsync(Review review, ReviewStep step, ProjectAccess access, CancellationToken cancellationToken)
+    {
+        var own = step.Participants.FirstOrDefault(p => p.UserId == access.UserId);
+        if (own is not null) return own;
+        var today = WorkingCalendar.Today(clock, access.Project.TimeZone);
+        var from = await db.Set<ReviewDelegation>().AsNoTracking()
+            .Where(d => d.ReviewId == review.Id && d.StepIndex == step.Index && d.ToUserId == access.UserId
+                && d.Status == DelegationStates.Active && d.EndDate >= today)
+            .Select(d => d.FromUserId).ToListAsync(cancellationToken);
+        return step.Participants.FirstOrDefault(p => from.Contains(p.UserId));
+    }
 
     /// <summary>Whether a verdict lets the revision go on to release (its published <c>proceed</c> property is true).</summary>
     private static bool Proceeds(Catalog catalog, string verdict) =>

@@ -107,7 +107,8 @@ public static class ReviewListEndpoints
     private static IQueryable<Review> Visible(DeliosDbContext db, ProjectAccess access, IReadOnlyList<string> restricted)
     {
         var documents = DocumentQueries.Visible(db, access, restricted).Select(d => d.Id);
-        return db.Reviews.AsNoTracking().Where(r => r.ProjectId == access.Project.Id && documents.Contains(r.DocumentId));
+        // A revision of a type that is not reviewed is released through a review with no steps: not a review to list.
+        return db.Reviews.AsNoTracking().Where(r => r.ProjectId == access.Project.Id && documents.Contains(r.DocumentId) && r.Steps.Any());
     }
 
     /// <summary>Applies every filter given. Each narrows; none widens.</summary>
@@ -217,7 +218,7 @@ public static class ReviewListEndpoints
                 open?.DueDate?.ToDateOnly(), steps.LastOrDefault()?.DueDate?.ToDateOnly(), r.StartedAt.ToDateTimeOffset(), r.StartedByName,
                 (r.ClosedAt ?? r.DecidedAt)?.ToDateTimeOffset(), d.Discipline, d.DocType, d.DeliverableType, d.Originator, d.ContractRef,
                 v.AuthoredByParty is null ? null : v.Submissions.OrderBy(s => s.Number).FirstOrDefault()?.SubmittedAt.ToDateTimeOffset(),
-                r.Comments.OrderBy(c => c.CreatedAt).Select(c => new ReviewCommentLine(c.AuthorName, c.Text, c.Blocking, c.Status != CommentStatuses.Open)).ToList());
+                r.Comments.Where(c => c.Status != CommentStatuses.Withdrawn).OrderBy(c => c.CreatedAt).Select(c => new ReviewCommentLine(c.AuthorName, c.Text, c.Blocking, c.Status != CommentStatuses.Open)).ToList());
         }).ToList();
     }
 }

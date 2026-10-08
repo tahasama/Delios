@@ -10,7 +10,9 @@ namespace Delios.Host.Reviews;
 public sealed record RouteView(Guid Id, string Name, string? Description, bool IsDefault, IReadOnlyList<RouteStep> Steps);
 
 /// <summary>One person's answer on a review step, as shown inside a <see cref="StepView"/>.</summary>
-public sealed record ParticipantView(string Name, string? Answer, string? GrantedStatus, string? Note, DateTimeOffset? AnsweredAt, Guid UserId);
+/// <param name="AnsweredBy">Somebody who answered in this person's place, by a hand-over.</param>
+public sealed record ParticipantView(string Name, string? Answer, string? GrantedStatus, string? Note, DateTimeOffset? AnsweredAt, Guid UserId,
+    string? AnsweredBy = null);
 
 /// <summary>One step of a review as sent to the client. <c>Number</c> counts from 1; the dispatch and foreign-answer fields are filled only for steps sent to another organization.</summary>
 public sealed record StepView(int Number, string Title, string? Function, string? Party, string? Participation, string Mode,
@@ -50,6 +52,9 @@ public static class ReviewEndpoints
         project.MapGet("/reviews/{reviewId:guid}/me", MeAsync);
         project.MapPost("/reviews/{reviewId:guid}/comments", CommentAsync);
         project.MapPost("/reviews/{reviewId:guid}/comments/{commentId:guid}/close", CloseCommentAsync);
+        project.MapPut("/reviews/{reviewId:guid}/comments/{commentId:guid}", EditCommentAsync);
+        project.MapDelete("/reviews/{reviewId:guid}/comments/{commentId:guid}", WithdrawCommentAsync);
+        project.MapPost("/revisions/{revisionId:guid}/send-on", SendOnAsync).AddEndpointFilter<IdempotencyFilter>();
         project.MapPost("/reviews/{reviewId:guid}/answer", AnswerAsync);
         project.MapPost("/reviews/{reviewId:guid}/release", ReleaseAsync);
         project.MapPost("/reviews/{reviewId:guid}/return", ReturnAsync);
@@ -111,6 +116,25 @@ public static class ReviewEndpoints
         CancellationToken cancellationToken) =>
         await reviews.CloseCommentAsync(ProjectAccessFilter.Of(http), reviewId, commentId, request, cancellationToken)
             ?? Results.NoContent();
+
+    /// <summary>PUT <c>/reviews/{reviewId}/comments/{commentId}</c>: its author changes a comment before their step is answered.</summary>
+    private static async Task<IResult> EditCommentAsync(
+        Guid reviewId, Guid commentId, CommentRequest request, HttpContext http, ReviewService reviews, CancellationToken cancellationToken) =>
+        await reviews.EditCommentAsync(ProjectAccessFilter.Of(http), reviewId, commentId, request, cancellationToken) ?? Results.NoContent();
+
+    /// <summary>DELETE <c>/reviews/{reviewId}/comments/{commentId}</c>: its author takes a comment back before their step is answered. It is kept, marked withdrawn.</summary>
+    private static async Task<IResult> WithdrawCommentAsync(
+        Guid reviewId, Guid commentId, HttpContext http, ReviewService reviews, CancellationToken cancellationToken) =>
+        await reviews.WithdrawCommentAsync(ProjectAccessFilter.Of(http), reviewId, commentId, cancellationToken) ?? Results.NoContent();
+
+    /// <summary>POST <c>/revisions/{revisionId}/send-on</c>: a revision of a type that is not reviewed goes on for release. 201 with its (stepless) review.</summary>
+    private static async Task<IResult> SendOnAsync(
+        Guid revisionId, SendOnRequest request, HttpContext http, ReviewService reviews, CancellationToken cancellationToken)
+    {
+        var access = ProjectAccessFilter.Of(http);
+        var (review, problem) = await reviews.SendOnAsync(access, revisionId, request, cancellationToken);
+        return problem ?? Results.Created($"/api/projects/{access.Project.Id}/reviews/{review!.Id}", View(review));
+    }
 
     /// <summary>POST <c>/reviews/{reviewId}/answer</c>: records the caller's answer on the current step.</summary>
     private static async Task<IResult> AnswerAsync(
@@ -174,10 +198,10 @@ public static class ReviewEndpoints
         r.Steps.OrderBy(s => s.Index).Select(s => new StepView(s.Index + 1, s.Title, s.FunctionCode, s.PartyName,
             s.Participation, s.Mode, s.Deciding, s.State, s.DueDate?.ToDateOnly(), s.Answer, s.GrantsStatuses,
             s.Participants.OrderBy(p => p.UserName).Select(p => new ParticipantView(p.UserName, p.Answer, p.GrantedStatus,
-                p.Note, p.AnsweredAt?.ToDateTimeOffset(), p.UserId)).ToList(),
+                p.Note, p.AnsweredAt?.ToDateTimeOffset(), p.UserId, p.AnsweredByName)).ToList(),
             s.TransmittalId, s.DispatchedAt?.ToDateTimeOffset(), s.DispatchChannel, s.DispatchRef, s.DispatchedByName,
             s.ForeignAnswer, s.RecordedByName, s.EvidenceFileId)).ToList(),
-        r.Comments.OrderBy(c => c.CreatedAt).Select(View).ToList());
+        r.Comments.Where(c => c.Status != CommentStatuses.Withdrawn).OrderBy(c => c.CreatedAt).Select(View).ToList());
 
     /// <summary>Converts a review comment entity into the <see cref="CommentView"/> sent to clients.</summary>
     private static CommentView View(ReviewComment c) => new(

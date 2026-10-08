@@ -233,7 +233,30 @@ export async function markDispatchedAction(_prev: Result | undefined, formData: 
   return { ok: "Recorded as sent." };
 }
 
-/** A type the organization does not review goes straight to release: not in the backend yet. */
-export async function submitForReleaseAction(_prev: Result | undefined, _formData: FormData): Promise<Result> {
-  return { error: "Releasing a document type without review is not supported yet." };
+/**
+ * A type the organization does not review goes straight to release: whoever
+ * would send it for review settles its status and who receives it. Document
+ * Control releases it, or it is released at once where nobody holds that function.
+ */
+export async function submitForReleaseAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
+  const ctx = await requireScope();
+  const revisionId = text(formData, "revisionId");
+  const status = text(formData, "issuedFor");
+  if (!status) return { error: "Choose the status it is released at." };
+  const asked = requestFromForm(formData);
+  if (asked.delegated) return { error: "Leaving it to the author to say who receives it is not supported yet." };
+  if (asked.needsApproval) return { error: "An outside approval before release is not supported yet." };
+  const issue = asked.recipients.internalUserIds.length || asked.recipients.partyIds.length
+    ? { reason: asked.reason, userIds: asked.recipients.internalUserIds, partyIds: asked.recipients.partyIds, note: asked.note }
+    : null;
+  let documentId: string;
+  try {
+    documentId = (await backendRevision(ctx, revisionId)).documentId;
+    await api(projectPath(ctx, `/revisions/${revisionId}/send-on`), { body: { status, issue } });
+  } catch (e) {
+    return failed(e);
+  }
+  revalidatePath(`/documents/${documentId}`);
+  revalidatePath("/");
+  return { ok: "Sent on for release." };
 }

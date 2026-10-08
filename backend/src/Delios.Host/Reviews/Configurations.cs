@@ -89,6 +89,7 @@ internal sealed class ReviewParticipantConfiguration : IEntityTypeConfiguration<
         b.Property(x => x.UserName).HasMaxLength(200);
         b.Property(x => x.Answer).HasMaxLength(64);
         b.Property(x => x.GrantedStatus).HasMaxLength(64);
+        b.Property(x => x.AnsweredByName).HasMaxLength(200);
     }
 }
 
@@ -108,5 +109,30 @@ internal sealed class ReviewCommentConfiguration : IEntityTypeConfiguration<Revi
         b.Property(x => x.Resolution).HasMaxLength(2000);
         b.Property(x => x.ClosedByName).HasMaxLength(200);
         b.Property(x => x.CreatedAt).HasDefaultValueSql("now()");
+    }
+}
+
+/// <summary>Tells Entity Framework how to store <see cref="ReviewDelegation"/>.</summary>
+internal sealed class ReviewDelegationConfiguration : IEntityTypeConfiguration<ReviewDelegation>
+{
+    /// <summary>Called by Entity Framework when it builds the model.</summary>
+    public void Configure(EntityTypeBuilder<ReviewDelegation> b)
+    {
+        b.ToTable("review_delegations");
+        b.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
+        b.HasOne<Review>().WithMany().HasForeignKey(x => x.ReviewId).OnDelete(DeleteBehavior.Restrict);
+        b.HasOne<User>().WithMany().HasForeignKey(x => x.FromUserId).OnDelete(DeleteBehavior.Restrict);
+        b.HasOne<User>().WithMany().HasForeignKey(x => x.ToUserId).OnDelete(DeleteBehavior.Restrict);
+        b.HasIndex(x => new { x.ReviewId, x.StepIndex, x.Status });
+        b.HasIndex(x => new { x.ToUserId, x.Status });
+        b.Property(x => x.FromName).HasMaxLength(200);
+        b.Property(x => x.ToName).HasMaxLength(200);
+        b.Property(x => x.Verb).HasMaxLength(16);
+        b.Property(x => x.Reason).HasMaxLength(1000);
+        b.Property(x => x.Status).HasMaxLength(16);
+        b.Property(x => x.RefusedReason).HasMaxLength(1000);
+        b.Property(x => x.Flag).HasMaxLength(500);
+        b.Property(x => x.AskedByName).HasMaxLength(200);
+        b.Property(x => x.GrantedByName).HasMaxLength(200);
     }
 }
