@@ -7,18 +7,19 @@ import { getActiveSet } from "@/lib/config";
 import { fmtDate } from "@/lib/utils";
 import { ArrowLeft } from "lucide-react";
 import { SearchPick } from "@/components/search-pick";
+import { documentsByIds, legacyPackages } from "@/lib/api/packages";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Add to package" };
 
 /** One document or a selection from the register, into an open delivery package. */
 export default async function AddToPackagePage({ searchParams }: { searchParams: Promise<{ docs?: string }> }) {
-  const { db } = await requireScope();
+  const ctx = await requireScope();
   const ids = ((await searchParams).docs ?? "").split(",").map((v) => v.trim()).filter(Boolean);
   const [docs, packages, statuses] = await Promise.all([
-    db.document.findMany({ where: { id: { in: ids } }, orderBy: { docNumber: "asc" }, select: { id: true, docNumber: true, title: true } }),
+    documentsByIds(ctx, ids),
     // Supplier packages fill themselves; schedule packages come from the requirements list.
-    db.package.findMany({ where: { closedAt: null, category: "DELIVERY" }, orderBy: { completionDate: "asc" }, include: { members: { select: { documentId: true } } } }),
+    legacyPackages(ctx, "DELIVERY").then((all) => all.filter((p) => !p.closedAt)),
     getActiveSet("STATUSES"),
   ]);
 

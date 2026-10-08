@@ -1,4 +1,5 @@
-import type { Tenant } from "./tenant";
+import { legacyDocument, documentContext } from "./api/legacy";
+import type { LegacyPackage } from "./api/packages";
 
 /**
  * Where each document a supplier owes us stands, in the two stages Document
@@ -34,7 +35,7 @@ export type SupplierRow = {
   doc: { id: string; docNumber: string; title: string; isPlaceholder: boolean };
   revision: { id: string; value: string; submittedAt: Date | null; statusCode: string | null } | null;
   state: SupplierState;
-  due: Date;
+  due: Date | null;
   late: boolean;          // not sent and past due, or sent after due
   arrivedOnTime: boolean | null;
   reason: string | null;  // rejection reason or review outcome note
@@ -45,87 +46,73 @@ export type SupplierRow = {
   comments: { by: string; text: string; blocking: boolean; settled: boolean; review: string | null; rev: string }[];
 };
 
-export async function supplierRows(t: Tenant, pkg: { partyCode: string | null; completionDate: Date; membershipFilter?: string | null; membershipExcluded?: string | null }): Promise<SupplierRow[]> {
-  if (!pkg.partyCode) return [];
-  // Everything from the supplier, narrowed by the package's rule if it has one,
-  // less what was taken out by hand.
-  const { parseFilter, parseExcluded } = await import("./package-rule");
-  const filter = parseFilter(pkg.membershipFilter);
-  const excluded = parseExcluded(pkg.membershipExcluded);
-  const tagged = filter?.assetIds?.length
-    ? (await t.db.relationship.findMany({ where: { kind: "DOC_ASSET", toId: { in: filter.assetIds } }, select: { fromId: true } })).map((one) => one.fromId)
-    : null;
-  const docs = await t.db.document.findMany({
-    where: {
-      originator: pkg.partyCode,
-      state: { notIn: ["CANCELLED", "WITHDRAWN"] },
-      ...(filter?.disciplines?.length ? { discipline: { in: filter.disciplines } } : {}),
-      ...(filter?.docTypes?.length ? { docType: { in: filter.docTypes } } : {}),
-      AND: [
-        ...(tagged ? [{ id: { in: tagged } }] : []),
-        ...(excluded.length ? [{ id: { notIn: excluded } }] : []),
-      ],
-    },
-    orderBy: { docNumber: "asc" },
-    include: {
-      // Needed-by dates from the approved requirements list are the supplier's baseline.
-      baselineEntries: { orderBy: { requiredBy: "asc" }, take: 1 },
-      revisions: {
-        orderBy: { createdAt: "desc" },
-        include: {
-          workflowRuns: { orderBy: { createdAt: "desc" }, take: 1 },
-          // Every review of the revision, with what was said — the latest decides the verdict.
-          cycles: { orderBy: { sequence: "desc" }, include: { comments: { orderBy: { createdAt: "asc" }, select: { authorName: true, text: true, progressionPreventing: true, status: true } } } },
-          transmittalItems: { include: { transmittal: true } },
-        },
-      },
-    },
-  });
+/**
+ * Where a revision stands, from the backend's state: sent in and waiting for
+ * Document Control (RECEIVED), sent back for a correction (CORRECTING),
+ * accepted and waiting to be routed (IN_PREPARATION), and so on.
+ */
+function stateOf(revisionState: string | null): SupplierState {
+  switch (revisionState) {
+    case "RECEIVED": return "AWAITING_CHECK";
+    case "CORRECTING": return "REJECTED";
+    case "IN_PREPARATION": return "TO_ROUTE";
+    case "IN_REVIEW": return "IN_REVIEW";
+    case "RETURNED": return "RETURNED";
+    case "RELEASED": case "SUPERSEDED": return "APPROVED";
+    default: return "NOT_SENT";
+  }
+}
+
+/**
+ * The package's documents, each where it stands. In a list, read from the
+ * package alone; on the package's own page, from each document in full (when
+ * it was sent, the comments, the transmittal it came on).
+ */
+export async function supplierRows(t: { projectId: string }, pkg: LegacyPackage): Promise<SupplierRow[]> {
   const now = Date.now();
-
-  return docs.map((doc) => {
-    const rev = doc.revisions[0] ?? null;
-    const due = doc.baselineEntries[0]?.requiredBy ?? rev?.plannedSubmissionDate ?? pkg.completionDate;
-    const incoming = rev?.transmittalItems
-      .map((i) => i.transmittal)
-      .filter((tr) => tr.direction === "INCOMING")
-      .sort((a, b) => +b.createdAt - +a.createdAt)[0] ?? null;
-    const run = rev?.workflowRuns[0] ?? null;
-    const cycle = rev?.cycles[0] ?? null;
-
-    let state: SupplierState = "NOT_SENT";
-    let reason: string | null = null;
-    if (rev) {
-      if (rev.state === "RELEASED" || rev.state === "SUPERSEDED" || run?.status === "DONE") state = "APPROVED";
-      else if (run?.status === "RETURNED") { state = "RETURNED"; reason = cycle?.outcomeNote ?? null; }
-      else if (rev.state === "IN_REVIEW") state = "IN_REVIEW";
-      else if (rev.submittedAt && incoming?.status === "REJECTED") { state = "REJECTED"; reason = incoming.rejectionReason; }
-      else if (rev.submittedAt && incoming?.status === "ISSUED") state = "AWAITING_CHECK";
-      else if (rev.submittedAt && incoming && incoming.status === "ACCEPTED") state = "TO_ROUTE";
-      // Entered by Document Control on the supplier's behalf: no transmittal, straight to review.
-      else if (rev.submittedAt && !incoming) state = "TO_ROUTE";
-    }
-    const arrivedOnTime = rev?.submittedAt ? rev.submittedAt.getTime() <= due.getTime() : null;
-    const late = state === "NOT_SENT" ? due.getTime() < now : arrivedOnTime === false;
-
+  return Promise.all(pkg.view.members.map(async (m): Promise<SupplierRow> => {
+    const due = m.dueDate ? new Date(m.dueDate) : pkg.completionDate;
+    const light: SupplierRow = {
+      doc: { id: m.documentId, docNumber: m.documentNumber, title: m.title, isPlaceholder: !m.latestRevision },
+      revision: m.latestRevision ? { id: "", value: m.latestRevision, submittedAt: null, statusCode: m.status } : null,
+      state: stateOf(m.latestState), due, late: false, arrivedOnTime: null, reason: null, outcome: null, transmittal: null,
+      submissions: m.latestRevision ? 1 : 0, comments: [],
+    };
+    light.late = light.state === "NOT_SENT" && !!due && due.getTime() < now;
+    if (!pkg.detail || !m.latestRevision) return light;
+    const [doc, context] = await Promise.all([
+      legacyDocument(t, m.documentId).catch(() => null),
+      documentContext(t, m.documentId).catch(() => null),
+    ]);
+    const rev = doc?.revisions[0];
+    if (!doc || !rev) return light;
+    const cycle = rev.cycles[rev.cycles.length - 1] ?? null;
+    const state = stateOf(rev.backend.state);
+    const incoming = (context?.transmittals ?? [])
+      .filter((one) => one.direction === "INCOMING" && one.revisionId === rev.id)
+      .sort((a, b) => b.issuedAt.localeCompare(a.issuedAt))[0] ?? null;
+    const arrivedOnTime = rev.submittedAt && due ? rev.submittedAt.getTime() <= due.getTime() : rev.submittedAt ? true : null;
     return {
       doc: { id: doc.id, docNumber: doc.docNumber, title: doc.title, isPlaceholder: doc.isPlaceholder },
-      revision: rev ? { id: rev.id, value: rev.value, submittedAt: rev.submittedAt, statusCode: rev.statusCode } : null,
-      state, due, late, arrivedOnTime, reason,
+      revision: { id: rev.id, value: rev.value, submittedAt: rev.submittedAt, statusCode: rev.statusCode },
+      state, due,
+      late: state === "NOT_SENT" ? !!due && due.getTime() < now : arrivedOnTime === false,
+      arrivedOnTime,
+      reason: state === "REJECTED" || state === "RETURNED" ? rev.backend.returnedReason ?? cycle?.outcomeNote ?? null : null,
       outcome: cycle?.outcome ?? null,
       transmittal: incoming ? { id: incoming.id, number: incoming.number } : null,
       submissions: doc.revisions.filter((r) => r.submittedAt).length,
       // The comments of the latest revision's reviews — the ones its verdict
       // rests on. A revision not yet reviewed has none, and shows none.
-      comments: (rev?.cycles ?? []).slice().reverse().flatMap((cy) => cy.comments.map((one) => ({ by: one.authorName, text: one.text, blocking: one.progressionPreventing, settled: one.status === "CLOSED", review: cy.number, rev: rev!.value }))),
+      comments: rev.cycles.flatMap((cy) => cy.comments.map((one) => ({ by: one.authorName, text: one.text, blocking: one.progressionPreventing, settled: one.status === "CLOSED", review: cy.number, rev: rev.value }))),
     };
-  });
+  }));
 }
 
 /** The figures from the two-stage diagram, for one package. */
 export function supplierFigures(rows: SupplierRow[]) {
   const planned = rows.length;
-  const arrived = rows.filter((r) => r.revision?.submittedAt).length;
+  const arrived = rows.filter((r) => r.state !== "NOT_SENT").length;
   const onTime = rows.filter((r) => r.arrivedOnTime === true).length;
   const lateArrived = rows.filter((r) => r.arrivedOnTime === false).length;
   const notArrivedLate = rows.filter((r) => r.state === "NOT_SENT" && r.late).length;

@@ -1,7 +1,7 @@
-import { requireScope } from "@/lib/scope";
 import { getActiveSet } from "@/lib/config";
 import { SearchPick } from "@/components/search-pick";
 import type { PackageFilter } from "@/lib/package-rule";
+import { outsideParties } from "@/lib/api/packages";
 
 /**
  * The rule a package fills itself by: any of tags, disciplines, document types
@@ -9,12 +9,12 @@ import type { PackageFilter } from "@/lib/package-rule";
  * is made. Left empty, the package has no rule and is filled by hand.
  */
 export async function RuleFields({ initial, supplier = false }: { initial?: PackageFilter | null; /** A supplier package: the supplier is fixed already. */ supplier?: boolean }) {
-  const { db } = await requireScope();
   const [assets, disciplines, types, parties] = await Promise.all([
-    db.assetItem.findMany({ orderBy: { code: "asc" }, select: { id: true, code: true, name: true } }),
+    // Asset tags are not in the backend.
+    Promise.resolve([] as { id: string; code: string; name: string }[]),
     getActiveSet("DISCIPLINES"),
     getActiveSet("DOCUMENT_TYPES"),
-    db.party.findMany({ where: { isInternal: false, active: true }, orderBy: { name: "asc" }, select: { code: true, name: true } }),
+    outsideParties(),
   ]);
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">

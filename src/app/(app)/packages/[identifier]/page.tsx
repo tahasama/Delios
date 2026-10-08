@@ -5,7 +5,9 @@ import { Timeline } from "@/components/timeline";
 import { Card, Chip, Info, Field, inputCls, Banner, DataTable, Th, Td } from "@/components/ui";
 import { ActionForm } from "@/components/form";
 import { addPackageMemberAction, removePackageMemberAction, setPackageRuleAction, assessPackageAction, issueShortfallAction, closePackageAction, acceptShortfallAction, acceptPackageAction } from "@/lib/actions/planning";
-import { syncPackage, parseFilter, meetsStatus, statusList, recipientIds, acceptorIds } from "@/lib/package-rule";
+import { parseFilter, meetsStatus, statusList, recipientIds, acceptorIds } from "@/lib/package-rule";
+import { legacyPackageByNumber, deliveryCandidates } from "@/lib/api/packages";
+import { legacyDocument } from "@/lib/api/legacy";
 import { SearchPick } from "@/components/search-pick";
 import { isAdmin } from "@/lib/auth";
 import { RuleFields } from "../rule-fields";
@@ -28,37 +30,24 @@ export const dynamic = "force-dynamic";
  */
 export default async function PackageDetailPage({ params, searchParams }: { params: Promise<{ identifier: string }>; searchParams: Promise<{ added?: string }> }) {
   const ctx = await requireScope();
-  const { user, db } = ctx;
+  const { user } = ctx;
   const { identifier } = await params;
   const sp = await searchParams;
-  // A package with a rule takes in what has come to match it since last seen.
-  const found = await db.package.findFirst({ where: { identifier }, select: { id: true } });
-  if (found) await syncPackage(ctx, found.id);
-  const pkg = await db.package.findFirst({
-    where: { identifier },
-    include: { members: { include: { document: { include: { revisions: { where: { state: "RELEASED" }, orderBy: { releasedAt: "desc" }, take: 1 } } } } } },
-  });
+  // A package with a rule takes in what has come to match it since last seen: the backend does so on reading it.
+  const pkg = await legacyPackageByNumber(ctx, identifier);
   if (!pkg) notFound();
   if (pkg.category === "SUPPLIER") return <SupplierPackage pkg={pkg} />;
   const staff = isController(user) || isAdmin(user);
   const [statuses, reasons, candidates, delivery] = await Promise.all([
     getActiveSet("STATUSES"),
     getActiveSet("REASONS_FOR_ISSUE"),
-    db.document.findMany({
-      where: { state: { in: ["PLANNED", "ACTIVE"] }, id: { notIn: pkg.members.map((m) => m.documentId) } },
-      orderBy: { docNumber: "asc" },
-      take: 500,
-      select: { id: true, docNumber: true, title: true, revisions: { where: { state: "RELEASED" }, orderBy: { releasedAt: "desc" }, take: 1, select: { value: true, statusCode: true } } },
-    }),
-    db.transmittal.findMany({ where: { OR: [{ packageId: pkg.id }, ...(pkg.transmittalId ? [{ id: pkg.transmittalId }] : [])] }, orderBy: { number: "asc" }, select: { id: true, number: true } }),
+    deliveryCandidates(ctx, pkg.members.map((m) => m.documentId)),
+    Promise.resolve(pkg.view.transmittals.map((one) => ({ id: one.id, number: one.number })).sort((a, b) => a.number.localeCompare(b.number))),
   ]);
   // Each document's latest revision and what its reviews said — the comments
   // column shows those, and nothing from older revisions.
-  const latestRevs = await db.revision.findMany({
-    where: { documentId: { in: pkg.members.map((m) => m.documentId) } },
-    orderBy: { createdAt: "desc" },
-    select: { documentId: true, value: true, cycles: { orderBy: { sequence: "asc" }, select: { comments: { orderBy: { createdAt: "asc" }, select: { authorName: true, text: true, progressionPreventing: true, status: true } } } } },
-  });
+  const latestRevs = (await Promise.all(pkg.members.map((m) => legacyDocument(ctx, m.documentId).catch(() => null))))
+    .flatMap((doc) => (doc?.revisions[0] ? [{ documentId: doc.id, value: doc.revisions[0].value, cycles: doc.revisions[0].cycles }] : []));
   const latestComments = new Map<string, { rev: string; comments: { by: string; text: string; blocking: boolean; settled: boolean }[] }>();
   for (const one of latestRevs) {
     if (latestComments.has(one.documentId)) continue;
@@ -66,7 +55,7 @@ export default async function PackageDetailPage({ params, searchParams }: { para
   }
   const shortfall: { docNumber: string; requiredStatus: string; currentStatus: string; reason: string; expectedDate: string | null }[] | null = pkg.shortfall ? JSON.parse(pkg.shortfall) : null;
   const isAcceptor = acceptorIds(pkg).includes(user.id);
-  const overdue = pkg.completionDate < new Date() && !pkg.closedAt;
+  const overdue = !!pkg.completionDate && pkg.completionDate < new Date() && !pkg.closedAt;
   const total = pkg.members.length;
   const readyCount = pkg.members.filter((member) => meetsStatus(member.document.revisions[0]?.statusCode, member.requiredStatus)).length;
   const sendsTo = recipientIds(pkg);

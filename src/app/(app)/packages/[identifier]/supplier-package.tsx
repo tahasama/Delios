@@ -14,6 +14,8 @@ import { submitSupplierPackageAction } from "@/lib/actions/supplier";
 import { supplierRows, supplierFigures, STATE_LABEL, WITH_SUPPLIER, type SupplierState } from "@/lib/supplier";
 import { fmtDate } from "@/lib/utils";
 import { ArrowLeft, Download } from "lucide-react";
+import { getMe } from "@/lib/api/me";
+import { documentsByIds, type LegacyPackage } from "@/lib/api/packages";
 
 const TONE: Record<SupplierState, string> = {
   NOT_SENT: "bg-slate-100 text-slate-700 ring-slate-200",
@@ -29,14 +31,14 @@ const TONE: Record<SupplierState, string> = {
  * Everything one supplier owes us, and where each item stands. The supplier
  * attaches files here and sends them; that is the only way they arrive.
  */
-export async function SupplierPackage({ pkg }: { pkg: { id: string; compositionOwnerId: string; compositionOwnerIds: string | null; identifier: string; partyCode: string | null; recipientName: string; completionDate: Date; requiredStatus: string; title: string | null; description: string | null; membershipFilter: string | null; membershipExcluded: string | null; membershipRule: string | null } }) {
+export async function SupplierPackage({ pkg }: { pkg: LegacyPackage }) {
   const ctx = await requireScope();
   const { user } = ctx;
   const staff = isController(user) || isAdmin(user);
   const isSupplier = !!user.partyCode && user.partyCode === pkg.partyCode;
   const rows = await supplierRows(ctx, pkg);
   const f = supplierFigures(rows);
-  const org = (await ctx.db.scopeConfig.findFirst())?.organizationName ?? "us";
+  const org = (await getMe())?.tenant.name ?? "us";
   // The supplier sends its own files; for a supplier not on the system,
   // Document Control attaches what arrived, line by line, on their behalf.
   const supplierMayUpload = isSupplier && (hasVerb(user, "CREATE") || hasVerb(user, "REVISE"));
@@ -101,7 +103,7 @@ export async function SupplierPackage({ pkg }: { pkg: { id: string; compositionO
   // The rule a supplier package was made with only names the supplier; a
   // narrowing rule is one with a filter behind it.
   const narrowed = parseFilter(pkg.membershipFilter) ? pkg.membershipRule : null;
-  const outDocs = excluded.length ? await ctx.db.document.findMany({ where: { id: { in: excluded } }, orderBy: { docNumber: "asc" }, select: { id: true, docNumber: true, title: true } }) : [];
+  const outDocs = excluded.length ? await documentsByIds(ctx, excluded) : [];
   // Admin, Document Control, or whoever created the package.
   const mayManage = staff || ownerIds(pkg).includes(user.id);
   const manage: StepItem[] = mayManage ? [
