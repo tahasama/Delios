@@ -32,3 +32,28 @@ export const getMe = cache(async (): Promise<Me | null> => {
     throw e;
   }
 });
+
+/** A notification as GET /api/me/notifications returns it. */
+export type MeNotification = {
+  id: string; projectId: string | null; kind: string; title: string; body: string | null; link: string | null;
+  createdAt: string; readAt: string | null;
+};
+
+/** The signed-in person's notifications, newest first, with how many are unread. */
+export async function getNotifications(per = 60): Promise<{ unread: number; total: number; rows: MeNotification[] }> {
+  return api("/api/me/notifications", { query: { per } });
+}
+
+/** How many notifications are unread; 0 when the backend cannot say. */
+export async function unreadNotifications(): Promise<number> {
+  try {
+    return (await apiShortLived<{ unread: number }>("/api/me/notifications", 5000, { query: { per: 1 } })).unread;
+  } catch {
+    return 0;
+  }
+}
+
+/** Marks every notification read. */
+export async function markAllNotificationsRead(): Promise<void> {
+  await api("/api/me/notifications/read", { method: "POST", body: { all: true } });
+}

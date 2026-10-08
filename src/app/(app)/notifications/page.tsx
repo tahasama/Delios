@@ -2,14 +2,21 @@ import Link from "next/link";
 import { requireScope } from "@/lib/scope";
 import { PageHeader, EmptyState } from "@/components/ui";
 import { timeAgo } from "@/lib/utils";
+import { getNotifications, markAllNotificationsRead } from "@/lib/api/me";
+import { forgetShortLived } from "@/lib/api/client";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Notifications" };
 
 export default async function NotificationsPage() {
   await requireScope();
-  // The backend sends no notifications: there is nothing to list or mark read.
-  const list = [] as { id: string; title: string; body: string | null; link: string | null; read: boolean; createdAt: Date }[];
+  const { rows } = await getNotifications(60);
+  const list = rows.map((n) => ({ id: n.id, title: n.title, body: n.body, link: n.link, read: n.readAt !== null, createdAt: new Date(n.createdAt) }));
+  // As before: opening the page reads them all.
+  if (list.some((n) => !n.read)) {
+    await markAllNotificationsRead();
+    await forgetShortLived();
+  }
 
   return (
     <div className="space-y-4">
