@@ -257,7 +257,8 @@ document**: attach the export to a new revision of it and send that for review. 
 approval, and moves every activity date. The "Project schedule" controlled-change page says so.
 
 **The requirements list can be a controlled document.**
-- On Document types, mark a type "Is a document requirements list — read when released".
+- The starter setup includes the document type **RQL — Document requirements list**, already marked. Any other
+  type can be marked too, on Document types: "Is a document requirements list — read when released".
 - A document of that type is registered and reviewed like any other: the printed PDF is what reviewers read.
 - When a revision is released, the spreadsheet (.xlsx or .csv) attached to it is read automatically. It uses the
   same columns as the requirements template.

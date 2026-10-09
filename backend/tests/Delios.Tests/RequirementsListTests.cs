@@ -66,9 +66,10 @@ public sealed class RequirementsListTests(Infrastructure infrastructure) : IClas
         var activities = await UntilAsync(engineer, $"{p}/activities", a => a.GetArrayLength() == 1);
         var a100 = activities[0].GetProperty("id").GetGuid();
 
-        // A document type marked as the requirements list.
-        using (var put = await admin.PutAsJsonAsync("/api/admin/values", new { setKey = "DOCUMENT_TYPES", code = "RQL", label = "Document requirements list", props = new { readsRequirements = true } }))
-            Assert.True(put.IsSuccessStatusCode, await put.Content.ReadAsStringAsync());
+        // The starter setup publishes the requirements list as a document type, marked to be read when released.
+        var types = await admin.GetFromJsonAsync<JsonElement>("/api/values?sets=DOCUMENT_TYPES");
+        var rql = types.GetProperty("DOCUMENT_TYPES").EnumerateArray().Single(v => v.GetProperty("code").GetString() == "RQL");
+        Assert.True(rql.GetProperty("props").GetProperty("readsRequirements").GetBoolean());
         var slab = (await Api.RegisterAsync(engineer, project, Api.Drawing("Inlet base slab reinforcement"))).GetProperty("number").GetString();
         var list = (await Api.RegisterAsync(engineer, project, new { title = "Civil document requirements", deliverableType = "ENG", docType = "RQL", discipline = "CI", subproject = "00" }))
             .GetProperty("id").GetGuid();

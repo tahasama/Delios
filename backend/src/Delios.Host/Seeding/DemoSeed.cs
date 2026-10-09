@@ -434,13 +434,34 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
     }
 
     /// <summary>
+    /// The document requirements list as a document type: reviewed like any deliverable, and read when released
+    /// (see <see cref="Schedules.RequirementsImporter"/>). Adds it when missing.
+    /// </summary>
+    private async Task<bool> EnsureRequirementsListTypeAsync(Guid t, CancellationToken cancellationToken)
+    {
+        if (await db.ValueEntries.AnyAsync(v => v.SetKey == ValueSets.DocumentTypes && v.Code == "RQL", cancellationToken)) return false;
+        var sort = (await db.ValueEntries.Where(v => v.SetKey == ValueSets.DocumentTypes).MaxAsync(v => (int?)v.Sort, cancellationToken) ?? -1) + 1;
+        db.ValueEntries.Add(new ValueEntry
+        {
+            TenantId = t,
+            SetKey = ValueSets.DocumentTypes,
+            Code = "RQL",
+            Label = "Document requirements list",
+            Sort = sort,
+            Props = JsonSerializer.SerializeToDocument(new Dictionary<string, object> { [Schedules.RequirementsImporter.Marker] = true }),
+        });
+        return true;
+    }
+
+    /// <summary>
     /// Correspondence: a deliverable type for what is filed rather than approved, numbered as our own engineering
     /// documents are, and its document types, released without a review. Adds only what is missing; an organization
     /// renames, retires or adds to any of it in its lists.
     /// </summary>
     private async Task<bool> EnsureCorrespondenceSetupAsync(Guid t, CancellationToken cancellationToken)
     {
-        if (await db.ValueEntries.AnyAsync(v => v.SetKey == ValueSets.DeliverableTypes && v.Code == "COR", cancellationToken)) return false;
+        var added = await EnsureRequirementsListTypeAsync(t, cancellationToken);
+        if (await db.ValueEntries.AnyAsync(v => v.SetKey == ValueSets.DeliverableTypes && v.Code == "COR", cancellationToken)) return added;
         async Task<int> NextSortAsync(string set) =>
             (await db.ValueEntries.Where(v => v.SetKey == set).MaxAsync(v => (int?)v.Sort, cancellationToken) ?? -1) + 1;
         db.ValueEntries.Add(new ValueEntry
