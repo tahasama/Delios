@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireScope } from "@/lib/scope";
 import { PageHeader, Banner } from "@/components/ui";
-import { allHandlers, summariseDiff, type DiffLine } from "@/lib/controlled/registry";
+import { allHandlers, summariseDiff, PLAN_KINDS, type DiffLine } from "@/lib/controlled/registry";
 import "@/lib/controlled/handlers";
 import { fmtDate } from "@/lib/utils";
 import { Grid3X3, CalendarRange, Tags, ArrowRight, CircleCheck, Clock, PencilLine } from "lucide-react";
@@ -36,7 +36,7 @@ export default async function ControlledPage() {
   }
 
   // Value sets are set up on their own page and agreed in the DMP.
-  const handlers = allHandlers().filter((h) => !h.direct);
+  const handlers = allHandlers().filter((h) => !h.direct && !PLAN_KINDS.includes(h.kind));
   const sets = await controlledSets(ctx);
 
   const cards = handlers.map((handler) => {

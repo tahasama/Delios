@@ -88,4 +88,59 @@ public sealed class RequirementsListTests(Infrastructure infrastructure) : IClas
         var activity = await UntilAsync(engineer, $"{p}/activities/{a100}", a => a.GetProperty("needs").GetArrayLength() == 2);
         Assert.Contains(activity.GetProperty("needs").EnumerateArray(), n => n.ToString().Contains("Kerb details"));
     }
+
+    [Fact]
+    public async Task A_released_disciplines_list_tags_the_activities_and_a_schedule_without_departments_keeps_them()
+    {
+        await using var app = await TestApp.StartAsync(infrastructure);
+        app.StartWorker();
+        var admin = await app.SignedInAsync("admin@demo.local");
+        var engineer = await app.SignedInAsync("engineer@demo.local");
+        var approver = await app.SignedInAsync("approver@demo.local");
+        var controller = await app.SignedInAsync("controller@demo.local");
+        var project = await Api.ProjectIdAsync(engineer);
+        var p = $"/api/projects/{project}";
+
+        // A schedule with no departments column: the activities come untagged.
+        var schedule = (await Api.RegisterAsync(engineer, project, new { title = "Construction programme", deliverableType = "ENG", docType = "SCH", discipline = "PM", subproject = "00" }))
+            .GetProperty("id").GetGuid();
+        using (var named = await controller.PutAsJsonAsync($"{p}/schedule", new { documentId = schedule }))
+            Assert.True(named.IsSuccessStatusCode, await named.Content.ReadAsStringAsync());
+        var programme = "Activity ID,Activity Name,Start,Finish\n" + $"A100,Pour inlet base slab,{Day(30)},{Day(35)}\n" + $"A200,Energise MCC,{Day(40)},{Day(41)}\n";
+        await ReleaseAsync(engineer, approver, controller, project, await RevisionAsync(engineer, project, schedule, "Programme.csv", programme));
+        var activities = await UntilAsync(engineer, $"{p}/activities", a => a.GetArrayLength() == 2);
+        Assert.All(activities.EnumerateArray(), a => Assert.Empty(a.GetProperty("departments").EnumerateArray()));
+        string[] Tags(JsonElement list, string code) => list.EnumerateArray().Single(a => a.GetProperty("code").GetString() == code)
+            .GetProperty("departments").EnumerateArray().Select(d => d.GetString()!).ToArray();
+
+        // The starter setup publishes the list as a document type, marked to be read when released.
+        var types = await admin.GetFromJsonAsync<JsonElement>("/api/values?sets=DOCUMENT_TYPES");
+        var dpa = types.GetProperty("DOCUMENT_TYPES").EnumerateArray().Single(v => v.GetProperty("code").GetString() == "DPA");
+        Assert.True(dpa.GetProperty("props").GetProperty("readsDepartments").GetBoolean());
+        var list = (await Api.RegisterAsync(engineer, project, new { title = "Disciplines per action", deliverableType = "ENG", docType = "DPA", discipline = "PM", subproject = "00" }))
+            .GetProperty("id").GetGuid();
+
+        // One wrong line: nothing is applied, and Document Control is told why.
+        await ReleaseAsync(engineer, approver, controller, project, await RevisionAsync(engineer, project, list, "Disciplines.csv",
+            "Action Code,Departments\nA100,CI\nA999,EL\n"));
+        var told = await UntilAsync(controller, "/api/me/notifications", n => n.GetProperty("rows").EnumerateArray().Any(x => x.GetProperty("title").GetString()!.Contains("disciplines list was not read")));
+        Assert.Contains("A999", told.GetProperty("rows").EnumerateArray().First(x => x.GetProperty("title").GetString()!.Contains("disciplines list was not read")).GetProperty("body").GetString());
+        Assert.Empty(Tags(await engineer.GetFromJsonAsync<JsonElement>($"{p}/activities"), "A100"));
+
+        // The corrected list tags both; a discipline may be named by its label.
+        await ReleaseAsync(engineer, approver, controller, project, await RevisionAsync(engineer, project, list, "Disciplines.csv",
+            "Action Code,Departments\nA100,CI\nA200,\"Electrical, ME\"\n"));
+        activities = await UntilAsync(engineer, $"{p}/activities", a => Tags(a, "A200").Length == 2);
+        Assert.Equal(["CI"], Tags(activities, "A100"));
+        Assert.Equal(["EL", "ME"], Tags(activities, "A200"));
+
+        // A new schedule revision without the column moves the dates and keeps the tags.
+        await ReleaseAsync(engineer, approver, controller, project, await RevisionAsync(engineer, project, schedule, "Programme.csv",
+            "Activity ID,Activity Name,Start,Finish\n" + $"A100,Pour inlet base slab,{Day(32)},{Day(36)}\n" + $"A200,Energise MCC,{Day(40)},{Day(41)}\n"));
+        var source = await UntilAsync(engineer, $"{p}/schedule", s => s.GetProperty("imports").GetArrayLength() == 2);
+        Assert.Equal("DONE", source.GetProperty("imports")[0].GetProperty("status").GetString());
+        activities = await engineer.GetFromJsonAsync<JsonElement>($"{p}/activities");
+        Assert.Equal(["CI"], Tags(activities, "A100"));
+        Assert.Equal(["EL", "ME"], Tags(activities, "A200"));
+    }
 }

@@ -21,6 +21,13 @@ export const CONTROLLED_KINDS = [
 ] as const;
 export type ControlledKind = (typeof CONTROLLED_KINDS)[number];
 
+/**
+ * The schedule's three lists are controlled documents now: each is uploaded on
+ * Schedule & actions as a new revision of its document and put in force by
+ * releasing it. Their handlers stay only to fill the template to download.
+ */
+export const PLAN_KINDS: readonly ControlledKind[] = ["SCHEDULE", "ACTION_DEPARTMENTS", "DOCUMENT_REQUIREMENTS"];
+
 export type ParseIssue = { line: number; message: string };
 
 export type ParseResult =

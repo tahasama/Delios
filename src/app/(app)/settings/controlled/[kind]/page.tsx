@@ -9,7 +9,7 @@ import {
   decideControlledVersionAction,
   discardControlledVersionAction,
 } from "@/lib/actions/controlled";
-import { handlerFor, summariseDiff, type DiffLine } from "@/lib/controlled/registry";
+import { handlerFor, summariseDiff, PLAN_KINDS, type DiffLine } from "@/lib/controlled/registry";
 import "@/lib/controlled/handlers";
 import { getSets } from "@/lib/config";
 import { fmtDate } from "@/lib/utils";
@@ -69,6 +69,8 @@ export default async function ControlledKindPage({ params }: { params: Promise<{
   const { kind } = await params;
   const handler = handlerFor(kind);
   if (handler?.direct) redirect("/settings/config");
+  // The schedule's lists are uploaded on Schedule & actions, as document revisions.
+  if (handler && PLAN_KINDS.includes(handler.kind)) redirect("/actions");
   if (!handler) notFound();
 
   const ctx = await requireScope();

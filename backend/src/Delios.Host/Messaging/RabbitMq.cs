@@ -84,7 +84,8 @@ public static class Topology
 
     /// <summary>A project's checks and schedule reads: a few seconds to minutes each, never in the way of uploads.</summary>
     public static readonly WorkQueue Checks = new("delios.checks", "delios.checks.retry",
-        [Host.Checks.CheckRunRequested.RoutingKey, Host.Schedules.ScheduleImportRequested.RoutingKey, Host.Schedules.RequirementsImportRequested.RoutingKey], Prefetch: 1);
+        [Host.Checks.CheckRunRequested.RoutingKey, Host.Schedules.ScheduleImportRequested.RoutingKey, Host.Schedules.RequirementsImportRequested.RoutingKey,
+            Host.Schedules.DepartmentsImportRequested.RoutingKey], Prefetch: 1);
 
     /// <summary>Email: each one to the mail server on its own, apart from every other job.</summary>
     public static readonly WorkQueue Mail = new("delios.mail", "delios.mail.retry",

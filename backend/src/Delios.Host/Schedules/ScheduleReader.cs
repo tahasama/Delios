@@ -5,8 +5,11 @@ using NodaTime;
 
 namespace Delios.Host.Schedules;
 
-/// <summary>One activity as the schedule file states it; departments as the file names them.</summary>
-public sealed record ParsedActivity(string Code, string Name, LocalDate? Start, LocalDate? Finish, string? Responsible, string[] Departments);
+/// <summary>
+/// One activity as the schedule file states it; departments as the file names them, or null when the file has no
+/// departments column at all (they then come from the disciplines-per-action list and are left as they are).
+/// </summary>
+public sealed record ParsedActivity(string Code, string Name, LocalDate? Start, LocalDate? Finish, string? Responsible, string[]? Departments);
 
 /// <summary>
 /// Reads activities from a schedule exported to Excel (.xlsx) or CSV, as Primavera
@@ -43,6 +46,11 @@ public static class ScheduleReader
     /// <summary>True for file names this reader can read (.xlsx or .csv). Used by the importer to pick the file of a revision.</summary>
     public static bool CanRead(string fileName) =>
         fileName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase) || fileName.EndsWith(".csv", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Discipline names or codes as a cell lists them: separated by commas, semicolons, bars or slashes.</summary>
+    public static string[] SplitDepartments(string? cell) =>
+        (cell ?? "").Split([',', ';', '|', '/'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
 
     /// <summary>Every used row of a spreadsheet (its first sheet) or a CSV file, as text.</summary>
     public static List<string[]> ReadRows(Stream content, string fileName) =>
@@ -98,8 +106,7 @@ public static class ScheduleReader
                 if (!startOk) return (null, $"Row {r + 1}: '{Cell(start)}' is not a date.");
                 if (!finishOk) return (null, $"Row {r + 1}: '{Cell(finish)}' is not a date.");
                 activities.Add(new ParsedActivity(id, Cell(name) ?? id, startDate, finishDate, Cell(responsible),
-                    (Cell(departments) ?? "").Split([',', ';', '|', '/'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                        .Distinct(StringComparer.OrdinalIgnoreCase).ToArray()));
+                    departments < 0 ? null : SplitDepartments(Cell(departments))));
             }
             return activities.Count == 0 ? (null, "The file has headings but no activities.") : (activities, null);
         }

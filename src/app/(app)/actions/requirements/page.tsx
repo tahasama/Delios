@@ -44,7 +44,9 @@ export default async function RequirementsPage() {
   const senderName = (s: string) => (isDepartmentSender(s) ? `${deptName(s.slice(5))} (us)` : parties.find((p) => p.code === s)?.name ?? s);
   const setState = (kind: string) => {
     const versions = pendingSets.find((s) => s.kind === kind)?.versions ?? [];
-    return { pending: versions.find((v) => v.state !== "APPROVED") ?? null, inForce: versions.find((v) => v.state === "APPROVED") ?? null };
+    // The newest read of the list's document: in force, or refused with the reason.
+    const latest = versions[0] ?? null;
+    return { refused: latest?.state === "REJECTED" ? latest : null, inForce: versions.find((v) => v.state === "APPROVED") ?? null };
   };
   const tagging = setState("ACTION_DEPARTMENTS");
   const list = setState("DOCUMENT_REQUIREMENTS");
@@ -69,7 +71,8 @@ export default async function RequirementsPage() {
       {tools ? <span className="ml-auto flex flex-wrap items-center gap-2">{tools}</span> : null}
     </div>
   );
-  const waiting = (one: { state: string; versionLabel: string }) => `${one.versionLabel} is ${one.state === "DRAFT" ? "uploaded, not yet sent for approval" : "waiting for approval"}.`;
+  const refused = (one: { sourceName: string | null; versionLabel: string; decisionReason: string | null }) =>
+    `${one.sourceName ?? one.versionLabel} was released but could not be read, so nothing changed${one.decisionReason ? `: ${one.decisionReason.split("\n")[0]}` : "."}`;
 
   return (
     <section className="register register-sheet register-sheet-open">
@@ -88,24 +91,24 @@ export default async function RequirementsPage() {
 
       {/* 1 — which disciplines each action concerns */}
       {bar(1, "Tag the disciplines",
-        tagging.pending
-          ? <span className="font-semibold text-amber-800">{waiting(tagging.pending)}</span>
+        tagging.refused
+          ? <span className="font-semibold text-red-700">{refused(tagging.refused)}</span>
           : untagged
             ? <span className="font-semibold text-amber-800">{untagged} action{untagged === 1 ? " has" : "s have"} no discipline, so nobody can be asked about {untagged === 1 ? "it" : "them"}.</span>
             : <>Every action is tagged{tagging.inForce ? ` (${tagging.inForce.versionLabel}, ${fmtDate(tagging.inForce.decidedAt)})` : ""}.</>,
         <>
           <a href="/api/controlled/current/ACTION_DEPARTMENTS" className="ask"><Download className="h-3.5 w-3.5" /> List</a>
-          {plan ? <Link href="/settings/controlled/ACTION_DEPARTMENTS" className="ask" data-on={untagged ? "true" : "false"}>Upload</Link> : null}
+          {plan ? <Link href="/actions" className="ask" data-on={untagged ? "true" : "false"}>Upload on the schedule</Link> : null}
         </>,
       )}
-      <p className="px-5 py-3 text-[11.5px] text-slate-500 sm:px-6">Tag them all in the list and upload it back, or one at a time on the action&rsquo;s own page.</p>
+      <p className="px-5 py-3 text-[11.5px] text-slate-500 sm:px-6">Fill the list and upload it on the schedule; releasing it puts the tags in force. One correction can be made on the action&rsquo;s own page.</p>
 
       {/* 2 — ask each discipline what it needs, chase, collect */}
       {bar(2, "Ask the disciplines",
-        list.pending
-          ? <span className="font-semibold text-amber-800">Requirements {waiting(list.pending)}</span>
+        list.refused
+          ? <span className="font-semibold text-red-700">{refused(list.refused)}</span>
           : <>Each answers on its own sheet: the documents it needs, from whom, by when.</>,
-        control ? <Link href="/settings/controlled/DOCUMENT_REQUIREMENTS" className="ask">Upload an answer by hand</Link> : undefined,
+        plan ? <Link href="/actions" className="ask">Upload on the schedule</Link> : undefined,
       )}
       {control && toAsk.length ? (
         <div className="border-b border-line px-5 py-3 sm:px-6">

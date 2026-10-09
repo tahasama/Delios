@@ -296,7 +296,7 @@ public sealed class ScheduleTests(Infrastructure infrastructure) : IClassFixture
         Assert.Equal(2, activities!.Count);
         Assert.Equal(("C-10", "Excavate", new LocalDate(2026, 11, 2), new LocalDate(2026, 11, 20)),
             (activities[0].Code, activities[0].Name, activities[0].Start, activities[0].Finish));
-        Assert.Equal(["Civil", "Survey"], activities[0].Departments);
+        Assert.Equal(["Civil", "Survey"], activities[0].Departments!);
         Assert.Null(activities[1].Start);
     }
 

@@ -40,7 +40,11 @@ public sealed class ScheduleImporter(
         {
             db.Enqueue(ScheduleImportRequested.RoutingKey, new ScheduleImportRequested(message.TenantId, revision.Id));
         }
-        // A released requirements list is read the same way, on the same queue.
+        // A released disciplines-per-action list, and a requirements list, are read the same way, on the same queue.
+        if (await DepartmentsImporter.IsListAsync(db, revision.DocumentId, cancellationToken))
+        {
+            db.Enqueue(DepartmentsImportRequested.RoutingKey, new DepartmentsImportRequested(message.TenantId, revision.Id));
+        }
         if (await RequirementsImporter.IsListAsync(db, revision.DocumentId, cancellationToken))
         {
             db.Enqueue(RequirementsImportRequested.RoutingKey, new RequirementsImportRequested(message.TenantId, revision.Id));
@@ -115,8 +119,9 @@ public sealed class ScheduleImporter(
         // A department is a discipline: the file's names become discipline codes; the rest are listed, not guessed.
         var catalog = await Catalog.LoadAsync(db, cancellationToken);
         var unmatched = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
-        string[] Disciplines(string[] names)
+        string[]? Disciplines(string[]? names)
         {
+            if (names is null) return null;
             foreach (var name in names.Where(n => catalog.Find(ValueSets.Disciplines, n) is null)) unmatched.Add(name);
             return names.Select(n => catalog.Find(ValueSets.Disciplines, n)).OfType<string>().Distinct().ToArray();
         }
@@ -138,7 +143,7 @@ public sealed class ScheduleImporter(
                     Start = row.Start,
                     Finish = row.Finish,
                     Responsible = row.Responsible,
-                    Departments = row.Departments,
+                    Departments = row.Departments ?? [],
                     SourceRevisionId = revision.Id,
                     UpdatedAt = now,
                 });
@@ -148,7 +153,7 @@ public sealed class ScheduleImporter(
             }
             var moved = activity.Start != row.Start || activity.Finish != row.Finish;
             var changed = activity.Name != row.Name || activity.Responsible != row.Responsible
-                || !activity.Departments.SequenceEqual(row.Departments) || activity.State == ActivityStates.Removed;
+                || (row.Departments is not null && !activity.Departments.SequenceEqual(row.Departments)) || activity.State == ActivityStates.Removed;
             if (moved) record.Moved++;
             else if (changed) record.Changed++;
             else record.Unchanged++;
@@ -158,7 +163,8 @@ public sealed class ScheduleImporter(
             activity.Start = row.Start;
             activity.Finish = row.Finish;
             activity.Responsible = row.Responsible;
-            activity.Departments = row.Departments;
+            // A schedule without a departments column leaves the project manager's tags as they are.
+            if (row.Departments is not null) activity.Departments = row.Departments;
             activity.State = ActivityStates.Active;
             activity.SourceRevisionId = revision.Id;
             activity.UpdatedAt = now;

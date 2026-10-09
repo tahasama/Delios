@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "demo:schedule": "node scripts/demo-schedule.mjs"
   },
   "dependencies": {
     "clsx": "^2.1.1",
