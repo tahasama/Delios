@@ -94,7 +94,11 @@ export const getScope = cache(async (): Promise<Scope | null> => {
   const levels = new Map<string, number>();
   for (const value of values.CONFIDENTIALITY ?? []) if (typeof value.props?.level === "number") levels.set(value.code, value.props.level);
 
-  const verbs = [...new Set(chosen.rules.flatMap((r) => r.verbs))];
+  // An older backend sends the function's verbs without its rules: read them as one rule for everything.
+  const rules = chosen.rules ?? [{
+    deliverableType: null, docType: null, discipline: null, criticality: null, confidentiality: null, projectRole: null, verbs: chosen.verbs ?? [],
+  }];
+  const verbs = [...new Set(rules.flatMap((r) => r.verbs))];
   const actor: Actor = {
     functionId: chosen.function.id,
     functionCode: chosen.function.code,
@@ -103,7 +107,7 @@ export const getScope = cache(async (): Promise<Scope | null> => {
     legacyRole: legacyRoleOf(verbs),
     levels,
     projectRole: chosen.contractRole,
-    rules: chosen.rules.map((r) => ({
+    rules: rules.map((r) => ({
       deliverableType: r.deliverableType, docType: r.docType, discipline: r.discipline, criticality: r.criticality,
       confidentiality: r.confidentiality, projectRole: r.projectRole, family: null, familyTypes: null, verbs: r.verbs as Verb[],
     })),
