@@ -5,6 +5,7 @@ import { ActionForm } from "@/components/form";
 import { removeNumberingSchemeAction, saveSchemeRoutingAction } from "@/lib/actions/admin";
 import { NumberingSchemeBuilder } from "./numbering-scheme-builder";
 import { getSets, getActiveSet } from "@/lib/config";
+import { legacyNumbering } from "@/lib/api/admin";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Numbering" };
@@ -60,13 +61,12 @@ function ruleSource(rule: string): string {
 }
 
 export default async function NumberingPage() {
-  const { user: me, db } = await requireScope();
+  const { user: me } = await requireScope();
   if (!maySetup(me, SETUP_PAGES.find((p) => p.href === "/settings/numbering")!)) {
     return <PageHeader title="Numbering" subtitle="Administrators and the control function." />;
   }
-  const [schemes, routing, sets, deliverables] = await Promise.all([
-    db.scheme.findMany({ include: { fields: { orderBy: { position: "asc" } } }, orderBy: { name: "asc" } }),
-    db.schemeRouting.findMany({ orderBy: { deliverableType: "asc" } }),
+  const [{ schemes, routing }, sets, deliverables] = await Promise.all([
+    legacyNumbering(),
     getSets(),
     getActiveSet("DELIVERABLE_TYPES"),
   ]);

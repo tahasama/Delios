@@ -19,6 +19,7 @@ import { fmtDate } from "@/lib/utils";
 import { confirmRecordAction, correctRecordAction } from "@/lib/actions/governance";
 import { SendForReview } from "@/components/send-for-review-panel";
 import { isController } from "@/lib/auth";
+import { legacyDocument, backendReview, backendDocument } from "@/lib/api/legacy";
 
 type DocLite = {
   id: string;
@@ -48,12 +49,7 @@ export async function WorkflowPanel({ doc, user, lead = [], extra: after = [] }:
   if (doc.kind === "RECORD") return <RecordPanel doc={doc} extra={extra} />;
 
   const ctx = await requireScope();
-  const { db } = ctx;
-  const revs = await db.revision.findMany({
-      where: { documentId: doc.id },
-      orderBy: { createdAt: "desc" },
-      include: { approvals: { orderBy: { decidedAt: "desc" } } },
-    });
+  const revs = (await legacyDocument(ctx, doc.id))?.revisions ?? [];
   const run = revs[0] ? await getRunForRevision(ctx, revs[0].id) : null;
   const inPrep = revs.find((r) => r.state === "IN_PREPARATION");
   const released = revs.find((r) => r.state === "RELEASED");
@@ -63,12 +59,9 @@ export async function WorkflowPanel({ doc, user, lead = [], extra: after = [] }:
   // The latest revision decides what is waiting on whom. A finished run says
   // nothing about that: it stays finished after the revision is released.
   if (run && run.status === "DONE" && revs[0]?.state === "NOT_RELEASED") {
-    const decided = await db.reviewCycle.findFirst({
-      where: { revisionId: revs[0].id, binding: true, outcome: { not: null } },
-      orderBy: { sequence: "desc" },
-      select: { outcome: true, outcomeSetKey: true, outcomeByName: true },
-    });
-    const verdicts = await getActiveSet(decided?.outcomeSetKey ?? "REVIEW_OUTCOMES");
+    const decided = [...revs[0].cycles].reverse().find((one) => one.binding && one.outcome)
+      ?? null as { outcome: string | null; outcomeByName: string | null } | null;
+    const verdicts = await getActiveSet("REVIEW_OUTCOMES");
     const said = decided?.outcome ? verdicts.find((one) => one.code === decided.outcome) : null;
     const letsItOut = said ? said.props.proceed === true : true;
     return (
@@ -173,7 +166,8 @@ async function SendPanel({ doc, revId, value, hasFiles, user, lead, extra }: { d
   // A type the organization does not review goes from here straight to release:
   // whoever would send it for review settles its status and who receives it.
   if (unreviewed) {
-    const full = await ctx.db.document.findUniqueOrThrow({ where: { id: doc.id } });
+    const found = await backendDocument(ctx, doc.id);
+    const full = { ...found!, id: doc.id, subProject: found!.subproject };
     const [statuses, reasons, choices, author] = await Promise.all([
       getActiveSet("STATUSES"),
       getActiveSet("REASONS_FOR_ISSUE"),
@@ -224,16 +218,18 @@ async function SendPanel({ doc, revId, value, hasFiles, user, lead, extra }: { d
 
 async function RunActivePanel({ run, user, extra }: { run: { id: string; templateName: string; steps: WfRuntimeStep[]; currentStep: number }; user: SessionUser; extra: StepItem[] }) {
   const ctx = await requireScope();
-  const { db } = ctx;
   const step = run.steps[run.currentStep];
-  const allParticipantIds = [...new Set(run.steps.flatMap((item) => item.participantIds))];
-  const participants = await db.user.findMany({ where: { id: { in: allParticipantIds } }, include: { party: true } });
+  const review = await backendReview(ctx, run.id);
+  const participants = [...new Map(review.steps.flatMap((item) => item.participants).map((one) => [one.userId, { id: one.userId, name: one.name }])).values()];
   const mine = !!step && step.participantIds.includes(user.id);
-  const activeCycle = step?.cycleId ? await db.reviewCycle.findUnique({ where: { id: step.cycleId } }) : null;
+  const openStep = review.steps.find((one) => one.state === "OPEN");
+  const activeCycle = step?.cycleId
+    ? { id: review.id, revisionId: review.revisionId, outcome: review.verdict, outcomeSetKey: "REVIEW_OUTCOMES", dueAt: openStep?.dueDate ? new Date(openStep.dueDate) : null }
+    : null;
   // The status the revision arrives at this step carrying, so the person either
   // changes it or confirms it on purpose.
   const carrying = activeCycle
-    ? (await db.revision.findUnique({ where: { id: activeCycle.revisionId }, select: { statusCode: true } }))?.statusCode ?? null
+    ? (await legacyDocument(ctx, review.documentId))?.revisions.find((one) => one.id === activeCycle.revisionId)?.statusCode ?? null
     : null;
   const outcomeSetKey = activeCycle?.outcomeSetKey ?? "REVIEW_OUTCOMES";
   const outcomes = await getActiveSet(outcomeSetKey);
@@ -246,7 +242,7 @@ async function RunActivePanel({ run, user, extra }: { run: { id: string; templat
   // The deciding step is offered the first request.
   const askWho = (await issuePolicy(ctx)).asked;
   const nextStep = deciding && activeCycle && !activeCycle.outcome
-    ? await requestChoices(ctx, (await db.revision.findUniqueOrThrow({ where: { id: activeCycle.revisionId }, select: { document: true } })).document)
+    ? await requestChoices(ctx, (await legacyDocument(ctx, review.documentId))!)
     : null;
   const issueReasons = nextStep ? await getActiveSet("REASONS_FOR_ISSUE") : [];
   const author = nextStep && activeCycle ? await authorOf(ctx, activeCycle.revisionId) : null;
@@ -255,13 +251,16 @@ async function RunActivePanel({ run, user, extra }: { run: { id: string; templat
     number: run.currentStep + 2 + index,
     title: one.title ?? `Step ${run.currentStep + 2 + index}`,
   }));
-  const adviceCycleIds = run.steps.slice(0, run.currentStep).map((s) => s.cycleId).filter((id): id is string => !!id);
-  const advice = adviceCycleIds.length
-    ? await db.reviewCycle.findMany({
-        where: { id: { in: adviceCycleIds } },
-        select: { id: true, outcome: true, outcomeByName: true, outcomeNote: true, outcomeSetKey: true, comments: { select: { id: true, authorName: true, text: true, progressionPreventing: true, status: true }, orderBy: { createdAt: "asc" } } },
-      })
-    : [];
+  // Each earlier step of the review: its answer, who gave it, and its comments.
+  const advice = review.steps.slice(0, run.currentStep).map((one) => {
+    const answered = one.participants.filter((p) => p.answeredAt);
+    return {
+      id: `${review.id}-${one.number}`, outcome: one.answer, outcomeByName: answered.map((p) => p.name).join(", ") || null,
+      outcomeNote: answered.map((p) => p.note).filter(Boolean).join(" ") || null, outcomeSetKey: "REVIEW_ADVICE",
+      comments: review.comments.filter((c) => c.step === one.number)
+        .map((c) => ({ id: c.id, authorName: c.author, text: c.text, progressionPreventing: c.blocking, status: c.status })),
+    };
+  });
   // An earlier step's answer is worked out from its comments; the words for it
   // come from the organization's published list, the Standard's own only until
   // that list exists.
@@ -291,7 +290,9 @@ async function RunActivePanel({ run, user, extra }: { run: { id: string; templat
     </div>
   ) : null;
   // An adviser's own comments, so the form can hold their advice to them.
-  const ownRows = step?.cycleId ? await db.reviewComment.findMany({ where: { cycleId: step.cycleId, authorId: user.id }, select: { progressionPreventing: true } }) : [];
+  const ownRows = step?.cycleId
+    ? review.comments.filter((c) => c.authorId === user.id && c.step === run.currentStep + 1).map((c) => ({ progressionPreventing: c.blocking }))
+    : [];
   const ownComments = { total: ownRows.length, blocking: ownRows.filter((c) => c.progressionPreventing).length };
 
   const waitingOn = step && step.status === "active"

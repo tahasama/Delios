@@ -1,4 +1,3 @@
-import { Prisma } from "@prisma/client";
 import type { Tenant } from "./tenant";
 
 /**
@@ -72,86 +71,10 @@ export function readDay(value: string | undefined, endOfDay: boolean): Date | nu
 /**
  * The documents an asset code names. A search term may be a tag number rather
  * than anything written on the document, and the register answers for both.
+ * Assets are not in the backend yet, so no tag names a document.
  */
-export async function documentsForAssets(t: Tenant, words: string[]): Promise<string[]> {
-  if (!words.length) return [];
-  const assets = await t.db.assetItem.findMany({
-    where: { OR: words.flatMap((word) => [{ code: { contains: word } }, { name: { contains: word } }]) },
-    select: { id: true },
-  });
-  if (!assets.length) return [];
-  const links = await t.db.relationship.findMany({
-    where: { kind: "DOC_ASSET", toId: { in: assets.map((asset) => asset.id) } },
-    select: { fromId: true },
-  });
-  return links.map((link) => link.fromId);
-}
-
-/**
- * Everything the register was asked, as one `where`.
- *
- * Every question is a column: the four that belong to the newest revision are
- * kept on the document by the scoped client, so the database can narrow, order
- * and page by them instead of the page reading every match into memory.
- */
-export function registerWhere(sp: RegisterSearch, assetDocIds: string[] = []): Prisma.DocumentWhereInput {
-  const searches = readSearch((sp.q ?? "").trim());
-  const view = sp.view === "all" ? "all" : "current";
-  const state = sp.state ?? "";
-  const revState = sp.rev ?? "";
-  const dateOn = DATE_COLUMN[sp.on ?? ""] ? sp.on! : "";
-  const from = readDay(sp.from, false);
-  const to = readDay(sp.to, true);
-
-  // "In review" and "for release" are two states of one revision, and "none"
-  // is the absence of one; the rest name themselves.
-  const revStateWhere: Prisma.DocumentWhereInput =
-    revState === "NONE" ? { latestRevisionId: null }
-      : revState === "FOR_RELEASE" ? { latestRevState: "NOT_RELEASED" }
-        : revState === "IN_REVIEW" ? { latestRevState: "IN_REVIEW" }
-          : revState ? { latestRevState: revState }
-            : {};
-
-  return {
-    AND: [
-      ...(state || view === "all" ? [] : [{ state: { notIn: ["WITHDRAWN", "CANCELLED", "ARCHIVED"] } }]),
-      ...(searches.length
-        ? [{
-            OR: searches.map((search) => ({
-              AND: search.words.map((word) => ({
-                OR: [
-                  // A document number is typed from its front, so it is matched
-                  // from its front as well: that match can use the index.
-                  { docNumber: { startsWith: word } },
-                  { docNumber: { contains: word } }, { title: { contains: word } }, { originator: { contains: word } },
-                  { contractRef: { contains: word } }, { previousId: { contains: word } },
-                  { discipline: { contains: word } }, { docType: { contains: word } }, { subProject: { contains: word } },
-                  ...(assetDocIds.length ? [{ id: { in: assetDocIds } }] : []),
-                ],
-              })),
-            })),
-          }]
-        : []),
-      state ? { state } : {},
-      sp.discipline ? { discipline: sp.discipline } : {},
-      sp.docType ? { docType: sp.docType } : {},
-      sp.supplier ? { originator: sp.supplier } : {},
-      sp.po ? { contractRef: sp.po } : {},
-      sp.criticality ? { criticality: sp.criticality } : {},
-      sp.confidentiality ? { confidentiality: sp.confidentiality } : {},
-      sp.deliverable ? { deliverableType: sp.deliverable } : {},
-      sp.phase ? { latestPhase: sp.phase } : {},
-      // What an action owes is a relation, not a column: one document can be
-      // owed by several actions, and one action owes many documents.
-      sp.action ? { baselineEntries: { some: { action: { code: sp.action } } } } : {},
-      revStateWhere,
-      sp.status ? { latestRevState: "RELEASED", latestStatusCode: sp.status } : {},
-      sp.verdict ? { latestVerdict: sp.verdict } : {},
-      dateOn && (from || to)
-        ? ({ [DATE_COLUMN[dateOn]]: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } } as Prisma.DocumentWhereInput)
-        : {},
-    ],
-  };
+export async function documentsForAssets(_t: Tenant, _words: string[]): Promise<string[]> {
+  return [];
 }
 
 /** Which column each sort reads. All of them are columns; none is derived. */

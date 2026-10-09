@@ -36,24 +36,12 @@ export function neededBy(actionDate: Date | null, entry: { leadBusinessDays: num
 }
 
 /**
- * The next system action code — A00001, A00002… — for a schedule that does not
- * carry its own. Codes are assigned once and never reused (§14.2): the counter
- * only moves forward, and a code already taken by hand is skipped.
+ * The next system action code, for a schedule that does not carry its own.
+ * Activity codes come from the schedule file the backend reads; it hands none
+ * out, so there is no counter to take one from.
  */
-export async function nextActionCode(t: Tenant): Promise<string> {
-  for (;;) {
-    const seq = await t.db.$transaction(async (tx) => {
-      const c = await tx.numberCounter.findUnique({ where: { projectId_prefix: { projectId: t.projectId, prefix: "ACTION" } } });
-      if (c) {
-        await tx.numberCounter.update({ where: { id: c.id }, data: { next: { increment: 1 } } });
-        return c.next;
-      }
-      await tx.numberCounter.create({ data: { projectId: t.projectId, prefix: "ACTION", next: 2 } });
-      return 1;
-    });
-    const code = `A${String(seq).padStart(5, "0")}`;
-    if (!(await t.db.action.findFirst({ where: { code } }))) return code;
-  }
+export async function nextActionCode(_t: Tenant): Promise<string> {
+  throw new Error("Action codes come from the schedule file: numbering them here is not supported yet.");
 }
 
 /** Departments stored on an action, as a list. */
@@ -61,18 +49,12 @@ export function departmentsOf(action: { departments: string | null }): string[] 
   return (action.departments ?? "").split(",").map((s) => s.trim()).filter(Boolean);
 }
 
-/** Move every rule-based needed-by date to follow its action. Returns how many moved. */
-export async function redateRequirements(t: Tenant): Promise<number> {
-  const entries = await t.db.baselineEntry.findMany({ where: { manualDate: false }, include: { action: true } });
-  let moved = 0;
-  for (const e of entries) {
-    const next = neededBy(e.action.scheduledDate, e);
-    if (next && next.getTime() !== e.requiredBy.getTime()) {
-      await t.db.baselineEntry.update({ where: { id: e.id }, data: { requiredBy: next } });
-      moved++;
-    }
-  }
-  return moved;
+/**
+ * Move every rule-based needed-by date to follow its action. The backend does
+ * it itself whenever the schedule is read in, so there is nothing to move here.
+ */
+export async function redateRequirements(_t: Tenant): Promise<number> {
+  return 0;
 }
 
 // ── Comparing two schedule versions ─────────────────────────────────────────

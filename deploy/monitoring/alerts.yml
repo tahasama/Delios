@@ -1,0 +1,228 @@
+# Two kinds of alert.
+#
+#   severity: critical / warning   Something is broken or about to break. Act now.
+#   severity: plan                 A threshold from docs/ARCHITECTURE.md "When to
+#                                  scale" has been crossed. Nothing is broken; it is
+#                                  time to switch on what the alert names, following
+#                                  docs/ACTIVATION.md.
+#
+# Every alert says what to do in its "action".
+
+groups:
+  - name: incidents
+    rules:
+      - alert: ApiDown
+        expr: up{job="api"} == 0 or absent(up{job="api"})
+        for: 2m
+        labels: { severity: critical }
+        annotations:
+          summary: "An API node is not answering ({{ $labels.instance }})."
+          action: "docker compose -f deploy/compose.yaml --profile app ps api; check its logs."
+
+      - alert: WorkerDown
+        expr: up{job="worker"} == 0 or absent(up{job="worker"})
+        for: 2m
+        labels: { severity: critical }
+        annotations:
+          summary: "A worker is not answering: uploaded files are not being scanned."
+          action: "docker compose -f deploy/compose.yaml --profile app ps worker; check its logs."
+
+      - alert: PostgresDown
+        expr: pg_up == 0
+        for: 1m
+        labels: { severity: critical }
+        annotations:
+          summary: "Postgres is not answering."
+          action: "Check the postgres container. With a standby running, see ACTIVATION.md 'Promote the standby'."
+
+      - alert: RedisDown
+        expr: redis_up == 0
+        for: 2m
+        labels: { severity: warning }
+        annotations:
+          summary: "Redis is not answering. The app stays correct but slower."
+          action: "Check the valkey container."
+
+      - alert: RabbitMqDown
+        expr: up{job="rabbitmq"} == 0
+        for: 2m
+        labels: { severity: critical }
+        annotations:
+          summary: "RabbitMQ is not answering. Messages wait in the outbox; nothing is lost."
+          action: "Check the rabbitmq container."
+
+      - alert: ServerErrors
+        expr: |
+          sum(rate(http_request_duration_seconds_count{job="api", code=~"5.."}[5m]))
+            / sum(rate(http_request_duration_seconds_count{job="api"}[5m])) > 0.02
+        for: 10m
+        labels: { severity: critical }
+        annotations:
+          summary: "More than 2% of API requests fail with a server error."
+          action: "Look at the API logs and error tracking for the failing endpoint."
+
+      - alert: OutboxStuck
+        expr: max(delios_outbox_oldest_unsent_seconds) > 300
+        for: 5m
+        labels: { severity: critical }
+        annotations:
+          summary: "Messages have waited more than 5 minutes to reach RabbitMQ."
+          action: "Check RabbitMQ and the API logs for 'Outbox relay failed'."
+
+      - alert: FilesParked
+        expr: max(rabbitmq_queue_messages{queue="delios.files.dead"}) > 0
+        for: 1m
+        labels: { severity: warning }
+        annotations:
+          summary: "{{ $value }} message(s) are parked: failed five times, or reached no queue."
+          action: "Each carries x-routing-key (what work it was) and x-error. Read the worker or API logs for the error; after fixing, publish them back to the delios exchange with that routing key from the RabbitMQ console."
+
+      - alert: DiskAlmostFull
+        expr: |
+          node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs"}
+            / node_filesystem_size_bytes{fstype!~"tmpfs|overlay|squashfs"} < 0.15
+        for: 10m
+        labels: { severity: critical }
+        annotations:
+          summary: "Less than 15% disk left on {{ $labels.mountpoint }}."
+          action: "Free space or grow the volume."
+
+      - alert: BackupTooOld
+        expr: time() - max(delios_backup_last_success_timestamp_seconds{type="any"}) > 26 * 3600
+        for: 15m
+        labels: { severity: critical }
+        annotations:
+          summary: "The last database backup finished more than 26 hours ago."
+          action: "Read the postgres container logs for 'backup-loop' errors."
+
+      - alert: BackupFailing
+        expr: increase(delios_backup_failures_total[6h]) > 0
+        labels: { severity: critical }
+        annotations:
+          summary: "A database backup failed in the last 6 hours."
+          action: "Read the postgres container logs for 'backup-loop' errors."
+
+      - alert: BackupsNotMeasured
+        expr: absent(delios_backup_last_success_timestamp_seconds)
+        for: 2h
+        labels: { severity: warning }
+        annotations:
+          summary: "No backup has been measured: the backup loop or node-exporter is not running."
+          action: "Check the postgres and node-exporter containers."
+
+      - alert: FileBackupTooOld
+        expr: time() - max(delios_file_backup_last_success_timestamp_seconds) > 12 * 3600
+        for: 15m
+        labels: { severity: critical }
+        annotations:
+          summary: "Stored files have not been copied to the second location for 12 hours."
+          action: "Read the file-backup container logs."
+
+      - alert: RestoreDrillOverdue
+        expr: |
+          time() - max(delios_restore_drill_last_success_timestamp_seconds) > 35 * 24 * 3600
+            or absent(delios_restore_drill_last_success_timestamp_seconds)
+        for: 24h
+        labels: { severity: warning }
+        annotations:
+          summary: "No restore drill has passed in 35 days. A backup never restored is not a backup."
+          action: "docker compose -f deploy/compose.yaml --profile drill run --rm restore-drill"
+
+      - alert: WalArchivingFailing
+        expr: min(delios_backup_archive_check_ok) == 0
+        for: 15m
+        labels: { severity: critical }
+        annotations:
+          summary: "Postgres cannot archive its write-ahead log: point-in-time recovery is at risk."
+          action: "Read the postgres container logs for archive-push errors."
+
+      - alert: StandbyLagging
+        expr: max(pg_replication_lag_seconds) > 60
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: "The standby is more than a minute behind the primary."
+          action: "Check the standby container and the network between them."
+
+  - name: scale-triggers
+    rules:
+      - alert: CpuHigh
+        expr: 1 - avg(rate(node_cpu_seconds_total{mode="idle"}[5m])) > 0.70
+        for: 15m
+        labels: { severity: plan, switch: second-api-node }
+        annotations:
+          summary: "The server's CPU has been above 70% for 15 minutes."
+          action: "ACTIVATION.md 'Second API node' (and 'More workers' if the files queue is long)."
+
+      - alert: MemoryHigh
+        expr: 1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes > 0.85
+        for: 15m
+        labels: { severity: plan, switch: bigger-server }
+        annotations:
+          summary: "Memory has been above 85% for 15 minutes."
+          action: "Move to a larger server, or move Postgres to its own (ACTIVATION.md 'Separate database server')."
+
+      - alert: ApiSlow
+        expr: |
+          histogram_quantile(0.95, sum by (le) (
+            rate(http_request_duration_seconds_bucket{job="api", endpoint!~"/health.*"}[5m]))) > 0.5
+        for: 15m
+        labels: { severity: plan, switch: second-api-node }
+        annotations:
+          summary: "One request in twenty takes longer than 500 ms."
+          action: "If CPU is high too: ACTIVATION.md 'Second API node'. If the database is the cause: 'Read replica'."
+
+      - alert: DatabaseConnectionsHigh
+        expr: sum(pg_stat_activity_count) / max(pg_settings_max_connections) > 0.8
+        for: 10m
+        labels: { severity: plan, switch: pgbouncer }
+        annotations:
+          summary: "More than 80% of the database's connections are in use."
+          action: "ACTIVATION.md 'PgBouncer'."
+
+      - alert: FileQueueGrowing
+        expr: |
+          max(rabbitmq_queue_messages{queue="delios.files"}) > 50
+            and deriv(max(rabbitmq_queue_messages{queue="delios.files"})[10m:1m]) > 0
+        for: 10m
+        labels: { severity: plan, switch: more-workers }
+        annotations:
+          summary: "More than 50 files wait for scanning and the queue keeps growing."
+          action: "ACTIVATION.md 'More workers'."
+
+      - alert: RegisterSearchSlow
+        expr: |
+          histogram_quantile(0.95, sum by (le) (
+            rate(delios_register_query_seconds_bucket{search="yes"}[10m]))) > 0.3
+        for: 30m
+        labels: { severity: plan, switch: opensearch }
+        annotations:
+          summary: "Register searches take longer than 300 ms for one search in twenty."
+          action: "First 'Read replica'; if searches stay slow, ACTIVATION.md 'OpenSearch'."
+
+      - alert: SearchIndexBehind
+        expr: |
+          max(delios_search_last_sync_timestamp_seconds) > 0
+            and time() - max(delios_search_last_sync_timestamp_seconds) > 300
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "The search index has not been brought up to date for over five minutes; new documents are not found by words."
+          action: "Check the opensearch container and the worker's log. Searches still answer from Postgres if the index is down."
+
+      - alert: SearchFallingBack
+        expr: increase(delios_search_fallbacks_total[15m]) > 0
+        for: 15m
+        labels: { severity: warning }
+        annotations:
+          summary: "Searches are answered from Postgres because the search index cannot be reached."
+          action: "docker compose ps opensearch; its log. ACTIVATION.md 'OpenSearch'."
+
+      - alert: DiskFillsWithinAWeek
+        expr: |
+          predict_linear(node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs"}[6h], 7 * 24 * 3600) < 0
+        for: 1h
+        labels: { severity: plan, switch: storage }
+        annotations:
+          summary: "At the current rate {{ $labels.mountpoint }} is full within 7 days."
+          action: "Grow the volume; check that files go to object storage, not local disk."

@@ -6,12 +6,13 @@ import { Card, Chip, Banner, Field, inputCls } from "@/components/ui";
 import { ActionForm } from "@/components/form";
 import { ADVICE_LABEL, OUTCOME_CONSEQUENCES } from "@/lib/standard";
 import { fmtDate, fmtDateTime } from "@/lib/utils";
-import { myAdvice, dueState, getRunForRevision } from "@/lib/workflow";
+import { myAdvice, dueState } from "@/lib/workflow";
+import { reviewCycle, reviewRun, earlierSteps, routeSteps } from "@/lib/api/reviews";
 import { rewindRouteAction } from "@/lib/actions/workflow";
 import { requestChoices, authorOf, issuePolicy } from "@/lib/issue-requests";
 import { DelegatePanel, DelegateForm, type DelegationRow } from "./delegate-panel";
 import { AnswerCard } from "./answer-card";
-import { delegateCandidates, delegationFlag } from "@/lib/delegation";
+import { delegateCandidates, delegationFlag, delegationsOn } from "@/lib/delegation";
 import { controlDoes, actIsOff, matrixBinds } from "@/lib/control-activities";
 import { RequestIssue } from "@/app/(app)/documents/[id]/request-issue";
 import { Timeline } from "@/components/timeline";
@@ -29,19 +30,9 @@ export const dynamic = "force-dynamic";
 
 export default async function ReviewCyclePage({ params }: { params: Promise<{ id: string }> }) {
   const ctx = await requireScope();
-  const { user, db } = ctx;
+  const { user } = ctx;
   const { id } = await params;
-  const cycle = await db.reviewCycle.findUnique({
-    where: { id },
-    include: {
-      revision: { include: { document: true, files: true, approvals: true } },
-      comments: { orderBy: { createdAt: "asc" } },
-      assignments: { orderBy: { order: "asc" } },
-      transmittal: true,
-      party: true,
-      files: { orderBy: { createdAt: "asc" } },
-    },
-  });
+  const cycle = await reviewCycle(ctx, id);
   if (!cycle) notFound();
 
   const [outcomes, adviceCodes, commentClasses, statuses] = await Promise.all([
@@ -65,19 +56,13 @@ export default async function ReviewCyclePage({ params }: { params: Promise<{ id
   const rendition = rev.files.find((file) => file.kind === "RENDITION") ?? null;
   // The route this step belongs to, if any. Progress draws the whole of it, so
   // there is no separate picture of the route on this page.
-  const run = await getRunForRevision(ctx, rev.id).catch(() => null);
+  const run = await reviewRun(ctx, cycle.id).catch(() => null);
   // What the steps before this one said. Whoever answers here reads it before
   // answering, and the decider reads all of it.
   const earlierIds = run
     ? run.steps.slice(0, run.steps.findIndex((step) => step.cycleId === cycle.id)).map((step) => step.cycleId).filter((one): one is string => !!one)
     : [];
-  const earlier = earlierIds.length
-    ? await db.reviewCycle.findMany({
-        where: { id: { in: earlierIds } },
-        orderBy: { sequence: "asc" },
-        select: { id: true, number: true, outcome: true, outcomeByName: true, outcomeAt: true, comments: { orderBy: { createdAt: "asc" }, select: { id: true, authorName: true, text: true, progressionPreventing: true, status: true, closesWith: true, closesWithStep: true } } },
-      })
-    : [];
+  const earlier = earlierIds.length ? await earlierSteps(ctx, cycle.id) : [];
   // The deciding step is offered the first request: the person who settles what
   // a revision is for is the likeliest to know who needs it.
   const askWho = (await issuePolicy(ctx)).asked;
@@ -106,11 +91,7 @@ export default async function ReviewCyclePage({ params }: { params: Promise<{ id
   const [handCandidates, handThroughControl, handRows, handOff, handStrict] = await Promise.all([
     assigned && cycle.status === "OPEN" ? delegateCandidates(ctx, { target: doc, verb: handVerb, fromUserId: user.id }) : Promise.resolve([]),
     controlDoes(ctx, "DELEGATE"),
-    db.delegation.findMany({
-      where: { cycleId: cycle.id },
-      orderBy: { createdAt: "desc" },
-      include: { fromUser: { select: { name: true } }, toUser: { select: { name: true } } },
-    }),
+    delegationsOn(ctx, cycle.id),
     actIsOff(ctx, "DELEGATE"),
     matrixBinds(ctx),
   ]);
@@ -131,6 +112,10 @@ export default async function ReviewCyclePage({ params }: { params: Promise<{ id
   const reserves = cycle.comments.filter((comment) => comment.progressionPreventing && comment.status === "OPEN");
   const myComments = cycle.comments.filter((comment) => comment.authorId === user.id);
   const canRecordOutcome = (assigned || controller) && !cycle.outcome && Boolean(cycle.issuedToReviewAt);
+  // Writing comments: whoever sits on the open step, until they answer it.
+  const mayComment = cycle.status === "OPEN" && assigned && !cycle.outcome && Boolean(cycle.issuedToReviewAt);
+  // Whether an open comment stops the release: Document Control, or the revision's author, may change it.
+  const mayReclassify = controller || rev.authoredById === user.id;
   // A step answered by an outside party that holds no accounts here: one of our
   // people sends the pack and writes down what comes back. The verdict stays
   // theirs; the record says who entered it.
@@ -147,9 +132,7 @@ export default async function ReviewCyclePage({ params }: { params: Promise<{ id
   // Every cycle of this route, so Progress can show the whole journey rather
   // than the two moments of the step you happen to be looking at.
   const routeCycleIds = run ? run.steps.map((step) => step.cycleId).filter((one): one is string => !!one) : [];
-  const routeCycles = routeCycleIds.length
-    ? await db.reviewCycle.findMany({ where: { id: { in: routeCycleIds } }, select: { id: true, outcome: true, outcomeAt: true, outcomeByName: true, dispatchedAt: true, assignments: { select: { userName: true } } } })
-    : [];
+  const routeCycles = routeCycleIds.length ? await routeSteps(ctx, cycle.id) : [];
   const byId = new Map(routeCycles.map((one) => [one.id, one]));
   // A decided review that is part of a route has one way back: Document Control
   // sends the revision back at the gate, with a reason, and everyone who sat on
@@ -274,6 +257,68 @@ export default async function ReviewCyclePage({ params }: { params: Promise<{ id
             </div>
             {rendition ? <iframe src={`/api/files/${rendition.id}`} title={`${doc.docNumber} revision ${rev.value}`} className="block h-160 w-full bg-canvas"/> : <div className="grid h-48 place-items-center bg-canvas/50 p-6 text-center"><div><FileText className="mx-auto h-8 w-8 text-slate-400"/><p className="mt-2 text-sm font-semibold text-slate-700">No PDF attached</p><Link href={`/documents/${doc.id}#workflow`} className="mt-2 inline-block text-xs font-semibold text-link hover:underline">Attach it on the document →</Link></div></div>}
           </section>
+
+          {/* Comments on this step. Until the step is answered they are its
+              author's draft: changed or taken back. After that they are the record.
+              Document Control, or the revision's author, may change whether an
+              open one stops the release; what it was is kept. */}
+          {mayComment || cycle.comments.length ? (
+            <Card title="Comments" description={mayComment ? "Yours can be changed or taken back until you answer the step." : undefined}>
+              {cycle.comments.length ? (
+                <ul className="space-y-2">
+                  {cycle.comments.map((comment) => (
+                    <li key={comment.id} className={`rounded-lg px-3 py-2 text-xs ${comment.progressionPreventing && comment.status === "OPEN" ? "bg-red-50 text-red-900 ring-1 ring-red-200" : "bg-canvas text-slate-700"}`}>
+                      <p className="leading-5">{comment.text}</p>
+                      <p className="mt-1 text-[11px] text-slate-400">
+                        {comment.authorName} · {fmtDateTime(comment.createdAt)}
+                        {comment.progressionPreventing ? (comment.status === "OPEN" ? " · stops the release" : " · settled") : null}
+                      </p>
+                      {mayComment && comment.authorId === user.id && comment.status === "OPEN" ? (
+                        <div className="mt-2 flex flex-wrap items-start gap-3">
+                          <details>
+                            <summary className="cursor-pointer text-[11px] font-semibold text-link">Change</summary>
+                            <div className="mt-2">
+                              <ActionForm action={editCommentAction} submitLabel="Save" size="sm" hidden={{ cycleId: cycle.id, commentId: comment.id }}>
+                                <textarea name="text" required rows={3} defaultValue={comment.text} className={inputCls} />
+                                <label className="flex items-center gap-2 text-xs text-slate-700"><input type="checkbox" name="blocking" defaultChecked={comment.progressionPreventing} /> Stops the release until it is settled</label>
+                              </ActionForm>
+                            </div>
+                          </details>
+                          <ActionForm action={removeCommentAction} submitLabel="Take back" variant="danger" size="sm" hidden={{ cycleId: cycle.id, commentId: comment.id }} className="space-y-0" />
+                        </div>
+                      ) : null}
+                      {mayReclassify && comment.status === "OPEN" && !(mayComment && comment.authorId === user.id) ? (
+                        <details className="mt-2">
+                          <summary className="cursor-pointer text-[11px] font-semibold text-link">{comment.progressionPreventing ? "Let it no longer stop the release" : "Make it stop the release"}</summary>
+                          <div className="mt-2">
+                            <ActionForm action={reclassifyCommentAction} submitLabel="Reclassify" size="sm" hidden={{ cycleId: cycle.id, commentId: comment.id, ...(comment.progressionPreventing ? {} : { prevent: "on" }) }}>
+                              <Field label="Why" hint="optional — kept with the comment"><input name="note" className={inputCls} /></Field>
+                            </ActionForm>
+                          </div>
+                        </details>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+              {mayComment ? (
+                <div className={cycle.comments.length ? "mt-3 border-t border-line pt-3" : undefined}>
+                  <ActionForm action={addCommentAction} submitLabel="Add comment" size="sm" hidden={{ cycleId: cycle.id }}>
+                    <Field label="Comment" required><textarea name="text" required rows={3} className={inputCls} placeholder="What is wrong, and where" /></Field>
+                    <label className="flex items-center gap-2 text-xs text-slate-700"><input type="checkbox" name="blocking" /> Stops the release until it is settled</label>
+                    {laterSteps.length ? (
+                      <Field label="Settled by" hint="when it stops the release">
+                        <select name="closesWithStep" defaultValue="" className={inputCls}>
+                          <option value="">The next revision</option>
+                          {laterSteps.map((step) => <option key={step.number} value={step.number}>Step {step.number} · {step.title}</option>)}
+                        </select>
+                      </Field>
+                    ) : null}
+                  </ActionForm>
+                </div>
+              ) : null}
+            </Card>
+          ) : null}
 
         </div>
 

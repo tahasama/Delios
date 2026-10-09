@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@prisma/client";
+import { getActiveSet } from "./config";
 import { CONTRACT_ROLES } from "./profiles/roles";
 
 /**
@@ -15,20 +15,13 @@ import { CONTRACT_ROLES } from "./profiles/roles";
  */
 export type RoleOption = { code: string; label: string; approval: string; description: string };
 
-export async function contractRoleOptions(db: PrismaClient, orgId: string): Promise<RoleOption[]> {
-  const published = await db.configValue.findMany({
-    where: { orgId, setKey: "CONTRACT_ROLES", status: "ACTIVE" },
-    orderBy: [{ sort: "asc" }, { code: "asc" }],
-    select: { code: true, label: true, props: true },
-  });
+export async function contractRoleOptions(_db?: unknown, _orgId?: string): Promise<RoleOption[]> {
+  const published = await getActiveSet("CONTRACT_ROLES").catch(() => []);
   if (!published.length) {
     return CONTRACT_ROLES.map((r) => ({ code: r.code, label: r.label, approval: r.approval, description: r.description }));
   }
   return published.map((value) => {
-    let props: { approval?: unknown; description?: unknown } = {};
-    if (value.props) {
-      try { props = JSON.parse(value.props) as typeof props; } catch { /* a malformed prop is simply absent */ }
-    }
+    const props = value.props as { approval?: unknown; description?: unknown };
     const builtIn = CONTRACT_ROLES.find((r) => r.code === value.code);
     return {
       code: value.code,
@@ -39,7 +32,6 @@ export async function contractRoleOptions(db: PrismaClient, orgId: string): Prom
   });
 }
 
-/** Whether this code is a role the organization offers. */
-export async function isContractRole(db: PrismaClient, orgId: string, code: string): Promise<boolean> {
-  return (await contractRoleOptions(db, orgId)).some((r) => r.code === code);
+export async function isContractRole(_db: unknown, _orgId: string, code: string): Promise<boolean> {
+  return (await contractRoleOptions()).some((r) => r.code === code);
 }

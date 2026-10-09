@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { requireScope } from "@/lib/scope";
+import { preparingRevisions, revisionsInPreparation } from "@/lib/api/reviews";
 import { PageHeader } from "@/components/ui";
 import { SendForReview } from "@/components/send-for-review-panel";
 import { RevisionChecklist } from "@/components/revision-checklist";
@@ -17,24 +18,17 @@ type Search = { revisions?: string; revision?: string | string[] };
  * a selection in the document register, it already knows.
  */
 export default async function StartReviewPage({ searchParams }: { searchParams: Promise<Search> }) {
-  const { db } = await requireScope();
+  const scope = await requireScope();
   const sp = await searchParams;
   const ids = [
     ...(sp.revisions ?? "").split(","),
     ...(Array.isArray(sp.revision) ? sp.revision : sp.revision ? [sp.revision] : []),
   ].map((v) => v.trim()).filter(Boolean);
-  const chosen = ids.length
-    ? await db.revision.findMany({ where: { id: { in: ids }, state: "IN_PREPARATION" }, include: { document: true } })
-    : [];
+  const chosen = ids.length ? await preparingRevisions(scope, ids) : [];
 
   // What may be sent: a revision being prepared, with its file, and nothing
   // already running. One with no file cannot be reviewed, so it is not offered.
-  const preparing = chosen.length ? [] : await db.revision.findMany({
-    where: { state: "IN_PREPARATION", workflowRuns: { none: { status: "ACTIVE" } } },
-    orderBy: { createdAt: "desc" },
-    take: 300,
-    include: { document: { select: { docNumber: true, title: true } } },
-  });
+  const preparing = chosen.length ? [] : await revisionsInPreparation(scope);
   const ready = preparing.filter((r) => r.renditionFileId || r.nativeFileId);
   const waitingForFile = preparing.length - ready.length;
 

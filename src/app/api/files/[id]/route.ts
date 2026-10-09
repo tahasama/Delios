@@ -1,48 +1,43 @@
 import { NextResponse } from "next/server";
 import { getScope } from "@/lib/scope";
-import { readStored } from "@/lib/files";
-import { audit } from "@/lib/audit";
+import { api, ApiProblem, projectPath } from "@/lib/api/client";
 
-// Controlled file access, read through the same scoped client every page
-// uses: the project the person is working in, the documents they are cleared
-// for (§5.7), and — for someone from another party — only what belongs to
-// them or was issued to them. A file outside that does not exist for them, so
-// the answer is the same "not found" either way. Every download is logged to
-// the audit trail (§16.4 Q5 evidence).
+// Controlled file access. The backend decides whether this person may open the
+// file (the project, their clearance, and for another party only what is
+// theirs or was issued to them), logs the download, and gives a short-lived
+// link; the bytes are passed on from there under the file's own name.
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const scope = await getScope();
   if (!scope) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const { user, db } = scope;
   const { id } = await params;
-  const file = await db.storedFile.findFirst({
-    where: { id },
-    include: { revision: { include: { document: true } } },
-  });
-  if (!file) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  const doc = file.revision?.document;
-
+  let ticket: { url: string };
   try {
-    const buf = await readStored(file.path);
-    const url = new URL(req.url);
-    const disposition = url.searchParams.get("dl") === "1" ? "attachment" : "inline";
-    await audit({
-      tenant: scope,
-      actor: user,
-      action: "DOWNLOAD",
-      entityType: "StoredFile",
-      entityId: file.id,
-      entityLabel: file.name,
-      detail: `${disposition === "attachment" ? "Downloaded" : "Viewed"} (${file.kind.toLowerCase()})${doc ? ` — ${doc.docNumber}` : ""}`,
-    });
-    return new NextResponse(new Uint8Array(buf), {
-      headers: {
-        "Content-Type": file.mime || "application/octet-stream",
-        "Content-Disposition": `${disposition}; filename="${encodeURIComponent(file.name)}"`,
-        "Content-Length": String(buf.length),
-        "Cache-Control": "private, no-store",
-      },
-    });
-  } catch {
-    return NextResponse.json({ error: "File missing from the repository — recorded as a defect (FM-10)." }, { status: 410 });
+    ticket = await api<{ url: string }>(projectPath(scope, `/files/${id}/download`));
+  } catch (e) {
+    if (e instanceof ApiProblem) return NextResponse.json({ error: e.message }, { status: e.status });
+    throw e;
   }
+  const stored = await fetch(ticket.url);
+  if (!stored.ok || !stored.body) return NextResponse.json({ error: "File missing from the repository." }, { status: 410 });
+  const url = new URL(req.url);
+  const type = stored.headers.get("content-type") || "application/octet-stream";
+  // Only what a browser shows without running anything opens in the page: a PDF or a plain image. Anything else
+  // (HTML, SVG, scripts) is a download, so a file somebody uploaded never runs as the person opening it.
+  const viewable = /^(application\/pdf|image\/(png|jpeg|gif|webp))\b/i.test(type);
+  const disposition = url.searchParams.get("dl") === "1" || !viewable ? "attachment" : "inline";
+  const raw = stored.headers.get("content-disposition")?.match(/filename\*?=(?:UTF-8'')?"?([^";]+)"?/i)?.[1] ?? id;
+  let decoded = raw;
+  try { decoded = decodeURIComponent(raw); } catch { /* the name as it came */ }
+  const plain = decoded.replace(/[\r\n"\\]/g, "_").replace(/[^\x20-\x7e]/g, "_");
+  return new NextResponse(stored.body, {
+    headers: {
+      "Content-Type": viewable ? type : "application/octet-stream",
+      "Content-Disposition": `${disposition}; filename="${plain}"; filename*=UTF-8''${encodeURIComponent(decoded)}`,
+      ...(stored.headers.get("content-length") ? { "Content-Length": stored.headers.get("content-length")! } : {}),
+      "Cache-Control": "private, no-store",
+      "X-Content-Type-Options": "nosniff",
+      // Embedded only by our own pages; a download, if a browser opens it anyway, runs nothing.
+      "Content-Security-Policy": viewable ? "frame-ancestors 'self'" : "sandbox; default-src 'none'; frame-ancestors 'none'",
+    },
+  });
 }

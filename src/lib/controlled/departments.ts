@@ -1,5 +1,8 @@
 import { register, headerIndex, cell, diffByKey, type Handler, type ParseIssue, type ParseResult } from "./registry";
 import { departmentsOf } from "../schedule";
+import { api, projectPath } from "../api/client";
+import { legacyActions } from "../api/schedule";
+import { getActiveSet } from "../config";
 
 /**
  * Which departments each scheduled activity concerns. Once the schedule is in,
@@ -38,13 +41,10 @@ const departments: Handler = {
     const { index, missing } = headerIndex(rows, ["Action Code", "Departments"], ALIASES);
     if (missing.length) return { ok: false, issues: [{ line: 1, message: `Missing column(s): ${missing.join(", ")}. Download the list and keep its header row.` }] };
 
-    const [actions, disciplines, entries] = await Promise.all([
-      t.db.action.findMany({ select: { code: true } }),
-      t.db.configValue.findMany({ where: { setKey: "DISCIPLINES", status: "ACTIVE" }, select: { code: true } }),
-      t.db.baselineEntry.findMany({ select: { department: true, action: { select: { code: true } } } }),
-    ]);
+    const [actions, disciplines] = await Promise.all([legacyActions(t), getActiveSet("DISCIPLINES")]);
     const codes = new Set(actions.map((a) => a.code));
     const known = new Set(disciplines.map((d) => d.code));
+    const entries = actions.flatMap((a) => a.entries.map((e) => ({ department: e.department, code: a.code })));
 
     const issues: ParseIssue[] = [];
     const parsed: DepartmentRow[] = [];
@@ -65,7 +65,7 @@ const departments: Handler = {
       const unknown = depts.filter((d) => !known.has(d));
       if (unknown.length) errors.push(`Not a department code: ${unknown.join(", ")}`);
       // A department with documents still listed cannot be dropped silently.
-      const listed = [...new Set(entries.filter((e) => e.action.code === actionCode && e.department && !depts.includes(e.department)).map((e) => e.department!))];
+      const listed = [...new Set(entries.filter((e) => e.code === actionCode && e.department && !depts.includes(e.department)).map((e) => e.department!))];
       if (listed.length) errors.push(`${listed.join(", ")} still ${listed.length === 1 ? "has" : "have"} documents listed for ${actionCode} — take them off the requirements list first`);
       if (errors.length) issues.push({ line, message: errors.join("; ") });
       else parsed.push({ actionCode, departments: depts });
@@ -76,19 +76,12 @@ const departments: Handler = {
   },
 
   async current(t) {
-    const actions = await t.db.action.findMany({ orderBy: [{ scheduledDate: "asc" }, { code: "asc" }] });
-    return actions.map((a): DepartmentRow => ({ actionCode: a.code, departments: departmentsOf(a) }));
+    return (await legacyActions(t)).map((a): DepartmentRow => ({ actionCode: a.code, departments: departmentsOf(a) }));
   },
 
   async exportRows(t) {
-    const actions = await t.db.action.findMany({ orderBy: [{ scheduledDate: "asc" }, { code: "asc" }] });
-    return actions.map((a) => [
-      a.code,
-      a.scheduleRef ?? "",
-      a.name,
-      a.description ?? "",
-      a.scheduledDate?.toISOString().slice(0, 10) ?? "",
-      departmentsOf(a).join(", "),
+    return (await legacyActions(t)).map((a) => [
+      a.code, a.scheduleRef ?? "", a.name, a.description ?? "", a.scheduledDate?.toISOString().slice(0, 10) ?? "", departmentsOf(a).join(", "),
     ]);
   },
 
@@ -105,13 +98,13 @@ const departments: Handler = {
 
   async apply(t, payload) {
     const rows = payload as DepartmentRow[];
+    const actions = new Map((await legacyActions(t)).map((a) => [a.code, a]));
     let changed = 0;
     for (const row of rows) {
-      const action = await t.db.action.findFirst({ where: { code: row.actionCode } });
+      const action = actions.get(row.actionCode);
       if (!action) continue;
-      const next = row.departments.join(",");
-      if ((action.departments ?? "") !== next) {
-        await t.db.action.update({ where: { id: action.id }, data: { departments: next } });
+      if (departmentsOf(action).join(",") !== row.departments.join(",")) {
+        await api(projectPath(t, `/activities/${action.id}/departments`), { method: "PUT", body: { departments: row.departments } });
         changed++;
       }
     }

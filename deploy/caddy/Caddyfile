@@ -1,0 +1,31 @@
+# The one way in. Locally it answers on :8080 over HTTP; in production set
+# SITE_ADDRESS to the domain (app.example.com) and Caddy obtains and renews the
+# TLS certificate itself.
+{$SITE_ADDRESS::80} {
+	encode zstd gzip
+
+	# The API, spread over however many api nodes are running. Nodes are found by
+	# name, so `--scale api=3` needs no change here. A node that fails is skipped
+	# for 30 seconds and the request retried on another.
+	handle /api/* {
+		reverse_proxy {
+			dynamic a api 8080 {
+				refresh 5s
+			}
+			lb_policy round_robin
+			lb_try_duration 10s
+			fail_duration 30s
+			unhealthy_status 502 503 504
+		}
+	}
+
+	# Health and metrics stay on the internal network; they are never served here.
+	handle /health/* {
+		respond 404
+	}
+
+	# The Next.js app joins here once it runs in a container (plan step 6).
+	handle {
+		respond "DELIOS: the API is at /api." 200
+	}
+}

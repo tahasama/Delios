@@ -1,0 +1,29 @@
+# Slack (or Mattermost). Put the incoming-webhook URL in
+# deploy/monitoring/alertmanager/secrets/slack_webhook (not committed).
+route:
+  receiver: team
+  group_by: [alertname]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  routes:
+    # Scale triggers are not emergencies: one reminder a day is enough.
+    - matchers: [severity="plan"]
+      receiver: team
+      repeat_interval: 24h
+
+inhibit_rules:
+  # When a node is down, its slowness is not news.
+  - source_matchers: [alertname="ApiDown"]
+    target_matchers: [alertname=~"ApiSlow|ServerErrors"]
+  - source_matchers: [alertname="PostgresDown"]
+    target_matchers: [alertname=~"ApiSlow|ServerErrors|DatabaseConnectionsHigh|BackupTooOld"]
+
+receivers:
+  - name: team
+    slack_configs:
+      - api_url_file: /etc/alertmanager/secrets/slack_webhook
+        channel: "#delios-alerts"                # CHANGE: the channel
+        send_resolved: true
+        title: '{{ .CommonAnnotations.summary }}'
+        text: '{{ range .Alerts }}{{ .Annotations.action }}{{ "\n" }}{{ end }}'

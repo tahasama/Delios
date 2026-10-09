@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { projectExceptions } from "@/lib/api/records";
 import { requireScope } from "@/lib/scope";
 import { CheckCircle2, CircleDashed, ArrowRight, Building2, Tags, FileDigit, Workflow, Users, ShieldCheck, CalendarClock, Gauge } from "lucide-react";
 import { profileForKind, missingFromProfile, type Profile } from "@/lib/profiles";
@@ -13,6 +14,10 @@ import { PrintButton } from "@/app/(app)/conformance/statement/print-button";
 import { setScopeAction, addExceptionAction } from "@/lib/actions/admin";
 import { fmtDate } from "@/lib/utils";
 
+import { adminFunctions, adminNumbering, adminParties, adminProjects, adminRoutes, adminUsers, orEmpty, scopeConfig } from "@/lib/api/admin";
+import { projectSettings } from "@/lib/api/settings";
+import { getSet, getSets } from "@/lib/config";
+
 export const dynamic = "force-dynamic";
 export const metadata = { title: "The plan" };
 
@@ -20,26 +25,31 @@ export default async function PlanPage({ searchParams }: { searchParams: Promise
   const sp = await searchParams;
   const view = sp.view === "built" || sp.view === "scope" ? sp.view : "plan";
   const ctx = await requireScope();
-  const { user, db } = ctx;
+  const { user } = ctx;
   if (!isAdmin(user)) return <PageHeader title="The plan" subtitle="Administrators only." />;
 
   const REQUIRED = ["DELIVERABLE_TYPES", "DOCUMENT_TYPES", "DISCIPLINES", "PHASES", "CRITICALITY", "CONFIDENTIALITY", "STATUSES", "REVIEW_OUTCOMES", "REASONS_FOR_ISSUE", "RETENTION_CLASSES"];
   const [scope, requiredSets, schemes, routings, externalParties, members, withDepartment, rules, templates, actions, calls, lastRun, projects] = await Promise.all([
-    db.scopeConfig.findFirst(),
-    db.configSet.findMany({ where: { key: { in: REQUIRED } }, include: { _count: { select: { values: true } } } }),
-    db.scheme.count({ where: { active: true } }),
-    db.schemeRouting.count({ where: { status: "ACTIVE" } }),
-    db.party.count({ where: { isInternal: false } }),
-    db.projectMembership.count({ where: { projectId: ctx.projectId, active: true } }),
-    db.projectMembership.count({ where: { projectId: ctx.projectId, active: true, department: { not: null } } }),
-    db.permissionRule.findMany({ select: { verbs: true } }),
-    db.workflowTemplate.count({ where: { active: true } }),
-    db.action.findMany({ select: { departments: true } }),
-    db.requirementCall.count(),
-    db.checkRun.findFirst({ orderBy: { ranAt: "desc" } }),
-    db.project.findMany({ where: { orgId: ctx.orgId, status: "ACTIVE" }, select: { kind: true } }),
+    scopeConfig(ctx.projectId),
+    Promise.all(REQUIRED.map(async (key) => ({ key, title: (await getSets()).find((one) => one.key === key)?.title ?? key, _count: { values: (await getSet(key)).length } }))),
+    adminNumbering().then((n) => n.schemes.filter((one) => one.active).length).catch(() => 0),
+    adminNumbering().then((n) => n.routing.filter((one) => one.active).length).catch(() => 0),
+    orEmpty(adminParties).then((all) => all.filter((one) => !one.isInternal).length),
+    orEmpty(adminUsers).then((all) => all.filter((u) => u.memberships.some((m) => m.projectId === ctx.projectId && m.active)).length),
+    orEmpty(adminUsers).then((all) => all.filter((u) => u.memberships.some((m) => m.projectId === ctx.projectId && m.active && m.department)).length),
+    orEmpty(adminFunctions).then((all) => all.flatMap((f) => f.rules.map((r) => ({ verbs: JSON.stringify(r.verbs) })))),
+    orEmpty(adminRoutes).then((all) => all.filter((r) => r.active).length),
+    // Which departments each activity calls on, the calls sent, and the last conformance run are not read here yet.
+    Promise.resolve([] as { departments: string }[]),
+    Promise.resolve(0),
+    Promise.resolve(null as { ranAt: Date; integrity: number } | null),
+    orEmpty(adminProjects).then(async (all) => Promise.all(all.filter((p) => p.status === "ACTIVE").map(async (p) => {
+      let info: { kind?: string } = {};
+      try { info = JSON.parse((await projectSettings(p.id).catch(() => new Map<string, string>())).get("PROJECT_INFO") ?? "{}"); } catch { info = {}; }
+      return { kind: info.kind ?? "GENERIC" };
+    }))),
   ]);
-  const exceptions = await db.exceptionEntry.findMany({ orderBy: { startDate: "desc" } });
+  const exceptions = await projectExceptions(ctx);
 
   // A list nobody has filled, by the name people know it by.
   const emptySets = REQUIRED.filter((key) => {

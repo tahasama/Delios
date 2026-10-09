@@ -1,4 +1,5 @@
 import type { Tenant } from "./tenant";
+import { orgSettings } from "./api/settings";
 
 /**
  * Which fields a form asks for, and which it insists on.
@@ -203,9 +204,9 @@ export type Rules = Record<string, FieldRule>;
  * A fixed field answers itself whatever is stored, so a policy row left behind
  * by an earlier version cannot weaken something that is not negotiable.
  */
-export async function fieldRules(t: Tenant, kind: FieldKind): Promise<Rules> {
-  const rows = await t.db.fieldPolicy.findMany({ where: { kind } });
-  const said = new Map(rows.map((r) => [r.field, r.rule as FieldRule]));
+export async function fieldRules(_t: Tenant, kind: FieldKind): Promise<Rules> {
+  const settings = await orgSettings();
+  const said = new Map(fieldsOf(kind).map((field) => [field.key, settings.get(`${FIELD_RULE_KEY}${kind}:${field.key}`) as FieldRule | undefined]));
   const out: Rules = {};
   for (const field of fieldsOf(kind)) {
     out[field.key] = field.fixed ? field.fallback : said.get(field.key) ?? field.fallback;
@@ -214,10 +215,10 @@ export async function fieldRules(t: Tenant, kind: FieldKind): Promise<Rules> {
 }
 
 /** The organization's own words for the application's fields. */
-export async function fieldLabels(t: Tenant, kind: FieldKind): Promise<Record<string, string>> {
-  const rows = await t.db.fieldPolicy.findMany({ where: { kind, label: { not: null } } });
+export async function fieldLabels(_t: Tenant, kind: FieldKind): Promise<Record<string, string>> {
+  const settings = await orgSettings();
   const out: Record<string, string> = {};
-  for (const field of fieldsOf(kind)) out[field.key] = rows.find((r) => r.field === field.key)?.label ?? field.label;
+  for (const field of fieldsOf(kind)) out[field.key] = settings.get(`${FIELD_LABEL_KEY}${kind}:${field.key}`) ?? field.label;
   return out;
 }
 
@@ -236,18 +237,32 @@ export type OwnField = {
 };
 
 /** The fields an organization added for itself, in the order it put them. */
-export async function ownFields(t: Tenant, kind: FieldKind): Promise<OwnField[]> {
-  const rows = (await t.db.customField.findMany({ where: { kind }, orderBy: [{ position: "asc" }, { addedAt: "asc" }] }))
-    .filter((r) => r.rule !== "OFF");
-  const needed = [...new Set(rows.map((r) => r.setKey).filter((k): k is string => !!k))];
-  const values = needed.length
-    ? await t.db.configValue.findMany({ where: { setKey: { in: needed }, status: "ACTIVE" }, orderBy: { sort: "asc" } })
-    : [];
-  return rows.map((r) => ({
-    id: r.id, key: r.key, label: r.label, control: r.control as Control,
-    setKey: r.setKey, rule: r.rule as FieldRule, help: r.help, inRegister: r.inRegister,
-    options: r.setKey ? values.filter((v) => v.setKey === r.setKey).map((v) => ({ code: v.code, label: `${v.code} — ${v.label}` })) : undefined,
-  }));
+export async function ownFields(_t: Tenant, kind: FieldKind): Promise<OwnField[]> {
+  const rows = (await storedOwnFields(kind)).filter((r) => r.rule !== "OFF");
+  const { getActiveSet } = await import("./config");
+  return Promise.all(rows.map(async (r) => ({
+    ...r,
+    options: r.setKey ? (await getActiveSet(r.setKey)).map((v) => ({ code: v.code, label: `${v.code} — ${v.label}` })) : undefined,
+  })));
+}
+
+/** The organization setting that holds a field's rule: FIELD_RULE:DOCUMENT:plannedDate. */
+export const FIELD_RULE_KEY = "FIELD_RULE:";
+/** The organization setting that holds a field's own name: FIELD_LABEL:DOCUMENT:plannedDate. */
+export const FIELD_LABEL_KEY = "FIELD_LABEL:";
+/** The organization setting that holds the fields it added for one kind of record, in order: OWN_FIELDS:DOCUMENT. */
+export const OWN_FIELDS_KEY = "OWN_FIELDS:";
+
+/** The fields an organization added for one kind of record, as stored, every rule included. */
+export async function storedOwnFields(kind: FieldKind): Promise<Omit<OwnField, "options">[]> {
+  const raw = (await orgSettings()).get(`${OWN_FIELDS_KEY}${kind}`);
+  if (!raw) return [];
+  try {
+    const rows = JSON.parse(raw) as Omit<OwnField, "options">[];
+    return Array.isArray(rows) ? rows : [];
+  } catch {
+    return [];
+  }
 }
 
 /** The answers a record carries to its organization's own fields. */

@@ -1,0 +1,7 @@
+apiVersion: 1
+providers:
+  - name: delios
+    folder: DELIOS
+    type: file
+    options:
+      path: /var/lib/grafana/dashboards

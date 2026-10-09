@@ -1,3 +1,4 @@
+import { getActiveSet, getValue } from "./config";
 import type { Tenant } from "./tenant";
 
 /**
@@ -42,24 +43,15 @@ export type Family = {
   stamp: StampRule;
 };
 
-function parse(props: string | null): Record<string, unknown> {
-  if (!props) return {};
-  try { return JSON.parse(props) as Record<string, unknown>; } catch { return {}; }
-}
-
 function asRule(value: unknown): StampRule {
   return value === "BEFORE" || value === "AFTER" ? value : "NONE";
 }
 
 /** Every family this organization publishes. */
-export async function families(t: Tenant): Promise<Family[]> {
-  const rows = await t.db.configValue.findMany({
-    where: { setKey: "DOC_FAMILIES", status: "ACTIVE" },
-    orderBy: [{ sort: "asc" }, { code: "asc" }],
-    select: { code: true, label: true, props: true },
-  });
+export async function families(_t: Tenant): Promise<Family[]> {
+  const rows = await getActiveSet("DOC_FAMILIES");
   return rows.map((row) => {
-    const props = parse(row.props);
+    const props = row.props;
     return {
       code: row.code,
       label: row.label,
@@ -104,16 +96,12 @@ export type TypeFamily = {
 export async function typesByFamily(t: Tenant): Promise<TypeFamily[]> {
   const [published, types] = await Promise.all([
     families(t),
-    t.db.configValue.findMany({
-      where: { setKey: "DOCUMENT_TYPES", status: "ACTIVE" },
-      orderBy: [{ sort: "asc" }, { code: "asc" }],
-      select: { code: true, label: true, props: true },
-    }),
+    getActiveSet("DOCUMENT_TYPES"),
   ]);
   return types.map((type) => ({
     code: type.code,
     label: type.label,
-    family: familyOf(type.code, parse(type.props), published),
+    family: familyOf(type.code, type.props, published),
   }));
 }
 
@@ -127,11 +115,8 @@ export async function typesByFamily(t: Tenant): Promise<TypeFamily[]> {
 export async function stampRuleFor(t: Tenant, docType: string | null | undefined): Promise<{ rule: StampRule; family: Family | null }> {
   if (!docType) return { rule: "NONE", family: null };
   const published = await families(t);
-  const type = await t.db.configValue.findFirst({
-    where: { setKey: "DOCUMENT_TYPES", code: docType },
-    select: { code: true, props: true },
-  });
-  const family = familyOf(docType, parse(type?.props ?? null), published);
+  const type = await getValue("DOCUMENT_TYPES", docType);
+  const family = familyOf(docType, type?.props ?? {}, published);
   return { rule: family?.stamp ?? "NONE", family };
 }
 

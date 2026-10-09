@@ -4,35 +4,39 @@ import { notFound } from "next/navigation";
 import { isController, isAdmin } from "@/lib/auth";
 
 import { Chip, DataTable, PageHeader, Th, Td } from "@/components/ui";
-import { compareScheduleActivities, type ScheduleChange } from "@/lib/schedule";
+import type { ScheduleChange } from "@/lib/schedule";
 import { fmtDate } from "@/lib/utils";
 import { ArrowLeft, CalendarCheck2, CircleAlert, GitCompareArrows } from "lucide-react";
 import { ControlledSource } from "@/components/controlled-source";
+import { scheduleVersions, dayOf } from "@/lib/api/schedule";
 
 export const dynamic = "force-dynamic";
 
 export default async function ScheduleVersionDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { user, db } = await requireScope();
+  const ctx = await requireScope();
+  const { user } = ctx;
   const { id } = await params;
-  const version = await db.scheduleVersion.findUnique({ where: { id }, include: { activities: { orderBy: { actionCode: "asc" } } } });
+  const versions = await scheduleVersions(ctx);
+  const version = versions.find((one) => one.id === id);
   if (!version) notFound();
-  const previous = await db.scheduleVersion.findFirst({
-    where: { sourceName: version.sourceName, id: { not: version.id }, status: { in: ["PUBLISHED", "SUPERSEDED"] }, importedAt: { lt: version.importedAt } },
-    orderBy: { importedAt: "desc" },
-    include: { activities: true },
-  });
-  const [sourceRelation, sourceOptions] = await Promise.all([
-    db.relationship.findFirst({ where: { kind: "CONTROL_SOURCE", fromType: "ScheduleVersion", fromId: version.id }, orderBy: { createdAt: "desc" } }),
-    db.revision.findMany({ orderBy: { createdAt: "desc" }, include: { document: { select: { docNumber: true, title: true } } }, take: 250 }),
-  ]);
-  const controlledSource = sourceRelation ? await db.revision.findUnique({ where: { id: sourceRelation.toId }, include: { document: { select: { id: true, docNumber: true, title: true } } } }) : null;
-  const changes = compareScheduleActivities(version.activities, previous?.activities ?? []);
+  // The read before it that took; the backend keeps what changed against it.
+  const previous = versions.slice(versions.indexOf(version) + 1).find((one) => one.status !== "FAILED") ?? null;
+  // The schedule's own revision is its controlled source; naming another
+  // schedule document is done on the backend's schedule settings, not here.
+  const [controlledSource, sourceOptions] = [version.revision, [] as { id: string; value: string; state: string; document: { docNumber: string; title: string } }[]];
+  const TYPE: Record<string, ScheduleChange["type"]> = { NEW: "NEW", MOVED: "DATE_CHANGED", CHANGED: "DETAIL_CHANGED", REMOVED: "REMOVED" };
+  const changes: ScheduleChange[] = version.view.changes.map((change) => {
+    const now = { actionCode: change.code, externalId: change.code, name: change.name, baselineDate: dayOf(change.newStart), forecastDate: null, responsibleParty: null };
+    const before = { ...now, baselineDate: dayOf(change.oldStart) };
+    return { type: TYPE[change.type] ?? "DETAIL_CHANGED", activity: change.type === "REMOVED" ? before : now, previous: change.type === "NEW" ? null : before };
+  }).sort((a, b) => a.activity.actionCode.localeCompare(b.activity.actionCode));
   const counts = {
     new: changes.filter((change) => change.type === "NEW").length,
     date: changes.filter((change) => change.type === "DATE_CHANGED").length,
     detail: changes.filter((change) => change.type === "DETAIL_CHANGED").length,
     removed: changes.filter((change) => change.type === "REMOVED").length,
-    unchanged: changes.filter((change) => change.type === "UNCHANGED").length,
+    // Activities the read left as they were are counted, not listed.
+    unchanged: version.view.unchanged,
   };
 
   return (

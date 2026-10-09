@@ -1,6 +1,8 @@
+import { cache } from "react";
 import type { Tenant } from "./tenant";
-import { holdersOf, can, loadActor, type DocumentClass, type Verb } from "./permissions";
-import { matrixBinds } from "./control-activities";
+import type { DocumentClass, Verb } from "./permissions";
+import { api, projectPath } from "./api/client";
+import { reviewOfRequest } from "./api/reviews";
 
 /**
  * Handing a review step to somebody else.
@@ -28,39 +30,57 @@ import { matrixBinds } from "./control-activities";
  * at all — offering them as the ordinary answer to "who takes this step" would
  * turn the exception into the habit. Where the route needs somebody the matrix
  * does not name, whoever configures the route adds them to the step.
+ *
+ * The backend keeps the hand-overs and applies these rules; the review a
+ * hand-over is raised from is the review the screens call a cycle.
  */
 
 /** The document facts the matrix reads. */
 export type Target = DocumentClass;
 
-/** Holds the verb only by the privilege that exists for emergencies. */
-async function byPrivilege(t: Tenant): Promise<Set<string>> {
-  const [control, configure] = await Promise.all([holdersOf(t, "CONTROL"), holdersOf(t, "CONFIGURE")]);
-  return new Set([...control, ...configure].map((one) => one.id));
+/** A hand-over on record for a review: who handed it to whom, until when, and where it stands. */
+export type DelegationRecord = {
+  id: string; fromUserId: string; toUserId: string; verb: string; status: string; endDate: Date; reason: string | null;
+  refusedReason: string | null; askedByName: string | null; grantedByName: string | null;
+  fromUser: { name: string }; toUser: { name: string };
+};
+
+type BackendDelegation = {
+  id: string; step: number; fromUserId: string; fromName: string; toUserId: string; toName: string; verb: string; status: string;
+  endDate: string; reason: string | null; refusedReason: string | null; flag: string | null; askedBy: string; grantedBy: string | null;
+};
+
+/** The flags of the hand-overs read for this request, by who took them: the backend says them with each hand-over. */
+const flags = cache(() => new Map<string, string | null>());
+
+/** The hand-overs raised from a review, newest first. */
+export async function delegationsOn(t: Tenant, cycleId: string): Promise<DelegationRecord[]> {
+  const rows = await api<BackendDelegation[]>(projectPath(t, `/reviews/${cycleId}/delegations`)).catch(() => [] as BackendDelegation[]);
+  for (const row of rows) if (!flags().has(row.toUserId)) flags().set(row.toUserId, row.flag);
+  return rows.map((row) => ({
+    id: row.id, fromUserId: row.fromUserId, toUserId: row.toUserId, verb: row.verb, status: row.status,
+    endDate: new Date(`${row.endDate}T23:59:59`), reason: row.reason, refusedReason: row.refusedReason,
+    askedByName: row.askedBy, grantedByName: row.grantedBy, fromUser: { name: row.fromName }, toUser: { name: row.toName },
+  }));
 }
+
+/** Who may take the open step of a review, as the backend offers them for the person asking. */
+const options = cache(async (t: Tenant, cycleId: string) =>
+  api<{ candidates: { id: string; name: string; functionName: string; inMatrix: boolean }[] }>(projectPath(t, `/reviews/${cycleId}/delegation-options`))
+    .then((one) => one.candidates).catch(() => []));
 
 /**
  * Who this person may hand a step of this kind to: those the matrix names,
  * and — unless it is the only rule — everybody else on the project, flagged.
+ * Asked of the review the page stands on.
  */
 export async function delegateCandidates(
   t: Tenant,
-  { target, verb, fromUserId }: { target: Target; verb: Verb; fromUserId: string },
+  _asked: { target: Target; verb: Verb; fromUserId: string },
+  cycleId?: string,
 ): Promise<{ id: string; name: string; functionName: string; inMatrix: boolean }[]> {
-  const [named, privileged, strict] = await Promise.all([holdersOf(t, verb, target), byPrivilege(t), matrixBinds(t)]);
-  const recommended = named
-    .filter((one) => one.id !== fromUserId && !privileged.has(one.id))
-    .map((one) => ({ id: one.id, name: one.name, functionName: one.functionName, inMatrix: true }));
-  if (strict) return recommended;
-  const members = await t.db.projectMembership.findMany({
-    where: { projectId: t.projectId, active: true, user: { active: true }, userId: { not: fromUserId } },
-    select: { user: { select: { id: true, name: true } }, function: { select: { name: true } } },
-    orderBy: { user: { name: "asc" } },
-  });
-  const others = members
-    .filter((m) => !recommended.some((one) => one.id === m.user.id))
-    .map((m) => ({ id: m.user.id, name: m.user.name, functionName: m.function?.name ?? "", inMatrix: false }));
-  return [...recommended, ...others];
+  const id = cycleId ?? reviewOfRequest();
+  return id ? options(t, id) : [];
 }
 
 /**
@@ -68,79 +88,33 @@ export async function delegateCandidates(
  * record and beside the hand-over; it never stops it unless the matrix binds.
  */
 export async function delegationFlag(
-  t: Tenant,
-  { target, verb, toUserId, toName }: { target: Target; verb: Verb; toUserId: string; toName: string },
+  _t: Tenant,
+  { toUserId }: { target: Target; verb: Verb; toUserId: string; toName: string },
 ): Promise<string | null> {
-  if (await named(t, toUserId, verb, target)) return null;
-  return `${toName} is not named in the matrix to ${verb === "APPROVE" ? "decide" : "advise"} on this kind of document.`;
-}
-
-/** Does this person hold the verb for this class in the matrix, right now? */
-async function named(t: Tenant, userId: string, verb: Verb, target: Target): Promise<boolean> {
-  const membership = await t.db.projectMembership.findFirst({
-    where: { projectId: t.projectId, userId, active: true, user: { active: true } },
-    select: { functionId: true },
-  });
-  if (!membership) return false;
-  return can(await loadActor(t, membership.functionId), verb, target);
+  return flags().get(toUserId) ?? null;
 }
 
 /**
- * Why this delegation may not exist, or null when it may. One sentence, in the
- * words of the person who would read it.
+ * Why this delegation may not exist, or null when it may. The backend applies
+ * the rest of the rule when the hand-over is made.
  */
 export async function delegationRefusal(
-  t: Tenant,
-  { target, verb, fromUserId, fromName, toUserId, toName }:
+  _t: Tenant,
+  { fromUserId, toUserId }:
     { target: Target; verb: Verb; fromUserId: string; fromName: string; toUserId: string; toName: string },
 ): Promise<string | null> {
   if (fromUserId === toUserId) return "A step cannot be handed to the person who already holds it.";
-  const act = verb === "APPROVE" ? "decide" : "advise";
-  // The matrix recommends: anyone on the project may take it, flagged.
-  if (!(await matrixBinds(t))) {
-    const member = await t.db.projectMembership.findFirst({ where: { projectId: t.projectId, userId: toUserId, active: true }, select: { id: true } });
-    return member ? null : `${toName} is not on this project.`;
-  }
-  if (!(await named(t, fromUserId, verb, target))) {
-    return `${fromName} may not ${act} on this document, so there is nothing to hand over.`;
-  }
-  if (!(await named(t, toUserId, verb, target))) {
-    return `${toName} is not named to ${act} on this kind of document. A step may only be handed to somebody the distribution matrix already names for it.`;
-  }
-  if ((await byPrivilege(t)).has(toUserId)) {
-    return `${toName} holds that verb as Document Control or as an administrator, for emergencies — not as somebody who ${act}s. If this step needs them, add them to it on the route.`;
-  }
   return null;
 }
 
 /**
  * The delegation, if any, that lets `userId` act in somebody else's place here.
- * A delegation raised from one review covers that review only; one raised
- * without a review covers the class its scope names.
+ * The backend seats the person a step was handed to; this is not asked separately.
  */
 export async function delegationInForce(
-  t: Tenant,
-  { userId, verb, target, cycleId }: { userId: string; verb: Verb; target: Target; cycleId?: string | null },
-) {
-  const rows = await t.db.delegation.findMany({
-    where: {
-      toUserId: userId,
-      status: "ACTIVE",
-      verb,
-      endDate: { gte: new Date() },
-      ...(cycleId ? { OR: [{ cycleId }, { cycleId: null }] } : { cycleId: null }),
-    },
-    include: { fromUser: { select: { id: true, name: true } } },
-    orderBy: { createdAt: "desc" },
-  });
-  const strict = await matrixBinds(t);
-  for (const row of rows) {
-    if (!strict) return row;
-    // Both ends, as they stand today — not as they stood when it was granted.
-    if (!(await named(t, row.fromUserId, verb, target))) continue;
-    if (!(await named(t, userId, verb, target))) continue;
-    return row;
-  }
+  _t: Tenant,
+  _asked: { userId: string; verb: Verb; target: Target; cycleId?: string | null },
+): Promise<{ id: string; fromUserId: string; fromUser: { id: string; name: string } } | null> {
   return null;
 }
 
@@ -151,17 +125,8 @@ export async function delegationInForce(
  */
 export async function mayAnswerCycle(
   t: Tenant,
-  { cycleId, userId, verb }: { cycleId: string; userId: string; verb: Verb },
+  { cycleId }: { cycleId: string; userId: string; verb: Verb },
 ): Promise<{ ok: boolean; onBehalfOf: string | null }> {
-  const cycle = await t.db.reviewCycle.findUnique({
-    where: { id: cycleId },
-    select: { assignments: { select: { userId: true } }, revision: { select: { document: true } } },
-  });
-  if (!cycle) return { ok: false, onBehalfOf: null };
-  if (cycle.assignments.some((seat) => seat.userId === userId)) return { ok: true, onBehalfOf: null };
-  const del = await delegationInForce(t, { userId, verb, target: cycle.revision.document, cycleId });
-  if (del && cycle.assignments.some((seat) => seat.userId === del.fromUserId)) {
-    return { ok: true, onBehalfOf: del.fromUser.name };
-  }
-  return { ok: false, onBehalfOf: null };
+  const me = await api<{ seated: boolean; onBehalfOf: string | null }>(projectPath(t, `/reviews/${cycleId}/me`)).catch(() => null);
+  return { ok: !!me?.seated, onBehalfOf: me?.onBehalfOf ?? null };
 }

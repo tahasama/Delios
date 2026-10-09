@@ -9,7 +9,8 @@ import { fmtDate } from "@/lib/utils";
 import { FolderOpen, ArrowRight } from "lucide-react";
 import { PROJECT_KINDS } from "@/lib/profiles/kinds";
 import { contractRoleOptions } from "@/lib/contract-roles";
-import { db as bare } from "@/lib/db";
+import { adminProjects } from "@/lib/api/admin";
+import { projectSettings } from "@/lib/api/settings";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Projects" };
@@ -19,17 +20,21 @@ const KINDS = PROJECT_KINDS;
 export default async function ProjectsPage() {
   const ctx = await requireScope();
   const policy = await formPolicy(ctx, "PROJECT");
-  const { db, user: me, orgId, projectId } = ctx;
+  const { user: me, projectId } = ctx;
   if (!isAdmin(me)) return <PageHeader title="Projects" subtitle="Administrators only." />;
 
-  const roleOptions = await contractRoleOptions(bare, ctx.orgId);
-  const projects = await db.project.findMany({
-    where: { orgId },
-    orderBy: [{ status: "asc" }, { code: "asc" }],
-    include: {
-      _count: { select: { members: true, documents: true, actions: true } },
-    },
-  });
+  const roleOptions = await contractRoleOptions();
+  const projects = await Promise.all((await adminProjects())
+    .sort((a, b) => a.status.localeCompare(b.status) || a.code.localeCompare(b.code))
+    .map(async (one) => {
+      // Its type and dates are the project's own answers, in its settings.
+      let info: { kind?: string; startDate?: string; endDate?: string | null } = {};
+      try { info = JSON.parse((await projectSettings(one.id).catch(() => new Map<string, string>())).get("PROJECT_INFO") ?? "{}"); } catch { info = {}; }
+      return {
+        ...one, kind: info.kind ?? "GENERIC", role: one.contractRole, startDate: new Date(info.startDate ?? one.createdAt),
+        endDate: info.endDate ? new Date(info.endDate) : null, _count: { members: one.members, documents: one.documents, actions: 0 },
+      };
+    }));
 
   return (
     <div className="space-y-4">

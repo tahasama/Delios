@@ -1,4 +1,6 @@
 import { ReadersPanel } from "./readers-panel";
+import { documentAssets, projectAssets } from "@/lib/api/records";
+import { documentReaders, projectReaders } from "@/lib/api/readers";
 import { openConfidentiality } from "@/lib/permissions";
 import { controlDoes } from "@/lib/control-activities";
 import { notFound } from "next/navigation";
@@ -6,7 +8,6 @@ import { requireScope } from "@/lib/scope";
 import { preflight } from "@/lib/rules/preflight";
 import { PreflightPanel, Guarded } from "@/components/preflight";
 import Link from "next/link";
-import { Prisma } from "@prisma/client";
 import { isController, isAdmin, mayContributeToDocument } from "@/lib/auth";
 import { Chip, StateChip, Banner, btn, Field, inputCls } from "@/components/ui";
 import { ActionForm } from "@/components/form";
@@ -22,7 +23,10 @@ import { updateDocumentAction, linkAssetAction, unlinkRelationshipAction, endDoc
 import {
   prepareRevisionAction, uploadRevisionFilesAction, releaseRevisionAction, voidRevisionAction, returnAtGateAction, liftHoldAction, returnHeldAction,
 } from "@/lib/actions/revisions";
-import { parseRecipients, mayRequestIssue, requestChoices, authorOf, issuePolicy, decisionLetsItOut } from "@/lib/issue-requests";
+import { parseRecipients, mayRequestIssue, requestChoices, authorOf, issuePolicy, decisionLetsItOut, requestsOn } from "@/lib/issue-requests";
+import { legacyDocument, documentContext, type LegacyRevision } from "@/lib/api/legacy";
+import { api, projectPath } from "@/lib/api/client";
+import type { RouteView } from "@/lib/api/types";
 import { requestIssueAction, carryOutRequestAction, cancelRequestAction } from "@/lib/actions/issue-requests";
 import { RequestIssue } from "./request-issue";
 import { ReturnTarget } from "./return-target";
@@ -55,47 +59,33 @@ export default async function DocumentDetailPage({
   searchParams: Promise<Record<string, string | undefined>>;
 }) {
   const ctx = await requireScope();
-  const { user, db } = ctx;
+  const { user } = ctx;
   const { id } = await params;
   const sp = await searchParams;
 
-  const doc = await db.document.findUnique({
-    where: { id },
-    include: {
-      baselineEntries: { include: { action: true }, orderBy: { requiredBy: "asc" } },
-      packageMembers: { include: { package: true } },
-      revisions: {
-        orderBy: { createdAt: "desc" },
-        include: {
-          files: true,
-          approvals: { orderBy: { decidedAt: "desc" } },
-          cycles: { orderBy: { sequence: "asc" }, include: { comments: true, assignments: true } },
-        },
-      },
-    },
-  });
+  const doc = await legacyDocument(ctx, id);
   if (!doc) notFound();
 
+  const context = await documentContext(ctx, id);
   const [rels, assets, disciplines, types, criticalities, confidentialities, retentions, phases, statuses, subprojects, suppliers, pos, auditEvents, transmittalItems] = await Promise.all([
-    db.relationship.findMany({ where: { OR: [{ kind: "DOC_ASSET", fromId: id }, { kind: "DOC_ASSET", toId: id }] } }),
-    db.assetItem.findMany({ orderBy: { code: "asc" } }),
+    documentAssets(ctx, id).then((links) => links.map((one) => ({ id: one.id, kind: "DOC_ASSET", fromId: id, toId: one.assetId }))),
+    projectAssets(ctx).then((all) => all.map((one) => ({ id: one.id, code: one.code, name: one.name }))),
     getSet("DISCIPLINES"), getSet("DOCUMENT_TYPES"), getActiveSet("CRITICALITY"), getSet("CONFIDENTIALITY"),
     getActiveSet("RETENTION_CLASSES"), getActiveSet("PHASES"), getActiveSet("STATUSES"),
     getSet("SUBPROJECTS"), getSet("SUPPLIER_CODES"), getSet("PURCHASE_ORDERS"),
     // The document's story lives on three kinds of record: the document, its
     // revisions (approval, release) and the transmittals that carried it.
-    db.auditEvent.findMany({
-      where: {
-        OR: [
-          { entityType: "Document", entityId: id },
-          { entityType: "Revision", entityId: { in: doc.revisions.map((r) => r.id) } },
-          { entityType: "Transmittal", entityId: { in: (await db.transmittalItem.findMany({ where: { revision: { documentId: id } }, select: { transmittalId: true } })).map((t) => t.transmittalId) } },
-        ],
+    Promise.resolve(context.history.slice(0, 12).map((one, index) => ({
+      id: `${index}`, actorName: one.actor ?? "System", action: one.action, entityType: one.entityType, entityLabel: one.entityLabel,
+      field: null as string | null, oldValue: null as string | null, newValue: null as string | null, detail: one.detail, ts: new Date(one.at),
+    }))),
+    Promise.resolve(context.transmittals.map((t) => ({
+      id: `${t.id}-${t.revisionId}`, revisionId: t.revisionId, revision: { value: t.revision },
+      transmittal: {
+        id: t.id, number: t.number, direction: t.direction, reasonForIssue: t.reason, dateOfIssue: new Date(t.issuedAt),
+        recipients: t.recipients.map((r) => ({ name: r.name, openedAt: r.openedAt ? new Date(r.openedAt) : null })),
       },
-      orderBy: { ts: "desc" },
-      take: 12,
-    }),
-    db.transmittalItem.findMany({ where: { revision: { documentId: id } }, orderBy: { transmittal: { dateOfIssue: "desc" } }, include: { revision: true, transmittal: { include: { recipients: true } } } }),
+    }))),
   ]);
   const deliverable = await getValue("DELIVERABLE_TYPES", doc.deliverableType);
   const label = (rows: { code: string; label: string }[], code: string | null) => (code ? rows.find((r) => r.code === code)?.label ?? code : null);
@@ -126,15 +116,10 @@ export default async function DocumentDetailPage({
       || doc.revisions.some((r) => r.authoredById === user.id || r.uploadedById === user.id));
   const [namedReaders, projectPeople] = closed
     ? await Promise.all([
-        db.documentAccess.findMany({ where: { documentId: doc.id }, orderBy: { createdAt: "asc" }, include: { user: { select: { name: true } } } }),
-        mayNameReaders
-          ? db.projectMembership.findMany({
-              where: { active: true, user: { active: true } },
-              include: { user: { select: { id: true, name: true } }, function: { select: { name: true } } },
-            })
-          : Promise.resolve([]),
+        documentReaders(ctx, doc.id),
+        projectReaders(ctx),
       ])
-    : [[], []];
+    : [[], []] as [{ id: string; userId: string; user: { name: string }; addedByName: string; reason: string | null; createdAt: Date }[], { user: { id: string; name: string }; function: { name: string } | null }[]];
   const inPrep = doc.revisions.find((r) => r.state === "IN_PREPARATION");
   const inReview = doc.revisions.find((r) => r.state === "IN_REVIEW");
   // Decided, waiting for Document Control. Still the revision in hand, and the
@@ -148,26 +133,12 @@ export default async function DocumentDetailPage({
   // Requests on the revision in hand: who asked for it to be sent, to whom, and
   // whether it has gone.
   const carrying = working ?? current ?? null;
-  const requests = carrying
-    ? await db.issueRequest.findMany({
-        where: { revisionId: carrying.id, status: { not: "CANCELLED" } },
-        orderBy: { raisedAt: "asc" },
-        include: { transmittal: { select: { id: true, number: true } } },
-      })
-    : [];
+  const requests = carrying ? await requestsOn(ctx, carrying.id) : [];
+  // The names behind the ids a request holds: the people and organizations of the distribution.
+  const named = requests.length ? await requestChoices(ctx, doc) : { proposed: [], others: [], parties: [] };
   const requestNames = {
-    people: new Map(
-      (await db.user.findMany({
-        where: { id: { in: [...new Set(requests.flatMap((one) => parseRecipients(one.recipients).internalUserIds))] } },
-        select: { id: true, name: true },
-      })).map((one) => [one.id, one.name] as [string, string]),
-    ),
-    parties: new Map(
-      (await db.party.findMany({
-        where: { id: { in: [...new Set(requests.flatMap((one) => parseRecipients(one.recipients).partyIds))] } },
-        select: { id: true, name: true },
-      })).map((one) => [one.id, one.name] as [string, string]),
-    ),
+    people: new Map([...named.proposed, ...named.others].map((one) => [one.id, one.name] as [string, string])),
+    parties: new Map(named.parties.map((one) => [one.id, one.name] as [string, string])),
   };
   // Released and never sent to anybody: in use, and nobody told. True whether
   // or not this organization asks for issuing.
@@ -212,20 +183,18 @@ export default async function DocumentDetailPage({
   const [people, backTo, routePeople, heldApproval] = sendBackOf ? await Promise.all([
     recipientCompanies(ctx, { withOffline: false }),
     returnRecipients(ctx, sendBackOf.id),
-    db.reviewAssignment.findMany({ where: { cycle: { revisionId: sendBackOf.id } }, select: { userId: true } }),
-    held ? db.reviewCycle.findFirst({ where: { revisionId: held.id, issueRequestId: { not: null } }, orderBy: { createdAt: "desc" }, include: { party: { select: { name: true } } } }) : null,
+    Promise.resolve(sendBackOf.cycles.flatMap((cycle) => cycle.assignments.map((seat) => ({ userId: seat.userId })))),
+    // Holding a released revision for an outside approval is not in the backend.
+    Promise.resolve(null as { status: string; party: { name: string } | null } | null),
   ]) : [[], { ids: [], names: "" }, [], null];
   const heldCleared = held && heldApproval?.status === "CLOSED" ? (await pendingIssue(ctx, held.id, { recipients: false })).ok : false;
-  const snapshotCount = await db.documentSnapshot.count({ where: { documentId: id } });
-  const [routeRows, peopleRows] = await Promise.all([
-    db.workflowTemplate.findMany({ where: { active: true }, orderBy: [{ isDefault: "desc" }, { name: "asc" }] }),
-    db.user.findMany({ select: { id: true, name: true } }),
-  ]);
-  const personName = new Map(peopleRows.map((p) => [p.id, p.name]));
+  // The document as it was at each point is not kept by the backend.
+  const snapshotCount = 0;
+  const routeRows = await api<RouteView[]>(projectPath(ctx, `/documents/${id}/routes`));
   const routes = routeRows.map((t) => ({
     id: t.id,
     name: t.name,
-    path: (JSON.parse(t.steps) as { act: string; participantIds: string[] }[]).map((st) => `${st.act === "APPROVAL" ? "approve" : "review"}: ${st.participantIds.map((pid) => personName.get(pid) ?? "?").join(", ")}`).join(" → "),
+    path: t.steps.map((st, index) => `${index === t.steps.length - 1 ? "approve" : "review"}: ${st.title}`).join(" → "),
   }));
   const cycles = doc.revisions.flatMap((rev) => rev.cycles.map((c) => ({ rev, c }))).sort((x, y) => +y.c.submittedAt - +x.c.submittedAt);
 
@@ -280,7 +249,7 @@ export default async function DocumentDetailPage({
     ),
   }] : [];
 
-  const openCycle = inReview && !run ? await db.reviewCycle.findFirst({ where: { revisionId: inReview.id, status: "OPEN" }, orderBy: { sequence: "desc" }, select: { id: true } }) : null;
+  const openCycle = inReview && !run ? [...inReview.cycles].reverse().find((one) => one.status === "OPEN") ?? null : null;
   const extra: StepItem[] = [
       // No separate approval: the review's binding verdict is the decision.
       ...(openCycle ? [{ key: "review", label: `Review of rev ${inReview?.value} — comments and verdict`, href: `/reviews/${openCycle.id}` }] : []),
@@ -839,9 +808,7 @@ function UsedIn({ kind, href, code, text, children }: { kind: string; href: stri
 
 function prettyState(value: string) { return value.replaceAll("_", " ").toLowerCase(); }
 
-type RevData = Prisma.RevisionGetPayload<{
-  include: { files: true; approvals: true; cycles: { include: { comments: true; assignments: true } } };
-}>;
+type RevData = LegacyRevision;
 
 /** One line per revision; its record and its per-revision controls open in place. */
 function RevisionRow({ rev, latest, followedBy, statusLabel, stateLabel, controller, userId, userRole, voidIsControl }: { rev: RevData; latest: boolean; followedBy: { value: string; why: string | null } | null; statusLabel: string | null; stateLabel: string; controller: boolean; userId: string; userRole: string; voidIsControl: boolean }) {

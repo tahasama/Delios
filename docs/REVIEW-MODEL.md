@@ -423,6 +423,27 @@ revision, ask for it to be issued, ask an outside organization to approve it, or
 ask the control function to void the revision or withdraw its approval. Everyone
 who sat on the route is told as each step answers, so they know when to ask.
 
+**Document Control's check is not a review verdict, and a fault in the
+submission keeps its revision.** (Agreed later; it refines the paragraph below.)
+A verdict is about what the document says; Document Control's check is about
+whether what was sent is in order: the template, the number in the title block,
+the right file. Its outcomes are their own published set (accepted, returned to
+sender, returned to initiator, returned for a new revision, released), recorded
+in their own column, and each says whether what it returns needs a new revision.
+
+- **On arrival.** What another organization sends in is accepted by Document
+  Control before anybody reviews it. Refused, it is returned to the sender, who
+  sends corrected files under the same revision.
+- **At the gate, whatever the verdict.** A fault Document Control finds in the
+  submission sends it back for correction under the same revision: to our
+  initiator, or to the organization that sent it. The corrected files come in,
+  and the route runs again from the start.
+- **A verdict that asked for changes** always needs a new revision, because what
+  the document says must change; Document Control sends it back with that verdict.
+- **Nothing is overwritten.** A revision holds its submissions in order; the
+  returned one is kept with the outcome and the reason, and the register shows
+  the same revision value throughout.
+
 **A revision ends released or returned, and a returned one is replaced, never
 corrected.** It keeps what was submitted and what was said about it, and the
 verdict that asked for changes authorizes the next revision. Editing it in place

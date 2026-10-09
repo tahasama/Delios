@@ -3,13 +3,14 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requireScope } from "@/lib/scope";
+import { randomUUID } from "node:crypto";
 import { isController, isAdmin, hasVerb } from "@/lib/auth";
-import { audit, notifyMany } from "@/lib/audit";
-import { saveUpload } from "@/lib/files";
-import { nextRevisionValue } from "@/lib/numbering";
-import { executionSeriesStarted } from "@/lib/lifecycle";
 import { getActiveSet } from "@/lib/config";
-import { holdersOf } from "@/lib/permissions";
+import { api, projectPath, refusal } from "@/lib/api/client";
+import { upload } from "@/lib/api/uploads";
+import { backendDocument, backendRevision } from "@/lib/api/legacy";
+import { addressees, packageView } from "@/lib/api/packages";
+import type { PackageView, TransmittalView } from "@/lib/api/types";
 
 /**
  * A supplier package holds everything one supplier owes us: every register
@@ -18,7 +19,7 @@ import { holdersOf } from "@/lib/permissions";
  */
 export async function createSupplierPackageAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
   const ctx = await requireScope();
-  const { user, db, projectId } = ctx;
+  const { user } = ctx;
   if (!isController(user) && !isAdmin(user)) return { error: "Document Control sets up supplier packages." };
   const partyCode = String(formData.get("partyCode") ?? "");
   const po = String(formData.get("po") ?? "").trim() || null;
@@ -29,81 +30,96 @@ export async function createSupplierPackageAction(_prev: { error?: string } | un
   if (!dueDate) return { error: "Give the date everything is due." };
   if (!requiredStatus) return { error: "Choose the status the documents must reach." };
   if (!acceptorList.length || acceptorList.includes(user.id)) return { error: "Choose who accepts the package — someone other than you." };
-  const party = await db.party.findFirst({ where: { code: partyCode } });
+  const party = (await addressees(ctx)).parties.find((one) => one.code === partyCode);
   if (!party) return { error: "Unknown supplier." };
-  const acceptors = await db.user.findMany({ where: { id: { in: acceptorList } }, select: { id: true, name: true } });
-  if (!acceptors.length) return { error: "Those people are no longer on the project." };
-  const identifier = `SP-${partyCode}${po ? `-${po}` : ""}`;
-  if (await db.package.findFirst({ where: { identifier } })) return { error: `${identifier} already exists.` };
-  await db.package.create({
-    data: {
-      projectId, identifier, category: "SUPPLIER", partyCode,
-      purpose: "SUPPLIER_DELIVERABLES", type: "ACCUMULATED",
-      membershipRule: `Every document from ${party.name}${po ? ` under PO ${po}` : ""}`,
-      recipientName: party.name, completionDate: new Date(dueDate), requiredStatus,
-      compositionOwnerId: user.id, compositionOwnerName: user.name,
-      acceptanceAuthorityId: acceptors[0].id, acceptanceAuthorityName: acceptors.map((one) => one.name).join(", "), acceptanceAuthorityIds: JSON.stringify(acceptors.map((one) => one.id)),
-    },
-  });
-  await audit({ actor: user, action: "PACKAGE_CREATED", entityType: "Package", entityId: identifier, entityLabel: identifier, detail: `Supplier package for ${party.name}.` });
-  redirect(`/packages/${identifier}`);
+  // The backend numbers it like every package; the rule naming the supplier (and the PO) fills it.
+  let number: string;
+  try {
+    const created = await api<PackageView>(projectPath(ctx, "/packages"), {
+      body: {
+        title: `${party.name}${po ? ` — ${po}` : ""}`, kind: "SUPPLY", supplierPartyId: party.id, purchaseOrder: po,
+        reason: (await supplyReason()).code, requiredStatuses: [requiredStatus], completionDate: dueDate,
+        ownerIds: [user.id], acceptorIds: acceptorList,
+      },
+      idempotencyKey: randomUUID(),
+    });
+    number = created.number;
+  } catch (e) {
+    return { error: refusal(e).message };
+  }
+  redirect(`/packages/${number}`);
 }
 
 /**
- * The supplier sends what they uploaded. Every file becomes a revision of its
- * placeholder, and all of them travel on ONE incoming transmittal to Document
- * Control — nothing controlled arrives by email.
+ * The supplier sends what they uploaded. Every file fills its placeholder, and
+ * all of them travel on ONE incoming transmittal to Document Control — nothing
+ * controlled arrives by email. The transmittal is the receipt.
  */
 export async function submitSupplierPackageAction(_prev: { error?: string; ok?: string } | undefined, formData: FormData): Promise<{ error?: string; ok?: string }> {
   const ctx = await requireScope();
-  const { user, db, projectId } = ctx;
+  const { user } = ctx;
   const packageId = String(formData.get("packageId") ?? "");
-  const pkg = await db.package.findFirst({ where: { id: packageId, category: "SUPPLIER" } });
-  if (!pkg?.partyCode) return { error: "This is not a supplier package." };
+  const pkg = await packageView(ctx, packageId);
+  const partyCode = pkg?.kind === "SUPPLY" ? pkg.rule?.originators[0] ?? user.partyCode : null;
+  if (!pkg || !partyCode) return { error: "This is not a supplier package." };
   const isStaff = isController(user) || isAdmin(user);
-  if (!isStaff && user.partyCode !== pkg.partyCode) return { error: "Only this supplier can send documents in this package." };
+  if (!isStaff && user.partyCode !== partyCode) return { error: "Only this supplier can send documents in this package." };
   if (!isStaff && !supplierMayUpload(user)) return { error: "Your access here is read-only. Ask Document Control for the right to upload." };
 
-  const docs = await db.document.findMany({ where: { originator: pkg.partyCode }, include: SUPPLIER_DOC });
-  const sent: { revisionId: string; label: string }[] = [];
-  for (const doc of docs) {
-    const upload = formData.get(`file_${doc.id}`) as File | null;
-    if (!upload || upload.size === 0) continue;
-    sent.push(await attachFile(ctx, doc, upload, `package ${pkg.identifier}`));
+  const chosen = pkg.members
+    .map((m) => ({ m, upload: formData.get(`file_${m.documentId}`) }))
+    .filter((one): one is { m: typeof one.m; upload: File } => one.upload instanceof File && one.upload.size > 0);
+  if (!chosen.length) return { error: "Attach at least one file." };
+  // Document Control entering what the supplier sent by other means records it for them.
+  const onBehalf = user.partyCode !== partyCode;
+  let sent: TransmittalView;
+  try {
+    const status = await sentFor(pkg.reason);
+    const planned = await Promise.all(chosen.map(async ({ m, upload: file }) => ({
+      documentId: m.documentId, fileIds: [await upload(ctx, { documentId: m.documentId }, file)], status,
+    })));
+    sent = await api<TransmittalView>(projectPath(ctx, "/transmittals/incoming"), {
+      body: { reason: pkg.reason, subject: `${pkg.number}: ${planned.length} document${planned.length === 1 ? "" : "s"}`, planned, fromPartyId: onBehalf ? pkg.supplierPartyId : null },
+      idempotencyKey: randomUUID(),
+    });
+  } catch (e) {
+    return { error: refusal(e).message };
   }
-  if (!sent.length) return { error: "Attach at least one file." };
-  if (user.partyCode !== pkg.partyCode) {
-    // Document Control entering what the supplier sent by other means: the
-    // check was done outside, so nothing waits on it — the review starts now.
-    const now = new Date();
-    await db.revision.updateMany({ where: { id: { in: sent.map((one) => one.revisionId) } }, data: { submittedAt: now, submittedById: user.id, submittedByName: user.name, issueDate: now } });
-    const party = await db.party.findFirst({ where: { code: pkg.partyCode }, select: { name: true } });
-    await audit({ actor: user, action: "SUPPLIER_FILES_ENTERED", entityType: "Package", entityId: pkg.identifier, entityLabel: pkg.identifier, detail: `Received from ${party?.name ?? pkg.partyCode} outside the system and entered by ${user.name}: ${sent.map((s) => s.label).join(", ")}.` });
-    revalidatePath(`/packages/${pkg.identifier}`);
-    redirect(`/reviews/send?revisions=${sent.map((one) => one.revisionId).join(",")}`);
-  }
-  const number = await sendRevisions(ctx, pkg.partyCode, sent, `through ${pkg.identifier}`);
-  revalidatePath(`/packages/${pkg.identifier}`);
+  revalidatePath(`/packages/${pkg.number}`);
   revalidatePath("/");
-  return { ok: `Sent ${sent.length} document${sent.length === 1 ? "" : "s"} on ${number}. Document Control has been notified.` };
+  // Received outside the system: the review form opens next.
+  if (onBehalf) redirect(`/reviews/send?revisions=${sent.items.map((one) => one.revisionId).filter(Boolean).join(",")}`);
+  return { ok: `Sent ${chosen.length} document${chosen.length === 1 ? "" : "s"} on ${sent.number}. Document Control has been notified.` };
 }
 
 /**
  * A supplier attaches its file to one of its placeholders, from the document
- * itself. Nothing is sent yet: the Send button appears once a file is there.
+ * itself. The backend keeps no file a supplier has not sent: attaching sends it,
+ * on its own incoming transmittal.
  */
 export async function attachSupplierFileAction(_prev: { error?: string; ok?: string } | undefined, formData: FormData): Promise<{ error?: string; ok?: string }> {
   const ctx = await requireScope();
-  const { user, db } = ctx;
+  const { user } = ctx;
   const documentId = String(formData.get("documentId") ?? "");
-  const upload = formData.get("file") as File | null;
-  const doc = await db.document.findFirst({ where: { id: documentId }, include: SUPPLIER_DOC });
+  const file = formData.get("file");
+  const doc = await backendDocument(ctx, documentId);
   if (!doc?.originator) return { error: "This is not a supplier's document." };
   if (!mayDeliver(user, doc.originator)) return { error: user.partyCode === doc.originator ? "Your access here is read-only. Ask Document Control for the right to upload." : "Only the supplier, or Document Control for them, attaches its file." };
-  if (!upload || upload.size === 0) return { error: "Choose the file." };
-  await attachFile(ctx, doc, upload, "its document page");
-  revalidatePath(`/documents/${doc.id}`);
-  return { ok: "Attached. Send it when you are ready." };
+  if (!(file instanceof File) || file.size === 0) return { error: "Choose the file." };
+  try {
+    const reason = await supplyReason();
+    const status = await sentFor(reason.code);
+    const fromPartyId = await partyIdFor(ctx, user, doc.originator);
+    const fileIds = [await upload(ctx, { documentId }, file)];
+    const sent = await api<TransmittalView>(projectPath(ctx, "/transmittals/incoming"), {
+      body: { reason: reason.code, planned: [{ documentId, fileIds, status }], fromPartyId },
+      idempotencyKey: randomUUID(),
+    });
+    revalidatePath(`/documents/${documentId}`);
+    return { ok: `Sent on ${sent.number}. Document Control has been notified.` };
+  } catch (e) {
+    return { error: refusal(e).message };
+  }
 }
 
 /**
@@ -112,25 +128,32 @@ export async function attachSupplierFileAction(_prev: { error?: string; ok?: str
  */
 export async function sendSupplierDocumentsAction(_prev: { error?: string; ok?: string } | undefined, formData: FormData): Promise<{ error?: string; ok?: string }> {
   const ctx = await requireScope();
-  const { user, db } = ctx;
+  const { user } = ctx;
   const ids = [...new Set(formData.getAll("revisionId").map(String).filter(Boolean))];
-  const revs = await db.revision.findMany({
-    where: { id: { in: ids }, state: "IN_PREPARATION" },
-    include: { document: true, transmittalItems: { include: { transmittal: true } } },
-  });
-  // Only what is attached and not yet on its way, or was turned back at the check.
-  const ready = revs.filter((r) => (r.renditionFileId || r.nativeFileId) && (!r.submittedAt || r.transmittalItems.some((i) => i.transmittal.status === "REJECTED")));
+  const revs = (await Promise.all(ids.map((id) => backendRevision(ctx, id).catch(() => null))))
+    .filter((r): r is NonNullable<typeof r> => !!r && r.state === "IN_PREPARATION");
+  const docs = await Promise.all(revs.map((r) => backendDocument(ctx, r.documentId)));
+  // Only what has a file and is not yet on its way.
+  const ready = revs.map((r, i) => ({ r, doc: docs[i], files: docs[i]?.revisions.find((one) => one.id === r.id)?.files.length ?? 0 }))
+    .filter((one) => one.doc && one.files > 0);
   if (!ready.length) return { error: "Nothing chosen has a file waiting to be sent." };
-  const parties = [...new Set(ready.map((r) => r.document.originator ?? ""))];
+  const parties = [...new Set(ready.map((one) => one.doc!.originator ?? ""))];
   if (parties.length !== 1 || !parties[0]) return { error: "Send one supplier's documents at a time." };
   if (!mayDeliver(user, parties[0])) return { error: "Only the supplier, or Document Control for them, sends its documents." };
-  const number = await sendRevisions(ctx, parties[0], ready.map((r) => ({ revisionId: r.id, label: `${r.document.docNumber} rev ${r.value}` })), "from the register");
-  for (const r of ready) revalidatePath(`/documents/${r.documentId}`);
+  let number: string;
+  try {
+    const sent = await api<TransmittalView>(projectPath(ctx, "/transmittals/incoming"), {
+      body: { reason: (await supplyReason()).code, revisionIds: ready.map((one) => one.r.id), fromPartyId: await partyIdFor(ctx, user, parties[0]) },
+      idempotencyKey: randomUUID(),
+    });
+    number = sent.number;
+  } catch (e) {
+    return { error: refusal(e).message };
+  }
+  for (const one of ready) revalidatePath(`/documents/${one.r.documentId}`);
   revalidatePath("/documents");
   return { ok: `Sent ${ready.length} document${ready.length === 1 ? "" : "s"} on ${number}.` };
 }
-
-const SUPPLIER_DOC = { revisions: { orderBy: { createdAt: "desc" as const }, include: { transmittalItems: { include: { transmittal: true } } } } };
 
 /**
  * The supplier itself — when its function lets it upload; read-only stays
@@ -146,79 +169,24 @@ function supplierMayUpload(user: unknown): boolean {
   return hasVerb(user as never, "CREATE") || hasVerb(user as never, "REVISE");
 }
 
-type SupplierDoc = {
-  id: string; docNumber: string; originator: string | null; isPlaceholder: boolean;
-  revisions: { id: string; value: string; state: string; submittedAt: Date | null; plannedSubmissionDate: Date | null; transmittalItems: { transmittal: { status: string } }[] }[];
-};
-
-/**
- * Put a file on the supplier's revision in hand — one turned back at the check,
- * or one not yet sent — or on a new revision. Under our number: whatever the
- * supplier calls it stays inside the file.
- */
-async function attachFile(ctx: Awaited<ReturnType<typeof requireScope>>, doc: SupplierDoc, upload: File, via: string): Promise<{ revisionId: string; label: string }> {
-  const { user, db, projectId } = ctx;
-  const scope = await db.scopeConfig.findFirst();
-  const latest = doc.revisions[0];
-  const rejectedAtCheck = latest && latest.state === "IN_PREPARATION" && latest.transmittalItems.some((i) => i.transmittal.status === "REJECTED");
-  const draft = latest && latest.state === "IN_PREPARATION" && !latest.submittedAt;
-  let rev: { id: string; value: string } | null = rejectedAtCheck || draft ? latest : null;
-  if (!rev) {
-    const series = (await executionSeriesStarted(ctx, doc.id)) ? "EXECUTION" : "DESIGN";
-    const value = nextRevisionValue(series as "DESIGN" | "EXECUTION", doc.revisions.map((r) => r.value), scope?.executionSeriesStart ?? 0);
-    rev = await db.revision.create({
-      data: {
-        projectId, documentId: doc.id, value, series, state: "IN_PREPARATION",
-        reasonForRevision: doc.revisions.length ? "Resubmission" : "First submission",
-        // A supplier's document is authored by the supplier, whoever uploads it.
-        authoredByName: doc.originator ?? "Supplier",
-        authoredByParty: doc.originator ?? null,
-        uploadedById: user.id,
-        uploadedByName: user.name,
-        changeDescription: doc.revisions.length ? "Resubmitted by the supplier" : "Initial submission",
-        plannedSubmissionDate: latest?.plannedSubmissionDate ?? null,
-        authorizationReason: `Supplier submission through ${via}`,
-        authorizedById: user.id, authorizedByName: user.name, authorizedAt: new Date(),
-      },
-    });
-    if (doc.isPlaceholder) await db.document.update({ where: { id: doc.id }, data: { isPlaceholder: false } });
-  }
-  const isPdf = upload.type === "application/pdf" || upload.name.toLowerCase().endsWith(".pdf");
-  const kind = isPdf ? "RENDITION" : "NATIVE";
-  const saved = await saveUpload(ctx, upload, doc.docNumber, kind, rev.value);
-  const file = await db.storedFile.create({ data: { projectId, path: saved.relPath, name: saved.name, size: saved.size, mime: saved.mime, sha256: saved.sha256, kind, revisionId: rev.id, uploadedById: user.id, uploadedByName: user.name } });
-  await db.revision.update({ where: { id: rev.id }, data: isPdf ? { renditionFileId: file.id } : { nativeFileId: file.id } });
-  return { revisionId: rev.id, label: `${doc.docNumber} rev ${rev.value}` };
+/** What a supplier's submission comes for: approval where the organization publishes it. */
+async function supplyReason() {
+  const reasons = await getActiveSet("REASONS_FOR_ISSUE");
+  return reasons.find((r) => /APPROV/i.test(r.code)) ?? reasons.find((r) => r.props.response === true) ?? reasons[0];
 }
 
-/** One incoming transmittal carries the submission to Document Control. */
-async function sendRevisions(ctx: Awaited<ReturnType<typeof requireScope>>, partyCode: string, sent: { revisionId: string; label: string }[], via: string): Promise<string> {
-  const { user, db, projectId } = ctx;
-  const scope = await db.scopeConfig.findFirst();
-  const now = new Date();
-  await db.revision.updateMany({ where: { id: { in: sent.map((one) => one.revisionId) } }, data: { submittedAt: now, submittedById: user.id, submittedByName: user.name, issueDate: now } });
-  const reasons = await getActiveSet("REASONS_FOR_ISSUE");
-  const reason = reasons.find((r) => r.props.reviewCycle === true && /APPROV/i.test(r.code)) ?? reasons.find((r) => r.props.reviewCycle === true) ?? reasons[0];
-  const controllers = await holdersOf(ctx, "CONTROL");
-  const number = await db.$transaction(async (tx) => {
-    const c = await tx.numberCounter.findUnique({ where: { projectId_prefix: { projectId, prefix: "TR" } } });
-    if (c) { await tx.numberCounter.update({ where: { id: c.id }, data: { next: { increment: 1 } } }); return `TR-${String(c.next).padStart(4, "0")}`; }
-    await tx.numberCounter.create({ data: { projectId, prefix: "TR", next: 2 } });
-    return "TR-0001";
-  });
-  const party = await db.party.findFirst({ where: { code: partyCode } });
-  const tr = await db.transmittal.create({
-    data: {
-      projectId, number, direction: "INCOMING", reasonForIssue: reason.code, dateOfIssue: now, issuingParty: party?.name ?? partyCode,
-      responseRequired: true, status: "ISSUED", receivedDate: now, receivedByParty: scope?.organizationName ?? null,
-      createdById: user.id, createdByName: user.name,
-      items: { create: sent.map((s) => ({ projectId, revisionId: s.revisionId })) },
-      recipients: { create: controllers.map((c) => ({ projectId, userId: c.id, name: c.name, organization: scope?.organizationName ?? null, notifiedAt: now })) },
-    },
-  });
-  await audit({ actor: user, action: "TRANSMITTAL_RAISED", entityType: "Transmittal", entityId: tr.id, entityLabel: number, detail: `${user.partyCode === partyCode ? "Submitted by" : `Recorded by ${user.name} on behalf of`} ${party?.name ?? partyCode} ${via}: ${sent.map((s) => s.label).join(", ")}.` });
-  await notifyMany(controllers.map((c) => c.id), "SUBMISSION_RECEIVED", `${party?.name ?? "Supplier"} sent ${sent.length} document${sent.length === 1 ? "" : "s"} (${number})`, "Check and accept, or reject with a reason.", `/transmittals/${tr.id}`);
-  return number;
+/** The status a submission is sent for, read from its reason: "For approval" → "Issued for approval". */
+async function sentFor(reasonCode: string): Promise<string> {
+  const [reasons, statuses] = await Promise.all([getActiveSet("REASONS_FOR_ISSUE"), getActiveSet("STATUSES")]);
+  const words = (reasons.find((r) => r.code === reasonCode)?.label ?? "").toLowerCase();
+  return (statuses.find((s) => words && s.label.toLowerCase().endsWith(words))
+    ?? statuses.find((s) => s.props.executes === false) ?? statuses[0])?.code ?? "";
+}
+
+/** The sending organization's id when Document Control records it for them; the supplier sends as itself. */
+async function partyIdFor(ctx: Awaited<ReturnType<typeof requireScope>>, user: { partyCode: string | null }, partyCode: string): Promise<string | null> {
+  if (user.partyCode === partyCode) return null;
+  return (await addressees(ctx)).parties.find((one) => one.code === partyCode)?.id ?? null;
 }
 
 /** The register's selection, sent in one go; the register says how it went. */

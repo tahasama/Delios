@@ -1,5 +1,9 @@
 import type { Tenant } from "./tenant";
-import { daysBefore, departmentsOf, DEFAULT_LEAD_DAYS } from "./schedule";
+import { departmentsOf, DEFAULT_LEAD_DAYS } from "./schedule";
+import { holders } from "./api/settings";
+import { adminUsers, orEmpty } from "./api/admin";
+import { legacyActions } from "./api/schedule";
+import { requirementCalls, senderIssues } from "./api/records";
 
 /**
  * From schedule to safe activity, in the order it happens:
@@ -38,17 +42,17 @@ export function isDepartmentSender(sender: string) {
   return sender.startsWith("DEPT:");
 }
 
-/** People who answer for a department on this project. */
+/** People who answer for a department on this project. A department is a discipline. */
 export async function departmentMembers(t: Tenant, department: string): Promise<string[]> {
-  const rows = await t.db.projectMembership.findMany({ where: { projectId: t.projectId, active: true, department }, select: { userId: true } });
-  return rows.map((r) => r.userId);
+  const people = await holders(t.projectId, "READ").catch(() => []);
+  return people.filter((one) => one.department === department).map((one) => one.id);
 }
 
 /** Who receives the issued list: the supplier's people, or the department's. */
 export async function senderRecipients(t: Tenant, sender: string): Promise<string[]> {
   if (isDepartmentSender(sender)) return departmentMembers(t, sender.slice(5));
-  const users = await t.db.user.findMany({ where: { active: true, party: { code: sender } }, select: { id: true } });
-  return users.map((u) => u.id);
+  const users = await orEmpty(adminUsers);
+  return users.filter((one) => one.active && one.partyCode === sender).map((one) => one.id);
 }
 
 export type CallState = "NOT_ISSUED" | "OPEN" | "OVERDUE" | "ANSWERED";
@@ -66,26 +70,28 @@ export type DepartmentRow = {
 
 /** Every department the schedule concerns, and where its call stands. */
 export async function departmentRows(t: Tenant): Promise<DepartmentRow[]> {
-  const [actions, calls, members, entries] = await Promise.all([
-    t.db.action.findMany({ orderBy: [{ scheduledDate: "asc" }, { code: "asc" }], select: { code: true, name: true, scheduledDate: true, departments: true } }),
-    t.db.requirementCall.findMany({ orderBy: { issuedAt: "desc" } }),
-    t.db.projectMembership.findMany({ where: { projectId: t.projectId, active: true, department: { not: null } }, select: { department: true } }),
-    t.db.baselineEntry.findMany({ select: { department: true } }),
-  ]);
+  const [actions, people, calls] = await Promise.all([legacyActions(t), holders(t.projectId, "READ").catch(() => []), requirementCalls(t)]);
+  const entries = actions.flatMap((a) => a.entries);
   const depts = [...new Set(actions.flatMap((a) => departmentsOf(a)))].sort();
   const now = Date.now();
   return depts.map((department) => {
     const mine = actions.filter((a) => departmentsOf(a).includes(department));
     const deptCalls = calls.filter((c) => c.department === department);
-    const covered = new Set(deptCalls.flatMap((c) => c.actionCodes.split(",")));
-    const call = deptCalls.find((c) => !c.answeredAt) ?? deptCalls[0] ?? null;
+    const covered = new Set(deptCalls.flatMap((c) => c.activityCodes));
+    const found = deptCalls.find((c) => !c.answeredAt) ?? deptCalls[0] ?? null;
+    const call = found ? {
+      id: found.id, actionCodes: found.activityCodes.join(","), dueAt: new Date(`${found.dueOn}T23:59:59`), issuedAt: new Date(found.issuedAt),
+      reminders: found.reminders, lastRemindedAt: found.lastRemindedAt ? new Date(found.lastRemindedAt) : null,
+      answeredAt: found.answeredAt ? new Date(found.answeredAt) : null, answerNote: found.answerNote,
+    } : null;
     const state: CallState = !call ? "NOT_ISSUED" : call.answeredAt ? "ANSWERED" : call.dueAt.getTime() < now ? "OVERDUE" : "OPEN";
     return {
       department,
-      actions: mine,
+      actions: mine.map((a) => ({ code: a.code, name: a.name, scheduledDate: a.scheduledDate })),
       notIssued: mine.filter((a) => !covered.has(a.code)).map((a) => a.code),
-      call, state,
-      members: members.filter((m) => m.department === department).length,
+      call,
+      state,
+      members: people.filter((m) => m.department === department).length,
       requirements: entries.filter((e) => e.department === department).length,
     };
   });
@@ -101,11 +107,10 @@ export type SenderRow = {
   recipients: number;
 };
 
+/** Who sends what, and when the list last went to them. */
 export async function senderRows(t: Tenant): Promise<SenderRow[]> {
-  const [entries, issues] = await Promise.all([
-    t.db.baselineEntry.findMany({ include: { document: { select: { originator: true, discipline: true } } }, orderBy: { requiredBy: "asc" } }),
-    t.db.senderIssue.findMany({ orderBy: { issuedAt: "desc" } }),
-  ]);
+  const [actions, issues] = await Promise.all([legacyActions(t), senderIssues(t)]);
+  const entries = actions.flatMap((a) => a.entries).sort((a, b) => a.requiredBy.getTime() - b.requiredBy.getTime());
   const bySender = new Map<string, typeof entries>();
   for (const e of entries) {
     const k = senderOf(e);
@@ -113,13 +118,15 @@ export async function senderRows(t: Tenant): Promise<SenderRow[]> {
   }
   const rows: SenderRow[] = [];
   for (const [sender, list] of bySender) {
-    const last = issues.find((i) => i.sender === sender) ?? null;
+    const last = issues.find((one) => one.sender === sender) ?? null;
+    const listed = new Set(last?.needIds ?? []);
     rows.push({
       sender,
       documents: list.length,
       firstNeeded: list[0]?.requiredBy ?? null,
-      lastIssue: last ? { issuedAt: last.issuedAt, issuedByName: last.issuedByName, entryCount: last.entryCount } : null,
-      changedSinceIssue: last ? list.filter((e) => e.updatedAt > last.issuedAt || e.createdAt > last.issuedAt).length : list.length,
+      lastIssue: last ? { issuedAt: new Date(last.issuedAt), issuedByName: last.issuedByName, entryCount: last.entryCount } : null,
+      // What was added since the list last went: a need it did not name.
+      changedSinceIssue: list.filter((e) => !listed.has(e.id)).length,
       recipients: (await senderRecipients(t, sender)).length,
     });
   }
@@ -137,19 +144,12 @@ const iso = (d: Date | null | undefined) => (d ? d.toISOString().slice(0, 10) : 
 const SHEET_BLANK_LINES = 5;
 
 export async function departmentSheet(t: Tenant, department: string): Promise<string[][]> {
-  const actions = await t.db.action.findMany({
-    orderBy: [{ scheduledDate: "asc" }, { code: "asc" }],
-    include: { entries: { where: { department }, include: { document: true }, orderBy: { requiredBy: "asc" } } },
-  });
-  // The equipment or material each listed document is already tied to, so the
-  // sheet comes back with the column filled rather than asking for it twice.
-  const docIds = actions.flatMap((a) => a.entries.map((e) => e.documentId));
-  const links = docIds.length ? await t.db.relationship.findMany({ where: { kind: "DOC_ASSET", fromId: { in: docIds } }, select: { fromId: true, toId: true } }) : [];
-  const assets = links.length ? await t.db.assetItem.findMany({ where: { id: { in: links.map((l) => l.toId) } }, select: { id: true, code: true } }) : [];
-  const tagOf = (documentId: string) => {
-    const link = links.find((l) => l.fromId === documentId);
-    return link ? assets.find((a) => a.id === link.toId)?.code ?? "" : "";
-  };
+  const actions = (await legacyActions(t)).map((a) => ({
+    ...a,
+    entries: a.entries.filter((e) => e.department === department).sort((x, y) => x.requiredBy.getTime() - y.requiredBy.getTime()),
+  }));
+  // Equipment and material tags are not kept by the backend: the column comes back empty.
+  const tagOf = (_documentId: string) => "";
   // The sheet is the requirements template, and the lines under each action are
   // blank on purpose: that is where the department writes what it needs.
   const rows: string[][] = [REQUIREMENT_COLUMNS];
@@ -181,7 +181,9 @@ export async function departmentSheet(t: Tenant, department: string): Promise<st
 
 /** What one sender is asked to deliver, and when — the base for their baseline. */
 export async function senderSheet(t: Tenant, sender: string): Promise<string[][]> {
-  const entries = await t.db.baselineEntry.findMany({ include: { document: true, action: true }, orderBy: [{ requiredBy: "asc" }, { document: { docNumber: "asc" } }] });
+  const entries = (await legacyActions(t))
+    .flatMap((action) => action.entries.map((e) => ({ ...e, action })))
+    .sort((a, b) => a.requiredBy.getTime() - b.requiredBy.getTime() || a.document.docNumber.localeCompare(b.document.docNumber));
   const rows: string[][] = [["Document Number", "Title", "Document Type", "Required Status", "Submit By", "Review Window Ends", "Approved By", "Needed For", "Activity", "Department"]];
   for (const e of entries.filter((x) => senderOf(x) === sender)) {
     rows.push([

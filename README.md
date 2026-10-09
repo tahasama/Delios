@@ -25,6 +25,63 @@ both teach people to ignore the page.
 - **pdf-lib** — releases are stamped with number / revision / status / date (§10.2); superseded renditions are watermarked (§12.5)
 - Files stored under `./uploads`, served only through an authenticated, confidentiality-checked route handler with download logging
 
+## Backend (in progress)
+
+The production backend is being built in `backend/` (ASP.NET Core 10, PostgreSQL,
+Redis, RabbitMQ, S3-compatible storage, ClamAV). The decisions and the build
+plan are in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). The Next.js app below
+moves onto its API area by area.
+
+Everything runs in Docker; the .NET 10 SDK is needed only to work on the code.
+
+On Windows (PowerShell):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File deploy\init-env.ps1                 # once: random passwords into deploy\.env (never committed)
+docker compose -f deploy/compose.yaml --profile app --profile monitoring up -d --build
+docker compose -f deploy/compose.yaml --profile app run --rm migrate seed-demo
+powershell -ExecutionPolicy Bypass -File deploy\demo.ps1                      # sign in, register, upload, scan, download
+```
+
+On macOS or Linux:
+
+```bash
+sh deploy/init-env.sh                                                         # once: random passwords into deploy/.env (never committed)
+docker compose -f deploy/compose.yaml --profile app up -d --build             # whole stack, API on :8080
+docker compose -f deploy/compose.yaml --profile app run --rm migrate seed-demo # demo tenant "demo", password demo1234
+```
+
+Sign in with `POST /api/auth/sign-in` and `{"email":"engineer@demo.local","password":"demo1234"}` (the email says which organization: a person belongs to one).
+The demo people are admin, controller, engineer, approver, viewer (`@demo.local`)
+and `supplier@acme.local`. The endpoints are listed at
+http://localhost:8080/api/openapi/v1.json.
+
+To work on the code, run only the dependencies in Docker and the API from the SDK
+(`init-env.sh` also stored the credentials as .NET user-secrets, outside the repository):
+
+```bash
+sh deploy/init-env.sh
+docker compose -f deploy/compose.yaml up -d
+dotnet run --project backend/src/Delios.Host -- migrate
+dotnet run --project backend/src/Delios.Host -- seed-demo
+dotnet run --project backend/src/Delios.Host                # API on http://localhost:5000
+dotnet test backend                                         # tests start their own containers
+```
+
+After pulling changes that touch `deploy/postgres`, rebuild and recreate the
+database volume: `docker compose -f deploy/compose.yaml down -v`, then `up --build`.
+
+Add `--profile monitoring` for Grafana (http://localhost:3301, user `admin`, password
+`GRAFANA_ADMIN_PASSWORD` in `deploy/.env`),
+Prometheus (:9090) and Alertmanager (:9093). Backups run from the start; the
+monthly restore drill is
+`docker compose -f deploy/compose.yaml --profile drill run --rm restore-drill`.
+Everything switched off until needed (standby, read replica, PgBouncer, more
+nodes, alert notifications) is in [docs/ACTIVATION.md](docs/ACTIVATION.md).
+
+Health: `/health/live` and `/health/ready` on each node (internal). Metrics: port 9091.
+Set `Delios__Role=worker` to run the same build as a queue worker.
+
 ## Running it
 
 The same commands work in PowerShell, cmd and bash.

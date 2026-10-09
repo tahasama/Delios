@@ -1,6 +1,5 @@
 import type { SessionUser } from "./auth";
 import type { Tenant } from "./tenant";
-import { captureSnapshotsForAudit } from "./history";
 
 type AuditInput = {
   actor?: SessionUser | null;
@@ -29,71 +28,20 @@ type AuditInput = {
 /** Marker for callers that know they may be running before any project exists. */
 export type AuditTenantOptional = { skipWhenNoProject: true };
 
-async function resolve(given?: Tenant): Promise<Tenant | null> {
-  if (given) return given;
-  // Loaded lazily: `scope` is server-component-only, and batch callers always
-  // pass a tenant, so `run-checks` and the seeds never pull it in.
-  const { getScope } = await import("./scope");
-  return await getScope();
+/**
+ * The backend writes the audit trail for every act it carries out, in the same
+ * transaction as the act, so the screens record nothing themselves. Kept for
+ * the callers that still announce an act; it records nothing.
+ */
+export async function audit(_input: AuditInput) {
+  // Recorded by the backend with the act itself.
 }
 
-export async function audit(input: AuditInput) {
-  const t = await resolve(input.tenant);
-  // An audit event that cannot be attributed to a project has nowhere to live.
-  // Dropping it silently would be worse than loud, so it is surfaced.
-  if (!t) {
-    if (input.skipWhenNoProject) return;
-    throw new Error(`audit(${input.action}): no tenant in scope — pass { tenant } from batch code.`);
-  }
-
-  const event = await t.db.auditEvent.create({
-    data: {
-      projectId: t.projectId,
-      actorId: input.actor?.id ?? null,
-      actorName: input.actor?.name ?? "system",
-      action: input.action,
-      entityType: input.entityType ?? null,
-      entityId: input.entityId ?? null,
-      entityLabel: input.entityLabel ?? null,
-      field: input.field ?? null,
-      oldValue: input.oldValue ?? null,
-      newValue: input.newValue ?? null,
-      detail: input.detail ?? null,
-    },
-  });
-  try {
-    await captureSnapshotsForAudit(
-      t,
-      {
-        entityType: input.entityType,
-        entityId: input.entityId,
-        action: input.action,
-        entityLabel: input.entityLabel,
-        detail: input.detail,
-        actorName: input.actor?.name ?? "system",
-      },
-      event.id,
-      event.ts,
-    );
-  } catch (error) {
-    console.error("Document snapshot capture failed", error);
-  }
+/** Notifications are not in the backend yet: nothing is sent. */
+export async function notify(_userId: string, _type: string, _title: string, _body?: string, _link?: string, _tenant?: Tenant) {
+  // Not in the backend yet.
 }
 
-export async function notify(userId: string, type: string, title: string, body?: string, link?: string, tenant?: Tenant) {
-  const t = await resolve(tenant);
-  if (!t) return;
-  await t.db.notification.create({
-    data: { projectId: t.projectId, userId, type, title, body: body ?? null, link: link ?? null },
-  });
-}
-
-export async function notifyMany(userIds: string[], type: string, title: string, body?: string, link?: string, tenant?: Tenant) {
-  const uniq = [...new Set(userIds)].filter(Boolean);
-  if (!uniq.length) return;
-  const t = await resolve(tenant);
-  if (!t) return;
-  await t.db.notification.createMany({
-    data: uniq.map((userId) => ({ projectId: t.projectId, userId, type, title, body: body ?? null, link: link ?? null })),
-  });
+export async function notifyMany(_userIds: string[], _type: string, _title: string, _body?: string, _link?: string, _tenant?: Tenant) {
+  // Not in the backend yet.
 }

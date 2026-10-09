@@ -1,10 +1,13 @@
 import { requireScope } from "@/lib/scope";
+import { projectExceptions } from "@/lib/api/records";
 import { PageHeader } from "@/components/ui";
 import { fmtDate, fmtDateTime } from "@/lib/utils";
 import { PrintButton } from "./print-button";
 import { AssuranceTabs } from "@/app/(app)/conformance/tabs";
 import { CATALOG, CHECK_BY_ID, PHASE_LABEL, type Phase } from "@/lib/checks/catalog";
 import { PREVENTED } from "@/lib/checks/prevented";
+import { checksOf, documentCount, flawedDocuments, liveDefects, optOutsOf, scopeOf } from "@/lib/api/conformance";
+import { getMe } from "@/lib/api/me";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Conformance" };
@@ -22,17 +25,23 @@ const SEVERITIES = ["CRITICAL", "MAJOR", "MINOR", "ADVISORY"] as const;
  */
 export default async function ConformancePage() {
   const ctx = await requireScope();
-  const { db } = ctx;
-  const [scope, project, lastRun, defects, exceptions, totalDocs, flawedDocs, optOuts] = await Promise.all([
-    db.scopeConfig.findFirst(),
-    db.project.findFirst(),
-    db.checkRun.findFirst({ orderBy: { ranAt: "desc" }, include: { items: true } }),
-    db.defect.findMany({ where: { status: { in: ["OPEN", "ACCEPTED"] } } }),
-    db.exceptionEntry.findMany({ orderBy: { startDate: "desc" } }),
-    db.document.count(),
-    db.document.count({ where: { defects: { some: { severity: { in: ["CRITICAL", "MAJOR"] }, status: { in: ["OPEN", "ACCEPTED"] } } } } }),
-    db.checkOptOut.findMany(),
+  const [scope, me, answer, defects, totalDocs, optOuts] = await Promise.all([
+    scopeOf(ctx.projectId),
+    getMe(),
+    checksOf(ctx.projectId),
+    liveDefects(ctx.projectId),
+    documentCount(ctx.projectId),
+    optOutsOf(ctx.projectId),
   ]);
+  const project = me?.projects.find((p) => p.id === ctx.projectId) ?? null;
+  const lastRun = answer.lastRun
+    ? {
+        ranAt: answer.lastRun.finishedAt ?? answer.lastRun.requestedAt, ranByName: answer.lastRun.requestedBy,
+        items: answer.lastRun.results.map((i) => ({ id: i.checkId, checkId: i.checkId, result: i.result, failingCount: i.failing, note: i.note })),
+      }
+    : null;
+  const exceptions = await projectExceptions(ctx);
+  const flawedDocs = flawedDocuments(defects);
 
   const threshold = scope?.integrityThreshold ?? 95;
   const clear = totalDocs - flawedDocs;

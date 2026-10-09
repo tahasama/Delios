@@ -4,7 +4,8 @@ import { requireScope } from "@/lib/scope";
 import { PageHeader, Card, Chip, Field, inputCls, DataTable, Th, Td, btn } from "@/components/ui";
 import { ActionForm } from "@/components/form";
 import { addConfigValueAction, retireConfigValueAction, createConfigSetAction, updateValuePropsAction, deleteValueAction, deleteSetAction, moveConfigValueAction, updateConfigSetAction, bulkValuesAction, } from "@/lib/actions/admin";
-import { getSets } from "@/lib/config";
+import { getSet, getSets } from "@/lib/config";
+import { adminValueSets } from "@/lib/api/admin";
 import { SET_PROP_FIELDS, parseProps, type PropField } from "@/lib/config-props";
 import { propFieldsFor } from "@/lib/set-props";
 import type { Tenant } from "@/lib/tenant";
@@ -27,32 +28,8 @@ const GROUPS: { title: string; keys: string[] }[] = [
   { title: "File formats", keys: ["NATIVE_FORMATS", "RENDITION_FORMATS", "PRESERVATION_FORMATS"] },
 ];
 
-/** Where each set's codes are used, so the page can say how often — and which cannot be renamed. */
-async function usage(t: Pick<Tenant, "db">, key: string): Promise<{ counts: Map<string, number>; unit: string; filter?: string }> {
-  const docField: Record<string, { field: "discipline" | "docType" | "deliverableType" | "criticality" | "confidentiality" | "retentionClass" | "subProject" | "originator" | "contractRef"; filter?: string }> = {
-    DISCIPLINES: { field: "discipline", filter: "discipline" }, DOCUMENT_TYPES: { field: "docType", filter: "docType" }, DELIVERABLE_TYPES: { field: "deliverableType" },
-    CRITICALITY: { field: "criticality" }, CONFIDENTIALITY: { field: "confidentiality" }, RETENTION_CLASSES: { field: "retentionClass" },
-    SUBPROJECTS: { field: "subProject" }, SUPPLIER_CODES: { field: "originator" }, PURCHASE_ORDERS: { field: "contractRef" },
-  };
-  const tally = (rows: { key: string | null; n: number }[]) => new Map(rows.filter((r) => r.key).map((r) => [r.key as string, r.n]));
-  const d = docField[key];
-  if (d) {
-    const rows = await t.db.document.groupBy({ by: [d.field], _count: true });
-    return { counts: tally(rows.map((r) => ({ key: (r as Record<string, unknown>)[d.field] as string | null, n: r._count }))), unit: "document", filter: d.filter };
-  }
-  if (key === "STATUSES" || key === "PHASES") {
-    const field = key === "STATUSES" ? "statusCode" : "phase";
-    const rows = await t.db.revision.groupBy({ by: [field], _count: true });
-    return { counts: tally(rows.map((r) => ({ key: (r as Record<string, unknown>)[field] as string | null, n: r._count }))), unit: "revision" };
-  }
-  if (key === "REVIEW_OUTCOMES") {
-    const rows = await t.db.reviewCycle.groupBy({ by: ["outcome"], _count: true });
-    return { counts: tally(rows.map((r) => ({ key: r.outcome, n: r._count }))), unit: "review" };
-  }
-  if (key === "REASONS_FOR_ISSUE") {
-    const rows = await t.db.transmittal.groupBy({ by: ["reasonForIssue"], _count: true });
-    return { counts: tally(rows.map((r) => ({ key: r.reasonForIssue, n: r._count }))), unit: "transmittal" };
-  }
+/** Where each set's codes are used, so the page can say how often: the backend does not count it yet, so nothing reads as used. */
+async function usage(_t: unknown, _key: string): Promise<{ counts: Map<string, number>; unit: string; filter?: string }> {
   return { counts: new Map(), unit: "" };
 }
 
@@ -72,7 +49,7 @@ type Params = { set?: string; q?: string; show?: string; edit?: string; panel?: 
 
 export default async function AdminConfigPage({ searchParams }: { searchParams: Promise<Params> }) {
   const ctx = await requireScope();
-  const { user: me, db } = ctx;
+  const { user: me } = ctx;
   if (!isAdmin(me)) return <PageHeader title="Disciplines, types & sets" subtitle="Administrators only." />;
   const sp = await searchParams;
   const sets = await getSets();
@@ -80,9 +57,10 @@ export default async function AdminConfigPage({ searchParams }: { searchParams: 
   const q = (sp.q ?? "").trim();
   const show = sp.show === "RETIRED" || sp.show === "ALL" ? sp.show : "ACTIVE";
   const [set, allValues, counts, used] = await Promise.all([
-    db.configSet.findFirst({ where: { key: currentKey } }),
-    db.configValue.findMany({ where: { setKey: currentKey }, orderBy: [{ sort: "asc" }, { code: "asc" }] }),
-    db.configValue.groupBy({ by: ["setKey"], where: { status: "ACTIVE" }, _count: true }),
+    Promise.resolve(sets.find((one) => one.key === currentKey) ?? null),
+    // A value is named by its list and code; its meaning travels as the JSON it was published with.
+    getSet(currentKey).then((all) => all.map((v) => ({ ...v, id: `${currentKey}::${v.code}`, setKey: currentKey, props: Object.keys(v.props).length ? JSON.stringify(v.props) : null }))),
+    adminValueSets().then((all) => all.map((one) => ({ setKey: one.key, _count: one.active }))).catch(() => [] as { setKey: string; _count: number }[]),
     usage(ctx, currentKey),
   ]);
   const propFields = propFieldsFor(currentKey);

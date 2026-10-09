@@ -1,0 +1,21 @@
+# The application on Kubernetes: switched off, for when one server is no longer
+# enough (docs/ACTIVATION.md "Kubernetes"). Databases, queues and storage are
+# not run here: they are services the cluster connects to.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: delios
+labels:
+  - pairs: { app.kubernetes.io/part-of: delios }
+    includeSelectors: false
+resources:
+  - namespace.yaml
+  - config.yaml
+  - api.yaml
+  - worker.yaml
+  - clamav.yaml
+  - migrate.yaml
+  - ingress.yaml
+images:
+  - name: delios-backend
+    newName: ghcr.io/OWNER/delios-backend
+    newTag: latest

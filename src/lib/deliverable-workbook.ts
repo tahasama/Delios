@@ -1,5 +1,7 @@
 import ExcelJS from "exceljs";
 import type { Tenant } from "./tenant";
+import { getActiveSet } from "./config";
+import { getMe } from "./api/me";
 
 /**
  * The deliverable list, as a workbook people can actually fill in.
@@ -53,28 +55,19 @@ const CONDITIONAL: { prop: string; column: Column }[] = [
 const HEADER_FILL = "FF102A43";
 const REQUIRED_FILL = "FFFDF3D7";
 
-function parse(props: string | null): Record<string, unknown> {
-  if (!props) return {};
-  try { return JSON.parse(props) as Record<string, unknown>; } catch { return {}; }
-}
-
 /** Excel refuses a sheet name carrying any of these. */
 const sheetName = (label: string) => label.replace(/[*?:\\/\[\]]/g, " ").replace(/\s{2,}/g, " ").slice(0, 31);
 
 export async function buildDeliverableWorkbook(t: Tenant): Promise<Buffer> {
-  const value = (key: string) =>
-    t.db.configValue.findMany({
-      where: { setKey: key, status: "ACTIVE" },
-      orderBy: [{ sort: "asc" }, { code: "asc" }],
-      select: { code: true, label: true, props: true },
-    });
+  // The backend gives each list in its published order.
+  const value = (key: string) => getActiveSet(key);
 
   const [deliverableTypes, fieldMatrix, project] = await Promise.all([
     value("DELIVERABLE_TYPES"),
     value("DELIVERABLE_TYPE_FIELDS"),
-    t.db.project.findFirst({ where: { id: t.projectId }, select: { code: true, name: true } }),
+    getMe().then((me) => me?.projects.find((one) => one.id === t.projectId) ?? null),
   ]);
-  const rules = new Map(fieldMatrix.map((row) => [row.code, parse(row.props)] as const));
+  const rules = new Map(fieldMatrix.map((row) => [row.code, row.props] as const));
 
   // Every list any column might draw from, fetched once.
   const needed = [...new Set([...ALWAYS, ...CONDITIONAL.map((c) => c.column)].map((c) => c.set).filter(Boolean))] as string[];

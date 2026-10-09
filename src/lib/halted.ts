@@ -1,6 +1,7 @@
-import type { Prisma } from "@prisma/client";
-import type { Tenant } from "./tenant";
 import { OUTCOME_CONSEQUENCES } from "./standard";
+import { getSet } from "./config";
+import { api, projectPath } from "./api/client";
+import type { RegisterPage } from "./api/types";
 
 /**
  * Verdict codes whose consequence is that the work may not proceed.
@@ -12,27 +13,34 @@ import { OUTCOME_CONSEQUENCES } from "./standard";
  * The four consequences of the Standard are the floor; an organization that
  * publishes its own outcome list says, per code, whether work proceeds.
  */
-export async function haltingVerdicts(t: Tenant): Promise<string[]> {
-  const rows = await t.db.configValue.findMany({ where: { setKey: "REVIEW_OUTCOMES" }, select: { code: true, props: true } });
+export async function haltingVerdicts(): Promise<string[]> {
+  const rows = await getSet("REVIEW_OUTCOMES");
   const codes = new Set<string>();
   for (const [code, one] of Object.entries(OUTCOME_CONSEQUENCES)) if (!one.proceed) codes.add(code);
   for (const row of rows) {
-    let props: Record<string, unknown> = {};
-    if (row.props) {
-      try { props = JSON.parse(row.props) as Record<string, unknown>; } catch { /* a malformed prop is not a verdict */ }
-    }
-    if (props.proceed === true) codes.delete(row.code);
-    else if (props.proceed === false) codes.add(row.code);
+    if (row.props?.proceed === true) codes.delete(row.code);
+    else if (row.props?.proceed === false) codes.add(row.code);
   }
   return [...codes];
 }
 
+/** A released revision a binding verdict says nobody may work from. */
+export type HaltedRevision = { id: string; documentId: string; value: string; document: { docNumber: string; title: string }; verdict: string; decidedBy: string | null };
+
 /**
- * Released, and a binding verdict on it says the work may not proceed — a
+ * Released, and the review that decided it says the work may not proceed — a
  * recipient's review that came back "revise and resubmit" is the usual case.
- * Advice cycles are left out: their answers come from another list and bind
- * nobody.
+ * Read from the register: documents whose current revision is their newest and
+ * whose newest verdict is one of those.
  */
-export async function haltedWhere(t: Tenant): Promise<Prisma.RevisionWhereInput> {
-  return { state: "RELEASED", cycles: { some: { binding: true, outcome: { in: await haltingVerdicts(t) } } } };
+export async function haltedRevisions(t: { projectId: string }): Promise<HaltedRevision[]> {
+  const verdicts = await haltingVerdicts();
+  const pages = await Promise.all(verdicts.map((verdict) =>
+    api<RegisterPage>(projectPath(t, "/register"), { query: { released: true, verdict, per: 250 } })));
+  return pages.flatMap((page) => page.rows)
+    .filter((row) => row.releasedRevisionId && row.releasedRevisionId === row.latestRevisionId)
+    .map((row) => ({
+      id: row.releasedRevisionId!, documentId: row.id, value: row.releasedRevision ?? row.revision ?? "",
+      document: { docNumber: row.number, title: row.title }, verdict: row.verdict ?? "", decidedBy: row.decidedBy,
+    }));
 }

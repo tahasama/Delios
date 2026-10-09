@@ -1,5 +1,6 @@
 import { mayCreateDocument } from "@/lib/auth";
 import { requireScope } from "@/lib/scope";
+import { unreadNotifications } from "@/lib/api/me";
 import { Sidebar, MobileNav, SearchBox } from "@/components/navigation";
 import { ProjectSwitcher } from "@/components/project-switcher";
 import { logoutAction } from "@/lib/actions/auth";
@@ -11,11 +12,10 @@ import type { Role } from "@/lib/standard";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const ctx = await requireScope();
-  const { user, db, project, available, role } = ctx;
-  const [unread, scope] = await Promise.all([
-    db.notification.count({ where: { userId: user.id, read: false } }),
-    db.scopeConfig.findFirst(),
-  ]);
+  const { user, project, available, role } = ctx;
+  // The organization's name is the account's.
+  const unread = await unreadNotifications();
+  const scope = { organizationName: user.organization };
 
   // The navigation is built from what this person may actually do, so nobody
   // is offered a destination that will refuse them.

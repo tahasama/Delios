@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { requireScope } from "@/lib/scope";
+import { backendDocument } from "@/lib/api/legacy";
+import { documentSnapshots } from "@/lib/api/snapshots";
 import { notFound } from "next/navigation";
 import { parseSnapshotPayload, summarizeSnapshotChange } from "@/lib/history";
 import { fmtDate, fmtDateTime } from "@/lib/utils";
@@ -17,11 +19,12 @@ export const dynamic = "force-dynamic";
  * not restated here in a second vocabulary.
  */
 export default async function DocumentHistoryPage({ params }: { params: Promise<{ id: string }> }) {
-  const { db } = await requireScope();
+  const ctx = await requireScope();
   const { id } = await params;
-  const document = await db.document.findUnique({ where: { id }, select: { id: true, docNumber: true, title: true } });
-  if (!document) notFound();
-  const snapshots = await db.documentSnapshot.findMany({ where: { documentId: id }, orderBy: { capturedAt: "asc" } });
+  const found = await backendDocument(ctx, id);
+  if (!found) notFound();
+  const document = { id: found.id, docNumber: found.number, title: found.title };
+  const snapshots = await documentSnapshots(ctx, id);
   const points = snapshots.map((snapshot, index) => {
     const payload = parseSnapshotPayload(snapshot.payload);
     const previous = index > 0 ? parseSnapshotPayload(snapshots[index - 1].payload) : null;

@@ -1,0 +1,19 @@
+# One overlay per environment: the image to run, the address, the size.
+#   kubectl create secret generic delios-secrets -n delios --from-env-file=secrets.env
+#   kubectl apply -k deploy/kubernetes/overlays/production
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base
+images:
+  - name: delios-backend
+    newName: ghcr.io/OWNER/delios-backend
+    newTag: "1.0.0"
+patches:
+  - target: { kind: Ingress, name: delios }
+    patch: |-
+      - { op: replace, path: /spec/tls/0/hosts/0, value: app.example.com }
+      - { op: replace, path: /spec/rules/0/host, value: app.example.com }
+  - target: { kind: ConfigMap, name: delios-config }
+    patch: |-
+      - { op: add, path: /data/Sso__PublicUrl, value: "https://app.example.com" }

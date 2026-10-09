@@ -16,6 +16,7 @@ import { isReadOnly } from "@/lib/auth";
 import { SearchPick } from "@/components/search-pick";
 import { RuleFields } from "./rule-fields";
 import { meetsStatus, statusList } from "@/lib/package-rule";
+import { legacyPackages, ourPeople, packageParties } from "@/lib/api/packages";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Packages" };
@@ -23,7 +24,7 @@ export const metadata = { title: "Packages" };
 export default async function PackagesPage({ searchParams }: { searchParams: Promise<{ category?: string }> }) {
   const ctx = await requireScope();
   const packagePolicy = await formPolicy(ctx, "PACKAGE");
-  const { user, db } = ctx;
+  const { user } = ctx;
   const staff = isController(user) || isAdmin(user);
   // A supplier only ever sees its own package.
   const supplierOnly = !user.isInternal;
@@ -33,23 +34,22 @@ export default async function PackagesPage({ searchParams }: { searchParams: Pro
   // addressed to them — and nothing else; the tenant client sees to that.
   const category = requested === "DELIVERY" ? "DELIVERY" : "SUPPLIER";
   const [pkgs, reasons, statuses, users] = await Promise.all([
-    db.package.findMany({ where: { category }, orderBy: { completionDate: "asc" }, include: { members: { include: { document: { include: { revisions: { where: { state: "RELEASED" }, orderBy: { releasedAt: "desc" }, take: 1 } } } } } } }),
+    legacyPackages(ctx, category),
     getActiveSet("REASONS_FOR_ISSUE"), getActiveSet("STATUSES"),
     // Anyone on the project may put a package together or accept it.
-    db.projectMembership.findMany({ where: { projectId: ctx.projectId, active: true, user: { active: true } }, orderBy: { user: { name: "asc" } }, select: { user: { select: { id: true, name: true } }, function: { select: { name: true } } } })
-      .then((rows) => rows.map((one) => ({ id: one.user.id, name: one.user.name, functionName: one.function?.name ?? "" }))),
+    ourPeople(ctx),
   ]);
   // A status code on its own says nothing to a newcomer: AB is "as-built".
   const statusMeaning = new Map(statuses.map((s) => [s.code, typeof s.props.may === "string" ? `${s.label}: ${s.props.may}` : s.label]));
   // Our own organization first: a package may be an internal handover.
-  const parties = supplierOnly ? [] : await db.party.findMany({ where: { OR: [{ active: true }, { isInternal: true }] }, orderBy: [{ isInternal: "desc" }, { name: "asc" }] });
+  const parties = supplierOnly ? [] : await packageParties(ctx);
   const supplierStats = new Map<string, ReturnType<typeof supplierFigures>>();
   if (category === "SUPPLIER") for (const p of pkgs) supplierStats.set(p.id, supplierFigures(await supplierRows(ctx, p)));
   // "For the schedule": each action's documents, read as a package.
   const rows = pkgs.map((pkg) => {
     const ready = pkg.members.filter((member) => meetsStatus(member.document.revisions[0]?.statusCode, member.requiredStatus)).length;
     const total = pkg.members.length;
-    const days = Math.ceil((pkg.completionDate.getTime() - Date.now()) / 86_400_000);
+    const days = pkg.completionDate ? Math.ceil((pkg.completionDate.getTime() - Date.now()) / 86_400_000) : 0;
     const state = pkg.acceptedAt ? "ACCEPTED" : pkg.closedAt ? "CLOSED" : pkg.shortfall ? "SHORTFALL" : pkg.assessedAt ? "READY" : days < 0 ? "OVERDUE" : "OPEN";
     return { ...pkg, ready, total, days, state };
   });

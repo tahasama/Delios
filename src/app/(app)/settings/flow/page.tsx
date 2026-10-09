@@ -12,6 +12,9 @@ import { SceneDeck, type Flow, type Scene } from "./scene-deck";
 import { ActSwitch } from "./act-switch";
 import { cn } from "@/lib/utils";
 
+import { adminFunctions, adminNumbering, legacyParties, legacyRoutes, orEmpty } from "@/lib/api/admin";
+import { getSet, getSets } from "@/lib/config";
+
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Control room" };
 
@@ -337,7 +340,7 @@ const EXTRA: Record<Stage["extras"][number], { title: string; href: string }> = 
 
 export default async function ControlRoomPage() {
   const ctx = await requireScope();
-  const { user: me, db } = ctx;
+  const { user: me } = ctx;
   const page = SETUP_PAGES.find((one) => one.href === "/settings/flow")!;
   if (!maySetup(me, page)) return <PageHeader title="Control room" subtitle="Administrators only." />;
 
@@ -345,13 +348,17 @@ export default async function ControlRoomPage() {
     controlSettings(ctx),
     policies(ctx),
     holdersOf(ctx, "CONTROL"),
-    db.configSet.findMany({ select: { key: true, title: true, description: true } }),
-    db.configValue.findMany({ select: { setKey: true, code: true, label: true, status: true, props: true }, orderBy: [{ sort: "asc" }, { code: "asc" }] }),
-    db.workflowTemplate.findMany({ where: { active: true }, select: { name: true, steps: true, outcomeSetKey: true } }),
-    db.scheme.count({ where: { active: true } }),
-    db.distributionRule.count(),
+    getSets().then((all) => all.map((one) => ({ key: one.key, title: one.title, description: one.description }))),
+    // Every value of every list, with its meaning as the JSON it was published with.
+    getSets().then(async (all) => (await Promise.all(all.map(async (one) => (await getSet(one.key)).map((v) => ({
+      setKey: one.key, code: v.code, label: v.label, status: v.status, props: Object.keys(v.props).length ? JSON.stringify(v.props) : null,
+    }))))).flat()),
+    legacyRoutes().catch(() => []),
+    adminNumbering().then((n) => n.schemes.filter((one) => one.active).length).catch(() => 0),
+    // Who receives what is the matrix's Receive rows.
+    orEmpty(adminFunctions).then((all) => all.reduce((n, f) => n + f.rules.filter((r) => r.verbs.includes("RECEIVE")).length, 0)),
     stateNames(ctx),
-    db.party.findMany({ where: { active: true }, select: { kind: true } }),
+    legacyParties().then((all) => all.filter((one) => one.active).map((one) => ({ kind: one.kind }))).catch(() => []),
   ]);
 
   const gate = holders.length > 0;

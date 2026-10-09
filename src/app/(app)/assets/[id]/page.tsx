@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { projectAsset } from "@/lib/api/records";
 import { requireScope } from "@/lib/scope";
 import { notFound } from "next/navigation";
 import { PageHeader, Card, DataTable, Th, Td, Chip, EmptyState } from "@/components/ui";
@@ -8,16 +9,14 @@ export const dynamic = "force-dynamic";
 
 // §16.4 Q2 — all information for an asset in one query (B.3.6).
 export default async function AssetDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { db } = await requireScope();
+  const ctx = await requireScope();
   const { id } = await params;
-  const asset = await db.assetItem.findUnique({ where: { id } });
+  const found = await projectAsset(ctx, id);
+  const asset = found?.asset ?? null;
   if (!asset) notFound();
-  const rels = await db.relationship.findMany({ where: { kind: "DOC_ASSET", OR: [{ toId: id }, { fromId: id }] } });
-  const otherIds = rels.map((r) => (r.toId === id ? r.fromId : r.toId));
-  const docs = await db.document.findMany({
-    where: { id: { in: otherIds } },
-    include: { revisions: { where: { state: "RELEASED" }, orderBy: { releasedAt: "desc" }, take: 1 } },
-  });
+  const docs = found!.documents.map((d) => ({
+    id: d.id, docNumber: d.number, title: d.title, docType: d.docType, discipline: d.discipline, state: d.state, revisions: d.current ? [d.current] : [],
+  }));
 
   return (
     <div className="space-y-5">

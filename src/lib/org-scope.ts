@@ -1,9 +1,8 @@
 import "server-only";
 import { cache } from "react";
 import { redirect } from "next/navigation";
-import { db } from "./db";
 import { getCurrentUser, isAdmin, type SessionUser } from "./auth";
-import { scopedClient, type ScopedDb } from "./tenant";
+import { getMe } from "./api/me";
 
 /**
  * An organization exists before its projects do. Someone who has just
@@ -27,30 +26,19 @@ export type OrgScope = {
   user: SessionUser;
   orgId: string;
   organization: { id: string; slug: string; name: string };
-  /** Organization-scoped. Project-scoped models return nothing through it. */
-  db: ScopedDb;
   /** How many active projects exist — zero is the whole reason to be here. */
   projectCount: number;
 };
 
 export const getOrgScope = cache(async (): Promise<OrgScope | null> => {
   const user = await getCurrentUser();
-  if (!user) return null;
-
-  const organization = await db.organization.findUnique({
-    where: { id: user.orgId },
-    select: { id: true, slug: true, name: true, active: true },
-  });
-  if (!organization || !organization.active) return null;
-
-  const projectCount = await db.project.count({ where: { orgId: user.orgId, status: "ACTIVE" } });
-
+  const me = await getMe();
+  if (!user || !me) return null;
   return {
     user,
     orgId: user.orgId,
-    organization: { id: organization.id, slug: organization.slug, name: organization.name },
-    db: scopedClient(user.orgId, NO_PROJECT),
-    projectCount,
+    organization: { id: user.orgId, slug: me.tenant.slug, name: me.tenant.name },
+    projectCount: me.projects.filter((p) => p.status === "ACTIVE").length,
   };
 });
 

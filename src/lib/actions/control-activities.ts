@@ -3,9 +3,14 @@
 import { revalidatePath } from "next/cache";
 import { requireAdminScope, requireScope } from "@/lib/scope";
 import { isAdmin } from "@/lib/auth";
-import { KINDS, KIND_LABEL, fieldsOf, keyFromLabel, type FieldKind, type Control } from "@/lib/field-policy";
-import { audit } from "@/lib/audit";
+import { randomUUID } from "crypto";
+import {
+  KINDS, fieldsOf, keyFromLabel, fieldRules, fieldLabels, storedOwnFields, FIELD_RULE_KEY, FIELD_LABEL_KEY, OWN_FIELDS_KEY,
+  type FieldKind, type Control, type FieldRule,
+} from "@/lib/field-policy";
 import { STATE_NAMES, STATE_NAME_MAX } from "@/lib/state-names";
+import { orgSettings, projectSettings, setOrgSetting, setProjectSetting } from "@/lib/api/settings";
+import { refusal } from "@/lib/api/client";
 import {
   CONTROL_ACTIVITIES,
   controlSettings,
@@ -33,22 +38,11 @@ type State = { error?: string; ok?: string };
 const ACT_MODES: ControlMode[] = ["CONTROL", "SELF"];
 const PROJECT_MODES: ProjectMode[] = ["CONTROL", "SELF", "CUSTOM"];
 
-/** One stored answer, with its own audit line. */
-async function put(key: string, mode: string, label: string): Promise<boolean> {
+/** One stored answer, in the project's settings; the backend writes its audit line. */
+async function put(key: string, mode: string, _label: string): Promise<boolean> {
   const ctx = await requireAdminScope();
-  const { user, db, projectId } = ctx;
-  const before = await db.controlSetting.findFirst({ where: { key }, select: { id: true, mode: true } });
-  if (before?.mode === mode) return false;
-  if (before) {
-    await db.controlSetting.update({ where: { id: before.id }, data: { mode, setById: user.id, setByName: user.name } });
-  } else {
-    await db.controlSetting.create({ data: { projectId, key, mode, setById: user.id, setByName: user.name } });
-  }
-  await audit({
-    tenant: ctx, actor: user, action: "CONTROL_SETTING_CHANGED", entityType: "ControlSetting",
-    entityId: before?.id ?? key, entityLabel: label,
-    oldValue: before?.mode ?? null, newValue: mode,
-  });
+  if ((await projectSettings(ctx.projectId)).get(key) === mode) return false;
+  await setProjectSetting(ctx.projectId, key, mode);
   return true;
 }
 
@@ -138,9 +132,8 @@ export async function setOneControlActivityAction(_prev: State | undefined, form
  * set back to the default, goes back to the default.
  */
 export async function setStateNamesAction(_prev: State | undefined, formData: FormData): Promise<State> {
-  const ctx = await requireAdminScope();
-  const { user, db, orgId } = ctx;
-  const before = new Map((await db.stateName.findMany({ select: { id: true, code: true, label: true } })).map((row) => [row.code, row]));
+  await requireAdminScope();
+  const before = await orgSettings();
   const taken = new Map<string, string>();
   const changed: string[] = [];
   const wanted = STATE_NAMES.map((one) => {
@@ -154,22 +147,16 @@ export async function setStateNamesAction(_prev: State | undefined, formData: Fo
     if (clash) return { error: `“${label}” is used twice — ${clash} and ${one.default} must read differently.` };
     taken.set(label.toLowerCase(), one.default);
   }
-  for (const { one, label } of wanted) {
-    const row = before.get(one.code);
-    const was = row?.label ?? one.default;
-    if (was === label) continue;
-    if (label === one.default) {
-      if (row) await db.stateName.delete({ where: { id: row.id } });
-    } else if (row) {
-      await db.stateName.update({ where: { id: row.id }, data: { label, setById: user.id, setByName: user.name } });
-    } else {
-      await db.stateName.create({ data: { orgId, code: one.code, label, setById: user.id, setByName: user.name } });
+  try {
+    for (const { one, label } of wanted) {
+      const was = before.get(`STATE_NAME:${one.code}`) ?? one.default;
+      if (was === label) continue;
+      // Set back to the default, the name is forgotten and the default applies again.
+      await setOrgSetting(`STATE_NAME:${one.code}`, label === one.default ? null : label);
+      changed.push(`${was} → ${label}`);
     }
-    await audit({
-      tenant: ctx, actor: user, action: "STATE_RENAMED", entityType: "StateName",
-      entityId: one.code, entityLabel: one.default, oldValue: was, newValue: label,
-    });
-    changed.push(`${was} → ${label}`);
+  } catch (e) {
+    return { error: refusal(e).message };
   }
   revalidatePath("/", "layout");
   if (!changed.length) return { ok: "Nothing changed." };
@@ -185,46 +172,45 @@ export async function setStateNamesAction(_prev: State | undefined, formData: Fo
  */
 export async function setFieldPolicyAction(_prev: { error?: string; ok?: string } | undefined, formData: FormData): Promise<{ error?: string; ok?: string }> {
   const ctx = await requireScope();
-  const { user, db, orgId } = ctx;
-  if (!isAdmin(user)) return { error: "Only an administrator decides what the forms ask for." };
+  if (!isAdmin(ctx.user)) return { error: "Only an administrator decides what the forms ask for." };
   const kind = String(formData.get("kind") ?? "") as FieldKind;
   if (!KINDS.includes(kind)) return { error: "No such form." };
-
+  const [rules, labels] = await Promise.all([fieldRules(ctx, kind), fieldLabels(ctx, kind)]);
   let changed = 0;
-  for (const field of fieldsOf(kind)) {
-    const before = await db.fieldPolicy.findFirst({ where: { kind, field: field.key } });
-    // A fixed field keeps its rule; its name is still the organization's to give.
-    const said = field.fixed ? before?.rule ?? field.fallback : String(formData.get(`rule:${field.key}`) ?? "");
-    if (!["REQUIRED", "OPTIONAL", "OFF"].includes(said)) continue;
-    const typed = String(formData.get(`label:${field.key}`) ?? "").trim();
-    const label = !typed || typed === field.label ? null : typed.slice(0, 60);
-    if ((before?.rule ?? field.fallback) === said && (before?.label ?? null) === label) continue;
-    await db.fieldPolicy.upsert({
-      where: { orgId_kind_field: { orgId, kind, field: field.key } },
-      update: { rule: said, label, setByName: user.name, setAt: new Date() },
-      create: { orgId, kind, field: field.key, rule: said, label, setByName: user.name },
+  try {
+    for (const field of fieldsOf(kind)) {
+      // A fixed field keeps its rule; its name is still the organization's to give.
+      const said = field.fixed ? rules[field.key] : String(formData.get(`rule:${field.key}`) ?? "");
+      if (!["REQUIRED", "OPTIONAL", "OFF"].includes(said)) continue;
+      const typed = String(formData.get(`label:${field.key}`) ?? "").trim();
+      const label = !typed || typed === field.label ? null : typed.slice(0, 60);
+      let moved = false;
+      if (!field.fixed && said !== rules[field.key]) {
+        await setOrgSetting(`${FIELD_RULE_KEY}${kind}:${field.key}`, said === field.fallback ? null : said);
+        moved = true;
+      }
+      if ((label ?? field.label) !== labels[field.key]) {
+        await setOrgSetting(`${FIELD_LABEL_KEY}${kind}:${field.key}`, label);
+        moved = true;
+      }
+      if (moved) changed++;
+    }
+    // The organization's own fields are saved from the same form.
+    const own = await storedOwnFields(kind);
+    let ownChanged = false;
+    const next = own.map((row) => {
+      const rule = String(formData.get(`own-rule:${row.id}`) ?? "");
+      const label = String(formData.get(`own-label:${row.id}`) ?? "").trim();
+      const inRegister = formData.get(`own-register:${row.id}`) === "on";
+      if (!["REQUIRED", "OPTIONAL", "OFF"].includes(rule) || !label) return row;
+      if (rule === row.rule && label === row.label && inRegister === row.inRegister) return row;
+      ownChanged = true;
+      changed++;
+      return { ...row, rule: rule as FieldRule, label: label.slice(0, 60), inRegister };
     });
-    changed++;
-  }
-  // The organization's own fields are saved from the same form.
-  for (const own of await db.customField.findMany({ where: { kind } })) {
-    const rule = String(formData.get(`own-rule:${own.id}`) ?? "");
-    const label = String(formData.get(`own-label:${own.id}`) ?? "").trim();
-    const inRegister = formData.get(`own-register:${own.id}`) === "on";
-    if (!["REQUIRED", "OPTIONAL", "OFF"].includes(rule) || !label) continue;
-    if (rule === own.rule && label === own.label && inRegister === own.inRegister) continue;
-    await db.customField.update({ where: { id: own.id }, data: { rule, label: label.slice(0, 60), inRegister } });
-    changed++;
-  }
-  if (changed) {
-    await audit({
-      actor: user,
-      action: "FIELDS_SET",
-      entityType: "FieldPolicy",
-      entityId: kind,
-      entityLabel: KIND_LABEL[kind],
-      detail: `${changed} field${changed === 1 ? "" : "s"} changed on ${KIND_LABEL[kind].toLowerCase()}.`,
-    });
+    if (ownChanged) await setOrgSetting(`${OWN_FIELDS_KEY}${kind}`, JSON.stringify(next));
+  } catch (e) {
+    return { error: refusal(e).message };
   }
   revalidatePath("/settings/fields");
   revalidatePath("/documents/new");
@@ -241,32 +227,29 @@ export async function setFieldPolicyAction(_prev: { error?: string; ok?: string 
  */
 export async function addOwnFieldAction(_prev: { error?: string; ok?: string } | undefined, formData: FormData): Promise<{ error?: string; ok?: string }> {
   const ctx = await requireScope();
-  const { user, db, orgId } = ctx;
-  if (!isAdmin(user)) return { error: "Only an administrator adds a field." };
+  if (!isAdmin(ctx.user)) return { error: "Only an administrator adds a field." };
   const kind = String(formData.get("kind") ?? "") as FieldKind;
   if (!KINDS.includes(kind)) return { error: "No such form." };
   const label = String(formData.get("label") ?? "").trim();
   const control = String(formData.get("control") ?? "") as Control;
   const setKey = String(formData.get("setKey") ?? "").trim() || null;
-  const rule = String(formData.get("rule") ?? "OPTIONAL");
+  const rule = String(formData.get("rule") ?? "OPTIONAL") as FieldRule;
   const help = String(formData.get("help") ?? "").trim() || null;
   const inRegister = formData.get("inRegister") === "on";
-
   if (!label) return { error: "Give the field a name — it is what people filling the form will read." };
   if (!["TEXT", "LONG_TEXT", "NUMBER", "DATE", "YES_NO", "CHOICE"].includes(control)) return { error: "Say what kind of answer it takes." };
   if (control === "CHOICE" && !setKey) return { error: "A field chosen from a list needs the list it draws from." };
   if (!["REQUIRED", "OPTIONAL", "OFF"].includes(rule)) return { error: "Say whether it must be filled." };
-
-  const existing = await db.customField.findMany({ where: { kind }, select: { key: true } });
+  const existing = await storedOwnFields(kind);
   const key = keyFromLabel(label, existing.map((e) => e.key));
-  const position = await db.customField.count({ where: { kind } });
-  await db.customField.create({
-    data: { orgId, kind, key, label: label.slice(0, 60), control, setKey: control === "CHOICE" ? setKey : null, rule, help, position, inRegister, addedByName: user.name },
-  });
-  await audit({
-    actor: user, action: "FIELD_ADDED", entityType: "CustomField", entityId: key, entityLabel: label,
-    detail: `Added to ${KIND_LABEL[kind].toLowerCase()} — ${control.toLowerCase().replace("_", " ")}${setKey ? ` from ${setKey}` : ""}.`,
-  });
+  try {
+    await setOrgSetting(`${OWN_FIELDS_KEY}${kind}`, JSON.stringify([
+      ...existing,
+      { id: randomUUID(), key, label: label.slice(0, 60), control, setKey: control === "CHOICE" ? setKey : null, rule, help, inRegister },
+    ]));
+  } catch (e) {
+    return { error: refusal(e).message };
+  }
   revalidatePath("/settings/fields");
   revalidatePath("/documents/new");
   return { ok: `${label} added.` };
@@ -275,19 +258,22 @@ export async function addOwnFieldAction(_prev: { error?: string; ok?: string } |
 /** Remove a field the organization added. Answers already given are left where they are. */
 export async function removeOwnFieldAction(_prev: { error?: string; ok?: string } | undefined, formData: FormData): Promise<{ error?: string; ok?: string }> {
   const ctx = await requireScope();
-  const { user, db } = ctx;
-  if (!isAdmin(user)) return { error: "Only an administrator removes a field." };
+  if (!isAdmin(ctx.user)) return { error: "Only an administrator removes a field." };
   const id = String(formData.get("id") ?? "");
-  const row = await db.customField.findFirst({ where: { id } });
-  if (!row) return { error: "No such field." };
-  await db.customField.delete({ where: { id } });
-  await audit({
-    actor: user, action: "FIELD_REMOVED", entityType: "CustomField", entityId: row.key, entityLabel: row.label,
-    detail: "Removed from the form. Answers already given stay with the records that carry them.",
-  });
-  revalidatePath("/settings/fields");
-  revalidatePath("/documents/new");
-  return { ok: `${row.label} removed. It is no longer asked; what was already answered stays on the record.` };
+  for (const kind of KINDS) {
+    const rows = await storedOwnFields(kind);
+    const row = rows.find((one) => one.id === id);
+    if (!row) continue;
+    try {
+      await setOrgSetting(`${OWN_FIELDS_KEY}${kind}`, JSON.stringify(rows.filter((one) => one.id !== id)));
+    } catch (e) {
+      return { error: refusal(e).message };
+    }
+    revalidatePath("/settings/fields");
+    revalidatePath("/documents/new");
+    return { ok: `${row.label} removed. It is no longer asked; what was already answered stays on the record.` };
+  }
+  return { error: "No such field." };
 }
 
 /**

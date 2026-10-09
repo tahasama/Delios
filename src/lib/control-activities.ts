@@ -1,6 +1,11 @@
 import { cache } from "react";
 import type { Tenant } from "./tenant";
-import { hasControlFunction } from "./issue-requests";
+import { projectSettings, holders } from "./api/settings";
+
+/** Somebody on the project holds the control function. */
+async function hasControlFunction(t: Tenant): Promise<boolean> {
+  return (await holders(t.projectId, "CONTROL")).length > 0;
+}
 
 /**
  * The acts that are either carried out by Document Control or by the people
@@ -164,10 +169,7 @@ export const PROJECT_MODE_LABEL: Record<ProjectMode, string> = {
  * Every answer this project has given, read once however many times a page asks.
  * A screen asks about half a dozen of these; one query answers all of them.
  */
-const answers = cache(async (t: Tenant): Promise<Map<string, string>> => {
-  const rows = await t.db.controlSetting.findMany({ select: { key: true, mode: true } });
-  return new Map(rows.map((one) => [one.key, one.mode]));
-});
+const answers = cache(async (t: Tenant): Promise<Map<string, string>> => projectSettings(t.projectId));
 
 export async function controlDoes(t: Tenant, key: string): Promise<boolean> {
   const rows = [...(await answers(t))].map(([k, mode]) => ({ key: k, mode }));

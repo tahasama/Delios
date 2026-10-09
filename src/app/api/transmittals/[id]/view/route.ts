@@ -1,15 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getScope } from "@/lib/scope";
 import { getSessionUser } from "@/lib/auth";
-import { audit, notifyMany } from "@/lib/audit";
-import { holdersOf } from "@/lib/permissions";
+import { api, ApiProblem, projectPath } from "@/lib/api/client";
+import type { TransmittalView } from "@/lib/api/types";
 
+// Opening a transmittal while signed in is the receipt. The backend records a
+// recipient's first opening when they read it, and their acknowledgement here;
+// doing it twice changes nothing, and somebody it did not go to has nothing to
+// record.
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const user = await getSessionUser();
   if (!user) return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
   const ctx = await getScope();
   if (!ctx) return NextResponse.json({ error: "No active project" }, { status: 403 });
-  const { db } = ctx;
 
   const origin = request.headers.get("origin");
   if (origin && origin !== request.nextUrl.origin) {
@@ -17,46 +20,17 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   }
 
   const { id } = await params;
-  const recipient = await db.transmittalRecipient.findFirst({
-    where: { transmittalId: id, userId: user.id },
-    include: { transmittal: { select: { id: true, number: true, status: true, createdById: true } } },
-  });
-  if (!recipient || recipient.transmittal.status === "DRAFT") {
-    return new NextResponse(null, { status: 204 });
+  let before: TransmittalView;
+  let after: TransmittalView;
+  try {
+    before = await api<TransmittalView>(projectPath(ctx, `/transmittals/${id}`));
+    after = await api<TransmittalView>(projectPath(ctx, `/transmittals/${id}/acknowledge`), { method: "POST" });
+  } catch (e) {
+    if (e instanceof ApiProblem && (e.status === 403 || e.status === 404)) return new NextResponse(null, { status: 204 });
+    throw e;
   }
 
-  const now = new Date();
-  const repeatWindow = new Date(now.getTime() - 60_000);
-  const firstOpen = await db.transmittalRecipient.updateMany({
-    where: { id: recipient.id, openedAt: null },
-    data: { openedAt: now },
-  });
-  await db.transmittalRecipient.updateMany({
-    where: {
-      id: recipient.id,
-      OR: [{ lastViewedAt: null }, { lastViewedAt: { lt: repeatWindow } }],
-    },
-    data: { lastViewedAt: now, viewCount: { increment: 1 } },
-  });
-
-  if (firstOpen.count === 1) {
-    await audit({
-      actor: user,
-      action: "TRANSMITTAL_OPENED",
-      entityType: "Transmittal",
-      entityId: id,
-      entityLabel: recipient.transmittal.number,
-      detail: `${recipient.name} saw ${recipient.transmittal.number}. Opening it while signed in is the receipt evidence.`,
-    });
-    const controllers = await holdersOf(ctx, "CONTROL");
-    await notifyMany(
-      [recipient.transmittal.createdById, ...controllers.map((controller) => controller.id)].filter((id) => id !== user.id),
-      "TRANSMITTAL_OPENED",
-      `${recipient.name} saw ${recipient.transmittal.number}`,
-      "They opened it while signed in, which is recorded as receipt.",
-      `/transmittals/${id}`,
-    );
-  }
-
-  return NextResponse.json({ firstOpen: firstOpen.count === 1 });
+  // The first time is the one that counts: it was not acknowledged before, and is now.
+  const acknowledged = (t: TransmittalView) => t.recipients.filter((one) => one.acknowledgedAt).length;
+  return NextResponse.json({ firstOpen: acknowledged(after) > acknowledged(before) });
 }

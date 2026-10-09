@@ -6,15 +6,30 @@ import { buildSheet, sheetToRows } from "@/lib/matrix-sheet";
 import { buildDeliverableWorkbook } from "@/lib/deliverable-workbook";
 import { buildSetsWorkbook } from "@/lib/sets-workbook";
 import { roleLabel } from "@/lib/profiles/roles";
+import { getSet, getSets } from "@/lib/config";
+import { api, ApiProblem, projectPath } from "@/lib/api/client";
+import { adminAudit } from "@/lib/api/admin";
+import { legacyPackages } from "@/lib/api/packages";
+import { activityLateness, legacyActions } from "@/lib/api/schedule";
+import { passOn, registerRows } from "@/lib/api/register";
 
 // §16.6 — views are generated at time of use, carry a generation timestamp and
 // are never edited. Every register view can be extracted (CSV opens in Excel).
-export async function GET(req: Request, { params }: { params: Promise<{ kind: string }> }) {
+// What the backend refuses comes back with its status and message.
+export async function GET(req: Request, context: { params: Promise<{ kind: string }> }) {
+  try {
+    return await extract(req, context);
+  } catch (e) {
+    if (e instanceof ApiProblem) return NextResponse.json({ error: e.message }, { status: e.status });
+    throw e;
+  }
+}
+
+async function extract(req: Request, { params }: { params: Promise<{ kind: string }> }) {
   const user = await getSessionUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const ctx = await getScope();
   if (!ctx) return NextResponse.json({ error: "No active project" }, { status: 403 });
-  const { db } = ctx;
   const { kind } = await params;
   // Another organization extracts only the registers it can read — never
   // settings, templates, people or the audit log.
@@ -27,59 +42,19 @@ export async function GET(req: Request, { params }: { params: Promise<{ kind: st
   let name = kind;
 
   if (kind === "documents") {
-    const docs = await db.document.findMany({ orderBy: { docNumber: "asc" }, include: { revisions: { orderBy: { createdAt: "desc" } } } });
-    rows = [["Document number", "Title", "Producer", "Type", "Discipline", "State", "Placeholder", "Current rev", "Status", "Released at", "Retention", "Criticality", "Confidentiality"]];
-    for (const d of docs) {
-      const cur = d.revisions.find((r) => r.state === "RELEASED");
-      rows.push([d.docNumber, d.title, d.deliverableType, d.docType, d.discipline, d.state, d.isPlaceholder ? "yes" : "no", cur?.value ?? "", cur?.statusCode ?? "", cur?.releasedAt?.toISOString().slice(0, 10) ?? "", d.retentionClass ?? "", d.criticality ?? "", d.confidentiality ?? ""]);
-    }
+    // The master register, every state, as the backend writes it.
+    return passOn(projectPath(ctx, "/register/export"), { view: "all", sort: "docNumber", dir: "asc", format: "csv" });
   } else if (kind === "reviews") {
     // The reviews page exports what it is showing: a selection when rows are
     // ticked, otherwise every review the filters match.
-    const url = new URL(req.url);
-    const ids = (url.searchParams.get("ids") ?? "").split(",").map((one) => one.trim()).filter(Boolean);
-    const status = url.searchParams.get("status") ?? "";
-    const kindAsked = url.searchParams.get("kind") ?? "";
-    const verdict = url.searchParams.get("verdict") ?? "";
-    const q = (url.searchParams.get("q") ?? "").trim();
-    const cycles = await db.reviewCycle.findMany({
-      where: ids.length ? { id: { in: ids } } : {
-        AND: [
-          status && status !== "ALL" ? { status } : {},
-          kindAsked ? { binding: kindAsked === "DECISION" } : {},
-          verdict ? { outcome: verdict } : {},
-          q ? { revision: { document: { OR: [{ docNumber: { contains: q } }, { title: { contains: q } }] } } } : {},
-        ],
-      },
-      orderBy: { submittedAt: "desc" },
-      include: {
-        revision: { select: { value: true, document: { select: { docNumber: true, title: true } }, cycles: { select: { number: true, comments: { orderBy: { createdAt: "asc" }, select: { authorName: true, text: true, progressionPreventing: true, status: true } } } } } },
-        assignments: { orderBy: { order: "asc" } },
-        comments: { where: { progressionPreventing: true, status: "OPEN" }, select: { id: true } },
-      },
-    });
-    rows = [["Review", "Document number", "Title", "Revision", "Kind", "Verdict", "Decided by", "Reviewers", "Opened", "Opened by", "Due", "Closed", "Blocking comments", "Status", "Comments"]];
-    for (const c of cycles) {
-      rows.push([
-        c.number ?? "", c.revision.document.docNumber, c.revision.document.title, c.revision.value,
-        c.binding ? "Decision" : "Advice", c.outcome ?? "", c.outcomeByName ?? "",
-        c.assignments.map((a) => a.userName).join("; "),
-        c.submittedAt.toISOString(), c.openedByName ?? "",
-        c.dueAt?.toISOString() ?? "", c.outcomeAt?.toISOString() ?? "",
-        c.comments.length, c.status,
-        // Every comment on the revision, one per line, for whoever sent it.
-        c.revision.cycles.flatMap((cy) => cy.comments.map((one) => `${one.authorName}${cy.number ? ` (${cy.number})` : ""}${one.progressionPreventing ? " [blocking]" : ""}: ${one.text}`)).join("\n"),
-      ]);
-    }
+    return passOn(projectPath(ctx, "/reviews/export"), { ...Object.fromEntries(new URL(req.url).searchParams), format: "csv" });
   } else if (kind === "review-matrix") {
-    const documents = await db.document.findMany({ orderBy: { docNumber: "asc" }, include: { revisions: { orderBy: { createdAt: "desc" }, include: { workflowRuns: { orderBy: { updatedAt: "desc" }, take: 1 }, cycles: { orderBy: { sequence: "desc" }, take: 1, include: { assignments: true, comments: { where: { status: "OPEN", progressionPreventing: true } } } }, approvals: { orderBy: { decidedAt: "desc" }, take: 1 } } } } });
+    // The register's row says where the newest revision stands and who decided;
+    // the route's run, the open comments and the approval are not in it.
+    const documents = await registerRows(ctx, { view: "all", sort: "docNumber", dir: "asc" });
     rows = [["Document number", "Title", "Discipline", "Type", "Criticality", "Revision", "Revision state", "Workflow", "Workflow state", "Review cycle", "Review status", "Reviewers", "Review outcome", "Blocking comments", "Approved by", "Approval role", "Authority matrix version", "Planned submission"]];
     for (const document of documents) {
-      const revision = document.revisions[0];
-      const run = revision?.workflowRuns[0];
-      const cycle = revision?.cycles[0];
-      const approval = revision?.approvals[0];
-      rows.push([document.docNumber, document.title, document.discipline, document.docType, document.criticality ?? "", revision?.value ?? "", revision?.state ?? "", run?.templateName ?? "", run?.status ?? "", cycle?.sequence ?? "", cycle?.status ?? "", cycle?.assignments.map((item) => item.userName).join("; ") ?? "", cycle?.outcome ?? "", cycle?.comments.length ?? 0, approval?.approverName ?? "", approval?.approverRole ?? "", approval?.matrixVersion ?? "", revision?.plannedSubmissionDate?.toISOString().slice(0, 10) ?? ""]);
+      rows.push([document.number, document.title, document.discipline, document.docType, document.criticality ?? "", document.revision ?? "", document.revisionState ?? "", "", "", "", "", "", document.verdict ?? "", "", document.decidedBy ?? "", "", "", document.plannedDate ?? ""]);
     }
     name = "review-approval-matrix";
   } else if (kind === "baseline") {
@@ -89,33 +64,35 @@ export async function GET(req: Request, { params }: { params: Promise<{ kind: st
     // An action's own sheet can tick documents rather than actions, and then the
     // file holds those documents of that action.
     const onlyDocs = new Set((query.get("docs") ?? "").split(",").map((one) => one.trim()).filter(Boolean));
-    const actions = await db.action.findMany({
-      where: ticked.length ? { id: { in: ticked } } : {},
-      orderBy: { code: "asc" },
-      include: {
-        entries: { where: onlyDocs.size ? { document: { docNumber: { in: [...onlyDocs] } } } : {}, include: { document: true } },
-        notes: { orderBy: { createdAt: "asc" } },
-      },
-    });
+    const actions = (await legacyActions(ctx))
+      .filter((a) => !ticked.length || ticked.includes(a.id))
+      .sort((a, b) => a.code.localeCompare(b.code))
+      .map((a) => ({ ...a, entries: a.entries.filter((e) => !onlyDocs.size || onlyDocs.has(e.document.docNumber)), notes: [...a.notes].reverse() }));
     const now = Date.now();
     /** The same six words the schedule uses, so a file and a screen agree. */
     const state = (a: (typeof actions)[number]) => {
       if (!a.entries.length) return "Nothing listed";
-      const met = a.metIssuedCount >= a.needCount && a.needCount > 0;
+      const met = a.entries.every((e) => e.state === "MET") && a.needCount > 0;
       const past = !!a.scheduledDate && a.scheduledDate.getTime() < now;
       if (met) {
         if (!past) return "Ready";
         return a.lastMetAt && a.scheduledDate && a.lastMetAt > a.scheduledDate ? "Late receipt" : "Done";
       }
       if (past) return "Overdue";
-      return a.nextNeededAt && a.nextNeededAt.getTime() - now <= 7 * 86_400_000 ? "At risk" : "Still ahead";
+      const nextNeededAt = a.entries.filter((e) => e.state === "MISSING").map((e) => e.requiredBy).sort((x, y) => x.getTime() - y.getTime())[0];
+      return nextNeededAt && nextNeededAt.getTime() - now <= 7 * 86_400_000 ? "At risk" : "Still ahead";
     };
     // Where each document's time went travels with it. The screen names the
     // step that slipped; the file carries every checkpoint, because an audit
     // asks what the other two were due and who owed them.
-    const { latenessOf } = await import("@/lib/action-lateness");
-    const lateness = new Map<string, Awaited<ReturnType<typeof latenessOf>>["rows"]>();
-    for (const a of actions) lateness.set(a.id, (await latenessOf(ctx, a.id)).rows);
+    const at = (iso: string | null | undefined) => (iso ? new Date(iso) : null);
+    const lateness = new Map<string, { docNumber: string; checkpoints: { name: string; at: Date | null; due: Date | null; owedBy: string; deadline: string }[]; cause: { name: string; at: Date | null; due: Date | null; owedBy: string; deadline: string } | null; outstanding: boolean }[]>();
+    for (const a of actions) {
+      lateness.set(a.id, (await activityLateness(ctx, a.id)).map((need) => {
+        const point = (one: (typeof need.checkpoints)[number]) => ({ name: one.name, at: at(one.at), due: at(one.due), owedBy: one.owedBy, deadline: one.deadline });
+        return { docNumber: need.documentNumber, checkpoints: need.checkpoints.map(point), cause: need.cause ? point(need.cause) : null, outstanding: need.state !== "MET" };
+      }));
+    }
 
     rows = [[
       "Action code", "Action", "Description", "Scheduled date", "Owner", "Departments", "State",
@@ -165,66 +142,53 @@ export async function GET(req: Request, { params }: { params: Promise<{ kind: st
     }
     name = "actions-baseline";
   } else if (kind === "packages") {
-    const pkgs = await db.package.findMany({ orderBy: { identifier: "asc" }, include: { members: { include: { document: true } } } });
+    const pkgs = [...(await legacyPackages(ctx, "DELIVERY")), ...(await legacyPackages(ctx, "SUPPLIER"))].sort((a, b) => a.identifier.localeCompare(b.identifier));
     rows = [["Package", "Title", "Type", "Purpose", "Recipient", "Completion date", "Required status", "Composition owner", "Acceptance authority", "Closed at", "Member document", "Member required status", "Member current status"]];
     for (const p of pkgs) {
-      if (!p.members.length) rows.push([p.identifier, p.title ?? "", p.type, p.purpose, p.recipientName, p.completionDate.toISOString().slice(0, 10), p.requiredStatus, p.compositionOwnerName, p.acceptanceAuthorityName, p.closedAt?.toISOString().slice(0, 10) ?? "", "", "", ""]);
+      if (!p.members.length) rows.push([p.identifier, p.title ?? "", p.type, p.purpose, p.recipientName, p.completionDate?.toISOString().slice(0, 10) ?? "", p.requiredStatus, p.compositionOwnerName, p.acceptanceAuthorityName, p.closedAt?.toISOString().slice(0, 10) ?? "", "", "", ""]);
       for (const m of p.members) {
-        const cur = await db.revision.findFirst({ where: { documentId: m.documentId, state: "RELEASED" } });
-        rows.push([p.identifier, p.title ?? "", p.type, p.purpose, p.recipientName, p.completionDate.toISOString().slice(0, 10), p.requiredStatus, p.compositionOwnerName, p.acceptanceAuthorityName, p.closedAt?.toISOString().slice(0, 10) ?? "", m.document.docNumber, m.requiredStatus, cur?.statusCode ?? "not released"]);
+        const cur = m.document.revisions[0];
+        rows.push([p.identifier, p.title ?? "", p.type, p.purpose, p.recipientName, p.completionDate?.toISOString().slice(0, 10) ?? "", p.requiredStatus, p.compositionOwnerName, p.acceptanceAuthorityName, p.closedAt?.toISOString().slice(0, 10) ?? "", m.document.docNumber, m.requiredStatus, cur?.statusCode ?? "not released"]);
       }
     }
   } else if (kind === "transmittals") {
-    const ticked = (new URL(req.url).searchParams.get("ids") ?? "").split(",").map((one) => one.trim()).filter(Boolean);
-    const list = await db.transmittal.findMany({
-      where: ticked.length ? { id: { in: ticked } } : {},
-      orderBy: { number: "asc" },
-      include: {
-        items: { include: { revision: { include: { document: true } } } },
-        recipients: true,
-        inReplyTo: { select: { number: true } },
-        answers: { orderBy: { dateOfIssue: "asc" }, select: { number: true, dateOfIssue: true } },
-      },
-    });
-    // Who was asked and who was kept informed are different facts, and the
-    // answer that came back is part of the record.
-    rows = [["Number", "Direction", "Reason", "Date of issue", "Issuing party", "Status", "Response due", "Received date", "Items", "Sent to", "Copied in", "Seen by", "In answer to", "Answered at", "Answered by"]];
-    for (const t of list) {
-      const items = t.items.map((i) => `${i.revision.document.docNumber} rev ${i.revision.value}`).join("; ");
-      const addressed = t.recipients.filter((r) => r.kind !== "CC");
-      const answer = t.answers[0] ?? null;
-      rows.push([
-        t.number, t.direction, t.reasonForIssue, t.dateOfIssue.toISOString().slice(0, 10), t.issuingParty, t.status,
-        t.responseDueDate?.toISOString().slice(0, 10) ?? "", t.receivedDate?.toISOString().slice(0, 10) ?? "", items,
-        addressed.map((r) => r.name).join("; "),
-        t.recipients.filter((r) => r.kind === "CC").map((r) => r.name).join("; "),
-        `${addressed.filter((r) => r.openedAt).length} of ${addressed.length}`,
-        t.inReplyTo?.number ?? "",
-        answer?.dateOfIssue.toISOString().slice(0, 10) ?? "",
-        t.answers.map((one) => one.number).join("; "),
-      ]);
-    }
+    // The transmittal log as the backend writes it: the ticked ones, or every one the filters match.
+    return passOn(projectPath(ctx, "/transmittals/log/export"), { ...Object.fromEntries(new URL(req.url).searchParams), format: "csv" });
   } else if (kind === "defects") {
-    const defects = await db.defect.findMany({ orderBy: [{ severity: "asc" }, { lastSeenAt: "desc" }] });
+    // Open and accepted findings, then the closed ones: the backend lists them apart.
+    type Defect = { checkId: string; severity: string; owner: string; status: string; label: string; description: string; firstSeenAt: string; lastSeenAt: string; acceptedReason: string | null; acceptedBy: string | null };
+    const [open, closed] = await Promise.all([
+      api<Defect[]>(projectPath(ctx, "/defects")),
+      api<Defect[]>(projectPath(ctx, "/defects"), { query: { status: "CLOSED" } }),
+    ]);
     rows = [["Check", "Severity", "Owner", "Status", "Entity", "Description", "First seen", "Last seen", "Accepted by", "Accepted reason", "Review date"]];
-    for (const d of defects) {
-      rows.push([d.checkId, d.severity, d.ownerRole, d.status, d.entityLabel ?? d.entityKey, d.description, d.firstSeenAt.toISOString(), d.lastSeenAt.toISOString(), d.acceptedByName ?? "", d.acceptedReason ?? "", d.reviewDate?.toISOString().slice(0, 10) ?? ""]);
+    for (const d of [...open, ...closed]) {
+      rows.push([d.checkId, d.severity, d.owner, d.status, d.label, d.description, d.firstSeenAt, d.lastSeenAt, d.acceptedBy ?? "", d.acceptedReason ?? "", ""]);
     }
   } else if (kind === "audit") {
-    const events = await db.auditEvent.findMany({ orderBy: { ts: "desc" }, take: 5000 });
+    // The organization's audit trail, this project's part of it, newest first.
+    const events: Awaited<ReturnType<typeof adminAudit>>["rows"] = [];
+    for (let page = 1; events.length < 5000; page++) {
+      const answer = await adminAudit({ projectId: ctx.projectId, page, per: 200 });
+      events.push(...answer.rows);
+      if (page >= answer.pages) break;
+    }
     rows = [["Timestamp", "Actor", "Action", "Entity type", "Entity", "Field", "Old value", "New value", "Detail"]];
-    for (const e of events) rows.push([e.ts.toISOString(), e.actorName, e.action, e.entityType ?? "", e.entityLabel ?? "", e.field ?? "", e.oldValue ?? "", e.newValue ?? "", e.detail ?? ""]);
+    for (const e of events.slice(0, 5000)) rows.push([e.at, e.actorName, e.action, e.entityType ?? "", e.entityLabel ?? "", "", "", "", e.detail ?? ""]);
   } else if (kind === "checks") {
-    const run = await db.checkRun.findFirst({ orderBy: { ranAt: "desc" }, include: { items: true } });
+    const { lastRun: run } = await api<{ lastRun: { requestedBy: string; finishedAt: string | null; results: { checkId: string; result: string; failing: number }[] } | null }>(projectPath(ctx, "/checks"));
     rows = [["Check", "Result", "Failing items", "Run at", "Ran by"]];
-    for (const i of run?.items ?? []) rows.push([i.checkId, i.result, i.failingCount, run!.ranAt.toISOString(), run?.ranByName ?? ""]);
+    for (const i of run?.results ?? []) rows.push([i.checkId, i.result, i.failing, run!.finishedAt ?? "", run?.requestedBy ?? ""]);
     name = "latest-check-results";
   } else if (kind === "config-set") {
     const setKey = new URL(req.url).searchParams.get("set") ?? "";
-    const set = await db.configSet.findFirst({ where: { key: setKey }, include: { values: { orderBy: [{ sort: "asc" }, { code: "asc" }] } } });
+    // A list is known by its values, or by the name an administrator gave it before it had any.
+    const values = await getSet(setKey);
+    const set = values.length ? { key: setKey } : (await getSets()).find((one) => one.key === setKey);
     if (!set) return NextResponse.json({ error: "Unknown value set" }, { status: 404 });
     rows = [["Code", "Label", "Status", "Sort", "Properties"]];
-    for (const value of set.values) rows.push([value.code, value.label, value.status, value.sort, value.props ?? ""]);
+    // The backend gives the values in their published order; that place is the sort.
+    for (const [sort, value] of values.entries()) rows.push([value.code, value.label, value.status, sort, Object.keys(value.props).length ? JSON.stringify(value.props) : ""]);
     name = `value-set-${set.key.toLowerCase()}`;
   } else if (kind === "template-sets") {
     // Every published list, a tab each, so one download covers the lot.
@@ -288,7 +252,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ kind: st
     // The distribution matrix, pre-filled. Nobody should start from an empty
     // template: a blank grid invites invented codes, and the file people edit
     // has to be the matrix as it actually stands today.
-    const project = await db.project.findFirst({ where: { id: ctx.projectId }, select: { code: true, name: true, role: true } });
+    const project = ctx.project;
     // The file is taken at the same view the page is showing, and every row
     // carries it, so a file filled in for vendor documents cannot be read back
     // as though it were about ours.

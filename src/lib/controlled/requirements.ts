@@ -1,7 +1,11 @@
 import { register, headerIndex, cell, parseDate, diffByKey, type Handler, type ParseIssue, type ParseResult } from "./registry";
-import { allocateNumber } from "../numbering";
-import { daysBefore, DEFAULT_LEAD_DAYS, departmentsOf } from "../schedule";
-import { retentionFor } from "../retention";
+import { DEFAULT_LEAD_DAYS, departmentsOf } from "../schedule";
+import { api, projectPath } from "../api/client";
+import { legacyActions } from "../api/schedule";
+import { registerByNumber } from "../api/register";
+import { adminFunctions, orEmpty } from "../api/admin";
+import { requirementCalls } from "../api/records";
+import { getActiveSet } from "../config";
 
 /**
  * The document requirements list — what each department needs for each
@@ -92,31 +96,19 @@ const requirements: Handler = {
     const { index, missing } = headerIndex(rows, required, ALIASES);
     if (missing.length) return { ok: false, issues: [{ line: 1, message: `Missing column(s): ${missing.join(", ")}. Download the template and keep its header row.` }] };
 
-    const [actions, docs, functions, values] = await Promise.all([
-      t.db.action.findMany({ select: { code: true, departments: true } }),
-      t.db.document.findMany({ select: { docNumber: true, docType: true } }),
-      t.db.function.findMany({ where: { active: true }, select: { code: true } }),
-      t.db.configValue.findMany({ where: { status: "ACTIVE", setKey: { in: ["DISCIPLINES", "DOCUMENT_TYPES", "STATUSES", "SUPPLIER_CODES", "PROJECT_CODES", "SUBPROJECTS", "PURCHASE_ORDERS"] } }, select: { setKey: true, code: true, props: true } }),
+    const [actions, docs, functions, types, statuses, disciplines, subprojects, pos, parties] = await Promise.all([
+      legacyActions(t), registerByNumber(t), orEmpty(adminFunctions), getActiveSet("DOCUMENT_TYPES"), getActiveSet("STATUSES"),
+      getActiveSet("DISCIPLINES"), getActiveSet("SUBPROJECTS"), getActiveSet("PURCHASE_ORDERS"),
+      api<{ code: string }[]>("/api/parties").catch(() => [] as { code: string }[]),
     ]);
     const actionByCode = new Map(actions.map((a) => [a.code, a]));
-    const docNumbers = new Set(docs.map((d) => d.docNumber));
-    const typeOfDoc = new Map(docs.map((d) => [d.docNumber, d.docType]));
     // Document types that describe a piece of equipment, from the published list.
-    const describesAsset = new Set(
-      values.filter((v) => {
-        if (v.setKey !== "DOCUMENT_TYPES") return false;
-        try { return v.props ? (JSON.parse(v.props) as { describesAsset?: boolean }).describesAsset === true : false; } catch { return false; }
-      }).map((v) => v.code),
-    );
-    const fnCodes = new Set(functions.map((f) => f.code));
+    const describesAsset = new Set(types.filter((v) => v.props.describesAsset === true).map((v) => v.code));
+    const fnCodes = new Set(functions.filter((f) => f.active).map((f) => f.code));
     // A requirement is about being able to build from the document, so the
     // status it defaults to is the first one that permits execution.
-    const statusValues = values.filter((v) => v.setKey === "STATUSES");
-    const permits = (v: { props: string | null }) => {
-      try { return v.props ? (JSON.parse(v.props) as { executionFlag?: boolean }).executionFlag === true : false; } catch { return false; }
-    };
-    const defaultStatus = (statusValues.find(permits) ?? statusValues[0])?.code ?? "";
-    const inSet = (key: string, code: string) => values.some((v) => v.setKey === key && v.code === code);
+    const defaultStatus = (statuses.find((v) => v.props.executionFlag === true || v.props.executes === true) ?? statuses[0])?.code ?? "";
+    const has = (list: { code: string }[], code: string) => list.some((v) => v.code === code);
 
     const issues: ParseIssue[] = [];
     const parsed: RequirementRow[] = [];
@@ -127,7 +119,6 @@ const requirements: Handler = {
     // a sheet by hand would expect.
     let lastAction = "";
     let lastDepartment = "";
-
     for (let i = 1; i < rows.length; i++) {
       const line = i + 1;
       const row = rows[i];
@@ -139,7 +130,7 @@ const requirements: Handler = {
       const named = cell(row, index, "Document");
       // An existing document is named by its number; anything else is the name of
       // a document that does not exist yet.
-      const docNumber = named && docNumbers.has(named) ? named : null;
+      const docNumber = named && docs.has(named) ? named : null;
       const title = docNumber ? null : named || null;
       const discipline = cell(row, index, "Discipline").toUpperCase() || null;
       const docType = cell(row, index, "Type").toUpperCase() || null;
@@ -151,7 +142,6 @@ const requirements: Handler = {
       const subProject = cell(row, index, "Sub-project") || null;
       const po = cell(row, index, "PO") || null;
       // What the document is about: the tag of the equipment, or the material.
-      // Without it nobody can find the document from the thing it describes.
       const assetCode = cell(row, index, "Equipment or material").toUpperCase() || null;
       // A pre-filled sheet arrives with blank lines under every action; a line
       // with no document on it means nothing more is needed there.
@@ -165,26 +155,26 @@ const requirements: Handler = {
       else if (!departmentsOf(action).includes(department)) errors.push(`${department || "(no department)"} is not a department of ${actionCode} (${departmentsOf(action).join(", ")})`);
 
       const external = !OURS.includes(submitted);
-      if (external && !inSet("SUPPLIER_CODES", submitted)) errors.push(`Supplier "${submitted}" is not a supplier code — leave it empty for our own engineering`);
-      if (approvedBy && !fnCodes.has(approvedBy)) errors.push(`Approved By "${approvedBy}" is not a function`);
+      if (external && !has(parties, submitted)) errors.push(`Supplier "${submitted}" is not an organization on this project — leave it empty for our own engineering`);
+      if (approvedBy && fnCodes.size && !fnCodes.has(approvedBy)) errors.push(`Approved By "${approvedBy}" is not a function`);
       if (!requiredStatus) errors.push("No status is published, so there is nothing a document can be required at");
-      else if (!inSet("STATUSES", requiredStatus)) errors.push(`Required Status "${requiredStatus}" is not a published status`);
+      else if (!has(statuses, requiredStatus)) errors.push(`Required Status "${requiredStatus}" is not a published status`);
       if (neededRaw && !parseDate(neededRaw)) errors.push("Date of delivery must be YYYY-MM-DD");
-      if (discipline && !inSet("DISCIPLINES", discipline)) errors.push(`Discipline "${discipline}" is not a published discipline`);
+      if (discipline && !has(disciplines, discipline)) errors.push(`Discipline "${discipline}" is not a published discipline`);
 
       // A drawing or datasheet of a thing must say which thing.
-      const typeForAsset = docType ?? (docNumber ? typeOfDoc.get(docNumber) ?? null : null);
+      const typeForAsset = docType ?? (docNumber ? docs.get(docNumber)?.docType ?? null : null);
       if (!assetCode && typeForAsset && describesAsset.has(typeForAsset)) {
         errors.push(`A ${typeForAsset} describes equipment — give its tag or material under "Equipment or material"`);
       }
 
       if (!docNumber) {
-        // A name nobody can turn into a number is not a requirement yet.
-        if (!docType || !inSet("DOCUMENT_TYPES", docType)) errors.push(`"${named}" is not in the register, so it is created — give its Type`);
+        // A name nobody can turn into a number is not a requirement yet. The
+        // project code is the project's own.
+        if (!docType || !has(types, docType)) errors.push(`"${named}" is not in the register, so it is created — give its Type`);
         if (!discipline) errors.push(`"${named}" is created, so give its Discipline`);
-        if (!projectCode || !inSet("PROJECT_CODES", projectCode)) errors.push(`"${named}" is created and needs a Project Code for its number`);
-        if (!subProject || !inSet("SUBPROJECTS", subProject)) errors.push(`"${named}" is created and needs a Sub-project for its number`);
-        if (external && (!po || !inSet("PURCHASE_ORDERS", po))) errors.push(`"${named}" comes from a supplier, so it needs its PO for its number`);
+        if (!subProject || !has(subprojects, subProject)) errors.push(`"${named}" is created and needs a Sub-project for its number`);
+        if (external && (!po || !has(pos, po))) errors.push(`"${named}" comes from a supplier, so it needs its PO for its number`);
       }
 
       const key = `${actionCode}|${docNumber ?? title}`;
@@ -196,7 +186,7 @@ const requirements: Handler = {
         assetCode,
         actionCode, department, discipline, docNumber, title, docType,
         submittedBy: external ? submitted : null, approvedBy, requiredStatus,
-        neededBy: neededRaw || null, projectCode, subProject, po,
+        neededBy: neededRaw ? parseDate(neededRaw)!.toISOString().slice(0, 10) : null, projectCode, subProject, po,
       });
     }
     if (issues.length) return { ok: false, issues };
@@ -206,9 +196,9 @@ const requirements: Handler = {
   },
 
   async current(t) {
-    const entries = await t.db.baselineEntry.findMany({ include: { action: true, document: true }, orderBy: [{ action: { code: "asc" } }, { document: { docNumber: "asc" } }] });
-    return entries.map((e): RequirementRow => ({
-      actionCode: e.action.code,
+    const actions = await legacyActions(t);
+    return actions.flatMap((a) => a.entries.map((e): RequirementRow => ({
+      actionCode: a.code,
       department: e.department ?? e.document.discipline,
       discipline: e.document.discipline,
       docNumber: e.document.docNumber,
@@ -222,22 +212,17 @@ const requirements: Handler = {
       requiredStatus: e.requiredStatus,
       neededBy: e.manualDate ? e.requiredBy.toISOString().slice(0, 10) : null,
       projectCode: null, subProject: null, po: null,
-    }));
+    })));
   },
 
   async exportRows(t) {
-    const [actions, entries] = await Promise.all([
-      t.db.action.findMany({ orderBy: [{ scheduledDate: "asc" }, { code: "asc" }] }),
-      t.db.baselineEntry.findMany({ include: { document: true }, orderBy: { document: { docNumber: "asc" } } }),
-    ]);
+    const actions = await legacyActions(t);
     const iso = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : "");
     const rows: string[][] = [];
-
     for (const action of actions) {
       const departments = departmentsOf(action);
-      if (!departments.length) continue;
       for (const department of departments) {
-        const mine = entries.filter((e) => e.actionId === action.id && (e.department ?? e.document.discipline) === department);
+        const mine = action.entries.filter((e) => (e.department ?? e.document.discipline) === department);
         // What is already required, then blank lines to write more on: a sheet
         // with no room to write is a sheet nobody can answer.
         const lines = mine.length + BLANK_LINES;
@@ -245,19 +230,10 @@ const requirements: Handler = {
           const entry = mine[i];
           const head = i === 0;
           rows.push([
-            head ? department : "",
-            head ? action.code : "",
-            head ? action.name : "",
-            head ? action.description ?? "" : "",
-            head ? iso(action.scheduledDate) : "",
-            entry?.document.docNumber ?? "",
-            entry?.document.discipline ?? "",
-            entry?.document.docType ?? "",
-            entry?.submittedBy ?? entry?.document.originator ?? "",
-            entry?.manualDate ? iso(entry.requiredBy) : "",
-            entry?.requiredStatus ?? "",
-            entry?.approvedBy ?? "",
-            "", "", "", "",
+            head ? department : "", head ? action.code : "", head ? action.name : "", head ? action.description ?? "" : "",
+            head ? iso(action.scheduledDate) : "", entry?.document.docNumber ?? "", entry?.document.discipline ?? "", entry?.document.docType ?? "",
+            entry?.submittedBy ?? entry?.document.originator ?? "", entry?.manualDate ? iso(entry.requiredBy) : "", entry?.requiredStatus ?? "",
+            entry?.approvedBy ?? "", "", "", "", "",
           ]);
         }
       }
@@ -279,84 +255,79 @@ const requirements: Handler = {
 
   async apply(t, payload, _key, versionLabel) {
     const rows = payload as RequirementRow[];
+    const [actions, docs, reasons, deliverables] = await Promise.all([
+      legacyActions(t), registerByNumber(t), getActiveSet("REASONS_FOR_ISSUE"), getActiveSet("DELIVERABLE_TYPES"),
+    ]);
+    const actionByCode = new Map(actions.map((a) => [a.code, a]));
+    // What the document is needed for: the reason that builds from it.
+    const purpose = (reasons.find((r) => r.code === "EXECUTION") ?? reasons.find((r) => r.code === "CONSTRUCTION") ?? reasons[0])?.code ?? "EXECUTION";
+    // A supplier's document is numbered as supplier data; ours as engineering.
+    const askOriginator = (v: { props: Record<string, unknown> }) => Array.isArray(v.props.required) && (v.props.required as string[]).includes("originator");
+    const supplied = deliverables.find(askOriginator)?.code ?? "SUP";
+    const ours = deliverables.find((v) => !askOriginator(v))?.code ?? "ENG";
     let created = 0;
     let upserted = 0;
     let dropped = 0;
-    const keep = new Map<string, Set<string>>(); // action|department -> document ids
+    const keep = new Map<string, { actionId: string; department: string; docIds: Set<string> }>();
 
     for (const row of rows) {
-      const action = await t.db.action.findFirstOrThrow({ where: { code: row.actionCode } });
-      let docId: string;
-      if (row.docNumber) {
-        docId = (await t.db.document.findFirstOrThrow({ where: { docNumber: row.docNumber } })).id;
-      } else {
-        const deliverableType = row.submittedBy ? "VND" : "ENG";
+      const action = actionByCode.get(row.actionCode);
+      if (!action) throw new Error(`Action ${row.actionCode} is no longer in the schedule.`);
+      let docId = row.docNumber ? docs.get(row.docNumber)?.id ?? null : null;
+      if (!docId) {
         // The document's own discipline, which is not always the department's.
-        const discipline = row.discipline ?? row.department;
-        const { docNumber } = await allocateNumber(t, deliverableType, {
-          "Project code": row.projectCode ?? "",
-          Subproject: row.subProject ?? "",
-          "Supplier code": row.submittedBy ?? "",
-          "Purchase order": row.po ?? "",
-          Discipline: discipline,
-          "Document type": row.docType ?? "",
-        });
-        const doc = await t.db.document.create({
-          data: {
-            projectId: t.projectId, docNumber, title: row.title ?? docNumber, deliverableType, docType: row.docType ?? "",
-            discipline, originator: row.submittedBy, subProject: row.subProject, contractRef: row.po,
-            state: "PLANNED", isPlaceholder: true, createdById: "requirements", createdByName: "Document requirements list",
-            retentionClass: await retentionFor(t, null),
+        const doc = await api<{ id: string; number: string }>(projectPath(t, "/documents"), {
+          body: {
+            title: row.title ?? row.docNumber ?? "Required document", deliverableType: row.submittedBy ? supplied : ours, docType: row.docType,
+            discipline: row.discipline ?? row.department, subproject: row.subProject, originator: row.submittedBy, contractRef: row.po,
           },
         });
         docId = doc.id;
         created++;
       }
 
-      // Tie the document to the thing it describes, so it can be found from the
-      // equipment as well as from the register. An unknown tag is registered.
+      // Tie the document to the thing it describes. An unknown tag is registered.
       if (row.assetCode) {
-        const asset =
-          (await t.db.assetItem.findFirst({ where: { code: row.assetCode } })) ??
-          (await t.db.assetItem.create({ data: { projectId: t.projectId, code: row.assetCode, name: row.assetCode } }));
-        const linked = await t.db.relationship.findFirst({ where: { kind: "DOC_ASSET", fromId: docId, toId: asset.id } });
-        if (!linked) await t.db.relationship.create({ data: { projectId: t.projectId, kind: "DOC_ASSET", fromType: "Document", fromId: docId, toType: "AssetItem", toId: asset.id, createdById: "requirements" } });
+        await api(projectPath(t, "/assets"), { body: { code: row.assetCode, name: row.assetCode } }).catch(() => null);
+        await api(projectPath(t, `/documents/${docId}/assets`), { body: { assetCode: row.assetCode } }).catch(() => null);
       }
 
-      const manual = !!row.neededBy;
-      const requiredBy = manual
-        ? parseDate(row.neededBy!)!
-        : action.scheduledDate ? daysBefore(action.scheduledDate, DEFAULT_LEAD_DAYS) : new Date();
-      const data = {
-        requiredStatus: row.requiredStatus, requiredBy, department: row.department,
-        submittedBy: row.submittedBy, approvedBy: row.approvedBy,
-        leadBusinessDays: manual ? null : DEFAULT_LEAD_DAYS, manualDate: manual,
-        createdByName: "Document requirements list",
-      };
-      const existing = await t.db.baselineEntry.findFirst({ where: { actionId: action.id, documentId: docId } });
-      if (existing) await t.db.baselineEntry.update({ where: { id: existing.id }, data });
-      else await t.db.baselineEntry.create({ data: { projectId: t.projectId, actionId: action.id, documentId: docId, ...data } });
+      const existing = action.entries.find((e) => e.documentId === docId);
+      const fixed = row.neededBy;
+      const same = existing && existing.department === row.department && existing.requiredStatus === row.requiredStatus
+        && (existing.manualDate ? existing.requiredBy.toISOString().slice(0, 10) : null) === fixed;
+      if (!same) {
+        if (existing) await api(projectPath(t, `/activities/${action.id}/needs/${existing.id}`), { method: "DELETE" });
+        await api(projectPath(t, `/activities/${action.id}/needs`), {
+          body: {
+            documentId: docId, purpose, requiredStatuses: [row.requiredStatus], anchor: "START",
+            offsetDays: fixed ? null : -DEFAULT_LEAD_DAYS, fixedDate: fixed, department: row.department,
+          },
+        });
+      }
       upserted++;
-
       const k = `${action.id}|${row.department}`;
-      if (!keep.has(k)) keep.set(k, new Set());
-      keep.get(k)!.add(docId);
+      if (!keep.has(k)) keep.set(k, { actionId: action.id, department: row.department, docIds: new Set() });
+      keep.get(k)!.docIds.add(docId);
     }
 
     // What an (action, department) no longer lists is no longer required.
-    for (const [k, docIds] of keep) {
-      const [actionId, department] = k.split("|");
-      const stale = await t.db.baselineEntry.findMany({ where: { actionId, department, documentId: { notIn: [...docIds] } } });
-      for (const s of stale) { await t.db.baselineEntry.delete({ where: { id: s.id } }); dropped++; }
+    for (const { actionId, department, docIds } of keep.values()) {
+      const action = actions.find((a) => a.id === actionId)!;
+      for (const stale of action.entries.filter((e) => e.department === department && !docIds.has(e.documentId))) {
+        await api(projectPath(t, `/activities/${actionId}/needs/${stale.id}`), { method: "DELETE" });
+        dropped++;
+      }
     }
 
     // The departments whose part this list carries have answered their call.
-    const answered = await t.db.requirementCall.updateMany({
-      where: { answeredAt: null, department: { in: [...new Set(rows.map((r) => r.department))] } },
-      data: { answeredAt: new Date(), answerNote: `Listed in ${versionLabel}` },
-    });
+    const departments = new Set(rows.map((r) => r.department));
+    const open = (await requirementCalls(t)).filter((c) => !c.answeredAt && departments.has(c.department));
+    for (const call of open) {
+      await api(projectPath(t, `/requirement-calls/${call.id}/answer`), { body: { note: `Listed in ${versionLabel}` } });
+    }
 
-    return { summary: `${upserted} requirement(s) in force${answered.count ? `, ${answered.count} department call(s) answered` : ""}${created ? `, ${created} placeholder(s) created` : ""}${dropped ? `, ${dropped} no longer required` : ""}.` };
+    return { summary: `${upserted} requirement(s) in force${open.length ? `, ${open.length} department call(s) answered` : ""}${created ? `, ${created} placeholder(s) created` : ""}${dropped ? `, ${dropped} no longer required` : ""}.` };
   },
 };
 

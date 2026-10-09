@@ -1,17 +1,17 @@
 "use server";
 
-import { audit } from "@/lib/audit";
 import { requireScope } from "@/lib/scope";
 import { parseCsv, toObjects } from "@/lib/csv";
-import { allocateNumber, validateNumber } from "@/lib/numbering";
-import { getActiveSet } from "@/lib/config";
+import { getActiveSet, getSet, getSets } from "@/lib/config";
 import { isReadOnly } from "@/lib/auth";
-import { retentionFor } from "@/lib/retention";
-import { hashPassword, isAdmin } from "@/lib/auth";
+import { isAdmin } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { readSheet, applyChanges } from "@/lib/matrix-read";
 import { propFieldsFor } from "@/lib/set-props";
 import { registerDocument } from "@/lib/register";
+import { api, projectPath, refusal } from "@/lib/api/client";
+import { adminFunctions, adminParties, adminUsers } from "@/lib/api/admin";
+import { documentView, registerByNumber } from "@/lib/api/register";
 
 // Bulk in/out — document controllers live in spreadsheets. Templates, preview,
 // then execute. No one fills a form per line.
@@ -84,7 +84,7 @@ const GET = (o: Record<string, string>, k: string) => (o[k] ?? "").trim();
  */
 export async function importBulkAction(_prev: BulkResult | undefined, formData: FormData): Promise<BulkResult> {
   const ctx = await requireScope();
-  const { user, db, projectId, orgId } = ctx;
+  const { user, projectId } = ctx;
   if (isReadOnly(user)) return { error: "Viewers cannot import." };
   const kind = String(formData.get("kind") ?? "");
   const dryRun = formData.get("dryRun") === "on";
@@ -99,6 +99,8 @@ export async function importBulkAction(_prev: BulkResult | undefined, formData: 
 
   const rows: BulkRowReport[] = [];
   let valid = 0;
+  // Document numbers to ids, for the rows that correct a document.
+  let known: Map<string, string> | undefined;
 
   if (kind === "deliverables") {
     const [types, disciplines, projects, subs, suppliers, pos, crits, confs, retentions] = await Promise.all([
@@ -106,7 +108,8 @@ export async function importBulkAction(_prev: BulkResult | undefined, formData: 
       getActiveSet("SUPPLIER_CODES"), getActiveSet("PURCHASE_ORDERS"), getActiveSet("CRITICALITY"), getActiveSet("CONFIDENTIALITY"), getActiveSet("RETENTION_CLASSES"),
     ]);
     const active = (set: { code: string }[], code: string) => set.some((v) => v.code === code);
-    const known = new Map((await db.document.findMany({ select: { docNumber: true, id: true } })).map((d) => [d.docNumber, d.id]));
+    const numbers = new Map([...(await registerByNumber(ctx)).values()].map((d) => [d.number, d.id]));
+    known = numbers;
     // What the number is built from cannot be corrected here: the number would
     // then say one thing and the record another, and a number is never rewritten.
     const INSIDE_THE_NUMBER = ["Type", "Discipline", "Project", "SubProject", "Supplier"];
@@ -118,7 +121,7 @@ export async function importBulkAction(_prev: BulkResult | undefined, formData: 
       const number = GET(o, "Document Number");
       if (number) {
         // A row that names a document is a correction to that document.
-        if (!known.has(number)) { rows.push({ line, ok: false, message: `${number} is not in the register — leave the number empty to register it instead` }); continue; }
+        if (!numbers.has(number)) { rows.push({ line, ok: false, message: `${number} is not in the register — leave the number empty to register it instead` }); continue; }
         const locked = INSIDE_THE_NUMBER.filter((f) => GET(o, f));
         if (locked.length) { rows.push({ line, ok: false, message: `${number}: ${locked.join(", ")} ${locked.length === 1 ? "is" : "are"} built into the number and cannot be corrected here. Withdraw it and register it again under the right number.` }); continue; }
         const fields = CORRECTABLE.filter((f) => GET(o, f));
@@ -129,7 +132,8 @@ export async function importBulkAction(_prev: BulkResult | undefined, formData: 
       if (!GET(o, "Title")) errs.push("Title missing");
       if (!active(types, GET(o, "Type"))) errs.push(`Type "${GET(o, "Type")}" not published/active`);
       if (!active(disciplines, GET(o, "Discipline"))) errs.push(`Discipline "${GET(o, "Discipline")}" not active`);
-      if (!active(projects, GET(o, "Project"))) errs.push(`Project "${GET(o, "Project")}" not active`);
+      // The backend registers into the project the import runs in; a Project column, when filled, must still be published.
+      if (GET(o, "Project") && !active(projects, GET(o, "Project"))) errs.push(`Project "${GET(o, "Project")}" not active`);
       if (GET(o, "SubProject") && !active(subs, GET(o, "SubProject"))) errs.push(`SubProject "${GET(o, "SubProject")}" not active`);
       if (GET(o, "Supplier") && !active(suppliers, GET(o, "Supplier"))) errs.push(`Supplier "${GET(o, "Supplier")}" not active`);
       if (GET(o, "PO") && !active(pos, GET(o, "PO"))) errs.push(`PO "${GET(o, "PO")}" not active`);
@@ -149,7 +153,7 @@ export async function importBulkAction(_prev: BulkResult | undefined, formData: 
     }
   } else if (kind === "baseline") {
     const statuses = await getActiveSet("STATUSES");
-    const docNumbers = new Set((await db.document.findMany({ select: { docNumber: true } })).map((d) => d.docNumber));
+    const docNumbers = new Set((await registerByNumber(ctx)).keys());
     for (let i = 0; i < objects.length; i++) {
       const o = objects[i];
       const line = i + 2;
@@ -167,11 +171,16 @@ export async function importBulkAction(_prev: BulkResult | undefined, formData: 
   } else if (kind === "people") {
     // A whole team arrives at once, in a spreadsheet, like everything else here.
     if (!ctx.can("CONFIGURE") && !ctx.can("CONTROL")) return { error: "Adding people needs Configure or Control." };
-    const [functions, parties, existing] = await Promise.all([
-      db.function.findMany({ where: { active: true }, select: { id: true, name: true, legacyRole: true } }),
-      db.party.findMany({ select: { id: true, code: true, name: true } }),
-      db.user.findMany({ select: { email: true } }),
-    ]);
+    let functions: { id: string; name: string }[], parties: { id: string; code: string; name: string }[], existing: { email: string }[];
+    try {
+      [functions, parties, existing] = await Promise.all([
+        adminFunctions().then((all) => all.filter((f) => f.active)),
+        adminParties(),
+        adminUsers(),
+      ]);
+    } catch (e) {
+      return { error: refusal(e).message };
+    }
     const emails = new Set(existing.map((u) => u.email.toLowerCase()));
     const seen = new Set<string>();
     for (let i = 0; i < objects.length; i++) {
@@ -213,29 +222,24 @@ export async function importBulkAction(_prev: BulkResult | undefined, formData: 
       if (kind === "deliverables" && GET(o, "Document Number")) {
         // A row naming a document corrects it; only what is not inside the
         // number may change, which validation has already enforced.
-        const doc = await db.document.findFirstOrThrow({ where: { docNumber: GET(o, "Document Number") } });
-        const map: Record<string, string> = { Title: "title", Criticality: "criticality", Confidentiality: "confidentiality", RetentionClass: "retentionClass", ContractRef: "contractRef", AssetCode: "assetCode", PlannedDate: "plannedDate", ReceivedDate: "receivedDate" };
+        const doc = await documentView(ctx, known!.get(GET(o, "Document Number"))!);
+        const map: Record<string, string> = { Title: "title", Criticality: "criticality", Confidentiality: "confidentiality", RetentionClass: "retentionClass", ContractRef: "contractRef", PlannedDate: "plannedDate", ReceivedDate: "receivedDate" };
         const dates = new Set(["plannedDate", "receivedDate"]);
-        const data: Record<string, unknown> = {};
+        const data: Record<string, string> = {};
         for (const [col, field] of Object.entries(map)) {
           const v = GET(o, col);
           if (!v) continue;
+          const current = (doc as unknown as Record<string, string | null>)[field];
           if (dates.has(field)) {
-            const current = (doc as unknown as Record<string, unknown>)[field] as Date | null;
-            const next = new Date(v);
-            if (current?.toISOString().slice(0, 10) === next.toISOString().slice(0, 10)) continue;
-            data[field] = next;
-            if (field === "plannedDate" && !doc.latestRevisionId) data.latestPlannedAt = next;
-            await audit({ actor: user, action: "METADATA_CHANGE", entityType: "Document", entityId: doc.id, entityLabel: doc.docNumber, field, oldValue: current ? current.toISOString().slice(0, 10) : null, newValue: v, detail: "Bulk deliverable list (4.9)." });
+            const next = new Date(v).toISOString().slice(0, 10);
+            if (current?.slice(0, 10) !== next) data[field] = next;
             continue;
           }
-          const current = (doc as unknown as Record<string, unknown>)[field];
-          if (String(current ?? "") !== v) {
-            data[field] = v;
-            await audit({ actor: user, action: "METADATA_CHANGE", entityType: "Document", entityId: doc.id, entityLabel: doc.docNumber, field, oldValue: current == null ? null : String(current), newValue: v, detail: "Bulk deliverable list (4.9)." });
-          }
+          if (String(current ?? "") !== v) data[field] = v;
         }
-        if (Object.keys(data).length) await db.document.update({ where: { id: doc.id }, data });
+        // The backend records every change with its old and new value (4.9).
+        if (Object.keys(data).length) await api(projectPath(ctx, `/documents/${doc.id}`), { method: "PUT", body: { changes: data } });
+        // Assets are not in the backend yet: an asset code corrects nothing.
         done++;
       } else if (kind === "deliverables") {
         // The same act as the form: one implementation, in lib/register.
@@ -259,38 +263,30 @@ export async function importBulkAction(_prev: BulkResult | undefined, formData: 
         });
         done++;
       } else if (kind === "baseline") {
-        let action = await db.action.findFirst({ where: { code: GET(o, "Action Code") } });
-        if (!action) {
-          action = await db.action.create({ data: { projectId, code: GET(o, "Action Code"), name: GET(o, "Action Name") || GET(o, "Action Code"), scheduledDate: GET(o, "Action Date") ? new Date(GET(o, "Action Date")) : null } });
-          await audit({ actor: user, action: "ACTION_CREATED", entityType: "Action", entityId: action.code, entityLabel: action.code, detail: "Bulk import." });
-        }
-        const doc = await db.document.findFirstOrThrow({ where: { docNumber: GET(o, "Document Number") } });
-        const dup = await db.baselineEntry.findFirst({ where: { actionId: action.id, documentId: doc.id } });
-        if (!dup) {
-          await db.baselineEntry.create({ data: { projectId, actionId: action.id, documentId: doc.id, requiredStatus: GET(o, "Required Status"), requiredBy: new Date(GET(o, "Required By")), createdByName: user.name } });
-          await audit({ actor: user, action: "BASELINE_ENTRY", entityType: "Action", entityId: action.id, entityLabel: action.code, newValue: doc.docNumber + " -> " + GET(o, "Required Status"), detail: "Bulk import (14.3)." });
-        }
-        done++;
+        // Activities come from the schedule, and what each needs is agreed
+        // through Schedule & actions; neither is imported here.
+        throw new Error("Importing the actions baseline is not supported yet.");
       } else if (kind === "people") {
-        const fn = await db.function.findFirstOrThrow({ where: { name: GET(o, "Function"), active: true } });
-        const company = GET(o, "Company");
+        const fn = (await adminFunctions()).find((f) => f.active && f.name.toLowerCase() === GET(o, "Function").toLowerCase());
+        if (!fn) throw new Error(`no published function called "${GET(o, "Function")}"`);
+        const company = GET(o, "Company").toLowerCase();
         const party = company
-          ? await db.party.findFirst({ where: { OR: [{ code: company }, { name: company }] } })
+          ? (await adminParties()).find((x) => x.code.toLowerCase() === company || x.name.toLowerCase() === company) ?? null
           : null;
         // A one-time password, written into the report so whoever imported can
         // hand it over; the person changes it when they first sign in.
         const password = `delios-${Math.random().toString(36).slice(2, 8)}`;
-        const created = await db.user.create({
-          data: {
-            orgId, email: GET(o, "Email").toLowerCase(), name: GET(o, "Name"), role: fn.legacyRole,
-            organization: party?.name ?? null, partyId: party?.id ?? null,
-            passwordHash: await hashPassword(password), active: true,
-          },
-        });
-        await db.projectMembership.create({
-          data: { projectId, userId: created.id, functionId: fn.id, department: GET(o, "Department") || null },
-        });
-        await audit({ actor: user, action: "USER_CREATED", entityType: "User", entityId: created.email, entityLabel: created.name, newValue: fn.name, detail: `Bulk import of people: added to this project as ${fn.name}.` });
+        let created: { id: string; name: string; email: string };
+        try {
+          created = await api<{ id: string; name: string; email: string }>("/api/admin/users", {
+            body: { name: GET(o, "Name"), email: GET(o, "Email").toLowerCase(), password, partyId: party?.id ?? null },
+          });
+          await api(`/api/admin/projects/${projectId}/members`, {
+            method: "PUT", body: { userId: created.id, functionId: fn.id, department: GET(o, "Department") || null, active: true },
+          });
+        } catch (e) {
+          throw new Error(refusal(e).message);
+        }
         const report2 = rows.find((r) => r.line === line);
         if (report2) report2.message = `${created.name} added as ${fn.name} \u2014 first password: ${password}`;
         done++;
@@ -316,7 +312,7 @@ export async function importBulkAction(_prev: BulkResult | undefined, formData: 
  * from the other twenty, and retiring stays a deliberate act on the list's page.
  */
 async function importSets(ctx: Awaited<ReturnType<typeof requireScope>>, formData: FormData, dryRun: boolean): Promise<BulkResult> {
-  const { user, db, orgId } = ctx;
+  const { user } = ctx;
   if (!isAdmin(user)) return { error: "Only an administrator may publish a list." };
 
   const file = formData.get("file") as File | null;
@@ -327,7 +323,7 @@ async function importSets(ctx: Awaited<ReturnType<typeof requireScope>>, formDat
   const book = new ExcelJS.Workbook();
   await book.xlsx.load(await file.arrayBuffer());
 
-  const sets = new Map((await db.configSet.findMany({ select: { key: true, title: true } })).map((one) => [one.key, one.title] as const));
+  const sets = new Map((await getSets()).map((one) => [one.key, one.title] as const));
   const rows: BulkRowReport[] = [];
   const work: { setKey: string; code: string; label: string; status: string; props: string | null; existingId?: string; line: number }[] = [];
   let line = 0;
@@ -340,9 +336,12 @@ async function importSets(ctx: Awaited<ReturnType<typeof requireScope>>, formDat
     sheet.getRow(2).eachCell({ includeEmpty: true }, (cell, column) => { headers[column] = String(cell.value ?? "").trim(); });
     if (headers[1] !== "Code") { rows.push({ line: ++line, ok: false, message: `${setKey}: the heading row is missing — download the workbook again.` }); continue; }
 
+    // A value is named by its list and code; props as the old rows kept them, a JSON text or nothing.
     const existing = new Map(
-      (await db.configValue.findMany({ where: { orgId, setKey }, select: { id: true, code: true, label: true, status: true, props: true } }))
-        .map((one) => [one.code, one] as const),
+      (await getSet(setKey)).map((one) => [one.code, {
+        id: `${setKey}:${one.code}`, code: one.code, label: one.label, status: one.status,
+        props: Object.keys(one.props).length ? JSON.stringify(one.props) : null,
+      }] as const),
     );
 
     sheet.eachRow({ includeEmpty: false }, (row, index) => {
@@ -410,22 +409,19 @@ async function importSets(ctx: Awaited<ReturnType<typeof requireScope>>, formDat
     };
   }
 
-  for (const one of work) {
-    if (one.existingId) {
-      await db.configValue.update({ where: { id: one.existingId }, data: { label: one.label, status: one.status, props: one.props } });
-    } else {
-      const count = await db.configValue.count({ where: { orgId, setKey: one.setKey } });
-      await db.configValue.create({ data: { orgId, setKey: one.setKey, code: one.code, label: one.label, status: one.status, props: one.props, sort: count } });
+  // The backend publishes a value or changes it with the same call, and audits each.
+  let published = 0;
+  try {
+    for (const one of work) {
+      await api("/api/admin/values", {
+        method: "PUT",
+        body: { setKey: one.setKey, code: one.code, label: one.label, status: one.status, props: one.props ? JSON.parse(one.props) : undefined },
+      });
+      published++;
     }
+  } catch (e) {
+    return { error: `${refusal(e).message} ${published} value(s) were published before that.`, rows, imported: published, failed: rows.filter((r) => !r.ok).length, dryRun: false };
   }
-  for (const setKey of new Set(work.map((w) => w.setKey))) {
-    await db.configSet.update({ where: { orgId_key: { orgId, key: setKey } }, data: { version: { increment: 1 } } });
-  }
-  await audit({
-    actor: user, action: "CONFIG_VALUE_PUBLISHED", entityType: "ConfigSet",
-    entityId: [...new Set(work.map((w) => w.setKey))].join(", "),
-    detail: `${work.filter((w) => !w.existingId).length} published, ${work.filter((w) => w.existingId).length} updated, from a workbook.`,
-  });
   revalidatePath("/", "layout");
   return { ok: `${work.length} value(s) published or updated.`, rows, imported: work.length, failed: rows.filter((r) => !r.ok).length, dryRun: false };
 }
@@ -435,7 +431,7 @@ async function importSets(ctx: Awaited<ReturnType<typeof requireScope>>, formDat
  * list, one line per cell that differs from what the matrix says today.
  */
 async function importMatrix(ctx: Awaited<ReturnType<typeof requireScope>>, formData: FormData, dryRun: boolean): Promise<BulkResult> {
-  const { user, db } = ctx;
+  const { user } = ctx;
   if (!isAdmin(user)) return { error: "Only an administrator may change the distribution matrix." };
 
   const file = formData.get("file") as File | null;
@@ -468,16 +464,7 @@ async function importMatrix(ctx: Awaited<ReturnType<typeof requireScope>>, formD
   const wrote = applied.filter((one) => one.wrote).length;
   const refused = applied.filter((one) => !one.ok).length;
 
-  if (wrote) {
-    await audit({
-      actor: user,
-      action: "MATRIX_IMPORTED",
-      entityType: "Project",
-      entityId: ctx.projectId,
-      entityLabel: ctx.project.code,
-      detail: `${wrote} cell(s) changed from a filled-in distribution matrix${refused ? `; ${refused} refused` : ""}.`,
-    });
-  }
+  // The backend audits every change to a function's rules.
   // The matrix decides what every screen offers, so nothing cached survives it.
   revalidatePath("/", "layout");
   return {

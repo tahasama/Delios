@@ -14,6 +14,7 @@ import {
 import { VERBS, VERB_LABEL, VERB_BLURB, type Verb } from "@/lib/permissions";
 import { CONTRACT_ROLES } from "@/lib/profiles/roles";
 import { Check, Minus } from "lucide-react";
+import { legacyFunctions } from "@/lib/api/admin";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Functions & permissions" };
@@ -31,7 +32,7 @@ function parseVerbs(json: string): Verb[] {
 }
 
 export default async function FunctionsPage() {
-  const { user: me, db } = await requireScope();
+  const { user: me } = await requireScope();
   if (!maySetup(me, SETUP_PAGES.find((p) => p.href === "/settings/functions")!)) {
     return <PageHeader title="Functions & permissions" subtitle="Administrators and the control function." />;
   }
@@ -40,13 +41,7 @@ export default async function FunctionsPage() {
   const mayChangeAdminFunctions = isAdmin(me);
 
   const [functions, disciplines, docTypes, deliverableTypes, criticalities, confidentialities] = await Promise.all([
-    db.function.findMany({
-      orderBy: [{ active: "desc" }, { sort: "asc" }],
-      include: {
-        rules: { orderBy: { sort: "asc" } },
-        _count: { select: { memberships: true } },
-      },
-    }),
+    legacyFunctions(),
     getActiveSet("DISCIPLINES"),
     getActiveSet("DOCUMENT_TYPES"),
     getActiveSet("DELIVERABLE_TYPES"),
@@ -232,6 +227,13 @@ export default async function FunctionsPage() {
                         {disciplines.map((d) => <option key={d.code} value={d.code}>{d.label}</option>)}
                       </select>
                     </label>
+                    <label className="flex items-center gap-2 text-xs text-slate-600">
+                      Clearance
+                      <select name="clearance" defaultValue={fn.clearance ?? ""} className="rounded-md border border-line-strong px-1.5 py-1 text-xs" title="The most confidential level this job reads without being named on the document">
+                        <option value="">no limit</option>
+                        {confidentialities.map((c) => <option key={c.code} value={c.code}>up to {c.label}</option>)}
+                      </select>
+                    </label>
                     <label className="flex items-center gap-1 text-xs text-slate-600"><input type="checkbox" name="active" defaultChecked={fn.active} /> in use</label>
                   </ActionForm>
                 </div>
@@ -251,6 +253,12 @@ export default async function FunctionsPage() {
                   <select name="department" defaultValue="" className={inputCls}>
                     <option value="">No department</option>
                     {disciplines.map((d) => <option key={d.code} value={d.code}>{d.label}</option>)}
+                  </select>
+                </Field>
+                <Field label="Clearance" hint="optional — the most confidential level it reads without being named on the document">
+                  <select name="clearance" defaultValue="" className={inputCls}>
+                    <option value="">No limit</option>
+                    {confidentialities.map((c) => <option key={c.code} value={c.code}>Up to {c.label}</option>)}
                   </select>
                 </Field>
               </div>

@@ -5,6 +5,10 @@ import { getActiveSet } from "@/lib/config";
 import { holdersOf } from "@/lib/permissions";
 import { recipientCompanies } from "@/lib/recipients";
 import { NewTransmittalForm } from "./new-transmittal-form";
+import { api, projectPath } from "@/lib/api/client";
+import { backendDocument } from "@/lib/api/legacy";
+import { addressees, backendTransmittal, ourOrganizationName } from "@/lib/api/transmittals";
+import type { RegisterPage } from "@/lib/api/types";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "New transmittal" };
@@ -14,75 +18,70 @@ type Search = { doc?: string; docs?: string; direction?: string; revisions?: str
 export default async function NewTransmittalPage({ searchParams }: { searchParams: Promise<Search> }) {
   const ctx = await requireScope();
   const policy = await formPolicy(ctx, "TRANSMITTAL");
-  const { db } = ctx;
   const sp = await searchParams;
 
-  const ourOrganization = (await db.party.findFirst({ where: { isInternal: true }, select: { name: true } }))?.name ?? "Our organization";
-  const [reasons, revisionRows, users, reviewers] = await Promise.all([
+  const ourOrganization = await ourOrganizationName();
+  const [reasons, register, found, reviewers] = await Promise.all([
     getActiveSet("REASONS_FOR_ISSUE"),
-    db.revision.findMany({
-      // What is on hold is not for use, so it is not offered for sending.
-      where: { state: { in: ["RELEASED", "IN_PREPARATION", "IN_REVIEW"] }, heldAt: null },
-      orderBy: { createdAt: "desc" },
-      take: 200,
-      include: { document: { select: { docNumber: true, title: true } } },
-    }),
-    db.user.findMany({ where: { active: true }, orderBy: { name: "asc" } }),
+    // The register's newest documents, each with its released revision and the
+    // one being worked on: what can be enclosed.
+    api<RegisterPage>(projectPath(ctx, "/register"), { query: { per: 250 } }),
+    addressees(ctx),
     holdersOf(ctx, "REVIEW"),
   ]);
+  const revisionRows = register.rows.flatMap((doc) => [
+    ...(doc.releasedRevisionId ? [{ id: doc.releasedRevisionId, value: doc.releasedRevision ?? "", statusCode: doc.releasedStatus, state: "RELEASED", document: { docNumber: doc.number, title: doc.title } }] : []),
+    ...(doc.latestRevisionId && doc.latestRevisionId !== doc.releasedRevisionId && (doc.revisionState === "IN_PREPARATION" || doc.revisionState === "IN_REVIEW")
+      ? [{ id: doc.latestRevisionId, value: doc.revision ?? "", statusCode: doc.proposedStatus, state: doc.revisionState, document: { docNumber: doc.number, title: doc.title } }]
+      : []),
+  ]).slice(0, 200);
+  const users = found.people.map((one) => ({ id: one.id, name: one.name, role: one.function }));
 
   // Companies with people who can receive something — see recipientCompanies.
   const companies = await recipientCompanies(ctx);
+
+  // The backend names who a transmittal went to; their accounts and parties are found by name.
+  const personByName = new Map(found.people.map((one) => [one.name, one.id]));
+  const partyByName = new Map(found.parties.map((one) => [one.name, one.id]));
 
   // Answering something: the question decides who this goes to. Whoever sent
   // it is addressed, the people copied in on the question are copied in on the
   // answer, and the subject carries the thread. All of it is editable — it is a
   // starting point, not a rule.
-  const answering = sp.replyTo
-    ? await db.transmittal.findUnique({
-        where: { id: sp.replyTo },
-        select: {
-          id: true, number: true, subject: true, direction: true, issuingParty: true, createdById: true,
-          recipients: { select: { userId: true, kind: true } },
-        },
-      })
+  const question = sp.replyTo ? await backendTransmittal(ctx, sp.replyTo) : null;
+  const answering = question
+    ? { id: question.id, number: question.number, subject: question.subject as string | null, direction: question.direction, issuingParty: question.from ?? question.issuedBy }
     : null;
-  const answerTo = answering
-    ? answering.direction === "OUTGOING"
+  const answerTo = question
+    ? question.direction === "OUTGOING"
       // We sent it, so the answer comes back to whoever raised it.
-      ? [answering.createdById]
+      ? [personByName.get(question.issuedBy)].filter((id): id is string => !!id)
       // It came from outside; the answer goes back to that company, and the
       // people it named are the ones who know about it.
-      : answering.recipients.filter((one) => one.kind !== "CC" && one.userId).map((one) => one.userId!)
+      : question.recipients.filter((one) => one.person).map((one) => personByName.get(one.name)).filter((id): id is string => !!id)
     : [];
-  const answerCopies = answering
-    ? answering.recipients.filter((one) => one.kind === "CC" && one.userId).map((one) => one.userId!)
-    : [];
+  const answerCopies: string[] = [];
 
   // Completing or correcting something we sent: the new transmittal starts as a
   // copy of the first — its reason, its people, its documents — and the sender
   // changes what was missing. The first stays exactly as it went.
   const followKind = sp.kind === "REPLACES" ? "REPLACES" : "SUPPLEMENT";
-  const following = sp.follows
-    ? await db.transmittal.findFirst({
-        where: { id: sp.follows, direction: "OUTGOING", NOT: { status: "DRAFT" } },
-        select: {
-          id: true, number: true, subject: true, reasonForIssue: true, status: true, rejectionReason: true,
-          items: { select: { revisionId: true } },
-          recipients: { select: { userId: true, partyId: true, kind: true } },
-        },
-      })
+  const first = sp.follows ? await backendTransmittal(ctx, sp.follows) : null;
+  const following = first && first.direction === "OUTGOING"
+    ? { id: first.id, number: first.number, subject: first.subject as string | null, reasonForIssue: first.reason, rejectionReason: null as string | null, items: first.items.filter((one) => one.revisionId).map((one) => ({ revisionId: one.revisionId! })) }
     : null;
-  const idOf = (one: { userId: string | null; partyId: string | null }) => one.userId ?? (one.partyId ? `party:${one.partyId}` : null);
-  const followTo = following ? following.recipients.filter((one) => one.kind !== "CC").map(idOf).filter((id): id is string => !!id) : [];
-  const followCopies = following ? following.recipients.filter((one) => one.kind === "CC").map(idOf).filter((id): id is string => !!id) : [];
+  const followTo = first && following
+    ? first.recipients.map((one) => (one.person ? personByName.get(one.name) : partyByName.get(one.organization ?? one.name) ? `party:${partyByName.get(one.organization ?? one.name)}` : undefined))
+        .filter((id): id is string => !!id)
+    : [];
+  const followCopies: string[] = [];
 
   const selectedDocumentIds = [...new Set([...(sp.docs ?? "").split(","), ...(sp.doc ? [sp.doc] : [])].map((value) => value.trim()).filter(Boolean))];
-  const selectedDocuments = selectedDocumentIds.length ? await db.document.findMany({
-    where: { id: { in: selectedDocumentIds } },
-    include: { revisions: { where: { state: "RELEASED" }, orderBy: { releasedAt: "desc" }, take: 1 } },
-  }) : [];
-  const preselected = selectedDocuments.flatMap((document) => document.revisions[0]?.id ? [document.revisions[0].id] : []);
+  const selectedDocuments = await Promise.all(selectedDocumentIds.map((one) => backendDocument(ctx, one)));
+  const preselected = selectedDocuments.flatMap((document) => {
+    const released = document?.revisions.filter((one) => one.state === "RELEASED").sort((a, b) => (b.releasedAt ?? "").localeCompare(a.releasedAt ?? ""))[0];
+    return released ? [released.id] : [];
+  });
 
   return (
     <div>

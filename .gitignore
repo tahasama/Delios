@@ -23,8 +23,6 @@ yarn-error.log*
 !.env.example
 
 # database
-prisma/dev.db
-prisma/dev.db-journal
 *.db
 
 # uploaded controlled files
@@ -33,6 +31,5 @@ prisma/dev.db-journal
 # typescript
 *.tsbuildinfo
 
-# legacy app (kept only in git history)
-/backend
+# legacy frontend (kept only in git history)
 /frontend

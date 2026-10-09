@@ -15,6 +15,8 @@ import { getSets } from "@/lib/config";
 import { fmtDate } from "@/lib/utils";
 import { ArrowLeft, Download, CircleCheck, CircleX, Clock, FileClock, Upload } from "lucide-react";
 
+import { controlledSets } from "@/lib/api/admin";
+
 export const dynamic = "force-dynamic";
 
 const STATE_STYLE: Record<string, string> = {
@@ -70,7 +72,7 @@ export default async function ControlledKindPage({ params }: { params: Promise<{
   if (!handler) notFound();
 
   const ctx = await requireScope();
-  const { db, user } = ctx;
+  const { user } = ctx;
   const mayOwn = !!handler.ownerVerb && ctx.can(handler.ownerVerb);
   const mayChange = ctx.can("CONFIGURE") || ctx.can("CONTROL") || mayOwn;
   const mayApprove = ctx.can("CONFIGURE") || (!!handler.ownerApproves && (ctx.can("CONTROL") || mayOwn));
@@ -78,11 +80,7 @@ export default async function ControlledKindPage({ params }: { params: Promise<{
 
   const projectId = handler.level === "PROJECT" ? ctx.projectId : null;
   const [sets, valueSets] = await Promise.all([
-    db.controlledSet.findMany({
-      where: { kind: handler.kind, projectId },
-      include: { versions: { orderBy: { createdAt: "desc" }, take: 20 } },
-      orderBy: { key: "asc" },
-    }),
+    controlledSets(ctx),
     handler.kind === "VALUE_SET" ? getSets() : Promise.resolve([]),
   ]);
 

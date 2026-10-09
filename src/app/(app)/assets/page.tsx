@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { projectAssets } from "@/lib/api/records";
 import { requireScope } from "@/lib/scope";
 import { PageHeader, EmptyState, Card, Field, inputCls } from "@/components/ui";
 import { ActionForm } from "@/components/form";
@@ -16,16 +17,13 @@ export const metadata = { title: "Assets & tags" };
 export default async function AssetsPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
   const ctx = await requireScope();
   const policy = await formPolicy(ctx, "ASSET");
-  const { db } = ctx;
   const keeper = ctx.can("CONTROL") || ctx.can("CONFIGURE");
   const q = ((await searchParams).q ?? "").trim();
-  const [assets, counts] = await Promise.all([
-    db.assetItem.findMany({
-      where: q ? { OR: [{ code: { contains: q } }, { name: { contains: q } }, { system: { contains: q } }, { area: { contains: q } }] } : {},
-      orderBy: { code: "asc" },
-    }),
-    db.relationship.groupBy({ by: ["toId"], _count: true, where: { kind: "DOC_ASSET" } }),
-  ]);
+  const found = await projectAssets(ctx, q || undefined);
+  const [assets, counts] = [
+    found.map((a) => ({ id: a.id, code: a.code, name: a.name, area: a.area, system: a.system, unit: a.unit, description: a.description, extras: a.extras ? JSON.stringify(a.extras) : null })),
+    found.map((a) => ({ toId: a.id, _count: a.documents })),
+  ];
   const countFor = (id: string) => counts.find((c) => c.toId === id)?._count ?? 0;
 
   return (
