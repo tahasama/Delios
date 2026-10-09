@@ -37,7 +37,10 @@ The system is the Standard: the rules a system can enforce are enforced, the rou
 - The approval matrix guides by default: people outside it are flagged, not forbidden. Admin may switch to strict.
 - Delegation is always recorded as "X delegated to Y; X answers for it".
 - Guests are scoped by tenancy to their own organization's material.
-- Stack is Next.js, Prisma and SQLite (Postgres later), server-rendered.
+- Statuses, lists and names are the organization's own, never hard-coded. A value's code never changes once documents use it.
+- Nothing is deleted except by the app owner: retire, mark or supersede instead.
+- A document gets its number only when it is registered.
+- Stack: Next.js frontend (repository root) that reads and writes only through the backend (`backend/`, ASP.NET Core, PostgreSQL with row-level security per organization). See `docs/SESSION-HANDOFF.md`.
 
 ## Brand Commitments
 
