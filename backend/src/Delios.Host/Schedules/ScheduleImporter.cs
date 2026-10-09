@@ -40,6 +40,11 @@ public sealed class ScheduleImporter(
         {
             db.Enqueue(ScheduleImportRequested.RoutingKey, new ScheduleImportRequested(message.TenantId, revision.Id));
         }
+        // A released requirements list is read the same way, on the same queue.
+        if (await RequirementsImporter.IsListAsync(db, revision.DocumentId, cancellationToken))
+        {
+            db.Enqueue(RequirementsImportRequested.RoutingKey, new RequirementsImportRequested(message.TenantId, revision.Id));
+        }
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
     }

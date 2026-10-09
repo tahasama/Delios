@@ -44,6 +44,10 @@ public static class ScheduleReader
     public static bool CanRead(string fileName) =>
         fileName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase) || fileName.EndsWith(".csv", StringComparison.OrdinalIgnoreCase);
 
+    /// <summary>Every used row of a spreadsheet (its first sheet) or a CSV file, as text.</summary>
+    public static List<string[]> ReadRows(Stream content, string fileName) =>
+        fileName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase) ? ReadExcel(content, null) : ReadCsv(content);
+
     /// <summary>The activities, or why the file cannot be read; the error names the row.</summary>
     public static (IReadOnlyList<ParsedActivity>? Activities, string? Error) Read(Stream content, string fileName, ScheduleColumns columns)
     {

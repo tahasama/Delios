@@ -105,6 +105,8 @@ export type LegacyEntry = {
     id: string; docNumber: string; title: string; discipline: string; docType: string; originator: string | null; isPlaceholder: boolean;
     /** The released revision, carrying the backend's answer on whether it serves this need. */
     revisions: { value: string; state: string; statusCode: string | null; meets: boolean }[];
+    /** Its newest revision, whatever its state: where it stands when it is not released yet. */
+    latest?: { value: string; state: string; statusCode: string | null; held: boolean } | null;
   };
   state: NeedView["state"];
 };
@@ -185,6 +187,10 @@ function legacyAction(detail: ActivityDetail, documents: Map<string, DocumentVie
         revisions: need.currentRevision
           ? [{ value: need.currentRevision, state: released?.state ?? "RELEASED", statusCode: need.currentStatus, meets: need.state === "MET" }]
           : [],
+        latest: (() => {
+          const newest = document?.revisions.slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+          return newest ? { value: newest.value, state: newest.state, statusCode: newest.statusCode, held: !!newest.heldAt } : null;
+        })(),
       },
       state: need.state,
     };

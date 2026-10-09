@@ -39,6 +39,8 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
             await db.SaveChangesAsync(cancellationToken);
             issuing |= await EnsureScheduleSetupAsync(existing.Id, cancellationToken);
             await db.SaveChangesAsync(cancellationToken);
+            issuing |= await EnsureCorrespondenceSetupAsync(existing.Id, cancellationToken);
+            await db.SaveChangesAsync(cancellationToken);
             await upgrade.CommitAsync(cancellationToken);
             logger.LogInformation(reviews || issuing ? "The demo tenant exists; what it lacked was added" : "The demo tenant already exists; nothing to do");
             return;
@@ -90,6 +92,8 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
         await EnsureControlSetupAsync(t, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         await EnsureScheduleSetupAsync(t, cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
+        await EnsureCorrespondenceSetupAsync(t, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         logger.LogInformation("Demo tenant '{Slug}' created; every password is {Password}", Slug, Password);
@@ -147,6 +151,8 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
         await EnsureControlSetupAsync(t, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         await EnsureScheduleSetupAsync(t, cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
+        await EnsureCorrespondenceSetupAsync(t, cancellationToken);
         if (!string.IsNullOrWhiteSpace(projectCode) && !string.IsNullOrWhiteSpace(projectName))
         {
             var project = new Project
@@ -424,6 +430,78 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
             ("RETURNED_FOR_REVISION", "Returned for a new revision", new { act = "return", newRevision = true }),
             ("RELEASED", "Released", new { act = "release" }),
         ]);
+        return true;
+    }
+
+    /// <summary>
+    /// The document requirements list as a document type: reviewed like any deliverable, and read when released
+    /// (see <see cref="Schedules.RequirementsImporter"/>). Adds it when missing.
+    /// </summary>
+    private async Task<bool> EnsureRequirementsListTypeAsync(Guid t, CancellationToken cancellationToken)
+    {
+        if (await db.ValueEntries.AnyAsync(v => v.SetKey == ValueSets.DocumentTypes && v.Code == "RQL", cancellationToken)) return false;
+        var sort = (await db.ValueEntries.Where(v => v.SetKey == ValueSets.DocumentTypes).MaxAsync(v => (int?)v.Sort, cancellationToken) ?? -1) + 1;
+        db.ValueEntries.Add(new ValueEntry
+        {
+            TenantId = t,
+            SetKey = ValueSets.DocumentTypes,
+            Code = "RQL",
+            Label = "Document requirements list",
+            Sort = sort,
+            Props = JsonSerializer.SerializeToDocument(new Dictionary<string, object> { [Schedules.RequirementsImporter.Marker] = true }),
+        });
+        return true;
+    }
+
+    /// <summary>
+    /// Correspondence: a deliverable type for what is filed rather than approved, numbered as our own engineering
+    /// documents are, and its document types, released without a review. Adds only what is missing; an organization
+    /// renames, retires or adds to any of it in its lists.
+    /// </summary>
+    private async Task<bool> EnsureCorrespondenceSetupAsync(Guid t, CancellationToken cancellationToken)
+    {
+        var added = await EnsureRequirementsListTypeAsync(t, cancellationToken);
+        if (await db.ValueEntries.AnyAsync(v => v.SetKey == ValueSets.DeliverableTypes && v.Code == "COR", cancellationToken)) return added;
+        async Task<int> NextSortAsync(string set) =>
+            (await db.ValueEntries.Where(v => v.SetKey == set).MaxAsync(v => (int?)v.Sort, cancellationToken) ?? -1) + 1;
+        db.ValueEntries.Add(new ValueEntry
+        {
+            TenantId = t,
+            SetKey = ValueSets.DeliverableTypes,
+            Code = "COR",
+            Label = "Correspondence",
+            Sort = await NextSortAsync(ValueSets.DeliverableTypes),
+        });
+        // Numbered as our own engineering documents are.
+        var scheme = await db.SchemeRoutings.Where(r => r.DeliverableType == "ENG").Select(r => (Guid?)r.SchemeId)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (scheme is { } schemeId && !await db.SchemeRoutings.AnyAsync(r => r.DeliverableType == "COR", cancellationToken))
+            db.SchemeRoutings.Add(new SchemeRouting { TenantId = t, DeliverableType = "COR", SchemeId = schemeId });
+        var sort = await NextSortAsync(ValueSets.DocumentTypes);
+        foreach (var (code, label) in new[]
+        {
+            ("MOM", "Minutes of meeting"),
+            ("LET", "Letters and correspondence"),
+            ("SRP", "Site and progress report"),
+            ("PHO", "Site photos and survey records"),
+            ("TCR", "Test certificate and inspection record"),
+            ("DLN", "Delivery note, packing list, mill certificate"),
+            ("PMT", "Permit and authority letter"),
+            ("VCM", "Vendor catalogue and manual"),
+            ("RFI", "Request for information"),
+        })
+        {
+            if (await db.ValueEntries.AnyAsync(v => v.SetKey == ValueSets.DocumentTypes && v.Code == code, cancellationToken)) continue;
+            db.ValueEntries.Add(new ValueEntry
+            {
+                TenantId = t,
+                SetKey = ValueSets.DocumentTypes,
+                Code = code,
+                Label = label,
+                Sort = sort++,
+                Props = JsonSerializer.SerializeToDocument(new { review = false }),
+            });
+        }
         return true;
     }
 
