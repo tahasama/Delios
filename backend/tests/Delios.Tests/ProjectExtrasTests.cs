@@ -147,3 +147,37 @@ public sealed class ClearanceTests(Infrastructure infrastructure) : IClassFixtur
         Assert.Equal(JsonValueKind.Null, (await viewer.GetFromJsonAsync<JsonElement>("/api/me")).GetProperty("projects")[0].GetProperty("function").GetProperty("clearance").ValueKind);
     }
 }
+
+/// <summary>Correspondence: filed, numbered like our own documents, released without a review.</summary>
+public sealed class CorrespondenceTests(Infrastructure infrastructure) : IClassFixture<Infrastructure>
+{
+    [Fact]
+    public async Task Minutes_are_numbered_and_sent_on_for_release_without_a_review()
+    {
+        await using var app = await TestApp.StartAsync(infrastructure);
+        app.StartWorker();
+        var engineer = await app.SignedInAsync("engineer@demo.local");
+        var controller = await app.SignedInAsync("controller@demo.local");
+        var project = await Api.ProjectIdAsync(engineer);
+        var registered = await Api.RegisterAsync(engineer, project, new
+        {
+            title = "Kick-off meeting minutes",
+            deliverableType = "COR",
+            docType = "MOM",
+            discipline = "PM",
+            subproject = "10",
+        });
+        Assert.EndsWith("-PM-MOM-00001", registered.GetProperty("number").GetString());
+        var p = await Flow.RevisionAsync(engineer, registered.GetProperty("id").GetGuid());
+
+        var (sent, review) = await Flow.PostAsync(engineer, $"/api/projects/{p.Project}/revisions/{p.Revision}/send-on", new { status = "IFI" });
+        Assert.True(sent == HttpStatusCode.Created, review.ToString());
+        var (released, body) = await Flow.PostAsync(controller, $"/api/projects/{p.Project}/reviews/{review.GetProperty("id")}/release", new { });
+        Assert.True(released == HttpStatusCode.OK, body.ToString());
+
+        // A drawing is reviewed: it cannot skip its review the same way.
+        var drawing = await Flow.RevisionAsync(engineer);
+        var (refused, refusedBody) = await Flow.PostAsync(engineer, $"/api/projects/{drawing.Project}/revisions/{drawing.Revision}/send-on", new { status = "IFI" });
+        Assert.Equal((HttpStatusCode.Conflict, "TYPE_IS_REVIEWED"), (refused, Flow.Code(refusedBody)));
+    }
+}

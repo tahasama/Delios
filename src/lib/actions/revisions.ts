@@ -202,10 +202,22 @@ export async function releaseRevisionAction(_prev: Result | undefined, formData:
   if (!statusCode) return { error: "Choose the status the revision is released at." };
   let documentId: string;
   try {
-    const review = await reviewOfRevision(ctx, revisionId);
-    if (!review) return { error: "Releasing a revision that was never reviewed is not supported yet." };
-    documentId = review.documentId;
-    await api(projectPath(ctx, `/reviews/${review.id}/release`), { body: { status: statusCode, outcome: text(formData, "outcome") || null } });
+    let review = await reviewOfRevision(ctx, revisionId);
+    if (!review) {
+      // Never reviewed: only a type released without a review goes straight to release, at the status chosen.
+      try {
+        review = await api<{ id: string; documentId: string; state: string }>(projectPath(ctx, `/revisions/${revisionId}/send-on`), { body: { status: statusCode } });
+      } catch (e) {
+        if (refusal(e).code === "TYPE_IS_REVIEWED") return { error: "This type of document is reviewed: send it for review first." };
+        throw e;
+      }
+      documentId = review.documentId;
+      // Where nobody holds Document Control it is already released.
+      if (review.state !== "RELEASED") await api(projectPath(ctx, `/reviews/${review.id}/release`), { body: { status: statusCode, outcome: text(formData, "outcome") || null } });
+    } else {
+      documentId = review.documentId;
+      await api(projectPath(ctx, `/reviews/${review.id}/release`), { body: { status: statusCode, outcome: text(formData, "outcome") || null } });
+    }
   } catch (e) {
     return failed(e);
   }
