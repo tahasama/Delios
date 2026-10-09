@@ -73,6 +73,10 @@ public sealed class FileQueueConsumer(
                     await scope.ServiceProvider.GetRequiredService<Reviews.Stamping>().MarkAsync(
                         Read<Reviews.RevisionMarked>(delivery), stoppingToken);
                     break;
+                case Schedules.RequirementsImportRequested.RoutingKey:
+                    await scope.ServiceProvider.GetRequiredService<Schedules.RequirementsImporter>().OnRequestedAsync(
+                        Read<Schedules.RequirementsImportRequested>(delivery), stoppingToken);
+                    break;
                 case Schedules.ScheduleImportRequested.RoutingKey:
                     await scope.ServiceProvider.GetRequiredService<Schedules.ScheduleImporter>().OnRequestedAsync(
                         Read<Schedules.ScheduleImportRequested>(delivery), stoppingToken);

@@ -146,6 +146,7 @@ public static class PlatformSetup
         services.AddScoped<Extraction.ExtractionProcessor>();
         services.AddScoped<Checks.CheckEngine>();
         services.AddScoped<Schedules.ScheduleImporter>();
+        services.AddScoped<Schedules.RequirementsImporter>();
         services.AddScoped<Reports.ReportBuilder>();
         services.AddOptions<Notifications.EmailOptions>().BindConfiguration(Notifications.EmailOptions.Section);
         services.AddScoped<Notifications.Notifier>();

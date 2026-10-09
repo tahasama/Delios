@@ -182,6 +182,26 @@ registering and editing. Documents registered before this update have none.
   out can be deleted; any other is kept.
 - Our own organization can be a recipient of a package.
 
+**Correspondence.**
+- A deliverable type **Correspondence (COR)**, numbered like Engineering, with document types that go to release
+  without a review:
+  - minutes (MOM);
+  - letters (LET);
+  - site and progress reports (SRP);
+  - photos and survey records (PHO);
+  - test certificates and inspection records (TCR);
+  - delivery notes (DLN);
+  - permits (PMT);
+  - vendor catalogues and manuals (VCM);
+  - requests for information (RFI).
+- New organizations get them; your demo gets them the next time its setup runs.
+- An organization renames, retires or adds types in its lists. Whether a type is reviewed is the existing
+  "Reviewed before release" choice on Document types.
+
+**Releasing a revision that was never sent for review** ("Release as [status]" on the document): for a type that
+is not reviewed, it is sent on and released at the status chosen. A reviewed type is refused: send it for review
+first.
+
 ## 5. Transmittals
 
 **Drafts are kept apart until issued.**
@@ -235,6 +255,24 @@ waiver; the backend counts it as covered for readiness.
 **The schedule itself is not uploaded as a "list for a decision".** It is read from the **schedule
 document**: attach the export to a new revision of it and send that for review. Releasing it is the
 approval, and moves every activity date. The "Project schedule" controlled-change page says so.
+
+**The requirements list can be a controlled document.**
+- On Document types, mark a type "Is a document requirements list — read when released".
+- A document of that type is registered and reviewed like any other: the printed PDF is what reviewers read.
+- When a revision is released, the spreadsheet (.xlsx or .csv) attached to it is read automatically. It uses the
+  same columns as the requirements template.
+- Each row becomes what an activity needs. A document the register doesn't have is registered as a placeholder.
+  For every activity and department the list mentions, what it no longer lists is no longer needed.
+- **All or nothing:** if any line is wrong (an unknown activity, a department the activity doesn't have, a
+  missing type for a new document…), nothing is applied. Document Control is told which lines and why, and fixes
+  the list in a new revision or uploads it by hand.
+- Every read, applied or not, appears in the history of uploaded lists ("rev B", from the released revision).
+- Uploading the list for a decision, below, still works as the manual way.
+
+**Needed documents show where they stand.** On an activity, each needed document shows its newest revision and
+state in your organization's own words, for example "placeholder · not started", "rev A · in review" or
+"rev B · IFC · released & issued". It is listed whatever its state. It counts as ready only when released at the
+required status.
 
 **Departments per activity and the requirements list are uploaded for a decision**, as before
 (draft → submit → approve, or rejected with a reason). Approving applies them. Differences:

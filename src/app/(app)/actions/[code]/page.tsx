@@ -104,6 +104,17 @@ export default async function ActionDetailPage({ params, searchParams }: { param
   // step where its time went. Dates are written here so the table stays a
   // client component without carrying Date objects across.
   const delayOf = new Map(lateness.rows.map((row) => [row.docNumber, row]));
+  // Where each needed document stands, in the organization's own words for its states: it is listed whatever its
+  // state, so people know it exists even before it is ready.
+  const { policy } = await import("@/lib/control-activities");
+  const { stateNames, stateName } = await import("@/lib/state-names");
+  const [names, together] = await Promise.all([stateNames(ctx), policy(ctx, "POLICY_RELEASE").then((one) => one === "TOGETHER")]);
+  const standing = (e: (typeof entries)[number]) => {
+    const latest = e.document.latest;
+    if (!latest) return e.document.isPlaceholder ? "placeholder · not started" : "no revision yet";
+    const name = stateName(names, latest.state, { together, held: latest.held });
+    return `rev ${latest.value}${latest.statusCode ? ` · ${latest.statusCode}` : ""} · ${name.toLowerCase()}`;
+  };
   const needed: NeededRow[] = entries.map((e) => {
     const cur = e.document.revisions[0];
     const ready = meetsRequirement(e.document.revisions, e.requiredStatus);
@@ -120,7 +131,7 @@ export default async function ActionDetailPage({ params, searchParams }: { param
       submitBy: fmtDate(e.requiredBy),
       submitBySort: e.requiredBy.getTime(),
       submitNote: e.manualDate ? "fixed date" : `${e.leadBusinessDays ?? DEFAULT_LEAD_DAYS} days before`,
-      has: cur ? `rev ${cur.value} \u00b7 ${cur.statusCode}` : e.document.isPlaceholder ? "not started" : "not released",
+      has: e.document.latest !== undefined ? standing(e) : cur ? `rev ${cur.value} \u00b7 ${cur.statusCode}` : e.document.isPlaceholder ? "not started" : "not released",
       ready,
       late: !ready && e.requiredBy < new Date(),
       outstanding: !!slip?.outstanding,
