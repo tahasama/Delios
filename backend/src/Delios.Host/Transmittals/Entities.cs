@@ -111,6 +111,15 @@ public sealed class Transmittal
     public Guid? ReviewStepId { get; set; }
     /// <summary>The package it delivered.</summary>
     public Guid? PackageId { get; set; }
+    /// <summary>The transmittal this one answers: a reply in the same exchange.</summary>
+    public Guid? InReplyToId { get; set; }
+    /// <summary>The transmittal this one follows, and how: SUPPLEMENT (adds to it) or REPLACES (stands in its place).</summary>
+    public Guid? FollowsId { get; set; }
+    public string? FollowKind { get; set; }
+    /// <summary>On something received: how it arrived, as whoever recorded it wrote it down.</summary>
+    public string? ReceiptNote { get; set; }
+    /// <summary>The organization's own fields, name to value, as JSON.</summary>
+    public string? Extras { get; set; }
     public List<TransmittalItem> Items { get; set; } = [];
     public List<TransmittalRecipient> Recipients { get; set; } = [];
 }
@@ -192,7 +201,14 @@ public sealed class TransmittalRecipient
     public required string Name { get; set; }
     public string? Organization { get; set; }
     /// <summary>First time this person opened the transmittal; used as evidence it was read.</summary>
+    /// <summary>TO: it is for them, and they acknowledge it. CC: copied in, for their information only.</summary>
+    public string Kind { get; set; } = RecipientKinds.To;
     public Instant? OpenedAt { get; set; }
+    /// <summary>How many times they opened it, and the last time.</summary>
+    public int ViewCount { get; set; }
+    public Instant? LastViewedAt { get; set; }
+    /// <summary>The last time they were told it is waiting for them; empty for an organization with nobody here.</summary>
+    public Instant? NotifiedAt { get; set; }
     public Instant? AcknowledgedAt { get; set; }
     public Instant? DispatchedAt { get; set; }
     /// <summary>How it was sent outside the system, for example email, their portal, by hand.</summary>
@@ -208,6 +224,33 @@ public sealed class TransmittalRecipient
 }
 
 /// <summary>Names of the value sets (admin-managed lists of allowed codes) used by issuing.</summary>
+/// <summary>Whether a recipient is who the transmittal is for (TO), or copied in (CC).</summary>
+public static class RecipientKinds
+{
+    public const string To = "TO";
+    public const string Cc = "CC";
+}
+
+/// <summary>
+/// A transmittal written and not sent yet. Kept apart from the record: it has no
+/// number, counts as nobody's issue, and nobody it names sees it, until it is issued.
+/// </summary>
+public sealed class TransmittalDraft
+{
+    public Guid Id { get; set; } = Guid.CreateVersion7();
+    public Guid TenantId { get; set; }
+    public Guid ProjectId { get; set; }
+    public Guid CreatedById { get; set; }
+    public required string CreatedByName { get; set; }
+    public Instant CreatedAt { get; set; }
+    public required string Subject { get; set; }
+    /// <summary>What it will be issued with, as JSON.</summary>
+    public required string Body { get; set; }
+    /// <summary>When it was issued, and the numbers it became; empty while it is a draft.</summary>
+    public Instant? IssuedAt { get; set; }
+    public string? IssuedAs { get; set; }
+}
+
 public static class TransmittalSets
 {
     /// <summary>Why a revision goes to someone. Props: response (bool), responseDays (working days).</summary>

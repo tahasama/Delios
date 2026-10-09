@@ -10,15 +10,10 @@ import { filesOf, upload } from "@/lib/api/uploads";
 import { addressees, dispatchOf, legacyTransmittal } from "@/lib/api/transmittals";
 import type { TransmittalView } from "@/lib/api/types";
 
-/**
- * The backend records a transmittal on the day it is sent or received: a day
- * other than today cannot be written on it. A day either side is let through,
- * since the person's today and the project's may differ.
- */
-function notToday(value: string): boolean {
-  if (!value) return false;
-  const day = new Date(`${value}T12:00:00`).getTime();
-  return Number.isNaN(day) || Math.abs(day - Date.now()) > 36 * 3_600_000;
+/** A day the form says, as the backend takes it: empty when today's, which the backend stamps itself. */
+function dayOf(value: string): string | null {
+  if (!value) return null;
+  return value === new Date().toISOString().slice(0, 10) ? null : value;
 }
 
 // G.2 steps 5–8 / G.5 steps 1 — the control function raises the transmittal (§11.13).
@@ -45,17 +40,15 @@ export async function createTransmittalAction(_prev: { error?: string } | undefi
   const issueNow = formData.get("issueNow") === "on";
   const inReplyToId = String(formData.get("inReplyTo") ?? "").trim() || null;
   const followsId = String(formData.get("followsId") ?? "").trim() || null;
+  const followKind = String(formData.get("followKind") ?? "").trim() || null;
 
   if (!reasonForIssue) return { error: "Every transmittal states its reason for issue." };
   if (!dateOfIssue) return { error: "Date of issue is required." };
   if (!revisionIds.length && !attachments.length && !message && !subject) return { error: "Enclose at least one revision, or write a subject and a message — a transmittal cannot be empty of both." };
   if (direction === "OUTGOING" && !recipientUsers.length && !partyTo.length) return { error: "Name at least one person to send it to — a company on its own is not a recipient." };
   if (direction === "OUTGOING" && !subject) return { error: "Give the transmittal a subject — it is the first thing the recipient reads." };
-  // What the backend does not keep is refused rather than quietly dropped.
-  if (inReplyToId) return { error: "Answering a transmittal is not supported yet." };
-  if (followsId) return { error: "Supplementing or replacing a transmittal is not supported yet." };
-  if (chosenCc.length) return { error: "Copying people in is not supported yet." };
-  if (notToday(dateOfIssue)) return { error: "Dating a transmittal other than today is not supported yet." };
+  // Copies are our own people; an organization is sent to, never copied.
+  if (chosenCc.some(isParty)) return { error: "Copy people in, not organizations: send to an organization instead." };
 
   const reasons = await getActiveSet("REASONS_FOR_ISSUE");
   if (!reasons.some((r) => r.code === reasonForIssue)) return { error: "Reason for issue is not in the defined set." };
@@ -71,14 +64,13 @@ export async function createTransmittalAction(_prev: { error?: string } | undefi
     direction === "INCOMING" ? ["reason", "message"] : ["reason", "subject", "message", "responseBy"],
   );
   if (asked.error) return { error: asked.error };
-  if (Object.values(asked.extras).some(Boolean)) return { error: "Fields of your own on a transmittal are not supported yet." };
+  const extras = Object.fromEntries(Object.entries(asked.extras).filter(([, value]) => !!value));
 
   let landing: string;
   try {
     if (direction === "INCOMING") {
       // What arrived from another organization. Their own people send it
       // themselves; Document Control records it for one working outside the system.
-      if (notes) return { error: "A note on how it arrived is not supported yet." };
       let fromPartyId: string | undefined;
       if (user.isInternal) {
         const found = (await addressees(ctx)).parties
@@ -94,15 +86,20 @@ export async function createTransmittalAction(_prev: { error?: string } | undefi
         unplanned.push({ title: file.name.replace(/\.[^.]+$/, ""), fileIds: [fileId] });
       }
       const t = await api<TransmittalView>(projectPath(ctx, "/transmittals/incoming"), {
-        body: { reason: reasonForIssue, message, revisionIds, unplanned, fromPartyId },
+        body: {
+          reason: reasonForIssue, message, revisionIds, unplanned, fromPartyId, note: notes || null, userIds: recipientUsers,
+          receivedOn: dayOf(dateOfIssue), inReplyToId, extras: Object.keys(extras).length ? extras : null,
+        },
         idempotencyKey: crypto.randomUUID(),
       });
       landing = `/transmittals/${t.id}`;
     } else {
-      if (!issueNow) return { error: "Keeping a transmittal as a draft is not supported yet." };
-      // One transmittal to our own people chosen, and one to each organization.
+      // One transmittal to our own people chosen, and one to each organization; those copied in are on each.
       const sent = await api<{ id: string; number: string; toName: string }[]>(projectPath(ctx, "/transmittals"), {
-        body: { revisionIds, userIds: recipientUsers, partyIds: partyTo, reason: reasonForIssue, subject, message },
+        body: {
+          revisionIds, userIds: recipientUsers, partyIds: partyTo, reason: reasonForIssue, subject, message, copyUserIds: chosenCc,
+          draft: !issueNow, inReplyToId, followsId, followKind, issuedOn: dayOf(dateOfIssue), extras: Object.keys(extras).length ? extras : null,
+        },
         idempotencyKey: crypto.randomUUID(),
       });
       landing = sent.length === 1 ? `/transmittals/${sent[0].id}` : `/transmittals?q=${encodeURIComponent(sent.map((one) => one.number).join(","))}`;
@@ -114,10 +111,18 @@ export async function createTransmittalAction(_prev: { error?: string } | undefi
   redirect(landing);
 }
 
-export async function issueTransmittalAction(_prev: { error?: string } | undefined, _formData: FormData): Promise<{ error?: string }> {
-  await requireScope();
-  // Every transmittal the backend holds went when it was made.
-  return { error: "Issuing a draft transmittal is not supported yet." };
+/** A draft is issued as it stands, checked again today; it becomes numbered transmittals. */
+export async function issueTransmittalAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
+  const ctx = await requireScope();
+  const id = String(formData.get("transmittalId") ?? "");
+  let sent: { id: string; number: string }[];
+  try {
+    sent = await api(projectPath(ctx, `/transmittals/${id}/issue`), { method: "POST" });
+  } catch (e) {
+    return { error: refusal(e).message };
+  }
+  revalidatePath("/transmittals");
+  redirect(sent.length === 1 ? `/transmittals/${sent[0].id}` : `/transmittals?q=${encodeURIComponent(sent.map((one) => one.number).join(","))}`);
 }
 
 /**
@@ -167,9 +172,17 @@ export async function attachTransmittalFilesAction(_prev: { error?: string; ok?:
 /**
  * Notifying again the people who have not opened it.
  */
-export async function chaseTransmittalAction(_prev: { error?: string } | undefined, _formData: FormData): Promise<{ error?: string }> {
-  await requireScope();
-  return { error: "Notifying people again is not supported yet." };
+export async function chaseTransmittalAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
+  const ctx = await requireScope();
+  const id = String(formData.get("transmittalId") ?? "");
+  const recipientIds = formData.getAll("recipientIds").map(String).filter(Boolean);
+  try {
+    await api(projectPath(ctx, `/transmittals/${id}/notify-again`), { body: { recipientIds } });
+  } catch (e) {
+    return { error: refusal(e).message };
+  }
+  revalidatePath(`/transmittals/${id}`);
+  return {};
 }
 
 /**
@@ -185,7 +198,6 @@ export async function markRecipientSentAction(_prev: { error?: string; ok?: stri
   const reference = String(formData.get("reference") ?? "").trim() || null;
   const when = String(formData.get("sentOn") ?? "").trim();
   if (!channel) return { error: "Say how it went to them." };
-  if (notToday(when)) return { error: "Recording that it went on a day other than today is not supported yet." };
 
   // Whoever carries the exchange with that organization has it waiting for them.
   const transmittalId = await dispatchOf(ctx, recipientId).catch(() => null);
@@ -195,7 +207,7 @@ export async function markRecipientSentAction(_prev: { error?: string; ok?: stri
     const [proof] = filesOf(formData, "evidence");
     const proofFileId = proof ? await upload(ctx, { transmittalId }, proof) : null;
     await api(projectPath(ctx, `/transmittals/${transmittalId}/recipients/${recipientId}/dispatch`), {
-      body: { channel, reference, proofFileId },
+      body: { channel, reference, proofFileId, dispatchedOn: dayOf(when) },
     });
   } catch (e) {
     return { error: refusal(e).message };

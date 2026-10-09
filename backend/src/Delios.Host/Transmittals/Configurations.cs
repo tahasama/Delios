@@ -53,6 +53,11 @@ internal sealed class TransmittalConfiguration : IEntityTypeConfiguration<Transm
         b.HasIndex(x => new { x.ProjectId, x.IssuedAt });
         b.HasIndex(x => x.IssueRequestId);
         b.HasIndex(x => x.ReviewStepId);
+        b.HasIndex(x => x.InReplyToId);
+        b.HasIndex(x => x.FollowsId);
+        b.Property(x => x.FollowKind).HasMaxLength(16);
+        b.Property(x => x.ReceiptNote).HasMaxLength(4000);
+        b.Property(x => x.Extras).HasColumnType("jsonb");
         b.HasOne<Packages.Package>().WithMany().HasForeignKey(x => x.PackageId).OnDelete(DeleteBehavior.Restrict);
         b.HasIndex(x => x.PackageId);
         b.HasOne<Party>().WithMany().HasForeignKey(x => x.FromPartyId).OnDelete(DeleteBehavior.Restrict);
@@ -113,9 +118,26 @@ internal sealed class TransmittalRecipientConfiguration : IEntityTypeConfigurati
         b.HasIndex(x => new { x.PartyId, x.DispatchedAt });
         b.Property(x => x.Name).HasMaxLength(200);
         b.Property(x => x.Organization).HasMaxLength(200);
+        b.Property(x => x.Kind).HasMaxLength(4).HasDefaultValue(RecipientKinds.To);
         b.Property(x => x.DispatchChannel).HasMaxLength(64);
         b.Property(x => x.DispatchRef).HasMaxLength(200);
         b.Property(x => x.DispatchedByName).HasMaxLength(200);
         b.Ignore(x => x.AwaitsDispatch);
+    }
+}
+
+/// <summary>EF Core mapping for <see cref="TransmittalDraft"/>.</summary>
+internal sealed class TransmittalDraftConfiguration : IEntityTypeConfiguration<TransmittalDraft>
+{
+    public void Configure(EntityTypeBuilder<TransmittalDraft> b)
+    {
+        b.ToTable("transmittal_drafts");
+        b.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
+        b.HasOne<Project>().WithMany().HasForeignKey(x => x.ProjectId).OnDelete(DeleteBehavior.Restrict);
+        b.HasIndex(x => new { x.ProjectId, x.CreatedById });
+        b.Property(x => x.CreatedByName).HasMaxLength(200);
+        b.Property(x => x.Subject).HasMaxLength(500);
+        b.Property(x => x.Body).HasColumnType("jsonb");
+        b.Property(x => x.IssuedAs).HasMaxLength(500);
     }
 }

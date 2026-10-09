@@ -19,7 +19,8 @@ public sealed record IssueAsk(
     bool Delegated = false, Guid? ApproverPartyId = null);
 
 /// <summary>That something went to an organization outside the system: when, how, their reference, the proof.</summary>
-public sealed record DispatchRequest(string? Channel, string? Reference = null, Guid? ProofFileId = null);
+/// <param name="DispatchedOn">The day it went, when not today: not before the transmittal, not to come.</param>
+public sealed record DispatchRequest(string? Channel, string? Reference = null, Guid? ProofFileId = null, DateOnly? DispatchedOn = null);
 
 /// <summary>
 /// Issuing: asking for a released revision to be sent, carrying the request out
@@ -319,60 +320,236 @@ public sealed class TransmittalService(
     /// </summary>
     public sealed record ComposeRequest(
         Guid[]? RevisionIds, Guid[]? UserIds, Guid[]? PartyIds, string? Reason, string? Subject = null, string? Message = null,
-        DateOnly? ResponseDue = null);
+        DateOnly? ResponseDue = null, Guid[]? CopyUserIds = null, bool Draft = false, Guid? InReplyToId = null, Guid? FollowsId = null,
+        string? FollowKind = null, DateOnly? IssuedOn = null, Dictionary<string, string?>? Extras = null);
+
+    /// <summary>A compose request checked: what it carries, to whom, and when it is dated.</summary>
+    private sealed record Prepared(
+        string Reason, string Subject, string? Message, LocalDate? Due, List<(Document Document, Revision Revision)> Items,
+        List<Addressee> People, List<Party> Parties, List<Addressee> Copies, Instant IssuedAt, Guid? InReplyToId, Guid? FollowsId,
+        string? FollowKind, string? Extras, List<Member> Members);
 
     /// <summary>
     /// Issues released revisions directly, without an issue request: one transmittal to the project's own people
-    /// chosen, and one to each outside party. Only those who may control or transmit every document do this.
+    /// chosen, and one to each outside party; those copied in are on each. Only those who may control or transmit
+    /// every document do this. A letter may carry no documents when it has a subject and a message.
     /// </summary>
     public async Task<(IReadOnlyList<Transmittal> Sent, IResult? Problem)> ComposeAsync(
         ProjectAccess access, ComposeRequest request, CancellationToken cancellationToken)
     {
+        var (prepared, problem) = await PrepareAsync(access, request, cancellationToken);
+        if (problem is not null) return ([], problem);
+        var p = prepared!;
+        var actor = new Actor(access.UserId, access.UserName);
+        var sent = new List<Transmittal>();
+        Raise Of(Party? to, string toName, IReadOnlyList<Addressee> recipients) => new(access.Project, actor, p.Reason, p.Subject, p.Message,
+            to, toName, p.Items, recipients, ResponseDue: p.Due, Copies: p.Copies, IssuedAt: p.IssuedAt, InReplyToId: p.InReplyToId,
+            FollowsId: p.FollowsId, FollowKind: p.FollowKind, Extras: p.Extras);
+        if (p.People.Count > 0 || p.Parties.Count == 0) sent.Add(await RaiseAsync(Of(null, "Internal distribution", p.People), cancellationToken));
+        foreach (var party in p.Parties) sent.Add(await RaiseAsync(Of(party, party.Name, AddresseesOf(party, p.Members)), cancellationToken));
+        foreach (var (document, revision) in p.Items)
+        {
+            await audit.WriteAsync(actor, "ISSUED", "Revision", revision.Id, Label(document, revision),
+                $"Issued {p.Reason}: {string.Join(", ", sent.Select(t => t.Number))}.", access.Project.Id, cancellationToken);
+        }
+        await db.SaveChangesAsync(cancellationToken);
+        return (sent, null);
+    }
+
+    private async Task<(Prepared? Prepared, IResult? Problem)> PrepareAsync(ProjectAccess access, ComposeRequest request, CancellationToken cancellationToken)
+    {
+        static (Prepared?, IResult?) Fail(IResult problem) => (null, problem);
         var revisionIds = request.RevisionIds?.Distinct().ToList() ?? [];
-        if (revisionIds.Count is 0 or > 500) return ([], Problems.Invalid("ITEMS_REQUIRED", "Choose between 1 and 500 released revisions."));
+        var subjectGiven = request.Subject?.Trim() is { Length: > 0 };
+        var messageGiven = request.Message?.Trim() is { Length: > 0 };
+        if (revisionIds.Count > 500) return Fail(Problems.Invalid("ITEMS_REQUIRED", "Choose at most 500 released revisions."));
+        if (revisionIds.Count == 0 && !(subjectGiven && messageGiven))
+            return Fail(Problems.Invalid("ITEMS_REQUIRED", "Enclose at least one released revision, or write a subject and a message: a letter says something."));
         var catalog = await Catalog.LoadAsync(db, cancellationToken);
         var reason = request.Reason?.Trim() ?? "";
         if (!catalog.IsActive(TransmittalSets.Reasons, reason))
-            return ([], Problems.Invalid("VALUE_NOT_PUBLISHED", $"{reason} is not a published reason for issue.", new { field = "reason", value = reason }));
+            return Fail(Problems.Invalid("VALUE_NOT_PUBLISHED", $"{reason} is not a published reason for issue.", new { field = "reason", value = reason }));
         var revisions = await db.Revisions.Where(r => revisionIds.Contains(r.Id) && r.ProjectId == access.Project.Id).ToListAsync(cancellationToken);
         var documentIds = revisions.Select(r => r.DocumentId).ToList();
         var documents = await DocumentQueries.Visible(db, access, catalog.RestrictedLevels())
             .Where(d => documentIds.Contains(d.Id)).ToDictionaryAsync(d => d.Id, cancellationToken);
         if (revisions.Count != revisionIds.Count || revisions.Any(r => !documents.ContainsKey(r.DocumentId)))
-            return ([], Problems.NotFound("REVISION_NOT_FOUND", "A revision chosen does not exist or is not yours to see."));
+            return Fail(Problems.NotFound("REVISION_NOT_FOUND", "A revision chosen does not exist or is not yours to see."));
         if (revisions.FirstOrDefault(r => r.State != RevisionStates.Released) is { } unreleased)
-            return ([], Problems.Conflict("NOT_RELEASED", $"{Label(documents[unreleased.DocumentId], unreleased)} is not released: only released revisions are issued."));
+            return Fail(Problems.Conflict("NOT_RELEASED", $"{Label(documents[unreleased.DocumentId], unreleased)} is not released: only released revisions are issued."));
+        if (revisions.FirstOrDefault(r => r.HeldAt is not null) is { } held)
+            return Fail(Problems.Conflict("ON_HOLD", $"{Label(documents[held.DocumentId], held)} is on hold, not for use."));
         if (documents.Values.FirstOrDefault(d => !access.Allows(Verbs.Control, d.Facts) && !access.Allows(Verbs.Transmit, d.Facts)) is { } refused)
-            return ([], Problems.Forbidden("TRANSMIT_NOT_ALLOWED", $"Your function does not issue {refused.Number}."));
+            return Fail(Problems.Forbidden("TRANSMIT_NOT_ALLOWED", $"Your function does not issue {refused.Number}."));
+        if (revisionIds.Count == 0 && !access.IsInternal)
+            return Fail(Problems.Forbidden("TRANSMIT_NOT_ALLOWED", "Only the project's own people write letters here."));
 
         var members = await MembersAsync(access.Project, cancellationToken);
         var userIds = request.UserIds?.Distinct().ToList() ?? [];
         var people = members.Where(m => userIds.Contains(m.UserId)).Select(m => new Addressee(m.UserId, null, m.Name, m.PartyName)).ToList();
-        if (people.Count != userIds.Count) return ([], Problems.Invalid("RECIPIENT_UNKNOWN", "Someone chosen is not active on this project."));
+        if (people.Count != userIds.Count) return Fail(Problems.Invalid("RECIPIENT_UNKNOWN", "Someone chosen is not active on this project."));
         var partyIds = request.PartyIds?.Distinct().ToList() ?? [];
         var parties = await db.Parties.AsNoTracking().Where(p => partyIds.Contains(p.Id) && p.Active).OrderBy(p => p.Name).ToListAsync(cancellationToken);
-        if (parties.Count != partyIds.Count) return ([], Problems.Invalid("PARTY_UNKNOWN", "An organization chosen is not an active party."));
-        if (people.Count == 0 && parties.Count == 0) return ([], Problems.Invalid("RECIPIENTS_REQUIRED", "Choose who it goes to."));
+        if (parties.Count != partyIds.Count) return Fail(Problems.Invalid("PARTY_UNKNOWN", "An organization chosen is not an active party."));
+        if (people.Count == 0 && parties.Count == 0) return Fail(Problems.Invalid("RECIPIENTS_REQUIRED", "Choose who it goes to."));
+        var copyIds = request.CopyUserIds?.Distinct().Where(id => !userIds.Contains(id)).ToList() ?? [];
+        var copies = members.Where(m => copyIds.Contains(m.UserId)).Select(m => new Addressee(m.UserId, null, m.Name, m.PartyName, RecipientKinds.Cc)).ToList();
+        if (copies.Count != copyIds.Count) return Fail(Problems.Invalid("RECIPIENT_UNKNOWN", "Someone copied in is not active on this project."));
+
+        var (issuedAt, notYet) = WorkingCalendar.Moment(clock, access.Project.TimeZone, request.IssuedOn);
+        if (notYet is not null) return Fail(Problems.Invalid("DATE_IN_FUTURE", $"The date of issue cannot be later than today. {notYet}"));
+        if (revisions.FirstOrDefault(r => r.ReleasedAt > issuedAt!.Value.Plus(Duration.FromHours(12))) is { } later)
+            return Fail(Problems.Invalid("DATE_BEFORE_RELEASE", $"{Label(documents[later.DocumentId], later)} was released after that day."));
+        Transmittal? answered = null, followed = null;
+        if (request.InReplyToId is { } replyTo)
+        {
+            answered = await Visible(access).AsNoTracking().SingleOrDefaultAsync(t => t.Id == replyTo, cancellationToken);
+            if (answered is null) return Fail(Problems.NotFound("TRANSMITTAL_NOT_FOUND", "The transmittal it answers does not exist or is not yours to see."));
+            if (answered.IssuedAt > issuedAt!.Value.Plus(Duration.FromHours(12)))
+                return Fail(Problems.Invalid("DATE_BEFORE_ANSWERED", $"It cannot be dated before {answered.Number}, which it answers."));
+        }
+        string? followKind = null;
+        if (request.FollowsId is { } follows)
+        {
+            followed = await Visible(access).AsNoTracking().SingleOrDefaultAsync(t => t.Id == follows, cancellationToken);
+            if (followed is null) return Fail(Problems.NotFound("TRANSMITTAL_NOT_FOUND", "The transmittal it follows does not exist or is not yours to see."));
+            followKind = (request.FollowKind ?? "SUPPLEMENT").Trim().ToUpperInvariant();
+            if (followKind is not ("SUPPLEMENT" or "REPLACES"))
+                return Fail(Problems.Invalid("FOLLOW_KIND_INVALID", "A follow-up either supplements the transmittal (SUPPLEMENT) or replaces it (REPLACES)."));
+        }
 
         var items = revisions.Select(r => (documents[r.DocumentId], r)).OrderBy(i => i.Item1.Number).ToList();
-        var subject = string.IsNullOrWhiteSpace(request.Subject)
-            ? items.Count == 1 ? $"{Label(items[0].Item1, items[0].r)}, {items[0].r.StatusCode}" : $"{items.Count} documents"
-            : request.Subject.Trim();
-        var message = string.IsNullOrWhiteSpace(request.Message) ? null : request.Message.Trim();
+        var subject = subjectGiven ? request.Subject!.Trim()
+            : items.Count == 1 ? $"{Label(items[0].Item1, items[0].r)}, {items[0].r.StatusCode}" : $"{items.Count} documents";
+        var message = messageGiven ? request.Message!.Trim() : null;
         var due = request.ResponseDue is { } d ? LocalDate.FromDateOnly(d) : (LocalDate?)null;
-        var actor = new Actor(access.UserId, access.UserName);
-        var sent = new List<Transmittal>();
-        if (people.Count > 0)
-            sent.Add(await RaiseAsync(new Raise(access.Project, actor, reason, subject, message, null, "Internal distribution", items, people, ResponseDue: due), cancellationToken));
-        foreach (var party in parties)
-            sent.Add(await RaiseAsync(new Raise(access.Project, actor, reason, subject, message, party, party.Name, items, AddresseesOf(party, members), ResponseDue: due), cancellationToken));
-        foreach (var (document, revision) in items)
+        return (new Prepared(reason, subject, message, due, items, people, parties, copies, issuedAt!.Value, answered?.Id, followed?.Id,
+            followKind, Documents.OwnFields.Write(null, request.Extras), members), null);
+    }
+
+    // ── Drafts ────────────────────────────────────────────────────────────────
+
+    /// <summary>Keeps a transmittal as a draft: checked as if it were issued now, sent to nobody, numbered when issued.</summary>
+    public async Task<(TransmittalDraft? Draft, IResult? Problem)> SaveDraftAsync(ProjectAccess access, ComposeRequest request, CancellationToken cancellationToken)
+    {
+        var (prepared, problem) = await PrepareAsync(access, request with { Draft = false }, cancellationToken);
+        if (problem is not null) return (null, problem);
+        var draft = new TransmittalDraft
         {
-            await audit.WriteAsync(actor, "ISSUED", "Revision", revision.Id, Label(document, revision),
-                $"Issued {reason}: {string.Join(", ", sent.Select(t => t.Number))}.", access.Project.Id, cancellationToken);
-        }
+            TenantId = access.Project.TenantId,
+            ProjectId = access.Project.Id,
+            CreatedById = access.UserId,
+            CreatedByName = access.UserName,
+            CreatedAt = clock.GetCurrentInstant(),
+            Subject = prepared!.Subject,
+            Body = JsonSerializer.Serialize(request with { Draft = false }),
+        };
+        db.Add(draft);
+        await db.SaveChangesAsync(cancellationToken);
+        return (draft, null);
+    }
+
+    /// <summary>A draft the caller may see: their own, or any for Document Control. Null otherwise.</summary>
+    public Task<TransmittalDraft?> DraftAsync(ProjectAccess access, Guid id, CancellationToken cancellationToken) =>
+        db.Set<TransmittalDraft>().SingleOrDefaultAsync(d => d.Id == id && d.ProjectId == access.Project.Id
+            && (d.CreatedById == access.UserId || access.Holds(Verbs.Control)), cancellationToken);
+
+    /// <summary>The drafts not yet issued that the caller may see, newest first.</summary>
+    public Task<List<TransmittalDraft>> DraftsAsync(ProjectAccess access, CancellationToken cancellationToken) =>
+        db.Set<TransmittalDraft>().AsNoTracking()
+            .Where(d => d.ProjectId == access.Project.Id && d.IssuedAt == null && (d.CreatedById == access.UserId || access.Holds(Verbs.Control)))
+            .OrderByDescending(d => d.CreatedAt).ToListAsync(cancellationToken);
+
+    /// <summary>Issues a draft as it stands, checked again today: it becomes numbered transmittals, and the draft records which.</summary>
+    public async Task<(IReadOnlyList<Transmittal> Sent, IResult? Problem)> IssueDraftAsync(ProjectAccess access, Guid id, CancellationToken cancellationToken)
+    {
+        var draft = await DraftAsync(access, id, cancellationToken);
+        if (draft is null) return ([], NotFound());
+        if (draft.IssuedAt is not null) return ([], Problems.Conflict("ALREADY_ISSUED", $"This draft was issued as {draft.IssuedAs}."));
+        var body = JsonSerializer.Deserialize<ComposeRequest>(draft.Body)!;
+        // Dated the day it goes, unless the draft named a day.
+        var (sent, problem) = await ComposeAsync(access, body, cancellationToken);
+        if (problem is not null) return ([], problem);
+        draft.IssuedAt = clock.GetCurrentInstant();
+        draft.IssuedAs = string.Join(", ", sent.Select(t => t.Number));
         await db.SaveChangesAsync(cancellationToken);
         return (sent, null);
+    }
+
+    /// <summary>A draft shown as the transmittal it will be: no number, nobody told yet.</summary>
+    public async Task<TransmittalView> DraftViewAsync(ProjectAccess access, TransmittalDraft draft, CancellationToken cancellationToken)
+    {
+        var body = JsonSerializer.Deserialize<ComposeRequest>(draft.Body)!;
+        var revisionIds = body.RevisionIds ?? [];
+        var items = await (from r in db.Revisions
+                           join d in db.Documents on r.DocumentId equals d.Id
+                           where revisionIds.Contains(r.Id)
+                           orderby d.Number
+                           select new TransmittalItemView(r.Id, TransmittalItemKinds.Revision, d.Id, r.Id, d.Number, d.Title, r.Value, r.StatusCode,
+                               null, null, null, null, null, new List<ItemFileView>())).ToListAsync(cancellationToken);
+        var members = await MembersAsync(access.Project, cancellationToken);
+        var partyIds = body.PartyIds ?? [];
+        var parties = await db.Parties.AsNoTracking().Where(p => partyIds.Contains(p.Id)).ToListAsync(cancellationToken);
+        var recipients = members.Where(m => (body.UserIds ?? []).Contains(m.UserId))
+            .Select(m => new RecipientView(m.UserId, m.Name, m.PartyName, true, null, null, null, null, null, null, null, RecipientKinds.To, m.UserId))
+            .Concat(parties.Select(p => new RecipientView(p.Id, p.Name, p.Name, false, null, null, null, null, null, null, null, RecipientKinds.To, null, p.Id)))
+            .Concat(members.Where(m => (body.CopyUserIds ?? []).Contains(m.UserId))
+                .Select(m => new RecipientView(m.UserId, m.Name, m.PartyName, true, null, null, null, null, null, null, null, RecipientKinds.Cc, m.UserId)))
+            .ToList();
+        return new TransmittalView(draft.Id, "Draft", TransmittalDirections.Outgoing, body.Reason ?? "", draft.Subject, body.Message,
+            parties.Count == 0 ? "Internal distribution" : string.Join(", ", parties.Select(p => p.Name)), false, body.ResponseDue,
+            draft.CreatedAt.ToDateTimeOffset(), draft.CreatedByName, null, null, items, recipients, State: "DRAFT", IssuedById: draft.CreatedById,
+            Extras: body.Extras is null ? null : JsonSerializer.SerializeToElement(body.Extras));
+    }
+
+    // ── Threads, chasing ──────────────────────────────────────────────────────
+
+    /// <summary>What a transmittal answers and follows, and what answered and followed it, among those the caller may see.</summary>
+    public async Task<TransmittalThread> ThreadAsync(ProjectAccess access, Transmittal t, CancellationToken cancellationToken)
+    {
+        var related = await Visible(access).AsNoTracking()
+            .Where(x => x.Id == t.InReplyToId || x.Id == t.FollowsId || x.InReplyToId == t.Id || x.FollowsId == t.Id)
+            .Select(x => new ThreadRow(x.Id, x.Number, x.Subject, x.IssuedAt, x.Direction, x.FollowKind, x.InReplyToId, x.FollowsId, x.IssuedByName,
+                x.FromName, x.Items.Count, x.Recipients.Count))
+            .ToListAsync(cancellationToken);
+        static TransmittalRef Ref(ThreadRow x) => new(x.Id, x.Number, x.Subject, x.IssuedAt.ToDateTimeOffset(), x.Direction, x.FollowKind,
+            x.Items, x.Recipients, x.IssuedByName, x.FromName);
+        return new TransmittalThread(
+            related.Where(x => x.Id == t.InReplyToId).Select(Ref).FirstOrDefault(),
+            related.Where(x => x.InReplyToId == t.Id).OrderBy(x => x.IssuedAt).Select(Ref).ToList(),
+            related.Where(x => x.Id == t.FollowsId).Select(Ref).FirstOrDefault(),
+            related.Where(x => x.FollowsId == t.Id).OrderBy(x => x.IssuedAt).Select(Ref).ToList());
+    }
+
+    private sealed record ThreadRow(Guid Id, string Number, string Subject, Instant IssuedAt, string Direction, string? FollowKind,
+        Guid? InReplyToId, Guid? FollowsId, string IssuedByName, string? FromName, int Items, int Recipients);
+
+    /// <summary>
+    /// Tells the people it is for again, those who have not acknowledged it (or the ones named). Whoever issued it,
+    /// or Document Control.
+    /// </summary>
+    public async Task<(Transmittal? Transmittal, IResult? Problem)> NotifyAgainAsync(
+        ProjectAccess access, Guid id, Guid[]? recipientIds, CancellationToken cancellationToken)
+    {
+        var transmittal = await Visible(access).Include(t => t.Items).Include(t => t.Recipients).AsSplitQuery()
+            .SingleOrDefaultAsync(t => t.Id == id, cancellationToken);
+        if (transmittal is null) return (null, NotFound());
+        if (transmittal.IssuedById != access.UserId && !access.Holds(Verbs.Control))
+            return (null, Problems.Forbidden("NOT_YOURS", "Whoever issued it, or Document Control, tells people again."));
+        var chosen = transmittal.Recipients.Where(r => r.UserId is not null && r.Kind == RecipientKinds.To && r.AcknowledgedAt is null
+            && (recipientIds is not { Length: > 0 } || recipientIds.Contains(r.Id))).ToList();
+        if (chosen.Count == 0) return (null, Problems.Conflict("NOBODY_TO_TELL", "Everybody it is for has acknowledged it."));
+        var now = clock.GetCurrentInstant();
+        foreach (var r in chosen) r.NotifiedAt = now;
+        await notifier.NotifyAsync(transmittal.TenantId, transmittal.ProjectId, chosen.Select(r => r.UserId!.Value),
+            Notifications.NotificationKinds.TransmittalReceived, $"Reminder — {transmittal.Number}: {transmittal.Subject}",
+            $"{transmittal.Reason} from {transmittal.IssuedByName}, waiting for you to acknowledge it"
+            + (transmittal.ResponseDue is { } due ? $"; answer by {due:yyyy-MM-dd}." : "."),
+            $"/transmittals/{transmittal.Id}", cancellationToken, Notifications.EmailKinds.Transmittal);
+        await audit.WriteAsync(new Actor(access.UserId, access.UserName), "TRANSMITTAL_CHASED", "Transmittal", transmittal.Id, transmittal.Number,
+            $"Told again: {string.Join(", ", chosen.Select(r => r.Name))}.", transmittal.ProjectId, cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
+        return (transmittal, null);
     }
 
     // ── Raising ───────────────────────────────────────────────────────────────
@@ -381,7 +558,7 @@ public sealed class TransmittalService(
     /// Someone a transmittal is addressed to: a user (<c>UserId</c> set) or an organization with nobody here
     /// (<c>UserId</c> empty, <c>PartyId</c> set).
     /// </summary>
-    public sealed record Addressee(Guid? UserId, Guid? PartyId, string Name, string? Organization);
+    public sealed record Addressee(Guid? UserId, Guid? PartyId, string Name, string? Organization, string Kind = RecipientKinds.To);
 
     /// <summary>
     /// Everything needed to raise one transmittal. Built by issue requests, review steps sent to a party, and package
@@ -392,7 +569,9 @@ public sealed class TransmittalService(
         Project Project, Actor Actor, string Reason, string Subject, string? Message, Party? To, string ToName,
         IReadOnlyList<(Document Document, Revision Revision)> Items, IReadOnlyList<Addressee> Recipients,
         Guid? IssueRequestId = null, Guid? ReviewStepId = null, LocalDate? ResponseDue = null, Guid? PackageId = null,
-        DispatchRequest? Dispatched = null, IReadOnlyList<(Document Document, LocalDate? Due)>? Placeholders = null);
+        DispatchRequest? Dispatched = null, IReadOnlyList<(Document Document, LocalDate? Due)>? Placeholders = null,
+        IReadOnlyList<Addressee>? Copies = null, Instant? IssuedAt = null, Guid? InReplyToId = null, Guid? FollowsId = null,
+        string? FollowKind = null, string? Extras = null);
 
     /// <summary>A numbered transmittal. What it records is never changed afterwards.</summary>
     public async Task<Transmittal> RaiseAsync(Raise raise, CancellationToken cancellationToken)
@@ -425,7 +604,11 @@ public sealed class TransmittalService(
             ToName = raise.ToName,
             ResponseRequired = responseRequired || raise.ResponseDue is not null,
             ResponseDue = due,
-            IssuedAt = now,
+            IssuedAt = raise.IssuedAt ?? now,
+            InReplyToId = raise.InReplyToId,
+            FollowsId = raise.FollowsId,
+            FollowKind = raise.FollowKind,
+            Extras = raise.Extras,
             IssuedById = raise.Actor.Id,
             IssuedByName = raise.Actor.Name,
             IssueRequestId = raise.IssueRequestId,
@@ -455,10 +638,14 @@ public sealed class TransmittalService(
             RevisionValue = "",
             DueDate = x.Due,
         }));
-        transmittal.Recipients = raise.Recipients.Select(a => new TransmittalRecipient
+        var addressed = raise.Recipients
+            .Concat((raise.Copies ?? []).Where(c => !raise.Recipients.Any(r => r.UserId == c.UserId))).ToList();
+        transmittal.Recipients = addressed.Select(a => new TransmittalRecipient
         {
             TenantId = project.TenantId,
             TransmittalId = transmittal.Id,
+            Kind = a.Kind,
+            NotifiedAt = a.UserId is null ? null : now,
             UserId = a.UserId,
             PartyId = a.PartyId,
             Name = a.Name,
@@ -479,7 +666,7 @@ public sealed class TransmittalService(
         var listed = string.Join("\n", transmittal.Items.Select(i => i.Kind == TransmittalItemKinds.Placeholder
             ? $"- {i.DocumentNumber} {i.Title} (to send by {i.DueDate?.ToString("yyyy-MM-dd", null) ?? "no date"})"
             : $"- {i.DocumentNumber} rev {i.RevisionValue} {i.Title}{(i.StatusCode is null ? "" : $" ({i.StatusCode})")}"));
-        await notifier.NotifyAsync(project.TenantId, project.Id, raise.Recipients.Where(a => a.UserId is not null).Select(a => a.UserId!.Value),
+        await notifier.NotifyAsync(project.TenantId, project.Id, addressed.Where(a => a.UserId is not null).Select(a => a.UserId!.Value),
             Notifications.NotificationKinds.TransmittalReceived, $"{number}: {raise.Subject}",
             $"{raise.Reason} from {raise.Actor.Name}{(due is null ? "" : $", answer by {due:yyyy-MM-dd}")}.\n{listed}{(raise.Message is null ? "" : $"\n\n{raise.Message}")}",
             $"/transmittals/{transmittal.Id}", cancellationToken, Notifications.EmailKinds.Transmittal);
@@ -520,9 +707,12 @@ public sealed class TransmittalService(
     {
         var transmittal = await Visible(access).Include(t => t.Items).Include(t => t.Recipients).AsSplitQuery()
             .SingleOrDefaultAsync(t => t.Id == id, cancellationToken);
-        if (transmittal?.Recipients.SingleOrDefault(r => r.UserId == access.UserId) is { OpenedAt: null } mine)
+        if (transmittal?.Recipients.SingleOrDefault(r => r.UserId == access.UserId) is { } mine)
         {
-            mine.OpenedAt = clock.GetCurrentInstant();
+            var now = clock.GetCurrentInstant();
+            mine.OpenedAt ??= now;
+            mine.LastViewedAt = now;
+            mine.ViewCount++;
             await db.SaveChangesAsync(cancellationToken);
         }
         return transmittal;
@@ -567,7 +757,11 @@ public sealed class TransmittalService(
         if (request.ProofFileId is { } proof
             && await BindEvidenceAsync(access, proof, item.RevisionId, cancellationToken) is { } bad) return (null, bad);
 
-        recipient.DispatchedAt = clock.GetCurrentInstant();
+        var (went, notYet) = WorkingCalendar.Moment(clock, access.Project.TimeZone, request.DispatchedOn);
+        if (notYet is not null) return (null, Problems.Invalid("DATE_IN_FUTURE", $"The day it went cannot be later than today. {notYet}"));
+        if (went!.Value.Plus(Duration.FromHours(12)) < transmittal.IssuedAt)
+            return (null, Problems.Invalid("DATE_BEFORE_ISSUE", "It cannot have gone before the transmittal was issued."));
+        recipient.DispatchedAt = went;
         recipient.DispatchChannel = channel;
         recipient.DispatchRef = request.Reference?.Trim();
         recipient.DispatchedByName = access.UserName;
@@ -789,7 +983,7 @@ public sealed class TransmittalService(
         var unacknowledged = await (
             from x in db.TransmittalRecipients
             join t in db.Transmittals on x.TransmittalId equals t.Id
-            where t.ProjectId == projectId && x.UserId == me && x.AcknowledgedAt == null
+            where t.ProjectId == projectId && x.UserId == me && x.AcknowledgedAt == null && x.Kind == RecipientKinds.To
             orderby t.IssuedAt
             select new { t.Id, t.Number, t.Reason, t.IssuedByName, t.ResponseDue, t.IssuedAt }).ToListAsync(cancellationToken);
         work.AddRange(unacknowledged.Select(x => new IssueWork("ACKNOWLEDGE_TRANSMITTAL", null, x.Id, null, x.Number,

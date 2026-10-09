@@ -6,6 +6,21 @@ namespace Delios.Host.Platform;
 public static class WorkingCalendar
 {
     /// <summary>
+    /// The moment to record for something said to have happened on a day: now when the day is today, midday in the
+    /// project's time zone otherwise. Null with a problem when the day is still to come.
+    /// </summary>
+    public static (Instant? At, string? Problem) Moment(IClock clock, string timeZone, DateOnly? day)
+    {
+        if (day is null) return (clock.GetCurrentInstant(), null);
+        var date = LocalDate.FromDateOnly(day.Value);
+        var today = Today(clock, timeZone);
+        if (date > today) return (null, "That day has not come yet.");
+        if (date == today) return (clock.GetCurrentInstant(), null);
+        var zone = DateTimeZoneProviders.Tzdb.GetZoneOrNull(timeZone) ?? DateTimeZone.Utc;
+        return (date.At(new LocalTime(12, 0)).InZoneLeniently(zone).ToInstant(), null);
+    }
+
+    /// <summary>
     /// Returns the date that is <c>days</c> working days after <c>start</c>, skipping the given weekend days (ISO numbers, 1 Monday to 7 Sunday).
     /// Used to work out due dates for reviews and transmittals.
     /// </summary>

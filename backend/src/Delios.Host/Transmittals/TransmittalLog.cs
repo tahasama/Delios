@@ -18,7 +18,7 @@ public sealed record TransmittalFilter(
     DateOnly? To = null, string? Sort = null, string? Dir = null, string? Ids = null, string? Direction = null);
 
 /// <summary>One recipient in a log row, and whether they have acknowledged it (or, for an organization outside, whether it went).</summary>
-public sealed record LogRecipient(Guid Id, string Name, bool Seen);
+public sealed record LogRecipient(Guid Id, string Name, bool Seen, string Kind = RecipientKinds.To, string? Organization = null);
 
 /// <summary>One row of the transmittal log.</summary>
 public sealed record LogRow(
@@ -130,9 +130,9 @@ public static class TransmittalLogEndpoints
             States.ToSend => toSend,
             States.Overdue => AnswerAwaited(db, query).Where(t => t.ResponseDue < today),
             States.AwaitingReply => AnswerAwaited(db, query).Where(t => t.ResponseDue == null || t.ResponseDue >= today),
-            States.AwaitingAck => query.Where(t => t.Recipients.Any(r => r.UserId != null && r.AcknowledgedAt == null)),
+            States.AwaitingAck => query.Where(t => t.Recipients.Any(r => r.UserId != null && r.Kind == RecipientKinds.To && r.AcknowledgedAt == null)),
             States.ToRegister => unregistered,
-            States.Complete => query.Where(t => !t.Recipients.Any(r => (r.UserId == null && r.DispatchedAt == null) || (r.UserId != null && r.AcknowledgedAt == null))
+            States.Complete => query.Where(t => !t.Recipients.Any(r => (r.UserId == null && r.DispatchedAt == null) || (r.UserId != null && r.Kind == RecipientKinds.To && r.AcknowledgedAt == null))
                 && !(t.ReviewStepId != null && t.ResponseRequired && db.ReviewSteps.Any(s => s.Id == t.ReviewStepId && s.CompletedAt == null))
                 && !t.Items.Any(i => i.Kind == TransmittalItemKinds.Unplanned && i.RegisteredAt == null)),
             _ => query,
@@ -170,7 +170,7 @@ public static class TransmittalLogEndpoints
             "documents" => By(t => t.Items.Count),
             // What it waits on, most pressing first: to send, then to acknowledge, then nothing.
             "status" => By(t => t.Recipients.Any(r => r.UserId == null && r.DispatchedAt == null) ? 0
-                : t.Recipients.Any(r => r.UserId != null && r.AcknowledgedAt == null) ? 1 : 2),
+                : t.Recipients.Any(r => r.UserId != null && r.Kind == RecipientKinds.To && r.AcknowledgedAt == null) ? 1 : 2),
             _ => By(t => t.IssuedAt),
         };
         return ordered.ThenBy(t => t.Number);
@@ -193,10 +193,10 @@ public static class TransmittalLogEndpoints
                 : t.Recipients.Any(r => r.AwaitsDispatch) ? States.ToSend
                 : awaited && t.ResponseDue < today ? States.Overdue
                 : awaited ? States.AwaitingReply
-                : t.Recipients.Any(r => r.UserId != null && r.AcknowledgedAt is null) ? States.AwaitingAck
+                : t.Recipients.Any(r => r.UserId != null && r.Kind == RecipientKinds.To && r.AcknowledgedAt is null) ? States.AwaitingAck
                 : States.Complete;
             return new LogRow(t.Id, t.Number, t.Subject, t.Reason, t.ToName, t.IssuedByName, t.IssuedAt.ToDateTimeOffset(), t.Items.Count, status,
-                t.Recipients.OrderBy(r => r.Name).Select(r => new LogRecipient(r.Id, r.Name, r.UserId is null ? r.DispatchedAt is not null : r.AcknowledgedAt is not null)).ToList(),
+                t.Recipients.OrderBy(r => r.Name).Select(r => new LogRecipient(r.Id, r.Name, r.UserId is null ? r.DispatchedAt is not null : r.AcknowledgedAt is not null, r.Kind, r.Organization)).ToList(),
                 t.ResponseRequired, t.ResponseDue?.ToDateOnly(), t.ReviewStepId is not null, t.Direction, t.FromName, t.TheirReference);
         }).ToList();
     }

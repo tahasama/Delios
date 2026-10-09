@@ -60,23 +60,6 @@ export async function ourOrganizationName(): Promise<string> {
 /** A file's kind, read from its name: the backend lists what an item carried without saying which is the rendition. */
 const kindOf = (name: string) => (/\.pdf$/i.test(name) ? "RENDITION" : "NATIVE");
 
-/**
- * The people and organizations on the record, matched back to their ids. The
- * backend names a recipient but does not say which account or party it is, so
- * a person is found by name among the project's people (or is the reader), and
- * an organization by name among the parties.
- */
-async function recipientIds(scope: Scope, t: TransmittalView) {
-  const [found, me] = await Promise.all([addressees(scope), getMe()]);
-  const person = new Map(found.people.map((one) => [one.name, one.id]));
-  if (me) person.set(me.user.name, me.user.id);
-  const party = new Map(found.parties.map((one) => [one.name, one.id]));
-  return t.recipients.map((r) => ({
-    id: r.id,
-    userId: r.person ? person.get(r.name) ?? `unknown:${r.id}` : null,
-    partyId: r.person ? null : party.get(r.organization ?? r.name) ?? `unknown:${r.id}`,
-  }));
-}
 
 /** Where an incoming submission stands with Document Control: still to check, returned, or accepted. */
 function arrivalOf(item: TransmittalItem, revision: { state: string; submission: number; returnedReason: string | null; submissions: { number: number; outcome: string | null; decidedBy: string | null; decidedAt: string | null }[] } | null) {
@@ -160,7 +143,7 @@ export const legacyTransmittal = cache(async (scope: Scope, id: string) => {
   const unregistered = t.items.some((one) => one.kind === "UNPLANNED" && !one.registeredAt);
   const arrivals = items.map((one) => one.arrival).filter((one): one is NonNullable<typeof one> => !!one);
   const returned = arrivals.find((one) => one.state === "RETURNED") ?? null;
-  const status = !incoming ? "ISSUED"
+  const status = t.state === "DRAFT" ? "DRAFT" : !incoming ? "ISSUED"
     : unregistered || arrivals.some((one) => one.state === "TO_CHECK") ? "ISSUED"
       : returned ? "REJECTED" : "ACCEPTED";
   // Who checked it: whoever last accepted, returned or registered what came.
@@ -170,25 +153,24 @@ export const legacyTransmittal = cache(async (scope: Scope, id: string) => {
   ].sort((a, b) => b.at.getTime() - a.at.getTime());
   const checked = status === "ACCEPTED" || status === "REJECTED" ? checks[0] ?? null : null;
 
-  const ids = await recipientIds(scope, t);
-  const recipients = t.recipients.map((r, i) => ({
+  const recipients = t.recipients.map((r) => ({
     id: r.id,
-    kind: "TO",
+    kind: r.kind ?? "TO",
     name: r.name,
     organization: r.organization,
-    userId: ids[i].userId,
-    partyId: ids[i].partyId,
+    userId: r.userId,
+    partyId: r.partyId,
     openedAt: date(r.openedAt),
-    // A person's acknowledgement is the last time they looked that the record keeps.
-    lastViewedAt: date(r.acknowledgedAt ?? r.openedAt),
-    viewCount: r.openedAt ? 1 : 0,
-    notifiedAt: r.person ? issuedAt : null,
+    lastViewedAt: date(r.lastViewedAt ?? r.acknowledgedAt ?? r.openedAt),
+    // Opened before each opening was counted: once at least.
+    viewCount: Math.max(r.viewCount ?? 0, r.openedAt ? 1 : 0),
+    notifiedAt: date(r.notifiedAt) ?? (r.person ? issuedAt : null),
     dispatchedAt: date(r.dispatchedAt),
     dispatchChannel: r.dispatchChannel,
     dispatchRef: r.dispatchRef,
     dispatchedByName: r.dispatchedBy,
     proof: r.proofFileId ? { id: r.proofFileId, name: "proof of sending" } : null,
-    party: r.person ? null : { id: ids[i].partyId!, name: r.organization ?? r.name, evidenceRequired: false, externalSystem: null as string | null },
+    party: r.person ? null : { id: r.partyId!, name: r.organization ?? r.name, evidenceRequired: false, externalSystem: null as string | null },
   }));
 
   // The request it carried out, and what the asker wrote.
@@ -216,21 +198,27 @@ export const legacyTransmittal = cache(async (scope: Scope, id: string) => {
     responseDueDate: date(t.responseDue),
     checkedByName: checked?.by ?? null,
     acceptanceCheckedAt: checked?.at ?? null,
-    acceptanceNotes: null as string | null,
+    acceptanceNotes: t.receiptNote,
     rejectionReason: status === "REJECTED" ? returned?.note ?? null : null,
     conditionsResult: null as string | null,
-    followKind: null as string | null,
+    followKind: t.followKind,
     items,
     recipients,
     cycles,
     files,
     issueRequests: requests,
     sentBefore,
-    // Threads and follow-ups are not kept by the backend.
-    inReplyTo: null as { id: string; number: string; subject: string | null } | null,
-    follows: null as { id: string; number: string; subject: string | null } | null,
-    followedBy: [] as { id: string; number: string; subject: string | null; followKind: string | null; status: string; dateOfIssue: Date; _count: { items: number; recipients: number } }[],
-    answers: [] as { id: string; number: string; subject: string | null; dateOfIssue: Date; status: string; createdByName: string; issuingParty: string; direction: string; _count: { items: number } }[],
+    // The exchange around it: what it answers and follows, and what answered and followed it.
+    inReplyTo: t.inReplyTo ? { id: t.inReplyTo.id, number: t.inReplyTo.number, subject: t.inReplyTo.subject as string | null } : null,
+    follows: t.follows ? { id: t.follows.id, number: t.follows.number, subject: t.follows.subject as string | null } : null,
+    followedBy: (t.followedBy ?? []).map((one) => ({
+      id: one.id, number: one.number, subject: one.subject as string | null, followKind: one.followKind, status: "ISSUED", dateOfIssue: new Date(one.issuedAt),
+      _count: { items: one.items, recipients: one.recipients },
+    })),
+    answers: (t.answers ?? []).map((one) => ({
+      id: one.id, number: one.number, subject: one.subject as string | null, dateOfIssue: new Date(one.issuedAt), status: "ISSUED",
+      createdByName: one.issuedBy, issuingParty: one.from ?? one.issuedBy, direction: one.direction, _count: { items: one.items },
+    })),
     backend: t,
   };
 });
@@ -289,4 +277,10 @@ export type RegisterItem = {
 /** Document Control puts an unplanned item in the register, under our numbering; throws the backend's refusal. */
 export async function registerUnplannedItem(scope: Scope, transmittalId: string, itemId: string, body: RegisterItem): Promise<TransmittalView> {
   return api<TransmittalView>(projectPath(scope, `/transmittals/${transmittalId}/items/${itemId}/register`), { body });
+}
+
+/** The drafts the reader may see, newest first: written, not sent, no number yet. */
+export async function transmittalDrafts(scope: Scope) {
+  return api<{ id: string; subject: string; createdAt: string; createdBy: string; reason: string | null; documents: number; people: number; parties: number; copies: number }[]>(
+    projectPath(scope, "/transmittals/drafts")).catch(() => []);
 }

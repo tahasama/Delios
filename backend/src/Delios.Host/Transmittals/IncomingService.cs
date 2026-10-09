@@ -29,7 +29,8 @@ public sealed record UnplannedItem(string? Title, string? DocType, string? Refer
 public sealed record IncomingRequest(
     string? Reason, string? Subject = null, string? Message = null, string? TheirReference = null,
     PlannedItem[]? Planned = null, UnplannedItem[]? Unplanned = null, Guid[]? RevisionIds = null,
-    Guid? FromPartyId = null, Guid? ProofFileId = null);
+    Guid? FromPartyId = null, Guid? ProofFileId = null, string? Note = null, Guid[]? UserIds = null, DateOnly? ReceivedOn = null,
+    Guid? InReplyToId = null, Dictionary<string, string?>? Extras = null);
 
 /// <summary>Body of an upload link for a file sent without a document: an unplanned item's file, or a covering letter.</summary>
 public sealed record LooseUploadRequest(string? FileName, long Size, string? ContentType, string? Sha256, bool Proof = false);
@@ -100,7 +101,21 @@ public sealed class IncomingService(
         var unplanned = request.Unplanned ?? [];
         var attached = request.RevisionIds?.Distinct().ToList() ?? [];
         var count = planned.Length + unplanned.Length + attached.Count;
-        if (count is 0 or > 200) return (null, Problems.Invalid("ITEMS_REQUIRED", "Send between 1 and 200 items."));
+        if (count > 200 || (count == 0 && Blank(request.Message) is null))
+            return (null, Problems.Invalid("ITEMS_REQUIRED", "Send between 1 and 200 items, or a message on its own."));
+        var (receivedAt, notYet) = WorkingCalendar.Moment(clock, access.Project.TimeZone, request.ReceivedOn);
+        if (notYet is not null) return (null, Problems.Invalid("DATE_IN_FUTURE", $"The day it arrived cannot be later than today. {notYet}"));
+        Transmittal? answered = null;
+        if (request.InReplyToId is { } replyTo)
+        {
+            answered = await transmittals.Visible(access).AsNoTracking().SingleOrDefaultAsync(t => t.Id == replyTo, cancellationToken);
+            if (answered is null) return (null, Problems.NotFound("TRANSMITTAL_NOT_FOUND", "The transmittal it answers does not exist or is not yours to see."));
+        }
+        // Who of ours it is for: told it came.
+        var forIds = request.UserIds?.Distinct().ToList() ?? [];
+        var forPeople = forIds.Count == 0 ? [] : (await transmittals.MembersAsync(access.Project, cancellationToken))
+            .Where(m => forIds.Contains(m.UserId) && m.Internal).ToList();
+        if (forPeople.Count != forIds.Count) return (null, Problems.Invalid("RECIPIENT_UNKNOWN", "Someone it is for is not one of ours on this project."));
         if (planned.Select(p => p.DocumentId).Distinct().Count() != planned.Length)
             return (null, Problems.Invalid("DOCUMENT_TWICE", "Each placeholder is sent once on a transmittal."));
 
@@ -118,10 +133,24 @@ public sealed class IncomingService(
             FromName = party.Name,
             TheirReference = Blank(request.TheirReference),
             ToName = "",
-            IssuedAt = now,
+            IssuedAt = receivedAt!.Value,
             IssuedById = access.UserId,
             IssuedByName = onBehalf ? $"{access.UserName}, for {party.Name}" : access.UserName,
+            ReceiptNote = Blank(request.Note),
+            InReplyToId = answered?.Id,
+            Extras = Documents.OwnFields.Write(null, request.Extras),
         };
+        transmittal.Recipients = forPeople.Select(m => new TransmittalRecipient
+        {
+            TenantId = transmittal.TenantId,
+            TransmittalId = transmittal.Id,
+            UserId = m.UserId,
+            Name = m.Name,
+            Organization = m.PartyName,
+            // Told it came, for their information: what arrived is Document Control's to check, not theirs to acknowledge.
+            Kind = RecipientKinds.Cc,
+            NotifiedAt = now,
+        }).ToList();
 
         // Placeholders filled, or corrections of what Document Control returned: our register is updated now.
         foreach (var item in planned)
@@ -199,15 +228,16 @@ public sealed class IncomingService(
         transmittal.Number = await numbering.RecordAsync(access.Project.TenantId, access.Project.Id, RecordKinds.Transmittal,
             NumberFields.ForRecord(access.Project.Code, party.Code, ours?.Code), "TR", cancellationToken);
         transmittal.Subject = Blank(request.Subject)
-            ?? (transmittal.Items.Count == 1 ? $"{Label(transmittal.Items[0])}" : $"{transmittal.Items.Count} items");
+            ?? (transmittal.Items.Count == 1 ? $"{Label(transmittal.Items[0])}" : transmittal.Items.Count == 0 ? "Letter" : $"{transmittal.Items.Count} items");
         db.Transmittals.Add(transmittal);
         await audit.WriteAsync(new Actor(access.UserId, access.UserName), "TRANSMITTAL_RECEIVED", "Transmittal", transmittal.Id,
             transmittal.Number,
             $"From {party.Name}{(transmittal.TheirReference is null ? "" : $" (their {transmittal.TheirReference})")}: "
             + string.Join(", ", transmittal.Items.Select(Label)) + ".",
             access.Project.Id, cancellationToken);
-        // Document Control checks what arrived.
-        await notifier.NotifyAsync(access.Project.TenantId, access.Project.Id, await notifier.ControlHoldersAsync(access.Project.Id, cancellationToken),
+        // Document Control checks what arrived; whoever it is for is told it came.
+        await notifier.NotifyAsync(access.Project.TenantId, access.Project.Id,
+            [.. await notifier.ControlHoldersAsync(access.Project.Id, cancellationToken), .. forPeople.Select(m => m.UserId)],
             Notifications.NotificationKinds.IncomingArrived, $"{transmittal.Number} from {party.Name}: {transmittal.Subject}",
             string.Join("\n", transmittal.Items.Select(i => $"- {Label(i)}")), $"/transmittals/{transmittal.Id}", cancellationToken,
             Notifications.EmailKinds.Transmittal);

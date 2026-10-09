@@ -176,7 +176,8 @@ export type ReviewMe = { seated: boolean; answered: boolean; control: boolean };
 export type TransmittalLog = { total: number; page: number; pages: number; per: number; sizes: number[]; rows: TransmittalLogRow[] };
 export type TransmittalLogRow = {
   id: string; number: string; subject: string; reason: string; toName: string; issuedBy: string; issuedAt: string; documents: number;
-  status: "TO_SEND" | "OVERDUE" | "AWAITING_REPLY" | "AWAITING_ACK" | "TO_REGISTER" | "COMPLETE"; recipients: { id: string; name: string; seen: boolean }[];
+  status: "TO_SEND" | "OVERDUE" | "AWAITING_REPLY" | "AWAITING_ACK" | "TO_REGISTER" | "COMPLETE";
+  recipients: { id: string; name: string; seen: boolean; kind: "TO" | "CC"; organization: string | null }[];
   responseRequired: boolean; responseDue: string | null; forReview: boolean;
   direction: "OUTGOING" | "INCOMING"; from: string | null; theirReference: string | null;
 };
@@ -186,9 +187,22 @@ export type TransmittalView = {
   id: string; number: string; direction: string; reason: string; subject: string; message: string | null; to: string;
   responseRequired: boolean; responseDue: string | null; issuedAt: string; issuedBy: string; issueRequestId: string | null; reviewStepId: string | null;
   items: TransmittalItem[];
-  recipients: { id: string; name: string; organization: string | null; person: boolean; openedAt: string | null; acknowledgedAt: string | null; dispatchedAt: string | null; dispatchChannel: string | null; dispatchRef: string | null; dispatchedBy: string | null; proofFileId: string | null }[];
+  recipients: {
+    id: string; name: string; organization: string | null; person: boolean; openedAt: string | null; acknowledgedAt: string | null;
+    dispatchedAt: string | null; dispatchChannel: string | null; dispatchRef: string | null; dispatchedBy: string | null; proofFileId: string | null;
+    kind: "TO" | "CC"; userId: string | null; partyId: string | null; notifiedAt: string | null; viewCount: number; lastViewedAt: string | null;
+  }[];
   /** Incoming: the organization that sent it, its own reference, and (recorded for it) its covering letter. */
   from: string | null; theirReference: string | null; proofFileId: string | null; packageId: string | null;
+  state: "ISSUED" | "DRAFT"; issuedById: string | null;
+  inReplyTo: TransmittalRef | null; answers: TransmittalRef[]; follows: TransmittalRef | null; followedBy: TransmittalRef[];
+  receiptNote: string | null; extras: Record<string, string> | null; followKind: string | null;
+};
+
+/** Another transmittal of the same exchange (TransmittalEndpoints TransmittalRef). */
+export type TransmittalRef = {
+  id: string; number: string; subject: string; issuedAt: string; direction: string; followKind: string | null;
+  items: number; recipients: number; issuedBy: string; from: string | null;
 };
 
 /**

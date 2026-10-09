@@ -1,5 +1,5 @@
 import { requireScope } from "@/lib/scope";
-import { addressees, ourOrganizationName, transmittalLog } from "@/lib/api/transmittals";
+import { addressees, ourOrganizationName, transmittalDrafts, transmittalLog } from "@/lib/api/transmittals";
 import { REASONS_FOR_ISSUE, REASON_LABEL, type ReasonForIssue } from "@/lib/standard";
 import { TransmittalRegister } from "./transmittal-register";
 import { TransmittalPlate } from "./transmittal-plate";
@@ -112,7 +112,7 @@ export default async function TransmittalsPage({ searchParams }: { searchParams:
   };
 
   // Parties are filtered by their code; the log offers them by name.
-  const [log, found, publishedReasons] = await Promise.all([
+  const [log, found, publishedReasons, drafts] = await Promise.all([
     nothing
       ? null
       : transmittalLog(scope, {
@@ -122,8 +122,9 @@ export default async function TransmittalsPage({ searchParams }: { searchParams:
         }),
     addressees(scope),
     getSet("REASONS_FOR_ISSUE"),
+    status === "DRAFT" && way !== "INCOMING" ? transmittalDrafts(scope) : Promise.resolve([]),
   ]);
-  const total = log?.total ?? 0;
+  const total = (log?.total ?? 0) + drafts.length;
 
   // The reasons come from the organization's own published list, so the words
   // in the filter and the note on hover are the words it chose. The Standard's
@@ -172,8 +173,8 @@ export default async function TransmittalsPage({ searchParams }: { searchParams:
       statusLabel: !outgoing && state === "ISSUED" ? "To check" : STATUS_LABEL[state] ?? state.toLowerCase(),
       // Seen is the backend's: a person acknowledged it, or an organization
       // with no accounts here was sent it by one of ours.
-      recipients: item.recipients.map((person) => ({ id: person.id, name: person.name, seen: person.seen })),
-      copies: 0,
+      recipients: item.recipients.filter((person) => person.kind !== "CC").map((person) => ({ id: person.id, name: person.name, seen: person.seen })),
+      copies: item.recipients.filter((person) => person.kind === "CC").length,
       dueAt: due?.toISOString() ?? null,
       dueIn: due ? Math.round((midnight(due) - today) / 86_400_000) : null,
       receivedAt: outgoing ? null : item.issuedAt,
@@ -182,6 +183,14 @@ export default async function TransmittalsPage({ searchParams }: { searchParams:
       replyDays: reasonDays.get(item.reason) ?? null,
     };
   });
+  // Drafts are kept apart from the log: written, not sent, no number yet.
+  rows.unshift(...drafts.map((draft) => ({
+    id: draft.id, number: "Draft", subject: draft.subject, outgoing: true, from: ourOrganization,
+    to: draft.parties ? `${draft.parties} organization${draft.parties === 1 ? "" : "s"}` : draft.people ? "Internal distribution" : "nobody yet",
+    reason: draft.reason ?? "", reasonLabel: reasonLabel.get(draft.reason ?? "") ?? draft.reason ?? "", issuedAt: draft.createdAt,
+    documents: draft.documents, status: "DRAFT", statusLabel: STATUS_LABEL.DRAFT ?? "Draft", recipients: [], copies: draft.copies,
+    dueAt: null, dueIn: null, receivedAt: null, checkedBy: null, replyNeeded: false, replyDays: null,
+  })));
 
   const query = new URLSearchParams();
   if (q) query.set("q", q);
