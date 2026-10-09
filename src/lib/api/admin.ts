@@ -18,13 +18,15 @@ export type AdminUser = {
 };
 
 export type AdminProject = {
-  id: string; code: string; name: string; contractRole: string; status: string; timeZone: string; weekendDays: number[];
+  id: string; code: string; name: string; contractRole: string; kind?: string; status: string; timeZone: string; weekendDays: number[];
   contentExtraction: string; createdAt: string; members: number; documents: number;
 };
 
 export type AdminRule = {
   id: string; verbs: string[]; deliverableType: string | null; docType: string | null; discipline: string | null; criticality: string | null;
   confidentiality: string | null; projectRole: string | null;
+  /** The family the row was written about: a family row is kept as one rule per type in it, each carrying the family. */
+  family?: string | null; note?: string | null;
 };
 
 export type AdminFunction = { id: string; code: string; name: string; active: boolean; holders: number; rules: AdminRule[] };
@@ -45,10 +47,11 @@ export type AdminNumbering = {
 
 export type RouteStepView = {
   title: string; functionCode: string | null; partyCode: string | null; reason: string | null; mode: string; days: number | null; grantsStatuses: string[];
+  userIds?: string[];
 };
 
 export type AdminRoute = {
-  id: string; name: string; description: string | null; isDefault: boolean; active: boolean;
+  id: string; name: string; description: string | null; isDefault: boolean; active: boolean; verdictSet?: string | null;
   patterns: { deliverableType: string | null; docType: string | null; discipline: string | null; criticality: string | null; originator: string | null }[];
   steps: RouteStepView[];
 };
@@ -149,8 +152,33 @@ export async function legacyFunctions() {
 export function rulesBody(rules: AdminRule[]) {
   return rules.map((r) => ({
     verbs: r.verbs, deliverableType: r.deliverableType, docType: r.docType, discipline: r.discipline, criticality: r.criticality,
-    confidentiality: r.confidentiality, projectRole: r.projectRole,
+    confidentiality: r.confidentiality, projectRole: r.projectRole, family: r.family ?? null, note: r.note ?? null,
   }));
+}
+
+/**
+ * The backend's rules as the matrix reads them: the rules a family row was kept as (one per document type in the
+ * family, each carrying the family) read back as the one family rule they were written as.
+ */
+export function asMatrixRules(rules: AdminRule[]) {
+  const out: { deliverableType: string | null; docType: string | null; discipline: string | null; criticality: string | null;
+    confidentiality: string | null; projectRole: string | null; family: string | null; familyTypes: string[] | null; verbs: string[] }[] = [];
+  const families = new Map<string, (typeof out)[number]>();
+  for (const r of rules) {
+    if (!r.family) {
+      out.push({ deliverableType: r.deliverableType, docType: r.docType, discipline: r.discipline, criticality: r.criticality,
+        confidentiality: r.confidentiality, projectRole: r.projectRole, family: null, familyTypes: null, verbs: r.verbs });
+      continue;
+    }
+    const key = [r.family, r.deliverableType, r.discipline, r.criticality, r.confidentiality, r.projectRole, [...r.verbs].sort().join(",")].join("|");
+    const one = families.get(key);
+    if (one) { if (r.docType) one.familyTypes!.push(r.docType); continue; }
+    const made = { deliverableType: r.deliverableType, docType: null, discipline: r.discipline, criticality: r.criticality,
+      confidentiality: r.confidentiality, projectRole: r.projectRole, family: r.family, familyTypes: r.docType ? [r.docType] : [], verbs: r.verbs };
+    families.set(key, made);
+    out.push(made);
+  }
+  return out;
 }
 
 // ── Organizations, as the organizations screen reads them ─────────────────────
@@ -196,7 +224,7 @@ export type LegacyRouteStep = {
 export async function legacyRoutes() {
   const [routes, parties] = await Promise.all([adminRoutes(), adminParties()]);
   return routes.filter((r) => r.active).map((r) => ({
-    id: r.id, name: r.name, description: r.description, isDefault: r.isDefault, outcomeSetKey: "REVIEW_OUTCOMES" as string | null, createdAt: new Date(0),
+    id: r.id, name: r.name, description: r.description, isDefault: r.isDefault, outcomeSetKey: (r.verdictSet ?? "REVIEW_OUTCOMES") as string | null, createdAt: new Date(0),
     classes: r.patterns.length
       ? JSON.stringify(r.patterns.map((p) => Object.fromEntries(Object.entries(p).filter(([, v]) => v))))
       : "*",
@@ -204,7 +232,7 @@ export async function legacyRoutes() {
       act: i === r.steps.length - 1 ? "APPROVAL" : "REVIEW",
       partyId: s.partyCode ? parties.find((p) => p.code === s.partyCode)?.id : undefined,
       mode: s.mode === "ALL" ? "ALL" : "ANY_OF",
-      participantIds: [],
+      participantIds: s.userIds ?? [],
       functionIds: s.functionCode ? [s.functionCode] : [],
       title: s.title,
       days: s.days ?? undefined,
@@ -216,9 +244,8 @@ export async function legacyRoutes() {
 /** A screen route as the backend takes it; what the backend cannot say is reported, not dropped in silence. */
 export async function backendRoute(classes: string, steps: LegacyRouteStep[]): Promise<{ patterns: unknown[]; steps: unknown[] } | { error: string }> {
   const parties = await adminParties();
-  if (steps.some((s) => s.participantIds.length)) return { error: "A step is answered by the holders of a function, or by an organization: naming people on a step is not supported yet." };
   if (steps.some((s) => (s.functionIds ?? []).length > 1)) return { error: "A step is answered by the holders of one function: choose one per step." };
-  if (steps.some((s) => !s.partyId && !(s.functionIds ?? []).length)) return { error: "Say who answers each step: a function, or an outside organization." };
+  if (steps.some((s) => !s.partyId && !(s.functionIds ?? []).length && !s.participantIds.length)) return { error: "Say who answers each step: a function, people of ours, or an outside organization." };
   const patterns = classes === "*" ? [] : (JSON.parse(classes) as Record<string, string | undefined>[]).map((p) => ({
     deliverableType: p.deliverableType || null, docType: p.docType || null, discipline: p.discipline || null, criticality: p.criticality || null,
     originator: p.originator || null,
@@ -227,7 +254,8 @@ export async function backendRoute(classes: string, steps: LegacyRouteStep[]): P
     patterns,
     steps: steps.map((s, i) => ({
       title: s.title || (i === steps.length - 1 ? "Decision" : `Review ${i + 1}`),
-      functionCode: s.partyId ? null : s.functionIds![0],
+      functionCode: s.partyId ? null : (s.functionIds ?? [])[0] ?? null,
+      userIds: s.partyId ? [] : s.participantIds,
       partyCode: s.partyId ? parties.find((p) => p.id === s.partyId)?.code ?? null : null,
       mode: s.mode === "ANY_OF" ? "ANY" : "ALL",
       days: s.days ?? null,

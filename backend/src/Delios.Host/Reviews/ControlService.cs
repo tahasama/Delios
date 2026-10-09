@@ -10,7 +10,8 @@ namespace Delios.Host.Reviews;
 
 /// <summary>Body of the arrival request: Document Control's outcome code and an optional note (required when returning).</summary>
 /// <param name="Outcome">One of the organization's control outcomes; empty takes the first one that fits the act.</param>
-public sealed record ControlRequest(string? Outcome = null, string? Note = null);
+/// <param name="Return">On arrival, send it back to the sender even where no "return" outcome is published.</param>
+public sealed record ControlRequest(string? Outcome = null, string? Note = null, bool Return = false);
 
 /// <summary>
 /// Document Control's own acts on a revision, kept apart from review verdicts: a
@@ -98,7 +99,8 @@ public sealed class ControlService(DeliosDbContext db, AuditLog audit, IClock cl
         }
         var catalog = await Catalog.LoadAsync(db, cancellationToken);
         var act = request.Outcome is { Length: > 0 } named
-            && catalog.Prop(ReviewSets.ControlOutcomes, named, "act") is { ValueKind: JsonValueKind.String } a ? a.GetString()! : Accept;
+            && catalog.Prop(ReviewSets.ControlOutcomes, named, "act") is { ValueKind: JsonValueKind.String } a ? a.GetString()!
+            : request.Return ? Return : Accept;
         if (act is not (Accept or Return))
             return (null, Problems.Invalid("OUTCOME_NOT_FOR_THIS_ACT", "On arrival a submission is accepted or returned.", new { act }));
         var (outcome, problem) = Pick(catalog, request.Outcome, act, newRevision: request.Outcome is null ? false : null, to: "sender");

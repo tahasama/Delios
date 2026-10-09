@@ -11,7 +11,7 @@ export type MeRule = {
 
 /** A project the person is on, with their function, department and the function's rules. */
 export type MeProject = {
-  id: string; code: string; name: string; timeZone: string; contractRole: string; status: string; department: string | null;
+  id: string; code: string; name: string; timeZone: string; contractRole: string; kind?: string; status: string; department: string | null;
   function: { id: string; code: string; name: string }; verbs: string[]; rules: MeRule[];
 };
 

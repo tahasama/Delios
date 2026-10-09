@@ -25,7 +25,7 @@ public sealed record SchemeRoutingRequest(string? DeliverableType, Guid? SchemeI
 /// <summary>Body of creating or changing a review route. A null field is left as it is; lists, when given, replace.</summary>
 public sealed record RouteRequest(
     string? Name = null, string? Description = null, bool? IsDefault = null, bool? Active = null, RoutePattern[]? Patterns = null,
-    RouteStep[]? Steps = null);
+    RouteStep[]? Steps = null, string? VerdictSet = null);
 
 /// <summary>
 /// What an administrator publishes for the organization: the value lists, how numbers are built and which scheme
@@ -234,7 +234,7 @@ public static class CatalogAdminEndpoints
     /// <summary><c>GET /api/admin/routes</c>: every review route, in use or not.</summary>
     private static async Task<IResult> RoutesAsync(DeliosDbContext db, CancellationToken cancellationToken) =>
         Results.Ok(await db.ReviewRoutes.AsNoTracking().OrderByDescending(r => r.IsDefault).ThenBy(r => r.Name)
-            .Select(r => new { r.Id, r.Name, r.Description, r.IsDefault, r.Active, r.Patterns, r.Steps })
+            .Select(r => new { r.Id, r.Name, r.Description, r.IsDefault, r.Active, r.Patterns, r.Steps, VerdictSet = r.VerdictSet ?? ReviewSets.Verdicts })
             .ToListAsync(cancellationToken));
 
     private static async Task<IResult?> CheckStepsAsync(DeliosDbContext db, RouteStep[] steps, CancellationToken cancellationToken)
@@ -243,8 +243,17 @@ public static class CatalogAdminEndpoints
         foreach (var step in steps)
         {
             if (string.IsNullOrWhiteSpace(step.Title)) return Problems.Invalid("STEP_TITLE_REQUIRED", "Every step has a title.");
-            if ((step.FunctionCode is null) == (step.PartyCode is null))
-                return Problems.Invalid("STEP_ANSWERER_REQUIRED", $"{step.Title}: a step is answered by one function of ours, or by one organization.");
+            step.UserIds ??= [];
+            var ours = step.FunctionCode is not null || step.UserIds.Length > 0;
+            if (ours == (step.PartyCode is not null))
+                return Problems.Invalid("STEP_ANSWERER_REQUIRED", $"{step.Title}: a step is answered by one function of ours and people of ours named on it, or by one organization.");
+            if (step.UserIds.Length > 0)
+            {
+                var ids = step.UserIds.Distinct().ToArray();
+                if (await db.Users.CountAsync(u => ids.Contains(u.Id) && u.Active && (u.PartyId == null || u.Party!.IsInternal), cancellationToken) != ids.Length)
+                    return Problems.Invalid("STEP_PERSON_UNKNOWN", $"{step.Title}: everybody named on a step is one of our people, still active.");
+                step.UserIds = ids;
+            }
             if (step.Mode is not (StepModes.Any or StepModes.All))
                 return Problems.Invalid("STEP_MODE_INVALID", $"{step.Title}: the first answer closes it (ANY), or everyone answers (ALL).");
             if (step.FunctionCode is { } function && !await db.Functions.AnyAsync(f => f.Code == function && f.Active, cancellationToken))
@@ -255,6 +264,19 @@ public static class CatalogAdminEndpoints
         return null;
     }
 
+    /// <summary>A route's own verdict list: published, with a verdict that lets it proceed. Null: the review outcomes.</summary>
+    private static async Task<(string? Set, IResult? Problem)> CheckVerdictSetAsync(DeliosDbContext db, string? requested, CancellationToken cancellationToken)
+    {
+        var set = Blank(requested);
+        if (set is null || set == ReviewSets.Verdicts) return (null, null);
+        var catalog = await Catalog.LoadAsync(db, cancellationToken);
+        var codes = await db.ValueEntries.AsNoTracking().Where(v => v.SetKey == set && v.Status == ValueStatus.Active).Select(v => v.Code).ToListAsync(cancellationToken);
+        if (codes.Count == 0) return (null, Problems.Invalid("VERDICT_SET_EMPTY", $"{set} has no published values to decide from."));
+        if (!codes.Any(c => ReviewSets.Proceeds(catalog, set, c)))
+            return (null, Problems.Invalid("VERDICT_SET_NEVER_PROCEEDS", $"No verdict of {set} lets a revision go on to release (proceed)."));
+        return (set, null);
+    }
+
     /// <summary><c>POST /api/admin/routes</c>: a new review route.</summary>
     private static async Task<IResult> CreateRouteAsync(
         RouteRequest request, HttpContext http, DeliosDbContext db, AuditLog audit, CancellationToken cancellationToken)
@@ -263,8 +285,11 @@ public static class CatalogAdminEndpoints
         if (name is null) return Problems.Invalid("NAME_REQUIRED", "A route has a name.");
         var steps = request.Steps ?? [];
         if (await CheckStepsAsync(db, steps, cancellationToken) is { } problem) return problem;
+        var (verdictSet, setProblem) = await CheckVerdictSetAsync(db, request.VerdictSet, cancellationToken);
+        if (setProblem is not null) return setProblem;
         var route = new ReviewRoute
         {
+            VerdictSet = verdictSet,
             TenantId = http.User.TenantId(),
             Name = name,
             Description = Blank(request.Description),
@@ -297,6 +322,12 @@ public static class CatalogAdminEndpoints
             changes.Add(isDefault ? "the default" : "not the default");
         }
         if (request.Active is { } active && active != route.Active) { changes.Add(active ? "in use" : "out of use"); route.Active = active; }
+        if (request.VerdictSet is not null)
+        {
+            var (verdictSet, setProblem) = await CheckVerdictSetAsync(db, request.VerdictSet, cancellationToken);
+            if (setProblem is not null) return setProblem;
+            if (verdictSet != route.VerdictSet) { route.VerdictSet = verdictSet; changes.Add($"decides from {verdictSet ?? ReviewSets.Verdicts}"); }
+        }
         if (request.Patterns is { } patterns) { route.Patterns = patterns.ToList(); changes.Add($"serves {patterns.Length} pattern(s)"); }
         if (request.Steps is { } steps)
         {

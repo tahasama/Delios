@@ -149,6 +149,12 @@ public static class TransmittalEndpoints
             return problem ?? Results.Ok(ticket);
         });
         project.MapPost("/transmittals/incoming", SendIncomingAsync).AddEndpointFilter<IdempotencyFilter>();
+        project.MapPost("/transmittals/{transmittalId:guid}/attachments",
+            async (Guid transmittalId, AttachFilesRequest r, HttpContext h, IncomingService s, TransmittalService t, CancellationToken c) =>
+            {
+                var (found, problem) = await s.AttachAsync(ProjectAccessFilter.Of(h), transmittalId, r, c);
+                return problem ?? Results.Ok(View(found!, await t.ItemFilesAsync(found!, c)));
+            });
         project.MapPost("/transmittals/{transmittalId:guid}/items/{itemId:guid}/register", RegisterItemAsync);
         project.MapGet("/transmittals/{transmittalId:guid}/receipt", ReceiptAsync);
     }

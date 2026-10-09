@@ -133,6 +133,7 @@ public static class PlatformSetup
         services.AddScoped<Reviews.ReviewService>();
         services.AddScoped<Reviews.DelegationService>();
         services.AddScoped<Documents.KeepingService>();
+        services.AddScoped<Transmittals.Supersession>();
         services.AddScoped<Documents.SnapshotRecorder>();
         services.AddScoped<Reviews.Stamping>();
         services.AddScoped<Reviews.ControlService>();
@@ -173,6 +174,7 @@ public static class PlatformSetup
             }
             if (search.UsesOpenSearch) services.AddHostedService<Search.SearchIndexer>();
             if (config.GetValue("Checks:Schedule", true)) services.AddHostedService<Checks.CheckScheduler>();
+            if (config.GetValue("Reviews:Warnings", true)) services.AddHostedService<Reviews.ReviewWarnings>();
         }
         services.AddScoped<Seeding.TenantSetup>();
         services.AddScoped<Seeding.DemoSeed>();

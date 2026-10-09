@@ -338,6 +338,7 @@ public static class IdentityEndpoints
                 m.Project.Name,
                 m.Project.TimeZone,
                 m.Project.ContractRole,
+                m.Project.Kind,
                 m.Project.Status,
                 m.Department,
                 Function = new { m.Function!.Id, m.Function.Code, m.Function.Name },
@@ -353,6 +354,7 @@ public static class IdentityEndpoints
                     r.Criticality,
                     r.Confidentiality,
                     r.ProjectRole,
+                    r.Family,
                     r.Verbs,
                 }).ToList(),
             })

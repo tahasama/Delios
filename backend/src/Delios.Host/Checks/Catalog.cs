@@ -223,8 +223,8 @@ public static class CheckCatalog
             "Verdicts given on decided reviews, against the published list", Severities.Major, "CF", async ctx =>
             {
                 var given = await ctx.Db.Reviews.Where(r => r.ProjectId == ctx.Project.Id && r.Verdict != null && r.State == ReviewStates.Decided)
-                    .Select(r => new { r.Id, r.Number, r.DocumentId, r.Verdict }).ToListAsync(ctx.CancellationToken);
-                return Fail(given.Where(g => !ctx.Values.IsActive(ReviewSets.Verdicts, g.Verdict!))
+                    .Select(r => new { r.Id, r.Number, r.DocumentId, r.Verdict, r.VerdictSet }).ToListAsync(ctx.CancellationToken);
+                return Fail(given.Where(g => !ctx.Values.IsActive(g.VerdictSet, g.Verdict!))
                     .Select(g => new Failure($"review:{g.Id}", "Review", g.Id, g.DocumentId, g.Number, $"{g.Verdict} is not a published verdict.")));
             }),
         new("RO-06", Phases.Running, "An open comment whose class is no longer published",

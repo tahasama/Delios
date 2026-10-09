@@ -70,7 +70,35 @@ public sealed class Numbering(DeliosDbContext db)
 
         var prefix = string.Join(scheme.Delimiter, parts);
         var digits = scheme.Fields.Single(f => f.Source == FieldSources.Sequence).Digits ?? 5;
+        // A range issued to a named party for this prefix is drawn down first; a number already on a document is passed over.
+        for (var tries = 0; tries < 100; tries++)
+        {
+            var number = await FromRangeAsync(projectId, prefix, scheme.Delimiter, digits, cancellationToken)
+                ?? await NextAsync(tenantId, projectId, prefix, scheme.Delimiter, digits, cancellationToken);
+            if (!await db.Documents.AnyAsync(d => d.ProjectId == projectId && d.Number == number, cancellationToken))
+                return new Allocation.Allocated(number);
+        }
         return new Allocation.Allocated(await NextAsync(tenantId, projectId, prefix, scheme.Delimiter, digits, cancellationToken));
+    }
+
+    /// <summary>
+    /// The next number of an open range issued for this prefix, the lowest range first, or null when none is left.
+    /// The range is marked exhausted when its last number is taken.
+    /// </summary>
+    private async Task<string?> FromRangeAsync(Guid projectId, string prefix, string delimiter, int digits, CancellationToken cancellationToken)
+    {
+        // One statement, the row locked: two people registering at once never draw the same number.
+        var drawn = await db.Database.SqlQuery<int>($"""
+            UPDATE number_ranges r
+            SET last_issued = GREATEST(r.last_issued + 1, r."from"),
+                status = CASE WHEN GREATEST(r.last_issued + 1, r."from") >= r."to" THEN 'EXHAUSTED' ELSE 'OPEN' END
+            WHERE r.id = (
+                SELECT id FROM number_ranges
+                WHERE project_id = {projectId} AND prefix = {prefix} AND status = 'OPEN' AND GREATEST(last_issued + 1, "from") <= "to"
+                ORDER BY "from" LIMIT 1 FOR UPDATE)
+            RETURNING r.last_issued AS "Value"
+            """).ToListAsync(cancellationToken);
+        return drawn.Count == 0 ? null : prefix + delimiter + drawn[0].ToString(CultureInfo.InvariantCulture).PadLeft(digits, '0');
     }
 
     /// <summary>

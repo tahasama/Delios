@@ -17,6 +17,8 @@ public sealed class ReviewRoute
     /// <summary>Offered when no route's patterns match the document.</summary>
     public bool IsDefault { get; set; }
     public bool Active { get; set; } = true;
+    /// <summary>The value list its deciding step answers from. Null: the review outcomes (<see cref="ReviewSets.Verdicts"/>).</summary>
+    public string? VerdictSet { get; set; }
     /// <summary>Documents it serves. Empty serves every document. A null field in a pattern means any value.</summary>
     public List<RoutePattern> Patterns { get; set; } = [];
     public List<RouteStep> Steps { get; set; } = [];
@@ -46,6 +48,8 @@ public sealed class RouteStep
     public string? PartyCode { get; set; }
     /// <summary>For a party's step: the reason for issue on the transmittal that carries it.</summary>
     public string? Reason { get; set; }
+    /// <summary>People of ours named on the step, seated as well as the function's holders (or alone), when they are on the project.</summary>
+    public Guid[] UserIds { get; set; } = [];
     /// <summary>ANY: the first answer closes the step. ALL: every holder answers.</summary>
     public string Mode { get; set; } = StepModes.Any;
     /// <summary>Working days, in the project's calendar, the step has once it opens.</summary>
@@ -79,6 +83,8 @@ public sealed class Review
     /// <summary>The deciding step's verdict and the status it granted.</summary>
     public string? Verdict { get; set; }
     public string? GrantedStatus { get; set; }
+    /// <summary>The value list the verdict comes from, copied from the route when the review starts.</summary>
+    public string VerdictSet { get; set; } = ReviewSets.Verdicts;
     public Guid StartedById { get; set; }
     public required string StartedByName { get; set; }
     public Instant StartedAt { get; set; }
@@ -127,6 +133,10 @@ public sealed class ReviewStep
     public int Index { get; set; }
     public required string Title { get; set; }
     public string? FunctionCode { get; set; }
+    /// <summary>People of ours named on the step, copied from the route.</summary>
+    public Guid[] UserIds { get; set; } = [];
+    /// <summary>When the people on the step were warned that it falls due the next working day.</summary>
+    public Instant? WarnedAt { get; set; }
     /// <summary>The outside party that answers, copied when the review starts.</summary>
     public Guid? PartyId { get; set; }
     public string? PartyName { get; set; }
@@ -288,6 +298,9 @@ public static class ReviewSets
     public const string Statuses = "STATUSES";
     /// <summary>The deciding step's verdicts. Props: proceed (bool).</summary>
     public const string Verdicts = "REVIEW_OUTCOMES";
+    /// <summary>Whether a verdict of <paramref name="set"/> lets the revision proceed to release.</summary>
+    public static bool Proceeds(Documents.Catalog catalog, string set, string verdict) =>
+        catalog.Prop(set, verdict, "proceed") is { ValueKind: System.Text.Json.JsonValueKind.True };
     /// <summary>What an adviser's comments amount to. Props: comments = none | some | blocking.</summary>
     public const string Advice = "REVIEW_ADVICE";
     /// <summary>Props: blocking (bool).</summary>

@@ -136,9 +136,11 @@ export const legacyTransmittal = cache(async (scope: Scope, id: string) => {
       .filter((one) => one.id !== t.id && one.direction === "OUTGOING" && new Date(one.issuedAt) < issuedAt).length);
   }
 
-  // What came in unplanned: kept with it as it arrived.
-  const files = t.items.filter((one) => one.kind === "UNPLANNED").flatMap((item) => item.files.map((f) => ({
-    id: f.id, name: f.name, size: f.size, sha256: f.sha256, uploadedByName: t.issuedBy, createdAt: issuedAt,
+  // What came in unplanned, kept with it as it arrived, and what Document Control kept with it later.
+  const files = t.items.filter((one) => one.kind === "UNPLANNED" || one.kind === "ATTACHMENT").flatMap((item) => item.files.map((f) => ({
+    id: f.id, name: f.name, size: f.size, sha256: f.sha256,
+    uploadedByName: item.kind === "ATTACHMENT" ? item.registeredBy ?? t.issuedBy : t.issuedBy,
+    createdAt: item.kind === "ATTACHMENT" && item.registeredAt ? new Date(item.registeredAt) : issuedAt,
   })));
   const unregistered = t.items.some((one) => one.kind === "UNPLANNED" && !one.registeredAt);
   const arrivals = items.map((one) => one.arrival).filter((one): one is NonNullable<typeof one> => !!one);

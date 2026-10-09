@@ -52,10 +52,20 @@ Each item says: what you did before, what happens now, and why.
 - Now: one review = one row, standing at the step it is on (the open one, or the deciding
   one once answered). The review page shows the whole route in "Progress".
 
-**Who sits on a step is whoever holds the step's function.**
-- Before: you could pick specific people per step when sending for review.
-- Now: the people picked per step are ignored. Everybody holding the step's function on the
-  project is seated. To change who reviews, change who holds the function, or the route.
+**Who sits on a step is set by the route.**
+- A route's step names a function, people of ours, or both. Everybody holding the function on the
+  project, and everybody named who is on the project, is seated.
+- Someone named on a route but not on the project is skipped. If nobody is left, the review is refused
+  with a message saying which step has nobody.
+- On the deciding step, at least one person named must hold a function that may approve the document.
+- Before: you could also pick people per step when sending for review. Now the people picked on the
+  "send for review" form are ignored: the route decides. To change who reviews, change the route or who
+  holds the function.
+
+**A route's own verdict list.**
+- A route can decide from its own list instead of the review outcomes (the "outcome set" on the routes
+  screen). The list must be published and have at least one verdict that lets a revision proceed.
+- Reviews keep the list their route had when they started; changing the route later does not change them.
 
 **Delegation (handing a step to somebody else).**
 - Works as before: until a date, with a reason, flagged when the matrix would not have made it,
@@ -88,10 +98,16 @@ Each item says: what you did before, what happens now, and why.
   Where nobody holds Document Control, that happens at once.
 - Not approved: Document Control sends it back with a reason. A held revision then stays on hold
   **for good**; the next revision replaces it.
-- No "HELD" stamp is printed on the PDF.
+- The worker makes a copy of the PDF people were reading marked "ON HOLD" across every page, with the
+  reason. The copy stays on record after the hold is lifted.
 
-**Late-review warning.** The old app warned the people on a step the day before it fell due. The
-backend does not send that warning yet (the "warned" date stays empty).
+**Late-review warning.**
+- The people on a step who have not answered are warned **once**, the working day before it falls due
+  (the project's working days and time zone). If the warning could not go the day before, it goes on
+  the day itself. It is a notification, and an email when review email is on.
+- The reviews list shows "warned <date>". Sending a step back and opening it again clears it, so it is
+  warned again.
+- It runs in the worker every 30 minutes. A step with no due date is never warned.
 
 ---
 
@@ -102,7 +118,7 @@ backend does not send that warning yet (the "warned" date stays empty).
 - Released ones: voided by whoever decided it, or Document Control (or its author where the people
   doing the work carry this act out). Never-reviewed ones: by the author or Document Control.
 - Whoever received it is told to stop using it, and what was asked to be sent for it lapses.
-- No "VOID" stamp is printed on the PDF.
+- The worker makes a copy of the PDF people were reading marked "VOID" across every page, with the reason.
 
 **"As it was" (the document's history page) starts from today.**
 - Each change to a document now records a snapshot of it. Documents changed before this update
@@ -124,10 +140,44 @@ registering and editing. Documents registered before this update have none.
 
 **Asset tags.**
 - An asset that is no longer used is **retired** (kept on record, offered no more), not deleted.
-- Packages cannot yet be filled "by asset tag" (refused with a message).
+- A package can be filled "by asset tag": the documents linked to the chosen tags (and matching its other
+  rules) join it.
 - A requirements list that names an unknown tag creates it (named by its tag) and links the document.
 
 ---
+
+**Records: confirmed and corrected.**
+- A record is **confirmed** once (by whoever may create or control it): it is then fixed as evidence and
+  never revised. Confirming it twice is refused.
+- A mistake in a record is **corrected by a further record** that names the one it corrects. Both are
+  kept; the original is never altered.
+
+**Withdrawing an approval.**
+- Only Document Control, with a reason. Only on the newest revision: if a later revision is already in
+  review or released, you are told to withdraw that one instead.
+- The review is kept as it was, marked "approval withdrawn" with who, when and why. The document shows
+  as withdrawn until a replacement is released. Its author is told.
+
+**Reclassifying a comment** (whether it stops the release).
+- Document Control or the revision's author, with an optional note, while the comment is open.
+- What it was before is kept and shown ("originally not blocking").
+
+**Numbers from a range issued to a party.**
+- When a document is registered, an open range issued for the same start of number (for example
+  `P1001-10-CI-DWG`) is used first, lowest range first. When its last number is taken it is marked
+  "exhausted", and numbering goes back to the project counter.
+- A number already on a document is skipped, so a range and the counter never give the same number twice.
+- There is still no "give me a number without registering": a number is given only when a document is
+  registered. No screen asks for one on its own.
+
+## 4b. Packages
+
+- **Several reasons for issue** on one package. The first is its main reason; what is delivered goes out
+  for all of them (the transmittal says "also for …").
+- **Your own fields** are kept with the package.
+- **Deleting** asks for a reason, which goes on the audit trail. Only an empty package that never went
+  out can be deleted; any other is kept.
+- Our own organization can be a recipient of a package.
 
 ## 5. Transmittals
 
@@ -157,11 +207,22 @@ registering and editing. Documents registered before this update have none.
 
 **Opened.** Each opening is now counted. Transmittals opened before this update show "opened once".
 
-**Still not possible:** adding files to something received after it was recorded (what came is fixed
-at arrival, which is its receipt); returning everything on a received transmittal when your
-organization has published no "return" outcome.
+**Files kept with it later.** Document Control can keep more files with something received after it was
+recorded (the covering email, a letter). What arrived is not changed: the files are kept beside it,
+shown as "kept by <name>, <date>", and the audit trail says they were added later.
+
+**Returning what arrived when no "return" outcome is published.** It is returned all the same: back to
+the sender, to correct under the same revision, with your reason.
 
 ---
+
+**Who still holds a replaced revision without knowing (Exposures).**
+- When a revision is released, everybody with an account who received an earlier revision on a
+  transmittal is **told in the app** to stop using it. That counts as told.
+- An organization with nobody here counts as told only once it is sent the current revision (or a later
+  one) on a transmittal. Until then it is listed on Exposures, with "Send rev … to them".
+- Releases made before this update told nobody; people with an account are counted as told anyway.
+- The "… is ready — issue it" link is never shown: drafts are kept apart until issued (see above).
 
 ## 6. Schedule and document requirements
 
@@ -187,6 +248,26 @@ supply package for them.
 **Uploaded lists for a decision** are never deleted: a discarded draft is kept, marked rejected.
 
 ---
+
+## 6b. Administration
+
+**An administrator opening a project they are not on** joins it, holding the organization's
+administrator function (the first function that may configure), as the old app did. It is on the audit
+trail ("PROJECT_JOINED"). Somebody who was taken off a project is not put back this way.
+
+**Project type** is now kept on the project itself, so the project switcher shows it. Projects created
+before this update get the type they were given (read from their saved details).
+
+**A distribution matrix row for a document family** (when the matrix is cut by family) is saved as one
+rule per document type in that family, each marked with the family. The matrix reads it back as one family
+row. If a type is added to the family later, re-import the row to cover it. Rules read from a file say so
+("Read from a filled-in distribution matrix").
+
+**Function clearance** is not kept: nothing decided anything by it. Who reads a closed document is decided
+by the people named on it (see "Readers of a closed document").
+
+**Two-step sign-in**: the backend supports it, but the sign-in page has no box for the code. An account with
+two-step sign-in switched on cannot sign in through the page until a code box is added to it.
 
 ## 7. Notifications and email
 

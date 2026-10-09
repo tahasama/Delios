@@ -150,6 +150,8 @@ public sealed class Project
     public required string Name { get; set; }
     /// <summary>What we are contracted to do here (EPC, PMC, OWNER…). Rules can apply to one role only.</summary>
     public string ContractRole { get; set; } = "GENERIC";
+    /// <summary>The kind of project (BUILDING, INFRASTRUCTURE…), from the organization's own list; GENERIC when none is said.</summary>
+    public string Kind { get; set; } = "GENERIC";
     /// <summary>"ACTIVE" or another state; only ACTIVE projects can be opened by members.</summary>
     public string Status { get; set; } = "ACTIVE";
     /// <summary>IANA time zone of the site. Due dates and working days are counted in it.</summary>
@@ -198,6 +200,13 @@ public sealed class PermissionRule
     /// The project contract role (see <c>Project.ContractRole</c>) this rule applies to. Null: every project.
     /// </summary>
     public string? ProjectRole { get; set; }
+    /// <summary>
+    /// The document family the row was written about, as a label: a family row is kept as one rule per document type
+    /// in the family, each carrying the family's code, so the matrix reads back as the family it was written as.
+    /// </summary>
+    public string? Family { get; set; }
+    /// <summary>Where the rule came from, in words (for example "Read from a filled-in distribution matrix").</summary>
+    public string? Note { get; set; }
     /// <summary>What the rule allows, from the constants in <c>Verbs</c>.</summary>
     public string[] Verbs { get; set; } = [];
 }

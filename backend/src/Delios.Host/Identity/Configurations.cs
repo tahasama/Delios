@@ -89,6 +89,7 @@ internal sealed class ProjectConfiguration : IEntityTypeConfiguration<Project>
         b.Property(x => x.Code).HasMaxLength(32);
         b.Property(x => x.Name).HasMaxLength(200);
         b.Property(x => x.ContractRole).HasMaxLength(32);
+        b.Property(x => x.Kind).HasMaxLength(32).HasDefaultValue("GENERIC");
         b.Property(x => x.Status).HasMaxLength(16);
         b.Property(x => x.TimeZone).HasMaxLength(64);
         b.Property(x => x.ContentExtraction).HasMaxLength(16);
@@ -120,6 +121,8 @@ internal sealed class PermissionRuleConfiguration : IEntityTypeConfiguration<Per
     {
         b.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
         b.HasIndex(x => x.TenantId);
+        b.Property(x => x.Family).HasMaxLength(32);
+        b.Property(x => x.Note).HasMaxLength(300);
     }
 }
 

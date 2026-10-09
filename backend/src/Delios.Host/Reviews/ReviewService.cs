@@ -47,7 +47,7 @@ public sealed record RewindRequest(int ToStep, string? Reason, string? Note);
 /// </summary>
 public sealed class ReviewService(
     DeliosDbContext db, Numbering numbering, AuditLog audit, IClock clock, TransmittalService transmittals,
-    ControlService control, Notifications.Notifier notifier)
+    ControlService control, Notifications.Notifier notifier, Supersession supersession)
 {
     /// <summary>Kinds of advice an advising step can give, worked out from the adviser's comments: none, some, or at least one blocking comment. Mapped to published advice codes by <see cref="AdviceCode"/>.</summary>
     private const string Advice_None = "none", Advice_Some = "some", Advice_Blocking = "blocking";
@@ -148,10 +148,12 @@ public sealed class ReviewService(
                         new { step = i + 1, reason = step.Reason }));
                 }
             }
-            if ((await SeatsAsync(access.Project, step.FunctionCode, party, party?.Participation, cancellationToken)).Count == 0)
+            if ((await SeatsAsync(access.Project, step.FunctionCode, party, party?.Participation, cancellationToken, step.UserIds)).Count == 0)
             {
                 return Fail(Problems.Invalid("STEP_HAS_NO_HOLDER",
-                    party is null ? $"Nobody holds {step.FunctionCode} on this project, so step {i + 1} ({step.Title}) could not be answered."
+                    party is null ? step.FunctionCode is null
+                        ? $"Nobody named on step {i + 1} ({step.Title}) is on this project, so it could not be answered."
+                        : $"Nobody {(step.UserIds.Length > 0 ? "named on it, nor anybody holding " : "holds ")}{step.FunctionCode} on this project, so step {i + 1} ({step.Title}) could not be answered."
                     : party.Participation == Participations.InApp
                         ? $"Nobody from {party.Name} is on this project, so step {i + 1} ({step.Title}) could not be answered."
                         : $"Nobody on this project carries the exchange with {party.Name}, so step {i + 1} ({step.Title}) could not be answered.",
@@ -159,7 +161,19 @@ public sealed class ReviewService(
             }
         }
         var deciding = route.Steps[^1];
-        if (deciding.PartyCode is null)
+        if (deciding.PartyCode is null && deciding.FunctionCode is null)
+        {
+            // Only people named: each decides on the strength of a function of theirs on the project.
+            var named = await db.Memberships.AsNoTracking().Include(m => m.Function!).ThenInclude(f => f.Rules)
+                .Where(m => m.ProjectId == access.Project.Id && m.Active && m.Function!.Active && deciding.UserIds.Contains(m.UserId))
+                .ToListAsync(cancellationToken);
+            if (!named.Any(m => Allows(m.Function!, access.Project, Verbs.Approve, document.Facts)))
+            {
+                return Fail(Problems.Invalid("DECIDER_CANNOT_APPROVE",
+                    "Nobody named on the deciding step may approve this document.", new { step = route.Steps.Count }));
+            }
+        }
+        else if (deciding.PartyCode is null)
         {
             var decider = await db.Functions.AsNoTracking().Include(f => f.Rules)
                 .SingleOrDefaultAsync(f => f.Code == deciding.FunctionCode && f.Active, cancellationToken);
@@ -182,6 +196,7 @@ public sealed class ReviewService(
             RevisionId = revision.Id,
             Number = number,
             RouteName = route.Name,
+            VerdictSet = route.VerdictSet ?? ReviewSets.Verdicts,
             StartedById = access.UserId,
             StartedByName = access.UserName,
             StartedAt = now,
@@ -194,6 +209,7 @@ public sealed class ReviewService(
                     Index = i,
                     Title = s.Title,
                     FunctionCode = party is null ? s.FunctionCode : null,
+                    UserIds = party is null ? s.UserIds : [],
                     PartyId = party?.Id,
                     PartyName = party?.Name,
                     Participation = party?.Participation,
@@ -396,12 +412,12 @@ public sealed class ReviewService(
         if (step.Deciding)
         {
             answer = request.Verdict ?? "";
-            if (!catalog.IsActive(ReviewSets.Verdicts, answer))
+            if (!catalog.IsActive(review.VerdictSet, answer))
             {
                 return (null, Problems.Invalid("VALUE_NOT_PUBLISHED", $"{answer} is not a published verdict.",
                     new { field = "verdict", value = answer }));
             }
-            if (Proceeds(catalog, answer) && review.IssueRequestId is null)
+            if (Proceeds(catalog, review.VerdictSet, answer) && review.IssueRequestId is null)
             {
                 granted = request.Status ?? "";
                 if (!catalog.IsActive(ReviewSets.Statuses, granted))
@@ -508,10 +524,10 @@ public sealed class ReviewService(
         if (step.Deciding)
         {
             // Several deciders: the most restrictive verdict binds.
-            var binding = answered.FirstOrDefault(p => !Proceeds(catalog, p.Answer!)) ?? answered[^1];
+            var binding = answered.FirstOrDefault(p => !Proceeds(catalog, review.VerdictSet, p.Answer!)) ?? answered[^1];
             step.Answer = binding.Answer;
             review.Verdict = binding.Answer;
-            review.GrantedStatus = Proceeds(catalog, binding.Answer!) ? binding.GrantedStatus : null;
+            review.GrantedStatus = Proceeds(catalog, review.VerdictSet, binding.Answer!) ? binding.GrantedStatus : null;
         }
         else
         {
@@ -521,7 +537,7 @@ public sealed class ReviewService(
         }
 
         // Reservations this step was named to settle close themselves, unless it objected.
-        var settles = step.Deciding ? Proceeds(catalog, step.Answer!) : AdviceKind(catalog, step.Answer!) != Advice_Blocking;
+        var settles = step.Deciding ? Proceeds(catalog, review.VerdictSet, step.Answer!) : AdviceKind(catalog, step.Answer!) != Advice_Blocking;
         if (settles)
         {
             foreach (var c in review.Comments.Where(c => c.Status == CommentStatuses.Open
@@ -559,7 +575,7 @@ public sealed class ReviewService(
         // Where nobody holds the control function, the people doing the work take
         // its acts: a verdict that proceeds releases, one that does not returns.
         if (await ControlHoldersAsync(access.Project.Id, cancellationToken) > 0) return;
-        if (!Proceeds(catalog, review.Verdict!))
+        if (!Proceeds(catalog, review.VerdictSet, review.Verdict!))
         {
             await ReturnToAuthorAsync(review, $"Verdict {review.Verdict}.", "System", cancellationToken);
         }
@@ -726,6 +742,7 @@ public sealed class ReviewService(
             revision.HeldAt = now;
             revision.HeldReason = $"Awaiting approval by {party.Name}.";
             revision.HeldByName = access.UserName;
+            db.Enqueue(RevisionMarked.RoutingKey, new RevisionMarked(revision.TenantId, revision.Id, FileKinds.Held, revision.HeldReason));
             await audit.WriteAsync(Actor(access), "REVISION_HELD", "Revision", revision.Id, label,
                 $"On hold, not for use: {revision.HeldReason}", access.Project.Id, cancellationToken);
             await notifier.NotifyAsync(document.TenantId, document.ProjectId, await ReceivedByAsync(revision.Id, cancellationToken),
@@ -747,7 +764,7 @@ public sealed class ReviewService(
         var now = clock.GetCurrentInstant();
         var request = await db.IssueRequests.SingleAsync(r => r.Id == review.IssueRequestId, cancellationToken);
         var party = review.Steps[0].PartyName ?? "The outside party";
-        var approved = Proceeds(catalog, review.Verdict!);
+        var approved = Proceeds(catalog, review.VerdictSet, review.Verdict!);
         review.DecidedAt = now;
         review.ClosedAt = now;
         review.ClosedByName = "System";
@@ -780,7 +797,7 @@ public sealed class ReviewService(
         }
         var main = await db.Reviews.Include(r => r.Comments)
             .SingleOrDefaultAsync(r => r.RevisionId == revision.Id && r.State == ReviewStates.Decided && r.IssueRequestId == null, cancellationToken);
-        if (main is not null && (main.Verdict is null || Proceeds(catalog, main.Verdict))
+        if (main is not null && (main.Verdict is null || Proceeds(catalog, main.VerdictSet, main.Verdict))
             && !main.Comments.Any(c => c.Blocking && c.Status == CommentStatuses.Open)
             && await ApprovalOwedAsync(revision.Id, cancellationToken) is null)
         {
@@ -935,7 +952,7 @@ public sealed class ReviewService(
             return (null, Problems.Conflict("REVIEW_NOT_DECIDED", "Only a decided review is released.", new { state = review.State }));
         }
         var catalog = await Catalog.LoadAsync(db, cancellationToken);
-        if (review.Verdict is not null && !Proceeds(catalog, review.Verdict))
+        if (review.Verdict is not null && !Proceeds(catalog, review.VerdictSet, review.Verdict))
         {
             return (null, Problems.Conflict("VERDICT_DOES_NOT_PROCEED",
                 $"Verdict {review.Verdict} asks for changes: send the revision back instead.", new { verdict = review.Verdict }));
@@ -990,7 +1007,7 @@ public sealed class ReviewService(
             // changes is different: what the document says must change, so the next
             // revision replaces it.
             var catalog = await Catalog.LoadAsync(db, cancellationToken);
-            var changesAsked = review.State == ReviewStates.Decided && review.Verdict is not null && !Proceeds(catalog, review.Verdict);
+            var changesAsked = review.State == ReviewStates.Decided && review.Verdict is not null && !Proceeds(catalog, review.VerdictSet, review.Verdict);
             var revision = await db.Revisions.SingleAsync(r => r.Id == review.RevisionId, cancellationToken);
             var fromOutside = revision.AuthoredByParty is { } party
                 && await db.Parties.AnyAsync(p => p.Code == party && !p.IsInternal, cancellationToken);
@@ -1161,10 +1178,10 @@ public sealed class ReviewService(
                 join v in db.Revisions on r.RevisionId equals v.Id
                 where r.ProjectId == access.Project.Id && r.State == ReviewStates.Decided
                 orderby r.DecidedAt
-                select new { r.Id, r.Number, DocumentId = d.Id, DocumentNumber = d.Number, d.Title, v.Value, r.Verdict, r.GrantedStatus, r.DecidedAt })
+                select new { r.Id, r.Number, DocumentId = d.Id, DocumentNumber = d.Number, d.Title, v.Value, r.Verdict, r.VerdictSet, r.GrantedStatus, r.DecidedAt })
                 .ToListAsync(cancellationToken);
             gate = decided.Select(x => new WorkItem(x.Id, x.Number, x.DocumentId, x.DocumentNumber, x.Title, x.Value,
-                x.Verdict is null || Proceeds(catalog, x.Verdict) ? "READY_TO_RELEASE" : "SEND_BACK", null, null,
+                x.Verdict is null || Proceeds(catalog, x.VerdictSet, x.Verdict) ? "READY_TO_RELEASE" : "SEND_BACK", null, null,
                 x.DecidedAt!.Value.ToDateTimeOffset(), true, x.Verdict, x.GrantedStatus)).ToList();
         }
         return new
@@ -1188,7 +1205,7 @@ public sealed class ReviewService(
         var step = review.Steps.Single(s => s.Index == index);
         var party = step.PartyId is { } partyId
             ? await db.Parties.AsNoTracking().SingleAsync(p => p.Id == partyId, cancellationToken) : null;
-        var holders = await SeatsAsync(project, step.FunctionCode, party, step.Participation, cancellationToken);
+        var holders = await SeatsAsync(project, step.FunctionCode, party, step.Participation, cancellationToken, step.UserIds);
         var today = WorkingCalendar.Today(clock, project.TimeZone);
         step.State = StepStates.Open;
         step.OpenedAt = clock.GetCurrentInstant();
@@ -1196,6 +1213,7 @@ public sealed class ReviewService(
         step.DueDate = step.Days is { } days && !step.ByProxy ? WorkingCalendar.AddWorkingDays(today, days, project.WeekendDays) : null;
         step.Answer = null;
         step.CompletedAt = null;
+        step.WarnedAt = null;
         ClearExchange(step);
         step.Participants = holders.Select(h => new ReviewParticipant
         {
@@ -1285,6 +1303,8 @@ public sealed class ReviewService(
             await audit.WriteAsync(actor, "SUPERSEDED", "Revision", old.Id, $"{document.Number} rev {old.Value}",
                 $"Superseded by rev {revision.Value}.", review.ProjectId, cancellationToken);
         }
+        // Whoever received what it replaces, and has an account here, is told to stop using it.
+        await supersession.TellReplacedAsync(document, revision, earlier, cancellationToken);
     }
 
     /// <summary>Closes the review and marks the revision returned: the author must make a new revision. Open steps end and open transmittals for the revision lapse.</summary>
@@ -1415,14 +1435,23 @@ public sealed class ReviewService(
     }
 
     /// <summary>
-    /// Who sits on a step: the holders of its function; for a party answering here,
-    /// its people on the project; for one answering by proxy, whoever of ours carries
-    /// the exchange with it.
+    /// Who sits on a step: the holders of its function and the people named on it who are on the project; for a party
+    /// answering here, its people on the project; for one answering by proxy, whoever of ours carries the exchange with it.
     /// </summary>
     private async Task<List<User>> SeatsAsync(
-        Project project, string? functionCode, Party? party, string? participation, CancellationToken cancellationToken)
+        Project project, string? functionCode, Party? party, string? participation, CancellationToken cancellationToken,
+        Guid[]? named = null)
     {
-        if (party is null) return functionCode is null ? [] : await HoldersAsync(project.Id, functionCode, cancellationToken);
+        if (party is null)
+        {
+            var holders = functionCode is null ? [] : await HoldersAsync(project.Id, functionCode, cancellationToken);
+            if (named is not { Length: > 0 }) return holders;
+            var people = await (from m in db.Memberships
+                                join u in db.Users on m.UserId equals u.Id
+                                where m.ProjectId == project.Id && m.Active && m.Function!.Active && u.Active && named.Contains(u.Id)
+                                select u).Distinct().ToListAsync(cancellationToken);
+            return holders.Concat(people).DistinctBy(u => u.Id).OrderBy(u => u.Name).ToList();
+        }
         if (participation == Participations.ByProxy) return await transmittals.CustodiansAsync(project.Id, party, cancellationToken);
         return await (from m in db.Memberships
                       join u in db.Users on m.UserId equals u.Id
@@ -1509,8 +1538,7 @@ public sealed class ReviewService(
     }
 
     /// <summary>Whether a verdict lets the revision go on to release (its published <c>proceed</c> property is true).</summary>
-    private static bool Proceeds(Catalog catalog, string verdict) =>
-        catalog.Prop(ReviewSets.Verdicts, verdict, "proceed") is { ValueKind: JsonValueKind.True };
+    private static bool Proceeds(Catalog catalog, string set, string verdict) => ReviewSets.Proceeds(catalog, set, verdict);
 
     /// <summary>The published advice code for an advice kind (none, some, blocking); the kind in capitals when none is published.</summary>
     private static string AdviceCode(Catalog catalog, string kind) =>
@@ -1546,4 +1574,13 @@ public sealed class ReviewService(
 public sealed record RevisionReleased(Guid TenantId, Guid RevisionId, Guid[] SupersededRevisionIds)
 {
     public const string RoutingKey = "revision.released";
+}
+
+/// <summary>
+/// Message sent through the outbox when a revision is voided or put on hold: the worker makes a copy of what people
+/// were reading marked VOID or ON HOLD. <c>Mark</c> is <see cref="FileKinds.Void"/> or <see cref="FileKinds.Held"/>.
+/// </summary>
+public sealed record RevisionMarked(Guid TenantId, Guid RevisionId, string Mark, string Note)
+{
+    public const string RoutingKey = "revision.marked";
 }

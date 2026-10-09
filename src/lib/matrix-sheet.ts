@@ -4,7 +4,7 @@ import { verbsFor, type Actor, type Verb } from "./permissions";
 import { familyOf, type Family } from "./families";
 import { matrixDetail } from "./control-activities";
 import { getActiveSet } from "./config";
-import { adminFunctions, orEmpty } from "./api/admin";
+import { adminFunctions, orEmpty, asMatrixRules } from "./api/admin";
 import { getMe } from "./api/me";
 import { registerByNumber } from "./api/register";
 
@@ -90,8 +90,8 @@ export async function buildSheet(
     getMe(),
   ]);
   const functions = allFunctions.filter((f) => f.active);
-  // The backend's rules are cut by class, never by family.
-  const rules = functions.flatMap((f) => f.rules.map((r) => ({ discipline: r.discipline, family: null as string | null })));
+  // A family row is kept as one rule per type in the family, each carrying the family.
+  const rules = functions.flatMap((f) => f.rules.map((r) => ({ discipline: r.discipline, family: r.family ?? null })));
   const typeFamilies = types.map((type) => ({ code: type.code, family: familyOf(type.code, type.props, published) }));
   const familyOfType = new Map(typeFamilies.map((one) => [one.code, one.family?.code ?? ""] as const));
   // One row per discipline, or one per discipline and document family where the
@@ -121,10 +121,7 @@ export async function buildSheet(
   const projectRole = me?.projects.find((p) => p.id === t.projectId)?.contractRole ?? null;
   const actors: (Actor | null)[] = functions.map((f) => ({
     functionId: f.id, functionCode: f.code, functionName: f.name, clearance: 0, legacyRole: "VIEWER", levels, projectRole,
-    rules: f.rules.map((r) => ({
-      deliverableType: r.deliverableType, docType: r.docType, discipline: r.discipline, criticality: r.criticality,
-      confidentiality: r.confidentiality, projectRole: r.projectRole, family: null, familyTypes: null, verbs: r.verbs as Verb[],
-    })),
+    rules: asMatrixRules(f.rules).map((r) => ({ ...r, verbs: r.verbs as Verb[] })),
   }));
   const columns = functions.map((f) => ({ code: f.code, name: f.name }));
 

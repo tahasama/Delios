@@ -404,6 +404,10 @@ public static class FileKinds
     public const string Stamped = "STAMPED";
     /// <summary>A stamped copy marked SUPERSEDED once a later revision is released.</summary>
     public const string Superseded = "SUPERSEDED";
+    /// <summary>The copy people were reading, marked VOID once the revision is voided.</summary>
+    public const string Void = "VOID";
+    /// <summary>The copy people were reading, marked ON HOLD while an outside approval is awaited.</summary>
+    public const string Held = "HELD";
     /// <summary>Proof filed against the revision: a party's returned stamped copy, the email that carried it.</summary>
     public const string Evidence = "EVIDENCE";
 }

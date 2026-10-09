@@ -16,12 +16,13 @@ public sealed record UpdateUserRequest(
     string? Password = null);
 
 /// <summary>Body of creating a project.</summary>
-public sealed record CreateProjectRequest(string? Code, string? Name, string? ContractRole = null, string? TimeZone = null);
+public sealed record CreateProjectRequest(string? Code, string? Name, string? ContractRole = null, string? TimeZone = null, string? Kind = null);
 
 /// <summary>Body of changing a project. A null field is left as it is.</summary>
 /// <remarks>A new <c>Code</c> shapes new numbers only; numbers already given keep the old one.</remarks>
 public sealed record UpdateProjectRequest(
-    string? Code = null, string? Name = null, string? ContractRole = null, string? Status = null, string? TimeZone = null, int[]? WeekendDays = null);
+    string? Code = null, string? Name = null, string? ContractRole = null, string? Status = null, string? TimeZone = null, int[]? WeekendDays = null,
+    string? Kind = null);
 
 /// <summary>Body of putting a person on a project, or changing their place on it: one function per person per project.</summary>
 public sealed record MembershipRequest(Guid UserId, Guid? FunctionId, string? Department = null, bool Active = true);
@@ -32,7 +33,7 @@ public sealed record CreateFunctionRequest(string? Code, string? Name);
 /// <summary>One row of the matrix as sent by the screens: what a function may do, to which documents (null: any).</summary>
 public sealed record RuleRequest(
     string[]? Verbs, string? DeliverableType = null, string? DocType = null, string? Discipline = null, string? Criticality = null,
-    string? Confidentiality = null, string? ProjectRole = null);
+    string? Confidentiality = null, string? ProjectRole = null, string? Family = null, string? Note = null);
 
 /// <summary>Body of changing a function. <c>Rules</c>, when given, replaces all of its matrix rows.</summary>
 public sealed record UpdateFunctionRequest(string? Name = null, bool? Active = null, RuleRequest[]? Rules = null);
@@ -58,6 +59,7 @@ public static class DirectoryEndpoints
         admin.MapGet("/projects", ProjectsAsync);
         admin.MapPost("/projects", CreateProjectAsync);
         admin.MapPut("/projects/{projectId:guid}", UpdateProjectAsync);
+        admin.MapPost("/projects/{projectId:guid}/join", JoinProjectAsync);
 
         // Document Control keeps these day to day, as well as administrators.
         var keepers = app.MapGroup("/api/admin").WithTags("Administration")
@@ -225,6 +227,7 @@ public static class DirectoryEndpoints
             p.Code,
             p.Name,
             p.ContractRole,
+            p.Kind,
             p.Status,
             p.TimeZone,
             p.WeekendDays,
@@ -253,6 +256,7 @@ public static class DirectoryEndpoints
             Code = code,
             Name = name,
             ContractRole = Blank(request.ContractRole)?.ToUpperInvariant() ?? "GENERIC",
+            Kind = Blank(request.Kind)?.ToUpperInvariant() ?? "GENERIC",
             TimeZone = zone,
         };
         db.Projects.Add(project);
@@ -285,6 +289,7 @@ public static class DirectoryEndpoints
         }
         if (Blank(request.Name) is { } name && name != project.Name) { changes.Add($"name → {name}"); project.Name = name; }
         if (Blank(request.ContractRole)?.ToUpperInvariant() is { } role && role != project.ContractRole) { changes.Add($"contract role → {role}"); project.ContractRole = role; }
+        if (Blank(request.Kind)?.ToUpperInvariant() is { } kind && kind != project.Kind) { changes.Add($"kind → {kind}"); project.Kind = kind; }
         if (Blank(request.Status)?.ToUpperInvariant() is { } status && status != project.Status)
         {
             if (status is not ("ACTIVE" or "CLOSED" or "ON_HOLD" or "ARCHIVED"))
@@ -315,6 +320,35 @@ public static class DirectoryEndpoints
     /// <c>PUT /api/admin/projects/{id}/members</c>: puts a person on the project with a function, changes their function
     /// or department, or ends their place on it (<c>Active</c> false).
     /// </summary>
+    /// <summary>
+    /// <c>POST /api/admin/projects/{id}/join</c>: an administrator opening one of the organization's projects they are not
+    /// on joins it, holding the organization's administrator function (the first function that may configure). Somebody
+    /// switched off on the project stays off.
+    /// </summary>
+    private static async Task<IResult> JoinProjectAsync(
+        Guid projectId, HttpContext http, DeliosDbContext db, AuditLog audit, CancellationToken cancellationToken)
+    {
+        var project = await db.Projects.AsNoTracking().SingleOrDefaultAsync(p => p.Id == projectId && p.Status == "ACTIVE", cancellationToken);
+        if (project is null) return Problems.NotFound("PROJECT_NOT_FOUND", "No such project in use.");
+        var me = http.User.UserId();
+        var membership = await db.Memberships.AsNoTracking().SingleOrDefaultAsync(m => m.ProjectId == projectId && m.UserId == me, cancellationToken);
+        if (membership is not null)
+        {
+            return membership.Active ? Results.NoContent()
+                : Problems.Conflict("SWITCHED_OFF_HERE", "You were taken off this project. Put yourself back in People & access, saying why.");
+        }
+        var function = await db.Functions.AsNoTracking().Where(f => f.Active && f.Rules.Any(r => r.Verbs.Contains(Verbs.Configure)
+                && (r.ProjectRole == null || r.ProjectRole == project.ContractRole)))
+            .OrderBy(f => f.Name).FirstOrDefaultAsync(cancellationToken);
+        if (function is null)
+            return Problems.Conflict("NO_ADMIN_FUNCTION", "No function may configure on this project. Publish one, or put yourself on it in People & access.");
+        db.Memberships.Add(new Membership { TenantId = project.TenantId, ProjectId = project.Id, UserId = me, FunctionId = function.Id });
+        await db.SaveChangesAsync(cancellationToken);
+        await audit.WriteAsync(await ActorAsync(http, db, cancellationToken), "PROJECT_JOINED", "Project", project.Id, project.Code,
+            $"An administrator opened the project and joined it as {function.Name}.", project.Id, cancellationToken);
+        return Results.NoContent();
+    }
+
     private static async Task<IResult> MemberAsync(
         Guid projectId, MembershipRequest request, HttpContext http, DeliosDbContext db, AuditLog audit, CancellationToken cancellationToken)
     {
@@ -375,7 +409,7 @@ public static class DirectoryEndpoints
             f.Name,
             f.Active,
             Holders = held.FirstOrDefault(h => h.Key == f.Id)?.Count ?? 0,
-            Rules = f.Rules.Select(r => new { r.Id, r.Verbs, r.DeliverableType, r.DocType, r.Discipline, r.Criticality, r.Confidentiality, r.ProjectRole }),
+            Rules = f.Rules.Select(r => new { r.Id, r.Verbs, r.DeliverableType, r.DocType, r.Discipline, r.Criticality, r.Confidentiality, r.ProjectRole, r.Family, r.Note }),
         }));
     }
 
@@ -428,6 +462,8 @@ public static class DirectoryEndpoints
                     Criticality = Blank(rule.Criticality),
                     Confidentiality = Blank(rule.Confidentiality),
                     ProjectRole = Blank(rule.ProjectRole),
+                    Family = Blank(rule.Family) is { } family && family.Length <= 32 ? family : null,
+                    Note = Blank(rule.Note) is { } note ? note.Length > 300 ? note[..300] : note : null,
                 });
             }
             changes.Add($"matrix: {rules.Length} row(s)");

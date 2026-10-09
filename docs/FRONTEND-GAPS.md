@@ -8,17 +8,10 @@ already reads "nothing" (an empty list), and the act answers
 "… is not supported yet." The per-area pages below were written before the
 latest additions; where an item there is listed above as added, it is done.
 
-## Still missing in the backend
-1. **Packages**: more than one reason for issue, the organization's own fields, filling by asset tag, the reason for deleting.
-2. **Governance acts**: confirming or correcting a record, withdrawing an approval, reclassifying a comment.
-3. **Received transmittals**: adding files after it was recorded; returning everything when no "return" outcome is published.
-4. **Review routes**: a route's own verdict list; naming people on a step (a step is a function or an organization).
-5. **Late-review warning** sent the day before a step falls due.
-6. **Who still holds a replaced revision without being told** (the first out-of-date risk on Exposures).
-7. **Numbering on its own** (a number before registering), action codes typed by hand, and number ranges being drawn from (ranges are recorded only).
-8. **Two-step sign-in** on the sign-in page; an administrator opening a project they are not on; function clearance and family-wide matrix rules; project kind.
-9. **PDF stamps** for "void" and "on hold".
-10. **A button for changing or taking back a comment** on the review page (the backend supports it; the screen has no button).
+## Still missing
+Nothing is missing in the backend. Two screens lack a control for something the backend does:
+1. **Two-step sign-in**: the sign-in page has no box for the code.
+2. **Changing or taking back a comment**: the review page has no button for it.
 
 What behaves differently from the old app, and why: [BEHAVIOUR-CHANGES.md](BEHAVIOUR-CHANGES.md).
 
@@ -34,6 +27,11 @@ What behaves differently from the old app, and why: [BEHAVIOUR-CHANGES.md](BEHAV
 - Voiding and its reassessment; an outside approval before use, with holds; legal hold; readers of a closed document; previous number, legacy scheme, application and own fields on a document; a snapshot of the document at each change.
 - Transmittal copies, drafts, letters with no documents, chosen dates, answers and follow-ups, telling again, opening counts, arrival notes and who something received is for, own fields.
 - Asset tags and their links to documents; published exceptions; number ranges; calls to departments, readiness, lists issued to senders, telling departments; uploaded lists waiting for a decision.
+- Packages with several reasons, own fields, filling by asset tag and a reason to delete; confirming and correcting records, withdrawing an approval, reclassifying a comment.
+- Files kept with something received after it was recorded; returning what arrived when no "return" outcome is published.
+- A route's own verdict list; people named on a route's step; the warning the working day before a step falls due.
+- Who still holds a replaced revision without being told (Exposures), and telling people with an account at release.
+- Numbers drawn from ranges issued to a party; "VOID" and "ON HOLD" copies of the PDF; an administrator joining a project they are not on; project type on the project; matrix rows by document family.
 
 ## By area, in detail
 - [Reviews](gaps/reviews.md)

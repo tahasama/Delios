@@ -10,7 +10,7 @@ namespace Delios.Host.Reviews;
 public sealed record ReturnHeldRequest(string? Reason);
 
 /// <summary>A review route offered for a document, as returned to the client by <c>GET .../documents/{documentId}/routes</c>.</summary>
-public sealed record RouteView(Guid Id, string Name, string? Description, bool IsDefault, IReadOnlyList<RouteStep> Steps);
+public sealed record RouteView(Guid Id, string Name, string? Description, bool IsDefault, IReadOnlyList<RouteStep> Steps, string VerdictSet = ReviewSets.Verdicts);
 
 /// <summary>One person's answer on a review step, as shown inside a <see cref="StepView"/>.</summary>
 /// <param name="AnsweredBy">Somebody who answered in this person's place, by a hand-over.</param>
@@ -21,7 +21,8 @@ public sealed record ParticipantView(string Name, string? Answer, string? Grante
 public sealed record StepView(int Number, string Title, string? Function, string? Party, string? Participation, string Mode,
     bool Deciding, string State, DateOnly? DueDate, string? Answer, IReadOnlyList<string> GrantsStatuses,
     IReadOnlyList<ParticipantView> Participants, Guid? TransmittalId, DateTimeOffset? DispatchedAt, string? DispatchChannel,
-    string? DispatchRef, string? DispatchedBy, string? ForeignAnswer, string? RecordedBy, Guid? EvidenceFileId);
+    string? DispatchRef, string? DispatchedBy, string? ForeignAnswer, string? RecordedBy, Guid? EvidenceFileId,
+    DateTimeOffset? WarnedAt = null);
 
 /// <summary>A review comment as sent to the client. <c>Step</c> and <c>ClosesWithStep</c> count from 1.</summary>
 public sealed record CommentView(Guid Id, int Step, string Author, string Text, string Class, bool Blocking,
@@ -33,7 +34,7 @@ public sealed record ReviewView(Guid Id, string Number, Guid DocumentId, Guid Re
     int? CurrentStep, string? Verdict, string? GrantedStatus, string StartedBy, DateTimeOffset StartedAt,
     DateTimeOffset? DecidedAt, DateTimeOffset? ClosedAt, string? ClosedBy, string? ReturnNote,
     IReadOnlyList<StepView> Steps, IReadOnlyList<CommentView> Comments, DateTimeOffset? ApprovalWithdrawnAt = null,
-    string? ApprovalWithdrawnBy = null, string? ApprovalWithdrawnReason = null);
+    string? ApprovalWithdrawnBy = null, string? ApprovalWithdrawnReason = null, string VerdictSet = ReviewSets.Verdicts);
 
 /// <summary>
 /// The HTTP endpoints for reviews: listing routes, starting a review, commenting, answering, releasing, returning, rewinding and dispatching steps.
@@ -84,7 +85,7 @@ public static class ReviewEndpoints
             .AsNoTracking().SingleOrDefaultAsync(d => d.Id == documentId, cancellationToken);
         if (document is null) return Problems.NotFound("DOCUMENT_NOT_FOUND", "No such document.");
         var routes = await reviews.RoutesForAsync(document, cancellationToken);
-        return Results.Ok(routes.Select(r => new RouteView(r.Id, r.Name, r.Description, r.IsDefault, r.Steps)));
+        return Results.Ok(routes.Select(r => new RouteView(r.Id, r.Name, r.Description, r.IsDefault, r.Steps, r.VerdictSet ?? ReviewSets.Verdicts)));
     }
 
     /// <summary>
@@ -209,9 +210,9 @@ public static class ReviewEndpoints
             s.Participants.OrderBy(p => p.UserName).Select(p => new ParticipantView(p.UserName, p.Answer, p.GrantedStatus,
                 p.Note, p.AnsweredAt?.ToDateTimeOffset(), p.UserId, p.AnsweredByName)).ToList(),
             s.TransmittalId, s.DispatchedAt?.ToDateTimeOffset(), s.DispatchChannel, s.DispatchRef, s.DispatchedByName,
-            s.ForeignAnswer, s.RecordedByName, s.EvidenceFileId)).ToList(),
+            s.ForeignAnswer, s.RecordedByName, s.EvidenceFileId, s.WarnedAt?.ToDateTimeOffset())).ToList(),
         r.Comments.Where(c => c.Status != CommentStatuses.Withdrawn).OrderBy(c => c.CreatedAt).Select(View).ToList(),
-        r.ApprovalWithdrawnAt?.ToDateTimeOffset(), r.ApprovalWithdrawnByName, r.ApprovalWithdrawnReason);
+        r.ApprovalWithdrawnAt?.ToDateTimeOffset(), r.ApprovalWithdrawnByName, r.ApprovalWithdrawnReason, r.VerdictSet);
 
     /// <summary>Converts a review comment entity into the <see cref="CommentView"/> sent to clients.</summary>
     private static CommentView View(ReviewComment c) => new(

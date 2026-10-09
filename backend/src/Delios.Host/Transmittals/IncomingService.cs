@@ -32,6 +32,9 @@ public sealed record IncomingRequest(
     Guid? FromPartyId = null, Guid? ProofFileId = null, string? Note = null, Guid[]? UserIds = null, DateOnly? ReceivedOn = null,
     Guid? InReplyToId = null, Dictionary<string, string?>? Extras = null);
 
+/// <summary>Body of keeping files with something received after it was recorded.</summary>
+public sealed record AttachFilesRequest(Guid[]? FileIds, string? Note = null);
+
 /// <summary>Body of an upload link for a file sent without a document: an unplanned item's file, or a covering letter.</summary>
 public sealed record LooseUploadRequest(string? FileName, long Size, string? ContentType, string? Sha256, bool Proof = false);
 
@@ -390,6 +393,44 @@ public sealed class IncomingService(
         return party is null
             ? (null, false, Problems.Invalid("PARTY_UNKNOWN", "That is not an active outside organization."))
             : (party, true, null);
+    }
+
+    /// <summary>
+    /// Document Control keeps further files with something received, after it was recorded: the letter that
+    /// followed, a corrected cover sheet. They are kept apart from what arrived, whose record is its receipt.
+    /// </summary>
+    public async Task<(Transmittal? Transmittal, IResult? Problem)> AttachAsync(
+        ProjectAccess access, Guid transmittalId, AttachFilesRequest request, CancellationToken cancellationToken)
+    {
+        if (!access.Holds(Verbs.Control)) return (null, Problems.Forbidden("CONTROL_ONLY", "Document Control keeps what arrived."));
+        var transmittal = await db.Transmittals.Include(t => t.Items).Include(t => t.Recipients).AsSplitQuery()
+            .SingleOrDefaultAsync(t => t.Id == transmittalId && t.ProjectId == access.Project.Id, cancellationToken);
+        if (transmittal is null) return (null, Problems.NotFound("TRANSMITTAL_NOT_FOUND", "No such transmittal."));
+        if (transmittal.Direction != TransmittalDirections.Incoming) return (null, Problems.Conflict("NOT_RECEIVED", "Files are kept with what we received."));
+        var (files, problem) = await LooseFilesAsync(access, request.FileIds, proof: false, cancellationToken);
+        if (problem is not null) return (null, problem);
+        var item = new TransmittalItem
+        {
+            TenantId = transmittal.TenantId,
+            TransmittalId = transmittal.Id,
+            Kind = TransmittalItemKinds.Attachment,
+            DocumentNumber = "",
+            Title = Blank(request.Note) ?? "Kept with it after it was recorded",
+            RevisionValue = "",
+            RegisteredAt = clock.GetCurrentInstant(),
+            RegisteredByName = access.UserName,
+        };
+        foreach (var file in files!)
+        {
+            file.TransmittalItemId = item.Id;
+            Process(file);
+        }
+        db.TransmittalItems.Add(item);
+        await audit.WriteAsync(new Actor(access.UserId, access.UserName), "TRANSMITTAL_FILES_KEPT", "Transmittal", transmittal.Id, transmittal.Number,
+            $"{files.Count} file(s) kept with it after it was recorded: {string.Join(", ", files.Select(f => f.Name))}.", access.Project.Id, cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
+        transmittal.Items.Add(item);
+        return (transmittal, null);
     }
 
     /// <summary>Uploaded files that belong to no document yet, uploaded by the caller and not used, each arrived.</summary>

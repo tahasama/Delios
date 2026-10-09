@@ -59,6 +59,7 @@ export async function signupAction(_prev: SignupState | undefined, formData: For
       body: {
         organizationName, name, email, password,
         projectCode: wantsProject ? projectCode : null, projectName: wantsProject ? projectName : null, contractRole: wantsProject ? projectRole : null,
+        projectKind: wantsProject ? projectKind : null,
       },
     });
   } catch {

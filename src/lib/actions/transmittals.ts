@@ -149,10 +149,10 @@ export async function acceptTransmittalAction(_prev: { error?: string } | undefi
     ? (await getActiveSet("CONTROL_OUTCOMES")).filter((one) => one.props.act === "return")
         .sort((a, b) => Number(b.props.to === "sender" && b.props.newRevision !== true) - Number(a.props.to === "sender" && a.props.newRevision !== true))[0]?.code
     : undefined;
-  if (reject && !outcome) return { error: "Returning what arrived is not supported yet." };
+  // Where the organization published no return outcome, it is returned to the sender all the same.
   try {
     for (const item of waiting) {
-      await api(projectPath(ctx, `/revisions/${item.revisionId}/arrival`), { body: { outcome, note: notes || null } });
+      await api(projectPath(ctx, `/revisions/${item.revisionId}/arrival`), { body: { outcome, note: notes || null, return: reject && !outcome } });
     }
   } catch (e) {
     return { error: refusal(e).message };
@@ -163,10 +163,21 @@ export async function acceptTransmittalAction(_prev: { error?: string } | undefi
 }
 
 /** Adding to what came with a received transmittal, after it was recorded. */
-export async function attachTransmittalFilesAction(_prev: { error?: string; ok?: string } | undefined, _formData: FormData): Promise<{ error?: string; ok?: string }> {
-  await requireScope();
-  // What came is fixed the moment it arrived: that moment is its receipt.
-  return { error: "Keeping more files with a received transmittal is not supported yet." };
+export async function attachTransmittalFilesAction(_prev: { error?: string; ok?: string } | undefined, formData: FormData): Promise<{ error?: string; ok?: string }> {
+  const ctx = await requireScope();
+  const id = String(formData.get("transmittalId") ?? "");
+  const files = formData.getAll("attachments").filter((one): one is File => one instanceof File && one.size > 0);
+  if (!files.length) return { error: "Choose the files to keep with it." };
+  try {
+    // What arrived stays as it was; these are kept beside it, said to be added later.
+    const fileIds = await Promise.all(files.map((file) => upload(ctx, { loose: true }, file)));
+    await api(projectPath(ctx, `/transmittals/${id}/attachments`), { body: { fileIds } });
+  } catch (e) {
+    return { error: refusal(e).message };
+  } finally {
+    revalidatePath(`/transmittals/${id}`);
+  }
+  return { ok: files.length === 1 ? "Kept with it." : `${files.length} files kept with it.` };
 }
 
 /**

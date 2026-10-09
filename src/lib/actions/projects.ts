@@ -47,7 +47,7 @@ export async function createProjectAction(_prev: ProjectState | undefined, formD
 
   let carried = 0;
   try {
-    const project = await api<{ id: string }>("/api/admin/projects", { body: { code, name, contractRole: role } });
+    const project = await api<{ id: string }>("/api/admin/projects", { body: { code, name, contractRole: role, kind } });
     // §1.6 — a project is measured against the scope it states for itself.
     await setProjectSetting(project.id, PROJECT_INFO, JSON.stringify({
       kind, startDate: startDate || new Date().toISOString().slice(0, 10), endDate: endDate || null,

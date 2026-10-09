@@ -9,7 +9,7 @@ namespace Delios.Host.Seeding;
 /// <summary>Body of an organization registering itself. The project is optional: an organization exists before its projects do.</summary>
 public sealed record SignUpRequest(
     string? OrganizationName, string? Name, string? Email, string? Password, string? ProjectCode = null, string? ProjectName = null,
-    string? ContractRole = null);
+    string? ContractRole = null, string? ProjectKind = null);
 
 /// <summary>
 /// The one self-service way in: an organization registers itself, with its first administrator and the recommended
@@ -45,7 +45,7 @@ public static class SignUpEndpoints
             return Problems.Conflict("EMAIL_TAKEN", "That email already signs somebody in. Sign in instead.");
 
         var (_, adminId) = await starter.StartAsync(organization, name, email, password, request.ProjectCode, request.ProjectName,
-            request.ContractRole, cancellationToken);
+            request.ContractRole, cancellationToken, request.ProjectKind);
         // Read back under the new organization's row-level security, which applies inside a transaction.
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         var admin = await db.Users.SingleAsync(u => u.Id == adminId, cancellationToken);

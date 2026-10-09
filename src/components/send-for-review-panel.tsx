@@ -31,14 +31,14 @@ export async function SendForReview({ revisionIds }: { revisionIds: string[] }) 
     matrixBinds(ctx),
   ]);
   const applicable = routeLists[0].filter((route) => routeLists.every((list) => list.some((one) => one.id === route.id)));
-  const setViews = await verdictSets(ctx, ["REVIEW_OUTCOMES"]);
+  const setViews = await verdictSets(ctx, ["REVIEW_OUTCOMES", ...applicable.map((t) => t.verdictSet ?? "REVIEW_OUTCOMES")]);
   const routes: SendRoute[] = applicable.map((t) => ({
     id: t.id,
     name: t.name,
     description: t.description,
     isDefault: t.isDefault,
-    verdicts: setViews.get("REVIEW_OUTCOMES") ?? null,
-    // The last step decides; earlier steps advise. Its people are whoever holds the step's function.
+    verdicts: setViews.get(t.verdictSet ?? "REVIEW_OUTCOMES") ?? null,
+    // The last step decides; earlier steps advise. Its people are whoever holds the step's function, and whoever it names.
     steps: t.steps.map((s, i) => {
       const deciding = i === t.steps.length - 1;
       const pool = deciding ? approvers : reviewers;
@@ -46,7 +46,7 @@ export async function SendForReview({ revisionIds }: { revisionIds: string[] }) 
         title: s.title || (deciding ? "Decision" : `Review ${i + 1}`),
         act: deciding ? "APPROVAL" as const : "REVIEW" as const,
         mode: s.mode === "ALL" ? "ALL" as const : "ANY_OF" as const,
-        proposed: pool.filter((p) => p.functionId === s.functionCode).map((p) => ({ id: p.id, why: `${p.functionName} (route)` })),
+        proposed: pool.filter((p) => p.functionId === s.functionCode || (s.userIds ?? []).includes(p.id)).map((p) => ({ id: p.id, why: p.functionId === s.functionCode ? `${p.functionName} (route)` : "named on the route" })),
         fromFunctions: s.functionCode ? [pool.find((p) => p.functionId === s.functionCode)?.functionName ?? s.functionCode] : [],
       };
     }),

@@ -223,8 +223,8 @@ export default async function ReviewsPage({ searchParams }: { searchParams: Prom
       notifyHref: late && waitingOnStep
         ? `/transmittals/new?revisions=${waitingOnStep.revisionId}&users=${waitingOnStep.userIds.join(",")}&reason=REVIEW&subject=${encodeURIComponent(`${c.documentNumber} rev ${c.revision} — review still open`)}&message=${encodeURIComponent(`This review was due on ${fmtDate(dueAt!)}. Please answer it.`)}`
         : null,
-      // The backend sends no automatic warning, so none is on record.
-      warnedAt: null,
+      // When the people on the open step were warned it falls due the next working day.
+      warnedAt: c.warnedAt ? fmtDate(c.warnedAt) : null,
       openedAt: fmtDate(c.startedAt),
       openedBy: c.startedBy,
       discipline: disciplineLabel.get(c.discipline) ?? c.discipline,

@@ -4,6 +4,7 @@ using System.Text.Json;
 using Delios.Host.Platform;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using NodaTime;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
@@ -13,9 +14,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Delios.Host.Platform.Migrations
 {
     [DbContext(typeof(DeliosDbContext))]
-    partial class DeliosDbContextModelSnapshot : ModelSnapshot
+    [Migration("20261009054223_RoutesAndWarnings")]
+    partial class RoutesAndWarnings
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1539,19 +1542,9 @@ namespace Delios.Host.Platform.Migrations
                         .HasColumnType("text")
                         .HasColumnName("doc_type");
 
-                    b.Property<string>("Family")
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)")
-                        .HasColumnName("family");
-
                     b.Property<Guid>("FunctionId")
                         .HasColumnType("uuid")
                         .HasColumnName("function_id");
-
-                    b.Property<string>("Note")
-                        .HasMaxLength(300)
-                        .HasColumnType("character varying(300)")
-                        .HasColumnName("note");
 
                     b.Property<string>("ProjectRole")
                         .HasColumnType("text")
@@ -1607,14 +1600,6 @@ namespace Delios.Host.Platform.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at")
                         .HasDefaultValueSql("now()");
-
-                    b.Property<string>("Kind")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)")
-                        .HasDefaultValue("GENERIC")
-                        .HasColumnName("kind");
 
                     b.Property<string>("Name")
                         .IsRequired()

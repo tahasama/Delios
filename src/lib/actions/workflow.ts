@@ -39,15 +39,15 @@ export async function saveTemplateAction(_prev: { error?: string } | undefined, 
       return { error: "The document-class scope is invalid." };
     }
   }
-  if (text(formData, "outcomeSetKey") && text(formData, "outcomeSetKey") !== "REVIEW_OUTCOMES") {
-    return { error: "Every route decides from the review outcomes list: a route's own verdict list is not supported yet." };
-  }
   let steps: LegacyRouteStep[];
   try { steps = JSON.parse(String(formData.get("steps") ?? "[]")); } catch { return { error: "Steps are not valid JSON." }; }
   if (!Array.isArray(steps) || steps.length === 0) return { error: "Add at least one step." };
   const route = await backendRoute(classes, steps);
   if ("error" in route) return { error: route.error };
-  const body = { name, description: text(formData, "description") || null, isDefault: formData.get("isDefault") === "on", ...route };
+  const body = {
+    name, description: text(formData, "description") || null, isDefault: formData.get("isDefault") === "on",
+    verdictSet: text(formData, "outcomeSetKey") || "REVIEW_OUTCOMES", ...route,
+  };
   try {
     if (id) await api(`/api/admin/routes/${id}`, { method: "PUT", body });
     else await api("/api/admin/routes", { body });

@@ -1,5 +1,6 @@
 using Delios.Host.Audit;
 using Delios.Host.Identity;
+using Delios.Host.Messaging;
 using Delios.Host.Platform;
 using Delios.Host.Reviews;
 using Delios.Host.Settings;
@@ -87,6 +88,7 @@ public sealed class KeepingService(
         revision.VoidedAt = now;
         revision.VoidReason = reason;
         revision.VoidAuthority = access.UserName;
+        db.Enqueue(Reviews.RevisionMarked.RoutingKey, new Reviews.RevisionMarked(revision.TenantId, revision.Id, FileKinds.Void, $"Void: {reason}"));
         if (request.Reassessment?.Trim() is { Length: > 0 } reassessment)
         {
             revision.VoidReassessment = reassessment;
@@ -282,6 +284,8 @@ public static class KeepingEndpoints
             });
         project.MapGet("/exposures/void", async (HttpContext h, KeepingService s, CancellationToken c) =>
             Results.Ok(await s.UnresolvedVoidsAsync(ProjectAccessFilter.Of(h), c)));
+        project.MapGet("/exposures/untold", async (HttpContext h, Transmittals.Supersession s, CancellationToken c) =>
+            Results.Ok(await s.UntoldAsync(ProjectAccessFilter.Of(h), c)));
         project.MapPost("/documents/{documentId:guid}/legal-hold",
             (Guid documentId, LegalHoldRequest r, HttpContext h, KeepingService s, CancellationToken c) =>
                 s.LegalHoldAsync(h, ProjectAccessFilter.Of(h), documentId, r, c));

@@ -5,7 +5,7 @@ import { redirect, notFound } from "next/navigation";
 import { getCurrentUser, atLeast, type SessionUser } from "./auth";
 import type { Role } from "./standard";
 import { can, verbsFor, explain, type Actor, type Verb, type DocumentClass } from "./permissions";
-import { api } from "./api/client";
+import { api, forgetShortLived } from "./api/client";
 import { getMe } from "./api/me";
 
 /**
@@ -85,8 +85,16 @@ export const getScope = cache(async (): Promise<Scope | null> => {
   const wanted = jar.get(PROJECT_COOKIE)?.value;
   const chosen = me.projects.find((p) => p.id === wanted) ?? me.projects[0];
   const summary = (p: (typeof me.projects)[number]): ProjectSummary =>
-    ({ id: p.id, orgId: me.tenant.slug, code: p.code, name: p.name, kind: "GENERIC", role: p.contractRole, status: p.status });
+    ({ id: p.id, orgId: me.tenant.slug, code: p.code, name: p.name, kind: p.kind ?? "GENERIC", role: p.contractRole, status: p.status });
   const available = me.projects.map(summary);
+  // An administrator may open any project their organization runs, whether or not they were put on it: joining
+  // happens on the switch, so there is still exactly one way to be in a project — a membership.
+  if (await configures(me)) {
+    const held = new Set(available.map((p) => p.id));
+    const rest = (await organizationProjects()).filter((p) => p.status === "ACTIVE" && !held.has(p.id));
+    available.push(...rest.map((p): ProjectSummary => ({ id: p.id, orgId: me.tenant.slug, code: p.code, name: p.name, kind: p.kind ?? "GENERIC", role: p.contractRole, status: p.status })));
+    available.sort((a, b) => a.code.localeCompare(b.code));
+  }
 
   // Confidentiality levels, as this organization published them.
   const values = await api<Record<string, { code: string; props: Record<string, unknown> | null }[]>>("/api/values", { query: { sets: "CONFIDENTIALITY" } })
@@ -177,10 +185,28 @@ export async function requireAccessScope(): Promise<Scope> {
 
 // ── Project switching ────────────────────────────────────────────────────────
 
+/** Whether this person administers the organization: flagged so, or holding Configure through a function somewhere. */
+async function configures(me: NonNullable<Awaited<ReturnType<typeof getMe>>>): Promise<boolean> {
+  return me.user.isAdmin || me.projects.some((p) => (p.rules ?? []).some((r) => r.verbs.includes("CONFIGURE")) || (p.verbs ?? []).includes("CONFIGURE"));
+}
+
+/** The organization's projects, as an administrator sees them. */
+const organizationProjects = cache(async () =>
+  api<{ id: string; code: string; name: string; contractRole: string; kind?: string; status: string }[]>("/api/admin/projects").catch(() => []));
+
 export async function setActiveProject(projectId: string, _userId: string) {
-  // Only a project the backend says this person is on.
+  // Only a project the backend says this person is on; an administrator joins one they are not on.
   const me = await getMe();
-  if (!me?.projects.some((p) => p.id === projectId)) return false;
+  if (!me) return false;
+  if (!me.projects.some((p) => p.id === projectId)) {
+    if (!(await configures(me)) || !(await organizationProjects()).some((p) => p.id === projectId)) return false;
+    try {
+      await api(`/api/admin/projects/${projectId}/join`, { body: {} });
+    } catch {
+      return false;
+    }
+    await forgetShortLived();
+  }
   const jar = await cookies();
   jar.set(PROJECT_COOKIE, projectId, {
     httpOnly: true,

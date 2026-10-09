@@ -146,6 +146,8 @@ public static class TransmittalItemKinds
     /// transmittal until Document Control registers it.
     /// </summary>
     public const string Unplanned = "UNPLANNED";
+    /// <summary>Files kept with something received after it was recorded, apart from what arrived.</summary>
+    public const string Attachment = "ATTACHMENT";
 }
 
 /// <summary>One revision on a transmittal, as it stood when it went.</summary>

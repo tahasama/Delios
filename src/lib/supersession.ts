@@ -9,6 +9,8 @@
  * replacement travel only through it.
  * Whoever is left is who still holds an out-of-date revision without knowing.
  */
+import { api, projectPath } from "@/lib/api/client";
+
 export type Recipient = { key: string; name: string; organization: string | null; userId: string | null; via: string };
 export type Untold = {
   document: { id: string; docNumber: string; title: string };
@@ -21,15 +23,27 @@ export type Untold = {
   draft: { id: string; number: string } | null;
 };
 
+type UntoldRow = {
+  documentId: string; documentNumber: string; title: string; oldRevisionId: string; oldValue: string; supersededAt: string | null;
+  current: { id: string; value: string; statusCode: string | null } | null; reason: string | null;
+  recipients: { key: string; name: string; organization: string | null; userId: string | null; via: string }[];
+};
+
 /**
- * Who still holds a replaced revision without having been told.
- *
- * The backend keeps no project-wide answer to this: it would take every
- * transmittal and every document read one at a time. Until it answers it
- * (see docs/gaps/conformance-reports.md), nobody is listed.
+ * Who still holds a replaced revision without having been told, as the
+ * backend works it out (GET /exposures/untold). A transmittal prepared and
+ * not issued is not looked for: drafts are kept apart until issued.
  */
-export async function untoldRecipients(_t: { projectId: string }): Promise<Untold[]> {
-  return [];
+export async function untoldRecipients(t: { projectId: string }): Promise<Untold[]> {
+  const rows = await api<UntoldRow[]>(projectPath(t, "/exposures/untold")).catch(() => [] as UntoldRow[]);
+  return rows.map((row) => ({
+    document: { id: row.documentId, docNumber: row.documentNumber, title: row.title },
+    old: { id: row.oldRevisionId, value: row.oldValue, supersededAt: row.supersededAt ? new Date(row.supersededAt) : null },
+    current: row.current,
+    recipients: row.recipients,
+    reason: row.reason,
+    draft: null,
+  }));
 }
 
 /**

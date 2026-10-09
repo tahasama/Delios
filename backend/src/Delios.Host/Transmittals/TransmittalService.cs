@@ -795,12 +795,12 @@ public sealed class TransmittalService(
 
     /// <summary>
     /// The files a transmittal's items carried: for a revision or a submission, the files of that revision as sent
-    /// (originals, not stamped copies); for an unplanned item, its own files.
+    /// (originals, not stamped copies); for an unplanned item or one kept with it later, its own files.
     /// </summary>
     public async Task<List<StoredFile>> ItemFilesAsync(Transmittal transmittal, CancellationToken cancellationToken)
     {
         var revisions = transmittal.Items.Where(i => i.RevisionId != null).Select(i => i.RevisionId!.Value).ToList();
-        var items = transmittal.Items.Where(i => i.Kind == TransmittalItemKinds.Unplanned).Select(i => i.Id).ToList();
+        var items = transmittal.Items.Where(i => i.Kind is TransmittalItemKinds.Unplanned or TransmittalItemKinds.Attachment).Select(i => i.Id).ToList();
         if (revisions.Count == 0 && items.Count == 0) return [];
         return await db.StoredFiles.AsNoTracking()
             .Where(f => (f.RevisionId != null && revisions.Contains(f.RevisionId.Value) && f.Kind != FileKinds.Evidence && f.DerivedFromId == null)
@@ -814,7 +814,7 @@ public sealed class TransmittalService(
     /// </summary>
     public static IEnumerable<StoredFile> FilesOf(TransmittalItem item, IReadOnlyList<StoredFile> files)
     {
-        if (item.Kind == TransmittalItemKinds.Unplanned) return files.Where(f => f.TransmittalItemId == item.Id);
+        if (item.Kind is TransmittalItemKinds.Unplanned or TransmittalItemKinds.Attachment) return files.Where(f => f.TransmittalItemId == item.Id);
         if (item.RevisionId is not { } revision) return [];
         var mine = files.Where(f => f.RevisionId == revision).ToList();
         var submission = item.Submission ?? (mine.Count == 0 ? 0 : mine.Max(f => f.Submission));
@@ -1020,9 +1020,9 @@ public sealed class TransmittalService(
         var document = revision is null ? null : await VisibleDocumentAsync(access, revision.DocumentId, cancellationToken);
         if (revision is null || document is null) return null;
         var decided = await db.Reviews.AsNoTracking().Where(r => r.RevisionId == revisionId && r.Verdict != null)
-            .OrderByDescending(r => r.DecidedAt).Select(r => r.Verdict).FirstOrDefaultAsync(cancellationToken);
+            .OrderByDescending(r => r.DecidedAt).Select(r => new { r.Verdict, r.VerdictSet }).FirstOrDefaultAsync(cancellationToken);
         var catalog = await Catalog.LoadAsync(db, cancellationToken);
-        var letsItOut = decided is null || catalog.Prop(ReviewSets.Verdicts, decided, "proceed") is { ValueKind: JsonValueKind.True };
+        var letsItOut = decided is null || ReviewSets.Proceeds(catalog, decided.VerdictSet, decided.Verdict!);
         var running = await db.Reviews.AnyAsync(r => r.RevisionId == revisionId && r.State == ReviewStates.InProgress, cancellationToken);
         var settled = revision.State is RevisionStates.Released or RevisionStates.InReview or RevisionStates.InPreparation;
         var may = settled && letsItOut && !running && await HasStandingAsync(access, document, revision, cancellationToken);
@@ -1159,10 +1159,10 @@ public sealed class TransmittalService(
     private async Task<bool> DecidedToProceedAsync(Guid revisionId, CancellationToken cancellationToken)
     {
         var verdict = await db.Reviews.Where(r => r.RevisionId == revisionId && r.State == ReviewStates.Decided)
-            .Select(r => r.Verdict).FirstOrDefaultAsync(cancellationToken);
-        if (verdict is null) return false;
+            .Select(r => new { r.Verdict, r.VerdictSet }).FirstOrDefaultAsync(cancellationToken);
+        if (verdict?.Verdict is null) return false;
         var catalog = await Catalog.LoadAsync(db, cancellationToken);
-        return catalog.Prop(ReviewSets.Verdicts, verdict, "proceed") is { ValueKind: JsonValueKind.True };
+        return ReviewSets.Proceeds(catalog, verdict.VerdictSet, verdict.Verdict);
     }
 
     /// <summary>

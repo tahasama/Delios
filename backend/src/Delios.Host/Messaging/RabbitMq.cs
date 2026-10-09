@@ -73,7 +73,7 @@ public static class Topology
 
     /// <summary>Scanning uploads and stamping releases: what people wait for.</summary>
     public static readonly WorkQueue Files = new(FilesQueue, FilesRetryQueue,
-        [Documents.FileUploaded.RoutingKey, Reviews.RevisionReleased.RoutingKey], Prefetch: 4);
+        [Documents.FileUploaded.RoutingKey, Reviews.RevisionReleased.RoutingKey, Reviews.RevisionMarked.RoutingKey], Prefetch: 4);
 
     /// <summary>
     /// Reading text and OCR: slow, and nobody is waiting at a screen. A queue of

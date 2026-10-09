@@ -141,7 +141,7 @@ export type DocumentContext = {
 };
 
 /** GET /documents/{id}/routes (ReviewEndpoints RouteView). */
-export type RouteView = { id: string; name: string; description: string | null; isDefault: boolean; steps: { title: string; functionCode: string | null; partyCode: string | null; mode: string; reason: string | null }[] };
+export type RouteView = { id: string; name: string; description: string | null; isDefault: boolean; verdictSet?: string; steps: { title: string; functionCode: string | null; partyCode: string | null; mode: string; reason: string | null; userIds?: string[] }[] };
 
 /** GET /reviews (ReviewList.cs). */
 export type ReviewsPage = { total: number; page: number; pages: number; per: number; sizes: number[]; rows: ReviewListRow[] };
@@ -153,6 +153,7 @@ export type ReviewListRow = {
   startedAt: string; startedBy: string; closedAt: string | null; discipline: string; docType: string; deliverableType: string;
   originator: string | null; contractRef: string | null; receivedAt: string | null;
   comments: { by: string; text: string; blocking: boolean; settled: boolean }[];
+  warnedAt?: string | null;
 };
 
 /** GET /reviews/{id} (ReviewEndpoints ReviewView). */
@@ -166,6 +167,7 @@ export type ReviewView = {
     participants: { name: string; answer: string | null; grantedStatus: string | null; note: string | null; answeredAt: string | null; userId: string }[];
     transmittalId: string | null; dispatchedAt: string | null; dispatchChannel: string | null; dispatchRef: string | null;
     dispatchedBy: string | null; foreignAnswer: string | null; recordedBy: string | null; evidenceFileId: string | null;
+    warnedAt?: string | null;
   }[];
   comments: {
     id: string; step: number; author: string; text: string; class: string; blocking: boolean; closesWith: string; closesWithStep: number | null;
@@ -173,6 +175,7 @@ export type ReviewView = {
     originalBlocking?: boolean | null; reclassifiedAt?: string | null; reclassifiedBy?: string | null;
   }[];
   approvalWithdrawnAt?: string | null; approvalWithdrawnBy?: string | null; approvalWithdrawnReason?: string | null;
+  verdictSet?: string;
 };
 
 /** GET /reviews/{id}/me. */
@@ -217,7 +220,7 @@ export type TransmittalRef = {
  * something unplanned received that waits to be registered.
  */
 export type TransmittalItem = {
-  id: string; kind: "REVISION" | "PLACEHOLDER" | "SUBMISSION" | "UNPLANNED";
+  id: string; kind: "REVISION" | "PLACEHOLDER" | "SUBMISSION" | "UNPLANNED" | "ATTACHMENT";
   documentId: string | null; revisionId: string | null; documentNumber: string; title: string; revision: string; status: string | null;
   dueDate: string | null; submission: number | null; docType: string | null; registeredAt: string | null; registeredBy: string | null;
   files: { id: string; name: string; size: number; sha256: string; status: string }[];

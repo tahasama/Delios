@@ -122,7 +122,7 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
     /// </summary>
     public async Task<(Tenant Tenant, Guid AdminId)> StartAsync(
         string organizationName, string adminName, string email, string password, string? projectCode, string? projectName,
-        string? contractRole, CancellationToken cancellationToken)
+        string? contractRole, CancellationToken cancellationToken, string? projectKind = null)
     {
         var slugBase = new string(organizationName.ToLowerInvariant().Select(c => char.IsAsciiLetterOrDigit(c) ? c : '-').ToArray()).Trim('-');
         if (slugBase.Length == 0 || slugBase is Slug or "admin" or "api") slugBase = $"org-{slugBase}".TrimEnd('-');
@@ -155,6 +155,7 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
                 Code = projectCode.Trim().ToUpperInvariant(),
                 Name = projectName.Trim(),
                 ContractRole = string.IsNullOrWhiteSpace(contractRole) ? "GENERIC" : contractRole.Trim().ToUpperInvariant(),
+                Kind = string.IsNullOrWhiteSpace(projectKind) ? "GENERIC" : projectKind.Trim().ToUpperInvariant(),
             };
             db.Projects.Add(project);
             db.Memberships.Add(new Membership { TenantId = t, ProjectId = project.Id, UserId = admin.Id, FunctionId = control.Id });

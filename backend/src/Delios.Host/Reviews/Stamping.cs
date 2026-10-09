@@ -74,6 +74,29 @@ public sealed class Stamping(
     }
 
     /// <summary>
+    /// Handles a <see cref="RevisionMarked"/> message: the copy people were reading (the stamped one where there is
+    /// one) is copied with VOID or ON HOLD across every page. Done once per copy; a redelivered message does no harm.
+    /// </summary>
+    public async Task MarkAsync(RevisionMarked message, CancellationToken cancellationToken)
+    {
+        tenant.Set(message.TenantId);
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+        var revision = await db.Revisions.Include(r => r.Files).SingleOrDefaultAsync(r => r.Id == message.RevisionId, cancellationToken);
+        if (revision is null || message.Mark is not (FileKinds.Void or FileKinds.Held)) return;
+        var document = await db.Documents.SingleAsync(d => d.Id == revision.DocumentId, cancellationToken);
+        var sources = revision.Files.Where(f => f.Kind == FileKinds.Stamped && f.Status == FileStatuses.Clean && f.Submission == revision.Submission).ToList();
+        if (sources.Count == 0)
+            sources = revision.Files.Where(f => f.Kind == FileKinds.Rendition && f.Status == FileStatuses.Clean && f.Submission == revision.Submission).ToList();
+        var word = message.Mark == FileKinds.Void ? "VOID" : "ON HOLD";
+        foreach (var source in sources)
+        {
+            if (revision.Files.Any(f => f.DerivedFromId == source.Id && f.Kind == message.Mark)) continue;
+            await DeriveAsync(source, message.Mark, document, revision, bytes => Watermark(bytes, message.Note, word), cancellationToken);
+        }
+        await transaction.CommitAsync(cancellationToken);
+    }
+
+    /// <summary>
     /// Reads <paramref name="source"/> from storage, applies <paramref name="transform"/> to its bytes, and saves the result as a new file of <paramref name="kind"/> derived from it, with an audit entry.
     /// If the PDF cannot be marked, records STAMP_NOT_POSSIBLE in the audit log and returns without failing, since a retry would fail the same way.
     /// </summary>
@@ -128,7 +151,7 @@ public sealed class Stamping(
         await storage.PutAsync(copy.ObjectKey, derived, copy.ContentType, cancellationToken);
         db.StoredFiles.Add(copy);
         await db.SaveChangesAsync(cancellationToken);
-        await audit.WriteAsync(Audit.Actor.System, kind == FileKinds.Stamped ? "STAMPED" : "WATERMARKED_SUPERSEDED",
+        await audit.WriteAsync(Audit.Actor.System, kind == FileKinds.Stamped ? "STAMPED" : $"WATERMARKED_{kind}",
             "StoredFile", copy.Id, copy.Name, $"{document.Number} rev {revision.Value}, made from {source.Name}.",
             document.ProjectId, cancellationToken);
     }
@@ -158,8 +181,8 @@ public sealed class Stamping(
         return output.ToArray();
     }
 
-    /// <summary>SUPERSEDED across every page, with what replaced it.</summary>
-    public static byte[] Watermark(byte[] pdf, string note)
+    /// <summary>SUPERSEDED (or another word) across every page, with a note under it.</summary>
+    public static byte[] Watermark(byte[] pdf, string note, string word = "SUPERSEDED")
     {
         using var input = new MemoryStream(pdf);
         using var document = PdfReader.Open(input, PdfDocumentOpenMode.Modify);
@@ -172,7 +195,7 @@ public sealed class Stamping(
             var center = new XPoint(page.Width.Point / 2, page.Height.Point / 2);
             var state = gfx.Save();
             gfx.RotateAtTransform(-45, center);
-            gfx.DrawString("SUPERSEDED", big, red, center, XStringFormats.Center);
+            gfx.DrawString(word, big, red, center, XStringFormats.Center);
             gfx.DrawString(note, small, red, new XPoint(center.X, center.Y + 46), XStringFormats.Center);
             gfx.Restore(state);
         }
