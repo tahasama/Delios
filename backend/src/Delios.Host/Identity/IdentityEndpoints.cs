@@ -341,7 +341,7 @@ public static class IdentityEndpoints
                 m.Project.Kind,
                 m.Project.Status,
                 m.Department,
-                Function = new { m.Function!.Id, m.Function.Code, m.Function.Name },
+                Function = new { m.Function!.Id, m.Function.Code, m.Function.Name, m.Function.Clearance },
                 Verbs = m.Function.Rules
                     .Where(r => r.ProjectRole == null || r.ProjectRole == m.Project.ContractRole)
                     .SelectMany(r => r.Verbs).Distinct().ToList(),

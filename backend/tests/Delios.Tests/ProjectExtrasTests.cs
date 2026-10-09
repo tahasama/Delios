@@ -106,3 +106,44 @@ public sealed class ProjectExtrasTests(Infrastructure infrastructure) : IClassFi
         Assert.Equal(("D", "Read from a filled-in distribution matrix"), (rule.GetProperty("family").GetString(), rule.GetProperty("note").GetString()));
     }
 }
+
+/// <summary>A function's clearance: documents above it are read only where the person is named on them.</summary>
+public sealed class ClearanceTests(Infrastructure infrastructure) : IClassFixture<Infrastructure>
+{
+    [Fact]
+    public async Task A_document_above_a_functions_clearance_is_read_only_where_the_person_is_named()
+    {
+        await using var app = await TestApp.StartAsync(infrastructure);
+        var admin = await app.SignedInAsync("admin@demo.local");
+        var engineer = await app.SignedInAsync("engineer@demo.local");
+        var viewer = await app.SignedInAsync("viewer@demo.local");
+        var me = await viewer.GetFromJsonAsync<JsonElement>("/api/me");
+        var function = me.GetProperty("projects")[0].GetProperty("function").GetProperty("id").GetGuid();
+        var viewerId = me.GetProperty("user").GetProperty("id").GetGuid();
+        var project = await Api.ProjectIdAsync(engineer);
+        var p = $"/api/projects/{project}";
+        var document = (await Api.RegisterAsync(engineer, project, Api.Drawing("Internal pump layout"))).GetProperty("id").GetGuid();
+        Assert.Equal(HttpStatusCode.OK, (await viewer.GetAsync($"{p}/documents/{document}")).StatusCode);
+
+        using (var unknown = await admin.PutAsJsonAsync($"/api/admin/functions/{function}", new { clearance = "SECRET" }))
+            Assert.Equal(HttpStatusCode.UnprocessableEntity, unknown.StatusCode);
+        using (var set = await admin.PutAsJsonAsync($"/api/admin/functions/{function}", new { clearance = "PUBLIC" }))
+            Assert.True(set.IsSuccessStatusCode, await set.Content.ReadAsStringAsync());
+        Assert.Equal("PUBLIC", (await viewer.GetFromJsonAsync<JsonElement>("/api/me")).GetProperty("projects")[0].GetProperty("function").GetProperty("clearance").GetString());
+
+        // INTERNAL is above PUBLIC: gone from the viewer's register and from the distribution proposed for it.
+        Assert.Equal(HttpStatusCode.NotFound, (await viewer.GetAsync($"{p}/documents/{document}")).StatusCode);
+        var spread = await engineer.GetFromJsonAsync<JsonElement>($"{p}/documents/{document}/distribution");
+        Assert.DoesNotContain(spread.GetProperty("proposed").EnumerateArray(), x => x.GetProperty("id").GetGuid() == viewerId);
+
+        // Named on it, they read it.
+        var (named, namedBody) = await Flow.PostAsync(engineer, $"{p}/documents/{document}/readers", new { userIds = new[] { viewerId }, reason = "Needs the layout." });
+        Assert.True(named == HttpStatusCode.OK || named == HttpStatusCode.NoContent || named == HttpStatusCode.Created, namedBody.ToString());
+        Assert.Equal(HttpStatusCode.OK, (await viewer.GetAsync($"{p}/documents/{document}")).StatusCode);
+
+        // Empty takes the limit away.
+        using (var clear = await admin.PutAsJsonAsync($"/api/admin/functions/{function}", new { clearance = "" }))
+            Assert.True(clear.IsSuccessStatusCode, await clear.Content.ReadAsStringAsync());
+        Assert.Equal(JsonValueKind.Null, (await viewer.GetFromJsonAsync<JsonElement>("/api/me")).GetProperty("projects")[0].GetProperty("function").GetProperty("clearance").ValueKind);
+    }
+}

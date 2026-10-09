@@ -51,7 +51,10 @@ export async function createFunctionAction(_prev: Result | undefined, formData: 
   if (!CODE.test(code)) return { error: "The code is short and uppercase, e.g. ELEC_TECH." };
   try {
     const created = await api<{ id: string }>("/api/admin/functions", { body: { code, name } });
-    if (verbs.length) await api(`/api/admin/functions/${created.id}`, { method: "PUT", body: { rules: [{ verbs }] } });
+    const clearance = String(formData.get("clearance") ?? "").trim();
+    if (verbs.length || clearance) {
+      await api(`/api/admin/functions/${created.id}`, { method: "PUT", body: { ...(verbs.length ? { rules: [{ verbs }] } : {}), ...(clearance ? { clearance } : {}) } });
+    }
   } catch (e) {
     return { error: refusal(e).message };
   }
@@ -72,7 +75,9 @@ export async function updateFunctionAction(_prev: Result | undefined, formData: 
     return { error: `${fn.holders} person(s) still hold ${fn.name}. Move them to another function first.` };
   }
   try {
-    await api(`/api/admin/functions/${id}`, { method: "PUT", body: { name: name || fn.name, active } });
+    // The most confidential level its holders read without being named on the document; empty is no limit.
+    const clearance = formData.has("clearance") ? String(formData.get("clearance") ?? "").trim() : undefined;
+    await api(`/api/admin/functions/${id}`, { method: "PUT", body: { name: name || fn.name, active, ...(clearance === undefined ? {} : { clearance }) } });
   } catch (e) {
     return { error: refusal(e).message };
   }

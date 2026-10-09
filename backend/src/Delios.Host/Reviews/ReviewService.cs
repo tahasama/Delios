@@ -148,12 +148,12 @@ public sealed class ReviewService(
                         new { step = i + 1, reason = step.Reason }));
                 }
             }
-            if ((await SeatsAsync(access.Project, step.FunctionCode, party, party?.Participation, cancellationToken, step.UserIds)).Count == 0)
+            if ((await SeatsAsync(access.Project, step.FunctionCode, party, party?.Participation, cancellationToken, step.UserIds, document)).Count == 0)
             {
                 return Fail(Problems.Invalid("STEP_HAS_NO_HOLDER",
                     party is null ? step.FunctionCode is null
-                        ? $"Nobody named on step {i + 1} ({step.Title}) is on this project, so it could not be answered."
-                        : $"Nobody {(step.UserIds.Length > 0 ? "named on it, nor anybody holding " : "holds ")}{step.FunctionCode} on this project, so step {i + 1} ({step.Title}) could not be answered."
+                        ? $"Nobody named on step {i + 1} ({step.Title}) is on this project and cleared for {document.Confidentiality ?? "this document"}, so it could not be answered."
+                        : $"Nobody {(step.UserIds.Length > 0 ? "named on it, nor anybody holding " : "holds ")}{step.FunctionCode} on this project with a clearance that reaches {document.Confidentiality ?? "this document"}, so step {i + 1} ({step.Title}) could not be answered."
                     : party.Participation == Participations.InApp
                         ? $"Nobody from {party.Name} is on this project, so step {i + 1} ({step.Title}) could not be answered."
                         : $"Nobody on this project carries the exchange with {party.Name}, so step {i + 1} ({step.Title}) could not be answered.",
@@ -1205,7 +1205,8 @@ public sealed class ReviewService(
         var step = review.Steps.Single(s => s.Index == index);
         var party = step.PartyId is { } partyId
             ? await db.Parties.AsNoTracking().SingleAsync(p => p.Id == partyId, cancellationToken) : null;
-        var holders = await SeatsAsync(project, step.FunctionCode, party, step.Participation, cancellationToken, step.UserIds);
+        var subject = await db.Documents.AsNoTracking().SingleAsync(d => d.Id == review.DocumentId, cancellationToken);
+        var holders = await SeatsAsync(project, step.FunctionCode, party, step.Participation, cancellationToken, step.UserIds, subject);
         var today = WorkingCalendar.Today(clock, project.TimeZone);
         step.State = StepStates.Open;
         step.OpenedAt = clock.GetCurrentInstant();
@@ -1440,17 +1441,17 @@ public sealed class ReviewService(
     /// </summary>
     private async Task<List<User>> SeatsAsync(
         Project project, string? functionCode, Party? party, string? participation, CancellationToken cancellationToken,
-        Guid[]? named = null)
+        Guid[]? named = null, Document? document = null)
     {
         if (party is null)
         {
             var holders = functionCode is null ? [] : await HoldersAsync(project.Id, functionCode, cancellationToken);
-            if (named is not { Length: > 0 }) return holders;
-            var people = await (from m in db.Memberships
-                                join u in db.Users on m.UserId equals u.Id
-                                where m.ProjectId == project.Id && m.Active && m.Function!.Active && u.Active && named.Contains(u.Id)
-                                select u).Distinct().ToListAsync(cancellationToken);
-            return holders.Concat(people).DistinctBy(u => u.Id).OrderBy(u => u.Name).ToList();
+            var people = named is not { Length: > 0 } ? [] : await (from m in db.Memberships
+                                                                    join u in db.Users on m.UserId equals u.Id
+                                                                    where m.ProjectId == project.Id && m.Active && m.Function!.Active && u.Active && named.Contains(u.Id)
+                                                                    select u).Distinct().ToListAsync(cancellationToken);
+            var seated = holders.Concat(people).DistinctBy(u => u.Id).OrderBy(u => u.Name).ToList();
+            return document is null ? seated : await ClearedAsync(project, document, seated, cancellationToken);
         }
         if (participation == Participations.ByProxy) return await transmittals.CustodiansAsync(project.Id, party, cancellationToken);
         return await (from m in db.Memberships
@@ -1458,6 +1459,24 @@ public sealed class ReviewService(
                       where m.ProjectId == project.Id && m.Active && m.Function!.Active && u.Active && u.PartyId == party.Id
                       orderby u.Name
                       select u).ToListAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Those of <paramref name="people"/> who may read the document: their function's clearance reaches its
+    /// confidentiality, or they registered it, or they are named on it.
+    /// </summary>
+    private async Task<List<User>> ClearedAsync(Project project, Document document, List<User> people, CancellationToken cancellationToken)
+    {
+        if (document.Confidentiality is null || people.Count == 0) return people;
+        var ids = people.Select(u => u.Id).ToList();
+        var clearances = await db.Memberships.AsNoTracking().Where(m => m.ProjectId == project.Id && m.Active && ids.Contains(m.UserId))
+            .Select(m => new { m.UserId, m.Function!.Clearance }).ToListAsync(cancellationToken);
+        if (clearances.All(c => c.Clearance is null)) return people;
+        var named = await db.DocumentAccess.AsNoTracking().Where(a => a.DocumentId == document.Id && ids.Contains(a.UserId))
+            .Select(a => a.UserId).ToListAsync(cancellationToken);
+        var ranks = await Clearance.RanksAsync(db, cancellationToken);
+        return people.Where(u => u.Id == document.CreatedById || named.Contains(u.Id)
+            || Clearance.Reaches(ranks, clearances.FirstOrDefault(c => c.UserId == u.Id)?.Clearance, document.Confidentiality)).ToList();
     }
 
     /// <summary>Loads the document and revision a review is about.</summary>

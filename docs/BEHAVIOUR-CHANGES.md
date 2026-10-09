@@ -74,10 +74,13 @@ Each item says: what you did before, what happens now, and why.
 - The delegate answers and comments **in the holder's place**: the record says
   "Aisha Approver for Eli Engineer", and the step shows the holder answered, by the delegate.
 
-**Changing or taking back a comment before the step is answered.**
-- The backend allows it (author only, until their step is answered).
-- **Your review page has no button for it.** The code is there, but no screen shows it. Until a
-  button is added, comments are closed with a resolution instead.
+**Writing, changing or taking back a comment before the step is answered.**
+- The review page has a **Comments** card under the document.
+- Whoever sits on the open step writes comments there, says whether each stops the release, and where the route
+  has later steps, which step settles it.
+- Until they answer, they can change or take back their own comments.
+- Document Control, or the revision's author, can switch an open comment between "stops the release" and not,
+  with a reason.
 - A comment taken back is **kept on record**, marked withdrawn, and no longer shown or counted.
   (The old app deleted it.)
 
@@ -263,11 +266,30 @@ rule per document type in that family, each marked with the family. The matrix r
 row. If a type is added to the family later, re-import the row to cover it. Rules read from a file say so
 ("Read from a filled-in distribution matrix").
 
-**Function clearance** is not kept: nothing decided anything by it. Who reads a closed document is decided
-by the people named on it (see "Readers of a closed document").
+**Function clearance.**
+- On Functions & permissions, a function can be given a clearance: "up to Internal", for example. No clearance
+  means no limit, which is how every existing function stays.
+- A document above a function's clearance is read only by:
+  - people named on it as readers;
+  - whoever registered it;
+  - whoever it was sent to.
+- This applies to every function, Document Control included. Before you limit Document Control, make sure
+  that is what you want.
+- Clearance also changes who is proposed and seated:
+  - People whose clearance does not reach a document are not proposed when sending it.
+  - They are not seated on its review steps. If nobody is left on a step, the review is refused with a message
+    saying so.
+- The order of the levels is the confidentiality list's own order, or its `level` property where one is set.
 
-**Two-step sign-in**: the backend supports it, but the sign-in page has no box for the code. An account with
-two-step sign-in switched on cannot sign in through the page until a code box is added to it.
+**Two-step sign-in.**
+- After the password, the sign-in page asks for the code from the authenticator app; a recovery code also works.
+- Where the organization requires two-step sign-in and the person has not set it up, the page shows the key to
+  add to their app. After the first code it shows the recovery codes, **once**.
+
+**Opening files.**
+- Only PDFs and plain images open in the browser.
+- Anything else downloads, and is never shown inside the app's own address, so an uploaded web page or script
+  cannot run.
 
 ## 7. Notifications and email
 

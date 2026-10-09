@@ -23,6 +23,8 @@ public sealed class ProjectAccess
     public required bool IsInternal { get; init; }
     /// <summary>Code of the party this person represents. Null: our own organization.</summary>
     public string? PartyCode { get; init; }
+    /// <summary>Confidentiality levels above this person's clearance: read only where they are named on the document.</summary>
+    public IReadOnlyList<string> AboveClearance { get; init; } = [];
 
     /// <summary>Every verb this person holds anywhere on the project, without duplicates.</summary>
     public IReadOnlySet<string> Verbs => Rules.SelectMany(r => r.Verbs).ToHashSet();
@@ -79,6 +81,8 @@ public sealed class ProjectAccessLoader(DeliosDbContext db)
             .Select(u => u.Party == null ? null : new { u.Party.Code, u.Party.IsInternal })
             .SingleAsync(cancellationToken);
         var project = membership.Project!;
+        var above = membership.Function!.Clearance is null ? []
+            : Clearance.Above(await Clearance.RanksAsync(db, cancellationToken), membership.Function.Clearance);
         return new ProjectAccess
         {
             Project = project,
@@ -90,6 +94,7 @@ public sealed class ProjectAccessLoader(DeliosDbContext db)
                 .ToList(),
             IsInternal = party is null || party.IsInternal,
             PartyCode = party?.Code,
+            AboveClearance = above,
         };
     }
 }

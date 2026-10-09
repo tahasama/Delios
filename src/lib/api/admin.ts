@@ -29,7 +29,7 @@ export type AdminRule = {
   family?: string | null; note?: string | null;
 };
 
-export type AdminFunction = { id: string; code: string; name: string; active: boolean; holders: number; rules: AdminRule[] };
+export type AdminFunction = { id: string; code: string; name: string; active: boolean; holders: number; rules: AdminRule[]; clearance?: string | null };
 
 export type AdminParty = {
   id: string; code: string; name: string; isInternal: boolean; active: boolean; participation: string; custodianFunction: string | null;
@@ -143,6 +143,7 @@ export async function legacyFunctions() {
     .sort((a, b) => Number(b.active) - Number(a.active) || a.name.localeCompare(b.name))
     .map((f) => ({
       id: f.id, code: f.code, name: f.name, active: f.active, description: null as string | null, department: null as string | null, sort: 0,
+      clearance: f.clearance ?? null,
       _count: { memberships: f.holders },
       rules: f.rules.map((r, sort) => ({ ...r, functionId: f.id, verbs: JSON.stringify(r.verbs), note: null as string | null, sort })),
     }));

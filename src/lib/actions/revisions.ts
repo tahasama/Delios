@@ -83,7 +83,7 @@ export async function addCommentAction(_prev: Result | undefined, formData: Form
   // classification is still what gets stored.
   const blocking = formData.get("blocking") === "on";
   const classes = await getActiveSet("COMMENT_CLASSES");
-  const classification = classes.find((c) => (c.props.progressionPreventing === true) === blocking)?.code
+  const classification = classes.find((c) => (c.props.progressionPreventing === true || c.props.blocking === true) === blocking)?.code
     ?? (blocking ? "BLOCKING" : "NON_BLOCKING");
   try {
     await api(projectPath(ctx, `/reviews/${cycleId}/comments`), {

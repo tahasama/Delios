@@ -12,7 +12,7 @@ export type MeRule = {
 /** A project the person is on, with their function, department and the function's rules. */
 export type MeProject = {
   id: string; code: string; name: string; timeZone: string; contractRole: string; kind?: string; status: string; department: string | null;
-  function: { id: string; code: string; name: string }; verbs: string[]; rules: MeRule[];
+  function: { id: string; code: string; name: string; clearance?: string | null }; verbs: string[]; rules: MeRule[];
 };
 
 /** GET /api/me: who is signed in, their organization, and the projects they are on. */

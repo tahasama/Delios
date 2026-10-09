@@ -672,6 +672,14 @@ public static class DocumentQueries
                 || d.CreatedById == me || db.DocumentAccess.Any(a => a.DocumentId == d.Id && a.UserId == me)
                 || sentToMe.Contains(d.Id));
         }
+        // Above your function's clearance, whatever your function: only where you are named on it.
+        var aboveClearance = access.AboveClearance;
+        if (aboveClearance.Count > 0)
+        {
+            query = query.Where(d => d.Confidentiality == null || !aboveClearance.Contains(d.Confidentiality)
+                || d.CreatedById == me || db.DocumentAccess.Any(a => a.DocumentId == d.Id && a.UserId == me)
+                || sentToMe.Contains(d.Id));
+        }
         return query;
     }
 }

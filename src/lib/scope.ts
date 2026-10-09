@@ -111,7 +111,10 @@ export const getScope = cache(async (): Promise<Scope | null> => {
     functionId: chosen.function.id,
     functionCode: chosen.function.code,
     functionName: chosen.function.name,
-    clearance: 0,
+    // The most confidential level read without being named, as its place in the published list; no limit reads past all.
+    clearance: chosen.function.clearance
+      ? Math.max(0, (values.CONFIDENTIALITY ?? []).findIndex((one) => one.code === chosen.function.clearance))
+      : Number.MAX_SAFE_INTEGER,
     legacyRole: legacyRoleOf(verbs),
     levels,
     projectRole: chosen.contractRole,

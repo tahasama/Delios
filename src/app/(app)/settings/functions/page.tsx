@@ -227,6 +227,13 @@ export default async function FunctionsPage() {
                         {disciplines.map((d) => <option key={d.code} value={d.code}>{d.label}</option>)}
                       </select>
                     </label>
+                    <label className="flex items-center gap-2 text-xs text-slate-600">
+                      Clearance
+                      <select name="clearance" defaultValue={fn.clearance ?? ""} className="rounded-md border border-line-strong px-1.5 py-1 text-xs" title="The most confidential level this job reads without being named on the document">
+                        <option value="">no limit</option>
+                        {confidentialities.map((c) => <option key={c.code} value={c.code}>up to {c.label}</option>)}
+                      </select>
+                    </label>
                     <label className="flex items-center gap-1 text-xs text-slate-600"><input type="checkbox" name="active" defaultChecked={fn.active} /> in use</label>
                   </ActionForm>
                 </div>
@@ -246,6 +253,12 @@ export default async function FunctionsPage() {
                   <select name="department" defaultValue="" className={inputCls}>
                     <option value="">No department</option>
                     {disciplines.map((d) => <option key={d.code} value={d.code}>{d.label}</option>)}
+                  </select>
+                </Field>
+                <Field label="Clearance" hint="optional — the most confidential level it reads without being named on the document">
+                  <select name="clearance" defaultValue="" className={inputCls}>
+                    <option value="">No limit</option>
+                    {confidentialities.map((c) => <option key={c.code} value={c.code}>Up to {c.label}</option>)}
                   </select>
                 </Field>
               </div>

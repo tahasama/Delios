@@ -178,6 +178,11 @@ public sealed class Function
     public required string Name { get; set; }
     /// <summary>False takes the function out of use: memberships with it no longer give access.</summary>
     public bool Active { get; set; } = true;
+    /// <summary>
+    /// The highest confidentiality level (a code of the confidentiality list) its holders read without being named on
+    /// the document. Null: no limit. See <see cref="Identity.Clearance"/>.
+    /// </summary>
+    public string? Clearance { get; set; }
     /// <summary>The permission matrix rows that belong to this function.</summary>
     public List<PermissionRule> Rules { get; set; } = [];
 }

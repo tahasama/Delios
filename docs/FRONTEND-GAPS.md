@@ -9,9 +9,13 @@ already reads "nothing" (an empty list), and the act answers
 latest additions; where an item there is listed above as added, it is done.
 
 ## Still missing
-Nothing is missing in the backend. Two screens lack a control for something the backend does:
-1. **Two-step sign-in**: the sign-in page has no box for the code.
-2. **Changing or taking back a comment**: the review page has no button for it.
+Nothing. The two screen items that were left are now in:
+- **Two-step sign-in**: the sign-in page asks for the code, and walks through first-time setup with recovery codes.
+- **Comments on the review page**: write, change and take back your comments until you answer; Document Control
+  or the revision's author can change whether an open comment stops the release.
+
+Not built on purpose: a document number on its own, before registering (a number is given only when a document is
+registered).
 
 What behaves differently from the old app, and why: [BEHAVIOUR-CHANGES.md](BEHAVIOUR-CHANGES.md).
 
@@ -31,6 +35,7 @@ What behaves differently from the old app, and why: [BEHAVIOUR-CHANGES.md](BEHAV
 - Files kept with something received after it was recorded; returning what arrived when no "return" outcome is published.
 - A route's own verdict list; people named on a route's step; the warning the working day before a step falls due.
 - Who still holds a replaced revision without being told (Exposures), and telling people with an account at release.
+- A function's clearance (the most confidential level it reads without being named).
 - Numbers drawn from ranges issued to a party; "VOID" and "ON HOLD" copies of the PDF; an administrator joining a project they are not on; project type on the project; matrix rows by document family.
 
 ## By area, in detail

@@ -42,7 +42,10 @@ public sealed class TransmittalService(
     public async Task<DistributionView> DistributionAsync(Project project, Document document, CancellationToken cancellationToken)
     {
         var members = await MembersAsync(project, cancellationToken);
-        var proposed = members.Where(m => m.Internal && ProjectAccess.OfFunction(project, m.Function).Allows(Verbs.Receive, document.Facts))
+        // The matrix proposes; a clearance that does not reach the document's confidentiality takes the person off.
+        var ranks = await Clearance.RanksAsync(db, cancellationToken);
+        var proposed = members.Where(m => m.Internal && ProjectAccess.OfFunction(project, m.Function).Allows(Verbs.Receive, document.Facts)
+                && Clearance.Reaches(ranks, m.Function.Clearance, document.Confidentiality))
             .ToList();
         var parties = await db.Parties.AsNoTracking().Where(p => p.Active && !p.IsInternal).OrderBy(p => p.Name)
             .Select(p => new PartyChoice(p.Id, p.Code, p.Name, p.Participation)).ToListAsync(cancellationToken);

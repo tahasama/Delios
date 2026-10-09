@@ -109,6 +109,7 @@ internal sealed class FunctionConfiguration : IEntityTypeConfiguration<Function>
         b.HasIndex(x => new { x.TenantId, x.Code }).IsUnique();
         b.Property(x => x.Code).HasMaxLength(32);
         b.Property(x => x.Name).HasMaxLength(200);
+        b.Property(x => x.Clearance).HasMaxLength(32);
         b.HasMany(x => x.Rules).WithOne().HasForeignKey(x => x.FunctionId).OnDelete(DeleteBehavior.Cascade);
     }
 }

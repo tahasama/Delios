@@ -36,7 +36,8 @@ public sealed record RuleRequest(
     string? Confidentiality = null, string? ProjectRole = null, string? Family = null, string? Note = null);
 
 /// <summary>Body of changing a function. <c>Rules</c>, when given, replaces all of its matrix rows.</summary>
-public sealed record UpdateFunctionRequest(string? Name = null, bool? Active = null, RuleRequest[]? Rules = null);
+/// <remarks><c>Clearance</c>: a confidentiality code; an empty string takes the limit away.</remarks>
+public sealed record UpdateFunctionRequest(string? Name = null, bool? Active = null, RuleRequest[]? Rules = null, string? Clearance = null);
 
 /// <summary>Body of creating or changing an organization taking part in projects.</summary>
 public sealed record PartyRequest(
@@ -408,6 +409,7 @@ public static class DirectoryEndpoints
             f.Code,
             f.Name,
             f.Active,
+            f.Clearance,
             Holders = held.FirstOrDefault(h => h.Key == f.Id)?.Count ?? 0,
             Rules = f.Rules.Select(r => new { r.Id, r.Verbs, r.DeliverableType, r.DocType, r.Discipline, r.Criticality, r.Confidentiality, r.ProjectRole, r.Family, r.Note }),
         }));
@@ -439,6 +441,18 @@ public static class DirectoryEndpoints
         var changes = new List<string>();
         if (Blank(request.Name) is { } name && name != function.Name) { changes.Add($"name → {name}"); function.Name = name; }
         if (request.Active is { } active && active != function.Active) { changes.Add(active ? "in use" : "out of use"); function.Active = active; }
+        if (request.Clearance is not null)
+        {
+            var clearance = Blank(request.Clearance);
+            if (clearance is not null && !await db.ValueEntries.AnyAsync(v => v.SetKey == Documents.ValueSets.Confidentiality && v.Code == clearance
+                    && v.Status == Documents.ValueStatus.Active, cancellationToken))
+                return Problems.Invalid("CLEARANCE_UNKNOWN", $"{clearance} is not a published confidentiality level.");
+            if (clearance != function.Clearance)
+            {
+                changes.Add(clearance is null ? "clearance: no limit" : $"clearance → {clearance}");
+                function.Clearance = clearance;
+            }
+        }
         if (request.Rules is { } rules)
         {
             if (!await Keepers.ConfiguresAsync(http) && rules.Any(r => (r.Verbs ?? []).Contains(Verbs.Configure)))

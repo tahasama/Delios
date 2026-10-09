@@ -68,32 +68,69 @@ function LoginForm() {
             }}
           >
             <input type="hidden" name="next" value={next} />
-            <div>
-              <label htmlFor="email" className="mb-1 block text-xs font-medium text-slate-700">
-                Email
-              </label>
-              <input id="email" name="email" type="email" autoComplete="email" required defaultValue={state?.email} className={inputCls} placeholder="you@company.com" />
-            </div>
-            <div>
-              <label htmlFor="password" className="mb-1 block text-xs font-medium text-slate-700">
-                Password
-              </label>
-              <input id="password" name="password" type="password" autoComplete="current-password" required className={inputCls} placeholder="••••••••" />
-            </div>
-            {state?.chooseOrg?.length ? (
-              <div>
-                <label htmlFor="org" className="mb-1 block text-xs font-medium text-slate-700">Organization</label>
-                <select id="org" name="org" required className={inputCls} defaultValue="">
-                  <option value="" disabled>Choose your organization…</option>
-                  {state.chooseOrg.map((o) => <option key={o.slug} value={o.slug}>{o.name}</option>)}
-                </select>
+            {state?.recoveryCodes ? (
+              <div className="space-y-3">
+                <p className="text-sm text-slate-700">Two-step sign-in is on. Keep these recovery codes somewhere safe: each signs you in once without the app. They are shown only now.</p>
+                <ul className="grid grid-cols-2 gap-1.5 rounded-lg border border-line bg-surface p-3 font-mono text-xs text-slate-700">
+                  {state.recoveryCodes.map((one) => <li key={one}>{one}</li>)}
+                </ul>
+                <Link href={state.next ?? "/"} className="block w-full rounded-lg bg-brand px-4 py-2.5 text-center text-sm font-medium text-white transition hover:bg-brand-hover">Continue</Link>
               </div>
-            ) : null}
+            ) : state?.mfa ? (
+              <>
+                <input type="hidden" name="challenge" value={state.mfa.challenge} />
+                <input type="hidden" name="step" value={state.mfa.step} />
+                <input type="hidden" name="email" value={state.email ?? ""} />
+                {state.mfa.secret ? <input type="hidden" name="secret" value={state.mfa.secret} /> : null}
+                {state.mfa.uri ? <input type="hidden" name="uri" value={state.mfa.uri} /> : null}
+                {state.mfa.step === "MFA_SETUP" ? (
+                  <div className="space-y-2 text-sm text-slate-600">
+                    <p>Your organization asks for two-step sign-in. Add this key to an authenticator app, then type the code it shows.</p>
+                    <p className="break-all rounded-lg border border-line bg-surface px-3 py-2 font-mono text-xs text-slate-800">{state.mfa.secret}</p>
+                    {state.mfa.uri ? <a href={state.mfa.uri} className="text-xs font-semibold text-brand-ink hover:underline">Open in an authenticator app on this device</a> : null}
+                  </div>
+                ) : (
+                  <p className="text-sm text-slate-600">Type the code from your authenticator app, or one of your recovery codes.</p>
+                )}
+                <div>
+                  <label htmlFor="code" className="mb-1 block text-xs font-medium text-slate-700">
+                    Code
+                  </label>
+                  <input id="code" name="code" type="text" autoComplete="one-time-code" required autoFocus className={inputCls} placeholder="123456" />
+                </div>
+              </>
+            ) : (
+              <>
+              <div>
+                <label htmlFor="email" className="mb-1 block text-xs font-medium text-slate-700">
+                  Email
+                </label>
+                <input id="email" name="email" type="email" autoComplete="email" required defaultValue={state?.email} className={inputCls} placeholder="you@company.com" />
+              </div>
+              <div>
+                <label htmlFor="password" className="mb-1 block text-xs font-medium text-slate-700">
+                  Password
+                </label>
+                <input id="password" name="password" type="password" autoComplete="current-password" required className={inputCls} placeholder="••••••••" />
+              </div>
+              {state?.chooseOrg?.length ? (
+                <div>
+                  <label htmlFor="org" className="mb-1 block text-xs font-medium text-slate-700">Organization</label>
+                  <select id="org" name="org" required className={inputCls} defaultValue="">
+                    <option value="" disabled>Choose your organization…</option>
+                    {state.chooseOrg.map((o) => <option key={o.slug} value={o.slug}>{o.name}</option>)}
+                  </select>
+                </div>
+              ) : null}
+              </>
+            )}
             <MissingSummary missing={missing} />
             {state?.error ? <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{state.error}</p> : null}
-            <button type="submit" disabled={pending} className="w-full rounded-lg bg-brand px-4 py-2.5 text-sm font-medium text-white transition hover:bg-brand-hover disabled:opacity-50">
-              {pending ? "Signing in…" : "Sign in"}
-            </button>
+            {state?.recoveryCodes ? null : (
+              <button type="submit" disabled={pending} className="w-full rounded-lg bg-brand px-4 py-2.5 text-sm font-medium text-white transition hover:bg-brand-hover disabled:opacity-50">
+                {pending ? "Signing in…" : state?.mfa ? "Verify" : "Sign in"}
+              </button>
+            )}
           </form>
           <p className="mt-6 text-center text-xs text-slate-500">
             Setting up a new organization?{" "}
