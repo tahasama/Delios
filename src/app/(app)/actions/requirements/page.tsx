@@ -1,297 +1,157 @@
 import Link from "next/link";
-import { controlledSets } from "@/lib/api/admin";
 import { requireScope } from "@/lib/scope";
-import { Chip, Field, inputCls } from "@/components/ui";
-import { ActionForm } from "@/components/form";
-import { issueCallsAction, remindCallAction, closeCallAction, issueToSendersAction } from "@/lib/actions/requirements";
-import { departmentRows, senderRows, clearance, isDepartmentSender, type CallState } from "@/lib/requirements-process";
-import { businessDaysAfter, departmentsOf } from "@/lib/schedule";
-import { fmtDate } from "@/lib/utils";
-import { ArrowLeft, Download } from "lucide-react";
+import { Card } from "@/components/ui";
+import { Timeline } from "@/components/timeline";
+import { StagePath } from "../../documents/[id]/next-step";
+import { departmentsOf } from "@/lib/schedule";
 import { getSet } from "@/lib/config";
-import { api } from "@/lib/api/client";
-import { legacyActions } from "@/lib/api/schedule";
-import { planLists } from "@/lib/plan-lists";
-import { PlanListPanel } from "../plan-list-panel";
+import { legacyActions, scheduleSource } from "@/lib/api/schedule";
+import { backendDocument } from "@/lib/api/legacy";
+import { planLists, type PlanListKind } from "@/lib/plan-lists";
+import { actionState, ACTION_STATES, DEFAULT_RISK_DAYS, type ActionState } from "@/lib/action-state";
+import { ArrowLeft } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Document requirements" };
 
-const ASKED: Record<CallState, [string, string]> = {
-  NOT_ISSUED: ["Not asked yet", "bg-slate-100 text-slate-700 ring-slate-200"],
-  OPEN: ["Waiting", "bg-amber-100 text-amber-800 ring-amber-200"],
-  OVERDUE: ["Late", "bg-red-100 text-red-800 ring-red-200"],
-  ANSWERED: ["Answered", "bg-emerald-100 text-emerald-800 ring-emerald-200"],
-};
+const STAGES = ["Schedule", "Disciplines per action", "Document requirements", "Documents ready"];
+const HAS_EVERYTHING: ActionState[] = ["READY", "DONE", "LATE_RECEIPT"];
 
 /**
- * From the schedule to work that is ready, on one sheet and in order: tag each
- * action with its disciplines, ask them what they need, tell whoever sends it,
- * and each discipline confirms before the day.
+ * How far the project is from knowing what every action needs, drawn the way
+ * the app draws every process: the stages in a row, then one point per stage
+ * with its date, its count and what is still missing. Each list is uploaded on
+ * the schedule and put in force by releasing its document.
  */
 export default async function RequirementsPage() {
   const ctx = await requireScope();
-  const control = ctx.can("CONTROL");
-  const plan = ctx.can("PLAN") || control;
-
-  const [actions, depts, senders, disciplines, parties, pendingSets, lists] = await Promise.all([
+  const [actions, lists, disciplines, { source }] = await Promise.all([
     legacyActions(ctx),
-    departmentRows(ctx),
-    senderRows(ctx),
+    planLists(ctx),
     getSet("DISCIPLINES"),
-    api<{ code: string; name: string }[]>("/api/parties").catch(() => [] as { code: string; name: string }[]),
-    controlledSets(ctx),
-    plan ? planLists(ctx) : Promise.resolve([]),
+    scheduleSource(ctx),
   ]);
-  const listOf = (kind: string) => lists.find((one) => one.kind === kind) ?? null;
-  /** A list's upload, opened where the step is read rather than on another page. */
-  const uploadHere = (kind: string, label: string) => {
-    const list = listOf(kind);
-    return list ? (
-      <details className="border-b border-line px-5 py-3 sm:px-6">
-        <summary className="ask cursor-pointer list-none [&::-webkit-details-marker]:hidden">{label}</summary>
-        <div className="mt-3"><PlanListPanel list={list} /></div>
-      </details>
-    ) : null;
-  };
-  const deptName = (c: string) => disciplines.find((d) => d.code === c)?.label ?? c;
-  const senderName = (s: string) => (isDepartmentSender(s) ? `${deptName(s.slice(5))} (us)` : parties.find((p) => p.code === s)?.name ?? s);
-  const setState = (kind: string) => {
-    const versions = pendingSets.find((s) => s.kind === kind)?.versions ?? [];
-    // The newest read of the list's document: in force, or refused with the reason.
-    const latest = versions[0] ?? null;
-    return { refused: latest?.state === "REJECTED" ? latest : null, inForce: versions.find((v) => v.state === "APPROVED") ?? null };
-  };
-  const tagging = setState("ACTION_DEPARTMENTS");
-  const list = setState("DOCUMENT_REQUIREMENTS");
-  const myDept = ctx.user.department ?? null;
+  const deptName = (code: string) => disciplines.find((one) => one.code === code)?.label ?? code;
+  const riskDays = source?.riskWindowDays ?? DEFAULT_RISK_DAYS;
 
-  const tagged = actions.filter((a) => departmentsOf(a).length).length;
-  const untagged = actions.length - tagged;
-  const toAsk = depts.filter((d) => d.notIssued.length);
-  const answered = depts.filter((d) => d.state === "ANSWERED").length;
-  const toTell = senders.filter((s) => !s.lastIssue || s.changedSinceIssue);
-  const due = businessDaysAfter(new Date(), 5).toISOString().slice(0, 10);
-  const horizon = businessDaysAfter(new Date(), 10).getTime();
-  const upcoming = actions.filter((a) => a.scheduledDate && a.scheduledDate.getTime() <= horizon && departmentsOf(a).length && !clearance(a).cleared);
+  // Each list's document, and its latest released revision: the one in force.
+  const released = async (kind: PlanListKind) => {
+    const doc = lists.find((one) => one.kind === kind)?.documents[0] ?? null;
+    if (!doc) return { doc: null, revision: null as { value: string; releasedAt: Date } | null };
+    const view = await backendDocument(ctx, doc.id);
+    const last = [...(view?.revisions ?? [])].reverse().find((one) => one.releasedAt);
+    return { doc, revision: last ? { value: last.value, releasedAt: new Date(last.releasedAt!) } : null };
+  };
+  const [schedule, tags, needs] = await Promise.all([released("SCHEDULE"), released("DEPARTMENTS"), released("REQUIREMENTS")]);
 
-  const th = "stencil px-3 py-2 text-left font-normal text-slate-500 first:pl-5 sm:first:pl-6";
-  const td = "px-3 py-2.5 align-top first:pl-5 sm:first:pl-6";
-  /** A step's bar: its number and name, then where it stands, then what can be done. */
-  const bar = (n: number, name: string, standing: React.ReactNode, tools?: React.ReactNode) => (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-y border-line bg-tint-soft px-5 py-2 sm:px-6">
-      <span className="stencil text-slate-600"><span className="mr-1.5 font-mono text-slate-500">{n}</span>{name}</span>
-      <span className="text-[11.5px] text-slate-600">{standing}</span>
-      {tools ? <span className="ml-auto flex flex-wrap items-center gap-2">{tools}</span> : null}
-    </div>
+  const tagged = actions.filter((one) => departmentsOf(one).length);
+  const untagged = actions.filter((one) => !departmentsOf(one).length);
+  // Every (action, discipline) the tags ask about, and whether the requirements list answers it.
+  const pairs = tagged.flatMap((one) => departmentsOf(one).map((department) => ({ action: one, department })));
+  const unanswered = pairs.filter(({ action, department }) => !action.entries.some((entry) => entry.department === department));
+  const byDiscipline = [...new Set(pairs.map((one) => one.department))].sort().map((department) => ({
+    department,
+    documents: tagged.flatMap((one) => one.entries).filter((entry) => entry.department === department).length,
+    missing: unanswered.filter((one) => one.department === department).map((one) => one.action.code),
+  }));
+  const stateOf = new Map(actions.map((one) => [one.id, actionState(one, riskDays)]));
+  const counts = new Map<ActionState, number>();
+  for (const state of stateOf.values()) counts.set(state, (counts.get(state) ?? 0) + 1);
+  const listed = actions.filter((one) => one.entries.length);
+  const complete = listed.filter((one) => HAS_EVERYTHING.includes(stateOf.get(one.id)!));
+
+  const at = !schedule.revision || !actions.length ? 0
+    : untagged.length ? 1
+      : unanswered.length || !listed.length ? 2
+        : complete.length === listed.length ? 4 : 3;
+  const docLink = (doc: { id: string } | null, revision: { value: string } | null, words: string) =>
+    doc ? <Link href={`/documents/${doc.id}`} className="font-semibold text-link hover:underline">{words}{revision ? `, rev ${revision.value}` : ""}</Link> : null;
+  const codes = (list: string[]) => (
+    <span className="font-mono">
+      {list.slice(0, 12).map((code, i) => <span key={code}>{i ? ", " : ""}<Link href={`/actions/${code}`} className="text-link hover:underline">{code}</Link></span>)}
+      {list.length > 12 ? ` and ${list.length - 12} more` : ""}
+    </span>
   );
-  const refused = (one: { sourceName: string | null; versionLabel: string; decisionReason: string | null }) =>
-    `${one.sourceName ?? one.versionLabel} was released but could not be read, so nothing changed${one.decisionReason ? `: ${one.decisionReason.split("\n")[0]}` : "."}`;
 
   return (
     <section className="register register-sheet register-sheet-open">
-      <div className="border-b border-line px-5 pt-6 pb-3 sm:px-6">
+      <div className="border-b border-line px-5 pt-6 pb-4 sm:px-6">
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
           <h1 className="plate-title min-w-0 text-slate-950">Document requirements</h1>
           <Link href="/actions" className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-semibold text-slate-500 hover:bg-slate-100"><ArrowLeft className="h-4 w-4" /> Schedule</Link>
         </div>
-        <p className="plate-meta mt-2">
-          {tagged} of {actions.length} actions tagged &middot; {answered} of {depts.length} disciplines answered &middot; {senders.length - toTell.length} of {senders.length} senders told &middot; {upcoming.length} to confirm in the next two weeks
-        </p>
         <p className="mt-1 max-w-2xl text-[11.5px] leading-4 text-slate-500">
-          Four steps, in order: tag each action with its disciplines, ask them what they need, tell whoever sends it, and each discipline confirms before the day.
+          How far the project is from knowing what every action needs. Each list is uploaded on the schedule; releasing it puts it in force.
         </p>
+        <div className="mt-4">
+          <StagePath stages={STAGES} at={at} />
+        </div>
       </div>
 
-      {/* 1 — which disciplines each action concerns */}
-      {bar(1, "Tag the disciplines",
-        tagging.refused
-          ? <span className="font-semibold text-red-700">{refused(tagging.refused)}</span>
-          : untagged
-            ? <span className="font-semibold text-amber-800">{untagged} action{untagged === 1 ? " has" : "s have"} no discipline, so nobody can be asked about {untagged === 1 ? "it" : "them"}.</span>
-            : <>Every action is tagged{tagging.inForce ? ` (${tagging.inForce.versionLabel}, ${fmtDate(tagging.inForce.decidedAt)})` : ""}.</>,
-        <a href="/api/controlled/current/ACTION_DEPARTMENTS" className="ask"><Download className="h-3.5 w-3.5" /> Current list to fill</a>,
-      )}
-      {uploadHere("DEPARTMENTS", "Upload disciplines per action")}
-
-      {/* 2 — ask each discipline what it needs, chase, collect */}
-      {bar(2, "Ask the disciplines",
-        list.refused
-          ? <span className="font-semibold text-red-700">{refused(list.refused)}</span>
-          : <>Each answers on its own sheet: the documents it needs, from whom, by when.</>,
-      )}
-      {uploadHere("REQUIREMENTS", "Upload document requirements")}
-      {control && toAsk.length ? (
-        <div className="border-b border-line px-5 py-3 sm:px-6">
-          <ActionForm action={issueCallsAction} hideSubmit>
-            <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
-              <fieldset className="min-w-0">
-                <legend className="stencil mb-1.5 text-slate-500">To ask</legend>
-                <div className="flex flex-wrap gap-x-4 gap-y-1.5">
-                  {toAsk.map((d) => (
-                    <label key={d.department} className="flex items-center gap-1.5 text-xs text-slate-700">
-                      <input type="checkbox" name="department" value={d.department} defaultChecked /> {deptName(d.department)} <span className="text-slate-500">· {d.notIssued.length} new</span>
-                    </label>
-                  ))}
-                </div>
-              </fieldset>
-              <Field label="Answer by" required><input type="date" name="dueAt" defaultValue={due} required className={inputCls} /></Field>
-              <button className="ask" data-on="true">Ask</button>
-            </div>
-          </ActionForm>
-        </div>
-      ) : null}
-      {depts.length ? (
-        <div className="overflow-x-auto">
-          <table className="w-full text-[13px]">
-            <thead className="border-b border-line"><tr><th className={th}>Discipline</th><th className={th}>Actions</th><th className={th}>Documents listed</th><th className={th}>Asked</th><th className={th}><span className="sr-only">Tools</span></th></tr></thead>
-            <tbody className="divide-y divide-line">
-              {depts.map((d) => (
-                <tr key={d.department} className={myDept === d.department ? "bg-tint-soft" : "hover:bg-tint-soft"}>
-                  <td className={td}>
-                    <span className="font-semibold text-slate-800">{deptName(d.department)}</span>
-                    {myDept === d.department ? <span className="ml-1.5 text-[11px] font-semibold text-link">yours</span> : null}
-                    <span className={`block text-[11px] ${d.members ? "text-slate-500" : "font-semibold text-red-700"}`}>{d.members ? `${d.members} ${d.members === 1 ? "person" : "people"}` : "nobody in it"}</span>
-                  </td>
-                  <td className={`${td} text-xs`}>
-                    <span className="font-mono">{d.actions.map((a) => a.code).join(", ")}</span>
-                    {d.notIssued.length && d.call ? <span className="block text-[11px] text-amber-800">{d.notIssued.length} not asked yet</span> : null}
-                  </td>
-                  <td className={`${td} text-xs tabular-nums`}>{d.requirements}</td>
-                  <td className={`${td} text-xs`}>
-                    <Chip className={ASKED[d.state][1]}>{ASKED[d.state][0]}</Chip>
-                    {d.call ? (
-                      <span className="mt-1 block text-[11px] text-slate-500">
-                        {d.call.answeredAt ? `${fmtDate(d.call.answeredAt)} · ${d.call.answerNote}` : `by ${fmtDate(d.call.dueAt)}`}
-                        {!d.call.answeredAt && d.call.reminders ? ` · reminded ${d.call.reminders}×` : ""}
-                      </span>
+      <div className="px-5 py-5 sm:px-6">
+        <Card className="max-w-3xl">
+          <Timeline
+            points={[
+              {
+                label: "Schedule released",
+                at: schedule.revision?.releasedAt ?? null,
+                holder: actions.length ? `${actions.length} action${actions.length === 1 ? "" : "s"}` : "no action yet",
+                here: at === 0,
+                detail: docLink(schedule.doc, schedule.revision, "The schedule") ?? "No schedule yet: upload it on the schedule.",
+              },
+              {
+                label: "Disciplines tagged",
+                at: tags.revision && actions.length && !untagged.length ? tags.revision.releasedAt : null,
+                holder: `${tagged.length} of ${actions.length} actions`,
+                here: at === 1,
+                detail: (
+                  <>
+                    {docLink(tags.doc, tags.revision, "Disciplines per action")}
+                    {untagged.length ? <p className="mt-1 text-amber-800">No discipline yet: {codes(untagged.map((one) => one.code))}</p> : null}
+                  </>
+                ),
+              },
+              {
+                label: "Requirements listed",
+                at: needs.revision && pairs.length && !unanswered.length ? needs.revision.releasedAt : null,
+                holder: `${pairs.length - unanswered.length} of ${pairs.length} discipline answers`,
+                here: at === 2,
+                detail: (
+                  <>
+                    {docLink(needs.doc, needs.revision, "Document requirements")}
+                    {byDiscipline.length ? (
+                      <ul className="mt-1.5 space-y-0.5">
+                        {byDiscipline.map((one) => (
+                          <li key={one.department}>
+                            <span className="font-semibold text-slate-700">{deptName(one.department)}</span>
+                            <span className="text-slate-500"> · {one.documents} document{one.documents === 1 ? "" : "s"}</span>
+                            {one.missing.length ? <span className="text-amber-800"> · nothing listed for {codes(one.missing)}</span> : null}
+                          </li>
+                        ))}
+                      </ul>
                     ) : null}
-                  </td>
-                  <td className={td}>
-                    <div className="flex flex-wrap items-start justify-end gap-2">
-                      <a href={`/api/requirements/sheet?dept=${d.department}`} className="ask"><Download className="h-3.5 w-3.5" /> Sheet</a>
-                      {control && d.call && !d.call.answeredAt ? (
-                        <>
-                          <ActionForm action={remindCallAction} hideSubmit hidden={{ callId: d.call.id }} className="space-y-0">
-                            <button className="ask" data-on={d.state === "OVERDUE" ? "true" : "false"}>{d.state === "OVERDUE" ? "Chase" : "Remind"}</button>
-                          </ActionForm>
-                          <details className="text-xs">
-                            <summary className="ask cursor-pointer list-none [&::-webkit-details-marker]:hidden">Nothing needed</summary>
-                            <div className="mt-2 w-64">
-                              <ActionForm action={closeCallAction} hideSubmit hidden={{ callId: d.call.id }}>
-                                <label className="block">
-                                  <span className="sr-only">What the discipline answered</span>
-                                  <input name="note" required className={inputCls} defaultValue="Nothing needed for these actions" />
-                                </label>
-                                <button className="ask" data-on="true">Record the answer</button>
-                              </ActionForm>
-                            </div>
-                          </details>
-                        </>
-                      ) : null}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : (
-        <p className="px-5 py-6 text-center text-sm text-slate-500 sm:px-6">No action is tagged yet, so there is nobody to ask. Tag the disciplines first.</p>
-      )}
-
-      {/* 3 — tell whoever sends the documents what to deliver, and by when */}
-      {bar(3, "Tell the senders",
-        senders.length
-          ? toTell.length
-            ? <span className="font-semibold text-amber-800">{toTell.length} sender{toTell.length === 1 ? " has" : "s have"} not been told the latest list.</span>
-            : <>Every sender has the latest list.</>
-          : <>A sender is whoever submits the document: a supplier, a contractor, or one of our disciplines.</>,
-      )}
-      {senders.length ? (
-        <>
-          <div className="overflow-x-auto">
-            <table className="w-full text-[13px]">
-              <thead className="border-b border-line"><tr><th className={th}>Sender</th><th className={th}>Documents</th><th className={th}>First due</th><th className={th}>Told</th><th className={th}><span className="sr-only">List</span></th></tr></thead>
-              <tbody className="divide-y divide-line">
-                {senders.map((s) => (
-                  <tr key={s.sender} className="hover:bg-tint-soft">
-                    <td className={td}><span className="font-semibold text-slate-800">{senderName(s.sender)}</span>{!s.recipients ? <span className="block text-[11px] font-semibold text-red-700">nobody to tell</span> : null}</td>
-                    <td className={`${td} text-xs tabular-nums`}>{s.documents}</td>
-                    <td className={`${td} whitespace-nowrap text-xs`}>{fmtDate(s.firstNeeded)}</td>
-                    <td className={`${td} text-xs`}>
-                      {s.lastIssue ? <>{fmtDate(s.lastIssue.issuedAt)} · {s.lastIssue.issuedByName}</> : <span className="font-semibold text-amber-800">not yet</span>}
-                      {s.lastIssue && s.changedSinceIssue ? <span className="block text-[11px] font-semibold text-amber-800">{s.changedSinceIssue} changed since</span> : null}
-                    </td>
-                    <td className={`${td} text-right`}><a href={`/api/requirements/sheet?sender=${encodeURIComponent(s.sender)}`} className="ask"><Download className="h-3.5 w-3.5" /> List</a></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          {control && toTell.length ? (
-            <div className="border-t border-line px-5 py-3 sm:px-6">
-              <ActionForm action={issueToSendersAction} hideSubmit>
-                <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
-                  <fieldset className="min-w-0">
-                    <legend className="stencil mb-1.5 text-slate-500">To tell</legend>
-                    <div className="flex flex-wrap gap-x-4 gap-y-1.5">
-                      {toTell.map((s) => (
-                        <label key={s.sender} className="flex items-center gap-1.5 text-xs text-slate-700">
-                          <input type="checkbox" name="sender" value={s.sender} defaultChecked /> {senderName(s.sender)}
-                        </label>
-                      ))}
-                    </div>
-                  </fieldset>
-                  <button className="ask" data-on="true">Send the lists</button>
-                </div>
-              </ActionForm>
-              <p className="mt-2 text-[11px] text-slate-500">Or download a sender&rsquo;s list and send it yourself on a transmittal.</p>
-            </div>
-          ) : null}
-        </>
-      ) : (
-        <p className="px-5 py-6 text-center text-sm text-slate-500 sm:px-6">Nothing to send until the disciplines have answered.</p>
-      )}
-
-      {/* 4 — before the day */}
-      {bar(4, "Confirm before the day",
-        <>Each discipline confirms its own documents on the action. Nobody confirms for another.</>,
-      )}
-      {upcoming.length ? (
-        <div className="overflow-x-auto">
-          <table className="w-full text-[13px]">
-            <thead className="border-b border-line"><tr><th className={th}>Action</th><th className={th}>Day</th><th className={th}>Disciplines</th></tr></thead>
-            <tbody className="divide-y divide-line">
-              {upcoming.map((a) => {
-                const c = clearance(a);
-                const late = !!a.scheduledDate && a.scheduledDate.getTime() < Date.now();
-                return (
-                  <tr key={a.id} className="hover:bg-tint-soft">
-                    <td className={td}><Link href={`/actions/${a.code}#confirm`} className="font-mono font-semibold text-brand-ink hover:underline">{a.code}</Link><span className="block max-w-80 truncate text-slate-800" title={a.name}>{a.name}</span></td>
-                    <td className={`${td} whitespace-nowrap text-xs ${late ? "font-semibold text-red-700" : ""}`}>{fmtDate(a.scheduledDate)}</td>
-                    <td className={td}>
-                      <div className="flex flex-wrap gap-1">
-                        {c.depts.map((d) => {
-                          const yes = c.confirmed.includes(d);
-                          const no = c.short.includes(d);
-                          return (
-                            <Chip key={d} className={yes ? "bg-emerald-100 text-emerald-800 ring-emerald-200" : no ? "bg-red-100 text-red-800 ring-red-200" : "bg-slate-100 text-slate-700 ring-slate-200"}>
-                              {deptName(d)} · {yes ? "available" : no ? "not available" : "waiting"}
-                            </Chip>
-                          );
-                        })}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      ) : (
-        <p className="px-5 py-6 text-center text-sm text-slate-500 sm:px-6">Nothing waiting to be confirmed in the next two weeks.</p>
-      )}
+                  </>
+                ),
+              },
+              {
+                label: "Documents ready",
+                at: null,
+                holder: listed.length ? `${complete.length} of ${listed.length} actions have everything` : "nothing listed yet",
+                here: at >= 3,
+                detail: listed.length ? (
+                  <p className="flex flex-wrap gap-x-3 gap-y-1">
+                    {ACTION_STATES.filter((one) => counts.get(one.code)).map((one) => (
+                      <Link key={one.code} href={`/actions?view=table&state=${one.code}`} className="text-link hover:underline">
+                        {counts.get(one.code)} {one.label.toLowerCase()}
+                      </Link>
+                    ))}
+                  </p>
+                ) : null,
+              },
+            ]}
+          />
+        </Card>
+      </div>
     </section>
   );
 }
