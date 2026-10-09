@@ -116,6 +116,7 @@ export type DocumentView = {
   createdById: string;
   legalHold: boolean; legalHoldReason: string | null; previousNumber: string | null; legacyScheme: string | null; appVersion: string | null;
   extras: Record<string, string> | null;
+  confirmedAt?: string | null; confirmedByName?: string | null; correctsId?: string | null;
 };
 
 export type RevisionView = {
@@ -166,7 +167,12 @@ export type ReviewView = {
     transmittalId: string | null; dispatchedAt: string | null; dispatchChannel: string | null; dispatchRef: string | null;
     dispatchedBy: string | null; foreignAnswer: string | null; recordedBy: string | null; evidenceFileId: string | null;
   }[];
-  comments: { id: string; step: number; author: string; text: string; class: string; blocking: boolean; closesWith: string; closesWithStep: number | null; status: string; resolution: string | null; closedBy: string | null; createdAt: string; authorId: string }[];
+  comments: {
+    id: string; step: number; author: string; text: string; class: string; blocking: boolean; closesWith: string; closesWithStep: number | null;
+    status: string; resolution: string | null; closedBy: string | null; createdAt: string; authorId: string;
+    originalBlocking?: boolean | null; reclassifiedAt?: string | null; reclassifiedBy?: string | null;
+  }[];
+  approvalWithdrawnAt?: string | null; approvalWithdrawnBy?: string | null; approvalWithdrawnReason?: string | null;
 };
 
 /** GET /reviews/{id}/me. */
@@ -245,7 +251,7 @@ export type PackageSummary = {
 };
 
 /** The rule a package fills itself by (Entities.cs PackageRule); empty lists mean any. */
-export type PackageRule = { deliverableTypes: string[]; disciplines: string[]; docTypes: string[]; originators: string[] };
+export type PackageRule = { deliverableTypes: string[]; disciplines: string[]; docTypes: string[]; originators: string[]; assetIds?: string[] };
 
 /** GET /packages/{id} (PackageEndpoints.cs PackageView). */
 export type PackageView = {
@@ -263,6 +269,7 @@ export type PackageView = {
   }[];
   transmittals: { id: string; number: string; direction: "OUTGOING" | "INCOMING"; issuedAt: string; items: number }[];
   kind: "DELIVERY" | "SUPPLY"; supplierPartyId: string | null; supplier: string | null; purchaseOrder: string | null;
+  reasons?: string[]; extras?: Record<string, string> | null;
 };
 
 /** GET /activity (ActivityEndpoints.cs): one act of the project, for Home's journal and log. */

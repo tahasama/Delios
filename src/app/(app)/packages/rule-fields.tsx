@@ -1,4 +1,6 @@
 import { getActiveSet } from "@/lib/config";
+import { requireScope } from "@/lib/scope";
+import { projectAssets } from "@/lib/api/records";
 import { SearchPick } from "@/components/search-pick";
 import type { PackageFilter } from "@/lib/package-rule";
 import { outsideParties } from "@/lib/api/packages";
@@ -10,8 +12,7 @@ import { outsideParties } from "@/lib/api/packages";
  */
 export async function RuleFields({ initial, supplier = false }: { initial?: PackageFilter | null; /** A supplier package: the supplier is fixed already. */ supplier?: boolean }) {
   const [assets, disciplines, types, parties] = await Promise.all([
-    // Asset tags are not in the backend.
-    Promise.resolve([] as { id: string; code: string; name: string }[]),
+    projectAssets(await requireScope()).then((all) => all.map((one) => ({ id: one.id, code: one.code, name: one.name }))),
     getActiveSet("DISCIPLINES"),
     getActiveSet("DOCUMENT_TYPES"),
     outsideParties(),

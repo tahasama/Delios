@@ -242,7 +242,10 @@ public static class TransmittalEndpoints
         var members = await transmittals.MembersAsync(access.Project, cancellationToken);
         var parties = await db.Parties.AsNoTracking().Where(p => p.Active && !p.IsInternal).OrderBy(p => p.Name)
             .Select(p => new { p.Id, p.Code, p.Name, p.Participation }).ToListAsync(cancellationToken);
-        return Results.Ok(new { people = members.OrderBy(m => m.Name).Select(m => m.View()), parties });
+        // Our own organization, for a handover inside it (a package delivered to us).
+        var ours = await db.Parties.AsNoTracking().Where(p => p.Active && p.IsInternal).OrderBy(p => p.Code)
+            .Select(p => new { p.Id, p.Code, p.Name }).FirstOrDefaultAsync(cancellationToken);
+        return Results.Ok(new { people = members.OrderBy(m => m.Name).Select(m => m.View()), parties, ours });
     }
 
     /// <summary>GET the list of transmittals the caller may see, newest first.</summary>

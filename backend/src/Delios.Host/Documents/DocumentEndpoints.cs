@@ -212,7 +212,8 @@ public static class DocumentEndpoints
         d.ReceivedDate?.ToDateOnly(), d.PlannedDate?.ToDateOnly(), d.CreatedByName,
         d.CreatedAt.ToDateTimeOffset(), d.UpdatedAt.ToDateTimeOffset(), d.Revisions.Select(View).ToList(), d.CreatedById,
         d.LegalHold, d.LegalHoldReason, d.PreviousNumber, d.LegacyScheme, d.AppVersion,
-        d.Extras is null ? null : System.Text.Json.JsonDocument.Parse(d.Extras).RootElement.Clone());
+        d.Extras is null ? null : System.Text.Json.JsonDocument.Parse(d.Extras).RootElement.Clone(), d.ConfirmedAt?.ToDateTimeOffset(),
+        d.ConfirmedByName, d.CorrectsId);
 
     /// <summary>Turns a revision entity, with its submissions and files, into the shape the API returns.</summary>
     private static RevisionView View(Revision r) => new(

@@ -30,6 +30,7 @@ internal sealed class PackageConfiguration : IEntityTypeConfiguration<Package>
         b.Property(x => x.ShortfallAcceptedByName).HasMaxLength(200);
         b.Property(x => x.ClosedByName).HasMaxLength(200);
         b.Property(x => x.ClosureNote).HasMaxLength(2000);
+        b.Property(x => x.Extras).HasColumnType("jsonb");
         b.Property(x => x.AcceptedByName).HasMaxLength(200);
         b.Property(x => x.CreatedByName).HasMaxLength(200);
         b.Property(x => x.CreatedAt).HasDefaultValueSql("now()");

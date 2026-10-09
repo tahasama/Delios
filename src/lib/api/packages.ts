@@ -70,7 +70,12 @@ export async function ourPeople(scope: Scope): Promise<{ id: string; name: strin
  * Our own organization is not among them: the backend gives out no id for it.
  */
 export async function packageParties(scope: Scope): Promise<{ id: string; code: string; name: string; isInternal: boolean }[]> {
-  return (await addressees(scope)).parties.map((one) => ({ id: one.id, code: one.code, name: one.name, isInternal: false }));
+  const found = await addressees(scope);
+  const ours = (found as { ours?: { id: string; code: string; name: string } | null }).ours;
+  return [
+    ...found.parties.map((one) => ({ id: one.id, code: one.code, name: one.name, isInternal: false })),
+    ...(ours ? [{ id: ours.id, code: ours.code, name: ours.name, isInternal: true }] : []),
+  ];
 }
 
 /** The organization's active outside parties, by code (GET /api/parties). */
@@ -109,8 +114,9 @@ async function legacyOf(scope: Scope, view: PackageView, createdAt: string, deta
   // A supply package's rule always names its supplier; the narrowing is the rest of it.
   const filter: PackageFilter = {
     disciplines: view.rule?.disciplines ?? [], docTypes: view.rule?.docTypes ?? [], originators: supply ? [] : view.rule?.originators ?? [],
+    assetIds: view.rule?.assetIds ?? [],
   };
-  const narrowing = !!(filter.disciplines!.length || filter.docTypes!.length || filter.originators!.length);
+  const narrowing = !!(filter.disciplines!.length || filter.docTypes!.length || filter.originators!.length || filter.assetIds!.length);
   const membershipRule = narrowing ? await describeFilter(filter) : null;
   // Our own organization is not among the outside parties: a recipient that is not one is us.
   const recipients = view.recipientPartyIds.map((id) => book.parties.find((one) => one.id === id)?.name ?? me?.tenant.name ?? "us");
@@ -123,7 +129,7 @@ async function legacyOf(scope: Scope, view: PackageView, createdAt: string, deta
       })))
     : null;
   return {
-    id: view.id, identifier: view.number, title: view.title, description: view.description, purpose: view.reason,
+    id: view.id, identifier: view.number, title: view.title, description: view.description, purpose: (view.reasons?.length ? view.reasons : [view.reason]).join(","),
     type: view.rule ? "ACCUMULATED" : "DEFINED", category: supply ? "SUPPLIER" : "DELIVERY",
     partyCode: supply ? view.rule?.originators[0] ?? me?.user.party?.code ?? null : null,
     recipientName: supply ? view.supplier ?? "" : recipients.join(", "),

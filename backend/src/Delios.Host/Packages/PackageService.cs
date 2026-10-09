@@ -10,13 +10,14 @@ namespace Delios.Host.Packages;
 
 /// <summary>The rule sent by the browser: lists of codes to match documents on. Every list may be left out.</summary>
 public sealed record RuleRequest(string[]? DeliverableTypes = null, string[]? Disciplines = null, string[]? DocTypes = null,
-    string[]? Originators = null);
+    string[]? Originators = null, Guid[]? AssetIds = null);
 
 /// <summary>Body of the create-package request.</summary>
 public sealed record CreatePackageRequest(
     string? Title, string? Reason, string[]? RequiredStatuses, Guid[]? OwnerIds, Guid[]? AcceptorIds,
     Guid[]? RecipientPartyIds = null, string? Description = null, DateOnly? CompletionDate = null, RuleRequest? Rule = null,
-    string? Kind = null, Guid? SupplierPartyId = null, string? PurchaseOrder = null);
+    string? Kind = null, Guid? SupplierPartyId = null, string? PurchaseOrder = null, string[]? Reasons = null,
+    Dictionary<string, string?>? Extras = null);
 
 /// <summary>Body of renaming a package.</summary>
 public sealed record RenameRequest(string? Title, string? Description = null);
@@ -60,11 +61,13 @@ public sealed class PackageService(
         if (title.Length == 0) return Fail(Problems.Invalid("TITLE_REQUIRED", "Give the package a title."));
 
         var catalog = await Catalog.LoadAsync(db, cancellationToken);
-        var reason = request.Reason ?? "";
-        if (!catalog.IsActive(TransmittalSets.Reasons, reason))
+        // One reason or several: the first leads its transmittals, the others are named on them.
+        var reasons = (request.Reasons is { Length: > 0 } many ? many : [request.Reason ?? ""]).Select(r => r.Trim()).Distinct().ToArray();
+        var reason = reasons[0];
+        if (reasons.FirstOrDefault(r => !catalog.IsActive(TransmittalSets.Reasons, r)) is { } badReason)
         {
-            return Fail(Problems.Invalid("VALUE_NOT_PUBLISHED", $"{reason} is not a published reason for issue.",
-                new { field = "reason", value = reason }));
+            return Fail(Problems.Invalid("VALUE_NOT_PUBLISHED", $"{badReason} is not a published reason for issue.",
+                new { field = "reason", value = badReason }));
         }
         if (StatusesProblem(catalog, request.RequiredStatuses, required: true) is { } badStatus) return Fail(badStatus);
 
@@ -120,6 +123,8 @@ public sealed class PackageService(
             Title = title,
             Description = Blank(request.Description),
             Reason = reason,
+            OtherReasons = reasons[1..],
+            Extras = Documents.OwnFields.Write(null, request.Extras),
             RequiredStatuses = request.RequiredStatuses!.Distinct().ToArray(),
             CompletionDate = request.CompletionDate is { } d ? LocalDate.FromDateOnly(d) : null,
             Rule = ToRule(rule),
@@ -276,7 +281,7 @@ public sealed class PackageService(
     /// Deletes a package that holds no document and never went anywhere. Anything else is kept: the database refuses
     /// it too. The deletion is in the audit trail, and the number is never given out again.
     /// </summary>
-    public async Task<IResult?> DeleteAsync(ProjectAccess access, Guid id, CancellationToken cancellationToken)
+    public async Task<IResult?> DeleteAsync(ProjectAccess access, Guid id, CancellationToken cancellationToken, string? reason = null)
     {
         var (package, problem) = await ComposableAsync(access, id, cancellationToken);
         if (problem is not null) return problem;
@@ -286,7 +291,7 @@ public sealed class PackageService(
             return Problems.Conflict("PACKAGE_HAS_GONE_OUT", "A transmittal went out for it; it is kept.");
         db.Packages.Remove(package);
         await audit.WriteAsync(Actor(access), "PACKAGE_DELETED", "Package", package.Id, package.Number,
-            $"{package.Title}: deleted while empty.", package.ProjectId, cancellationToken);
+            $"{package.Title}: deleted while empty.{(Blank(reason) is { } why ? $" {why}" : "")}", package.ProjectId, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         return null;
     }
@@ -443,7 +448,7 @@ public sealed class PackageService(
                         .Select(m => new TransmittalService.Addressee(m.UserId, null, m.Name, party.Name)).ToList()
                     : TransmittalService.AddresseesOf(party, members);
                 sent.Add(await transmittals.RaiseAsync(new TransmittalService.Raise(access.Project, actor, package.Reason,
-                    $"{package.Number} {package.Title}: {ready.Count} document(s)", Blank(request.Note), party, party.Name,
+                    $"{package.Number} {package.Title}: {ready.Count} document(s)", AlsoFor(package, Blank(request.Note)), party, party.Name,
                     items, addressees, PackageId: package.Id), cancellationToken));
             }
         }
@@ -562,6 +567,8 @@ public sealed class PackageService(
         if (rule.Disciplines.Length > 0) query = query.Where(d => rule.Disciplines.Contains(d.Discipline));
         if (rule.DocTypes.Length > 0) query = query.Where(d => rule.DocTypes.Contains(d.DocType));
         if (rule.Originators.Length > 0) query = query.Where(d => d.Originator != null && rule.Originators.Contains(d.Originator));
+        if (rule.AssetIds.Length > 0)
+            query = query.Where(d => db.Set<Records.DocumentAsset>().Any(l => l.DocumentId == d.Id && rule.AssetIds.Contains(l.AssetId)));
         // A supplier with several orders: each supply package holds what its own order covers.
         if (package.Kind == PackageKinds.Supply && package.PurchaseOrder is { } order) query = query.Where(d => d.ContractRef == order);
         // What a supplier owes is what was planned; something it sent unplanned (an RFI, an NCR) and we registered is not.
@@ -687,9 +694,14 @@ public sealed class PackageService(
             Disciplines = request.Disciplines?.Distinct().ToArray() ?? [],
             DocTypes = request.DocTypes?.Distinct().ToArray() ?? [],
             Originators = request.Originators?.Distinct().ToArray() ?? [],
+            AssetIds = request.AssetIds?.Distinct().ToArray() ?? [],
         };
         return rule.IsEmpty ? null : rule;
     }
+
+    /// <summary>The note on a package's transmittal, naming the further reasons it goes for.</summary>
+    private static string? AlsoFor(Package package, string? note) => package.OtherReasons.Length == 0 ? note
+        : $"Also for: {string.Join(", ", package.OtherReasons)}.{(note is null ? "" : $" {note}")}";
 
     /// <summary>Trims text and turns empty or whitespace-only text into null.</summary>
     private static string? Blank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();

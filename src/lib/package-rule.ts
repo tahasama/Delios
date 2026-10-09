@@ -48,12 +48,17 @@ export function filterFromForm(formData: FormData): PackageFilter {
 /** The rule in words, as the package shows it. */
 export async function describeFilter(filter: PackageFilter): Promise<string> {
   const parts: string[] = [];
-  // Asset tags are not in the backend: a rule never names one.
   const { getActiveSet } = await import("./config");
   const named = async (key: string, codes: string[]) => {
     const values = await getActiveSet(key);
     return codes.map((code) => values.find((one) => one.code === code)?.label ?? code).join(" or ");
   };
+  if (filter.assetIds?.length) {
+    const { projectAssets } = await import("./api/records");
+    const { requireScope } = await import("./scope");
+    const tags = (await projectAssets(await requireScope())).filter((one) => filter.assetIds!.includes(one.id)).map((one) => one.code);
+    parts.push(`tagged ${tags.join(" or ") || "with an asset no longer listed"}`);
+  }
   if (filter.disciplines?.length) parts.push(`in ${await named("DISCIPLINES", filter.disciplines)}`);
   if (filter.docTypes?.length) parts.push(`of type ${await named("DOCUMENT_TYPES", filter.docTypes)}`);
   if (filter.originators?.length) {

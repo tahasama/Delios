@@ -156,6 +156,11 @@ public sealed class Document
     public string? Extras { get; set; }
     /// <summary>Kept whatever its retention says: nothing about it may be disposed of while it holds.</summary>
     public bool LegalHold { get; set; }
+    /// <summary>A record confirmed: fixed as evidence from then on.</summary>
+    public Instant? ConfirmedAt { get; set; }
+    public string? ConfirmedByName { get; set; }
+    /// <summary>The record this one corrects; both are kept, the original never altered.</summary>
+    public Guid? CorrectsId { get; set; }
     public string? LegalHoldReason { get; set; }
     public Instant? LegalHoldAt { get; set; }
     public string? LegalHoldByName { get; set; }

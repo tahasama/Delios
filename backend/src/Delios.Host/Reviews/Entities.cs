@@ -94,6 +94,10 @@ public sealed class Review
     /// request: its one step is theirs, and its answer settles the request, not the revision.
     /// </summary>
     public Guid? IssueRequestId { get; set; }
+    /// <summary>The approval this review gave, withdrawn afterwards by Document Control: when, by whom, why. The review itself is kept as it was.</summary>
+    public Instant? ApprovalWithdrawnAt { get; set; }
+    public string? ApprovalWithdrawnByName { get; set; }
+    public string? ApprovalWithdrawnReason { get; set; }
     /// <summary>Row version, changed by the database on each update; used to detect two saves of the same review at once.</summary>
     public uint Version { get; set; }
     public List<ReviewStep> Steps { get; set; } = [];
@@ -209,6 +213,10 @@ public sealed class ReviewComment
     public Instant? ClosedAt { get; set; }
     public string? ClosedByName { get; set; }
     public Instant CreatedAt { get; set; }
+    /// <summary>Reclassified after it was written: whether it blocked as written, and who changed it, when.</summary>
+    public bool? OriginalBlocking { get; set; }
+    public Instant? ReclassifiedAt { get; set; }
+    public string? ReclassifiedByName { get; set; }
 }
 
 /// <summary>What settles a comment: the next revision (REVISION) or a later step of the same route (STEP).</summary>

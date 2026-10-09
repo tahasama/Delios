@@ -24,14 +24,12 @@ export async function createPackageAction(_prev: { error?: string } | undefined,
   if (isReadOnly(user)) return { error: "Viewers cannot create packages." };
   const title = String(formData.get("title") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim() || null;
-  // One reason or several; the backend keeps one, the reason its transmittals go for.
+  // One reason or several; the first leads its transmittals, the others are named on them.
   const purposes = formData.getAll("purpose").map(String).filter(Boolean);
-  if (purposes.length > 1) return { error: "More than one reason for issue on a package is not supported yet." };
   const purpose = purposes[0] ?? "";
 
   // A package filled by a rule states it as a filter.
   const filter = filterFromForm(formData);
-  if (filter.assetIds?.length) return { error: "Filling a package by asset tag is not supported yet." };
   // Handed to one or more organizations on the project.
   const partyIds = formData.getAll("recipientPartyIds").map(String).filter(Boolean);
   const completionDate = String(formData.get("completionDate") ?? "");
@@ -56,16 +54,16 @@ export async function createPackageAction(_prev: { error?: string } | undefined,
     (n) => String(formData.get(n) ?? ""),
   );
   if (asked.error) return { error: asked.error };
-  if (Object.keys(asked.extras).length) return { error: "Fields of your own on a package are not supported yet." };
+  const extras = Object.fromEntries(Object.entries(asked.extras).filter(([, value]) => !!value));
 
   // The backend numbers it, checks the people and values, and lets the rule fill it.
   let number: string;
   try {
     const created = await api<PackageView>(projectPath(ctx, "/packages"), {
       body: {
-        title, description, reason: purpose, requiredStatuses, ownerIds: ownerList, acceptorIds: acceptorList, recipientPartyIds: partyIds,
-        completionDate, kind: "DELIVERY",
-        rule: isEmpty(filter) ? null : { disciplines: filter.disciplines ?? [], docTypes: filter.docTypes ?? [], originators: filter.originators ?? [] },
+        title, description, reason: purpose, reasons: purposes, requiredStatuses, ownerIds: ownerList, acceptorIds: acceptorList, recipientPartyIds: partyIds,
+        completionDate, kind: "DELIVERY", extras: Object.keys(extras).length ? extras : null,
+        rule: isEmpty(filter) ? null : { disciplines: filter.disciplines ?? [], docTypes: filter.docTypes ?? [], originators: filter.originators ?? [], assetIds: filter.assetIds ?? [] },
       },
       idempotencyKey: randomUUID(),
     });
@@ -139,8 +137,7 @@ export async function removePackageMemberAction(_prev: { error?: string } | unde
 /** Set, change or clear the rule a package fills itself by. */
 export async function setPackageRuleAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
   const filter = filterFromForm(formData);
-  if (filter.assetIds?.length) return { error: "Filling a package by asset tag is not supported yet." };
-  const rule = isEmpty(filter) ? null : { disciplines: filter.disciplines ?? [], docTypes: filter.docTypes ?? [], originators: filter.originators ?? [] };
+  const rule = isEmpty(filter) ? null : { disciplines: filter.disciplines ?? [], docTypes: filter.docTypes ?? [], originators: filter.originators ?? [], assetIds: filter.assetIds ?? [] };
   const { error } = await onPackage(String(formData.get("packageId") ?? ""), "/rule", rule, "PUT");
   return error ? { error } : {};
 }
@@ -166,7 +163,7 @@ export async function deletePackageAction(_prev: { error?: string } | undefined,
   const pkg = await packageView(ctx, packageId);
   if (!pkg) return { error: "That package no longer exists." };
   try {
-    await api(projectPath(ctx, `/packages/${packageId}`), { method: "DELETE" });
+    await api(projectPath(ctx, `/packages/${packageId}`), { method: "DELETE", query: { reason } });
   } catch (e) {
     return { error: refusal(e).message };
   }

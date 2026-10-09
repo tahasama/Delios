@@ -42,6 +42,8 @@ internal sealed class ReviewConfiguration : IEntityTypeConfiguration<Review>
         b.Property(x => x.StartedByName).HasMaxLength(200);
         b.Property(x => x.ClosedByName).HasMaxLength(200);
         b.Property(x => x.ReturnReason).HasMaxLength(64);
+        b.Property(x => x.ApprovalWithdrawnByName).HasMaxLength(200);
+        b.Property(x => x.ApprovalWithdrawnReason).HasMaxLength(2000);
         b.Property(x => x.StartedAt).HasDefaultValueSql("now()");
         b.Property(x => x.Version).IsRowVersion();
     }
@@ -108,6 +110,7 @@ internal sealed class ReviewCommentConfiguration : IEntityTypeConfiguration<Revi
         b.Property(x => x.Status).HasMaxLength(16);
         b.Property(x => x.Resolution).HasMaxLength(2000);
         b.Property(x => x.ClosedByName).HasMaxLength(200);
+        b.Property(x => x.ReclassifiedByName).HasMaxLength(200);
         b.Property(x => x.CreatedAt).HasDefaultValueSql("now()");
     }
 }

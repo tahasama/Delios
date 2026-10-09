@@ -26,7 +26,8 @@ public sealed record PackageView(Guid Id, string Number, string Title, string? D
     DateTimeOffset? AssessedAt, IReadOnlyList<ShortfallLine> Shortfall, DateTimeOffset? ShortfallIssuedAt,
     DateTimeOffset? ShortfallAcceptedAt, string? ShortfallAcceptedBy, DateTimeOffset? ClosedAt, string? ClosedBy,
     string? ClosureNote, DateTimeOffset? AcceptedAt, string? AcceptedBy, string CreatedBy, IReadOnlyList<MemberView> Members,
-    IReadOnlyList<PackageTransmittal> Transmittals, string Kind, Guid? SupplierPartyId, string? Supplier, string? PurchaseOrder);
+    IReadOnlyList<PackageTransmittal> Transmittals, string Kind, Guid? SupplierPartyId, string? Supplier, string? PurchaseOrder,
+    IReadOnlyList<string>? Reasons = null, System.Text.Json.JsonElement? Extras = null);
 
 /// <summary>A transmittal raised for a package: a delivery, a request to its supplier, or what the supplier sent back.</summary>
 public sealed record PackageTransmittal(Guid Id, string Number, string Direction, DateTimeOffset IssuedAt, int Items);
@@ -69,8 +70,8 @@ public static class PackageEndpoints
             Act(h, s, (a) => s.RequestAsync(a, packageId, r, c)));
         project.MapPut("/{packageId:guid}", (Guid packageId, RenameRequest r, HttpContext h, PackageService s, CancellationToken c) =>
             Act(h, s, (a) => s.RenameAsync(a, packageId, r, c)));
-        project.MapDelete("/{packageId:guid}", async (Guid packageId, HttpContext h, PackageService s, CancellationToken c) =>
-            await s.DeleteAsync(ProjectAccessFilter.Of(h), packageId, c) ?? Results.NoContent());
+        project.MapDelete("/{packageId:guid}", async (Guid packageId, HttpContext h, PackageService s, CancellationToken c, string? reason) =>
+            await s.DeleteAsync(ProjectAccessFilter.Of(h), packageId, c, reason) ?? Results.NoContent());
     }
 
     /// <summary>GET the packages of the project, newest first.</summary>
@@ -126,6 +127,7 @@ public static class PackageEndpoints
                 r.Ready, r.Member.ByRule, r.Member.RequestedAt?.ToDateTimeOffset(), r.LatestRevision, r.LatestState,
                 r.DueDate?.ToDateOnly())).ToList(),
             await packages.TransmittalsAsync(p, cancellationToken), p.Kind, p.SupplierPartyId,
-            await packages.SupplierNameAsync(p, cancellationToken), p.PurchaseOrder);
+            await packages.SupplierNameAsync(p, cancellationToken), p.PurchaseOrder, [p.Reason, .. p.OtherReasons],
+            p.Extras is null ? null : System.Text.Json.JsonDocument.Parse(p.Extras).RootElement.Clone());
     }
 }

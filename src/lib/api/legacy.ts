@@ -124,7 +124,8 @@ export function cycleOf(review: ReviewView, sequence: number): LegacyCycle {
     comments: review.comments.map((c) => ({
       id: c.id, cycleId: review.id, authorId: c.authorId, authorName: c.author, text: c.text, classification: c.class, progressionPreventing: c.blocking,
       closesWith: c.closesWith, closesWithStep: c.closesWithStep, status: c.status, resolution: c.resolution, closedAt: null,
-      reclassifiedAt: null, reclassifiedByName: null, originalProgressionPreventing: null, createdAt: new Date(c.createdAt),
+      reclassifiedAt: date(c.reclassifiedAt ?? null), reclassifiedByName: c.reclassifiedBy ?? null,
+      originalProgressionPreventing: c.originalBlocking ?? null, createdAt: new Date(c.createdAt),
     })),
     assignments: review.steps.flatMap((s, i) => s.participants.map((p, j) => ({
       id: `${review.id}-${i}-${j}`, cycleId: review.id, userId: p.userId, userName: p.name, order: s.number, completedAt: date(p.answeredAt),
@@ -166,7 +167,7 @@ export function revisionOf(documentId: string, r: RevisionView, reviews: ReviewV
       const by = deciding?.participants.find((p) => p.answer && p.answer !== "NONE");
       return {
         id: one.id, revisionId: r.id, approverId: by?.userId ?? "", approverName: by?.name ?? one.startedBy, approverRole: deciding?.function ?? deciding?.party ?? deciding?.title ?? "",
-        matrixVersion: 0, decidedAt: new Date(one.decidedAt!), note: by?.note ?? null, withdrawnAt: null, withdrawnBy: null, withdrawnReason: null,
+        matrixVersion: 0, decidedAt: new Date(one.decidedAt!), note: by?.note ?? null, withdrawnAt: date(one.approvalWithdrawnAt ?? null), withdrawnBy: one.approvalWithdrawnBy ?? null, withdrawnReason: one.approvalWithdrawnReason ?? null,
       };
     }),
     cycles,
@@ -184,7 +185,7 @@ export const legacyDocument = cache(async (scope: Scope, id: string): Promise<Le
     id: doc.id, extras: doc.extras ? JSON.stringify(doc.extras) : null, projectId: scope.projectId, docNumber: doc.number, title: doc.title, deliverableType: doc.deliverableType,
     docType: doc.docType, discipline: doc.discipline, originator: doc.originator, subProject: doc.subproject, contractRef: doc.contractRef,
     criticality: doc.criticality, confidentiality: doc.confidentiality, retentionClass: doc.retentionClass, state: doc.state, kind: doc.kind,
-    confirmedAt: null, confirmedByName: null, disposedAt: null, disposedBy: null, disposalBasis: null, legalHold: doc.legalHold,
+    confirmedAt: date(doc.confirmedAt ?? null), confirmedByName: doc.confirmedByName ?? null, disposedAt: null, disposedBy: null, disposalBasis: null, legalHold: doc.legalHold,
     isPlaceholder: doc.isPlaceholder, previousId: doc.previousNumber, legacyScheme: doc.legacyScheme, createdDate: new Date(doc.createdAt), receivedDate: date(doc.receivedDate),
     plannedDate: date(doc.plannedDate), appVersion: doc.appVersion, createdById: doc.createdById, createdByName: doc.createdByName,
     createdAt: new Date(doc.createdAt), updatedAt: new Date(doc.updatedAt),

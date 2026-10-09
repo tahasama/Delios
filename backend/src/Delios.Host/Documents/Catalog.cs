@@ -48,6 +48,14 @@ public sealed class Catalog
         _sets.TryGetValue(setKey, out var set) && set.TryGetValue(code, out var v) ? v.Label : code;
 
     /// <summary>The first active value whose string property equals the one given.</summary>
+    /// <summary>The first active code of a set whose property is this true/false value; null when none.</summary>
+    public string? CodeWhere(string setKey, string prop, bool value) =>
+        _sets.TryGetValue(setKey, out var set)
+            ? set.Values.Where(v => v.Status == ValueStatus.Active).OrderBy(v => v.Sort)
+                .FirstOrDefault(v => v.Props?.RootElement.TryGetProperty(prop, out var p) == true
+                    && p.ValueKind == (value ? JsonValueKind.True : JsonValueKind.False))?.Code
+            : null;
+
     public string? CodeWhere(string setKey, string prop, string value) =>
         _sets.TryGetValue(setKey, out var set)
             ? set.Values.Where(v => v.Status == ValueStatus.Active).OrderBy(v => v.Sort)

@@ -319,6 +319,7 @@ public static class PlatformSetup
             Reviews.DelegationEndpoints.MapDelegationEndpoints(app);
             Documents.KeepingEndpoints.MapKeepingEndpoints(app);
             Documents.SnapshotEndpoints.MapSnapshotEndpoints(app);
+            Documents.GovernanceEndpoints.MapGovernanceEndpoints(app);
             Records.ProjectRecordEndpoints.MapProjectRecordEndpoints(app);
             Transmittals.TransmittalEndpoints.MapTransmittalEndpoints(app);
             Packages.PackageEndpoints.MapPackageEndpoints(app);

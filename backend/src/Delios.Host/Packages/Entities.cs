@@ -23,6 +23,10 @@ public sealed class Package
     public string? PurchaseOrder { get; set; }
     public required string Title { get; set; }
     public string? Description { get; set; }
+    /// <summary>Further reasons for issue, after the one its transmittals go for; named on them.</summary>
+    public string[] OtherReasons { get; set; } = [];
+    /// <summary>The organization's own fields, as JSON.</summary>
+    public string? Extras { get; set; }
     /// <summary>From the published reasons for issue: what the delivery is for, or what the supplier is asked for.</summary>
     public required string Reason { get; set; }
     /// <summary>A member is ready when its released status is any one of these.</summary>
@@ -82,9 +86,11 @@ public sealed class PackageRule
     public string[] Disciplines { get; set; } = [];
     public string[] DocTypes { get; set; } = [];
     public string[] Originators { get; set; } = [];
+    /// <summary>Asset tags: a document linked to any of them matches.</summary>
+    public Guid[] AssetIds { get; set; } = [];
 
     /// <summary>True when no list is filled in, which means there is no rule.</summary>
-    public bool IsEmpty => DeliverableTypes.Length + Disciplines.Length + DocTypes.Length + Originators.Length == 0;
+    public bool IsEmpty => DeliverableTypes.Length + Disciplines.Length + DocTypes.Length + Originators.Length + AssetIds.Length == 0;
 }
 
 /// <summary>A document the assessment found not ready, and why.</summary>

@@ -144,6 +144,8 @@ internal sealed class DocumentConfiguration : IEntityTypeConfiguration<Document>
         b.Property(x => x.Extras).HasColumnType("jsonb");
         b.Property(x => x.LegalHoldReason).HasMaxLength(1000);
         b.Property(x => x.LegalHoldByName).HasMaxLength(200);
+        b.Property(x => x.ConfirmedByName).HasMaxLength(200);
+        b.HasIndex(x => x.CorrectsId);
         b.Property(x => x.LatestRevisionValue).HasMaxLength(16);
         b.Property(x => x.LatestRevisionState).HasMaxLength(16);
         b.Property(x => x.CreatedAt).HasDefaultValueSql("now()");
