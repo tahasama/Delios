@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { unresolvedVoids } from "@/lib/api/readers";
 import { requireScope } from "@/lib/scope";
 import { isController, isAdmin } from "@/lib/auth";
 import { PageHeader, Card, Chip, Banner, inputCls, btn } from "@/components/ui";
@@ -27,8 +28,7 @@ export default async function ExposuresPage() {
     untoldRecipients(ctx),
     haltedRevisions(ctx).then((rows) => rows.map((r) => ({ ...r, cycles: [{ outcome: r.verdict, outcomeByName: r.decidedBy }] }))),
     orphanedNeeds(ctx),
-    // A void revision's reassessment is not kept by the backend: none is listed as unresolved.
-    Promise.resolve([] as { id: string; documentId: string; value: string; voidReason: string | null; document: { docNumber: string } }[]),
+    unresolvedVoids(ctx),
   ]);
 
   const total = unpropagated.length + blocked.length + orphaned.length + unresolvedVoid.length;

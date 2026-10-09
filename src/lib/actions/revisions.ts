@@ -7,7 +7,7 @@ import { getActiveSet } from "@/lib/config";
 import { api, projectPath, refusal } from "@/lib/api/client";
 import { backendRevision, backendReview, reviewOfRevision } from "@/lib/api/legacy";
 import { upload, filesOf } from "@/lib/api/uploads";
-import { requestFromForm } from "@/lib/issue-requests";
+import { requestFromForm, issueAsk } from "@/lib/issue-requests";
 
 /**
  * A revision's acts. The backend decides who may and whether the revision is
@@ -164,9 +164,8 @@ export async function recordOutcomeAction(_prev: Result | undefined, formData: F
     const proof = filesOf(formData, "evidence")[0];
     const evidenceFileId = proof ? await upload(ctx, { reviewId: cycleId }, proof) : null;
     const asked = requestFromForm(formData);
-    const issue = open.deciding && (asked.recipients.internalUserIds.length || asked.recipients.partyIds.length)
-      ? { reason: asked.reason, userIds: asked.recipients.internalUserIds, partyIds: asked.recipients.partyIds, note: asked.note }
-      : null;
+    if (open.deciding && asked.needsApproval && !asked.approverId) return { error: "Say which party has to approve it before it is released." };
+    const issue = open.deciding ? issueAsk(asked) : null;
     await api(projectPath(ctx, `/reviews/${cycleId}/answer`), {
       body: {
         verdict: open.deciding ? text(formData, "outcome") || null : null,
@@ -237,22 +236,68 @@ export async function returnAtGateAction(_prev: Result | undefined, formData: Fo
   return {};
 }
 
-/** §7.2 — void: not in the backend yet. */
-export async function voidRevisionAction(_prev: Result | undefined, _formData: FormData): Promise<Result> {
-  return { error: "Voiding a revision is not supported yet." };
+/** §7.2 — void: the newest revision, released in error or never reviewed. */
+export async function voidRevisionAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
+  const ctx = await requireScope();
+  const revisionId = text(formData, "revisionId");
+  const reason = text(formData, "voidReason");
+  if (!reason) return { error: "Voiding is recorded with a reason." };
+  let documentId: string;
+  try {
+    documentId = (await backendRevision(ctx, revisionId)).documentId;
+    await api(projectPath(ctx, `/documents/${documentId}/revisions/${revisionId}/void`), {
+      body: { reason, reassessment: text(formData, "reassessment") || null },
+    });
+  } catch (e) {
+    return failed(e);
+  }
+  revalidatePath(`/documents/${documentId}`);
+  return {};
 }
 
-/** §12.6 — the reassessment of work performed under a voided revision: not in the backend yet. */
-export async function recordVoidReassessmentAction(_prev: Result | undefined, _formData: FormData): Promise<Result> {
-  return { error: "Recording a void reassessment is not supported yet." };
+/** §12.6 — the reassessment of work performed under a voided revision. */
+export async function recordVoidReassessmentAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
+  const ctx = await requireScope();
+  const revisionId = text(formData, "revisionId");
+  const note = text(formData, "note");
+  if (!note) return { error: "Describe the reassessment of work performed." };
+  try {
+    await api(projectPath(ctx, `/revisions/${revisionId}/reassessment`), { body: { note } });
+  } catch (e) {
+    return failed(e);
+  }
+  revalidatePath("/exposures");
+  return {};
 }
 
-/** Holding a released revision for an outside approval is not in the backend. */
-export async function liftHoldAction(_prev: Result | undefined, _formData: FormData): Promise<Result> {
-  return { error: "Holds are not supported yet." };
+/** An approval asked for after release came back yes: the hold is lifted and what waited is sent. */
+export async function liftHoldAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
+  const ctx = await requireScope();
+  const revisionId = text(formData, "revisionId");
+  let documentId: string;
+  try {
+    documentId = (await backendRevision(ctx, revisionId)).documentId;
+    await api(projectPath(ctx, `/revisions/${revisionId}/hold/lift`), { method: "POST" });
+  } catch (e) {
+    return failed(e);
+  }
+  revalidatePath(`/documents/${documentId}`);
+  return {};
 }
 
-/** Holding a released revision for an outside approval is not in the backend. */
-export async function returnHeldAction(_prev: Result | undefined, _formData: FormData): Promise<Result> {
-  return { error: "Holds are not supported yet." };
+/** An approval asked for after release came back no: it stays on hold for good, and goes back with a reason. */
+export async function returnHeldAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
+  const ctx = await requireScope();
+  const revisionId = text(formData, "revisionId");
+  const reason = text(formData, "reason");
+  if (!reason) return { error: "Say why it is going back — whoever gets it has to know what to do." };
+  let documentId: string;
+  try {
+    documentId = (await backendRevision(ctx, revisionId)).documentId;
+    await api(projectPath(ctx, `/revisions/${revisionId}/hold/return`), { body: { reason } });
+  } catch (e) {
+    return failed(e);
+  }
+  revalidatePath(`/documents/${documentId}`);
+  return {};
 }

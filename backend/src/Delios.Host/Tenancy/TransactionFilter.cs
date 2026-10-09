@@ -7,7 +7,7 @@ namespace Delios.Host.Tenancy;
 /// that writes several rows commits completely or not at all. A response of 400
 /// or above rolls back.
 /// </summary>
-public sealed class TransactionFilter(DeliosDbContext db) : IEndpointFilter
+public sealed class TransactionFilter(DeliosDbContext db, Documents.SnapshotRecorder snapshots) : IEndpointFilter
 {
     /// <summary>
     /// Starts a transaction, runs the endpoint, and commits unless the result has a status code of 400 or more.
@@ -20,6 +20,7 @@ public sealed class TransactionFilter(DeliosDbContext db) : IEndpointFilter
         var result = await next(context);
         if (result is not IStatusCodeHttpResult { StatusCode: >= 400 })
         {
+            await snapshots.CaptureAsync(cancel);
             await transaction.CommitAsync(cancel);
         }
         return result;

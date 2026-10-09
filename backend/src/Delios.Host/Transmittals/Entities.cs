@@ -24,6 +24,15 @@ public sealed class IssueRequest
     public string? Note { get; set; }
     /// <summary>Why people outside the defined distribution receive it. Required when there are any.</summary>
     public string? OffDistributionReason { get; set; }
+    /// <summary>Left to the revision's author to say who receives it: it names nobody, and is closed when they ask.</summary>
+    public bool Delegated { get; set; }
+    /// <summary>
+    /// An outside party that must approve the revision before it is used. Until they
+    /// have, a revision awaiting release is not released, and a released one is held.
+    /// </summary>
+    public Guid? ApproverPartyId { get; set; }
+    /// <summary>WAITING, APPROVED or REFUSED; empty when no outside approval is asked.</summary>
+    public string? ApprovalState { get; set; }
     public Guid RaisedById { get; set; }
     public required string RaisedByName { get; set; }
     public Instant RaisedAt { get; set; }
@@ -36,6 +45,14 @@ public sealed class IssueRequest
     /// Row version kept by the database; EF Core uses it to detect two people changing the same request at once.
     /// </summary>
     public uint Version { get; set; }
+}
+
+/// <summary>Where an outside approval asked by an <see cref="IssueRequest"/> stands.</summary>
+public static class ApprovalStates
+{
+    public const string Waiting = "WAITING";
+    public const string Approved = "APPROVED";
+    public const string Refused = "REFUSED";
 }
 
 /// <summary>The values <c>IssueRequest.Status</c> can take.</summary>

@@ -153,12 +153,12 @@ export function revisionOf(documentId: string, r: RevisionView, reviews: ReviewV
     id: r.id, documentId, value: r.value, series: r.series,
     state: r.state === "IN_REVIEW" && pending ? "NOT_RELEASED" : r.state,
     statusCode: r.statusCode ?? mine.find((one) => one.state === "DECIDED")?.grantedStatus ?? null, statusSetAt: date(decided[0]?.decidedAt), statusSetByName: null, returnedAt: date(r.returnedAt), returnedReason: r.returnedReason,
-    heldAt: null, heldReason: null, heldByName: null, phase: null, reasonForRevision: r.reasonForRevision, changeDescription: r.changeDescription,
+    heldAt: date(r.heldAt), heldReason: r.heldReason, heldByName: r.heldByName, phase: null, reasonForRevision: r.reasonForRevision, changeDescription: r.changeDescription,
     plannedSubmissionDate: null, issueDate: date(issued?.issuedAt), nativeFileId: current.find((f) => f.kind === "NATIVE")?.id ?? null,
     renditionFileId: current.find((f) => f.kind === "RENDITION")?.id ?? null, appVersion: null, authorizationReason: null, authorizedById: null,
     authorizedByName: null, authorizedAt: null, releasedAt: date(r.releasedAt), releasedById: null, releasedByName: r.releasedByName,
-    issuedAt: date(issued?.issuedAt), supersededAt: date(r.supersededAt), supersededById: null, voidedAt: null, voidReason: null, voidAuthority: null,
-    voidReassessment: null, submittedAt: date(r.submissions[0]?.submittedAt), submittedById: r.authoredById, submittedByName: r.submissions[0]?.submittedBy ?? null,
+    issuedAt: date(issued?.issuedAt), supersededAt: date(r.supersededAt), supersededById: null, voidedAt: date(r.voidedAt), voidReason: r.voidReason, voidAuthority: r.voidAuthority,
+    voidReassessment: r.voidReassessment, submittedAt: date(r.submissions[0]?.submittedAt), submittedById: r.authoredById, submittedByName: r.submissions[0]?.submittedBy ?? null,
     authoredById: r.authoredById, authoredByName: r.authoredByName, authoredByParty: r.authoredByParty, uploadedById: r.authoredById,
     uploadedByName: r.authoredByName, createdAt: new Date(r.createdAt), extras: null, files,
     approvals: decided.map((one) => {
@@ -181,12 +181,12 @@ export const legacyDocument = cache(async (scope: Scope, id: string): Promise<Le
   const context = await documentContext(scope, id);
   const reviews = await Promise.all(context.reviews.map((one) => backendReview(scope, one.id)));
   return {
-    id: doc.id, extras: null, projectId: scope.projectId, docNumber: doc.number, title: doc.title, deliverableType: doc.deliverableType,
+    id: doc.id, extras: doc.extras ? JSON.stringify(doc.extras) : null, projectId: scope.projectId, docNumber: doc.number, title: doc.title, deliverableType: doc.deliverableType,
     docType: doc.docType, discipline: doc.discipline, originator: doc.originator, subProject: doc.subproject, contractRef: doc.contractRef,
     criticality: doc.criticality, confidentiality: doc.confidentiality, retentionClass: doc.retentionClass, state: doc.state, kind: doc.kind,
-    confirmedAt: null, confirmedByName: null, disposedAt: null, disposedBy: null, disposalBasis: null, legalHold: false,
-    isPlaceholder: doc.isPlaceholder, previousId: null, legacyScheme: null, createdDate: new Date(doc.createdAt), receivedDate: date(doc.receivedDate),
-    plannedDate: date(doc.plannedDate), appVersion: null, createdById: doc.createdById, createdByName: doc.createdByName,
+    confirmedAt: null, confirmedByName: null, disposedAt: null, disposedBy: null, disposalBasis: null, legalHold: doc.legalHold,
+    isPlaceholder: doc.isPlaceholder, previousId: doc.previousNumber, legacyScheme: doc.legacyScheme, createdDate: new Date(doc.createdAt), receivedDate: date(doc.receivedDate),
+    plannedDate: date(doc.plannedDate), appVersion: doc.appVersion, createdById: doc.createdById, createdByName: doc.createdByName,
     createdAt: new Date(doc.createdAt), updatedAt: new Date(doc.updatedAt),
     revisions: doc.revisions.map((r) => revisionOf(doc.id, r, reviews, context.transmittals))
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()),

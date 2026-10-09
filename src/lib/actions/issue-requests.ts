@@ -20,11 +20,10 @@ export async function requestIssueAction(_prev: { error?: string } | undefined, 
   const ctx = await requireScope();
   const revisionId = String(formData.get("revisionId") ?? "");
   const asked = requestFromForm(formData);
-  if (!asked.delegated && noRecipients(asked.recipients)) {
+  if (!asked.delegated && !asked.needsApproval && noRecipients(asked.recipients)) {
     return { error: "Say who it goes to, or leave it to the author." };
   }
-  if (asked.delegated) return { error: "Leaving it to the author to say who receives it is not supported yet." };
-  if (asked.needsApproval) return { error: "An outside approval before release is not supported yet." };
+  if (asked.needsApproval && !asked.approverId) return { error: "Say which party has to approve it." };
   // The backend checks standing, records the request, and sends it at once
   // where the revision is released and the asker is the one who sends.
   try {

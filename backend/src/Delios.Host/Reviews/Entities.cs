@@ -89,6 +89,11 @@ public sealed class Review
     public string? ReturnReason { get; set; }
     /// <summary>Why the revision was sent back to its author, when it was.</summary>
     public string? ReturnNote { get; set; }
+    /// <summary>
+    /// Set when this review carries an outside party's approval asked by an issue
+    /// request: its one step is theirs, and its answer settles the request, not the revision.
+    /// </summary>
+    public Guid? IssueRequestId { get; set; }
     /// <summary>Row version, changed by the database on each update; used to detect two saves of the same review at once.</summary>
     public uint Version { get; set; }
     public List<ReviewStep> Steps { get; set; } = [];

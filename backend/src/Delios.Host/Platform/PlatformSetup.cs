@@ -132,6 +132,8 @@ public static class PlatformSetup
         services.AddScoped<Documents.FileProcessor>();
         services.AddScoped<Reviews.ReviewService>();
         services.AddScoped<Reviews.DelegationService>();
+        services.AddScoped<Documents.KeepingService>();
+        services.AddScoped<Documents.SnapshotRecorder>();
         services.AddScoped<Reviews.Stamping>();
         services.AddScoped<Reviews.ControlService>();
         services.AddScoped<Transmittals.TransmittalService>();
@@ -315,6 +317,8 @@ public static class PlatformSetup
             Documents.DocumentEndpoints.MapDocumentEndpoints(app);
             Reviews.ReviewEndpoints.MapReviewEndpoints(app);
             Reviews.DelegationEndpoints.MapDelegationEndpoints(app);
+            Documents.KeepingEndpoints.MapKeepingEndpoints(app);
+            Documents.SnapshotEndpoints.MapSnapshotEndpoints(app);
             Transmittals.TransmittalEndpoints.MapTransmittalEndpoints(app);
             Packages.PackageEndpoints.MapPackageEndpoints(app);
             Search.SearchEndpoints.MapSearchEndpoints(app);

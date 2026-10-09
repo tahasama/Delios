@@ -16,7 +16,7 @@ public sealed record Actor(Guid? Id, string Name)
 /// the change it describes commit together or not at all. The database stamps
 /// the time and extends the tenant's hash chain.
 /// </summary>
-public sealed class AuditLog(DeliosDbContext db, TenantContext tenant)
+public sealed class AuditLog(DeliosDbContext db, TenantContext tenant, Documents.SnapshotRecorder snapshots)
 {
     /// <summary>
     /// Appends one event to the audit trail by calling the <c>audit_append</c> database function.
@@ -28,6 +28,7 @@ public sealed class AuditLog(DeliosDbContext db, TenantContext tenant)
         string? entityType = null, Guid? entityId = null, string? entityLabel = null,
         string? detail = null, Guid? projectId = null, CancellationToken cancellationToken = default)
     {
+        snapshots.Note(entityType, entityId, action, detail, actor.Name);
         await db.Database.ExecuteSqlAsync($"""
             SELECT audit_append({tenant.Required}::uuid, {projectId}::uuid, {actor.Id}::uuid, {actor.Name}::text,
                 {action}::text, {entityType}::text, {entityId}::uuid, {entityLabel}::text, {detail}::text)

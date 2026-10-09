@@ -1,4 +1,5 @@
 import { ReadersPanel } from "./readers-panel";
+import { documentReaders, projectReaders } from "@/lib/api/readers";
 import { openConfidentiality } from "@/lib/permissions";
 import { controlDoes } from "@/lib/control-activities";
 import { notFound } from "next/navigation";
@@ -115,9 +116,8 @@ export default async function DocumentDetailPage({
       || doc.revisions.some((r) => r.authoredById === user.id || r.uploadedById === user.id));
   const [namedReaders, projectPeople] = closed
     ? await Promise.all([
-        // Naming the readers of a closed document is not in the backend.
-        Promise.resolve([] as { id: string; userId: string; user: { name: string }; addedByName: string; reason: string | null; createdAt: Date }[]),
-        Promise.resolve([] as { user: { id: string; name: string }; function: { name: string } | null }[]),
+        documentReaders(ctx, doc.id),
+        projectReaders(ctx),
       ])
     : [[], []] as [{ id: string; userId: string; user: { name: string }; addedByName: string; reason: string | null; createdAt: Date }[], { user: { id: string; name: string }; function: { name: string } | null }[]];
   const inPrep = doc.revisions.find((r) => r.state === "IN_PREPARATION");

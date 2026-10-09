@@ -138,6 +138,12 @@ internal sealed class DocumentConfiguration : IEntityTypeConfiguration<Document>
         b.Property(x => x.State).HasMaxLength(16);
         b.Property(x => x.Kind).HasMaxLength(16);
         b.Property(x => x.CreatedByName).HasMaxLength(200);
+        b.Property(x => x.PreviousNumber).HasMaxLength(200);
+        b.Property(x => x.LegacyScheme).HasMaxLength(100);
+        b.Property(x => x.AppVersion).HasMaxLength(100);
+        b.Property(x => x.Extras).HasColumnType("jsonb");
+        b.Property(x => x.LegalHoldReason).HasMaxLength(1000);
+        b.Property(x => x.LegalHoldByName).HasMaxLength(200);
         b.Property(x => x.LatestRevisionValue).HasMaxLength(16);
         b.Property(x => x.LatestRevisionState).HasMaxLength(16);
         b.Property(x => x.CreatedAt).HasDefaultValueSql("now()");
@@ -168,6 +174,11 @@ internal sealed class RevisionConfiguration : IEntityTypeConfiguration<Revision>
         b.Property(x => x.StatusCode).HasMaxLength(64);
         b.Property(x => x.ReleasedByName).HasMaxLength(200);
         b.Property(x => x.ReturnedReason).HasMaxLength(2000);
+        b.Property(x => x.HeldReason).HasMaxLength(2000);
+        b.Property(x => x.HeldByName).HasMaxLength(200);
+        b.Property(x => x.VoidReason).HasMaxLength(2000);
+        b.Property(x => x.VoidAuthority).HasMaxLength(200);
+        b.Property(x => x.VoidReassessment).HasMaxLength(4000);
         b.Property(x => x.ControlOutcome).HasMaxLength(64);
         b.OwnsMany(x => x.Submissions, s => s.ToJson());
         b.Property(x => x.CreatedAt).HasDefaultValueSql("now()");
@@ -218,6 +229,8 @@ internal sealed class DocumentAccessConfiguration : IEntityTypeConfiguration<Doc
         b.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);
         b.HasIndex(x => new { x.DocumentId, x.UserId }).IsUnique();
         b.HasIndex(x => x.UserId);
+        b.Property(x => x.AddedByName).HasMaxLength(200);
+        b.Property(x => x.Reason).HasMaxLength(1000);
         b.Property(x => x.CreatedAt).HasDefaultValueSql("now()");
     }
 }

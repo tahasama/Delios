@@ -8,7 +8,8 @@ public sealed record RegisterDocumentRequest(
     string? Title, string? DeliverableType, string? DocType, string? Discipline,
     string? Originator = null, string? Subproject = null, string? ContractRef = null,
     string? Criticality = null, string? Confidentiality = null, string? RetentionClass = null,
-    DateOnly? ReceivedDate = null, DateOnly? PlannedDate = null, string? Kind = null);
+    DateOnly? ReceivedDate = null, DateOnly? PlannedDate = null, string? Kind = null,
+    string? PreviousNumber = null, string? LegacyScheme = null, string? AppVersion = null, Dictionary<string, string?>? Extras = null);
 
 /// <summary>
 /// The JSON body that changes a document's metadata (PUT /documents/{id}): only the fields named in
@@ -53,14 +54,17 @@ public sealed record RevisionView(
     string? ChangeDescription, string AuthoredByName, DateTimeOffset CreatedAt, string? StatusCode,
     DateTimeOffset? ReleasedAt, DateTimeOffset? SupersededAt, string? ReturnedReason, int Submission, string? ControlOutcome,
     IReadOnlyList<SubmissionView> Submissions, IReadOnlyList<FileView> Files, Guid AuthoredById, string? AuthoredByParty,
-    string? ReleasedByName, DateTimeOffset? ReturnedAt);
+    string? ReleasedByName, DateTimeOffset? ReturnedAt, DateTimeOffset? HeldAt = null, string? HeldReason = null, string? HeldByName = null,
+    DateTimeOffset? VoidedAt = null, string? VoidReason = null, string? VoidAuthority = null, string? VoidReassessment = null);
 
 /// <summary>A full document as the API shows it, with every revision; returned by GET /documents/{id} and after changes.</summary>
 public sealed record DocumentView(
     Guid Id, string Number, string Title, string DeliverableType, string DocType, string Discipline,
     string? Originator, string? Subproject, string? ContractRef, string? Criticality, string? Confidentiality,
     string? RetentionClass, string State, string Kind, bool IsPlaceholder, DateOnly? ReceivedDate, DateOnly? PlannedDate,
-    string CreatedByName, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt, IReadOnlyList<RevisionView> Revisions, Guid CreatedById);
+    string CreatedByName, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt, IReadOnlyList<RevisionView> Revisions, Guid CreatedById,
+    bool LegalHold = false, string? LegalHoldReason = null, string? PreviousNumber = null, string? LegacyScheme = null, string? AppVersion = null,
+    System.Text.Json.JsonElement? Extras = null);
 
 /// <summary>One page of the register. <c>Next</c> is the value to pass as <c>after</c> for the next page; null on the last page.</summary>
 public sealed record DocumentPage(IReadOnlyList<DocumentSummary> Items, string? Next);

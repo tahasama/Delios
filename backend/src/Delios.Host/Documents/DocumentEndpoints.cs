@@ -206,11 +206,13 @@ public static class DocumentEndpoints
     }
 
     /// <summary>Turns a document entity (database row) into the shape the API returns.</summary>
-    private static DocumentView View(Document d) => new(
+    internal static DocumentView View(Document d) => new(
         d.Id, d.Number, d.Title, d.DeliverableType, d.DocType, d.Discipline, d.Originator, d.Subproject, d.ContractRef,
         d.Criticality, d.Confidentiality, d.RetentionClass, d.State, d.Kind, d.IsPlaceholder,
         d.ReceivedDate?.ToDateOnly(), d.PlannedDate?.ToDateOnly(), d.CreatedByName,
-        d.CreatedAt.ToDateTimeOffset(), d.UpdatedAt.ToDateTimeOffset(), d.Revisions.Select(View).ToList(), d.CreatedById);
+        d.CreatedAt.ToDateTimeOffset(), d.UpdatedAt.ToDateTimeOffset(), d.Revisions.Select(View).ToList(), d.CreatedById,
+        d.LegalHold, d.LegalHoldReason, d.PreviousNumber, d.LegacyScheme, d.AppVersion,
+        d.Extras is null ? null : System.Text.Json.JsonDocument.Parse(d.Extras).RootElement.Clone());
 
     /// <summary>Turns a revision entity, with its submissions and files, into the shape the API returns.</summary>
     private static RevisionView View(Revision r) => new(
@@ -221,5 +223,6 @@ public static class DocumentEndpoints
             x.SubmittedByName, x.Outcome, x.Note, x.DecidedByName, x.DecidedAt?.ToDateTimeOffset())).ToList(),
         r.Files.Select(f => new FileView(f.Id, f.Name, f.Kind, f.ContentType, f.Size, f.Sha256, f.Status,
             f.StatusDetail, f.DetectedType, f.CreatedAt.ToDateTimeOffset(), f.DerivedFromId, f.Submission)).ToList(),
-        r.AuthoredById, r.AuthoredByParty, r.ReleasedByName, r.ReturnedAt?.ToDateTimeOffset());
+        r.AuthoredById, r.AuthoredByParty, r.ReleasedByName, r.ReturnedAt?.ToDateTimeOffset(), r.HeldAt?.ToDateTimeOffset(), r.HeldReason,
+        r.HeldByName, r.VoidedAt?.ToDateTimeOffset(), r.VoidReason, r.VoidAuthority, r.VoidReassessment);
 }

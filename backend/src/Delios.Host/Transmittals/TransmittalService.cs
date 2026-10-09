@@ -12,8 +12,11 @@ using NodaTime;
 namespace Delios.Host.Transmittals;
 
 /// <summary>Who a revision should go to, and why. Asked by people, carried out by Document Control.</summary>
+/// <param name="Delegated">Leave it to the revision's author to say who receives it: they are told, and ask themselves.</param>
+/// <param name="ApproverPartyId">An outside party that must approve it first: release waits for them, or a released revision is held.</param>
 public sealed record IssueAsk(
-    string? Reason, Guid[]? UserIds = null, Guid[]? PartyIds = null, string? Note = null, string? OffDistributionReason = null);
+    string? Reason, Guid[]? UserIds = null, Guid[]? PartyIds = null, string? Note = null, string? OffDistributionReason = null,
+    bool Delegated = false, Guid? ApproverPartyId = null);
 
 /// <summary>That something went to an organization outside the system: when, how, their reference, the proof.</summary>
 public sealed record DispatchRequest(string? Channel, string? Reference = null, Guid? ProofFileId = null);
@@ -79,11 +82,26 @@ public sealed class TransmittalService(
         var (request, problem) = await NewRequestAsync(access, document, revision, ask, cancellationToken);
         if (problem is not null) return (null, [], problem);
         db.IssueRequests.Add(request!);
+        // The author said who: what was left to them is answered.
+        if (!request!.Delegated)
+        {
+            foreach (var left in await db.IssueRequests.Where(r => r.RevisionId == revision.Id && r.Status == IssueRequestStatuses.Open && r.Delegated)
+                .ToListAsync(cancellationToken))
+            {
+                Close(left, IssueRequestStatuses.Done, access.UserName);
+            }
+        }
         await audit.WriteAsync(new Actor(access.UserId, access.UserName), "ISSUE_REQUESTED", "Revision", revision.Id,
             Label(document, revision), $"Asked for {request!.Reason}.", document.ProjectId, cancellationToken);
 
         IReadOnlyList<Transmittal> sent = [];
-        if (revision.State == RevisionStates.Released && await MayCarryOutAsync(access, document, request, cancellationToken))
+        if (request.Delegated)
+        {
+            await notifier.NotifyAsync(document.TenantId, document.ProjectId, [revision.AuthoredById], Notifications.NotificationKinds.IssueRequested,
+                $"Who should get {Label(document, revision)}?",
+                "It was left to you to say who this revision goes to. Ask for it when you know.", $"/documents/{document.Id}", cancellationToken);
+        }
+        else if (Ready(request, revision) && revision.State == RevisionStates.Released && await MayCarryOutAsync(access, document, request, cancellationToken))
         {
             sent = await CarryOutAsync(access.Project, new Actor(access.UserId, access.UserName), request, revision, document,
                 cancellationToken);
@@ -112,8 +130,13 @@ public sealed class TransmittalService(
         }
         var userIds = ask.UserIds?.Distinct().ToArray() ?? [];
         var partyIds = ask.PartyIds?.Distinct().ToArray() ?? [];
-        if (userIds.Length + partyIds.Length == 0)
+        if (ask.Delegated && userIds.Length + partyIds.Length > 0)
+            return (null, Problems.Invalid("DELEGATED_NAMES_NOBODY", "Either say who receives it, or leave it to the author: not both."));
+        if (userIds.Length + partyIds.Length == 0 && !ask.Delegated && ask.ApproverPartyId is null)
             return (null, Problems.Invalid("RECIPIENTS_REQUIRED", "Say who receives it: our own people, an outside party, or both."));
+        if (ask.ApproverPartyId is { } approver
+            && !await db.Parties.AnyAsync(p => p.Id == approver && p.Active && !p.IsInternal, cancellationToken))
+            return (null, Problems.Invalid("APPROVER_UNKNOWN", "Whoever approves it from outside must be an active outside party."));
 
         var members = await MembersAsync(access.Project, cancellationToken);
         var strangers = userIds.Except(members.Select(m => m.UserId)).ToList();
@@ -148,6 +171,9 @@ public sealed class TransmittalService(
             PartyIds = partyIds,
             Note = ask.Note?.Trim() is { Length: > 0 } note ? note : null,
             OffDistributionReason = off.Count > 0 ? offReason : null,
+            Delegated = ask.Delegated,
+            ApproverPartyId = ask.ApproverPartyId,
+            ApprovalState = ask.ApproverPartyId is null ? null : ApprovalStates.Waiting,
             RaisedById = access.UserId,
             RaisedByName = access.UserName,
             RaisedAt = clock.GetCurrentInstant(),
@@ -172,6 +198,10 @@ public sealed class TransmittalService(
             return (null, [], Problems.Conflict("NOT_RELEASED", "Only a released revision is issued; this one is not, or no longer.",
                 new { state = revision.State }));
         }
+        if (request.Delegated) return (null, [], Problems.Conflict("LEFT_TO_AUTHOR", "This one names nobody: it waits for the author to say who."));
+        if (request.ApprovalState is ApprovalStates.Waiting or ApprovalStates.Refused)
+            return (null, [], Problems.Conflict("AWAITING_APPROVAL", "It waits for the outside approval first."));
+        if (revision.HeldAt is not null) return (null, [], Problems.Conflict("ON_HOLD", "It is on hold, not for use."));
         var sent = await CarryOutAsync(access.Project, new Actor(access.UserId, access.UserName), request, revision, document!,
             cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
@@ -225,7 +255,7 @@ public sealed class TransmittalService(
         var open = await db.IssueRequests.Where(r => r.RevisionId == revision.Id && r.Status == IssueRequestStatuses.Open)
             .OrderBy(r => r.RaisedAt).ToListAsync(cancellationToken);
         var sent = new List<Transmittal>();
-        foreach (var request in open)
+        foreach (var request in open.Where(r => Ready(r, revision)))
         {
             sent.AddRange(await CarryOutAsync(project, actor, request, revision, document, cancellationToken));
         }
@@ -960,7 +990,15 @@ public sealed class TransmittalService(
     public static IssueRequestView View(IssueRequest r, IReadOnlyList<string> transmittals, IReadOnlyList<Guid>? transmittalIds = null) => new(
         r.Id, r.RevisionId, r.Reason, r.UserIds, r.PartyIds, r.Note, r.OffDistributionReason, r.RaisedByName,
         r.RaisedAt.ToDateTimeOffset(), r.Status, r.ClosedAt?.ToDateTimeOffset(), r.ClosedByName, transmittals, r.RaisedById,
-        transmittalIds ?? []);
+        transmittalIds ?? [], r.Delegated, r.ApproverPartyId, r.ApprovalState);
+
+    /// <summary>
+    /// Whether a request can become transmittals now: it names somebody, no outside
+    /// approval is still owed, and its revision is not on hold.
+    /// </summary>
+    public static bool Ready(IssueRequest r, Revision revision) =>
+        !r.Delegated && r.ApprovalState is null or ApprovalStates.Approved && revision.HeldAt is null
+        && r.UserIds.Length + r.PartyIds.Length > 0;
 
     /// <summary>The 404 answer for a transmittal that does not exist or is not visible.</summary>
     private static IResult NotFound() => Problems.NotFound("TRANSMITTAL_NOT_FOUND", "No such transmittal.");

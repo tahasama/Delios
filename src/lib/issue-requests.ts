@@ -206,8 +206,24 @@ export async function requestsOn(t: Tenant, revisionId: string) {
 /** Ask for a revision to be sent. The backend checks standing; where nobody sends for the project, the asker's request goes at once. */
 export async function raiseRequest(t: Tenant, revisionId: string, asked: ReturnType<typeof requestFromForm>) {
   return api<{ request: IssueRequestView; transmittals: string[] }>(projectPath(t, `/revisions/${revisionId}/issue-requests`), {
-    body: { reason: asked.reason, userIds: asked.recipients.internalUserIds, partyIds: asked.recipients.partyIds, note: asked.note },
+    body: {
+      reason: asked.reason, userIds: asked.delegated ? [] : asked.recipients.internalUserIds, partyIds: asked.delegated ? [] : asked.recipients.partyIds,
+      note: asked.note, delegated: asked.delegated, approverPartyId: asked.needsApproval ? asked.approverId : null,
+    },
   });
+}
+
+/**
+ * What a deciding step (or sending on a type that is not reviewed) says about who
+ * receives it, as the backend's request: null when it says nothing.
+ */
+export function issueAsk(asked: ReturnType<typeof requestFromForm>) {
+  const named = asked.recipients.internalUserIds.length + asked.recipients.partyIds.length > 0;
+  if (!named && !asked.delegated && !(asked.needsApproval && asked.approverId)) return null;
+  return {
+    reason: asked.reason, userIds: asked.delegated ? [] : asked.recipients.internalUserIds, partyIds: asked.delegated ? [] : asked.recipients.partyIds,
+    note: asked.note, delegated: asked.delegated, approverPartyId: asked.needsApproval ? asked.approverId : null,
+  };
 }
 
 /** Carry one request out: the backend raises its transmittals. */

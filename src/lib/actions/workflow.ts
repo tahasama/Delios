@@ -5,7 +5,7 @@ import { requireScope } from "@/lib/scope";
 import { api, projectPath, refusal } from "@/lib/api/client";
 import { backendRevision, backendReview } from "@/lib/api/legacy";
 import { upload, filesOf } from "@/lib/api/uploads";
-import { requestFromForm } from "@/lib/issue-requests";
+import { requestFromForm, issueAsk } from "@/lib/issue-requests";
 import { formPolicy, checkForm } from "@/lib/field-policy";
 import { setOrgSetting } from "@/lib/api/settings";
 import { adminParties, backendRoute, PARTY_KEY, type LegacyRouteStep } from "@/lib/api/admin";
@@ -244,11 +244,8 @@ export async function submitForReleaseAction(_prev: Result | undefined, formData
   const status = text(formData, "issuedFor");
   if (!status) return { error: "Choose the status it is released at." };
   const asked = requestFromForm(formData);
-  if (asked.delegated) return { error: "Leaving it to the author to say who receives it is not supported yet." };
-  if (asked.needsApproval) return { error: "An outside approval before release is not supported yet." };
-  const issue = asked.recipients.internalUserIds.length || asked.recipients.partyIds.length
-    ? { reason: asked.reason, userIds: asked.recipients.internalUserIds, partyIds: asked.recipients.partyIds, note: asked.note }
-    : null;
+  if (asked.needsApproval && !asked.approverId) return { error: "Say which party has to approve it before it is released." };
+  const issue = issueAsk(asked);
   let documentId: string;
   try {
     documentId = (await backendRevision(ctx, revisionId)).documentId;

@@ -115,6 +115,10 @@ export async function createDocumentAction(_prev: { error?: string } | undefined
       body: {
         title, deliverableType, docType, discipline, originator, subproject: subProject, contractRef, criticality,
         confidentiality, retentionClass: chosenRetention, receivedDate, plannedDate: String(formData.get("plannedDate") ?? "") || null, kind,
+        previousNumber: String(formData.get("previousId") ?? "").trim() || null,
+        legacyScheme: String(formData.get("legacyScheme") ?? "").trim() || null,
+        appVersion: String(formData.get("appVersion") ?? "").trim() || null,
+        extras: Object.keys(answered.extras).length ? answered.extras : null,
       },
       idempotencyKey: String(formData.get("formKey") ?? "") || undefined,
     });
@@ -161,8 +165,7 @@ export async function updateDocumentAction(_prev: { error?: string; ok?: string 
   const changes: Record<string, string | null> = {};
   for (const field of EDITABLE_FIELDS) {
     if (!formData.has(field)) continue;
-    const name = field === "subProject" ? "subproject" : field;
-    if (field === "appVersion" || field === "previousId" || field === "legacyScheme") continue; // not kept by the backend
+    const name = field === "subProject" ? "subproject" : field === "previousId" ? "previousNumber" : field;
     changes[name] = String(formData.get(field) ?? "").trim() || null;
   }
   try {
@@ -171,7 +174,7 @@ export async function updateDocumentAction(_prev: { error?: string; ok?: string 
     const current: Record<string, string | null> = {
       title: before.title, docType: before.docType, discipline: before.discipline, originator: before.originator, subproject: before.subproject,
       contractRef: before.contractRef, criticality: before.criticality, confidentiality: before.confidentiality, retentionClass: before.retentionClass,
-      receivedDate: before.receivedDate,
+      receivedDate: before.receivedDate, previousNumber: before.previousNumber, legacyScheme: before.legacyScheme, appVersion: before.appVersion,
     };
     const changed = Object.fromEntries(Object.entries(changes).filter(([field, value]) => (current[field] ?? null) !== value));
     if (!Object.keys(changed).length) return { ok: "No changes to record." };

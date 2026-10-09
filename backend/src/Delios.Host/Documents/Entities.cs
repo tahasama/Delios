@@ -147,6 +147,18 @@ public sealed class Document
     public bool IsPlaceholder { get; set; } = true;
     public LocalDate? ReceivedDate { get; set; }
     public LocalDate? PlannedDate { get; set; }
+    /// <summary>The number it went by before this register, and the scheme that number belonged to.</summary>
+    public string? PreviousNumber { get; set; }
+    public string? LegacyScheme { get; set; }
+    /// <summary>The application (and version) its native file is made with.</summary>
+    public string? AppVersion { get; set; }
+    /// <summary>The organization's own fields (Settings → Forms &amp; fields), name to value, as JSON. Null when none.</summary>
+    public string? Extras { get; set; }
+    /// <summary>Kept whatever its retention says: nothing about it may be disposed of while it holds.</summary>
+    public bool LegalHold { get; set; }
+    public string? LegalHoldReason { get; set; }
+    public Instant? LegalHoldAt { get; set; }
+    public string? LegalHoldByName { get; set; }
     public Guid CreatedById { get; set; }
     public required string CreatedByName { get; set; }
     public Instant CreatedAt { get; set; }
@@ -213,6 +225,19 @@ public sealed class Revision
     /// <summary>Sent back to its author: kept as submitted, replaced by the next revision.</summary>
     public Instant? ReturnedAt { get; set; }
     public string? ReturnedReason { get; set; }
+    /// <summary>
+    /// Released, but not for use while an outside approval it turned out to need is
+    /// awaited; or for good, where that approval was refused.
+    /// </summary>
+    public Instant? HeldAt { get; set; }
+    public string? HeldReason { get; set; }
+    public string? HeldByName { get; set; }
+    /// <summary>Voided: released in error, or never reviewed. Who decided it, why, and what was found of the work done from it.</summary>
+    public Instant? VoidedAt { get; set; }
+    public string? VoidReason { get; set; }
+    public string? VoidAuthority { get; set; }
+    public string? VoidReassessment { get; set; }
+    public Instant? VoidReassessedAt { get; set; }
     /// <summary>
     /// Which set of files is the revision's now. A submission Document Control
     /// returned for a correction is replaced by the next one under the same
@@ -397,5 +422,7 @@ public sealed class DocumentAccess
     public Guid UserId { get; set; }
     /// <summary>The user who gave this person access.</summary>
     public Guid AddedById { get; set; }
+    public string? AddedByName { get; set; }
+    public string? Reason { get; set; }
     public Instant CreatedAt { get; set; }
 }

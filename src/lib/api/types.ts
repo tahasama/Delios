@@ -114,6 +114,8 @@ export type DocumentView = {
   receivedDate: string | null; plannedDate: string | null; createdByName: string; createdAt: string; updatedAt: string;
   revisions: RevisionView[];
   createdById: string;
+  legalHold: boolean; legalHoldReason: string | null; previousNumber: string | null; legacyScheme: string | null; appVersion: string | null;
+  extras: Record<string, string> | null;
 };
 
 export type RevisionView = {
@@ -124,6 +126,8 @@ export type RevisionView = {
   submissions: { number: number; submittedAt: string; submittedBy: string; outcome: string | null; note: string | null; decidedBy: string | null; decidedAt: string | null }[];
   files: { id: string; name: string; kind: string; contentType: string; size: number; sha256: string; status: string; statusDetail: string | null; detectedType: string | null; createdAt: string; derivedFromId: string | null; submission: number }[];
   authoredById: string; authoredByParty: string | null; releasedByName: string | null; returnedAt: string | null;
+  heldAt: string | null; heldReason: string | null; heldByName: string | null;
+  voidedAt: string | null; voidReason: string | null; voidAuthority: string | null; voidReassessment: string | null;
 };
 
 /** GET /documents/{id}/context (DocumentContext.cs). */

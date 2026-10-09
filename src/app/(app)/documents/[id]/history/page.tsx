@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requireScope } from "@/lib/scope";
 import { backendDocument } from "@/lib/api/legacy";
+import { documentSnapshots } from "@/lib/api/snapshots";
 import { notFound } from "next/navigation";
 import { parseSnapshotPayload, summarizeSnapshotChange } from "@/lib/history";
 import { fmtDate, fmtDateTime } from "@/lib/utils";
@@ -23,8 +24,7 @@ export default async function DocumentHistoryPage({ params }: { params: Promise<
   const found = await backendDocument(ctx, id);
   if (!found) notFound();
   const document = { id: found.id, docNumber: found.number, title: found.title };
-  // The backend keeps no snapshots of a document: there are no recorded points to open.
-  const snapshots: { id: string; payload: string; revisionId: string | null; capturedAt: Date; eventType: string; eventLabel: string | null; actorName: string | null }[] = [];
+  const snapshots = await documentSnapshots(ctx, id);
   const points = snapshots.map((snapshot, index) => {
     const payload = parseSnapshotPayload(snapshot.payload);
     const previous = index > 0 ? parseSnapshotPayload(snapshots[index - 1].payload) : null;

@@ -135,6 +135,10 @@ public sealed class DocumentService(
             Kind = kind,
             ReceivedDate = request.ReceivedDate is { } received ? LocalDate.FromDateOnly(received) : null,
             PlannedDate = request.PlannedDate is { } planned ? LocalDate.FromDateOnly(planned) : null,
+            PreviousNumber = Blank(request.PreviousNumber),
+            LegacyScheme = Blank(request.LegacyScheme),
+            AppVersion = Blank(request.AppVersion),
+            Extras = OwnFields.Write(null, request.Extras),
             CreatedById = access.UserId,
             CreatedByName = access.UserName,
             CreatedAt = now,
@@ -222,6 +226,18 @@ public sealed class DocumentService(
                     if (field == "receivedDate") { before = document.ReceivedDate?.ToString(); document.ReceivedDate = date; }
                     else { before = document.PlannedDate?.ToString(); document.PlannedDate = date; }
                     value = date?.ToString();
+                    break;
+                case "previousNumber" or "legacyScheme" or "appVersion":
+                    (before, value) = field switch
+                    {
+                        "previousNumber" => (document.PreviousNumber, document.PreviousNumber = value),
+                        "legacyScheme" => (document.LegacyScheme, document.LegacyScheme = value),
+                        _ => (document.AppVersion, document.AppVersion = value),
+                    };
+                    break;
+                case var own when own.StartsWith("extra:", StringComparison.Ordinal) && own.Length > 6:
+                    before = OwnFields.Read(document.Extras, own[6..]);
+                    document.Extras = OwnFields.Write(document.Extras, new() { [own[6..]] = value });
                     break;
                 default:
                     return Fail(Problems.Invalid("FIELD_NOT_EDITABLE", $"{field} cannot be changed.", new { field }));
@@ -658,4 +674,27 @@ public static class DocumentQueries
         }
         return query;
     }
+}
+
+/// <summary>The organization's own fields on a record, kept as one JSON object of name to text.</summary>
+public static class OwnFields
+{
+    /// <summary>The stored fields with these changes made: an empty value removes a field. Null when none is left.</summary>
+    public static string? Write(string? stored, Dictionary<string, string?>? changes)
+    {
+        var fields = stored is null ? new Dictionary<string, string>()
+            : System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(stored) ?? [];
+        foreach (var (name, value) in changes ?? [])
+        {
+            var key = name.Trim();
+            if (key.Length is 0 or > 100) continue;
+            if (string.IsNullOrWhiteSpace(value)) fields.Remove(key);
+            else fields[key] = value.Trim().Length > 2000 ? value.Trim()[..2000] : value.Trim();
+        }
+        return fields.Count == 0 ? null : System.Text.Json.JsonSerializer.Serialize(fields);
+    }
+
+    /// <summary>One stored field, or null.</summary>
+    public static string? Read(string? stored, string name) =>
+        stored is null ? null : (System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(stored) ?? []).GetValueOrDefault(name);
 }

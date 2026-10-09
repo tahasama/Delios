@@ -6,6 +6,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Delios.Host.Reviews;
 
+/// <summary>Body of sending back a held revision its outside approver refused: why.</summary>
+public sealed record ReturnHeldRequest(string? Reason);
+
 /// <summary>A review route offered for a document, as returned to the client by <c>GET .../documents/{documentId}/routes</c>.</summary>
 public sealed record RouteView(Guid Id, string Name, string? Description, bool IsDefault, IReadOnlyList<RouteStep> Steps);
 
@@ -55,6 +58,10 @@ public static class ReviewEndpoints
         project.MapPut("/reviews/{reviewId:guid}/comments/{commentId:guid}", EditCommentAsync);
         project.MapDelete("/reviews/{reviewId:guid}/comments/{commentId:guid}", WithdrawCommentAsync);
         project.MapPost("/revisions/{revisionId:guid}/send-on", SendOnAsync).AddEndpointFilter<IdempotencyFilter>();
+        project.MapPost("/revisions/{revisionId:guid}/hold/lift", async (Guid revisionId, HttpContext h, ReviewService r, CancellationToken c) =>
+            await r.LiftHoldAsync(ProjectAccessFilter.Of(h), revisionId, c) ?? Results.NoContent());
+        project.MapPost("/revisions/{revisionId:guid}/hold/return", async (Guid revisionId, ReturnHeldRequest body, HttpContext h, ReviewService r, CancellationToken c) =>
+            await r.ReturnHeldAsync(ProjectAccessFilter.Of(h), revisionId, body.Reason, c) ?? Results.NoContent());
         project.MapPost("/reviews/{reviewId:guid}/answer", AnswerAsync);
         project.MapPost("/reviews/{reviewId:guid}/release", ReleaseAsync);
         project.MapPost("/reviews/{reviewId:guid}/return", ReturnAsync);
