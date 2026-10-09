@@ -11,6 +11,8 @@ import { ArrowLeft, Download } from "lucide-react";
 import { getSet } from "@/lib/config";
 import { api } from "@/lib/api/client";
 import { legacyActions } from "@/lib/api/schedule";
+import { planLists } from "@/lib/plan-lists";
+import { PlanListPanel } from "../plan-list-panel";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Document requirements" };
@@ -32,14 +34,26 @@ export default async function RequirementsPage() {
   const control = ctx.can("CONTROL");
   const plan = ctx.can("PLAN") || control;
 
-  const [actions, depts, senders, disciplines, parties, pendingSets] = await Promise.all([
+  const [actions, depts, senders, disciplines, parties, pendingSets, lists] = await Promise.all([
     legacyActions(ctx),
     departmentRows(ctx),
     senderRows(ctx),
     getSet("DISCIPLINES"),
     api<{ code: string; name: string }[]>("/api/parties").catch(() => [] as { code: string; name: string }[]),
     controlledSets(ctx),
+    plan ? planLists(ctx) : Promise.resolve([]),
   ]);
+  const listOf = (kind: string) => lists.find((one) => one.kind === kind) ?? null;
+  /** A list's upload, opened where the step is read rather than on another page. */
+  const uploadHere = (kind: string, label: string) => {
+    const list = listOf(kind);
+    return list ? (
+      <details className="border-b border-line px-5 py-3 sm:px-6">
+        <summary className="ask cursor-pointer list-none [&::-webkit-details-marker]:hidden">{label}</summary>
+        <div className="mt-3"><PlanListPanel list={list} /></div>
+      </details>
+    ) : null;
+  };
   const deptName = (c: string) => disciplines.find((d) => d.code === c)?.label ?? c;
   const senderName = (s: string) => (isDepartmentSender(s) ? `${deptName(s.slice(5))} (us)` : parties.find((p) => p.code === s)?.name ?? s);
   const setState = (kind: string) => {
@@ -96,20 +110,17 @@ export default async function RequirementsPage() {
           : untagged
             ? <span className="font-semibold text-amber-800">{untagged} action{untagged === 1 ? " has" : "s have"} no discipline, so nobody can be asked about {untagged === 1 ? "it" : "them"}.</span>
             : <>Every action is tagged{tagging.inForce ? ` (${tagging.inForce.versionLabel}, ${fmtDate(tagging.inForce.decidedAt)})` : ""}.</>,
-        <>
-          <a href="/api/controlled/current/ACTION_DEPARTMENTS" className="ask"><Download className="h-3.5 w-3.5" /> List</a>
-          {plan ? <Link href="/actions" className="ask" data-on={untagged ? "true" : "false"}>Upload on the schedule</Link> : null}
-        </>,
+        <a href="/api/controlled/current/ACTION_DEPARTMENTS" className="ask"><Download className="h-3.5 w-3.5" /> Current list to fill</a>,
       )}
-      <p className="px-5 py-3 text-[11.5px] text-slate-500 sm:px-6">Fill the list and upload it on the schedule; releasing it puts the tags in force. One correction can be made on the action&rsquo;s own page.</p>
+      {uploadHere("DEPARTMENTS", "Upload disciplines per action")}
 
       {/* 2 — ask each discipline what it needs, chase, collect */}
       {bar(2, "Ask the disciplines",
         list.refused
           ? <span className="font-semibold text-red-700">{refused(list.refused)}</span>
           : <>Each answers on its own sheet: the documents it needs, from whom, by when.</>,
-        plan ? <Link href="/actions" className="ask">Upload on the schedule</Link> : undefined,
       )}
+      {uploadHere("REQUIREMENTS", "Upload document requirements")}
       {control && toAsk.length ? (
         <div className="border-b border-line px-5 py-3 sm:px-6">
           <ActionForm action={issueCallsAction} hideSubmit>

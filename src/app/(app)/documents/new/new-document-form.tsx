@@ -44,9 +44,11 @@ function Ask({ label, hint, required, children, className }: { label: string; hi
  * it is comes with the file.
  */
 export function NewDocumentForm({
-  received, fromFile, routes, numberingSets, deliverableTypes, docTypes, disciplines, currentProject, subprojects, suppliers, pos, criticalities, confidentialities, retentionClasses, defaultConfidentiality, fields, ownFields, labels,
+  received, start, fromFile, routes, numberingSets, deliverableTypes, docTypes, disciplines, currentProject, subprojects, suppliers, pos, criticalities, confidentialities, retentionClasses, defaultConfidentiality, fields, ownFields, labels,
 }: {
   received: boolean;
+  /** Where another page sent the reader to register a document of a known type: our own, with its title. */
+  start?: { docType: string; title: string };
   /** A file that came with a received transmittal, used instead of an upload. */
   fromFile?: { id: string; name: string; transmittal: string | null };
   routes: { id: string; name: string; isDefault: boolean; path: string }[];
@@ -63,12 +65,12 @@ export function NewDocumentForm({
   labels: Record<string, string>;
 }) {
   const [step, setStep] = useState(1);
-  const [producer, setProducer] = useState(received ? "VND" : "");
+  const [producer, setProducer] = useState(received ? "VND" : start ? "ENG" : "");
   const [sendTo, setSendTo] = useState(received ? routes.find((r) => r.isDefault)?.id ?? routes[0]?.id ?? "" : "");
   const [hasFile, setHasFile] = useState(!!fromFile);
-  const [docType, setDocType] = useState("");
+  const [docType, setDocType] = useState(start?.docType ?? "");
   const [discipline, setDiscipline] = useState("");
-  const [title, setTitle] = useState("");
+  const [title, setTitle] = useState(start?.title ?? "");
   const [criticality, setCriticality] = useState("");
   const [confidentiality, setConfidentiality] = useState(defaultConfidentiality ?? "");
   // The register refuses a title that only repeats the type, so the form says so first.
@@ -181,6 +183,7 @@ export function NewDocumentForm({
                 single
                 name="docType"
                 browse
+                initial={start ? [start.docType] : undefined}
                 items={typesForProducer.map((o) => ({ id: o.code, name: o.label, detail: o.code }))}
                 label="Type"
                 required

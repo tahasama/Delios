@@ -9,7 +9,7 @@ import { NewDocumentForm } from "./new-document-form";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Create document" };
 
-export default async function NewDocumentPage({ searchParams }: { searchParams: Promise<{ received?: string; fromFile?: string }> }) {
+export default async function NewDocumentPage({ searchParams }: { searchParams: Promise<{ received?: string; fromFile?: string; docType?: string; title?: string }> }) {
   const ctx = await requireScope();
   const { user, project } = ctx;
   const sp = await searchParams;
@@ -81,6 +81,7 @@ export default async function NewDocumentPage({ searchParams }: { searchParams: 
         labels={labels}
         ownFields={own}
         received={received}
+        start={!received && sp.docType ? { docType: sp.docType, title: (sp.title ?? "").slice(0, 200) } : undefined}
         fromFile={fromFile}
         routes={routes}
         numberingSets={numberingSets}

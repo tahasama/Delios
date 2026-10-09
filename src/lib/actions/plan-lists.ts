@@ -37,8 +37,14 @@ export async function uploadPlanListAction(_prev: Result | undefined, formData: 
       const { source } = await api<{ source: { documentId: string } | null }>(projectPath(ctx, "/schedule"));
       if (!source) await api(projectPath(ctx, "/schedule"), { method: "PUT", body: { documentId } });
     }
+    // A revision still being prepared takes the files; one in review must be decided first; otherwise a new one starts.
+    const view = await api<{ revisions: { id: string; value: string; state: string }[] }>(projectPath(ctx, `/documents/${documentId}`));
+    const latest = view.revisions.at(-1) ?? null;
+    if (latest?.state === "IN_REVIEW") return { error: `Rev ${latest.value} is in review. Release or return it first; then upload the next version.` };
+    const open = latest && ["IN_PREPARATION", "CORRECTING", "RECEIVED"].includes(latest.state) ? latest : null;
     const fileIds = await Promise.all(files.map((file) => upload(ctx, { documentId }, file)));
-    await api(projectPath(ctx, `/documents/${documentId}/revisions`), { body: { fileIds, changeDescription, filesLater: false } });
+    if (open) await api(projectPath(ctx, `/documents/${documentId}/revisions/${open.id}/files`), { body: { fileIds } });
+    else await api(projectPath(ctx, `/documents/${documentId}/revisions`), { body: { fileIds, changeDescription, filesLater: false } });
   } catch (e) {
     return { error: refusal(e).message };
   }
