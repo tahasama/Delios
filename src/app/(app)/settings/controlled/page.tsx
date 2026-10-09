@@ -37,7 +37,7 @@ export default async function ControlledPage() {
 
   // Value sets are set up on their own page and agreed in the DMP.
   const handlers = allHandlers().filter((h) => !h.direct);
-  const sets = await controlledSets();
+  const sets = await controlledSets(ctx);
 
   const cards = handlers.map((handler) => {
     const mine = sets.filter(

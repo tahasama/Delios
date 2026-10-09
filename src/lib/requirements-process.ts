@@ -3,6 +3,7 @@ import { departmentsOf, DEFAULT_LEAD_DAYS } from "./schedule";
 import { holders } from "./api/settings";
 import { adminUsers, orEmpty } from "./api/admin";
 import { legacyActions } from "./api/schedule";
+import { requirementCalls, senderIssues } from "./api/records";
 
 /**
  * From schedule to safe activity, in the order it happens:
@@ -67,22 +68,29 @@ export type DepartmentRow = {
   requirements: number;
 };
 
-/**
- * Every department the schedule concerns, and where its call stands. The
- * backend keeps no calls to departments, so none has been asked yet.
- */
+/** Every department the schedule concerns, and where its call stands. */
 export async function departmentRows(t: Tenant): Promise<DepartmentRow[]> {
-  const [actions, people] = await Promise.all([legacyActions(t), holders(t.projectId, "READ").catch(() => [])]);
+  const [actions, people, calls] = await Promise.all([legacyActions(t), holders(t.projectId, "READ").catch(() => []), requirementCalls(t)]);
   const entries = actions.flatMap((a) => a.entries);
   const depts = [...new Set(actions.flatMap((a) => departmentsOf(a)))].sort();
+  const now = Date.now();
   return depts.map((department) => {
     const mine = actions.filter((a) => departmentsOf(a).includes(department));
+    const deptCalls = calls.filter((c) => c.department === department);
+    const covered = new Set(deptCalls.flatMap((c) => c.activityCodes));
+    const found = deptCalls.find((c) => !c.answeredAt) ?? deptCalls[0] ?? null;
+    const call = found ? {
+      id: found.id, actionCodes: found.activityCodes.join(","), dueAt: new Date(`${found.dueOn}T23:59:59`), issuedAt: new Date(found.issuedAt),
+      reminders: found.reminders, lastRemindedAt: found.lastRemindedAt ? new Date(found.lastRemindedAt) : null,
+      answeredAt: found.answeredAt ? new Date(found.answeredAt) : null, answerNote: found.answerNote,
+    } : null;
+    const state: CallState = !call ? "NOT_ISSUED" : call.answeredAt ? "ANSWERED" : call.dueAt.getTime() < now ? "OVERDUE" : "OPEN";
     return {
       department,
       actions: mine.map((a) => ({ code: a.code, name: a.name, scheduledDate: a.scheduledDate })),
-      notIssued: mine.map((a) => a.code),
-      call: null,
-      state: "NOT_ISSUED" as CallState,
+      notIssued: mine.filter((a) => !covered.has(a.code)).map((a) => a.code),
+      call,
+      state,
       members: people.filter((m) => m.department === department).length,
       requirements: entries.filter((e) => e.department === department).length,
     };
@@ -99,9 +107,10 @@ export type SenderRow = {
   recipients: number;
 };
 
-/** Who sends what. The backend keeps no record of a list issued to a sender, so none has been. */
+/** Who sends what, and when the list last went to them. */
 export async function senderRows(t: Tenant): Promise<SenderRow[]> {
-  const entries = (await legacyActions(t)).flatMap((a) => a.entries).sort((a, b) => a.requiredBy.getTime() - b.requiredBy.getTime());
+  const [actions, issues] = await Promise.all([legacyActions(t), senderIssues(t)]);
+  const entries = actions.flatMap((a) => a.entries).sort((a, b) => a.requiredBy.getTime() - b.requiredBy.getTime());
   const bySender = new Map<string, typeof entries>();
   for (const e of entries) {
     const k = senderOf(e);
@@ -109,12 +118,15 @@ export async function senderRows(t: Tenant): Promise<SenderRow[]> {
   }
   const rows: SenderRow[] = [];
   for (const [sender, list] of bySender) {
+    const last = issues.find((one) => one.sender === sender) ?? null;
+    const listed = new Set(last?.needIds ?? []);
     rows.push({
       sender,
       documents: list.length,
       firstNeeded: list[0]?.requiredBy ?? null,
-      lastIssue: null,
-      changedSinceIssue: list.length,
+      lastIssue: last ? { issuedAt: new Date(last.issuedAt), issuedByName: last.issuedByName, entryCount: last.entryCount } : null,
+      // What was added since the list last went: a need it did not name.
+      changedSinceIssue: list.filter((e) => !listed.has(e.id)).length,
       recipients: (await senderRecipients(t, sender)).length,
     });
   }

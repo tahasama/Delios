@@ -1,4 +1,5 @@
 import { requireScope } from "@/lib/scope";
+import { projectExceptions } from "@/lib/api/records";
 import { PageHeader } from "@/components/ui";
 import { fmtDate, fmtDateTime } from "@/lib/utils";
 import { PrintButton } from "./print-button";
@@ -39,8 +40,7 @@ export default async function ConformancePage() {
         items: answer.lastRun.results.map((i) => ({ id: i.checkId, checkId: i.checkId, result: i.result, failingCount: i.failing, note: i.note })),
       }
     : null;
-  // Exceptions granted against the rules are not kept by the backend.
-  const exceptions = [] as { id: string; item: string; reason: string; authority: string; startDate: Date; reviewPoint: Date | null }[];
+  const exceptions = await projectExceptions(ctx);
   const flawedDocs = flawedDocuments(defects);
 
   const threshold = scope?.integrityThreshold ?? 95;

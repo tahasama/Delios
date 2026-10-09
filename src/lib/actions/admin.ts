@@ -7,7 +7,7 @@ import { isAdmin } from "@/lib/auth";
 import { formPolicy, checkForm } from "@/lib/field-policy";
 import { buildProps } from "@/lib/config-props";
 import { getSet, getSets, SET_KEY } from "@/lib/config";
-import { api, forgetShortLived, refusal } from "@/lib/api/client";
+import { api, forgetShortLived, projectPath, refusal } from "@/lib/api/client";
 import { setOrgSetting } from "@/lib/api/settings";
 import { adminNumbering, adminUsers, backendField, RECORD_KIND } from "@/lib/api/admin";
 
@@ -168,27 +168,97 @@ export async function setScopeAction(_prev: Result | undefined, formData: FormDa
   return {};
 }
 
-/** The asset breakdown is not in the backend yet. */
-export async function addAssetAction(_prev: Result | undefined, _formData: FormData): Promise<Result> {
-  return { error: "The asset list is not supported yet." };
+/** The organization's own fields on an asset, as the form names them. */
+function assetFields(formData: FormData) {
+  const extras: Record<string, string> = {};
+  for (const [name, value] of formData.entries()) {
+    if (name.startsWith("own:") && typeof value === "string" && value.trim()) extras[name.slice(4)] = value.trim();
+  }
+  return {
+    name: text(formData, "name"), area: text(formData, "area") || null, system: text(formData, "system") || null,
+    unit: text(formData, "unit") || null, description: text(formData, "description") || null, extras: Object.keys(extras).length ? extras : null,
+  };
 }
 
-export async function updateAssetAction(_prev: Result | undefined, _formData: FormData): Promise<Result> {
-  return { error: "The asset list is not supported yet." };
+/** Document Control adds a tag to the asset breakdown. */
+export async function addAssetAction(_prev: (Result & { ok?: string }) | undefined, formData: FormData): Promise<Result & { ok?: string }> {
+  const ctx = await requireScope();
+  const code = text(formData, "code").toUpperCase();
+  const fields = assetFields(formData);
+  if (!code || !fields.name) return { error: "A tag and a name are required." };
+  try {
+    await api(projectPath(ctx, "/assets"), { body: { code, ...fields } });
+  } catch (e) {
+    return failed(e);
+  }
+  revalidatePath("/assets");
+  return { ok: `${code} added.` };
 }
 
-export async function removeAssetAction(_prev: Result | undefined, _formData: FormData): Promise<Result> {
-  return { error: "The asset list is not supported yet." };
+export async function updateAssetAction(_prev: (Result & { ok?: string }) | undefined, formData: FormData): Promise<Result & { ok?: string }> {
+  const ctx = await requireScope();
+  const id = text(formData, "id");
+  const fields = assetFields(formData);
+  if (!fields.name) return { error: "An asset needs a name." };
+  let code: string;
+  try {
+    code = (await api<{ code: string }>(projectPath(ctx, `/assets/${id}`), { method: "PUT", body: fields })).code;
+  } catch (e) {
+    return failed(e);
+  }
+  revalidatePath("/assets");
+  revalidatePath(`/assets/${id}`);
+  return { ok: `${code} saved.` };
 }
 
-/** Published exceptions to the standard are not kept by the backend yet. */
-export async function addExceptionAction(_prev: Result | undefined, _formData: FormData): Promise<Result> {
-  return { error: "Recording exceptions is not supported yet." };
+/** An unused tag is retired: kept on record, offered no more. */
+export async function removeAssetAction(_prev: (Result & { ok?: string }) | undefined, formData: FormData): Promise<Result & { ok?: string }> {
+  const ctx = await requireScope();
+  const id = text(formData, "id");
+  try {
+    await api(projectPath(ctx, `/assets/${id}/retire`), { method: "POST" });
+  } catch (e) {
+    return failed(e);
+  }
+  revalidatePath("/assets");
+  return { ok: "Removed from the list." };
 }
 
-/** Number ranges issued to a named party are not kept by the backend yet. */
-export async function issueNumberRangeAction(_prev: Result | undefined, _formData: FormData): Promise<Result> {
-  return { error: "Issuing number ranges is not supported yet." };
+/** A published exception to the standard: what, which clauses, why, on whose authority, and dates. */
+export async function addExceptionAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
+  const ctx = await requireScope();
+  const body = {
+    item: text(formData, "item"), clauses: text(formData, "clauses"), reason: text(formData, "reason"), authority: text(formData, "authority"),
+    startDate: text(formData, "startDate") || null, reviewPoint: text(formData, "reviewPoint") || null,
+  };
+  if (!body.item || !body.clauses || !body.reason || !body.authority || !body.startDate) {
+    return { error: "An exception records what is exempt, clauses, reason, granting authority and dates." };
+  }
+  try {
+    await api(projectPath(ctx, "/exceptions"), { body });
+  } catch (e) {
+    return failed(e);
+  }
+  revalidatePath("/settings/dmp");
+  return {};
+}
+
+/** A range of numbers given to a named party. */
+export async function issueNumberRangeAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
+  const ctx = await requireScope();
+  const prefix = text(formData, "prefix");
+  const from = Number(formData.get("from") ?? "");
+  const to = Number(formData.get("to") ?? "");
+  const issuedTo = text(formData, "issuedTo");
+  if (!prefix || !issuedTo) return { error: "Prefix and the named party are required." };
+  if (!Number.isFinite(from) || !Number.isFinite(to) || from < 1 || to < from) return { error: "The range must be from ≤ to, starting at 1." };
+  try {
+    await api(projectPath(ctx, "/number-ranges"), { body: { prefix, from, to, issuedTo } });
+  } catch (e) {
+    return failed(e);
+  }
+  revalidatePath("/settings/numbering");
+  return {};
 }
 
 /** Rename and describe a set. Its key is the values' list: it stays, as codes do. */

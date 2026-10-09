@@ -80,7 +80,7 @@ export default async function ControlledKindPage({ params }: { params: Promise<{
 
   const projectId = handler.level === "PROJECT" ? ctx.projectId : null;
   const [sets, valueSets] = await Promise.all([
-    controlledSets(),
+    controlledSets(ctx),
     handler.kind === "VALUE_SET" ? getSets() : Promise.resolve([]),
   ]);
 

@@ -1,5 +1,8 @@
-import { nextActionCode, redateRequirements } from "../schedule";
 import { VERBS, type Verb } from "../permissions";
+import { api } from "../api/client";
+import { adminFunctions } from "../api/admin";
+import { legacyActions } from "../api/schedule";
+import { getSet } from "../config";
 import {
   register,
   headerIndex,
@@ -64,21 +67,73 @@ const distributionMatrix: Handler = {
   ],
   approverHint: "Administrator",
 
-  async parse(): Promise<ParseResult> {
-    // Uploading a list for a decision is not in the backend yet.
-    return { ok: false, issues: [{ line: 1, message: "Uploading this list for a decision is not supported yet." }] };
+  async parse(_t, rows): Promise<ParseResult> {
+    const { index, missing } = headerIndex(rows, MATRIX_COLUMNS.slice(0, 7));
+    if (missing.length) {
+      return { ok: false, issues: [{ line: 1, message: `Missing column(s): ${missing.join(", ")}. Keep the template's header row.` }] };
+    }
+    const known = new Map((await adminFunctions()).map((f) => [f.code, f.active]));
+    const issues: ParseIssue[] = [];
+    const parsed: MatrixRow[] = [];
+    const seen = new Set<string>();
+    for (let i = 1; i < rows.length; i++) {
+      const line = i + 1;
+      const row = rows[i];
+      if (row.every((c) => !c.trim())) continue;
+      const functionCode = cell(row, index, "Function").toUpperCase();
+      if (!functionCode) { issues.push({ line, message: "Function is missing." }); continue; }
+      if (!known.has(functionCode)) { issues.push({ line, message: `No function with code ${functionCode} is published. Publish it first, or correct the code.` }); continue; }
+      if (known.get(functionCode) === false) { issues.push({ line, message: `${functionCode} is retired — a retired function cannot be granted anything.` }); continue; }
+      const rawVerbs = cell(row, index, "Verbs").split(/[|,;]/).map((v) => v.trim().toUpperCase()).filter(Boolean);
+      if (!rawVerbs.length) { issues.push({ line, message: "Verbs is empty. A rule that grants nothing should be left out." }); continue; }
+      const bad = rawVerbs.filter((v) => !(VERBS as readonly string[]).includes(v));
+      if (bad.length) { issues.push({ line, message: `Unknown verb(s): ${bad.join(", ")}. Use ${VERBS.join(", ")}.` }); continue; }
+      const entry: MatrixRow = {
+        functionCode,
+        deliverableType: cell(row, index, "Deliverable type") || null,
+        docType: cell(row, index, "Document type") || null,
+        discipline: cell(row, index, "Discipline") || null,
+        criticality: cell(row, index, "Criticality") || null,
+        confidentiality: cell(row, index, "Confidentiality") || null,
+        verbs: VERBS.filter((v) => rawVerbs.includes(v)),
+        note: cell(row, index, "Note") || null,
+      };
+      const key = ruleKey(entry);
+      if (seen.has(key)) { issues.push({ line, message: `Duplicate rule for ${key}. Combine the verbs onto one row.` }); continue; }
+      seen.add(key);
+      parsed.push(entry);
+    }
+    if (issues.length) return { ok: false, issues };
+    // A matrix with nobody able to configure anything locks the organization out of its own settings.
+    if (!parsed.some((r) => r.verbs.includes("CONFIGURE"))) {
+      return { ok: false, issues: [{ line: 0, message: "This file replaces the whole matrix, and no row in it grants Configure — approving it would lock everyone out of settings. Add a row giving one function CONFIGURE, or start from the “In force” download and edit that." }] };
+    }
+    return { ok: true, payload: parsed, rowCount: parsed.length };
   },
 
   async current() {
-    return [];
+    const functions = await adminFunctions();
+    return functions.flatMap((f) => f.rules.map((r): MatrixRow => ({
+      functionCode: f.code, deliverableType: r.deliverableType, docType: r.docType, discipline: r.discipline, criticality: r.criticality,
+      confidentiality: r.confidentiality, verbs: VERBS.filter((v) => r.verbs.includes(v)), note: null,
+    })));
   },
 
   diff(current, next) {
     return diffByKey(current as MatrixRow[], next as MatrixRow[], ruleKey, (r) => r.verbs.join(", "));
   },
 
-  async apply(): Promise<{ summary: string }> {
-    throw new Error("Applying this list is not supported yet.");
+  async apply(_t, payload) {
+    const rows = payload as MatrixRow[];
+    // The whole matrix is replaced: each function gets exactly the rules the file gives it, none where it gives none.
+    for (const fn of await adminFunctions()) {
+      const mine = rows.filter((r) => r.functionCode === fn.code).map((r) => ({
+        verbs: r.verbs, deliverableType: r.deliverableType, docType: r.docType, discipline: r.discipline, criticality: r.criticality,
+        confidentiality: r.confidentiality,
+      }));
+      await api(`/api/admin/functions/${fn.id}`, { method: "PUT", body: { rules: mine } });
+    }
+    return { summary: `${rows.length} rule(s) in force.` };
   },
 };
 
@@ -129,12 +184,15 @@ const schedule: Handler = {
   approverHint: "Document Control",
 
   async parse(): Promise<ParseResult> {
-    // Uploading a list for a decision is not in the backend yet.
-    return { ok: false, issues: [{ line: 1, message: "Uploading this list for a decision is not supported yet." }] };
+    // The schedule is a controlled document: its export is read when a revision of it is released.
+    return { ok: false, issues: [{ line: 1, message: "The schedule is read from the schedule document: attach the export to a new revision of it and send that for review. Releasing it is the approval, and moves every activity date." }] };
   },
 
-  async current() {
-    return [];
+  async current(t) {
+    return (await legacyActions(t)).map((a): ActivityRow => ({
+      externalId: a.scheduleRef ?? a.code, actionCode: a.code, name: a.name, description: a.description,
+      date: a.scheduledDate ? a.scheduledDate.toISOString().slice(0, 10) : null, responsibleParty: a.ownerName,
+    }));
   },
 
   diff(current, next) {
@@ -149,7 +207,7 @@ const schedule: Handler = {
   },
 
   async apply(): Promise<{ summary: string }> {
-    throw new Error("Applying this list is not supported yet.");
+    throw new Error("The schedule is applied by releasing the schedule document's revision.");
   },
 };
 
@@ -172,13 +230,39 @@ const valueSet: Handler = {
   approverHint: "Administrator",
   direct: true,
 
-  async parse(): Promise<ParseResult> {
-    // Uploading a list for a decision is not in the backend yet.
-    return { ok: false, issues: [{ line: 1, message: "Uploading this list for a decision is not supported yet." }] };
+  async parse(_t, rows): Promise<ParseResult> {
+    const { index, missing } = headerIndex(rows, ["Code", "Label"]);
+    if (missing.length) return { ok: false, issues: [{ line: 1, message: `Missing column(s): ${missing.join(", ")}.` }] };
+    const issues: ParseIssue[] = [];
+    const parsed: ValueRow[] = [];
+    const seen = new Set<string>();
+    for (let i = 1; i < rows.length; i++) {
+      const line = i + 1;
+      const row = rows[i];
+      if (row.every((c) => !c.trim())) continue;
+      const code = cell(row, index, "Code");
+      const label = cell(row, index, "Label");
+      const status = (cell(row, index, "Status") || "ACTIVE").toUpperCase();
+      const sortRaw = cell(row, index, "Sort");
+      const props = cell(row, index, "Properties") || null;
+      if (!code) { issues.push({ line, message: "Code is missing." }); continue; }
+      if (!label) { issues.push({ line, message: `${code} has no label.` }); continue; }
+      if (seen.has(code)) { issues.push({ line, message: `${code} appears twice.` }); continue; }
+      if (status !== "ACTIVE" && status !== "RETIRED") { issues.push({ line, message: `${code}: status must be ACTIVE or RETIRED.` }); continue; }
+      if (props) {
+        try { JSON.parse(props); } catch { issues.push({ line, message: `${code}: Properties is not valid JSON.` }); continue; }
+      }
+      seen.add(code);
+      parsed.push({ code, label, status, sort: sortRaw ? Number(sortRaw) : parsed.length, props });
+    }
+    if (issues.length) return { ok: false, issues };
+    return { ok: true, payload: parsed, rowCount: parsed.length };
   },
 
-  async current() {
-    return [];
+  async current(_t, key) {
+    return (await getSet(key)).map((v, i): ValueRow => ({
+      code: v.code, label: v.label, status: v.status, sort: i, props: Object.keys(v.props).length ? JSON.stringify(v.props) : null,
+    }));
   },
 
   diff(current, next) {
@@ -196,8 +280,23 @@ const valueSet: Handler = {
     );
   },
 
-  async apply(): Promise<{ summary: string }> {
-    throw new Error("Applying this list is not supported yet.");
+  async apply(_t, payload, key) {
+    const rows = payload as ValueRow[];
+    const existing = await getSet(key);
+    const incoming = new Set(rows.map((r) => r.code));
+    for (const row of rows) {
+      await api("/api/admin/values", {
+        method: "PUT",
+        body: { setKey: key, code: row.code, label: row.label, status: row.status, sort: row.sort, props: row.props ? JSON.parse(row.props) : undefined },
+      });
+    }
+    // In-use values are retired, never deleted.
+    let retired = 0;
+    for (const value of existing.filter((v) => !incoming.has(v.code) && v.status !== "RETIRED")) {
+      await api("/api/admin/values", { method: "PUT", body: { setKey: key, code: value.code, status: "RETIRED" } });
+      retired++;
+    }
+    return { summary: `${rows.length} value(s) published${retired ? `, ${retired} retired` : ""}.` };
   },
 };
 

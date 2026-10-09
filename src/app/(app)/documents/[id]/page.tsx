@@ -1,4 +1,5 @@
 import { ReadersPanel } from "./readers-panel";
+import { documentAssets, projectAssets } from "@/lib/api/records";
 import { documentReaders, projectReaders } from "@/lib/api/readers";
 import { openConfidentiality } from "@/lib/permissions";
 import { controlDoes } from "@/lib/control-activities";
@@ -67,9 +68,8 @@ export default async function DocumentDetailPage({
 
   const context = await documentContext(ctx, id);
   const [rels, assets, disciplines, types, criticalities, confidentialities, retentions, phases, statuses, subprojects, suppliers, pos, auditEvents, transmittalItems] = await Promise.all([
-    // Assets are not in the backend: no tags to link a document to.
-    Promise.resolve([] as { id: string; kind: string; fromId: string; toId: string }[]),
-    Promise.resolve([] as { id: string; code: string; name: string }[]),
+    documentAssets(ctx, id).then((links) => links.map((one) => ({ id: one.id, kind: "DOC_ASSET", fromId: id, toId: one.assetId }))),
+    projectAssets(ctx).then((all) => all.map((one) => ({ id: one.id, code: one.code, name: one.name }))),
     getSet("DISCIPLINES"), getSet("DOCUMENT_TYPES"), getActiveSet("CRITICALITY"), getSet("CONFIDENTIALITY"),
     getActiveSet("RETENTION_CLASSES"), getActiveSet("PHASES"), getActiveSet("STATUSES"),
     getSet("SUBPROJECTS"), getSet("SUPPLIER_CODES"), getSet("PURCHASE_ORDERS"),

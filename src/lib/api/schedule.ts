@@ -143,7 +143,18 @@ async function inBatches<T, R>(items: T[], load: (item: T) => Promise<R>, size =
   return out;
 }
 
-function legacyAction(detail: ActivityDetail, documents: Map<string, DocumentView | null>, versionLabel: string | null): LegacyAction {
+type Confirmation = LegacyAction["confirmations"][number] & { activityId: string };
+
+/** Each department's readiness answers, by activity. */
+async function confirmationsOf(scope: Scope): Promise<Confirmation[]> {
+  const { readinessAnswers } = await import("./records");
+  return (await readinessAnswers(scope)).map((one) => ({
+    activityId: one.activityId, department: one.department, available: one.available, note: one.note,
+    confirmedByName: one.confirmedByName, confirmedAt: new Date(one.confirmedAt),
+  }));
+}
+
+function legacyAction(detail: ActivityDetail, documents: Map<string, DocumentView | null>, versionLabel: string | null, confirmations: Confirmation[] = []): LegacyAction {
   const { activity, needs, decisions } = detail;
   const scheduledDate = dayOf(activity.start);
   // By department, then by the day each is needed, as the action's list was kept.
@@ -198,7 +209,7 @@ function legacyAction(detail: ActivityDetail, documents: Map<string, DocumentVie
     state: activity.state,
     readiness: activity.readiness,
     entries,
-    confirmations: [],
+    confirmations: confirmations.filter((one) => one.activityId === activity.id),
     notes: [...decisions].reverse().map((one) => ({
       id: one.id,
       decision: one.decision,
@@ -225,7 +236,7 @@ export const legacyActionByCode = cache(async (scope: Scope, code: string): Prom
   const summary = await activityByCode(scope, code);
   const detail = summary ? await activityDetail(scope, summary.id) : null;
   if (!detail) return null;
-  return legacyAction(detail, await documentsOf(scope, detail.needs), await versionInForce(scope));
+  return legacyAction(detail, await documentsOf(scope, detail.needs), await versionInForce(scope), await confirmationsOf(scope));
 });
 
 /**
@@ -235,8 +246,10 @@ export const legacyActionByCode = cache(async (scope: Scope, code: string): Prom
 export const legacyActions = cache(async (scope: Scope): Promise<LegacyAction[]> => {
   const list = await activityList(scope);
   const details = (await inBatches(list, (one) => activityDetail(scope, one.id))).filter((one): one is ActivityDetail => !!one);
-  const [documents, label] = await Promise.all([documentsOf(scope, details.flatMap((one) => one.needs)), versionInForce(scope)]);
-  return details.map((one) => legacyAction(one, documents, label));
+  const [documents, label, confirmations] = await Promise.all([
+    documentsOf(scope, details.flatMap((one) => one.needs)), versionInForce(scope), confirmationsOf(scope),
+  ]);
+  return details.map((one) => legacyAction(one, documents, label, confirmations));
 });
 
 // ── Schedule versions ────────────────────────────────────────────────────────

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { projectAsset } from "@/lib/api/records";
 import { requireScope } from "@/lib/scope";
 import { notFound } from "next/navigation";
 import { PageHeader, Card, DataTable, Th, Td, Chip, EmptyState } from "@/components/ui";
@@ -8,12 +9,14 @@ export const dynamic = "force-dynamic";
 
 // §16.4 Q2 — all information for an asset in one query (B.3.6).
 export default async function AssetDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  await requireScope();
-  await params;
-  // Assets are not in the backend: no asset is found.
-  const asset = null as { id: string; code: string; name: string; area: string | null; system: string | null; unit: string | null } | null;
+  const ctx = await requireScope();
+  const { id } = await params;
+  const found = await projectAsset(ctx, id);
+  const asset = found?.asset ?? null;
   if (!asset) notFound();
-  const docs = [] as { id: string; docNumber: string; title: string; docType: string; discipline: string; state: string; revisions: { value: string; statusCode: string | null }[] }[];
+  const docs = found!.documents.map((d) => ({
+    id: d.id, docNumber: d.number, title: d.title, docType: d.docType, discipline: d.discipline, state: d.state, revisions: d.current ? [d.current] : [],
+  }));
 
   return (
     <div className="space-y-5">

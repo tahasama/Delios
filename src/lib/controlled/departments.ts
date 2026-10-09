@@ -1,5 +1,8 @@
 import { register, headerIndex, cell, diffByKey, type Handler, type ParseIssue, type ParseResult } from "./registry";
 import { departmentsOf } from "../schedule";
+import { api, projectPath } from "../api/client";
+import { legacyActions } from "../api/schedule";
+import { getActiveSet } from "../config";
 
 /**
  * Which departments each scheduled activity concerns. Once the schedule is in,
@@ -34,17 +37,52 @@ const departments: Handler = {
   ownerApproves: true,
   ownerVerb: "PLAN",
 
-  async parse(): Promise<ParseResult> {
-    // Uploading a list for a decision is not in the backend yet.
-    return { ok: false, issues: [{ line: 1, message: "Uploading this list for a decision is not supported yet." }] };
+  async parse(t, rows): Promise<ParseResult> {
+    const { index, missing } = headerIndex(rows, ["Action Code", "Departments"], ALIASES);
+    if (missing.length) return { ok: false, issues: [{ line: 1, message: `Missing column(s): ${missing.join(", ")}. Download the list and keep its header row.` }] };
+
+    const [actions, disciplines] = await Promise.all([legacyActions(t), getActiveSet("DISCIPLINES")]);
+    const codes = new Set(actions.map((a) => a.code));
+    const known = new Set(disciplines.map((d) => d.code));
+    const entries = actions.flatMap((a) => a.entries.map((e) => ({ department: e.department, code: a.code })));
+
+    const issues: ParseIssue[] = [];
+    const parsed: DepartmentRow[] = [];
+    const seen = new Set<string>();
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i];
+      if (row.every((c) => !c.trim())) continue;
+      const line = i + 1;
+      const actionCode = cell(row, index, "Action Code").toUpperCase();
+      const depts = splitDepartments(cell(row, index, "Departments"));
+      const errors: string[] = [];
+      if (!actionCode) errors.push("Action Code is missing");
+      else if (!codes.has(actionCode)) errors.push(`${actionCode} is not in the schedule`);
+      if (seen.has(actionCode)) errors.push(`${actionCode} is listed twice`);
+      seen.add(actionCode);
+      // Obligatory: an activity nobody is concerned by cannot be prepared for.
+      if (!depts.length) errors.push("Every activity needs at least one department");
+      const unknown = depts.filter((d) => !known.has(d));
+      if (unknown.length) errors.push(`Not a department code: ${unknown.join(", ")}`);
+      // A department with documents still listed cannot be dropped silently.
+      const listed = [...new Set(entries.filter((e) => e.code === actionCode && e.department && !depts.includes(e.department)).map((e) => e.department!))];
+      if (listed.length) errors.push(`${listed.join(", ")} still ${listed.length === 1 ? "has" : "have"} documents listed for ${actionCode} — take them off the requirements list first`);
+      if (errors.length) issues.push({ line, message: errors.join("; ") });
+      else parsed.push({ actionCode, departments: depts });
+    }
+    if (issues.length) return { ok: false, issues };
+    if (!parsed.length) return { ok: false, issues: [{ line: 0, message: "The list contains no activities." }] };
+    return { ok: true, payload: parsed, rowCount: parsed.length };
   },
 
-  async current() {
-    return [];
+  async current(t) {
+    return (await legacyActions(t)).map((a): DepartmentRow => ({ actionCode: a.code, departments: departmentsOf(a) }));
   },
 
-  async exportRows() {
-    return [];
+  async exportRows(t) {
+    return (await legacyActions(t)).map((a) => [
+      a.code, a.scheduleRef ?? "", a.name, a.description ?? "", a.scheduledDate?.toISOString().slice(0, 10) ?? "", departmentsOf(a).join(", "),
+    ]);
   },
 
   diff(current, next) {
@@ -58,8 +96,19 @@ const departments: Handler = {
     );
   },
 
-  async apply(): Promise<{ summary: string }> {
-    throw new Error("Applying this list is not supported yet.");
+  async apply(t, payload) {
+    const rows = payload as DepartmentRow[];
+    const actions = new Map((await legacyActions(t)).map((a) => [a.code, a]));
+    let changed = 0;
+    for (const row of rows) {
+      const action = actions.get(row.actionCode);
+      if (!action) continue;
+      if (departmentsOf(action).join(",") !== row.departments.join(",")) {
+        await api(projectPath(t, `/activities/${action.id}/departments`), { method: "PUT", body: { departments: row.departments } });
+        changed++;
+      }
+    }
+    return { summary: `${rows.length} activit${rows.length === 1 ? "y" : "ies"} tagged, ${changed} changed.` };
   },
 };
 

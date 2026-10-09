@@ -187,12 +187,25 @@ export async function updateDocumentAction(_prev: { error?: string; ok?: string 
   }
 }
 
-/** Associate the document with the asset it describes (§5.8): assets are not in the backend yet. */
-export async function linkAssetAction(_prev: { error?: string } | undefined, _formData: FormData): Promise<{ error?: string }> {
-  return { error: "Linking a document to an asset is not supported yet." };
+/** Associate the document with the asset it describes (§5.8). */
+export async function linkAssetAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
+  const ctx = await requireScope();
+  const documentId = String(formData.get("documentId") ?? "");
+  const assetCode = String(formData.get("assetCode") ?? "").trim();
+  if (!assetCode) return { error: "Enter an asset code." };
+  try {
+    await api(projectPath(ctx, `/documents/${documentId}/assets`), { body: { assetCode } });
+  } catch (e) {
+    return { error: refusal(e).message };
+  }
+  revalidatePath(`/documents/${documentId}`);
+  return {};
 }
 
 export async function unlinkRelationshipAction(formData: FormData) {
+  const ctx = await requireScope();
+  const relationshipId = String(formData.get("relationshipId") ?? "");
+  await api(projectPath(ctx, `/document-assets/${relationshipId}`), { method: "DELETE" }).catch(() => null);
   revalidatePath(`/documents/${String(formData.get("documentId") ?? "")}`);
 }
 

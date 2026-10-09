@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { projectExceptions } from "@/lib/api/records";
 import { requireScope } from "@/lib/scope";
 import { CheckCircle2, CircleDashed, ArrowRight, Building2, Tags, FileDigit, Workflow, Users, ShieldCheck, CalendarClock, Gauge } from "lucide-react";
 import { profileForKind, missingFromProfile, type Profile } from "@/lib/profiles";
@@ -48,8 +49,7 @@ export default async function PlanPage({ searchParams }: { searchParams: Promise
       return { kind: info.kind ?? "GENERIC" };
     }))),
   ]);
-  // Published exceptions to the standard are not kept by the backend yet.
-  const exceptions = [] as { id: string; item: string; clauses: string; reason: string; authority: string; startDate: Date; reviewPoint: Date | null }[];
+  const exceptions = await projectExceptions(ctx);
 
   // A list nobody has filled, by the name people know it by.
   const emptySets = REQUIRED.filter((key) => {

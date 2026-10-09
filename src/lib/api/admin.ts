@@ -237,8 +237,9 @@ export async function backendRoute(classes: string, steps: LegacyRouteStep[]): P
 }
 
 // ── Controlled changes ────────────────────────────────────────────────────────
-// Uploaded lists waiting for a decision are not kept by the backend yet: there
-// are none, and the screens read that as "nothing uploaded".
+// Uploaded lists waiting for a decision: each kind and key is a set, its
+// uploads the versions, newest first. The organization's lists and the
+// project's are read together.
 
 export type ControlledVersionRow = {
   id: string; key: string; title: string; state: string; versionLabel: string; rowCount: number; decidedAt: Date | null; decidedByName: string | null;
@@ -247,8 +248,21 @@ export type ControlledVersionRow = {
 };
 export type ControlledSetRow = { id: string; key: string; title: string; kind: string; projectId: string | null; versions: ControlledVersionRow[] };
 
-export async function controlledSets(_kind?: string): Promise<ControlledSetRow[]> {
-  return [];
+export async function controlledSets(scope?: { projectId: string }): Promise<ControlledSetRow[]> {
+  const { controlledVersions } = await import("./records");
+  const rows = [...(await controlledVersions(null)), ...(scope ? await controlledVersions(scope) : [])];
+  const sets = new Map<string, ControlledSetRow>();
+  for (const v of rows) {
+    const id = `${v.projectId ?? "org"}|${v.kind}|${v.key}`;
+    if (!sets.has(id)) sets.set(id, { id, key: v.key, title: v.title, kind: v.kind, projectId: v.projectId, versions: [] });
+    sets.get(id)!.versions.push({
+      id: v.id, key: v.key, title: v.title, state: v.state, versionLabel: v.versionLabel, rowCount: v.rowCount,
+      decidedAt: v.decidedAt ? new Date(v.decidedAt) : null, decidedByName: v.decidedBy, decisionReason: v.decisionReason,
+      createdAt: new Date(v.createdAt), submittedAt: v.submittedAt ? new Date(v.submittedAt) : null, submittedById: v.submittedById,
+      submittedByName: v.submittedBy, sourceName: v.sourceName, notes: v.notes, diff: v.diff ? JSON.stringify(v.diff) : null,
+    });
+  }
+  return [...sets.values()];
 }
 
 // ── The scope statement ───────────────────────────────────────────────────────

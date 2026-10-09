@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { projectAssets } from "@/lib/api/records";
 import { requireScope } from "@/lib/scope";
 import { PageHeader, EmptyState, Card, Field, inputCls } from "@/components/ui";
 import { ActionForm } from "@/components/form";
@@ -18,10 +19,10 @@ export default async function AssetsPage({ searchParams }: { searchParams: Promi
   const policy = await formPolicy(ctx, "ASSET");
   const keeper = ctx.can("CONTROL") || ctx.can("CONFIGURE");
   const q = ((await searchParams).q ?? "").trim();
-  // Assets are not in the backend: there are none to list, and no documents linked to them.
+  const found = await projectAssets(ctx, q || undefined);
   const [assets, counts] = [
-    [] as { id: string; code: string; name: string; area: string | null; system: string | null; unit: string | null; description: string | null; extras: string | null }[],
-    [] as { toId: string; _count: number }[],
+    found.map((a) => ({ id: a.id, code: a.code, name: a.name, area: a.area, system: a.system, unit: a.unit, description: a.description, extras: a.extras ? JSON.stringify(a.extras) : null })),
+    found.map((a) => ({ toId: a.id, _count: a.documents })),
   ];
   const countFor = (id: string) => counts.find((c) => c.toId === id)?._count ?? 0;
 

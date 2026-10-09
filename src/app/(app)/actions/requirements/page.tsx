@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { controlledSets } from "@/lib/api/admin";
 import { requireScope } from "@/lib/scope";
 import { Card, Chip, DataTable, Th, Td, Field, inputCls, btn } from "@/components/ui";
 import { ActionForm } from "@/components/form";
@@ -37,8 +38,7 @@ export default async function RequirementsPage() {
     senderRows(ctx),
     getSet("DISCIPLINES"),
     api<{ code: string; name: string }[]>("/api/parties").catch(() => [] as { code: string; name: string }[]),
-    // The backend keeps no controlled lists: nothing is uploaded or waiting.
-    Promise.resolve([] as { kind: string; versions: { state: string; versionLabel: string; decidedAt: Date | null }[] }[]),
+    controlledSets(ctx),
     Promise.resolve({ department: ctx.user.department ?? null }),
   ]);
   const deptName = (c: string) => disciplines.find((d) => d.code === c)?.label ?? c;
