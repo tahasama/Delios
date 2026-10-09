@@ -13,7 +13,8 @@ export type PlanRow = {
 };
 
 /**
- * What the colour says, and only that: dark green is done, violet is done but
+ * What the colour says, and only that (the bar also says it in words, for a
+ * screen reader): dark green is done, violet is done but
  * the documents came after the work, green is ready, blue is work still
  * ahead with nothing owed yet, amber is a document owed within the week, red is
  * a day that has passed with something still missing, grey is nothing listed.
@@ -28,6 +29,11 @@ const TONE: Record<PlanRow["readiness"], string> = {
   UNKNOWN: "bg-slate-300",
 };
 const DAY = 86_400_000;
+
+/** The state in words, for whoever cannot see the bar's colour. */
+const STATE_WORD: Record<PlanRow["readiness"], string> = {
+  DONE: "Done", LATE_RECEIPT: "Late receipt", READY: "Ready", UPCOMING: "Still ahead", AT_RISK: "At risk", NOT_READY: "Overdue", UNKNOWN: "Nothing listed",
+};
 
 /**
  * The plan as people draw it: one bar per activity, from the day its first
@@ -50,7 +56,14 @@ export function PlanTimeline({ rows, window, fit }: {
   fit?: number;
 }) {
   const dated = rows.filter((r) => r.scheduledDate);
-  if (!dated.length) return null;
+  // Every action here lacks a date: there is nothing to draw, and that is said.
+  if (!dated.length) {
+    return rows.length ? (
+      <p className="px-6 py-16 text-center text-sm text-slate-700">
+        {rows.length === 1 ? "This action has" : `These ${rows.length} actions have`} no date from the schedule, so there is no bar to draw. The table lists {rows.length === 1 ? "it" : "them"}.
+      </p>
+    ) : null;
+  }
   const starts = dated.map((r) => (r.firstNeeded ?? r.scheduledDate!).getTime());
   const ends = dated.map((r) => r.scheduledDate!.getTime());
   const now = Date.now();
@@ -92,16 +105,13 @@ export function PlanTimeline({ rows, window, fit }: {
           </span>
         ))}
         <span
-          className="absolute top-0 whitespace-nowrap rounded bg-red-500 px-1 text-[10px] leading-4 font-semibold text-white"
+          className="absolute top-0 whitespace-nowrap rounded bg-brand px-1 text-[10px] leading-4 font-semibold text-white"
           style={{ left: `${at(now)}%`, marginLeft: "0.25rem" }}
         >
           today · {fmtDate(new Date(now))}
         </span>
       </div>
 
-      {/* A plan is as long as the project. It keeps the height it opened at and
-          scrolls inside it, so loading more never pushes the page about. One
-          bar is 20px and the gap between two is 10px. */}
       {/* A plan is as long as the project. It keeps the height it opened at and
           scrolls inside it, so loading more never pushes the page about. One
           bar is 20px and the gap between two is 10px. */}
@@ -117,7 +127,7 @@ export function PlanTimeline({ rows, window, fit }: {
             {ticks.map((t) => (
               <div key={t.label} className="absolute top-0 h-full border-l border-dashed border-line" style={{ left: `${t.left}%` }} />
             ))}
-            <div className="absolute top-0 h-full border-l-2 border-red-400/70" style={{ left: `${at(now)}%` }} />
+            <div className="absolute top-0 h-full border-l-2 border-brand/60" style={{ left: `${at(now)}%` }} />
           </div>
           <ul className="relative space-y-2.5 pt-1">
           {dated.map((r) => {
@@ -139,6 +149,8 @@ export function PlanTimeline({ rows, window, fit }: {
                   <span
                     className={`absolute top-1/2 h-2.5 -translate-y-1/2 ${TONE[r.readiness]} ${fromBefore ? "rounded-r-full" : "rounded-full"}`}
                     style={{ left: `${left}%`, width: `${width}%` }}
+                    role="img"
+                    aria-label={`${STATE_WORD[r.readiness]}: documents needed from ${fmtDate(r.firstNeeded)}, work on ${fmtDate(r.scheduledDate)}, ${r.ready} of ${r.total} ready`}
                     title={`${r.code}: documents needed from ${fmtDate(r.firstNeeded)} · work on ${fmtDate(r.scheduledDate)} · ${r.ready} of ${r.total} ready`}
                   />
                   {at(end) >= 0 && at(end) <= 100

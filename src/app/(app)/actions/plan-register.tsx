@@ -45,7 +45,7 @@ export function PlanRegister({
   plate, uploads, view, plan, cardHeight, more, rows, total, filters, filterOptions, facets, paging, sort, exportHref,
 }: {
   plate: React.ReactNode;
-  /** The three uploads the schedule rests on, shown with the title they belong to. */
+  /** Where the dates come from, the pages behind the schedule, and uploading by hand for whoever plans. */
   uploads: React.ReactNode;
   /** Which of the two views is showing. */
   view: "plan" | "table";
@@ -66,6 +66,8 @@ export function PlanRegister({
     href: string | null;
     /** The days the plan is drawn across, and the address that widens or narrows it. */
     window: { label: string; href: string; wide: boolean; elsewhere: number } | null;
+    /** Of those drawn, how many have no date from the schedule and so no bar. */
+    undated: number;
   };
   rows: PlanTableRow[];
   total: number;
@@ -223,9 +225,9 @@ export function PlanRegister({
     <section className="register register-sheet register-sheet-open mb-4">
       {plate}
 
-      {/* What the schedule rests on: three uploads, with the title they belong
-          to rather than as a band of their own. */}
-      <div className="border-b border-line px-5 py-3 sm:px-6">{uploads}</div>
+      {/* Where the dates come from and the pages behind them, one quiet line
+          under the title. */}
+      <div className="border-b border-line px-5 py-2 sm:px-6">{uploads}</div>
 
       <form
         // Remounted whenever the answer changes, so Clear all empties the boxes
@@ -373,7 +375,24 @@ export function PlanRegister({
             </span>
           </div>
 
-          {plan}
+          {more && !more.total ? (
+            /* Nothing to draw is said, never left as an empty card: what was
+               asked, and the way back to a plan with bars in it. */
+            <div className="px-6 py-20 text-center">
+              <p className="font-mono text-xs tracking-[0.2em] text-slate-400 uppercase">no actions</p>
+              <p className="mt-2 text-sm text-slate-700">
+                {more.window && more.window.elsewhere
+                  ? `Nothing in these days. ${more.window.elsewhere.toLocaleString("en-GB")} ${more.window.elsewhere === 1 ? "action falls" : "actions fall"} outside them.`
+                  : "Nothing in the schedule matches these filters."}
+              </p>
+              <div className="mt-3 flex items-center justify-center gap-4">
+                {more.window && more.window.elsewhere ? (
+                  <button type="button" onClick={() => go(more.window!.href)} className="text-xs font-semibold text-link hover:underline">Show every date →</button>
+                ) : null}
+                {facets.length ? <button type="button" onClick={() => go("/actions")} className="text-xs font-semibold text-link hover:underline">Clear the {facets.length} filter{facets.length === 1 ? "" : "s"} →</button> : null}
+              </div>
+            </div>
+          ) : plan}
 
           {more && more.total ? (
             <div data-dt-foot className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 border-t border-line px-5 py-2.5 sm:px-6">
@@ -385,6 +404,11 @@ export function PlanRegister({
                 </span>
                 {more.window && more.window.elsewhere ? (
                   <span className="text-amber-800">· {more.window.elsewhere.toLocaleString("en-GB")} outside these days</span>
+                ) : null}
+                {more.undated ? (
+                  <button type="button" onClick={() => go(viewHref("table"))} className="text-amber-800 hover:underline" title="An action with no date has no bar; the table lists it">
+                    · {more.undated.toLocaleString("en-GB")} with no date — in the table
+                  </button>
                 ) : null}
                 {more.window ? (
                   <button

@@ -4,6 +4,7 @@ import { clearance } from "@/lib/requirements-process";
 import { readSearch, readDay } from "@/lib/register-query";
 import { PLAN_CARD_HEIGHT, PLAN_FIRST } from "@/lib/plan-card";
 import { meetsRequirement } from "@/lib/readiness";
+import { ACTION_STATES, DEFAULT_RISK_DAYS, actionState, dayHasPassed } from "@/lib/action-state";
 import { fmtDate } from "@/lib/utils";
 import { getSet } from "@/lib/config";
 import { api } from "@/lib/api/client";
@@ -44,19 +45,8 @@ const SORTS: Record<string, (a: LegacyAction, b: LegacyAction) => number> = {
   documents: (a, b) => a.entries.length - b.entries.length || byCode(a, b),
 };
 
-/**
- * The states, each a shape of what the action carries — how many documents it
- * needs, how many are met, and the day the next missing one is owed.
- */
-const STATES = [
-  { code: "DONE", label: "Done" },
-  { code: "LATE_RECEIPT", label: "Late receipt" },
-  { code: "READY", label: "Ready" },
-  { code: "UPCOMING", label: "Still ahead" },
-  { code: "AT_RISK", label: "At risk" },
-  { code: "NOT_READY", label: "Overdue" },
-  { code: "UNKNOWN", label: "Nothing listed" },
-];
+/** The states, said once for the schedule and the action's own page alike. */
+const STATES = ACTION_STATES;
 
 /**
  * What became of the work, as against whether its documents arrived.
@@ -76,18 +66,6 @@ const HAPPENED = [
 
 /** How many days either side of today the plan shows when nobody says otherwise. */
 const PLAN_WINDOW_DAYS = 30;
-
-/**
- * A document owed within this many days — or already owed — puts its action at
- * risk. Further out than that, the work is simply still ahead.
- */
-const RISK_DAYS = 7;
-
-/**
- * How many bars the plan draws before asking. Twelve leaves the footer — and
- * the way to draw more — where the page ends rather than below it, now that the
- * footer carries two rows.
- */
 
 /** How many more the plan draws at a time — the reader's choice, like rows. */
 const PLAN_STEPS = [5, 10, 25, 50, 100];
@@ -126,33 +104,16 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
   const planFrom = fromDay ?? (windowed ? daysBefore(new Date(), PLAN_WINDOW_DAYS) : null);
   const planTo = toDay ?? (windowed ? daysBefore(new Date(), -PLAN_WINDOW_DAYS) : null);
 
-  // What the backend says is met, counted on the action; the schedule is read
-  // whole and filtered here.
-  const now = new Date();
-  const risk = new Date(now.getTime() + RISK_DAYS * 86_400_000);
+  // Where each action stands is one rule, shared with the action's own page;
+  // the schedule is read whole and filtered here.
   const met = (action: LegacyAction) => action.entries.filter((entry) => meetsRequirement(entry.document.revisions, entry.requiredStatus)).length;
-  const missingOn = (action: LegacyAction) => action.entries.filter((entry) => !meetsRequirement(entry.document.revisions, entry.requiredStatus));
   const shortOfWhatItNeeds = (action: LegacyAction) => met(action) !== action.entries.length;
-  const hasAll = (action: LegacyAction) => met(action) === action.entries.length;
-  const before = (date: Date | null, than: Date) => !!date && date < than;
-  const nextNeededAt = (action: LegacyAction) => missingOn(action).map((one) => one.requiredBy).sort((x, y) => x.getTime() - y.getTime())[0] ?? null;
   const afterTheDay = (action: LegacyAction) => !!action.lastMetAt && !!action.scheduledDate && action.lastMetAt > action.scheduledDate;
-  const STATE_WHERE: Record<string, (action: LegacyAction) => boolean> = {
-    UNKNOWN: (a) => a.entries.length === 0,
-    // Everything arrived, but the last of it after the day of the work. It is
-    // not done: done means they were there in time.
-    LATE_RECEIPT: (a) => a.entries.length > 0 && hasAll(a) && before(a.scheduledDate, now) && afterTheDay(a),
-    DONE: (a) => a.entries.length > 0 && hasAll(a) && before(a.scheduledDate, now) && !afterTheDay(a),
-    READY: (a) => a.entries.length > 0 && hasAll(a) && !before(a.scheduledDate, now),
-    NOT_READY: (a) => a.entries.length > 0 && shortOfWhatItNeeds(a) && before(a.scheduledDate, now),
-    AT_RISK: (a) => a.entries.length > 0 && shortOfWhatItNeeds(a) && !!a.scheduledDate && a.scheduledDate >= now && !!nextNeededAt(a) && nextNeededAt(a)! <= risk,
-    UPCOMING: (a) => a.entries.length > 0 && shortOfWhatItNeeds(a) && !!a.scheduledDate && a.scheduledDate >= now && (!nextNeededAt(a) || nextNeededAt(a)! > risk),
-  };
 
   // The work happened without everything it needed: its day has passed and, on
   // that day, either something was still missing or the last of it had not yet
   // arrived. Both readings of "short on the day", in one clause.
-  const shortOnTheDay = (a: LegacyAction) => a.entries.length > 0 && before(a.scheduledDate, now) && (shortOfWhatItNeeds(a) || afterTheDay(a));
+  const shortOnTheDay = (a: LegacyAction) => a.entries.length > 0 && dayHasPassed(a) && (shortOfWhatItNeeds(a) || afterTheDay(a));
   const decided = (a: LegacyAction, decision: string) => a.notes.some((note) => note.decision === decision);
   const HAPPENED_WHERE: Record<string, (action: LegacyAction) => boolean> = {
     WITHOUT: (a) => shortOnTheDay(a) && !decided(a, "STOPPED"),
@@ -166,7 +127,7 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
     !(planFrom || planTo) || (!!a.scheduledDate && (!planFrom || a.scheduledDate >= planFrom) && (!planTo || a.scheduledDate <= planTo));
   const outsideWindow = (a: LegacyAction) =>
     (!code || a.code === code)
-    && (!state || STATE_WHERE[state](a))
+    && (!state || actionState(a, riskDays) === state)
     && (!happened || HAPPENED_WHERE[happened](a))
     // A discipline is what an action is tagged with and what a document
     // belongs to — the same list, so the filter answers for both.
@@ -191,6 +152,9 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
     // Suppliers are the organizations the project deals with.
     api<{ code: string; name: string }[]>("/api/parties").then((rows) => rows.map((one) => ({ code: one.code, label: one.name }))).catch(() => []),
   ]);
+  // How near a missing document's date must be to put its action at risk is the
+  // project's setting, the same one the late warnings use.
+  const riskDays = source.source?.riskWindowDays ?? DEFAULT_RISK_DAYS;
   const found = schedule.filter(where).sort(orderBy);
   const matching = found.length;
   const everywhere = windowed ? schedule.filter(outsideWindow).length : 0;
@@ -204,7 +168,6 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
     ? (await backendDocument(ctx, source.source.documentId))?.revisions.find((one) => one.id === latest.revisionId)?.releasedAt ?? null
     : null;
   const publishedVersion = latest ? { publishedAt: releasedAt ? new Date(releasedAt) : null } : null;
-  const draftCount = 0;
   const inUse = [...schedule].sort(SORTS.date);
 
   const deptLabel = new Map(disciplineRows.map((one) => [one.code, one.label]));
@@ -216,21 +179,11 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
     const firstNeeded = action.entries.map((one) => one.requiredBy).filter(Boolean).sort((a, b) => a!.getTime() - b!.getTime())[0] ?? null;
     // The next document still owed — what a controller chases first.
     const nextNeeded = missing.map((one) => one.requiredBy).filter(Boolean).sort((a, b) => a!.getTime() - b!.getTime())[0] ?? null;
-    // Four states, and they are not degrees of the same thing: nothing missing,
-    // the day has passed, a document is already owed or nearly owed, and the
-    // ordinary case of work that is simply still ahead.
-    let readiness: Readiness = "UNKNOWN";
-    if (total > 0 && missing.length === 0) {
-      const afterwards = !!action.lastMetAt && !!action.scheduledDate && action.lastMetAt > action.scheduledDate;
-      readiness = daysUntil !== null && daysUntil < 0 ? (afterwards ? "LATE_RECEIPT" : "DONE") : "READY";
-    }
-    else if (total > 0 && daysUntil !== null && daysUntil < 0) readiness = "NOT_READY";
-    else if (total > 0 && nextNeeded && nextNeeded.getTime() - Date.now() <= RISK_DAYS * 86_400_000) readiness = "AT_RISK";
-    else if (total > 0) readiness = "UPCOMING";
+    const readiness: Readiness = actionState(action, riskDays);
     // What became of the work, which is not the same question as whether its
     // documents arrived. The day passing is the work happening; only Document
     // Control saying it was postponed takes that back.
-    const passed = daysUntil !== null && daysUntil < 0;
+    const passed = dayHasPassed(action);
     const shortOnTheDay = missing.length > 0
       || (!!action.lastMetAt && !!action.scheduledDate && action.lastMetAt > action.scheduledDate);
     const happened: Happened = action.notes.some((note) => note.decision === "STOPPED")
@@ -366,10 +319,7 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
     <div>
       <PlanRegister
         plate={
-          <PlanPlate
-            inForceSince={publishedVersion ? fmtDate(publishedVersion.publishedAt) : null}
-            drafts={draftCount}
-          />
+          <PlanPlate inForceSince={publishedVersion ? fmtDate(publishedVersion.publishedAt) : null} />
         }
         uploads={<PlanCards />}
         cardHeight={PLAN_CARD_HEIGHT}
@@ -383,6 +333,7 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
                 steps: PLAN_STEPS.map((by) => ({ by, href: deeper(by) })),
                 href: matching > rows.length ? deeper(step) : null,
                 window: planWindow,
+                undated: rows.filter((row) => !row.scheduledDate).length,
               }
             : undefined
         }

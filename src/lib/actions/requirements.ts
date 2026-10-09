@@ -83,11 +83,17 @@ export async function issueToSendersAction(_prev: State | undefined, formData: F
 export async function confirmReadinessAction(_prev: State | undefined, formData: FormData): Promise<State> {
   const ctx = await requireScope();
   const actionId = String(formData.get("actionId") ?? "");
+  const answer = String(formData.get("available") ?? "");
+  const note = String(formData.get("note") ?? "").trim() || null;
+  // Available or not is a choice, never a box left as it was; and "not
+  // available" is what Document Control is alerted with, so it says why.
+  if (answer !== "yes" && answer !== "no") return { error: "Choose Available or Not available." };
+  if (answer === "no" && !note) return { error: "Say what is missing, and when it will be there." };
   try {
     await api(projectPath(ctx, `/activities/${actionId}/readiness`), {
       body: {
-        department: String(formData.get("department") ?? ""), available: formData.get("available") === "yes",
-        note: String(formData.get("note") ?? "").trim() || null,
+        department: String(formData.get("department") ?? ""), available: answer === "yes",
+        note,
       },
     });
   } catch (e) {

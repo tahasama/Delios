@@ -1,61 +1,80 @@
 import Link from "next/link";
 import { requireScope } from "@/lib/scope";
 import { scheduleVersions } from "@/lib/api/schedule";
-
-import { PageHeader, Chip } from "@/components/ui";
 import { fmtDate } from "@/lib/utils";
-import { ArrowLeft, ArrowRight, CalendarSync, FileUp, History } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Schedule versions" };
 
+/** A read's standing, in words: in force, an earlier one, or one that could not be read. */
+const STANDING: Record<string, { label: string; rail: string; tone: string }> = {
+  PUBLISHED: { label: "In force", rail: "rail-released", tone: "text-emerald-800" },
+  SUPERSEDED: { label: "Earlier", rail: "rail-none", tone: "text-slate-500" },
+  FAILED: { label: "Could not be read", rail: "rail-void", tone: "text-red-700" },
+};
+
+/**
+ * Every release of the schedule document, read on its own. The newest good
+ * read is the one in force; the others are kept, with what each one moved.
+ */
 export default async function ScheduleVersionsPage() {
   const versions = await scheduleVersions(await requireScope());
-  const published = versions.find((version) => version.status === "PUBLISHED");
+  const inForce = versions.find((version) => version.status === "PUBLISHED") ?? null;
+  const th = "stencil px-3 py-2 text-left font-normal text-slate-500 first:pl-5 sm:first:pl-6";
+  const td = "px-3 py-2.5 align-top first:pl-5 sm:first:pl-6";
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Schedule versions"
-        subtitle="Every schedule that has been in use, and what each one changed. New versions arrive through Controlled changes."
-        actions={<Link href="/actions" className="inline-flex items-center gap-1.5 text-sm font-semibold text-link"><ArrowLeft className="h-4 w-4" /> Schedule & actions</Link>}
-      />
-
-      {published ? (
-        <section className="flex items-center justify-between gap-5 rounded-2xl border border-emerald-200 bg-emerald-50 px-6 py-5">
-          <div className="flex items-center gap-4">
-            <span className="grid h-11 w-11 place-items-center rounded-xl bg-surface text-emerald-700 shadow-sm"><CalendarSync className="h-5 w-5" /></span>
-            <div><p className="text-xs font-bold uppercase tracking-[0.12em] text-emerald-700">Published schedule</p><p className="mt-1 text-base font-semibold text-slate-900">{published.sourceName} · {published.versionLabel}</p><p className="mt-1 text-xs text-slate-500">Published {fmtDate(published.publishedAt)} by {published.publishedByName}</p></div>
-          </div>
-          <Link href={`/actions/schedules/${published.id}`} className="inline-flex items-center gap-1.5 text-sm font-semibold text-emerald-800">View version <ArrowRight className="h-4 w-4" /></Link>
-        </section>
-      ) : (
-        <section className="rounded-2xl border border-amber-200 bg-amber-50 px-6 py-5"><p className="text-sm font-semibold text-amber-900">No schedule version has been published yet.</p><p className="mt-1 text-xs text-amber-800/75">Existing action dates remain available, but they are not linked to a controlled schedule version.</p></section>
-      )}
-
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1.1fr_0.9fr]">
-        <section className="rounded-2xl border border-line bg-surface shadow-sm">
-          <header className="border-b border-line px-6 py-5"><div className="flex items-center gap-2"><FileUp className="h-4 w-4 text-link" /><h2 className="text-base font-semibold text-slate-900">Import a schedule update</h2></div><p className="mt-1 text-xs text-slate-500">A schedule change is issued formally and approved by someone other than whoever uploaded it.</p></header>
-          <div className="px-6 py-5">
-            <p className="text-sm text-slate-600">Schedule imports go through <strong>Controlled changes</strong>, together with every other configuration that arrives as a file. You upload it, see exactly which action dates would move, and an approver decides.</p>
-            <Link href="/settings/controlled" className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-link">Open controlled changes <ArrowRight className="h-4 w-4" /></Link>
-          </div>
-        </section>
-
-        <section className="rounded-2xl border border-line bg-surface shadow-sm">
-          <header className="border-b border-line px-6 py-5"><div className="flex items-center gap-2"><History className="h-4 w-4 text-link" /><h2 className="text-base font-semibold text-slate-900">Version history</h2></div><p className="mt-1 text-xs text-slate-500">Drafts, the active published version, and superseded sources.</p></header>
-          <div className="px-6 py-2">
-            {versions.length ? <ul className="divide-y divide-line">{versions.map((version) => (
-              <li key={version.id}><Link href={`/actions/schedules/${version.id}`} className="group flex items-center justify-between gap-4 py-4"><div className="min-w-0"><div className="flex items-center gap-2"><p className="truncate text-sm font-semibold text-slate-800">{version.versionLabel}</p><StatusChip status={version.status} /></div><p className="mt-1 truncate text-xs text-slate-500">{version.sourceName} · {version._count.activities} activities</p><p className="mt-1 text-[11px] text-slate-400">Imported {fmtDate(version.importedAt)} by {version.importedByName}</p></div><ArrowRight className="h-4 w-4 shrink-0 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-slate-500" /></Link></li>
-            ))}</ul> : <div className="py-12 text-center"><p className="text-sm font-semibold text-slate-700">No versions imported</p><p className="mt-1 text-xs text-slate-400">The first validated import will appear here.</p></div>}
-          </div>
-        </section>
+    <section className="register register-sheet register-sheet-open">
+      <div className="border-b border-line px-5 pt-6 pb-3 sm:px-6">
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+          <h1 className="plate-title min-w-0 text-slate-950">Schedule versions</h1>
+          <Link href="/actions" className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-semibold text-slate-500 hover:bg-slate-100"><ArrowLeft className="h-4 w-4" /> Schedule</Link>
+        </div>
+        <p className="plate-meta mt-2">
+          {inForce
+            ? <>In force: <Link href={`/actions/schedules/${inForce.id}`} className="font-mono font-semibold text-brand-ink hover:underline">{inForce.sourceName} {inForce.versionLabel}</Link>, released {fmtDate(inForce.publishedAt)} by {inForce.publishedByName} &middot; {inForce._count.activities} activities</>
+            : "No schedule is in force yet."}
+        </p>
+        <p className="mt-1 max-w-2xl text-[11.5px] leading-4 text-slate-500">
+          Each time the schedule document is released, its dates are read in and the actions follow. There is nothing to approve here: the release was the approval.
+        </p>
       </div>
-    </div>
-  );
-}
 
-function StatusChip({ status }: { status: string }) {
-  const cls = status === "PUBLISHED" ? "bg-emerald-100 text-emerald-800 ring-emerald-200" : status === "DRAFT" ? "bg-sky-100 text-sky-800 ring-sky-200" : "bg-slate-100 text-slate-600 ring-slate-200";
-  return <Chip className={cls}>{status.toLowerCase()}</Chip>;
+      {versions.length ? (
+        <div className="overflow-x-auto">
+          <table className="w-full text-[13px]">
+            <thead className="border-b border-line bg-tint-soft">
+              <tr><th className={th}>Version</th><th className={th}>Standing</th><th className={th}>Released</th><th className={th}>What it changed</th></tr>
+            </thead>
+            <tbody className="divide-y divide-line">
+              {versions.map((version) => {
+                const standing = STANDING[version.status] ?? STANDING.SUPERSEDED;
+                const { added, moved, changed, removed } = version.view;
+                const said = [added && `${added} new`, moved && `${moved} moved`, changed && `${changed} changed`, removed && `${removed} removed`].filter(Boolean).join(" · ");
+                return (
+                  <tr key={version.id} className={`${standing.rail} hover:bg-tint-soft`}>
+                    <td className={`${td} rail`}>
+                      <Link href={`/actions/schedules/${version.id}`} className="font-mono font-semibold text-brand-ink hover:underline">{version.sourceName} {version.versionLabel}</Link>
+                      <span className="block text-xs text-slate-500">{version._count.activities} activities</span>
+                    </td>
+                    <td className={`${td} text-xs font-semibold ${standing.tone}`}>
+                      {standing.label}
+                      {version.status === "FAILED" && version.notes ? <span className="block max-w-80 font-normal">{version.notes}</span> : null}
+                    </td>
+                    <td className={`${td} whitespace-nowrap text-xs text-slate-600`}>{fmtDate(version.importedAt)}<span className="block text-slate-500">{version.importedByName}</span></td>
+                    <td className={`${td} text-xs tabular-nums text-slate-600`}>{version.status === "FAILED" ? "—" : said || "Nothing"}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <p className="px-5 py-8 text-center text-sm text-slate-500 sm:px-6">
+          No schedule has been read yet. Release the schedule document and its dates are read in on their own.
+        </p>
+      )}
+    </section>
+  );
 }

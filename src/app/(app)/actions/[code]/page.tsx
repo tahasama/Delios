@@ -19,7 +19,8 @@ import { ArrowLeft } from "lucide-react";
 import { getActiveSet } from "@/lib/config";
 import { api } from "@/lib/api/client";
 import { holders } from "@/lib/api/settings";
-import { legacyActionByCode } from "@/lib/api/schedule";
+import { legacyActionByCode, scheduleSource } from "@/lib/api/schedule";
+import { actionState, stateLabel, dayHasPassed, DEFAULT_RISK_DAYS, type ActionState } from "@/lib/action-state";
 
 export const dynamic = "force-dynamic";
 
@@ -65,40 +66,38 @@ export default async function ActionDetailPage({ params, searchParams }: { param
   // neither a slip nor a note.
   const tellsSomething = lateness.rows.some((row) => row.cause || row.outstanding) || action.notes.length > 0;
   const readyCount = action.entries.filter((e) => meetsRequirement(e.document.revisions, e.requiredStatus)).length;
-  const overdue = action.scheduledDate && new Date(action.scheduledDate) < new Date();
   // The earliest date a document is owed: where the activity's own clock starts.
   const firstDue = action.entries.map((e) => e.requiredBy).filter(Boolean).sort((a, b) => a.getTime() - b.getTime())[0] ?? null;
-  // The same six states the schedule uses, said the same way here. Done means
-  // the documents were there in time; late receipt means they came afterwards.
+  // The same states the schedule uses, by the same rule, so the two pages never
+  // disagree about one action.
   const everything = action.entries.length > 0 && readyCount === action.entries.length;
-  const afterwards = !!action.lastMetAt && !!action.scheduledDate && action.lastMetAt > action.scheduledDate;
-  const readiness = action.entries.length === 0
-    ? "UNKNOWN"
-    : everything
-      ? (overdue ? (afterwards ? "LATE_RECEIPT" : "DONE") : "READY")
-      : overdue ? "NOT_READY" : "AT_RISK";
+  const riskDays = (await scheduleSource(ctx)).source?.riskWindowDays ?? DEFAULT_RISK_DAYS;
+  const readiness = actionState(action, riskDays);
   // Who is short, and the transmittal that tells them — the placeholder numbers
-  // are named in it, and the sender adds anyone else who should see it.
+  // are named in it, and the sender adds anyone else who should see it. Each
+  // discipline is told about its own documents only: Notify on its row reaches
+  // its people, not every discipline the action concerns.
   const short = shortfall(action).filter((s) => depts.includes(s.department));
   // A department is a discipline: the people whose membership names one of them.
-  const deptPeople = (await holders(ctx.projectId, "READ").catch(() => []))
-    .filter((one) => !!one.department && depts.includes(one.department)).map((one) => ({ userId: one.id }));
-  const remindHref = `/transmittals/new?${new URLSearchParams({
-    reason: "INFORMATION",
-    users: deptPeople.map((m) => m.userId).join(","),
-    subject: `${action.code} on ${fmtDate(action.scheduledDate)} — ${readiness === "NOT_READY" ? "overdue" : "at risk"}: ${short.map((s) => `${s.department} ${s.missing} of ${s.total} missing`).join(", ")}`,
-    message: [
-      `${action.name} is planned for ${fmtDate(action.scheduledDate)}.`,
-      short.map((s) => `${deptLabel(s.department)} still owes ${s.missing} of ${s.total}: ${s.numbers.join(", ")}.`).join("\n"),
-      "Departments concerned: " + depts.map(deptLabel).join(", ") + ".",
-      "Send the documents, or say when they will arrive.",
-    ].join("\n\n"),
-  })}`;
+  const people = await holders(ctx.projectId, "READ").catch(() => []);
+  const remindHref = (department: string) => {
+    const owes = short.find((one) => one.department === department)!;
+    return `/transmittals/new?${new URLSearchParams({
+      reason: "INFORMATION",
+      users: people.filter((one) => one.department === department).map((one) => one.id).join(","),
+      subject: `${action.code} on ${fmtDate(action.scheduledDate)} — ${stateLabel(readiness).toLowerCase()}: ${deptLabel(department)} ${owes.missing} of ${owes.total} missing`,
+      message: [
+        `${action.name} is planned for ${fmtDate(action.scheduledDate)}.`,
+        `${deptLabel(department)} still owes ${owes.missing} of ${owes.total}: ${owes.numbers.join(", ")}.`,
+        "Send the documents, or say when they will arrive.",
+      ].join("\n\n"),
+    })}`;
+  };
 
   // The work is taken to have happened once its day has passed — that is what
   // a schedule is — unless Document Control wrote down that it was postponed.
   const postponed = action.notes.find((note) => note.decision === "STOPPED") ?? null;
-  const happened = !postponed && !!action.scheduledDate && action.scheduledDate.getTime() < Date.now();
+  const happened = !postponed && dayHasPassed(action);
 
   // One row per required document: what it is, whether it is there, and the
   // step where its time went. Dates are written here so the table stays a
@@ -235,29 +234,35 @@ export default async function ActionDetailPage({ params, searchParams }: { param
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
                       {owes && control ? (
-                        <Link href={remindHref} className="text-xs font-semibold text-link hover:underline">Notify</Link>
+                        <Link href={remindHref(d)} className="text-xs font-semibold text-link hover:underline">Notify {deptLabel(d)}</Link>
                       ) : null}
                     </div>
                     {mine && (!confirmOpens || confirmOpens.getTime() <= Date.now()) ? (
                       /* Answered the way the sheet asks everything else: plain
-                         fields on one line, and one button. */
-                      <details className="w-full text-xs">
-                        <summary className="cursor-pointer text-xs font-semibold text-link">{c ? "Confirm again" : "Confirm"}</summary>
+                         fields on one line, and one button. Available or not is
+                         a choice somebody makes, never what an untouched box
+                         happens to say. */
+                      <details className="group w-full text-xs">
+                        <summary className="ask cursor-pointer list-none [&::-webkit-details-marker]:hidden">{c ? "Confirm again" : "Confirm"}</summary>
                         <ActionForm action={confirmReadinessAction} hideSubmit hidden={{ actionId: action.id, department: d }}>
-                          <div className="asking mt-2.5 grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-[auto_minmax(0,1fr)_auto]">
-                            {/* Ticked is available; left untouched says the
-                                documents are not there, and then the note is
-                                what Document Control is alerted with. */}
-                            <label className="flex min-w-0 items-center gap-2 whitespace-nowrap text-xs font-medium text-slate-700">
-                              <input type="checkbox" name="available" value="yes" defaultChecked={!missing.length} />
-                              Documents available
-                            </label>
+                          <fieldset className="asking mt-2.5 grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center">
+                            <legend className="sr-only">Are {deptLabel(d)}&rsquo;s documents available?</legend>
+                            <div className="flex items-center gap-4 whitespace-nowrap text-xs font-medium text-slate-700">
+                              <label className="flex items-center gap-1.5">
+                                <input type="radio" name="available" value="yes" required />
+                                Available
+                              </label>
+                              <label className="flex items-center gap-1.5">
+                                <input type="radio" name="available" value="no" required />
+                                Not available
+                              </label>
+                            </div>
                             <label className="min-w-0">
                               <span className="sr-only">Note</span>
-                              <input name="note" required={readinessPolicy.rules.note === "REQUIRED"} className="plain w-full" placeholder={missing.length ? `${missing.length} not ready — say what and why` : readinessPolicy.rules.note === "REQUIRED" ? `${readinessPolicy.labels.note} — this project asks for one every time` : "Note — optional, unless you leave the box unticked"} />
+                              <input name="note" required={readinessPolicy.rules.note === "REQUIRED"} className="plain w-full" placeholder={missing.length ? `${missing.length} not ready — say what and why` : readinessPolicy.rules.note === "REQUIRED" ? `${readinessPolicy.labels.note} — this project asks for one every time` : "Note — needed when not available"} />
                             </label>
-                            <button className="ask">Record</button>
-                          </div>
+                            <button className="ask" data-on="true">Record</button>
+                          </fieldset>
                         </ActionForm>
                       </details>
                     ) : null}
@@ -308,14 +313,17 @@ export default async function ActionDetailPage({ params, searchParams }: { param
   );
 }
 
-function ReadinessChip({ readiness }: { readiness: "DONE" | "LATE_RECEIPT" | "READY" | "AT_RISK" | "NOT_READY" | "UNKNOWN" }) {
-  const map = {
-    DONE: ["Done", "bg-emerald-600/10 text-emerald-900 ring-emerald-300"],
-    LATE_RECEIPT: ["Late receipt", "bg-violet-100 text-violet-800 ring-violet-300"],
-    READY: ["Ready", "bg-emerald-100 text-emerald-800 ring-emerald-200"],
-    AT_RISK: ["At risk", "bg-amber-100 text-amber-800 ring-amber-200"],
-    NOT_READY: ["Overdue", "bg-red-100 text-red-800 ring-red-200"],
-    UNKNOWN: ["No documents listed", "bg-slate-100 text-slate-700 ring-slate-200"],
-  } as const;
-  return <Chip className={map[readiness][1]}>{map[readiness][0]}</Chip>;
+/** The schedule's own chip colours, so a state reads the same on both pages. */
+const TONE: Record<ActionState, string> = {
+  DONE: "bg-emerald-600/10 text-emerald-900 ring-emerald-300",
+  LATE_RECEIPT: "bg-violet-100 text-violet-800 ring-violet-300",
+  READY: "bg-emerald-100 text-emerald-800 ring-emerald-200",
+  UPCOMING: "bg-sky-100 text-sky-800 ring-sky-200",
+  AT_RISK: "bg-amber-100 text-amber-800 ring-amber-200",
+  NOT_READY: "bg-red-100 text-red-800 ring-red-200",
+  UNKNOWN: "bg-slate-100 text-slate-600 ring-slate-200",
+};
+
+function ReadinessChip({ readiness }: { readiness: ActionState }) {
+  return <Chip className={TONE[readiness]}>{stateLabel(readiness)}</Chip>;
 }

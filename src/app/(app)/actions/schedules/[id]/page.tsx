@@ -1,98 +1,128 @@
 import Link from "next/link";
 import { requireScope } from "@/lib/scope";
 import { notFound } from "next/navigation";
-import { isController, isAdmin } from "@/lib/auth";
-
-import { Chip, DataTable, PageHeader, Th, Td } from "@/components/ui";
+import { Banner, Chip } from "@/components/ui";
 import type { ScheduleChange } from "@/lib/schedule";
 import { fmtDate } from "@/lib/utils";
-import { ArrowLeft, CalendarCheck2, CircleAlert, GitCompareArrows } from "lucide-react";
-import { ControlledSource } from "@/components/controlled-source";
+import { ArrowLeft } from "lucide-react";
 import { scheduleVersions, dayOf } from "@/lib/api/schedule";
 
 export const dynamic = "force-dynamic";
 
+/** Each kind of change in plain words, and the rail its row carries. */
+const CHANGE: Record<ScheduleChange["type"], { label: string; chip: string; rail: string }> = {
+  NEW: { label: "New", chip: "bg-sky-100 text-sky-800 ring-sky-200", rail: "rail-review" },
+  DATE_CHANGED: { label: "Date moved", chip: "bg-amber-100 text-amber-800 ring-amber-200", rail: "rail-prep" },
+  DETAIL_CHANGED: { label: "Details changed", chip: "bg-amber-100 text-amber-800 ring-amber-200", rail: "rail-prep" },
+  REMOVED: { label: "Removed", chip: "bg-red-100 text-red-800 ring-red-200", rail: "rail-void" },
+  UNCHANGED: { label: "Unchanged", chip: "bg-slate-100 text-slate-700 ring-slate-200", rail: "rail-none" },
+};
+
+const STANDING: Record<string, string> = {
+  PUBLISHED: "in force",
+  SUPERSEDED: "an earlier version",
+  FAILED: "could not be read",
+};
+
+/** One read of the schedule document: where it stands, and every activity it moved. */
 export default async function ScheduleVersionDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const ctx = await requireScope();
-  const { user } = ctx;
   const { id } = await params;
   const versions = await scheduleVersions(ctx);
   const version = versions.find((one) => one.id === id);
   if (!version) notFound();
   // The read before it that took; the backend keeps what changed against it.
   const previous = versions.slice(versions.indexOf(version) + 1).find((one) => one.status !== "FAILED") ?? null;
-  // The schedule's own revision is its controlled source; naming another
-  // schedule document is done on the backend's schedule settings, not here.
-  const [controlledSource, sourceOptions] = [version.revision, [] as { id: string; value: string; state: string; document: { docNumber: string; title: string } }[]];
   const TYPE: Record<string, ScheduleChange["type"]> = { NEW: "NEW", MOVED: "DATE_CHANGED", CHANGED: "DETAIL_CHANGED", REMOVED: "REMOVED" };
-  const changes: ScheduleChange[] = version.view.changes.map((change) => {
-    const now = { actionCode: change.code, externalId: change.code, name: change.name, baselineDate: dayOf(change.newStart), forecastDate: null, responsibleParty: null };
-    const before = { ...now, baselineDate: dayOf(change.oldStart) };
-    return { type: TYPE[change.type] ?? "DETAIL_CHANGED", activity: change.type === "REMOVED" ? before : now, previous: change.type === "NEW" ? null : before };
-  }).sort((a, b) => a.activity.actionCode.localeCompare(b.activity.actionCode));
-  const counts = {
-    new: changes.filter((change) => change.type === "NEW").length,
-    date: changes.filter((change) => change.type === "DATE_CHANGED").length,
-    detail: changes.filter((change) => change.type === "DETAIL_CHANGED").length,
-    removed: changes.filter((change) => change.type === "REMOVED").length,
+  const changes = version.view.changes.map((change) => ({
+    type: TYPE[change.type] ?? "DETAIL_CHANGED",
+    code: change.code,
+    name: change.name,
+    was: change.type === "NEW" ? null : dayOf(change.oldStart),
+    now: change.type === "REMOVED" ? null : dayOf(change.newStart),
+  })).sort((a, b) => a.code.localeCompare(b.code));
+  const count = (type: ScheduleChange["type"]) => changes.filter((change) => change.type === type).length;
+  const summary = [
+    [count("NEW"), "new"],
+    [count("DATE_CHANGED"), "moved"],
+    [count("DETAIL_CHANGED"), "details changed"],
+    [count("REMOVED"), "removed"],
     // Activities the read left as they were are counted, not listed.
-    unchanged: version.view.unchanged,
-  };
+    [version.view.unchanged, "unchanged"],
+  ] as const;
+
+  const th = "stencil px-3 py-2 text-left font-normal text-slate-500 first:pl-5 sm:first:pl-6";
+  const td = "px-3 py-2.5 align-top first:pl-5 sm:first:pl-6";
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title={`${version.sourceName} · ${version.versionLabel}`}
-        subtitle={`Imported ${fmtDate(version.importedAt)} by ${version.importedByName}. ${version.notes ?? "No import note was provided."}`}
-        actions={<Link href="/actions/schedules" className="inline-flex items-center gap-1.5 text-sm font-semibold text-link"><ArrowLeft className="h-4 w-4" /> Schedule versions</Link>}
-      />
-
-      <ControlledSource label="schedule document" sourceType="ScheduleVersion" sourceId={version.id} returnPath={`/actions/schedules/${version.id}`} source={controlledSource} options={sourceOptions} canLink={isController(user) || isAdmin(user)} />
-
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_auto]">
-        <section className="rounded-2xl border border-line bg-surface p-6 shadow-sm">
-          <div className="flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-xl bg-tint text-link"><GitCompareArrows className="h-5 w-5" /></span><div><p className="text-sm font-semibold text-slate-900">Change summary</p><p className="mt-0.5 text-xs text-slate-500">Compared with {previous ? `${previous.versionLabel}, imported ${fmtDate(previous.importedAt)}` : "an empty starting point"}.</p></div></div>
-          <div className="mt-5 grid grid-cols-5 gap-2"><ChangeMetric label="New" value={counts.new} tone="blue" /><ChangeMetric label="Date changes" value={counts.date} tone="amber" /><ChangeMetric label="Detail changes" value={counts.detail} tone="amber" /><ChangeMetric label="Removed" value={counts.removed} tone="red" /><ChangeMetric label="Unchanged" value={counts.unchanged} tone="slate" /></div>
-        </section>
-        <section className={`min-w-82.5 rounded-2xl border p-6 shadow-sm ${version.status === "DRAFT" ? "border-amber-200 bg-amber-50" : "border-emerald-200 bg-emerald-50"}`}>
-          <div className="flex items-center gap-3">{version.status === "DRAFT" ? <CircleAlert className="h-5 w-5 text-amber-700" /> : <CalendarCheck2 className="h-5 w-5 text-emerald-700" />}<div><p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Status</p><p className="mt-1 text-sm font-semibold text-slate-900">{version.status === "DRAFT" ? "Draft—live dates unchanged" : version.status === "PUBLISHED" ? "Published to live actions" : "Superseded history"}</p></div></div>
-          {version.status === "DRAFT" ? <p className="mt-5 text-xs text-slate-600">Approve it in <Link href="/settings/controlled" className="font-semibold text-link">Controlled changes</Link> — the decision is recorded there with its reason.</p> : null}
-          {version.publishedAt ? <p className="mt-4 text-xs text-slate-500">Published {fmtDate(version.publishedAt)} by {version.publishedByName}</p> : null}
-        </section>
+    <section className="register register-sheet register-sheet-open">
+      <div className="flex flex-col-reverse gap-3 border-b border-line px-5 pt-6 pb-3 sm:px-6 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0 flex-1">
+          {version.revision ? (
+            <Link href={`/documents/${version.revision.document.id}`} className="font-mono text-[12.5px] font-semibold tracking-tight text-slate-500 hover:text-link hover:underline">{version.sourceName}</Link>
+          ) : (
+            <p className="font-mono text-[12.5px] font-semibold tracking-tight text-slate-500">{version.sourceName}</p>
+          )}
+          <h1 className="plate-name mt-1 min-w-0">Schedule {version.versionLabel}</h1>
+          <p className="plate-meta mt-2">
+            Released {fmtDate(version.importedAt)} by {version.importedByName} &middot; {STANDING[version.status] ?? STANDING.SUPERSEDED}
+            {version.status !== "FAILED" ? <> &middot; compared with {previous ? previous.versionLabel : "nothing before it"}</> : null}
+          </p>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <Link href="/actions/schedules" className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-semibold text-slate-500 hover:bg-slate-100"><ArrowLeft className="h-4 w-4" /> Schedule versions</Link>
+        </div>
       </div>
 
-      <section className="overflow-hidden rounded-2xl border border-line bg-surface shadow-sm">
-        <header className="border-b border-line px-6 py-5"><h2 className="text-base font-semibold text-slate-900">Activity comparison</h2><p className="mt-1 text-xs text-slate-500">Every imported activity is identified by its action code. Dates shown in red or amber will affect readiness when this version is published.</p></header>
-        <DataTable id="schedule-changes" className="rounded-none border-0 shadow-none" head={<tr><Th>Change</Th><Th>Action</Th><Th>Activity</Th><Th>Previous date</Th><Th>New date</Th><Th>Responsible party</Th></tr>}>
-          {changes.map((change) => <ChangeRow key={`${change.type}-${change.activity.actionCode}`} change={change} />)}
-        </DataTable>
-      </section>
-    </div>
+      {version.status === "FAILED" ? (
+        <div className="border-b border-line px-5 py-3.5 sm:px-6">
+          <Banner tone="danger" title="This release could not be read">
+            {version.notes ?? "The file did not match what a schedule is expected to hold."} The dates in force did not change. Fix the file and release the document again.
+          </Banner>
+        </div>
+      ) : (
+        <>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-line bg-tint-soft px-5 py-2 sm:px-6">
+            <span className="stencil mr-1 text-slate-500">What changed</span>
+            {summary.map(([value, label], i) => (
+              <span key={label} className={`text-xs tabular-nums ${value ? "text-slate-700" : "text-slate-500"}`}>
+                {i ? <span aria-hidden className="mr-3 text-slate-300">·</span> : null}
+                <span className="font-semibold">{value}</span> {label}
+              </span>
+            ))}
+          </div>
+
+          {changes.length ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-[13px]">
+                <thead className="border-b border-line bg-tint-soft">
+                  <tr><th className={th}>Action</th><th className={th}>Change</th><th className={th}>Was</th><th className={th}>Now</th></tr>
+                </thead>
+                <tbody className="divide-y divide-line">
+                  {changes.map((change) => {
+                    const kind = CHANGE[change.type];
+                    return (
+                      <tr key={`${change.type}-${change.code}`} className={`${kind.rail} hover:bg-tint-soft`}>
+                        <td className={`${td} rail`}>
+                          {change.type === "REMOVED"
+                            ? <span className="font-mono font-semibold text-slate-700">{change.code}</span>
+                            : <Link href={`/actions/${change.code}`} className="font-mono font-semibold text-brand-ink hover:underline">{change.code}</Link>}
+                          <span className="block max-w-96 truncate text-slate-800" title={change.name}>{change.name}</span>
+                        </td>
+                        <td className={td}><Chip className={kind.chip}>{kind.label}</Chip></td>
+                        <td className={`${td} whitespace-nowrap text-xs tabular-nums text-slate-500 ${change.type === "DATE_CHANGED" ? "line-through decoration-slate-400" : ""}`}>{change.was ? fmtDate(change.was) : "—"}</td>
+                        <td className={`${td} whitespace-nowrap text-xs font-semibold tabular-nums text-slate-800`}>{change.now ? fmtDate(change.now) : "—"}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="px-5 py-8 text-center text-sm text-slate-500 sm:px-6">This release moved nothing: every activity kept its date.</p>
+          )}
+        </>
+      )}
+    </section>
   );
-}
-
-function effectiveDate(activity: ScheduleChange["activity"] | null) { return activity ? activity.forecastDate ?? activity.baselineDate : null; }
-
-function ChangeRow({ change }: { change: ScheduleChange }) {
-  const tint = change.type === "REMOVED" ? "[&>td]:bg-red-50/60" : change.type === "DATE_CHANGED" ? "[&>td]:bg-amber-50/50" : undefined;
-  return (
-    <tr className={tint}>
-      <Td className="whitespace-nowrap"><ChangeChip type={change.type} /></Td>
-      <Td className="whitespace-nowrap font-mono text-xs font-bold text-link">{change.activity.actionCode}</Td>
-      <Td className="min-w-60"><p className="text-sm font-medium text-slate-800">{change.activity.name}</p><p className="mt-0.5 text-[11px] text-slate-400">{change.activity.externalId}</p></Td>
-      <Td className={`whitespace-nowrap text-xs tabular-nums text-slate-500 ${change.type === "DATE_CHANGED" ? "line-through decoration-slate-300" : ""}`}>{fmtDate(effectiveDate(change.previous))}</Td>
-      <Td className="whitespace-nowrap text-xs font-semibold tabular-nums text-slate-800">{change.type === "REMOVED" ? "—" : fmtDate(effectiveDate(change.activity))}</Td>
-      <Td className="text-xs text-slate-500">{change.activity.responsibleParty ?? "—"}</Td>
-    </tr>
-  );
-}
-
-function ChangeChip({ type }: { type: ScheduleChange["type"] }) {
-  const map = { NEW: ["new", "bg-sky-100 text-sky-800 ring-sky-200"], DATE_CHANGED: ["date changed", "bg-amber-100 text-amber-800 ring-amber-200"], DETAIL_CHANGED: ["details changed", "bg-amber-100 text-amber-800 ring-amber-200"], REMOVED: ["removed", "bg-red-100 text-red-800 ring-red-200"], UNCHANGED: ["unchanged", "bg-slate-100 text-slate-600 ring-slate-200"] } as const;
-  return <Chip className={map[type][1]}>{map[type][0]}</Chip>;
-}
-
-function ChangeMetric({ label, value, tone }: { label: string; value: number; tone: "blue" | "amber" | "red" | "slate" }) {
-  const cls = { blue: "bg-sky-50 text-sky-700", amber: "bg-amber-50 text-amber-700", red: "bg-red-50 text-red-700", slate: "bg-slate-50 text-slate-600" }[tone];
-  return <div className={`rounded-xl px-3 py-3 ${cls}`}><p className="text-lg font-semibold tabular-nums">{value}</p><p className="mt-0.5 text-[10px] font-bold uppercase tracking-wide opacity-75">{label}</p></div>;
 }
