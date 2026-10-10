@@ -109,6 +109,7 @@ export async function withdrawRevisionAction(_prev: Result | undefined, formData
     return failed(e);
   }
   revalidatePath(`/documents/${documentId}`);
+  revalidatePath("/reviews", "layout");
   return {};
 }
 
@@ -216,6 +217,7 @@ export async function recordOutcomeAction(_prev: Result | undefined, formData: F
         verdict: text(formData, "outcome") || null,
         status: text(formData, "issuedFor") || null,
         note, issue, foreignAnswer: text(formData, "theirCode") || null, evidenceFileId,
+        closesWithStep: Number(text(formData, "closesWithStep")) || null,
       },
     });
   } catch (e) {

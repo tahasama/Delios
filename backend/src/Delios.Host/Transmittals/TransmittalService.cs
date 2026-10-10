@@ -12,7 +12,7 @@ using NodaTime;
 namespace Delios.Host.Transmittals;
 
 /// <summary>Who a revision should go to, and why. Asked by people, carried out by Document Control.</summary>
-/// <param name="Delegated">Leave it to the revision's author to say who receives it: they are told, and ask themselves.</param>
+/// <param name="Delegated">Leave it to whoever started the review to say who receives it: they are told, and ask themselves.</param>
 /// <param name="ApproverPartyId">An outside party that must approve it first: release waits for them, or a released revision is held.</param>
 public sealed record IssueAsk(
     string? Reason, Guid[]? UserIds = null, Guid[]? PartyIds = null, string? Note = null, string? OffDistributionReason = null,
@@ -101,7 +101,10 @@ public sealed class TransmittalService(
         IReadOnlyList<Transmittal> sent = [];
         if (request.Delegated)
         {
-            await notifier.NotifyAsync(document.TenantId, document.ProjectId, [revision.AuthoredById], Notifications.NotificationKinds.IssueRequested,
+            // Left to whoever started the revision's review; the author only when it was never reviewed.
+            var initiator = await db.Reviews.AsNoTracking().Where(r => r.RevisionId == revision.Id)
+                .OrderByDescending(r => r.StartedAt).Select(r => (Guid?)r.StartedById).FirstOrDefaultAsync(cancellationToken) ?? revision.AuthoredById;
+            await notifier.NotifyAsync(document.TenantId, document.ProjectId, [initiator], Notifications.NotificationKinds.IssueRequested,
                 $"Who should get {Label(document, revision)}?",
                 "It was left to you to say who this revision goes to. Ask for it when you know.", $"/documents/{document.Id}", cancellationToken);
         }
@@ -1029,7 +1032,10 @@ public sealed class TransmittalService(
         var running = await db.Reviews.AnyAsync(r => r.RevisionId == revisionId && r.State == ReviewStates.InProgress, cancellationToken);
         var settled = revision.State is RevisionStates.Released or RevisionStates.InReview or RevisionStates.InPreparation;
         var may = settled && letsItOut && !running && await HasStandingAsync(access, document, revision, cancellationToken);
-        return new Standing(may, letsItOut, revision.AuthoredByName, revision.AuthoredById);
+        // Who a "leave it to them" goes to: whoever started its latest review, else its author.
+        var initiator = await db.Reviews.AsNoTracking().Where(r => r.RevisionId == revisionId).OrderByDescending(r => r.StartedAt)
+            .Select(r => new { r.StartedByName, r.StartedById }).FirstOrDefaultAsync(cancellationToken);
+        return new Standing(may, letsItOut, initiator?.StartedByName ?? revision.AuthoredByName, initiator?.StartedById ?? revision.AuthoredById);
     }
 
     /// <summary>

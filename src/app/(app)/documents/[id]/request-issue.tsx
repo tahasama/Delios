@@ -86,7 +86,7 @@ export function RequestIssue({ reasons, proposed, others, parties, author, onDec
       <div className="space-y-1.5">
         {onDecision ? <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Once it is released</p> : null}
         {option("SEND", "Say who receives it")}
-        {option("AUTHOR", <>Leave it to {author ?? "whoever wrote it"} — they are notified, and ask for it themselves when they know who needs it</>)}
+        {option("AUTHOR", <>Leave it to {author ?? "whoever started the review"} — they are notified, and ask for it themselves when they know who needs it</>)}
       </div>
       {chosen === "AUTHOR" ? <input type="hidden" name="delegateNextStep" value="on" /> : null}
 

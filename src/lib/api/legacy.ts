@@ -153,7 +153,8 @@ export function revisionOf(documentId: string, r: RevisionView, reviews: ReviewV
   return {
     id: r.id, documentId, value: r.value, series: r.series,
     state: r.state === "IN_REVIEW" && pending ? "NOT_RELEASED" : r.state,
-    statusCode: r.statusCode ?? mine.find((one) => one.state === "DECIDED")?.grantedStatus ?? null, statusSetAt: date(decided[0]?.decidedAt), statusSetByName: null, returnedAt: date(r.returnedAt), returnedReason: r.returnedReason,
+    // Decided and waiting for release: what the decider granted is what it carries.
+    statusCode: (r.state === "NOT_RELEASED" || (r.state === "IN_REVIEW" && pending) ? mine.find((one) => one.state === "DECIDED")?.grantedStatus : null) ?? r.statusCode ?? null, statusSetAt: date(decided[0]?.decidedAt), statusSetByName: null, returnedAt: date(r.returnedAt), returnedReason: r.returnedReason,
     heldAt: date(r.heldAt), heldReason: r.heldReason, heldByName: r.heldByName, phase: null, reasonForRevision: r.reasonForRevision, changeDescription: r.changeDescription,
     plannedSubmissionDate: null, issueDate: date(issued?.issuedAt), nativeFileId: current.find((f) => f.kind === "NATIVE")?.id ?? null,
     renditionFileId: current.find((f) => f.kind === "RENDITION")?.id ?? null, appVersion: null, authorizationReason: null, authorizedById: null,

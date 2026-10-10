@@ -574,6 +574,79 @@ plan.
 **Depends on it:** `src/app/(app)/settings/dmp/plan.tsx`,
 `ScopeConfig.dmpDocumentId`.
 
+## 28 · Advice is chosen from a published list, with its comments
+
+**Clause:** §9 *Review*.
+
+**Must say:** an advising step answers from the organization's advice list (for
+example: no comment, comments none blocking, blocking comments). The comments
+are written with that answer, in the same place, and are obligatory when the
+answer has comments; otherwise they are not asked. Advice never says less than
+the comments it carries. The decider reads it and is not bound by it, except
+that a blocking comment stops release until settled. The same holds for a
+verdict that carries comments (accepted with comments, rejected).
+
+**Depends on it:** `REVIEW_ADVICE`, `ReviewService.AnswerAsync`, `verdict-status.tsx`.
+
+---
+
+## 29 · A revision under review may be withdrawn to be changed
+
+**Clause:** §7.2 *Revision state*, §9 *Review*.
+
+**Must say:** until released, a revision is changed in full (files, title,
+fields) while in preparation. Under review, the author or Document Control
+withdraws it, with a reason. The review is kept, in the review register, as
+**withdrawn** with that reason and its comments; everyone on the route is told.
+The revision then goes through a new review. A revision is never in two
+reviews at once.
+
+**Depends on it:** `ReviewStates.Withdrawn`, `WithdrawForUpdateAsync`.
+
+---
+
+## 30 · What a revision is issued for is stated at start and confirmed at each step
+
+**Clause:** §7.3 *Revision status*, §9 *Review*.
+
+**Must say:** a revision starts with its purpose (IFR when nothing else is said).
+Each step of its review confirms it or changes it, on purpose; the decider's
+grant is what the revision is released at. Document Control releases what was
+granted and does not choose it.
+
+**Depends on it:** `Revision.StatusCode`, `AnswerRequest.Status`.
+
+---
+
+## 31 · The sender names the people of a review; a step is never without names
+
+**Clause:** §9.2 *Review route*.
+
+**Must say:** a route proposes who answers each step; the sender may change the
+people for that review, and the record says so. Every step names who answers it
+before the review starts, and the review shows those names on every step,
+including those not yet reached. "Leave it to" someone (who receives it once
+released) goes to whoever started the review.
+
+**Depends on it:** `StartReviewRequest.People`, `StepView.GoesTo`.
+
+---
+
+## 32 · The schedule's lists are controlled documents
+
+**Clause:** §11 *Planning*.
+
+**Must say:** the schedule, the disciplines per action and the document
+requirements list are each a register document, revised and released like any
+other. Their Excel is read into the application only by Document Control or a
+function holding the Plan permission. From a released revision: the uploader
+confirms the file is that revision, or says why it differs. With no released
+revision: a reason is obligatory (approver away, approved on paper and the
+stamped scan follows). Every upload is logged with who and why. Actions keep
+the application's own number and the planner's ID beside it.
+
+**Depends on it:** `ListUploadEndpoints`, `Verbs.Plan`, `Activity.ExternalId`.
+
 ## Still open — decided in conversation, not yet built
 
 - **Escalation** where somebody refuses to acknowledge carrying an action

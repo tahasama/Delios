@@ -21,7 +21,7 @@ Everything below follows from that sentence.
 | **Review** | The whole route over one revision, its steps, their verdicts and comments | A single reviewer's opinion |
 | **Step** | One party's turn to answer, in order | A transmittal |
 | **Verdict** | What a step said, from that step's published set | The release |
-| **Advice** | What an advisory step's comments amount to; derived, never chosen | A verdict |
+| **Advice** | What an advisory step says, picked from the published advice list; never less than its comments say, and a comment is obligatory when the advice has comments | A verdict |
 | **Grant** | The deciding step naming the status the revision will carry | Publication |
 | **Publish (release)** | Document Control applying the granted status, superseding, making current | Approval |
 | **Issue** | Handing a published revision to a party, by transmittal, with a reason | Release |

@@ -173,7 +173,7 @@ export function WorkflowTemplateBuilder({ id, name = "", description = "", class
                   <span className="mt-1.5 block text-[11px] leading-4 text-slate-600">
                     {step.partyId
                       ? <span className="font-medium text-slate-700">{outsideParties.find((party) => party.id === step.partyId)?.name ?? "An outside party"}<span className="block text-[10px] text-slate-400">outside party</span></span>
-                      : empty ? <span className="text-amber-700">Nobody yet — the discipline decides who</span> : [...people, ...fns.map((f) => `${f} (function)`)].join(", ")}
+                      : empty ? <span className="text-amber-700">Nobody yet — name a person or a function</span> : [...people, ...fns.map((f) => `${f} (function)`)].join(", ")}
                   </span>
                   {step.days ? <span className="mt-1.5 block text-[10px] text-slate-400">{step.days} working day{step.days === 1 ? "" : "s"}</span> : null}
                   {people.length + fns.length > 1 ? (
@@ -244,7 +244,7 @@ export function WorkflowTemplateBuilder({ id, name = "", description = "", class
             <div className="mt-4 grid gap-4 xl:grid-cols-[1fr_280px]">
               <div>
                 <p className="text-xs font-medium text-slate-700">People</p>
-                <p className="mb-1.5 text-[11px] text-slate-400">Two or more work in parallel. Leave the box empty to assign by the document&apos;s discipline when it is sent.</p>
+                <p className="mb-1.5 text-[11px] text-slate-400">Two or more work in parallel. Every step names someone: people, a function, or an outside party.</p>
                 <div className="scroll-thin max-h-56 overflow-y-auto rounded-xl border border-line p-2">
                   {/* An outside party sits in the same list as our own people:
                       picking one is how a step becomes external. */}

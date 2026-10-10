@@ -13,7 +13,7 @@ export function decisionOptions(values: SetValue[]): VerdictOption[] {
       effect: VERDICT_EFFECT_SHORT[effect],
       proceeds: effect !== "RETURN",
       resubmit: v.props.resubmit === true,
-      blocks: v.props.blocking === true,
+      blocks: v.props.blocking === true || v.props.comments === "blocking",
       // Advice has no code anybody quotes — NO_COMMENT is a name, not a code —
       // so only its words are shown. A verdict's code is quoted daily.
       advice: v.props.advice === true,

@@ -21,8 +21,10 @@ public sealed record CloseCommentRequest(string? Resolution);
 /// <param name="Issue">On the deciding step, with a verdict that lets the revision out: who it goes to once released.</param>
 /// <param name="ForeignAnswer">For a party answering by proxy: their answer as they wrote it.</param>
 /// <param name="EvidenceFileId">For a party answering by proxy: the proof of their answer.</param>
+/// <param name="Note">The comment given with the answer. It is kept as a review comment of this step: blocking with blocking advice.</param>
+/// <param name="ClosesWithStep">A later step that settles that comment, counted from 1; the next revision when absent.</param>
 public sealed record AnswerRequest(string? Verdict = null, string? Status = null, string? Note = null, IssueAsk? Issue = null,
-    string? ForeignAnswer = null, Guid? EvidenceFileId = null);
+    string? ForeignAnswer = null, Guid? EvidenceFileId = null, int? ClosesWithStep = null);
 /// <summary>Body of a release request. <c>Status</c>, if given, must equal the status the deciding step granted.</summary>
 /// <param name="Outcome">Document Control's outcome to record, from its own published set.</param>
 public sealed record ReleaseRequest(string? Status = null, string? Outcome = null);
@@ -431,6 +433,7 @@ public sealed class ReviewService(
         var catalog = await Catalog.LoadAsync(db, cancellationToken);
         string answer;
         string? granted = null;
+        var kindWritten = Advice_None;
         if (step.Deciding)
         {
             answer = request.Verdict ?? "";
@@ -470,6 +473,7 @@ public sealed class ReviewService(
             var mine = review.Comments.Where(c => c.StepIndex == step.Index && c.Status != CommentStatuses.Withdrawn
                 && (c.AuthorId == access.UserId || c.AuthorId == seat.UserId)).ToList();
             var kind = mine.Any(c => c.Blocking) ? Advice_Blocking : mine.Count > 0 ? Advice_Some : Advice_None;
+            kindWritten = kind;
             answer = string.IsNullOrWhiteSpace(request.Verdict) ? AdviceCode(catalog, kind) : request.Verdict;
             if (!catalog.IsActive(ReviewSets.Advice, answer) && answer != AdviceCode(catalog, kind))
             {
@@ -518,6 +522,34 @@ public sealed class ReviewService(
         }
 
         var now = clock.GetCurrentInstant();
+        // The comment is said with the answer, in one place: it joins the review's comments.
+        if (request.Note?.Trim() is { Length: > 0 } said)
+        {
+            if (request.ClosesWithStep is { } later && (later <= step.Index + 1 || later > review.Steps.Count))
+            {
+                return (null, Problems.Invalid("CLOSING_STEP_INVALID", "A comment can only be settled by a later step of this route."));
+            }
+            var blocking = !step.Deciding && AdviceKind(catalog, answer) == Advice_Blocking;
+            db.ReviewComments.Add(new ReviewComment
+            {
+                TenantId = review.TenantId,
+                ReviewId = review.Id,
+                StepIndex = step.Index,
+                AuthorId = access.UserId,
+                AuthorName = step.ByProxy ? $"{step.PartyName} (recorded by {access.UserName})"
+                    : seat.UserId == access.UserId ? access.UserName : $"{access.UserName} for {seat.UserName}",
+                Text = said,
+                Class = catalog.CodeWhere(ReviewSets.CommentClasses, "blocking", blocking) ?? (blocking ? "BLOCKING" : "NON_BLOCKING"),
+                Blocking = blocking,
+                ClosesWith = request.ClosesWithStep is null ? CommentClosure.Revision : CommentClosure.Step,
+                ClosesWithStep = request.ClosesWithStep,
+                CreatedAt = now,
+            });
+        }
+        else if (!step.Deciding && AdviceKind(catalog, answer) != Advice_None && kindWritten == Advice_None)
+        {
+            return (null, Problems.Invalid("COMMENT_REQUIRED", "Advice with comments says what they are: write them with it.", new { field = "comment" }));
+        }
         seat.Answer = answer;
         seat.GrantedStatus = granted;
         if (!step.Deciding && granted is not null)
@@ -525,7 +557,8 @@ public sealed class ReviewService(
             var (_, subject) = await SubjectAsync(review, cancellationToken);
             subject.StatusCode = granted;
         }
-        seat.Note = request.Note?.Trim();
+        // What they wrote is a comment of the step now (above), not a second copy on the answer.
+        seat.Note = null;
         seat.AnsweredAt = now;
         var stoodIn = seat.UserId != access.UserId;
         if (stoodIn)
@@ -579,6 +612,12 @@ public sealed class ReviewService(
             step.Answer = binding.Answer;
             review.Verdict = binding.Answer;
             review.GrantedStatus = Proceeds(catalog, review.VerdictSet, binding.Answer!) ? binding.GrantedStatus : null;
+            // What the decider granted is what the revision now carries: release reads it from here.
+            if (review.GrantedStatus is not null)
+            {
+                var (_, decided) = await SubjectAsync(review, cancellationToken);
+                decided.StatusCode = review.GrantedStatus;
+            }
         }
         else
         {

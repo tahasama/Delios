@@ -64,7 +64,9 @@ export function VerdictDecision({ verdicts, statuses, deciding, carrying, laterS
 }) {
   const [code, setCode] = useState("");
   const [status, setStatus] = useState(carrying ?? "");
-  const verdict = verdicts.find((one) => one.code === code);
+  const isAdvice = !deciding && !!advice;
+  // On an advice step the choice starts at what was already written.
+  const verdict = verdicts.find((one) => one.code === (isAdvice ? code || advice!.code : code));
   const proceeds = verdict?.proceeds === true;
   const chosen = statuses.find((one) => one.code === status);
   const unchanged = !!carrying && status === carrying;
@@ -80,17 +82,11 @@ export function VerdictDecision({ verdicts, statuses, deciding, carrying, laterS
         <Field
           label="Your advice"
           required
-          hint={advice.comments
-            ? `your ${advice.comments} comment${advice.comments === 1 ? "" : "s"}${advice.blocking ? `, ${advice.blocking} blocking` : ""} — the decider reads it`
-            : "no comment written yet — the decider reads it"}
+          hint="the decider reads it"
         >
           <select name="outcome" required className={inputCls} value={code || advice.code} onChange={(event) => setCode(event.target.value)}>
             {verdicts.map((one) => <option key={one.code} value={one.code}>{one.label}</option>)}
           </select>
-          <span className="mt-1.5 block text-[11px] text-slate-500">
-            Comments are written in the comments box on this page.{" "}
-            <a href="#add-comment" className="font-semibold text-link underline">Write a comment &darr;</a>
-          </span>
         </Field>
       ) : (
         <Field label="Your verdict" required hint={deciding ? "this one decides the revision" : "input for whoever decides"}>
@@ -102,24 +98,26 @@ export function VerdictDecision({ verdicts, statuses, deciding, carrying, laterS
         </Field>
       )}
 
+      {/* The comment belongs to the answer: asked only when the answer says
+          something is wrong, and then it must be said. */}
       {needsComment ? (
         <Field
-          label={proceeds ? "What the next revision must fix" : "What must change"}
+          label={isAdvice ? (verdict!.blocks ? "Your blocking comments" : "Your comments") : proceeds ? "What the next revision must fix" : "What must change"}
           required
-          hint={`${verdict!.code} — ${verdict!.label.toLowerCase()}: say what, and where`}
+          hint={isAdvice ? (verdict!.blocks ? "they stop the release until settled — say what, and where" : "say what, and where") : "say what, and where"}
         >
           <textarea
             name="comment"
             rows={3}
             required
             className={inputCls}
-            placeholder={proceeds ? "what to settle in the next revision" : "what must change before it comes back"}
+            placeholder={isAdvice ? "what is wrong, and where" : proceeds ? "what to settle in the next revision" : "what must change before it comes back"}
           />
         </Field>
       ) : null}
 
       {/* A reservation on somebody else's answer is settled by that answer. */}
-      {needsComment && proceeds && laterSteps.length ? (
+      {needsComment && (isAdvice ? verdict!.blocks : proceeds) && laterSteps.length ? (
         <Field label="What settles it" hint="a reservation on a later step is closed when that step answers — the revision does not go round again for it">
           <select name="closesWithStep" defaultValue="" className={inputCls}>
             <option value="">The next revision</option>

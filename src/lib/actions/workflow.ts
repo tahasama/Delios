@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { requireScope } from "@/lib/scope";
 import { api, projectPath, refusal } from "@/lib/api/client";
 import { backendRevision, backendReview } from "@/lib/api/legacy";
@@ -81,12 +82,14 @@ export async function sendForReviewAction(_prev: Result | undefined, formData: F
   // One key per press of Send: a revision sent again later is a new review, not a replay of the old one.
   const attempt = text(formData, "attempt") || crypto.randomUUID();
   const sent: string[] = [];
+  const opened: string[] = [];
   const refused: string[] = [];
   for (const revisionId of revisionIds) {
     try {
       const revision = await backendRevision(ctx, revisionId);
-      await api(projectPath(ctx, `/revisions/${revisionId}/reviews`), { body: { routeId, people: people.length ? people : null }, idempotencyKey: `review-${revisionId}-${attempt}` });
+      const started = await api<{ id: string }>(projectPath(ctx, `/revisions/${revisionId}/reviews`), { body: { routeId, people: people.length ? people : null }, idempotencyKey: `review-${revisionId}-${attempt}` });
       sent.push(`rev ${revision.value}`);
+      opened.push(started.id);
       revalidatePath(`/documents/${revision.documentId}`);
     } catch (e) {
       refused.push(refusal(e).message);
@@ -94,6 +97,8 @@ export async function sendForReviewAction(_prev: Result | undefined, formData: F
   }
   revalidatePath("/"); revalidatePath("/documents");
   if (!sent.length) return { error: refused.join(" · ") || "Nothing was sent." };
+  // One review started: open it.
+  if (opened.length === 1 && !refused.length) redirect(`/reviews/${opened[0]}`);
   return { ok: `Sent ${sent.length}: ${sent.join(", ")}.`, error: refused.length ? refused.join(" · ") : undefined };
 }
 

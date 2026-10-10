@@ -22,7 +22,7 @@ import { markDispatchedAction } from "@/lib/actions/workflow";
 import { VerdictDecision } from "@/app/(app)/documents/[id]/verdict-status";
 import { preflight } from "@/lib/rules/preflight";
 import { Guarded } from "@/components/preflight";
-import { issueToReviewAction, addCommentAction, removeCommentAction, editCommentAction, recordOutcomeAction, returnToOriginatorAction } from "@/lib/actions/revisions";
+import { issueToReviewAction, withdrawRevisionAction, removeCommentAction, editCommentAction, recordOutcomeAction, returnToOriginatorAction } from "@/lib/actions/revisions";
 import { reclassifyCommentAction } from "@/lib/actions/governance";
 import { ArrowLeft, ExternalLink, FileText } from "lucide-react";
 
@@ -155,7 +155,8 @@ export default async function ReviewCyclePage({ params }: { params: Promise<{ id
           const last = index === (run?.steps.length ?? 0) - 1;
           return {
             group: "Review route",
-            here: !!step.cycleId && step.cycleId === cycle.id,
+            // Every step of a review shares its id: where it stands is the step that is open.
+            here: step.status === "active" && rev.state === "IN_REVIEW",
             label: `${index + 1}. ${step.title ?? (last ? "Decision" : `Step ${index + 1}`)} — ${last ? "decides" : "advises"}`,
             at: one?.outcomeAt ?? null,
             holder: one?.outcome
@@ -165,7 +166,7 @@ export default async function ReviewCyclePage({ params }: { params: Promise<{ id
                 : step.goesTo?.length ? `not started · goes to ${step.goesTo.join(", ")}` : "not started",
           };
         }),
-        { group: "Document Control", label: "Not released", at: rev.state === "NOT_RELEASED" ? rev.statusSetAt : null, holder: rev.statusCode ? `at ${rev.statusCode}, waiting for Document Control` : "waiting for Document Control" },
+        { group: "Document Control", label: "Not released", here: rev.state === "NOT_RELEASED", at: rev.state === "NOT_RELEASED" ? rev.statusSetAt : null, holder: rev.statusCode ? `at ${rev.statusCode}, waiting for Document Control` : "waiting for Document Control" },
         { group: "Document Control", label: "Released", at: rev.releasedAt, holder: rev.releasedByName ?? null },
       ]
     : [
@@ -259,12 +260,12 @@ export default async function ReviewCyclePage({ params }: { params: Promise<{ id
             {rendition ? <iframe src={`/api/files/${rendition.id}`} title={`${doc.docNumber} revision ${rev.value}`} className="block h-160 w-full bg-canvas"/> : <div className="grid h-48 place-items-center bg-canvas/50 p-6 text-center"><div><FileText className="mx-auto h-8 w-8 text-slate-400"/><p className="mt-2 text-sm font-semibold text-slate-700">No PDF attached</p><Link href={`/documents/${doc.id}#workflow`} className="mt-2 inline-block text-xs font-semibold text-link hover:underline">Attach it on the document →</Link></div></div>}
           </section>
 
-          {/* Comments on this step. Until the step is answered they are its
-              author's draft: changed or taken back. After that they are the record.
+          {/* Comments are written with the answer, under the verdict or advice
+              that needs them; this lists them.
               Document Control, or the revision's author, may change whether an
               open one stops the release; what it was is kept. */}
-          {mayComment || cycle.comments.length ? (
-            <Card title="Comments" description={mayComment ? "Yours can be changed or taken back until you answer the step." : undefined}>
+          {cycle.comments.length ? (
+            <Card title="Comments" description="Written with each step's answer.">
               {cycle.comments.length ? (
                 <ul className="space-y-2">
                   {cycle.comments.map((comment) => (
@@ -302,28 +303,23 @@ export default async function ReviewCyclePage({ params }: { params: Promise<{ id
                   ))}
                 </ul>
               ) : null}
-              {mayComment ? (
-                <div id="add-comment" className={cycle.comments.length ? "mt-3 scroll-mt-24 border-t border-line pt-3" : "scroll-mt-24"}>
-                  <ActionForm action={addCommentAction} submitLabel="Add comment" size="sm" hidden={{ cycleId: cycle.id }}>
-                    <Field label="Comment" required><textarea name="text" required rows={3} className={inputCls} placeholder="What is wrong, and where" /></Field>
-                    <label className="flex items-center gap-2 text-xs text-slate-700"><input type="checkbox" name="blocking" /> Stops the release until it is settled</label>
-                    {laterSteps.length ? (
-                      <Field label="Settled by" hint="when it stops the release">
-                        <select name="closesWithStep" defaultValue="" className={inputCls}>
-                          <option value="">The next revision</option>
-                          {laterSteps.map((step) => <option key={step.number} value={step.number}>Step {step.number} · {step.title}</option>)}
-                        </select>
-                      </Field>
-                    ) : null}
-                  </ActionForm>
-                </div>
-              ) : null}
             </Card>
           ) : null}
 
         </div>
 
         <aside className="space-y-4">
+          {/* The author or Document Control takes the revision back out of review
+              to change it. The review stays in the register as withdrawn. */}
+          {rev.state === "IN_REVIEW" && !cycle.withdrawn && (controller || rev.authoredById === user.id) ? (
+            <Card title="Withdraw from review">
+              <ActionForm action={withdrawRevisionAction} submitLabel="Withdraw" variant="danger" size="sm" hidden={{ revisionId: rev.id }}>
+                <Field label="Why" required hint="everyone on the route is told; the review is kept as withdrawn">
+                  <textarea name="reason" required rows={2} className={inputCls} placeholder="what has to change" />
+                </Field>
+              </ActionForm>
+            </Card>
+          ) : null}
           {/* A step held by an organization that is not on this system. Our
               people do its work here, in the same screen as any other review:
               the same comments, the same verdict, with proof of what they sent
