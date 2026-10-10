@@ -7,7 +7,8 @@ import Link from "next/link";
 import { formPolicy } from "@/lib/field-policy";
 import { requireScope } from "@/lib/scope";
 import { notFound } from "next/navigation";
-import { Card, Chip, Banner } from "@/components/ui";
+import { Card, Banner } from "@/components/ui";
+import { StateStamp } from "../state-stamp";
 import { ActionForm } from "@/components/form";
 import { confirmReadinessAction } from "@/lib/actions/requirements";
 import { clearance } from "@/lib/requirements-process";
@@ -20,7 +21,7 @@ import { getActiveSet } from "@/lib/config";
 import { api } from "@/lib/api/client";
 import { holders } from "@/lib/api/settings";
 import { legacyActionByCode, scheduleSource } from "@/lib/api/schedule";
-import { actionState, stateLabel, dayHasPassed, DEFAULT_RISK_DAYS, type ActionState } from "@/lib/action-state";
+import { actionState, stateLabel, dayHasPassed, DEFAULT_RISK_DAYS } from "@/lib/action-state";
 
 export const dynamic = "force-dynamic";
 
@@ -174,24 +175,37 @@ export default async function ActionDetailPage({ params, searchParams }: { param
           </>
         ) : undefined}
         plate={
-          <div className="flex flex-col-reverse gap-3 border-b border-line px-5 pt-6 pb-3 sm:px-6 lg:flex-row lg:items-start lg:justify-between">
-            <div className="min-w-0 flex-1">
-              <p className="font-mono text-[12.5px] font-semibold tracking-tight text-slate-500">
-                {action.code}
-                {action.scheduleRef && action.scheduleRef !== action.code ? <span className="ml-2 font-sans text-[11.5px] font-normal">planner&rsquo;s ID {action.scheduleRef}</span> : null}
-              </p>
-              <h1 className="plate-name mt-1 min-w-0">{action.name}</h1>
-              <p className="plate-meta mt-2">
-                activity {fmtDate(action.scheduledDate)} &middot; {readyCount} of {action.entries.length} documents ready
-                {action.scheduleActivities[0] ? ` \u00b7 schedule ${action.scheduleActivities[0].scheduleVersion.versionLabel}` : ""}
-              </p>
-              <p className="mt-1 max-w-2xl text-[11.5px] leading-4 text-slate-400">
-                Check your documents in the table below, and confirm your discipline&rsquo;s documents are available at the bottom of this page.
-              </p>
+          /* The action as one filled-in docket: the name leads, in ink, its
+             stamp beside it; the facts sit in boxed fields underneath. */
+          <div className="docket-head px-5 pt-5 pb-4 sm:px-6">
+            <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
+              <div className="min-w-0 flex-1">
+                <Link href="/actions" className="stencil inline-flex items-center gap-1 hover:text-brand-ink"><ArrowLeft className="h-3.5 w-3.5" /> Schedule &amp; actions</Link>
+                <h1 className="plate-name mt-2 min-w-0">{action.name}</h1>
+              </div>
+              <div className="pt-6"><StateStamp state={readiness} size="lg" /></div>
             </div>
-            <div className="flex shrink-0 items-center gap-2">
-              <Link href="/actions" className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-semibold text-slate-500 hover:bg-slate-100"><ArrowLeft className="h-4 w-4" /> Schedule</Link>
-              <ReadinessChip readiness={readiness} />
+            <div className="fields mt-4 grid-cols-2 sm:grid-cols-4">
+              <div className="field">
+                <span className="field-label">Action No.</span>
+                <span className="field-value font-mono">{action.code}</span>
+                <span className="field-note">{action.scheduleRef && action.scheduleRef !== action.code ? `planner’s ID ${action.scheduleRef}` : "our number"}</span>
+              </div>
+              <div className="field">
+                <span className="field-label">Day of the work</span>
+                <span className="field-value">{fmtDate(action.scheduledDate)}</span>
+                <span className="field-note">{action.scheduleActivities[0] ? `schedule ${action.scheduleActivities[0].scheduleVersion.versionLabel}` : "from the schedule"}</span>
+              </div>
+              <div className="field" data-tone={readyCount < action.entries.length ? "needs" : undefined}>
+                <span className="field-label">Documents ready</span>
+                <span className="field-value">{readyCount}<small>of {action.entries.length}</small></span>
+                <span className="field-note">checked in the table below</span>
+              </div>
+              <a href="#confirm" className="field" data-tone={depts.length && !clear.cleared ? "needs" : undefined}>
+                <span className="field-label">Disciplines confirmed</span>
+                <span className="field-value">{clear.confirmed.length}<small>of {clear.depts.length}</small></span>
+                <span className="field-note">confirm yours at the bottom of the page</span>
+              </a>
             </div>
           </div>
         }
@@ -228,7 +242,7 @@ export default async function ActionDetailPage({ params, searchParams }: { param
                         <span className="ml-1.5 text-xs font-normal text-slate-400">· {deptEntries.length - missing.length} of {deptEntries.length} ready</span>
                       </p>
                       {c ? (
-                        <p className={`text-[11px] ${c.available ? "text-emerald-700" : "text-red-700"}`}>
+                        <p className={`signature mt-1 text-[11.5px] ${c.available ? "" : "text-red-700"}`}>
                           {c.available ? "Available" : "Not available"} — {c.confirmedByName}, {fmtDate(c.confirmedAt)}{c.note ? ` · ${c.note}` : ""}
                         </p>
                       ) : <p className="text-[11px] text-slate-400">Not confirmed</p>}
@@ -313,19 +327,4 @@ export default async function ActionDetailPage({ params, searchParams }: { param
       </div>
     </div>
   );
-}
-
-/** The schedule's own chip colours, so a state reads the same on both pages. */
-const TONE: Record<ActionState, string> = {
-  DONE: "bg-emerald-600/10 text-emerald-900 ring-emerald-300",
-  LATE_RECEIPT: "bg-violet-100 text-violet-800 ring-violet-300",
-  READY: "bg-emerald-100 text-emerald-800 ring-emerald-200",
-  UPCOMING: "bg-sky-100 text-sky-800 ring-sky-200",
-  AT_RISK: "bg-amber-100 text-amber-800 ring-amber-200",
-  NOT_READY: "bg-red-100 text-red-800 ring-red-200",
-  UNKNOWN: "bg-slate-100 text-slate-600 ring-slate-200",
-};
-
-function ReadinessChip({ readiness }: { readiness: ActionState }) {
-  return <Chip className={TONE[readiness]}>{stateLabel(readiness)}</Chip>;
 }

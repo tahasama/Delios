@@ -340,7 +340,7 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
             failed={source.imports[0]?.status === "FAILED" ? { revision: source.imports[0].revisionValue, error: source.imports[0].error } : null}
           />
         }
-        uploads={<PlanCards from={dateOn === "date" ? fromDay : null} to={dateOn === "date" ? toDay : null} />}
+        uploads={<PlanCards from={dateOn === "date" ? fromDay : null} to={dateOn === "date" ? toDay : null} missing={schedule.filter(HAPPENED_WHERE.WITHOUT).length} undated={undatedAll} />}
         cardHeight={PLAN_CARD_HEIGHT}
         view={view}
         more={

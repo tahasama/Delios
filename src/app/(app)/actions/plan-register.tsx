@@ -1,5 +1,6 @@
 "use client";
 
+import { StateStamp } from "./state-stamp";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
@@ -682,15 +683,6 @@ const RAIL: Record<PlanTableRow["readiness"], string> = {
   UNKNOWN: "rail-none",
 };
 
-const READINESS: Record<PlanTableRow["readiness"], { label: string; chip: string }> = {
-  DONE: { label: "Done", chip: "bg-emerald-600/10 text-emerald-900 ring-emerald-300" },
-  LATE_RECEIPT: { label: "Late receipt", chip: "bg-violet-100 text-violet-800 ring-violet-300" },
-  READY: { label: "Ready", chip: "bg-emerald-100 text-emerald-800 ring-emerald-200" },
-  UPCOMING: { label: "Still ahead", chip: "bg-sky-100 text-sky-800 ring-sky-200" },
-  AT_RISK: { label: "At risk", chip: "bg-amber-100 text-amber-800 ring-amber-200" },
-  NOT_READY: { label: "Overdue", chip: "bg-red-100 text-red-800 ring-red-200" },
-  UNKNOWN: { label: "Nothing listed", chip: "bg-slate-100 text-slate-600 ring-slate-200" },
-};
 
 const HAPPENED: Record<PlanTableRow["happened"], { label: string; chip: string }> = {
   POSTPONED: { label: "Postponed", chip: "bg-slate-100 text-slate-700 ring-slate-300" },
@@ -712,7 +704,7 @@ const COLUMNS: Column[] = [
     key: "readiness", label: "State",
     note: "Every state is about one thing: does the register hold a released revision of each listed document, at the status the action needs? Done — the day has passed and it did, in time. Late receipt — everything arrived, but the last of it after the day of the work. Ready — the day is today or ahead and it does. Still ahead — the day is ahead and nothing is owed within the week. At risk — a document is owed within a week, or already. Overdue — the day has passed and something is still missing.",
     cellClass: "whitespace-nowrap",
-    cell: (row) => <Chip className={READINESS[row.readiness].chip}>{READINESS[row.readiness].label}</Chip>,
+    cell: (row) => <StateStamp state={row.readiness} />,
   },
   {
     key: "happened", label: "Went ahead?",
