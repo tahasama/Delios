@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { fmtDate } from "@/lib/utils";
 import { ActionForm } from "@/components/form";
 import { Field, inputCls } from "@/components/ui";
 import { uploadPlanListAction, uploadLooseListAction } from "@/lib/actions/plan-lists";
@@ -63,6 +64,15 @@ export function PlanListPanel({ list, control }: { list: PlanList; control: bool
         </div>
         {template}
       </div>
+      {list.direct ? (
+        // What is in force came from a direct upload: it can be taken back as it was read.
+        <p className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-md bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900 ring-1 ring-amber-200">
+          <span>In force: uploaded directly on {fmtDate(list.direct)}, without a document.</span>
+          <a href={`/api/plan-direct/${list.kind}`} className="inline-flex items-center gap-1 font-semibold underline">
+            <Download className="h-3.5 w-3.5" /> Download it (.csv)
+          </a>
+        </p>
+      ) : null}
 
       {list.documents.length ? (
         <>
