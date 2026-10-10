@@ -137,7 +137,7 @@ export type DocumentContext = {
   transmittals: { id: string; number: string; reason: string; toName: string; issuedAt: string; revision: string; forReview: boolean }[];
   packages: { id: string; number: string; title: string; state: string }[];
   activities: { activityId: string; code: string; name: string; purpose: string; neededBy: string | null; state: string; waiverNote: string | null }[];
-  history: { at: string; actor: string | null; action: string; entityType: string | null; entityLabel: string | null; detail: string | null }[];
+  history: { at: string; actor: string | null; action: string; entityType: string | null; entityId?: string | null; entityLabel: string | null; detail: string | null }[];
 };
 
 /** GET /documents/{id}/routes (ReviewEndpoints RouteView). */

@@ -87,7 +87,7 @@ public static class DocumentContextEndpoints
         var history = await db.AuditEvents.AsNoTracking()
             .Where(e => e.EntityId == documentId || (e.EntityId != null && revisionIds.Contains(e.EntityId.Value)))
             .OrderByDescending(e => e.Id).Take(200)
-            .Select(e => new { e.At, Actor = access.IsInternal ? e.ActorName : null, e.Action, e.EntityType, e.EntityLabel, e.Detail })
+            .Select(e => new { e.At, Actor = access.IsInternal ? e.ActorName : null, e.Action, e.EntityType, e.EntityId, e.EntityLabel, e.Detail })
             .ToListAsync(cancellationToken);
         return Results.Ok(new
         {
@@ -151,7 +151,7 @@ public static class DocumentContextEndpoints
                 a.RequiredStatuses,
                 Start = a.Start?.ToDateOnly()
             }),
-            history = history.Select(e => new { At = e.At.ToDateTimeOffset(), e.Actor, e.Action, e.EntityType, e.EntityLabel, e.Detail }),
+            history = history.Select(e => new { At = e.At.ToDateTimeOffset(), e.Actor, e.Action, e.EntityType, e.EntityId, e.EntityLabel, e.Detail }),
         });
     }
 }

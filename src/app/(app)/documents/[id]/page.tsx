@@ -73,8 +73,9 @@ export default async function DocumentDetailPage({
     getSet("SUBPROJECTS"), getSet("SUPPLIER_CODES"), getSet("PURCHASE_ORDERS"),
     // The document's story lives on three kinds of record: the document, its
     // revisions (approval, release) and the transmittals that carried it.
-    Promise.resolve(context.history.slice(0, 12).map((one, index) => ({
-      id: `${index}`, actorName: one.actor ?? "System", action: one.action, entityType: one.entityType, entityLabel: one.entityLabel,
+    // Every event, with its reason: nothing drops out of the History tab.
+    Promise.resolve(context.history.map((one, index) => ({
+      id: `${index}`, actorName: one.actor ?? "System", action: one.action, entityType: one.entityType, entityId: one.entityId ?? null, entityLabel: one.entityLabel,
       field: null as string | null, oldValue: null as string | null, newValue: null as string | null, detail: one.detail, ts: new Date(one.at),
     }))),
     Promise.resolve(context.transmittals.map((t) => ({
@@ -102,6 +103,15 @@ export default async function DocumentDetailPage({
   ]);
   const mayRetire = controller || (!withdrawIsControl && doc.createdById === user.id);
   // Withdrawn is for a document that was released; cancelled for one that never was.
+  // What happened to each revision, with its reason: its own events, and the
+  // document's while it was the newest (cancelled, withdrawn, held…).
+  const eventsOf = (revId: string) => {
+    const index = doc.revisions.findIndex((one) => one.id === revId);
+    const from = doc.revisions[index]?.createdAt;
+    const until = index > 0 ? doc.revisions[index - 1].createdAt : null;
+    return auditEvents.filter((e) => e.entityId === revId
+      || (e.entityType === "Document" && from && e.ts >= from && (!until || e.ts < until)));
+  };
   const lastReleased = doc.revisions.find((one) => one.state === "RELEASED" || one.state === "SUPERSEDED");
   const everReleased = !!lastReleased;
 
@@ -717,7 +727,7 @@ export default async function DocumentDetailPage({
                 {doc.revisions.map((rev, index) => (
                   /* Only the newest revision can still be acted on. Everything
                      before it is frozen as it was issued. */
-                  <RevisionRow key={rev.id} rev={rev} latest={index === 0} followedBy={index > 0 ? { value: doc.revisions[index - 1].value, why: doc.revisions[index - 1].reasonForRevision } : null} statusLabel={label(statuses, rev.statusCode)} stateLabel={stateName(names, rev.state, { together, held: !!rev.heldAt })} controller={controller} userId={user.id} userRole={user.role} voidIsControl={voidIsControl} held={doc.legalHold} />
+                  <RevisionRow key={rev.id} rev={rev} latest={index === 0} followedBy={index > 0 ? { value: doc.revisions[index - 1].value, why: doc.revisions[index - 1].reasonForRevision } : null} statusLabel={label(statuses, rev.statusCode)} stateLabel={stateName(names, rev.state, { together, held: !!rev.heldAt })} controller={controller} userId={user.id} userRole={user.role} voidIsControl={voidIsControl} held={doc.legalHold} events={eventsOf(rev.id)} />
                 ))}
               </ul>
             ) : <Empty>No revision yet.</Empty>,
@@ -867,7 +877,7 @@ function prettyState(value: string) { return value.replaceAll("_", " ").toLowerC
 type RevData = LegacyRevision;
 
 /** One line per revision; its record and its per-revision controls open in place. */
-function RevisionRow({ rev, latest, followedBy, statusLabel, stateLabel, controller, userId, userRole, voidIsControl, held = false }: { rev: RevData; latest: boolean; followedBy: { value: string; why: string | null } | null; statusLabel: string | null; stateLabel: string; controller: boolean; userId: string; userRole: string; voidIsControl: boolean; held?: boolean }) {
+function RevisionRow({ rev, latest, followedBy, statusLabel, stateLabel, controller, userId, userRole, voidIsControl, held = false, events = [] }: { rev: RevData; latest: boolean; followedBy: { value: string; why: string | null } | null; statusLabel: string | null; stateLabel: string; controller: boolean; userId: string; userRole: string; voidIsControl: boolean; held?: boolean; events?: { id: string; actorName: string; action: string; detail: string | null; ts: Date }[] }) {
   const state = rev.state as RevState;
   const pdf = rev.files.find((f) => f.kind === "RENDITION");
   const native = rev.files.find((f) => f.kind === "NATIVE");
@@ -905,6 +915,21 @@ function RevisionRow({ rev, latest, followedBy, statusLabel, stateLabel, control
               <div key={k}><dt className="text-[11px] text-slate-400">{k}</dt><dd className="text-xs text-slate-800">{v}</dd></div>
             ))}
           </dl>
+
+          {/* What happened to this revision, each with who, when and why. */}
+          {events.length ? (
+            <div>
+              <p className="text-[11px] text-slate-400">What happened to it</p>
+              <ul className="mt-1 space-y-1">
+                {[...events].reverse().map((e) => (
+                  <li key={e.id} className="text-xs text-slate-700">
+                    <span className="text-slate-400">{fmtDate(e.ts)}</span> · <span className="font-semibold">{prettyState(e.action)}</span> · {e.actorName}
+                    {e.detail ? <span className="block pl-3 text-slate-500">{plain(e.detail)}</span> : null}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
 
           <div className="flex flex-wrap gap-2 text-xs">
             {pdf ? <a href={`/api/files/${pdf.id}`} target="_blank" className="font-semibold text-link hover:underline">PDF</a> : <span className="text-slate-400">no PDF</span>}

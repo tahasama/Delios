@@ -88,7 +88,7 @@ export type BackendContext = {
   transmittals: ContextTransmittal[];
   packages: { id: string; number: string; title: string; state: string; kind: string; required: string[]; to: string }[];
   activities: { activityId: string; code: string; name: string; purpose: string; neededBy: string | null; state: string; waiverNote: string | null; needId: string; requiredStatuses: string[]; start: string | null }[];
-  history: { at: string; actor: string | null; action: string; entityType: string | null; entityLabel: string | null; detail: string | null }[];
+  history: { at: string; actor: string | null; action: string; entityType: string | null; entityId?: string | null; entityLabel: string | null; detail: string | null }[];
 };
 
 const date = (iso: string | null | undefined) => (iso ? new Date(iso) : null);

@@ -95,6 +95,10 @@ conversation, write it into the right one in the same commit as the code.
   Document Control, only on the newest revision and not while on legal hold.
 - Stamps next to the number (register and document page): cancelled,
   withdrawn, archived, void, legal hold. The state column stays.
+- Every reason (cancel, withdraw, reinstate, void, take back, hold, withdraw
+  from review) is in the document's History tab, in full and never cut off,
+  and under "What happened to it" in the Revisions tab on the revision it
+  happened to (document-level events go to the revision newest at the time).
 
 ### Schedule & actions
 - The schedule (SCH), disciplines per action (DPA) and requirements (RQL) are
