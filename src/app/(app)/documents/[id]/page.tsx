@@ -226,6 +226,22 @@ export default async function DocumentDetailPage({
   // revision is released it can be changed — its files and the document's
   // details — in one place. In review it is taken out of the review first:
   // closed as withdrawn, everyone on it told, its comments kept.
+  // The document's details, as one set of fields: the revision's edit step and
+  // the Details tab both use these, so the two can never ask different things.
+  const detailFields = (<>
+    <Field label="Title" required><input name="title" defaultValue={doc.title} className={inputCls} /></Field>
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <Field label="Type"><select name="docType" defaultValue={doc.docType} className={inputCls}>{types.filter((t) => t.status === "ACTIVE").map((t) => <option key={t.code} value={t.code}>{t.label}</option>)}</select></Field>
+      <Field label="Discipline"><select name="discipline" defaultValue={doc.discipline} className={inputCls}>{disciplines.filter((d) => d.status === "ACTIVE").map((d) => <option key={d.code} value={d.code}>{d.label}</option>)}</select></Field>
+      <Field label="Criticality"><select name="criticality" defaultValue={doc.criticality ?? ""} className={inputCls}><option value="">—</option>{criticalities.map((c) => <option key={c.code} value={c.code}>{c.label}</option>)}</select></Field>
+      <Field label="Confidentiality"><select name="confidentiality" defaultValue={doc.confidentiality ?? ""} className={inputCls}>{confidentialities.map((c) => <option key={c.code} value={c.code}>{c.label}</option>)}</select></Field>
+      <Field label="Retention"><select name="retentionClass" defaultValue={doc.retentionClass ?? ""} className={inputCls}><option value="">—</option>{retentions.map((r) => <option key={r.code} value={r.code}>{r.label}</option>)}</select></Field>
+      <Field label="Received"><input type="date" name="receivedDate" defaultValue={doc.receivedDate?.toISOString().slice(0, 10) ?? ""} className={inputCls} /></Field>
+      <Field label="Previous number"><input name="previousId" defaultValue={doc.previousId ?? ""} className={inputCls} /></Field>
+    </div>
+    <input type="hidden" name="appVersion" value={doc.appVersion ?? ""} />
+    <input type="hidden" name="legacyScheme" value={doc.legacyScheme ?? ""} />
+  </>);
   const editing = canEdit && working && working.state === "IN_PREPARATION";
   const lead: StepItem[] = editing ? [{
     key: "edit", label: `Edit rev ${working!.value}`, open: !workingHasPdf, primary: !workingHasPdf, body: (
@@ -238,16 +254,7 @@ export default async function DocumentDetailPage({
                 <input type="file" name="nativeFile" className="block w-full text-xs" />
               </Field>
             </div>
-            <Field label="Title" required><input name="title" defaultValue={doc.title} className={inputCls} /></Field>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <Field label="Type"><select name="docType" defaultValue={doc.docType} className={inputCls}>{types.filter((t) => t.status === "ACTIVE").map((t) => <option key={t.code} value={t.code}>{t.label}</option>)}</select></Field>
-              <Field label="Discipline"><select name="discipline" defaultValue={doc.discipline} className={inputCls}>{disciplines.filter((d) => d.status === "ACTIVE").map((d) => <option key={d.code} value={d.code}>{d.label}</option>)}</select></Field>
-              <Field label="Criticality"><select name="criticality" defaultValue={doc.criticality ?? ""} className={inputCls}><option value="">—</option>{criticalities.map((c) => <option key={c.code} value={c.code}>{c.label}</option>)}</select></Field>
-              <Field label="Confidentiality"><select name="confidentiality" defaultValue={doc.confidentiality ?? ""} className={inputCls}>{confidentialities.map((c) => <option key={c.code} value={c.code}>{c.label}</option>)}</select></Field>
-              <Field label="Retention"><select name="retentionClass" defaultValue={doc.retentionClass ?? ""} className={inputCls}><option value="">—</option>{retentions.map((r) => <option key={r.code} value={r.code}>{r.label}</option>)}</select></Field>
-              <Field label="Received"><input type="date" name="receivedDate" defaultValue={doc.receivedDate?.toISOString().slice(0, 10) ?? ""} className={inputCls} /></Field>
-              <Field label="Previous number"><input name="previousId" defaultValue={doc.previousId ?? ""} className={inputCls} /></Field>
-            </div>
+            {detailFields}
           </ActionForm>
     ),
   }] : canEdit && working && working.state === "IN_REVIEW" ? [{
@@ -573,23 +580,15 @@ export default async function DocumentDetailPage({
                     answerable={answerableFor}
                   />
                 ) : null}
-                {canEdit ? (
+                {editing ? (
+                  // One place to change a revision being prepared: its edit step, files and details together.
+                  <p className="mt-4 text-xs text-slate-500">Rev {working!.value} is being prepared: change these details with its files in <strong className="text-slate-700">Edit rev {working!.value}</strong>, in the Next step card above.</p>
+                ) : canEdit ? (
                   <details className="mt-4">
                     <summary className="cursor-pointer list-none text-xs font-semibold text-link">Edit details</summary>
                     <div className="mt-3 max-w-2xl">
                       <ActionForm action={updateDocumentAction} submitLabel="Save" size="sm" hidden={{ id: doc.id }}>
-                        <Field label="Title" required><input name="title" defaultValue={doc.title} className={inputCls} /></Field>
-                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                          <Field label="Type"><select name="docType" defaultValue={doc.docType} className={inputCls}>{types.filter((t) => t.status === "ACTIVE").map((t) => <option key={t.code} value={t.code}>{t.label}</option>)}</select></Field>
-                          <Field label="Discipline"><select name="discipline" defaultValue={doc.discipline} className={inputCls}>{disciplines.filter((d) => d.status === "ACTIVE").map((d) => <option key={d.code} value={d.code}>{d.label}</option>)}</select></Field>
-                          <Field label="Criticality"><select name="criticality" defaultValue={doc.criticality ?? ""} className={inputCls}><option value="">—</option>{criticalities.map((c) => <option key={c.code} value={c.code}>{c.label}</option>)}</select></Field>
-                          <Field label="Confidentiality"><select name="confidentiality" defaultValue={doc.confidentiality ?? ""} className={inputCls}>{confidentialities.map((c) => <option key={c.code} value={c.code}>{c.label}</option>)}</select></Field>
-                          <Field label="Retention"><select name="retentionClass" defaultValue={doc.retentionClass ?? ""} className={inputCls}><option value="">—</option>{retentions.map((r) => <option key={r.code} value={r.code}>{r.label}</option>)}</select></Field>
-                          <Field label="Received"><input type="date" name="receivedDate" defaultValue={doc.receivedDate?.toISOString().slice(0, 10) ?? ""} className={inputCls} /></Field>
-                          <Field label="Previous number"><input name="previousId" defaultValue={doc.previousId ?? ""} className={inputCls} /></Field>
-                        </div>
-                        <input type="hidden" name="appVersion" value={doc.appVersion ?? ""} />
-                        <input type="hidden" name="legacyScheme" value={doc.legacyScheme ?? ""} />
+                        {detailFields}
                       </ActionForm>
                     </div>
                   </details>
