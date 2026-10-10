@@ -143,4 +143,43 @@ public sealed class RequirementsListTests(Infrastructure infrastructure) : IClas
         Assert.Equal(["CI"], Tags(activities, "A100"));
         Assert.Equal(["EL", "ME"], Tags(activities, "A200"));
     }
+
+    [Fact]
+    public async Task A_list_uploaded_without_a_register_document_needs_the_uploaders_word_and_is_applied_whole()
+    {
+        await using var app = await TestApp.StartAsync(infrastructure);
+        app.StartWorker();
+        var engineer = await app.SignedInAsync("engineer@demo.local");
+        var controller = await app.SignedInAsync("controller@demo.local");
+        var project = await Api.ProjectIdAsync(engineer);
+        var p = $"/api/projects/{project}";
+        static string B64(string text) => Convert.ToBase64String(Encoding.UTF8.GetBytes(text));
+        var programme = "Activity ID,Activity Name,Start,Finish\n" + $"A100,Pour inlet base slab,{Day(30)},{Day(35)}\n" + $"A200,Energise MCC,{Day(40)},{Day(41)}\n";
+
+        // Only Document Control, and only with their word that it is not a register document, and why.
+        var (engineerTried, engineerBody) = await Flow.PostAsync(engineer, $"{p}/schedule/lists", new { kind = "SCHEDULE", fileName = "Programme.csv", contentBase64 = B64(programme), aware = true, reason = "No schedule document yet" });
+        Assert.Equal((HttpStatusCode.Forbidden, "CONTROL_ONLY"), (engineerTried, Flow.Code(engineerBody)));
+        var (unaware, unawareBody) = await Flow.PostAsync(controller, $"{p}/schedule/lists", new { kind = "SCHEDULE", fileName = "Programme.csv", contentBase64 = B64(programme), aware = false, reason = "x" });
+        Assert.Equal((HttpStatusCode.UnprocessableEntity, "NOT_AWARE"), (unaware, Flow.Code(unawareBody)));
+        var (silent, silentBody) = await Flow.PostAsync(controller, $"{p}/schedule/lists", new { kind = "SCHEDULE", fileName = "Programme.csv", contentBase64 = B64(programme), aware = true, reason = " " });
+        Assert.Equal((HttpStatusCode.UnprocessableEntity, "REASON_REQUIRED"), (silent, Flow.Code(silentBody)));
+
+        // The schedule, applied at once.
+        var (read, readBody) = await Flow.PostAsync(controller, $"{p}/schedule/lists", new { kind = "SCHEDULE", fileName = "Programme.csv", contentBase64 = B64(programme), aware = true, reason = "The planner sent it by email; the schedule document comes next week." });
+        Assert.True(read == HttpStatusCode.OK, readBody.ToString());
+        Assert.Equal(2, (await engineer.GetFromJsonAsync<JsonElement>($"{p}/activities")).GetArrayLength());
+
+        // A wrong line: nothing is applied.
+        var (wrong, wrongBody) = await Flow.PostAsync(controller, $"{p}/schedule/lists", new { kind = "DEPARTMENTS", fileName = "Disciplines.csv", contentBase64 = B64("Action Code,Departments\nA100,CI\nA999,EL\n"), aware = true, reason = "Sent by the project manager" });
+        Assert.Equal((HttpStatusCode.UnprocessableEntity, "LIST_NOT_READ"), (wrong, Flow.Code(wrongBody)));
+        Assert.All((await engineer.GetFromJsonAsync<JsonElement>($"{p}/activities")).EnumerateArray(), a => Assert.Empty(a.GetProperty("departments").EnumerateArray()));
+
+        // The corrected list is applied, and kept with who uploaded it and why.
+        var (tagged, taggedBody) = await Flow.PostAsync(controller, $"{p}/schedule/lists", new { kind = "DEPARTMENTS", fileName = "Disciplines.csv", contentBase64 = B64("Action Code,Departments\nA100,CI\nA200,EL\n"), aware = true, reason = "Sent by the project manager" });
+        Assert.True(tagged == HttpStatusCode.OK, taggedBody.ToString());
+        var activities = await engineer.GetFromJsonAsync<JsonElement>($"{p}/activities");
+        Assert.Contains(activities.EnumerateArray(), a => a.GetProperty("code").GetString() == "A200" && a.GetProperty("departments")[0].GetString() == "EL");
+        var kept = await controller.GetFromJsonAsync<JsonElement>($"{p}/controlled?kind=ACTION_DEPARTMENTS");
+        Assert.Contains(kept.EnumerateArray(), v => v.GetProperty("decisionReason").GetString() == "Sent by the project manager" && v.GetProperty("createdBy").GetString() == "Carla Control");
+    }
 }

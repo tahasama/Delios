@@ -59,7 +59,7 @@ export function PlanTimeline({ rows, window, fit }: {
   // Every action here lacks a date: there is nothing to draw, and that is said.
   if (!dated.length) {
     return rows.length ? (
-      <p className="px-6 py-16 text-center text-sm text-slate-700">
+      <p className="flex-1 px-6 py-16 text-center text-sm text-slate-700">
         {rows.length === 1 ? "This action has" : `These ${rows.length} actions have`} no date from the schedule, so there is no bar to draw. The table lists {rows.length === 1 ? "it" : "them"}.
       </p>
     ) : null;
@@ -91,7 +91,7 @@ export function PlanTimeline({ rows, window, fit }: {
   }
 
   return (
-    <section className="px-5 pt-1 pb-4 sm:px-6">
+    <section className="flex min-h-0 flex-1 flex-col px-5 pt-1 pb-3 sm:px-6">
       {/* The dates are written once, above everything, and stay there: the bars
           scroll under them rather than taking the calendar with them.
           The band and the grid below it cover exactly the track the bars are
@@ -115,10 +115,7 @@ export function PlanTimeline({ rows, window, fit }: {
       {/* A plan is as long as the project. It keeps the height it opened at and
           scrolls inside it, so loading more never pushes the page about. One
           bar is 20px and the gap between two is 10px. */}
-      <div
-        className="scroll-quiet relative overflow-x-hidden overflow-y-auto"
-        style={{ maxHeight: `${Math.max(fit ?? 12, 1) * 30 + 6}px` }}
-      >
+      <div className="scroll-quiet relative min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
         {/* The lines are drawn on the bars, not on the window onto them: this
             box is as tall as every bar there is, so today's line reaches the
             last one however far down it was loaded. */}

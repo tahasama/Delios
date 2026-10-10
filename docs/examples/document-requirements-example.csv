@@ -1,0 +1,8 @@
+Department,Action Code,Document,Discipline,Type,Supplier,Date of delivery,Required Status,Sub-project
+CI,A600,Sludge thickener excavation and shoring,CI,DWG,,,IFC,20
+CI,A610,Sludge thickener base reinforcement,CI,DWG,,,IFC,20
+ST,A610,Sludge thickener base design calculation,ST,CAL,,,IFC,20
+ME,A620,Thickener mechanism installation arrangement,ME,DWG,,,IFC,20
+ME,A630,Thickener mechanism installation arrangement,ME,DWG,,,IFC,20
+EL,A630,Thickener drive single line diagram,EL,DWG,,,IFC,20
+IN,A630,Thickener level instrument loop diagram,IN,DWG,,,IFC,20

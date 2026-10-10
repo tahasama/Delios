@@ -9,8 +9,12 @@
  * module carries no directive.
  */
 
-/** How many bars the plan draws before asking, and what one of them takes. */
-export const PLAN_FIRST = 12;
+/**
+ * How many bars the plan draws before asking, and what one of them takes. The
+ * plan's card fills the window and scrolls inside, so it opens with enough bars
+ * to fill a tall screen.
+ */
+export const PLAN_FIRST = 25;
 export const PLAN_ROW = 30;
 
 /** What the plan spends on everything that is not a bar: the band carrying the
@@ -24,7 +28,7 @@ export const CARD_CHROME = 6 + 20 + 16 + 45;
  * a plan narrowed to a handful of bars, and is thrown away rather than carried
  * around the application.
  */
-export const PLAN_CARD_HEIGHT = PLAN_FIRST * PLAN_ROW + CARD_CHROME;
+export const PLAN_CARD_HEIGHT = 12 * PLAN_ROW + CARD_CHROME;
 
 /** Where this browser keeps the height the plan measured. */
 export const CARD_KEY = "actions:card";

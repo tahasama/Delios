@@ -116,6 +116,43 @@ public sealed class ScheduleImporter(
             return;
         }
 
+        var unmatched = await ApplyAsync(revision.TenantId, revision.ProjectId, parsed, revision.Id, record, cancellationToken);
+        await audit.WriteAsync(Actor.System, "SCHEDULE_READ", "Revision", revision.Id, label,
+            $"{parsed.Count} activities from {file.Name}: {record.Added} new, {record.Moved} moved, {record.Changed} changed, {record.Removed} removed."
+            + (unmatched.Count > 0 ? $" Not a discipline, left off: {string.Join(", ", unmatched)}." : ""),
+            revision.ProjectId, cancellationToken);
+        logger.LogInformation("Schedule {Label} read: {Count} activities", label, parsed.Count);
+    }
+
+    /// <summary>
+    /// Reads a schedule file uploaded on its own, with no document in the register: the same reading, applied at
+    /// once. Returns what changed, or why the file cannot be read. The caller records who did it and why.
+    /// </summary>
+    public async Task<(string? Summary, string? Error)> ReadUploadAsync(Guid tenantId, Guid projectId, string fileName, byte[] bytes, CancellationToken cancellationToken)
+    {
+        if (!ScheduleReader.CanRead(fileName)) return (null, "The schedule must be an .xlsx or .csv export.");
+        var source = await db.ScheduleSources.AsNoTracking().SingleOrDefaultAsync(s => s.ProjectId == projectId, cancellationToken);
+        await db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock(hashtext({"schedule:" + projectId}))", cancellationToken);
+        IReadOnlyList<ParsedActivity>? parsed;
+        string? error;
+        using (var content = new MemoryStream(bytes)) (parsed, error) = ScheduleReader.Read(content, fileName, source?.Columns ?? new ScheduleColumns());
+        if (parsed is null) return (null, $"{fileName}: {error}");
+        // Counted the way a released revision's read is counted; kept in the uploaded lists, not as a revision read.
+        var tally = new ScheduleImport { TenantId = tenantId, ProjectId = projectId, RevisionValue = "-" };
+        var unmatched = await ApplyAsync(tenantId, projectId, parsed, null, tally, cancellationToken);
+        return ($"{parsed.Count} activities from {fileName}: {tally.Added} new, {tally.Moved} moved, {tally.Changed} changed, {tally.Removed} removed."
+            + (unmatched.Count > 0 ? $" Not a discipline, left off: {string.Join(", ", unmatched)}." : ""), null);
+    }
+
+    /// <summary>
+    /// Makes the project's activities what the parsed schedule says: adds new ones, updates existing ones, marks
+    /// missing ones removed, counts it all on <paramref name="record"/>, and restates every activity's readiness,
+    /// since moved dates move the needs. Returns the department names that are not disciplines.
+    /// </summary>
+    private async Task<SortedSet<string>> ApplyAsync(Guid tenantId, Guid projectId, IReadOnlyList<ParsedActivity> parsed, Guid? sourceRevisionId,
+        ScheduleImport record, CancellationToken cancellationToken)
+    {
+        var now = clock.GetCurrentInstant();
         // A department is a discipline: the file's names become discipline codes; the rest are listed, not guessed.
         var catalog = await Catalog.LoadAsync(db, cancellationToken);
         var unmatched = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -128,7 +165,7 @@ public sealed class ScheduleImporter(
         parsed = parsed.Select(p => p with { Departments = Disciplines(p.Departments) }).ToList();
 
         // Codes match whatever their letter case: "a100" in one revision is "A100" in the next.
-        var existing = (await db.Activities.Where(a => a.ProjectId == revision.ProjectId).ToListAsync(cancellationToken))
+        var existing = (await db.Activities.Where(a => a.ProjectId == projectId).ToListAsync(cancellationToken))
             .ToDictionary(a => a.Code, StringComparer.OrdinalIgnoreCase);
         foreach (var row in parsed)
         {
@@ -136,15 +173,15 @@ public sealed class ScheduleImporter(
             {
                 db.Activities.Add(new Activity
                 {
-                    TenantId = revision.TenantId,
-                    ProjectId = revision.ProjectId,
+                    TenantId = tenantId,
+                    ProjectId = projectId,
                     Code = row.Code,
                     Name = row.Name,
                     Start = row.Start,
                     Finish = row.Finish,
                     Responsible = row.Responsible,
                     Departments = row.Departments ?? [],
-                    SourceRevisionId = revision.Id,
+                    SourceRevisionId = sourceRevisionId,
                     UpdatedAt = now,
                 });
                 record.Added++;
@@ -166,7 +203,7 @@ public sealed class ScheduleImporter(
             // A schedule without a departments column leaves the project manager's tags as they are.
             if (row.Departments is not null) activity.Departments = row.Departments;
             activity.State = ActivityStates.Active;
-            activity.SourceRevisionId = revision.Id;
+            activity.SourceRevisionId = sourceRevisionId;
             activity.UpdatedAt = now;
         }
         var codes = parsed.Select(p => p.Code).ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -181,13 +218,9 @@ public sealed class ScheduleImporter(
         await db.SaveChangesAsync(cancellationToken);
 
         // Dates moved: every need counted from them moves too.
-        var all = await db.Activities.Where(a => a.ProjectId == revision.ProjectId).Select(a => a.Id).ToListAsync(cancellationToken);
+        var all = await db.Activities.Where(a => a.ProjectId == projectId).Select(a => a.Id).ToListAsync(cancellationToken);
         await Readiness.RestateAsync(db, clock, all, cancellationToken);
-        await audit.WriteAsync(Actor.System, "SCHEDULE_READ", "Revision", revision.Id, label,
-            $"{parsed.Count} activities from {file.Name}: {record.Added} new, {record.Moved} moved, {record.Changed} changed, {record.Removed} removed."
-            + (unmatched.Count > 0 ? $" Not a discipline, left off: {string.Join(", ", unmatched)}." : ""),
-            revision.ProjectId, cancellationToken);
-        logger.LogInformation("Schedule {Label} read: {Count} activities", label, parsed.Count);
+        return unmatched;
     }
 
     /// <summary>Marks an import as failed with its reason, cut to 2000 characters to fit the database column.</summary>

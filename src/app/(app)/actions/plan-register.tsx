@@ -6,7 +6,6 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { ArrowDown, ArrowRight, ArrowUp, ArrowUpDown, CalendarRange, ChevronDown, ChevronLeft, ChevronRight, Download, Pin, PinOff, Rows3, Search, X } from "lucide-react";
 import { DataTable, Th, Td, Chip, Info } from "@/components/ui";
 import { DateWindow } from "@/components/date-window";
-import { CARD_KEY } from "@/components/card-height";
 
 /**
  * The schedule, asked about once and answered two ways.
@@ -85,38 +84,24 @@ export function PlanRegister({
   const [order, setOrder] = useState<string[] | null>(null);
   const [frozen, setFrozen] = useState(true);
   /**
-   * The plan decides how tall this card is; the table is then made to match it.
-   * It is measured while the plan is on screen and kept for the table, because
-   * only one of the two is ever rendered.
+   * One height for both views: what the window has left once the app's bar and
+   * the two tabs above the card are counted, so that scrolled to the end the
+   * tabs and the whole card are on screen together. The plan scrolls inside it,
+   * as the table does.
    */
   const card = useRef<HTMLElement>(null);
-  // Never nothing: the standard height until this browser has measured one.
-  const [planCard, setPlanCard] = useState<number>(cardHeight);
+  const tabs = useRef<HTMLElement>(null);
+  const [fit, setFit] = useState<number>(cardHeight);
   useEffect(() => {
-    try {
-      const kept = Number(localStorage.getItem(CARD_KEY));
-      // A kept number below the standard height was measured from a plan that
-      // had been narrowed. It is thrown away rather than used.
-      if (kept >= cardHeight) setPlanCard(kept);
-      else if (kept > 0) localStorage.removeItem(CARD_KEY);
-    } catch {}
-    if (view !== "plan") return;
     const measure = () => {
-      const box = card.current;
-      if (!box) return;
-      const tall = box.getBoundingClientRect().height;
-      // Only a plan drawing its full complement of bars says what a card is.
-      // A narrowed plan is shorter, and must not take every other register
-      // down with it — the number outlives the question that was asked.
-      if (tall < cardHeight) return;
-      setPlanCard(tall);
-      try { localStorage.setItem(CARD_KEY, tall.toFixed(2)); } catch {}
+      const bar = document.querySelector<HTMLElement>("[data-app-header]")?.offsetHeight ?? 0;
+      const above = tabs.current ? tabs.current.offsetHeight + 16 : 0;
+      setFit(Math.max(360, Math.floor(window.innerHeight - bar - above - 24)));
     };
     measure();
-    const watch = new ResizeObserver(measure);
-    if (card.current) watch.observe(card.current);
-    return () => watch.disconnect();
-  }, [view, rows.length, cardHeight]);
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, []);
 
   // The order somebody dragged their columns into is this browser's business.
   useEffect(() => {
@@ -265,7 +250,7 @@ export function PlanRegister({
         <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3.5 sm:grid-cols-4 lg:grid-cols-7">
           <Narrow name="code" value={filters.code} empty="Action" options={filterOptions.codes} />
           <Narrow name="state" value={filters.state} empty="State" options={filterOptions.states} />
-          <Narrow name="happened" value={filters.happened} empty="What happened" options={filterOptions.happened} />
+          <Narrow name="happened" value={filters.happened} empty="On the day" options={filterOptions.happened} />
           <Narrow name="discipline" value={filters.discipline} empty="Discipline" options={filterOptions.disciplines} />
           <Narrow name="docType" value={filters.docType} empty="Type" options={filterOptions.types} />
           <Narrow name="supplier" value={filters.supplier} empty="Supplier" options={filterOptions.suppliers} />
@@ -277,7 +262,7 @@ export function PlanRegister({
     {/* The two views stand on their own between the question and the answer.
         One frame, split down the middle: the chosen side is the lit one, and
         the other is drawn as the control it is rather than left as plain text. */}
-    <nav className="mb-4 grid grid-cols-2 space overflow-hidden rounded-xl border border-line bg-surface" aria-label="How to look at the schedule">
+    <nav ref={tabs} className="mb-4 grid grid-cols-2 space overflow-hidden rounded-xl border border-line bg-surface" aria-label="How to look at the schedule">
       {([
         { id: "plan", label: "The plan", hint: "drawn on a timeline", icon: CalendarRange },
         { id: "table", label: "The table", hint: "one line per action", icon: Rows3 },
@@ -311,8 +296,8 @@ export function PlanRegister({
     <section
       ref={card}
       data-dt-frame
-      className={`register register-sheet ${view === "table" ? "flex flex-col" : ""}`}
-      style={view === "table" ? { height: planCard } : undefined}
+      className="register register-sheet flex flex-col"
+      style={{ height: fit }}
     >
       {facets.length ? (
         <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2 sm:px-6">
@@ -336,10 +321,10 @@ export function PlanRegister({
       ) : null}
 
       {view === "plan" ? (
-        <div className={pending ? "opacity-60 transition-opacity" : "transition-opacity"}>
+        <div className={`flex min-h-0 flex-1 flex-col ${pending ? "opacity-60 transition-opacity" : "transition-opacity"}`}>
           {/* What the plan covers, and what its colours mean: the two things a
               reader needs before the bars, at the two corners above them. */}
-          <div className="flex items-start justify-between gap-4 px-5 pt-3 sm:px-6 mt-2">
+          <div className="flex items-start justify-between gap-4 px-5 pt-2.5 sm:px-6">
             <span className="font-mono text-[11px] tracking-tight text-slate-500 tabular-nums">
               {more?.window && !more.window.wide ? more.window.label : "Every date in the schedule"}
             </span>
@@ -378,7 +363,7 @@ export function PlanRegister({
           {more && !more.total ? (
             /* Nothing to draw is said, never left as an empty card: what was
                asked, and the way back to a plan with bars in it. */
-            <div className="px-6 py-20 text-center">
+            <div className="flex-1 px-6 py-20 text-center">
               <p className="font-mono text-xs tracking-[0.2em] text-slate-400 uppercase">no actions</p>
               <p className="mt-2 text-sm text-slate-700">
                 {more.window && more.window.elsewhere
@@ -477,7 +462,7 @@ export function PlanRegister({
                 defaultHidden={["Description", "Responsible", "Confirmed"]}
                 fill
                 stretch
-                capHeight={planCard}
+                capHeight={fit}
                 tools={
                   <a
                     href={selectedExportHref}
@@ -661,8 +646,8 @@ const READINESS: Record<PlanTableRow["readiness"], { label: string; chip: string
 
 const HAPPENED: Record<PlanTableRow["happened"], { label: string; chip: string }> = {
   POSTPONED: { label: "Postponed", chip: "bg-slate-100 text-slate-700 ring-slate-300" },
-  CARRIED: { label: "Carried out", chip: "bg-amber-100 text-amber-900 ring-amber-300" },
-  DONE: { label: "Done", chip: "bg-emerald-600/10 text-emerald-900 ring-emerald-300" },
+  CARRIED: { label: "Went ahead short", chip: "bg-amber-100 text-amber-900 ring-amber-300" },
+  DONE: { label: "Went ahead", chip: "bg-emerald-600/10 text-emerald-900 ring-emerald-300" },
   AHEAD: { label: "Not yet", chip: "bg-sky-50 text-sky-800 ring-sky-200" },
 };
 
@@ -672,7 +657,7 @@ const COLUMNS: Column[] = [
     key: "departments", label: "Disciplines",
     note: "The disciplines the project manager tagged this action with. They are the ones asked what it needs.",
     cell: (row) => row.departments.length
-      ? <span className="flex max-w-56 flex-wrap gap-1">{row.departments.map((one) => <span key={one} className="whitespace-nowrap rounded-md bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-600">{one}</span>)}</span>
+      ? <span className="block max-w-56 text-xs text-slate-700">{row.departments.join(", ")}</span>
       : <span className="text-xs font-semibold text-amber-700">needs disciplines</span>,
   },
   {
@@ -682,13 +667,14 @@ const COLUMNS: Column[] = [
     cell: (row) => <Chip className={READINESS[row.readiness].chip}>{READINESS[row.readiness].label}</Chip>,
   },
   {
-    key: "happened", label: "What happened",
-    note: "What became of the work, which is not the same question as whether its documents arrived. The day passing is the work happening — Postponed, and only Document Control writing that down, takes it back. Carried out means the day passed and it went ahead short of what it needed; Done means it had everything, in time.",
+    key: "happened", label: "On the day",
+    note: "What became of the work, which is not the same question as whether its documents arrived. The day passing is the work happening; only Document Control writing down Postponed takes it back. Went ahead short: the day passed without everything it needed. Went ahead: it had everything, in time. Not yet: the day is still ahead.",
     cellClass: "whitespace-nowrap",
-    cell: (row) => (
+    // Before the day there is nothing to say: the column stays quiet.
+    cell: (row) => row.happened === "AHEAD" ? <span className="text-xs text-slate-400">—</span> : (
       <span className="inline-flex flex-col items-start gap-1">
         <Chip className={HAPPENED[row.happened].chip}>{HAPPENED[row.happened].label}</Chip>
-        <span className="text-[11px] text-slate-400">{row.happenedNote}</span>
+        <span className="text-[11px] text-slate-500">{row.happenedNote}</span>
       </span>
     ),
   },

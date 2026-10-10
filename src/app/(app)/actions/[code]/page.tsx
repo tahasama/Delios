@@ -162,7 +162,6 @@ export default async function ActionDetailPage({ params, searchParams }: { param
         rows={needed}
         exportHref={`/api/export/baseline?ids=${action.id}`}
         empty={depts.length ? undefined : "Tag the disciplines first."}
-        link={control && depts.length ? <Link href="/actions/requirements" className="text-xs font-semibold text-link hover:underline">Requirements &rarr;</Link> : undefined}
         chips={depts.length > 1 ? (
           <>
             <Link href={`/actions/${action.code}`} className={`facet ${!dept ? "font-semibold text-brand-ink" : ""}`}>All</Link>
@@ -208,7 +207,6 @@ export default async function ActionDetailPage({ params, searchParams }: { param
                   : `each confirms its documents are available${confirmOpens ? ` — from ${fmtDate(confirmOpens)}` : ""}`}
               </span>
             ) : null}
-            {control ? <Link href="/actions/requirements" className="ml-auto text-[11px] font-semibold text-link hover:underline">Requirements &rarr;</Link> : null}
           </div>
           {depts.length ? (
             <ul className="divide-y divide-line">

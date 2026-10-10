@@ -58,9 +58,9 @@ const STATES = ACTION_STATES;
  * written down at all.
  */
 const HAPPENED = [
-  { code: "WITHOUT", label: "Happened without all its documents" },
-  { code: "CARRIED", label: "… and it was written down" },
-  { code: "NONE", label: "… and nothing was written down" },
+  { code: "WITHOUT", label: "Went ahead short of documents" },
+  { code: "CARRIED", label: "… with a note" },
+  { code: "NONE", label: "… with no note" },
   { code: "STOPPED", label: "Postponed" },
 ];
 
@@ -271,7 +271,7 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
   if (q) facets.push({ key: "search", label: q, without: drop("q") });
   if (code) facets.push({ key: "action", label: code, without: drop("code") });
   if (state) facets.push({ key: "state", label: said(STATES, state), without: drop("state") });
-  if (happened) facets.push({ key: "what happened", label: said(HAPPENED, happened), without: drop("happened") });
+  if (happened) facets.push({ key: "on the day", label: said(HAPPENED, happened), without: drop("happened") });
   if (discipline) facets.push({ key: "discipline", label: said(disciplineRows, discipline), without: drop("discipline") });
   if (docType) facets.push({ key: "type", label: said(typeRows, docType), without: drop("docType") });
   if (supplier) facets.push({ key: "supplier", label: said(supplierRows, supplier), without: drop("supplier") });

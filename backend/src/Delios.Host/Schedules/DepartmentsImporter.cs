@@ -91,6 +91,20 @@ public sealed class DepartmentsImporter(
         await transaction.CommitAsync(cancellationToken);
     }
 
+    /// <summary>
+    /// Reads a list uploaded on its own, with no document in the register: the same reading, applied at once, all
+    /// or nothing. Returns what changed, or what is wrong. The caller records who did it and why.
+    /// </summary>
+    public async Task<(string? Summary, List<string> Problems)> ReadUploadAsync(Project project, string fileName, byte[] bytes, CancellationToken cancellationToken)
+    {
+        if (!ScheduleReader.CanRead(fileName)) return (null, ["The list must be an .xlsx or .csv file."]);
+        await db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock(hashtext({"schedule:" + project.Id}))", cancellationToken);
+        List<string[]> rows;
+        try { using var content = new MemoryStream(bytes); rows = ScheduleReader.ReadRows(content, fileName); }
+        catch (Exception e) when (e is not OperationCanceledException) { return (null, [$"{fileName} could not be read: {e.Message}"]); }
+        return await ApplyAsync(project, rows, cancellationToken);
+    }
+
     /// <summary>Tags every activity the list names with its disciplines. Returns a summary, or what is wrong, line by line.</summary>
     private async Task<(string? Summary, List<string> Problems)> ApplyAsync(Project project, List<string[]> rows, CancellationToken cancellationToken)
     {

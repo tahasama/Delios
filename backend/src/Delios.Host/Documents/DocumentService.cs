@@ -442,7 +442,10 @@ public sealed class DocumentService(
         document!.UpdatedAt = clock.GetCurrentInstant();
         await db.SaveChangesAsync(cancellationToken);
         await audit.WriteAsync(new Actor(access.UserId, access.UserName), "FILE_UPLOADED", "Revision", revision.Id,
-            $"{document.Number} rev {revision.Value}", string.Join(", ", files!.Select(f => f.Name)), document.ProjectId, cancellationToken);
+            $"{document.Number} rev {revision.Value}",
+            // Files added to a revision rather than a new one: the uploader's reason is kept with them.
+            string.Join(", ", files!.Select(f => f.Name)) + (string.IsNullOrWhiteSpace(request.ChangeDescription) ? "" : $". Why: {request.ChangeDescription.Trim()}"),
+            document.ProjectId, cancellationToken);
         return (revision, null);
     }
 

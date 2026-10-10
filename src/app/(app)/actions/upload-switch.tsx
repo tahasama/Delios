@@ -16,9 +16,9 @@ export function UploadSwitch({ line, panels }: {
   const shown = panels.find((one) => one.kind === open) ?? null;
   return (
     <div>
-      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+      <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
         {line}
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-2">
           {panels.map((one, i) => (
             <button
               key={one.kind}

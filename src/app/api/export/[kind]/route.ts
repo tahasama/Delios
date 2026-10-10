@@ -112,7 +112,7 @@ async function extract(req: Request, { params }: { params: Promise<{ kind: strin
       const head = [
         a.code, a.name, a.description ?? "", a.scheduledDate?.toISOString().slice(0, 10) ?? "",
         a.ownerName ?? "", a.departments ?? "", state(a), a.lastMetAt?.toISOString().slice(0, 10) ?? "",
-        note ? (note.decision === "CARRIED" ? "Carried out without all of its documents" : "Postponed") : "",
+        note ? (note.decision === "CARRIED" ? "Went ahead short of documents" : "Postponed") : "",
         note?.plannedDate?.toISOString().slice(0, 10) ?? "",
         note?.responsibleName ?? "", note?.reason ?? "", note?.delayResponsible ?? "", note?.delayReason ?? "",
       ];
