@@ -20,7 +20,7 @@ export function PlanPlate({ inForce, plans, failed }: {
       <h1 className="plate-title min-w-0 text-slate-950">Schedule &amp; actions</h1>
       <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">
         {inForce
-          ? <>{inForce.since ? `Dates in force since ${inForce.since}.` : "Dates from the released schedule."} Each action is a day the project must be ready for, with the documents its disciplines need.</>
+          ? <>{inForce.since ? `Dates in force since ${inForce.since}.` : "Dates from the released schedule."}</>
           : plans
             ? <>No schedule yet: upload it below, and every action follows from it.</>
             : <>No schedule yet. Document Control, or whoever plans the project, uploads it; every action follows from it.</>}

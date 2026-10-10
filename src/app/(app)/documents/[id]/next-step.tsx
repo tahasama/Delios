@@ -97,13 +97,20 @@ export function NextStepBody({ status, items }: { status: React.ReactNode; items
  * is behind it ticked, what is ahead plain. Tells where it is without a
  * sentence about it.
  */
-export function StagePath({ stages, at, note }: { stages: string[]; at: number; note?: React.ReactNode }) {
+export function StagePath({ stages, at, note, under }: {
+  stages: string[];
+  at: number;
+  note?: React.ReactNode;
+  /** One short line under each stage — its own count — read with the stage it belongs to. */
+  under?: React.ReactNode[];
+}) {
   return (
     <div>
-      <ol className="flex flex-wrap items-center gap-y-2">
+      <ol className={cn("flex flex-wrap gap-y-2", under ? "items-start gap-y-3" : "items-center")}>
         {stages.map((name, i) => (
-          <li key={name} className="flex items-center">
-            {i ? <span className={cn("mx-1 h-px w-3 sm:mx-1.5 sm:w-10", i <= at ? "bg-(--color-brand)" : "bg-line-strong")} aria-hidden /> : null}
+          <li key={name} className={cn("flex", under ? "items-start" : "items-center")}>
+            {i ? <span className={cn("mx-1 h-px w-3 sm:mx-1.5 sm:w-10", under && "mt-[13px]", i <= at ? "bg-(--color-brand)" : "bg-line-strong")} aria-hidden /> : null}
+            <span className={under ? "flex flex-col gap-1" : "contents"}>
             <span
               className={cn(
                 "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-semibold",
@@ -114,6 +121,8 @@ export function StagePath({ stages, at, note }: { stages: string[]; at: number; 
               aria-current={i === at ? "step" : undefined}
             >
               {i < at ? "✓" : null} {name}
+            </span>
+            {under?.[i] ? <span className="px-2.5 text-xs leading-5 text-slate-500">{under[i]}</span> : null}
             </span>
           </li>
         ))}

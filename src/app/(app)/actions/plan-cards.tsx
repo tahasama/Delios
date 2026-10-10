@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { fmtDate } from "@/lib/utils";
 import { requireScope } from "@/lib/scope";
 import { planLists } from "@/lib/plan-lists";
 import { planProgress, PLAN_STAGES } from "@/lib/plan-progress";
@@ -8,8 +7,8 @@ import { PlanListPanel } from "./plan-list-panel";
 import { UploadSwitch } from "./upload-switch";
 
 /**
- * How far the schedule has come — the stages in a row, then one line of counts —
- * and, for whoever plans the project, its three uploads in the order they are
+ * How far the schedule has come — the stages in a row, each with its own count
+ * under it — and, for whoever plans the project, its three uploads in the order they are
  * done: the schedule, the disciplines each action concerns, the documents each
  * discipline needs.
  */
@@ -17,40 +16,35 @@ export async function PlanCards({ from = null, to = null }: { from?: Date | null
   const ctx = await requireScope();
   const plans = ctx.can("PLAN") || ctx.can("CONTROL") || ctx.can("CONFIGURE");
   const [progress, lists] = await Promise.all([planProgress(ctx, { from, to }), plans ? planLists(ctx) : Promise.resolve([])]);
-  const dot = <span aria-hidden className="text-slate-300">·</span>;
+  const day = (d: Date) => d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+
+  // Each stage carries its own count, so the row reads as one thing.
+  const under: React.ReactNode[] = [
+    progress.schedule ? (
+      <>
+        <Link href={`/documents/${progress.schedule.documentId}`} className="font-semibold text-link hover:underline">
+          {progress.schedule.revision ? `Rev ${progress.schedule.revision}` : "Its document"}
+        </Link>
+        {" · "}<Link href="/actions/schedules" className="text-link hover:underline">versions</Link>
+      </>
+    ) : "None yet",
+    progress.actions ? (
+      <>
+        {progress.tagged} of {progress.actions} tagged
+        {progress.untagged.length ? <>{" · "}<Link href="/actions?view=table&untagged=1" className="font-semibold text-amber-800 hover:underline">{progress.untagged.length} untagged</Link></> : null}
+      </>
+    ) : null,
+    progress.actions ? <>{progress.answered} of {progress.asked} lists</> : null,
+    progress.actions ? (
+      <span title={progress.window.chosen ? "Actions within the dates chosen" : "Actions within a month either side of today"}>
+        {progress.complete} of {progress.listed} · {day(progress.window.from)} – {day(progress.window.to)}
+      </span>
+    ) : null,
+  ];
 
   const summary = (
-    <div className="min-w-0 flex-1 basis-[30rem] space-y-1.5">
-      <StagePath stages={PLAN_STAGES} at={progress.at} />
-      <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500">
-        {progress.schedule ? (
-          <span>
-            Dates from{" "}
-            <Link href={`/documents/${progress.schedule.documentId}`} className="font-semibold text-link hover:underline">
-              the schedule{progress.schedule.revision ? `, rev ${progress.schedule.revision}` : ""}
-            </Link>
-            {" "}· <Link href="/actions/schedules" className="text-link hover:underline">each version and its moved dates</Link>
-          </span>
-        ) : <span>No schedule yet</span>}
-        {progress.actions ? (
-          <>
-            {dot}
-            <span>
-              {progress.tagged} of {progress.actions} actions tagged
-              {progress.untagged.length ? (
-                <span className="text-amber-800"> (missing: {progress.untagged.slice(0, 6).map((code, i) => <span key={code}>{i ? ", " : ""}<Link href={`/actions/${code}`} className="font-mono hover:underline">{code}</Link></span>)}{progress.untagged.length > 6 ? <> and <Link href="/actions?view=table&untagged=1" className="hover:underline">{progress.untagged.length - 6} more</Link></> : null})</span>
-              ) : null}
-            </span>
-            {dot}
-            <span>{progress.answered} of {progress.asked} discipline lists</span>
-            {dot}
-            <span>
-              {progress.complete} of {progress.listed} actions have every document
-              <span className="text-slate-500"> — {progress.window.chosen ? "dates chosen" : "a month either side of today"}: {fmtDate(progress.window.from)} → {fmtDate(progress.window.to)}</span>
-            </span>
-          </>
-        ) : null}
-      </p>
+    <div className="min-w-0 flex-1 basis-[30rem]">
+      <StagePath stages={PLAN_STAGES} at={progress.at} under={under} />
     </div>
   );
   if (!plans) return summary;

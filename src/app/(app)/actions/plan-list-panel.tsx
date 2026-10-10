@@ -12,7 +12,9 @@ const STATE: Record<string, string> = {
 };
 const said = (state: string) => STATE[state] ?? state.replaceAll("_", " ").toLowerCase();
 
-const fileInput = "block w-full text-xs text-slate-600 file:mr-3 file:rounded-md file:border file:border-line-strong file:bg-surface file:px-2.5 file:py-1 file:text-xs file:font-semibold file:text-brand-ink";
+const fileInputLook = "text-xs text-slate-600 file:mr-3 file:rounded-md file:border file:border-line-strong file:bg-surface file:px-2.5 file:py-1 file:text-xs file:font-semibold file:text-brand-ink";
+const fileInput = `block w-full ${fileInputLook}`;
+const fileInputInline = `block ${fileInputLook}`;
 
 /**
  * One of the schedule's lists: what it is, the document that holds it, and the
@@ -54,10 +56,12 @@ export function PlanListPanel({ list, control }: { list: PlanList; control: bool
 
   return (
     <section className="min-w-0">
-      <h2 className="stencil text-slate-600">{list.title}</h2>
-      <p className="mt-1 text-xs leading-5 text-slate-500">{list.says}</p>
-      <p className="mt-1 text-xs leading-5 text-slate-500">
-        Releasing it on its page reads the Excel by itself. Upload here only if the released revision has no Excel, its read failed, or there is no released document.
+      <h2 className="text-sm font-semibold text-slate-900">
+        {list.title}
+        <span className="ml-2 text-xs font-normal text-slate-500">{list.says}</span>
+      </h2>
+      <p className="mt-0.5 text-xs leading-5 text-slate-500">
+        Releasing its document reads the Excel by itself. Upload here only if that read is missing or failed.
       </p>
 
       {list.documents.length ? (
@@ -75,11 +79,11 @@ export function PlanListPanel({ list, control }: { list: PlanList; control: bool
           </ul>
           {!inForce.length ? (
             <>
-              <p className="mt-2 text-xs text-slate-600">Release it from its page; then upload the spreadsheet of that revision here.</p>
+              <p className="mt-2 text-xs text-slate-600">Nothing released yet. Release it from its page and its Excel is read by itself.</p>
               {loose}
             </>
           ) : control ? (
-            <ActionForm action={uploadPlanListAction} hideSubmit resetOnSuccess hidden={{ kind: list.kind, ...(only ? { revisionId: only.released!.id } : {}) }} className="mt-2.5 max-w-xl space-y-2.5">
+            <ActionForm action={uploadPlanListAction} hideSubmit resetOnSuccess hidden={{ kind: list.kind, ...(only ? { revisionId: only.released!.id } : {}) }} className="mt-3 max-w-xl space-y-2">
               {only ? null : (
                 <Field label="Which list" required>
                   <select name="revisionId" required className={inputCls} defaultValue="">
@@ -88,15 +92,17 @@ export function PlanListPanel({ list, control }: { list: PlanList; control: bool
                   </select>
                 </Field>
               )}
-              <Field label={only ? `Spreadsheet of rev ${only.released!.value}` : "Spreadsheet of the revision in force"} hint=".xlsx or .csv" required>
-                <input type="file" name="file" required accept=".xlsx,.csv" className={fileInput} />
-              </Field>
-              {/* The uploader vouches for the file, or says why it differs. */}
-              <ConfirmOrWhy revision={only ? `rev ${only.released!.value}` : "the revision in force"} />
-              <div className="flex flex-wrap items-center gap-3">
-                <button className="ask" data-on="true">Upload and read</button>
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  type="file" name="file" required accept=".xlsx,.csv"
+                  aria-label={only ? `Excel of rev ${only.released!.value} (.xlsx or .csv)` : "Excel of the revision in force (.xlsx or .csv)"}
+                  className={`${fileInputInline} min-w-0 flex-1`}
+                />
                 {template}
               </div>
+              {/* The uploader vouches for the file, or says why it differs. */}
+              <ConfirmOrWhy revision={only ? `rev ${only.released!.value}` : "the revision in force"} />
+              <button className="ask" data-on="true">Upload and read</button>
             </ActionForm>
           ) : (
             <p className="mt-2 text-xs text-slate-500">Document Control uploads the spreadsheet of the revision in force.</p>
@@ -107,7 +113,7 @@ export function PlanListPanel({ list, control }: { list: PlanList; control: bool
           <p className="mt-2 text-xs text-slate-600">
             No document holds it yet.{" "}
             <Link href={`/documents/new?${new URLSearchParams({ ...(type ? { docType: type.code } : {}), title: list.title })}`} className="font-semibold text-link hover:underline">Register one</Link>
-            {list.types.length ? <> as a {list.types.map((one) => `${one.label} (${one.code})`).join(" or ")}</> : null}, then upload here.
+            {list.types.length ? <> as a {list.types.map((one) => `${one.label} (${one.code})`).join(" or ")}</> : null}, then release it from its page.
           </p>
           {loose}
         </>
