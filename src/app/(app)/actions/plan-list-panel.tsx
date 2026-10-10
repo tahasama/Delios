@@ -28,6 +28,33 @@ export function PlanListPanel({ list, control }: { list: PlanList; control: bool
     ? <a href={list.template} className="inline-flex items-center gap-1 text-xs font-semibold text-link hover:underline"><Download className="h-3.5 w-3.5" /> Current list to fill</a>
     : null;
 
+  // The same way out wherever no revision is in force: no document yet, or none released.
+  const loose = control ? (
+    <details className="mt-2.5 max-w-xl">
+      <summary className="cursor-pointer text-xs font-semibold text-link">Or upload it without a released document</summary>
+      <ActionForm action={uploadLooseListAction} hideSubmit resetOnSuccess hidden={{ kind: list.kind }} className="mt-2.5 space-y-2.5">
+        <p className="flex gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+          <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <span>It is applied at once, with no review, and is not tied to a released document. Your name, the file and your reason are kept in the activity log.</span>
+        </p>
+        <Field label="File" hint="the list as .xlsx or .csv" required>
+          <input type="file" name="file" required accept=".xlsx,.csv" className={fileInput} />
+        </Field>
+        <Field label="Why without a released document" required>
+          <input name="reason" required className={inputCls} placeholder="e.g. The planner sent it by email; the document is released next week" />
+        </Field>
+        <label className="flex items-start gap-2 text-xs text-slate-700">
+          <input type="checkbox" name="aware" value="yes" required className="mt-0.5" />
+          I know this list is not a released document in the register.
+        </label>
+        <div className="flex flex-wrap items-center gap-3">
+          <button className="ask" data-on="true">Upload and apply</button>
+          {template}
+        </div>
+      </ActionForm>
+    </details>
+  ) : null;
+
   return (
     <section className="min-w-0">
       <h2 className="stencil text-slate-600">{list.title}</h2>
@@ -47,7 +74,10 @@ export function PlanListPanel({ list, control }: { list: PlanList; control: bool
             ))}
           </ul>
           {!inForce.length ? (
-            <p className="mt-2 text-xs text-slate-600">Release the document from its page first; then upload the spreadsheet of that revision here.</p>
+            <>
+              <p className="mt-2 text-xs text-slate-600">Release it from its page; then upload the spreadsheet of that revision here.</p>
+              {loose}
+            </>
           ) : control ? (
             <ActionForm action={uploadPlanListAction} hideSubmit resetOnSuccess hidden={{ kind: list.kind, ...(only ? { revisionId: only.released!.id } : {}) }} className="mt-2.5 max-w-xl space-y-2.5">
               {only ? null : (
@@ -86,31 +116,7 @@ export function PlanListPanel({ list, control }: { list: PlanList; control: bool
             <Link href={`/documents/new?${new URLSearchParams({ ...(type ? { docType: type.code } : {}), title: list.title })}`} className="font-semibold text-link hover:underline">Register one</Link>
             {list.types.length ? <> as a {list.types.map((one) => `${one.label} (${one.code})`).join(" or ")}</> : null}, then upload here.
           </p>
-          {control ? (
-            <details className="mt-2.5 max-w-xl">
-              <summary className="cursor-pointer text-xs font-semibold text-link">Or upload it without a register document</summary>
-              <ActionForm action={uploadLooseListAction} hideSubmit resetOnSuccess hidden={{ kind: list.kind }} className="mt-2.5 space-y-2.5">
-                <p className="flex gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-                  <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                  <span>It is applied at once, with no review, and is not a controlled document. Your name, the file and your reason are kept in the activity log.</span>
-                </p>
-                <Field label="File" hint="the list as .xlsx or .csv" required>
-                  <input type="file" name="file" required accept=".xlsx,.csv" className={fileInput} />
-                </Field>
-                <Field label="Why without a register document" required>
-                  <input name="reason" required className={inputCls} placeholder="e.g. The planner sent it by email; the schedule document follows next week" />
-                </Field>
-                <label className="flex items-start gap-2 text-xs text-slate-700">
-                  <input type="checkbox" name="aware" value="yes" required className="mt-0.5" />
-                  I know this list is not a document in the register.
-                </label>
-                <div className="flex flex-wrap items-center gap-3">
-                  <button className="ask" data-on="true">Upload and apply</button>
-                  {template}
-                </div>
-              </ActionForm>
-            </details>
-          ) : null}
+          {loose}
         </>
       )}
     </section>
