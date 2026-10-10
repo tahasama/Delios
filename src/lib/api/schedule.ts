@@ -45,7 +45,7 @@ export type NeedLateness = { requirementId: string; documentNumber: string; stat
 type LocalDateJson = string | { year: number; month: number; day: number } | null;
 
 export type ScheduleImportView = {
-  id: string; revisionId: string; revisionValue: string; fileId: string | null; status: "DONE" | "FAILED"; error: string | null;
+  id: string; revisionId: string; revisionValue: string; fileId: string | null; status: "DONE" | "FAILED"; error: string | null; importedAt: string;
   added: number; moved: number; changed: number; removed: number; unchanged: number; unmatchedDepartments: string[];
   changes: { code: string; name: string; type: "NEW" | "MOVED" | "CHANGED" | "REMOVED"; oldStart: LocalDateJson; newStart: LocalDateJson; oldFinish: LocalDateJson; newFinish: LocalDateJson }[];
 };
@@ -122,6 +122,8 @@ export type LegacyAction = {
   departments: string | null; scheduledDate: Date | null; finishDate: Date | null;
   createdAt: Date | null; riskNotifiedAt: Date | null; lastMetAt: Date | null; scheduleRef: string | null;
   needCount: number; state: string;
+  /** The latest schedule read moved its dates: what they were, and which read moved them. */
+  moved: { wasStart: Date | null; wasFinish: Date | null; in: string } | null;
   /** The backend's readiness label (NONE, READY, READY_WITH_WAIVERS, AT_RISK, PENDING). */
   readiness: string;
   entries: LegacyEntry[];
@@ -212,6 +214,7 @@ function legacyAction(detail: ActivityDetail, documents: Map<string, DocumentVie
     lastMetAt: covered ? arrivals[0] ?? null : null,
     // The planner's own ID for it, kept beside our number.
     scheduleRef: activity.externalId ?? null,
+    moved: activity.moved ? { wasStart: dayOf(activity.moved.wasStart), wasFinish: dayOf(activity.moved.wasFinish), in: activity.moved.in } : null,
     needCount: activity.needs,
     state: activity.state,
     readiness: activity.readiness,

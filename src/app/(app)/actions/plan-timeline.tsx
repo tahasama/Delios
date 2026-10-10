@@ -4,6 +4,8 @@ import { fmtDate } from "@/lib/utils";
 export type PlanRow = {
   code: string;
   name: string;
+  /** The latest schedule read moved its dates: the sentence that says so. */
+  moved?: string | null;
   scheduledDate: Date | null;
   /** The day the work ends, when the schedule gives one: the work itself is drawn from start to finish. */
   finishDate?: Date | null;
@@ -141,8 +143,10 @@ export function PlanTimeline({ rows, window, fit }: {
             const fromBefore = rawLeft < 0;
             return (
               <li key={r.code} className="flex items-center gap-2">
-                <Link href={`/actions/${r.code}`} className="w-50 shrink-0 truncate text-xs text-slate-600 hover:text-link" title={`${r.code} — ${r.name}`}>
-                  <span className="font-mono font-semibold text-slate-700">{r.code}</span> {r.name}
+                <Link href={`/actions/${r.code}`} className="w-50 shrink-0 truncate text-xs text-slate-600 hover:text-link" title={`${r.code} — ${r.name}${r.moved ? `\n${r.moved}` : ""}`}>
+                  <span className="font-mono font-semibold text-slate-700">{r.code}</span>
+                  {r.moved ? <span className="stamp mx-1.5 text-amber-700">moved</span> : " "}
+                  {r.name}
                 </Link>
                 <span className="relative h-5 flex-1">
                   <span

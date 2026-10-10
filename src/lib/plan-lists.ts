@@ -34,6 +34,8 @@ export type PlanList = {
   documents: PlanListDocument[];
   /** The sheet to fill, with the headings the reader looks for. */
   template: string;
+  /** What is in force was uploaded here without a document, after any document's read: when. */
+  direct: Date | null;
 };
 
 type Summary = { id: string; number: string; title: string; latestRevision: string | null; latestRevisionState: string | null };
@@ -74,6 +76,16 @@ export async function planLists(scope: { projectId: string }): Promise<PlanList[
   const readLabels = new Set(uploaded.flatMap((set) => set.versions).filter((v) => v.state === "APPROVED" && v.sourceName).map((v) => v.sourceName!));
   for (const doc of schedules) if (doc.released) doc.read = source.imports.some((one) => one.revisionId === doc.released!.id && one.status === "DONE");
   for (const doc of [...departments, ...requirements]) if (doc.released) doc.read = readLabels.has(`${doc.number} rev ${doc.released.value}`);
+  // Whether what is in force came from an upload with no document, later than any document's read.
+  const versionsOf = (kind: string) => uploaded.filter((set) => set.kind === kind).flatMap((set) => set.versions).filter((v) => v.state === "APPROVED");
+  const newest = (dates: Date[]) => dates.reduce<Date | null>((top, one) => (!top || one > top ? one : top), null);
+  const direct = (kind: string, documentRead: Date | null) => {
+    const versions = versionsOf(kind);
+    const loose = newest(versions.filter((v) => v.versionLabel.startsWith("upload")).map((v) => v.createdAt));
+    const read = documentRead ?? newest(versions.filter((v) => !v.versionLabel.startsWith("upload")).map((v) => v.createdAt));
+    return loose && (!read || loose > read) ? loose : null;
+  };
+  const scheduleRead = newest(source.imports.filter((one) => one.status === "DONE").map((one) => new Date(one.importedAt)));
   // The schedule is the project's one schedule document, once it is named.
   const named = source.source ? schedules.filter((one) => one.id === source.source!.documentId) : [];
 
@@ -85,6 +97,7 @@ export async function planLists(scope: { projectId: string }): Promise<PlanList[
       types: scheduleTypes,
       documents: named.length ? named : schedules,
       template: "/api/plan-template/SCHEDULE",
+      direct: direct("SCHEDULE", scheduleRead),
     },
     {
       kind: "DEPARTMENTS",
@@ -93,6 +106,7 @@ export async function planLists(scope: { projectId: string }): Promise<PlanList[
       types: departmentTypes,
       documents: departments,
       template: "/api/plan-template/DEPARTMENTS",
+      direct: direct("ACTION_DEPARTMENTS", null),
     },
     {
       kind: "REQUIREMENTS",
@@ -101,6 +115,7 @@ export async function planLists(scope: { projectId: string }): Promise<PlanList[
       types: requirementTypes,
       documents: requirements,
       template: "/api/plan-template/REQUIREMENTS",
+      direct: direct("DOCUMENT_REQUIREMENTS", null),
     },
   ];
 }

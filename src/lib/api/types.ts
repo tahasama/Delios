@@ -288,4 +288,6 @@ export type ActivitySummary = {
   departments: string[]; state: string; readiness: string; needs: number; met: number; waived: number; nextNeededBy: string | null;
   /** The planner's own ID for the action in the schedule file; `code` is our number. */
   externalId?: string | null;
+  /** The latest schedule read moved it: the dates before, and which read ("rev C", "a direct upload"). */
+  moved?: { wasStart: string | null; wasFinish: string | null; in: string; at: string } | null;
 };

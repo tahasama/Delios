@@ -15,6 +15,7 @@ import { warnOnceAtRisk } from "@/lib/risk-notice";
 import { PlanCards } from "./plan-cards";
 import { PlanPlate } from "./plan-plate";
 import { PlanTimeline } from "./plan-timeline";
+import { movedPhrase } from "./moved";
 import { PlanRegister, type PlanTableRow } from "./plan-register";
 
 export const dynamic = "force-dynamic";
@@ -213,6 +214,7 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
       id: row.id,
       code: row.code,
       plannerId: row.scheduleRef && row.scheduleRef !== row.code ? row.scheduleRef : null,
+      moved: movedPhrase(row.moved, row.scheduledDate, row.finishDate),
       name: row.name,
       departments: departmentsOf(row).map((one) => deptLabel.get(one) ?? one),
       date: row.scheduledDate ? fmtDate(row.scheduledDate) : null,
@@ -361,7 +363,7 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
         }
         plan={
           <PlanTimeline
-            rows={rows.map((row) => ({ code: row.code, name: row.name, scheduledDate: row.scheduledDate, finishDate: row.finishDate, firstNeeded: row.firstNeeded, readiness: row.readiness, ready: row.ready, total: row.total }))}
+            rows={rows.map((row) => ({ code: row.code, name: row.name, moved: movedPhrase(row.moved, row.scheduledDate, row.finishDate), scheduledDate: row.scheduledDate, finishDate: row.finishDate, firstNeeded: row.firstNeeded, readiness: row.readiness, ready: row.ready, total: row.total }))}
             window={planFrom && planTo ? { from: planFrom, to: planTo } : undefined}
             fit={PLAN_FIRST}
           />

@@ -18,9 +18,13 @@ export async function PlanCards({ from = null, to = null }: { from?: Date | null
   const [progress, lists] = await Promise.all([planProgress(ctx, { from, to }), planLists(ctx).catch(() => [])]);
   const day = (d: Date) => d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 
-  // Under each list stage: the revision in force, linked to its document, or that there is none.
+  // Under each list stage: the revision in force, linked to its document, that it was uploaded
+  // directly, or that there is none.
   const inForce = (kind: string) => {
-    const docs = lists.find((one) => one.kind === kind)?.documents ?? [];
+    const list = lists.find((one) => one.kind === kind);
+    // Uploaded here without a document, after any document's read: that is what is in force.
+    if (list?.direct) return <span className="text-amber-800">Uploaded directly, {day(list.direct)}</span>;
+    const docs = list?.documents ?? [];
     const released = docs.filter((one) => one.released);
     if (!docs.length) return "None yet";
     if (!released.length) return "Not released yet";

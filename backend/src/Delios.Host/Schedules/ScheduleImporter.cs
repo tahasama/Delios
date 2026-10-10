@@ -117,7 +117,7 @@ public sealed class ScheduleImporter(
             return;
         }
 
-        var unmatched = await ApplyAsync(revision.TenantId, revision.ProjectId, parsed, revision.Id, record, cancellationToken);
+        var unmatched = await ApplyAsync(revision.TenantId, revision.ProjectId, parsed, revision.Id, $"rev {revision.Value}", record, cancellationToken);
         await audit.WriteAsync(Actor.System, "SCHEDULE_READ", "Revision", revision.Id, label,
             $"{parsed.Count} activities from {file.Name}: {record.Added} new, {record.Moved} moved, {record.Changed} changed, {record.Removed} removed."
             + (unmatched.Count > 0 ? $" Not a discipline, left off: {string.Join(", ", unmatched)}." : ""),
@@ -160,7 +160,7 @@ public sealed class ScheduleImporter(
                 tally = earlier;
             }
         }
-        var unmatched = await ApplyAsync(tenantId, projectId, parsed, revision?.Id, tally, cancellationToken);
+        var unmatched = await ApplyAsync(tenantId, projectId, parsed, revision?.Id, revision is null ? "a direct upload" : $"rev {revision.Value}", tally, cancellationToken);
         return ($"{parsed.Count} activities from {fileName}: {tally.Added} new, {tally.Moved} moved, {tally.Changed} changed, {tally.Removed} removed."
             + (unmatched.Count > 0 ? $" Not a discipline, left off: {string.Join(", ", unmatched)}." : ""), null);
     }
@@ -171,7 +171,7 @@ public sealed class ScheduleImporter(
     /// since moved dates move the needs. Returns the department names that are not disciplines.
     /// </summary>
     private async Task<SortedSet<string>> ApplyAsync(Guid tenantId, Guid projectId, IReadOnlyList<ParsedActivity> parsed, Guid? sourceRevisionId,
-        ScheduleImport record, CancellationToken cancellationToken)
+        string readLabel, ScheduleImport record, CancellationToken cancellationToken)
     {
         var now = clock.GetCurrentInstant();
         // A department is a discipline: the file's names become discipline codes; the rest are listed, not guessed.
@@ -221,6 +221,21 @@ public sealed class ScheduleImporter(
             else if (changed) record.Changed++;
             else record.Unchanged++;
             if (moved || changed) record.Changes.Add(Change(activity.Code, row.Name, moved ? "MOVED" : "CHANGED", activity, row));
+            // The action says it moved, and from where, until a later read leaves it in place.
+            if (moved)
+            {
+                activity.WasStart = activity.Start;
+                activity.WasFinish = activity.Finish;
+                activity.MovedIn = readLabel;
+                activity.MovedAt = now;
+            }
+            else
+            {
+                activity.WasStart = null;
+                activity.WasFinish = null;
+                activity.MovedIn = null;
+                activity.MovedAt = null;
+            }
             activity.ExternalId = row.Code;
             activity.Name = row.Name;
             activity.Start = row.Start;

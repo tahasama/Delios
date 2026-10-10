@@ -134,5 +134,11 @@ conversation, write it into the right one in the same commit as the code.
   on leaving it. Apply lights only while typed words or dates wait. Every filter
   is kept through sorting, paging, load more, the key and export.
 - Progress on an action: a date still to come is shown as due, never as done.
+- Under each stage of Schedule & actions: the revision in force, "Uploaded
+  directly" (with the day) when a direct upload is newer, "Not released yet",
+  or "None yet".
+- An action whose dates the latest schedule read moved carries a "moved" stamp
+  in the table and on the plan; its page says "Moved by rev C: was … , now …".
+  The stamp goes when a later read leaves its dates where they are.
 - "Documents ready" counts only the actions in a window: a month either side
   of today, or the dates the user filtered on. Never the whole schedule.

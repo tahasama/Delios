@@ -20,6 +20,7 @@ import { getActiveSet } from "@/lib/config";
 import { api } from "@/lib/api/client";
 import { holders } from "@/lib/api/settings";
 import { legacyActionByCode, scheduleSource } from "@/lib/api/schedule";
+import { movedPhrase } from "../moved";
 import { actionState, stateLabel, dayHasPassed, DEFAULT_RISK_DAYS, type ActionState } from "@/lib/action-state";
 
 export const dynamic = "force-dynamic";
@@ -65,6 +66,8 @@ export default async function ActionDetailPage({ params, searchParams }: { param
   // without its documents, are not questions worth asking of an action that has
   // neither a slip nor a note.
   const tellsSomething = lateness.rows.some((row) => row.cause || row.outstanding) || action.notes.length > 0;
+  // The latest schedule read moved its dates: said once, under the date.
+  const moved = movedPhrase(action.moved, action.scheduledDate, action.finishDate);
   const readyCount = action.entries.filter((e) => meetsRequirement(e.document.revisions, e.requiredStatus)).length;
   // The earliest date a document is owed: where the activity's own clock starts.
   const firstDue = action.entries.map((e) => e.requiredBy).filter(Boolean).sort((a, b) => a.getTime() - b.getTime())[0] ?? null;
@@ -185,6 +188,11 @@ export default async function ActionDetailPage({ params, searchParams }: { param
                 activity {fmtDate(action.scheduledDate)} &middot; {readyCount} of {action.entries.length} documents ready
                 {action.scheduleActivities[0] ? ` \u00b7 schedule ${action.scheduleActivities[0].scheduleVersion.versionLabel}` : ""}
               </p>
+              {moved ? (
+                <p className="mt-2 flex flex-wrap items-center gap-2 text-xs text-amber-800">
+                  <span className="stamp text-amber-700">moved</span> {moved}
+                </p>
+              ) : null}
               <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">
                 Check your documents in the table below, and confirm your discipline&rsquo;s documents are available at the bottom of this page.
               </p>

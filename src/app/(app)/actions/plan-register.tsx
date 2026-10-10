@@ -20,6 +20,8 @@ export type PlanTableRow = {
   code: string;
   /** The planner's ID for it, when it differs from our number. */
   plannerId: string | null;
+  /** The latest schedule read moved its dates: what they were and are, in one sentence. */
+  moved: string | null;
   name: string;
   departments: string[];
   date: string | null;
@@ -557,6 +559,7 @@ export function PlanRegister({
                       <Td className={`${frozen ? "sticky left-10 z-1" : ""} min-w-65 ${on ? "bg-tint" : "bg-surface"}`}>
                         <Link href={`/actions/${row.code}`} className="doc-number">{row.code}</Link>
                         {row.plannerId ? <span className="ml-1.5 font-mono text-[11px] text-slate-500" title="The planner's ID in the schedule file">{row.plannerId}</span> : null}
+                        {row.moved ? <span className="stamp ml-2 text-amber-700" title={row.moved}>moved</span> : null}
                         <span className="doc-title block max-w-80 truncate" title={row.name}>{row.name}</span>
                       </Td>
                       {columns.map((column) => <Td key={column.key} className={column.cellClass}>{column.cell(row)}</Td>)}

@@ -120,6 +120,15 @@ public sealed class Activity
     /// <summary>The schedule revision the activity was last read from.</summary>
     public Guid? SourceRevisionId { get; set; }
     public Instant UpdatedAt { get; set; }
+    // When the latest schedule read moved its dates: what they were, and which read moved them.
+    // Cleared by the next read that leaves the dates where they are.
+    /// <summary>The start before the latest read moved it; null when that read did not move it.</summary>
+    public LocalDate? WasStart { get; set; }
+    /// <summary>The finish before the latest read moved it.</summary>
+    public LocalDate? WasFinish { get; set; }
+    /// <summary>Which read moved it: "rev C", or "a direct upload".</summary>
+    public string? MovedIn { get; set; }
+    public Instant? MovedAt { get; set; }
     // What it is waiting for, kept on the activity so the schedule can be sorted
     // and filtered by it. Written by Readiness.RestateAsync; nothing here is a new fact.
     /// <summary>How many documents the activity needs.</summary>
@@ -275,6 +284,7 @@ internal sealed class ActivityConfiguration : IEntityTypeConfiguration<Activity>
         b.HasIndex(x => new { x.ProjectId, x.Code }).IsUnique();
         b.HasIndex(x => new { x.ProjectId, x.Start });
         b.HasIndex(x => new { x.ProjectId, x.NextNeededBy });
+        b.Property(x => x.MovedIn).HasMaxLength(32);
         b.Property(x => x.Code).HasMaxLength(64);
         b.Property(x => x.ExternalId).HasMaxLength(64);
         b.HasIndex(x => new { x.ProjectId, x.ExternalId });

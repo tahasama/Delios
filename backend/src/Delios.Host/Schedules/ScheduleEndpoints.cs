@@ -28,7 +28,11 @@ public sealed record DecisionRequest(string? Decision, string? ResponsibleName, 
 
 /// <summary>One activity as the schedule list shows it: its dates, departments, readiness label and need counts.</summary>
 public sealed record ActivitySummary(Guid Id, string Code, string Name, DateOnly? Start, DateOnly? Finish, string? Responsible,
-    IReadOnlyList<string> Departments, string State, string Readiness, int Needs, int Met, int Waived, DateOnly? NextNeededBy, string? ExternalId = null);
+    IReadOnlyList<string> Departments, string State, string Readiness, int Needs, int Met, int Waived, DateOnly? NextNeededBy, string? ExternalId = null,
+    ActivityMove? Moved = null);
+
+/// <summary>The latest schedule read moved the activity: its dates before, and which read moved it.</summary>
+public sealed record ActivityMove(DateOnly? WasStart, DateOnly? WasFinish, string In, DateTimeOffset At);
 
 /// <summary>One need of an activity as the activity page shows it: the document, its current revision and status, when it is needed, and its state or waiver.</summary>
 public sealed record NeedView(Guid Id, Guid DocumentId, string DocumentNumber, string Title, string? CurrentRevision, string? CurrentStatus,
@@ -428,7 +432,8 @@ public static class ScheduleEndpoints
     /// <summary>Turns a stored activity into the list shape, adding its readiness label.</summary>
     private static ActivitySummary Summary(Activity a, LocalDate today, int window) => new(
         a.Id, a.Code, a.Name, a.Start?.ToDateOnly(), a.Finish?.ToDateOnly(), a.Responsible, a.Departments, a.State,
-        ReadinessLabels.Of(a, today, window), a.NeedCount, a.MetCount, a.WaivedCount, a.NextNeededBy?.ToDateOnly(), a.ExternalId);
+        ReadinessLabels.Of(a, today, window), a.NeedCount, a.MetCount, a.WaivedCount, a.NextNeededBy?.ToDateOnly(), a.ExternalId,
+        a.MovedIn is null || a.MovedAt is null ? null : new ActivityMove(a.WasStart?.ToDateOnly(), a.WasFinish?.ToDateOnly(), a.MovedIn, a.MovedAt.Value.ToDateTimeOffset()));
 
     /// <summary>Builds the views of an activity's needs, looking up each document and its current released revision, ordered by the day they are needed.</summary>
     private static async Task<List<NeedView>> NeedViewsAsync(DeliosDbContext db, IEnumerable<Requirement> needs, CancellationToken cancellationToken)
