@@ -296,6 +296,21 @@ public static class DirectoryEndpoints
             if (status is not ("ACTIVE" or "CLOSED" or "ON_HOLD" or "ARCHIVED"))
                 return Problems.Invalid("STATUS_INVALID", "A project is ACTIVE, ON_HOLD, CLOSED or ARCHIVED.");
             changes.Add($"status → {status}");
+            // A document is archived with its project, never on its own; reopening the project brings them back.
+            if (status == "ARCHIVED")
+            {
+                var archived = await db.Documents.Where(d => d.ProjectId == projectId
+                        && (d.State == Documents.DocumentStates.Planned || d.State == Documents.DocumentStates.Active))
+                    .ExecuteUpdateAsync(d => d.SetProperty(x => x.State, Documents.DocumentStates.Archived), cancellationToken);
+                changes.Add($"{archived} document(s) archived with it");
+            }
+            else if (project.Status == "ARCHIVED")
+            {
+                var back = await db.Documents.Where(d => d.ProjectId == projectId && d.State == Documents.DocumentStates.Archived)
+                    .ExecuteUpdateAsync(d => d.SetProperty(x => x.State,
+                        x => x.LatestRevisionState == null ? Documents.DocumentStates.Planned : Documents.DocumentStates.Active), cancellationToken);
+                changes.Add($"{back} document(s) back in use");
+            }
             project.Status = status;
         }
         if (Blank(request.TimeZone) is { } zone && zone != project.TimeZone)

@@ -79,6 +79,15 @@ conversation, write it into the right one in the same commit as the code.
   voided (backend refuses with ON_LEGAL_HOLD). New revisions and reviews go on.
   The document page shows a banner with since when, who and why.
 
+### Ending a document
+- Hold and End are separate, never shown as a pair.
+- **Void** is for one revision (released in error, or never reviewed).
+- **Cancelled**: the document will never be produced; only if nothing of it was
+  ever released. **Withdrawn**: it was released and is no longer valid;
+  everyone sent a revision of it is told to stop using it.
+- **Archived** is never chosen per document: documents are archived with their
+  project, and come back if the project is reopened.
+
 ### Schedule & actions
 - The schedule (SCH), disciplines per action (DPA) and requirements (RQL) are
   register documents, revised and released on the document page.

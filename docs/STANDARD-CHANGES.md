@@ -671,6 +671,21 @@ removes anything.
 
 **Depends on it:** `KeepingService.LegalHoldAsync`, `ON_LEGAL_HOLD`.
 
+## 35 · How a document ends: cancelled, withdrawn, archived
+
+**Clause:** §7.1 *Document state*.
+
+**Must say:** a document that will never be produced, and of which nothing was
+ever released, is **cancelled**. A document that was released and is no longer
+valid is **withdrawn**: everyone who was sent a revision of it is told to stop
+using it, and its history stays. A document is **archived** only with its
+project, when the project is archived; reopening the project brings its
+documents back into use. Voiding is not an end of the document: it says one
+revision never counted.
+
+**Depends on it:** `DocumentService.EndAsync` (`WAS_RELEASED`, `NEVER_RELEASED`,
+`ARCHIVED_WITH_PROJECT`), `Supersession.TellWithdrawnAsync`, project status update.
+
 ## Still open — decided in conversation, not yet built
 
 - **Escalation** where somebody refuses to acknowledge carrying an action

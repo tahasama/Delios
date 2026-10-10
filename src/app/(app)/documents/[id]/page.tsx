@@ -101,6 +101,8 @@ export default async function DocumentDetailPage({
     controlDoes(ctx, "VOID"),
   ]);
   const mayRetire = controller || (!withdrawIsControl && doc.createdById === user.id);
+  // Withdrawn is for a document that was released; cancelled for one that never was.
+  const everReleased = doc.revisions.some((one) => one.state === "RELEASED" || one.state === "SUPERSEDED");
 
   const confidentialityRows = await getSet("CONFIDENTIALITY");
   const openCodes = openConfidentiality(confidentialityRows.map((one) => ({ code: one.code, props: one.props })));
@@ -599,32 +601,33 @@ export default async function DocumentDetailPage({
                 ) : canEdit && doc.kind !== "RECORD" ? (
                   <p className="mt-4 text-xs text-slate-500">To change these details, start a new revision: they change with it.</p>
                 ) : null}
+                {/* Two different intentions, kept apart: hold keeps it as it is; ending it says it is finished. */}
                 {controller ? (
                   <details className="mt-3">
-                    <summary className="cursor-pointer list-none text-xs font-semibold text-slate-500">Retire or hold this document…</summary>
-                    <div className="mt-3 max-w-md space-y-4">
-                      {doc.disposedAt ? (
-                        <p className="text-xs text-slate-500">Disposed {fmtDate(doc.disposedAt)} by {doc.disposedBy} · {doc.disposalBasis}</p>
+                    <summary className="cursor-pointer list-none text-xs font-semibold text-slate-500">{doc.legalHold ? "Lift the legal hold…" : "Put on legal hold…"}</summary>
+                    <div className="mt-3 max-w-md">
+                      <ActionForm action={setLegalHoldAction} submitLabel={doc.legalHold ? "Lift legal hold" : "Put on legal hold"} size="sm" variant="secondary" hidden={{ documentId: doc.id, hold: doc.legalHold ? "off" : "on" }}>
+                        <Field label={doc.legalHold ? "Why it is lifted" : "Why it is held"} required hint={doc.legalHold ? "kept in the activity log" : "while held it cannot be ended and no revision voided; work on it goes on"}>
+                          <input name="reason" required className={inputCls} placeholder={doc.legalHold ? "e.g. Claim settled" : "e.g. Claim 42 from the contractor"} />
+                        </Field>
+                      </ActionForm>
+                    </div>
+                  </details>
+                ) : null}
+                {mayRetire && !doc.legalHold && (doc.state === "ACTIVE" || doc.state === "PLANNED") && !working ? (
+                  <details className="mt-3">
+                    <summary className="cursor-pointer list-none text-xs font-semibold text-slate-500">End this document…</summary>
+                    <div className="mt-3 max-w-md">
+                      {everReleased ? (
+                        <ActionForm action={endDocumentStateAction} submitLabel="Withdraw the document" variant="danger" size="sm" hidden={{ documentId: doc.id, kind: "WITHDRAWN" }} confirmText="Everyone who was sent a revision of it will be told to stop using it. Continue?">
+                          <p className="text-xs text-slate-600">It was released and is no longer valid. It stays in the register with its history; everyone who was sent a revision of it is told to stop using it.</p>
+                          <Field label="Why" required><input name="reason" required className={inputCls} placeholder="e.g. Made obsolete by the design change of variation 12" /></Field>
+                        </ActionForm>
                       ) : (
-                        <>
-                          <ActionForm action={setLegalHoldAction} submitLabel={doc.legalHold ? "Lift legal hold" : "Put on legal hold"} size="sm" variant="secondary" hidden={{ documentId: doc.id, hold: doc.legalHold ? "off" : "on" }}>
-                            <Field label={doc.legalHold ? "Why it is lifted" : "Why it is held"} required hint={doc.legalHold ? "kept in the activity log" : "while held it cannot be retired and no revision voided; work on it goes on"}>
-                              <input name="reason" required className={inputCls} placeholder={doc.legalHold ? "e.g. Claim settled" : "e.g. Claim 42 from the contractor"} />
-                            </Field>
-                          </ActionForm>
-                          {doc.state === "ACTIVE" && mayRetire && !doc.legalHold ? (
-                            <ActionForm action={endDocumentStateAction} submitLabel="Retire" variant="danger" size="sm" hidden={{ documentId: doc.id }} confirmText="People who received it will be told to stop using it. Continue?">
-                              <Field label="Retire as">
-                                <select name="kind" className={inputCls} defaultValue="WITHDRAWN">
-                                  <option value="WITHDRAWN">Withdrawn</option>
-                                  <option value="CANCELLED">Cancelled</option>
-                                  <option value="ARCHIVED">Archived</option>
-                                </select>
-                              </Field>
-                              <Field label="Reason" required><input name="reason" className={inputCls} /></Field>
-                            </ActionForm>
-                          ) : null}
-                        </>
+                        <ActionForm action={endDocumentStateAction} submitLabel="Cancel the document" variant="danger" size="sm" hidden={{ documentId: doc.id, kind: "CANCELLED" }}>
+                          <p className="text-xs text-slate-600">Nothing of it was ever released: it will never be produced. Its number stays reserved to it.</p>
+                          <Field label="Why" required><input name="reason" required className={inputCls} placeholder="e.g. Dropped from the scope by variation 12" /></Field>
+                        </ActionForm>
                       )}
                     </div>
                   </details>

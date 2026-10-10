@@ -15,7 +15,7 @@ namespace Delios.Host.Documents;
 /// </summary>
 public sealed class DocumentService(
     DeliosDbContext db, Numbering numbering, FileStorage storage, AuditLog audit, IClock clock,
-    IOptions<StorageOptions> storageOptions)
+    IOptions<StorageOptions> storageOptions, Transmittals.Supersession supersession)
 {
     /// <summary>
     /// Registers a new document: checks the title, the coded values and the fields the deliverable type requires,
@@ -276,8 +276,10 @@ public sealed class DocumentService(
         if (!access.Allows(Verbs.Control, document.Facts) && document.CreatedById != access.UserId)
             return Fail(Problems.Forbidden("END_NOT_ALLOWED", "Document Control, or whoever registered it, ends a document."));
         var state = request.State?.Trim().ToUpperInvariant();
-        if (state is not (DocumentStates.Withdrawn or DocumentStates.Cancelled or DocumentStates.Archived))
-            return Fail(Problems.Invalid("END_STATE_INVALID", "A document is withdrawn, cancelled or archived."));
+        if (state == DocumentStates.Archived)
+            return Fail(Problems.Invalid("ARCHIVED_WITH_PROJECT", "A document is archived with its project, when the project is closed; not on its own."));
+        if (state is not (DocumentStates.Withdrawn or DocumentStates.Cancelled))
+            return Fail(Problems.Invalid("END_STATE_INVALID", "A document is withdrawn (it was released and is no longer valid) or cancelled (it will never be produced)."));
         var reason = Blank(request.Reason);
         if (reason is null)
             return Fail(Problems.Invalid("REASON_REQUIRED", "A reason is required: each end state is recorded with date and authority."));
@@ -285,15 +287,22 @@ public sealed class DocumentService(
         if (document.State is not (DocumentStates.Planned or DocumentStates.Active))
             return Fail(Problems.Conflict("DOCUMENT_NOT_OPEN", $"The document is already {document.State.ToLowerInvariant()}.", new { state = document.State }));
         string[] moving = [RevisionStates.InPreparation, RevisionStates.InReview, RevisionStates.Received, RevisionStates.Correcting];
-        if (await db.Revisions.AnyAsync(r => r.DocumentId == document.Id && moving.Contains(r.State), cancellationToken)
-            && state != DocumentStates.Archived)
+        if (await db.Revisions.AnyAsync(r => r.DocumentId == document.Id && moving.Contains(r.State), cancellationToken))
             return Fail(Problems.Conflict("REVISION_IN_MOTION", "A revision of it is still in motion: finish it, or send it back, first."));
+        // Cancelled: never produced, so nothing of it was ever released. Withdrawn: it was, and is no longer valid.
+        var everReleased = await db.Revisions.AnyAsync(r => r.DocumentId == document.Id
+            && (r.State == RevisionStates.Released || r.State == RevisionStates.Superseded), cancellationToken);
+        if (state == DocumentStates.Cancelled && everReleased)
+            return Fail(Problems.Conflict("WAS_RELEASED", "A revision of it was released, so it is not cancelled: withdraw it, and the people who received it are told."));
+        if (state == DocumentStates.Withdrawn && !everReleased)
+            return Fail(Problems.Conflict("NEVER_RELEASED", "Nothing of it was ever released, so there is nothing to withdraw: cancel it."));
         var before = document.State;
         document.State = state;
         document.UpdatedAt = clock.GetCurrentInstant();
         await db.SaveChangesAsync(cancellationToken);
         await audit.WriteAsync(new Actor(access.UserId, access.UserName), "STATE_TRANSITION", "Document", document.Id,
             document.Number, $"{before} → {state}: {reason}", document.ProjectId, cancellationToken);
+        if (state == DocumentStates.Withdrawn) await supersession.TellWithdrawnAsync(document, reason, cancellationToken);
         return (document, null);
     }
 

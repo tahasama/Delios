@@ -39,6 +39,21 @@ public sealed class Supersession(DeliosDbContext db, Notifications.Notifier noti
             $"/documents/{document.Id}", cancellationToken);
     }
 
+    /// <summary>A document withdrawn: everyone with an account who was sent any of its revisions is told to stop using it.</summary>
+    public async Task TellWithdrawnAsync(Document document, string reason, CancellationToken cancellationToken)
+    {
+        var people = await (from t in db.Transmittals
+                            from i in t.Items
+                            from p in t.Recipients
+                            join r in db.Revisions on i.RevisionId equals r.Id
+                            where t.Direction == TransmittalDirections.Outgoing && r.DocumentId == document.Id && p.UserId != null
+                            select p.UserId!.Value).Distinct().ToListAsync(cancellationToken);
+        await notifier.NotifyAsync(document.TenantId, document.ProjectId, people, Notifications.NotificationKinds.Released,
+            $"{document.Number} is withdrawn",
+            $"Stop using {document.Number} ({document.Title}) and discard any copy of it, whatever revision you hold. Why: {reason}",
+            $"/documents/{document.Id}", cancellationToken);
+    }
+
     /// <summary>Every replaced revision on the project still held by an organization that was never sent a newer one.</summary>
     public async Task<IReadOnlyList<Untold>> UntoldAsync(ProjectAccess access, CancellationToken cancellationToken)
     {
