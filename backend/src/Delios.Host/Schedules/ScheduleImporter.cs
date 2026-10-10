@@ -128,7 +128,8 @@ public sealed class ScheduleImporter(
     /// Reads a schedule file uploaded on its own, with no document in the register: the same reading, applied at
     /// once. Returns what changed, or why the file cannot be read. The caller records who did it and why.
     /// </summary>
-    public async Task<(string? Summary, string? Error)> ReadUploadAsync(Guid tenantId, Guid projectId, string fileName, byte[] bytes, CancellationToken cancellationToken)
+    public async Task<(string? Summary, string? Error)> ReadUploadAsync(Guid tenantId, Guid projectId, string fileName, byte[] bytes,
+        Revision? revision, CancellationToken cancellationToken)
     {
         if (!ScheduleReader.CanRead(fileName)) return (null, "The schedule must be an .xlsx or .csv export.");
         var source = await db.ScheduleSources.AsNoTracking().SingleOrDefaultAsync(s => s.ProjectId == projectId, cancellationToken);
@@ -137,9 +138,28 @@ public sealed class ScheduleImporter(
         string? error;
         using (var content = new MemoryStream(bytes)) (parsed, error) = ScheduleReader.Read(content, fileName, source?.Columns ?? new ScheduleColumns());
         if (parsed is null) return (null, $"{fileName}: {error}");
-        // Counted the way a released revision's read is counted; kept in the uploaded lists, not as a revision read.
-        var tally = new ScheduleImport { TenantId = tenantId, ProjectId = projectId, RevisionValue = "-" };
-        var unmatched = await ApplyAsync(tenantId, projectId, parsed, null, tally, cancellationToken);
+        // Counted the way a released revision's read is counted. The released revision the file belongs to keeps the read
+        // as its own, the first time; a file with no revision, or read again, is kept among the uploaded lists instead.
+        var tally = new ScheduleImport { TenantId = tenantId, ProjectId = projectId, RevisionValue = "-", ImportedAt = clock.GetCurrentInstant() };
+        if (revision is not null)
+        {
+            // Released with no spreadsheet, its read failed: this file is that read, done now.
+            var earlier = await db.ScheduleImports.SingleOrDefaultAsync(i => i.RevisionId == revision.Id, cancellationToken);
+            if (earlier is null)
+            {
+                tally.RevisionId = revision.Id;
+                tally.RevisionValue = revision.Value;
+                db.ScheduleImports.Add(tally);
+            }
+            else if (earlier.Status == ScheduleImportStatuses.Failed)
+            {
+                earlier.Status = ScheduleImportStatuses.Done;
+                earlier.Error = null;
+                earlier.ImportedAt = tally.ImportedAt;
+                tally = earlier;
+            }
+        }
+        var unmatched = await ApplyAsync(tenantId, projectId, parsed, revision?.Id, tally, cancellationToken);
         return ($"{parsed.Count} activities from {fileName}: {tally.Added} new, {tally.Moved} moved, {tally.Changed} changed, {tally.Removed} removed."
             + (unmatched.Count > 0 ? $" Not a discipline, left off: {string.Join(", ", unmatched)}." : ""), null);
     }

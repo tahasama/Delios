@@ -182,4 +182,60 @@ public sealed class RequirementsListTests(Infrastructure infrastructure) : IClas
         var kept = await controller.GetFromJsonAsync<JsonElement>($"{p}/controlled?kind=ACTION_DEPARTMENTS");
         Assert.Contains(kept.EnumerateArray(), v => v.GetProperty("decisionReason").GetString() == "Sent by the project manager" && v.GetProperty("createdBy").GetString() == "Carla Control");
     }
+
+    [Fact]
+    public async Task The_spreadsheet_of_a_released_revision_is_uploaded_on_the_schedule_and_read_against_that_revision()
+    {
+        await using var app = await TestApp.StartAsync(infrastructure);
+        app.StartWorker();
+        var engineer = await app.SignedInAsync("engineer@demo.local");
+        var approver = await app.SignedInAsync("approver@demo.local");
+        var controller = await app.SignedInAsync("controller@demo.local");
+        var project = await Api.ProjectIdAsync(engineer);
+        var p = $"/api/projects/{project}";
+        static string B64(string text) => Convert.ToBase64String(Encoding.UTF8.GetBytes(text));
+        async Task<Guid> ReleasedPdfOnlyAsync(Guid document)
+        {
+            var pdf = await Flow.UploadAsync(engineer, project, document, "Printed.pdf", Flow.Pdf(), "application/pdf");
+            var (_, revision) = await Flow.PostAsync(engineer, $"{p}/documents/{document}/revisions", new { fileIds = new[] { pdf } });
+            var id = revision.GetProperty("id").GetGuid();
+            await Flow.UntilAsync(engineer, project, document, d => Flow.Revision(d, id).GetProperty("filesState").GetString() != "PROCESSING");
+            await ReleaseAsync(engineer, approver, controller, project, id);
+            return id;
+        }
+
+        // The schedule document, released as a PDF only: its read fails for want of a spreadsheet.
+        var schedule = (await Api.RegisterAsync(engineer, project, new { title = "Construction programme", deliverableType = "ENG", docType = "SCH", discipline = "PM", subproject = "00" }))
+            .GetProperty("id").GetGuid();
+        using (var named = await controller.PutAsJsonAsync($"{p}/schedule", new { documentId = schedule }))
+            Assert.True(named.IsSuccessStatusCode, await named.Content.ReadAsStringAsync());
+        var revA = await ReleasedPdfOnlyAsync(schedule);
+        await UntilAsync(engineer, $"{p}/schedule", s => s.GetProperty("imports").GetArrayLength() == 1);
+
+        // Its spreadsheet, uploaded on the schedule for rev A: read against rev A, no reason asked.
+        var programme = "Activity ID,Activity Name,Start,Finish\n" + $"A100,Pour inlet base slab,{Day(30)},{Day(35)}\n" + $"A200,Energise MCC,{Day(40)},{Day(41)}\n";
+        var (read, readBody) = await Flow.PostAsync(controller, $"{p}/schedule/lists", new { kind = "SCHEDULE", fileName = "Programme.csv", contentBase64 = B64(programme), revisionId = revA });
+        Assert.True(read == HttpStatusCode.OK, readBody.ToString());
+        Assert.Equal(2, (await engineer.GetFromJsonAsync<JsonElement>($"{p}/activities")).GetArrayLength());
+        var imports = (await engineer.GetFromJsonAsync<JsonElement>($"{p}/schedule")).GetProperty("imports");
+        Assert.Equal(("DONE", 1), (imports[0].GetProperty("status").GetString(), imports.GetArrayLength()));
+
+        // Another file for the same revision needs a reason.
+        var (again, againBody) = await Flow.PostAsync(controller, $"{p}/schedule/lists", new { kind = "SCHEDULE", fileName = "Programme.csv", contentBase64 = B64(programme), revisionId = revA });
+        Assert.Equal((HttpStatusCode.UnprocessableEntity, "REASON_REQUIRED"), (again, Flow.Code(againBody)));
+        var (reasoned, reasonedBody) = await Flow.PostAsync(controller, $"{p}/schedule/lists", new { kind = "SCHEDULE", fileName = "Programme.csv", contentBase64 = B64(programme), revisionId = revA, reason = "The first export missed a column" });
+        Assert.True(reasoned == HttpStatusCode.OK, reasonedBody.ToString());
+
+        // The schedule's revision is not a disciplines list.
+        var (wrong, wrongBody) = await Flow.PostAsync(controller, $"{p}/schedule/lists", new { kind = "DEPARTMENTS", fileName = "Disciplines.csv", contentBase64 = B64("Action Code,Departments\nA100,CI\n"), revisionId = revA });
+        Assert.Equal((HttpStatusCode.UnprocessableEntity, "NOT_THIS_LIST"), (wrong, Flow.Code(wrongBody)));
+
+        // The disciplines list, released as a PDF only, then its spreadsheet: kept against its revision.
+        var list = (await Api.RegisterAsync(engineer, project, new { title = "Disciplines per action", deliverableType = "ENG", docType = "DPA", discipline = "PM", subproject = "00" }));
+        var listRev = await ReleasedPdfOnlyAsync(list.GetProperty("id").GetGuid());
+        var (tagged, taggedBody) = await Flow.PostAsync(controller, $"{p}/schedule/lists", new { kind = "DEPARTMENTS", fileName = "Disciplines.csv", contentBase64 = B64("Action Code,Departments\nA100,CI\nA200,EL\n"), revisionId = listRev });
+        Assert.True(tagged == HttpStatusCode.OK, taggedBody.ToString());
+        var kept = await controller.GetFromJsonAsync<JsonElement>($"{p}/controlled?kind=ACTION_DEPARTMENTS");
+        Assert.Contains(kept.EnumerateArray(), v => v.GetProperty("sourceName").GetString() == $"{list.GetProperty("number").GetString()} rev A");
+    }
 }
