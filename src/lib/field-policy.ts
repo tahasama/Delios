@@ -123,7 +123,7 @@ export const FIELDS: FieldDef[] = [
   // ── Starting a revision ──
   { control: "TEXT", kind: "REVISION", key: "value", label: "Revision", text: "Its place in the published series.", fallback: "REQUIRED", fixed: "The series decides it; it is never typed." },
   { control: "TEXT", kind: "REVISION", key: "reasonForRevision", label: "Reason", text: "Why there is a new revision at all.", fallback: "REQUIRED", fixed: "A revision nobody asked for, with no reason recorded, is how a register loses its thread." },
-  { control: "LONG_TEXT", kind: "REVISION", key: "changeDescription", label: "What changed", text: "What is different from the last one — not a restatement of the reason.", fallback: "REQUIRED" },
+  { control: "LONG_TEXT", kind: "REVISION", key: "changeDescription", label: "What changed, and why", text: "What is different from the last revision, and why it is made.", fallback: "REQUIRED" },
   { control: "CHOICE", setKey: "STATUSES", computedBy: "What may be built from it, and whether work may proceed, follow from the status.", kind: "REVISION", key: "statusCode", label: "Released as", text: "The status it carries once released. Asked at release, not when it is started.", fallback: "REQUIRED" },
   { control: "DATE", kind: "REVISION", key: "plannedSubmissionDate", label: "Due for submission", text: "When it is promised.", fallback: "OPTIONAL" },
   { control: "CHOICE", setKey: "PHASES", kind: "REVISION", key: "phase", label: "Phase", text: "The stage of the project it belongs to.", fallback: "OPTIONAL" },

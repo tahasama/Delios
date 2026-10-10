@@ -111,9 +111,9 @@ export default async function ReviewCyclePage({ params }: { params: Promise<{ id
 
   const reserves = cycle.comments.filter((comment) => comment.progressionPreventing && comment.status === "OPEN");
   const myComments = cycle.comments.filter((comment) => comment.authorId === user.id);
-  const canRecordOutcome = (assigned || controller) && !cycle.outcome && Boolean(cycle.issuedToReviewAt);
+  const canRecordOutcome = (assigned || controller) && !cycle.outcome && !cycle.withdrawn && Boolean(cycle.issuedToReviewAt);
   // Writing comments: whoever sits on the open step, until they answer it.
-  const mayComment = cycle.status === "OPEN" && assigned && !cycle.outcome && Boolean(cycle.issuedToReviewAt);
+  const mayComment = cycle.status === "OPEN" && assigned && !cycle.outcome && !cycle.withdrawn && Boolean(cycle.issuedToReviewAt);
   // Whether an open comment stops the release: Document Control, or the revision's author, may change it.
   const mayReclassify = controller || rev.authoredById === user.id;
   // A step answered by an outside party that holds no accounts here: one of our
@@ -161,13 +161,21 @@ export default async function ReviewCyclePage({ params }: { params: Promise<{ id
             at: one?.outcomeAt ?? null,
             holder: one?.outcome
               ? `${verdictLabel(one.outcome)} — ${one.outcomeByName ?? ""}`
+              : cycle.withdrawn
+                ? "not answered — withdrawn"
               : one
                 ? `with ${one.assignments.map((seat) => seat.userName).join(", ") || "nobody yet"}`
                 : step.goesTo?.length ? `not started · goes to ${step.goesTo.join(", ")}` : "not started",
           };
         }),
+        // Withdrawn: this review ends there. Release, if it comes, comes from a later review.
+        ...(cycle.withdrawn ? [
+          { group: "Withdrawn", label: "Withdrawn from review", here: true, at: cycle.withdrawn.at, holder: cycle.withdrawn.note ?? null },
+          { group: "Withdrawn", label: rev.releasedAt ? "Released — in a later review" : "Released", at: rev.releasedAt, holder: rev.releasedAt ? rev.releasedByName ?? null : "only through a new review" },
+        ] : [
         { group: "Document Control", label: "Not released", here: rev.state === "NOT_RELEASED", at: rev.state === "NOT_RELEASED" ? rev.statusSetAt : null, holder: rev.statusCode ? `at ${rev.statusCode}, waiting for Document Control` : "waiting for Document Control" },
         { group: "Document Control", label: "Released", at: rev.releasedAt, holder: rev.releasedByName ?? null },
+        ]),
       ]
     : [
         { label: "Submitted", at: cycle.submittedAt, holder: cycle.openedByName },
@@ -362,6 +370,8 @@ export default async function ReviewCyclePage({ params }: { params: Promise<{ id
             <DelegatePanel rows={handOvers} controller={controller} off={handOff} />
           ) : null}
 
+          {/* A withdrawn review is closed: nothing more is answered on it. */}
+          {cycle.withdrawn ? null : (
           <AnswerCard
             title={cycle.binding ? "Binding verdict" : "Advice"}
             answerLabel={cycle.binding ? "Give my verdict" : "Give my advice"}
@@ -405,6 +415,7 @@ export default async function ReviewCyclePage({ params }: { params: Promise<{ id
               ) : null}</ActionForm></Guarded>}
             {cycle.outcome ? null : <p className="mt-2 text-xs leading-5 text-slate-500">{!cycle.issuedToReviewAt ? "Document Control sends it to the reviewers first." : ""}</p>}
           </AnswerCard>
+          )}
 
           {!cycle.issuedToReviewAt ? <Card title="Send to reviewers">{mayIssueToReviewers ? <ActionForm action={issueToReviewAction} submitLabel="Send to reviewers" hidden={{ cycleId: cycle.id }}/> : <p className="text-xs text-slate-500">{issueIsControl ? "Waiting for Document Control." : "Waiting for whoever sent it for review."}</p>}</Card> : null}
 

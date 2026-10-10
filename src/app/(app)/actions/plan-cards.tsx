@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { fmtDate } from "@/lib/utils";
 import { requireScope } from "@/lib/scope";
 import { planLists } from "@/lib/plan-lists";
 import { planProgress, PLAN_STAGES } from "@/lib/plan-progress";
@@ -12,10 +13,10 @@ import { UploadSwitch } from "./upload-switch";
  * done: the schedule, the disciplines each action concerns, the documents each
  * discipline needs.
  */
-export async function PlanCards() {
+export async function PlanCards({ from = null, to = null }: { from?: Date | null; to?: Date | null } = {}) {
   const ctx = await requireScope();
   const plans = ctx.can("PLAN") || ctx.can("CONTROL") || ctx.can("CONFIGURE");
-  const [progress, lists] = await Promise.all([planProgress(ctx), plans ? planLists(ctx) : Promise.resolve([])]);
+  const [progress, lists] = await Promise.all([planProgress(ctx, { from, to }), plans ? planLists(ctx) : Promise.resolve([])]);
   const dot = <span aria-hidden className="text-slate-300">·</span>;
 
   const summary = (
@@ -42,7 +43,10 @@ export async function PlanCards() {
             {dot}
             <span>{progress.answered} of {progress.asked} discipline lists</span>
             {dot}
-            <span>{progress.complete} of {progress.listed} actions have every document</span>
+            <span>
+              {progress.complete} of {progress.listed} actions have every document
+              <span className="text-slate-400"> — {progress.window.chosen ? "dates chosen" : "a month either side of today"}: {fmtDate(progress.window.from)} → {fmtDate(progress.window.to)}</span>
+            </span>
           </>
         ) : null}
       </p>

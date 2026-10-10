@@ -325,7 +325,7 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
         plate={
           <PlanPlate inForceSince={publishedVersion ? fmtDate(publishedVersion.publishedAt) : null} />
         }
-        uploads={<PlanCards />}
+        uploads={<PlanCards from={dateOn === "date" ? fromDay : null} to={dateOn === "date" ? toDay : null} />}
         cardHeight={PLAN_CARD_HEIGHT}
         view={view}
         more={

@@ -59,13 +59,20 @@ conversation, write it into the right one in the same commit as the code.
   reason and comments; everyone on the route is told. The revision can then be
   sent again.
 - Revisions are never skipped, and an upload elsewhere never creates one.
+- Starting a revision asks one text, "What changed, and why" (never two fields
+  saying the same), plus a PDF and a native file, both optional at start.
+- A withdrawn review is closed: no advice, verdict or comment can be given on
+  it. Its progress ends at "Withdrawn"; a release comes from a later review.
 
 ### Schedule & actions
 - The schedule (SCH), disciplines per action (DPA) and requirements (RQL) are
   register documents, revised and released on the document page.
 - Their Excel is uploaded on Schedule & actions only by Document Control or a
   function with the Plan permission.
-- Released revision: tick "this file is rev X as released" or give a reason it
-  differs. No released revision: a reason is obligatory. Always logged.
+- Released revision: "this file is rev X as released" is ticked by default;
+  only when unticked is a reason obligatory. No released revision: a reason is
+  obligatory. Always logged. Same on all three uploads.
 - Actions get our own number (A00001…) and keep the planner's ID beside it.
 - Progress on an action: a date still to come is shown as due, never as done.
+- "Documents ready" counts only the actions in a window: a month either side
+  of today, or the dates the user filtered on. Never the whole schedule.

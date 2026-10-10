@@ -3,6 +3,7 @@ import { ActionForm } from "@/components/form";
 import { Field, inputCls } from "@/components/ui";
 import { uploadPlanListAction, uploadLooseListAction } from "@/lib/actions/plan-lists";
 import type { PlanList } from "@/lib/plan-lists";
+import { ConfirmOrWhy } from "./confirm-or-why";
 import { Download, TriangleAlert } from "lucide-react";
 
 const STATE: Record<string, string> = {
@@ -87,14 +88,8 @@ export function PlanListPanel({ list, control }: { list: PlanList; control: bool
               <Field label={only ? `Spreadsheet of rev ${only.released!.value}` : "Spreadsheet of the revision in force"} hint=".xlsx or .csv" required>
                 <input type="file" name="file" required accept=".xlsx,.csv" className={fileInput} />
               </Field>
-              {/* Either the uploader vouches for the file, or says why it differs: one or the other. */}
-              <label className="flex items-start gap-2 text-xs text-slate-700">
-                <input type="checkbox" name="confirmed" value="yes" className="mt-0.5" />
-                <span>This file is the list of {only ? `rev ${only.released!.value}` : "the revision in force"} as released. I take responsibility for it matching.</span>
-              </label>
-              <Field label="Or, if it differs from the released revision, why" hint="kept in the activity log">
-                <input name="reason" className={inputCls} placeholder="e.g. The approver is away; the stamped scan follows" />
-              </Field>
+              {/* The uploader vouches for the file, or says why it differs. */}
+              <ConfirmOrWhy revision={only ? `rev ${only.released!.value}` : "the revision in force"} />
               <div className="flex flex-wrap items-center gap-3">
                 <button className="ask" data-on="true">Upload and read</button>
                 {template}

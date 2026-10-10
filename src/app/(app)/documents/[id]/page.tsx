@@ -446,11 +446,7 @@ export default async function DocumentDetailPage({
                   <span className="stencil mr-2 text-slate-500">Why</span>{ground.why}
                   {ground.comments ? <span className="text-slate-500"> · {ground.comments} comment{ground.comments === 1 ? "" : "s"} to address</span> : null}
                 </div>
-              ) : (
-                <Field label="Why a new revision" required hint={`rev ${doc.revisions[0]?.value} was accepted as it stands — this stays next to it`} className="sm:col-span-2">
-                  <input name="reasonForRevision" required className={inputCls} />
-                </Field>
-              )}
+              ) : null}
               <Asked policy={revisionPolicy} field="changeDescription" className="sm:col-span-2">
                 {({ required }) => <input name="changeDescription" required={required} className={inputCls} defaultValue={doc.revisions.length ? "" : "Initial version"} />}
               </Asked>
@@ -466,7 +462,8 @@ export default async function DocumentDetailPage({
                 )}
               </Asked>
               <Added fields={revisionPolicy.own} className="sm:col-span-2" />
-              <Field label="File" hint="optional — a PDF shows in the viewer" className="sm:col-span-2"><input type="file" name="revisionFile" className="block w-full text-xs" /></Field>
+              <Field label="PDF" hint="optional now — what people will read; needed before it is sent"><input type="file" name="renditionFile" accept=".pdf" className="block w-full text-xs" /></Field>
+              <Field label="Native file" hint="optional — the editable original (.docx, .dwg, .xlsx…)"><input type="file" name="nativeFile" className="block w-full text-xs" /></Field>
               {routes.length && reviewed ? (
                 <Field label="Then" hint="needs the file above" className="sm:col-span-2">
                   <select name="sendTemplateId" className={inputCls} defaultValue="">
@@ -704,7 +701,7 @@ export default async function DocumentDetailPage({
                       <span className="font-mono text-xs font-bold text-slate-900">Rev {rev.value}</span>
                       <span className="text-xs text-slate-500">review {c.sequence}</span>
                       <span className="min-w-0 flex-1 truncate text-xs text-slate-700">
-                        {c.status === "OPEN" ? `with ${c.assignments.map((a) => a.userName).join(", ") || "nobody yet"}` : prettyState(c.outcome ?? "closed")}
+                        {c.status === "OPEN" ? `with ${c.assignments.map((a) => a.userName).join(", ") || "nobody yet"}` : c.withdrawn ? "withdrawn" : prettyState(c.outcome ?? "closed")}
                       </span>
                       {c.comments.length ? <span className="text-[11px] text-slate-500">{c.comments.length} comment{c.comments.length === 1 ? "" : "s"}</span> : null}
                       <span className="text-[11px] text-slate-400">{fmtDate(c.submittedAt)}</span>

@@ -26,12 +26,12 @@ export async function prepareRevisionAction(_prev: Result | undefined, formData:
   const ctx = await requireScope();
   const documentId = text(formData, "documentId");
   const changeDescription = text(formData, "changeDescription");
-  if (!changeDescription) return { error: "Description of change is required — it says what changed; it does not restate the reason." };
+  if (!changeDescription) return { error: "Say what changes in this revision, and why." };
   try {
-    const files = filesOf(formData, "revisionFile");
+    const files = filesOf(formData, "renditionFile", "nativeFile");
     const fileIds = await Promise.all(files.map((file) => upload(ctx, { documentId }, file)));
     const revision = await api<{ id: string; value: string }>(projectPath(ctx, `/documents/${documentId}/revisions`), {
-      body: { fileIds, reasonForRevision: text(formData, "reasonForRevision") || null, changeDescription, filesLater: fileIds.length === 0, purpose: text(formData, "purpose") || null },
+      body: { fileIds, reasonForRevision: text(formData, "reasonForRevision") || changeDescription, changeDescription, filesLater: fileIds.length === 0, purpose: text(formData, "purpose") || null },
     });
     // The send can come with the new revision, so a resubmission is one form rather than three.
     const routeId = text(formData, "sendTemplateId");

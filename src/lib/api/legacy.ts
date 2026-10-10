@@ -33,6 +33,8 @@ export type LegacyAssignment = { id: string; cycleId: string; userId: string; us
 
 export type LegacyCycle = {
   id: string; number: string | null; revisionId: string; mode: string; sequence: number; status: string; openedById: string; openedByName: string;
+  /** Taken back out of review to be changed. */
+  withdrawn?: boolean;
   transmittalId: string | null; submittedAt: Date; receivedAt: Date | null; issuedToReviewAt: Date | null; returnedFromReviewAt: Date | null;
   returnedToOriginatorAt: Date | null; dueAt: Date | null; outcome: string | null; outcomeAt: Date | null; outcomeByName: string | null;
   outcomeNote: string | null; binding: boolean; partyId: string | null; dispatchedAt: Date | null; issueRequestId: string | null; createdAt: Date;
@@ -115,7 +117,7 @@ export function cycleOf(review: ReviewView, sequence: number): LegacyCycle {
   const closed = review.state === "RELEASED" || review.state === "RETURNED" || review.state === "WITHDRAWN";
   return {
     id: review.id, number: review.number, revisionId: review.revisionId, mode: deciding?.mode ?? "PARALLEL", sequence,
-    status: closed ? "CLOSED" : "OPEN", openedById: "", openedByName: review.startedBy, transmittalId: deciding?.transmittalId ?? null,
+    status: closed ? "CLOSED" : "OPEN", withdrawn: review.state === "WITHDRAWN", openedById: "", openedByName: review.startedBy, transmittalId: deciding?.transmittalId ?? null,
     submittedAt: new Date(review.startedAt), receivedAt: new Date(review.startedAt), issuedToReviewAt: new Date(review.startedAt),
     returnedFromReviewAt: date(review.decidedAt), returnedToOriginatorAt: review.state === "RETURNED" ? date(review.closedAt) : null,
     dueAt: date(review.steps.find((s) => s.state === "OPEN")?.dueDate ?? null), outcome: review.verdict, outcomeAt: date(review.decidedAt),
