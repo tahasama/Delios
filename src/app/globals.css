@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @import "./theme.css";
 @import "./board.css";
+@import "./planboard.css";
 
 @custom-variant dark (&:where(.dark, .dark *));
 /* The desktop sidebar collapsed to icons (SIDEBAR in navigation.tsx). */
