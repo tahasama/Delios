@@ -121,6 +121,8 @@ async function readCycle(scope: Scope, review: ReviewView) {
     returnedToOriginatorAt: review.state === "RETURNED" && review.closedAt ? new Date(review.closedAt) : null,
     withdrawn: review.state === "WITHDRAWN" ? { note: review.returnNote, at: review.closedAt ? new Date(review.closedAt) : null } : null,
     comments: commentsOf(review, step.number),
+    // What an answer said in its own words: reviews answered before comments were kept as review comments.
+    answerNotes: step.participants.filter((one) => one.note).map((one) => ({ by: one.name, text: one.note!, at: one.answeredAt ? new Date(one.answeredAt) : null })),
     assignments: [...step.participants.map((one, index) => ({
       id: `${review.id}-${step.number}-${index}`, userId: one.userId, userName: one.name, completedAt: one.answeredAt ? new Date(one.answeredAt) : null,
     })), ...(await standIn(scope, review, step))],
@@ -177,7 +179,12 @@ export async function earlierSteps(scope: Scope, id: string) {
     const by = answered(step);
     return {
       id: stepCycleId(review, step)!, number: null as string | null, outcome: step.answer, outcomeByName: by.names, outcomeAt: by.at,
-      comments: commentsOf(review, step.number),
+      // Answers given before comments were kept as review comments carry their words on the answer itself.
+      comments: [...commentsOf(review, step.number), ...step.participants.filter((one) => one.note).map((one, index) => ({
+        id: `${step.number}-note-${index}`, authorId: one.userId, authorName: one.name, text: one.note!, progressionPreventing: false,
+        status: "CLOSED", closesWith: null as string | null, closesWithStep: null as number | null, resolution: null as string | null,
+        createdAt: one.answeredAt ? new Date(one.answeredAt) : new Date(0),
+      }))],
     };
   });
 }

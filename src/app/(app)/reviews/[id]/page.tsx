@@ -173,7 +173,9 @@ export default async function ReviewCyclePage({ params }: { params: Promise<{ id
           { group: "Withdrawn", label: "Withdrawn from review", here: true, at: cycle.withdrawn.at, holder: cycle.withdrawn.note ?? null },
           { group: "Withdrawn", label: rev.releasedAt ? "Released — in a later review" : "Released", at: rev.releasedAt, holder: rev.releasedAt ? rev.releasedByName ?? null : "only through a new review" },
         ] : [
-        { group: "Document Control", label: "Not released", here: rev.state === "NOT_RELEASED", at: rev.state === "NOT_RELEASED" ? rev.statusSetAt : null, holder: rev.statusCode ? `at ${rev.statusCode}, waiting for Document Control` : "waiting for Document Control" },
+        // Decided is when it became Not released; it stays reached once released.
+        { group: "Document Control", label: "Not released", here: rev.state === "NOT_RELEASED", at: cycle.binding && cycle.outcome ? cycle.returnedFromReviewAt : null,
+          holder: rev.state === "NOT_RELEASED" ? (rev.statusCode ? `at ${rev.statusCode}, waiting for Document Control` : "waiting for Document Control") : cycle.outcome && rev.statusCode ? `decided at ${rev.statusCode}` : null },
         { group: "Document Control", label: "Released", at: rev.releasedAt, holder: rev.releasedByName ?? null },
         ]),
       ]
@@ -381,6 +383,16 @@ export default async function ReviewCyclePage({ params }: { params: Promise<{ id
           >
             {cycle.outcome ? <div><p className="text-sm font-semibold text-slate-900">{cycle.binding ? <><span className="font-mono">{cycle.outcome}</span> · {verdictLabel(cycle.outcome)}</> : verdictLabel(cycle.outcome)}</p><p className="mt-1 text-xs leading-5 text-slate-500">{OUTCOME_CONSEQUENCES[cycle.outcome]?.blurb}</p>              {/* What the verdict said. A verdict that reads "Comments" and
                   shows no comments is not a record of anything. */}
+              {cycle.answerNotes.length ? (
+                <ul className="mt-3 space-y-2 border-t border-line pt-3">
+                  {cycle.answerNotes.map((note, index) => (
+                    <li key={index} className="rounded-lg bg-canvas px-3 py-2 text-xs text-slate-700">
+                      <p className="leading-5">{note.text}</p>
+                      <p className="mt-1 text-[11px] text-slate-400">{note.by}{note.at ? ` · ${fmtDateTime(note.at)}` : ""}</p>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
               {cycle.comments.length ? (
                 <ul className="mt-3 space-y-2 border-t border-line pt-3">
                   {cycle.comments.map((comment) => (

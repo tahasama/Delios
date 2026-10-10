@@ -744,7 +744,7 @@ export default async function DocumentDetailPage({
                       <span className="font-mono text-xs font-bold text-slate-900">Rev {rev.value}</span>
                       <span className="text-xs text-slate-500">review {c.sequence}</span>
                       <span className="min-w-0 flex-1 truncate text-xs text-slate-700">
-                        {c.status === "OPEN" ? `with ${c.assignments.map((a) => a.userName).join(", ") || "nobody yet"}` : c.withdrawn ? "withdrawn" : prettyState(c.outcome ?? "closed")}
+                        {c.status === "OPEN" ? `with ${c.assignments.map((a) => a.userName).join(", ") || "nobody yet"}` : c.withdrawn ? `withdrawn${c.outcomeNote ? ` — ${c.outcomeNote.replace(/^Withdrawn for update by /, "by ")}` : ""}` : prettyState(c.outcome ?? "closed")}
                       </span>
                       {c.comments.length ? <span className="text-[11px] text-slate-500">{c.comments.length} comment{c.comments.length === 1 ? "" : "s"}</span> : null}
                       <span className="text-[11px] text-slate-400">{fmtDate(c.submittedAt)}</span>
