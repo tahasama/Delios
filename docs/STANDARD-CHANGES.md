@@ -691,6 +691,17 @@ The people told of the end are told of its reversal.
 **Depends on it:** `DocumentService.EndAsync`, `ReinstateAsync`, `KeepingService.UnvoidAsync` (`WAS_RELEASED`, `NEVER_RELEASED`,
 `ARCHIVED_WITH_PROJECT`), `Supersession.TellWithdrawnAsync`, project status update.
 
+## 36 · A project's code is always a published value
+
+**Clause:** Annex C *Configuration* (published value sets), §5 *Numbering*.
+
+**Must say:** the list of project codes in Settings holds every project's code
+from the moment the project is created or its code changed. A document takes
+its project's code from the project it is created in; it is never typed and
+never refused for it. A code the administrator retired stays retired.
+
+**Depends on it:** `ProjectCodes.EnsurePublishedAsync`, called on project create and code change and before a document is numbered.
+
 ## Still open — decided in conversation, not yet built
 
 - **Escalation** where somebody refuses to acknowledge carrying an action

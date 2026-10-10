@@ -40,6 +40,8 @@ public static class ValueSets
     public const string Criticality = "CRITICALITY";
     public const string Confidentiality = "CONFIDENTIALITY";
     public const string RetentionClasses = "RETENTION_CLASSES";
+    /// <summary>Every project's code. Kept by <see cref="ProjectCodes"/>: a project's own code is always in it.</summary>
+    public const string ProjectCodes = "PROJECT_CODES";
     /// <summary>Words that, alone, make a title say nothing: "Drawing", "Report".</summary>
     public const string GenericTitleWords = "GENERIC_TITLE_WORDS";
 }

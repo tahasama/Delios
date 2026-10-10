@@ -1,4 +1,5 @@
 using Delios.Host.Audit;
+using Delios.Host.Documents;
 using Delios.Host.Platform;
 using Delios.Host.Tenancy;
 using Microsoft.AspNetCore.Identity;
@@ -261,6 +262,7 @@ public static class DirectoryEndpoints
             TimeZone = zone,
         };
         db.Projects.Add(project);
+        await ProjectCodes.EnsurePublishedAsync(db, project.TenantId, project.Code, project.Name, cancellationToken);
         var control = await db.Functions.Where(f => f.Active && f.Rules.Any(r => r.Verbs.Contains(Verbs.Control)))
             .OrderBy(f => f.Code).Select(f => (Guid?)f.Id).FirstOrDefaultAsync(cancellationToken);
         if (control is { } functionId)
@@ -287,6 +289,7 @@ public static class DirectoryEndpoints
                 return Problems.Conflict("PROJECT_CODE_TAKEN", $"{code} is already a project.");
             changes.Add($"code {project.Code} → {code}; numbers already given keep {project.Code}");
             project.Code = code;
+            await ProjectCodes.EnsurePublishedAsync(db, project.TenantId, code, Blank(request.Name) ?? project.Name, cancellationToken);
         }
         if (Blank(request.Name) is { } name && name != project.Name) { changes.Add($"name → {name}"); project.Name = name; }
         if (Blank(request.ContractRole)?.ToUpperInvariant() is { } role && role != project.ContractRole) { changes.Add($"contract role → {role}"); project.ContractRole = role; }

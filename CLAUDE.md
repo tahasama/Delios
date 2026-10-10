@@ -74,7 +74,8 @@ conversation, write it into the right one in the same commit as the code.
   it. Its progress ends at "Withdrawn"; a release comes from a later review.
 
 - Creating a document takes the same two optional files as a revision: a PDF
-  and a native file. The project code comes from the project the user is in;
+  and a native file. The project code comes from the project the user is in
+  and is always in the Settings list of project codes (added there automatically);
   it is never asked for and never refused.
 
 ### Legal hold

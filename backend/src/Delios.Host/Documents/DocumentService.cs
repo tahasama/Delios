@@ -101,6 +101,8 @@ public sealed class DocumentService(
         }
 
         var kind = request.Kind?.ToUpperInvariant() == DocumentKinds.Record ? DocumentKinds.Record : DocumentKinds.Document;
+        // The project's own code is in Settings, whatever was published before.
+        await ProjectCodes.EnsurePublishedAsync(db, access.Project.TenantId, access.Project.Code, access.Project.Name, cancellationToken);
         var allocation = await numbering.AllocateAsync(access.Project.TenantId, access.Project.Id, request.DeliverableType,
             new NumberFields(access.Project.Code, Blank(request.Subproject), originator, Blank(request.ContractRef),
                 request.Discipline, request.DocType), cancellationToken);
