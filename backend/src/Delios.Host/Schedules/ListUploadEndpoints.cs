@@ -15,13 +15,14 @@ namespace Delios.Host.Schedules;
 /// A schedule list's file uploaded on Schedule &amp; actions: which list, the file, and either the released revision
 /// it is the list of, or the uploader's word that there is no such document.
 /// </summary>
-public sealed record ListUploadRequest(string Kind, string FileName, string ContentBase64, Guid? RevisionId = null, bool Aware = false, string? Reason = null);
+public sealed record ListUploadRequest(string Kind, string FileName, string ContentBase64, Guid? RevisionId = null, bool Aware = false, string? Reason = null, bool Confirmed = false);
 
 /// <summary>
 /// The schedule's three lists — the schedule, the disciplines per action, the document requirements — are documents
 /// in the register; their revisions are made, reviewed and released there, never here. Here Document Control uploads
 /// the spreadsheet of the revision in force: it is read and applied at once, all or nothing, and recorded against that
-/// revision. A second file for a revision whose list was already read needs a reason. Where a project has no such
+/// revision. The uploader confirms the file is that revision's list as released, taking responsibility for it
+/// matching, or says why it differs. Where a project has no such
 /// document, a list may be uploaded on its own, with the uploader's word that they know it is not a register
 /// document and why. Every upload keeps the uploader, the file's fingerprint and its rows among the uploaded lists and
 /// in the audit trail.
@@ -51,7 +52,8 @@ public static class ListUploadEndpoints
         ScheduleImporter schedules, DepartmentsImporter departments, RequirementsImporter requirements, CancellationToken cancellationToken)
     {
         var access = ProjectAccessFilter.Of(http);
-        if (!access.IsInternal || !access.Holds(Verbs.Control)) return Problems.Forbidden("CONTROL_ONLY", "Document Control uploads the schedule's lists.");
+        if (!access.IsInternal || !(access.Holds(Verbs.Control) || access.Holds(Verbs.Plan)))
+            return Problems.Forbidden("PLAN_NOT_ALLOWED", "Your function does not upload the schedule's lists. Document Control, or a function given Plan, does.");
         if (!Lists.TryGetValue(request.Kind ?? "", out var list)) return Problems.Invalid("LIST_UNKNOWN", "Choose the schedule, the disciplines per action or the document requirements.");
         var project = access.Project;
         var reason = request.Reason?.Trim() ?? "";
@@ -75,11 +77,9 @@ public static class ListUploadEndpoints
                 _ => await RequirementsImporter.IsListAsync(db, document.Id, cancellationToken),
             };
             if (!fits) return Problems.Invalid("NOT_THIS_LIST", $"{document.Number} does not hold the {list.Title.ToLowerInvariant()}.");
-            var read = list.Kind == "SCHEDULE"
-                ? await db.ScheduleImports.AnyAsync(i => i.RevisionId == revision.Id && i.Status == ScheduleImportStatuses.Done, cancellationToken)
-                : await db.Set<ControlledVersion>().AnyAsync(v => v.ProjectId == project.Id && v.Kind == list.Kind && v.SourceName == label && v.State == "APPROVED", cancellationToken);
-            if (read && reason.Length == 0)
-                return Problems.Invalid("REASON_REQUIRED", $"The list of {label} was already read. Say why you upload another file for it: it is kept as proof.");
+            // The uploader vouches for the file, or says why it is not the released revision's list as it stands.
+            if (!request.Confirmed && reason.Length == 0)
+                return Problems.Invalid("CONFIRM_OR_REASON", $"Tick that this file is the list of {label} as released, or say why it differs.");
             // The first schedule upload names the project's schedule document.
             if (list.Kind == "SCHEDULE" && source is null)
                 db.ScheduleSources.Add(new ScheduleSource { TenantId = project.TenantId, ProjectId = project.Id, DocumentId = document.Id });
@@ -153,7 +153,9 @@ public static class ListUploadEndpoints
         await db.SaveChangesAsync(cancellationToken);
         var said = revision is null
             ? $"{list.Title} uploaded without a register document. {access.UserName} confirmed they know it is not a controlled document. Why: {reason} {summary}"
-            : $"{list.Title} of {label} read from {fileName}, uploaded by {access.UserName}.{(reason.Length > 0 ? $" Read again; why: {reason}" : "")} {summary}";
+            : $"{list.Title} of {label} read from {fileName}, uploaded by {access.UserName}."
+              + (request.Confirmed ? $" {access.UserName} confirms it is the list of {label} as released and takes responsibility for it matching." : "")
+              + (reason.Length > 0 ? $" Differs from {label} as released; why: {reason}." : "") + $" {summary}";
         await audit.WriteAsync(http.User.Actor(), revision is null ? "LIST_UPLOADED_WITHOUT_DOCUMENT" : "LIST_READ_FROM_UPLOAD",
             revision is null ? "Project" : "Revision", revision?.Id ?? project.Id, label ?? $"{list.Title}: {fileName}", said, project.Id, cancellationToken);
         return Results.Ok(new { summary });

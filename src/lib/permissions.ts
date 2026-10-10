@@ -77,7 +77,7 @@ export const VERB_BLURB: Record<Verb, string> = {
  ACCEPT: "Run the acceptance check on an incoming transmittal.",
   CONTROL: "Act as the control function: release, supersede, withdraw.",
   CONFIGURE: "Publish value sets, schemes, people and this matrix.",
-  PLAN: "Project manager: tag the departments each scheduled activity concerns.",
+  PLAN: "Upload the schedule's lists on Schedule & actions: the schedule, the disciplines per action, the document requirements.",
   ROUTES: "Create and edit review routes (workflow templates).",
   MATRIX: "Read this distribution matrix without being able to change it.",
 };

@@ -41,7 +41,7 @@ export function PlanListPanel({ list, control }: { list: PlanList; control: bool
           <input type="file" name="file" required accept=".xlsx,.csv" className={fileInput} />
         </Field>
         <Field label="Why without a released document" required>
-          <input name="reason" required className={inputCls} placeholder="e.g. The planner sent it by email; the document is released next week" />
+          <input name="reason" required className={inputCls} placeholder="e.g. Approver not available; or the organization approves on paper and a stamped scan follows" />
         </Field>
         <label className="flex items-start gap-2 text-xs text-slate-700">
           <input type="checkbox" name="aware" value="yes" required className="mt-0.5" />
@@ -91,15 +91,14 @@ export function PlanListPanel({ list, control }: { list: PlanList; control: bool
               <Field label={only ? `Spreadsheet of rev ${only.released!.value}` : "Spreadsheet of the revision in force"} hint=".xlsx or .csv" required>
                 <input type="file" name="file" required accept=".xlsx,.csv" className={fileInput} />
               </Field>
-              {only?.read || !only ? (
-                <Field
-                  label={only ? `Why another file for rev ${only.released!.value}` : "Why another file, if its list was already read"}
-                  hint="its list was already read; no new revision marks this, so your reason is kept as proof"
-                  required={!!only}
-                >
-                  <input name="reason" required={!!only} className={inputCls} placeholder="e.g. The first export missed a column" />
-                </Field>
-              ) : null}
+              {/* Either the uploader vouches for the file, or says why it differs: one or the other. */}
+              <label className="flex items-start gap-2 text-xs text-slate-700">
+                <input type="checkbox" name="confirmed" value="yes" className="mt-0.5" />
+                <span>This file is the list of {only ? `rev ${only.released!.value}` : "the revision in force"} as released. I take responsibility for it matching.</span>
+              </label>
+              <Field label="Or, if it differs from the released revision, why" hint="kept in the activity log">
+                <input name="reason" className={inputCls} placeholder="e.g. The approver is away; the stamped scan follows" />
+              </Field>
               <div className="flex flex-wrap items-center gap-3">
                 <button className="ask" data-on="true">Upload and read</button>
                 {template}

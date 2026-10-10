@@ -266,10 +266,12 @@ public static class Verbs
     /// </summary>
     public const string Control = "CONTROL";
     public const string Configure = "CONFIGURE";
+    /// <summary>Upload the schedule's lists on Schedule &amp; actions: the schedule, the disciplines per action, the document requirements.</summary>
+    public const string Plan = "PLAN";
 
     /// <summary>Every verb in one set; the demo data uses it to give Document Control every right.</summary>
     public static readonly IReadOnlySet<string> All = new HashSet<string>
     {
-        Read, Create, Revise, Review, Approve, Transmit, Receive, Accept, Control, Configure,
+        Read, Create, Revise, Review, Approve, Transmit, Receive, Accept, Control, Configure, Plan,
     };
 }

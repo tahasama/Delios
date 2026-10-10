@@ -11,33 +11,37 @@ type Result = { error?: string; ok?: string };
 /**
  * Upload the spreadsheet of the revision in force. Revisions are made on the
  * document's own page, never here: the list is read from this file and
- * recorded against the released revision, at once, all or nothing. A second
- * file for a revision already read needs the uploader's reason, kept as proof.
+ * recorded against the released revision, at once, all or nothing. The
+ * uploader confirms the file is that revision's list as released, taking
+ * responsibility for it matching, or says why it differs; either is kept in
+ * the activity log.
  */
 export async function uploadPlanListAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
   const ctx = await requireScope();
-  if (!ctx.can("CONTROL")) return { error: "Document Control uploads the schedule's lists." };
+  if (!ctx.can("CONTROL") && !ctx.can("PLAN")) return { error: "Your function does not upload the schedule's lists. Document Control, or a function given Plan, does." };
   const kind = String(formData.get("kind") ?? "") as PlanListKind;
   const revisionId = String(formData.get("revisionId") ?? "");
+  const confirmed = formData.get("confirmed") === "yes";
   const reason = String(formData.get("reason") ?? "").trim();
   const list = (await planLists(ctx)).find((one) => one.kind === kind);
   if (!list) return { error: "Unknown list." };
   const document = list.documents.find((one) => one.released?.id === revisionId);
   if (!document) return { error: `Choose the ${list.title.toLowerCase()} in force.` };
-  if (document.read && !reason) return { error: `The list of rev ${document.released!.value} was already read. Say why you upload another file for it: it is kept as proof.` };
+  const rev = document.released!.value;
+  if (!confirmed && !reason) return { error: `Tick that this file is the list of rev ${rev} as released, or say why it differs.` };
   const file = filesOf(formData, "file").find((one) => /\.(xlsx|csv)$/i.test(one.name)) ?? null;
   if (!file) return { error: "Choose the list as .xlsx or .csv." };
   let summary = "";
   try {
     const bytes = Buffer.from(await file.arrayBuffer());
     ({ summary } = await api<{ summary: string }>(projectPath(ctx, "/schedule/lists"), {
-      body: { kind, fileName: file.name, contentBase64: bytes.toString("base64"), revisionId, reason: reason || null },
+      body: { kind, fileName: file.name, contentBase64: bytes.toString("base64"), revisionId, confirmed, reason: reason || null },
     }));
   } catch (e) {
     return { error: refusal(e).message };
   }
   revalidatePath("/actions");
-  return { ok: `Read as the list of ${document.number} rev ${document.released!.value}. ${summary}` };
+  return { ok: `Read as the list of ${document.number} rev ${rev}. ${summary}` };
 }
 
 /**
@@ -48,7 +52,7 @@ export async function uploadPlanListAction(_prev: Result | undefined, formData: 
  */
 export async function uploadLooseListAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
   const ctx = await requireScope();
-  if (!ctx.can("CONTROL")) return { error: "Document Control uploads a list without a register document." };
+  if (!ctx.can("CONTROL") && !ctx.can("PLAN")) return { error: "Your function does not upload the schedule's lists. Document Control, or a function given Plan, does." };
   const kind = String(formData.get("kind") ?? "") as PlanListKind;
   const aware = formData.get("aware") === "yes";
   const reason = String(formData.get("reason") ?? "").trim();

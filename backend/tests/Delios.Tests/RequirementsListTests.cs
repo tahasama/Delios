@@ -158,7 +158,7 @@ public sealed class RequirementsListTests(Infrastructure infrastructure) : IClas
 
         // Only Document Control, and only with their word that it is not a register document, and why.
         var (engineerTried, engineerBody) = await Flow.PostAsync(engineer, $"{p}/schedule/lists", new { kind = "SCHEDULE", fileName = "Programme.csv", contentBase64 = B64(programme), aware = true, reason = "No schedule document yet" });
-        Assert.Equal((HttpStatusCode.Forbidden, "CONTROL_ONLY"), (engineerTried, Flow.Code(engineerBody)));
+        Assert.Equal((HttpStatusCode.Forbidden, "PLAN_NOT_ALLOWED"), (engineerTried, Flow.Code(engineerBody)));
         var (unaware, unawareBody) = await Flow.PostAsync(controller, $"{p}/schedule/lists", new { kind = "SCHEDULE", fileName = "Programme.csv", contentBase64 = B64(programme), aware = false, reason = "x" });
         Assert.Equal((HttpStatusCode.UnprocessableEntity, "NOT_AWARE"), (unaware, Flow.Code(unawareBody)));
         var (silent, silentBody) = await Flow.PostAsync(controller, $"{p}/schedule/lists", new { kind = "SCHEDULE", fileName = "Programme.csv", contentBase64 = B64(programme), aware = true, reason = " " });
@@ -212,28 +212,28 @@ public sealed class RequirementsListTests(Infrastructure infrastructure) : IClas
         var revA = await ReleasedPdfOnlyAsync(schedule);
         await UntilAsync(engineer, $"{p}/schedule", s => s.GetProperty("imports").GetArrayLength() == 1);
 
-        // Its spreadsheet, uploaded on the schedule for rev A: read against rev A, no reason asked.
+        // Its spreadsheet, uploaded on the schedule for rev A: the uploader vouches for it, or says why it differs.
         var programme = "Activity ID,Activity Name,Start,Finish\n" + $"A100,Pour inlet base slab,{Day(30)},{Day(35)}\n" + $"A200,Energise MCC,{Day(40)},{Day(41)}\n";
-        var (read, readBody) = await Flow.PostAsync(controller, $"{p}/schedule/lists", new { kind = "SCHEDULE", fileName = "Programme.csv", contentBase64 = B64(programme), revisionId = revA });
+        var (unvouched, unvouchedBody) = await Flow.PostAsync(controller, $"{p}/schedule/lists", new { kind = "SCHEDULE", fileName = "Programme.csv", contentBase64 = B64(programme), revisionId = revA });
+        Assert.Equal((HttpStatusCode.UnprocessableEntity, "CONFIRM_OR_REASON"), (unvouched, Flow.Code(unvouchedBody)));
+        var (read, readBody) = await Flow.PostAsync(controller, $"{p}/schedule/lists", new { kind = "SCHEDULE", fileName = "Programme.csv", contentBase64 = B64(programme), revisionId = revA, confirmed = true });
         Assert.True(read == HttpStatusCode.OK, readBody.ToString());
         Assert.Equal(2, (await engineer.GetFromJsonAsync<JsonElement>($"{p}/activities")).GetArrayLength());
         var imports = (await engineer.GetFromJsonAsync<JsonElement>($"{p}/schedule")).GetProperty("imports");
         Assert.Equal(("DONE", 1), (imports[0].GetProperty("status").GetString(), imports.GetArrayLength()));
 
-        // Another file for the same revision needs a reason.
-        var (again, againBody) = await Flow.PostAsync(controller, $"{p}/schedule/lists", new { kind = "SCHEDULE", fileName = "Programme.csv", contentBase64 = B64(programme), revisionId = revA });
-        Assert.Equal((HttpStatusCode.UnprocessableEntity, "REASON_REQUIRED"), (again, Flow.Code(againBody)));
+        // A file that differs from rev A as released says why.
         var (reasoned, reasonedBody) = await Flow.PostAsync(controller, $"{p}/schedule/lists", new { kind = "SCHEDULE", fileName = "Programme.csv", contentBase64 = B64(programme), revisionId = revA, reason = "The first export missed a column" });
         Assert.True(reasoned == HttpStatusCode.OK, reasonedBody.ToString());
 
         // The schedule's revision is not a disciplines list.
-        var (wrong, wrongBody) = await Flow.PostAsync(controller, $"{p}/schedule/lists", new { kind = "DEPARTMENTS", fileName = "Disciplines.csv", contentBase64 = B64("Action Code,Departments\nA100,CI\n"), revisionId = revA });
+        var (wrong, wrongBody) = await Flow.PostAsync(controller, $"{p}/schedule/lists", new { kind = "DEPARTMENTS", fileName = "Disciplines.csv", contentBase64 = B64("Action Code,Departments\nA100,CI\n"), revisionId = revA, confirmed = true });
         Assert.Equal((HttpStatusCode.UnprocessableEntity, "NOT_THIS_LIST"), (wrong, Flow.Code(wrongBody)));
 
         // The disciplines list, released as a PDF only, then its spreadsheet: kept against its revision.
         var list = (await Api.RegisterAsync(engineer, project, new { title = "Disciplines per action", deliverableType = "ENG", docType = "DPA", discipline = "PM", subproject = "00" }));
         var listRev = await ReleasedPdfOnlyAsync(list.GetProperty("id").GetGuid());
-        var (tagged, taggedBody) = await Flow.PostAsync(controller, $"{p}/schedule/lists", new { kind = "DEPARTMENTS", fileName = "Disciplines.csv", contentBase64 = B64("Action Code,Departments\nA100,CI\nA200,EL\n"), revisionId = listRev });
+        var (tagged, taggedBody) = await Flow.PostAsync(controller, $"{p}/schedule/lists", new { kind = "DEPARTMENTS", fileName = "Disciplines.csv", contentBase64 = B64("Action Code,Departments\nA100,CI\nA200,EL\n"), revisionId = listRev, confirmed = true });
         Assert.True(tagged == HttpStatusCode.OK, taggedBody.ToString());
         var kept = await controller.GetFromJsonAsync<JsonElement>($"{p}/controlled?kind=ACTION_DEPARTMENTS");
         Assert.Contains(kept.EnumerateArray(), v => v.GetProperty("sourceName").GetString() == $"{list.GetProperty("number").GetString()} rev A");

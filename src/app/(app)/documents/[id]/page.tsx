@@ -234,7 +234,17 @@ export default async function DocumentDetailPage({
   // A file is attached while the revision is being prepared. Once it is with
   // its reviewers, or decided, attaching one would change what was reviewed
   // after the fact — the next revision carries the new file.
-  const lead: StepItem[] = canEdit && working && !workingHasPdf && working.state === "IN_PREPARATION" ? [{
+  const lead: StepItem[] = canEdit && working && working.state === "IN_PREPARATION" ? workingHasPdf ? [{
+    // The PDF is there; the source file can still join it, until the revision is sent — a schedule's or a list's
+    // spreadsheet among them, which is what the system reads when the revision is released.
+    key: "attach", label: `Add a file to rev ${working.value}`, body: (
+          <ActionForm action={uploadRevisionFilesAction} submitLabel="Add" size="sm" hidden={{ revisionId: working.id }}>
+            <Field label="Source file" hint="the editable original — for a schedule or a list, its .xlsx or .csv">
+              <input type="file" name="nativeFile" className="block w-full text-xs" />
+            </Field>
+          </ActionForm>
+    ),
+  }] : [{
     key: "attach", label: `Attach the file to rev ${working.value}`, open: true, primary: true, body: (
           <ActionForm action={uploadRevisionFilesAction} submitLabel="Attach" size="sm" hidden={{ revisionId: working.id }}>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
