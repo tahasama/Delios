@@ -43,10 +43,6 @@ export function PlanListPanel({ list, control }: { list: PlanList; control: bool
         <Field label="Why without a released document" required>
           <input name="reason" required className={inputCls} placeholder="e.g. Approver not available; or the organization approves on paper and a stamped scan follows" />
         </Field>
-        <label className="flex items-start gap-2 text-xs text-slate-700">
-          <input type="checkbox" name="aware" value="yes" required className="mt-0.5" />
-          I know this list is not a released document in the register.
-        </label>
         <div className="flex flex-wrap items-center gap-3">
           <button className="ask" data-on="true">Upload and apply</button>
           {template}

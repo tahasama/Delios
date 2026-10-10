@@ -54,17 +54,15 @@ export async function uploadLooseListAction(_prev: Result | undefined, formData:
   const ctx = await requireScope();
   if (!ctx.can("CONTROL") && !ctx.can("PLAN")) return { error: "Your function does not upload the schedule's lists. Document Control, or a function given Plan, does." };
   const kind = String(formData.get("kind") ?? "") as PlanListKind;
-  const aware = formData.get("aware") === "yes";
   const reason = String(formData.get("reason") ?? "").trim();
   const file = filesOf(formData, "file").find((one) => /\.(xlsx|csv)$/i.test(one.name)) ?? null;
   if (!file) return { error: "Choose the list as .xlsx or .csv." };
-  if (!aware) return { error: "Tick that you know this list is not a document in the register." };
   if (!reason) return { error: "Say why it is uploaded without a register document: it is kept with the upload." };
   let summary = "";
   try {
     const bytes = Buffer.from(await file.arrayBuffer());
     ({ summary } = await api<{ summary: string }>(projectPath(ctx, "/schedule/lists"), {
-      body: { kind, fileName: file.name, contentBase64: bytes.toString("base64"), aware, reason },
+      body: { kind, fileName: file.name, contentBase64: bytes.toString("base64"), aware: true, reason },
     }));
   } catch (e) {
     return { error: refusal(e).message };

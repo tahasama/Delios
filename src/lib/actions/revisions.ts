@@ -68,24 +68,43 @@ export async function uploadRevisionFilesAction(_prev: Result | undefined, formD
 }
 
 /**
- * New files for a revision not yet released, as a new submission of it; the
- * earlier files stay in its history. One in review is first taken out of it:
- * the review closes as withdrawn, everyone on it is told, and a reason is
- * required. Its author or Document Control only.
+ * Edit a revision not yet released, in one go: its files and the document's
+ * details. A new file replaces the one of its kind as a new submission of the
+ * revision, the earlier one kept in its history; a revision without files yet
+ * simply takes them. Its author or Document Control only, for the files.
  */
-export async function updateRevisionFilesAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
+export async function editRevisionAction(_prev: Result | undefined, formData: FormData): Promise<Result & { ok?: string }> {
   const ctx = await requireScope();
   const revisionId = text(formData, "revisionId");
-  const reason = text(formData, "reason");
-  const inReview = text(formData, "inReview") === "yes";
   const files = filesOf(formData, "nativeFile", "renditionFile");
-  if (!files.length) return { error: "Choose the new files." };
-  if (inReview && !reason) return { error: "Say why it is taken out of review: everyone on the route is told." };
   let documentId: string;
   try {
     documentId = (await backendRevision(ctx, revisionId)).documentId;
-    const fileIds = await Promise.all(files.map((file) => upload(ctx, { documentId }, file)));
-    await api(projectPath(ctx, `/documents/${documentId}/revisions/${revisionId}/update`), { body: { fileIds, changeDescription: reason || null } });
+    if (files.length) {
+      const fileIds = await Promise.all(files.map((file) => upload(ctx, { documentId }, file)));
+      const path = text(formData, "hasFiles") === "yes" ? "update" : "files";
+      await api(projectPath(ctx, `/documents/${documentId}/revisions/${revisionId}/${path}`), { body: { fileIds } });
+    }
+  } catch (e) {
+    return failed(e);
+  }
+  const { updateDocumentAction } = await import("./documents");
+  const details = await updateDocumentAction(undefined, formData);
+  revalidatePath(`/documents/${documentId}`);
+  if (details.error) return { error: files.length ? `The files are in; the details were not saved: ${details.error}` : details.error };
+  return { ok: files.length ? "Saved: files and details." : details.ok ?? "Saved." };
+}
+
+/** Take a revision out of its review to edit it: closed as withdrawn, everyone on it told, comments kept. */
+export async function withdrawRevisionAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
+  const ctx = await requireScope();
+  const revisionId = text(formData, "revisionId");
+  const reason = text(formData, "reason");
+  if (!reason) return { error: "Say why it is taken out of review: everyone on the route is told." };
+  let documentId: string;
+  try {
+    documentId = (await backendRevision(ctx, revisionId)).documentId;
+    await api(projectPath(ctx, `/documents/${documentId}/revisions/${revisionId}/withdraw`), { body: { changeDescription: reason } });
   } catch (e) {
     return failed(e);
   }

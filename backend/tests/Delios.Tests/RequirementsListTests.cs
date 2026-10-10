@@ -159,8 +159,6 @@ public sealed class RequirementsListTests(Infrastructure infrastructure) : IClas
         // Only Document Control, and only with their word that it is not a register document, and why.
         var (engineerTried, engineerBody) = await Flow.PostAsync(engineer, $"{p}/schedule/lists", new { kind = "SCHEDULE", fileName = "Programme.csv", contentBase64 = B64(programme), aware = true, reason = "No schedule document yet" });
         Assert.Equal((HttpStatusCode.Forbidden, "PLAN_NOT_ALLOWED"), (engineerTried, Flow.Code(engineerBody)));
-        var (unaware, unawareBody) = await Flow.PostAsync(controller, $"{p}/schedule/lists", new { kind = "SCHEDULE", fileName = "Programme.csv", contentBase64 = B64(programme), aware = false, reason = "x" });
-        Assert.Equal((HttpStatusCode.UnprocessableEntity, "NOT_AWARE"), (unaware, Flow.Code(unawareBody)));
         var (silent, silentBody) = await Flow.PostAsync(controller, $"{p}/schedule/lists", new { kind = "SCHEDULE", fileName = "Programme.csv", contentBase64 = B64(programme), aware = true, reason = " " });
         Assert.Equal((HttpStatusCode.UnprocessableEntity, "REASON_REQUIRED"), (silent, Flow.Code(silentBody)));
 

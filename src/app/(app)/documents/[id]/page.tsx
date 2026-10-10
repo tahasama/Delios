@@ -21,7 +21,7 @@ import { fmtDate, timeAgo, plain } from "@/lib/utils";
 import { getActiveSet, getSet, getValue } from "@/lib/config";
 import { updateDocumentAction, linkAssetAction, unlinkRelationshipAction, endDocumentStateAction } from "@/lib/actions/documents";
 import {
-  prepareRevisionAction, uploadRevisionFilesAction, updateRevisionFilesAction, releaseRevisionAction, voidRevisionAction, returnAtGateAction, liftHoldAction, returnHeldAction,
+  prepareRevisionAction, editRevisionAction, withdrawRevisionAction, releaseRevisionAction, voidRevisionAction, returnAtGateAction, liftHoldAction, returnHeldAction,
 } from "@/lib/actions/revisions";
 import { parseRecipients, mayRequestIssue, requestChoices, authorOf, issuePolicy, decisionLetsItOut, requestsOn } from "@/lib/issue-requests";
 import { legacyDocument, documentContext, type LegacyRevision } from "@/lib/api/legacy";
@@ -230,55 +230,36 @@ export default async function DocumentDetailPage({
     }),
   ];
 
-  // What the Next step card offers besides the review route itself.
-  // A file is attached while the revision is being prepared. Once it is with
-  // its reviewers, or decided, attaching one would change what was reviewed
-  // after the fact — the next revision carries the new file.
-  const lead: StepItem[] = canEdit && working && working.state === "IN_PREPARATION" ? workingHasPdf ? [{
-    // The PDF is there; the source file can still join it, until the revision is sent — a schedule's or a list's
-    // spreadsheet among them, which is what the system reads when the revision is released.
-    key: "attach", label: `Add a file to rev ${working.value}`, body: (
-          <ActionForm action={uploadRevisionFilesAction} submitLabel="Add" size="sm" hidden={{ revisionId: working.id }}>
-            <Field label="Source file" hint="the editable original — for a schedule or a list, its .xlsx or .csv">
-              <input type="file" name="nativeFile" className="block w-full text-xs" />
+  // What the Next step card offers besides the review route itself. Until a
+  // revision is released it can be changed — its files and the document's
+  // details — in one place. In review it is taken out of the review first:
+  // closed as withdrawn, everyone on it told, its comments kept.
+  const editing = canEdit && working && working.state === "IN_PREPARATION";
+  const lead: StepItem[] = editing ? [{
+    key: "edit", label: `Edit rev ${working!.value}`, open: !workingHasPdf, primary: !workingHasPdf, body: (
+          <ActionForm action={editRevisionAction} submitLabel="Save" size="sm" hidden={{ revisionId: working!.id, id: doc.id, hasFiles: working!.files.length ? "yes" : "no" }}>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <Field label="PDF" hint={workingHasPdf ? "replaces the one there" : "what people will read — needed before it is sent"}>
+                <input type="file" name="renditionFile" accept=".pdf" className="block w-full text-xs" />
+              </Field>
+              <Field label="Source file" hint="the editable original; for a schedule or a list, its .xlsx or .csv — read on release">
+                <input type="file" name="nativeFile" className="block w-full text-xs" />
+              </Field>
+            </div>
+            <Field label="Title" required><input name="title" defaultValue={doc.title} className={inputCls} /></Field>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <Field label="Type"><select name="docType" defaultValue={doc.docType} className={inputCls}>{types.filter((t) => t.status === "ACTIVE").map((t) => <option key={t.code} value={t.code}>{t.label}</option>)}</select></Field>
+              <Field label="Discipline"><select name="discipline" defaultValue={doc.discipline} className={inputCls}>{disciplines.filter((d) => d.status === "ACTIVE").map((d) => <option key={d.code} value={d.code}>{d.label}</option>)}</select></Field>
+              <Field label="Criticality"><select name="criticality" defaultValue={doc.criticality ?? ""} className={inputCls}><option value="">—</option>{criticalities.map((c) => <option key={c.code} value={c.code}>{c.label}</option>)}</select></Field>
+            </div>
+          </ActionForm>
+    ),
+  }] : canEdit && working && working.state === "IN_REVIEW" ? [{
+    key: "withdraw", label: `Withdraw rev ${working.value} from review to edit it`, body: (
+          <ActionForm action={withdrawRevisionAction} submitLabel="Withdraw from review" size="sm" variant="secondary" hidden={{ revisionId: working.id }}>
+            <Field label="Why" hint="the review closes as withdrawn, its comments kept, and everyone on it is told; send it again once edited" required>
+              <input name="reason" required className={inputCls} />
             </Field>
-          </ActionForm>
-    ),
-  }] : [{
-    key: "attach", label: `Attach the file to rev ${working.value}`, open: true, primary: true, body: (
-          <ActionForm action={uploadRevisionFilesAction} submitLabel="Attach" size="sm" hidden={{ revisionId: working.id }}>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <Field label="PDF" hint="what people will read — needed before release">
-                <input type="file" name="renditionFile" accept=".pdf" className="block w-full text-xs" />
-              </Field>
-              <Field label="Source file" hint="optional — the editable original">
-                <input type="file" name="nativeFile" className="block w-full text-xs" />
-              </Field>
-            </div>
-          </ActionForm>
-    ),
-  }] : [];
-
-  // New files for a revision until it is released: a new submission of it, the
-  // earlier files kept in its history. In review, the update takes it out of the
-  // review first — closed as withdrawn, everyone on it told — so a reason is asked.
-  const updating = canEdit && working && ((working.state === "IN_PREPARATION" && working.files.length > 0) || working.state === "IN_REVIEW");
-  const update: StepItem[] = updating ? [{
-    key: "update", label: `Update the files of rev ${working!.value}`, body: (
-          <ActionForm action={updateRevisionFilesAction} submitLabel={working!.state === "IN_REVIEW" ? "Withdraw from review and update" : "Update"} size="sm" hidden={{ revisionId: working!.id, inReview: working!.state === "IN_REVIEW" ? "yes" : "no" }}>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <Field label="PDF" hint="what people will read">
-                <input type="file" name="renditionFile" accept=".pdf" className="block w-full text-xs" />
-              </Field>
-              <Field label="Source file" hint="the editable original">
-                <input type="file" name="nativeFile" className="block w-full text-xs" />
-              </Field>
-            </div>
-            {working!.state === "IN_REVIEW" ? (
-              <Field label="Why it is taken out of review" hint="the review closes as withdrawn, its comments kept, and everyone on it is told; send it again once updated" required>
-                <input name="reason" required className={inputCls} />
-              </Field>
-            ) : null}
           </ActionForm>
     ),
   }] : [];
@@ -554,7 +535,7 @@ export default async function DocumentDetailPage({
         {/* A supplier sees its own delivery: attach, then send. */}
         {!user.isInternal && user.partyCode && doc.originator === user.partyCode
           ? <SupplierDelivery documentId={doc.id} />
-          : <WorkflowPanel doc={doc} user={user} lead={[...lead, ...update]} extra={extra} />}
+          : <WorkflowPanel doc={doc} user={user} lead={lead} extra={extra} />}
       </section>
 
       {/* Everything else, one tab at a time */}

@@ -47,6 +47,7 @@ public static class DocumentEndpoints
         project.MapPost("/documents/{documentId:guid}/revisions/{revisionId:guid}/submissions", ResubmitAsync);
         project.MapPost("/documents/{documentId:guid}/revisions/{revisionId:guid}/files", AttachAsync);
         project.MapPost("/documents/{documentId:guid}/revisions/{revisionId:guid}/update", UpdateFilesAsync);
+        project.MapPost("/documents/{documentId:guid}/revisions/{revisionId:guid}/withdraw", WithdrawAsync);
         project.MapPut("/documents/{documentId:guid}", UpdateAsync);
         project.MapPost("/documents/{documentId:guid}/end", EndAsync);
         project.MapGet("/files/{fileId:guid}/download", DownloadAsync);
@@ -187,6 +188,28 @@ public static class DocumentEndpoints
         }
         var (updated, problem) = await documents.UpdateFilesAsync(access, documentId, revisionId, request, cancellationToken);
         return problem ?? Results.Ok(View(updated!));
+    }
+
+    /// <summary>
+    /// POST .../revisions/{revisionId}/withdraw: its author or Document Control takes a revision out of its review to
+    /// edit it. The review closes as withdrawn, comments kept, everyone on it told; the revision is in preparation again.
+    /// </summary>
+    private static async Task<IResult> WithdrawAsync(
+        Guid documentId, Guid revisionId, StartRevisionRequest request, HttpContext http, DeliosDbContext db,
+        Reviews.ReviewService reviews, CancellationToken cancellationToken)
+    {
+        var access = ProjectAccessFilter.Of(http);
+        var revision = await db.Revisions.AsNoTracking().SingleOrDefaultAsync(r => r.Id == revisionId && r.DocumentId == documentId, cancellationToken);
+        if (revision is null) return Problems.NotFound("REVISION_NOT_FOUND", "No such revision.");
+        if (revision.AuthoredById != access.UserId && !access.Holds(Verbs.Control))
+            return Problems.Forbidden("AUTHOR_OR_CONTROL", "Its author or Document Control takes a revision out of review.");
+        if (revision.State != RevisionStates.InReview)
+            return Problems.Conflict("NOT_IN_REVIEW", $"Revision {revision.Value} is not in review.");
+        var reason = request.ChangeDescription?.Trim() ?? "";
+        if (reason.Length == 0) return Problems.Invalid("REASON_REQUIRED", "Say why it is taken out of review: everyone on the route is told.");
+        if (await reviews.WithdrawForUpdateAsync(access, revisionId, reason, cancellationToken) is { } refused) return refused;
+        await db.SaveChangesAsync(cancellationToken);
+        return Results.NoContent();
     }
 
     /// <summary>POST .../revisions/{revisionId}/files: attaches files to a revision still in preparation.</summary>

@@ -86,7 +86,6 @@ public static class ListUploadEndpoints
         }
         else
         {
-            if (!request.Aware) return Problems.Invalid("NOT_AWARE", "Tick that you know this list is not a document in the register.");
             if (reason.Length == 0) return Problems.Invalid("REASON_REQUIRED", "Say why it is uploaded without a register document: it is kept with the upload.");
         }
 

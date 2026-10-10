@@ -470,9 +470,23 @@ public sealed class DocumentService(
         if (filesProblem is not null) return (null, filesProblem);
         if (files!.Count == 0) return (null, Problems.Invalid("FILES_REQUIRED", "Choose the new files."));
         var now = clock.GetCurrentInstant();
+        // A new file replaces the one of its kind; the other kind carries over as it was, already scanned.
+        var replaced = files.Select(f => f.Kind).ToHashSet();
+        var kept = revision.Files.Where(f => f.Submission == revision.Submission && f.Kind is FileKinds.Native or FileKinds.Rendition && !replaced.Contains(f.Kind)).ToList();
         revision.Submission++;
         revision.Submissions.Add(new SubmissionRecord { Number = revision.Submission, SubmittedAt = now, SubmittedByName = access.UserName, Note = request.ChangeDescription });
         revision.FilesState = FilesStates.Processing;
+        foreach (var old in kept)
+        {
+            db.StoredFiles.Add(new StoredFile
+            {
+                TenantId = old.TenantId, ProjectId = old.ProjectId, DocumentId = old.DocumentId, RevisionId = revision.Id,
+                ObjectKey = old.ObjectKey, Name = old.Name, ContentType = old.ContentType, Size = old.Size, Sha256 = old.Sha256,
+                Kind = old.Kind, Submission = revision.Submission, Status = old.Status, DetectedType = old.DetectedType,
+                StatusDetail = old.StatusDetail, UploadedById = old.UploadedById, UploadedByName = old.UploadedByName,
+                CreatedAt = old.CreatedAt, ScannedAt = old.ScannedAt,
+            });
+        }
         Bind(files, revision);
         document!.UpdatedAt = now;
         await db.SaveChangesAsync(cancellationToken);
