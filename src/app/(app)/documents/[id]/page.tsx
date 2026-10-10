@@ -21,7 +21,7 @@ import { fmtDate, timeAgo, plain } from "@/lib/utils";
 import { getActiveSet, getSet, getValue } from "@/lib/config";
 import { updateDocumentAction, linkAssetAction, unlinkRelationshipAction, endDocumentStateAction } from "@/lib/actions/documents";
 import {
-  prepareRevisionAction, uploadRevisionFilesAction, releaseRevisionAction, voidRevisionAction, returnAtGateAction, liftHoldAction, returnHeldAction,
+  prepareRevisionAction, uploadRevisionFilesAction, updateRevisionFilesAction, releaseRevisionAction, voidRevisionAction, returnAtGateAction, liftHoldAction, returnHeldAction,
 } from "@/lib/actions/revisions";
 import { parseRecipients, mayRequestIssue, requestChoices, authorOf, issuePolicy, decisionLetsItOut, requestsOn } from "@/lib/issue-requests";
 import { legacyDocument, documentContext, type LegacyRevision } from "@/lib/api/legacy";
@@ -255,6 +255,30 @@ export default async function DocumentDetailPage({
                 <input type="file" name="nativeFile" className="block w-full text-xs" />
               </Field>
             </div>
+          </ActionForm>
+    ),
+  }] : [];
+
+  // New files for a revision until it is released: a new submission of it, the
+  // earlier files kept in its history. In review, the update takes it out of the
+  // review first — closed as withdrawn, everyone on it told — so a reason is asked.
+  const updating = canEdit && working && ((working.state === "IN_PREPARATION" && working.files.length > 0) || working.state === "IN_REVIEW");
+  const update: StepItem[] = updating ? [{
+    key: "update", label: `Update the files of rev ${working!.value}`, body: (
+          <ActionForm action={updateRevisionFilesAction} submitLabel={working!.state === "IN_REVIEW" ? "Withdraw from review and update" : "Update"} size="sm" hidden={{ revisionId: working!.id, inReview: working!.state === "IN_REVIEW" ? "yes" : "no" }}>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <Field label="PDF" hint="what people will read">
+                <input type="file" name="renditionFile" accept=".pdf" className="block w-full text-xs" />
+              </Field>
+              <Field label="Source file" hint="the editable original">
+                <input type="file" name="nativeFile" className="block w-full text-xs" />
+              </Field>
+            </div>
+            {working!.state === "IN_REVIEW" ? (
+              <Field label="Why it is taken out of review" hint="the review closes as withdrawn, its comments kept, and everyone on it is told; send it again once updated" required>
+                <input name="reason" required className={inputCls} />
+              </Field>
+            ) : null}
           </ActionForm>
     ),
   }] : [];
@@ -530,7 +554,7 @@ export default async function DocumentDetailPage({
         {/* A supplier sees its own delivery: attach, then send. */}
         {!user.isInternal && user.partyCode && doc.originator === user.partyCode
           ? <SupplierDelivery documentId={doc.id} />
-          : <WorkflowPanel doc={doc} user={user} lead={lead} extra={extra} />}
+          : <WorkflowPanel doc={doc} user={user} lead={[...lead, ...update]} extra={extra} />}
       </section>
 
       {/* Everything else, one tab at a time */}

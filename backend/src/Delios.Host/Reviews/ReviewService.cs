@@ -1308,6 +1308,39 @@ public sealed class ReviewService(
         await supersession.TellReplacedAsync(document, revision, earlier, cancellationToken);
     }
 
+    /// <summary>
+    /// The author or Document Control takes a revision back out of its review to update its files: the review closes
+    /// as withdrawn, with its comments kept; open steps end, open transmittals lapse, and everyone on the route is told.
+    /// The revision is in preparation again, to be sent once its new files are in. Returns a problem when no review is open.
+    /// </summary>
+    public async Task<IResult?> WithdrawForUpdateAsync(ProjectAccess access, Guid revisionId, string reason, CancellationToken cancellationToken)
+    {
+        var review = await db.Reviews.Include(r => r.Steps)
+            .Where(r => r.RevisionId == revisionId && (r.State == ReviewStates.InProgress || r.State == ReviewStates.Decided))
+            .OrderByDescending(r => r.StartedAt).FirstOrDefaultAsync(cancellationToken);
+        if (review is null) return Problems.Conflict("NO_OPEN_REVIEW", "This revision has no open review to withdraw.");
+        var now = clock.GetCurrentInstant();
+        var revision = await db.Revisions.SingleAsync(r => r.Id == revisionId, cancellationToken);
+        var document = await db.Documents.SingleAsync(d => d.Id == review.DocumentId, cancellationToken);
+        var note = $"Withdrawn for update by {access.UserName}: {reason}";
+        revision.State = RevisionStates.InPreparation;
+        document.LatestRevisionState = RevisionStates.InPreparation;
+        document.UpdatedAt = now;
+        review.State = ReviewStates.Returned;
+        review.ReturnNote = note;
+        review.ClosedAt = now;
+        review.ClosedByName = access.UserName;
+        var told = review.Steps.SelectMany(s => s.UserIds).Append(review.StartedById).Distinct().Where(id => id != access.UserId).ToList();
+        foreach (var step in review.Steps.Where(s => s.State == StepStates.Open)) step.State = StepStates.Done;
+        await transmittals.LapseOpenAsync(revision.Id, access.UserName, cancellationToken);
+        await CloseApprovalsAsync(revision.Id, review.Id, access.UserName, cancellationToken);
+        await audit.WriteAsync(Actor(access), "WITHDRAWN_FOR_UPDATE", "Revision", revision.Id, $"{document.Number} rev {revision.Value}",
+            $"{note} Review {review.Number} closed; its comments are kept.", review.ProjectId, cancellationToken);
+        await TellAsync(review, told, Notifications.NotificationKinds.ReviewReturned,
+            $"{TransmittalService.Label(document, revision)} withdrawn from review for an update", note, cancellationToken, $"/documents/{document.Id}");
+        return null;
+    }
+
     /// <summary>Closes the review and marks the revision returned: the author must make a new revision. Open steps end and open transmittals for the revision lapse.</summary>
     private async Task ReturnToAuthorAsync(Review review, string note, string by, CancellationToken cancellationToken)
     {

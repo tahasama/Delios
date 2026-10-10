@@ -67,6 +67,32 @@ export async function uploadRevisionFilesAction(_prev: Result | undefined, formD
   return {};
 }
 
+/**
+ * New files for a revision not yet released, as a new submission of it; the
+ * earlier files stay in its history. One in review is first taken out of it:
+ * the review closes as withdrawn, everyone on it is told, and a reason is
+ * required. Its author or Document Control only.
+ */
+export async function updateRevisionFilesAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
+  const ctx = await requireScope();
+  const revisionId = text(formData, "revisionId");
+  const reason = text(formData, "reason");
+  const inReview = text(formData, "inReview") === "yes";
+  const files = filesOf(formData, "nativeFile", "renditionFile");
+  if (!files.length) return { error: "Choose the new files." };
+  if (inReview && !reason) return { error: "Say why it is taken out of review: everyone on the route is told." };
+  let documentId: string;
+  try {
+    documentId = (await backendRevision(ctx, revisionId)).documentId;
+    const fileIds = await Promise.all(files.map((file) => upload(ctx, { documentId }, file)));
+    await api(projectPath(ctx, `/documents/${documentId}/revisions/${revisionId}/update`), { body: { fileIds, changeDescription: reason || null } });
+  } catch (e) {
+    return failed(e);
+  }
+  revalidatePath(`/documents/${documentId}`);
+  return {};
+}
+
 /** The review goes to its reviewers as soon as it starts; there is no separate issuing. */
 export async function issueToReviewAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
   const cycleId = text(formData, "cycleId");

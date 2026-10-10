@@ -450,6 +450,41 @@ public sealed class DocumentService(
     }
 
     /// <summary>
+    /// Updates the files of a revision still in preparation: a new submission of the same revision, carrying the new
+    /// files; the earlier ones stay with the submission they came with. Its author or Document Control only.
+    /// </summary>
+    public async Task<(Revision? Revision, IResult? Problem)> UpdateFilesAsync(
+        ProjectAccess access, Guid documentId, Guid revisionId, StartRevisionRequest request, CancellationToken cancellationToken)
+    {
+        var (document, problem) = await ContributableAsync(access, documentId, cancellationToken);
+        if (problem is not null) return (null, problem);
+        var revision = await db.Revisions.Include(r => r.Files)
+            .SingleOrDefaultAsync(r => r.Id == revisionId && r.DocumentId == documentId, cancellationToken);
+        if (revision is null) return (null, Problems.NotFound("REVISION_NOT_FOUND", "No such revision."));
+        if (revision.AuthoredById != access.UserId && !access.Holds(Verbs.Control))
+            return (null, Problems.Forbidden("AUTHOR_OR_CONTROL", "Its author or Document Control updates a revision's files."));
+        if (revision.State != RevisionStates.InPreparation)
+            return (null, Problems.Conflict("REVISION_NOT_IN_PREPARATION",
+                $"Revision {revision.Value} is {revision.State.ToLowerInvariant().Replace('_', ' ')}; its files are updated until it is released.", new { state = revision.State }));
+        var (files, filesProblem) = await UploadedFilesAsync(access, document!, request.FileIds, cancellationToken);
+        if (filesProblem is not null) return (null, filesProblem);
+        if (files!.Count == 0) return (null, Problems.Invalid("FILES_REQUIRED", "Choose the new files."));
+        var now = clock.GetCurrentInstant();
+        revision.Submission++;
+        revision.Submissions.Add(new SubmissionRecord { Number = revision.Submission, SubmittedAt = now, SubmittedByName = access.UserName, Note = request.ChangeDescription });
+        revision.FilesState = FilesStates.Processing;
+        Bind(files, revision);
+        document!.UpdatedAt = now;
+        await db.SaveChangesAsync(cancellationToken);
+        await audit.WriteAsync(new Actor(access.UserId, access.UserName), "FILES_UPDATED", "Revision", revision.Id,
+            $"{document.Number} rev {revision.Value}",
+            $"Submission {revision.Submission}: {string.Join(", ", files.Select(f => f.Name))}"
+            + (string.IsNullOrWhiteSpace(request.ChangeDescription) ? "" : $". Why: {request.ChangeDescription.Trim()}"),
+            document.ProjectId, cancellationToken);
+        return (revision, null);
+    }
+
+    /// <summary>
     /// Makes the first revision of a document just registered from files that came in unplanned on a transmittal and
     /// were already scanned. Document Control registered it, so it needs no check on arrival: it is in preparation.
     /// </summary>
