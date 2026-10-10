@@ -108,7 +108,7 @@ export default async function CodesPage() {
         </p>
       </Card>
 
-      <Card id="advice" title="3b · Review advice — what an earlier step says" description="Every step of a route except the last gives advice, and an adviser is never asked to choose it: it is read off the comments they wrote. No comment means nothing to say; a comment marked as stopping the release means that must be settled first. The decider reads it and is not bound by it — except that a blocking comment still stops the release until it is settled.">
+      <Card id="advice" title="3b · Review advice — what an earlier step says" description="Every step of a route except the last gives advice, picked from this list. It starts at what the adviser's comments say and may say more, never less: a comment marked as stopping the release means the advice is blocking. The decider reads it and is not bound by it — except that a blocking comment still stops the release until it is settled.">
         <DataTable id="codes-advice" toolbar={false} head={<tr><Th>Advice</Th><Th>What the adviser did</Th></tr>}>
           {(advice.length ? advice.map((a) => ({ code: a.code, label: a.label, meaning: typeof a.props.meaning === "string" ? a.props.meaning : ADVICE_MEANING[a.code] ?? "—" }))
             : ADVICE_CODES.map((code) => ({ code, label: ADVICE_LABEL[code], meaning: ADVICE_MEANING[code] }))).map((a) => (

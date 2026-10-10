@@ -75,12 +75,17 @@ export async function sendForReviewAction(_prev: Result | undefined, formData: F
   const routeId = text(formData, "templateId");
   if (!revisionIds.length) return { error: "Nothing to send." };
   if (!routeId) return { error: "Choose a route." };
+  // The people the sender kept or chose on each step; a step left empty keeps the route's own.
+  const people: string[][] = [];
+  for (let i = 0; formData.has(`stepShown_${i}`); i++) people.push(formData.getAll(`participants_${i}`).map(String).filter(Boolean));
+  // One key per press of Send: a revision sent again later is a new review, not a replay of the old one.
+  const attempt = text(formData, "attempt") || crypto.randomUUID();
   const sent: string[] = [];
   const refused: string[] = [];
   for (const revisionId of revisionIds) {
     try {
       const revision = await backendRevision(ctx, revisionId);
-      await api(projectPath(ctx, `/revisions/${revisionId}/reviews`), { body: { routeId }, idempotencyKey: `review-${revisionId}-${routeId}` });
+      await api(projectPath(ctx, `/revisions/${revisionId}/reviews`), { body: { routeId, people: people.length ? people : null }, idempotencyKey: `review-${revisionId}-${attempt}` });
       sent.push(`rev ${revision.value}`);
       revalidatePath(`/documents/${revision.documentId}`);
     } catch (e) {

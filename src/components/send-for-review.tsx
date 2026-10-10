@@ -43,10 +43,12 @@ export function SendForReviewForm({ revisionIds, routes, reviewers, approvers, e
 }) {
   const [routeId, setRouteId] = useState(routes.find((r) => r.isDefault)?.id ?? routes[0]?.id ?? "");
   const route = routes.find((r) => r.id === routeId);
+  const [attempt] = useState(() => crypto.randomUUID());
   if (!routes.length) return <p className="text-sm text-amber-800">No review route applies to {revisionIds.length > 1 ? "all of these documents" : "this document"}. Review routes are set up in Settings → Review routes.</p>;
 
   return (
     <ActionForm action={sendForReviewAction} submitLabel={revisionIds.length > 1 ? `Send ${revisionIds.length} documents` : "Send"} size="sm" hidden={{}}>
+      <input type="hidden" name="attempt" value={attempt} />
       {revisionIds.map((id) => <input key={id} type="hidden" name="revisionIds" value={id} />)}
       <Field label="Route" required>
         <select name="templateId" required className={inputCls} value={routeId} onChange={(e) => setRouteId(e.target.value)}>
@@ -98,6 +100,7 @@ function StepCard({ index, step, pool, many }: { index: number; step: SendStep; 
   return (
     <fieldset className={`flex w-64 shrink-0 flex-col rounded-xl border p-2.5 ${approval ? "border-brand-line/30 bg-tint-soft" : "border-line bg-surface"}`}>
       <legend className="sr-only">Step {index + 1}</legend>
+      <input type="hidden" name={`stepShown_${index}`} value="1" />
       <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400" title={approval ? "This step's verdict binds; a verdict that proceeds is the release approval" : "Advice for the decider"}>Step {index + 1} · {approval ? "Decides" : "Advises"}</p>
       <p className="text-sm font-semibold text-slate-800">{step.title}</p>
       <p className="mb-2 text-[11px] text-slate-500">{MODE[step.mode] ?? step.mode}{step.mode === "SERIAL" ? " — in the order listed" : ""}</p>

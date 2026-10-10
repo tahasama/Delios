@@ -291,9 +291,9 @@ export default async function ActionDetailPage({ params, searchParams }: { param
         <Card title="Progress">
           <Timeline
             points={[
-              { label: "Disciplines tagged", at: depts.length ? action.createdAt : null, holder: depts.length ? depts.map(deptLabel).join(", ") : "nobody yet" },
-              { label: "Documents listed", at: action.entries.length ? action.entries[0].createdAt : null, holder: action.entries.length ? `${action.entries.length} document${action.entries.length === 1 ? "" : "s"}` : "none listed" },
-              { label: "First document due", at: firstDue, holder: firstDue && firstDue < new Date() ? "that date has passed" : null },
+              { label: "Disciplines tagged", done: depts.length > 0, at: depts.length ? action.createdAt ?? null : null, holder: depts.length ? depts.map(deptLabel).join(", ") : "nobody yet" },
+              { label: "Documents listed", done: action.entries.length > 0, at: action.entries.length ? action.entries[0].createdAt ?? null : null, holder: action.entries.length ? `${action.entries.length} document${action.entries.length === 1 ? "" : "s"}` : "none listed" },
+              { label: "First document due", at: firstDue, planned: !!firstDue && firstDue > new Date(), holder: firstDue && firstDue < new Date() ? "that date has passed" : null },
               ...(action.riskNotifiedAt ? [{ label: "Warned automatically", at: action.riskNotifiedAt, holder: depts.map(deptLabel).join(", ") }] : []),
               { label: "Every document ready", at: everything ? action.lastMetAt ?? action.scheduledDate : null, holder: `${readyCount} of ${action.entries.length} ready` },
               { label: "Disciplines confirmed", at: clear.cleared ? action.confirmations.map((c) => c.confirmedAt).filter(Boolean).sort((x, y) => y!.getTime() - x!.getTime())[0] ?? null : null, holder: `${clear.confirmed.length} of ${clear.depts.length}` },
@@ -303,6 +303,7 @@ export default async function ActionDetailPage({ params, searchParams }: { param
               {
                 label: postponed ? "The work was postponed" : happened ? "The work happened" : "The work happens",
                 at: action.scheduledDate,
+                planned: !happened && !postponed,
                 holder: postponed ? `${postponed.responsibleName}: ${postponed.reason}` : null,
               },
             ]}

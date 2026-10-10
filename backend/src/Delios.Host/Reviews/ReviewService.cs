@@ -11,7 +11,8 @@ using NodaTime;
 namespace Delios.Host.Reviews;
 
 /// <summary>Body of the start-review request. <c>RouteId</c> picks a route; null takes the best route for the document.</summary>
-public sealed record StartReviewRequest(Guid? RouteId = null);
+/// <summary>Body of a review start. <c>People</c>, if given, holds per step the people the sender chose; a step left empty keeps the route's own.</summary>
+public sealed record StartReviewRequest(Guid? RouteId = null, Guid[][]? People = null);
 /// <summary>Body of a new comment. <c>Class</c> is a published comment class code; <c>ClosesWithStep</c> (from 1) names a later step that settles it, or null when it is settled with the revision.</summary>
 public sealed record CommentRequest(string? Text, string? Class, int? ClosesWithStep = null);
 /// <summary>Body of the close-comment request: how the comment was settled (required).</summary>
@@ -130,6 +131,17 @@ public sealed class ReviewService(
                 : "That route does not serve this document."));
         }
 
+        // The sender's choice of people on a step of ours replaces the route's for this
+        // review: they answer it, and nobody else. The route itself is unchanged.
+        var chosenBySender = new List<string>();
+        for (var i = 0; i < route.Steps.Count && request.People is { } chosen && i < chosen.Length; i++)
+        {
+            if (route.Steps[i].PartyCode is not null || chosen[i] is not { Length: > 0 } ids) continue;
+            route.Steps[i].FunctionCode = null;
+            route.Steps[i].UserIds = ids.Distinct().ToArray();
+            chosenBySender.Add($"step {i + 1}");
+        }
+
         // Every step must have someone to answer it, a party's step a reason to
         // send it to them, and the one who decides, if ours, must be allowed to
         // approve this document. An outside party's approval is theirs to give.
@@ -233,11 +245,14 @@ public sealed class ReviewService(
         await OpenStepAsync(access, review, 0, cancellationToken);
 
         revision.State = RevisionStates.InReview;
+        // Under review, a revision with no purpose yet is issued for review: each step confirms it or changes it.
+        if (revision.StatusCode is null && catalog.IsActive(ReviewSets.Statuses, "IFR")) revision.StatusCode = "IFR";
         document.LatestRevisionState = RevisionStates.InReview;
         document.UpdatedAt = now;
         await db.SaveChangesAsync(cancellationToken);
         await audit.WriteAsync(Actor(access), "REVIEW_STARTED", "Review", review.Id, review.Number,
-            $"{document.Number} rev {revision.Value} sent for review on route {route.Name}.", access.Project.Id, cancellationToken);
+            $"{document.Number} rev {revision.Value} sent for review on route {route.Name}"
+            + (chosenBySender.Count > 0 ? $", the sender choosing the people on {string.Join(", ", chosenBySender)}." : "."), access.Project.Id, cancellationToken);
         return (review, null);
     }
 
@@ -450,11 +465,35 @@ public sealed class ReviewService(
         }
         else
         {
-            // An adviser is not asked: the answer is already in what they wrote.
+            // The adviser picks from the published advice set. What they wrote sets the
+            // floor: advice may not say less than their comments do.
             var mine = review.Comments.Where(c => c.StepIndex == step.Index && c.Status != CommentStatuses.Withdrawn
                 && (c.AuthorId == access.UserId || c.AuthorId == seat.UserId)).ToList();
             var kind = mine.Any(c => c.Blocking) ? Advice_Blocking : mine.Count > 0 ? Advice_Some : Advice_None;
-            answer = AdviceCode(catalog, kind);
+            answer = string.IsNullOrWhiteSpace(request.Verdict) ? AdviceCode(catalog, kind) : request.Verdict;
+            if (!catalog.IsActive(ReviewSets.Advice, answer) && answer != AdviceCode(catalog, kind))
+            {
+                return (null, Problems.Invalid("VALUE_NOT_PUBLISHED", $"{answer} is not published advice.",
+                    new { field = "verdict", value = answer }));
+            }
+            var severity = new[] { Advice_None, Advice_Some, Advice_Blocking };
+            if (Array.IndexOf(severity, AdviceKind(catalog, answer)) < Array.IndexOf(severity, kind))
+            {
+                return (null, Problems.Invalid("ADVICE_BELOW_COMMENTS",
+                    $"Your comments say {AdviceCode(catalog, kind)}; your advice cannot say less than they do.",
+                    new { field = "verdict", floor = AdviceCode(catalog, kind) }));
+            }
+            // What the revision is issued for, as this adviser sees it: kept, or changed.
+            // It is carried to the next step, which confirms it or changes it again.
+            if (!string.IsNullOrWhiteSpace(request.Status))
+            {
+                if (!catalog.IsActive(ReviewSets.Statuses, request.Status))
+                {
+                    return (null, Problems.Invalid("VALUE_NOT_PUBLISHED", $"{request.Status} is not a published status.",
+                        new { field = "status", value = request.Status }));
+                }
+                granted = request.Status;
+            }
         }
 
         // Who it goes to once released: offered to whoever decides, because they are
@@ -481,6 +520,11 @@ public sealed class ReviewService(
         var now = clock.GetCurrentInstant();
         seat.Answer = answer;
         seat.GrantedStatus = granted;
+        if (!step.Deciding && granted is not null)
+        {
+            var (_, subject) = await SubjectAsync(review, cancellationToken);
+            subject.StatusCode = granted;
+        }
         seat.Note = request.Note?.Trim();
         seat.AnsweredAt = now;
         var stoodIn = seat.UserId != access.UserId;
@@ -503,7 +547,7 @@ public sealed class ReviewService(
             if (await OpenApprovalAsync(access, issue, cancellationToken) is { } approvalProblem) return (null, approvalProblem);
         }
         await audit.WriteAsync(Actor(access), step.Deciding ? "VERDICT" : "ADVICE", "Review", review.Id, review.Number,
-            $"Step {step.Index + 1} ({step.Title}): {answer}{(granted is null ? "" : $", granting {granted}")}"
+            $"Step {step.Index + 1} ({step.Title}): {answer}{(granted is null ? "" : step.Deciding ? $", granting {granted}" : $", issued for {granted}")}"
             + (stoodIn ? $", answered for {seat.UserName}, who handed the step over" : "")
             + (step.ByProxy ? $", recorded for {step.PartyName}{(step.ForeignAnswer is null ? "" : $" who wrote \"{step.ForeignAnswer}\"")}." : "."),
             review.ProjectId, cancellationToken);

@@ -231,7 +231,8 @@ async function RunActivePanel({ run, user, extra }: { run: { id: string; templat
   const carrying = activeCycle
     ? (await legacyDocument(ctx, review.documentId))?.revisions.find((one) => one.id === activeCycle.revisionId)?.statusCode ?? null
     : null;
-  const outcomeSetKey = activeCycle?.outcomeSetKey ?? "REVIEW_OUTCOMES";
+  // The last step answers from the verdicts; every earlier one from the advice list.
+  const outcomeSetKey = run.currentStep === run.steps.length - 1 ? activeCycle?.outcomeSetKey ?? "REVIEW_OUTCOMES" : "REVIEW_ADVICE";
   const outcomes = await getActiveSet(outcomeSetKey);
   const statuses = await getActiveSet("STATUSES");
   const serialNext = step?.mode === "SERIAL" ? nextSerialParticipant(step) : null;
@@ -337,7 +338,8 @@ async function RunActivePanel({ run, user, extra }: { run: { id: string; templat
       status={<>
         <ol className="space-y-1.5">
           {run.steps.map((s, i) => {
-            const names = participants.filter((p) => s.participantIds.includes(p.id)).map((p) => p.name).join(", ");
+            const names = participants.filter((p) => s.participantIds.includes(p.id)).map((p) => p.name).join(", ")
+              || (s.goesTo?.length ? `goes to ${s.goesTo.join(", ")}` : "");
             return (
               <li key={i} className="flex flex-wrap items-center gap-2 text-sm">
                 <span className={`grid h-5 w-5 place-items-center rounded-full text-[10px] font-bold ${s.status === "done" ? "bg-emerald-500 text-white" : s.status === "active" ? "bg-amber-500 text-white" : s.status === "declined" ? "bg-red-500 text-white" : "bg-slate-200 text-slate-500"}`}>

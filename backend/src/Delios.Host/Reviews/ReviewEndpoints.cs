@@ -22,7 +22,7 @@ public sealed record StepView(int Number, string Title, string? Function, string
     bool Deciding, string State, DateOnly? DueDate, string? Answer, IReadOnlyList<string> GrantsStatuses,
     IReadOnlyList<ParticipantView> Participants, Guid? TransmittalId, DateTimeOffset? DispatchedAt, string? DispatchChannel,
     string? DispatchRef, string? DispatchedBy, string? ForeignAnswer, string? RecordedBy, Guid? EvidenceFileId,
-    DateTimeOffset? WarnedAt = null);
+    DateTimeOffset? WarnedAt = null, IReadOnlyList<string>? GoesTo = null);
 
 /// <summary>A review comment as sent to the client. <c>Step</c> and <c>ClosesWithStep</c> count from 1.</summary>
 public sealed record CommentView(Guid Id, int Step, string Author, string Text, string Class, bool Blocking,
@@ -106,10 +106,29 @@ public static class ReviewEndpoints
         await reviews.MeAsync(ProjectAccessFilter.Of(http), reviewId, cancellationToken) is { } me
             ? Results.Ok(me) : Problems.NotFound("REVIEW_NOT_FOUND", "No such review.");
 
-    private static async Task<IResult> GetAsync(Guid reviewId, HttpContext http, ReviewService reviews, CancellationToken cancellationToken)
+    private static async Task<IResult> GetAsync(Guid reviewId, HttpContext http, ReviewService reviews, DeliosDbContext db, CancellationToken cancellationToken)
     {
         var review = await reviews.ReadAsync(ProjectAccessFilter.Of(http), reviewId, cancellationToken);
-        return review is null ? Problems.NotFound("REVIEW_NOT_FOUND", "No such review.") : Results.Ok(View(review));
+        if (review is null) return Problems.NotFound("REVIEW_NOT_FOUND", "No such review.");
+        // A step not yet open has nobody seated: say who it will go to, from the people
+        // named on it and the function that answers it.
+        var ids = review.Steps.SelectMany(s => s.UserIds).Distinct().ToList();
+        var codes = review.Steps.Select(s => s.FunctionCode).OfType<string>().Distinct().ToList();
+        var people = await db.Users.AsNoTracking().Where(u => ids.Contains(u.Id)).ToDictionaryAsync(u => u.Id, u => u.Name, cancellationToken);
+        var functions = await db.Functions.AsNoTracking().Where(f => codes.Contains(f.Code)).ToDictionaryAsync(f => f.Code, f => f.Name, cancellationToken);
+        var view = View(review);
+        return Results.Ok(view with
+        {
+            Steps = view.Steps.Select(step =>
+            {
+                var s = review.Steps.Single(one => one.Index == step.Number - 1);
+                if (step.Participants.Count > 0) return step;
+                List<string> goesTo = s.PartyName is { } party ? [party]
+                    : [.. s.UserIds.Select(id => people.GetValueOrDefault(id)).OfType<string>(),
+                       .. s.FunctionCode is { } code ? [$"whoever holds {functions.GetValueOrDefault(code) ?? code}"] : Array.Empty<string>()];
+                return step with { GoesTo = goesTo };
+            }).ToList(),
+        });
     }
 
     /// <summary>POST <c>/reviews/{reviewId}/comments</c>: adds a comment to the current step of a review.</summary>

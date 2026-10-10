@@ -159,6 +159,7 @@ export async function reviewRun(scope: Scope, id: string): Promise<RunData> {
     status: step.state === "DONE" ? "done" : step.state === "OPEN" ? "active" : "pending",
     cycleId: stepCycleId(review, step),
     decidedBy: step.participants.filter((one) => one.answeredAt).map((one) => one.userId),
+    goesTo: step.goesTo ?? [],
   }));
   return {
     id: review.id, revisionId: review.revisionId, templateName: review.route, steps,

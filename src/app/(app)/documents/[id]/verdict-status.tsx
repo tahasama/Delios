@@ -75,19 +75,23 @@ export function VerdictDecision({ verdicts, statuses, deciding, carrying, laterS
   return (
     <>
       {!deciding && advice ? (
-        // Advice is what the comments say. Write, or mark blocking, the comments
-        // on the review; this follows them.
-        <div className="rounded-lg bg-tint-soft px-3 py-2 text-xs text-slate-700">
-          <input type="hidden" name="outcome" value={advice.code} />
-          <span className="stencil mr-2 text-slate-500">Your advice</span>
-          <strong>{verdicts.find((one) => one.code === advice.code)?.label ?? advice.code}</strong>
-          <span className="block text-[11px] text-slate-500">
-            {advice.comments
-              ? `Worked out from your ${advice.comments} comment${advice.comments === 1 ? "" : "s"}${advice.blocking ? `, ${advice.blocking} of them blocking` : ""}.`
-              : "You have written no comment, so you have nothing to say."}
-            {" "}To change it, add or edit your comments on the review — not here.
+        // Advice is picked from the organization's advice list. It starts at what
+        // the comments say, and may say more than they do, never less.
+        <Field
+          label="Your advice"
+          required
+          hint={advice.comments
+            ? `your ${advice.comments} comment${advice.comments === 1 ? "" : "s"}${advice.blocking ? `, ${advice.blocking} blocking` : ""} — the decider reads it`
+            : "no comment written yet — the decider reads it"}
+        >
+          <select name="outcome" required className={inputCls} value={code || advice.code} onChange={(event) => setCode(event.target.value)}>
+            {verdicts.map((one) => <option key={one.code} value={one.code}>{one.label}</option>)}
+          </select>
+          <span className="mt-1.5 block text-[11px] text-slate-500">
+            Comments are written in the comments box on this page.{" "}
+            <a href="#add-comment" className="font-semibold text-link underline">Write a comment &darr;</a>
           </span>
-        </div>
+        </Field>
       ) : (
         <Field label="Your verdict" required hint={deciding ? "this one decides the revision" : "input for whoever decides"}>
           <select name="outcome" required className={inputCls} value={code} onChange={(event) => setCode(event.target.value)}>

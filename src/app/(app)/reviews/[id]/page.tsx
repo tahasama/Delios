@@ -162,7 +162,7 @@ export default async function ReviewCyclePage({ params }: { params: Promise<{ id
               ? `${verdictLabel(one.outcome)} — ${one.outcomeByName ?? ""}`
               : one
                 ? `with ${one.assignments.map((seat) => seat.userName).join(", ") || "nobody yet"}`
-                : "not started",
+                : step.goesTo?.length ? `not started · goes to ${step.goesTo.join(", ")}` : "not started",
           };
         }),
         { group: "Document Control", label: "Not released", at: rev.state === "NOT_RELEASED" ? rev.statusSetAt : null, holder: rev.statusCode ? `at ${rev.statusCode}, waiting for Document Control` : "waiting for Document Control" },
@@ -302,7 +302,7 @@ export default async function ReviewCyclePage({ params }: { params: Promise<{ id
                 </ul>
               ) : null}
               {mayComment ? (
-                <div className={cycle.comments.length ? "mt-3 border-t border-line pt-3" : undefined}>
+                <div id="add-comment" className={cycle.comments.length ? "mt-3 scroll-mt-24 border-t border-line pt-3" : "scroll-mt-24"}>
                   <ActionForm action={addCommentAction} submitLabel="Add comment" size="sm" hidden={{ cycleId: cycle.id }}>
                     <Field label="Comment" required><textarea name="text" required rows={3} className={inputCls} placeholder="What is wrong, and where" /></Field>
                     <label className="flex items-center gap-2 text-xs text-slate-700"><input type="checkbox" name="blocking" /> Stops the release until it is settled</label>

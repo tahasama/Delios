@@ -213,8 +213,8 @@ export async function recordOutcomeAction(_prev: Result | undefined, formData: F
     const issue = open.deciding ? issueAsk(asked) : null;
     await api(projectPath(ctx, `/reviews/${cycleId}/answer`), {
       body: {
-        verdict: open.deciding ? text(formData, "outcome") || null : null,
-        status: open.deciding ? text(formData, "issuedFor") || null : null,
+        verdict: text(formData, "outcome") || null,
+        status: text(formData, "issuedFor") || null,
         note, issue, foreignAnswer: text(formData, "theirCode") || null, evidenceFileId,
       },
     });

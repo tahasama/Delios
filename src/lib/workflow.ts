@@ -118,6 +118,8 @@ export type WfRuntimeStep = WfStep & {
   status: "pending" | "active" | "done" | "declined";
   cycleId?: string;
   decidedBy?: string[];
+  /** Who a step not yet open will go to. */
+  goesTo?: string[];
   /** ALL mode: each participant's input, so the step can close on the most severe one. */
   inputs?: { userId: string; code: string; returns: boolean }[];
 };
@@ -170,6 +172,7 @@ export async function getRunForRevision(t: Tenant, revisionId: string): Promise<
     cycleId: review.id,
     decidedBy: step.participants.filter((one) => one.answeredAt).map((one) => one.userId),
     inputs: step.participants.filter((one) => one.answer).map((one) => ({ userId: one.userId, code: one.answer!, returns: false })),
+    goesTo: step.goesTo ?? [],
   }));
   const status = review.state === "IN_PROGRESS" ? "ACTIVE" : review.state === "RETURNED" ? "RETURNED" : "DONE";
   return {

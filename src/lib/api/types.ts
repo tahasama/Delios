@@ -168,6 +168,8 @@ export type ReviewView = {
     transmittalId: string | null; dispatchedAt: string | null; dispatchChannel: string | null; dispatchRef: string | null;
     dispatchedBy: string | null; foreignAnswer: string | null; recordedBy: string | null; evidenceFileId: string | null;
     warnedAt?: string | null;
+    /** Who a step not yet open will go to: the people named on it and the function that answers it. */
+    goesTo?: string[] | null;
   }[];
   comments: {
     id: string; step: number; author: string; text: string; class: string; blocking: boolean; closesWith: string; closesWithStep: number | null;
