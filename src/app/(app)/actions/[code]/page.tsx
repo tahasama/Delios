@@ -178,14 +178,14 @@ export default async function ActionDetailPage({ params, searchParams }: { param
             <div className="min-w-0 flex-1">
               <p className="font-mono text-[12.5px] font-semibold tracking-tight text-slate-500">
                 {action.code}
-                {action.scheduleRef && action.scheduleRef !== action.code ? <span className="ml-2 font-sans text-[11.5px] font-normal">planner&rsquo;s ID {action.scheduleRef}</span> : null}
+                {action.scheduleRef && action.scheduleRef !== action.code ? <span className="ml-2 font-sans text-xs font-normal">planner&rsquo;s ID {action.scheduleRef}</span> : null}
               </p>
               <h1 className="plate-name mt-1 min-w-0">{action.name}</h1>
               <p className="plate-meta mt-2">
                 activity {fmtDate(action.scheduledDate)} &middot; {readyCount} of {action.entries.length} documents ready
                 {action.scheduleActivities[0] ? ` \u00b7 schedule ${action.scheduleActivities[0].scheduleVersion.versionLabel}` : ""}
               </p>
-              <p className="mt-1 max-w-2xl text-[11.5px] leading-4 text-slate-400">
+              <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">
                 Check your documents in the table below, and confirm your discipline&rsquo;s documents are available at the bottom of this page.
               </p>
             </div>
@@ -202,9 +202,9 @@ export default async function ActionDetailPage({ params, searchParams }: { param
         <div className="space-y-4">
         <section id="confirm" className="register register-sheet register-sheet-open">
           <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2 sm:px-6">
-            <span className="stencil mr-1 text-slate-400">Disciplines concerned</span>
+            <span className="stencil mr-1 text-slate-500">Disciplines concerned</span>
             {depts.length ? (
-              <span className="text-[11px] text-slate-400">
+              <span className="text-[11px] text-slate-500">
                 {clear.cleared
                   ? "every discipline has confirmed its documents are available"
                   : `each confirms its documents are available${confirmOpens ? ` — from ${fmtDate(confirmOpens)}` : ""}`}
@@ -225,13 +225,13 @@ export default async function ActionDetailPage({ params, searchParams }: { param
                     <div className="min-w-0">
                       <p className="text-sm font-semibold text-slate-800">
                         {deptLabel(d)}
-                        <span className="ml-1.5 text-xs font-normal text-slate-400">· {deptEntries.length - missing.length} of {deptEntries.length} ready</span>
+                        <span className="ml-1.5 text-xs font-normal text-slate-500">· {deptEntries.length - missing.length} of {deptEntries.length} ready</span>
                       </p>
                       {c ? (
                         <p className={`text-[11px] ${c.available ? "text-emerald-700" : "text-red-700"}`}>
                           {c.available ? "Available" : "Not available"} — {c.confirmedByName}, {fmtDate(c.confirmedAt)}{c.note ? ` · ${c.note}` : ""}
                         </p>
-                      ) : <p className="text-[11px] text-slate-400">Not confirmed</p>}
+                      ) : <p className="text-[11px] text-slate-500">Not confirmed</p>}
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
                       {owes && control ? (
@@ -277,7 +277,7 @@ export default async function ActionDetailPage({ params, searchParams }: { param
             </div>
           )}
           {short.length && action.riskNotifiedAt ? (
-            <p className="border-t border-line px-5 py-2 text-[11px] text-slate-400 sm:px-6">
+            <p className="border-t border-line px-5 py-2 text-[11px] text-slate-500 sm:px-6">
               Everyone concerned was warned automatically on {fmtDate(action.riskNotifiedAt)}.
               {admin ? <> <Link href={`/settings/audit?q=${encodeURIComponent(action.code)}`} className="font-semibold text-link underline">Every notice sent &rarr;</Link></> : null}
             </p>

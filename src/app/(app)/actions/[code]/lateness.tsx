@@ -36,8 +36,8 @@ export function ActionNotes({ notes, actionId, mayNote }: {
   return (
     <section id="note" className="register register-sheet register-sheet-open">
       <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2 sm:px-6">
-        <span className="stencil mr-1 text-slate-400">Went ahead?</span>
-        <span className="text-[11px] text-slate-400">when the day came with documents missing: did the work go ahead, or was it postponed &mdash; kept, with the date the day stood at</span>
+        <span className="stencil mr-1 text-slate-500">Went ahead?</span>
+        <span className="text-[11px] text-slate-500">when the day came with documents missing: did the work go ahead, or was it postponed &mdash; kept, with the date the day stood at</span>
         {notes.length ? (
           <span className="ml-auto font-mono text-[11px] tabular-nums text-slate-500">{notes.length} written</span>
         ) : null}
@@ -55,7 +55,7 @@ export function ActionNotes({ notes, actionId, mayNote }: {
               {note.delayResponsible ? (
                 <p className="text-slate-600">Delay owed by <strong className="font-semibold text-slate-800">{note.delayResponsible}</strong>{note.delayReason ? `: ${note.delayReason}` : ""}</p>
               ) : null}
-              <p className="mt-0.5 text-[11px] text-slate-400">Written down by {note.recordedByName}, {fmtDate(note.createdAt)} &mdash; and kept.</p>
+              <p className="mt-0.5 text-[11px] text-slate-500">Written down by {note.recordedByName}, {fmtDate(note.createdAt)} &mdash; and kept.</p>
             </li>
           ))}
         </ul>

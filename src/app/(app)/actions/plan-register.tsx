@@ -250,7 +250,7 @@ export function PlanRegister({
               defaultValue={filters.q}
               placeholder="Search actions, their documents and people"
               title={'A space narrows, a comma widens. For example: pour clarifier  ·  A00005, A00012'}
-              className="plain w-full py-2! pl-6! text-[13.5px]!"
+              className="plain w-full py-2! pl-6! text-sm!"
             />
           </label>
           <button className="ask" data-on={dirty ? "true" : "false"} disabled={pending}>
@@ -296,7 +296,7 @@ export function PlanRegister({
           >
             <tab.icon className="h-4 w-4" />
             {tab.label}
-            <span className={`hidden text-[11px] font-normal sm:inline ${on ? "text-slate-400" : "text-slate-500"}`}>· {tab.hint}</span>
+            <span className={`hidden text-[11px] font-normal sm:inline ${on ? "text-slate-500" : "text-slate-500"}`}>· {tab.hint}</span>
             {/* The side you are not on is the one you can go to, so it is the
                 one that carries the arrow. */}
             {on ? null : <ArrowRight className="h-3.5 w-3.5 text-slate-400 transition group-hover:translate-x-0.5" />}
@@ -313,7 +313,7 @@ export function PlanRegister({
     >
       {facets.length ? (
         <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2 sm:px-6">
-          <span className="stencil mr-1 text-slate-400">Showing</span>
+          <span className="stencil mr-1 text-slate-500">Showing</span>
           {facets.map((facet) => (
             <button key={`${facet.key}-${facet.label}`} type="button" onClick={() => go(facet.without)} className="facet" title="Remove this filter" aria-label={`Remove the filter ${facet.key}: ${facet.label}`}>
               <span className="facet-key">{facet.key}</span>
@@ -377,7 +377,7 @@ export function PlanRegister({
             /* Nothing to draw is said, never left as an empty card: what was
                asked, and the way back to a plan with bars in it. */
             <div className="flex-1 px-6 py-20 text-center">
-              <p className="font-mono text-xs tracking-[0.2em] text-slate-400 uppercase">no actions</p>
+              <p className="font-mono text-xs tracking-[0.2em] text-slate-500 uppercase">no actions</p>
               <p className="mt-2 text-sm text-slate-700">
                 {more.window && more.window.elsewhere
                   ? `Nothing dated in these days. ${more.window.elsewhere.toLocaleString("en-GB")} ${more.window.elsewhere === 1 ? "action falls" : "actions fall"} outside them.`
@@ -404,7 +404,7 @@ export function PlanRegister({
                   the window — one line, on the left where counts are read. */}
               <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-slate-500">
                 <span className="font-mono tabular-nums">
-                  {more.shown.toLocaleString("en-GB")}<span className="ml-1 font-sans text-slate-400">of {more.total.toLocaleString("en-GB")}</span>
+                  {more.shown.toLocaleString("en-GB")}<span className="ml-1 font-sans text-slate-500">of {more.total.toLocaleString("en-GB")}</span>
                 </span>
                 {more.window && more.window.elsewhere ? (
                   <span className="text-amber-800">· {more.window.elsewhere.toLocaleString("en-GB")} outside these days</span>
@@ -435,12 +435,12 @@ export function PlanRegister({
                   type="button"
                   onClick={() => go(more.href!)}
                   disabled={pending}
-                  className="inline-flex min-w-48 items-center justify-center gap-1.5 rounded-lg border border-line bg-surface px-5 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-brand-line/50 hover:text-brand-ink disabled:text-slate-400"
+                  className="inline-flex min-w-48 items-center justify-center gap-1.5 rounded-lg border border-line bg-surface px-5 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-brand-line/50 hover:text-brand-ink disabled:text-slate-500"
                 >
                   {pending ? "Loading…" : `Load ${Math.min(more.step, more.total - more.shown)} more`}
                   <ChevronDown className="h-3.5 w-3.5" />
                 </button>
-              ) : <span className="text-[11px] text-slate-400">all of them drawn</span>}
+              ) : <span className="text-[11px] text-slate-500">all of them drawn</span>}
 
               {/* How many more each press draws. */}
               <label className="flex items-center justify-end gap-1.5 leading-none">
@@ -455,7 +455,7 @@ export function PlanRegister({
                 >
                   {more.steps.map((one) => <option key={one.by} value={one.by}>{one.by}</option>)}
                 </select>
-                <span className="stencil text-slate-400">at a time</span>
+                <span className="stencil text-slate-500">at a time</span>
               </label>
             </div>
           ) : null}
@@ -566,7 +566,7 @@ export function PlanRegister({
               </DataTable>
             ) : (
               <div className="px-6 py-20 text-center">
-                <p className="font-mono text-xs tracking-[0.2em] text-slate-400 uppercase">no actions</p>
+                <p className="font-mono text-xs tracking-[0.2em] text-slate-500 uppercase">no actions</p>
                 <p className="mt-2 text-sm text-slate-700">Nothing in the schedule matches these filters.</p>
                 {facets.length ? <button type="button" onClick={() => go("/actions?view=table")} className="mt-3 text-xs font-semibold text-link hover:underline">Clear the {facets.length} filter{facets.length === 1 ? "" : "s"} →</button> : null}
               </div>
@@ -577,7 +577,7 @@ export function PlanRegister({
             <div data-dt-foot className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 border-t border-line px-5 py-2.5 sm:px-6">
               <p className="font-mono text-[11px] tabular-nums text-slate-500">
                 {paging.from.toLocaleString("en-GB")}–{paging.to.toLocaleString("en-GB")}
-                <span className="ml-1.5 font-sans text-slate-400">of {total.toLocaleString("en-GB")}</span>
+                <span className="ml-1.5 font-sans text-slate-500">of {total.toLocaleString("en-GB")}</span>
               </p>
               {paging.pages > 1 ? (
                 <span className="flex items-center gap-2">
@@ -587,7 +587,7 @@ export function PlanRegister({
                 </span>
               ) : <span />}
               <label className="flex items-center justify-end gap-1.5">
-                <span className="stencil text-slate-400">Rows</span>
+                <span className="stencil text-slate-500">Rows</span>
                 <select className="plain" value={paging.perPage} onChange={(event) => go(sized(Number(event.target.value)))}>
                   {paging.sizes.map((size) => <option key={size} value={size}>{size}</option>)}
                 </select>
@@ -732,7 +732,7 @@ const COLUMNS: Column[] = [
     cell: (row) => row.date
       ? <>
           <span className="text-xs font-medium text-slate-800">{row.date}{row.finish ? ` → ${row.finish}` : ""}</span>
-          <span className={`block font-sans text-[11px] ${row.late ? "text-red-400" : "text-slate-400"}`}>
+          <span className={`block font-sans text-[11px] ${row.late ? "text-red-600" : "text-slate-500"}`}>
             {row.when}{row.days ? ` · ${row.days} day${row.days === 1 ? "" : "s"}` : ""}
           </span>
         </>
@@ -744,7 +744,7 @@ const COLUMNS: Column[] = [
     headClass: "text-right", cellClass: "whitespace-nowrap text-right",
     cell: (row) => row.total
       ? <span className="inline-flex flex-col items-end gap-1">
-          <span className="text-xs font-semibold tabular-nums text-slate-800">{row.ready}<span className="font-normal text-slate-400"> / {row.total}</span></span>
+          <span className="text-xs font-semibold tabular-nums text-slate-800">{row.ready}<span className="font-normal text-slate-500"> / {row.total}</span></span>
           <span className="h-1 w-14 overflow-hidden rounded-full bg-slate-100">
             <span
               className={`block h-full rounded-full ${row.ready === row.total ? "bg-emerald-500" : "bg-amber-500"}`}
@@ -775,7 +775,7 @@ const COLUMNS: Column[] = [
           {row.missing.length > 3 ? <li><Link href={`/actions/${row.code}`} className="text-[11px] font-semibold text-link hover:underline">+{row.missing.length - 3} more</Link></li> : null}
         </ul>
       : row.total === 0
-        ? <span className="text-xs text-slate-400">Nothing listed yet</span>
+        ? <span className="text-xs text-slate-500">Nothing listed yet</span>
         : <span className="text-xs font-medium text-emerald-700">Nothing missing</span>,
   },
   {

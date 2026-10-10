@@ -22,7 +22,7 @@ export async function PlanCards({ from = null, to = null }: { from?: Date | null
   const summary = (
     <div className="min-w-0 flex-1 basis-[30rem] space-y-1.5">
       <StagePath stages={PLAN_STAGES} at={progress.at} />
-      <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11.5px] text-slate-500">
+      <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500">
         {progress.schedule ? (
           <span>
             Dates from{" "}
@@ -46,7 +46,7 @@ export async function PlanCards({ from = null, to = null }: { from?: Date | null
             {dot}
             <span>
               {progress.complete} of {progress.listed} actions have every document
-              <span className="text-slate-400"> — {progress.window.chosen ? "dates chosen" : "a month either side of today"}: {fmtDate(progress.window.from)} → {fmtDate(progress.window.to)}</span>
+              <span className="text-slate-500"> — {progress.window.chosen ? "dates chosen" : "a month either side of today"}: {fmtDate(progress.window.from)} → {fmtDate(progress.window.to)}</span>
             </span>
           </>
         ) : null}

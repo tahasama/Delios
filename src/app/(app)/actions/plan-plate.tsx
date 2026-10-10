@@ -18,7 +18,7 @@ export function PlanPlate({ inForce, plans, failed }: {
   return (
     <div className="border-b border-line px-5 pt-5 pb-2.5 sm:px-6">
       <h1 className="plate-title min-w-0 text-slate-950">Schedule &amp; actions</h1>
-      <p className="mt-1 max-w-2xl text-[11.5px] leading-4 text-slate-500">
+      <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">
         {inForce
           ? <>{inForce.since ? `Dates in force since ${inForce.since}.` : "Dates from the released schedule."} Each action is a day the project must be ready for, with the documents its disciplines need.</>
           : plans
@@ -26,7 +26,7 @@ export function PlanPlate({ inForce, plans, failed }: {
             : <>No schedule yet. Document Control, or whoever plans the project, uploads it; every action follows from it.</>}
       </p>
       {failed ? (
-        <p className="mt-2 max-w-2xl rounded-md bg-red-50 px-2.5 py-1.5 text-[11.5px] leading-4 text-red-900 ring-1 ring-red-200">
+        <p className="mt-2 max-w-2xl rounded-md bg-red-50 px-2.5 py-1.5 text-xs leading-5 text-red-900 ring-1 ring-red-200">
           The schedule of rev {failed.revision} could not be read{failed.error ? `: ${failed.error}` : "."} {inForce ? " The dates shown are still the ones from before it." : " No dates are in force yet."}{" "}
           <Link href="/actions/schedules" className="font-semibold underline">See every read →</Link>
         </p>

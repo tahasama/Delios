@@ -102,7 +102,7 @@ export function PlanTimeline({ rows, window, fit }: {
           line up with nothing. */}
       <div className="relative ml-52 mr-16 h-4">
         {ticks.map((t, index) => (
-          <span key={`${index}-${t.label}`} className="absolute top-0 whitespace-nowrap text-[10px] leading-none text-slate-400" style={{ left: `${t.left}%`, marginLeft: "0.25rem" }}>
+          <span key={`${index}-${t.label}`} className="absolute top-0 whitespace-nowrap text-[10px] leading-none text-slate-500" style={{ left: `${t.left}%`, marginLeft: "0.25rem" }}>
             {t.label}
           </span>
         ))}

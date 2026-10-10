@@ -103,12 +103,12 @@ const COLUMNS: Column[] = [
     cell: (row) => row.source ? (
       <>
         <span className="font-semibold text-red-700">{row.source}</span>
-        <span className="block text-[10px] text-slate-400">owed by {row.owedBy}</span>
+        <span className="block text-[11px] text-slate-500">owed by {row.owedBy}</span>
       </>
     ) : row.outstanding ? (
       <>
         <span className="font-semibold text-amber-700">Still not released &amp; issued</span>
-        <span className="block text-[10px] text-slate-400">owed by {row.owedBy}</span>
+        <span className="block text-[11px] text-slate-500">owed by {row.owedBy}</span>
       </>
     ) : <span className="text-slate-400">&mdash;</span>,
   },
@@ -117,7 +117,7 @@ const COLUMNS: Column[] = [
     label: "Happened",
     by: (row) => row.sourceAtSort ?? LAST,
     cellClass: "whitespace-nowrap font-mono text-xs tabular-nums",
-    cell: (row) => row.sourceAt ?? <span className="font-sans text-slate-400">not yet</span>,
+    cell: (row) => row.sourceAt ?? <span className="font-sans text-slate-500">not yet</span>,
   },
   {
     key: "deadline",
@@ -148,15 +148,15 @@ const COLUMNS: Column[] = [
     cellClass: "text-xs",
     cell: (row) => {
       const middle = row.chain.slice(1, -1);
-      if (!middle.length) return <span className="text-slate-400">no route yet</span>;
+      if (!middle.length) return <span className="text-slate-500">no route yet</span>;
       return (
         <span className="block space-y-0.5">
           {middle.map((one, at) => (
             <span key={`${one.name}-${at}`} className={`block whitespace-nowrap ${one.late ? "text-red-700" : "text-slate-600"}`}>
               <span className="font-medium">{one.name}</span>
               <span className="ml-1.5 font-mono tabular-nums">{one.at ?? "not yet"}</span>
-              {one.due ? <span className="text-slate-400"> &middot; due {one.due}</span> : null}
-              <span className="text-slate-400"> &middot; {one.owedBy}</span>
+              {one.due ? <span className="text-slate-500"> &middot; due {one.due}</span> : null}
+              <span className="text-slate-500"> &middot; {one.owedBy}</span>
             </span>
           ))}
         </span>
@@ -182,7 +182,7 @@ const COLUMNS: Column[] = [
     cell: (row) => (
       <>
         <span className={row.late ? "font-semibold text-red-700" : ""}>{row.submitBy}</span>
-        <span className="block text-[10px] text-slate-400">{row.submitNote}</span>
+        <span className="block text-[11px] text-slate-500">{row.submitNote}</span>
       </>
     ),
   },
@@ -202,7 +202,7 @@ function MomentCell({ one }: { one: Moment | null }) {
   return (
     <>
       <span className={`font-mono tabular-nums ${one.late ? "font-semibold text-red-700" : ""}`}>{one.at ?? "not yet"}</span>
-      {one.due ? <span className="block text-[10px] text-slate-400">{one.deadline} {one.due}</span> : null}
+      {one.due ? <span className="block text-[11px] text-slate-500">{one.deadline} {one.due}</span> : null}
     </>
   );
 }
@@ -354,7 +354,7 @@ export function NeededTable({ rows, chips, plate, exportHref, empty, link }: {
       style={cardHeight ? { maxHeight: cardHeight } : undefined}
     >
       <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2 sm:px-6">
-        <span className="stencil mr-1 text-slate-400">Documents needed</span>
+        <span className="stencil mr-1 text-slate-500">Documents needed</span>
         {chips}
         {link ? <span className="ml-3">{link}</span> : null}
         {facets.length ? (
@@ -453,7 +453,7 @@ export function NeededTable({ rows, chips, plate, exportHref, empty, link }: {
             })}
           </DataTable>
         ) : (
-          <p className="px-5 py-6 text-xs text-slate-400 sm:px-6">
+          <p className="px-5 py-6 text-xs text-slate-500 sm:px-6">
             {rows.length
               ? "No document here answers to that. Clear a filter above."
               : empty ?? "No documents listed yet. Each discipline answers Document Control’s call; the answers become the approved requirements list."}
@@ -464,7 +464,7 @@ export function NeededTable({ rows, chips, plate, exportHref, empty, link }: {
       <div data-dt-foot className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 border-t border-line px-5 py-2.5 sm:px-6">
         <p className="font-mono text-[11px] tabular-nums text-slate-500">
           {ordered.length ? `${(here - 1) * perPage + 1}–${Math.min(here * perPage, ordered.length)}` : 0}
-          <span className="ml-1.5 font-sans text-slate-400">of {ordered.length}{ticked.length ? `, ${ticked.length} ticked` : ""}</span>
+          <span className="ml-1.5 font-sans text-slate-500">of {ordered.length}{ticked.length ? `, ${ticked.length} ticked` : ""}</span>
         </p>
         {pages > 1 ? (
           <span className="flex items-center gap-2">
@@ -474,7 +474,7 @@ export function NeededTable({ rows, chips, plate, exportHref, empty, link }: {
           </span>
         ) : <span />}
         <label className="flex items-center justify-end gap-1.5">
-          <span className="stencil text-slate-400">Rows</span>
+          <span className="stencil text-slate-500">Rows</span>
           <select className="plain" value={perPage} onChange={(event) => { setPerPage(Number(event.target.value)); setPage(1); }}>
             {SIZES.map((size) => <option key={size} value={size}>{size}</option>)}
           </select>
