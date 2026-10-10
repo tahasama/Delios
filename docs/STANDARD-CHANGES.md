@@ -683,7 +683,12 @@ project, when the project is archived; reopening the project brings its
 documents back into use. Voiding is not an end of the document: it says one
 revision never counted.
 
-**Depends on it:** `DocumentService.EndAsync` (`WAS_RELEASED`, `NEVER_RELEASED`,
+Each end can be taken back with a recorded reason: a cancelled or withdrawn
+document is reinstated (not while its project is archived), and a void is
+taken back while the revision is still the newest and the document not held.
+The people told of the end are told of its reversal.
+
+**Depends on it:** `DocumentService.EndAsync`, `ReinstateAsync`, `KeepingService.UnvoidAsync` (`WAS_RELEASED`, `NEVER_RELEASED`,
 `ARCHIVED_WITH_PROJECT`), `Supersession.TellWithdrawnAsync`, project status update.
 
 ## Still open — decided in conversation, not yet built

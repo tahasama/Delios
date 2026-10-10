@@ -199,6 +199,22 @@ export async function unlinkRelationshipAction(formData: FormData) {
 }
 
 // End states (Part 12) — recorded with date and responsible authority (§12.1)
+/** Take a cancellation or withdrawal back, with a reason. */
+export async function reinstateDocumentAction(_prev: { error?: string; ok?: string } | undefined, formData: FormData): Promise<{ error?: string; ok?: string }> {
+  const ctx = await requireScope();
+  const documentId = String(formData.get("documentId") ?? "");
+  const reason = String(formData.get("reason") ?? "").trim();
+  if (!reason) return { error: "Say why it is reinstated." };
+  try {
+    await api(projectPath(ctx, `/documents/${documentId}/reinstate`), { body: { reason } });
+  } catch (e) {
+    return { error: refusal(e).message };
+  }
+  revalidatePath(`/documents/${documentId}`);
+  revalidatePath("/documents");
+  return { ok: "Reinstated." };
+}
+
 export async function endDocumentStateAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
   const ctx = await requireScope();
   const documentId = String(formData.get("documentId") ?? "");

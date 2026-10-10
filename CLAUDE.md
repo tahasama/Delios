@@ -87,6 +87,14 @@ conversation, write it into the right one in the same commit as the code.
   everyone sent a revision of it is told to stop using it.
 - **Archived** is never chosen per document: documents are archived with their
   project, and come back if the project is reopened.
+- The Details tab has "Cancel or withdraw": both listed, the impossible one
+  with why (e.g. "Not possible: rev A was released"). Once ended, the same place
+  reinstates it, with a reason (not in an archived project; a withdrawn
+  document's recipients are told it counts again).
+- Void stays on the revision row. A void can be taken back with a reason by
+  Document Control, only on the newest revision and not while on legal hold.
+- Stamps next to the number (register and document page): cancelled,
+  withdrawn, archived, void, legal hold. The state column stays.
 
 ### Schedule & actions
 - The schedule (SCH), disciplines per action (DPA) and requirements (RQL) are

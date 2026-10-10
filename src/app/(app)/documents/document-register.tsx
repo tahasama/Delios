@@ -520,6 +520,9 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
                 <Link href={`/documents/${row.id}`} className="doc-number relative z-1 whitespace-nowrap">{row.docNumber}</Link>
                 {row.revState === "SUPERSEDED" ? <span className="stamp text-violet-700">superseded</span> : null}
                 {row.revState === "VOID" ? <span className="stamp text-red-700">void</span> : null}
+                {row.docState === "CANCELLED" ? <span className="stamp text-slate-500">cancelled</span> : null}
+                {row.docState === "WITHDRAWN" ? <span className="stamp text-red-700">withdrawn</span> : null}
+                {row.docState === "ARCHIVED" ? <span className="stamp text-slate-500">archived</span> : null}
                 {row.placeholder ? <span className="stamp text-slate-500">number reserved</span> : null}
                 {row.onHold ? <span title={row.onHold} className="stamp text-red-700">not for use</span> : null}
               </span>

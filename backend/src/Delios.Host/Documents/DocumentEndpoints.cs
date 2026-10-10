@@ -50,6 +50,7 @@ public static class DocumentEndpoints
         project.MapPost("/documents/{documentId:guid}/revisions/{revisionId:guid}/withdraw", WithdrawAsync);
         project.MapPut("/documents/{documentId:guid}", UpdateAsync);
         project.MapPost("/documents/{documentId:guid}/end", EndAsync);
+        project.MapPost("/documents/{documentId:guid}/reinstate", ReinstateAsync);
         project.MapGet("/files/{fileId:guid}/download", DownloadAsync);
     }
 
@@ -157,7 +158,15 @@ public static class DocumentEndpoints
         return problem ?? Results.NoContent();
     }
 
-    /// <summary>POST /documents/{documentId}/end: withdraws, cancels or archives the document, with the reason.</summary>
+    /// <summary>POST /documents/{documentId}/reinstate: takes a cancellation or withdrawal back, with the reason.</summary>
+    private static async Task<IResult> ReinstateAsync(
+        Guid documentId, EndDocumentRequest request, HttpContext http, DocumentService documents, CancellationToken cancellationToken)
+    {
+        var (_, problem) = await documents.ReinstateAsync(ProjectAccessFilter.Of(http), documentId, request, cancellationToken);
+        return problem ?? Results.NoContent();
+    }
+
+    /// <summary>POST /documents/{documentId}/end: withdraws or cancels the document, with the reason.</summary>
     private static async Task<IResult> EndAsync(
         Guid documentId, EndDocumentRequest request, HttpContext http, DocumentService documents, CancellationToken cancellationToken)
     {

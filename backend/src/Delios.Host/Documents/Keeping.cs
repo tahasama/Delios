@@ -108,6 +108,49 @@ public sealed class KeepingService(
         return (revision, null);
     }
 
+    /// <summary>
+    /// Takes a void back, with a reason: the revision returns to what it was (released, or in preparation) and the people
+    /// who received it are told it counts again. Only while it is still the newest revision and the document is not on hold.
+    /// Document Control's, as the one who answers for what is in force.
+    /// </summary>
+    public async Task<(Revision? Revision, IResult? Problem)> UnvoidAsync(
+        HttpContext http, ProjectAccess access, Guid documentId, Guid revisionId, VoidRequest request, CancellationToken cancellationToken)
+    {
+        var document = await VisibleAsync(access, documentId, cancellationToken);
+        var revision = document is null ? null
+            : await db.Revisions.SingleOrDefaultAsync(r => r.Id == revisionId && r.DocumentId == documentId, cancellationToken);
+        if (document is null || revision is null) return (null, Problems.NotFound("REVISION_NOT_FOUND", "No such revision."));
+        if (revision.State != RevisionStates.Void) return (null, Problems.Conflict("NOT_VOID", $"Rev {revision.Value} is not void."));
+        var reason = request.Reason?.Trim() ?? "";
+        if (reason.Length == 0) return (null, Problems.Invalid("REASON_REQUIRED", "Taking a void back is recorded with a reason."));
+        if (document.LegalHold) return (null, OnHold(document));
+        if (!access.Allows(Verbs.Control, document.Facts) && !await Keepers.ConfiguresAsync(http))
+            return (null, Problems.Forbidden("CONTROL_ONLY", "Document Control takes a void back."));
+        if (document.State is not (DocumentStates.Planned or DocumentStates.Active))
+            return (null, Problems.Conflict("DOCUMENT_NOT_OPEN", $"The document is {document.State.ToLowerInvariant()}: reinstate it first."));
+        var newer = await db.Revisions.AsNoTracking().Where(r => r.DocumentId == documentId && r.CreatedAt > revision.CreatedAt)
+            .Select(r => r.Value).FirstOrDefaultAsync(cancellationToken);
+        if (newer is not null)
+            return (null, Problems.Conflict("NOT_NEWEST", $"Rev {newer} came after it: rev {revision.Value} stays void."));
+
+        var now = clock.GetCurrentInstant();
+        var back = revision.ReleasedAt is not null ? RevisionStates.Released : RevisionStates.InPreparation;
+        revision.State = back;
+        revision.VoidedAt = null;
+        revision.VoidReason = null;
+        revision.VoidAuthority = null;
+        if (document.LatestRevisionId == revision.Id) document.LatestRevisionState = back;
+        document.UpdatedAt = now;
+        var label = $"{document.Number} rev {revision.Value}";
+        await audit.WriteAsync(new Actor(access.UserId, access.UserName), "UNVOIDED", "Revision", revision.Id, label,
+            $"Void → {(back == RevisionStates.Released ? "Released" : "In preparation")}. {reason}", access.Project.Id, cancellationToken);
+        await notifier.NotifyAsync(document.TenantId, document.ProjectId, await ReceivedByAsync(revision.Id, cancellationToken),
+            Notifications.NotificationKinds.General, $"Valid again: {label}",
+            $"The void on it was taken back. {reason}", $"/documents/{document.Id}", cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
+        return (revision, null);
+    }
+
     /// <summary>Records what was found of the work done from a voided revision. Whoever may void it records it.</summary>
     public async Task<(Revision? Revision, IResult? Problem)> ReassessAsync(
         HttpContext http, ProjectAccess access, Guid revisionId, ReassessmentRequest request, CancellationToken cancellationToken)
@@ -285,6 +328,12 @@ public static class KeepingEndpoints
             {
                 var (revision, problem) = await s.VoidAsync(h, ProjectAccessFilter.Of(h), documentId, revisionId, r, c);
                 return problem ?? Results.Ok(new { revision!.Id, revision.State, revision.VoidReason });
+            });
+        project.MapPost("/documents/{documentId:guid}/revisions/{revisionId:guid}/unvoid",
+            async (Guid documentId, Guid revisionId, VoidRequest r, HttpContext h, KeepingService s, CancellationToken c) =>
+            {
+                var (revision, problem) = await s.UnvoidAsync(h, ProjectAccessFilter.Of(h), documentId, revisionId, r, c);
+                return problem ?? Results.Ok(new { revision!.Id, revision.State });
             });
         project.MapPost("/revisions/{revisionId:guid}/reassessment",
             async (Guid revisionId, ReassessmentRequest r, HttpContext h, KeepingService s, CancellationToken c) =>

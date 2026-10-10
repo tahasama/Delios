@@ -54,6 +54,21 @@ public sealed class Supersession(DeliosDbContext db, Notifications.Notifier noti
             $"/documents/{document.Id}", cancellationToken);
     }
 
+    /// <summary>A withdrawn document reinstated: those told to stop using it are told it counts again.</summary>
+    public async Task TellReinstatedAsync(Document document, string reason, CancellationToken cancellationToken)
+    {
+        var people = await (from t in db.Transmittals
+                            from i in t.Items
+                            from p in t.Recipients
+                            join r in db.Revisions on i.RevisionId equals r.Id
+                            where t.Direction == TransmittalDirections.Outgoing && r.DocumentId == document.Id && p.UserId != null
+                            select p.UserId!.Value).Distinct().ToListAsync(cancellationToken);
+        await notifier.NotifyAsync(document.TenantId, document.ProjectId, people, Notifications.NotificationKinds.Released,
+            $"{document.Number} is back in use",
+            $"Its withdrawal was taken back: {document.Number} ({document.Title}) counts again. Why: {reason}",
+            $"/documents/{document.Id}", cancellationToken);
+    }
+
     /// <summary>Every replaced revision on the project still held by an organization that was never sent a newer one.</summary>
     public async Task<IReadOnlyList<Untold>> UntoldAsync(ProjectAccess access, CancellationToken cancellationToken)
     {

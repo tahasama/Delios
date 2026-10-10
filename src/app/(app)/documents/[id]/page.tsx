@@ -19,9 +19,9 @@ import { typeSkipsReview } from "@/lib/review-need";
 import { ownFields, readExtras, formPolicy } from "@/lib/field-policy";
 import { fmtDate, timeAgo, plain } from "@/lib/utils";
 import { getActiveSet, getSet, getValue } from "@/lib/config";
-import { updateDocumentAction, linkAssetAction, unlinkRelationshipAction, endDocumentStateAction } from "@/lib/actions/documents";
+import { updateDocumentAction, reinstateDocumentAction, linkAssetAction, unlinkRelationshipAction, endDocumentStateAction } from "@/lib/actions/documents";
 import {
-  prepareRevisionAction, editRevisionAction, withdrawRevisionAction, releaseRevisionAction, voidRevisionAction, returnAtGateAction, liftHoldAction, returnHeldAction,
+  prepareRevisionAction, editRevisionAction, withdrawRevisionAction, releaseRevisionAction, voidRevisionAction, unvoidRevisionAction, returnAtGateAction, liftHoldAction, returnHeldAction,
 } from "@/lib/actions/revisions";
 import { parseRecipients, mayRequestIssue, requestChoices, authorOf, issuePolicy, decisionLetsItOut, requestsOn } from "@/lib/issue-requests";
 import { legacyDocument, documentContext, type LegacyRevision } from "@/lib/api/legacy";
@@ -102,7 +102,8 @@ export default async function DocumentDetailPage({
   ]);
   const mayRetire = controller || (!withdrawIsControl && doc.createdById === user.id);
   // Withdrawn is for a document that was released; cancelled for one that never was.
-  const everReleased = doc.revisions.some((one) => one.state === "RELEASED" || one.state === "SUPERSEDED");
+  const lastReleased = doc.revisions.find((one) => one.state === "RELEASED" || one.state === "SUPERSEDED");
+  const everReleased = !!lastReleased;
 
   const confidentialityRows = await getSet("CONFIDENTIALITY");
   const openCodes = openConfidentiality(confidentialityRows.map((one) => ({ code: one.code, props: one.props })));
@@ -497,7 +498,14 @@ export default async function DocumentDetailPage({
       <section className="register register-sheet register-sheet-open">
         <div className="flex flex-col-reverse gap-3 px-5 pt-6 pb-4 sm:px-6 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0 flex-1">
-            <p className="font-mono text-[12.5px] font-semibold tracking-tight text-slate-500">{doc.docNumber}</p>
+            <p className="flex flex-wrap items-center gap-2 font-mono text-[12.5px] font-semibold tracking-tight text-slate-500">
+              {doc.docNumber}
+              {doc.state === "CANCELLED" ? <span className="stamp font-sans text-slate-500">cancelled</span> : null}
+              {doc.state === "WITHDRAWN" ? <span className="stamp font-sans text-red-700">withdrawn</span> : null}
+              {doc.state === "ARCHIVED" ? <span className="stamp font-sans text-slate-500">archived</span> : null}
+              {doc.revisions[0]?.state === "VOID" ? <span className="stamp font-sans text-red-700">rev {doc.revisions[0].value} void</span> : null}
+              {doc.legalHold ? <span className="stamp font-sans text-amber-800">legal hold</span> : null}
+            </p>
             <h1 className="plate-name mt-1 min-w-0">{doc.title}</h1>
             <p className="plate-meta mt-2 flex flex-wrap items-center gap-x-2 gap-y-1">
               {shown ? <span className="font-mono font-semibold text-slate-800">Rev {shown.value}</span> : null}
@@ -614,20 +622,52 @@ export default async function DocumentDetailPage({
                     </div>
                   </details>
                 ) : null}
-                {mayRetire && !doc.legalHold && (doc.state === "ACTIVE" || doc.state === "PLANNED") && !working ? (
+                {/* Cancel or withdraw: both are listed, with what is possible and why
+                    not; once ended, the same place takes it back. */}
+                {mayRetire && doc.kind !== "RECORD" ? (
                   <details className="mt-3">
-                    <summary className="cursor-pointer list-none text-xs font-semibold text-slate-500">End this document…</summary>
-                    <div className="mt-3 max-w-md">
-                      {everReleased ? (
-                        <ActionForm action={endDocumentStateAction} submitLabel="Withdraw the document" variant="danger" size="sm" hidden={{ documentId: doc.id, kind: "WITHDRAWN" }} confirmText="Everyone who was sent a revision of it will be told to stop using it. Continue?">
-                          <p className="text-xs text-slate-600">It was released and is no longer valid. It stays in the register with its history; everyone who was sent a revision of it is told to stop using it.</p>
-                          <Field label="Why" required><input name="reason" required className={inputCls} placeholder="e.g. Made obsolete by the design change of variation 12" /></Field>
+                    <summary className="cursor-pointer list-none text-xs font-semibold text-slate-500">
+                      {doc.state === "CANCELLED" ? "Take the cancellation back…" : doc.state === "WITHDRAWN" ? "Take the withdrawal back…" : "Cancel or withdraw…"}
+                    </summary>
+                    <div className="mt-3 max-w-md space-y-4">
+                      {doc.state === "CANCELLED" || doc.state === "WITHDRAWN" ? (
+                        <ActionForm action={reinstateDocumentAction} submitLabel="Reinstate" size="sm" variant="secondary" hidden={{ documentId: doc.id }}>
+                          <p className="text-xs text-slate-600">
+                            It is {doc.state === "CANCELLED" ? "cancelled" : "withdrawn"}. Reinstated, it is in use again{doc.state === "WITHDRAWN" ? ", and everyone who was told to stop using it is told it counts again" : ""}.
+                          </p>
+                          <Field label="Why" required><input name="reason" required className={inputCls} placeholder="e.g. Brought back into scope by variation 14" /></Field>
                         </ActionForm>
+                      ) : doc.state === "ARCHIVED" ? (
+                        <p className="text-xs text-slate-500">It is archived with its project. Reopen the project to bring it back.</p>
+                      ) : doc.legalHold ? (
+                        <p className="text-xs text-slate-500">It is on legal hold: neither is possible until the hold is lifted.</p>
+                      ) : working ? (
+                        <p className="text-xs text-slate-500">Rev {working.value} is {stateName(names, working.state, { together }).toLowerCase()}: finish it, or withdraw it from review, before the document is cancelled or withdrawn.</p>
                       ) : (
-                        <ActionForm action={endDocumentStateAction} submitLabel="Cancel the document" variant="danger" size="sm" hidden={{ documentId: doc.id, kind: "CANCELLED" }}>
-                          <p className="text-xs text-slate-600">Nothing of it was ever released: it will never be produced. Its number stays reserved to it.</p>
-                          <Field label="Why" required><input name="reason" required className={inputCls} placeholder="e.g. Dropped from the scope by variation 12" /></Field>
-                        </ActionForm>
+                        <>
+                          <div>
+                            <p className="text-xs font-semibold text-slate-800">Cancel</p>
+                            {everReleased ? (
+                              <p className="mt-1 text-xs text-slate-500">Not possible: rev {lastReleased?.value} was released. A released document is withdrawn instead.</p>
+                            ) : (
+                              <ActionForm action={endDocumentStateAction} submitLabel="Cancel the document" variant="danger" size="sm" hidden={{ documentId: doc.id, kind: "CANCELLED" }}>
+                                <p className="text-xs text-slate-600">It will never be produced. Its number stays reserved to it, and it can be reinstated.</p>
+                                <Field label="Why" required><input name="reason" required className={inputCls} placeholder="e.g. Dropped from the scope by variation 12" /></Field>
+                              </ActionForm>
+                            )}
+                          </div>
+                          <div className="border-t border-line pt-3">
+                            <p className="text-xs font-semibold text-slate-800">Withdraw</p>
+                            {everReleased ? (
+                              <ActionForm action={endDocumentStateAction} submitLabel="Withdraw the document" variant="danger" size="sm" hidden={{ documentId: doc.id, kind: "WITHDRAWN" }} confirmText="Everyone who was sent a revision of it will be told to stop using it. Continue?">
+                                <p className="text-xs text-slate-600">It was released and is no longer valid. It stays in the register with its history; everyone who was sent a revision of it is told to stop using it. It can be reinstated.</p>
+                                <Field label="Why" required><input name="reason" required className={inputCls} placeholder="e.g. Made obsolete by the design change of variation 12" /></Field>
+                              </ActionForm>
+                            ) : (
+                              <p className="mt-1 text-xs text-slate-500">Not possible: nothing of it was ever released. A document never released is cancelled instead.</p>
+                            )}
+                          </div>
+                        </>
                       )}
                     </div>
                   </details>
@@ -899,6 +939,18 @@ function RevisionRow({ rev, latest, followedBy, statusLabel, stateLabel, control
               already have worked from. And one that was never reviewed at all —
               opened, left, and now in the way of the next one: voiding it says
               it never counted, which is the truth, and clears the document. */}
+          {/* A void taken back, with a reason: only the newest revision, not while held. */}
+          {!held && controller && latest && state === "VOID" ? (
+            <details>
+              <summary className="cursor-pointer text-xs font-semibold text-slate-600">Take the void back…</summary>
+              <div className="mt-2 max-w-md">
+                <ActionForm action={unvoidRevisionAction} submitLabel="Take the void back" size="sm" variant="secondary" hidden={{ revisionId: rev.id }}>
+                  <p className="text-xs text-slate-600">Rev {rev.value} counts again, as {rev.releasedAt ? "released" : "in preparation"}. Everyone who received it is told.</p>
+                  <Field label="Why" required><input name="reason" required className={inputCls} placeholder="e.g. Voided against the wrong revision" /></Field>
+                </ActionForm>
+              </div>
+            </details>
+          ) : null}
           {!held && (controller || (!voidIsControl && (rev.authoredById === userId || rev.uploadedById === userId))) && latest && (state === "RELEASED" || (state === "IN_PREPARATION" && !rev.cycles.length)) ? (
             <details>
               <summary className="cursor-pointer text-xs font-semibold text-red-700">{state === "RELEASED" ? "Void — issued in error…" : "Void — it was never reviewed…"}</summary>

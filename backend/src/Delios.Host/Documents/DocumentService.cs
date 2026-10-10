@@ -307,6 +307,34 @@ public sealed class DocumentService(
     }
 
     /// <summary>
+    /// Takes a cancellation or a withdrawal back, with a reason: the document is in use again (planned if it has no
+    /// revision yet). Not in an archived project. A withdrawn document's recipients are told it counts again.
+    /// </summary>
+    public async Task<(Document? Document, IResult? Problem)> ReinstateAsync(
+        ProjectAccess access, Guid documentId, EndDocumentRequest request, CancellationToken cancellationToken)
+    {
+        var document = await DocumentQueries.Visible(db, access, await RestrictedAsync(cancellationToken))
+            .SingleOrDefaultAsync(d => d.Id == documentId, cancellationToken);
+        if (document is null) return Fail(Problems.NotFound("DOCUMENT_NOT_FOUND", "No such document."));
+        if (!access.Allows(Verbs.Control, document.Facts) && document.CreatedById != access.UserId)
+            return Fail(Problems.Forbidden("END_NOT_ALLOWED", "Document Control, or whoever registered it, reinstates a document."));
+        if (document.State is not (DocumentStates.Cancelled or DocumentStates.Withdrawn))
+            return Fail(Problems.Conflict("NOT_ENDED", "Only a cancelled or withdrawn document is reinstated.", new { state = document.State }));
+        var reason = Blank(request.Reason);
+        if (reason is null) return Fail(Problems.Invalid("REASON_REQUIRED", "Reinstating is recorded with a reason."));
+        if (await db.Projects.AnyAsync(p => p.Id == document.ProjectId && p.Status == "ARCHIVED", cancellationToken))
+            return Fail(Problems.Conflict("PROJECT_ARCHIVED", "Its project is archived: reopen the project first."));
+        var before = document.State;
+        document.State = document.LatestRevisionState is null ? DocumentStates.Planned : DocumentStates.Active;
+        document.UpdatedAt = clock.GetCurrentInstant();
+        await db.SaveChangesAsync(cancellationToken);
+        await audit.WriteAsync(new Actor(access.UserId, access.UserName), "STATE_TRANSITION", "Document", document.Id,
+            document.Number, $"{before} → {document.State}: reinstated. {reason}", document.ProjectId, cancellationToken);
+        if (before == DocumentStates.Withdrawn) await supersession.TellReinstatedAsync(document, reason, cancellationToken);
+        return (document, null);
+    }
+
+    /// <summary>
     /// Records a file someone is about to upload to a document (status awaiting upload) and returns a signed link
     /// the browser uses to send the bytes straight to object storage. The file is attached to a revision later.
     /// </summary>

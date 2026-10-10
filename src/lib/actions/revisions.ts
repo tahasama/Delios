@@ -305,6 +305,23 @@ export async function voidRevisionAction(_prev: Result | undefined, formData: Fo
   return {};
 }
 
+/** Take a void back, with a reason: the revision counts again. Document Control's. */
+export async function unvoidRevisionAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
+  const ctx = await requireScope();
+  const revisionId = text(formData, "revisionId");
+  const reason = text(formData, "reason");
+  if (!reason) return { error: "Say why the void is taken back." };
+  let documentId: string;
+  try {
+    documentId = (await backendRevision(ctx, revisionId)).documentId;
+    await api(projectPath(ctx, `/documents/${documentId}/revisions/${revisionId}/unvoid`), { body: { reason } });
+  } catch (e) {
+    return failed(e);
+  }
+  revalidatePath(`/documents/${documentId}`);
+  return {};
+}
+
 /** §12.6 — the reassessment of work performed under a voided revision. */
 export async function recordVoidReassessmentAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
   const ctx = await requireScope();
