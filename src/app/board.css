@@ -55,25 +55,17 @@
   }
   .board-week-head { display: flex; flex-direction: column; gap: 0.1rem; padding: 0.1rem 0.2rem 0.2rem; }
 
-  /* The card: white, a coloured tab across its top, a faint wash of the same colour. */
+  /* The card: coloured all over, as a T-card is, its edge a shade of the same colour. */
   .t-card {
-    position: relative;
     display: flex;
     flex-direction: column;
     gap: 0.35rem;
-    overflow: hidden;
     border-radius: 0.6rem;
-    padding: 0.75rem 0.7rem 0.6rem;
-    background: color-mix(in oklab, var(--tab) 7%, var(--color-surface));
-    box-shadow: 0 1px 2px rgb(15 23 42 / 7%), 0 4px 10px -8px rgb(15 23 42 / 30%);
+    padding: 0.6rem 0.7rem;
+    background: color-mix(in oklab, var(--tab) 14%, var(--color-surface));
+    border: 1px solid color-mix(in oklab, var(--tab) 38%, var(--color-surface));
+    box-shadow: 0 1px 2px rgb(15 23 42 / 6%);
     transition: transform 140ms cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 140ms;
-  }
-  .t-card::before {
-    content: "";
-    position: absolute;
-    inset: 0 0 auto 0;
-    height: 4px;
-    background: var(--tab);
   }
   .t-card:hover { transform: translateY(-1px); box-shadow: 0 2px 4px rgb(15 23 42 / 8%), 0 10px 18px -12px rgb(15 23 42 / 40%); }
   .t-card:focus-visible { outline: 2px solid var(--tab); outline-offset: 2px; }

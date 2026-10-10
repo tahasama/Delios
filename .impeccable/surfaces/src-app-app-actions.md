@@ -13,7 +13,7 @@ Scope: Schedule & actions (/actions) and the action page (/actions/[code]). Mode
 
 THESIS: The planning board. Schedule & actions in the manner of a site office's T-card board: a light, quiet page where colour lives only on the action cards, each in its week's column, its colour its state. Refuses grey cards of equal weight, and the paper-form costume of the first trial (rejected: colours, paper feel, narrow fonts, heaviness).
 
-OWN-WORLD: The app's own type and light ground. Seven state colours, each a card's top tab, a faint wash and a tag (ready green, done deep green, late receipt violet, still ahead blue, at risk amber, overdue red, nothing listed grey), used identically on the board, the timeline bars, the colour key and the table. Facts as a label over a figure, divided by thin rules, no boxes.
+OWN-WORLD: The app's own type and light ground. Seven state colours, each colouring a whole card (fill and edge) and a tag (ready green, done deep green, late receipt violet, still ahead blue, at risk amber, overdue red, nothing listed grey), used identically on the board, the timeline bars, the colour key and the table. Facts as a label over a figure, divided by thin rules, no boxes.
 
 STORY: The planner opens the board and sees each week at a glance — how many cards, how many red or amber, this week lit — opens a card, and reads the action's name, its state tag and four facts.
 
