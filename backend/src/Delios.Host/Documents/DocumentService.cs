@@ -380,6 +380,11 @@ public sealed class DocumentService(
                     $"The document is already in the {from} series and cannot go back to {to}.", new { from, to }));
         }
         var value = ((NextValue.Value)next).Text;
+        // What the revision is issued for (IFR, IFA, IFC…): one of the published statuses, proposed now and confirmed
+        // or changed by the approver; it is released at the status the approver gives.
+        var purpose = Blank(request.Purpose)?.ToUpperInvariant();
+        if (purpose is not null && !(await Catalog.LoadAsync(db, cancellationToken)).IsActive(Reviews.ReviewSets.Statuses, purpose))
+            return (null, Problems.Invalid("VALUE_NOT_PUBLISHED", $"{purpose} is not a published status.", new { purpose }));
 
         var now = clock.GetCurrentInstant();
         var revision = new Revision
@@ -395,7 +400,7 @@ public sealed class DocumentService(
             AuthoredByName = access.UserName,
             AuthoredByParty = incoming?.OnBehalfOf ?? access.PartyCode,
             CreatedAt = now,
-            StatusCode = incoming?.Status,
+            StatusCode = incoming?.Status ?? purpose,
             State = await NeedsAcceptanceAsync(access, incoming, cancellationToken) ? RevisionStates.Received : RevisionStates.InPreparation,
             FilesState = later ? FilesStates.None : FilesStates.Processing,
             Submissions = [new SubmissionRecord { Number = 1, SubmittedAt = now, SubmittedByName = access.UserName }],

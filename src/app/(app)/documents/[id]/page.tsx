@@ -431,8 +431,15 @@ export default async function DocumentDetailPage({
         { key: "revise", primary: ground.kind !== "OWN", label: ground.kind === "FIRST" ? "Start the first revision" : ground.kind === "ASKED" ? `New revision — answer rev ${doc.revisions[0]?.value}` : "Start a new revision", open: !doc.revisions.length, body: (<>
           <ActionForm action={prepareRevisionAction} submitLabel="Start revision" hidden={{ documentId: doc.id }}>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {/* What it is issued for, from the organization's statuses: proposed now, confirmed or changed by the approver. */}
+              <Field label="Issued for" required hint="the approver confirms it or changes it in the verdict" className="sm:col-span-2">
+                <select name="purpose" required defaultValue="" className={inputCls}>
+                  <option value="" disabled>Choose…</option>
+                  {statuses.filter((one) => one.status === "ACTIVE").map((one) => <option key={one.code} value={one.code}>{one.code} — {one.label}</option>)}
+                </select>
+              </Field>
               {ground.kind === "FIRST" ? (
-                <Field label="Reason" required className="sm:col-span-2"><input name="reasonForRevision" className={inputCls} defaultValue="First issue" /></Field>
+                <input type="hidden" name="reasonForRevision" value="First issue" />
               ) : ground.kind === "ASKED" ? (
                 // The verdict is the reason; nobody writes it again.
                 <div className="rounded-lg bg-tint-soft px-3 py-2 text-xs text-slate-700 sm:col-span-2">

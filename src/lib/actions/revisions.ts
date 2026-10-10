@@ -31,7 +31,7 @@ export async function prepareRevisionAction(_prev: Result | undefined, formData:
     const files = filesOf(formData, "revisionFile");
     const fileIds = await Promise.all(files.map((file) => upload(ctx, { documentId }, file)));
     const revision = await api<{ id: string; value: string }>(projectPath(ctx, `/documents/${documentId}/revisions`), {
-      body: { fileIds, reasonForRevision: text(formData, "reasonForRevision") || null, changeDescription, filesLater: fileIds.length === 0 },
+      body: { fileIds, reasonForRevision: text(formData, "reasonForRevision") || null, changeDescription, filesLater: fileIds.length === 0, purpose: text(formData, "purpose") || null },
     });
     // The send can come with the new revision, so a resubmission is one form rather than three.
     const routeId = text(formData, "sendTemplateId");

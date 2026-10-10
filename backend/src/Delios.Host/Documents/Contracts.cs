@@ -31,7 +31,7 @@ public sealed record UploadRequest(string? FileName, long Size, string? ContentT
 /// <param name="FilesLater">Start the revision now and attach its files afterwards (POST .../revisions/{id}/files).</param>
 public sealed record StartRevisionRequest(
     Guid[]? FileIds, string? ReasonForRevision = null, string? ChangeDescription = null, string? Series = null,
-    bool FilesLater = false);
+    bool FilesLater = false, string? Purpose = null);
 
 /// <summary>One row of the document register list, as returned by GET /documents.</summary>
 public sealed record DocumentSummary(

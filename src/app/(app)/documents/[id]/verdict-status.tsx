@@ -127,7 +127,7 @@ export function VerdictDecision({ verdicts, statuses, deciding, carrying, laterS
           <Field
             label="Issued for"
             required
-            hint={carrying ? `it arrived at ${carrying} — change it, or confirm it stays` : "what the revision is issued for once this step is done"}
+            hint={carrying ? `it carries ${carrying} — confirm it, or change it` : "what the revision is issued for once this step is done"}
           >
             <select name="issuedFor" required value={status} onChange={(event) => setStatus(event.target.value)} className={inputCls}>
               <option value="" disabled>Choose…</option>
