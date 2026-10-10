@@ -21,15 +21,14 @@ export type PlanRow = {
  * ahead with nothing owed yet, amber is a document owed within the week, red is
  * a day that has passed with something still missing, grey is nothing listed.
  */
-// The same state colours as the board's cards (board.css), so a colour is learned once.
 const TONE: Record<PlanRow["readiness"], string> = {
-  DONE: "state-done",
-  LATE_RECEIPT: "state-late-receipt",
-  READY: "state-ready",
-  UPCOMING: "state-upcoming",
-  AT_RISK: "state-at-risk",
-  NOT_READY: "state-not-ready",
-  UNKNOWN: "state-unknown",
+  DONE: "bg-emerald-700",
+  LATE_RECEIPT: "bg-violet-400",
+  READY: "bg-emerald-400",
+  UPCOMING: "bg-sky-500",
+  AT_RISK: "bg-amber-500",
+  NOT_READY: "bg-red-500",
+  UNKNOWN: "bg-slate-300",
 };
 const DAY = 86_400_000;
 
@@ -148,7 +147,7 @@ export function PlanTimeline({ rows, window, fit }: {
                 <span className="relative h-5 flex-1">
                   <span
                     className={`absolute top-1/2 h-2.5 -translate-y-1/2 ${TONE[r.readiness]} ${fromBefore ? "rounded-r-full" : "rounded-full"}`}
-                    style={{ left: `${left}%`, width: `${width}%`, background: "var(--tab)" }}
+                    style={{ left: `${left}%`, width: `${width}%` }}
                     role="img"
                     aria-label={`${STATE_WORD[r.readiness]}: ${r.firstNeeded ? `documents needed from ${fmtDate(r.firstNeeded)}, ` : ""}work on ${fmtDate(r.scheduledDate)}, ${r.ready} of ${r.total} ready`}
                     title={`${r.code}: documents needed from ${fmtDate(r.firstNeeded)} · work on ${fmtDate(r.scheduledDate)} · ${r.ready} of ${r.total} ready`}

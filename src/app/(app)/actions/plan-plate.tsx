@@ -16,7 +16,7 @@ export function PlanPlate({ inForce, plans, failed }: {
   failed: { revision: string; error: string | null } | null;
 }) {
   return (
-    <div className="sheet-head px-5 pt-5 pb-3 sm:px-6">
+    <div className="border-b border-line px-5 pt-5 pb-2.5 sm:px-6">
       <h1 className="plate-title min-w-0 text-slate-950">Schedule &amp; actions</h1>
       <p className="mt-1 max-w-2xl text-[11.5px] leading-4 text-slate-500">
         {inForce

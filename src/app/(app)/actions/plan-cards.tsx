@@ -13,15 +13,16 @@ import { UploadSwitch } from "./upload-switch";
  * done: the schedule, the disciplines each action concerns, the documents each
  * discipline needs.
  */
-export async function PlanCards({ from = null, to = null, missing = 0, undated = 0 }: { from?: Date | null; to?: Date | null; missing?: number; undated?: number } = {}) {
+export async function PlanCards({ from = null, to = null }: { from?: Date | null; to?: Date | null } = {}) {
   const ctx = await requireScope();
   const plans = ctx.can("PLAN") || ctx.can("CONTROL") || ctx.can("CONFIGURE");
   const [progress, lists] = await Promise.all([planProgress(ctx, { from, to }), plans ? planLists(ctx) : Promise.resolve([])]);
+  const dot = <span aria-hidden className="text-slate-300">·</span>;
 
   const summary = (
     <div className="min-w-0 flex-1 basis-[30rem] space-y-1.5">
       <StagePath stages={PLAN_STAGES} at={progress.at} />
-      <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-slate-500">
+      <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11.5px] text-slate-500">
         {progress.schedule ? (
           <span>
             Dates from{" "}
@@ -31,43 +32,25 @@ export async function PlanCards({ from = null, to = null, missing = 0, undated =
             {" "}· <Link href="/actions/schedules" className="text-link hover:underline">each version and its moved dates</Link>
           </span>
         ) : <span>No schedule yet</span>}
+        {progress.actions ? (
+          <>
+            {dot}
+            <span>
+              {progress.tagged} of {progress.actions} actions tagged
+              {progress.untagged.length ? (
+                <span className="text-amber-800"> (missing: {progress.untagged.slice(0, 6).map((code, i) => <span key={code}>{i ? ", " : ""}<Link href={`/actions/${code}`} className="font-mono hover:underline">{code}</Link></span>)}{progress.untagged.length > 6 ? <> and <Link href="/actions?view=table&untagged=1" className="hover:underline">{progress.untagged.length - 6} more</Link></> : null})</span>
+              ) : null}
+            </span>
+            {dot}
+            <span>{progress.answered} of {progress.asked} discipline lists</span>
+            {dot}
+            <span>
+              {progress.complete} of {progress.listed} actions have every document
+              <span className="text-slate-400"> — {progress.window.chosen ? "dates chosen" : "a month either side of today"}: {fmtDate(progress.window.from)} → {fmtDate(progress.window.to)}</span>
+            </span>
+          </>
+        ) : null}
       </p>
-      {/* The counts somebody came for, each in its own boxed field: a printed
-          label, the figure in ink, pink where somebody is needed. */}
-      {progress.actions ? (
-        <div className="fields mt-3 grid-cols-2 sm:grid-cols-3 xl:grid-cols-5">
-          <div className="field">
-            <span className="field-label">Documents ready</span>
-            <span className="field-value">{progress.complete}<small>of {progress.listed}</small></span>
-            <span className="field-note">{progress.window.chosen ? "dates chosen" : "a month either side of today"}: {fmtDate(progress.window.from)} → {fmtDate(progress.window.to)}</span>
-          </div>
-          <Link href="/actions?happened=WITHOUT&all=1" className="field" data-tone={missing ? "needs" : undefined}>
-            <span className="field-label">Went ahead, documents missing</span>
-            <span className="field-value">{missing}</span>
-            <span className="field-note">every date</span>
-          </Link>
-          <Link href="/actions?view=table&nodate=1" className="field" data-tone={undated ? "needs" : undefined}>
-            <span className="field-label">No date</span>
-            <span className="field-value">{undated}</span>
-            <span className="field-note">listed in the table only</span>
-          </Link>
-          <div className="field" data-tone={progress.untagged.length ? "needs" : undefined}>
-            <span className="field-label">Disciplines tagged</span>
-            <span className="field-value">{progress.tagged}<small>of {progress.actions}</small></span>
-            {progress.untagged.length ? (
-              <span className="field-note">
-                missing: {progress.untagged.slice(0, 4).map((code, i) => <span key={code}>{i ? ", " : ""}<Link href={`/actions/${code}`} className="font-semibold text-link hover:underline">{code}</Link></span>)}
-                {progress.untagged.length > 4 ? <> and <Link href="/actions?view=table&untagged=1" className="font-semibold text-link hover:underline">{progress.untagged.length - 4} more</Link></> : null}
-              </span>
-            ) : <span className="field-note">every action</span>}
-          </div>
-          <div className="field">
-            <span className="field-label">Discipline lists</span>
-            <span className="field-value">{progress.answered}<small>of {progress.asked}</small></span>
-            <span className="field-note">disciplines that said what each action needs</span>
-          </div>
-        </div>
-      ) : null}
     </div>
   );
   if (!plans) return summary;
