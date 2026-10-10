@@ -36,8 +36,8 @@ export function ActionNotes({ notes, actionId, mayNote }: {
   return (
     <section id="note" className="register register-sheet register-sheet-open">
       <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2 sm:px-6">
-        <span className="stencil mr-1 text-slate-400">On the day</span>
-        <span className="text-[11px] text-slate-400">what was decided when the day came and something was missing &mdash; kept, with the date the day stood at</span>
+        <span className="stencil mr-1 text-slate-400">Went ahead?</span>
+        <span className="text-[11px] text-slate-400">when the day came with documents missing: did the work go ahead, or was it postponed &mdash; kept, with the date the day stood at</span>
         {notes.length ? (
           <span className="ml-auto font-mono text-[11px] tabular-nums text-slate-500">{notes.length} written</span>
         ) : null}
@@ -48,7 +48,7 @@ export function ActionNotes({ notes, actionId, mayNote }: {
           {notes.map((note) => (
             <li key={note.id} className="px-5 py-3 text-xs leading-5 sm:px-6">
               <p className={`font-semibold ${note.decision === "CARRIED" ? "text-amber-800" : "text-slate-700"}`}>
-                {note.decision === "CARRIED" ? "Went ahead short of documents" : "Postponed — the work did not happen"}
+                {note.decision === "CARRIED" ? "Went ahead with missing documents" : "Postponed — the work did not happen"}
                 {note.plannedDate ? <span className="font-normal text-slate-500"> &middot; the day stood at {fmtDate(note.plannedDate)}</span> : null}
               </p>
               <p className="mt-0.5 text-slate-600"><strong className="font-semibold text-slate-800">{note.responsibleName}</strong> carries it: {note.reason}</p>
@@ -67,10 +67,10 @@ export function ActionNotes({ notes, actionId, mayNote }: {
         <ActionForm action={recordActionNoteAction} hideSubmit hidden={{ actionId }}>
           <div className="asking grid grid-cols-1 gap-x-4 gap-y-3.5 px-5 py-3.5 sm:grid-cols-2 sm:px-6">
             <label className="min-w-0">
-              <span className="sr-only">On the day</span>
+              <span className="sr-only">Went ahead?</span>
               <select name="decision" required defaultValue="" className="plain w-full">
-                <option value="" disabled>On the day&hellip;</option>
-                <option value="CARRIED">It went ahead short of documents</option>
+                <option value="" disabled>Went ahead?&hellip;</option>
+                <option value="CARRIED">Yes, with missing documents</option>
                 <option value="STOPPED">The work was postponed &mdash; it did not happen</option>
               </select>
             </label>

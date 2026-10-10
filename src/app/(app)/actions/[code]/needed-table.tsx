@@ -96,9 +96,9 @@ const LAST = Number.MAX_SAFE_INTEGER;
 const COLUMNS: Column[] = [
   {
     key: "source",
-    label: "Delay source",
+    label: "Where it got late",
     by: (row) => row.source ?? (row.outstanding ? "zz" : "zzz"),
-    note: "The first step that slipped. The steps after it inherit the delay rather than own it.",
+    note: "The first step of the document's way that ran late: sent for review (or sent in by the supplier), a review step, released, or issued. The steps after it only inherit the delay.",
     cellClass: "whitespace-nowrap text-xs",
     cell: (row) => row.source ? (
       <>
@@ -313,7 +313,7 @@ export function NeededTable({ rows, chips, plate, exportHref, empty, link }: {
   const facets = [
     q.trim() ? { key: "Search", label: q.trim(), clear: () => setQ("") } : null,
     discipline ? { key: "Discipline", label: discipline, clear: () => setDiscipline("") } : null,
-    source ? { key: "Delay source", label: source === "__none__" ? "nothing slipped" : source, clear: () => setSource("") } : null,
+    source ? { key: "Where it got late", label: source === "__none__" ? "nowhere, on time" : source, clear: () => setSource("") } : null,
     ready ? { key: "Ready", label: ready === "yes" ? "yes" : ready === "late" ? "late" : "not yet", clear: () => setReady("") } : null,
   ].filter((one): one is { key: string; label: string; clear: () => void } => !!one);
 
@@ -339,7 +339,7 @@ export function NeededTable({ rows, chips, plate, exportHref, empty, link }: {
             className="plain w-full pl-6"
           />
         </label>
-        <Narrow value={source} onChange={(next) => { setSource(next); setPage(1); }} empty="Delay source" options={[{ code: "__none__", label: "Nothing slipped" }, ...sources.map((one) => ({ code: one, label: one }))]} />
+        <Narrow value={source} onChange={(next) => { setSource(next); setPage(1); }} empty="Where it got late" options={[{ code: "__none__", label: "Nowhere, on time" }, ...sources.map((one) => ({ code: one, label: one }))]} />
         <Narrow value={discipline} onChange={(next) => { setDiscipline(next); setPage(1); }} empty="Discipline" options={disciplines.map((one) => ({ code: one, label: one }))} />
         <Narrow value={ready} onChange={(next) => { setReady(next); setPage(1); }} empty="Ready" options={[{ code: "yes", label: "Ready" }, { code: "late", label: "Late" }, { code: "no", label: "Not yet" }]} />
       </div>
