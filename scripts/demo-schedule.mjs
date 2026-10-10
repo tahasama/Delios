@@ -202,7 +202,8 @@ async function main() {
   }
 
   // What Document Control wrote about the overdue one, and a discipline confirming.
-  const byCode = Object.fromEntries((await engineer.get(`${p}/activities`)).map((one) => [one.code, one.id]));
+  // By the planner's IDs the programme used; each action also has our own number (A00001…).
+  const byCode = Object.fromEntries((await engineer.get(`${p}/activities`)).map((one) => [one.externalId ?? one.code, one.id]));
   await controller.post(`${p}/activities/${byCode.A120}/decisions`, {
     decision: "CARRIED", responsibleName: "Site manager", reason: "Screens set on temporary supports; drawing follows.",
     delayOwedBy: "Mechanical", delayReason: "Vendor dimensions came late",

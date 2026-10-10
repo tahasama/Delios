@@ -176,7 +176,10 @@ export default async function ActionDetailPage({ params, searchParams }: { param
         plate={
           <div className="flex flex-col-reverse gap-3 border-b border-line px-5 pt-6 pb-3 sm:px-6 lg:flex-row lg:items-start lg:justify-between">
             <div className="min-w-0 flex-1">
-              <p className="font-mono text-[12.5px] font-semibold tracking-tight text-slate-500">{action.code}</p>
+              <p className="font-mono text-[12.5px] font-semibold tracking-tight text-slate-500">
+                {action.code}
+                {action.scheduleRef && action.scheduleRef !== action.code ? <span className="ml-2 font-sans text-[11.5px] font-normal">planner&rsquo;s ID {action.scheduleRef}</span> : null}
+              </p>
               <h1 className="plate-name mt-1 min-w-0">{action.name}</h1>
               <p className="plate-meta mt-2">
                 {action.ownerName ?? "No owner"} &middot; activity {fmtDate(action.scheduledDate)} &middot; {readyCount} of {action.entries.length} documents ready

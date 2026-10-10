@@ -18,6 +18,8 @@ import { DateWindow } from "@/components/date-window";
 export type PlanTableRow = {
   id: string;
   code: string;
+  /** The planner's ID for it, when it differs from our number. */
+  plannerId: string | null;
   name: string;
   description: string | null;
   owner: string | null;
@@ -534,6 +536,7 @@ export function PlanRegister({
                       </Td>
                       <Td className={`${frozen ? "sticky left-10 z-1" : ""} min-w-65 ${on ? "bg-tint" : "bg-surface"}`}>
                         <Link href={`/actions/${row.code}`} className="doc-number">{row.code}</Link>
+                        {row.plannerId ? <span className="ml-1.5 font-mono text-[11px] text-slate-500" title="The planner's ID in the schedule file">{row.plannerId}</span> : null}
                         <span className="doc-title block max-w-80 truncate" title={row.name}>{row.name}</span>
                       </Td>
                       {columns.map((column) => <Td key={column.key} className={column.cellClass}>{column.cell(row)}</Td>)}

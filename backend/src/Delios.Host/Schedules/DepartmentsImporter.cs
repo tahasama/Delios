@@ -131,9 +131,11 @@ public sealed class DepartmentsImporter(
             string Cell(int index) => index < rows[r].Length ? rows[r][index].Trim() : "";
             if (rows[r].All(string.IsNullOrWhiteSpace)) continue;
             var line = r + 1;
-            var code = Cell(actionAt);
-            if (code.Length == 0) { problems.Add($"Line {line}: Action Code is missing."); continue; }
-            if (!activities.ContainsKey(code)) { problems.Add($"Line {line}: action {code} is not in the schedule."); continue; }
+            var given = Cell(actionAt);
+            if (given.Length == 0) { problems.Add($"Line {line}: Action Code is missing."); continue; }
+            // Our number or the planner's ID, either one.
+            if (ScheduleImporter.Named(activities.Values, given) is not { } found) { problems.Add($"Line {line}: action {given} is not in the schedule."); continue; }
+            var code = found.Code;
             if (tags.ContainsKey(code)) { problems.Add($"Line {line}: action {code} is listed twice."); continue; }
             var named = ScheduleReader.SplitDepartments(Cell(departmentsAt));
             var unknown = named.Where(n => catalog.Find(ValueSets.Disciplines, n) is null).ToList();

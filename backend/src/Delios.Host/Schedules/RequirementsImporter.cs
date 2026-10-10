@@ -239,7 +239,7 @@ public sealed class RequirementsImporter(
             var asset = Cell("asset").ToUpperInvariant() is { Length: > 0 } at ? at : null;
 
             if (actionCode.Length == 0) errors.Add("Action Code is missing");
-            else if (!activities.TryGetValue(actionCode, out var activity)) errors.Add($"Action {actionCode} is not in the schedule");
+            else if (ScheduleImporter.Named(activities.Values, actionCode) is not { } activity) errors.Add($"Action {actionCode} is not in the schedule");
             else if (activity.Departments.Length == 0) errors.Add($"Action {actionCode} has no departments yet");
             else if (!activity.Departments.Contains(department, StringComparer.OrdinalIgnoreCase))
                 errors.Add($"{(department.Length > 0 ? department : "(no department)")} is not a department of {actionCode} ({string.Join(", ", activity.Departments)})");
@@ -265,6 +265,8 @@ public sealed class RequirementsImporter(
                 if (!Has(ValueSets.Subprojects, subproject)) errors.Add($"\"{named}\" is created and needs a Sub-project for its number");
                 if (external && !Has(ValueSets.PurchaseOrders, po)) errors.Add($"\"{named}\" comes from a supplier, so it needs its PO for its number");
             }
+            // Kept by our number, whichever the list used.
+            actionCode = ScheduleImporter.Named(activities.Values, actionCode)?.Code ?? actionCode;
             if (!seen.Add($"{actionCode}|{docNumber ?? title}")) errors.Add("This document is listed twice for the same action");
             if (errors.Count > 0) { problems.Add($"Line {line}: {string.Join("; ", errors)}."); continue; }
             parsed.Add(new Row(line, actionCode, department, docNumber, title, discipline, docType, external ? supplier : null, status,

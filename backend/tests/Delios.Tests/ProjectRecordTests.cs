@@ -100,8 +100,8 @@ public sealed class ProjectRecordTests(Infrastructure infrastructure) : IClassFi
             activities = await engineer.GetFromJsonAsync<JsonElement>($"{p}/activities");
             if (activities.GetArrayLength() < 2) await Task.Delay(200);
         }
-        var a200 = activities.EnumerateArray().Single(a => a.GetProperty("code").GetString() == "A200").GetProperty("id").GetGuid();
-        var a100 = activities.EnumerateArray().Single(a => a.GetProperty("code").GetString() == "A100").GetProperty("id").GetGuid();
+        var a200 = activities.EnumerateArray().Single(a => a.GetProperty("externalId").GetString() == "A200").GetProperty("id").GetGuid();
+        var a100 = activities.EnumerateArray().Single(a => a.GetProperty("externalId").GetString() == "A100").GetProperty("id").GetGuid();
 
         // The project manager's list tags A200 with EL.
         using (var tag = await controller.PutAsJsonAsync($"{p}/activities/{a200}/departments", new { departments = new[] { "el" } }))

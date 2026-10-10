@@ -1,3 +1,4 @@
+using System.Globalization;
 using Delios.Host.Audit;
 using Delios.Host.Documents;
 using Delios.Host.Messaging;
@@ -184,18 +185,23 @@ public sealed class ScheduleImporter(
         }
         parsed = parsed.Select(p => p with { Departments = Disciplines(p.Departments) }).ToList();
 
-        // Codes match whatever their letter case: "a100" in one revision is "A100" in the next.
-        var existing = (await db.Activities.Where(a => a.ProjectId == projectId).ToListAsync(cancellationToken))
-            .ToDictionary(a => a.Code, StringComparer.OrdinalIgnoreCase);
+        // The planner's IDs match whatever their letter case: "a100" in one revision is "A100" in the next. Each
+        // action keeps our own number, given the first time it is read; the planner's ID is kept beside it.
+        var all = await db.Activities.Where(a => a.ProjectId == projectId).ToListAsync(cancellationToken);
+        var existing = all.GroupBy(a => a.ExternalId ?? a.Code, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+        var next = all.Select(a => a.Code).Where(OurNumber).Select(c => int.Parse(c[1..], CultureInfo.InvariantCulture)).DefaultIfEmpty(0).Max();
         foreach (var row in parsed)
         {
             if (!existing.TryGetValue(row.Code, out var activity))
             {
+                var code = $"A{++next:D5}";
                 db.Activities.Add(new Activity
                 {
                     TenantId = tenantId,
                     ProjectId = projectId,
-                    Code = row.Code,
+                    Code = code,
+                    ExternalId = row.Code,
                     Name = row.Name,
                     Start = row.Start,
                     Finish = row.Finish,
@@ -205,7 +211,7 @@ public sealed class ScheduleImporter(
                     UpdatedAt = now,
                 });
                 record.Added++;
-                record.Changes.Add(Change(row.Code, row.Name, "NEW", null, row));
+                record.Changes.Add(Change(code, row.Name, "NEW", null, row));
                 continue;
             }
             var moved = activity.Start != row.Start || activity.Finish != row.Finish;
@@ -214,8 +220,8 @@ public sealed class ScheduleImporter(
             if (moved) record.Moved++;
             else if (changed) record.Changed++;
             else record.Unchanged++;
-            if (moved || changed) record.Changes.Add(Change(row.Code, row.Name, moved ? "MOVED" : "CHANGED", activity, row));
-            activity.Code = row.Code;
+            if (moved || changed) record.Changes.Add(Change(activity.Code, row.Name, moved ? "MOVED" : "CHANGED", activity, row));
+            activity.ExternalId = row.Code;
             activity.Name = row.Name;
             activity.Start = row.Start;
             activity.Finish = row.Finish;
@@ -226,8 +232,8 @@ public sealed class ScheduleImporter(
             activity.SourceRevisionId = sourceRevisionId;
             activity.UpdatedAt = now;
         }
-        var codes = parsed.Select(p => p.Code).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        foreach (var gone in existing.Values.Where(a => a.State == ActivityStates.Active && !codes.Contains(a.Code)))
+        var ids = parsed.Select(p => p.Code).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var gone in existing.Values.Where(a => a.State == ActivityStates.Active && !ids.Contains(a.ExternalId ?? a.Code)))
         {
             gone.State = ActivityStates.Removed;
             gone.UpdatedAt = now;
@@ -238,10 +244,21 @@ public sealed class ScheduleImporter(
         await db.SaveChangesAsync(cancellationToken);
 
         // Dates moved: every need counted from them moves too.
-        var all = await db.Activities.Where(a => a.ProjectId == projectId).Select(a => a.Id).ToListAsync(cancellationToken);
-        await Readiness.RestateAsync(db, clock, all, cancellationToken);
+        var ids2 = await db.Activities.Where(a => a.ProjectId == projectId).Select(a => a.Id).ToListAsync(cancellationToken);
+        await Readiness.RestateAsync(db, clock, ids2, cancellationToken);
         return unmatched;
     }
+
+    /// <summary>Whether a code is one of our own action numbers: A and five digits.</summary>
+    private static bool OurNumber(string code) => code.Length == 6 && code[0] == 'A' && code[1..].All(char.IsAsciiDigit);
+
+    /// <summary>
+    /// The action a list names, by our number or by the planner's ID, whatever the letter case; null when the
+    /// schedule has no such action. Used by the disciplines and requirements lists.
+    /// </summary>
+    public static Activity? Named(IEnumerable<Activity> activities, string name) =>
+        activities.FirstOrDefault(a => string.Equals(a.Code, name, StringComparison.OrdinalIgnoreCase))
+        ?? activities.FirstOrDefault(a => string.Equals(a.ExternalId, name, StringComparison.OrdinalIgnoreCase));
 
     /// <summary>Marks an import as failed with its reason, cut to 2000 characters to fit the database column.</summary>
     private static void Fail(ScheduleImport record, string error)

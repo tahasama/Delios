@@ -104,7 +104,10 @@ public sealed class Activity
     public Guid TenantId { get; set; }
     public Guid ProjectId { get; set; }
     /// <summary>The schedule's own activity id.</summary>
+    /// <summary>Our own number for the action, given on the first read (A00001, A00002…) and kept for good.</summary>
     public required string Code { get; set; }
+    /// <summary>The planner's own ID for it in the schedule file (P6's Activity ID, MS Project's ID); later reads match on it.</summary>
+    public string? ExternalId { get; set; }
     public required string Name { get; set; }
     public LocalDate? Start { get; set; }
     public LocalDate? Finish { get; set; }
@@ -273,6 +276,8 @@ internal sealed class ActivityConfiguration : IEntityTypeConfiguration<Activity>
         b.HasIndex(x => new { x.ProjectId, x.Start });
         b.HasIndex(x => new { x.ProjectId, x.NextNeededBy });
         b.Property(x => x.Code).HasMaxLength(64);
+        b.Property(x => x.ExternalId).HasMaxLength(64);
+        b.HasIndex(x => new { x.ProjectId, x.ExternalId });
         b.Property(x => x.Name).HasMaxLength(500);
         b.Property(x => x.Responsible).HasMaxLength(200);
         b.Property(x => x.State).HasMaxLength(16);

@@ -210,7 +210,8 @@ function legacyAction(detail: ActivityDetail, documents: Map<string, DocumentVie
     createdAt: null,
     riskNotifiedAt: null,
     lastMetAt: covered ? arrivals[0] ?? null : null,
-    scheduleRef: null,
+    // The planner's own ID for it, kept beside our number.
+    scheduleRef: activity.externalId ?? null,
     needCount: activity.needs,
     state: activity.state,
     readiness: activity.readiness,

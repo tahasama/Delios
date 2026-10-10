@@ -62,7 +62,7 @@ public sealed class ScheduleTests(Infrastructure infrastructure) : IClassFixture
     }
 
     private static JsonElement ByCode(JsonElement activities, string code) =>
-        activities.EnumerateArray().Single(a => a.GetProperty("code").GetString() == code);
+        activities.EnumerateArray().Single(a => a.GetProperty("externalId").GetString() == code);
 
     [Fact]
     public async Task A_released_schedule_becomes_activities_whose_needs_turn_them_ready_waived_or_at_risk()
@@ -165,7 +165,7 @@ public sealed class ScheduleTests(Infrastructure infrastructure) : IClassFixture
         Assert.Equal(("WAIVED", "Eli Engineer"),
             (waived.GetProperty("needs")[0].GetProperty("state").GetString(), waived.GetProperty("needs")[0].GetProperty("waivedBy").GetString()));
         var green = await GetAsync(engineer, $"{p}/activities?readiness=READY_WITH_WAIVERS");
-        Assert.Equal("A200", green.EnumerateArray().Single().GetProperty("code").GetString());
+        Assert.Equal("A200", green.EnumerateArray().Single().GetProperty("externalId").GetString());
 
         // A decision when documents were missing: one the organization published, who carries it and why.
         var (unpublished, unpublishedBody) = await Flow.PostAsync(controller, $"{a("A300")}/decisions",
@@ -207,8 +207,10 @@ public sealed class ScheduleTests(Infrastructure infrastructure) : IClassFixture
                 latest.GetProperty("changed").GetInt32()));
         var now = await GetAsync(engineer, $"{p}/activities");
         // "a200" is A200 written in another case: the same activity, not a new one.
-        Assert.Equal(["A100", "A200", "A400"], now.EnumerateArray().Select(x => x.GetProperty("code").GetString()!.ToUpperInvariant()).Order());
-        var gone = (await GetAsync(engineer, $"{p}/activities?includeRemoved=true")).EnumerateArray().Single(x => x.GetProperty("code").GetString() == "A300");
+        Assert.Equal(["A100", "A200", "A400"], now.EnumerateArray().Select(x => x.GetProperty("externalId").GetString()!.ToUpperInvariant()).Order());
+        // Our own numbers, given on the first read and kept: A00001 to A00003, then A00004 for the new one.
+        Assert.Equal(["A00001", "A00002", "A00004"], now.EnumerateArray().Select(x => x.GetProperty("code").GetString()!).Order());
+        var gone = (await GetAsync(engineer, $"{p}/activities?includeRemoved=true")).EnumerateArray().Single(x => x.GetProperty("externalId").GetString() == "A300");
         var (removed, removedBody) = await Flow.PostAsync(controller, $"{p}/activities/{gone.GetProperty("id").GetGuid()}/decisions",
             new { decision = "CARRIED", responsibleName = "Site manager", reason = "Too late." });
         Assert.Equal((HttpStatusCode.Conflict, "ACTIVITY_REMOVED"), (removed, Flow.Code(removedBody)));
@@ -221,7 +223,7 @@ public sealed class ScheduleTests(Infrastructure infrastructure) : IClassFixture
         var report = await GetAsync(engineer, $"{p}/reports/readiness?horizonDays=60");
         var lines = report.GetProperty("rows").EnumerateArray()
             .Select(r => r.EnumerateArray().Select(c => c.GetProperty("text").GetString()).ToList()).ToList();
-        Assert.Equal([("A100", "For execution", "There"), ("a200", "For information", "Waived, still followed up")],
+        Assert.Equal([("A00001", "For execution", "There"), ("A00002", "For information", "Waived, still followed up")],
             lines.Select(l => (l[0], l[4], l[7])));
         Assert.Equal("Electrical", lines[1][3]);
     }

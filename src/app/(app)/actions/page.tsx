@@ -204,6 +204,7 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
     return {
       id: row.id,
       code: row.code,
+      plannerId: row.scheduleRef && row.scheduleRef !== row.code ? row.scheduleRef : null,
       name: row.name,
       description: row.description,
       owner: row.ownerName,

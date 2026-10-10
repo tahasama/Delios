@@ -282,4 +282,6 @@ export type ActivityRow = { id: number; at: string; actorName: string; action: s
 export type ActivitySummary = {
   id: string; code: string; name: string; start: string | null; finish: string | null; responsible: string | null;
   departments: string[]; state: string; readiness: string; needs: number; met: number; waived: number; nextNeededBy: string | null;
+  /** The planner's own ID for the action in the schedule file; `code` is our number. */
+  externalId?: string | null;
 };

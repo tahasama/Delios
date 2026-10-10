@@ -110,7 +110,7 @@ public sealed class RequirementsListTests(Infrastructure infrastructure) : IClas
         await ReleaseAsync(engineer, approver, controller, project, await RevisionAsync(engineer, project, schedule, "Programme.csv", programme));
         var activities = await UntilAsync(engineer, $"{p}/activities", a => a.GetArrayLength() == 2);
         Assert.All(activities.EnumerateArray(), a => Assert.Empty(a.GetProperty("departments").EnumerateArray()));
-        string[] Tags(JsonElement list, string code) => list.EnumerateArray().Single(a => a.GetProperty("code").GetString() == code)
+        string[] Tags(JsonElement list, string code) => list.EnumerateArray().Single(a => a.GetProperty("externalId").GetString() == code)
             .GetProperty("departments").EnumerateArray().Select(d => d.GetString()!).ToArray();
 
         // The starter setup publishes the list as a document type, marked to be read when released.
@@ -176,7 +176,7 @@ public sealed class RequirementsListTests(Infrastructure infrastructure) : IClas
         var (tagged, taggedBody) = await Flow.PostAsync(controller, $"{p}/schedule/lists", new { kind = "DEPARTMENTS", fileName = "Disciplines.csv", contentBase64 = B64("Action Code,Departments\nA100,CI\nA200,EL\n"), aware = true, reason = "Sent by the project manager" });
         Assert.True(tagged == HttpStatusCode.OK, taggedBody.ToString());
         var activities = await engineer.GetFromJsonAsync<JsonElement>($"{p}/activities");
-        Assert.Contains(activities.EnumerateArray(), a => a.GetProperty("code").GetString() == "A200" && a.GetProperty("departments")[0].GetString() == "EL");
+        Assert.Contains(activities.EnumerateArray(), a => a.GetProperty("externalId").GetString() == "A200" && a.GetProperty("departments")[0].GetString() == "EL");
         var kept = await controller.GetFromJsonAsync<JsonElement>($"{p}/controlled?kind=ACTION_DEPARTMENTS");
         Assert.Contains(kept.EnumerateArray(), v => v.GetProperty("decisionReason").GetString() == "Sent by the project manager" && v.GetProperty("createdBy").GetString() == "Carla Control");
     }
