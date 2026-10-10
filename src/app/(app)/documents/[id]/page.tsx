@@ -582,7 +582,7 @@ export default async function DocumentDetailPage({
                 ) : null}
                 {editing ? (
                   // One place to change a revision being prepared: its edit step, files and details together.
-                  <p className="mt-4 text-xs text-slate-500">Rev {working!.value} is being prepared: change these details with its files in <strong className="text-slate-700">Edit rev {working!.value}</strong>, in the Next step card above.</p>
+                  <p className="mt-4 text-xs text-slate-500">Rev {working!.value} is being prepared: change these details with its files in{" "}<a href="#step-edit" className="font-semibold text-link underline">Edit rev {working!.value}</a>.</p>
                 ) : canEdit && (doc.revisions.length === 0 || doc.kind === "RECORD") ? (
                   // Nothing prepared yet (a reserved number), or a record, which has no review: set here.
                   <details className="mt-4">

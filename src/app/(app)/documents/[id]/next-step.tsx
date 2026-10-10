@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, ChevronRight, X } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -27,6 +27,22 @@ export type StepItem = {
 export function NextStepBody({ status, items }: { status: React.ReactNode; items: StepItem[] }) {
   const [open, setOpen] = useState<string | null>(() => (items.find((one) => one.open && one.primary && one.body) ?? items.find((one) => one.open && one.body))?.key ?? null);
   const chosen = items.find((one) => one.key === open && one.body);
+  const panel = useRef<HTMLDivElement>(null);
+
+  // A link elsewhere on the page to "#step-<key>" opens that form here and
+  // brings it into view. The address is put back, so the same link works again.
+  useEffect(() => {
+    const follow = () => {
+      const key = window.location.hash.startsWith("#step-") ? window.location.hash.slice(6) : null;
+      if (!key || !items.some((one) => one.key === key && one.body)) return;
+      setOpen(key);
+      history.replaceState(null, "", window.location.pathname + window.location.search);
+      requestAnimationFrame(() => panel.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
+    };
+    follow();
+    window.addEventListener("hashchange", follow);
+    return () => window.removeEventListener("hashchange", follow);
+  }, [items]);
 
   return (
     <>
@@ -62,7 +78,7 @@ export function NextStepBody({ status, items }: { status: React.ReactNode; items
       </div>
 
       {chosen ? (
-        <div className="border-t border-line">
+        <div ref={panel} className="scroll-mt-24 border-t border-line">
           <div className="flex items-center justify-between gap-3 bg-tint-soft px-5 py-2 sm:px-6">
             <span className="inline-flex items-center gap-2 text-[13px] font-semibold text-slate-800">{chosen.label}</span>
             <button type="button" onClick={() => setOpen(null)} className="grid h-6 w-6 place-items-center rounded-md text-slate-400 hover:bg-tint hover:text-slate-700" aria-label="Close">
