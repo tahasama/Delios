@@ -1,10 +1,10 @@
 "use client";
 
-import { StateStamp } from "./state-stamp";
+import { StateTag } from "./state-tag";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { ArrowDown, ArrowRight, ArrowUp, ArrowUpDown, CalendarRange, ChevronDown, ChevronLeft, ChevronRight, Download, Pin, PinOff, Rows3, Search, X } from "lucide-react";
+import { ArrowDown, ArrowRight, LayoutGrid, ArrowUp, ArrowUpDown, CalendarRange, ChevronDown, ChevronLeft, ChevronRight, Download, Pin, PinOff, Rows3, Search, X } from "lucide-react";
 import { DataTable, Th, Td, Chip, Info } from "@/components/ui";
 import { DateWindow } from "@/components/date-window";
 
@@ -51,7 +51,7 @@ export function PlanRegister({
   /** Where the dates come from, the pages behind the schedule, and uploading by hand for whoever plans. */
   uploads: React.ReactNode;
   /** Which of the two views is showing. */
-  view: "plan" | "table";
+  view: "board" | "plan" | "table";
   /** The plan, drawn by the server component, shown under the question. */
   plan: React.ReactNode;
   /**
@@ -189,10 +189,10 @@ export function PlanRegister({
     params.delete("page");
     return here(params);
   };
-  const viewHref = (next: "plan" | "table") => {
+  const viewHref = (next: "board" | "plan" | "table") => {
     const params = new URLSearchParams(paging.query);
-    if (next === "table") params.set("view", "table");
-    else params.delete("view");
+    if (next === "board") params.delete("view");
+    else params.set("view", next);
     params.delete("page");
     return here(params);
   };
@@ -235,7 +235,7 @@ export function PlanRegister({
           setDirty(false);
           const data = new FormData(event.currentTarget);
           const params = new URLSearchParams();
-          if (view === "table") params.set("view", "table");
+          if (view !== "board") params.set("view", view);
           for (const [key, value] of data.entries()) if (value) params.set(key, String(value));
           go(here(params));
         }}
@@ -275,8 +275,9 @@ export function PlanRegister({
     {/* The two views stand on their own between the question and the answer.
         One frame, split down the middle: the chosen side is the lit one, and
         the other is drawn as the control it is rather than left as plain text. */}
-    <nav ref={tabs} className="mb-4 grid grid-cols-2 space overflow-hidden rounded-xl border border-line bg-surface" aria-label="How to look at the schedule">
+    <nav ref={tabs} className="mb-4 grid grid-cols-3 space overflow-hidden rounded-xl border border-line bg-surface" aria-label="How to look at the schedule">
       {([
+        { id: "board", label: "The board", hint: "cards by week", icon: LayoutGrid },
         { id: "plan", label: "The plan", hint: "drawn on a timeline", icon: CalendarRange },
         { id: "table", label: "The table", hint: "one line per action", icon: Rows3 },
       ] as const).map((tab, at) => {
@@ -288,7 +289,7 @@ export function PlanRegister({
             scroll={false}
             aria-current={on ? "page" : undefined}
             className={`group flex items-center justify-center gap-2 px-4 py-3 text-sm font-semibold transition ${
-              at === 0 ? "border-r border-line" : ""
+              at < 2 ? "border-r border-line" : ""
             } ${
               on
                 ? "bg-surface text-brand-ink shadow-[inset_0_-3px_0_0_var(--color-brand)]"
@@ -324,7 +325,7 @@ export function PlanRegister({
           ))}
           <button
             type="button"
-            onClick={() => go(view === "table" ? "/actions?view=table" : "/actions")}
+            onClick={() => go(view === "board" ? "/actions" : `/actions?view=${view}`)}
             className="ml-1 inline-flex items-center gap-1 rounded-sm bg-brand px-2 py-1 text-[11px] font-semibold text-white transition-colors hover:bg-brand-hover"
           >
             <X className="h-3 w-3" /> Clear all {facets.length}
@@ -333,7 +334,7 @@ export function PlanRegister({
         </div>
       ) : null}
 
-      {view === "plan" ? (
+      {view !== "table" ? (
         <div className={`flex min-h-0 flex-1 flex-col ${pending ? "opacity-60 transition-opacity" : "transition-opacity"}`}>
           {/* What the plan covers, and what its colours mean: the two things a
               reader needs before the bars, at the two corners above them. */}
@@ -346,13 +347,13 @@ export function PlanRegister({
               title="Each bar runs from the day the first document is needed to the day the work happens; the line is today. The colour says whether the register holds every document the action needs, released and at the status it asks for."
             >
               {([
-                ["bg-emerald-700", "done", "DONE"],
-                ["bg-violet-400", "late receipt", "LATE_RECEIPT"],
-                ["bg-emerald-400", "ready", "READY"],
-                ["bg-sky-500", "still ahead", "UPCOMING"],
-                ["bg-amber-500", "at risk", "AT_RISK"],
-                ["bg-red-500", "overdue", "NOT_READY"],
-                ["bg-slate-300", "nothing listed", "UNKNOWN"],
+                ["state-done", "done", "DONE"],
+                ["state-late-receipt", "late receipt", "LATE_RECEIPT"],
+                ["state-ready", "ready", "READY"],
+                ["state-upcoming", "still ahead", "UPCOMING"],
+                ["state-at-risk", "at risk", "AT_RISK"],
+                ["state-not-ready", "overdue", "NOT_READY"],
+                ["state-unknown", "nothing listed", "UNKNOWN"],
               ] as const).map(([tone, word, code]) => {
                 const on = filters.state === code;
                 return (
@@ -366,7 +367,7 @@ export function PlanRegister({
                     title={on ? `Showing ${word} only. Click to show every state again.` : `Show ${word} only`}
                     className={`inline-flex items-center gap-1.5 rounded-full px-1.5 py-0.5 transition-colors hover:bg-slate-100 hover:text-brand-ink ${on ? "bg-slate-100 font-semibold text-brand-ink" : ""}`}
                   >
-                    <span className={`h-1.5 w-3 rounded-full ${tone}`} />
+                    <span className={`h-1.5 w-3 rounded-full ${tone}`} style={{ background: "var(--tab)" }} />
                     {word}
                   </button>
                 );
@@ -394,7 +395,7 @@ export function PlanRegister({
                 {more.noNote?.count ? (
                   <button type="button" onClick={() => go(more.noNote!.href)} className="text-xs font-semibold text-red-700 hover:underline">{more.noNote.count.toLocaleString("en-GB")} went ahead with missing documents →</button>
                 ) : null}
-                {facets.length ? <button type="button" onClick={() => go("/actions")} className="text-xs font-semibold text-link hover:underline">Clear the {facets.length} filter{facets.length === 1 ? "" : "s"} →</button> : null}
+                {facets.length ? <button type="button" onClick={() => go(view === "plan" ? "/actions?view=plan" : "/actions")} className="text-xs font-semibold text-link hover:underline">Clear the {facets.length} filter{facets.length === 1 ? "" : "s"} →</button> : null}
               </div>
             </div>
           ) : plan}
@@ -704,7 +705,7 @@ const COLUMNS: Column[] = [
     key: "readiness", label: "State",
     note: "Every state is about one thing: does the register hold a released revision of each listed document, at the status the action needs? Done — the day has passed and it did, in time. Late receipt — everything arrived, but the last of it after the day of the work. Ready — the day is today or ahead and it does. Still ahead — the day is ahead and nothing is owed within the week. At risk — a document is owed within a week, or already. Overdue — the day has passed and something is still missing.",
     cellClass: "whitespace-nowrap",
-    cell: (row) => <StateStamp state={row.readiness} />,
+    cell: (row) => <StateTag state={row.readiness} />,
   },
   {
     key: "happened", label: "Went ahead?",

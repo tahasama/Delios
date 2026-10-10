@@ -1,0 +1,120 @@
+/* ── The planning board ─────────────────────────────────────────────────────
+   Schedule & actions in the manner of a site office's T-card planning board:
+   the page stays light and quiet, and colour lives on the cards — each action
+   a card in its week, its colour its state. The same colour marks the state
+   everywhere else (tags in the table, the action's own page), so a state is
+   learned once. */
+
+/* One colour per state: the card's top tab, its wash, and its tag. */
+.state-ready { --tab: #2e9b5a; --tag-bg: #dcf2e4; --tag-fg: #145f36; }
+.state-done { --tab: #1d6f43; --tag-bg: #d3eadb; --tag-fg: #11502e; }
+.state-late-receipt { --tab: #7b55c8; --tag-bg: #ebe3fb; --tag-fg: #4e2f93; }
+.state-upcoming { --tab: #3a78c0; --tag-bg: #e0ebf8; --tag-fg: #1f4f86; }
+.state-at-risk { --tab: #d48911; --tag-bg: #fcebc9; --tag-fg: #7d4d00; }
+.state-not-ready { --tab: #d23b3b; --tag-bg: #fadcdc; --tag-fg: #8f1d1d; }
+.state-unknown { --tab: #9aa4b2; --tag-bg: #eceff3; --tag-fg: #4b5563; }
+
+:root.dark .state-ready { --tab: #3fb873; --tag-bg: #173a27; --tag-fg: #9fe3b9; }
+:root.dark .state-done { --tab: #2f9a5c; --tag-bg: #133222; --tag-fg: #8ad3a8; }
+:root.dark .state-late-receipt { --tab: #9a7be0; --tag-bg: #2b2342; --tag-fg: #cdbdf5; }
+:root.dark .state-upcoming { --tab: #5b97dc; --tag-bg: #1a2c42; --tag-fg: #a9cbf2; }
+:root.dark .state-at-risk { --tab: #e5a134; --tag-bg: #3b2c12; --tag-fg: #f3cf8b; }
+:root.dark .state-not-ready { --tab: #e85a5a; --tag-bg: #431c1e; --tag-fg: #f6a9a9; }
+:root.dark .state-unknown { --tab: #6b7584; --tag-bg: #262c35; --tag-fg: #b5bdc8; }
+
+@layer components {
+  /* A state, said as a small coloured tag. */
+  .state-tag {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 0.375rem;
+    padding: 0.1rem 0.45rem;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.35;
+    white-space: nowrap;
+    background: var(--tag-bg);
+    color: var(--tag-fg);
+  }
+  .state-tag-lg { padding: 0.3rem 0.7rem; font-size: 13px; border-radius: 0.5rem; }
+
+  /* A week of the board: a column of cards on the board's light ground. */
+  .board-week {
+    display: flex;
+    width: 15rem;
+    flex-shrink: 0;
+    flex-direction: column;
+    gap: 0.6rem;
+    border-radius: 0.75rem;
+    padding: 0.6rem;
+    background: color-mix(in oklab, var(--color-canvas) 70%, var(--color-surface));
+  }
+  .board-week-now {
+    background: var(--color-tint);
+    box-shadow: inset 0 0 0 1px var(--color-brand-line);
+  }
+  .board-week-head { display: flex; flex-direction: column; gap: 0.1rem; padding: 0.1rem 0.2rem 0.2rem; }
+
+  /* The card: white, a coloured tab across its top, a faint wash of the same colour. */
+  .t-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    overflow: hidden;
+    border-radius: 0.6rem;
+    padding: 0.75rem 0.7rem 0.6rem;
+    background: color-mix(in oklab, var(--tab) 7%, var(--color-surface));
+    box-shadow: 0 1px 2px rgb(15 23 42 / 7%), 0 4px 10px -8px rgb(15 23 42 / 30%);
+    transition: transform 140ms cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 140ms;
+  }
+  .t-card::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 4px;
+    background: var(--tab);
+  }
+  .t-card:hover { transform: translateY(-1px); box-shadow: 0 2px 4px rgb(15 23 42 / 8%), 0 10px 18px -12px rgb(15 23 42 / 40%); }
+  .t-card:focus-visible { outline: 2px solid var(--tab); outline-offset: 2px; }
+  .t-card-name {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.3;
+    color: var(--color-slate-900);
+  }
+  @media (prefers-reduced-motion: reduce) { .t-card { transition: none; } .t-card:hover { transform: none; } }
+
+  /* The head of a sheet, and the facts it states: a label, then the figure. */
+  .sheet-head { border-bottom: 1px solid var(--color-line); }
+  .fields { display: grid; row-gap: 1rem; }
+  .field {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 0.2rem;
+    padding: 0.1rem 1.25rem 0.1rem 0;
+  }
+  .field + .field { padding-left: 1.25rem; border-left: 1px solid var(--color-line); }
+  .field-label { font-size: 11.5px; font-weight: 500; color: var(--color-slate-500); }
+  .field-value {
+    font-size: 1.5rem;
+    font-weight: 600;
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+    color: var(--color-slate-900);
+  }
+  .field-value small { margin-left: 0.3rem; font-size: 0.8rem; font-weight: 500; color: var(--color-slate-400); }
+  .field-note { font-size: 11.5px; line-height: 1.35; color: var(--color-slate-500); }
+  a.field { border-radius: 0.375rem; transition: background-color 120ms; }
+  a.field:hover .field-value { color: var(--color-brand-ink); }
+  .field[data-tone="needs"] .field-value { color: #b42323; }
+  :root.dark .field[data-tone="needs"] .field-value { color: #f6a9a9; }
+
+  /* A discipline's confirmation: who said so, set apart from what it is. */
+  .signature { color: var(--color-slate-700); }
+}

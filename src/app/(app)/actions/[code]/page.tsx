@@ -8,7 +8,7 @@ import { formPolicy } from "@/lib/field-policy";
 import { requireScope } from "@/lib/scope";
 import { notFound } from "next/navigation";
 import { Card, Banner } from "@/components/ui";
-import { StateStamp } from "../state-stamp";
+import { StateTag } from "../state-tag";
 import { ActionForm } from "@/components/form";
 import { confirmReadinessAction } from "@/lib/actions/requirements";
 import { clearance } from "@/lib/requirements-process";
@@ -175,15 +175,15 @@ export default async function ActionDetailPage({ params, searchParams }: { param
           </>
         ) : undefined}
         plate={
-          /* The action as one filled-in docket: the name leads, in ink, its
-             stamp beside it; the facts sit in boxed fields underneath. */
-          <div className="docket-head px-5 pt-5 pb-4 sm:px-6">
+          /* The action as its card on the planning board: the name leads, its
+             state tag beside it; the facts sit underneath. */
+          <div className="sheet-head px-5 pt-5 pb-4 sm:px-6">
             <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
               <div className="min-w-0 flex-1">
                 <Link href="/actions" className="stencil inline-flex items-center gap-1 hover:text-brand-ink"><ArrowLeft className="h-3.5 w-3.5" /> Schedule &amp; actions</Link>
                 <h1 className="plate-name mt-2 min-w-0">{action.name}</h1>
               </div>
-              <div className="pt-6"><StateStamp state={readiness} size="lg" /></div>
+              <div className="pt-6"><StateTag state={readiness} size="lg" /></div>
             </div>
             <div className="fields mt-4 grid-cols-2 sm:grid-cols-4">
               <div className="field">

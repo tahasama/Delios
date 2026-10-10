@@ -15,6 +15,7 @@ import { warnOnceAtRisk } from "@/lib/risk-notice";
 import { PlanCards } from "./plan-cards";
 import { PlanPlate } from "./plan-plate";
 import { PlanTimeline } from "./plan-timeline";
+import { PlanBoard } from "./plan-board";
 import { PlanRegister, type PlanTableRow } from "./plan-register";
 
 export const dynamic = "force-dynamic";
@@ -74,7 +75,9 @@ const DEFAULT_STEP = 25;
 export default async function ActionsPage({ searchParams }: { searchParams: Promise<Search> }) {
   const ctx = await requireScope();
   const sp = await searchParams;
-  const view = sp.view === "table" ? "table" : "plan";
+  // The board is the first view; the plan (a timeline) and the table are one click away.
+  const view = sp.view === "table" ? "table" : sp.view === "plan" ? "plan" : "board";
+  const drawn = view !== "table";
 
   const q = (sp.q ?? "").trim().slice(0, 200);
   const searches = readSearch(q);
@@ -101,7 +104,7 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
 
   // The plan is naturally long, so it opens on a window around today — one month
   // either side, today in the middle — until somebody asks for another.
-  const windowed = !fromDay && !toDay && view === "plan" && sp.all !== "1";
+  const windowed = !fromDay && !toDay && drawn && sp.all !== "1";
   const planFrom = fromDay ?? (windowed ? daysBefore(new Date(), PLAN_WINDOW_DAYS) : null);
   const planTo = toDay ?? (windowed ? daysBefore(new Date(), -PLAN_WINDOW_DAYS) : null);
 
@@ -251,8 +254,8 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
   const query = new URLSearchParams();
   // Which view is being read is part of the question: paging, sorting and
   // changing the row count must not drop somebody back onto the plan.
-  if (view === "table") query.set("view", "table");
-  if (sp.all === "1" && view === "plan") query.set("all", "1");
+  if (view !== "board") query.set("view", view);
+  if (sp.all === "1" && drawn) query.set("all", "1");
   if (q) query.set("q", q);
   if (code) query.set("code", code);
   if (state) query.set("state", state);
@@ -274,7 +277,7 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
     const params = new URLSearchParams(query);
     params.delete(key);
     if (key === "on") { params.delete("from"); params.delete("to"); }
-    if (view === "table") params.set("view", "table");
+    if (view !== "board") params.set("view", view);
     params.delete("page");
     return `/actions${params.size ? `?${params}` : ""}`;
   };
@@ -326,7 +329,7 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
         // How many the window leaves out, said as a number rather than implied.
         elsewhere: Math.max(everywhere - matching - undatedAll, 0),
       }
-    : sp.all === "1" && view === "plan" && !fromDay && !toDay
+    : sp.all === "1" && drawn && !fromDay && !toDay
       ? { label: "every date", href: `/actions${narrowParams.size ? `?${narrowParams}` : ""}`, wide: true, elsewhere: 0 }
       : null;
 
@@ -344,7 +347,7 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
         cardHeight={PLAN_CARD_HEIGHT}
         view={view}
         more={
-          view === "plan"
+          drawn
             ? {
                 shown: rows.length,
                 total: matching,
@@ -359,13 +362,18 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
               }
             : undefined
         }
-        plan={
+        plan={view === "board" ? (
+          <PlanBoard
+            rows={rows.map((row) => ({ code: row.code, name: row.name, scheduledDate: row.scheduledDate, finishDate: row.finishDate, firstNeeded: row.firstNeeded, readiness: row.readiness, ready: row.ready, total: row.total }))}
+            window={planFrom && planTo ? { from: planFrom, to: planTo } : undefined}
+          />
+        ) : (
           <PlanTimeline
             rows={rows.map((row) => ({ code: row.code, name: row.name, scheduledDate: row.scheduledDate, finishDate: row.finishDate, firstNeeded: row.firstNeeded, readiness: row.readiness, ready: row.ready, total: row.total }))}
             window={planFrom && planTo ? { from: planFrom, to: planTo } : undefined}
             fit={PLAN_FIRST}
           />
-        }
+        )}
         rows={tableRows}
         total={matching}
         filters={{ q, state, happened, discipline, docType, supplier, code, on: dateOn, from: sp.from ?? "", to: sp.to ?? "" }}
