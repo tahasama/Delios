@@ -11,7 +11,7 @@ export function ConfirmOrWhy({ revision }: { revision: string }) {
   const [vouched, setVouched] = useState(true);
   return (
     <>
-      <label className="flex items-start gap-2 text-xs text-slate-700">
+      <label className="flex items-start gap-2 text-xs leading-5 text-slate-700">
         <input type="checkbox" name="confirmed" value="yes" checked={vouched} onChange={(event) => setVouched(event.target.checked)} className="mt-0.5" />
         <span>This file is {revision} as released; I take responsibility for it matching.</span>
       </label>

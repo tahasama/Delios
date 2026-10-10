@@ -1,4 +1,4 @@
-import { ActionNotes } from "./lateness";
+import { ActionNotes, type WentAhead } from "./lateness";
 import { NeededTable, type NeededRow } from "./needed-table";
 import { latenessOf } from "@/lib/action-lateness";
 import { carrierRefusal, actIsOff } from "@/lib/control-activities";
@@ -62,10 +62,6 @@ export default async function ActionDetailPage({ params, searchParams }: { param
   const lateness = await latenessOf(ctx, action.id);
   // Left out by the organization: the notes already written are still read.
   const mayNote = !(await actIsOff(ctx, "ACTION_NOTE")) && !(await carrierRefusal(ctx, "ACTION_NOTE", { control, standing: true }));
-  // Where the time went, and what was decided about work that went ahead
-  // without its documents, are not questions worth asking of an action that has
-  // neither a slip nor a note.
-  const tellsSomething = lateness.rows.some((row) => row.cause || row.outstanding) || action.notes.length > 0;
   // The latest schedule read moved its dates: said once, under the date.
   const moved = movedPhrase(action.moved, action.scheduledDate, action.finishDate);
   const readyCount = action.entries.filter((e) => meetsRequirement(e.document.revisions, e.requiredStatus)).length;
@@ -101,6 +97,9 @@ export default async function ActionDetailPage({ params, searchParams }: { param
   // a schedule is — unless Document Control wrote down that it was postponed.
   const postponed = action.notes.find((note) => note.decision === "STOPPED") ?? null;
   const happened = !postponed && dayHasPassed(action);
+  // Went ahead? Not yet before the day; after it, read from the documents unless postponed.
+  const missingCount = action.entries.length - readyCount;
+  const wentAhead: WentAhead = postponed ? "POSTPONED" : !dayHasPassed(action) ? "NOT_YET" : missingCount > 0 ? "MISSING_DOCUMENTS" : "WITH_DOCUMENTS";
 
   // One row per required document: what it is, whether it is there, and the
   // step where its time went. Dates are written here so the table stays a
@@ -292,7 +291,7 @@ export default async function ActionDetailPage({ params, searchParams }: { param
           ) : null}
         </section>
 
-          {tellsSomething ? <ActionNotes notes={action.notes} actionId={action.id} mayNote={mayNote} /> : null}
+          <ActionNotes notes={action.notes} actionId={action.id} mayNote={mayNote} answer={wentAhead} missing={missingCount} />
         </div>
 
         <aside>

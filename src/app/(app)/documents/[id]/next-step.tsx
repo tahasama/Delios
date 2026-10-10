@@ -110,7 +110,7 @@ export function StagePath({ stages, at, note, under }: {
         {stages.map((name, i) => (
           <li key={name} className={cn("flex", under ? "items-start" : "items-center")}>
             {i ? <span className={cn("mx-1 h-px w-3 sm:mx-1.5 sm:w-10", under && "mt-[13px]", i <= at ? "bg-(--color-brand)" : "bg-line-strong")} aria-hidden /> : null}
-            <span className={under ? "flex flex-col gap-1.5" : "contents"}>
+            <span className={under ? "flex flex-col items-center gap-1.5 text-center" : "contents"}>
             <span
               className={cn(
                 "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-semibold",

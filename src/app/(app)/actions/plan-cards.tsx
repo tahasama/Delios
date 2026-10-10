@@ -42,7 +42,10 @@ export async function PlanCards({ from = null, to = null }: { from?: Date | null
     // Counted only in the window: a month either side of today, or the dates chosen.
     progress.actions ? (
       <span title={progress.window.chosen ? "Actions within the dates chosen" : "Actions within a month either side of today"}>
-        {progress.complete} of {progress.listed} · {day(progress.window.from)} – {day(progress.window.to)}
+        <span className={`font-semibold ${!progress.listed ? "text-slate-600" : progress.complete === progress.listed ? "text-emerald-700" : "text-amber-800"}`}>
+          {progress.complete} of {progress.listed} ready
+        </span>
+        {" · "}{day(progress.window.from)} – {day(progress.window.to)}
       </span>
     ) : null,
   ];
