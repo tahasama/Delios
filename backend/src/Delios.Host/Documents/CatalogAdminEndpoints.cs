@@ -244,6 +244,7 @@ public static class CatalogAdminEndpoints
         {
             if (string.IsNullOrWhiteSpace(step.Title)) return Problems.Invalid("STEP_TITLE_REQUIRED", "Every step has a title.");
             step.UserIds ??= [];
+            step.GrantsStatuses ??= [];
             var ours = step.FunctionCode is not null || step.UserIds.Length > 0;
             if (ours == (step.PartyCode is not null))
                 return Problems.Invalid("STEP_ANSWERER_REQUIRED", $"{step.Title}: a step is answered by one function of ours and people of ours named on it, or by one organization.");

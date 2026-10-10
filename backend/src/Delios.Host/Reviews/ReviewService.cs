@@ -58,6 +58,12 @@ public sealed class ReviewService(
     public async Task<IReadOnlyList<ReviewRoute>> RoutesForAsync(Document document, CancellationToken cancellationToken)
     {
         var routes = await db.ReviewRoutes.AsNoTracking().Where(r => r.Active).ToListAsync(cancellationToken);
+        // A step naming a function and no people can come back with no list at all: read it as empty.
+        foreach (var step in routes.SelectMany(r => r.Steps))
+        {
+            step.UserIds ??= [];
+            step.GrantsStatuses ??= [];
+        }
         return routes
             .Select(r => (Route: r, Score: Score(r, document)))
             .Where(x => x.Score >= 0)
@@ -209,7 +215,8 @@ public sealed class ReviewService(
                     Index = i,
                     Title = s.Title,
                     FunctionCode = party is null ? s.FunctionCode : null,
-                    UserIds = party is null ? s.UserIds : [],
+                    // A route stored before steps named people has no list at all: none named.
+                    UserIds = party is null ? s.UserIds ?? [] : [],
                     PartyId = party?.Id,
                     PartyName = party?.Name,
                     Participation = party?.Participation,
@@ -218,7 +225,7 @@ public sealed class ReviewService(
                     Mode = party?.Participation == Participations.ByProxy ? StepModes.Any : s.Mode,
                     Deciding = i == route.Steps.Count - 1,
                     Days = s.Days,
-                    GrantsStatuses = s.GrantsStatuses,
+                    GrantsStatuses = s.GrantsStatuses ?? [],
                 };
             }).ToList(),
         };
