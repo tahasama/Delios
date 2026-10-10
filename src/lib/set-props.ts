@@ -32,6 +32,8 @@ export type PropField =
   | { key: string; label: string; type: "int"; hint?: string }
   | { key: string; label: string; type: "text"; hint?: string }
   | { key: string; label: string; type: "select"; options: string[]; hint?: string }
+  /** One value of another published list, offered from that list. */
+  | { key: string; label: string; type: "set"; setKey: string; hint?: string }
   /** One plain question whose answer sets several stored properties at once. */
   | { key: string; label: string; type: "choice"; options: ChoiceOption[]; read: (props: Record<string, unknown>) => string; hint?: string };
 
@@ -52,6 +54,7 @@ export const SET_PROP_FIELDS: Record<string, PropField[]> = {
     { key: "appliesTo", label: "Who produces it", type: "select", options: ["Supplier", "Non-supplier", "Unclassified"], hint: "supplier documents carry the supplier fields in their number" },
  { key: "describesAsset", label: "Describes equipment — link it to an asset", type: "bool", hint: "" },
     { key: "readsRequirements", label: "Is a document requirements list — read when released", type: "bool", hint: "the spreadsheet on each released revision becomes what the activities need" },
+    { key: "criticality", label: "Recommended criticality", type: "set", setKey: "CRITICALITY", hint: "filled in when a document of this type is created; whoever creates it may choose another" },
   ],
   STATUSES: [
  { key: "executionFlag", label: "Allows work on site or in the shop", type: "bool", hint: "building, fabricating, installing or ordering from it" },
@@ -93,6 +96,7 @@ export const SET_PROP_FIELDS: Record<string, PropField[]> = {
     { key: "reason", label: "Maps to reason for issue", type: "select", options: ["INFORMATION", "REVIEW", "APPROVAL", "PRICING", "EXECUTION", "RECORD", "REQUEST"] },
   ],
   CRITICALITY: [
+    { key: "meaning", label: "What it means", type: "text", hint: "in plain words, with examples — shown when someone chooses it" },
  { key: "approval", label: "Minimum approval role", type: "select", options: ["REVIEWER", "APPROVER", "CONTROLLER", "ADMIN"], hint: "" },
     { key: "retention", label: "Suggested retention class", type: "text" },
  { key: "format", label: "Format obligation", type: "text", hint: "" },

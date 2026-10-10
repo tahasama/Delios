@@ -64,6 +64,10 @@ export default async function AdminConfigPage({ searchParams }: { searchParams: 
     usage(ctx, currentKey),
   ]);
   const propFields = propFieldsFor(currentKey);
+  // The other lists a property picks from, such as a document type's recommended criticality.
+  const lists: Record<string, { code: string; label: string }[]> = Object.fromEntries(await Promise.all(
+    [...new Set((propFields ?? []).flatMap((f) => (f.type === "set" ? [f.setKey] : [])))].map(async (key) =>
+      [key, (await getSet(key)).filter((v) => v.status === "ACTIVE").map((v) => ({ code: v.code, label: v.label }))] as const)));
   const values = allValues.filter((v) =>
     (show === "ALL" || v.status === show) &&
     (!q || v.code.toLowerCase().includes(q.toLowerCase()) || v.label.toLowerCase().includes(q.toLowerCase())),
@@ -130,7 +134,7 @@ export default async function AdminConfigPage({ searchParams }: { searchParams: 
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <Field label="Code" required hint="what appears in numbers and lists"><input name="code" required maxLength={24} className={inputCls} /></Field>
                     <Field label="Label" required><input name="label" required className={inputCls} /></Field>
-                    {propFields?.map((f) => <PropInput key={f.key} field={f} value={undefined} />)}
+                    {propFields?.map((f) => <PropInput key={f.key} field={f} value={undefined} lists={lists} />)}
                   </div>
                 </ActionForm>
               </Card>
@@ -256,7 +260,7 @@ export default async function AdminConfigPage({ searchParams }: { searchParams: 
                                   <textarea name="propsJson" rows={2} defaultValue={v.props ?? ""} className={inputCls} />
                                 </Field>
                               )}
-                              {propFields?.map((f) => <PropInput key={f.key} field={f} value={f.type === "choice" ? f.read(props) : props[f.key]} />)}
+                              {propFields?.map((f) => <PropInput key={f.key} field={f} value={f.type === "choice" ? f.read(props) : props[f.key]} lists={lists} />)}
                             </div>
                           </ActionForm>
                           <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-line pt-3 text-xs">
@@ -297,7 +301,17 @@ export default async function AdminConfigPage({ searchParams }: { searchParams: 
   );
 }
 
-function PropInput({ field, value }: { field: PropField; value: unknown }) {
+function PropInput({ field, value, lists }: { field: PropField; value: unknown; lists: Record<string, { code: string; label: string }[]> }) {
+  if (field.type === "set") {
+    return (
+      <Field label={field.label} hint={field.hint}>
+        <select name={`prop_${field.key}`} defaultValue={typeof value === "string" ? value : ""} className={inputCls}>
+          <option value="">—</option>
+          {(lists[field.setKey] ?? []).map((o) => <option key={o.code} value={o.code}>{o.code} — {o.label}</option>)}
+        </select>
+      </Field>
+    );
+  }
   if (field.type === "choice") {
     return (
       <fieldset className="sm:col-span-2">

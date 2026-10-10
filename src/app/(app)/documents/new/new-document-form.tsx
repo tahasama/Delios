@@ -11,7 +11,7 @@ import { isEmptyTitle } from "@/lib/standard";
 import type { OwnField } from "@/lib/field-policy";
 import { OwnFields } from "./own-fields";
 
-type Opt = { code: string; label: string; meaning?: string | null; appliesTo?: string | null };
+type Opt = { code: string; label: string; meaning?: string | null; appliesTo?: string | null; criticality?: string | null; decides?: string | null };
 
 const PRODUCER_LABEL: Record<string, string> = {
   ENG: "Internal engineering",
@@ -87,6 +87,11 @@ export function NewDocumentForm({
   const must = (key: string, byNumber = false) => byNumber || fields[key] === "REQUIRED";
   const external = producer === "CTR" || producer === "VND" || producer === "TPY" || producer === "CLT";
   const docTypeLabel = docTypes.find((t) => t.code === docType)?.label ?? docType;
+  // The type recommends a criticality; it is filled in until the person chooses one themselves.
+  const recommended = criticalities.find((o) => o.code === docTypes.find((t) => t.code === docType)?.criticality) ?? null;
+  const [ownCriticality, setOwnCriticality] = useState(false);
+  const shownCriticality = ownCriticality ? criticality : recommended?.code ?? criticality;
+  const level = criticalities.find((o) => o.code === shownCriticality) ?? null;
   // Each type says who produces it. Once the producer is chosen, the list is
   // the types that belong to them — two hundred names narrows to the ones that
   // can be right. A type that says nothing is offered either way.
@@ -274,11 +279,23 @@ export function NewDocumentForm({
               </>
             ) : null}
             <Ask label={labels["criticality"]} required hint="how serious an error in it would be">
-              <select name="criticality" required className={field} value={criticality} onChange={(e) => setCriticality(e.target.value)}>
+              <select name="criticality" required className={field} value={shownCriticality} onChange={(e) => { setCriticality(e.target.value); setOwnCriticality(true); }}>
                 <option value="" disabled>Choose…</option>
-                {criticalities.map((o) => <option key={o.code} value={o.code}>{o.label}</option>)}
+                {criticalities.map((o) => <option key={o.code} value={o.code}>{o.label}{o.code === recommended?.code ? " (recommended)" : ""}</option>)}
               </select>
-              {meaningOf(criticalities, criticality) ? <span className="mt-1 block text-[11px] text-slate-500">{meaningOf(criticalities, criticality)}</span> : null}
+              {recommended ? (
+                <span className="mt-1 block text-[11px] text-slate-500">
+                  {shownCriticality === recommended.code
+                    ? <>Recommended for {docTypeLabel.toLowerCase()}. Choose another if you see it differently.</>
+                    : <>{docTypeLabel} is usually {recommended.label.toLowerCase()}.{" "}
+                        <button type="button" className="font-semibold text-link hover:underline" onClick={() => { setCriticality(recommended.code); setOwnCriticality(false); }}>Use {recommended.label.toLowerCase()}</button></>}
+                </span>
+              ) : null}
+              {level && (level.meaning || level.decides) ? (
+                <span className="mt-1 block text-[11px] text-slate-500">
+                  {[level.meaning && !level.decides?.includes(level.meaning) ? level.meaning : null, level.decides].filter(Boolean).join(" — ")}
+                </span>
+              ) : null}
             </Ask>
             {asks("confidentiality") ? (
             <Ask label={labels["confidentiality"]} required={must("confidentiality")}>

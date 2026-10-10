@@ -55,6 +55,13 @@ export default async function NewDocumentPage({ searchParams }: { searchParams: 
       .filter((x): x is string => typeof x === "string" && x.length > 0)[0] ?? null,
     // Who produces this kind of document, where the value says so.
     appliesTo: typeof r.props?.appliesTo === "string" ? r.props.appliesTo : null,
+    // A document type's recommended criticality, filled in when it is chosen.
+    criticality: typeof r.props?.criticality === "string" ? r.props.criticality : null,
+    // What a criticality level decides: who approves it and how long it is kept.
+    decides: [
+      r.props?.approval ? `approved by ${String(r.props.approval).toLowerCase()}` : null,
+      r.props?.retention ? `kept for ${String(r.props.retention).replaceAll("_", " ").toLowerCase()}` : null,
+    ].filter(Boolean).join(" · ") || null,
   }));
   const byName = (rows: { code: string; label: string; props?: Record<string, unknown> }[]) => toOpt(rows).sort((x, y) => x.label.localeCompare(y.label));
 

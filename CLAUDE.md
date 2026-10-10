@@ -77,6 +77,9 @@ conversation, write it into the right one in the same commit as the code.
   and a native file. The project code comes from the project the user is in
   and is always in the Settings list of project codes (added there automatically);
   it is never asked for and never refused.
+- Criticality: the document type recommends a level (Settings, on the type);
+  it is filled in on create and marked "(recommended)"; the person may choose
+  another. Each level shows its meaning and what it decides.
 
 ### Legal hold
 - Document Control or an administrator puts a document on hold, and lifts it,

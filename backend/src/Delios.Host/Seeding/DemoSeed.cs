@@ -180,8 +180,10 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
             ("CI", "Civil", null), ("EL", "Electrical", null), ("ME", "Mechanical", null), ("PR", "Process", null),
             ("IN", "Instrumentation", null), ("ST", "Structural", null), ("GE", "General", null), ("PM", "Project Management", null));
         Set(ValueSets.DocumentTypes,
-            ("DWG", "Drawing", null), ("CAL", "Calculation", null), ("SPC", "Specification", null), ("DAS", "Datasheet", null),
-            ("PRO", "Procedure", null), ("REP", "Report", null), ("LST", "List", null));
+            // Each type recommends a criticality; whoever creates a document may choose another.
+            ("DWG", "Drawing", new { criticality = "B" }), ("CAL", "Calculation", new { criticality = "A" }),
+            ("SPC", "Specification", new { criticality = "B" }), ("DAS", "Datasheet", new { criticality = "B" }),
+            ("PRO", "Procedure", new { criticality = "B" }), ("REP", "Report", new { criticality = "C" }), ("LST", "List", new { criticality = "C" }));
         Set(ValueSets.DeliverableTypes,
             ("ENG", "Engineering Document", null),
             ("SUP", "Supplier Data", new { required = new[] { "originator", "contractRef", "receivedDate" } }));
@@ -199,8 +201,9 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
             ("PROJECT_DURATION", "Project duration", new { @default = true }),
             ("LIFE_OF_ASSET", "Life of asset", null), ("PERMANENT", "Permanent", null));
         Set(ValueSets.Criticality,
-            ("A", "High", new { retention = "PERMANENT" }), ("B", "Medium", new { retention = "LIFE_OF_ASSET" }),
-            ("C", "Low", new { retention = "PROJECT_DURATION" }));
+            ("A", "High", new { retention = "PERMANENT", meaning = "An error could hurt people or the environment, or stop the plant: design basis, calculations, safety studies." }),
+            ("B", "Medium", new { retention = "LIFE_OF_ASSET", meaning = "An error means rework or delay on site or in the shop: drawings, specifications, datasheets." }),
+            ("C", "Low", new { retention = "PROJECT_DURATION", meaning = "An error is put right with no consequence on site: lists, reports for information." }));
         Set(ValueSets.Confidentiality,
             ("PUBLIC", "Public", null), ("INTERNAL", "Internal", new { @default = true }),
             ("CONFIDENTIAL", "Confidential", new { restricted = true }));

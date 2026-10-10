@@ -702,6 +702,19 @@ never refused for it. A code the administrator retired stays retired.
 
 **Depends on it:** `ProjectCodes.EnsurePublishedAsync`, called on project create and code change and before a document is numbered.
 
+## 37 · Criticality is recommended by the document type
+
+**Clause:** §5.6 *Criticality*, Annex C *Configuration*.
+
+**Must say:** each document type carries a recommended criticality, published
+in Settings with the type. Creating a document fills it in from the type; the
+person creating it may choose another level when they see it differently, and
+the recommended one stays marked. Each level says in plain words what it means,
+with examples, and what it decides (who approves, how long it is kept), shown
+where it is chosen.
+
+**Depends on it:** `DOCUMENT_TYPES` property `criticality`, `CRITICALITY` property `meaning`, the create form.
+
 ## Still open — decided in conversation, not yet built
 
 - **Escalation** where somebody refuses to acknowledge carrying an action
