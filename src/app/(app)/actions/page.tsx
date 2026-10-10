@@ -69,6 +69,8 @@ const PLAN_WINDOW_DAYS = 30;
 
 /** How many more the plan draws at a time — the reader's choice, like rows. */
 const PLAN_STEPS = [5, 10, 25, 50, 100];
+/** How many more the plan draws at a press, unless the reader chose another step. */
+const DEFAULT_STEP = 25;
 
 export default async function ActionsPage({ searchParams }: { searchParams: Promise<Search> }) {
   const ctx = await requireScope();
@@ -96,7 +98,7 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
   // Never more than asked for, and never a page that loads the whole schedule
   // because somebody typed a number into the address.
   const shown = Math.min(Math.max(Number(sp.show) || PLAN_FIRST, PLAN_FIRST), 2000);
-  const step = PLAN_STEPS.includes(Number(sp.step)) ? Number(sp.step) : PLAN_STEPS[0];
+  const step = PLAN_STEPS.includes(Number(sp.step)) ? Number(sp.step) : DEFAULT_STEP;
 
   // The plan is naturally long, so it opens on a window around today — one month
   // either side, today in the middle — until somebody asks for another.
@@ -157,7 +159,11 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
   const riskDays = source.source?.riskWindowDays ?? DEFAULT_RISK_DAYS;
   const found = schedule.filter(where).sort(orderBy);
   const matching = found.length;
-  const everywhere = windowed ? schedule.filter(outsideWindow).length : 0;
+  // Undated actions have no place in a window of days: they are counted on
+  // their own, every time, so they never quietly drop out of the plan.
+  const allMatching = schedule.filter(outsideWindow);
+  const undatedAll = allMatching.filter((one) => !one.scheduledDate).length;
+  const everywhere = windowed ? allMatching.length : 0;
   // The table pages through them; the plan draws as many as it has been asked
   // for, and offers to draw more.
   const actions = view === "table" ? found.slice((page - 1) * perPage, page * perPage) : found.slice(0, shown);
@@ -258,7 +264,7 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
   if (sp.to) query.set("to", sp.to);
   if (sp.sort && SORTS[sp.sort]) { query.set("sort", sp.sort); query.set("dir", dir); }
   if (perPage !== 50) query.set("per", String(perPage));
-  if (step !== PLAN_STEPS[0]) query.set("step", String(step));
+  if (step !== DEFAULT_STEP) query.set("step", String(step));
 
   /** The address this question makes without one of its answers. */
   const drop = (key: keyof Search) => {
@@ -293,7 +299,7 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
   const deeper = (by: number) => {
     const params = new URLSearchParams(query);
     params.set("show", String(shown + by));
-    if (by !== PLAN_STEPS[0]) params.set("step", String(by));
+    if (by !== DEFAULT_STEP) params.set("step", String(by));
     else params.delete("step");
     return `/actions?${params}`;
   };
@@ -313,7 +319,7 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
         href: `/actions?${wideParams}`,
         wide: false,
         // How many the window leaves out, said as a number rather than implied.
-        elsewhere: Math.max(everywhere - matching, 0),
+        elsewhere: Math.max(everywhere - matching - undatedAll, 0),
       }
     : sp.all === "1" && view === "plan" && !fromDay && !toDay
       ? { label: "every date", href: `/actions${narrowParams.size ? `?${narrowParams}` : ""}`, wide: true, elsewhere: 0 }
@@ -323,7 +329,11 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
     <div>
       <PlanRegister
         plate={
-          <PlanPlate inForceSince={publishedVersion ? fmtDate(publishedVersion.publishedAt) : null} />
+          <PlanPlate
+            inForce={publishedVersion ? { since: publishedVersion.publishedAt ? fmtDate(publishedVersion.publishedAt) : null } : null}
+            plans={ctx.can("PLAN") || ctx.can("CONTROL") || ctx.can("CONFIGURE")}
+            failed={source.imports[0]?.status === "FAILED" ? { revision: source.imports[0].revisionValue, error: source.imports[0].error } : null}
+          />
         }
         uploads={<PlanCards from={dateOn === "date" ? fromDay : null} to={dateOn === "date" ? toDay : null} />}
         cardHeight={PLAN_CARD_HEIGHT}
@@ -337,7 +347,9 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
                 steps: PLAN_STEPS.map((by) => ({ by, href: deeper(by) })),
                 href: matching > rows.length ? deeper(step) : null,
                 window: planWindow,
-                undated: rows.filter((row) => !row.scheduledDate).length,
+                undated: undatedAll,
+                // What Document Control owes a note on: went ahead short, nothing written down.
+                noNote: { count: schedule.filter(HAPPENED_WHERE.NONE).length, href: "/actions?happened=NONE" },
               }
             : undefined
         }

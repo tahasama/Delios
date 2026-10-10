@@ -72,6 +72,7 @@ export function PlanRegister({
     window: { label: string; href: string; wide: boolean; elsewhere: number } | null;
     /** Of those drawn, how many have no date from the schedule and so no bar. */
     undated: number;
+    noNote?: { count: number; href: string };
   };
   rows: PlanTableRow[];
   total: number;
@@ -208,6 +209,10 @@ export function PlanRegister({
     return here(params);
   };
 
+  // Apply is lit only while typed words or dates wait to be applied.
+  const [dirty, setDirty] = useState(false);
+  useEffect(() => setDirty(false), [filters.q, filters.on, filters.from, filters.to]);
+
   const pageSelected = rows.length > 0 && selected.length === rows.length;
   const selectedExportHref = allMatching || !selected.length ? exportHref : `/api/export/baseline?ids=${encodeURIComponent(selected.join(","))}`;
 
@@ -233,6 +238,7 @@ export function PlanRegister({
           for (const [key, value] of data.entries()) if (value) params.set(key, String(value));
           go(here(params));
         }}
+        onChange={() => setDirty(true)}
         className="asking px-5 py-3.5 pb-5 sm:px-6"
       >
         <div className="flex items-center gap-3">
@@ -242,11 +248,12 @@ export function PlanRegister({
             <input
               name="q"
               defaultValue={filters.q}
-              placeholder={'A space narrows, a comma widens: pour clarifier  ·  A00005, A00012  ·  "switchroom energisation"'}
+              placeholder="Search actions, their documents and people"
+              title={'A space narrows, a comma widens. For example: pour clarifier  ·  A00005, A00012'}
               className="plain w-full py-2! pl-6! text-[13.5px]!"
             />
           </label>
-          <button className="ask" data-on={facets.length ? "true" : "false"} disabled={pending}>
+          <button className="ask" data-on={dirty ? "true" : "false"} disabled={pending}>
             {pending ? "Filtering" : "Apply"}
           </button>
         </div>
@@ -308,7 +315,7 @@ export function PlanRegister({
         <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2 sm:px-6">
           <span className="stencil mr-1 text-slate-400">Showing</span>
           {facets.map((facet) => (
-            <button key={`${facet.key}-${facet.label}`} type="button" onClick={() => go(facet.without)} className="facet" title="Remove this filter">
+            <button key={`${facet.key}-${facet.label}`} type="button" onClick={() => go(facet.without)} className="facet" title="Remove this filter" aria-label={`Remove the filter ${facet.key}: ${facet.label}`}>
               <span className="facet-key">{facet.key}</span>
               <span className="font-medium">{facet.label}</span>
               <X className="h-3 w-3" />
@@ -341,9 +348,10 @@ export function PlanRegister({
                 ["bg-emerald-700", "done", "DONE"],
                 ["bg-violet-400", "late receipt", "LATE_RECEIPT"],
                 ["bg-emerald-400", "ready", "READY"],
-                ["bg-sky-500", "ahead", "UPCOMING"],
+                ["bg-sky-500", "still ahead", "UPCOMING"],
                 ["bg-amber-500", "at risk", "AT_RISK"],
                 ["bg-red-500", "overdue", "NOT_READY"],
+                ["bg-slate-300", "nothing listed", "UNKNOWN"],
               ] as const).map(([tone, word, code]) => {
                 const on = filters.state === code;
                 return (
@@ -379,6 +387,9 @@ export function PlanRegister({
                 {more.window && more.window.elsewhere ? (
                   <button type="button" onClick={() => go(more.window!.href)} className="text-xs font-semibold text-link hover:underline">Show every date →</button>
                 ) : null}
+                {more.undated ? (
+                  <button type="button" onClick={() => go(viewHref("table"))} className="text-xs font-semibold text-amber-800 hover:underline">{more.undated.toLocaleString("en-GB")} with no date — in the table →</button>
+                ) : null}
                 {facets.length ? <button type="button" onClick={() => go("/actions")} className="text-xs font-semibold text-link hover:underline">Clear the {facets.length} filter{facets.length === 1 ? "" : "s"} →</button> : null}
               </div>
             </div>
@@ -398,6 +409,11 @@ export function PlanRegister({
                 {more.undated ? (
                   <button type="button" onClick={() => go(viewHref("table"))} className="text-amber-800 hover:underline" title="An action with no date has no bar; the table lists it">
                     · {more.undated.toLocaleString("en-GB")} with no date — in the table
+                  </button>
+                ) : null}
+                {more.noNote?.count ? (
+                  <button type="button" onClick={() => go(more.noNote!.href)} className="text-red-700 hover:underline" title="Their day passed short of what they needed, and nobody wrote down what happened">
+                    · {more.noNote.count.toLocaleString("en-GB")} went ahead short, with no note
                   </button>
                 ) : null}
                 {more.window ? (
@@ -499,6 +515,7 @@ export function PlanRegister({
                           type="button"
                           onClick={() => setFrozen((held) => { try { localStorage.setItem(FREEZE_KEY, held ? "0" : "1"); } catch {} return !held; })}
                           aria-pressed={frozen}
+                          aria-label="Keep the action column in view while scrolling sideways"
                           title={frozen ? "This column stays in view while you scroll sideways. Click to let it scroll away." : "This column scrolls away with the rest. Click to keep it in view."}
                           className={`rounded-sm p-0.5 transition-colors hover:text-brand-ink ${frozen ? "text-slate-400" : "text-slate-300"}`}
                         >
@@ -585,7 +602,8 @@ function Narrow({ name, value, empty, options }: { name: string; value: string; 
   return (
     <label className="min-w-0 flex-1">
       <span className="sr-only">{empty}</span>
-      <select name={name} defaultValue={value} data-on={value ? "true" : "false"} className="plain w-full">
+      {/* A choice applies as it is made, like the colour key; only typed words wait for Apply. */}
+      <select name={name} defaultValue={value} data-on={value ? "true" : "false"} className="plain w-full" onChange={(event) => event.currentTarget.form?.requestSubmit()}>
         <option value="">{empty}</option>
         {options.map((option) => <option key={option.code} value={option.code}>{option.label}</option>)}
       </select>
@@ -631,9 +649,9 @@ type Column = {
  * register and the dispatch log carry.
  */
 const RAIL: Record<PlanTableRow["readiness"], string> = {
-  DONE: "rail-released",
+  DONE: "rail-done",
   LATE_RECEIPT: "rail-superseded",
-  READY: "rail-released",
+  READY: "rail-ready",
   UPCOMING: "rail-review",
   AT_RISK: "rail-prep",
   NOT_READY: "rail-void",
@@ -661,7 +679,7 @@ const HAPPENED: Record<PlanTableRow["happened"], { label: string; chip: string }
 const COLUMNS: Column[] = [
   {
     key: "departments", label: "Disciplines",
-    note: "The disciplines the project manager tagged this action with. They are the ones asked what it needs.",
+    note: "The disciplines this action is tagged with, from the disciplines-per-action list. They are the ones asked what it needs.",
     cell: (row) => row.departments.length
       ? <span className="block max-w-56 text-xs text-slate-700">{row.departments.join(", ")}</span>
       : <span className="text-xs font-semibold text-amber-700">needs disciplines</span>,
@@ -705,8 +723,8 @@ const COLUMNS: Column[] = [
           <span className="text-xs font-semibold tabular-nums text-slate-800">{row.ready}<span className="font-normal text-slate-400"> / {row.total}</span></span>
           <span className="h-1 w-14 overflow-hidden rounded-full bg-slate-100">
             <span
-              className={`block h-full rounded-full ${row.ready === row.total ? "bg-emerald-500" : row.ready ? "bg-amber-500" : "bg-red-400"}`}
-              style={{ width: `${Math.max(Math.round((row.ready / row.total) * 100), 4)}%` }}
+              className={`block h-full rounded-full ${row.ready === row.total ? "bg-emerald-500" : "bg-amber-500"}`}
+              style={{ width: row.ready ? `${Math.max(Math.round((row.ready / row.total) * 100), 4)}%` : "0%" }}
             />
           </span>
         </span>

@@ -28,7 +28,7 @@ export function UploadSwitch({ line, panels }: {
               aria-expanded={open === one.kind}
               onClick={() => setOpen(open === one.kind ? null : one.kind)}
             >
-              <span className="font-mono text-[11px] opacity-60">{i + 1}</span>
+              <span aria-hidden className="font-mono text-[11px] opacity-60">{i + 1}</span>
               <Upload className="h-3.5 w-3.5" /> {one.label}
             </button>
           ))}

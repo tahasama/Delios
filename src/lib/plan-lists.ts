@@ -89,7 +89,7 @@ export async function planLists(scope: { projectId: string }): Promise<PlanList[
     {
       kind: "DEPARTMENTS",
       title: "Disciplines per action",
-      says: "The project manager's list: which disciplines each action concerns.",
+      says: "Which disciplines each action concerns.",
       types: departmentTypes,
       documents: departments,
       template: "/api/controlled/current/ACTION_DEPARTMENTS",

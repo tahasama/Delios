@@ -16,6 +16,9 @@ type Result = { error?: string; ok?: string; link?: { href: string; label: strin
  * responsibility for it matching, or says why it differs; either is kept in
  * the activity log.
  */
+/** After a schedule is read: where its versions and moved dates are shown. */
+const changes = (kind: PlanListKind) => kind === "SCHEDULE" ? { href: "/actions/schedules", label: "See what changed →" } : undefined;
+
 /** The placeholders a requirements list registered, found in the register by their numbers. */
 const placeholders = (numbers: string[] | undefined) => numbers?.length
   ? { href: `/documents?q=${encodeURIComponent(numbers.join(", "))}`, label: `See the ${numbers.length} new placeholder${numbers.length === 1 ? "" : "s"} in the register →` }
@@ -47,7 +50,7 @@ export async function uploadPlanListAction(_prev: Result | undefined, formData: 
     return { error: refusal(e).message };
   }
   revalidatePath("/actions");
-  return { ok: `Read as the list of ${document.number} rev ${rev}. ${summary}`, link: placeholders(registered) };
+  return { ok: `Read as the list of ${document.number} rev ${rev}. ${summary}`, link: placeholders(registered) ?? changes(kind) };
 }
 
 /**
@@ -75,5 +78,5 @@ export async function uploadLooseListAction(_prev: Result | undefined, formData:
     return { error: refusal(e).message };
   }
   revalidatePath("/actions");
-  return { ok: `Applied. ${summary}`, link: placeholders(registered) };
+  return { ok: `Applied. ${summary}`, link: placeholders(registered) ?? changes(kind) };
 }

@@ -101,8 +101,8 @@ export function PlanTimeline({ rows, window, fit }: {
           count 56px and its gap on the right. Any other figure and the dates
           line up with nothing. */}
       <div className="relative ml-52 mr-16 h-4">
-        {ticks.map((t) => (
-          <span key={t.label} className="absolute top-0 whitespace-nowrap text-[10px] leading-none text-slate-400" style={{ left: `${t.left}%`, marginLeft: "0.25rem" }}>
+        {ticks.map((t, index) => (
+          <span key={`${index}-${t.label}`} className="absolute top-0 whitespace-nowrap text-[10px] leading-none text-slate-400" style={{ left: `${t.left}%`, marginLeft: "0.25rem" }}>
             {t.label}
           </span>
         ))}
@@ -163,6 +163,8 @@ export function PlanTimeline({ rows, window, fit }: {
                       <span
                         className="absolute top-1/2 h-3.5 -translate-y-1/2 rounded bg-slate-700"
                         style={{ left: `${from}%`, width: `max(4px, ${Math.max(to - from, 0)}%)` }}
+                        role="img"
+                        aria-label={r.finishDate ? `Work from ${fmtDate(r.scheduledDate)} to ${fmtDate(r.finishDate)}` : `Work on ${fmtDate(r.scheduledDate)}`}
                         title={r.finishDate ? `Work from ${fmtDate(r.scheduledDate)} to ${fmtDate(r.finishDate)}` : `Work on ${fmtDate(r.scheduledDate)}`}
                       />
                     );

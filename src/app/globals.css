@@ -231,6 +231,8 @@ summary::-webkit-details-marker {
   .rail-review { --rail: var(--color-sky-400); }
   .rail-release { --rail: var(--color-brand-line); }
   .rail-released { --rail: var(--color-emerald-500); }
+  .rail-done { --rail: var(--color-emerald-700); }
+  .rail-ready { --rail: var(--color-emerald-400); }
   .rail-superseded { --rail: var(--color-violet-400); }
   .rail-void { --rail: var(--color-red-400); }
 

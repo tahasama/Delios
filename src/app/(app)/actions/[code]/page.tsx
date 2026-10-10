@@ -273,7 +273,7 @@ export default async function ActionDetailPage({ params, searchParams }: { param
             </ul>
           ) : (
             <div className="px-5 py-3.5 sm:px-6">
-              <Banner tone="warn" title="Needs disciplines">The project manager tags this activity in the disciplines list. Until then its documents cannot be asked for.</Banner>
+              <Banner tone="warn" title="Needs disciplines">The disciplines-per-action list does not tag this action yet. Document Control, or whoever plans the project, uploads it; until then its documents cannot be asked for.</Banner>
             </div>
           )}
           {short.length && action.riskNotifiedAt ? (

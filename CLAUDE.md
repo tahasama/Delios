@@ -108,7 +108,12 @@ conversation, write it into the right one in the same commit as the code.
 - Released revision: "this file is rev X as released" is ticked by default;
   only when unticked is a reason obligatory. No released revision: a reason is
   obligatory. Always logged. Same on all three uploads.
+- Releasing a list document reads its Excel automatically (the schedule, when it
+  is the project's schedule; DPA and RQL by their type). The three upload buttons
+  stay, for no document, not released, no Excel attached, or a failed read.
 - Actions get our own number (A00001…) and keep the planner's ID beside it.
+- Actions with no date are always counted on the plan ("N with no date — in the
+  table"), never silently left out of the window.
 - Progress on an action: a date still to come is shown as due, never as done.
 - "Documents ready" counts only the actions in a window: a month either side
   of today, or the dates the user filtered on. Never the whole schedule.
