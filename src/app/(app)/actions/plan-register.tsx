@@ -23,6 +23,9 @@ export type PlanTableRow = {
   owner: string | null;
   departments: string[];
   date: string | null;
+  /** The day the work ends, when the schedule gives one, and how many days it lasts. */
+  finish: string | null;
+  days: number | null;
   when: string;
   late: boolean;
   readiness: "DONE" | "LATE_RECEIPT" | "READY" | "AT_RISK" | "NOT_READY" | "UPCOMING" | "UNKNOWN";
@@ -683,8 +686,10 @@ const COLUMNS: Column[] = [
     headClass: "text-right", cellClass: "whitespace-nowrap text-right text-xs tabular-nums",
     cell: (row) => row.date
       ? <>
-          <span className="text-xs font-medium text-slate-800">{row.date}</span>
-          <span className={`block font-sans text-[11px] ${row.late ? "text-red-400" : "text-slate-400"}`}>{row.when}</span>
+          <span className="text-xs font-medium text-slate-800">{row.date}{row.finish ? ` → ${row.finish}` : ""}</span>
+          <span className={`block font-sans text-[11px] ${row.late ? "text-red-400" : "text-slate-400"}`}>
+            {row.when}{row.days ? ` · ${row.days} day${row.days === 1 ? "" : "s"}` : ""}
+          </span>
         </>
       : <span className="text-slate-300">—</span>,
   },

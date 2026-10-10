@@ -6,7 +6,7 @@ import { api, projectPath, refusal } from "@/lib/api/client";
 import { filesOf } from "@/lib/api/uploads";
 import { planLists, type PlanListKind } from "@/lib/plan-lists";
 
-type Result = { error?: string; ok?: string };
+type Result = { error?: string; ok?: string; link?: { href: string; label: string } };
 
 /**
  * Upload the spreadsheet of the revision in force. Revisions are made on the
@@ -16,6 +16,11 @@ type Result = { error?: string; ok?: string };
  * responsibility for it matching, or says why it differs; either is kept in
  * the activity log.
  */
+/** The placeholders a requirements list registered, found in the register by their numbers. */
+const placeholders = (numbers: string[] | undefined) => numbers?.length
+  ? { href: `/documents?q=${encodeURIComponent(numbers.join(", "))}`, label: `See the ${numbers.length} new placeholder${numbers.length === 1 ? "" : "s"} in the register →` }
+  : undefined;
+
 export async function uploadPlanListAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
   const ctx = await requireScope();
   if (!ctx.can("CONTROL") && !ctx.can("PLAN")) return { error: "Your function does not upload the schedule's lists. Document Control, or a function given Plan, does." };
@@ -32,16 +37,17 @@ export async function uploadPlanListAction(_prev: Result | undefined, formData: 
   const file = filesOf(formData, "file").find((one) => /\.(xlsx|csv)$/i.test(one.name)) ?? null;
   if (!file) return { error: "Choose the list as .xlsx or .csv." };
   let summary = "";
+  let registered: string[] = [];
   try {
     const bytes = Buffer.from(await file.arrayBuffer());
-    ({ summary } = await api<{ summary: string }>(projectPath(ctx, "/schedule/lists"), {
+    ({ summary, registered } = await api<{ summary: string; registered: string[] }>(projectPath(ctx, "/schedule/lists"), {
       body: { kind, fileName: file.name, contentBase64: bytes.toString("base64"), revisionId, confirmed, reason: reason || null },
     }));
   } catch (e) {
     return { error: refusal(e).message };
   }
   revalidatePath("/actions");
-  return { ok: `Read as the list of ${document.number} rev ${rev}. ${summary}` };
+  return { ok: `Read as the list of ${document.number} rev ${rev}. ${summary}`, link: placeholders(registered) };
 }
 
 /**
@@ -59,14 +65,15 @@ export async function uploadLooseListAction(_prev: Result | undefined, formData:
   if (!file) return { error: "Choose the list as .xlsx or .csv." };
   if (!reason) return { error: "Say why it is uploaded without a register document: it is kept with the upload." };
   let summary = "";
+  let registered: string[] = [];
   try {
     const bytes = Buffer.from(await file.arrayBuffer());
-    ({ summary } = await api<{ summary: string }>(projectPath(ctx, "/schedule/lists"), {
+    ({ summary, registered } = await api<{ summary: string; registered: string[] }>(projectPath(ctx, "/schedule/lists"), {
       body: { kind, fileName: file.name, contentBase64: bytes.toString("base64"), aware: true, reason },
     }));
   } catch (e) {
     return { error: refusal(e).message };
   }
   revalidatePath("/actions");
-  return { ok: `Applied. ${summary}` };
+  return { ok: `Applied. ${summary}`, link: placeholders(registered) };
 }

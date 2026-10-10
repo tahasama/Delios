@@ -157,6 +157,6 @@ public static class ListUploadEndpoints
               + (reason.Length > 0 ? $" Differs from {label} as released; why: {reason}." : "") + $" {summary}";
         await audit.WriteAsync(http.User.Actor(), revision is null ? "LIST_UPLOADED_WITHOUT_DOCUMENT" : "LIST_READ_FROM_UPLOAD",
             revision is null ? "Project" : "Revision", revision?.Id ?? project.Id, label ?? $"{list.Title}: {fileName}", said, project.Id, cancellationToken);
-        return Results.Ok(new { summary });
+        return Results.Ok(new { summary, registered = requirements.Registered });
     }
 }

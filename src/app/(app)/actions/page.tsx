@@ -209,6 +209,9 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
       owner: row.ownerName,
       departments: departmentsOf(row).map((one) => deptLabel.get(one) ?? one),
       date: row.scheduledDate ? fmtDate(row.scheduledDate) : null,
+      finish: row.finishDate && row.scheduledDate && row.finishDate > row.scheduledDate ? fmtDate(row.finishDate) : null,
+      // Start and finish both count: work on the 12th and 13th lasts two days.
+      days: row.finishDate && row.scheduledDate ? Math.round((row.finishDate.getTime() - row.scheduledDate.getTime()) / 86_400_000) + 1 : null,
       when: datePhrase(row.daysUntil),
       late: row.daysUntil !== null && row.daysUntil < 0,
       readiness: row.readiness,
@@ -339,7 +342,7 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
         }
         plan={
           <PlanTimeline
-            rows={rows.map((row) => ({ code: row.code, name: row.name, scheduledDate: row.scheduledDate, firstNeeded: row.firstNeeded, readiness: row.readiness, ready: row.ready, total: row.total }))}
+            rows={rows.map((row) => ({ code: row.code, name: row.name, scheduledDate: row.scheduledDate, finishDate: row.finishDate, firstNeeded: row.firstNeeded, readiness: row.readiness, ready: row.ready, total: row.total }))}
             window={planFrom && planTo ? { from: planFrom, to: planTo } : undefined}
             fit={PLAN_FIRST}
           />

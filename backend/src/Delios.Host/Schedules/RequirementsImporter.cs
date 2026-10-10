@@ -32,6 +32,9 @@ public sealed class RequirementsImporter(
     DeliosDbContext db, TenantContext tenant, FileStorage storage, DocumentService documents, AuditLog audit, IClock clock,
     Notifications.Notifier notifier, ILogger<RequirementsImporter> logger)
 {
+    /// <summary>The numbers of the placeholders the last list read registered, for the reader to go and see.</summary>
+    public List<string> Registered { get; } = [];
+
     /// <summary>The document type property that marks a requirements list.</summary>
     public const string Marker = "readsRequirements";
     /// <summary>How the list is filed among the uploaded lists, so its history reads in one place.</summary>
@@ -306,6 +309,7 @@ public sealed class RequirementsImporter(
                     row.Po), cancellationToken);
                 if (problem is not null) { problems.Add($"Line {row.Line}: \"{row.Title}\" could not be registered: {MessageOf(problem)}"); continue; }
                 documentId = document!.Id;
+                Registered.Add(document.Number);
                 created++;
             }
 

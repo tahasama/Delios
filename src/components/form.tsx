@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { btn } from "./ui";
 import { collectInvalid, type MissingField } from "./form-validation";
 
-type State = { error?: string; ok?: string; issues?: { line: number; message: string }[] };
+type State = { error?: string; ok?: string; issues?: { line: number; message: string }[]; link?: { href: string; label: string } };
 
 /** What is missing, said out loud rather than left to a tooltip off-screen. */
 export function MissingSummary({ missing }: { missing: MissingField[] }) {
@@ -103,7 +103,12 @@ export function ActionForm({
         </div>
       ) : null}
 
-      {state?.ok ? <p className="rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-700">{state.ok}</p> : null}
+      {state?.ok ? (
+        <p className="rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+          {state.ok}
+          {state.link ? <> <a href={state.link.href} className="font-semibold underline">{state.link.label}</a></> : null}
+        </p>
+      ) : null}
 
       {hideSubmit ? null : (
         <button type="submit" disabled={pending} className={cn(btn(variant, size))}>

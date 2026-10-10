@@ -5,6 +5,8 @@ export type PlanRow = {
   code: string;
   name: string;
   scheduledDate: Date | null;
+  /** The day the work ends, when the schedule gives one: the work itself is drawn from start to finish. */
+  finishDate?: Date | null;
   /** The earliest date a document is needed for this activity. */
   firstNeeded: Date | null;
   readiness: "DONE" | "LATE_RECEIPT" | "READY" | "AT_RISK" | "NOT_READY" | "UPCOMING" | "UNKNOWN";
@@ -150,9 +152,21 @@ export function PlanTimeline({ rows, window, fit }: {
                     aria-label={`${STATE_WORD[r.readiness]}: documents needed from ${fmtDate(r.firstNeeded)}, work on ${fmtDate(r.scheduledDate)}, ${r.ready} of ${r.total} ready`}
                     title={`${r.code}: documents needed from ${fmtDate(r.firstNeeded)} · work on ${fmtDate(r.scheduledDate)} · ${r.ready} of ${r.total} ready`}
                   />
-                  {at(end) >= 0 && at(end) <= 100
-                    ? <span className="absolute top-1/2 h-3.5 w-1 -translate-y-1/2 rounded bg-slate-700" style={{ left: `${at(end)}%` }} />
-                    : null}
+                  {/* The work itself, start to finish, as a dark block on the end of the bar;
+                      with no finish date, a tick on its day. */}
+                  {(() => {
+                    const finish = r.finishDate && r.finishDate.getTime() > end ? r.finishDate.getTime() : end;
+                    const from = Math.max(at(end), 0);
+                    const to = Math.min(at(finish), 100);
+                    if (to < 0 || from > 100) return null;
+                    return (
+                      <span
+                        className="absolute top-1/2 h-3.5 -translate-y-1/2 rounded bg-slate-700"
+                        style={{ left: `${from}%`, width: `max(4px, ${Math.max(to - from, 0)}%)` }}
+                        title={r.finishDate ? `Work from ${fmtDate(r.scheduledDate)} to ${fmtDate(r.finishDate)}` : `Work on ${fmtDate(r.scheduledDate)}`}
+                      />
+                    );
+                  })()}
                 </span>
                 <span className="w-14 shrink-0 text-right text-[11px] tabular-nums text-slate-500">{r.total ? `${r.ready}/${r.total}` : "—"}</span>
               </li>
