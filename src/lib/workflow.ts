@@ -174,7 +174,7 @@ export async function getRunForRevision(t: Tenant, revisionId: string): Promise<
     inputs: step.participants.filter((one) => one.answer).map((one) => ({ userId: one.userId, code: one.answer!, returns: false })),
     goesTo: step.goesTo ?? [],
   }));
-  const status = review.state === "IN_PROGRESS" ? "ACTIVE" : review.state === "RETURNED" ? "RETURNED" : "DONE";
+  const status = review.state === "IN_PROGRESS" ? "ACTIVE" : review.state === "RETURNED" ? "RETURNED" : review.state === "WITHDRAWN" ? "WITHDRAWN" : "DONE";
   return {
     id: review.id, revisionId, templateName: review.route, steps,
     currentStep: review.currentStep ? review.currentStep - 1 : steps.length, status,

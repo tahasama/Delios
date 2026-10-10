@@ -121,6 +121,8 @@ public static class ReviewStates
     public const string Released = "RELEASED";
     /// <summary>The revision was sent back to its author or sender; the review is closed.</summary>
     public const string Returned = "RETURNED";
+    /// <summary>The author or Document Control took the revision back out of review to change it; the reason is the review's note.</summary>
+    public const string Withdrawn = "WITHDRAWN";
 }
 
 /// <summary>A step of a run, copied from the route when the review starts.</summary>

@@ -36,6 +36,8 @@ export type ReviewRow = {
   verdictProceeds: boolean | null;
   decidedBy: string | null;
   open: boolean;
+  /** Withdrawn from review to be changed: the reason given. */
+  withdrawn?: string | null;
   reviewers: { name: string; done: boolean }[];
   doneCount: number;
   dueAt: string | null;
@@ -388,6 +390,7 @@ function PageStep({ onClick, disabled, label, children }: { onClick: () => void;
  * the same way on all three.
  */
 function railFor(row: ReviewRow): string {
+  if (row.withdrawn) return "rail-void";
   if (row.open) return row.dueState === "overdue" ? "rail-void" : row.dueState === "at risk" ? "rail-prep" : "rail-review";
   if (row.verdictProceeds === false) return "rail-void";
   return "rail-released";
@@ -427,7 +430,12 @@ const COLUMNS: Column[] = [
     note: "On a decision, the code the decider gave. On an advisory step, what that person's comments amounted to — advisers are not asked for a code.",
     cellClass: "whitespace-nowrap text-xs",
     cell: (row) =>
-      row.verdict || row.verdictLabel ? (
+      row.withdrawn ? (
+        <span className="text-slate-600">
+          <Chip className="bg-slate-100 text-slate-700 ring-slate-300">withdrawn</Chip>
+          <span className="mt-0.5 block max-w-64 truncate text-[11px] text-slate-500" title={row.withdrawn}>{row.withdrawn}</span>
+        </span>
+      ) : row.verdict || row.verdictLabel ? (
         <span className={row.verdictProceeds === null ? "text-slate-600" : row.verdictProceeds ? "text-emerald-700" : "text-red-700"}>
           {row.verdict ? <span className="code-chip">{row.verdict}</span> : null}
           {row.verdictLabel && row.verdictLabel !== row.verdict ? <span className={row.verdict ? "ml-1.5" : ""}>{row.verdictLabel}</span> : null}

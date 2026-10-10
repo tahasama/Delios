@@ -116,6 +116,11 @@ public static class ReviewEndpoints
         var codes = review.Steps.Select(s => s.FunctionCode).OfType<string>().Distinct().ToList();
         var people = await db.Users.AsNoTracking().Where(u => ids.Contains(u.Id)).ToDictionaryAsync(u => u.Id, u => u.Name, cancellationToken);
         var functions = await db.Functions.AsNoTracking().Where(f => codes.Contains(f.Code)).ToDictionaryAsync(f => f.Code, f => f.Name, cancellationToken);
+        var holders = (await (from m in db.Memberships.AsNoTracking()
+                              join u in db.Users.AsNoTracking() on m.UserId equals u.Id
+                              where m.ProjectId == review.ProjectId && m.Active && m.Function!.Active && u.Active && codes.Contains(m.Function.Code)
+                              select new { m.Function!.Code, u.Name }).ToListAsync(cancellationToken))
+            .GroupBy(h => h.Code).ToDictionary(g => g.Key, g => g.Select(h => h.Name).Distinct().Order().ToList());
         var view = View(review);
         return Results.Ok(view with
         {
@@ -125,7 +130,10 @@ public static class ReviewEndpoints
                 if (step.Participants.Count > 0) return step;
                 List<string> goesTo = s.PartyName is { } party ? [party]
                     : [.. s.UserIds.Select(id => people.GetValueOrDefault(id)).OfType<string>(),
-                       .. s.FunctionCode is { } code ? [$"whoever holds {functions.GetValueOrDefault(code) ?? code}"] : Array.Empty<string>()];
+                       .. s.FunctionCode is { } code
+                           ? holders.GetValueOrDefault(code) is { Count: > 0 } names ? names : [$"nobody holds {functions.GetValueOrDefault(code) ?? code} yet"]
+                           : []];
+                goesTo = goesTo.Distinct().ToList();
                 return step with { GoesTo = goesTo };
             }).ToList(),
         });

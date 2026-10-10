@@ -119,6 +119,7 @@ async function readCycle(scope: Scope, review: ReviewView) {
     openedById: "", openedByName: review.startedBy, submittedAt: new Date(review.startedAt), receivedAt: new Date(review.startedAt),
     issuedToReviewAt: new Date(review.startedAt) as Date | null, returnedFromReviewAt: review.decidedAt ? new Date(review.decidedAt) : null,
     returnedToOriginatorAt: review.state === "RETURNED" && review.closedAt ? new Date(review.closedAt) : null,
+    withdrawn: review.state === "WITHDRAWN" ? { note: review.returnNote, at: review.closedAt ? new Date(review.closedAt) : null } : null,
     comments: commentsOf(review, step.number),
     assignments: [...step.participants.map((one, index) => ({
       id: `${review.id}-${step.number}-${index}`, userId: one.userId, userName: one.name, completedAt: one.answeredAt ? new Date(one.answeredAt) : null,

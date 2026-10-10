@@ -154,6 +154,8 @@ export type ReviewListRow = {
   originator: string | null; contractRef: string | null; receivedAt: string | null;
   comments: { by: string; text: string; blocking: boolean; settled: boolean }[];
   warnedAt?: string | null;
+  /** Why it was withdrawn or sent back, in the words recorded. */
+  note?: string | null;
 };
 
 /** GET /reviews/{id} (ReviewEndpoints ReviewView). */

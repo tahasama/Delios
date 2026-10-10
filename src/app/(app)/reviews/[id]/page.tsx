@@ -238,11 +238,12 @@ export default async function ReviewCyclePage({ params }: { params: Promise<{ id
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <Link href={`/documents/${doc.id}`} className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 font-mono text-xs font-semibold text-slate-500 hover:bg-slate-100"><ArrowLeft className="h-4 w-4" /> {doc.docNumber}</Link>
-            <Chip className={cycle.status === "OPEN" ? "bg-amber-100 text-amber-800 ring-amber-200" : "bg-canvas-deep text-slate-600 ring-line"}>Review {cycle.sequence} · {cycle.status === "OPEN" ? "open" : "closed"}</Chip>
+            <Chip className={cycle.status === "OPEN" ? "bg-amber-100 text-amber-800 ring-amber-200" : "bg-canvas-deep text-slate-600 ring-line"}>Review {cycle.sequence} · {cycle.status === "OPEN" ? "open" : cycle.withdrawn ? "withdrawn" : "closed"}</Chip>
           </div>
         </div>
       </section>
 
+      {cycle.withdrawn ? <Banner tone="info" title={`Withdrawn${cycle.withdrawn.at ? ` on ${fmtDate(cycle.withdrawn.at)}` : ""}`}>{cycle.withdrawn.note ?? "Taken back out of review to be changed."} Its comments are kept here; the revision goes round a new review once the change is in.</Banner> : null}
       {reserves.length ? <Banner tone="warn" title="Held under reserve">{reserves.length} comment{reserves.length === 1 ? " carries a reserve" : "s carry a reserve"} that the route has still to settle. The decider's verdict is what releases the revision.</Banner> : null}
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">

@@ -112,7 +112,7 @@ export const backendReview = cache(async (scope: Scope, id: string): Promise<Rev
 export function cycleOf(review: ReviewView, sequence: number): LegacyCycle {
   const deciding = review.steps.find((s) => s.deciding) ?? review.steps[review.steps.length - 1];
   const decider = deciding?.participants.find((p) => p.answer && p.answer !== "NONE")?.name ?? deciding?.participants[0]?.name ?? null;
-  const closed = review.state === "RELEASED" || review.state === "RETURNED";
+  const closed = review.state === "RELEASED" || review.state === "RETURNED" || review.state === "WITHDRAWN";
   return {
     id: review.id, number: review.number, revisionId: review.revisionId, mode: deciding?.mode ?? "PARALLEL", sequence,
     status: closed ? "CLOSED" : "OPEN", openedById: "", openedByName: review.startedBy, transmittalId: deciding?.transmittalId ?? null,

@@ -29,7 +29,7 @@ public sealed record ReviewRow(
     bool Open, int? CurrentStep, string? StepTitle, string? Verdict, string? GrantedStatus, string? DecidedBy,
     IReadOnlyList<ReviewerView> Reviewers, DateOnly? DueDate, DateOnly? RouteDueDate, DateTimeOffset StartedAt, string StartedBy,
     DateTimeOffset? ClosedAt, string Discipline, string DocType, string DeliverableType, string? Originator, string? ContractRef,
-    DateTimeOffset? ReceivedAt, IReadOnlyList<ReviewCommentLine> Comments, DateTimeOffset? WarnedAt = null);
+    DateTimeOffset? ReceivedAt, IReadOnlyList<ReviewCommentLine> Comments, DateTimeOffset? WarnedAt = null, string? Note = null);
 
 /// <summary>
 /// Every review on the project, one row per review: filters, sorting, page
@@ -219,7 +219,7 @@ public static class ReviewListEndpoints
                 (r.ClosedAt ?? r.DecidedAt)?.ToDateTimeOffset(), d.Discipline, d.DocType, d.DeliverableType, d.Originator, d.ContractRef,
                 v.AuthoredByParty is null ? null : v.Submissions.OrderBy(s => s.Number).FirstOrDefault()?.SubmittedAt.ToDateTimeOffset(),
                 r.Comments.Where(c => c.Status != CommentStatuses.Withdrawn).OrderBy(c => c.CreatedAt).Select(c => new ReviewCommentLine(c.AuthorName, c.Text, c.Blocking, c.Status != CommentStatuses.Open)).ToList(),
-                open?.WarnedAt?.ToDateTimeOffset());
+                open?.WarnedAt?.ToDateTimeOffset(), r.ReturnNote);
         }).ToList();
     }
 }

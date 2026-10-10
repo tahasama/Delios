@@ -1377,7 +1377,7 @@ public sealed class ReviewService(
         revision.State = RevisionStates.InPreparation;
         document.LatestRevisionState = RevisionStates.InPreparation;
         document.UpdatedAt = now;
-        review.State = ReviewStates.Returned;
+        review.State = ReviewStates.Withdrawn;
         review.ReturnNote = note;
         review.ClosedAt = now;
         review.ClosedByName = access.UserName;

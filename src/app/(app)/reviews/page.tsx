@@ -212,6 +212,7 @@ export default async function ReviewsPage({ searchParams }: { searchParams: Prom
       verdictProceeds: c.verdict ? proceeds.get(c.verdict) ?? null : null,
       decidedBy: c.decidedBy,
       open: c.open,
+      withdrawn: c.state === "WITHDRAWN" ? c.note ?? "withdrawn" : null,
       reviewers: c.reviewers,
       doneCount: c.reviewers.filter((a) => a.done).length,
       dueAt: dueAt ? fmtDate(dueAt) : null,

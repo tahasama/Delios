@@ -56,6 +56,12 @@ export async function WorkflowPanel({ doc, user, lead = [], extra: after = [] }:
   const controller = isController(user);
 
   if (run && run.status === "ACTIVE") return <RunActivePanel run={run} user={user} extra={extra} />;
+  // A revision back in preparation is sent again, whatever its last review said:
+  // withdrawn to be changed, it goes round a new review once the change is in.
+  if (inPrep && revs[0]?.id === inPrep.id) {
+    const withdrawn = run?.status === "WITHDRAWN" ? (await backendReview(ctx, run.id)).returnNote : null;
+    return <SendPanel doc={doc} revId={inPrep.id} value={inPrep.value} hasFiles={!!(inPrep.renditionFileId || inPrep.nativeFileId)} user={user} lead={lead} extra={after} withdrawn={withdrawn} />;
+  }
   // The latest revision decides what is waiting on whom. A finished run says
   // nothing about that: it stays finished after the revision is released.
   if (run && run.status === "DONE" && revs[0]?.state === "NOT_RELEASED") {
@@ -143,7 +149,7 @@ export async function WorkflowPanel({ doc, user, lead = [], extra: after = [] }:
 
 // ── Sending: pick a template, override participants, go ─────────────────────
 
-async function SendPanel({ doc, revId, value, hasFiles, user, lead, extra }: { doc: DocLite; revId: string; value: string; hasFiles: boolean; user: SessionUser; lead: StepItem[]; extra: StepItem[] }) {
+async function SendPanel({ doc, revId, value, hasFiles, user, lead, extra, withdrawn }: { doc: DocLite; revId: string; value: string; hasFiles: boolean; user: SessionUser; lead: StepItem[]; extra: StepItem[]; withdrawn?: string | null }) {
   // Who sends: the author for internal work; Document Control always, and
   // only Document Control for what a supplier or other party produced.
   const isControl = isController(user);
@@ -151,9 +157,12 @@ async function SendPanel({ doc, revId, value, hasFiles, user, lead, extra }: { d
   const canSend = mayContributeToDocument(user, doc) && (isControl || (!external && user.id === doc.createdById));
   const ctx = await requireScope();
   const unreviewed = await typeSkipsReview(ctx, doc.docType);
-  const file = hasFiles
-    ? <><strong className="text-slate-800">Rev {value}</strong> has its file.</>
-    : <><strong className="text-slate-800">Rev {value}</strong> has no file yet — a PDF is needed before it goes further.</>;
+  const file = <>
+    {hasFiles
+      ? <><strong className="text-slate-800">Rev {value}</strong> has its file.</>
+      : <><strong className="text-slate-800">Rev {value}</strong> has no file yet — a PDF is needed before it goes further.</>}
+    {withdrawn ? <span className="mt-1 block text-[11px] text-slate-500">Its last review was withdrawn — {withdrawn.replace(/^Withdrawn for update by /, "by ")}. Send it again once the change is in.</span> : null}
+  </>;
   if (!canSend) {
     return (
       <Card
