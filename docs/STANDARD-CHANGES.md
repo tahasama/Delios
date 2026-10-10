@@ -659,6 +659,18 @@ revision. Before the first revision, the reserved number's details may be set.
 
 **Depends on it:** `DocumentService.UpdateAsync` (`DETAILS_NEED_A_REVISION`).
 
+## 34 · Legal hold freezes the end of a document, not its work
+
+**Clause:** §10 *Retention and disposal*.
+
+**Must say:** a legal hold is put on and lifted by Document Control, each time
+with a recorded reason. While held, the document cannot be retired and none of
+its revisions voided. The work goes on: new revisions and reviews are allowed.
+Nothing is ever disposed of by the application; only the owner of the system
+removes anything.
+
+**Depends on it:** `KeepingService.LegalHoldAsync`, `ON_LEGAL_HOLD`.
+
 ## Still open — decided in conversation, not yet built
 
 - **Escalation** where somebody refuses to acknowledge carrying an action

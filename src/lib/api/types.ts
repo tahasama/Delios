@@ -114,7 +114,7 @@ export type DocumentView = {
   receivedDate: string | null; plannedDate: string | null; createdByName: string; createdAt: string; updatedAt: string;
   revisions: RevisionView[];
   createdById: string;
-  legalHold: boolean; legalHoldReason: string | null; previousNumber: string | null; legacyScheme: string | null; appVersion: string | null;
+  legalHold: boolean; legalHoldReason: string | null; legalHoldAt?: string | null; legalHoldBy?: string | null; previousNumber: string | null; legacyScheme: string | null; appVersion: string | null;
   extras: Record<string, string> | null;
   confirmedAt?: string | null; confirmedByName?: string | null; correctsId?: string | null;
 };

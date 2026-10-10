@@ -73,6 +73,12 @@ conversation, write it into the right one in the same commit as the code.
 - A withdrawn review is closed: no advice, verdict or comment can be given on
   it. Its progress ends at "Withdrawn"; a release comes from a later review.
 
+### Legal hold
+- Document Control or an administrator puts a document on hold, and lifts it,
+  each time with a reason. While held: it cannot be retired and no revision
+  voided (backend refuses with ON_LEGAL_HOLD). New revisions and reviews go on.
+  The document page shows a banner with since when, who and why.
+
 ### Schedule & actions
 - The schedule (SCH), disciplines per action (DPA) and requirements (RQL) are
   register documents, revised and released on the document page.

@@ -281,6 +281,7 @@ public sealed class DocumentService(
         var reason = Blank(request.Reason);
         if (reason is null)
             return Fail(Problems.Invalid("REASON_REQUIRED", "A reason is required: each end state is recorded with date and authority."));
+        if (document.LegalHold) return Fail(KeepingService.OnHold(document));
         if (document.State is not (DocumentStates.Planned or DocumentStates.Active))
             return Fail(Problems.Conflict("DOCUMENT_NOT_OPEN", $"The document is already {document.State.ToLowerInvariant()}.", new { state = document.State }));
         string[] moving = [RevisionStates.InPreparation, RevisionStates.InReview, RevisionStates.Received, RevisionStates.Correcting];

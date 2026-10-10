@@ -52,6 +52,7 @@ public sealed class KeepingService(
         if (document is null || revision is null) return (null, Problems.NotFound("REVISION_NOT_FOUND", "No such revision."));
         var reason = request.Reason?.Trim() ?? "";
         if (reason.Length == 0) return (null, Problems.Invalid("REASON_REQUIRED", "Voiding is recorded with a reason."));
+        if (document.LegalHold) return (null, OnHold(document));
         var newer = await db.Revisions.AsNoTracking().Where(r => r.DocumentId == documentId && r.CreatedAt > revision.CreatedAt)
             .OrderByDescending(r => r.CreatedAt).Select(r => r.Value).FirstOrDefaultAsync(cancellationToken);
         if (newer is not null)
@@ -147,7 +148,12 @@ public sealed class KeepingService(
 
     // ── Legal hold ────────────────────────────────────────────────────────────
 
-    /// <summary>Document Control or an administrator puts a document on legal hold, or lifts it.</summary>
+    /// <summary>The refusal for ending or voiding anything of a document on legal hold.</summary>
+    internal static IResult OnHold(Document document) => Problems.Conflict("ON_LEGAL_HOLD",
+        $"It is on legal hold since {document.LegalHoldAt?.ToDateTimeUtc():d MMM yyyy}{(document.LegalHoldByName is null ? "" : $", by {document.LegalHoldByName}")}: {document.LegalHoldReason ?? "no reason given"}. Lift the hold first.");
+
+    /// <summary>Document Control or an administrator puts a document on legal hold, or lifts it. A reason is required both ways.
+    /// While held, the document cannot be retired and no revision of it voided; new revisions and reviews go on.</summary>
     public async Task<IResult> LegalHoldAsync(
         HttpContext http, ProjectAccess access, Guid documentId, LegalHoldRequest request, CancellationToken cancellationToken)
     {
@@ -156,12 +162,16 @@ public sealed class KeepingService(
         if (!access.Allows(Verbs.Control, document.Facts) && !await Keepers.ConfiguresAsync(http))
             return Problems.Forbidden("CONTROL_ONLY", "Only the control function records legal holds.");
         if (document.LegalHold == request.On) return Results.NoContent();
+        // Put on, and lifted, with a reason: both are recorded.
+        var reason = request.Reason?.Trim() ?? "";
+        if (reason.Length == 0)
+            return Problems.Invalid("REASON_REQUIRED", request.On ? "Say why it is held: the claim, dispute or instruction." : "Say why the hold is lifted.");
         document.LegalHold = request.On;
-        document.LegalHoldReason = request.On ? request.Reason?.Trim() is { Length: > 0 } why ? why : null : null;
+        document.LegalHoldReason = request.On ? reason : null;
         document.LegalHoldAt = request.On ? clock.GetCurrentInstant() : null;
         document.LegalHoldByName = request.On ? access.UserName : null;
         await audit.WriteAsync(new Actor(access.UserId, access.UserName), "LEGAL_HOLD", "Document", document.Id, document.Number,
-            request.On ? $"Legal hold: nothing about it may be disposed of.{(document.LegalHoldReason is null ? "" : $" {document.LegalHoldReason}")}" : "Legal hold cleared.",
+            request.On ? $"Legal hold: it may not be retired nor any revision voided. {reason}" : $"Legal hold lifted. {reason}",
             access.Project.Id, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         return Results.NoContent();

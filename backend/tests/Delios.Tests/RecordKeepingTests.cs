@@ -174,5 +174,10 @@ public sealed class RecordKeepingTests(Infrastructure infrastructure) : IClassFi
         var (hold, _) = await Flow.PostAsync(controller, $"{path}/legal-hold", new { on = true, reason = "Claim 42" });
         Assert.Equal(HttpStatusCode.NoContent, hold);
         Assert.True((await controller.GetFromJsonAsync<JsonElement>(path)).GetProperty("legalHold").GetBoolean());
+        // While held it is not retired; lifting the hold takes a reason too.
+        var (retire, retireBody) = await Flow.PostAsync(controller, $"{path}/end", new { state = "WITHDRAWN", reason = "Superseded" });
+        Assert.Equal((HttpStatusCode.Conflict, "ON_LEGAL_HOLD"), (retire, Flow.Code(retireBody)));
+        var (bareLift, bareLiftBody) = await Flow.PostAsync(controller, $"{path}/legal-hold", new { on = false });
+        Assert.Equal((HttpStatusCode.UnprocessableEntity, "REASON_REQUIRED"), (bareLift, Flow.Code(bareLiftBody)));
     }
 }

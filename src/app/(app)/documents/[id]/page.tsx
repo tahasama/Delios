@@ -478,8 +478,11 @@ export default async function DocumentDetailPage({
 
   return (
     <div className="space-y-4">
-      {sp.sent ? <Banner tone="good" title="Registered and sent for approval">It is now with the people shown below. You will be notified when they decide.</Banner> : null}
-      {sp.sendError ? <Banner tone="warn" title="Registered, but not sent">{sp.sendError} Send it from the step below.</Banner> : null}
+      {doc.legalHold ? (
+        <Banner tone="warn" title={`On legal hold${doc.legalHoldAt ? ` since ${fmtDate(doc.legalHoldAt)}` : ""}${doc.legalHoldBy ? ` — ${doc.legalHoldBy}` : ""}`}>
+          {doc.legalHoldReason ?? "No reason was recorded."} While held it cannot be retired and no revision voided. New revisions and reviews go on.
+        </Banner>
+      ) : null}
       {sp.released ? (
         <Banner tone="good" title={`Released${sp.superseded ? ` · rev ${sp.superseded} superseded` : ""}`}>
           This revision is now the one in use.{sp.issued && sp.issued !== "0" ? ` It was issued as the decision asked: ${sp.issued} transmittal${sp.issued === "1" ? "" : "s"} raised.` : " Nobody has been told yet."}
@@ -604,8 +607,12 @@ export default async function DocumentDetailPage({
                         <p className="text-xs text-slate-500">Disposed {fmtDate(doc.disposedAt)} by {doc.disposedBy} · {doc.disposalBasis}</p>
                       ) : (
                         <>
-                          <ActionForm action={setLegalHoldAction} submitLabel={doc.legalHold ? "Lift legal hold" : "Put on legal hold"} size="sm" variant="secondary" hidden={{ documentId: doc.id, hold: doc.legalHold ? "off" : "on" }} />
-                          {doc.state === "ACTIVE" && mayRetire ? (
+                          <ActionForm action={setLegalHoldAction} submitLabel={doc.legalHold ? "Lift legal hold" : "Put on legal hold"} size="sm" variant="secondary" hidden={{ documentId: doc.id, hold: doc.legalHold ? "off" : "on" }}>
+                            <Field label={doc.legalHold ? "Why it is lifted" : "Why it is held"} required hint={doc.legalHold ? "kept in the activity log" : "while held it cannot be retired and no revision voided; work on it goes on"}>
+                              <input name="reason" required className={inputCls} placeholder={doc.legalHold ? "e.g. Claim settled" : "e.g. Claim 42 from the contractor"} />
+                            </Field>
+                          </ActionForm>
+                          {doc.state === "ACTIVE" && mayRetire && !doc.legalHold ? (
                             <ActionForm action={endDocumentStateAction} submitLabel="Retire" variant="danger" size="sm" hidden={{ documentId: doc.id }} confirmText="People who received it will be told to stop using it. Continue?">
                               <Field label="Retire as">
                                 <select name="kind" className={inputCls} defaultValue="WITHDRAWN">
@@ -667,7 +674,7 @@ export default async function DocumentDetailPage({
                 {doc.revisions.map((rev, index) => (
                   /* Only the newest revision can still be acted on. Everything
                      before it is frozen as it was issued. */
-                  <RevisionRow key={rev.id} rev={rev} latest={index === 0} followedBy={index > 0 ? { value: doc.revisions[index - 1].value, why: doc.revisions[index - 1].reasonForRevision } : null} statusLabel={label(statuses, rev.statusCode)} stateLabel={stateName(names, rev.state, { together, held: !!rev.heldAt })} controller={controller} userId={user.id} userRole={user.role} voidIsControl={voidIsControl} />
+                  <RevisionRow key={rev.id} rev={rev} latest={index === 0} followedBy={index > 0 ? { value: doc.revisions[index - 1].value, why: doc.revisions[index - 1].reasonForRevision } : null} statusLabel={label(statuses, rev.statusCode)} stateLabel={stateName(names, rev.state, { together, held: !!rev.heldAt })} controller={controller} userId={user.id} userRole={user.role} voidIsControl={voidIsControl} held={doc.legalHold} />
                 ))}
               </ul>
             ) : <Empty>No revision yet.</Empty>,
@@ -817,7 +824,7 @@ function prettyState(value: string) { return value.replaceAll("_", " ").toLowerC
 type RevData = LegacyRevision;
 
 /** One line per revision; its record and its per-revision controls open in place. */
-function RevisionRow({ rev, latest, followedBy, statusLabel, stateLabel, controller, userId, userRole, voidIsControl }: { rev: RevData; latest: boolean; followedBy: { value: string; why: string | null } | null; statusLabel: string | null; stateLabel: string; controller: boolean; userId: string; userRole: string; voidIsControl: boolean }) {
+function RevisionRow({ rev, latest, followedBy, statusLabel, stateLabel, controller, userId, userRole, voidIsControl, held = false }: { rev: RevData; latest: boolean; followedBy: { value: string; why: string | null } | null; statusLabel: string | null; stateLabel: string; controller: boolean; userId: string; userRole: string; voidIsControl: boolean; held?: boolean }) {
   const state = rev.state as RevState;
   const pdf = rev.files.find((f) => f.kind === "RENDITION");
   const native = rev.files.find((f) => f.kind === "NATIVE");
@@ -889,7 +896,7 @@ function RevisionRow({ rev, latest, followedBy, statusLabel, stateLabel, control
               already have worked from. And one that was never reviewed at all —
               opened, left, and now in the way of the next one: voiding it says
               it never counted, which is the truth, and clears the document. */}
-          {(controller || (!voidIsControl && (rev.authoredById === userId || rev.uploadedById === userId))) && latest && (state === "RELEASED" || (state === "IN_PREPARATION" && !rev.cycles.length)) ? (
+          {!held && (controller || (!voidIsControl && (rev.authoredById === userId || rev.uploadedById === userId))) && latest && (state === "RELEASED" || (state === "IN_PREPARATION" && !rev.cycles.length)) ? (
             <details>
               <summary className="cursor-pointer text-xs font-semibold text-red-700">{state === "RELEASED" ? "Void — issued in error…" : "Void — it was never reviewed…"}</summary>
               <div className="mt-2 max-w-md">
