@@ -7,34 +7,35 @@ import { PlanListPanel } from "./plan-list-panel";
 import { UploadSwitch } from "./upload-switch";
 
 /**
- * How far the schedule has come — the stages in a row, each with its own count
- * under it — and, for whoever plans the project, its three uploads in the order they are
+ * How far the schedule has come — the stages in a row, each with the revision
+ * in force under it — and, for whoever plans the project, its three uploads in the order they are
  * done: the schedule, the disciplines each action concerns, the documents each
  * discipline needs.
  */
 export async function PlanCards({ from = null, to = null }: { from?: Date | null; to?: Date | null } = {}) {
   const ctx = await requireScope();
   const plans = ctx.can("PLAN") || ctx.can("CONTROL") || ctx.can("CONFIGURE");
-  const [progress, lists] = await Promise.all([planProgress(ctx, { from, to }), plans ? planLists(ctx) : Promise.resolve([])]);
+  const [progress, lists] = await Promise.all([planProgress(ctx, { from, to }), planLists(ctx).catch(() => [])]);
   const day = (d: Date) => d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 
-  // Each stage carries its own count, so the row reads as one thing.
+  // Under each list stage: the revision in force, linked to its document, or that there is none.
+  const inForce = (kind: string) => {
+    const docs = lists.find((one) => one.kind === kind)?.documents ?? [];
+    const released = docs.filter((one) => one.released);
+    if (!docs.length) return "None yet";
+    if (!released.length) return "Not released yet";
+    if (released.length > 1) return `${released.length} documents in force`;
+    return <Link href={`/documents/${released[0].id}`} className="font-semibold text-link hover:underline">Rev {released[0].released!.value}</Link>;
+  };
   const under: React.ReactNode[] = [
-    progress.schedule ? (
-      <>
-        <Link href={`/documents/${progress.schedule.documentId}`} className="font-semibold text-link hover:underline">
-          {progress.schedule.revision ? `Rev ${progress.schedule.revision}` : "Its document"}
-        </Link>
-        {" · "}<Link href="/actions/schedules" className="text-link hover:underline">versions</Link>
-      </>
-    ) : "None yet",
-    progress.actions ? (
-      <>
-        {progress.tagged} of {progress.actions} tagged
-        {progress.untagged.length ? <>{" · "}<Link href="/actions?view=table&untagged=1" className="font-semibold text-amber-800 hover:underline">{progress.untagged.length} untagged</Link></> : null}
-      </>
-    ) : null,
-    progress.actions ? <>{progress.answered} of {progress.asked} lists</> : null,
+    inForce("SCHEDULE"),
+    <>
+      {inForce("DEPARTMENTS")}
+      {/* Only a problem is counted here: actions no discipline is tagged on. */}
+      {progress.untagged.length ? <>{" · "}<Link href="/actions?view=table&untagged=1" className="font-semibold text-amber-800 hover:underline">{progress.untagged.length} untagged</Link></> : null}
+    </>,
+    inForce("REQUIREMENTS"),
+    // Counted only in the window: a month either side of today, or the dates chosen.
     progress.actions ? (
       <span title={progress.window.chosen ? "Actions within the dates chosen" : "Actions within a month either side of today"}>
         {progress.complete} of {progress.listed} · {day(progress.window.from)} – {day(progress.window.to)}

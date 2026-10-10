@@ -219,9 +219,9 @@ export function PlanRegister({
     <section className="register register-sheet register-sheet-open mb-4">
       {plate}
 
-      {/* How far the schedule has come, each stage with its count, and the
-          uploads for whoever plans it. */}
-      <div className="border-b border-line px-5 py-3 sm:px-6">{uploads}</div>
+      {/* How far the schedule has come, each stage with its revision in
+          force, and the uploads for whoever plans it. */}
+      <div className="border-b border-line px-5 py-5 sm:px-6">{uploads}</div>
 
       <form
         // Remounted whenever the answer changes, so Clear all empties the boxes

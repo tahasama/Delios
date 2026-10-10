@@ -27,9 +27,7 @@ export function PlanListPanel({ list, control }: { list: PlanList; control: bool
   const type = list.types[0] ?? null;
   const inForce = list.documents.filter((one) => one.released);
   const only = inForce.length === 1 ? inForce[0] : null;
-  const template = list.template
-    ? <a href={list.template} className="inline-flex items-center gap-1 text-xs font-semibold text-link hover:underline"><Download className="h-3.5 w-3.5" /> Current list to fill</a>
-    : null;
+  const template = <a href={list.template} className="inline-flex items-center gap-1 text-xs font-semibold text-link hover:underline"><Download className="h-3.5 w-3.5" /> Template to fill (.csv)</a>;
 
   // The same way out wherever no revision is in force: no document yet, or none released.
   const loose = control ? (
@@ -46,10 +44,7 @@ export function PlanListPanel({ list, control }: { list: PlanList; control: bool
         <Field label="Why without a released document" required>
           <input name="reason" required className={inputCls} placeholder="e.g. Approver not available; or the organization approves on paper and a stamped scan follows" />
         </Field>
-        <div className="flex flex-wrap items-center gap-3">
-          <button className="ask" data-on="true">Upload and apply</button>
-          {template}
-        </div>
+        <button className="ask" data-on="true">Upload and apply</button>
       </ActionForm>
     </details>
   ) : null;
@@ -63,6 +58,7 @@ export function PlanListPanel({ list, control }: { list: PlanList; control: bool
       <p className="mt-0.5 text-xs leading-5 text-slate-500">
         Releasing its document reads the Excel by itself. Upload here only if that read is missing or failed.
       </p>
+      <p className="mt-1.5">{template}</p>
 
       {list.documents.length ? (
         <>
@@ -98,7 +94,6 @@ export function PlanListPanel({ list, control }: { list: PlanList; control: bool
                   aria-label={only ? `Excel of rev ${only.released!.value} (.xlsx or .csv)` : "Excel of the revision in force (.xlsx or .csv)"}
                   className={`${fileInputInline} min-w-0 flex-1`}
                 />
-                {template}
               </div>
               {/* The uploader vouches for the file, or says why it differs. */}
               <ConfirmOrWhy revision={only ? `rev ${only.released!.value}` : "the revision in force"} />

@@ -32,8 +32,8 @@ export type PlanList = {
   types: { code: string; label: string }[];
   /** The documents that hold it on this project; the schedule has one. */
   documents: PlanListDocument[];
-  /** A sheet to fill, where the system can give one. */
-  template: string | null;
+  /** The sheet to fill, with the headings the reader looks for. */
+  template: string;
 };
 
 type Summary = { id: string; number: string; title: string; latestRevision: string | null; latestRevisionState: string | null };
@@ -84,7 +84,7 @@ export async function planLists(scope: { projectId: string }): Promise<PlanList[
       says: "The planner's export (.xlsx or .csv): every action and its date.",
       types: scheduleTypes,
       documents: named.length ? named : schedules,
-      template: null,
+      template: "/api/plan-template/SCHEDULE",
     },
     {
       kind: "DEPARTMENTS",
@@ -92,7 +92,7 @@ export async function planLists(scope: { projectId: string }): Promise<PlanList[
       says: "Which disciplines each action concerns.",
       types: departmentTypes,
       documents: departments,
-      template: "/api/controlled/current/ACTION_DEPARTMENTS",
+      template: "/api/plan-template/DEPARTMENTS",
     },
     {
       kind: "REQUIREMENTS",
@@ -100,7 +100,7 @@ export async function planLists(scope: { projectId: string }): Promise<PlanList[
       says: "What each discipline needs for each action, from whom, by when.",
       types: requirementTypes,
       documents: requirements,
-      template: null,
+      template: "/api/plan-template/REQUIREMENTS",
     },
   ];
 }

@@ -101,16 +101,16 @@ export function StagePath({ stages, at, note, under }: {
   stages: string[];
   at: number;
   note?: React.ReactNode;
-  /** One short line under each stage — its own count — read with the stage it belongs to. */
+  /** One short line under each stage, read with the stage it belongs to. */
   under?: React.ReactNode[];
 }) {
   return (
     <div>
-      <ol className={cn("flex flex-wrap gap-y-2", under ? "items-start gap-y-3" : "items-center")}>
+      <ol className={cn("flex flex-wrap gap-y-2", under ? "items-start gap-y-4" : "items-center")}>
         {stages.map((name, i) => (
           <li key={name} className={cn("flex", under ? "items-start" : "items-center")}>
             {i ? <span className={cn("mx-1 h-px w-3 sm:mx-1.5 sm:w-10", under && "mt-[13px]", i <= at ? "bg-(--color-brand)" : "bg-line-strong")} aria-hidden /> : null}
-            <span className={under ? "flex flex-col gap-1" : "contents"}>
+            <span className={under ? "flex flex-col gap-1.5" : "contents"}>
             <span
               className={cn(
                 "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-semibold",

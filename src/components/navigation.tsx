@@ -75,7 +75,6 @@ function primaryNav(p: NavPermissions): NavItem[] {
         label: "Schedule & actions",
         description: "What is needed, and when",
         icon: CalendarRange,
-        exclude: ["/actions/schedules"],
       },
       {
         href: "/transmittals",

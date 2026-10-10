@@ -255,6 +255,12 @@ export default async function DocumentDetailPage({
     <input type="hidden" name="appVersion" value={doc.appVersion ?? ""} />
     <input type="hidden" name="legacyScheme" value={doc.legacyScheme ?? ""} />
   </>);
+  // A schedule, disciplines-per-action or requirements list: its sheet to fill, where its file is attached.
+  const typeProps = types.find((one) => one.code === doc.docType)?.props ?? {};
+  const listKind = doc.docType === "SCH" ? "SCHEDULE" : typeProps.readsDepartments === true ? "DEPARTMENTS" : typeProps.readsRequirements === true ? "REQUIREMENTS" : null;
+  const listTemplate = listKind
+    ? <a href={`/api/plan-template/${listKind}`} className="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-link hover:underline">Template to fill (.csv)</a>
+    : null;
   const editing = canEdit && working && working.state === "IN_PREPARATION";
   const lead: StepItem[] = editing ? [{
     key: "edit", label: `Edit rev ${working!.value}`, open: !workingHasPdf, primary: !workingHasPdf, body: (
@@ -265,6 +271,7 @@ export default async function DocumentDetailPage({
               </Field>
               <Field label="Source file" hint="the editable original; for a schedule or a list, its .xlsx or .csv — read on release">
                 <input type="file" name="nativeFile" className="block w-full text-xs" />
+                {listTemplate}
               </Field>
             </div>
             {detailFields}
@@ -475,7 +482,7 @@ export default async function DocumentDetailPage({
               </Asked>
               <Added fields={revisionPolicy.own} className="sm:col-span-2" />
               <Field label="PDF" hint="optional now — what people will read; needed before it is sent"><input type="file" name="renditionFile" accept=".pdf" className="block w-full text-xs" /></Field>
-              <Field label="Native file" hint="optional — the editable original (.docx, .dwg, .xlsx…)"><input type="file" name="nativeFile" className="block w-full text-xs" /></Field>
+              <Field label="Native file" hint="optional — the editable original (.docx, .dwg, .xlsx…)"><input type="file" name="nativeFile" className="block w-full text-xs" />{listTemplate}</Field>
             </div>
           </ActionForm>
         </>) },

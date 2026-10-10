@@ -1,5 +1,3 @@
-import Link from "next/link";
-
 /**
  * The schedule's masthead. The dates come from the released schedule document,
  * read on its own, so what is said here is the day those dates came into
@@ -27,8 +25,7 @@ export function PlanPlate({ inForce, plans, failed }: {
       </p>
       {failed ? (
         <p className="mt-2 max-w-2xl rounded-md bg-red-50 px-2.5 py-1.5 text-xs leading-5 text-red-900 ring-1 ring-red-200">
-          The schedule of rev {failed.revision} could not be read{failed.error ? `: ${failed.error}` : "."} {inForce ? " The dates shown are still the ones from before it." : " No dates are in force yet."}{" "}
-          <Link href="/actions/schedules" className="font-semibold underline">See every read →</Link>
+          The schedule of rev {failed.revision} could not be read{failed.error ? `: ${failed.error}` : "."} {inForce ? " The dates shown are still the ones from before it." : " No dates are in force yet."}
         </p>
       ) : null}
     </div>

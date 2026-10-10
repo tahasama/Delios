@@ -7,6 +7,9 @@ type SetValue = { code: string; label: string; props: Record<string, unknown> };
 export function decisionOptions(values: SetValue[]): VerdictOption[] {
   return values.map((v) => {
     const effect = verdictEffect(v.props);
+    // An advice value says how much its comments weigh and nothing about
+    // release, so it is never read as a verdict that sends the revision back.
+    const isAdvice = v.props.advice === true || typeof v.props.comments === "string";
     return {
       code: v.code,
       label: v.label,
@@ -16,12 +19,14 @@ export function decisionOptions(values: SetValue[]): VerdictOption[] {
       blocks: v.props.blocking === true || v.props.comments === "blocking",
       // Advice has no code anybody quotes — NO_COMMENT is a name, not a code —
       // so only its words are shown. A verdict's code is quoted daily.
-      advice: v.props.advice === true,
+      advice: isAdvice,
       // A verdict that says anything is wrong needs somewhere to say it: one
       // that sends the revision back, one that carries comments into the next
       // revision, and any advice whose own list says it has comments. A clean
       // accept, and "nothing to say", have nothing to add and are not asked.
-      wantsComment: effect === "RETURN" || v.props.resubmit === true || v.props.blocking === true || v.props.comments === "some" || v.props.comments === "blocking",
+      wantsComment: isAdvice
+        ? v.props.comments === "some" || v.props.comments === "blocking"
+        : effect === "RETURN" || v.props.resubmit === true || v.props.blocking === true || v.props.comments === "some" || v.props.comments === "blocking",
       meaning: typeof v.props.meaning === "string" ? v.props.meaning : null,
     };
   });

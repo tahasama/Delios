@@ -124,6 +124,16 @@ public static class ListUploadEndpoints
         List<string[]> rows;
         using (var content = new MemoryStream(bytes)) rows = ScheduleReader.ReadRows(content, fileName);
         var now = clock.GetCurrentInstant();
+        // Each upload keeps its own label, unique within its list: "rev B", then "rev B (2)" for the same
+        // revision read again; "upload 1", "upload 2"… for lists with no document.
+        var stem = revision is null ? "upload" : $"rev {revision.Value}";
+        var taken = (await db.Set<ControlledVersion>().AsNoTracking()
+            .Where(v => v.ProjectId == project.Id && v.Kind == list.Kind && v.Key == "default" && v.VersionLabel != null && v.VersionLabel.StartsWith(stem))
+            .Select(v => v.VersionLabel!).ToListAsync(cancellationToken)).ToHashSet();
+        var versionLabel = revision is null ? "upload 1" : stem;
+        for (var n = 2; taken.Contains(versionLabel); n++) versionLabel = revision is null ? $"upload {n}" : $"{stem} ({n})";
+        if (versionLabel.Length > 16) versionLabel = $"upload {taken.Count + 1}";
+        var note = summary is { Length: > 2000 } ? summary[..2000] : summary;
         db.Add(new ControlledVersion
         {
             TenantId = project.TenantId,
@@ -131,7 +141,7 @@ public static class ListUploadEndpoints
             Kind = list.Kind,
             Key = "default",
             Title = list.Title,
-            VersionLabel = revision is null ? "upload" : $"rev {revision.Value}" is { Length: <= 16 } brief ? brief : "upload",
+            VersionLabel = versionLabel,
             State = "APPROVED",
             Payload = JsonSerializer.Serialize(rows),
             RowCount = Math.Max(rows.Count - 1, 0),
@@ -139,7 +149,7 @@ public static class ListUploadEndpoints
             SourceName = label ?? fileName,
             SourceSize = bytes.Length,
             SourceHash = Convert.ToHexStringLower(SHA256.HashData(bytes)),
-            Notes = summary,
+            Notes = note,
             CreatedById = access.UserId,
             CreatedByName = access.UserName,
             CreatedAt = now,
@@ -147,7 +157,7 @@ public static class ListUploadEndpoints
             DecidedAt = now,
             DecisionReason = reason.Length == 0 ? null : reason.Length > 2000 ? reason[..2000] : reason,
             AppliedAt = now,
-            AppliedSummary = summary,
+            AppliedSummary = note,
         });
         await db.SaveChangesAsync(cancellationToken);
         var said = revision is null
