@@ -27,7 +27,7 @@ export function PlanPlate({ inForce, plans, failed }: {
       </p>
       {failed ? (
         <p className="mt-2 max-w-2xl rounded-md bg-red-50 px-2.5 py-1.5 text-[11.5px] leading-4 text-red-900 ring-1 ring-red-200">
-          The schedule of rev {failed.revision} could not be read{failed.error ? `: ${failed.error}` : "."} The dates shown are still the ones before it.{" "}
+          The schedule of rev {failed.revision} could not be read{failed.error ? `: ${failed.error}` : "."} {inForce ? " The dates shown are still the ones from before it." : " No dates are in force yet."}{" "}
           <Link href="/actions/schedules" className="font-semibold underline">See every read →</Link>
         </p>
       ) : null}

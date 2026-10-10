@@ -1,5 +1,5 @@
-Activity ID,Activity Name,Start,Finish,Responsible
-A600,Excavate sludge thickener,24-Oct-26,26-Oct-26,Site manager
-A610,Pour thickener base,07-Nov-26,08-Nov-26,Site manager
-A620,Install thickener mechanism,24-Nov-26,27-Nov-26,Site manager
-A630,Commission thickener,19-Dec-26,21-Dec-26,Commissioning lead
+Activity ID,Activity Name,Start,Finish
+A600,Excavate sludge thickener,24-Oct-26,26-Oct-26
+A610,Pour thickener base,07-Nov-26,08-Nov-26
+A620,Install thickener mechanism,24-Nov-26,27-Nov-26
+A630,Commission thickener,19-Dec-26,21-Dec-26

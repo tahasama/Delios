@@ -21,8 +21,6 @@ export type PlanTableRow = {
   /** The planner's ID for it, when it differs from our number. */
   plannerId: string | null;
   name: string;
-  description: string | null;
-  owner: string | null;
   departments: string[];
   date: string | null;
   /** The day the work ends, when the schedule gives one, and how many days it lasts. */
@@ -73,6 +71,7 @@ export function PlanRegister({
     /** Of those drawn, how many have no date from the schedule and so no bar. */
     undated: number;
     noNote?: { count: number; href: string };
+    undatedHref?: string;
   };
   rows: PlanTableRow[];
   total: number;
@@ -232,13 +231,14 @@ export function PlanRegister({
         action="/actions"
         onSubmit={(event) => {
           event.preventDefault();
+          setDirty(false);
           const data = new FormData(event.currentTarget);
           const params = new URLSearchParams();
           if (view === "table") params.set("view", "table");
           for (const [key, value] of data.entries()) if (value) params.set(key, String(value));
           go(here(params));
         }}
-        onChange={() => setDirty(true)}
+        onChange={(event) => { if (!(event.target as HTMLElement).dataset.instant) setDirty(true); }}
         className="asking px-5 py-3.5 pb-5 sm:px-6"
       >
         <div className="flex items-center gap-3">
@@ -262,7 +262,7 @@ export function PlanRegister({
         <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3.5 sm:grid-cols-4 lg:grid-cols-7">
           <Narrow name="code" value={filters.code} empty="Action" options={filterOptions.codes} />
           <Narrow name="state" value={filters.state} empty="State" options={filterOptions.states} />
-          <Narrow name="happened" value={filters.happened} empty="On the day" options={filterOptions.happened} />
+          <Narrow name="happened" value={filters.happened} empty="Went ahead?" options={filterOptions.happened} />
           <Narrow name="discipline" value={filters.discipline} empty="Discipline" options={filterOptions.disciplines} />
           <Narrow name="docType" value={filters.docType} empty="Type" options={filterOptions.types} />
           <Narrow name="supplier" value={filters.supplier} empty="Supplier" options={filterOptions.suppliers} />
@@ -338,7 +338,7 @@ export function PlanRegister({
               reader needs before the bars, at the two corners above them. */}
           <div className="flex items-start justify-between gap-4 px-5 pt-2.5 sm:px-6">
             <span className="font-mono text-[11px] tracking-tight text-slate-500 tabular-nums">
-              {more?.window && !more.window.wide ? more.window.label : "Every date in the schedule"}
+              {more?.window && !more.window.wide ? more.window.label : filters.from || filters.to ? `${filters.from || "…"} → ${filters.to || "…"}` : "Every date in the schedule"}
             </span>
             <span
               className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1 text-[11px] text-slate-500"
@@ -380,15 +380,18 @@ export function PlanRegister({
               <p className="font-mono text-xs tracking-[0.2em] text-slate-400 uppercase">no actions</p>
               <p className="mt-2 text-sm text-slate-700">
                 {more.window && more.window.elsewhere
-                  ? `Nothing in these days. ${more.window.elsewhere.toLocaleString("en-GB")} ${more.window.elsewhere === 1 ? "action falls" : "actions fall"} outside them.`
-                  : "Nothing in the schedule matches these filters."}
+                  ? `Nothing dated in these days. ${more.window.elsewhere.toLocaleString("en-GB")} ${more.window.elsewhere === 1 ? "action falls" : "actions fall"} outside them.`
+                  : facets.length ? "Nothing in the schedule matches these filters." : more.undated ? "Nothing dated in the schedule." : "The schedule has no actions yet."}
               </p>
               <div className="mt-3 flex items-center justify-center gap-4">
                 {more.window && more.window.elsewhere ? (
                   <button type="button" onClick={() => go(more.window!.href)} className="text-xs font-semibold text-link hover:underline">Show every date →</button>
                 ) : null}
                 {more.undated ? (
-                  <button type="button" onClick={() => go(viewHref("table"))} className="text-xs font-semibold text-amber-800 hover:underline">{more.undated.toLocaleString("en-GB")} with no date — in the table →</button>
+                  <button type="button" onClick={() => go(more.undatedHref ?? viewHref("table"))} className="text-xs font-semibold text-amber-800 hover:underline">{more.undated.toLocaleString("en-GB")} with no date — in the table →</button>
+                ) : null}
+                {more.noNote?.count ? (
+                  <button type="button" onClick={() => go(more.noNote!.href)} className="text-xs font-semibold text-red-700 hover:underline">{more.noNote.count.toLocaleString("en-GB")} went ahead with missing documents →</button>
                 ) : null}
                 {facets.length ? <button type="button" onClick={() => go("/actions")} className="text-xs font-semibold text-link hover:underline">Clear the {facets.length} filter{facets.length === 1 ? "" : "s"} →</button> : null}
               </div>
@@ -407,13 +410,13 @@ export function PlanRegister({
                   <span className="text-amber-800">· {more.window.elsewhere.toLocaleString("en-GB")} outside these days</span>
                 ) : null}
                 {more.undated ? (
-                  <button type="button" onClick={() => go(viewHref("table"))} className="text-amber-800 hover:underline" title="An action with no date has no bar; the table lists it">
+                  <button type="button" onClick={() => go(more.undatedHref ?? viewHref("table"))} className="text-amber-800 hover:underline" title="An action with no date has no bar; the table lists them">
                     · {more.undated.toLocaleString("en-GB")} with no date — in the table
                   </button>
                 ) : null}
                 {more.noNote?.count ? (
-                  <button type="button" onClick={() => go(more.noNote!.href)} className="text-red-700 hover:underline" title="Their day passed short of what they needed, and nobody wrote down what happened">
-                    · {more.noNote.count.toLocaleString("en-GB")} went ahead short, with no note
+                  <button type="button" onClick={() => go(more.noNote!.href)} className="text-red-700 hover:underline" title="Across every date: their day passed without every document they needed">
+                    · {more.noNote.count.toLocaleString("en-GB")} went ahead with missing documents
                   </button>
                 ) : null}
                 {more.window ? (
@@ -480,7 +483,7 @@ export function PlanRegister({
               <DataTable
                 id="actions"
                 className="rounded-none border-0 shadow-none"
-                defaultHidden={["Description", "Responsible", "Confirmed"]}
+                defaultHidden={["Confirmed"]}
                 fill
                 stretch
                 capHeight={fit}
@@ -599,11 +602,32 @@ export function PlanRegister({
 
 /** One narrowing choice, drawn as the register draws them. */
 function Narrow({ name, value, empty, options }: { name: string; value: string; empty: string; options: Opt[] }) {
+  // A choice made with the pointer applies at once, like the colour key. One
+  // made with the keyboard applies on leaving the box, so stepping through the
+  // options with the arrow keys does not reload the page at every step.
+  const pointer = useRef(false);
+  const waiting = useRef(false);
   return (
     <label className="min-w-0 flex-1">
       <span className="sr-only">{empty}</span>
-      {/* A choice applies as it is made, like the colour key; only typed words wait for Apply. */}
-      <select name={name} defaultValue={value} data-on={value ? "true" : "false"} className="plain w-full" onChange={(event) => event.currentTarget.form?.requestSubmit()}>
+      <select
+        name={name}
+        defaultValue={value}
+        data-on={value ? "true" : "false"}
+        data-instant="true"
+        className="plain w-full"
+        onPointerDown={() => { pointer.current = true; }}
+        onKeyDown={() => { pointer.current = false; }}
+        onChange={(event) => {
+          if (pointer.current) event.currentTarget.form?.requestSubmit();
+          else waiting.current = true;
+        }}
+        onBlur={(event) => {
+          if (!waiting.current) return;
+          waiting.current = false;
+          event.currentTarget.form?.requestSubmit();
+        }}
+      >
         <option value="">{empty}</option>
         {options.map((option) => <option key={option.code} value={option.code}>{option.label}</option>)}
       </select>
@@ -670,8 +694,8 @@ const READINESS: Record<PlanTableRow["readiness"], { label: string; chip: string
 
 const HAPPENED: Record<PlanTableRow["happened"], { label: string; chip: string }> = {
   POSTPONED: { label: "Postponed", chip: "bg-slate-100 text-slate-700 ring-slate-300" },
-  CARRIED: { label: "Went ahead short", chip: "bg-amber-100 text-amber-900 ring-amber-300" },
-  DONE: { label: "Went ahead", chip: "bg-emerald-600/10 text-emerald-900 ring-emerald-300" },
+  CARRIED: { label: "Missing documents", chip: "bg-amber-100 text-amber-900 ring-amber-300" },
+  DONE: { label: "With documents", chip: "bg-emerald-600/10 text-emerald-900 ring-emerald-300" },
   AHEAD: { label: "Not yet", chip: "bg-sky-50 text-sky-800 ring-sky-200" },
 };
 
@@ -691,8 +715,8 @@ const COLUMNS: Column[] = [
     cell: (row) => <Chip className={READINESS[row.readiness].chip}>{READINESS[row.readiness].label}</Chip>,
   },
   {
-    key: "happened", label: "On the day",
-    note: "What became of the work, which is not the same question as whether its documents arrived. The day passing is the work happening; only Document Control writing down Postponed takes it back. Went ahead short: the day passed without everything it needed. Went ahead: it had everything, in time. Not yet: the day is still ahead.",
+    key: "happened", label: "Went ahead?",
+    note: "Once the day has passed: With documents — it had everything it needed, in time. Missing documents — it went ahead without all of them; each discipline that confirmed going ahead said why. Postponed — Document Control wrote down that it did not happen. Before the day: not yet.",
     cellClass: "whitespace-nowrap",
     // Before the day there is nothing to say: the column stays quiet.
     cell: (row) => row.happened === "AHEAD" ? <span className="text-xs text-slate-400">—</span> : (
@@ -764,8 +788,6 @@ const COLUMNS: Column[] = [
       </span>
     ),
   },
-  { key: "description", label: "Description", cellClass: "max-w-72 truncate text-xs text-slate-600", cell: (row) => row.description ?? <span className="text-slate-300">·</span> },
-  { key: "owner", label: "Responsible", cellClass: "whitespace-nowrap text-xs text-slate-600", cell: (row) => row.owner ?? <span className="text-slate-300">·</span> },
 ];
 
 /** The arrow that says a column can be ordered. Dim until it is used. */

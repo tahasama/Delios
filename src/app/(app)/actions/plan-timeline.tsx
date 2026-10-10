@@ -123,8 +123,8 @@ export function PlanTimeline({ rows, window, fit }: {
             last one however far down it was loaded. */}
         <div className="relative min-h-full">
           <div className="pointer-events-none absolute inset-y-0 left-52 right-16">
-            {ticks.map((t) => (
-              <div key={t.label} className="absolute top-0 h-full border-l border-dashed border-line" style={{ left: `${t.left}%` }} />
+            {ticks.map((t, index) => (
+              <div key={`${index}-${t.label}`} className="absolute top-0 h-full border-l border-dashed border-line" style={{ left: `${t.left}%` }} />
             ))}
             <div className="absolute top-0 h-full border-l-2 border-brand/60" style={{ left: `${at(now)}%` }} />
           </div>
@@ -149,7 +149,7 @@ export function PlanTimeline({ rows, window, fit }: {
                     className={`absolute top-1/2 h-2.5 -translate-y-1/2 ${TONE[r.readiness]} ${fromBefore ? "rounded-r-full" : "rounded-full"}`}
                     style={{ left: `${left}%`, width: `${width}%` }}
                     role="img"
-                    aria-label={`${STATE_WORD[r.readiness]}: documents needed from ${fmtDate(r.firstNeeded)}, work on ${fmtDate(r.scheduledDate)}, ${r.ready} of ${r.total} ready`}
+                    aria-label={`${STATE_WORD[r.readiness]}: ${r.firstNeeded ? `documents needed from ${fmtDate(r.firstNeeded)}, ` : ""}work on ${fmtDate(r.scheduledDate)}, ${r.ready} of ${r.total} ready`}
                     title={`${r.code}: documents needed from ${fmtDate(r.firstNeeded)} · work on ${fmtDate(r.scheduledDate)} · ${r.ready} of ${r.total} ready`}
                   />
                   {/* The work itself, start to finish, as a dark block on the end of the bar;

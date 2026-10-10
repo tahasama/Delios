@@ -26,7 +26,7 @@ type Readiness = PlanTableRow["readiness"];
 type Happened = "POSTPONED" | "CARRIED" | "DONE" | "AHEAD";
 
 type Search = {
-  view?: string; all?: string; q?: string; state?: string; happened?: string; discipline?: string; docType?: string; supplier?: string;
+  view?: string; all?: string; q?: string; state?: string; happened?: string; nodate?: string; untagged?: string; discipline?: string; docType?: string; supplier?: string;
   code?: string; on?: string; from?: string; to?: string;
   sort?: string; dir?: string; page?: string; per?: string; show?: string; step?: string;
 };
@@ -58,9 +58,8 @@ const STATES = ACTION_STATES;
  * written down at all.
  */
 const HAPPENED = [
-  { code: "WITHOUT", label: "Went ahead short of documents" },
-  { code: "CARRIED", label: "… with a note" },
-  { code: "NONE", label: "… with no note" },
+  { code: "WITH", label: "With documents" },
+  { code: "WITHOUT", label: "Missing documents" },
   { code: "STOPPED", label: "Postponed" },
 ];
 
@@ -117,10 +116,11 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
   // arrived. Both readings of "short on the day", in one clause.
   const shortOnTheDay = (a: LegacyAction) => a.entries.length > 0 && dayHasPassed(a) && (shortOfWhatItNeeds(a) || afterTheDay(a));
   const decided = (a: LegacyAction, decision: string) => a.notes.some((note) => note.decision === decision);
+  // Went ahead? Once its day has passed: with its documents, with documents
+  // missing, or not at all because Document Control postponed it.
   const HAPPENED_WHERE: Record<string, (action: LegacyAction) => boolean> = {
+    WITH: (a) => a.entries.length > 0 && dayHasPassed(a) && !shortOnTheDay(a) && !decided(a, "STOPPED"),
     WITHOUT: (a) => shortOnTheDay(a) && !decided(a, "STOPPED"),
-    CARRIED: (a) => shortOnTheDay(a) && decided(a, "CARRIED"),
-    NONE: (a) => shortOnTheDay(a) && a.notes.length === 0,
     STOPPED: (a) => decided(a, "STOPPED"),
   };
 
@@ -131,6 +131,8 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
     (!code || a.code === code)
     && (!state || actionState(a, riskDays) === state)
     && (!happened || HAPPENED_WHERE[happened](a))
+    && (sp.nodate !== "1" || !a.scheduledDate)
+    && (sp.untagged !== "1" || departmentsOf(a).length === 0)
     // A discipline is what an action is tagged with and what a document
     // belongs to — the same list, so the filter answers for both.
     && (!discipline || departmentsOf(a).includes(discipline) || a.entries.some((e) => e.document.discipline === discipline))
@@ -140,7 +142,7 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
     // A space narrows, a comma widens: every word of a part must be found
     // somewhere on the action, and any part may be the one that matches.
     && (!searches.length || searches.some((search) => search.words.every((word) =>
-      has(a.code, word) || has(a.name, word) || has(a.description, word) || has(a.ownerName, word) || has(a.scheduleRef, word)
+      has(a.code, word) || has(a.name, word) || has(a.description, word) || has(a.scheduleRef, word)
       || a.entries.some((e) => has(e.document.docNumber, word) || has(e.document.title, word)))));
   const where = (a: LegacyAction) => outsideWindow(a) && inWindow(a);
 
@@ -212,8 +214,6 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
       code: row.code,
       plannerId: row.scheduleRef && row.scheduleRef !== row.code ? row.scheduleRef : null,
       name: row.name,
-      description: row.description,
-      owner: row.ownerName,
       departments: departmentsOf(row).map((one) => deptLabel.get(one) ?? one),
       date: row.scheduledDate ? fmtDate(row.scheduledDate) : null,
       finish: row.finishDate && row.scheduledDate && row.finishDate > row.scheduledDate ? fmtDate(row.finishDate) : null,
@@ -256,6 +256,9 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
   if (q) query.set("q", q);
   if (code) query.set("code", code);
   if (state) query.set("state", state);
+  if (happened) query.set("happened", happened);
+  if (sp.nodate === "1") query.set("nodate", "1");
+  if (sp.untagged === "1") query.set("untagged", "1");
   if (discipline) query.set("discipline", discipline);
   if (docType) query.set("docType", docType);
   if (supplier) query.set("supplier", supplier);
@@ -281,7 +284,9 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
   if (q) facets.push({ key: "search", label: q, without: drop("q") });
   if (code) facets.push({ key: "action", label: code, without: drop("code") });
   if (state) facets.push({ key: "state", label: said(STATES, state), without: drop("state") });
-  if (happened) facets.push({ key: "on the day", label: said(HAPPENED, happened), without: drop("happened") });
+  if (happened) facets.push({ key: "went ahead?", label: said(HAPPENED, happened), without: drop("happened") });
+  if (sp.nodate === "1") facets.push({ key: "date", label: "none", without: drop("nodate") });
+  if (sp.untagged === "1") facets.push({ key: "disciplines", label: "not tagged", without: drop("untagged") });
   if (discipline) facets.push({ key: "discipline", label: said(disciplineRows, discipline), without: drop("discipline") });
   if (docType) facets.push({ key: "type", label: said(typeRows, docType), without: drop("docType") });
   if (supplier) facets.push({ key: "supplier", label: said(supplierRows, supplier), without: drop("supplier") });
@@ -348,8 +353,9 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
                 href: matching > rows.length ? deeper(step) : null,
                 window: planWindow,
                 undated: undatedAll,
-                // What Document Control owes a note on: went ahead short, nothing written down.
-                noNote: { count: schedule.filter(HAPPENED_WHERE.NONE).length, href: "/actions?happened=NONE" },
+                undatedHref: "/actions?view=table&nodate=1",
+                // Went ahead with documents missing, across every date, opened on every date.
+                noNote: { count: schedule.filter(HAPPENED_WHERE.WITHOUT).length, href: "/actions?happened=WITHOUT&all=1" },
               }
             : undefined
         }

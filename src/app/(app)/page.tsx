@@ -108,7 +108,8 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
       const ready = a.met + a.waived;
       const scheduledDate = at(a.start);
       const late = scheduledDate ? scheduledDate.getTime() < Date.now() : false;
-      const mine = !!a.responsible && a.responsible === user.name;
+      // Engaged in it: the action concerns the discipline this person answers for.
+      const mine = !!user.department && a.departments.includes(user.department);
       return { id: a.id, code: a.code, name: a.name, scheduledDate, total, ready, short: total - ready, late, mine };
     })
     .filter((a) => a.total > 0 && a.short > 0 && a.scheduledDate)

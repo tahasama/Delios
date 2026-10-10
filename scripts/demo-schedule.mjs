@@ -139,8 +139,8 @@ async function main() {
     ["A400", "Hydrotest process pipework", 24, 26],
     ["A500", "Handover of inlet works", 60, 60],
   ];
-  const programme = csv([["Activity ID", "Activity Name", "Start", "Finish", "Responsible"],
-    ...activities.map(([code, name, start, finish]) => [code, name, day(start), day(finish), "Site manager"])]);
+  const programme = csv([["Activity ID", "Activity Name", "Start", "Finish"],
+    ...activities.map(([code, name, start, finish]) => [code, name, day(start), day(finish)])]);
   await release(await revise(engineer, schedule.id, [["Programme.pdf", pdf("Construction programme"), "application/pdf"], ["Programme.csv", programme, "text/csv"]], "First issue of the programme"));
   const read = await until("the schedule to be read", () => engineer.get(`${p}/activities`), (rows) => rows.length === activities.length);
   console.log(`  ${read.length} activities read.`);

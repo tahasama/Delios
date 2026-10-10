@@ -95,7 +95,7 @@ async function extract(req: Request, { params }: { params: Promise<{ kind: strin
     }
 
     rows = [[
-      "Action code", "Action", "Description", "Scheduled date", "Owner", "Departments", "State",
+      "Action code", "Action", "Description", "Scheduled date", "Departments", "State",
       "Last document issued", "Decision", "Decision stood at", "Carried by", "Reason", "Delay owed by", "Delay reason",
       "Document number", "Required status", "Required by",
       "Delay source", "Delay source happened", "Delay source deadline", "Delay source due", "Delay source owed by",
@@ -111,8 +111,8 @@ async function extract(req: Request, { params }: { params: Promise<{ kind: strin
       const note = a.notes[a.notes.length - 1] ?? null;
       const head = [
         a.code, a.name, a.description ?? "", a.scheduledDate?.toISOString().slice(0, 10) ?? "",
-        a.ownerName ?? "", a.departments ?? "", state(a), a.lastMetAt?.toISOString().slice(0, 10) ?? "",
-        note ? (note.decision === "CARRIED" ? "Went ahead short of documents" : "Postponed") : "",
+        a.departments ?? "", state(a), a.lastMetAt?.toISOString().slice(0, 10) ?? "",
+        note ? (note.decision === "CARRIED" ? "Went ahead with missing documents" : "Postponed") : "",
         note?.plannedDate?.toISOString().slice(0, 10) ?? "",
         note?.responsibleName ?? "", note?.reason ?? "", note?.delayResponsible ?? "", note?.delayReason ?? "",
       ];
@@ -230,9 +230,9 @@ async function extract(req: Request, { params }: { params: Promise<{ kind: strin
     name = "template-baseline";
   } else if (kind === "template-schedule") {
     rows = [
-      ["Activity ID", "Action Code", "Activity Name", "Baseline Date", "Forecast Date", "Responsible Party"],
-      ["SCH-1001", "A0042", "Foundation concrete pour - area 20", "2026-10-01", "2026-10-05", "Construction"],
-      ["SCH-1015", "A0048", "Mechanical completion - unit 73", "2026-10-18", "2026-10-18", "Commissioning"],
+      ["Activity ID", "Action Code", "Activity Name", "Baseline Date", "Forecast Date"],
+      ["SCH-1001", "A0042", "Foundation concrete pour - area 20", "2026-10-01", "2026-10-05"],
+      ["SCH-1015", "A0048", "Mechanical completion - unit 73", "2026-10-18", "2026-10-18"],
     ];
     name = "template-schedule-version";
   } else if (kind === "template-people") {

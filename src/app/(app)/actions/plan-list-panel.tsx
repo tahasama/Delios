@@ -56,6 +56,9 @@ export function PlanListPanel({ list, control }: { list: PlanList; control: bool
     <section className="min-w-0">
       <h2 className="stencil text-slate-600">{list.title}</h2>
       <p className="mt-1 text-[11.5px] leading-4 text-slate-500">{list.says}</p>
+      <p className="mt-1 text-[11.5px] leading-4 text-slate-500">
+        Releasing it on its page reads the Excel by itself. Upload here only if the released revision has no Excel, its read failed, or there is no released document.
+      </p>
 
       {list.documents.length ? (
         <>

@@ -678,6 +678,10 @@ public static class ProjectRecordEndpoints
         if (!mine && !access.Holds(Verbs.Control)) return Problems.Forbidden("NOT_YOUR_DEPARTMENT", $"Someone who answers for {department} confirms its documents.");
         var note = Blank(r.Note);
         if (!r.Available && note is null) return Problems.Invalid("NOTE_REQUIRED", "Say what is missing and why: Document Control is alerted with it.");
+        // Going ahead with this discipline's documents missing is always explained.
+        if (r.Available && note is null && await db.Set<Schedules.Requirement>().AnyAsync(n => n.ActivityId == activityId && n.Department == department
+                && n.State != RequirementStates.Met && n.State != RequirementStates.Waived, c))
+            return Problems.Invalid("NOTE_REQUIRED", "Some of its documents are missing: say why it can go ahead without them.");
         var row = await db.Set<ReadinessConfirmation>().SingleOrDefaultAsync(x => x.ActivityId == activityId && x.Department == department, c);
         if (row is null)
         {

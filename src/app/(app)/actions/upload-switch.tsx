@@ -26,6 +26,7 @@ export function UploadSwitch({ line, panels }: {
               className="ask"
               data-on={open === one.kind ? "true" : "false"}
               aria-expanded={open === one.kind}
+              aria-controls={`upload-${one.kind}`}
               onClick={() => setOpen(open === one.kind ? null : one.kind)}
             >
               <span aria-hidden className="font-mono text-[11px] opacity-60">{i + 1}</span>
@@ -34,7 +35,7 @@ export function UploadSwitch({ line, panels }: {
           ))}
         </div>
       </div>
-      {shown ? <div className="mt-3 border-t border-line pt-4">{shown.panel}</div> : null}
+      {shown ? <div id={`upload-${shown.kind}`} className="mt-3 border-t border-line pt-4">{shown.panel}</div> : null}
     </div>
   );
 }

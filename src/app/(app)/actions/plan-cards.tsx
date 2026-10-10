@@ -29,7 +29,7 @@ export async function PlanCards({ from = null, to = null }: { from?: Date | null
             <Link href={`/documents/${progress.schedule.documentId}`} className="font-semibold text-link hover:underline">
               the schedule{progress.schedule.revision ? `, rev ${progress.schedule.revision}` : ""}
             </Link>
-            {" "}<Link href="/actions/schedules" className="text-link hover:underline">(what changed)</Link>
+            {" "}· <Link href="/actions/schedules" className="text-link hover:underline">each version and its moved dates</Link>
           </span>
         ) : <span>No schedule yet</span>}
         {progress.actions ? (
@@ -38,7 +38,7 @@ export async function PlanCards({ from = null, to = null }: { from?: Date | null
             <span>
               {progress.tagged} of {progress.actions} actions tagged
               {progress.untagged.length ? (
-                <span className="text-amber-800"> (missing: {progress.untagged.slice(0, 6).map((code, i) => <span key={code}>{i ? ", " : ""}<Link href={`/actions/${code}`} className="font-mono hover:underline">{code}</Link></span>)}{progress.untagged.length > 6 ? <span className="text-slate-500"> and {progress.untagged.length - 6} more</span> : null})</span>
+                <span className="text-amber-800"> (missing: {progress.untagged.slice(0, 6).map((code, i) => <span key={code}>{i ? ", " : ""}<Link href={`/actions/${code}`} className="font-mono hover:underline">{code}</Link></span>)}{progress.untagged.length > 6 ? <> and <Link href="/actions?view=table&untagged=1" className="hover:underline">{progress.untagged.length - 6} more</Link></> : null})</span>
               ) : null}
             </span>
             {dot}

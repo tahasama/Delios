@@ -182,7 +182,7 @@ export default async function ActionDetailPage({ params, searchParams }: { param
               </p>
               <h1 className="plate-name mt-1 min-w-0">{action.name}</h1>
               <p className="plate-meta mt-2">
-                {action.ownerName ?? "No owner"} &middot; activity {fmtDate(action.scheduledDate)} &middot; {readyCount} of {action.entries.length} documents ready
+                activity {fmtDate(action.scheduledDate)} &middot; {readyCount} of {action.entries.length} documents ready
                 {action.scheduleActivities[0] ? ` \u00b7 schedule ${action.scheduleActivities[0].scheduleVersion.versionLabel}` : ""}
               </p>
               <p className="mt-1 max-w-2xl text-[11.5px] leading-4 text-slate-400">
@@ -260,7 +260,7 @@ export default async function ActionDetailPage({ params, searchParams }: { param
                             </div>
                             <label className="min-w-0">
                               <span className="sr-only">Note</span>
-                              <input name="note" required={readinessPolicy.rules.note === "REQUIRED"} className="plain w-full" placeholder={missing.length ? `${missing.length} not ready — say what and why` : readinessPolicy.rules.note === "REQUIRED" ? `${readinessPolicy.labels.note} — this project asks for one every time` : "Note — needed when not available"} />
+                              <input name="note" required={missing.length > 0 || readinessPolicy.rules.note === "REQUIRED"} className="plain w-full" placeholder={missing.length ? `${missing.length} not ready — say why it goes ahead, or what is missing` : readinessPolicy.rules.note === "REQUIRED" ? `${readinessPolicy.labels.note} — this project asks for one every time` : "Note — needed when not available"} />
                             </label>
                             <button className="ask" data-on="true">Record</button>
                           </fieldset>

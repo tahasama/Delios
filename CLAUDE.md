@@ -114,6 +114,17 @@ conversation, write it into the right one in the same commit as the code.
 - Actions get our own number (A00001…) and keep the planner's ID beside it.
 - Actions with no date are always counted on the plan ("N with no date — in the
   table"), never silently left out of the window.
+- No "Responsible" on actions: the people concerned are those of the disciplines
+  the action is tagged with, found through the distribution matrix (adjust the
+  disciplines in the Excel before upload). Description shows only on the
+  action's own page, not in the table.
+- "Went ahead?" (after the day): With documents / Missing documents / Postponed;
+  "not yet" before the day. Going ahead needs the concerned disciplines to
+  confirm; confirming with any of that discipline's documents missing always
+  needs an explanation (backend refuses otherwise).
+- Filters: a dropdown picked with the mouse applies at once; with the keyboard,
+  on leaving it. Apply lights only while typed words or dates wait. Every filter
+  is kept through sorting, paging, load more, the key and export.
 - Progress on an action: a date still to come is shown as due, never as done.
 - "Documents ready" counts only the actions in a window: a month either side
   of today, or the dates the user filtered on. Never the whole schedule.
