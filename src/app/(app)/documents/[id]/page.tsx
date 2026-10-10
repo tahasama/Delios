@@ -31,7 +31,7 @@ import { ReturnTarget } from "./return-target";
 import { CopyPicker } from "@/app/(app)/transmittals/new/recipient-picker";
 import { recipientCompanies } from "@/lib/recipients";
 import { withdrawApprovalAction } from "@/lib/actions/governance";
-import { setLegalHoldAction, disposeDocumentAction } from "@/lib/actions/retention";
+import { setLegalHoldAction } from "@/lib/actions/retention";
 import { getRunForRevision } from "@/lib/workflow";
 import { WorkflowPanel } from "./workflow-panel";
 import type { StepItem } from "./next-step";
@@ -617,9 +617,6 @@ export default async function DocumentDetailPage({
                               <Field label="Reason" required><input name="reason" className={inputCls} /></Field>
                             </ActionForm>
                           ) : null}
-                          <ActionForm action={disposeDocumentAction} submitLabel="Record disposal" size="sm" variant="danger" hidden={{ documentId: doc.id }} confirmText="Disposal is permanent. Continue?">
-                            <input name="basis" className={inputCls} placeholder="Basis and who authorised it" />
-                          </ActionForm>
                         </>
                       )}
                     </div>
