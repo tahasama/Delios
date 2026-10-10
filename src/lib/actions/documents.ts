@@ -40,7 +40,6 @@ export async function createDocumentAction(_prev: { error?: string } | undefined
  if (!discipline) return { error: "Discipline is required — exactly one." };
 
   const schemeSets: Record<string, string> = {
-    "Project code": "PROJECT_CODES",
     Subproject: "SUBPROJECTS",
     "Supplier code": "SUPPLIER_CODES",
     "Purchase order": "PURCHASE_ORDERS",
@@ -48,7 +47,6 @@ export async function createDocumentAction(_prev: { error?: string } | undefined
     "Document type": "DOCUMENT_TYPES",
   };
   const fieldValues: Record<string, string> = {
-    "Project code": String(formData.get("projectCode") ?? ""),
     Subproject: subProject ?? "",
     "Supplier code": originator ?? "",
     "Purchase order": contractRef ?? "",
@@ -93,7 +91,7 @@ export async function createDocumentAction(_prev: { error?: string } | undefined
     retentionClass: chosenRetention,
     plannedDate: String(formData.get("plannedDate") ?? ""),
     assetCode: String(formData.get("assetCode") ?? ""),
-    file: (formData.get("nativeFile") as File | null)?.size ? "yes" : "",
+    file: filesOf(formData, "renditionFile", "nativeFile").length ? "yes" : "",
     title, docType, discipline,
   });
   if (shortOf.length) {
@@ -126,14 +124,14 @@ export async function createDocumentAction(_prev: { error?: string } | undefined
     return { error: refusal(e).message };
   }
 
-  // An initial file creates the first revision immediately. A PDF is the
-  // viewable copy (rendition); anything else is the editable source.
-  const file = kind === "DOCUMENT" ? filesOf(formData, "nativeFile")[0] : undefined;
-  if (file) {
+  // Initial files create the first revision immediately: the PDF people read
+  // and the editable native file, either or both.
+  const files = kind === "DOCUMENT" ? filesOf(formData, "renditionFile", "nativeFile") : [];
+  if (files.length) {
     try {
-      const fileId = await upload(ctx, { documentId: doc.id }, file);
+      const fileIds = await Promise.all(files.map((file) => upload(ctx, { documentId: doc.id }, file)));
       // The review is sent from the document's page, where the route and its people are chosen.
-      await api(projectPath(ctx, `/documents/${doc.id}/revisions`), { body: { fileIds: [fileId] } });
+      await api(projectPath(ctx, `/documents/${doc.id}/revisions`), { body: { fileIds } });
     } catch {
       // file failure must not lose the register entry — the author can attach from the page
     }

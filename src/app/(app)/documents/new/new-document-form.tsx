@@ -65,7 +65,10 @@ export function NewDocumentForm({
 }) {
   const [step, setStep] = useState(1);
   const [producer, setProducer] = useState(received ? "VND" : start ? "ENG" : "");
-  const [hasFile, setHasFile] = useState(!!fromFile);
+  const [receivedFile, setHasFile] = useState(!!fromFile);
+  const [pdf, setPdf] = useState(false);
+  const [native, setNative] = useState(false);
+  const hasFile = receivedFile || pdf || native;
   const [docType, setDocType] = useState(start?.docType ?? "");
   const [discipline, setDiscipline] = useState("");
   const [title, setTitle] = useState(start?.title ?? "");
@@ -294,9 +297,15 @@ export function NewDocumentForm({
               </Ask>
             ) : null}
             {received || !asks("file") ? null : (
-              <Ask label={labels["file"]} required={must("file")} hint={must("file") ? "this project registers nothing without its file" : "optional — you can attach it later"}>
-                <input type="file" name="nativeFile" className={cn(field, "text-[12px] text-slate-500 file:mr-2 file:rounded file:border-0 file:bg-canvas-deep file:px-2 file:py-0.5 file:text-[11px] file:font-semibold file:text-slate-700")} onChange={(e) => setHasFile(!!e.target.files?.length)} />
-              </Ask>
+              <>
+                {/* The same two files a new revision takes: what people read, and the editable original. */}
+                <Ask label="PDF" required={must("file")} hint={must("file") ? "this project registers nothing without its file — the PDF or the native file" : "optional — what people will read; needed before it is sent"}>
+                  <input type="file" name="renditionFile" accept=".pdf" className={cn(field, "text-[12px] text-slate-500 file:mr-2 file:rounded file:border-0 file:bg-canvas-deep file:px-2 file:py-0.5 file:text-[11px] file:font-semibold file:text-slate-700")} onChange={(e) => setPdf(!!e.target.files?.length)} />
+                </Ask>
+                <Ask label="Native file" hint="optional — the editable original (.docx, .dwg, .xlsx…)">
+                  <input type="file" name="nativeFile" className={cn(field, "text-[12px] text-slate-500 file:mr-2 file:rounded file:border-0 file:bg-canvas-deep file:px-2 file:py-0.5 file:text-[11px] file:font-semibold file:text-slate-700")} onChange={(e) => setNative(!!e.target.files?.length)} />
+                </Ask>
+              </>
             )}
             <OwnFields fields={ownFields} />
 

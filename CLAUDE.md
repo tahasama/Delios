@@ -73,6 +73,10 @@ conversation, write it into the right one in the same commit as the code.
 - A withdrawn review is closed: no advice, verdict or comment can be given on
   it. Its progress ends at "Withdrawn"; a release comes from a later review.
 
+- Creating a document takes the same two optional files as a revision: a PDF
+  and a native file. The project code comes from the project the user is in;
+  it is never asked for and never refused.
+
 ### Legal hold
 - Document Control or an administrator puts a document on hold, and lifts it,
   each time with a reason. While held: it cannot be retired and no revision
