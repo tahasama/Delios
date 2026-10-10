@@ -25,8 +25,6 @@ import {
 } from "@/lib/actions/revisions";
 import { parseRecipients, mayRequestIssue, requestChoices, authorOf, issuePolicy, decisionLetsItOut, requestsOn } from "@/lib/issue-requests";
 import { legacyDocument, documentContext, type LegacyRevision } from "@/lib/api/legacy";
-import { api, projectPath } from "@/lib/api/client";
-import type { RouteView } from "@/lib/api/types";
 import { requestIssueAction, carryOutRequestAction, cancelRequestAction } from "@/lib/actions/issue-requests";
 import { RequestIssue } from "./request-issue";
 import { ReturnTarget } from "./return-target";
@@ -190,12 +188,6 @@ export default async function DocumentDetailPage({
   const heldCleared = held && heldApproval?.status === "CLOSED" ? (await pendingIssue(ctx, held.id, { recipients: false })).ok : false;
   // The document as it was at each point is not kept by the backend.
   const snapshotCount = 0;
-  const routeRows = await api<RouteView[]>(projectPath(ctx, `/documents/${id}/routes`));
-  const routes = routeRows.map((t) => ({
-    id: t.id,
-    name: t.name,
-    path: t.steps.map((st, index) => `${index === t.steps.length - 1 ? "approve" : "review"}: ${st.title}`).join(" → "),
-  }));
   const cycles = doc.revisions.flatMap((rev) => rev.cycles.map((c) => ({ rev, c }))).sort((x, y) => +y.c.submittedAt - +x.c.submittedAt);
 
   // This revision's own review steps and transmittals, for its progress line.
@@ -464,14 +456,6 @@ export default async function DocumentDetailPage({
               <Added fields={revisionPolicy.own} className="sm:col-span-2" />
               <Field label="PDF" hint="optional now — what people will read; needed before it is sent"><input type="file" name="renditionFile" accept=".pdf" className="block w-full text-xs" /></Field>
               <Field label="Native file" hint="optional — the editable original (.docx, .dwg, .xlsx…)"><input type="file" name="nativeFile" className="block w-full text-xs" /></Field>
-              {routes.length && reviewed ? (
-                <Field label="Then" hint="needs the file above" className="sm:col-span-2">
-                  <select name="sendTemplateId" className={inputCls} defaultValue="">
-                    <option value="">Just create the revision</option>
-                    {routes.map((r) => <option key={r.id} value={r.id}>Send for approval — {r.name} ({r.path})</option>)}
-                  </select>
-                </Field>
-              ) : null}
             </div>
           </ActionForm>
         </>) },

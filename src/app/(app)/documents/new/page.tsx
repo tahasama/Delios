@@ -2,7 +2,7 @@ import { fieldRules, fieldLabels, ownFields } from "@/lib/field-policy";
 import { getActiveSet } from "@/lib/config";
 import { requireScope } from "@/lib/scope";
 import { mayCreateDocument } from "@/lib/auth";
-import { adminRoutes, legacyNumbering, orEmpty } from "@/lib/api/admin";
+import { legacyNumbering } from "@/lib/api/admin";
 import { Banner, PageHeader } from "@/components/ui";
 import { NewDocumentForm } from "./new-document-form";
 
@@ -45,18 +45,6 @@ export default async function NewDocumentPage({ searchParams }: { searchParams: 
     const scheme = schemes.find((sc) => sc.name === r.schemeName);
     numberingSets[r.deliverableType] = (scheme?.fields ?? []).map((f) => f.valueSetKey).filter((k): k is string => !!k);
   }
-  // Review routes, each described by who it goes to — people choose by that.
-  const templates = (await orEmpty(adminRoutes)).filter((t) => t.active)
-    .sort((a, b) => Number(b.isDefault) - Number(a.isDefault) || a.name.localeCompare(b.name));
-  const routes = templates.map((t) => {
-    const steps = t.steps;
-    return {
-      id: t.id,
-      name: t.name,
-      isDefault: t.isDefault,
-      path: steps.map((st, index) => `${index === steps.length - 1 ? "approve" : "review"}: ${st.title}`).join(" → "),
-    };
-  });
   const defaultConf = confidentialities.find((c) => c.props.default === true)?.code ?? null;
   // A value's own one-line meaning travels with it, so the form can say what
   // "Restricted" or "Asset life" means where it is chosen.
@@ -83,7 +71,6 @@ export default async function NewDocumentPage({ searchParams }: { searchParams: 
         received={received}
         start={!received && sp.docType ? { docType: sp.docType, title: (sp.title ?? "").slice(0, 200) } : undefined}
         fromFile={fromFile}
-        routes={routes}
         numberingSets={numberingSets}
         deliverableTypes={toOpt(deliverableTypes)}
         docTypes={byName(docTypes)}

@@ -129,27 +129,16 @@ export async function createDocumentAction(_prev: { error?: string } | undefined
   // An initial file creates the first revision immediately. A PDF is the
   // viewable copy (rendition); anything else is the editable source.
   const file = kind === "DOCUMENT" ? filesOf(formData, "nativeFile")[0] : undefined;
-  let sent: "yes" | "no" | string = "no";
   if (file) {
     try {
       const fileId = await upload(ctx, { documentId: doc.id }, file);
-      const rev = await api<{ id: string }>(projectPath(ctx, `/documents/${doc.id}/revisions`), { body: { fileIds: [fileId] } });
-      // "Register & send": start the chosen review route straight away.
-      const routeId = String(formData.get("sendTemplateId") ?? "");
-      if (routeId) {
-        try {
-          await api(projectPath(ctx, `/revisions/${rev.id}/reviews`), { body: { routeId } });
-          sent = "yes";
-        } catch (e) {
-          sent = refusal(e).message;
-        }
-      }
+      // The review is sent from the document's page, where the route and its people are chosen.
+      await api(projectPath(ctx, `/documents/${doc.id}/revisions`), { body: { fileIds: [fileId] } });
     } catch {
       // file failure must not lose the register entry — the author can attach from the page
     }
   }
-  const q = sent === "yes" ? "sent=1" : sent === "no" ? "created=1" : `created=1&sendError=${encodeURIComponent(sent)}`;
-  redirect(`/documents/${doc.id}?${q}`);
+  redirect(`/documents/${doc.id}?created=1`);
 }
 
 const EDITABLE_FIELDS = [

@@ -30,19 +30,10 @@ export async function prepareRevisionAction(_prev: Result | undefined, formData:
   try {
     const files = filesOf(formData, "renditionFile", "nativeFile");
     const fileIds = await Promise.all(files.map((file) => upload(ctx, { documentId }, file)));
-    const revision = await api<{ id: string; value: string }>(projectPath(ctx, `/documents/${documentId}/revisions`), {
+    await api(projectPath(ctx, `/documents/${documentId}/revisions`), {
       body: { fileIds, reasonForRevision: text(formData, "reasonForRevision") || changeDescription, changeDescription, filesLater: fileIds.length === 0, purpose: text(formData, "purpose") || null },
     });
-    // The send can come with the new revision, so a resubmission is one form rather than three.
-    const routeId = text(formData, "sendTemplateId");
-    if (routeId && fileIds.length) {
-      try {
-        await api(projectPath(ctx, `/revisions/${revision.id}/reviews`), { body: { routeId } });
-      } catch (e) {
-        revalidatePath(`/documents/${documentId}`);
-        return { error: `Rev ${revision.value} was created but not sent: ${refusal(e).message}` };
-      }
-    }
+    // Sent for review from the document's page, where the route and its people are chosen.
   } catch (e) {
     return failed(e);
   }

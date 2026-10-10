@@ -44,14 +44,13 @@ function Ask({ label, hint, required, children, className }: { label: string; hi
  * it is comes with the file.
  */
 export function NewDocumentForm({
-  received, start, fromFile, routes, numberingSets, deliverableTypes, docTypes, disciplines, currentProject, subprojects, suppliers, pos, criticalities, confidentialities, retentionClasses, defaultConfidentiality, fields, ownFields, labels,
+  received, start, fromFile, numberingSets, deliverableTypes, docTypes, disciplines, currentProject, subprojects, suppliers, pos, criticalities, confidentialities, retentionClasses, defaultConfidentiality, fields, ownFields, labels,
 }: {
   received: boolean;
   /** Where another page sent the reader to register a document of a known type: our own, with its title. */
   start?: { docType: string; title: string };
   /** A file that came with a received transmittal, used instead of an upload. */
   fromFile?: { id: string; name: string; transmittal: string | null };
-  routes: { id: string; name: string; isDefault: boolean; path: string }[];
   numberingSets: Record<string, string[]>;
   /** The project being worked in. A document is registered here, so it is not a choice. */
   currentProject: { code: string; name: string };
@@ -66,7 +65,6 @@ export function NewDocumentForm({
 }) {
   const [step, setStep] = useState(1);
   const [producer, setProducer] = useState(received ? "VND" : start ? "ENG" : "");
-  const [sendTo, setSendTo] = useState(received ? routes.find((r) => r.isDefault)?.id ?? routes[0]?.id ?? "" : "");
   const [hasFile, setHasFile] = useState(!!fromFile);
   const [docType, setDocType] = useState(start?.docType ?? "");
   const [discipline, setDiscipline] = useState("");
@@ -95,7 +93,6 @@ export function NewDocumentForm({
     return supplierDoc ? one.appliesTo === "Supplier" : one.appliesTo === "Non-supplier";
   });
   const disciplineLabel = disciplines.find((d) => d.code === discipline)?.label ?? discipline;
-  const route = routes.find((r) => r.id === sendTo);
   const ready = Boolean(producer && docType && discipline);
   const may = (n: number) => n === 1 || ready;
 
@@ -303,24 +300,12 @@ export function NewDocumentForm({
             )}
             <OwnFields fields={ownFields} />
 
-            <Ask
-              label="After it is registered"
-              className="sm:col-span-2"
-              hint={routes.length ? (hasFile ? undefined : "attach the file to send it for review now") : "no review route is set up yet — ask an administrator"}
-            >
-              <select name="sendTemplateId" disabled={!hasFile} className={cn(field, !hasFile && "cursor-not-allowed text-slate-400")} value={hasFile ? sendTo : ""} onChange={(e) => setSendTo(e.target.value)}>
-                <option value="">Register it only — I will send it for review later</option>
-                {routes.map((r) => <option key={r.id} value={r.id}>Send for review — {r.name}</option>)}
-              </select>
-              {hasFile && route ? <span className="mt-1.5 block text-[11px] text-slate-500">It goes to {route.path}</span> : null}
-              {!hasFile ? <span className="mt-1.5 block text-[11px] text-slate-500">Nothing can be reviewed until there is something to read. Register it now, and send it once the file exists.</span> : null}
-            </Ask>
           </div>
           {foot(received ? null : 1,
             <button type="submit" disabled={emptyTitle || (received && !ready)} data-on="true" className="ask disabled:cursor-not-allowed disabled:opacity-50">
-              {hasFile && sendTo ? "Create and send" : received ? "Register it" : "Create and get a number"}
+              {received ? "Register it" : "Create and get a number"}
             </button>,
-            hasFile && sendTo ? "It gets its number, then goes to the route." : "It gets its number and waits in the register.",
+            hasFile ? "It gets its number; send it for review from its page, choosing the route and the people." : "It gets its number and waits in the register.",
           )}
         </section>
       </ActionForm>

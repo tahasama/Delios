@@ -39,6 +39,9 @@ conversation, write it into the right one in the same commit as the code.
 - The sender may change the people on each step for that review; that choice
   is what the review uses, and the record says so.
 - Sending for review opens the new review's page.
+- A review is only ever started from the Send for review form (route, people
+  per step, copies). No "create and send" shortcut on the new-document or
+  new-revision forms: create first, then send from the document's page.
 - A revision is never in two reviews at once.
 - Advisers pick advice from the published advice list; never less than their
   comments say.
