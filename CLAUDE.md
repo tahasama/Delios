@@ -27,6 +27,8 @@ conversation, write it into the right one in the same commit as the code.
   wrong, revisit the whole flow it belongs to (start → withdraw → send again →
   advise → decide → release → issue), not only the line reported.
 - Never remove behaviour that exists without saying so and why.
+- No code written inside the page (no inline scripts, no `dangerouslySetInnerHTML`).
+  Display preferences (theme, sidebar width) live in cookies the server reads.
 
 ## Rules that must never break
 

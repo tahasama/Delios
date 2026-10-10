@@ -25,6 +25,7 @@ import {
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { PREF, savePreference } from "@/lib/preferences";
 
 /**
  * Five jobs, then two doors.
@@ -110,8 +111,8 @@ function isActive(pathname: string, item: NavItem) {
 
 /* Sidebar width. The desktop sidebar can be dragged wider or narrower. Below
    railBelow it snaps to an icon rail, where labels show as tooltips. The width
-   lives in a CSS variable on <html>, set before first paint by THEME_SCRIPT, so
-   the layout never jumps. */
+   lives in a CSS variable on <html> and in a cookie, which the server reads to
+   send every page at that width (app/layout.tsx), so the layout never jumps. */
 export const SIDEBAR = { default: 268, rail: 76, min: 76, max: 360, railBelow: 180 } as const;
 
 function setSidebarWidth(w: number, persist: boolean) {
@@ -120,7 +121,7 @@ function setSidebarWidth(w: number, persist: boolean) {
   if (w < SIDEBAR.railBelow) root.dataset.sidebar = "rail";
   else delete root.dataset.sidebar;
   if (persist) {
-    try { localStorage.setItem("sidebar", String(w)); } catch {}
+    savePreference(PREF.sidebar, String(w));
   }
 }
 const isRail = () => typeof document !== "undefined" && document.documentElement.dataset.sidebar === "rail";
