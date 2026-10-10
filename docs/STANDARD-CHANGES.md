@@ -647,6 +647,18 @@ the application's own number and the planner's ID beside it.
 
 **Depends on it:** `ListUploadEndpoints`, `Verbs.Plan`, `Activity.ExternalId`.
 
+## 33 · A document's details change only with a revision
+
+**Clause:** §4.9 *Metadata change*.
+
+**Must say:** the details of a document (title, type, discipline, criticality,
+confidentiality, retention…) change together with a revision being prepared,
+and are part of what that revision's review sees. Once the revision has left
+preparation, no detail changes on its own: correcting one takes a new
+revision. Before the first revision, the reserved number's details may be set.
+
+**Depends on it:** `DocumentService.UpdateAsync` (`DETAILS_NEED_A_REVISION`).
+
 ## Still open — decided in conversation, not yet built
 
 - **Escalation** where somebody refuses to acknowledge carrying an action

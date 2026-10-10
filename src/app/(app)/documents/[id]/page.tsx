@@ -583,7 +583,8 @@ export default async function DocumentDetailPage({
                 {editing ? (
                   // One place to change a revision being prepared: its edit step, files and details together.
                   <p className="mt-4 text-xs text-slate-500">Rev {working!.value} is being prepared: change these details with its files in <strong className="text-slate-700">Edit rev {working!.value}</strong>, in the Next step card above.</p>
-                ) : canEdit ? (
+                ) : canEdit && (doc.revisions.length === 0 || doc.kind === "RECORD") ? (
+                  // Nothing prepared yet (a reserved number), or a record, which has no review: set here.
                   <details className="mt-4">
                     <summary className="cursor-pointer list-none text-xs font-semibold text-link">Edit details</summary>
                     <div className="mt-3 max-w-2xl">
@@ -592,6 +593,8 @@ export default async function DocumentDetailPage({
                       </ActionForm>
                     </div>
                   </details>
+                ) : canEdit && doc.kind !== "RECORD" ? (
+                  <p className="mt-4 text-xs text-slate-500">To change these details, start a new revision: they change with it.</p>
                 ) : null}
                 {controller ? (
                   <details className="mt-3">

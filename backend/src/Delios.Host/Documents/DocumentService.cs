@@ -168,6 +168,14 @@ public sealed class DocumentService(
             return Fail(Problems.Forbidden("EDIT_NOT_ALLOWED", "Your function on this project cannot change this document's details."));
         if (document.State is not (DocumentStates.Planned or DocumentStates.Active))
             return Fail(Problems.Conflict("DOCUMENT_NOT_OPEN", $"The document is {document.State.ToLowerInvariant()}.", new { state = document.State }));
+        // A document's details change with a revision being prepared, never on their own:
+        // once a revision is out of preparation, changing them takes a new revision.
+        if (document.Kind == DocumentKinds.Document && document.LatestRevisionState is { } latest && latest != RevisionStates.InPreparation)
+        {
+            return Fail(Problems.Conflict("DETAILS_NEED_A_REVISION",
+                $"Rev {document.LatestRevisionValue} is {latest.Replace('_', ' ').ToLowerInvariant()}. Start a new revision to change the document's details.",
+                new { state = latest }));
+        }
 
         var catalog = await Catalog.LoadAsync(db, cancellationToken);
         var sets = new Dictionary<string, string>

@@ -58,7 +58,11 @@ conversation, write it into the right one in the same commit as the code.
 
 ### Revisions
 - Until released, everything is editable in one "Edit rev X" step: PDF, native
-  file, title and every field. Author or Document Control.
+  file, title and every field. Author or Document Control. The Details tab uses
+  the same fields and, while a revision is prepared, points to Edit rev.
+- A document's details change only with a revision in preparation (or before
+  its first revision). Once out of preparation, a change takes a new revision;
+  the backend refuses otherwise. Records keep their own details edit.
 - In review: "Withdraw from review" with a reason, on the document page and the
   review page. The review stays in the register as **Withdrawn** with its
   reason and comments; everyone on the route is told. The revision can then be
