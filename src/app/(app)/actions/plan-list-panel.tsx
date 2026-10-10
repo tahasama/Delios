@@ -9,19 +9,21 @@ const STATE: Record<string, string> = {
   IN_PREPARATION: "in preparation", CORRECTING: "being corrected", RECEIVED: "received", IN_REVIEW: "in review",
   RELEASED: "released", RETURNED: "returned", SUPERSEDED: "superseded", VOID: "void",
 };
+const said = (state: string) => STATE[state] ?? state.replaceAll("_", " ").toLowerCase();
 
 const fileInput = "block w-full text-xs text-slate-600 file:mr-3 file:rounded-md file:border file:border-line-strong file:bg-surface file:px-2.5 file:py-1 file:text-xs file:font-semibold file:text-brand-ink";
 
 /**
  * One of the schedule's lists: what it is, the document that holds it, and the
- * form that uploads its next version. With no document yet, the way to register
- * one, already filled in — or, for Document Control, to upload the list without
- * one, knowingly and with a reason kept in the activity log.
+ * upload of the spreadsheet of its revision in force. Revisions are made on the
+ * document's page; here the released one's list is read. With no document, the
+ * way to register one, already filled in — or, knowingly and with a reason, to
+ * upload the list without one.
  */
 export function PlanListPanel({ list, control }: { list: PlanList; control: boolean }) {
-  const only = list.documents.length === 1 ? list.documents[0] : null;
   const type = list.types[0] ?? null;
-  const state = only?.latestRevisionState ?? null;
+  const inForce = list.documents.filter((one) => one.released);
+  const only = inForce.length === 1 ? inForce[0] : null;
   const template = list.template
     ? <a href={list.template} className="inline-flex items-center gap-1 text-xs font-semibold text-link hover:underline"><Download className="h-3.5 w-3.5" /> Current list to fill</a>
     : null;
@@ -33,38 +35,48 @@ export function PlanListPanel({ list, control }: { list: PlanList; control: bool
 
       {list.documents.length ? (
         <>
-          {only ? (
-            <p className="mt-2 text-xs text-slate-600">
-              <Link href={`/documents/${only.id}`} className="font-mono font-semibold text-brand-ink hover:underline">{only.number}</Link>
-              <span className="text-slate-500">{only.latestRevisionValue ? ` · rev ${only.latestRevisionValue} · ${STATE[state ?? ""] ?? (state ?? "").toLowerCase()}` : " · no revision yet"}</span>
-            </p>
-          ) : null}
-          {state === "IN_REVIEW" ? (
-            <p className="mt-2 text-xs text-slate-600">Rev {only!.latestRevisionValue} is in review. Upload the next version once it is released or returned.</p>
-          ) : (
-            <ActionForm action={uploadPlanListAction} hideSubmit hidden={{ kind: list.kind, ...(only ? { documentId: only.id } : {}) }} className="mt-2.5 max-w-xl space-y-2.5">
+          <ul className="mt-2 space-y-0.5 text-xs text-slate-600">
+            {list.documents.map((doc) => (
+              <li key={doc.id}>
+                <Link href={`/documents/${doc.id}`} className="font-mono font-semibold text-brand-ink hover:underline">{doc.number}</Link>
+                <span className="text-slate-500">
+                  {doc.released ? ` · in force: rev ${doc.released.value}${doc.read ? ", list read" : ", list not read yet"}` : " · nothing released yet"}
+                  {doc.pending ? ` · rev ${doc.pending.value} ${said(doc.pending.state)}` : ""}
+                </span>
+              </li>
+            ))}
+          </ul>
+          {!inForce.length ? (
+            <p className="mt-2 text-xs text-slate-600">Release the document from its page first; then upload the spreadsheet of that revision here.</p>
+          ) : control ? (
+            <ActionForm action={uploadPlanListAction} hideSubmit resetOnSuccess hidden={{ kind: list.kind, ...(only ? { revisionId: only.released!.id } : {}) }} className="mt-2.5 max-w-xl space-y-2.5">
               {only ? null : (
                 <Field label="Which list" required>
-                  <select name="documentId" required className={inputCls} defaultValue="">
+                  <select name="revisionId" required className={inputCls} defaultValue="">
                     <option value="" disabled>Choose…</option>
-                    {list.documents.map((one) => <option key={one.id} value={one.id}>{one.number} — {one.title}</option>)}
+                    {inForce.map((one) => <option key={one.id} value={one.released!.id}>{one.number} rev {one.released!.value} — {one.title}</option>)}
                   </select>
                 </Field>
               )}
-              <Field label="Files" hint="the list as .xlsx or .csv, and a PDF of it" required>
-                <input type="file" name="file" multiple required accept=".xlsx,.csv,.pdf" className={fileInput} />
+              <Field label={only ? `Spreadsheet of rev ${only.released!.value}` : "Spreadsheet of the revision in force"} hint=".xlsx or .csv" required>
+                <input type="file" name="file" required accept=".xlsx,.csv" className={fileInput} />
               </Field>
-              {state === "IN_PREPARATION" ? (
-                <Field label={`Why these files go onto rev ${only!.latestRevisionValue}`} hint="no new revision is started, so your reason is kept as proof" required>
-                  <input name="why" required className={inputCls} placeholder="e.g. The PDF was missing from the first upload" />
+              {only?.read || !only ? (
+                <Field
+                  label={only ? `Why another file for rev ${only.released!.value}` : "Why another file, if its list was already read"}
+                  hint="its list was already read; no new revision marks this, so your reason is kept as proof"
+                  required={!!only}
+                >
+                  <input name="reason" required={!!only} className={inputCls} placeholder="e.g. The first export missed a column" />
                 </Field>
               ) : null}
               <div className="flex flex-wrap items-center gap-3">
-                <button className="ask" data-on="true">Upload</button>
+                <button className="ask" data-on="true">Upload and read</button>
                 {template}
-                <span className="text-[11px] text-slate-500">Send it for review from its page; releasing it puts it in force.</span>
               </div>
             </ActionForm>
+          ) : (
+            <p className="mt-2 text-xs text-slate-500">Document Control uploads the spreadsheet of the revision in force.</p>
           )}
         </>
       ) : (
