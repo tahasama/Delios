@@ -112,7 +112,7 @@ export function StagePath({ stages, at, note, under, pick }: {
 }) {
   return (
     <div>
-      <ol className={cn("flex flex-wrap gap-y-2", under ? "items-start gap-y-4 xl:flex-nowrap" : "items-center")}>
+      <ol className={cn("flex gap-y-2", under ? "w-full flex-wrap items-start gap-y-4 lg:flex-nowrap" : "flex-wrap items-center")}>
         {stages.map((name, i) => {
           const pickable = !!pick?.can[i];
           const open = pickable && pick!.open === i;
@@ -134,8 +134,9 @@ export function StagePath({ stages, at, note, under, pick }: {
             </span>
           );
           return (
-            <li key={name} className={cn("flex", under ? "items-start" : "items-center")}>
-              {i ? <span className={cn("mx-1 h-px w-3 sm:mx-1.5", under ? "mt-[13px] shrink-0 sm:w-6" : "sm:w-10", i <= at ? "bg-(--color-brand)" : "bg-line-strong")} aria-hidden /> : null}
+            <li key={name} className={cn("flex", under ? cn("items-start", i && "flex-1") : "items-center")}>
+              {/* With a line under each stage the row spans the width: the joins stretch between them. */}
+              {i ? <span className={cn("h-px", under ? "mx-3 mt-[13px] min-w-6 flex-1" : "mx-1 w-3 sm:mx-1.5 sm:w-10", i <= at ? "bg-(--color-brand)" : "bg-line-strong")} aria-hidden /> : null}
               <span
                 className={under || pick ? cn(
                   "flex flex-col items-center gap-1.5 text-center",

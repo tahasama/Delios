@@ -14,7 +14,8 @@ import { UploadSwitch } from "./upload-switch";
  */
 export async function PlanCards({ from = null, to = null }: { from?: Date | null; to?: Date | null } = {}) {
   const ctx = await requireScope();
-  const plans = ctx.can("PLAN") || ctx.can("CONTROL") || ctx.can("CONFIGURE");
+  // Who uploads the lists: Document Control, or a function given Plan. The backend refuses anyone else.
+  const plans = ctx.can("PLAN") || ctx.can("CONTROL");
   const [progress, lists] = await Promise.all([planProgress(ctx, { from, to }), planLists(ctx).catch(() => [])]);
   const day = (d: Date) => d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 
@@ -57,7 +58,7 @@ export async function PlanCards({ from = null, to = null }: { from?: Date | null
   // Whoever plans the project opens each list's upload from its own stage.
   const STAGE: Record<string, number> = { SCHEDULE: 0, DEPARTMENTS: 1, REQUIREMENTS: 2 };
   const panels = plans
-    ? lists.map((list) => ({ stage: STAGE[list.kind], kind: list.kind, panel: <PlanListPanel list={list} control={ctx.can("CONTROL") || ctx.can("PLAN")} /> }))
+    ? lists.map((list) => ({ stage: STAGE[list.kind], kind: list.kind, panel: <PlanListPanel list={list} control /> }))
     : [];
   return <UploadSwitch stages={PLAN_STAGES} at={progress.at} under={keyed} panels={panels} />;
 }

@@ -338,7 +338,7 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
         plate={
           <PlanPlate
             inForce={publishedVersion ? { since: publishedVersion.publishedAt ? fmtDate(publishedVersion.publishedAt) : null } : null}
-            plans={ctx.can("PLAN") || ctx.can("CONTROL") || ctx.can("CONFIGURE")}
+            plans={ctx.can("PLAN") || ctx.can("CONTROL")}
             failed={source.imports[0]?.status === "FAILED" ? { revision: source.imports[0].revisionValue, error: source.imports[0].error } : null}
           />
         }
