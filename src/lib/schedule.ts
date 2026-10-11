@@ -8,6 +8,20 @@ import type { Tenant } from "./tenant";
  */
 export const DEFAULT_LEAD_DAYS = 7;
 
+type Coded = { code: string; props: Record<string, unknown> };
+
+/**
+ * What an action needs a document for, and the status it needs, when nobody
+ * says: the reason that builds from it, and the first status that permits
+ * execution. The requirements list and a document added by hand use the same.
+ */
+export function needDefaults(reasons: Coded[], statuses: Coded[]): { purpose: string; status: string } {
+  return {
+    purpose: (reasons.find((r) => r.code === "EXECUTION") ?? reasons.find((r) => r.code === "CONSTRUCTION") ?? reasons[0])?.code ?? "EXECUTION",
+    status: (statuses.find((v) => v.props.executionFlag === true || v.props.executes === true) ?? statuses[0])?.code ?? "",
+  };
+}
+
 /** `days` days before `date`. */
 export function daysBefore(date: Date, days: number): Date {
   const d = new Date(date);

@@ -1,3 +1,4 @@
+import { activityDetail } from "@/lib/api/schedule";
 import { PageHeader } from "@/components/ui";
 import { formPolicy } from "@/lib/field-policy";
 import { requireScope } from "@/lib/scope";
@@ -13,7 +14,7 @@ import type { RegisterPage } from "@/lib/api/types";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "New transmittal" };
 
-type Search = { doc?: string; docs?: string; direction?: string; revisions?: string; users?: string; to?: string; reason?: string; party?: string; subject?: string; message?: string; replyTo?: string; follows?: string; kind?: string };
+type Search = { doc?: string; docs?: string; direction?: string; revisions?: string; users?: string; to?: string; reason?: string; party?: string; subject?: string; message?: string; replyTo?: string; follows?: string; kind?: string; activity?: string };
 
 export default async function NewTransmittalPage({ searchParams }: { searchParams: Promise<Search> }) {
   const ctx = await requireScope();
@@ -76,6 +77,8 @@ export default async function NewTransmittalPage({ searchParams }: { searchParam
     : [];
   const followCopies: string[] = [];
 
+  // Asking for a document to be added to a schedule action.
+  const asked = sp.activity ? await activityDetail(ctx, sp.activity).catch(() => null) : null;
   const selectedDocumentIds = [...new Set([...(sp.docs ?? "").split(","), ...(sp.doc ? [sp.doc] : [])].map((value) => value.trim()).filter(Boolean))];
   const selectedDocuments = await Promise.all(selectedDocumentIds.map((one) => backendDocument(ctx, one)));
   const preselected = selectedDocuments.flatMap((document) => {
@@ -127,6 +130,7 @@ export default async function NewTransmittalPage({ searchParams }: { searchParam
           message: sp.message,
           answering: answering ? { id: answering.id, number: answering.number, subject: answering.subject } : undefined,
           following: following ? { id: following.id, number: following.number, kind: followKind, rejection: following.rejectionReason } : undefined,
+          activity: asked ? { id: asked.activity.id, code: asked.activity.code } : undefined,
         }}
       />
     </div>

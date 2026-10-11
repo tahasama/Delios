@@ -5,7 +5,8 @@
 // every state on Schedule & actions shows up (done, late receipt, ready, still
 // ahead, at risk, overdue, nothing listed). It also leaves each demo person
 // something to do on their Home: a discipline to confirm, a late confirmation,
-// a postponement waiting for the planner, a review to decide, a draft.
+// a postponement waiting for the planner, a request to add a document to an
+// action, a review to decide, a draft.
 //
 // Needs the backend running with the demo seeded (docs/SESSION-HANDOFF.md §4):
 //   node scripts/demo-schedule.mjs                      (API at http://localhost:8080)
@@ -238,6 +239,12 @@ async function main() {
     people: [idOf("viewer@demo.local")].filter(Boolean),
   });
   // A300 is within its risk window with the duty pump datasheet missing: Mechanical's confirmation waits (approver's Home).
+  // Civil asks for the shoring drawing to be added to A110: the list missed it. Document Control answers on the action.
+  await engineer.post(`${p}/transmittals`, {
+    userIds: [idOf("controller@demo.local")].filter(Boolean), reason: "INFORMATION", activityId: byCode.A110,
+    subject: `Add a document to ${(await engineer.get(`${p}/activities`)).find((one) => one.id === byCode.A110).code} (Civil)`,
+    message: `Please add ${docs.excavation.number}, ${docs.excavation.title}, for Civil: the shoring stays in place while the slab is poured.\n\nIt was not on the requirements list.`,
+  });
 
   // ── Work in progress on the register ───────────────────────────────────────
   console.log("A review waiting on its decision, and a draft…");
@@ -249,7 +256,7 @@ async function main() {
   console.log("\nDone. Every release was sent in the same act. Sign in as each demo person to see their Home:");
   console.log("  approver  — decide the MCC diagram; confirm Mechanical's documents for A300");
   console.log("  viewer    — Electrical's documents for A310, notified by hand");
-  console.log("  controller — confirm the A400 postponement (holds Plan); the schedule's upkeep");
+  console.log("  controller — confirm the A400 postponement (holds Plan); add the shoring drawing to A110, as Civil asked; the schedule's upkeep");
   console.log("  engineer  — the loop diagrams draft");
 }
 

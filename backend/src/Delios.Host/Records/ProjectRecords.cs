@@ -789,7 +789,9 @@ public static class ProjectRecordEndpoints
     private static async Task<IResult> SetDepartmentsAsync(Guid activityId, HttpContext h, DeliosDbContext db, AuditLog audit, CancellationToken c)
     {
         var access = ProjectAccessFilter.Of(h);
-        if (!await KeepsAsync(h, access)) return Problems.Forbidden("CONTROL_ONLY", "The project manager's approved list, or Document Control, tags activities.");
+        // Whoever may upload the disciplines-per-action list tags by hand too: Document Control or Plan.
+        if (!access.Holds(Verbs.Plan) && !await KeepsAsync(h, access))
+            return Problems.Forbidden("CONTROL_ONLY", "Document Control, or whoever plans the project, tags activities.");
         var body = await h.Request.ReadFromJsonAsync<DepartmentsRequest>(c);
         var activity = await db.Activities.SingleOrDefaultAsync(a => a.Id == activityId && a.ProjectId == access.Project.Id, c);
         if (activity is null) return Problems.NotFound("ACTIVITY_NOT_FOUND", "No such activity.");

@@ -195,6 +195,16 @@ conversation, write it into the right one in the same commit as the code.
 - "Request a document" (concerned discipline or Document Control) opens a
   transmittal to Document Control with the file attached; Document Control
   adds the number to the action. No status or date is asked.
+- The transmittal remembers the action it asks about. Until Document Control
+  answers (adds the document, or "Nothing to add" with why), it is on their
+  Home and at the top of the action's "Disciplines and documents"; the
+  transmittal page says where it stands. Whoever asked is told the answer.
+- By hand, on the action's "Disciplines and documents": Control or Plan tags
+  the disciplines (`mayUploadLists`, as the backend checks); Document Control
+  adds a register document for a tagged discipline, or takes one off. The
+  document's "Used in" tab adds it to an action too. A document added by hand
+  gets the same purpose and status as the requirements list uses when it says
+  nothing (`needDefaults`), due by the project's lead before the day.
 - Filters: a dropdown picked with the mouse applies at once; with the keyboard,
   on leaving it. Apply lights only while typed words or dates wait. Every filter
   is kept through sorting, paging, load more, the key and export.

@@ -22,7 +22,8 @@ import { Timeline } from "@/components/timeline";
 import { SendForReview } from "@/components/send-for-review-panel";
 import { ArrowLeft } from "lucide-react";
 import { getActiveSet } from "@/lib/config";
-import { carriersOf as carriersOfTransmittal, legacyTransmittal } from "@/lib/api/transmittals";
+import { carriersOf as carriersOfTransmittal, legacyTransmittal, backendTransmittal } from "@/lib/api/transmittals";
+import { activityDetail } from "@/lib/api/schedule";
 
 export const dynamic = "force-dynamic";
 
@@ -48,6 +49,9 @@ export default async function TransmittalDetailPage({ params, searchParams }: { 
   if (!t) notFound();
 
   const controller = isController(user) || isAdmin(user);
+  // A request to add a document to a schedule action: answered on the action's page.
+  const ask = (await backendTransmittal(ctx, id))?.activity ?? null;
+  const askedOf = ask ? (await activityDetail(ctx, ask.id))?.activity ?? null : null;
   const mine = t.recipients.find((recipient) => recipient.userId === user.id) ?? null;
   const conditions: { key: string; pass: boolean; notApplicable?: boolean }[] = t.conditionsResult ? JSON.parse(t.conditionsResult) : [];
   const readyToRoute = t.items.filter((one) => one.revision.state === "IN_PREPARATION").map((one) => one.revisionId);
@@ -182,6 +186,16 @@ export default async function TransmittalDetailPage({ params, searchParams }: { 
         </section>
       ) : null}
       {sp.issueError ? <Banner tone="warn" title="Created, but not sent">{sp.issueError} Issue it above once that is settled.</Banner> : null}
+      {ask && askedOf ? (
+        <Banner tone={ask.answeredAt ? "info" : "warn"} title={`Asks for a document to be added to ${askedOf.code}`}>
+          {ask.answeredAt
+            ? <>Answered by {ask.answeredBy}, {fmtDate(ask.answeredAt)}: {ask.answer} </>
+            : <>{askedOf.name}. Not answered yet. </>}
+          <Link href={`/actions/${askedOf.code}${!ask.answeredAt && ctx.can("CONTROL") ? "#asked" : ""}`} className="font-semibold text-link hover:underline">
+            {!ask.answeredAt && ctx.can("CONTROL") ? "Answer it on the action" : "Open the action"}
+          </Link>
+        </Banner>
+      ) : null}
       {t.status === "REJECTED" ? (
         <Banner tone="danger" title="Rejected">{t.rejectionReason} — the documents it carried were not accepted, and no review has started.</Banner>
       ) : null}

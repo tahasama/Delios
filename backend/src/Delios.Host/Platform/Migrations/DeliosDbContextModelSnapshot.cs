@@ -4256,6 +4256,22 @@ namespace Delios.Host.Platform.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<string>("ActivityAnswer")
+                        .HasColumnType("text")
+                        .HasColumnName("activity_answer");
+
+                    b.Property<Instant?>("ActivityAnsweredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("activity_answered_at");
+
+                    b.Property<string>("ActivityAnsweredByName")
+                        .HasColumnType("text")
+                        .HasColumnName("activity_answered_by_name");
+
+                    b.Property<Guid?>("ActivityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("activity_id");
+
                     b.Property<string>("Direction")
                         .IsRequired()
                         .HasMaxLength(16)

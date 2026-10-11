@@ -212,6 +212,8 @@ export type TransmittalView = {
   state: "ISSUED" | "DRAFT"; issuedById: string | null;
   inReplyTo: TransmittalRef | null; answers: TransmittalRef[]; follows: TransmittalRef | null; followedBy: TransmittalRef[];
   receiptNote: string | null; extras: Record<string, string> | null; followKind: string | null;
+  /** It asks for a document to be added to this schedule action; answered once Document Control has. */
+  activity: { id: string; answeredAt: string | null; answeredBy: string | null; answer: string | null } | null;
 };
 
 /** Another transmittal of the same exchange (TransmittalEndpoints TransmittalRef). */

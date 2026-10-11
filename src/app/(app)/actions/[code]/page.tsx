@@ -22,6 +22,10 @@ import { movedPhrase } from "../moved";
 import { actionState, stateLabel, dayHasPassed, riskFrom, isPostponed, DEFAULT_RISK_DAYS, type ActionState } from "@/lib/action-state";
 import { mayUploadLists } from "@/lib/permissions";
 import { NotifyPanel } from "@/components/notify-panel";
+import { LinksCard, type Ask } from "./links-card";
+import { actionWork } from "@/lib/api/schedule";
+import { backendTransmittal } from "@/lib/api/transmittals";
+import { registerByNumber } from "@/lib/api/register";
 
 export const dynamic = "force-dynamic";
 
@@ -80,6 +84,7 @@ export default async function ActionDetailPage({ params, searchParams }: { param
   const controllers = await holders(ctx.projectId, "CONTROL").catch(() => []);
   const requestHref = (department: string) => `/transmittals/new?${new URLSearchParams({
     reason: "INFORMATION",
+    activity: action.id,
     users: controllers.map((one) => one.id).join(","),
     subject: `Add a document to ${action.code} (${deptLabel(department)})`,
     message: [
@@ -87,6 +92,22 @@ export default async function ActionDetailPage({ params, searchParams }: { param
       "It was not on the requirements list.",
     ].join("\n\n"),
   })}`;
+
+  // Setting disciplines and documents by hand, and the requests to add one still waiting for Document Control.
+  const mayTag = mayUploadLists(ctx.user.verbs);
+  const asks: Ask[] = control
+    ? await Promise.all((await actionWork(ctx)).filter((w) => w.kind === "ADD_TO_ACTION" && w.activityId === action.id && w.transmittalId).map(async (w) => {
+        const t = await backendTransmittal(ctx, w.transmittalId!);
+        return {
+          transmittalId: w.transmittalId!, number: w.number ?? "", from: w.from ?? "Someone", since: w.since,
+          subject: t?.subject ?? "", message: t?.message ?? null,
+          documentIds: [...new Set((t?.items ?? []).map((one) => one.documentId).filter((id): id is string => !!id))],
+        };
+      }))
+    : [];
+  const pickDocuments = control
+    ? [...(await registerByNumber(ctx)).values()].map((d) => ({ id: d.id, name: d.number, detail: d.title }))
+    : [];
 
   // The work is taken to have happened once its day has passed — that is what
   // a schedule is — unless a postponement was written down and not taken back.
@@ -162,7 +183,7 @@ export default async function ActionDetailPage({ params, searchParams }: { param
       <NeededTable
         rows={needed}
         exportHref={`/api/export/baseline?ids=${action.id}`}
-        empty={depts.length ? undefined : "Tag the disciplines first."}
+        empty={depts.length ? undefined : "Tag the disciplines first, under Disciplines and documents."}
         chips={depts.length > 1 ? (
           <>
             <Link href={`/actions/${action.code}`} className={`facet ${!dept ? "font-semibold text-brand-ink" : ""}`}>All</Link>
@@ -262,7 +283,7 @@ export default async function ActionDetailPage({ params, searchParams }: { param
                           </p>
                         ) : null}
                       </div>
-                      {mine && deptEntries.length ? (
+                      {mine ? (
                         <Link href={requestHref(d)} className="text-xs font-semibold text-link hover:underline">Request a document</Link>
                       ) : null}
                     </div>
@@ -319,10 +340,24 @@ export default async function ActionDetailPage({ params, searchParams }: { param
             </ul>
           ) : (
             <div className="px-5 py-3.5 sm:px-6">
-              <Banner tone="warn" title="Needs disciplines">The disciplines-per-action list does not tag this action yet. Document Control, or whoever plans the project, uploads it; until then its documents cannot be asked for.</Banner>
+              <Banner tone="warn" title="Needs disciplines">No discipline is tagged on this action yet. Document Control, or whoever plans the project, tags them under Disciplines and documents below, or with the disciplines-per-action list; until then its documents cannot be asked for.</Banner>
             </div>
           )}
         </section>
+
+          {mayTag || control ? (
+            <LinksCard
+              actionId={action.id}
+              code={action.code}
+              departments={depts}
+              disciplines={disciplines.map((d) => ({ code: d.code, label: d.label }))}
+              entries={action.entries.map((e) => ({ id: e.id, docNumber: e.document.docNumber, title: e.document.title, department: e.department }))}
+              documents={pickDocuments}
+              asks={asks}
+              mayTag={mayTag}
+              control={control}
+            />
+          ) : null}
 
           <ActionNotes
             notes={action.notes}

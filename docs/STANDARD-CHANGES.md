@@ -733,6 +733,21 @@ reason, kept on the record. Every notice is kept: who was told, by whom, when.
 **Depends on it:** `ActionNotices`, `NoticeLog`, `Activity.RiskFrom`, `Requirement.RiskDays`, `ReadinessConfirmation.Automatic/Revoked*`,
 `ActivityDecision.Confirmed*/Reversed*`, `/notices`, `NotifyPanel`.
 
+## 39 · Disciplines and documents of an action set by hand
+
+**Clause:** §14 *Planning and readiness of activities*.
+
+**Must say:** besides the disciplines-per-action and requirements lists,
+Document Control or whoever plans the project may tag an action's disciplines
+by hand, and Document Control may add a register document to an action (for a
+discipline it concerns) or take one off. Anyone concerned may ask, by a
+transmittal to Document Control that names the action; Document Control
+answers every such request, by adding the document or saying why not, and the
+person who asked is told. Each change is kept in the activity log.
+
+**Depends on it:** `Transmittal.ActivityId/ActivityAnswered*`, `/transmittals/{id}/activity-answer`, `NeedRequest.TransmittalId`,
+`ADD_TO_ACTION` Home work, `LinksCard`, `needDefaults`.
+
 ## Still open — decided in conversation, not yet built
 
 - **Escalation** where somebody refuses to acknowledge carrying an action

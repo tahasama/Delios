@@ -41,6 +41,7 @@ export async function createTransmittalAction(_prev: { error?: string } | undefi
   const inReplyToId = String(formData.get("inReplyTo") ?? "").trim() || null;
   const followsId = String(formData.get("followsId") ?? "").trim() || null;
   const followKind = String(formData.get("followKind") ?? "").trim() || null;
+  const activityId = String(formData.get("activityId") ?? "").trim() || null;
 
   if (!reasonForIssue) return { error: "Every transmittal states its reason for issue." };
   if (!dateOfIssue) return { error: "Date of issue is required." };
@@ -98,7 +99,7 @@ export async function createTransmittalAction(_prev: { error?: string } | undefi
       const sent = await api<{ id: string; number: string; toName: string }[]>(projectPath(ctx, "/transmittals"), {
         body: {
           revisionIds, userIds: recipientUsers, partyIds: partyTo, reason: reasonForIssue, subject, message, copyUserIds: chosenCc,
-          draft: !issueNow, inReplyToId, followsId, followKind, issuedOn: dayOf(dateOfIssue), extras: Object.keys(extras).length ? extras : null,
+          draft: !issueNow, inReplyToId, followsId, followKind, issuedOn: dayOf(dateOfIssue), extras: Object.keys(extras).length ? extras : null, activityId,
         },
         idempotencyKey: crypto.randomUUID(),
       });

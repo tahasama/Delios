@@ -18,7 +18,10 @@ public sealed record SourceRequest(Guid DocumentId, ScheduleColumns? Columns = n
 /// <param name="OffsetDays">Days from the anchor: negative before, positive after. Empty: the project's lead before the start.</param>
 public sealed record NeedRequest(
     Guid DocumentId, string? Purpose, string[]? RequiredStatuses = null, string? Anchor = null, int? OffsetDays = null,
-    DateOnly? FixedDate = null, string? Department = null);
+    DateOnly? FixedDate = null, string? Department = null, Guid? TransmittalId = null);
+
+/// <summary>Document Control's answer to a request to add a document to an action, when nothing is added: why.</summary>
+public sealed record ActivityAskAnswer(string? Note);
 
 /// <summary>Request body for waiving a need: the note saying why the activity can go ahead without the document.</summary>
 public sealed record WaiverRequest(string? Note);
@@ -50,7 +53,8 @@ public sealed record DecisionView(Guid Id, string Decision, DateOnly? PlannedSta
 /// documents), CONFIRM_POSTPONEMENT (whoever plans confirms a postponement), UNTAGGED (actions no discipline is
 /// tagged on), SCHEDULE_READ_FAILED (the schedule's last read failed).
 /// </summary>
-public sealed record ActionWork(string Kind, Guid? ActivityId, string? Code, string? Name, DateOnly? Day, string? Department, int Count, DateTimeOffset? Since);
+public sealed record ActionWork(string Kind, Guid? ActivityId, string? Code, string? Name, DateOnly? Day, string? Department, int Count, DateTimeOffset? Since,
+    Guid? TransmittalId = null, string? Number = null, string? From = null);
 
 /// <summary>A notice a person sends: what it is about (its subject key), to whom, and what it says.</summary>
 public sealed record NoticeRequest(string? Subject, string? Title, string? Body, string? Link, Guid[]? People);
@@ -105,6 +109,7 @@ public static class ScheduleEndpoints
         project.MapPost("/activities/{activityId:guid}/decisions/{decisionId:guid}/confirm", ConfirmPostponementAsync);
         project.MapPost("/activities/{activityId:guid}/decisions/{decisionId:guid}/reverse", ReverseDecisionAsync);
         project.MapGet("/activities/{activityId:guid}/lateness", LatenessAsync);
+        project.MapPost("/transmittals/{transmittalId:guid}/activity-answer", AnswerActivityAskAsync);
     }
 
     // ── The schedule document ─────────────────────────────────────────────────
@@ -227,7 +232,7 @@ public static class ScheduleEndpoints
     /// </summary>
     private static async Task<IResult> AddNeedAsync(
         Guid activityId, NeedRequest request, HttpContext http, DeliosDbContext db, IClock clock, AuditLog audit,
-        CancellationToken cancellationToken)
+        Notifications.Notifier notifier, CancellationToken cancellationToken)
     {
         var access = ProjectAccessFilter.Of(http);
         if (!(access.Holds(Verbs.Create) || access.Holds(Verbs.Revise) || access.Holds(Verbs.Control)))
@@ -247,7 +252,15 @@ public static class ScheduleEndpoints
         var anchor = request.Anchor ?? Anchors.Start;
         if (anchor is not (Anchors.Start or Anchors.Finish)) return Problems.Invalid("ANCHOR_INVALID", "START or FINISH.");
         if (await db.Requirements.AnyAsync(r => r.ActivityId == activityId && r.DocumentId == document.Id && r.Purpose == purpose, cancellationToken))
-            return Problems.Conflict("NEED_EXISTS", "The activity already needs that document for that purpose.");
+            return Problems.Conflict("NEED_EXISTS", $"{activity.Code} already needs {document.Number}.");
+        // Added in answer to a request: the request is this action's and still open.
+        Transmittal? ask = null;
+        if (request.TransmittalId is { } askId)
+        {
+            ask = await db.Transmittals.SingleOrDefaultAsync(t => t.Id == askId && t.ProjectId == access.Project.Id && t.ActivityId == activityId, cancellationToken);
+            if (ask is null) return Problems.NotFound("REQUEST_NOT_FOUND", $"No request to add a document to {activity.Code} by that number.");
+            if (ask.ActivityAnsweredAt is not null) return Problems.Conflict("ALREADY_ANSWERED", $"{ask.ActivityAnsweredByName} already answered {ask.Number}.");
+        }
         // A department is a discipline.
         string? department = null;
         if (!string.IsNullOrWhiteSpace(request.Department))
@@ -277,9 +290,45 @@ public static class ScheduleEndpoints
         await db.SaveChangesAsync(cancellationToken);
         await Readiness.RestateAsync(db, clock, [activity.Id], cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
+        if (ask is not null) await AnswerAsync(db, notifier, clock, access, ask, activity, $"{document.Number} added to {activity.Code}.", cancellationToken);
         await audit.WriteAsync(http.User.Actor(), "NEED_ADDED", "Activity", activity.Id, activity.Code,
-            $"Needs {document.Number} for {purpose}, by {need.NeededBy?.ToString() ?? "a date not yet known"}.", access.Project.Id, cancellationToken);
+            $"Needs {document.Number} for {purpose}, by {need.NeededBy?.ToString() ?? "a date not yet known"}"
+            + (ask is null ? "." : $", as {ask.Number} asked."), access.Project.Id, cancellationToken);
         return await ActivityAsync(activityId, http, db, clock, cancellationToken);
+    }
+
+    /// <summary>
+    /// Document Control answers a request to add a document to an action without adding one (already there, not
+    /// the right action…), saying why. Whoever asked is told, as when a document is added.
+    /// </summary>
+    private static async Task<IResult> AnswerActivityAskAsync(Guid transmittalId, ActivityAskAnswer request, HttpContext http,
+        DeliosDbContext db, IClock clock, AuditLog audit, Notifications.Notifier notifier, CancellationToken cancellationToken)
+    {
+        var access = ProjectAccessFilter.Of(http);
+        if (!access.Holds(Verbs.Control)) return Problems.Forbidden("CONTROL_ONLY", "Document Control answers a request to add a document to an action.");
+        var note = request.Note?.Trim() ?? "";
+        if (note.Length == 0) return Problems.Invalid("REASON_REQUIRED", "Say why nothing is added; whoever asked reads it.");
+        var ask = await db.Transmittals.SingleOrDefaultAsync(t => t.Id == transmittalId && t.ProjectId == access.Project.Id, cancellationToken);
+        if (ask?.ActivityId is not { } activityId) return NotFound();
+        if (ask.ActivityAnsweredAt is not null) return Problems.Conflict("ALREADY_ANSWERED", $"{ask.ActivityAnsweredByName} already answered it.");
+        var activity = await db.Activities.AsNoTracking().SingleAsync(a => a.Id == activityId, cancellationToken);
+        await AnswerAsync(db, notifier, clock, access, ask, activity, $"Nothing added: {note}", cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
+        await audit.WriteAsync(http.User.Actor(), "ACTIVITY_REQUEST_ANSWERED", "Transmittal", ask.Id, ask.Number, note, access.Project.Id, cancellationToken);
+        return Results.NoContent();
+    }
+
+    /// <summary>Closes a request to add a document to an action with what was done, and tells whoever asked.</summary>
+    private static async Task AnswerAsync(DeliosDbContext db, Notifications.Notifier notifier, IClock clock, ProjectAccess access,
+        Transmittal ask, Activity activity, string answer, CancellationToken cancellationToken)
+    {
+        ask.ActivityAnsweredAt = clock.GetCurrentInstant();
+        ask.ActivityAnsweredByName = access.UserName;
+        ask.ActivityAnswer = answer;
+        if (ask.IssuedById is { } asker)
+            await notifier.NotifyAsync(access.Project.TenantId, access.Project.Id, [asker], Notifications.NotificationKinds.General,
+                $"{ask.Number}: {access.UserName} answered", answer, $"/actions/{activity.Code}", cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
     }
 
     /// <summary>DELETE /activities/{activityId}/needs/{needId}: removes a need (by whoever added it, or Document Control) and recomputes the activity's readiness.</summary>
@@ -444,6 +493,19 @@ public static class ScheduleEndpoints
                 .ToDictionaryAsync(a => a.Id, cancellationToken);
             work.AddRange(waiting.Where(d => named.ContainsKey(d.ActivityId)).Select(d => new ActionWork("CONFIRM_POSTPONEMENT", d.ActivityId,
                 named[d.ActivityId].Code, named[d.ActivityId].Name, d.PlannedStart?.ToDateOnly(), null, 1, d.RecordedAt.ToDateTimeOffset())));
+        }
+
+        // Requests to add a document to an action: Document Control answers each one.
+        if (access.Holds(Verbs.Control))
+        {
+            var asks = await (from t in db.Transmittals.AsNoTracking()
+                              join a in db.Activities.AsNoTracking() on t.ActivityId equals a.Id
+                              where t.ProjectId == projectId && t.ActivityAnsweredAt == null
+                              orderby t.IssuedAt
+                              select new { t.Id, t.Number, t.IssuedAt, t.IssuedByName, ActivityId = a.Id, a.Code, a.Name, a.Start })
+                .ToListAsync(cancellationToken);
+            work.AddRange(asks.Select(x => new ActionWork("ADD_TO_ACTION", x.ActivityId, x.Code, x.Name, x.Start?.ToDateOnly(), null, 1,
+                x.IssuedAt.ToDateTimeOffset(), x.Id, x.Number, x.IssuedByName)));
         }
 
         // The schedule's own upkeep: Document Control, or whoever plans.

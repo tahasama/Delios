@@ -24,6 +24,8 @@ export type Prefill = {
   answering?: { id: string; number: string; subject: string | null };
   /** The sent transmittal this one completes (a supplement) or corrects (it replaces one they rejected). */
   following?: { id: string; number: string; kind: "SUPPLEMENT" | "REPLACES"; rejection: string | null };
+  /** The schedule action it asks a document to be added to: Document Control answers it there. */
+  activity?: { id: string; code: string };
 };
 
 const STEPS = ["Which way, and why", "What goes with it", "Who gets it"];
@@ -188,6 +190,17 @@ export function NewTransmittalForm({
               Answering <Link href={`/transmittals/${prefill.answering.id}`} className="font-mono font-semibold text-link hover:underline">{prefill.answering.number}</Link>
               {prefill.answering.subject ? <> &mdash; {prefill.answering.subject}</> : null}.
               {" "}The people it was sent to and copied in are carried over; change any of them in step 3.
+            </p>
+          </>
+        ) : null}
+
+        {/* A request to add a document to an action: the action travels with it, so Document Control answers it there. */}
+        {prefill?.activity ? (
+          <>
+            <input type="hidden" name="activityId" value={prefill.activity.id} />
+            <p className="mb-4 rounded-lg border border-line bg-tint-soft px-4 py-2.5 text-xs text-slate-600">
+              Asks for a document to be added to <Link href={`/actions/${prefill.activity.code}`} className="font-mono font-semibold text-link hover:underline">{prefill.activity.code}</Link>.
+              {" "}Enclose it in step 2 if it is released, or name it in the message. Document Control answers on the action&rsquo;s page, and you are told.
             </p>
           </>
         ) : null}

@@ -354,3 +354,16 @@ export function noticeHistory(notices: NoticeView[], now = new Date()): { count:
     lastTo: notices[notices.length - 1].recipients,
   };
 }
+
+/**
+ * What on the schedule waits for the person asking (GET /activities-work): their discipline's confirmations,
+ * a postponement to confirm, a request to add a document to an action, the schedule's upkeep.
+ */
+export type ActionWork = {
+  kind: "CONFIRM_DOCUMENTS" | "CONFIRM_POSTPONEMENT" | "ADD_TO_ACTION" | "UNTAGGED" | "SCHEDULE_READ_FAILED";
+  activityId: string | null; code: string | null; name: string | null; day: string | null; department: string | null;
+  count: number; since: string | null; transmittalId: string | null; number: string | null; from: string | null;
+};
+
+export const actionWork = cache(async (scope: Scope): Promise<ActionWork[]> =>
+  api<ActionWork[]>(projectPath(scope, "/activities-work")).catch(() => []));

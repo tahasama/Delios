@@ -1,5 +1,5 @@
 import { register, headerIndex, cell, parseDate, diffByKey, type Handler, type ParseIssue, type ParseResult } from "./registry";
-import { DEFAULT_LEAD_DAYS, departmentsOf } from "../schedule";
+import { DEFAULT_LEAD_DAYS, departmentsOf, needDefaults } from "../schedule";
 import { api, projectPath } from "../api/client";
 import { legacyActions } from "../api/schedule";
 import { registerByNumber } from "../api/register";
@@ -109,7 +109,7 @@ const requirements: Handler = {
     const fnCodes = new Set(functions.filter((f) => f.active).map((f) => f.code));
     // A requirement is about being able to build from the document, so the
     // status it defaults to is the first one that permits execution.
-    const defaultStatus = (statuses.find((v) => v.props.executionFlag === true || v.props.executes === true) ?? statuses[0])?.code ?? "";
+    const defaultStatus = needDefaults([], statuses).status;
     const has = (list: { code: string }[], code: string) => list.some((v) => v.code === code);
 
     const issues: ParseIssue[] = [];
@@ -262,7 +262,7 @@ const requirements: Handler = {
     ]);
     const actionByCode = new Map(actions.map((a) => [a.code, a]));
     // What the document is needed for: the reason that builds from it.
-    const purpose = (reasons.find((r) => r.code === "EXECUTION") ?? reasons.find((r) => r.code === "CONSTRUCTION") ?? reasons[0])?.code ?? "EXECUTION";
+    const purpose = needDefaults(reasons, []).purpose;
     // A supplier's document is numbered as supplier data; ours as engineering.
     const askOriginator = (v: { props: Record<string, unknown> }) => Array.isArray(v.props.required) && (v.props.required as string[]).includes("originator");
     const supplied = deliverables.find(askOriginator)?.code ?? "SUP";

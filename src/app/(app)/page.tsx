@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Count } from "./tally";
 import { api, projectPath } from "@/lib/api/client";
+import { actionWork } from "@/lib/api/schedule";
 import type { ActivityRow, ActivitySummary, Work } from "@/lib/api/types";
 import { requireScope } from "@/lib/scope";
 import { fmtDate, fmtDateTime } from "@/lib/utils";
@@ -49,7 +50,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
       : Promise.resolve([]),
     // What on the schedule waits for this person: their discipline's confirmations, a postponement to confirm, upkeep.
     user.isInternal
-      ? api<{ kind: string; activityId: string | null; code: string | null; name: string | null; day: string | null; department: string | null; count: number; since: string | null }[]>(projectPath(session, "/activities-work")).catch(() => [])
+      ? actionWork(session)
       : Promise.resolve([]),
   ]);
   const lastRun = checks.lastRun;
@@ -209,6 +210,8 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
       ? { href: `/actions/${w.code}#confirm`, code: w.code ?? "", title: `${w.name} · ${w.department}: ${w.count} document${w.count === 1 ? "" : "s"} missing`, tag: w.day && new Date(w.day).getTime() < Date.now() ? "day passed" : "confirm", tone: w.day && new Date(w.day).getTime() < Date.now() ? "amber" : "sky", at: at(w.since), cta: "Confirm" }
       : w.kind === "CONFIRM_POSTPONEMENT"
         ? { href: `/actions/${w.code}#note`, code: w.code ?? "", title: `${w.name}: postponed, waiting for you to confirm`, tag: "postponed", tone: "amber", at: at(w.since), cta: "Confirm" }
+        : w.kind === "ADD_TO_ACTION"
+        ? { href: `/actions/${w.code}#asked`, code: w.code ?? "", title: `${w.name}: ${w.from ?? "someone"} asks for a document to be added (${w.number})`, tag: "asked", tone: "sky", at: at(w.since), cta: "Answer" }
         : w.kind === "UNTAGGED"
           ? { href: "/actions?view=table&untagged=1", code: `${w.count}`, title: `action${w.count === 1 ? "" : "s"} with no discipline tagged`, tag: "untagged", tone: "amber", at: null, cta: "Tag them" }
           : { href: "/actions", code: w.code ?? "", title: `the schedule could not be read${w.name ? `: ${w.name}` : ""}`, tag: "read failed", tone: "amber", at: at(w.since), cta: "Upload" }),

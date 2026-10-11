@@ -116,6 +116,14 @@ public sealed class Transmittal
     /// <summary>The transmittal this one follows, and how: SUPPLEMENT (adds to it) or REPLACES (stands in its place).</summary>
     public Guid? FollowsId { get; set; }
     public string? FollowKind { get; set; }
+    /// <summary>
+    /// The schedule action it asks a document to be added to. Document Control answers it on the action's page:
+    /// the document added there (or a reason it is not) closes the request, with who and when.
+    /// </summary>
+    public Guid? ActivityId { get; set; }
+    public Instant? ActivityAnsweredAt { get; set; }
+    public string? ActivityAnsweredByName { get; set; }
+    public string? ActivityAnswer { get; set; }
     /// <summary>On something received: how it arrived, as whoever recorded it wrote it down.</summary>
     public string? ReceiptNote { get; set; }
     /// <summary>The organization's own fields, name to value, as JSON.</summary>

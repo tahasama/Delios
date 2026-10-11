@@ -327,13 +327,13 @@ public sealed class TransmittalService(
     public sealed record ComposeRequest(
         Guid[]? RevisionIds, Guid[]? UserIds, Guid[]? PartyIds, string? Reason, string? Subject = null, string? Message = null,
         DateOnly? ResponseDue = null, Guid[]? CopyUserIds = null, bool Draft = false, Guid? InReplyToId = null, Guid? FollowsId = null,
-        string? FollowKind = null, DateOnly? IssuedOn = null, Dictionary<string, string?>? Extras = null);
+        string? FollowKind = null, DateOnly? IssuedOn = null, Dictionary<string, string?>? Extras = null, Guid? ActivityId = null);
 
     /// <summary>A compose request checked: what it carries, to whom, and when it is dated.</summary>
     private sealed record Prepared(
         string Reason, string Subject, string? Message, LocalDate? Due, List<(Document Document, Revision Revision)> Items,
         List<Addressee> People, List<Party> Parties, List<Addressee> Copies, Instant IssuedAt, Guid? InReplyToId, Guid? FollowsId,
-        string? FollowKind, string? Extras, List<Member> Members);
+        string? FollowKind, string? Extras, List<Member> Members, Guid? ActivityId = null);
 
     /// <summary>
     /// Issues released revisions directly, without an issue request: one transmittal to the project's own people
@@ -350,7 +350,7 @@ public sealed class TransmittalService(
         var sent = new List<Transmittal>();
         Raise Of(Party? to, string toName, IReadOnlyList<Addressee> recipients) => new(access.Project, actor, p.Reason, p.Subject, p.Message,
             to, toName, p.Items, recipients, ResponseDue: p.Due, Copies: p.Copies, IssuedAt: p.IssuedAt, InReplyToId: p.InReplyToId,
-            FollowsId: p.FollowsId, FollowKind: p.FollowKind, Extras: p.Extras);
+            FollowsId: p.FollowsId, FollowKind: p.FollowKind, Extras: p.Extras, ActivityId: p.ActivityId);
         if (p.People.Count > 0 || p.Parties.Count == 0) sent.Add(await RaiseAsync(Of(null, "Internal distribution", p.People), cancellationToken));
         foreach (var party in p.Parties) sent.Add(await RaiseAsync(Of(party, party.Name, AddresseesOf(party, p.Members)), cancellationToken));
         foreach (var (document, revision) in p.Items)
@@ -424,13 +424,18 @@ public sealed class TransmittalService(
                 return Fail(Problems.Invalid("FOLLOW_KIND_INVALID", "A follow-up either supplements the transmittal (SUPPLEMENT) or replaces it (REPLACES)."));
         }
 
+        // A request to add a document to a schedule action names an action of this project.
+        if (request.ActivityId is { } activityId
+            && !await db.Activities.AnyAsync(a => a.Id == activityId && a.ProjectId == access.Project.Id, cancellationToken))
+            return Fail(Problems.NotFound("ACTIVITY_NOT_FOUND", "The action it is about is not in this project's schedule."));
+
         var items = revisions.Select(r => (documents[r.DocumentId], r)).OrderBy(i => i.Item1.Number).ToList();
         var subject = subjectGiven ? request.Subject!.Trim()
             : items.Count == 1 ? $"{Label(items[0].Item1, items[0].r)}, {items[0].r.StatusCode}" : $"{items.Count} documents";
         var message = messageGiven ? request.Message!.Trim() : null;
         var due = request.ResponseDue is { } d ? LocalDate.FromDateOnly(d) : (LocalDate?)null;
         return (new Prepared(reason, subject, message, due, items, people, parties, copies, issuedAt!.Value, answered?.Id, followed?.Id,
-            followKind, Documents.OwnFields.Write(null, request.Extras), members), null);
+            followKind, Documents.OwnFields.Write(null, request.Extras), members, request.ActivityId), null);
     }
 
     // ── Drafts ────────────────────────────────────────────────────────────────
@@ -577,7 +582,7 @@ public sealed class TransmittalService(
         Guid? IssueRequestId = null, Guid? ReviewStepId = null, LocalDate? ResponseDue = null, Guid? PackageId = null,
         DispatchRequest? Dispatched = null, IReadOnlyList<(Document Document, LocalDate? Due)>? Placeholders = null,
         IReadOnlyList<Addressee>? Copies = null, Instant? IssuedAt = null, Guid? InReplyToId = null, Guid? FollowsId = null,
-        string? FollowKind = null, string? Extras = null);
+        string? FollowKind = null, string? Extras = null, Guid? ActivityId = null);
 
     /// <summary>A numbered transmittal. What it records is never changed afterwards.</summary>
     public async Task<Transmittal> RaiseAsync(Raise raise, CancellationToken cancellationToken)
@@ -615,6 +620,7 @@ public sealed class TransmittalService(
             FollowsId = raise.FollowsId,
             FollowKind = raise.FollowKind,
             Extras = raise.Extras,
+            ActivityId = raise.ActivityId,
             IssuedById = raise.Actor.Id,
             IssuedByName = raise.Actor.Name,
             IssueRequestId = raise.IssueRequestId,

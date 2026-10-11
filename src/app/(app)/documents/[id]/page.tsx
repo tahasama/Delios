@@ -40,6 +40,8 @@ import { Timeline } from "@/components/timeline";
 import { DocTabs } from "./doc-tabs";
 import { ArrowLeft, ChevronRight, Download, ExternalLink, FileText, Send } from "lucide-react";
 import { hasVerb } from "@/lib/auth";
+import { activityList } from "@/lib/api/schedule";
+import { addDocumentToActionAction } from "@/lib/actions/action-links";
 
 export const dynamic = "force-dynamic";
 
@@ -93,6 +95,11 @@ export default async function DocumentDetailPage({
 
   const canEdit = mayContributeToDocument(user, doc) && !["WITHDRAWN", "CANCELLED"].includes(doc.state);
   const controller = isController(user) || isAdmin(user);
+  // Document Control adds it to a schedule action from here too: the actions with a discipline tagged that do not need it yet.
+  const mayAddToAction = ctx.can("CONTROL") && !["WITHDRAWN", "CANCELLED"].includes(doc.state);
+  const actionChoices = mayAddToAction
+    ? (await activityList(ctx)).filter((a) => a.departments.length && !doc.baselineEntries.some((e) => e.action.code === a.code))
+    : [];
 
   // A closed document — above the open confidentiality levels — is read by the
   // people named on it. Whoever is answerable for the content names them.
@@ -840,6 +847,26 @@ export default async function DocumentDetailPage({
                     ) : null)}
                   </ul>
                 )}
+                {actionChoices.length ? (
+                  <details className="border-t border-line py-3">
+                    <summary className="cursor-pointer list-none text-xs font-semibold text-link">+ Add to a schedule action</summary>
+                    <div className="mt-2 max-w-md">
+                      <ActionForm action={addDocumentToActionAction} submitLabel="Add" size="sm" hidden={{ documentIds: doc.id }} className="space-y-3">
+                        <Field label="Action" required>
+                          <select name="actionId" required className={inputCls} defaultValue="">
+                            <option value="" disabled hidden>Action</option>
+                            {actionChoices.map((a) => <option key={a.id} value={a.id}>{a.code} · {a.name}{a.start ? ` · ${fmtDate(a.start)}` : ""}</option>)}
+                          </select>
+                        </Field>
+                        <Field label="For" required hint="a discipline the action concerns">
+                          <select name="department" required className={inputCls} defaultValue={doc.discipline}>
+                            {disciplines.filter((d) => d.status === "ACTIVE").map((d) => <option key={d.code} value={d.code}>{d.label}</option>)}
+                          </select>
+                        </Field>
+                      </ActionForm>
+                    </div>
+                  </details>
+                ) : null}
                 {canEdit ? (
                   <details className="border-t border-line py-3">
                     <summary className="cursor-pointer list-none text-xs font-semibold text-link">+ Link an asset</summary>
