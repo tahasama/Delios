@@ -272,7 +272,6 @@ export function NeededTable({ rows, chips, plate, exportHref, empty, link }: {
   };
 
   /** The narrowing choices this sheet offers, from what it is holding. */
-  const sources = useMemo(() => [...new Set(rows.map((row) => row.source).filter((one): one is string => !!one))].sort(), [rows]);
   const disciplines = useMemo(() => [...new Set(rows.map((row) => row.discipline))].sort(), [rows]);
 
   const matched = useMemo(() => {
@@ -280,10 +279,9 @@ export function NeededTable({ rows, chips, plate, exportHref, empty, link }: {
     return rows.filter((row) => {
       if (needle && !`${row.docNumber} ${row.title}`.toLowerCase().includes(needle)) return false;
       if (discipline && row.discipline !== discipline) return false;
-      // Nowhere, on time: no step was late and none is still owed. Still owed: not yet released and issued.
-      if (source === "__none__" && (row.source || row.outstanding)) return false;
-      if (source === "__owed__" && (row.source || !row.outstanding)) return false;
-      if (source && source !== "__none__" && source !== "__owed__" && row.source !== source) return false;
+      // Two choices: it was late (a step slipped, or it is still owed), or it wasn't.
+      if (source === "late" && !(row.source || row.outstanding)) return false;
+      if (source === "ontime" && (row.source || row.outstanding)) return false;
       if (ready === "yes" && !row.ready) return false;
       if (ready === "late" && !(row.late && !row.ready)) return false;
       if (ready === "no" && (row.ready || row.late)) return false;
@@ -316,7 +314,7 @@ export function NeededTable({ rows, chips, plate, exportHref, empty, link }: {
   const facets = [
     q.trim() ? { key: "Search", label: q.trim(), clear: () => setQ("") } : null,
     discipline ? { key: "Discipline", label: discipline, clear: () => setDiscipline("") } : null,
-    source ? { key: "Where it got late", label: source === "__none__" ? "nowhere, on time" : source === "__owed__" ? "still not released & issued" : source, clear: () => setSource("") } : null,
+    source ? { key: "Where it got late", label: source === "late" ? "reason of lateness" : "wasn't late", clear: () => setSource("") } : null,
     ready ? { key: "Ready", label: ready === "yes" ? "yes" : ready === "late" ? "late" : "not yet", clear: () => setReady("") } : null,
   ].filter((one): one is { key: string; label: string; clear: () => void } => !!one);
 
@@ -342,11 +340,7 @@ export function NeededTable({ rows, chips, plate, exportHref, empty, link }: {
             className="plain w-full pl-6"
           />
         </label>
-        <Narrow value={source} onChange={(next) => { setSource(next); setPage(1); }} empty="Where it got late" options={[
-          { code: "__none__", label: "Nowhere, on time" },
-          ...sources.map((one) => ({ code: one, label: one })),
-          ...(rows.some((row) => !row.source && row.outstanding) ? [{ code: "__owed__", label: "Still not released & issued" }] : []),
-        ]} />
+        <Narrow value={source} onChange={(next) => { setSource(next); setPage(1); }} empty="Where it got late" options={[{ code: "late", label: "Reason of lateness" }, { code: "ontime", label: "Wasn't late" }]} />
         <Narrow value={discipline} onChange={(next) => { setDiscipline(next); setPage(1); }} empty="Discipline" options={disciplines.map((one) => ({ code: one, label: one }))} />
         <Narrow value={ready} onChange={(next) => { setReady(next); setPage(1); }} empty="Ready" options={[{ code: "yes", label: "Ready" }, { code: "late", label: "Late" }, { code: "no", label: "Not yet" }]} />
       </div>
@@ -507,7 +501,8 @@ function Narrow({ value, onChange, empty, options }: {
     <label className="min-w-0 flex-1">
       <span className="sr-only">{empty}</span>
       <select value={value} onChange={(event) => onChange(event.target.value)} data-on={value ? "true" : "false"} className="plain w-full">
-        <option value="">{empty}</option>
+        {/* The filter's name shows while nothing is chosen; it is not a choice. Clear it with its chip. */}
+        <option value="" disabled hidden>{empty}</option>
         {options.map((option) => <option key={option.code} value={option.code}>{option.label}</option>)}
       </select>
     </label>
