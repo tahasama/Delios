@@ -158,7 +158,8 @@ export default async function PackageDetailPage({ params, searchParams }: { para
         </ActionForm>
       ),
     });
-    items.push(...manageItems(pkg, { mayEdit: staff || acceptorIds(pkg).includes(user.id) || pkg.compositionOwnerId === user.id || (pkg.compositionOwnerIds ?? "").includes(user.id), mayDelete: staff || pkg.compositionOwnerId === user.id || (pkg.compositionOwnerIds ?? "").includes(user.id) }));
+    items.push(...manageItems(pkg, { mayEdit: staff || acceptorIds(pkg).includes(user.id) || pkg.compositionOwnerId === user.id || (pkg.compositionOwnerIds ?? "").includes(user.id), // Only an empty package that never went out is deleted: it holds no content.
+      mayDelete: total === 0 && !delivery.length && (staff || pkg.compositionOwnerId === user.id || (pkg.compositionOwnerIds ?? "").includes(user.id)) }));
   }
 
   return (

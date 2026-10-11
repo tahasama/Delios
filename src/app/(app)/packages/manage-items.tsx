@@ -21,7 +21,7 @@ export function manageItems(pkg: { id: string; title: string | null; description
     label: "Delete the package",
     body: (
       <ActionForm action={deletePackageAction} submitLabel="Delete package" size="sm" variant="danger" hidden={{ packageId: pkg.id }} confirmText="The package is deleted. Its documents stay in the register. Continue?">
-        <p className="text-xs text-slate-500">Only the package goes; its documents stay in the register. Its number is not given out again.</p>
+        <p className="text-xs text-slate-500">It is empty, so nothing of content goes with it. Its number is not given out again.</p>
         <Field label="Why" required hint="goes on the record"><input name="reason" required className={inputCls} /></Field>
       </ActionForm>
     ),

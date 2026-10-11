@@ -20,7 +20,9 @@ conversation, write it into the right one in the same commit as the code.
 - Never send screenshots or pictures.
 - Never quote a bare document number as a reference.
 - Ask before choosing any code (status, verdict, type…). A code never changes once used.
-- Nothing is deleted except by the app owner.
+- Nothing is deleted except by the app owner. Exception: an empty package
+  that never went out may be deleted by whoever composes it (it holds no content;
+  removing a package never removes documents).
 - The owner's full-rights account: `grant-all <email>` (backend command) makes
   that person an administrator, unlocks them, and puts them on every project
   with Document Control, which is given every verb.
@@ -52,6 +54,8 @@ conversation, write it into the right one in the same commit as the code.
   with the thing it is about, to the people it is for. Never only in a log.
   Nothing written is erased by a later step: a take-back, a send-back or a
   correction is kept beside what it answers.
+- A comment changed or taken back by its author before their step is answered
+  is a draft: only its final version is shown.
 
 ### Reviews
 - Every route step names who answers it: people, a function, or an outside
