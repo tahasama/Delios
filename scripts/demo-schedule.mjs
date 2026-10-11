@@ -1,8 +1,11 @@
-// Fills the demo project's schedule through the API, the way people would: a
-// schedule document, the project manager's disciplines per action, a document
-// requirements list, and deliverables released at different times, so every
-// state on Schedule & actions shows up (done, late receipt, ready, still ahead,
-// at risk, overdue, nothing listed).
+// Fills the demo project through the API, the way people would, following the
+// app's own flow: every release says who receives it and is sent in the same
+// act; a schedule document, the project manager's disciplines per action, a
+// document requirements list, and deliverables released at different times, so
+// every state on Schedule & actions shows up (done, late receipt, ready, still
+// ahead, at risk, overdue, nothing listed). It also leaves each demo person
+// something to do on their Home: a discipline to confirm, a late confirmation,
+// a postponement waiting for the planner, a review to decide, a draft.
 //
 // Needs the backend running with the demo seeded (docs/SESSION-HANDOFF.md §4):
 //   node scripts/demo-schedule.mjs                      (API at http://localhost:8080)
@@ -96,11 +99,18 @@ async function main() {
     }
     throw new Error("The worker did not scan the files. Is it running?");
   };
-  /** Through review to release: the engineer checks, the approver approves at IFC, Document Control releases. */
-  const release = async (revisionId) => {
+  /**
+   * Through review to release, as the app has it: the engineer checks (no comment), the approver approves at IFC and
+   * says who receives it, Document Control releases — and the release sends it in the same act.
+   */
+  const toReview = async (revisionId) => {
     const review = await engineer.post(`${p}/revisions/${revisionId}/reviews`, {});
-    await engineer.post(`${p}/reviews/${review.id}/answer`, {});
-    await approver.post(`${p}/reviews/${review.id}/answer`, { verdict: "C1", status: "IFC" });
+    await engineer.post(`${p}/reviews/${review.id}/answer`, { verdict: "NO_COMMENT" });
+    return review;
+  };
+  const release = async (revisionId) => {
+    const review = await toReview(revisionId);
+    await approver.post(`${p}/reviews/${review.id}/answer`, { verdict: "C1", status: "IFC", issue: { reason: "EXECUTION", userIds: receivers } });
     await controller.post(`${p}/reviews/${review.id}/release`, {});
   };
   const until = async (label, read, done) => {
@@ -122,6 +132,9 @@ async function main() {
     const person = people.find((one) => one.email === email);
     if (person) await admin.put(`/api/admin/projects/${project}/members`, { userId: person.id, department });
   }
+  // Who a released revision is sent to: the site (the viewer receives documents) and Document Control.
+  const idOf = (email) => people.find((one) => one.email === email)?.id;
+  const receivers = ["viewer@demo.local", "controller@demo.local"].map(idOf).filter(Boolean);
 
   // ── The schedule ───────────────────────────────────────────────────────────
   console.log("Schedule: registering and releasing the programme…");
@@ -201,16 +214,43 @@ async function main() {
     await release(await revise(engineer, doc.id, [[`${doc.number}.pdf`, pdf(doc.title), "application/pdf"]], "First issue"));
   }
 
-  // What Document Control wrote about the overdue one, and a discipline confirming.
   // By the planner's IDs the programme used; each action also has our own number (A00001…).
   const byCode = Object.fromEntries((await engineer.get(`${p}/activities`)).map((one) => [one.externalId ?? one.code, one.id]));
-  await controller.post(`${p}/activities/${byCode.A120}/decisions`, {
-    decision: "CARRIED", responsibleName: "Site manager", reason: "Screens set on temporary supports; drawing follows.",
-    delayOwedBy: "Mechanical", delayReason: "Vendor dimensions came late",
-  });
-  await controller.post(`${p}/activities/${byCode.A200}/readiness`, { department: "ST", available: true, note: null });
 
-  console.log("\nDone. Open Schedule & actions: every state should show.");
+  // ── What happened around the days ──────────────────────────────────────────
+  console.log("Confirmations, a postponement, a notice…");
+  // A120's day passed with Mechanical's drawing missing: Mechanical says, late, why the work went ahead without it.
+  await approver.post(`${p}/activities/${byCode.A120}/readiness`, {
+    department: "ME", available: true,
+    note: "Screens set on temporary supports on the site manager's word; the arrangement drawing came after the day.",
+  });
+  // A400's hydrotest is postponed: Document Control writes it down; whoever plans the project is asked to confirm it.
+  await controller.post(`${p}/activities/${byCode.A400}/decisions`, {
+    decision: "STOPPED", responsibleName: "Site manager", reason: "Pipe supports are not finished; the hydrotest cannot be held on the day.",
+  });
+  // A310 is short of Electrical's single line diagram: Document Control tells Electrical by hand.
+  const a310 = (await engineer.get(`${p}/activities`)).find((one) => one.id === byCode.A310);
+  await controller.post(`${p}/notices`, {
+    subject: `activity:${byCode.A310}:manual:EL`,
+    title: `${a310.code}: Electrical has documents missing`,
+    body: "The pump house MCC single line diagram is still missing. Send it, or confirm and say why the work can go ahead.",
+    link: `/actions/${a310.code}`,
+    people: [idOf("viewer@demo.local")].filter(Boolean),
+  });
+  // A300 is within its risk window with the duty pump datasheet missing: Mechanical's confirmation waits (approver's Home).
+
+  // ── Work in progress on the register ───────────────────────────────────────
+  console.log("A review waiting on its decision, and a draft…");
+  // The MCC single line diagram is reviewed: the engineer checked it; the approver has to decide (approver's Home).
+  await toReview(await revise(engineer, docs.mcc.id, [[`${docs.mcc.number}.pdf`, pdf(docs.mcc.title), "application/pdf"]], "First issue"));
+  // The loop diagrams are being written: a revision in preparation (engineer's Home, Drafts).
+  await revise(engineer, docs.loops.id, [[`${docs.loops.number}.pdf`, pdf(docs.loops.title), "application/pdf"]], "First issue, being drafted");
+
+  console.log("\nDone. Every release was sent in the same act. Sign in as each demo person to see their Home:");
+  console.log("  approver  — decide the MCC diagram; confirm Mechanical's documents for A300");
+  console.log("  viewer    — Electrical's documents for A310, notified by hand");
+  console.log("  controller — confirm the A400 postponement (holds Plan); the schedule's upkeep");
+  console.log("  engineer  — the loop diagrams draft");
 }
 
 main().catch((error) => {

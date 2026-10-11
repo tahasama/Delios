@@ -95,6 +95,25 @@ conversation, write it into the right one in the same commit as the code.
   it is filled in on create and marked "(recommended)"; the person may choose
   another. Each level shows its meaning and what it decides.
 
+- Released and issued are one act unless the organization sets POLICY_RELEASE =
+  SEPARATE: a release needs someone to send to (an open request naming people
+  or organizations, or the people named on the release form); the backend
+  refuses otherwise (ISSUE_REQUIRED). The release sends it.
+
+### Home
+- Home's to-do lists everything the signed-in person has to do, whatever it
+  is: reviews to decide or advise, releases, documents returned, things to send
+  (asked for, left to them to say who, to dispatch), transmittals to check or
+  acknowledge, uploads owed, drafts, and the schedule (their discipline's
+  documents to confirm, postponements to confirm, untagged actions, a failed
+  schedule read). Every new kind of work gets a row there.
+
+### Demo data
+- `scripts/demo-schedule.mjs` fills a fresh demo through the API following the
+  app's real flow (releases say who receives them and are sent; confirmations,
+  a postponement, a notice, a review waiting, a draft), leaving each demo person
+  something on their Home. Keep it in step whenever a flow changes.
+
 ### Legal hold
 - Document Control or an administrator puts a document on hold, and lifts it,
   each time with a reason. While held: it cannot be retired and no revision
