@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import Link from "next/link";
 import { requireScope } from "@/lib/scope";
 import { planLists } from "@/lib/plan-lists";
@@ -55,7 +56,7 @@ export async function PlanCards({ from = null, to = null }: { from?: Date | null
 
   const summary = (
     <div className="min-w-0 flex-1 basis-[30rem]">
-      <StagePath stages={PLAN_STAGES} at={progress.at} under={under} />
+      <StagePath stages={PLAN_STAGES} at={progress.at} under={under.map((node, i) => <Fragment key={i}>{node}</Fragment>)} />
     </div>
   );
   if (!plans) return summary;

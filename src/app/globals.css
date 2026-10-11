@@ -339,6 +339,9 @@ summary::-webkit-details-marker {
   .ask:hover { border-color: var(--color-brand-line); background: var(--color-tint); }
   .ask[data-on="true"] { background: var(--color-brand); border-color: var(--color-brand); color: #ffffff; }
   .ask[data-on="true"]:hover { background: var(--color-brand-hover); }
+  /* Inside a register sheet the buttons sit with its small controls (the joined
+     upload buttons, the file field): the same height, corners and weight. */
+  .register .ask { border-radius: 0.375rem; padding: 0.3rem 0.75rem; font-size: 12px; box-shadow: none; }
   /* A panel trigger says what is chosen on one line, however long it is. */
   .register button.plain { display: block; width: 100%; overflow: hidden; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
 
