@@ -905,6 +905,9 @@ public static class ScheduleEndpoints
             .SingleOrDefaultAsync(a => a.Id == activityId && a.ProjectId == access.Project.Id, cancellationToken);
         if (activity is null) return NotFound();
         var result = new List<NeedLateness>();
+        // Before a review starts, the route it will take is the one that serves the document: its days are what
+        // sending for review has to leave before the day the document is needed.
+        var routes = await db.ReviewRoutes.AsNoTracking().Where(r => r.Active).ToListAsync(cancellationToken);
         foreach (var need in activity.Requirements)
         {
             var document = await db.Documents.AsNoTracking().SingleAsync(d => d.Id == need.DocumentId, cancellationToken);
@@ -918,20 +921,28 @@ public static class ScheduleEndpoints
                                                           orderby t.IssuedAt
                                                           select (Instant?)t.IssuedAt).FirstOrDefaultAsync(cancellationToken);
             var due = need.NeededBy;
-            var routeDays = review?.Steps.Sum(s => s.Days ?? 0) ?? 0;
-            var external = revision?.AuthoredByParty is not null;
+            var expected = routes.Select(r => (Route: r, Score: Reviews.ReviewService.Score(r, document))).Where(x => x.Score >= 0)
+                .OrderByDescending(x => x.Score).ThenByDescending(x => x.Route.IsDefault).Select(x => x.Route).FirstOrDefault();
+            var routeDays = review?.Steps.Sum(s => s.Days ?? 0) ?? expected?.Steps.Sum(s => s.Days ?? 0) ?? 0;
+            // Owed by an outside organization when its revision came from one, or, before any revision, when the document's
+            // originator is an organization outside ours.
+            var external = revision is not null
+                ? revision.AuthoredByParty is not null
+                : document.Originator is { } originator && await db.Parties.AnyAsync(p => p.Code == originator && !p.IsInternal, cancellationToken);
+            // Named for the act, not as if it happened: whether it did is the checkpoint's own date.
             var checkpoints = new List<Checkpoint>
             {
-                Point(today, zone, external ? "Sent in by the supplier" : "Sent for review", "Submission due",
-                    due?.PlusDays(-routeDays), review?.StartedAt, external ? document.Originator ?? "the supplier" : revision?.AuthoredByName ?? "its author"),
+                Point(today, zone, external ? "Sending in, by the supplier" : "Sending for review", "Submission due",
+                    due?.PlusDays(-routeDays), review?.StartedAt,
+                    external ? document.Originator ?? "the supplier" : revision?.AuthoredByName ?? document.CreatedByName),
             };
             foreach (var step in review?.Steps.OrderBy(s => s.Index) ?? Enumerable.Empty<ReviewStep>())
             {
                 checkpoints.Add(Point(today, zone, step.PartyName is null ? $"Review step {step.Index + 1}: {step.Title}" : $"{step.PartyName}: {step.Title}",
                     "Step due", step.DueDate, step.CompletedAt, step.PartyName ?? step.FunctionCode ?? "the step"));
             }
-            checkpoints.Add(Point(today, zone, "Released", "Needed by", due, revision?.ReleasedAt, "Document Control"));
-            checkpoints.Add(Point(today, zone, "Issued", "Needed by", due, issued, "Document Control"));
+            checkpoints.Add(Point(today, zone, "Release", "Needed by", due, revision?.ReleasedAt, "Document Control"));
+            checkpoints.Add(Point(today, zone, "Issue", "Needed by", due, issued, "Document Control"));
             result.Add(new NeedLateness(need.Id, document.Number, need.State, checkpoints, checkpoints.FirstOrDefault(c => c.Late)));
         }
         return Results.Ok(result);

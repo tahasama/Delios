@@ -265,6 +265,13 @@ conversation, write it into the right one in the same commit as the code.
   on leaving it. Apply lights only while typed words or dates wait. Every filter
   is kept through sorting, paging, load more, the key and export.
 - Progress on an action: a date still to come is shown as due, never as done.
+- The schedule's date reads from today, never "overdue": "40 days ago · lasted
+  3 days", "Today", "In 5 days · lasts 3 days".
+- Where a document got late: its checkpoints are named for the act (Sending
+  for review, each review step, Release, Issue) and their dates say whether it
+  happened. Before a review exists, sending for review is due the route's days
+  before the day it is needed (the route that serves the document). Route
+  steps lists only the review's own steps.
 - Under each stage of Schedule & actions: the revision in force, "Uploaded
   directly" (with the day) when a direct upload is newer, "Not released yet",
   or "None yet".

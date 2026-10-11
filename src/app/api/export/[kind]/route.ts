@@ -99,7 +99,7 @@ async function extract(req: Request, { params }: { params: Promise<{ kind: strin
       "Last document issued", "Decision", "Decision stood at", "Carried by", "Reason", "Delay owed by", "Delay reason",
       "Document number", "Required status", "Required by",
       "Delay source", "Delay source happened", "Delay source deadline", "Delay source due", "Delay source owed by",
-      "Sent for review at", "Submission due", "Sent for review owed by",
+      "Sent for review at", "Submission due", "Sending for review owed by",
       "Route steps",
       "Released & issued at", "Day of the activity", "Release owed by",
       "Still outstanding",

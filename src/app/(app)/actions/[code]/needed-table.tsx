@@ -98,7 +98,7 @@ const COLUMNS: Column[] = [
     key: "source",
     label: "Where it got late",
     by: (row) => row.source ?? (row.outstanding ? "zz" : "zzz"),
-    note: "The first step of the document's way that ran late: sent for review (or sent in by the supplier), a review step, released, or issued. The steps after it only inherit the delay.",
+    note: "The first step of the document's way that ran late: sending for review (or sending in, by the supplier), a review step, release, or issue. The steps after it only inherit the delay.",
     cellClass: "whitespace-nowrap text-xs",
     cell: (row) => row.source ? (
       <>
@@ -136,7 +136,7 @@ const COLUMNS: Column[] = [
   },
   {
     key: "sent",
-    label: "Sent for review",
+    label: "Sending for review",
     by: (row) => row.chain[0]?.atSort ?? LAST,
     cellClass: "whitespace-nowrap text-xs",
     cell: (row) => <MomentCell one={row.chain[0] ?? null} />,
@@ -147,7 +147,8 @@ const COLUMNS: Column[] = [
     note: "Every step of the route, in order, with the day it answered and the day it was given.",
     cellClass: "text-xs",
     cell: (row) => {
-      const middle = row.chain.slice(1, -1);
+      // Between sending for review and the last two (release, issue): the review's own steps.
+      const middle = row.chain.slice(1, -2);
       if (!middle.length) return <span className="text-slate-500">no route yet</span>;
       return (
         <span className="block space-y-0.5">
@@ -168,7 +169,13 @@ const COLUMNS: Column[] = [
     label: "Released & issued",
     by: (row) => row.chain[row.chain.length - 1]?.atSort ?? LAST,
     cellClass: "whitespace-nowrap text-xs",
-    cell: (row) => <MomentCell one={row.chain.length > 1 ? row.chain[row.chain.length - 1] : null} />,
+    // Release and issue each with its own day: together when they are one act, apart when they are not.
+    cell: (row) => row.chain.length > 2 ? (
+      <span className="block space-y-1">
+        <span className="block"><span className="font-medium text-slate-600">Release </span><MomentCell one={row.chain[row.chain.length - 2]} /></span>
+        <span className="block"><span className="font-medium text-slate-600">Issue </span><MomentCell one={row.chain[row.chain.length - 1]} /></span>
+      </span>
+    ) : <MomentCell one={null} />,
   },
   { key: "discipline", label: "Discipline", by: (row) => row.discipline, cellClass: "text-xs", cell: (row) => row.discipline },
   { key: "from", label: "From", by: (row) => row.from, cellClass: "text-xs", cell: (row) => row.from },
@@ -382,7 +389,7 @@ export function NeededTable({ rows, chips, plate, exportHref, empty, link }: {
           <DataTable
             id="action-needed"
             className="rounded-none border-0 shadow-none"
-            defaultHidden={["Approved by", "Sent for review", "Route steps", "Released & issued"]}
+            defaultHidden={["Approved by", "Sending for review", "Route steps", "Released & issued"]}
             fill
             stretch={!!cardHeight}
             onMove={move}

@@ -124,7 +124,7 @@ export function LinksCard({ actionId, code, departments, disciplines, documents,
 
         <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 sm:px-6">
           <p className="text-xs text-slate-700">
-            <span className="font-semibold">Documents</span> <span className="text-slate-500">· {count} needed</span>
+            <span className="font-semibold">Documents</span> <span className="text-slate-500">· {count === 0 ? "none on its list yet" : `${count} on its list`}</span>
           </p>
           {tagged.length ? (
             <Link href={`/documents?pick=${encodeURIComponent(code)}`} className="ask">Add or take off, in the register</Link>

@@ -225,7 +225,7 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
       finish: row.finishDate && row.scheduledDate && row.finishDate > row.scheduledDate ? fmtDate(row.finishDate) : null,
       // Start and finish both count: work on the 12th and 13th lasts two days.
       days: row.finishDate && row.scheduledDate ? Math.round((row.finishDate.getTime() - row.scheduledDate.getTime()) / 86_400_000) + 1 : null,
-      when: datePhrase(row.daysUntil),
+      when: datePhrase(row.daysUntil, row.finishDate && row.scheduledDate ? Math.round((row.finishDate.getTime() - row.scheduledDate.getTime()) / 86_400_000) + 1 : null),
       late: row.daysUntil !== null && row.daysUntil < 0,
       readiness: row.readiness,
       ready: row.ready,
@@ -398,9 +398,14 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
   );
 }
 
-function datePhrase(days: number | null) {
+/**
+ * When the action is, from today, and how long it lasts: "40 days ago · lasted
+ * 3 days", "Today · lasts 3 days", "In 5 days · lasts 3 days". A past day is
+ * not "overdue": the work is taken to have happened unless it was postponed.
+ */
+function datePhrase(days: number | null, lasts: number | null) {
   if (days === null) return "No date from the schedule";
-  if (days === 0) return "Today";
-  if (days < 0) return `${Math.abs(days)} day${Math.abs(days) === 1 ? "" : "s"} overdue`;
-  return `${days} day${days === 1 ? "" : "s"} to go`;
+  const plural = (n: number) => `${n} day${n === 1 ? "" : "s"}`;
+  const when = days === 0 ? "Today" : days < 0 ? `${plural(Math.abs(days))} ago` : `In ${plural(days)}`;
+  return lasts && lasts > 1 ? `${when} · ${days < 0 ? "lasted" : "lasts"} ${plural(lasts)}` : when;
 }

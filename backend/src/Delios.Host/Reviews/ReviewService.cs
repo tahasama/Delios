@@ -75,7 +75,7 @@ public sealed class ReviewService(
     }
 
     /// <summary>-1 when the route does not serve the document; otherwise how many fields its best pattern pins.</summary>
-    private static int Score(ReviewRoute route, Document d)
+    internal static int Score(ReviewRoute route, Document d)
     {
         if (route.Patterns.Count == 0) return route.IsDefault ? 0 : 0;
         var best = -1;
