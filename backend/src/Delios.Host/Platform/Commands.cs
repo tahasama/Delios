@@ -4,7 +4,7 @@ namespace Delios.Host.Platform;
 
 /// <summary>
 /// One-shot commands run with the same build and settings as the app:
-/// <c>migrate</c>, <c>create-tenant</c>, <c>seed-demo</c>, <c>reindex</c>.
+/// <c>migrate</c>, <c>create-tenant</c>, <c>seed-demo</c>, <c>reindex</c>, <c>grant-all</c>.
 /// </summary>
 public static class Commands
 {
@@ -12,7 +12,7 @@ public static class Commands
     /// True when the first command-line argument names one of these commands. Program.cs then runs the command instead of starting the web server.
     /// </summary>
     public static bool IsCommand(string[] args) =>
-        args.Length > 0 && args[0] is DatabaseMigrator.Command or "create-tenant" or "seed-demo" or "reindex";
+        args.Length > 0 && args[0] is DatabaseMigrator.Command or "create-tenant" or "seed-demo" or "reindex" or "grant-all";
 
     /// <summary>
     /// Runs the command named by the first argument and returns the process exit code (0 success, 2 wrong usage or refused).
@@ -62,9 +62,16 @@ public static class Commands
                 await Console.Out.WriteLineAsync("Search index dropped; the worker rebuilds it from the register.");
                 return 0;
 
+            case "grant-all" when args.Length == 2:
+                // The new password, when one is wanted, comes from the environment so it never sits in shell history.
+                var newPassword = Environment.GetEnvironmentVariable("DELIOS_ADMIN_PASSWORD");
+                var said = await services.GetRequiredService<GrantAll>().RunAsync(args[1], string.IsNullOrWhiteSpace(newPassword) ? null : newPassword);
+                await Console.Out.WriteLineAsync(said);
+                return said.StartsWith("No one") ? 2 : 0;
+
             default:
                 await Console.Error.WriteLineAsync(
-                    "Usage: migrate | create-tenant <slug> <name> <admin-email> <admin-name> | seed-demo | reindex");
+                    "Usage: migrate | create-tenant <slug> <name> <admin-email> <admin-name> | seed-demo | reindex | grant-all <email>");
                 return 2;
         }
     }

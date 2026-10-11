@@ -291,7 +291,16 @@ export default async function ActionDetailPage({ params, searchParams }: { param
           ) : null}
         </section>
 
-          <ActionNotes notes={action.notes} actionId={action.id} mayNote={mayNote} answer={wentAhead} missing={missingCount} />
+          <ActionNotes
+            notes={action.notes}
+            actionId={action.id}
+            mayNote={mayNote}
+            answer={wentAhead}
+            missing={missingCount}
+            total={action.entries.length}
+            day={action.scheduledDate ? fmtDate(action.scheduledDate) : null}
+            heldUpBy={[...new Set(lateness.rows.map((row) => row.cause?.owedBy ?? row.checkpoints.at(-1)?.owedBy).filter((one): one is string => !!one))]}
+          />
         </div>
 
         <aside>

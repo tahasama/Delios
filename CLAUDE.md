@@ -21,6 +21,9 @@ conversation, write it into the right one in the same commit as the code.
 - Never quote a bare document number as a reference.
 - Ask before choosing any code (status, verdict, type…). A code never changes once used.
 - Nothing is deleted except by the app owner.
+- The owner's full-rights account: `grant-all <email>` (backend command) makes
+  that person an administrator, unlocks them, and puts them on every project
+  with Document Control, which is given every verb.
 - No model names in commits. Commit and push to the working branch.
 - Do not run the tests unless asked; do compile (`dotnet build`, `npx tsc --noEmit`).
 - Think about the whole flow, not a patch. When the owner reports something
@@ -144,6 +147,12 @@ conversation, write it into the right one in the same commit as the code.
   "not yet" before the day. Going ahead needs the concerned disciplines to
   confirm; confirming with any of that discipline's documents missing always
   needs an explanation (backend refuses otherwise).
+- The action page's "Went ahead?" card shows the answer and the situation in
+  one sentence (the day, how many documents missing). Its choices are the same
+  words as the schedule's: Missing documents (only when some are), Postponed;
+  With documents is read from the documents, never written. "Why" is a
+  paragraph, given by the manager who decided, written down by Document
+  Control. "Held up by" offers who the late documents were owed by.
 - Filters: a dropdown picked with the mouse applies at once; with the keyboard,
   on leaving it. Apply lights only while typed words or dates wait. Every filter
   is kept through sorting, paging, load more, the key and export.

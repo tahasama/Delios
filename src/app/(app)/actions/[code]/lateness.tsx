@@ -1,4 +1,5 @@
 import { ActionForm } from "@/components/form";
+import { Field, inputCls } from "@/components/ui";
 import { fmtDate } from "@/lib/utils";
 import { recordActionNoteAction } from "@/lib/actions/action-notes";
 
@@ -38,15 +39,29 @@ const ANSWER: Record<WentAhead, { word: string; tone: string }> = {
   POSTPONED: { word: "Postponed", tone: "text-slate-700 ring-slate-300 bg-slate-100" },
 };
 
-export function ActionNotes({ notes, actionId, mayNote, answer, missing }: {
+export function ActionNotes({ notes, actionId, mayNote, answer, missing, total, day, heldUpBy }: {
   notes: Note[];
   actionId: string;
   /** Whoever writes the note on this project: Document Control, or the manager. */
   mayNote: boolean;
   answer: WentAhead;
-  /** How many of the action's documents are not there. */
+  /** How many of the action's documents are not there, of how many. */
   missing: number;
+  total: number;
+  /** The action's day, as written. */
+  day: string | null;
+  /** Who the late documents were owed by, to choose from when saying who held it up. */
+  heldUpBy: string[];
 }) {
+  // What the situation is, in one sentence, for every answer.
+  const situation = answer === "NOT_YET"
+    ? `Its day${day ? `, ${day},` : ""} has not come. Answered after it; a postponement can be written down now.`
+    : answer === "WITH_DOCUMENTS"
+      ? `Every document was there on ${day ?? "the day"}. Nothing to write down unless the work was postponed.`
+      : answer === "MISSING_DOCUMENTS"
+        ? `${day ?? "The day"} passed with ${missing} of ${total} document${total === 1 ? "" : "s"} missing. Write down who let it go ahead and why, or that it was postponed.`
+        : `Postponed${notes[0]?.plannedDate ? ` — its day stood at ${fmtDate(notes[0].plannedDate)}` : ""}.`;
+
   return (
     <section id="note" className="register register-sheet register-sheet-open">
       <div className="flex flex-wrap items-center gap-2 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
@@ -57,69 +72,57 @@ export function ActionNotes({ notes, actionId, mayNote, answer, missing }: {
         ) : null}
       </div>
 
+      <p className="px-5 py-3 text-xs leading-5 text-slate-600 sm:px-6">{situation}</p>
+
       {notes.length ? (
-        <ul className="divide-y divide-line">
+        <ul className="divide-y divide-line border-t border-line">
           {notes.map((note) => (
             <li key={note.id} className="px-5 py-3 text-xs leading-5 sm:px-6">
               <p className={`font-semibold ${note.decision === "CARRIED" ? "text-amber-800" : "text-slate-700"}`}>
-                {note.decision === "CARRIED" ? "Missing documents — it went ahead without them" : "Postponed — it did not happen on the day"}
+                {note.decision === "CARRIED" ? "Missing documents" : "Postponed"}
                 {note.plannedDate ? <span className="font-normal text-slate-500"> &middot; the day stood at {fmtDate(note.plannedDate)}</span> : null}
               </p>
-              <p className="mt-0.5 text-slate-600"><strong className="font-semibold text-slate-800">{note.responsibleName}</strong> carries it: {note.reason}</p>
+              <p className="mt-0.5 whitespace-pre-line text-slate-600"><strong className="font-semibold text-slate-800">{note.responsibleName}</strong> decided: {note.reason}</p>
               {note.delayResponsible ? (
-                <p className="text-slate-600">Delay owed by <strong className="font-semibold text-slate-800">{note.delayResponsible}</strong>{note.delayReason ? `: ${note.delayReason}` : ""}</p>
+                <p className="whitespace-pre-line text-slate-600">Held up by <strong className="font-semibold text-slate-800">{note.delayResponsible}</strong>{note.delayReason ? `: ${note.delayReason}` : ""}</p>
               ) : null}
-              <p className="mt-0.5 text-[11px] text-slate-500">Written down by {note.recordedByName}, {fmtDate(note.createdAt)} &mdash; and kept.</p>
+              <p className="mt-0.5 text-[11px] text-slate-500">Written down by {note.recordedByName}, {fmtDate(note.createdAt)}, and kept.</p>
             </li>
           ))}
         </ul>
-      ) : (
-        <p className="px-5 py-3 text-xs leading-5 text-slate-600 sm:px-6">
-          {answer === "NOT_YET"
-            ? "Answered after the day: with documents, missing documents, or postponed."
-            : answer === "WITH_DOCUMENTS"
-              ? "Every document was there on the day. Nothing to write unless the work was postponed."
-              : answer === "MISSING_DOCUMENTS"
-                ? `The day passed with ${missing} document${missing === 1 ? "" : "s"} missing. Write down who let it go ahead, and why — or that it was postponed.`
-                : "Postponed."}
-        </p>
-      )}
+      ) : null}
 
       {mayNote && answer !== "POSTPONED" ? (
-        /* Only the answers a person gives: "with documents" is read from the documents themselves. */
-        <ActionForm action={recordActionNoteAction} hideSubmit hidden={{ actionId }}>
-          <div className="asking grid grid-cols-1 gap-x-5 gap-y-4 border-t border-line px-5 py-4 sm:grid-cols-2 sm:px-6">
-            <label className="min-w-0">
-              <span className="sr-only">Went ahead?</span>
-              <select name="decision" required defaultValue="" className="plain w-full">
-                <option value="" disabled>Write down&hellip;</option>
-                {missing > 0 ? <option value="CARRIED">Missing documents &mdash; it went ahead without them</option> : null}
-                <option value="STOPPED">Postponed &mdash; it did not happen on the day</option>
+        /* The choices are the schedule's own answers; "With documents" is read
+           from the documents, so it is never written down. */
+        <ActionForm action={recordActionNoteAction} submitLabel="Write it down" hidden={{ actionId }} className="space-y-4 border-t border-line px-5 py-4 sm:px-6">
+          <div className="grid grid-cols-1 gap-x-5 gap-y-4 sm:grid-cols-2">
+            <Field label="Went ahead?" required>
+              <select name="decision" required defaultValue="" className={inputCls}>
+                <option value="" disabled hidden>Choose…</option>
+                {missing > 0 ? <option value="CARRIED">Missing documents</option> : null}
+                <option value="STOPPED">Postponed</option>
               </select>
-            </label>
-            <label className="min-w-0">
-              <span className="sr-only">Who approved it</span>
-              <input name="responsibleName" required className="plain w-full" placeholder="Who decided it — the manager this day answers to" />
-            </label>
-            <label className="min-w-0 sm:col-span-2">
-              <span className="sr-only">Why</span>
-              <input name="reason" required className="plain w-full" placeholder="Why — in their words, because an audit reads this" />
-            </label>
-            <label className="min-w-0">
-              <span className="sr-only">Delay owed by</span>
-              <input name="delayResponsible" className="plain w-full" placeholder="Delay owed by — optional" />
-            </label>
-            <label className="min-w-0">
-              <span className="sr-only">What they say about the delay</span>
-              <input name="delayReason" className="plain w-full" placeholder="What they say about it — optional" />
-            </label>
-            <div className="flex justify-end sm:col-span-2">
-              <button className="ask">Write it down</button>
-            </div>
+            </Field>
+            <Field label="Who decided" required hint="the manager this day answers to">
+              <input name="responsibleName" required className={inputCls} />
+            </Field>
+          </div>
+          <Field label="Why" required hint="in the manager's own words — they give the reason, you write it down">
+            <textarea name="reason" required rows={3} className={inputCls} />
+          </Field>
+          <div className="grid grid-cols-1 gap-x-5 gap-y-4 sm:grid-cols-2">
+            <Field label="Held up by" hint="optional — who the missing documents were waiting on">
+              <input name="delayResponsible" list={`held-up-${actionId}`} className={inputCls} />
+              <datalist id={`held-up-${actionId}`}>{heldUpBy.map((one) => <option key={one} value={one} />)}</datalist>
+            </Field>
+            <Field label="Their explanation" hint="optional — what they said about it">
+              <input name="delayReason" className={inputCls} />
+            </Field>
           </div>
         </ActionForm>
-      ) : !mayNote ? (
-        <p className="border-t border-line px-5 py-3 text-xs text-slate-500 sm:px-6">Document Control writes this down, from what the manager and the late party tell them.</p>
+      ) : !mayNote && answer !== "WITH_DOCUMENTS" ? (
+        <p className="border-t border-line px-5 py-3 text-xs text-slate-500 sm:px-6">Document Control writes this down, from what the manager tells them.</p>
       ) : null}
     </section>
   );
