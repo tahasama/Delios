@@ -29,11 +29,15 @@ export type NeedView = {
   id: string; documentId: string; documentNumber: string; title: string; currentRevision: string | null; currentStatus: string | null;
   purpose: string; requiredStatuses: string[]; anchor: string; offsetDays: number; fixedDate: string | null; neededBy: string | null;
   department: string | null; state: "MISSING" | "MET" | "WAIVED"; metAt: string | null; waiverNote: string | null; waivedBy: string | null; waivedAt: string | null;
+  /** This document's own risk window from the requirements list, in days before the action's day; null uses the project's. */
+  riskDays?: number | null;
 };
 
 export type DecisionView = {
   id: string; decision: string; plannedStart: string | null; responsibleName: string; reason: string;
   delayOwedBy: string | null; delayReason: string | null; recordedBy: string; recordedAt: string;
+  confirmedBy?: string | null; confirmedAt?: string | null; confirmNote?: string | null;
+  reversedBy?: string | null; reversedAt?: string | null; reversedReason?: string | null;
 };
 
 export type ActivityDetail = { activity: ActivitySummary; needs: NeedView[]; decisions: DecisionView[] };
@@ -100,6 +104,8 @@ export type LegacyEntry = {
   /** What the need asks for: the statuses it names, or its purpose. */
   requiredStatus: string;
   requiredBy: Date; manualDate: boolean; leadBusinessDays: number | null;
+  /** This document's own risk window, in days before the action's day; null uses the project's. */
+  riskDays: number | null;
   submittedBy: string | null; approvedBy: string | null; createdAt: Date | null; updatedAt: Date | null;
   document: {
     id: string; docNumber: string; title: string; discipline: string; docType: string; originator: string | null; isPlaceholder: boolean;
@@ -114,6 +120,10 @@ export type LegacyEntry = {
 export type LegacyNote = {
   id: string; decision: string; plannedDate: Date | null; responsibleName: string; reason: string;
   delayResponsible: string | null; delayReason: string | null; recordedByName: string; createdAt: Date;
+  /** A postponement confirmed by whoever plans, with what changes. */
+  confirmedByName: string | null; confirmedAt: Date | null; confirmNote: string | null;
+  /** Taken back by Document Control, with why: it no longer counts. */
+  reversedByName: string | null; reversedAt: Date | null; reversedReason: string | null;
 };
 
 export type LegacyAction = {
@@ -128,7 +138,13 @@ export type LegacyAction = {
   readiness: string;
   entries: LegacyEntry[];
   /** Departments confirming their documents are there: not kept by the backend. */
-  confirmations: { department: string; available: boolean; note: string | null; confirmedByName: string; confirmedAt: Date | null }[];
+  confirmations: {
+    department: string; available: boolean; note: string | null; confirmedByName: string; confirmedAt: Date | null;
+    /** Written by the system when the day passed with every document released. */
+    automatic: boolean;
+    /** Taken back by Document Control: it then counts as not confirmed. */
+    revokedAt: Date | null; revokedByName: string | null; revokedReason: string | null;
+  }[];
   notes: LegacyNote[];
   scheduleActivities: { scheduleVersion: { versionLabel: string } }[];
 };
@@ -155,6 +171,8 @@ async function confirmationsOf(scope: Scope): Promise<Confirmation[]> {
   return (await readinessAnswers(scope)).map((one) => ({
     activityId: one.activityId, department: one.department, available: one.available, note: one.note,
     confirmedByName: one.confirmedByName, confirmedAt: new Date(one.confirmedAt),
+    automatic: !!one.automatic, revokedAt: one.revokedAt ? new Date(one.revokedAt) : null,
+    revokedByName: one.revokedByName ?? null, revokedReason: one.revokedReason ?? null,
   }));
 }
 
@@ -174,6 +192,7 @@ function legacyAction(detail: ActivityDetail, documents: Map<string, DocumentVie
       requiredBy: dayOf(need.neededBy) ?? scheduledDate ?? new Date(),
       manualDate: !!need.fixedDate,
       leadBusinessDays: need.anchor === "START" && need.offsetDays <= 0 ? -need.offsetDays : null,
+      riskDays: need.riskDays ?? null,
       submittedBy: null,
       approvedBy: null,
       createdAt: null,
@@ -230,6 +249,12 @@ function legacyAction(detail: ActivityDetail, documents: Map<string, DocumentVie
       delayReason: one.delayReason,
       recordedByName: one.recordedBy,
       createdAt: new Date(one.recordedAt),
+      confirmedByName: one.confirmedBy ?? null,
+      confirmedAt: one.confirmedAt ? new Date(one.confirmedAt) : null,
+      confirmNote: one.confirmNote ?? null,
+      reversedByName: one.reversedBy ?? null,
+      reversedAt: one.reversedAt ? new Date(one.reversedAt) : null,
+      reversedReason: one.reversedReason ?? null,
     })),
     scheduleActivities: versionLabel ? [{ scheduleVersion: { versionLabel } }] : [],
   };
@@ -310,3 +335,22 @@ export const scheduleVersions = cache(async (scope: Scope): Promise<LegacySchedu
     };
   });
 });
+
+// ── Notices ──────────────────────────────────────────────────────────────────
+
+export type NoticeView = { id: string; subject: string; automatic: boolean; title: string; body: string | null; recipients: string[]; sentBy: string; sentAt: string };
+
+/** Every notice whose subject starts with this, oldest first: what the notify panels count from. */
+export const noticesAbout = cache(async (scope: Scope, subject: string): Promise<NoticeView[]> =>
+  api<NoticeView[]>(projectPath(scope, "/notices"), { query: { subject } }).catch(() => [] as NoticeView[]));
+
+/** What a notify panel says about the notices already sent on one matter. */
+export function noticeHistory(notices: NoticeView[], now = new Date()): { count: number; daysSinceFirst: number | null; lastTo: string[] } {
+  if (!notices.length) return { count: 0, daysSinceFirst: null, lastTo: [] };
+  const first = new Date(notices[0].sentAt);
+  return {
+    count: notices.length,
+    daysSinceFirst: Math.max(0, Math.floor((now.getTime() - first.getTime()) / 86_400_000)),
+    lastTo: notices[notices.length - 1].recipients,
+  };
+}

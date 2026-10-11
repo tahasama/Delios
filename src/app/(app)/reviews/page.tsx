@@ -221,9 +221,8 @@ export default async function ReviewsPage({ searchParams }: { searchParams: Prom
       routeDueAt: routeDueAt ? fmtDate(routeDueAt) : null,
       routeDueState: routeState,
       dueState: state,
-      notifyHref: late && waitingOnStep
-        ? `/transmittals/new?revisions=${waitingOnStep.revisionId}&users=${waitingOnStep.userIds.join(",")}&reason=REVIEW&subject=${encodeURIComponent(`${c.documentNumber} rev ${c.revision} — review still open`)}&message=${encodeURIComponent(`This review was due on ${fmtDate(dueAt!)}. Please answer it.`)}`
-        : null,
+      // Notifying the people it waits on is done on the review's page, where who is told can be changed.
+      notifyHref: late && waitingOnStep ? `/reviews/${c.id}#notify` : null,
       // When the people on the open step were warned it falls due the next working day.
       warnedAt: c.warnedAt ? fmtDate(c.warnedAt) : null,
       openedAt: fmtDate(c.startedAt),

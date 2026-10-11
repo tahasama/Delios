@@ -16,7 +16,7 @@ import { activityDetail, type ActivityDetail } from "@/lib/api/schedule";
  * written. It is never edited and never deleted: it exists to be read by an
  * audit, and a record that can be tidied afterwards is not one.
  */
-type State = { error?: string; message?: string };
+type State = { error?: string; ok?: string };
 
 export async function recordActionNoteAction(_prev: State | undefined, formData: FormData): Promise<State> {
   const ctx = await requireScope();
@@ -29,9 +29,7 @@ export async function recordActionNoteAction(_prev: State | undefined, formData:
   const delayReason = String(formData.get("delayReason") ?? "").trim() || null;
 
   if (await actIsOff(ctx, "ACTION_NOTE")) return { error: "Notes on actions are not used on this project." };
-  if (decision !== "CARRIED" && decision !== "STOPPED") {
-    return { error: "Say whether the work went ahead without its documents, or was stopped." };
-  }
+  if (!decision) return { error: "Choose what happened." };
   if (!responsibleName) return { error: "Name who carries this decision — the manager the action answers to." };
   if (!reason) return { error: "Say why. A decision with no reason on it is not a record of anything." };
 
@@ -56,5 +54,35 @@ export async function recordActionNoteAction(_prev: State | undefined, formData:
   }
 
   revalidatePath(`/actions/${action.code}`);
-  return { message: decision === "CARRIED" ? "Recorded: it went ahead, and the record says on whose word." : "Recorded: it was stopped, and the record says why." };
+  return { ok: "Written down. Everyone concerned, and whoever plans the project, has been told." };
+}
+
+/** Whoever plans the project confirms a postponement, saying what changes for the next schedule revision. */
+export async function confirmPostponementAction(_prev: State | undefined, formData: FormData): Promise<State> {
+  const ctx = await requireScope();
+  const actionId = String(formData.get("actionId") ?? "");
+  const note = String(formData.get("note") ?? "").trim();
+  if (!note) return { error: "Say what changes, so the next schedule revision can follow." };
+  try {
+    const detail = await api<ActivityDetail>(projectPath(ctx, `/activities/${actionId}/decisions/${String(formData.get("decisionId") ?? "")}/confirm`), { body: { note } });
+    revalidatePath(`/actions/${detail.activity.code}`);
+  } catch (e) {
+    return { error: refusal(e).message };
+  }
+  return { ok: "Confirmed. Everyone concerned and Document Control have been told." };
+}
+
+/** Document Control takes a decision back, with why. It stays on the record, marked. */
+export async function reverseDecisionAction(_prev: State | undefined, formData: FormData): Promise<State> {
+  const ctx = await requireScope();
+  const actionId = String(formData.get("actionId") ?? "");
+  const note = String(formData.get("note") ?? "").trim();
+  if (!note) return { error: "Say why it is taken back." };
+  try {
+    const detail = await api<ActivityDetail>(projectPath(ctx, `/activities/${actionId}/decisions/${String(formData.get("decisionId") ?? "")}/reverse`), { body: { note } });
+    revalidatePath(`/actions/${detail.activity.code}`);
+  } catch (e) {
+    return { error: refusal(e).message };
+  }
+  return { ok: "Taken back. Everyone concerned and whoever plans the project have been told." };
 }

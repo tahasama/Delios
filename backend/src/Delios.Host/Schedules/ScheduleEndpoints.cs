@@ -402,9 +402,13 @@ public static class ScheduleEndpoints
         Notifications.Notifier notifier, CancellationToken cancellationToken)
     {
         var access = ProjectAccessFilter.Of(http);
-        if (!(access.Holds(Verbs.Control) || access.Holds(Verbs.Plan)))
-            return Problems.Forbidden("NOTICE_NOT_ALLOWED", "Document Control, or whoever plans the project, sends these notices.");
         var subject = request.Subject?.Trim() ?? "";
+        // Document Control or whoever plans the project; and, about a review, whoever started it.
+        var mayTell = access.Holds(Verbs.Control) || access.Holds(Verbs.Plan)
+            || (subject.StartsWith("review:") && Guid.TryParse(subject.Split(':')[1], out var reviewId)
+                && await db.Reviews.AnyAsync(r => r.Id == reviewId && r.ProjectId == access.Project.Id && r.StartedById == access.UserId, cancellationToken));
+        if (!mayTell)
+            return Problems.Forbidden("NOTICE_NOT_ALLOWED", "Document Control, whoever plans the project, or whoever started the review sends these notices.");
         var title = request.Title?.Trim() ?? "";
         if (subject.Length == 0 || title.Length == 0) return Problems.Invalid("NOTICE_INCOMPLETE", "Say what the notice is about.");
         var chosen = (request.People ?? []).Distinct().ToArray();

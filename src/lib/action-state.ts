@@ -11,7 +11,8 @@ import { meetsRequirement } from "./readiness";
  * - late receipt — every document is there, the last after the day;
  * - ready — every document is there and the day is still ahead;
  * - overdue — the day has passed with something still missing;
- * - at risk — a missing document is owed within the risk window, or already;
+ * - at risk — the action's day is within a missing document's risk window
+ *   (its own from the requirements list, or the project's), counted back from the day;
  * - still ahead — something is missing, but nothing is owed soon.
  */
 export type ActionState = "DONE" | "LATE_RECEIPT" | "READY" | "UPCOMING" | "AT_RISK" | "NOT_READY" | "UNKNOWN";
@@ -28,7 +29,7 @@ export const ACTION_STATES: { code: ActionState; label: string }[] = [
 
 export const stateLabel = (state: ActionState) => ACTION_STATES.find((one) => one.code === state)!.label;
 
-/** A missing document owed within this many days puts its action at risk, unless the project says otherwise. */
+/** Days before an action's day that a missing document puts it at risk, unless the project or the document says otherwise. */
 export const DEFAULT_RISK_DAYS = 7;
 
 const DAY = 86_400_000;
@@ -36,7 +37,7 @@ const DAY = 86_400_000;
 type Stateful = {
   scheduledDate: Date | null;
   lastMetAt: Date | null;
-  entries: { requiredBy: Date; requiredStatus: string; document: { revisions: { statusCode: string | null; meets?: boolean }[] } }[];
+  entries: { requiredBy: Date; requiredStatus: string; riskDays?: number | null; document: { revisions: { statusCode: string | null; meets?: boolean }[] } }[];
 };
 
 /** The start of the day `now` falls in: a day passes at midnight, not 24 hours after it began. */
@@ -62,6 +63,31 @@ export function actionState(action: Stateful, riskDays = DEFAULT_RISK_DAYS, now 
     return afterwards ? "LATE_RECEIPT" : "DONE";
   }
   if (passed) return "NOT_READY";
-  const next = Math.min(...missing.map((entry) => entry.requiredBy.getTime()));
-  return next <= now.getTime() + riskDays * DAY ? "AT_RISK" : "UPCOMING";
+  const from = riskFrom(action, riskDays);
+  return from && from.getTime() <= now.getTime() ? "AT_RISK" : "UPCOMING";
+}
+
+/**
+ * The day an action is at risk from, and its departments confirm by hand: its
+ * day less the longest-reaching risk window of a document still missing. The
+ * backend writes the same day (Activity.RiskFrom). Null when nothing is missing
+ * or there is no day.
+ */
+export function riskFrom<E extends Stateful["entries"][number]>(
+  action: { scheduledDate: Date | null; entries: E[] }, riskDays = DEFAULT_RISK_DAYS, only?: (entry: E) => boolean,
+): Date | null {
+  if (!action.scheduledDate) return null;
+  const missing = action.entries.filter((entry) => (!only || only(entry)) && !meetsRequirement(entry.document.revisions, entry.requiredStatus));
+  if (!missing.length) return null;
+  const day = startOfDay(action.scheduledDate).getTime();
+  return new Date(Math.min(...missing.map((entry) => day - (entry.riskDays ?? riskDays) * DAY)));
+}
+
+/**
+ * Whether an action was postponed: a decision from the organization's list that
+ * does not proceed, not taken back by Document Control. The schedule and the
+ * action's page both ask this.
+ */
+export function isPostponed(action: { notes: { decision: string; reversedAt?: Date | null }[] }, postponeCodes: string[]): boolean {
+  return action.notes.some((note) => postponeCodes.includes(note.decision) && !note.reversedAt);
 }

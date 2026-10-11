@@ -103,6 +103,22 @@ export async function confirmReadinessAction(_prev: State | undefined, formData:
   return { ok: "Recorded." };
 }
 
+/** Document Control takes a department's confirmation back (an honest mistake), with why. */
+export async function revokeReadinessAction(_prev: State | undefined, formData: FormData): Promise<State> {
+  const ctx = await requireScope();
+  const reason = String(formData.get("reason") ?? "").trim();
+  if (!reason) return { error: "Say why the confirmation is taken back." };
+  try {
+    await api(projectPath(ctx, `/activities/${String(formData.get("actionId") ?? "")}/readiness/revoke`), {
+      body: { department: String(formData.get("department") ?? ""), reason },
+    });
+  } catch (e) {
+    return failed(e);
+  }
+  revalidatePath("/actions", "layout");
+  return { ok: "Taken back. The discipline confirms again." };
+}
+
 /**
  * Tell every department an activity concerns where it stands, and name the
  * ones that are short. Everybody sees the risk; the department that must act

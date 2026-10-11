@@ -1,11 +1,12 @@
 import { requireScope } from "@/lib/scope";
 import { departmentsOf, daysBefore } from "@/lib/schedule";
+import { getActiveSet } from "@/lib/config";
 import { mayUploadLists } from "@/lib/permissions";
 import { clearance } from "@/lib/requirements-process";
 import { readSearch, readDay } from "@/lib/register-query";
 import { PLAN_CARD_HEIGHT, PLAN_FIRST } from "@/lib/plan-card";
 import { meetsRequirement } from "@/lib/readiness";
-import { ACTION_STATES, DEFAULT_RISK_DAYS, actionState, dayHasPassed } from "@/lib/action-state";
+import { ACTION_STATES, DEFAULT_RISK_DAYS, actionState, dayHasPassed, isPostponed } from "@/lib/action-state";
 import { fmtDate } from "@/lib/utils";
 import { getSet } from "@/lib/config";
 import { api } from "@/lib/api/client";
@@ -117,13 +118,15 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
   // that day, either something was still missing or the last of it had not yet
   // arrived. Both readings of "short on the day", in one clause.
   const shortOnTheDay = (a: LegacyAction) => a.entries.length > 0 && dayHasPassed(a) && (shortOfWhatItNeeds(a) || afterTheDay(a));
-  const decided = (a: LegacyAction, decision: string) => a.notes.some((note) => note.decision === decision);
+  // Postponed: a decision of the organization's that does not proceed, not taken back.
+  const postponeCodes = (await getActiveSet("ACTIVITY_DECISIONS")).filter((one) => one.props.proceeds !== true).map((one) => one.code);
+  const postponed = (a: LegacyAction) => isPostponed(a, postponeCodes);
   // Went ahead? Once its day has passed: with its documents, with documents
   // missing, or not at all because Document Control postponed it.
   const HAPPENED_WHERE: Record<string, (action: LegacyAction) => boolean> = {
-    WITH: (a) => a.entries.length > 0 && dayHasPassed(a) && !shortOnTheDay(a) && !decided(a, "STOPPED"),
-    WITHOUT: (a) => shortOnTheDay(a) && !decided(a, "STOPPED"),
-    STOPPED: (a) => decided(a, "STOPPED"),
+    WITH: (a) => a.entries.length > 0 && dayHasPassed(a) && !shortOnTheDay(a) && !postponed(a),
+    WITHOUT: (a) => shortOnTheDay(a) && !postponed(a),
+    STOPPED: (a) => postponed(a),
   };
 
   const has = (text: string | null | undefined, word: string) => !!text && text.toLowerCase().includes(word.toLowerCase());
@@ -196,7 +199,7 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
     const passed = dayHasPassed(action);
     const shortOnTheDay = missing.length > 0
       || (!!action.lastMetAt && !!action.scheduledDate && action.lastMetAt > action.scheduledDate);
-    const happened: Happened = action.notes.some((note) => note.decision === "STOPPED")
+    const happened: Happened = postponed(action)
       ? "POSTPONED"
       : !passed
         ? "AHEAD"

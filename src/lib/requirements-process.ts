@@ -1,3 +1,4 @@
+import { meetsRequirement } from "./readiness";
 import type { Tenant } from "./tenant";
 import { departmentsOf, DEFAULT_LEAD_DAYS } from "./schedule";
 import { holders } from "./api/settings";
@@ -195,10 +196,23 @@ export async function senderSheet(t: Tenant, sender: string): Promise<string[][]
 }
 
 /** An activity's departments, whether each has confirmed, and whether it may go ahead. */
-export function clearance(action: { departments: string | null; confirmations: { department: string; available: boolean }[] }) {
+export function clearance(action: {
+  departments: string | null;
+  scheduledDate?: Date | null;
+  confirmations: { department: string; available: boolean; revokedAt?: Date | null }[];
+  entries?: { department: string | null; requiredStatus: string; document: { revisions: { statusCode: string | null; meets?: boolean }[] } }[];
+}) {
   const depts = departmentsOf(action);
-  const confirmed = depts.filter((d) => action.confirmations.some((c) => c.department === d && c.available));
-  const short = depts.filter((d) => action.confirmations.some((c) => c.department === d && !c.available));
+  // A confirmation taken back no longer counts; before the day, a department whose documents are all released at
+  // their status is confirmed by them.
+  const kept = action.confirmations.filter((c) => !c.revokedAt);
+  const passed = !!action.scheduledDate && action.scheduledDate.getTime() < new Date().setHours(0, 0, 0, 0);
+  const releasedAll = (d: string) => {
+    const of = (action.entries ?? []).filter((e) => e.department === d || !e.department);
+    return of.length > 0 && of.every((e) => meetsRequirement(e.document.revisions, e.requiredStatus));
+  };
+  const confirmed = depts.filter((d) => kept.some((c) => c.department === d && c.available) || (!passed && !kept.some((c) => c.department === d) && releasedAll(d)));
+  const short = depts.filter((d) => kept.some((c) => c.department === d && !c.available));
   return { depts, confirmed, short, cleared: depts.length > 0 && confirmed.length === depts.length };
 }
 

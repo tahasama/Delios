@@ -7,7 +7,10 @@ import { ActionForm } from "@/components/form";
 import { ADVICE_LABEL, OUTCOME_CONSEQUENCES } from "@/lib/standard";
 import { fmtDate, fmtDateTime } from "@/lib/utils";
 import { myAdvice, dueState } from "@/lib/workflow";
-import { reviewCycle, reviewRun, earlierSteps, routeSteps } from "@/lib/api/reviews";
+import { reviewCycle, reviewRun, earlierSteps, routeSteps, waitingOn } from "@/lib/api/reviews";
+import { holders } from "@/lib/api/settings";
+import { noticesAbout, noticeHistory } from "@/lib/api/schedule";
+import { NotifyPanel } from "@/components/notify-panel";
 import { rewindRouteAction } from "@/lib/actions/workflow";
 import { requestChoices, authorOf, issuePolicy } from "@/lib/issue-requests";
 import { DelegatePanel, DelegateForm, type DelegationRow } from "./delegate-panel";
@@ -50,6 +53,21 @@ export default async function ReviewCyclePage({ params }: { params: Promise<{ id
     ?? OUTCOME_CONSEQUENCES[code]?.label
     ?? code;
   const controller = isController(user) || isAdmin(user);
+  // Notifying the people the review still waits on, by hand: Document Control, or whoever started it.
+  const notify = cycle.status === "OPEN" && !cycle.withdrawn && (controller || (!!cycle.openedById && cycle.openedById === user.id))
+    ? await (async () => {
+        const [waiting, everyone, sent] = await Promise.all([
+          waitingOn(ctx, id).catch(() => ({ userIds: [] as string[] })),
+          holders(ctx.projectId, "READ").catch(() => []),
+          noticesAbout(ctx, `review:${id}`),
+        ]);
+        return {
+          waiting: waiting.userIds,
+          people: everyone.map((one) => ({ id: one.id, name: one.name, detail: one.functionName })),
+          history: noticeHistory(sent),
+        };
+      })()
+    : null;
   const assigned = cycle.assignments.some((assignment) => assignment.userId === user.id);
   const rev = cycle.revision;
   const doc = rev.document;
@@ -489,6 +507,20 @@ export default async function ReviewCyclePage({ params }: { params: Promise<{ id
               </ActionForm>
               </div>
             </details>
+          ) : null}
+
+          {notify ? (
+            <Card title="Notify" description="the people the review still waits on" id="notify">
+              <NotifyPanel
+                subject={`review:${id}:remind`}
+                title={`${doc.docNumber} rev ${rev.value}: your answer is awaited`}
+                body={`${doc.docNumber} rev ${rev.value} — ${doc.title} — waits on your answer${cycle.dueAt ? `; it was due ${fmtDate(cycle.dueAt)}` : ""}. Please answer it on the review's page.`}
+                link={`/reviews/${id}`}
+                people={notify.people}
+                chosen={notify.waiting}
+                history={notify.history}
+              />
+            </Card>
           ) : null}
 
           <Card title="Progress" description={run?.templateName ?? undefined}>

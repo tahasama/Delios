@@ -180,6 +180,8 @@ export type ReviewView = {
   }[];
   approvalWithdrawnAt?: string | null; approvalWithdrawnBy?: string | null; approvalWithdrawnReason?: string | null;
   verdictSet?: string;
+  /** Who started the review: they may notify its people by hand. */
+  startedById?: string | null;
 };
 
 /** GET /reviews/{id}/me. */

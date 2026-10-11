@@ -34,7 +34,8 @@ public sealed record ReviewView(Guid Id, string Number, Guid DocumentId, Guid Re
     int? CurrentStep, string? Verdict, string? GrantedStatus, string StartedBy, DateTimeOffset StartedAt,
     DateTimeOffset? DecidedAt, DateTimeOffset? ClosedAt, string? ClosedBy, string? ReturnNote,
     IReadOnlyList<StepView> Steps, IReadOnlyList<CommentView> Comments, DateTimeOffset? ApprovalWithdrawnAt = null,
-    string? ApprovalWithdrawnBy = null, string? ApprovalWithdrawnReason = null, string VerdictSet = ReviewSets.Verdicts);
+    string? ApprovalWithdrawnBy = null, string? ApprovalWithdrawnReason = null, string VerdictSet = ReviewSets.Verdicts,
+    Guid? StartedById = null);
 
 /// <summary>
 /// The HTTP endpoints for reviews: listing routes, starting a review, commenting, answering, releasing, returning, rewinding and dispatching steps.
@@ -239,7 +240,7 @@ public static class ReviewEndpoints
             s.TransmittalId, s.DispatchedAt?.ToDateTimeOffset(), s.DispatchChannel, s.DispatchRef, s.DispatchedByName,
             s.ForeignAnswer, s.RecordedByName, s.EvidenceFileId, s.WarnedAt?.ToDateTimeOffset())).ToList(),
         r.Comments.Where(c => c.Status != CommentStatuses.Withdrawn).OrderBy(c => c.CreatedAt).Select(View).ToList(),
-        r.ApprovalWithdrawnAt?.ToDateTimeOffset(), r.ApprovalWithdrawnByName, r.ApprovalWithdrawnReason, r.VerdictSet);
+        r.ApprovalWithdrawnAt?.ToDateTimeOffset(), r.ApprovalWithdrawnByName, r.ApprovalWithdrawnReason, r.VerdictSet, r.StartedById);
 
     /// <summary>Converts a review comment entity into the <see cref="CommentView"/> sent to clients.</summary>
     private static CommentView View(ReviewComment c) => new(

@@ -62,6 +62,8 @@ const COLUMNS = [
   "Project Code",
   "Sub-project",
   "PO",
+  // Optional: days before the action's day this document puts it at risk; empty uses the project's.
+  "Risk window (days)",
 ];
 
 /** What the same columns used to be called, so an older file still uploads. */
@@ -88,7 +90,7 @@ const requirements: Handler = {
   clause: "§14.1 · §14.3",
   level: "PROJECT",
   columns: COLUMNS,
-  sample: ["EL", "A00001", "Pump house — MCC energisation", "MCC-2 and its feeders", "2026-10-20", "P1001-50-EL-DSW-09102", "EL", "DSW", "", "", "", "", "BL-301", "", "", ""],
+  sample: ["EL", "A00001", "Pump house — MCC energisation", "MCC-2 and its feeders", "2026-10-20", "P1001-50-EL-DSW-09102", "EL", "DSW", "", "", "", "", "BL-301", "", "", "", ""],
   approverHint: "Document Control",
 
   async parse(t, rows): Promise<ParseResult> {

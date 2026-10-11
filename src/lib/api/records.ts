@@ -46,7 +46,10 @@ export const requirementCalls = cache(async (scope: Scope): Promise<CallRow[]> =
 
 /** Every department's readiness answer, per activity. */
 export const readinessAnswers = cache(async (scope: Scope) =>
-  api<{ activityId: string; department: string; available: boolean; note: string | null; confirmedByName: string; confirmedAt: string }[]>(
+  api<{
+    activityId: string; department: string; available: boolean; note: string | null; confirmedByName: string; confirmedAt: string;
+    automatic?: boolean; revokedAt?: string | null; revokedByName?: string | null; revokedReason?: string | null;
+  }[]>(
     projectPath(scope, "/readiness")).catch(() => []));
 
 /** The requirements list as issued to each sender, newest first. */

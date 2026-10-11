@@ -147,12 +147,35 @@ conversation, write it into the right one in the same commit as the code.
   "not yet" before the day. Going ahead needs the concerned disciplines to
   confirm; confirming with any of that discipline's documents missing always
   needs an explanation (backend refuses otherwise).
-- The action page's "Went ahead?" card shows the answer and the situation in
-  one sentence (the day, how many documents missing). Its choices are the same
-  words as the schedule's: Missing documents (only when some are), Postponed;
-  With documents is read from the documents, never written. "Why" is a
-  paragraph, given by the manager who decided, written down by Document
-  Control. "Held up by" offers who the late documents were owed by.
+- Risk window: the requirements list may give each document "Risk window (days)";
+  otherwise the project's (7 by default, changeable). An action is at risk from
+  its day less the longest-reaching window of a document still missing (same
+  rule on screen and backend: `riskFrom` / `Activity.RiskFrom`).
+- Confirmation per discipline: all its documents released at their status →
+  confirmed automatically (live before the day; frozen by the system when the
+  day passes, kept even if a document later stops counting). Missing documents,
+  placeholders included → the discipline confirms by hand from its risk window,
+  always with why it goes ahead without them. After the day a confirmation is
+  still taken, always with why (and whether the documents came after).
+  Document Control can take a person's confirmation back, with a reason; it is
+  kept, marked, and the discipline confirms again.
+- Automatic notices (worker job, once each): at risk → each discipline still
+  short and not confirmed; day passed → the same. Confirmed disciplines and
+  postponed actions are not notified. A discipline that never answers stays open.
+- Postponed: written with who decided and why; everyone concerned and whoever
+  holds Plan are told; a Plan holder confirms it with what changes (a new
+  schedule revision to follow); Document Control can take it back with a
+  reason. "Postponed" is any published decision that does not proceed
+  (`isPostponed`), on every page. Missing documents are explained per
+  discipline, not on the "Went ahead?" card.
+- Manual notices everywhere use `NotifyPanel`: the people it would go to are
+  chosen, any can be removed or added, the message can change, and it shows how
+  many notices were sent on that matter and days since the first (automatic
+  ones counted). Kept in the notice log. Sent by Document Control, Plan
+  holders, or (about a review) whoever started it.
+- "Request a document" (concerned discipline or Document Control) opens a
+  transmittal to Document Control with the file attached; Document Control
+  adds the number to the action. No status or date is asked.
 - Filters: a dropdown picked with the mouse applies at once; with the keyboard,
   on leaving it. Apply lights only while typed words or dates wait. Every filter
   is kept through sorting, paging, load more, the key and export.

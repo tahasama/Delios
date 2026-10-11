@@ -715,6 +715,24 @@ where it is chosen.
 
 **Depends on it:** `DOCUMENT_TYPES` property `criticality`, `CRITICALITY` property `meaning`, the create form.
 
+## 38 · Before an action: automatic confirmation, notices, postponement
+
+**Clause:** §14 *Planning and readiness of activities*.
+
+**Must say:** a discipline whose documents for an action are all released at
+the status asked is confirmed automatically; otherwise it confirms by hand from
+the action's risk window (per document, or the project's), always saying why it
+goes ahead without what is missing, and after the day always saying why it
+confirms late. The disciplines still short are told automatically when the
+action becomes at risk and again when its day passes; those who confirmed are
+not. A postponement is written with who decided and why, and is confirmed by
+whoever plans the project with what changes, so a new schedule revision can
+follow. Document Control may take back a confirmation or a decision, with a
+reason, kept on the record. Every notice is kept: who was told, by whom, when.
+
+**Depends on it:** `ActionNotices`, `NoticeLog`, `Activity.RiskFrom`, `Requirement.RiskDays`, `ReadinessConfirmation.Automatic/Revoked*`,
+`ActivityDecision.Confirmed*/Reversed*`, `/notices`, `NotifyPanel`.
+
 ## Still open — decided in conversation, not yet built
 
 - **Escalation** where somebody refuses to acknowledge carrying an action
