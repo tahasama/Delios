@@ -148,15 +148,13 @@ conversation, write it into the right one in the same commit as the code.
   on leaving it. Apply lights only while typed words or dates wait. Every filter
   is kept through sorting, paging, load more, the key and export.
 - Progress on an action: a date still to come is shown as due, never as done.
-- Under each list stage of Schedule & actions: the revision in force, "Uploaded
+- Under each stage of Schedule & actions: the revision in force, "Uploaded
   directly" (with the day) when a direct upload is newer, "Not released yet",
-  or "None yet"; then its detail (read / not read yet, a revision on its way,
-  who uploaded it directly, untagged actions). The three lists are a stepper;
-  Documents ready is set apart after them as their result.
-- Who may upload the lists is one rule, `mayUploadLists` (`src/lib/permissions.ts`):
-  Control or Plan held outright, as the backend checks. Configure does not count.
+  or "None yet".
 - An action whose dates the latest schedule read moved carries a "moved" stamp
   in the table and on the plan; its page says "Moved by rev C: was … , now …".
   The stamp goes when a later read leaves its dates where they are.
+- Who may upload the lists is one rule, `mayUploadLists` (`src/lib/permissions.ts`):
+  Control or Plan held outright, as the backend checks. Configure does not count.
 - "Documents ready" counts only the actions in a window: a month either side
   of today, or the dates the user filtered on. Never the whole schedule.
