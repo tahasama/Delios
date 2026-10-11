@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { TONE } from "./plan-timeline";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { ArrowDown, ArrowRight, ArrowUp, ArrowUpDown, CalendarRange, ChevronDown, ChevronLeft, ChevronRight, Download, Pin, PinOff, Rows3, Search, X } from "lucide-react";
@@ -338,8 +339,8 @@ export function PlanRegister({
         <div className={`flex min-h-0 flex-1 flex-col ${pending ? "opacity-60 transition-opacity" : "transition-opacity"}`}>
           {/* What the plan covers, and what its colours mean: the two things a
               reader needs before the bars, at the two corners above them. */}
-          <div className="flex items-start justify-between gap-4 px-5 pt-2.5 sm:px-6">
-            <span className="font-mono text-[11px] tracking-tight text-slate-500 tabular-nums">
+          <div className="flex items-start justify-between gap-4 px-5 pt-4 sm:px-6">
+            <span className="font-mono text-xs font-semibold tracking-tight text-slate-700 tabular-nums">
               {more?.window && !more.window.wide ? more.window.label : filters.from || filters.to ? `${filters.from || "…"} → ${filters.to || "…"}` : "Every date in the schedule"}
             </span>
             <span
@@ -347,13 +348,13 @@ export function PlanRegister({
               title="Each bar runs from the day the first document is needed to the day the work happens; the line is today. The colour says whether the register holds every document the action needs, released and at the status it asks for."
             >
               {([
-                ["bg-emerald-700", "done", "DONE"],
-                ["bg-violet-400", "late receipt", "LATE_RECEIPT"],
-                ["bg-emerald-400", "ready", "READY"],
-                ["bg-sky-500", "still ahead", "UPCOMING"],
-                ["bg-amber-500", "at risk", "AT_RISK"],
-                ["bg-red-500", "overdue", "NOT_READY"],
-                ["bg-slate-300", "nothing listed", "UNKNOWN"],
+                [TONE.DONE, "done", "DONE"],
+                [TONE.LATE_RECEIPT, "late receipt", "LATE_RECEIPT"],
+                [TONE.READY, "ready", "READY"],
+                [TONE.UPCOMING, "still ahead", "UPCOMING"],
+                [TONE.AT_RISK, "at risk", "AT_RISK"],
+                [TONE.NOT_READY, "overdue", "NOT_READY"],
+                [TONE.UNKNOWN, "nothing listed", "UNKNOWN"],
               ] as const).map(([tone, word, code]) => {
                 const on = filters.state === code;
                 return (

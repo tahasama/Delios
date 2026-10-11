@@ -23,13 +23,15 @@ export type PlanRow = {
  * ahead with nothing owed yet, amber is a document owed within the week, red is
  * a day that has passed with something still missing, grey is nothing listed.
  */
-const TONE: Record<PlanRow["readiness"], string> = {
-  DONE: "bg-emerald-700",
-  LATE_RECEIPT: "bg-violet-400",
-  READY: "bg-emerald-400",
-  UPCOMING: "bg-sky-500",
-  AT_RISK: "bg-amber-500",
-  NOT_READY: "bg-red-500",
+// Softened so they sit with the page rather than shout: the same hues, let a
+// little of the sheet through. The key above the plan reads this same map.
+export const TONE: Record<PlanRow["readiness"], string> = {
+  DONE: "bg-emerald-700/70",
+  LATE_RECEIPT: "bg-violet-400/70",
+  READY: "bg-emerald-400/70",
+  UPCOMING: "bg-sky-500/65",
+  AT_RISK: "bg-amber-500/70",
+  NOT_READY: "bg-red-500/70",
   UNKNOWN: "bg-slate-300",
 };
 const DAY = 86_400_000;
@@ -95,7 +97,7 @@ export function PlanTimeline({ rows, window, fit }: {
   }
 
   return (
-    <section className="flex min-h-0 flex-1 flex-col px-5 pt-1 pb-3 sm:px-6">
+    <section className="flex min-h-0 flex-1 flex-col px-5 pt-4 pb-3 sm:px-6">
       {/* The dates are written once, above everything, and stay there: the bars
           scroll under them rather than taking the calendar with them.
           The band and the grid below it cover exactly the track the bars are
@@ -130,7 +132,7 @@ export function PlanTimeline({ rows, window, fit }: {
             ))}
             <div className="absolute top-0 h-full border-l-2 border-brand/60" style={{ left: `${at(now)}%` }} />
           </div>
-          <ul className="relative space-y-2.5 pt-1">
+          <ul className="relative space-y-2.5 pt-3">
           {dated.map((r) => {
             const start = (r.firstNeeded ?? r.scheduledDate!).getTime();
             const end = r.scheduledDate!.getTime();
