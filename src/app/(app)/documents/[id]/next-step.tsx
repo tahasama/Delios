@@ -106,10 +106,10 @@ export function StagePath({ stages, at, note, under }: {
 }) {
   return (
     <div>
-      <ol className={cn("flex flex-wrap gap-y-2", under ? "items-start gap-y-4" : "items-center")}>
+      <ol className={cn("flex flex-wrap gap-y-2", under ? "items-start gap-y-4 xl:flex-nowrap" : "items-center")}>
         {stages.map((name, i) => (
           <li key={name} className={cn("flex", under ? "items-start" : "items-center")}>
-            {i ? <span className={cn("mx-1 h-px w-3 sm:mx-1.5 sm:w-10", under && "mt-[13px]", i <= at ? "bg-(--color-brand)" : "bg-line-strong")} aria-hidden /> : null}
+            {i ? <span className={cn("mx-1 h-px w-3 sm:mx-1.5", under ? "mt-[13px] shrink-0 sm:w-6" : "sm:w-10", i <= at ? "bg-(--color-brand)" : "bg-line-strong")} aria-hidden /> : null}
             <span className={under ? "flex flex-col items-center gap-1.5 text-center" : "contents"}>
             <span
               className={cn(
