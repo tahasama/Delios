@@ -229,6 +229,20 @@ public sealed class Membership
     /// <summary>The discipline this person answers for on the project.</summary>
     public string? Department { get; set; }
     public bool Active { get; set; } = true;
+    /// <summary>
+    /// Added while the project wants management to confirm who joins: not on the project (inactive) until confirmed.
+    /// Who added them, who is asked (empty: anyone holding Manage on the project), and how it was settled.
+    /// </summary>
+    public Instant? PendingSince { get; set; }
+    public Guid? ProposedById { get; set; }
+    public string? ProposedByName { get; set; }
+    public Guid? ConfirmerId { get; set; }
+    public string? ConfirmerName { get; set; }
+    public Instant? ConfirmedAt { get; set; }
+    public string? ConfirmedByName { get; set; }
+    public Instant? RefusedAt { get; set; }
+    public string? RefusedByName { get; set; }
+    public string? RefusedReason { get; set; }
 }
 
 /// <summary>A signed-in browser. The cookie holds a random token; only its hash is stored.</summary>

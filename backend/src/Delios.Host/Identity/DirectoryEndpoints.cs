@@ -26,7 +26,7 @@ public sealed record UpdateProjectRequest(
     string? Kind = null);
 
 /// <summary>Body of putting a person on a project, or changing their place on it: one function per person per project.</summary>
-public sealed record MembershipRequest(Guid UserId, Guid? FunctionId, string? Department = null, bool Active = true);
+public sealed record MembershipRequest(Guid UserId, Guid? FunctionId, string? Department = null, bool Active = true, Guid? ConfirmerId = null);
 
 /// <summary>Body of creating a function.</summary>
 public sealed record CreateFunctionRequest(string? Code, string? Name);
@@ -67,10 +67,14 @@ public static class DirectoryEndpoints
         var keepers = app.MapGroup("/api/admin").WithTags("Administration")
             .AddEndpointFilter<TransactionFilter>()
             .AddEndpointFilter(Keepers.Filter);
-        keepers.MapGet("/users", UsersAsync);
-        keepers.MapPost("/users", CreateUserAsync);
-        keepers.MapPut("/users/{userId:guid}", UpdateUserAsync);
-        keepers.MapPut("/projects/{projectId:guid}/members", MemberAsync);
+        // People, and who is on which project: also management, which adds people where there is no Document Control.
+        var people = app.MapGroup("/api/admin").WithTags("Administration")
+            .AddEndpointFilter<TransactionFilter>()
+            .AddEndpointFilter(Keepers.People);
+        people.MapGet("/users", UsersAsync);
+        people.MapPost("/users", CreateUserAsync);
+        people.MapPut("/users/{userId:guid}", UpdateUserAsync);
+        people.MapPut("/projects/{projectId:guid}/members", MemberAsync);
         keepers.MapGet("/functions", FunctionsAsync);
         keepers.MapPost("/functions", CreateFunctionAsync);
         keepers.MapPut("/functions/{functionId:guid}", UpdateFunctionAsync);
@@ -120,6 +124,14 @@ public static class DirectoryEndpoints
                 FunctionName = m.Function.Name,
                 m.Department,
                 m.Active,
+                PendingSince = m.PendingSince?.ToDateTimeOffset(),
+                m.ProposedByName,
+                m.ConfirmerName,
+                RefusedAt = m.RefusedAt?.ToDateTimeOffset(),
+                m.RefusedByName,
+                m.RefusedReason,
+                ConfirmedAt = m.ConfirmedAt?.ToDateTimeOffset(),
+                m.ConfirmedByName,
             }),
         }));
     }
@@ -378,6 +390,19 @@ public static class DirectoryEndpoints
         var function = request.FunctionId is { } fid ? await db.Functions.AsNoTracking().SingleOrDefaultAsync(f => f.Id == fid && f.Active, cancellationToken) : null;
         if (request.FunctionId is not null && function is null) return Problems.Invalid("FUNCTION_UNKNOWN", "Choose one of the organization's functions.");
         var membership = await db.Memberships.SingleOrDefaultAsync(m => m.ProjectId == projectId && m.UserId == request.UserId, cancellationToken);
+        // Who adds people here: Document Control, or management where the project has no Document Control. An
+        // administrator always may, and is never held for confirmation: they set the project up.
+        var me = http.User.UserId();
+        var admin = await Keepers.ConfiguresAsync(http);
+        var holds = async (string verb) => await db.Memberships.AnyAsync(m => m.ProjectId == projectId && m.UserId == me && m.Active
+            && m.Function!.Active && m.Function.Rules.Any(r => r.Verbs.Contains(verb)), cancellationToken);
+        var withControl = await Settings.ProjectAnswers.ControlDoesAsync(db, projectId, "PROJECT_PEOPLE", cancellationToken);
+        if (!admin && !(withControl ? await holds(Verbs.Control) : await holds(Verbs.Manage) || await holds(Verbs.Control)))
+            return Problems.Forbidden("PEOPLE_NOT_YOURS", withControl
+                ? $"On {project.Code} Document Control adds people."
+                : $"On {project.Code} management adds people.");
+        // Joining waits for management's confirmation where the project asks for it.
+        var confirming = !admin && await Settings.ProjectAnswers.NeedsConfirmationAsync(db, projectId, "PROJECT_PEOPLE", cancellationToken);
         var changes = new List<string>();
         if (membership is null)
         {
@@ -393,6 +418,7 @@ public static class DirectoryEndpoints
             };
             db.Memberships.Add(membership);
             changes.Add($"added to {project.Code} as {function.Name}");
+            if (confirming) changes.Add(await HoldForConfirmationAsync(db, http, membership, request.ConfirmerId, cancellationToken));
         }
         else
         {
@@ -402,8 +428,11 @@ public static class DirectoryEndpoints
             if (request.Active != membership.Active)
             {
                 if (!request.Active && user.Id == http.User.UserId()) return Problems.Conflict("SELF_LOCKOUT", "You cannot remove yourself from a project.");
+                if (request.Active && membership.PendingSince is not null)
+                    return Problems.Conflict("PENDING", $"{user.Name} waits for {membership.ConfirmerName ?? "management"} to confirm them on {project.Code}.");
                 membership.Active = request.Active;
                 changes.Add(request.Active ? $"back on {project.Code}" : $"removed from {project.Code}");
+                if (request.Active && confirming) changes.Add(await HoldForConfirmationAsync(db, http, membership, request.ConfirmerId, cancellationToken));
             }
         }
         if (changes.Count == 0) return Results.NoContent();
@@ -411,6 +440,36 @@ public static class DirectoryEndpoints
         await audit.WriteAsync(await ActorAsync(http, db, cancellationToken), "MEMBERSHIP_CHANGED", "User", user.Id, user.Name,
             string.Join("; ", changes), projectId, cancellationToken);
         return Results.NoContent();
+    }
+
+    /// <summary>
+    /// Holds a person off the project until management confirms them: inactive, with who added them and who is asked
+    /// (anyone holding Manage on the project when nobody is named). Those asked are told.
+    /// </summary>
+    private static async Task<string> HoldForConfirmationAsync(DeliosDbContext db, HttpContext http, Membership membership, Guid? confirmerId,
+        CancellationToken cancellationToken)
+    {
+        var clock = http.RequestServices.GetRequiredService<IClock>();
+        var notifier = http.RequestServices.GetRequiredService<Notifications.Notifier>();
+        var by = (await db.Users.AsNoTracking().SingleAsync(u => u.Id == http.User.UserId(), cancellationToken)).Name;
+        var confirmer = confirmerId is { } cid ? await db.Users.AsNoTracking().SingleOrDefaultAsync(u => u.Id == cid && u.Active, cancellationToken) : null;
+        membership.Active = false;
+        membership.PendingSince = clock.GetCurrentInstant();
+        membership.ProposedById = http.User.UserId();
+        membership.ProposedByName = by;
+        membership.ConfirmerId = confirmer?.Id;
+        membership.ConfirmerName = confirmer?.Name;
+        membership.ConfirmedAt = null;
+        membership.ConfirmedByName = null;
+        membership.RefusedAt = null;
+        membership.RefusedByName = null;
+        membership.RefusedReason = null;
+        var told = confirmer is not null ? [confirmer.Id] : await Schedules.NoticeLog.HoldersAsync(db, membership.ProjectId, Verbs.Manage, cancellationToken);
+        var person = (await db.Users.AsNoTracking().SingleAsync(u => u.Id == membership.UserId, cancellationToken)).Name;
+        if (told.Count > 0)
+            await notifier.NotifyAsync(membership.TenantId, membership.ProjectId, told.Distinct(), Notifications.NotificationKinds.General,
+                $"{person} to confirm on the project", $"{by} added {person}; they join once confirmed.", "/people/confirm", cancellationToken);
+        return $"waiting for {confirmer?.Name ?? "management"} to confirm";
     }
 
     // ── Functions and the matrix ────────────────────────────────────────────
@@ -615,6 +674,20 @@ public static class Keepers
     /// <summary>An endpoint filter that lets through only those who administer the organization.</summary>
     public static Func<EndpointFilterInvocationContext, EndpointFilterDelegate, ValueTask<object?>> Configurers(string refusal) => async (context, next) =>
         await ConfiguresAsync(context.HttpContext) ? await next(context) : Problems.Forbidden("ADMIN_ONLY", refusal);
+
+    /// <summary>People and memberships: an administrator, Document Control, or management (Manage).</summary>
+    public static async ValueTask<object?> People(EndpointFilterInvocationContext context, EndpointFilterDelegate next)
+    {
+        var http = context.HttpContext;
+        if (await ConfiguresAsync(http)) return await next(context);
+        var db = http.RequestServices.GetRequiredService<DeliosDbContext>();
+        var me = http.User.UserId();
+        var keeps = await db.Memberships.AnyAsync(m => m.UserId == me && m.Active && m.Function!.Active
+            && m.Function.Rules.Any(r => r.Verbs.Contains(Verbs.Control) || r.Verbs.Contains(Verbs.Manage)), http.RequestAborted);
+        return keeps
+            ? await next(context)
+            : Problems.Forbidden("ADMIN_OR_CONTROL", "An administrator, Document Control or management keeps the project's people.");
+    }
 
     public static async ValueTask<object?> Filter(EndpointFilterInvocationContext context, EndpointFilterDelegate next)
     {

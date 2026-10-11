@@ -763,6 +763,22 @@ refused, never cut.
 **Depends on it:** `Written` (`Revision.Unvoided*`, `Document.Ended*/Reinstated*/LegalHoldLifted*`), `Review.SendBacks`,
 `ReviewComment.ReclassifyNote`, `Package.AcceptNote`, the revision row, the review page's "Sent back".
 
+## 41 · Management confirms requests and new people, where the project wants it
+
+**Clause:** §1.4 *Roles* and §14 *Planning and readiness of activities*.
+
+**Must say:** each project says whether Document Control adds documents and
+disciplines to actions and people to the project, or the work does it itself
+(the discipline for its own documents; management for people). With Document
+Control, the project may also ask for management's confirmation: Document
+Control checks the request, management (a function holding Manage) confirms
+or refuses with a reason, and the change is then applied. A person added is
+not on the project until confirmed. A request keeps the rule it was raised
+under.
+
+**Depends on it:** `ACTION_LINKS`, `PROJECT_PEOPLE`, `CONFIRM:{act}`, `Verbs.Manage`, `Transmittal.ActivityConfirm/ActivityProposal`,
+`Membership.PendingSince/Refused*`, `/activity-check|confirm|refuse`, `/people/pending|confirm|refuse`.
+
 ## Still open — decided in conversation, not yet built
 
 - **Escalation** where somebody refuses to acknowledge carrying an action

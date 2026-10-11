@@ -237,6 +237,16 @@ conversation, write it into the right one in the same commit as the code.
 - Management is the Manage permission (`MANAGE`) on a function (project,
   construction, engineering manager…). When a confirmation is sought, its
   holders are proposed first; anyone on the project can still be chosen.
+- A request with confirmation: Document Control checks it on the action
+  ("Checked — send to confirm": exactly what changes, and who confirms); the
+  person asked confirms or refuses with why under "Your confirmation" on the
+  action; confirmed, it is applied by itself. Whether a request needs it is
+  fixed when it is raised. Each stage is on Home.
+- People with confirmation: someone added (or put back) on the project stays
+  off it until management confirms them on "People to confirm"; refused, they
+  stay off with why, shown on People & access. Administrators setting a
+  project up are not held. Without Document Control, Manage holders add people
+  (and reach People & access); with it, Document Control of that project does.
 - "Went ahead?" before the day reads "Answered after the day" and asks
   nothing. A postponement is recorded behind "Will it not go ahead? Record a
   postponement": who decided is picked from the people on the project, of

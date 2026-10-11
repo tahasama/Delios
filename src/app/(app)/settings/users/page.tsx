@@ -44,6 +44,8 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
       ...one,
       organization: null as string | null,
       party: one.partyId ? { id: one.partyId, name: one.partyName ?? "", code: one.partyCode ?? "" } : null,
+      // Not on the project yet: waiting for management, or refused.
+      held: one.memberships.find((seat) => !seat.active && seat.projectId === projectId && (seat.pendingSince || seat.refusedAt)) ?? null,
       memberships: one.memberships.filter((seat) => seat.active).map((seat) => ({
         ...seat, project: { code: seat.projectCode, name: seat.projectName }, function: { name: seat.functionName },
       })),
@@ -195,7 +197,12 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
                   <span className="block text-[11px] text-slate-400">{u.email}{u.active ? "" : " · switched off"}</span>
                 </Td>
                 <Td className="text-xs">{u.party?.name ?? u.organization ?? "—"}</Td>
-                <Td className="text-xs">{here ? here.function.name : <span className="text-amber-700">not on {project.code}</span>}</Td>
+                <Td className="text-xs">
+                  {here ? here.function.name
+                    : u.held?.pendingSince ? <span className="text-amber-700">{u.held.functionName} · waiting for {u.held.confirmerName ?? "management"} to confirm</span>
+                    : u.held?.refusedAt ? <span className="whitespace-pre-line text-red-700">{u.held.functionName} · refused by {u.held.refusedByName}: {u.held.refusedReason}</span>
+                    : <span className="text-amber-700">not on {project.code}</span>}
+                </Td>
                 <Td className="text-xs">{here?.department ? deptLabel(here.department) : "—"}</Td>
                 <Td className="text-xs">{elsewhere.length ? elsewhere.map((m) => `${m.project.code} · ${m.function.name}`).join(", ") : "—"}</Td>
                 <Td>

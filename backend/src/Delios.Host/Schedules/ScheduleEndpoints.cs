@@ -769,6 +769,14 @@ public static class ScheduleEndpoints
         work.AddRange(confirming.Select(x => new ActionWork("CONFIRM_ACTION_REQUEST", x.ActivityId, x.Code, x.Name, x.Start?.ToDateOnly(), null, 1,
             x.ActivityCheckedAt?.ToDateTimeOffset(), x.Id, x.Number, x.ActivityCheckedByName, x.ActivityAskKind ?? "DOCUMENT")));
 
+        // People added to the project who wait for this person's confirmation (anyone holding Manage when nobody was named).
+        var manages = access.Holds(Verbs.Manage);
+        var joining = await db.Memberships.AsNoTracking()
+            .Where(m => m.ProjectId == projectId && m.PendingSince != null && (m.ConfirmerId == access.UserId || (m.ConfirmerId == null && manages)))
+            .OrderBy(m => m.PendingSince).Select(m => m.PendingSince).ToListAsync(cancellationToken);
+        if (joining.Count > 0)
+            work.Add(new ActionWork("CONFIRM_PERSON", null, null, null, null, null, joining.Count, joining[0]!.Value.ToDateTimeOffset()));
+
         // The schedule's own upkeep: Document Control, or whoever plans.
         if (access.Holds(Verbs.Control) || access.Holds(Verbs.Plan))
         {

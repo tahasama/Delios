@@ -347,6 +347,11 @@ public static class ProjectRecordEndpoints
         p.MapPost("/activities/{activityId:guid}/readiness/revoke", RevokeReadinessAsync);
         p.MapPost("/activities/{activityId:guid}/notify-departments", NotifyDepartmentsAsync);
         p.MapPut("/activities/{activityId:guid}/departments", SetDepartmentsAsync);
+        p.MapGet("/people/pending", PendingPeopleAsync);
+        p.MapPost("/people/{membershipId:guid}/confirm", (Guid membershipId, HttpContext h, DeliosDbContext db, AuditLog audit, IClock clock,
+            Notifications.Notifier notifier, CancellationToken c) => SettlePersonAsync(membershipId, null, h, db, audit, clock, notifier, c));
+        p.MapPost("/people/{membershipId:guid}/refuse", (Guid membershipId, RefusePersonRequest r, HttpContext h, DeliosDbContext db, AuditLog audit,
+            IClock clock, Notifications.Notifier notifier, CancellationToken c) => SettlePersonAsync(membershipId, r.Note ?? "", h, db, audit, clock, notifier, c));
         p.MapGet("/sender-issues", async (HttpContext h, DeliosDbContext db, CancellationToken c) =>
             Results.Ok(await db.Set<SenderIssue>().AsNoTracking().Where(x => x.ProjectId == ProjectAccessFilter.Of(h).Project.Id)
                 .OrderByDescending(x => x.IssuedAt).ToListAsync(c)));
@@ -782,6 +787,70 @@ public static class ProjectRecordEndpoints
             activity.Name, $"/actions/{activity.Code}", c);
         await audit.WriteAsync(Who(access), "DEPARTMENTS_NOTIFIED", "Activity", activity.Id, activity.Code, subject, access.Project.Id, c);
         return Results.Ok(new { subject, told = people.Distinct().Count() });
+    }
+
+    private sealed record RefusePersonRequest(string? Note);
+
+    /// <summary>One person waiting to join the project, as the one confirming reads it.</summary>
+    private sealed record PendingPerson(Guid MembershipId, Guid UserId, string Name, string? Organization, string Function, string? Department,
+        DateTimeOffset Since, string? ProposedBy, Guid? ConfirmerId, string? ConfirmerName, bool Mine);
+
+    /// <summary>GET /people/pending: the people added to the project who wait for management's confirmation.</summary>
+    private static async Task<IResult> PendingPeopleAsync(HttpContext h, DeliosDbContext db, CancellationToken c)
+    {
+        var access = ProjectAccessFilter.Of(h);
+        var manages = access.Holds(Verbs.Manage);
+        var rows = await (from m in db.Memberships.AsNoTracking()
+                          join u in db.Users.AsNoTracking() on m.UserId equals u.Id
+                          join f in db.Functions.AsNoTracking() on m.FunctionId equals f.Id
+                          where m.ProjectId == access.Project.Id && m.PendingSince != null
+                          orderby m.PendingSince
+                          select new { m, u.Name, Organization = u.Party != null ? u.Party.Name : null, Function = f.Name }).ToListAsync(c);
+        return Results.Ok(rows.Select(x => new PendingPerson(x.m.Id, x.m.UserId, x.Name, x.Organization, x.Function, x.m.Department,
+            x.m.PendingSince!.Value.ToDateTimeOffset(), x.m.ProposedByName, x.m.ConfirmerId, x.m.ConfirmerName,
+            x.m.ConfirmerId == access.UserId || (x.m.ConfirmerId == null && manages))));
+    }
+
+    /// <summary>
+    /// Management confirms a person on the project (they join), or refuses with why (they do not; it stays on the
+    /// record). Whoever was named, or anyone holding Manage when nobody was. Whoever added them is told.
+    /// </summary>
+    private static async Task<IResult> SettlePersonAsync(Guid membershipId, string? refusal, HttpContext h, DeliosDbContext db, AuditLog audit,
+        IClock clock, Notifications.Notifier notifier, CancellationToken c)
+    {
+        var access = ProjectAccessFilter.Of(h);
+        var membership = await db.Memberships.SingleOrDefaultAsync(m => m.Id == membershipId && m.ProjectId == access.Project.Id, c);
+        if (membership is null) return Problems.NotFound("PERSON_NOT_FOUND", "No such person waiting on this project.");
+        if (membership.PendingSince is null) return Problems.Conflict("NOT_PENDING", "They are not waiting for a confirmation.");
+        if (!(membership.ConfirmerId == access.UserId || (membership.ConfirmerId is null && access.Holds(Verbs.Manage))))
+            return Problems.Forbidden("NOT_YOURS", $"{membership.ConfirmerName ?? "Management"} confirms them.");
+        if (refusal is not null && refusal.Trim().Length == 0) return Problems.Invalid("REASON_REQUIRED", "Say why; whoever added them reads it.");
+        var person = await db.Users.AsNoTracking().SingleAsync(u => u.Id == membership.UserId, c);
+        var now = clock.GetCurrentInstant();
+        membership.PendingSince = null;
+        if (refusal is null)
+        {
+            membership.Active = true;
+            membership.ConfirmedAt = now;
+            membership.ConfirmedByName = access.UserName;
+        }
+        else
+        {
+            membership.RefusedAt = now;
+            membership.RefusedByName = access.UserName;
+            membership.RefusedReason = refusal.Trim();
+        }
+        await db.SaveChangesAsync(c);
+        var said = refusal is null ? $"{person.Name} confirmed on the project by {access.UserName}." : $"{person.Name} refused by {access.UserName}: {refusal.Trim()}";
+        await audit.WriteAsync(Who(access), refusal is null ? "PERSON_CONFIRMED" : "PERSON_REFUSED", "User", person.Id, person.Name, said, access.Project.Id, c);
+        // Whoever added them is told, and the person themselves once they are on.
+        var told = new List<Guid>();
+        if (membership.ProposedById is { } adder) told.Add(adder);
+        if (refusal is null) told.Add(person.Id);
+        if (told.Count > 0)
+            await notifier.NotifyAsync(access.Project.TenantId, access.Project.Id, told.Distinct(), Notifications.NotificationKinds.General,
+                refusal is null ? $"{person.Name} is on the project" : $"{person.Name} was not confirmed", said, "/", c);
+        return Results.NoContent();
     }
 
     private sealed record DepartmentsRequest(string[]? Departments, Guid? TransmittalId = null);

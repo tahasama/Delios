@@ -23,6 +23,8 @@ export type SetupPage = {
    * audit trail stay with administrators.
    */
   control?: true;
+  /** Also open to management (Manage), which adds people where the project has no Document Control. */
+  manage?: true;
 };
 
 /** Does this person reach this setup page? */
@@ -31,7 +33,8 @@ export function maySetup(user: { verbs?: string[]; role?: string } | null, page:
   const held = heldVerbs(user);
   const holds = (verb: string) => held.includes(verb);
   if (holds(page.verb ?? "CONFIGURE")) return true;
-  return page.control === true && holds("CONTROL");
+  // Management adds people where the project has no Document Control, so it reaches People & access.
+  return (page.control === true && holds("CONTROL")) || (page.manage === true && holds("MANAGE"));
 }
 
 export const SETUP_PAGES: SetupPage[] = [
@@ -109,6 +112,7 @@ export const SETUP_PAGES: SetupPage[] = [
     text: "Who is on which project, and in what function. Invite outsiders or create visitors.",
     group: "Access",
     control: true,
+    manage: true,
   },
 
   {

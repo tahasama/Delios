@@ -1466,6 +1466,22 @@ namespace Delios.Host.Platform.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("active");
 
+                    b.Property<Instant?>("ConfirmedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("confirmed_at");
+
+                    b.Property<string>("ConfirmedByName")
+                        .HasColumnType("text")
+                        .HasColumnName("confirmed_by_name");
+
+                    b.Property<Guid?>("ConfirmerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("confirmer_id");
+
+                    b.Property<string>("ConfirmerName")
+                        .HasColumnType("text")
+                        .HasColumnName("confirmer_name");
+
                     b.Property<string>("Department")
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)")
@@ -1475,9 +1491,33 @@ namespace Delios.Host.Platform.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("function_id");
 
+                    b.Property<Instant?>("PendingSince")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("pending_since");
+
                     b.Property<Guid>("ProjectId")
                         .HasColumnType("uuid")
                         .HasColumnName("project_id");
+
+                    b.Property<Guid?>("ProposedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("proposed_by_id");
+
+                    b.Property<string>("ProposedByName")
+                        .HasColumnType("text")
+                        .HasColumnName("proposed_by_name");
+
+                    b.Property<Instant?>("RefusedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("refused_at");
+
+                    b.Property<string>("RefusedByName")
+                        .HasColumnType("text")
+                        .HasColumnName("refused_by_name");
+
+                    b.Property<string>("RefusedReason")
+                        .HasColumnType("text")
+                        .HasColumnName("refused_reason");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid")

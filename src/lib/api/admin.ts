@@ -10,6 +10,10 @@ import { api } from "./client";
 export type AdminMembership = {
   id: string; projectId: string; projectCode: string; projectName: string; functionId: string; functionCode: string; functionName: string;
   department: string | null; active: boolean;
+  /** Added while management confirms who joins: waiting, or refused with why, or confirmed. */
+  pendingSince?: string | null; proposedByName?: string | null; confirmerName?: string | null;
+  refusedAt?: string | null; refusedByName?: string | null; refusedReason?: string | null;
+  confirmedAt?: string | null; confirmedByName?: string | null;
 };
 
 export type AdminUser = {

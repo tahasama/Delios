@@ -210,6 +210,8 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
       ? { href: `/actions/${w.code}#confirm`, code: w.code ?? "", title: `${w.name} · ${w.department}: ${w.count} document${w.count === 1 ? "" : "s"} missing`, tag: w.day && new Date(w.day).getTime() < Date.now() ? "day passed" : "confirm", tone: w.day && new Date(w.day).getTime() < Date.now() ? "amber" : "sky", at: at(w.since), cta: "Confirm" }
       : w.kind === "CONFIRM_POSTPONEMENT"
         ? { href: `/actions/${w.code}#note`, code: w.code ?? "", title: `${w.name}: postponed, waiting for you to confirm`, tag: "postponed", tone: "amber", at: at(w.since), cta: "Confirm" }
+        : w.kind === "CONFIRM_PERSON"
+        ? { href: "/people/confirm", code: `${w.count}`, title: `${w.count === 1 ? "person waits" : "people wait"} for you to confirm them on the project`, tag: "to confirm", tone: "amber", at: at(w.since), cta: "Confirm" }
         : w.kind === "CONFIRM_ACTION_REQUEST"
         ? { href: `/actions/${w.code}#your-confirmation`, code: w.code ?? "", title: `${w.name}: ${w.ask === "DISCIPLINE" ? "a discipline" : "a document"} to add, checked by ${w.from ?? "Document Control"} (${w.number})`, tag: "to confirm", tone: "amber", at: at(w.since), cta: "Confirm" }
         : w.kind === "ADD_TO_ACTION"
