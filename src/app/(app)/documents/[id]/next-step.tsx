@@ -122,7 +122,7 @@ export function StagePath({ stages, at, note, under }: {
             >
               {i < at ? "✓" : null} {name}
             </span>
-            {under?.[i] ? <span className="px-2.5 text-xs leading-5 text-slate-500">{under[i]}</span> : null}
+            {under?.[i] ? <span className="px-2.5 text-[11px] leading-4 text-slate-500">{under[i]}</span> : null}
             </span>
           </li>
         ))}
