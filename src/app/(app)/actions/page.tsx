@@ -4,7 +4,7 @@ import { clearance } from "@/lib/requirements-process";
 import { readSearch, readDay } from "@/lib/register-query";
 import { PLAN_CARD_HEIGHT, PLAN_FIRST } from "@/lib/plan-card";
 import { meetsRequirement } from "@/lib/readiness";
-import { ACTION_STATES, DEFAULT_RISK_DAYS, actionState, dayHasPassed, wentAhead, type WentAhead } from "@/lib/action-state";
+import { ACTION_STATES, DEFAULT_RISK_DAYS, actionState, dayHasPassed } from "@/lib/action-state";
 import { fmtDate } from "@/lib/utils";
 import { getSet } from "@/lib/config";
 import { api } from "@/lib/api/client";
@@ -24,7 +24,7 @@ export const metadata = { title: "Schedule & actions" };
 type Readiness = PlanTableRow["readiness"];
 
 /** What became of the work, as against whether its documents arrived. */
-type Happened = WentAhead;
+type Happened = "POSTPONED" | "CARRIED" | "DONE" | "AHEAD";
 
 type Search = {
   view?: string; all?: string; q?: string; state?: string; happened?: string; nodate?: string; untagged?: string; discipline?: string; docType?: string; supplier?: string;
@@ -58,12 +58,10 @@ const STATES = ACTION_STATES;
  * what they needed, and of those, which were owned and which were never
  * written down at all.
  */
-// Every answer the "Went ahead?" column can give, by the name the address uses.
-const HAPPENED: { code: string; label: string; is: WentAhead }[] = [
-  { code: "WITH", label: "With documents", is: "DONE" },
-  { code: "WITHOUT", label: "Missing documents", is: "CARRIED" },
-  { code: "STOPPED", label: "Postponed", is: "POSTPONED" },
-  { code: "NOTYET", label: "Not yet", is: "AHEAD" },
+const HAPPENED = [
+  { code: "WITH", label: "With documents" },
+  { code: "WITHOUT", label: "Missing documents" },
+  { code: "STOPPED", label: "Postponed" },
 ];
 
 /** How many days either side of today the plan shows when nobody says otherwise. */
@@ -111,10 +109,21 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
   // Where each action stands is one rule, shared with the action's own page;
   // the schedule is read whole and filtered here.
   const met = (action: LegacyAction) => action.entries.filter((entry) => meetsRequirement(entry.document.revisions, entry.requiredStatus)).length;
+  const shortOfWhatItNeeds = (action: LegacyAction) => met(action) !== action.entries.length;
+  const afterTheDay = (action: LegacyAction) => !!action.lastMetAt && !!action.scheduledDate && action.lastMetAt > action.scheduledDate;
 
-  // Went ahead? The same answer the column shows, from the one rule.
-  const answerOf = (a: LegacyAction) => wentAhead(a, a.entries.length - met(a));
-  const happenedIs = HAPPENED.find((one) => one.code === happened)?.is ?? null;
+  // The work happened without everything it needed: its day has passed and, on
+  // that day, either something was still missing or the last of it had not yet
+  // arrived. Both readings of "short on the day", in one clause.
+  const shortOnTheDay = (a: LegacyAction) => a.entries.length > 0 && dayHasPassed(a) && (shortOfWhatItNeeds(a) || afterTheDay(a));
+  const decided = (a: LegacyAction, decision: string) => a.notes.some((note) => note.decision === decision);
+  // Went ahead? Once its day has passed: with its documents, with documents
+  // missing, or not at all because Document Control postponed it.
+  const HAPPENED_WHERE: Record<string, (action: LegacyAction) => boolean> = {
+    WITH: (a) => a.entries.length > 0 && dayHasPassed(a) && !shortOnTheDay(a) && !decided(a, "STOPPED"),
+    WITHOUT: (a) => shortOnTheDay(a) && !decided(a, "STOPPED"),
+    STOPPED: (a) => decided(a, "STOPPED"),
+  };
 
   const has = (text: string | null | undefined, word: string) => !!text && text.toLowerCase().includes(word.toLowerCase());
   const inWindow = (a: LegacyAction) =>
@@ -122,7 +131,7 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
   const outsideWindow = (a: LegacyAction) =>
     (!code || a.code === code)
     && (!state || actionState(a, riskDays) === state)
-    && (!happenedIs || answerOf(a) === happenedIs)
+    && (!happened || HAPPENED_WHERE[happened](a))
     && (sp.nodate !== "1" || !a.scheduledDate)
     && (sp.untagged !== "1" || departmentsOf(a).length === 0)
     // A discipline is what an action is tagged with and what a document
@@ -181,8 +190,16 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
     const nextNeeded = missing.map((one) => one.requiredBy).filter(Boolean).sort((a, b) => a!.getTime() - b!.getTime())[0] ?? null;
     const readiness: Readiness = actionState(action, riskDays);
     // What became of the work, which is not the same question as whether its
-    // documents arrived: the one rule the filter reads too.
-    const happened: Happened = wentAhead(action, missing.length);
+    // documents arrived. The day passing is the work happening; only Document
+    // Control saying it was postponed takes that back.
+    const passed = dayHasPassed(action);
+    const shortOnTheDay = missing.length > 0
+      || (!!action.lastMetAt && !!action.scheduledDate && action.lastMetAt > action.scheduledDate);
+    const happened: Happened = action.notes.some((note) => note.decision === "STOPPED")
+      ? "POSTPONED"
+      : !passed
+        ? "AHEAD"
+        : shortOnTheDay ? "CARRIED" : "DONE";
     return { ...action, total, ready, missing, daysUntil, readiness, firstNeeded, nextNeeded, happened };
   });
 
@@ -340,7 +357,7 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
                 undated: undatedAll,
                 undatedHref: "/actions?view=table&nodate=1",
                 // Went ahead with documents missing, across every date, opened on every date.
-                noNote: { count: schedule.filter((a) => answerOf(a) === "CARRIED").length, href: "/actions?happened=WITHOUT&all=1" },
+                noNote: { count: schedule.filter(HAPPENED_WHERE.WITHOUT).length, href: "/actions?happened=WITHOUT&all=1" },
               }
             : undefined
         }

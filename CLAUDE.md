@@ -27,10 +27,6 @@ conversation, write it into the right one in the same commit as the code.
   wrong, revisit the whole flow it belongs to (start → withdraw → send again →
   advise → decide → release → issue), not only the line reported.
 - Never remove behaviour that exists without saying so and why.
-- A filter reads the same value its column shows, from one shared rule, and
-  offers exactly the values present. Never a separate list or a second
-  computation of the same answer; never a hardcoded special case to make one
-  filter "work".
 - No code written inside the page (no inline scripts, no `dangerouslySetInnerHTML`).
   Display preferences (theme, sidebar width) live in cookies the server reads.
 
