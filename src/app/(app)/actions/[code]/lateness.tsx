@@ -1,4 +1,5 @@
 import { ActionForm } from "@/components/form";
+import { SearchPick, type PickItem } from "@/components/search-pick";
 import { Field, inputCls } from "@/components/ui";
 import { fmtDate } from "@/lib/utils";
 import { recordActionNoteAction, confirmPostponementAction, reverseDecisionAction } from "@/lib/actions/action-notes";
@@ -10,7 +11,7 @@ export type Note = LegacyNote;
 export type WentAhead = "NOT_YET" | "WITH_DOCUMENTS" | "MISSING_DOCUMENTS" | "POSTPONED";
 
 const ANSWER: Record<WentAhead, { word: string; tone: string }> = {
-  NOT_YET: { word: "Not yet", tone: "text-slate-600 ring-line-strong" },
+  NOT_YET: { word: "Answered after the day", tone: "text-slate-600 ring-line-strong" },
   WITH_DOCUMENTS: { word: "With documents", tone: "text-emerald-800 ring-emerald-300 bg-emerald-50" },
   MISSING_DOCUMENTS: { word: "Missing documents", tone: "text-amber-900 ring-amber-300 bg-amber-50" },
   POSTPONED: { word: "Postponed", tone: "text-slate-700 ring-slate-300 bg-slate-100" },
@@ -25,7 +26,7 @@ const ANSWER: Record<WentAhead, { word: string; tone: string }> = {
  * with what changes, and Document Control can take it back. Nothing is erased:
  * a postponement taken back stays, marked.
  */
-export function ActionNotes({ notes, actionId, mayNote, mayPlan, mayControl, answer, missing, total, day, postponeCodes }: {
+export function ActionNotes({ notes, actionId, mayNote, mayPlan, mayControl, answer, missing, total, day, postponeCodes, people }: {
   notes: Note[];
   actionId: string;
   /** Who writes a postponement down: Document Control, or whoever the project lets. */
@@ -42,10 +43,12 @@ export function ActionNotes({ notes, actionId, mayNote, mayPlan, mayControl, ans
   day: string | null;
   /** The published decisions that mean "postponed"; the first is the one written down here. */
   postponeCodes: string[];
+  /** Everyone on the project, of every organization: who decided a postponement is one of them. */
+  people: PickItem[];
 }) {
   const active = notes.find((note) => postponeCodes.includes(note.decision) && !note.reversedAt) ?? null;
   const situation = answer === "NOT_YET"
-    ? `Its day${day ? `, ${day},` : ""} has not come. It is answered after the day; a postponement can be written down now.`
+    ? `Nothing to fill in now. ${day ? `After ${day}` : "After its day"} this says whether it went ahead, from its documents.`
     : answer === "WITH_DOCUMENTS"
       ? `Every document was there on ${day ?? "the day"}.`
       : answer === "MISSING_DOCUMENTS"
@@ -112,17 +115,20 @@ export function ActionNotes({ notes, actionId, mayNote, mayPlan, mayControl, ans
         </ul>
       ) : null}
 
+      {/* Only if it does not go ahead on the day: kept folded, so nobody takes it for a form to fill. */}
       {mayNote && !active && postponeCodes.length ? (
-        <ActionForm action={recordActionNoteAction} submitLabel="Write down: postponed" hidden={{ actionId, decision: postponeCodes[0] }} className="space-y-4 border-t border-line px-5 py-4 sm:px-6">
-          <p className="text-xs font-semibold text-slate-700">Postponed</p>
-          <Field label="Who decided" required hint="the manager this day answers to">
-            <input name="responsibleName" required className={inputCls} />
-          </Field>
-          <Field label="Why" required hint="in the manager's own words: they give the reason, you write it down">
-            <textarea name="reason" required rows={3} className={inputCls} />
-          </Field>
-          <p className="text-[11px] text-slate-500">Everyone concerned is told, and whoever plans the project is asked to confirm it.</p>
-        </ActionForm>
+        <details className="border-t border-line px-5 py-3 sm:px-6">
+          <summary className="cursor-pointer list-none text-xs font-semibold text-link [&::-webkit-details-marker]:hidden">
+            {answer === "NOT_YET" ? `Will it not go ahead${day ? ` on ${day}` : ""}? Record a postponement` : "It did not go ahead? Record a postponement"}
+          </summary>
+          <ActionForm action={recordActionNoteAction} submitLabel="Record the postponement" hidden={{ actionId, decision: postponeCodes[0] }} className="mt-3 space-y-4">
+            <SearchPick single items={people} name="decidedBy" label="Who decided" hint="anyone on the project: client, contractor, owner, our own people" placeholder="Type a name or an organization" required />
+            <Field label="Why" required>
+              <textarea name="reason" required rows={3} className={inputCls} />
+            </Field>
+            <p className="text-[11px] text-slate-500">Everyone concerned is told, and whoever plans the project is asked to confirm it.</p>
+          </ActionForm>
+        </details>
       ) : null}
     </section>
   );

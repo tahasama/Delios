@@ -187,7 +187,7 @@ export default async function TransmittalDetailPage({ params, searchParams }: { 
       ) : null}
       {sp.issueError ? <Banner tone="warn" title="Created, but not sent">{sp.issueError} Issue it above once that is settled.</Banner> : null}
       {ask && askedOf ? (
-        <Banner tone={ask.answeredAt ? "info" : "warn"} title={`Asks for a document to be added to ${askedOf.code}`}>
+        <Banner tone={ask.answeredAt ? "info" : "warn"} title={`Asks for ${ask.kind === "DISCIPLINE" ? "a missing discipline" : "a document"} to be added to ${askedOf.code}`}>
           {ask.answeredAt
             ? <>Answered by {ask.answeredBy}, {fmtDate(ask.answeredAt)}: {ask.answer} </>
             : <>{askedOf.name}. Not answered yet. </>}

@@ -6,6 +6,7 @@ import { RegisterPlate } from "./register-plate";
 import { OUTCOME_CONSEQUENCES, DOC_STATES, DOC_STATE_LABEL, DOC_MEANING, REV_STATES, REV_MEANING, type DocState, type RevState } from "@/lib/standard";
 import { getSet } from "@/lib/config";
 import { DocumentRegister } from "./document-register";
+import { activityDetail } from "@/lib/api/schedule";
 import { hasVerb } from "@/lib/auth";
 import { Banner } from "@/components/ui";
 import { REGISTER_SORTS, readSearch } from "@/lib/register-query";
@@ -47,6 +48,8 @@ const DATE_FIELDS = [
   { key: "updated", label: "Changed" },
 ] as const;
 type Search = {
+  /** The register opened for one action: its documents ticked, to add or take off. */
+  pick?: string;
   phase?: string;
   action?: string;
   sent?: string;
@@ -222,6 +225,20 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
   if (q) query.set("q", q); if (state) query.set("state", state); if (discipline) query.set("discipline", discipline); if (docType) query.set("docType", docType); if (revState) query.set("rev", revState); if (statusCode) query.set("status", statusCode); if (verdictCode) query.set("verdict", verdictCode); if (supplier) query.set("supplier", supplier); if (po) query.set("po", po); if (view === "all") query.set("view", "all"); if (criticality) query.set("criticality", criticality); if (confidentiality) query.set("confidentiality", confidentiality); if (deliverable) query.set("deliverable", deliverable);
   if (dateOn) query.set("on", dateOn); if (sp.from) query.set("from", sp.from); if (sp.to) query.set("to", sp.to);
   if (sort) { query.set("sort", sort); query.set("dir", dir); }
+  // Opened for an action, by Document Control: what it needs now starts ticked.
+  const picking = sp.pick && scope.can("CONTROL")
+    ? await (async () => {
+        const one = activities.find((a) => a.code === sp.pick);
+        const detail = one ? await activityDetail(scope, one.id) : null;
+        if (!one || !detail) return null;
+        return {
+          actionId: one.id, code: one.code, name: one.name,
+          linked: [...new Set(detail.needs.map((need) => need.documentId))],
+          disciplines: one.departments.map((code) => ({ code, label: disciplineLabel.get(code) ?? code })),
+        };
+      })()
+    : null;
+  if (picking) query.set("pick", picking.code);
 
 
   return <div className="space-y-4">
@@ -236,7 +253,9 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
       paging={{ page: current, pages, perPage, sizes: PAGE_SIZES, from: matchCount ? (current - 1) * perPage + 1 : 0, to: Math.min(current * perPage, matchCount), query: query.toString() }}
       codes={codes}
       sort={{ key: sort, dir }}
-      userCanAct={!isReadOnly(user)} filters={{ q, terms, state, rev: revState, status: statusCode, verdict: verdictCode, supplier, po, discipline, docType, view, criticality, confidentiality, deliverable, phase: sp.phase ?? "", action: sp.action ?? "", on: dateOn, from: sp.from ?? "", to: sp.to ?? "" }} filterOptions={{ states: DOC_STATES.map((code) => ({ code, label: DOC_STATE_LABEL[code] ?? code })), revStates: [
+      picking={picking}
+      mayAddToAction={scope.can("CONTROL")}
+      userCanAct={!isReadOnly(user)} filters={{ pick: picking?.code ?? "", q, terms, state, rev: revState, status: statusCode, verdict: verdictCode, supplier, po, discipline, docType, view, criticality, confidentiality, deliverable, phase: sp.phase ?? "", action: sp.action ?? "", on: dateOn, from: sp.from ?? "", to: sp.to ?? "" }} filterOptions={{ states: DOC_STATES.map((code) => ({ code, label: DOC_STATE_LABEL[code] ?? code })), revStates: [
       { code: "NONE", label: "No revision yet" },
       { code: "IN_PREPARATION", label: names.IN_PREPARATION },
       { code: "IN_REVIEW", label: names.IN_REVIEW },

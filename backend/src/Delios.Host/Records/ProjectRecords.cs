@@ -784,9 +784,10 @@ public static class ProjectRecordEndpoints
         return Results.Ok(new { subject, told = people.Distinct().Count() });
     }
 
-    private sealed record DepartmentsRequest(string[]? Departments);
+    private sealed record DepartmentsRequest(string[]? Departments, Guid? TransmittalId = null);
 
-    private static async Task<IResult> SetDepartmentsAsync(Guid activityId, HttpContext h, DeliosDbContext db, AuditLog audit, CancellationToken c)
+    private static async Task<IResult> SetDepartmentsAsync(Guid activityId, HttpContext h, DeliosDbContext db, AuditLog audit, IClock clock,
+        Notifications.Notifier notifier, CancellationToken c)
     {
         var access = ProjectAccessFilter.Of(h);
         // Whoever may upload the disciplines-per-action list tags by hand too: Document Control or Plan.
@@ -799,9 +800,20 @@ public static class ProjectRecordEndpoints
         var catalog = await Catalog.LoadAsync(db, c);
         if (departments.FirstOrDefault(d => !catalog.IsActive(ValueSets.Disciplines, d)) is { } unknown)
             return Problems.Invalid("VALUE_NOT_PUBLISHED", $"{unknown} is not a published discipline.", new { field = "departments", value = unknown });
+        // Tagged in answer to a request for a missing discipline: the request is this action's and still open.
+        Transmittals.Transmittal? ask = null;
+        if (body?.TransmittalId is { } askId)
+        {
+            ask = await db.Transmittals.SingleOrDefaultAsync(t => t.Id == askId && t.ProjectId == access.Project.Id && t.ActivityId == activityId, c);
+            if (ask is null) return Problems.NotFound("REQUEST_NOT_FOUND", $"No request about {activity.Code} by that number.");
+            if (ask.ActivityAnsweredAt is not null) return Problems.Conflict("ALREADY_ANSWERED", $"{ask.ActivityAnsweredByName} already answered {ask.Number}.");
+        }
         var was = string.Join(", ", activity.Departments);
         activity.Departments = departments;
         await db.SaveChangesAsync(c);
+        if (ask is not null)
+            await Schedules.ScheduleEndpoints.AnswerAsync(db, notifier, clock, access, ask, activity,
+                $"{activity.Code} now concerns {(departments.Length == 0 ? "no discipline" : string.Join(", ", departments.Select(d => catalog.Label(ValueSets.Disciplines, d))))}.", c);
         await audit.WriteAsync(Who(access), "ACTIVITY_DEPARTMENTS", "Activity", activity.Id, activity.Code,
             $"{(was.Length == 0 ? "none" : was)} → {(departments.Length == 0 ? "none" : string.Join(", ", departments))}", access.Project.Id, c);
         return Results.NoContent();

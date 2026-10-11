@@ -10,6 +10,10 @@ import { DataTable } from "@/components/data-table";
 import { DateWindow } from "@/components/date-window";
 import { Th, Td, Info } from "@/components/ui";
 import { useCardHeight } from "@/components/card-height";
+import { ActionForm } from "@/components/form";
+import { setActionDocumentsAction } from "@/lib/actions/action-links";
+import { inputCls } from "@/components/ui";
+import { CalendarCheck } from "lucide-react";
 
 /** Available from the Columns menu; off until someone wants them. */
 const OPTIONAL = ["Received from", "Document state", "Review verdict", "Originator", "Sub-project", "Contract", "Criticality", "Confidentiality", "Planned submission", "Issued", "Released", "Decided by", "In packages", "Kept for", "Produced by", "Revision started", "File added"];
@@ -53,7 +57,7 @@ export type Paging = {
   query: string;
 };
 
-type Filters = { q: string; terms: string[]; state: string; rev: string; status: string; verdict: string; supplier: string; po: string; discipline: string; docType: string; criticality: string; confidentiality: string; deliverable: string; phase: string; action: string; view: string; on: string; from: string; to: string };
+type Filters = { pick: string; q: string; terms: string[]; state: string; rev: string; status: string; verdict: string; supplier: string; po: string; discipline: string; docType: string; criticality: string; confidentiality: string; deliverable: string; phase: string; action: string; view: string; on: string; from: string; to: string };
 
 /** Where the guide explains each kind of code. */
 const GUIDE: Record<string, string> = {
@@ -94,7 +98,14 @@ type Column = {
   cell: (row: RegisterRow, codes: Record<string, string>) => React.ReactNode;
 };
 
-export function DocumentRegister({ rows, total, userCanAct, filters, filterOptions, exportHref, plate, paging, codes, sort, views, supplier }: {
+/** The register opened for one action: what it needs now, ticked; its disciplines, for what is added. */
+type Picking = { actionId: string; code: string; name: string; linked: string[]; disciplines: { code: string; label: string }[] };
+
+export function DocumentRegister({ rows, total, userCanAct, filters, filterOptions, exportHref, plate, paging, codes, sort, views, supplier, picking, mayAddToAction }: {
+  /** Opened from an action, by Document Control: tick to add, untick to take off. */
+  picking?: Picking | null;
+  /** Document Control: the selection can be added to an action. */
+  mayAddToAction?: boolean;
   /** The reader is an outside organization: what they owe can be sent from here. */
   supplier?: { to: string; readOnly?: boolean } | null;
   rows: RegisterRow[]; total: number; userCanAct: boolean;
@@ -115,7 +126,7 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
   // Every register is the height the schedule's plan set.
   const cardHeight = useCardHeight();
   const [pending, startTransition] = useTransition();
-  const [selected, setSelected] = useState<string[]>([]);
+  const [selected, setSelected] = useState<string[]>(() => picking?.linked ?? []);
   const [allMatching, setAllMatching] = useState(false);
   const [order, setOrder] = useState<string[] | null>(null);
   const [frozen, setFrozen] = useState(true);
@@ -185,7 +196,8 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
   const selectedRows = useMemo(() => rows.filter((row) => selected.includes(row.id)), [rows, selected]);
   const selectedRevisionIds = selectedRows.map((row) => row.reviewRevisionId).filter((id): id is string => Boolean(id));
   const transmittableRows = selectedRows.filter((row) => row.hasReleased);
-  const pageSelected = rows.length > 0 && selected.length === rows.length;
+  // Opened for an action, the ticks span pages: the box at the top ticks or unticks this page only.
+  const pageSelected = rows.length > 0 && (picking ? rows.every((row) => selected.includes(row.id)) : selected.length === rows.length);
   const transmittalHref = `/transmittals/new?docs=${encodeURIComponent(transmittableRows.map((row) => row.id).join(","))}`;
   // Exporting every match needs no list of ids: the filters are the list.
   /**
@@ -279,7 +291,21 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
   if (filters.phase) facets.push({ key: "phase", label: labelIn(filterOptions.phases, filters.phase), without: drop("phase") });
   if (filters.action) facets.push({ key: "owed by", label: labelIn(filterOptions.actions, filters.action), without: drop("action") });
 
+  const adding = picking ? selected.filter((id) => !picking.linked.includes(id)) : [];
+  const leaving = picking ? picking.linked.filter((id) => !selected.includes(id)) : [];
+
   return <>
+    {picking ? (
+      <section className="register register-sheet register-sheet-open mb-5 px-5 py-3.5 sm:px-6">
+        <p className="text-sm font-semibold text-slate-900">
+          Documents for <Link href={`/actions/${picking.code}`} className="font-mono text-brand-ink hover:underline">{picking.code}</Link>
+          <span className="ml-2 font-normal text-slate-600">{picking.name}</span>
+        </p>
+        <p className="mt-1 text-xs leading-5 text-slate-500">
+          Ticked is what it needs. Tick a document to add it, untick one to take it off; search and filter freely, the ticks stay. Then save below.
+        </p>
+      </section>
+    ) : null}
     <section className="register register-sheet register-sheet-open mb-5">
       {plate}
 
@@ -297,6 +323,8 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
         }}
         className="asking border-b border-line px-5 py-3.5 sm:px-6"
       >
+        {/* Opened for an action: narrowing keeps it open for that action. */}
+        {filters.pick ? <input type="hidden" name="pick" value={filters.pick} /> : null}
         <div className="flex items-center gap-3">
           <label className="search-field relative min-w-0 flex-1">
             <span className="sr-only">Search the register</span>
@@ -436,7 +464,7 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
 
       {/* Selecting a page is one thing; acting on every match is another, and
           the difference is said out loud rather than assumed. */}
-      {pageSelected && paging && total > rows.length ? (
+      {!picking && pageSelected && paging && total > rows.length ? (
         <div className="flex flex-wrap items-center gap-2 border-b border-line bg-tint px-5 py-2.5 text-xs text-brand-ink sm:px-6">
           {allMatching ? (
             <>
@@ -469,7 +497,12 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
               title="Selects this page. The register offers every match above."
               type="checkbox"
               checked={pageSelected}
-              onChange={() => { setAllMatching(false); setSelected(pageSelected ? [] : rows.map((row) => row.id)); }}
+              onChange={() => {
+                setAllMatching(false);
+                const page = rows.map((row) => row.id);
+                if (picking) setSelected((now) => pageSelected ? now.filter((id) => !page.includes(id)) : [...new Set([...now, ...page])]);
+                else setSelected(pageSelected ? [] : page);
+              }}
             />
           </Th>
           <Th
@@ -562,7 +595,25 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
       ) : null}
     </section>
 
-    {selected.length ? <div className="dock sticky bottom-4 z-30 mx-auto flex max-w-4xl flex-wrap items-center gap-2 rounded-sm border border-white/10 bg-brand-strong p-2.5 text-white shadow-[0_8px_30px_rgb(0_0_0/0.18)]">
+    {picking ? (
+      <div className="dock sticky bottom-4 z-30 mx-auto max-w-4xl rounded-sm border border-white/10 bg-brand-strong p-2.5 text-white shadow-[0_8px_30px_rgb(0_0_0/0.18)]">
+        <ActionForm action={setActionDocumentsAction} submitLabel="Save" size="sm" hidden={{ actionId: picking.actionId }} className="flex flex-wrap items-center gap-2 space-y-0">
+          {selected.map((id) => <input key={id} type="hidden" name="documentIds" value={id} />)}
+          <span className="px-2 text-xs">
+            <span className="font-mono text-sm tabular-nums">{selected.length}</span>
+            <span className="ml-1.5 text-[10px] uppercase tracking-[0.12em] text-white/60">ticked for {picking.code}</span>
+            {adding.length || leaving.length ? <span className="ml-2 text-white/80">{adding.length} to add · {leaving.length} to take off</span> : <span className="ml-2 text-white/60">nothing changed yet</span>}
+          </span>
+          {adding.length ? (
+            <select name="department" required defaultValue={picking.disciplines.length === 1 ? picking.disciplines[0].code : ""} className={`${inputCls} w-auto text-slate-900`} aria-label="For which discipline">
+              <option value="" disabled hidden>For which discipline</option>
+              {picking.disciplines.map((d) => <option key={d.code} value={d.code}>{d.label}</option>)}
+            </select>
+          ) : null}
+          <Link href={`/actions/${picking.code}`} className="ml-auto rounded-sm px-3 py-2 text-xs font-semibold text-white/70 hover:bg-white/10 hover:text-white">Back without saving</Link>
+        </ActionForm>
+      </div>
+    ) : selected.length ? <div className="dock sticky bottom-4 z-30 mx-auto flex max-w-4xl flex-wrap items-center gap-2 rounded-sm border border-white/10 bg-brand-strong p-2.5 text-white shadow-[0_8px_30px_rgb(0_0_0/0.18)]">
       <span className="px-2 font-mono text-sm tabular-nums">{allMatching ? total.toLocaleString("en-GB") : selected.length}<span className="ml-1.5 text-[10px] uppercase tracking-[0.12em] text-white/60">selected</span></span>
       {userCanAct ? (selectedRevisionIds.length ? <Link href={`/reviews/send?revisions=${encodeURIComponent(selectedRevisionIds.join(","))}`} className="inline-flex items-center gap-1.5 rounded-sm bg-[#d9a441] px-3 py-2 text-xs font-semibold text-brand-ink"><GitPullRequestArrow className="h-4 w-4" /> Send for review ({selectedRevisionIds.length})</Link> : <span className="inline-flex items-center gap-1.5 rounded-sm bg-white/10 px-3 py-2 text-xs font-semibold text-white/55" title="Only documents with a revision being prepared can be sent"><GitPullRequestArrow className="h-4 w-4" /> Nothing ready to send</span>) : null}
       {transmittableRows.length ? <Link href={transmittalHref} className="inline-flex items-center gap-1.5 rounded-sm bg-white/10 px-3 py-2 text-xs font-semibold hover:bg-white/15"><ArrowLeftRight className="h-4 w-4" /> Create transmittal ({transmittableRows.length})</Link> : <span className="inline-flex items-center gap-1.5 rounded-sm bg-white/10 px-3 py-2 text-xs font-semibold text-white/55" title="Only current released revisions may be sent on an outgoing transmittal"><ArrowLeftRight className="h-4 w-4" /> No released revision to transmit</span>}
@@ -576,6 +627,7 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
         ) : <span className="inline-flex items-center gap-1.5 rounded-sm bg-white/10 px-3 py-2 text-xs font-semibold text-white/55" title="Only documents with a file attached and not yet sent"><Send className="h-4 w-4" /> Nothing ready to send</span>;
       })() : null}
       {userCanAct ? <Link href={`/packages/add?docs=${encodeURIComponent(selected.join(","))}`} className="inline-flex items-center gap-1.5 rounded-sm bg-white/10 px-3 py-2 text-xs font-semibold hover:bg-white/15"><PackagePlus className="h-4 w-4" /> Add to package</Link> : null}
+      {mayAddToAction ? <Link href={`/actions/add?docs=${encodeURIComponent(selected.join(","))}`} className="inline-flex items-center gap-1.5 rounded-sm bg-white/10 px-3 py-2 text-xs font-semibold hover:bg-white/15"><CalendarCheck className="h-4 w-4" /> Add to action</Link> : null}
       <a
         href={selectedExportHref}
         onClick={(event) => { event.preventDefault(); window.location.href = exportWith(selectedExportHref); }}

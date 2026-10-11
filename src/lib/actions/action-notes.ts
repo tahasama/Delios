@@ -6,6 +6,7 @@ import { isController, isAdmin } from "@/lib/auth";
 import { carrierRefusal, actIsOff } from "@/lib/control-activities";
 import { api, projectPath, refusal } from "@/lib/api/client";
 import { activityDetail, type ActivityDetail } from "@/lib/api/schedule";
+import { addressees } from "@/lib/api/transmittals";
 
 /**
  * What was decided about an action that did not have its documents.
@@ -23,14 +24,17 @@ export async function recordActionNoteAction(_prev: State | undefined, formData:
   const { user } = ctx;
   const actionId = String(formData.get("actionId") ?? "");
   const decision = String(formData.get("decision") ?? "");
-  const responsibleName = String(formData.get("responsibleName") ?? "").trim();
+  // Who decided is picked from the people on the project, of any organization, and kept with their organization.
+  const decidedBy = String(formData.get("decidedBy") ?? "");
+  const person = decidedBy ? (await addressees(ctx)).people.find((one) => one.id === decidedBy) : null;
+  const responsibleName = person ? `${person.name}${person.organization ? ` (${person.organization})` : ""}` : String(formData.get("responsibleName") ?? "").trim();
   const reason = String(formData.get("reason") ?? "").trim();
   const delayResponsible = String(formData.get("delayResponsible") ?? "").trim() || null;
   const delayReason = String(formData.get("delayReason") ?? "").trim() || null;
 
   if (await actIsOff(ctx, "ACTION_NOTE")) return { error: "Notes on actions are not used on this project." };
   if (!decision) return { error: "Choose what happened." };
-  if (!responsibleName) return { error: "Name who carries this decision — the manager the action answers to." };
+  if (!responsibleName) return { error: "Choose who decided it." };
   if (!reason) return { error: "Say why. A decision with no reason on it is not a record of anything." };
 
   const action = (await activityDetail(ctx, actionId))?.activity;

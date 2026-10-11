@@ -227,7 +227,9 @@ async function main() {
   });
   // A400's hydrotest is postponed: Document Control writes it down; whoever plans the project is asked to confirm it.
   await controller.post(`${p}/activities/${byCode.A400}/decisions`, {
-    decision: "STOPPED", responsibleName: "Site manager", reason: "Pipe supports are not finished; the hydrotest cannot be held on the day.",
+    // Who decided is a person on the project, of whichever organization, as the form picks them.
+    decision: "STOPPED", responsibleName: people.find((one) => one.email === "approver@demo.local")?.name ?? "The approver",
+    reason: "Pipe supports are not finished; the hydrotest cannot be held on the day.",
   });
   // A310 is short of Electrical's single line diagram: Document Control tells Electrical by hand.
   const a310 = (await engineer.get(`${p}/activities`)).find((one) => one.id === byCode.A310);
@@ -241,7 +243,7 @@ async function main() {
   // A300 is within its risk window with the duty pump datasheet missing: Mechanical's confirmation waits (approver's Home).
   // Civil asks for the shoring drawing to be added to A110: the list missed it. Document Control answers on the action.
   await engineer.post(`${p}/transmittals`, {
-    userIds: [idOf("controller@demo.local")].filter(Boolean), reason: "INFORMATION", activityId: byCode.A110,
+    userIds: [idOf("controller@demo.local")].filter(Boolean), reason: "INFORMATION", activityId: byCode.A110, activityAsk: "DOCUMENT",
     subject: `Add a document to ${(await engineer.get(`${p}/activities`)).find((one) => one.id === byCode.A110).code} (Civil)`,
     message: `Please add ${docs.excavation.number}, ${docs.excavation.title}, for Civil: the shoring stays in place while the slab is poured.\n\nIt was not on the requirements list.`,
   });

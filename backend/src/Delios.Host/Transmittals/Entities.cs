@@ -121,6 +121,8 @@ public sealed class Transmittal
     /// the document added there (or a reason it is not) closes the request, with who and when.
     /// </summary>
     public Guid? ActivityId { get; set; }
+    /// <summary>What it asks of the action: DOCUMENT (add one) or DISCIPLINE (tag a missing one).</summary>
+    public string? ActivityAskKind { get; set; }
     public Instant? ActivityAnsweredAt { get; set; }
     public string? ActivityAnsweredByName { get; set; }
     public string? ActivityAnswer { get; set; }

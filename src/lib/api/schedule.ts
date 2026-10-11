@@ -363,6 +363,8 @@ export type ActionWork = {
   kind: "CONFIRM_DOCUMENTS" | "CONFIRM_POSTPONEMENT" | "ADD_TO_ACTION" | "UNTAGGED" | "SCHEDULE_READ_FAILED";
   activityId: string | null; code: string | null; name: string | null; day: string | null; department: string | null;
   count: number; since: string | null; transmittalId: string | null; number: string | null; from: string | null;
+  /** On a request about an action: a document to add, or a missing discipline to tag. */
+  ask: "DOCUMENT" | "DISCIPLINE" | null;
 };
 
 export const actionWork = cache(async (scope: Scope): Promise<ActionWork[]> =>

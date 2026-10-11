@@ -9,7 +9,6 @@ import { notFound } from "next/navigation";
 import { Card, Chip, Banner, Field, inputCls } from "@/components/ui";
 import { ActionForm } from "@/components/form";
 import { confirmReadinessAction, revokeReadinessAction } from "@/lib/actions/requirements";
-import { clearance } from "@/lib/requirements-process";
 import { departmentsOf, DEFAULT_LEAD_DAYS } from "@/lib/schedule";
 import { Timeline } from "@/components/timeline";
 import { fmtDate } from "@/lib/utils";
@@ -24,7 +23,7 @@ import { mayUploadLists } from "@/lib/permissions";
 import { NotifyPanel } from "@/components/notify-panel";
 import { LinksCard, type Ask } from "./links-card";
 import { actionWork } from "@/lib/api/schedule";
-import { backendTransmittal } from "@/lib/api/transmittals";
+import { backendTransmittal, addressees } from "@/lib/api/transmittals";
 import { registerByNumber } from "@/lib/api/register";
 
 export const dynamic = "force-dynamic";
@@ -56,7 +55,6 @@ export default async function ActionDetailPage({ params, searchParams }: { param
   // Only administrators read the audit trail, so only they are sent to it.
   const admin = ctx.can("CONFIGURE");
   const me = { department: ctx.user.department ?? null };
-  const clear = clearance(action);
   const entries = dept ? action.entries.filter((e) => e.department === dept) : action.entries;
   // Which of the three moments slipped, for each document, and who writes the
   // note about what was decided.
@@ -85,6 +83,7 @@ export default async function ActionDetailPage({ params, searchParams }: { param
   const requestHref = (department: string) => `/transmittals/new?${new URLSearchParams({
     reason: "INFORMATION",
     activity: action.id,
+    ask: "DOCUMENT",
     users: controllers.map((one) => one.id).join(","),
     subject: `Add a document to ${action.code} (${deptLabel(department)})`,
     message: [
@@ -93,13 +92,22 @@ export default async function ActionDetailPage({ params, searchParams }: { param
     ].join("\n\n"),
   })}`;
 
-  // Setting disciplines and documents by hand, and the requests to add one still waiting for Document Control.
-  const mayTag = mayUploadLists(ctx.user.verbs);
+  // A discipline the action should concern and does not: anyone on the project may ask Document Control to add it.
+  const disciplineRequestHref = `/transmittals/new?${new URLSearchParams({
+    reason: "INFORMATION",
+    activity: action.id,
+    ask: "DISCIPLINE",
+    users: controllers.map((one) => one.id).join(","),
+    subject: `Add a discipline to ${action.code}`,
+    message: `Please add the discipline … to ${action.code}, ${action.name}, on ${fmtDate(action.scheduledDate)}.\n\nWhy it concerns us: …`,
+  })}`;
+
+  // Setting disciplines and documents by hand, and the requests about them still waiting: Document Control only.
   const asks: Ask[] = control
     ? await Promise.all((await actionWork(ctx)).filter((w) => w.kind === "ADD_TO_ACTION" && w.activityId === action.id && w.transmittalId).map(async (w) => {
         const t = await backendTransmittal(ctx, w.transmittalId!);
         return {
-          transmittalId: w.transmittalId!, number: w.number ?? "", from: w.from ?? "Someone", since: w.since,
+          transmittalId: w.transmittalId!, number: w.number ?? "", from: w.from ?? "Someone", since: w.since, kind: w.ask ?? "DOCUMENT",
           subject: t?.subject ?? "", message: t?.message ?? null,
           documentIds: [...new Set((t?.items ?? []).map((one) => one.documentId).filter((id): id is string => !!id))],
         };
@@ -108,6 +116,16 @@ export default async function ActionDetailPage({ params, searchParams }: { param
   const pickDocuments = control
     ? [...(await registerByNumber(ctx)).values()].map((d) => ({ id: d.id, name: d.number, detail: d.title }))
     : [];
+
+  // Which disciplines stand confirmed, by the card's own rule: a confirmation by hand (or frozen by the
+  // system on the day), or, before the day, every one of its documents released at its status.
+  const confirmedDepts = depts.filter((d) => {
+    const own = action.entries.filter((e) => e.department === d || !e.department);
+    const ready = own.length > 0 && own.every((e) => meetsRequirement(e.document.revisions, e.requiredStatus));
+    return action.confirmations.some((x) => x.department === d && !x.revokedAt) || (!dayHasPassed(action) && ready);
+  });
+  const confirmedAt = action.confirmations.filter((x) => !x.revokedAt).map((x) => x.confirmedAt).filter((x): x is Date => !!x)
+    .sort((x, y) => y.getTime() - x.getTime())[0] ?? action.lastMetAt ?? null;
 
   // The work is taken to have happened once its day has passed — that is what
   // a schedule is — unless a postponement was written down and not taken back.
@@ -340,22 +358,27 @@ export default async function ActionDetailPage({ params, searchParams }: { param
             </ul>
           ) : (
             <div className="px-5 py-3.5 sm:px-6">
-              <Banner tone="warn" title="Needs disciplines">No discipline is tagged on this action yet. Document Control, or whoever plans the project, tags them under Disciplines and documents below, or with the disciplines-per-action list; until then its documents cannot be asked for.</Banner>
+              <Banner tone="warn" title="Needs disciplines">No discipline is tagged on this action yet, so its documents cannot be asked for. Document Control tags them, by hand or with the disciplines-per-action list.</Banner>
             </div>
           )}
+          {/* Anyone on the project may ask for a discipline the action should concern. */}
+          {ctx.user.isInternal ? (
+            <p className="flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-line px-5 py-2.5 text-xs text-slate-500 sm:px-6">
+              Is a discipline missing from this action?
+              <Link href={disciplineRequestHref} className="font-semibold text-link hover:underline">Request it</Link>
+            </p>
+          ) : null}
         </section>
 
-          {mayTag || control ? (
+          {control ? (
             <LinksCard
               actionId={action.id}
               code={action.code}
               departments={depts}
               disciplines={disciplines.map((d) => ({ code: d.code, label: d.label }))}
-              entries={action.entries.map((e) => ({ id: e.id, docNumber: e.document.docNumber, title: e.document.title, department: e.department }))}
               documents={pickDocuments}
               asks={asks}
-              mayTag={mayTag}
-              control={control}
+              count={action.entries.length}
             />
           ) : null}
 
@@ -370,6 +393,7 @@ export default async function ActionDetailPage({ params, searchParams }: { param
             total={action.entries.length}
             day={action.scheduledDate ? fmtDate(action.scheduledDate) : null}
             postponeCodes={postponeCodes}
+            people={(await addressees(ctx)).people.map((one) => ({ id: one.id, name: one.name, detail: [one.organization, one.function].filter(Boolean).join(" · ") }))}
           />
         </div>
 
@@ -379,10 +403,17 @@ export default async function ActionDetailPage({ params, searchParams }: { param
             points={[
               { label: "Disciplines tagged", done: depts.length > 0, at: depts.length ? action.createdAt ?? null : null, holder: depts.length ? depts.map(deptLabel).join(", ") : "nobody yet" },
               { label: "Documents listed", done: action.entries.length > 0, at: action.entries.length ? action.entries[0].createdAt ?? null : null, holder: action.entries.length ? `${action.entries.length} document${action.entries.length === 1 ? "" : "s"}` : "none listed" },
-              { label: "First document due", at: firstDue, planned: !!firstDue && firstDue > new Date(), holder: firstDue && firstDue < new Date() ? "that date has passed" : null },
               ...(action.riskNotifiedAt ? [{ label: "Warned automatically", at: action.riskNotifiedAt, holder: depts.map(deptLabel).join(", ") }] : []),
-              { label: "Every document ready", at: everything ? action.lastMetAt ?? action.scheduledDate : null, holder: `${readyCount} of ${action.entries.length} ready` },
-              { label: "Disciplines confirmed", at: clear.cleared ? action.confirmations.map((c) => c.confirmedAt).filter(Boolean).sort((x, y) => y!.getTime() - x!.getTime())[0] ?? null : null, holder: `${clear.confirmed.length} of ${clear.depts.length}` },
+              // Ready, or when the first one is due: the due date is not a step of its own,
+              // so a point never shows open between two that are done.
+              everything
+                ? { label: "Every document ready", at: action.lastMetAt ?? null, done: true, holder: `${readyCount} of ${action.entries.length} ready` }
+                : { label: "Every document ready", at: firstDue, planned: !!firstDue && firstDue > new Date(),
+                    holder: `${readyCount} of ${action.entries.length} ready${firstDue && firstDue < new Date() ? ` · the first was due ${fmtDate(firstDue)}` : ""}` },
+              // Confirmed as the card says: by hand, or automatically when every document is released at its status.
+              { label: "Disciplines confirmed", done: depts.length > 0 && confirmedDepts.length === depts.length,
+                at: depts.length > 0 && confirmedDepts.length === depts.length ? confirmedAt : null,
+                holder: `${confirmedDepts.length} of ${depts.length}` },
               // A schedule's date passing is the work happening. Only Document
               // Control saying otherwise — a note that the work was postponed —
               // takes that back.

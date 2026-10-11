@@ -25,7 +25,7 @@ export type Prefill = {
   /** The sent transmittal this one completes (a supplement) or corrects (it replaces one they rejected). */
   following?: { id: string; number: string; kind: "SUPPLEMENT" | "REPLACES"; rejection: string | null };
   /** The schedule action it asks a document to be added to: Document Control answers it there. */
-  activity?: { id: string; code: string };
+  activity?: { id: string; code: string; ask: "DOCUMENT" | "DISCIPLINE" };
 };
 
 const STEPS = ["Which way, and why", "What goes with it", "Who gets it"];
@@ -198,9 +198,14 @@ export function NewTransmittalForm({
         {prefill?.activity ? (
           <>
             <input type="hidden" name="activityId" value={prefill.activity.id} />
+            <input type="hidden" name="activityAsk" value={prefill.activity.ask} />
             <p className="mb-4 rounded-lg border border-line bg-tint-soft px-4 py-2.5 text-xs text-slate-600">
-              Asks for a document to be added to <Link href={`/actions/${prefill.activity.code}`} className="font-mono font-semibold text-link hover:underline">{prefill.activity.code}</Link>.
-              {" "}Enclose it in step 2 if it is released, or name it in the message. Document Control answers on the action&rsquo;s page, and you are told.
+              {prefill.activity.ask === "DISCIPLINE" ? "Asks for a missing discipline to be added to " : "Asks for a document to be added to "}
+              <Link href={`/actions/${prefill.activity.code}`} className="font-mono font-semibold text-link hover:underline">{prefill.activity.code}</Link>.
+              {" "}{prefill.activity.ask === "DISCIPLINE"
+                ? "Say which discipline, and why the action concerns it."
+                : "Enclose it in step 2 if it is released, or name it in the message."}
+              {" "}Document Control answers on the action&rsquo;s page, and you are told.
             </p>
           </>
         ) : null}

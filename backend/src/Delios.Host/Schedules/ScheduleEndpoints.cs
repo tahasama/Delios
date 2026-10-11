@@ -54,7 +54,7 @@ public sealed record DecisionView(Guid Id, string Decision, DateOnly? PlannedSta
 /// tagged on), SCHEDULE_READ_FAILED (the schedule's last read failed).
 /// </summary>
 public sealed record ActionWork(string Kind, Guid? ActivityId, string? Code, string? Name, DateOnly? Day, string? Department, int Count, DateTimeOffset? Since,
-    Guid? TransmittalId = null, string? Number = null, string? From = null);
+    Guid? TransmittalId = null, string? Number = null, string? From = null, string? Ask = null);
 
 /// <summary>A notice a person sends: what it is about (its subject key), to whom, and what it says.</summary>
 public sealed record NoticeRequest(string? Subject, string? Title, string? Body, string? Link, Guid[]? People);
@@ -319,7 +319,7 @@ public static class ScheduleEndpoints
     }
 
     /// <summary>Closes a request to add a document to an action with what was done, and tells whoever asked.</summary>
-    private static async Task AnswerAsync(DeliosDbContext db, Notifications.Notifier notifier, IClock clock, ProjectAccess access,
+    internal static async Task AnswerAsync(DeliosDbContext db, Notifications.Notifier notifier, IClock clock, ProjectAccess access,
         Transmittal ask, Activity activity, string answer, CancellationToken cancellationToken)
     {
         ask.ActivityAnsweredAt = clock.GetCurrentInstant();
@@ -502,10 +502,10 @@ public static class ScheduleEndpoints
                               join a in db.Activities.AsNoTracking() on t.ActivityId equals a.Id
                               where t.ProjectId == projectId && t.ActivityAnsweredAt == null
                               orderby t.IssuedAt
-                              select new { t.Id, t.Number, t.IssuedAt, t.IssuedByName, ActivityId = a.Id, a.Code, a.Name, a.Start })
+                              select new { t.Id, t.Number, t.IssuedAt, t.IssuedByName, t.ActivityAskKind, ActivityId = a.Id, a.Code, a.Name, a.Start })
                 .ToListAsync(cancellationToken);
             work.AddRange(asks.Select(x => new ActionWork("ADD_TO_ACTION", x.ActivityId, x.Code, x.Name, x.Start?.ToDateOnly(), null, 1,
-                x.IssuedAt.ToDateTimeOffset(), x.Id, x.Number, x.IssuedByName)));
+                x.IssuedAt.ToDateTimeOffset(), x.Id, x.Number, x.IssuedByName, x.ActivityAskKind ?? "DOCUMENT")));
         }
 
         // The schedule's own upkeep: Document Control, or whoever plans.

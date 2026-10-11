@@ -4328,6 +4328,10 @@ namespace Delios.Host.Platform.Migrations
                         .HasColumnType("text")
                         .HasColumnName("activity_answered_by_name");
 
+                    b.Property<string>("ActivityAskKind")
+                        .HasColumnType("text")
+                        .HasColumnName("activity_ask_kind");
+
                     b.Property<Guid?>("ActivityId")
                         .HasColumnType("uuid")
                         .HasColumnName("activity_id");
