@@ -339,9 +339,34 @@ summary::-webkit-details-marker {
   .ask:hover { border-color: var(--color-brand-line); background: var(--color-tint); }
   .ask[data-on="true"] { background: var(--color-brand); border-color: var(--color-brand); color: #ffffff; }
   .ask[data-on="true"]:hover { background: var(--color-brand-hover); }
-  /* Inside a register sheet the buttons sit with its small controls (the joined
-     upload buttons, the file field): the same height, corners and weight. */
-  .register .ask { border-radius: 0.375rem; padding: 0.3rem 0.75rem; font-size: 12px; box-shadow: none; }
+  /* One size for every control in a register sheet: the search field, the
+     filters, the buttons, the file field and the joined upload buttons all
+     stand the same height, with the same text and the same corners, so none of
+     them crowds another. Change it here and every one follows. */
+  .register { --control-h: 2rem; --control-text: 13px; --control-radius: 0.375rem; }
+  .register .ask {
+    height: var(--control-h);
+    padding: 0 0.85rem;
+    font-size: var(--control-text);
+    border-radius: var(--control-radius);
+    box-shadow: none;
+  }
+  .register select.plain,
+  .register button.plain,
+  .register input.plain:not([type="checkbox"]):not([type="radio"]) {
+    height: var(--control-h);
+    padding-top: 0;
+    padding-bottom: 0;
+    font-size: var(--control-text);
+  }
+  .register .control { height: var(--control-h); font-size: var(--control-text); border-radius: var(--control-radius); }
+  .register input[type="file"] { font-size: var(--control-text); }
+  .register input[type="file"]::file-selector-button {
+    height: var(--control-h);
+    padding: 0 0.85rem;
+    font-size: var(--control-text);
+    border-radius: var(--control-radius);
+  }
   /* A panel trigger says what is chosen on one line, however long it is. */
   .register button.plain { display: block; width: 100%; overflow: hidden; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
 

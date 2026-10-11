@@ -252,7 +252,7 @@ export function PlanRegister({
               defaultValue={filters.q}
               placeholder="Search actions, their documents and people"
               title={'A space narrows, a comma widens. For example: pour clarifier  ·  A00005, A00012'}
-              className="plain w-full py-2! pl-6! text-sm!"
+              className="plain w-full pl-6!"
             />
           </label>
           <button className="ask" data-on={dirty ? "true" : "false"} disabled={pending}>

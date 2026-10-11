@@ -19,12 +19,12 @@ export function UploadSwitch({ line, panels }: {
       <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-4">
         {line}
         {/* One small joined group: a button per list, in the order they are done. */}
-        <div className="inline-flex shrink-0 items-stretch divide-x divide-line overflow-hidden rounded-md border border-line text-xs">
+        <div className="control inline-flex shrink-0 items-stretch divide-x divide-line overflow-hidden border border-line">
           {panels.map((one) => (
             <button
               key={one.kind}
               type="button"
-              className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 font-semibold transition-colors ${
+              className={`inline-flex items-center gap-1.5 px-3 font-semibold transition-colors ${
                 open === one.kind ? "bg-tint text-brand-ink" : "text-slate-600 hover:bg-tint-soft hover:text-brand-ink"
               }`}
               aria-expanded={open === one.kind}
