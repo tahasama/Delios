@@ -1,5 +1,6 @@
 import { requireScope } from "@/lib/scope";
 import { departmentsOf, daysBefore } from "@/lib/schedule";
+import { mayUploadLists } from "@/lib/permissions";
 import { clearance } from "@/lib/requirements-process";
 import { readSearch, readDay } from "@/lib/register-query";
 import { PLAN_CARD_HEIGHT, PLAN_FIRST } from "@/lib/plan-card";
@@ -338,7 +339,7 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
         plate={
           <PlanPlate
             inForce={publishedVersion ? { since: publishedVersion.publishedAt ? fmtDate(publishedVersion.publishedAt) : null } : null}
-            plans={ctx.can("PLAN") || ctx.can("CONTROL")}
+            plans={mayUploadLists(ctx.user.verbs)}
             failed={source.imports[0]?.status === "FAILED" ? { revision: source.imports[0].revisionValue, error: source.imports[0].error } : null}
           />
         }

@@ -101,66 +101,83 @@ export function StagePath({ stages, at, note, under, pick }: {
   stages: string[];
   at: number;
   note?: React.ReactNode;
-  /** One short line under each stage, read with the stage it belongs to. */
+  /**
+   * Lines under each stage. With them the row is drawn as a stepper: columns
+   * of one width, the join running from each pill to the next, the lines read
+   * left-aligned under their pill.
+   */
   under?: React.ReactNode[];
   /**
    * Stages that open something under the row (the schedule's uploads, for
-   * whoever plans): which can, which is open, and what pressing one does.
+   * whoever may upload): which can, which is open, and what pressing one does.
    * "Open" is an underline, never the fill: the fill stays "where it stands".
    */
   pick?: { can: boolean[]; open: number | null; onPick: (index: number) => void; controls: (index: number) => string };
 }) {
+  const pillOf = (name: string, i: number) => {
+    const pickable = !!pick?.can[i];
+    const open = pickable && pick!.open === i;
+    const pill = (
+      <span
+        className={cn(
+          "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-semibold",
+          i < at && "text-slate-500",
+          i === at && "bg-(--color-brand) text-white",
+          i > at && "text-slate-400 ring-1 ring-line-strong",
+          pickable && i < at && "ring-1 ring-line",
+          pickable && i !== at && "transition-colors group-hover:bg-tint group-hover:text-brand-ink",
+          open && i !== at && "bg-tint text-brand-ink",
+        )}
+        aria-current={i === at ? "step" : undefined}
+      >
+        {i < at ? "✓" : null} {name}
+        {pickable ? <Upload aria-hidden className="h-3 w-3 opacity-70" /> : null}
+      </span>
+    );
+    return pickable ? (
+      <button
+        type="button"
+        onClick={() => pick!.onPick(i)}
+        aria-expanded={open}
+        aria-controls={pick!.controls(i)}
+        title={`Upload the ${name.toLowerCase()} list`}
+        className={cn(
+          "group shrink-0 cursor-pointer rounded-full outline-none focus-visible:ring-3 focus-visible:ring-link/20",
+          // Open: a short bar under the pill, apart from the fill that says where things stand.
+          "relative after:absolute after:inset-x-2.5 after:-bottom-1.5 after:h-0.5 after:rounded-full",
+          open ? "after:bg-(--color-brand)" : "after:bg-transparent",
+        )}
+      >
+        {pill}
+      </button>
+    ) : <span className="shrink-0">{pill}</span>;
+  };
+
+  if (under) {
+    return (
+      <ol className="flex flex-wrap gap-y-5">
+        {stages.map((name, i) => (
+          <li key={name} className="w-52 shrink-0">
+            <div className="flex items-center">
+              {pillOf(name, i)}
+              {i < stages.length - 1 ? <span className={cn("mx-2 h-px flex-1", i < at ? "bg-(--color-brand)" : "bg-line-strong")} aria-hidden /> : null}
+            </div>
+            {under[i] ? <div className="mt-2.5 space-y-0.5 px-2.5 text-[11px] leading-4 text-slate-500">{under[i]}</div> : null}
+          </li>
+        ))}
+      </ol>
+    );
+  }
+
   return (
     <div>
-      <ol className={cn("flex gap-y-2", under ? "w-full flex-wrap items-start gap-y-4 lg:flex-nowrap" : "flex-wrap items-center")}>
-        {stages.map((name, i) => {
-          const pickable = !!pick?.can[i];
-          const open = pickable && pick!.open === i;
-          const pill = (
-            <span
-              className={cn(
-                "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-semibold",
-                i < at && "text-slate-500",
-                i === at && "bg-(--color-brand) text-white",
-                i > at && "text-slate-400 ring-1 ring-line-strong",
-                pickable && i < at && "ring-1 ring-line",
-                pickable && i !== at && "transition-colors group-hover:bg-tint group-hover:text-brand-ink",
-                open && i !== at && "text-brand-ink",
-              )}
-              aria-current={i === at ? "step" : undefined}
-            >
-              {i < at ? "✓" : null} {name}
-              {pickable ? <Upload aria-hidden className="h-3 w-3 opacity-70" /> : null}
-            </span>
-          );
-          return (
-            <li key={name} className={cn("flex", under ? cn("items-start", i && "flex-1") : "items-center")}>
-              {/* With a line under each stage the row spans the width: the joins stretch between them. */}
-              {i ? <span className={cn("h-px", under ? "mx-3 mt-[13px] min-w-6 flex-1" : "mx-1 w-3 sm:mx-1.5 sm:w-10", i <= at ? "bg-(--color-brand)" : "bg-line-strong")} aria-hidden /> : null}
-              <span
-                className={under || pick ? cn(
-                  "flex flex-col items-center gap-1.5 text-center",
-                  pick && "border-b-2 pb-1.5",
-                  pick && (open ? "border-(--color-brand)" : "border-transparent"),
-                ) : "contents"}
-              >
-                {pickable ? (
-                  <button
-                    type="button"
-                    onClick={() => pick!.onPick(i)}
-                    aria-expanded={open}
-                    aria-controls={pick!.controls(i)}
-                    title={`Upload the ${name.toLowerCase()} list`}
-                    className="group cursor-pointer rounded-full outline-none focus-visible:ring-3 focus-visible:ring-link/20"
-                  >
-                    {pill}
-                  </button>
-                ) : pill}
-                {under?.[i] ? <span className="px-2.5 text-[11px] leading-4 text-slate-500">{under[i]}</span> : null}
-              </span>
-            </li>
-          );
-        })}
+      <ol className="flex flex-wrap items-center gap-y-2">
+        {stages.map((name, i) => (
+          <li key={name} className="flex items-center">
+            {i ? <span className={cn("mx-1 h-px w-3 sm:mx-1.5 sm:w-10", i <= at ? "bg-(--color-brand)" : "bg-line-strong")} aria-hidden /> : null}
+            {pillOf(name, i)}
+          </li>
+        ))}
       </ol>
       {note ? <p className="mt-2.5 text-[13px] text-slate-600">{note}</p> : null}
     </div>

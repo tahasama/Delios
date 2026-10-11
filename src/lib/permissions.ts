@@ -275,3 +275,14 @@ export async function holdersOf(
   const found = await holders(t.projectId, verb, target?.deliverableType, target?.docType, target?.discipline, target?.criticality, target?.confidentiality);
   return found.map((one) => ({ id: one.id, name: one.name, functionName: one.functionName, department: one.department }));
 }
+
+/**
+ * Who uploads the schedule's lists: a function that holds Control or Plan
+ * outright. Configure does not stand in for Plan here, because the backend
+ * (ListUploadEndpoints) checks the two verbs themselves. The one rule every
+ * screen and action asks.
+ */
+export function mayUploadLists(held: readonly string[] | undefined): boolean {
+  if (!held) return false;
+  return held.includes("CONTROL") || held.includes("PLAN");
+}
