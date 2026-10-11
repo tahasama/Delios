@@ -41,19 +41,18 @@ public static class CatalogAdminEndpoints
             .AddEndpointFilter(Keepers.Configurers("Only an administrator publishes the organization's lists and rules."));
         admin.MapGet("/value-sets", SetsAsync);
         admin.MapPut("/values", ValueAsync);
-        // Numbering and review routes are the organization's: an administrator changes them.
-        admin.MapPost("/numbering/schemes", CreateSchemeAsync);
-        admin.MapPut("/numbering/schemes/{schemeId:guid}", UpdateSchemeAsync);
-        admin.MapPut("/numbering/routing", RouteSchemeAsync);
-        admin.MapPost("/routes", CreateRouteAsync);
-        admin.MapPut("/routes/{routeId:guid}", UpdateRouteAsync);
 
-        // Document Control reads them, as well as administrators.
+        // Document Control keeps these day to day, as well as administrators.
         var keepers = app.MapGroup("/api/admin").WithTags("Administration")
             .AddEndpointFilter<TransactionFilter>()
             .AddEndpointFilter(Keepers.Filter);
         keepers.MapGet("/numbering", NumberingAsync);
+        keepers.MapPost("/numbering/schemes", CreateSchemeAsync);
+        keepers.MapPut("/numbering/schemes/{schemeId:guid}", UpdateSchemeAsync);
+        keepers.MapPut("/numbering/routing", RouteSchemeAsync);
         keepers.MapGet("/routes", RoutesAsync);
+        keepers.MapPost("/routes", CreateRouteAsync);
+        keepers.MapPut("/routes/{routeId:guid}", UpdateRouteAsync);
         admin.MapGet("/audit", AuditAsync);
     }
 

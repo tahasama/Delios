@@ -23,11 +23,10 @@ conversation, write it into the right one in the same commit as the code.
 - Nothing is deleted except by the app owner. Exception: an empty package
   that never went out may be deleted by whoever composes it (it holds no content;
   removing a package never removes documents).
-- Document Control acts only on the projects it is on, never on the
-  organization's configuration: functions, organizations, numbering, review
-  routes, a person's account (name, email, company, signing in), projects and
-  classification sets are an administrator's (backend refuses otherwise). It
-  reads what it needs from them, and puts people on its own projects.
+- Every setting there is today is the project's, not the organization's (no
+  organization administration page exists yet). Document Control keeps its
+  freedom on them (people, functions, organizations, numbering, routes); it
+  acts on the projects it is on.
 - The owner's full-rights account: `grant-all <email>` (backend command) makes
   that person an administrator, unlocks them, and puts them on every project
   with Document Control, which is given every verb.

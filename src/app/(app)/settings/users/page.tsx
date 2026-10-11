@@ -20,9 +20,6 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
   const { user: me, projectId, project } = ctx;
   const policy = await formPolicy(ctx, "PERSON");
   const sp = await searchParams;
-  // A person's account (name, email, company, signing in) is the organization's: an administrator changes it.
-  // Document Control and management change who is on their project, in what job and discipline.
-  const admin = isAdmin(me);
   if (!maySetup(me, SETUP_PAGES.find((p) => p.href === "/settings/users")!)) {
     return <PageHeader title="People & access" subtitle="Administrators and the control function." />;
   }
@@ -214,25 +211,14 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
                     <div className="mt-2 w-[min(90vw,34rem)]">
                       <ActionForm action={savePersonAction} submitLabel="Save" size="sm" hidden={{ userId: u.id }}>
                         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                          {admin ? (
-                            <>
-                              <Field label="Name" required><input name="name" required defaultValue={u.name} className={inputCls} /></Field>
-                              <Field label="Email" required><input type="email" name="email" required defaultValue={u.email} className={inputCls} /></Field>
-                              <Field label="Works for">
-                                <select name="partyId" defaultValue={u.partyId ?? ""} className={inputCls}>
-                                  <option value="">—</option>
-                                  {parties.filter((p) => p.active || p.id === u.partyId).map((p) => <option key={p.id} value={p.id}>{p.name}{p.active ? "" : " (revoked)"}</option>)}
-                                </select>
-                              </Field>
-                            </>
-                          ) : (
-                            <>
-                              <input type="hidden" name="name" value={u.name} />
-                              <input type="hidden" name="email" value={u.email} />
-                              <input type="hidden" name="partyId" value={u.partyId ?? ""} />
-                              {u.active ? <input type="hidden" name="active" value="on" /> : null}
-                            </>
-                          )}
+                          <Field label="Name" required><input name="name" required defaultValue={u.name} className={inputCls} /></Field>
+                          <Field label="Email" required><input type="email" name="email" required defaultValue={u.email} className={inputCls} /></Field>
+                          <Field label="Works for">
+                            <select name="partyId" defaultValue={u.partyId ?? ""} className={inputCls}>
+                              <option value="">—</option>
+                              {parties.filter((p) => p.active || p.id === u.partyId).map((p) => <option key={p.id} value={p.id}>{p.name}{p.active ? "" : " (revoked)"}</option>)}
+                            </select>
+                          </Field>
                           <Field label={`Job on ${project.code}`} required={!here}>
                             <select name="functionId" defaultValue={here?.functionId ?? ""} className={inputCls}>
                               <option value="">{here ? "unchanged" : "Choose… (adds them to the project)"}</option>
@@ -245,7 +231,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
                               {disciplines.map((d) => <option key={d.code} value={d.code}>{d.label}</option>)}
                             </select>
                           </Field>
-                          {admin ? <label className="flex items-center gap-2 self-end pb-2 text-xs text-slate-600"><input type="checkbox" name="active" defaultChecked={u.active} /> Can sign in</label> : null}
+                          <label className="flex items-center gap-2 self-end pb-2 text-xs text-slate-600"><input type="checkbox" name="active" defaultChecked={u.active} /> Can sign in</label>
                         </div>
                       </ActionForm>
                     </div>

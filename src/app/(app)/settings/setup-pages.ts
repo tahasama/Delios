@@ -16,10 +16,11 @@ export type SetupPage = {
   /** The verb that opens this page. Configure (administrators) unless stated. */
   verb?: "MATRIX" | "ROUTES";
   /**
-   * Also open to the control function, for the projects it is on: who is on
-   * them. The organization's own set-up — functions, organizations, numbering,
-   * review routes, projects, the classification sets — and the audit trail
-   * stay with administrators.
+   * Also open to the control function. Document Control runs the register day
+   * to day, so the lists it works from are its own: who the parties are, who
+   * has access, how numbers are built, which routes exist. What decides the
+   * organization itself — projects, scope, the classification sets — and the
+   * audit trail stay with administrators.
    */
   control?: true;
   /** Also open to management (Manage), which adds people where the project has no Document Control. */
@@ -48,6 +49,7 @@ export const SETUP_PAGES: SetupPage[] = [
     title: "Organizations",
     text: "Your own organization and the others you exchange information with.",
     group: "Organization",
+    control: true,
   },
   {
     href: "/settings/dmp",
@@ -79,6 +81,7 @@ export const SETUP_PAGES: SetupPage[] = [
     title: "Numbering",
     text: "How document numbers are built, and which deliverable type uses which scheme.",
     group: "Classification",
+    control: true,
   },
 
   {
@@ -93,6 +96,7 @@ export const SETUP_PAGES: SetupPage[] = [
     text: "Reviewer sequences — parallel, serial, consolidated.",
     group: "How work flows",
     verb: "ROUTES",
+    control: true,
   },
 
   {
@@ -100,6 +104,7 @@ export const SETUP_PAGES: SetupPage[] = [
     title: "Functions & permissions",
     text: "What each function may do. An administrator’s own function can only be changed by an administrator.",
     group: "Access",
+    control: true,
   },
   {
     href: "/settings/users",

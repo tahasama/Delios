@@ -781,6 +781,14 @@ under.
 
 ## Still open — decided in conversation, not yet built
 
+- **Transmittals as the one channel, in two families.** Transmittals will work
+  like email: a request, its answer, a confirmation sought and given all travel
+  as transmittals in one thread. The kinds a user picks before sending fall in
+  two families, never named as such on screen: information (request, answer to
+  a request, confirmation request, RFI…) and data (IFR, IFA, IFP…). Until then,
+  answers to a request about an action are notices, and the transmittal records
+  where the request stands.
+
 - **Escalation** where somebody refuses to acknowledge carrying an action
   without its documents. Agreed to be the Standard's and the DMP's business
   rather than the application's; the Standard should say what happens.
