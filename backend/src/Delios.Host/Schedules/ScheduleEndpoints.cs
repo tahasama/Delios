@@ -128,6 +128,7 @@ public static class ScheduleEndpoints
         project.MapGet("/activities/{activityId:guid}/lateness", LatenessAsync);
         project.MapPost("/transmittals/{transmittalId:guid}/activity-answer", AnswerActivityAskAsync);
         project.MapGet("/activities/{activityId:guid}/requests", ActivityRequestsAsync);
+        project.MapPost("/activities/{activityId:guid}/departments/own", AddOwnDepartmentAsync);
         project.MapPost("/transmittals/{transmittalId:guid}/activity-check", CheckActivityAskAsync);
         project.MapPost("/transmittals/{transmittalId:guid}/activity-confirm", ConfirmActivityAskAsync);
         project.MapPost("/transmittals/{transmittalId:guid}/activity-refuse", RefuseActivityAskAsync);
@@ -272,11 +273,23 @@ public static class ScheduleEndpoints
         }
         var (need, document, problem) = await NewNeedAsync(db, clock, access, activity, request, cancellationToken);
         if (problem is not null) return problem;
+        // Without Document Control, the people of a discipline add for their own discipline only; Document Control
+        // and whoever plans keep adding for any.
+        var self = !access.Holds(Verbs.Control) && !access.Holds(Verbs.Plan);
+        if (self)
+        {
+            if (await Delios.Host.Settings.ProjectAnswers.ControlDoesAsync(db, access.Project.Id, "ACTION_LINKS", cancellationToken))
+                return Problems.Forbidden("CONTROL_ONLY", "On this project Document Control adds documents to actions: ask them.");
+            var own = await OwnDepartmentAsync(db, access, cancellationToken);
+            if (own is null || need!.Department != own)
+                return Problems.Forbidden("OWN_DISCIPLINE_ONLY", "You add documents for your own discipline only.");
+        }
         db.Requirements.Add(need!);
         await db.SaveChangesAsync(cancellationToken);
         await Readiness.RestateAsync(db, clock, [activity.Id], cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         if (ask is not null) await AnswerAsync(db, notifier, clock, access, ask, activity, $"{document!.Number} added to {activity.Code}.", cancellationToken);
+        if (self) await TellPlannersAsync(db, notifier, access, activity, $"{access.UserName} added {document!.Number}", $"{activity.Code} now needs {document.Number} for {need!.Department}.", cancellationToken);
         await audit.WriteAsync(http.User.Actor(), "NEED_ADDED", "Activity", activity.Id, activity.Code,
             $"Needs {document!.Number} for {need!.Purpose}, by {need.NeededBy?.ToString() ?? "a date not yet known"}"
             + (ask is null ? "." : $", as {ask.Number} asked."), access.Project.Id, cancellationToken);
@@ -505,6 +518,45 @@ public static class ScheduleEndpoints
             return (null, null, Problems.Forbidden("NOT_YOURS", $"{ask.ActivityConfirmerName} was asked to confirm it."));
         var activity = await db.Activities.SingleAsync(a => a.Id == activityId, cancellationToken);
         return (ask, activity, null);
+    }
+
+    /// <summary>
+    /// POST /activities/{id}/departments/own: without Document Control, someone whose discipline the action should
+    /// concern adds it themselves. Their own discipline only; whoever plans the project is told.
+    /// </summary>
+    private static async Task<IResult> AddOwnDepartmentAsync(Guid activityId, HttpContext http, DeliosDbContext db, AuditLog audit,
+        Notifications.Notifier notifier, CancellationToken cancellationToken)
+    {
+        var access = ProjectAccessFilter.Of(http);
+        if (await Delios.Host.Settings.ProjectAnswers.ControlDoesAsync(db, access.Project.Id, "ACTION_LINKS", cancellationToken))
+            return Problems.Forbidden("CONTROL_ONLY", "On this project Document Control adds disciplines to actions: ask them.");
+        var own = await OwnDepartmentAsync(db, access, cancellationToken);
+        if (own is null) return Problems.Forbidden("NO_DISCIPLINE", "You answer for no discipline on this project.");
+        var activity = await db.Activities.SingleOrDefaultAsync(a => a.Id == activityId && a.ProjectId == access.Project.Id, cancellationToken);
+        if (activity is null) return NotFound();
+        if (activity.Departments.Contains(own)) return Results.NoContent();
+        var was = string.Join(", ", activity.Departments);
+        activity.Departments = [.. activity.Departments.Append(own).OrderBy(d => d)];
+        await db.SaveChangesAsync(cancellationToken);
+        await audit.WriteAsync(http.User.Actor(), "ACTIVITY_DEPARTMENTS", "Activity", activity.Id, activity.Code,
+            $"{(was.Length == 0 ? "none" : was)} → {string.Join(", ", activity.Departments)}: {access.UserName} added their own discipline.", access.Project.Id, cancellationToken);
+        await TellPlannersAsync(db, notifier, access, activity, $"{access.UserName} added {own}", $"{activity.Code} now concerns {own} too.", cancellationToken);
+        return Results.NoContent();
+    }
+
+    /// <summary>The discipline the caller answers for on the project, if any.</summary>
+    private static Task<string?> OwnDepartmentAsync(DeliosDbContext db, ProjectAccess access, CancellationToken cancellationToken) =>
+        db.Memberships.AsNoTracking().Where(m => m.ProjectId == access.Project.Id && m.UserId == access.UserId && m.Active && m.Department != null)
+            .Select(m => m.Department).FirstOrDefaultAsync(cancellationToken);
+
+    /// <summary>Tells whoever plans the project of a change made by a discipline itself.</summary>
+    private static async Task TellPlannersAsync(DeliosDbContext db, Notifications.Notifier notifier, ProjectAccess access, Activity activity,
+        string title, string body, CancellationToken cancellationToken)
+    {
+        var planners = (await NoticeLog.HoldersAsync(db, access.Project.Id, Verbs.Plan, cancellationToken)).Where(id => id != access.UserId).Distinct().ToList();
+        if (planners.Count > 0)
+            await notifier.NotifyAsync(access.Project.TenantId, access.Project.Id, planners, Notifications.NotificationKinds.General,
+                $"{activity.Code}: {title}", body, $"/actions/{activity.Code}", cancellationToken);
     }
 
     /// <summary>Tells Document Control on the project how a request it checked was settled.</summary>

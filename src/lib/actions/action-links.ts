@@ -7,6 +7,7 @@ import { api, projectPath, refusal } from "@/lib/api/client";
 import { getActiveSet } from "@/lib/config";
 import { needDefaults } from "@/lib/schedule";
 import { activityDetail } from "@/lib/api/schedule";
+import { controlDoes } from "@/lib/control-activities";
 
 type State = { error?: string; ok?: string };
 
@@ -93,13 +94,16 @@ export async function addDocumentToActionAction(_prev: State | undefined, formDa
  */
 export async function setActionDocumentsAction(_prev: State | undefined, formData: FormData): Promise<State> {
   const ctx = await requireScope();
-  if (!ctx.can("CONTROL")) return { error: "Document Control chooses an action's documents." };
+  // Without Document Control, the people of a discipline choose their own discipline's documents.
+  const own = !ctx.can("CONTROL") && !(await controlDoes(ctx, "ACTION_LINKS")) ? ctx.user.department ?? null : null;
+  if (!ctx.can("CONTROL") && !own) return { error: "Document Control chooses an action's documents." };
   const actionId = String(formData.get("actionId") ?? "");
   const ticked = new Set(formData.getAll("documentIds").map(String).filter(Boolean));
-  const department = String(formData.get("department") ?? "") || null;
+  const department = own ?? (String(formData.get("department") ?? "") || null);
   const detail = await activityDetail(ctx, actionId);
   if (!detail) return { error: "That action is no longer in the schedule." };
-  const { activity, needs } = detail;
+  const activity = detail.activity;
+  const needs = own ? detail.needs.filter((one) => one.department === own) : detail.needs;
   const linked = new Set(needs.map((one) => one.documentId));
   const adding = [...ticked].filter((id) => !linked.has(id));
   const leaving = needs.filter((one) => !ticked.has(one.documentId));
@@ -198,4 +202,18 @@ export async function refuseActionRequestAction(_prev: State | undefined, formDa
   }
   refresh(code, transmittalId);
   return { ok: "Refused." };
+}
+
+/** Without Document Control: someone adds their own discipline to an action that should concern it. */
+export async function addOwnDisciplineAction(_prev: State | undefined, formData: FormData): Promise<State> {
+  const ctx = await requireScope();
+  const actionId = String(formData.get("actionId") ?? "");
+  const code = String(formData.get("code") ?? "");
+  try {
+    await api(projectPath(ctx, `/activities/${actionId}/departments/own`), { method: "POST" });
+  } catch (e) {
+    return { error: refusal(e).message };
+  }
+  refresh(code);
+  return { ok: "Added. Whoever plans the project is told." };
 }

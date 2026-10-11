@@ -23,7 +23,7 @@ import { mayUploadLists } from "@/lib/permissions";
 import { NotifyPanel } from "@/components/notify-panel";
 import { LinksCard, proposalText, type Ask } from "./links-card";
 import { activityRequests } from "@/lib/api/schedule";
-import { confirmActionRequestAction, refuseActionRequestAction } from "@/lib/actions/action-links";
+import { confirmActionRequestAction, refuseActionRequestAction, addOwnDisciplineAction } from "@/lib/actions/action-links";
 import { addressees } from "@/lib/api/transmittals";
 import { registerByNumber } from "@/lib/api/register";
 
@@ -92,6 +92,11 @@ export default async function ActionDetailPage({ params, searchParams }: { param
       "It was not on the requirements list.",
     ].join("\n\n"),
   })}`;
+
+  // Who adds documents and disciplines to an action here: Document Control (asked by everyone else), or, without it,
+  // the people of each discipline for their own.
+  const { controlDoes } = await import("@/lib/control-activities");
+  const selfLinks = !(await controlDoes(ctx, "ACTION_LINKS"));
 
   // A discipline the action should concern and does not: anyone on the project may ask Document Control to add it.
   const disciplineRequestHref = `/transmittals/new?${new URLSearchParams({
@@ -339,7 +344,10 @@ export default async function ActionDetailPage({ params, searchParams }: { param
                           </p>
                         ) : null}
                       </div>
-                      {mine ? (
+                      {/* Without Document Control, the discipline chooses its own documents; otherwise it asks. */}
+                      {selfLinks && me.department === d ? (
+                        <Link href={`/documents?pick=${encodeURIComponent(action.code)}`} className="text-xs font-semibold text-link hover:underline">Add or take off documents, in the register</Link>
+                      ) : !selfLinks && mine ? (
                         <Link href={requestHref(d)} className="text-xs font-semibold text-link hover:underline">Request a document</Link>
                       ) : null}
                     </div>
@@ -399,8 +407,13 @@ export default async function ActionDetailPage({ params, searchParams }: { param
               <Banner tone="warn" title="Needs disciplines">No discipline is tagged on this action yet, so its documents cannot be asked for. Document Control tags them, by hand or with the disciplines-per-action list.</Banner>
             </div>
           )}
-          {/* Anyone on the project may ask for a discipline the action should concern. */}
-          {ctx.user.isInternal ? (
+          {/* A discipline the action should concern: asked of Document Control, or, without it, added by its own people. */}
+          {selfLinks && me.department && !depts.includes(me.department) ? (
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-line px-5 py-2.5 text-xs text-slate-500 sm:px-6">
+              Is your discipline, {deptLabel(me.department)}, missing from this action?
+              <ActionForm action={addOwnDisciplineAction} submitLabel="Add it" size="sm" variant="secondary" hidden={{ actionId: action.id, code: action.code }} className="space-y-0" />
+            </div>
+          ) : !selfLinks && ctx.user.isInternal ? (
             <p className="flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-line px-5 py-2.5 text-xs text-slate-500 sm:px-6">
               Is a discipline missing from this action?
               <Link href={disciplineRequestHref} className="font-semibold text-link hover:underline">Request it</Link>

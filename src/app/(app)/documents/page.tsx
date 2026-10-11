@@ -7,6 +7,7 @@ import { OUTCOME_CONSEQUENCES, DOC_STATES, DOC_STATE_LABEL, DOC_MEANING, REV_STA
 import { getSet } from "@/lib/config";
 import { DocumentRegister } from "./document-register";
 import { activityDetail } from "@/lib/api/schedule";
+import { controlDoes } from "@/lib/control-activities";
 import { hasVerb } from "@/lib/auth";
 import { Banner } from "@/components/ui";
 import { REGISTER_SORTS, readSearch } from "@/lib/register-query";
@@ -226,15 +227,17 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
   if (dateOn) query.set("on", dateOn); if (sp.from) query.set("from", sp.from); if (sp.to) query.set("to", sp.to);
   if (sort) { query.set("sort", sort); query.set("dir", dir); }
   // Opened for an action, by Document Control: what it needs now starts ticked.
-  const picking = sp.pick && scope.can("CONTROL")
+  // Without Document Control, the people of a discipline open it for their own discipline's documents only.
+  const own = !scope.can("CONTROL") && !(await controlDoes(scope, "ACTION_LINKS")) ? user.department ?? null : null;
+  const picking = sp.pick && (scope.can("CONTROL") || own)
     ? await (async () => {
         const one = activities.find((a) => a.code === sp.pick);
         const detail = one ? await activityDetail(scope, one.id) : null;
-        if (!one || !detail) return null;
+        if (!one || !detail || (own && !one.departments.includes(own))) return null;
         return {
           actionId: one.id, code: one.code, name: one.name,
-          linked: [...new Set(detail.needs.map((need) => need.documentId))],
-          disciplines: one.departments.map((code) => ({ code, label: disciplineLabel.get(code) ?? code })),
+          linked: [...new Set(detail.needs.filter((need) => !own || need.department === own).map((need) => need.documentId))],
+          disciplines: (own ? [own] : one.departments).map((code) => ({ code, label: disciplineLabel.get(code) ?? code })),
         };
       })()
     : null;
