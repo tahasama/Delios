@@ -37,11 +37,22 @@ public sealed record ActivityMove(DateOnly? WasStart, DateOnly? WasFinish, strin
 /// <summary>One need of an activity as the activity page shows it: the document, its current revision and status, when it is needed, and its state or waiver.</summary>
 public sealed record NeedView(Guid Id, Guid DocumentId, string DocumentNumber, string Title, string? CurrentRevision, string? CurrentStatus,
     string Purpose, IReadOnlyList<string> RequiredStatuses, string Anchor, int OffsetDays, DateOnly? FixedDate, DateOnly? NeededBy,
-    string? Department, string State, DateTimeOffset? MetAt, string? WaiverNote, string? WaivedBy, DateTimeOffset? WaivedAt);
+    string? Department, string State, DateTimeOffset? MetAt, string? WaiverNote, string? WaivedBy, DateTimeOffset? WaivedAt, int? RiskDays = null);
 
 /// <summary>One recorded activity decision as the activity page shows it.</summary>
 public sealed record DecisionView(Guid Id, string Decision, DateOnly? PlannedStart, string ResponsibleName, string Reason,
-    string? DelayOwedBy, string? DelayReason, string RecordedBy, DateTimeOffset RecordedAt);
+    string? DelayOwedBy, string? DelayReason, string RecordedBy, DateTimeOffset RecordedAt,
+    string? ConfirmedBy = null, DateTimeOffset? ConfirmedAt = null, string? ConfirmNote = null,
+    string? ReversedBy = null, DateTimeOffset? ReversedAt = null, string? ReversedReason = null);
+
+/// <summary>A notice a person sends: what it is about (its subject key), to whom, and what it says.</summary>
+public sealed record NoticeRequest(string? Subject, string? Title, string? Body, string? Link, Guid[]? People);
+
+/// <summary>One notice as the screens list it.</summary>
+public sealed record NoticeView(Guid Id, string Subject, bool Automatic, string Title, string? Body, string[] Recipients, string SentBy, DateTimeOffset SentAt);
+
+/// <summary>A postponement confirmed by whoever plans, or taken back by Document Control: the words that go with it.</summary>
+public sealed record DecisionNoteRequest(string? Note);
 
 /// <summary>
 /// One step in a document's path to an activity (sent for review, each review step, released, issued): when it was due, when it happened,
@@ -81,6 +92,10 @@ public static class ScheduleEndpoints
         project.MapPost("/activities/{activityId:guid}/needs/{needId:guid}/waive", WaiveAsync);
         project.MapDelete("/activities/{activityId:guid}/needs/{needId:guid}/waive", UnwaiveAsync);
         project.MapPost("/activities/{activityId:guid}/decisions", DecideAsync);
+        project.MapGet("/notices", NoticesAsync);
+        project.MapPost("/notices", SendNoticeAsync);
+        project.MapPost("/activities/{activityId:guid}/decisions/{decisionId:guid}/confirm", ConfirmPostponementAsync);
+        project.MapPost("/activities/{activityId:guid}/decisions/{decisionId:guid}/reverse", ReverseDecisionAsync);
         project.MapGet("/activities/{activityId:guid}/lateness", LatenessAsync);
     }
 
@@ -191,7 +206,8 @@ public static class ScheduleEndpoints
             activity = Summary(activity, today, window),
             needs = await NeedViewsAsync(db, activity.Requirements, cancellationToken),
             decisions = decisions.Select(d => new DecisionView(d.Id, d.Decision, d.PlannedStart?.ToDateOnly(), d.ResponsibleName, d.Reason,
-                d.DelayOwedBy, d.DelayReason, d.RecordedByName, d.RecordedAt.ToDateTimeOffset())),
+                d.DelayOwedBy, d.DelayReason, d.RecordedByName, d.RecordedAt.ToDateTimeOffset(),
+                d.ConfirmedByName, d.ConfirmedAt?.ToDateTimeOffset(), d.ConfirmNote, d.ReversedByName, d.ReversedAt?.ToDateTimeOffset(), d.ReversedReason)),
         });
     }
 
@@ -324,7 +340,7 @@ public static class ScheduleEndpoints
     /// <summary>The activity went ahead without its documents, or was stopped for them: who decided, why, and whose delay it was.</summary>
     private static async Task<IResult> DecideAsync(
         Guid activityId, DecisionRequest request, HttpContext http, DeliosDbContext db, IClock clock, AuditLog audit,
-        CancellationToken cancellationToken)
+        Notifications.Notifier notifier, CancellationToken cancellationToken)
     {
         var access = ProjectAccessFilter.Of(http);
         if (!(access.Holds(Verbs.Control) || access.Holds(Verbs.Approve)))
@@ -354,9 +370,116 @@ public static class ScheduleEndpoints
             RecordedByName = access.UserName,
             RecordedAt = clock.GetCurrentInstant(),
         });
+        // Postponed: everyone the activity concerns is told, and whoever plans the project is asked to confirm it.
+        if (!ActionNotices.Proceeds(await Catalog.LoadAsync(db, cancellationToken), decision))
+        {
+            var people = await ConcernedAsync(db, access.Project.Id, activity, cancellationToken);
+            people.AddRange(await NoticeLog.HoldersAsync(db, access.Project.Id, Verbs.Plan, cancellationToken));
+            await NoticeLog.SendAsync(db, notifier, clock, access.Project.TenantId, access.Project.Id, $"activity:{activityId}:postponed", false,
+                access.UserName, $"{activity.Code} is postponed: whoever plans the project, confirm it",
+                $"{activity.Name}. {responsible} decided: {reason} Confirm it on the action's page and say what changes, so a new schedule revision can follow.",
+                $"/actions/{activity.Code}", people, cancellationToken);
+        }
         await db.SaveChangesAsync(cancellationToken);
         await audit.WriteAsync(http.User.Actor(), "ACTIVITY_DECISION", "Activity", activityId, activity.Code,
             $"{decision} by {responsible}: {reason}", access.Project.Id, cancellationToken);
+        return await ActivityAsync(activityId, http, db, clock, cancellationToken);
+    }
+
+    /// <summary>GET /notices?subject=…: every notice whose subject starts with it, oldest first.</summary>
+    private static async Task<IResult> NoticesAsync(HttpContext http, DeliosDbContext db, string? subject, CancellationToken cancellationToken)
+    {
+        var access = ProjectAccessFilter.Of(http);
+        if (!access.IsInternal) return Results.Ok(Array.Empty<NoticeView>());
+        var prefix = subject?.Trim() ?? "";
+        var rows = await db.Notices.AsNoTracking().Where(n => n.ProjectId == access.Project.Id && (prefix.Length == 0 || n.Subject.StartsWith(prefix)))
+            .OrderBy(n => n.SentAt).Take(500).ToListAsync(cancellationToken);
+        return Results.Ok(rows.Select(n => new NoticeView(n.Id, n.Subject, n.Automatic, n.Title, n.Body, n.RecipientNames, n.SentByName, n.SentAt.ToDateTimeOffset())));
+    }
+
+    /// <summary>POST /notices: a person tells the people they chose. Document Control, or whoever plans the project.</summary>
+    private static async Task<IResult> SendNoticeAsync(NoticeRequest request, HttpContext http, DeliosDbContext db, IClock clock, AuditLog audit,
+        Notifications.Notifier notifier, CancellationToken cancellationToken)
+    {
+        var access = ProjectAccessFilter.Of(http);
+        if (!(access.Holds(Verbs.Control) || access.Holds(Verbs.Plan)))
+            return Problems.Forbidden("NOTICE_NOT_ALLOWED", "Document Control, or whoever plans the project, sends these notices.");
+        var subject = request.Subject?.Trim() ?? "";
+        var title = request.Title?.Trim() ?? "";
+        if (subject.Length == 0 || title.Length == 0) return Problems.Invalid("NOTICE_INCOMPLETE", "Say what the notice is about.");
+        var chosen = (request.People ?? []).Distinct().ToArray();
+        // Only people on this project are told.
+        var people = await db.Memberships.AsNoTracking().Where(m => m.ProjectId == access.Project.Id && m.Active && chosen.Contains(m.UserId))
+            .Select(m => m.UserId).Distinct().ToListAsync(cancellationToken);
+        if (people.Count == 0) return Problems.Invalid("NO_ONE", "Choose at least one person on this project.");
+        var link = request.Link is { Length: > 0 } l && l.StartsWith('/') ? l : null;
+        var notice = await NoticeLog.SendAsync(db, notifier, clock, access.Project.TenantId, access.Project.Id, subject, false, access.UserName,
+            title, request.Body?.Trim() is { Length: > 0 } b ? b : null, link, people, cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
+        await audit.WriteAsync(http.User.Actor(), "NOTICE_SENT", "Notice", notice.Id, subject,
+            $"{title} — to {string.Join(", ", notice.RecipientNames)}", access.Project.Id, cancellationToken);
+        return Results.Ok(new NoticeView(notice.Id, notice.Subject, false, notice.Title, notice.Body, notice.RecipientNames, notice.SentByName, notice.SentAt.ToDateTimeOffset()));
+    }
+
+    /// <summary>Everyone who answers for one of the activity's departments.</summary>
+    private static async Task<List<Guid>> ConcernedAsync(DeliosDbContext db, Guid projectId, Activity activity, CancellationToken cancellationToken)
+    {
+        var people = new List<Guid>();
+        foreach (var department in activity.Departments) people.AddRange(await NoticeLog.DepartmentMembersAsync(db, projectId, department, cancellationToken));
+        return people;
+    }
+
+    /// <summary>
+    /// Whoever plans the project confirms a postponement, saying what changes, so a new schedule revision can be
+    /// expected. Everyone concerned and Document Control are told.
+    /// </summary>
+    private static async Task<IResult> ConfirmPostponementAsync(Guid activityId, Guid decisionId, DecisionNoteRequest request, HttpContext http,
+        DeliosDbContext db, IClock clock, AuditLog audit, Notifications.Notifier notifier, CancellationToken cancellationToken)
+    {
+        var access = ProjectAccessFilter.Of(http);
+        if (!access.Holds(Verbs.Plan)) return Problems.Forbidden("PLAN_ONLY", "Whoever plans the project confirms a postponement.");
+        var note = request.Note?.Trim() ?? "";
+        if (note.Length == 0) return Problems.Invalid("NOTE_REQUIRED", "Say what changes, so the next schedule revision can follow.");
+        var activity = await db.Activities.AsNoTracking().SingleOrDefaultAsync(a => a.Id == activityId && a.ProjectId == access.Project.Id, cancellationToken);
+        var row = await db.ActivityDecisions.SingleOrDefaultAsync(d => d.Id == decisionId && d.ActivityId == activityId, cancellationToken);
+        if (activity is null || row is null) return NotFound();
+        if (ActionNotices.Proceeds(await Catalog.LoadAsync(db, cancellationToken), row.Decision))
+            return Problems.Conflict("NOT_POSTPONED", "Only a postponement is confirmed.");
+        if (row.ReversedAt is not null) return Problems.Conflict("REVERSED", "This postponement was taken back.");
+        if (row.ConfirmedAt is not null) return Problems.Conflict("CONFIRMED", $"{row.ConfirmedByName} already confirmed it.");
+        row.ConfirmedByName = access.UserName;
+        row.ConfirmedAt = clock.GetCurrentInstant();
+        row.ConfirmNote = note;
+        var people = await ConcernedAsync(db, access.Project.Id, activity, cancellationToken);
+        people.AddRange(await NoticeLog.HoldersAsync(db, access.Project.Id, Verbs.Control, cancellationToken));
+        await NoticeLog.SendAsync(db, notifier, clock, access.Project.TenantId, access.Project.Id, $"activity:{activityId}:postponed", false,
+            access.UserName, $"{activity.Code}: postponement confirmed by {access.UserName}", note, $"/actions/{activity.Code}", people, cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
+        await audit.WriteAsync(http.User.Actor(), "POSTPONEMENT_CONFIRMED", "Activity", activityId, activity.Code, note, access.Project.Id, cancellationToken);
+        return await ActivityAsync(activityId, http, db, clock, cancellationToken);
+    }
+
+    /// <summary>Document Control takes a decision back, with why (a planner who would not confirm, a mistake). Kept, marked.</summary>
+    private static async Task<IResult> ReverseDecisionAsync(Guid activityId, Guid decisionId, DecisionNoteRequest request, HttpContext http,
+        DeliosDbContext db, IClock clock, AuditLog audit, Notifications.Notifier notifier, CancellationToken cancellationToken)
+    {
+        var access = ProjectAccessFilter.Of(http);
+        if (!access.Holds(Verbs.Control)) return Problems.Forbidden("CONTROL_ONLY", "Document Control takes a decision back.");
+        var reason = request.Note?.Trim() ?? "";
+        if (reason.Length == 0) return Problems.Invalid("REASON_REQUIRED", "Say why it is taken back.");
+        var activity = await db.Activities.AsNoTracking().SingleOrDefaultAsync(a => a.Id == activityId && a.ProjectId == access.Project.Id, cancellationToken);
+        var row = await db.ActivityDecisions.SingleOrDefaultAsync(d => d.Id == decisionId && d.ActivityId == activityId, cancellationToken);
+        if (activity is null || row is null) return NotFound();
+        if (row.ReversedAt is not null) return Problems.Conflict("REVERSED", "It was already taken back.");
+        row.ReversedByName = access.UserName;
+        row.ReversedAt = clock.GetCurrentInstant();
+        row.ReversedReason = reason;
+        var people = await ConcernedAsync(db, access.Project.Id, activity, cancellationToken);
+        people.AddRange(await NoticeLog.HoldersAsync(db, access.Project.Id, Verbs.Plan, cancellationToken));
+        await NoticeLog.SendAsync(db, notifier, clock, access.Project.TenantId, access.Project.Id, $"activity:{activityId}:postponed", false,
+            access.UserName, $"{activity.Code}: the decision was taken back by {access.UserName}", reason, $"/actions/{activity.Code}", people, cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
+        await audit.WriteAsync(http.User.Actor(), "DECISION_REVERSED", "Activity", activityId, activity.Code, reason, access.Project.Id, cancellationToken);
         return await ActivityAsync(activityId, http, db, clock, cancellationToken);
     }
 
@@ -446,7 +569,7 @@ public static class ScheduleEndpoints
         return list.OrderBy(n => n.NeededBy).Select(n => new NeedView(n.Id, n.DocumentId, documents[n.DocumentId].Number, documents[n.DocumentId].Title,
             current.GetValueOrDefault(n.DocumentId)?.Value, current.GetValueOrDefault(n.DocumentId)?.StatusCode, n.Purpose, n.RequiredStatuses,
             n.Anchor, n.OffsetDays, n.FixedDate?.ToDateOnly(), n.NeededBy?.ToDateOnly(), n.Department, n.State, n.MetAt?.ToDateTimeOffset(),
-            n.WaiverNote, n.WaivedByName, n.WaivedAt?.ToDateTimeOffset())).ToList();
+            n.WaiverNote, n.WaivedByName, n.WaivedAt?.ToDateTimeOffset(), n.RiskDays)).ToList();
     }
 
     /// <summary>The standard "no such activity" 404 answer.</summary>

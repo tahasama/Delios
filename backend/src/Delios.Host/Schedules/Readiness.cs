@@ -24,13 +24,13 @@ public static class ReadinessLabels
 
     /// <summary>
     /// Works out an activity's readiness label from its stored counts. Used by the schedule endpoints when listing activities, and by the report builder.
-    /// <paramref name="riskWindowDays"/> is how many days ahead a missing document counts as at risk.
+    /// At risk once <see cref="Activity.RiskFrom"/> has come (written with each document's window); <paramref name="riskWindowDays"/> is kept for callers.
     /// </summary>
     public static string Of(Activity a, LocalDate today, int riskWindowDays) =>
         a.NeedCount == 0 ? None
         : a.MetCount == a.NeedCount ? Ready
         : a.MetCount + a.WaivedCount == a.NeedCount ? ReadyWithWaivers
-        : a.NextNeededBy is { } owed && owed <= today.PlusDays(riskWindowDays) ? AtRisk
+        : a.RiskFrom is { } from && from <= today ? AtRisk
         : Pending;
 }
 
@@ -57,6 +57,9 @@ public static class Readiness
         var released = current.ToDictionary(r => r.DocumentId);
         var catalog = await Catalog.LoadAsync(db, cancellationToken);
         var now = clock.GetCurrentInstant();
+        var projectIds = activities.Select(a => a.ProjectId).Distinct().ToList();
+        var windows = await db.ScheduleSources.AsNoTracking().Where(s => projectIds.Contains(s.ProjectId))
+            .ToDictionaryAsync(s => s.ProjectId, s => s.RiskWindowDays, cancellationToken);
 
         foreach (var activity in activities)
         {
@@ -81,6 +84,12 @@ public static class Readiness
             activity.WaivedCount = activity.Requirements.Count(r => r.State == RequirementStates.Waived);
             activity.NextNeededBy = activity.Requirements.Where(r => r.State == RequirementStates.Missing && r.NeededBy is not null)
                 .Select(r => r.NeededBy).Min();
+            // At risk from the earliest day a missing document's window opens, counted back from the activity's day:
+            // its own window from the requirements list, or the project's.
+            var window = windows.GetValueOrDefault(activity.ProjectId, 7);
+            activity.RiskFrom = activity.Start is { } day
+                ? activity.Requirements.Where(r => r.State == RequirementStates.Missing).Select(r => (LocalDate?)day.PlusDays(-(r.RiskDays ?? window))).Min()
+                : null;
         }
     }
 

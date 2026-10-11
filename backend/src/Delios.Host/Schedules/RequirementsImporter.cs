@@ -54,13 +54,15 @@ public sealed class RequirementsImporter(
         ["asset"] = ["equipment or material"],
         ["subproject"] = ["sub-project", "subproject"],
         ["po"] = ["po"],
+        // Optional: how many days before the action's day this document puts it at risk; empty uses the project's.
+        ["riskDays"] = ["risk window (days)", "risk window", "risk days", "at risk days before"],
     };
 
     private static readonly string[] Ours = ["", "OURS", "US", "INTERNAL", "INTERNAL ENGINEERING", "OUR ENGINEERING", "ENG"];
 
     private sealed record Row(
         int Line, string ActionCode, string Department, string? DocNumber, string? Title, string? Discipline, string? DocType,
-        string? Supplier, string Status, LocalDate? NeededBy, string? Subproject, string? Po, string? Asset);
+        string? Supplier, string Status, LocalDate? NeededBy, string? Subproject, string? Po, string? Asset, int? RiskDays = null);
 
     /// <summary>Whether a released revision is a requirements list, by its document's type.</summary>
     public static async Task<bool> IsListAsync(DeliosDbContext db, Guid documentId, CancellationToken cancellationToken)
@@ -237,6 +239,8 @@ public sealed class RequirementsImporter(
             var subproject = Cell("subproject") is { Length: > 0 } sp ? sp : null;
             var po = Cell("po") is { Length: > 0 } p ? p : null;
             var asset = Cell("asset").ToUpperInvariant() is { Length: > 0 } at ? at : null;
+            var riskText = Cell("riskDays");
+            int? riskDays = null;
 
             if (actionCode.Length == 0) errors.Add("Action Code is missing");
             else if (ScheduleImporter.Named(activities.Values, actionCode) is not { } activity) errors.Add($"Action {actionCode} is not in the schedule");
@@ -254,6 +258,11 @@ public sealed class RequirementsImporter(
                     neededBy = LocalDate.FromDateTime(day);
                 else errors.Add("Date of delivery must be YYYY-MM-DD");
             }
+            if (riskText.Length > 0)
+            {
+                if (int.TryParse(riskText, NumberStyles.Integer, CultureInfo.InvariantCulture, out var days) && days is >= 0 and <= 365) riskDays = days;
+                else errors.Add("Risk window (days) must be a whole number of days, 0 to 365, or empty");
+            }
             if (discipline is not null && !Has(ValueSets.Disciplines, discipline)) errors.Add($"Discipline \"{discipline}\" is not a published discipline");
             var typeForAsset = docType ?? (docNumber is not null ? register[docNumber] : null);
             if (asset is null && typeForAsset is not null && describesAsset.Contains(typeForAsset))
@@ -270,7 +279,7 @@ public sealed class RequirementsImporter(
             if (!seen.Add($"{actionCode}|{docNumber ?? title}")) errors.Add("This document is listed twice for the same action");
             if (errors.Count > 0) { problems.Add($"Line {line}: {string.Join("; ", errors)}."); continue; }
             parsed.Add(new Row(line, actionCode, department, docNumber, title, discipline, docType, external ? supplier : null, status,
-                neededBy, subproject, po, asset));
+                neededBy, subproject, po, asset, riskDays));
         }
         if (problems.Count == 0 && parsed.Count == 0) problems.Add("The list has no document on it.");
         return (parsed, problems);
@@ -330,7 +339,7 @@ public sealed class RequirementsImporter(
             var existing = await db.Requirements.Where(n => n.ActivityId == activity.Id && n.DocumentId == documentId).ToListAsync(cancellationToken);
             var same = existing.FirstOrDefault(n => string.Equals(n.Department, row.Department, StringComparison.OrdinalIgnoreCase)
                 && n.RequiredStatuses.SequenceEqual([row.Status]) && n.FixedDate == row.NeededBy);
-            if (same is not null) kept++;
+            if (same is not null) { kept++; same.RiskDays = row.RiskDays; }
             else
             {
                 if (existing.Count > 0) { db.Requirements.RemoveRange(existing); changed++; }
@@ -345,6 +354,7 @@ public sealed class RequirementsImporter(
                     Anchor = Anchors.Start,
                     OffsetDays = -lead,
                     FixedDate = row.NeededBy,
+                    RiskDays = row.RiskDays,
                     Department = row.Department,
                     CreatedByName = label,
                     CreatedAt = now,

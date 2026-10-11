@@ -110,6 +110,15 @@ public sealed class ReadinessConfirmation
     public string? Note { get; set; }
     public required string ConfirmedByName { get; set; }
     public Instant ConfirmedAt { get; set; }
+    /// <summary>
+    /// Written by the system, not a person: every document of the department was released at its status when the
+    /// activity's day passed. Kept as it was then, whatever happens to the documents afterwards.
+    /// </summary>
+    public bool Automatic { get; set; }
+    /// <summary>Document Control took a person's confirmation back (an honest mistake): when, who and why. It then counts as not confirmed.</summary>
+    public Instant? RevokedAt { get; set; }
+    public string? RevokedByName { get; set; }
+    public string? RevokedReason { get; set; }
 }
 
 /// <summary>The requirements list as it was issued to one sender (a supplier's code, or DEPT:{discipline}).</summary>
@@ -235,6 +244,8 @@ internal sealed class RecordsConfiguration :
         b.Property(x => x.Department).HasMaxLength(64);
         b.Property(x => x.Note).HasMaxLength(2000);
         b.Property(x => x.ConfirmedByName).HasMaxLength(200);
+        b.Property(x => x.RevokedByName).HasMaxLength(200);
+        b.Property(x => x.RevokedReason).HasMaxLength(2000);
     }
 
     public void Configure(EntityTypeBuilder<SenderIssue> b)
@@ -279,6 +290,9 @@ public sealed record NumberRangeRequest(string? Prefix, int From, int To, string
 public sealed record CallsRequest(string[]? Departments, DateOnly? DueOn);
 public sealed record AnswerCallRequest(string? Note);
 public sealed record ReadinessRequest(string? Department, bool Available, string? Note);
+
+/// <summary>Taking a confirmation back: the reason is kept with it.</summary>
+public sealed record RevokeReadinessRequest(string? Department, string? Reason);
 public sealed record SenderIssueRequest(string? Sender);
 public sealed record ControlledUpload(string? Kind, string? Key, string? Title, JsonElement Payload, JsonElement? Diff = null, int RowCount = 0,
     string? SourceName = null, long? SourceSize = null, string? SourceHash = null, string? Notes = null, string? VersionLabel = null);
@@ -330,6 +344,7 @@ public static class ProjectRecordEndpoints
             Results.Ok(await db.Set<ReadinessConfirmation>().AsNoTracking().Where(x => x.ProjectId == ProjectAccessFilter.Of(h).Project.Id)
                 .ToListAsync(c)));
         p.MapPost("/activities/{activityId:guid}/readiness", ConfirmReadinessAsync);
+        p.MapPost("/activities/{activityId:guid}/readiness/revoke", RevokeReadinessAsync);
         p.MapPost("/activities/{activityId:guid}/notify-departments", NotifyDepartmentsAsync);
         p.MapPut("/activities/{activityId:guid}/departments", SetDepartmentsAsync);
         p.MapGet("/sender-issues", async (HttpContext h, DeliosDbContext db, CancellationToken c) =>
@@ -678,6 +693,10 @@ public static class ProjectRecordEndpoints
         if (!mine && !access.Holds(Verbs.Control)) return Problems.Forbidden("NOT_YOUR_DEPARTMENT", $"Someone who answers for {department} confirms its documents.");
         var note = Blank(r.Note);
         if (!r.Available && note is null) return Problems.Invalid("NOTE_REQUIRED", "Say what is missing and why: Document Control is alerted with it.");
+        // After the day a confirmation is still taken, and always says why it comes late.
+        var today = WorkingCalendar.Today(clock, access.Project.TimeZone);
+        if (activity.Start is { } day && day < today && note is null)
+            return Problems.Invalid("NOTE_REQUIRED", "The day has passed: say why it is confirmed now, and whether the documents came after it.");
         // Going ahead with this discipline's documents missing is always explained.
         if (r.Available && note is null && await db.Set<Schedules.Requirement>().AnyAsync(n => n.ActivityId == activityId && n.Department == department
                 && n.State != RequirementStates.Met && n.State != RequirementStates.Waived, c))
@@ -699,6 +718,11 @@ public static class ProjectRecordEndpoints
         row.Note = note;
         row.ConfirmedByName = access.UserName;
         row.ConfirmedAt = clock.GetCurrentInstant();
+        // A person's answer replaces the system's, and an answer taken back is answered afresh.
+        row.Automatic = false;
+        row.RevokedAt = null;
+        row.RevokedByName = null;
+        row.RevokedReason = null;
         await audit.WriteAsync(Who(access), "READINESS_CONFIRMED", "Activity", activity.Id, activity.Code,
             $"{department}: {(r.Available ? "documents available" : "not available")}.{(note is null ? "" : $" {note}")}", access.Project.Id, c);
         if (!r.Available)
@@ -706,6 +730,32 @@ public static class ProjectRecordEndpoints
             await notifier.NotifyAsync(access.Project.TenantId, access.Project.Id, await notifier.ControlHoldersAsync(access.Project.Id, c),
                 Notifications.NotificationKinds.General, $"{activity.Code}: {department} is short of documents", note, $"/actions/{activity.Code}", c);
         }
+        await db.SaveChangesAsync(c);
+        return Results.Ok(row);
+    }
+
+    /// <summary>
+    /// Document Control takes a person's confirmation back (an honest mistake), with a reason. The row stays, marked,
+    /// so the record shows both; the department then counts as not confirmed and answers again.
+    /// </summary>
+    private static async Task<IResult> RevokeReadinessAsync(Guid activityId, RevokeReadinessRequest r, HttpContext h, DeliosDbContext db,
+        AuditLog audit, IClock clock, CancellationToken c)
+    {
+        var access = ProjectAccessFilter.Of(h);
+        if (!access.Holds(Verbs.Control)) return Problems.Forbidden("CONTROL_ONLY", "Document Control takes a confirmation back.");
+        var reason = Blank(r.Reason);
+        if (reason is null) return Problems.Invalid("REASON_REQUIRED", "Say why the confirmation is taken back.");
+        var department = r.Department?.Trim().ToUpperInvariant() ?? "";
+        var activity = await db.Activities.AsNoTracking().SingleOrDefaultAsync(a => a.Id == activityId && a.ProjectId == access.Project.Id, c);
+        if (activity is null) return Problems.NotFound("ACTIVITY_NOT_FOUND", "No such activity.");
+        var row = await db.Set<ReadinessConfirmation>().SingleOrDefaultAsync(x => x.ActivityId == activityId && x.Department == department, c);
+        if (row is null || row.RevokedAt is not null) return Problems.Conflict("NOT_CONFIRMED", $"{department} has no confirmation to take back.");
+        if (row.Automatic) return Problems.Conflict("AUTOMATIC", "This one was written by the system when the day passed; it stays as it was.");
+        row.RevokedAt = clock.GetCurrentInstant();
+        row.RevokedByName = access.UserName;
+        row.RevokedReason = reason;
+        await audit.WriteAsync(Who(access), "READINESS_REVOKED", "Activity", activity.Id, activity.Code,
+            $"{department}: confirmation by {row.ConfirmedByName} taken back. Why: {reason}", access.Project.Id, c);
         await db.SaveChangesAsync(c);
         return Results.Ok(row);
     }

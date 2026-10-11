@@ -21,8 +21,11 @@ public sealed class ScheduleSource
     public ScheduleColumns Columns { get; set; } = new();
     /// <summary>Days before an activity's start a document is needed, unless a need says otherwise.</summary>
     public int DefaultLeadDays { get; set; } = 7;
-    /// <summary>A missing document owed within this many days marks its activity at risk.</summary>
-    public int RiskWindowDays { get; set; } = 14;
+    /// <summary>
+    /// Days before an activity's day that a missing document puts it at risk, unless the requirements list gives the
+    /// document its own (<see cref="Requirement.RiskDays"/>). From then on the department confirms by hand.
+    /// </summary>
+    public int RiskWindowDays { get; set; } = 7;
 }
 
 /// <summary>The headings of the schedule export. Matched without regard to case or spacing.</summary>
@@ -139,6 +142,11 @@ public sealed class Activity
     public int WaivedCount { get; set; }
     /// <summary>The earliest day a document still missing is owed.</summary>
     public LocalDate? NextNeededBy { get; set; }
+    /// <summary>
+    /// From this day the activity is at risk and its departments confirm by hand: its day less the shortest risk window
+    /// of a document still missing. Null when nothing is missing. Written by Readiness.RestateAsync.
+    /// </summary>
+    public LocalDate? RiskFrom { get; set; }
     public List<Requirement> Requirements { get; set; } = [];
 }
 
@@ -175,6 +183,8 @@ public sealed class Requirement
     public LocalDate? NeededBy { get; set; }
     /// <summary>The department (a published discipline) that owns the need: its members may waive it.</summary>
     public string? Department { get; set; }
+    /// <summary>This document's own risk window, in days before the activity's day, from the requirements list; null uses the project's.</summary>
+    public int? RiskDays { get; set; }
     /// <summary>MISSING, MET or WAIVED (see <see cref="RequirementStates"/>). Recomputed by <see cref="Readiness.RestateAsync"/>.</summary>
     public string State { get; set; } = RequirementStates.Missing;
     /// <summary>When the document was first there for it.</summary>
@@ -230,6 +240,35 @@ public sealed class ActivityDecision
     public string? DelayReason { get; set; }
     public required string RecordedByName { get; set; }
     public Instant RecordedAt { get; set; }
+    /// <summary>A postponement is confirmed by whoever plans the project, with what changes for the next schedule revision.</summary>
+    public string? ConfirmedByName { get; set; }
+    public Instant? ConfirmedAt { get; set; }
+    public string? ConfirmNote { get; set; }
+    /// <summary>Document Control took the decision back, with why. It then no longer counts.</summary>
+    public string? ReversedByName { get; set; }
+    public Instant? ReversedAt { get; set; }
+    public string? ReversedReason { get; set; }
+}
+
+/// <summary>
+/// One notice sent about something (an activity's risk, its day passing, a postponement…), by the system or by a
+/// person. Kept so the screens can say who was told, and how many days since the first notice on the same subject.
+/// </summary>
+public sealed class Notice
+{
+    public Guid Id { get; set; } = Guid.CreateVersion7();
+    public Guid TenantId { get; set; }
+    public Guid ProjectId { get; set; }
+    /// <summary>What the notice is about, as a key the screens ask by: "activity:{id}", "activity:{id}:risk:{department}"…</summary>
+    public required string Subject { get; set; }
+    /// <summary>Sent by the system (the risk and day-passed notices) rather than by a person.</summary>
+    public bool Automatic { get; set; }
+    public required string Title { get; set; }
+    public string? Body { get; set; }
+    public Guid[] RecipientIds { get; set; } = [];
+    public string[] RecipientNames { get; set; } = [];
+    public required string SentByName { get; set; }
+    public Instant SentAt { get; set; }
 }
 
 /// <summary>The names of the organization's lists of values that belong to the schedule feature.</summary>
@@ -315,11 +354,37 @@ internal sealed class RequirementConfiguration : IEntityTypeConfiguration<Requir
     }
 }
 
+/// <summary>Tells Entity Framework how to store <see cref="Notice"/>.</summary>
+internal sealed class NoticeConfiguration : IEntityTypeConfiguration<Notice>
+{
+    /// <summary>Sets up the table mapping. Called by Entity Framework when it builds the database model.</summary>
+    public void Configure(EntityTypeBuilder<Notice> b)
+    {
+        b.ToTable("notices");
+        b.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
+        b.HasOne<Project>().WithMany().HasForeignKey(x => x.ProjectId).OnDelete(DeleteBehavior.Restrict);
+        b.HasIndex(x => new { x.ProjectId, x.Subject, x.SentAt });
+        b.Property(x => x.Subject).HasMaxLength(200);
+        b.Property(x => x.Title).HasMaxLength(300);
+        b.Property(x => x.Body).HasMaxLength(4000);
+        b.Property(x => x.SentByName).HasMaxLength(200);
+    }
+}
+
 /// <summary>Tells Entity Framework how to store <see cref="ActivityDecision"/>.</summary>
 internal sealed class ActivityDecisionConfiguration : IEntityTypeConfiguration<ActivityDecision>
 {
     /// <summary>Sets up the table mapping. Called by Entity Framework when it builds the database model.</summary>
     public void Configure(EntityTypeBuilder<ActivityDecision> b)
+    {
+        ConfigureDecision(b);
+        b.Property(x => x.ConfirmedByName).HasMaxLength(200);
+        b.Property(x => x.ConfirmNote).HasMaxLength(4000);
+        b.Property(x => x.ReversedByName).HasMaxLength(200);
+        b.Property(x => x.ReversedReason).HasMaxLength(2000);
+    }
+
+    private static void ConfigureDecision(EntityTypeBuilder<ActivityDecision> b)
     {
         b.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
         b.HasOne<Activity>().WithMany().HasForeignKey(x => x.ActivityId).OnDelete(DeleteBehavior.Restrict);

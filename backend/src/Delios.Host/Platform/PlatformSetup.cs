@@ -177,6 +177,7 @@ public static class PlatformSetup
             if (search.UsesOpenSearch) services.AddHostedService<Search.SearchIndexer>();
             if (config.GetValue("Checks:Schedule", true)) services.AddHostedService<Checks.CheckScheduler>();
             if (config.GetValue("Reviews:Warnings", true)) services.AddHostedService<Reviews.ReviewWarnings>();
+            if (config.GetValue("Schedule:Notices", true)) services.AddHostedService<Schedules.ActionNotices>();
         }
         services.AddScoped<Seeding.TenantSetup>();
         services.AddScoped<Seeding.DemoSeed>();

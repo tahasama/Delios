@@ -71,6 +71,7 @@ public sealed class DeliosDbContext(DbContextOptions<DeliosDbContext> options)
     public DbSet<Schedules.Activity> Activities => Set<Schedules.Activity>();
     public DbSet<Schedules.Requirement> Requirements => Set<Schedules.Requirement>();
     public DbSet<Schedules.ActivityDecision> ActivityDecisions => Set<Schedules.ActivityDecision>();
+    public DbSet<Schedules.Notice> Notices => Set<Schedules.Notice>();
     public DbSet<Packages.PackageMember> PackageMembers => Set<Packages.PackageMember>();
 
     /// <summary>
