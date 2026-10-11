@@ -65,3 +65,24 @@ export function actionState(action: Stateful, riskDays = DEFAULT_RISK_DAYS, now 
   const next = Math.min(...missing.map((entry) => entry.requiredBy.getTime()));
   return next <= now.getTime() + riskDays * DAY ? "AT_RISK" : "UPCOMING";
 }
+
+/**
+ * Went ahead? One answer per action, read the same way by the schedule's
+ * column, its filter and the action's own page:
+ *   AHEAD     — not yet: its day has not passed;
+ *   POSTPONED — written down as postponed (whenever it was);
+ *   CARRIED   — its day passed with a document missing, or the last one came after the day;
+ *   DONE      — its day passed with every document there (or none was listed).
+ */
+export type WentAhead = "AHEAD" | "POSTPONED" | "CARRIED" | "DONE";
+
+export function wentAhead(
+  action: { scheduledDate: Date | null; lastMetAt: Date | null; notes: { decision: string }[] },
+  missing: number,
+  now = new Date(),
+): WentAhead {
+  if (action.notes.some((note) => note.decision === "STOPPED")) return "POSTPONED";
+  if (!dayHasPassed(action, now)) return "AHEAD";
+  const lastCameAfter = !!action.lastMetAt && !!action.scheduledDate && action.lastMetAt > action.scheduledDate;
+  return missing > 0 || lastCameAfter ? "CARRIED" : "DONE";
+}

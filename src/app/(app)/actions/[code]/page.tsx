@@ -1,4 +1,4 @@
-import { ActionNotes, type WentAhead } from "./lateness";
+import { ActionNotes } from "./lateness";
 import { NeededTable, type NeededRow } from "./needed-table";
 import { latenessOf } from "@/lib/action-lateness";
 import { carrierRefusal, actIsOff } from "@/lib/control-activities";
@@ -21,7 +21,7 @@ import { api } from "@/lib/api/client";
 import { holders } from "@/lib/api/settings";
 import { legacyActionByCode, scheduleSource } from "@/lib/api/schedule";
 import { movedPhrase } from "../moved";
-import { actionState, stateLabel, dayHasPassed, DEFAULT_RISK_DAYS, type ActionState } from "@/lib/action-state";
+import { actionState, stateLabel, dayHasPassed, wentAhead, DEFAULT_RISK_DAYS, type ActionState } from "@/lib/action-state";
 
 export const dynamic = "force-dynamic";
 
@@ -99,7 +99,7 @@ export default async function ActionDetailPage({ params, searchParams }: { param
   const happened = !postponed && dayHasPassed(action);
   // Went ahead? Not yet before the day; after it, read from the documents unless postponed.
   const missingCount = action.entries.length - readyCount;
-  const wentAhead: WentAhead = postponed ? "POSTPONED" : !dayHasPassed(action) ? "NOT_YET" : missingCount > 0 ? "MISSING_DOCUMENTS" : "WITH_DOCUMENTS";
+  const answer = wentAhead(action, missingCount);
 
   // One row per required document: what it is, whether it is there, and the
   // step where its time went. Dates are written here so the table stays a
@@ -291,7 +291,7 @@ export default async function ActionDetailPage({ params, searchParams }: { param
           ) : null}
         </section>
 
-          <ActionNotes notes={action.notes} actionId={action.id} mayNote={mayNote} answer={wentAhead} missing={missingCount} />
+          <ActionNotes notes={action.notes} actionId={action.id} mayNote={mayNote} answer={answer} missing={missingCount} />
         </div>
 
         <aside>

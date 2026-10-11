@@ -1,6 +1,7 @@
 import { ActionForm } from "@/components/form";
 import { fmtDate } from "@/lib/utils";
 import { recordActionNoteAction } from "@/lib/actions/action-notes";
+import type { WentAhead } from "@/lib/action-state";
 
 export type Note = {
   id: string;
@@ -28,13 +29,11 @@ export type Note = {
  * beside the documents, not the subject of the page, so it carries no heading
  * of its own.
  */
-/** The answer to "Went ahead?", the same as the schedule's column says it. */
-export type WentAhead = "NOT_YET" | "WITH_DOCUMENTS" | "MISSING_DOCUMENTS" | "POSTPONED";
-
+/** The answer to "Went ahead?", in the words the schedule's column uses. */
 const ANSWER: Record<WentAhead, { word: string; tone: string }> = {
-  NOT_YET: { word: "Not yet", tone: "text-slate-600 ring-line-strong" },
-  WITH_DOCUMENTS: { word: "With documents", tone: "text-emerald-800 ring-emerald-300 bg-emerald-50" },
-  MISSING_DOCUMENTS: { word: "Missing documents", tone: "text-amber-900 ring-amber-300 bg-amber-50" },
+  AHEAD: { word: "Not yet", tone: "text-slate-600 ring-line-strong" },
+  DONE: { word: "With documents", tone: "text-emerald-800 ring-emerald-300 bg-emerald-50" },
+  CARRIED: { word: "Missing documents", tone: "text-amber-900 ring-amber-300 bg-amber-50" },
   POSTPONED: { word: "Postponed", tone: "text-slate-700 ring-slate-300 bg-slate-100" },
 };
 
@@ -75,11 +74,11 @@ export function ActionNotes({ notes, actionId, mayNote, answer, missing }: {
         </ul>
       ) : (
         <p className="px-5 py-3 text-xs leading-5 text-slate-600 sm:px-6">
-          {answer === "NOT_YET"
+          {answer === "AHEAD"
             ? "Answered after the day: with documents, missing documents, or postponed."
-            : answer === "WITH_DOCUMENTS"
+            : answer === "DONE"
               ? "Every document was there on the day. Nothing to write unless the work was postponed."
-              : answer === "MISSING_DOCUMENTS"
+              : answer === "CARRIED"
                 ? `The day passed with ${missing} document${missing === 1 ? "" : "s"} missing. Write down who let it go ahead, and why — or that it was postponed.`
                 : "Postponed."}
         </p>
@@ -93,7 +92,7 @@ export function ActionNotes({ notes, actionId, mayNote, answer, missing }: {
               <span className="sr-only">Went ahead?</span>
               <select name="decision" required defaultValue="" className="plain w-full">
                 <option value="" disabled>Write down&hellip;</option>
-                {missing > 0 ? <option value="CARRIED">Missing documents &mdash; it went ahead without them</option> : null}
+                {missing > 0 || answer === "CARRIED" ? <option value="CARRIED">Missing documents &mdash; it went ahead without them</option> : null}
                 <option value="STOPPED">Postponed &mdash; it did not happen on the day</option>
               </select>
             </label>
