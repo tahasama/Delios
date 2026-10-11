@@ -96,9 +96,9 @@ const LAST = Number.MAX_SAFE_INTEGER;
 const COLUMNS: Column[] = [
   {
     key: "source",
-    label: "First late step",
+    label: "Where it got late",
     by: (row) => row.source ?? (row.outstanding ? "zz" : "zzz"),
-    note: "Each document goes through steps before it is ready: sent for review (or sent in by the supplier), each review step, released, issued. This is the first of those steps that missed its deadline, and who owed it. The steps after it only inherit the delay. \"On time\" means no step was late.",
+    note: "The first step of the document's way that ran late: sent for review (or sent in by the supplier), a review step, released, or issued. The steps after it only inherit the delay.",
     cellClass: "whitespace-nowrap text-xs",
     cell: (row) => row.source ? (
       <>
@@ -110,11 +110,11 @@ const COLUMNS: Column[] = [
         <span className="font-semibold text-amber-700">Still not released &amp; issued</span>
         <span className="block text-[11px] text-slate-500">owed by {row.owedBy}</span>
       </>
-    ) : <span className="text-emerald-700">On time</span>,
+    ) : <span className="text-slate-400">&mdash;</span>,
   },
   {
     key: "happened",
-    label: "Date of that step",
+    label: "Happened",
     by: (row) => row.sourceAtSort ?? LAST,
     cellClass: "whitespace-nowrap font-mono text-xs tabular-nums",
     cell: (row) => row.sourceAt ?? <span className="font-sans text-slate-500">not yet</span>,
@@ -280,8 +280,10 @@ export function NeededTable({ rows, chips, plate, exportHref, empty, link }: {
     return rows.filter((row) => {
       if (needle && !`${row.docNumber} ${row.title}`.toLowerCase().includes(needle)) return false;
       if (discipline && row.discipline !== discipline) return false;
-      // "On time": no step was late, and none is still owed past its deadline.
-      if (source === "__none__" ? !!row.source || row.outstanding : source && row.source !== source) return false;
+      // Nowhere, on time: no step was late and none is still owed. Still owed: not yet released and issued.
+      if (source === "__none__" && (row.source || row.outstanding)) return false;
+      if (source === "__owed__" && (row.source || !row.outstanding)) return false;
+      if (source && source !== "__none__" && source !== "__owed__" && row.source !== source) return false;
       if (ready === "yes" && !row.ready) return false;
       if (ready === "late" && !(row.late && !row.ready)) return false;
       if (ready === "no" && (row.ready || row.late)) return false;
@@ -314,7 +316,7 @@ export function NeededTable({ rows, chips, plate, exportHref, empty, link }: {
   const facets = [
     q.trim() ? { key: "Search", label: q.trim(), clear: () => setQ("") } : null,
     discipline ? { key: "Discipline", label: discipline, clear: () => setDiscipline("") } : null,
-    source ? { key: "First late step", label: source === "__none__" ? "on time" : source, clear: () => setSource("") } : null,
+    source ? { key: "Where it got late", label: source === "__none__" ? "nowhere, on time" : source === "__owed__" ? "still not released & issued" : source, clear: () => setSource("") } : null,
     ready ? { key: "Ready", label: ready === "yes" ? "yes" : ready === "late" ? "late" : "not yet", clear: () => setReady("") } : null,
   ].filter((one): one is { key: string; label: string; clear: () => void } => !!one);
 
@@ -340,7 +342,11 @@ export function NeededTable({ rows, chips, plate, exportHref, empty, link }: {
             className="plain w-full pl-6"
           />
         </label>
-        <Narrow value={source} onChange={(next) => { setSource(next); setPage(1); }} empty="First late step" options={[{ code: "__none__", label: "None — on time" }, ...sources.map((one) => ({ code: one, label: one }))]} />
+        <Narrow value={source} onChange={(next) => { setSource(next); setPage(1); }} empty="Where it got late" options={[
+          { code: "__none__", label: "Nowhere, on time" },
+          ...sources.map((one) => ({ code: one, label: one })),
+          ...(rows.some((row) => !row.source && row.outstanding) ? [{ code: "__owed__", label: "Still not released & issued" }] : []),
+        ]} />
         <Narrow value={discipline} onChange={(next) => { setDiscipline(next); setPage(1); }} empty="Discipline" options={disciplines.map((one) => ({ code: one, label: one }))} />
         <Narrow value={ready} onChange={(next) => { setReady(next); setPage(1); }} empty="Ready" options={[{ code: "yes", label: "Ready" }, { code: "late", label: "Late" }, { code: "no", label: "Not yet" }]} />
       </div>
