@@ -7,6 +7,7 @@ import {
   policies,
   MODE_LABEL,
   NOT_SWITCHABLE,
+  CONFIRMABLE,
   PROJECT_MODE_LABEL,
   type ControlMode,
   type ProjectMode,
@@ -64,7 +65,7 @@ export async function ProjectSettings() {
               On the other two answers it is kept as it stands, ready for the day
               the administrator comes back to it. */}
           <ul className="mt-4 space-y-3 border-t border-line pt-4">
-            {rows.map(({ activity, mode, controlDoes, off }) => (
+            {rows.map(({ activity, mode, controlDoes, off, confirm }) => (
               <li key={activity.key} className="rounded-xl border border-line px-3.5 py-3">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
@@ -91,6 +92,19 @@ export async function ProjectSettings() {
                     ))}
                   </select>
                 </div>
+                {/* With Document Control, a request may also need management's say. */}
+                {CONFIRMABLE[activity.key] ? (
+                  <label className="mt-2.5 flex cursor-pointer items-start gap-2 border-t border-line pt-2.5 text-xs leading-5 text-slate-700">
+                    <input type="checkbox" name={`confirm:${activity.key}`} defaultChecked={confirm} className="mt-1" />
+                    <span>
+                      <span className="font-semibold text-slate-900">Requests need management confirmation</span>
+                      <span className="block text-slate-600">
+                        {CONFIRMABLE[activity.key]} Only with Document Control{controlDoes ? "" : " — not used while the people doing the work carry it out"}.
+                        {" "}Whoever holds Manage is proposed first.
+                      </span>
+                    </span>
+                  </label>
+                ) : null}
               </li>
             ))}
           </ul>

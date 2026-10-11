@@ -268,10 +268,16 @@ public static class Verbs
     public const string Configure = "CONFIGURE";
     /// <summary>Upload the schedule's lists on Schedule &amp; actions: the schedule, the disciplines per action, the document requirements.</summary>
     public const string Plan = "PLAN";
+    /// <summary>
+    /// Management (project, construction, engineering manager…): proposed first when a request needs management's
+    /// confirmation — a change to an action's documents or disciplines, a person added to the project — and adds
+    /// people to the project where there is no Document Control.
+    /// </summary>
+    public const string Manage = "MANAGE";
 
     /// <summary>Every verb in one set; the demo data uses it to give Document Control every right.</summary>
     public static readonly IReadOnlySet<string> All = new HashSet<string>
     {
-        Read, Create, Revise, Review, Approve, Transmit, Receive, Accept, Control, Configure, Plan,
+        Read, Create, Revise, Review, Approve, Transmit, Receive, Accept, Control, Configure, Plan, Manage,
     };
 }

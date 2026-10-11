@@ -140,6 +140,14 @@ public static class ProjectAnswers
             && db.Users.Any(u => u.Id == m.UserId && u.Active), cancellationToken);
     }
 
+    /// <summary>
+    /// Whether a request for this act, carried out by Document Control, needs management's confirmation first
+    /// (<c>CONFIRM:{act}</c> = ON). Without Document Control nothing is confirmed.
+    /// </summary>
+    public static async Task<bool> NeedsConfirmationAsync(DeliosDbContext db, Guid projectId, string act, CancellationToken cancellationToken) =>
+        (await AllAsync(db, projectId, cancellationToken)).GetValueOrDefault($"CONFIRM:{act}") == "ON"
+        && await ControlDoesAsync(db, projectId, act, cancellationToken);
+
     /// <summary>Whether the organization left this act out on the project.</summary>
     public static async Task<bool> IsOffAsync(DeliosDbContext db, Guid projectId, string act, CancellationToken cancellationToken) =>
         (await AllAsync(db, projectId, cancellationToken)).GetValueOrDefault($"SKIP:{act}") == "OFF";

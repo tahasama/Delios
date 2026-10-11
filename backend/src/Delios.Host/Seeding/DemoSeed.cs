@@ -109,9 +109,11 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
             Name = name,
             Rules = [new PermissionRule { TenantId = t, Verbs = verbs }],
         };
-        var control = Fn("DC", "Document Control", [.. Verbs.All]);
+        // Management confirms what Document Control checked: a second pair of eyes, so Document Control does not hold it.
+        var control = Fn("DC", "Document Control", [.. Verbs.All.Where(v => v != Verbs.Manage)]);
         var engineer = Fn("ENG", "Engineer", Verbs.Read, Verbs.Create, Verbs.Revise, Verbs.Review);
-        var approver = Fn("APP", "Approver", Verbs.Read, Verbs.Review, Verbs.Approve);
+        // The approver stands for the project manager in the demo.
+        var approver = Fn("APP", "Approver", Verbs.Read, Verbs.Review, Verbs.Approve, Verbs.Manage);
         var viewer = Fn("VIEW", "Viewer", Verbs.Read, Verbs.Receive);
         var supplier = Fn("SUP", "Supplier", Verbs.Read, Verbs.Revise);
         db.Functions.AddRange(control, engineer, approver, viewer, supplier);

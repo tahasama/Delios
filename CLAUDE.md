@@ -225,6 +225,18 @@ conversation, write it into the right one in the same commit as the code.
   "Used in" tab. A document added by hand gets the same purpose and status
   as the requirements list uses when it says nothing (`needDefaults`), due by
   the project's lead before the day.
+- Who adds a document or a discipline to an action, and who adds people to a
+  project, are two acts in Settings → Who does what (`ACTION_LINKS`,
+  `PROJECT_PEOPLE`): with Document Control or without. With Document Control,
+  a tick "Requests need management confirmation" (`CONFIRM:{act}` = ON):
+  unticked, Document Control applies it; ticked, Document Control checks it,
+  management confirms or refuses with why, and what was asked is applied by
+  itself. Without Document Control: the people of a discipline add to actions
+  for their own discipline themselves (the planner is told), and management
+  adds people. Requests already open finish the way they started.
+- Management is the Manage permission (`MANAGE`) on a function (project,
+  construction, engineering manager…). When a confirmation is sought, its
+  holders are proposed first; anyone on the project can still be chosen.
 - "Went ahead?" before the day reads "Answered after the day" and asks
   nothing. A postponement is recorded behind "Will it not go ahead? Record a
   postponement": who decided is picked from the people on the project, of

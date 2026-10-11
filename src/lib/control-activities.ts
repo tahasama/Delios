@@ -86,6 +86,20 @@ export const CONTROL_ACTIVITIES: ControlActivity[] = [
     self: "The manager the action answers to writes it themselves.",
   },
   {
+    key: "ACTION_LINKS",
+    title: "Adding a document or a discipline to an action",
+    text: "Somebody finds an action is missing a document it needs, or a discipline it concerns.",
+    control: "Whoever needs it asks, and Document Control adds it. Asking is taking responsibility for it: the request keeps their name.",
+    self: "The people of the discipline add it themselves, for their own discipline only; whoever plans the project is told.",
+  },
+  {
+    key: "PROJECT_PEOPLE",
+    title: "Adding people to the project",
+    text: "Somebody new joins the project, with a function and a discipline.",
+    control: "Document Control adds them.",
+    self: "Management adds them.",
+  },
+  {
     key: "VOID",
     title: "Voiding a revision, and recording what came of it",
     text: "A revision released in error, or never reviewed — and the work already done from it.",
@@ -112,6 +126,25 @@ export const SKIPPABLE: Record<string, { off: string }> = {
 };
 
 export const SKIP_KEY = (key: string) => `SKIP:${key}`;
+
+/**
+ * Acts whose requests may need management's confirmation when Document Control
+ * carries them out: Document Control checks, management confirms or refuses, and
+ * what was asked is then applied by itself. Without Document Control nothing is
+ * confirmed.
+ */
+export const CONFIRMABLE: Record<string, string> = {
+  ACTION_LINKS: "Document Control checks the request, then management confirms or refuses it; once confirmed it is applied by itself.",
+  PROJECT_PEOPLE: "Document Control adds them, then management confirms or refuses; until confirmed they are not on the project.",
+};
+
+export const CONFIRM_KEY = (key: string) => `CONFIRM:${key}`;
+
+/** A request for this act needs management's confirmation on this project. */
+export async function needsConfirmation(t: Tenant, key: string): Promise<boolean> {
+  if (!CONFIRMABLE[key]) return false;
+  return (await answers(t)).get(CONFIRM_KEY(key)) === "ON" && (await controlDoes(t, key));
+}
 
 /** Has the organization left this act out? */
 export async function actIsOff(t: Tenant, key: string): Promise<boolean> {
@@ -347,7 +380,7 @@ export async function controlSettings(t: Tenant): Promise<{
   /** What the project answers for all of its acts, and whether that was set. */
   projectMode: ProjectMode;
   set: boolean;
-  rows: { activity: ControlActivity; mode: ControlMode; controlDoes: boolean; off: boolean }[];
+  rows: { activity: ControlActivity; mode: ControlMode; controlDoes: boolean; off: boolean; confirm: boolean }[];
 }> {
   const [byKey, follows] = await Promise.all([answers(t), hasControlFunction(t)]);
   const all = byKey.get(PROJECT_KEY);
@@ -367,6 +400,7 @@ export async function controlSettings(t: Tenant): Promise<{
         // default — which for most is the project's control function.
         controlDoes: !set ? mine : projectMode === "CONTROL" ? true : projectMode === "SELF" ? false : mine,
         off: !!SKIPPABLE[activity.key] && byKey.get(SKIP_KEY(activity.key)) === "OFF",
+        confirm: !!CONFIRMABLE[activity.key] && byKey.get(CONFIRM_KEY(activity.key)) === "ON",
       };
     }),
   };

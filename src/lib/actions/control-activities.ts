@@ -16,6 +16,8 @@ import {
   controlSettings,
   SKIPPABLE,
   SKIP_KEY,
+  CONFIRMABLE,
+  CONFIRM_KEY,
   actIsOff,
   MODE_LABEL,
   POLICIES,
@@ -61,6 +63,10 @@ export async function setControlActivitiesAction(_prev: State | undefined, formD
       if (!ACT_MODES.includes(value)) continue;
       if (await put(activity.key, value, activity.title)) changed = true;
     }
+  }
+  // Management's confirmation is its own answer, kept whichever way the acts are carried out.
+  for (const key of Object.keys(CONFIRMABLE)) {
+    if (await put(CONFIRM_KEY(key), formData.get(`confirm:${key}`) === "on" ? "ON" : "OFF", `${key} — management confirms`)) changed = true;
   }
   revalidatePath("/settings/control");
   revalidatePath("/settings/flow");
