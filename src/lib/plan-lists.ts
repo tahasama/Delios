@@ -34,8 +34,8 @@ export type PlanList = {
   documents: PlanListDocument[];
   /** The sheet to fill, with the headings the reader looks for. */
   template: string;
-  /** What is in force was uploaded here without a document, after any document's read: when. */
-  direct: Date | null;
+  /** What is in force was uploaded here without a document, after any document's read: when, by whom, and why. */
+  direct: { at: Date; by: string | null; why: string | null } | null;
 };
 
 type Summary = { id: string; number: string; title: string; latestRevision: string | null; latestRevisionState: string | null };
@@ -81,9 +81,11 @@ export async function planLists(scope: { projectId: string }): Promise<PlanList[
   const newest = (dates: Date[]) => dates.reduce<Date | null>((top, one) => (!top || one > top ? one : top), null);
   const direct = (kind: string, documentRead: Date | null) => {
     const versions = versionsOf(kind);
-    const loose = newest(versions.filter((v) => v.versionLabel.startsWith("upload")).map((v) => v.createdAt));
+    const loose = versions.filter((v) => v.versionLabel.startsWith("upload")).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
     const read = documentRead ?? newest(versions.filter((v) => !v.versionLabel.startsWith("upload")).map((v) => v.createdAt));
-    return loose && (!read || loose > read) ? loose : null;
+    return loose && (!read || loose.createdAt > read)
+      ? { at: loose.createdAt, by: loose.decidedByName ?? loose.submittedByName, why: loose.decisionReason }
+      : null;
   };
   const scheduleRead = newest(source.imports.filter((one) => one.status === "DONE").map((one) => new Date(one.importedAt)));
   // The schedule is the project's one schedule document, once it is named.

@@ -23,7 +23,10 @@ export async function PlanCards({ from = null, to = null }: { from?: Date | null
   const inForce = (kind: string) => {
     const list = lists.find((one) => one.kind === kind);
     // Uploaded here without a document, after any document's read: that is what is in force.
-    if (list?.direct) return <span className="text-amber-800">Uploaded directly, {day(list.direct)}</span>;
+    if (list?.direct) {
+      const { at, by, why } = list.direct;
+      return <span className="text-amber-800" title={[by ? `By ${by}` : null, why ? `Why: ${why}` : null].filter(Boolean).join("\n") || undefined}>Uploaded directly, {day(at)}</span>;
+    }
     const docs = list?.documents ?? [];
     const released = docs.filter((one) => one.released);
     if (!docs.length) return "None yet";

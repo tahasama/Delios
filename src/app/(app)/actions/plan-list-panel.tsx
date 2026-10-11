@@ -67,7 +67,10 @@ export function PlanListPanel({ list, control }: { list: PlanList; control: bool
       {list.direct ? (
         // What is in force came from a direct upload: it can be taken back as it was read.
         <p className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-md bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900 ring-1 ring-amber-200">
-          <span>In force: uploaded directly on {fmtDate(list.direct)}, without a document.</span>
+          <span>
+            In force: uploaded directly on {fmtDate(list.direct.at)}{list.direct.by ? ` by ${list.direct.by}` : ""}, without a document.
+            {list.direct.why ? <> Why: {list.direct.why}</> : null}
+          </span>
           <a href={`/api/plan-direct/${list.kind}`} className="inline-flex items-center gap-1 font-semibold underline">
             <Download className="h-3.5 w-3.5" /> Download it (.csv)
           </a>
