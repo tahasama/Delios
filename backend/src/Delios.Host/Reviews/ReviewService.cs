@@ -27,7 +27,7 @@ public sealed record AnswerRequest(string? Verdict = null, string? Status = null
     string? ForeignAnswer = null, Guid? EvidenceFileId = null, int? ClosesWithStep = null);
 /// <summary>Body of a release request. <c>Status</c>, if given, must equal the status the deciding step granted.</summary>
 /// <param name="Outcome">Document Control's outcome to record, from its own published set.</param>
-public sealed record ReleaseRequest(string? Status = null, string? Outcome = null);
+public sealed record ReleaseRequest(string? Status = null, string? Outcome = null, Transmittals.IssueAsk? Issue = null);
 /// <summary>Body of a return request: Document Control sends the revision back to its author, or the route back to a step. <c>Note</c> is required; <c>Reason</c> is required when going back to a step.</summary>
 /// <param name="ToStep">Null sends the revision back to its author; a step number (from 1) sends the route back to that step.</param>
 /// <param name="Outcome">
@@ -1064,10 +1064,44 @@ public sealed class ReviewService(
         if (await ApprovalOwedAsync(review.RevisionId, cancellationToken) is { } owed) return (null, owed);
         var (outcome, outcomeProblem) = ControlService.Pick(catalog, request.Outcome, ControlService.Release);
         if (outcomeProblem is not null) return (null, outcomeProblem);
+        if (await IssueWithReleaseAsync(access, review.RevisionId, request.Issue, cancellationToken) is { } noOne) return (null, noOne);
         await ReleaseCoreAsync(access, review, status, access.UserName, cancellationToken);
         control.Record(await db.Revisions.SingleAsync(r => r.Id == review.RevisionId, cancellationToken), outcome, null, access.UserName);
         await db.SaveChangesAsync(cancellationToken);
         return (review, null);
+    }
+
+    /// <summary>
+    /// Released and issued are one act unless the organization keeps them separate (setting POLICY_RELEASE =
+    /// SEPARATE): the release must have someone to send to. That is an open request naming people or organizations
+    /// (asked when the review was decided), or the people named with the release itself, which become such a
+    /// request. The release then sends it (see ReleaseCoreAsync). Returns the refusal, or null.
+    /// </summary>
+    private async Task<IResult?> IssueWithReleaseAsync(ProjectAccess access, Guid revisionId, Transmittals.IssueAsk? issue, CancellationToken cancellationToken)
+    {
+        var named = await db.IssueRequests.AnyAsync(r => r.RevisionId == revisionId && r.Status == IssueRequestStatuses.Open && !r.Delegated
+            && (r.UserIds.Length > 0 || r.PartyIds.Length > 0), cancellationToken);
+        var hasNames = issue is not null && ((issue.UserIds?.Length ?? 0) + (issue.PartyIds?.Length ?? 0)) > 0;
+        if (hasNames)
+        {
+            var revision = await db.Revisions.SingleAsync(r => r.Id == revisionId, cancellationToken);
+            var document = await db.Documents.SingleAsync(d => d.Id == revision.DocumentId, cancellationToken);
+            var (request, problem) = await transmittals.NewRequestAsync(access, document, revision, issue! with { Delegated = false }, cancellationToken);
+            if (problem is not null) return problem;
+            db.IssueRequests.Add(request!);
+            return null;
+        }
+        if (named || await ReleasePolicyAsync(access.Project.Id, cancellationToken) == "SEPARATE") return null;
+        return Problems.Invalid("ISSUE_REQUIRED",
+            "Released and issued go together here: say who receives it (our own people, an outside party, or both), and why.");
+    }
+
+    /// <summary>The project's answer to POLICY_RELEASE, else the organization's; TOGETHER when neither said.</summary>
+    private async Task<string> ReleasePolicyAsync(Guid projectId, CancellationToken cancellationToken)
+    {
+        var rows = await db.Settings.AsNoTracking().Where(s => s.Key == "POLICY_RELEASE" && (s.ProjectId == projectId || s.ProjectId == null))
+            .Select(s => new { s.ProjectId, s.Value }).ToListAsync(cancellationToken);
+        return rows.FirstOrDefault(r => r.ProjectId == projectId)?.Value ?? rows.FirstOrDefault(r => r.ProjectId == null)?.Value ?? "TOGETHER";
     }
 
     /// <summary>

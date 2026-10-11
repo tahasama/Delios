@@ -2,7 +2,7 @@ import { ReadersPanel } from "./readers-panel";
 import { documentAssets, projectAssets } from "@/lib/api/records";
 import { documentReaders, projectReaders } from "@/lib/api/readers";
 import { openConfidentiality } from "@/lib/permissions";
-import { controlDoes } from "@/lib/control-activities";
+import { controlDoes, policy as controlPolicy } from "@/lib/control-activities";
 import { notFound } from "next/navigation";
 import { requireScope } from "@/lib/scope";
 import { preflight } from "@/lib/rules/preflight";
@@ -23,7 +23,7 @@ import { updateDocumentAction, reinstateDocumentAction, linkAssetAction, unlinkR
 import {
   prepareRevisionAction, editRevisionAction, withdrawRevisionAction, releaseRevisionAction, voidRevisionAction, unvoidRevisionAction, returnAtGateAction, liftHoldAction, returnHeldAction,
 } from "@/lib/actions/revisions";
-import { parseRecipients, mayRequestIssue, requestChoices, authorOf, issuePolicy, decisionLetsItOut, requestsOn } from "@/lib/issue-requests";
+import { parseRecipients, noRecipients, mayRequestIssue, requestChoices, authorOf, issuePolicy, decisionLetsItOut, requestsOn } from "@/lib/issue-requests";
 import { legacyDocument, documentContext, type LegacyRevision } from "@/lib/api/legacy";
 import { requestIssueAction, carryOutRequestAction, cancelRequestAction } from "@/lib/actions/issue-requests";
 import { RequestIssue } from "./request-issue";
@@ -170,6 +170,26 @@ export default async function DocumentDetailPage({
   const askChoices = mayAsk && carrying && policy.asked ? await requestChoices(ctx, doc) : null;
   const issueReasons = askChoices ? await getActiveSet("REASONS_FOR_ISSUE") : [];
   const revisionAuthor = carrying ? await authorOf(ctx, carrying.id) : null;
+  // Released and issued are one act unless the organization keeps them apart: when no request names who receives
+  // it, the release asks, with the same fields as asking for it to be sent.
+  const releaseTogether = (await controlPolicy(ctx, "POLICY_RELEASE")) !== "SEPARATE";
+  const namedToSend = requests.some((one) => one.status === "OPEN" && !one.delegated && !noRecipients(parseRecipients(one.recipients)));
+  const releaseChoices = controller && working && releaseTogether && !namedToSend ? await requestChoices(ctx, doc) : null;
+  const releaseReasons = releaseChoices ? await getActiveSet("REASONS_FOR_ISSUE") : [];
+  const releaseAuthor = releaseChoices && working ? await authorOf(ctx, working.id) : null;
+  const whoReceives = releaseChoices ? (
+    <div className="mb-3 space-y-2 rounded-lg border border-line px-3.5 py-3">
+      <p className="text-xs font-semibold text-slate-700">Who receives it — released and issued go together</p>
+      <RequestIssue
+        author={releaseAuthor}
+        reasons={releaseReasons.map((one) => ({ code: one.code, label: one.label }))}
+        proposed={releaseChoices.proposed}
+        others={releaseChoices.others}
+        parties={releaseChoices.parties}
+        ours={releaseChoices.ours}
+      />
+    </div>
+  ) : null;
 
   // What the deciding step answered, and whether that answer is final. A verdict
   // that asks for changes does not release: releasing it would supersede the
@@ -420,7 +440,9 @@ export default async function DocumentDetailPage({
                   : " That verdict asks for changes, so this revision is not released: releasing it would replace the revision people are working from. Send it back."}
               </p>
               {decisionFinal ? (
-                <ActionForm action={releaseRevisionAction} submitLabel={`Release as ${working.statusCode}`} size="sm" hidden={{ revisionId: working.id, statusCode: working.statusCode ?? "" }} />
+                <ActionForm action={releaseRevisionAction} submitLabel={`Release as ${working.statusCode}`} size="sm" hidden={{ revisionId: working.id, statusCode: working.statusCode ?? "" }}>
+                  {whoReceives}
+                </ActionForm>
               ) : null}
               <details className="mt-3 border-t border-line pt-3" open={!decisionFinal}>
                 <summary className="cursor-pointer text-xs font-semibold text-slate-600">{decisionFinal ? "Send it back instead" : "Send it back"}</summary>
@@ -434,6 +456,7 @@ export default async function DocumentDetailPage({
             </>
           ) : (
             <ActionForm action={releaseRevisionAction} submitLabel="Release" size="sm" hidden={{ revisionId: working.id }}>
+              {whoReceives}
               <Field label="Released as" required hint="older revisions have no decided status; newer ones carry the reviewers' choice">
                 <select name="statusCode" className={inputCls} defaultValue="">
                   <option value="" disabled>Choose a status…</option>

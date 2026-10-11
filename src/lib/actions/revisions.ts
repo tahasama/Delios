@@ -238,6 +238,10 @@ export async function releaseRevisionAction(_prev: Result | undefined, formData:
   const revisionId = text(formData, "revisionId");
   const statusCode = text(formData, "statusCode");
   if (!statusCode) return { error: "Choose the status the revision is released at." };
+  // Released and issued in one act: who receives it, when the decision did not say. The backend refuses a release
+  // with nobody to send to unless the organization keeps the two apart.
+  const named = issueAsk(requestFromForm(formData));
+  const issue = named && !named.delegated ? named : null;
   let documentId: string;
   try {
     let review = await reviewOfRevision(ctx, revisionId);
@@ -251,10 +255,10 @@ export async function releaseRevisionAction(_prev: Result | undefined, formData:
       }
       documentId = review.documentId;
       // Where nobody holds Document Control it is already released.
-      if (review.state !== "RELEASED") await api(projectPath(ctx, `/reviews/${review.id}/release`), { body: { status: statusCode, outcome: text(formData, "outcome") || null } });
+      if (review.state !== "RELEASED") await api(projectPath(ctx, `/reviews/${review.id}/release`), { body: { status: statusCode, outcome: text(formData, "outcome") || null, issue } });
     } else {
       documentId = review.documentId;
-      await api(projectPath(ctx, `/reviews/${review.id}/release`), { body: { status: statusCode, outcome: text(formData, "outcome") || null } });
+      await api(projectPath(ctx, `/reviews/${review.id}/release`), { body: { status: statusCode, outcome: text(formData, "outcome") || null, issue } });
     }
   } catch (e) {
     return failed(e);
