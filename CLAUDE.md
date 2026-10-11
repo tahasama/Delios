@@ -23,6 +23,11 @@ conversation, write it into the right one in the same commit as the code.
 - Nothing is deleted except by the app owner. Exception: an empty package
   that never went out may be deleted by whoever composes it (it holds no content;
   removing a package never removes documents).
+- Document Control acts only on the projects it is on, never on the
+  organization's configuration: functions, organizations, numbering, review
+  routes, a person's account (name, email, company, signing in), projects and
+  classification sets are an administrator's (backend refuses otherwise). It
+  reads what it needs from them, and puts people on its own projects.
 - The owner's full-rights account: `grant-all <email>` (backend command) makes
   that person an administrator, unlocks them, and puts them on every project
   with Document Control, which is given every verb.
@@ -225,6 +230,9 @@ conversation, write it into the right one in the same commit as the code.
   "Used in" tab. A document added by hand gets the same purpose and status
   as the requirements list uses when it says nothing (`needDefaults`), due by
   the project's lead before the day.
+- With Document Control, only Document Control adds documents and disciplines
+  to actions by hand; whoever plans does it only by uploading the lists
+  (`fromList`). Not planners by hand, not authors.
 - Who adds a document or a discipline to an action, and who adds people to a
   project, are two acts in Settings → Who does what (`ACTION_LINKS`,
   `PROJECT_PEOPLE`): with Document Control or without. With Document Control,

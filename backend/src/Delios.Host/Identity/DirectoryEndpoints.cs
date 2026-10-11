@@ -62,25 +62,24 @@ public static class DirectoryEndpoints
         admin.MapPost("/projects", CreateProjectAsync);
         admin.MapPut("/projects/{projectId:guid}", UpdateProjectAsync);
         admin.MapPost("/projects/{projectId:guid}/join", JoinProjectAsync);
+        // The organization's own set-up is an administrator's: a person's account, functions, organizations.
+        // Document Control acts on the projects it is on, never on the organization's configuration.
+        admin.MapPut("/users/{userId:guid}", UpdateUserAsync);
+        admin.MapPost("/functions", CreateFunctionAsync);
+        admin.MapPut("/functions/{functionId:guid}", UpdateFunctionAsync);
+        admin.MapPost("/parties", CreatePartyAsync);
+        admin.MapPut("/parties/{partyId:guid}", UpdatePartyAsync);
 
-        // Document Control keeps these day to day, as well as administrators.
-        var keepers = app.MapGroup("/api/admin").WithTags("Administration")
-            .AddEndpointFilter<TransactionFilter>()
-            .AddEndpointFilter(Keepers.Filter);
-        // People, and who is on which project: also management, which adds people where there is no Document Control.
+        // Who is on which project: Document Control of that project, or management where there is none. They read
+        // the people, functions and organizations to choose from, and create an account for someone new joining.
         var people = app.MapGroup("/api/admin").WithTags("Administration")
             .AddEndpointFilter<TransactionFilter>()
             .AddEndpointFilter(Keepers.People);
         people.MapGet("/users", UsersAsync);
         people.MapPost("/users", CreateUserAsync);
-        people.MapPut("/users/{userId:guid}", UpdateUserAsync);
         people.MapPut("/projects/{projectId:guid}/members", MemberAsync);
-        keepers.MapGet("/functions", FunctionsAsync);
-        keepers.MapPost("/functions", CreateFunctionAsync);
-        keepers.MapPut("/functions/{functionId:guid}", UpdateFunctionAsync);
-        keepers.MapGet("/parties", PartiesAsync);
-        keepers.MapPost("/parties", CreatePartyAsync);
-        keepers.MapPut("/parties/{partyId:guid}", UpdatePartyAsync);
+        people.MapGet("/functions", FunctionsAsync);
+        people.MapGet("/parties", PartiesAsync);
     }
 
     private static async Task<Actor> ActorAsync(HttpContext http, DeliosDbContext db, CancellationToken cancellationToken)

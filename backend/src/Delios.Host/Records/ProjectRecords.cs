@@ -853,16 +853,16 @@ public static class ProjectRecordEndpoints
         return Results.NoContent();
     }
 
-    private sealed record DepartmentsRequest(string[]? Departments, Guid? TransmittalId = null);
+    private sealed record DepartmentsRequest(string[]? Departments, Guid? TransmittalId = null, bool FromList = false);
 
     private static async Task<IResult> SetDepartmentsAsync(Guid activityId, HttpContext h, DeliosDbContext db, AuditLog audit, IClock clock,
         Notifications.Notifier notifier, CancellationToken c)
     {
         var access = ProjectAccessFilter.Of(h);
-        // Whoever may upload the disciplines-per-action list tags by hand too: Document Control or Plan.
-        if (!access.Holds(Verbs.Plan) && !await KeepsAsync(h, access))
-            return Problems.Forbidden("CONTROL_ONLY", "Document Control, or whoever plans the project, tags activities.");
+        // Document Control tags by hand; whoever plans only by uploading the disciplines-per-action list.
         var body = await h.Request.ReadFromJsonAsync<DepartmentsRequest>(c);
+        if (!await KeepsAsync(h, access) && !(body?.FromList == true && access.Holds(Verbs.Plan)))
+            return Problems.Forbidden("CONTROL_ONLY", "Document Control tags activities; whoever plans does it with the disciplines-per-action list.");
         var activity = await db.Activities.SingleOrDefaultAsync(a => a.Id == activityId && a.ProjectId == access.Project.Id, c);
         if (activity is null) return Problems.NotFound("ACTIVITY_NOT_FOUND", "No such activity.");
         var departments = body?.Departments?.Select(d => d.Trim().ToUpperInvariant()).Where(d => d.Length > 0).Distinct().OrderBy(d => d).ToArray() ?? [];

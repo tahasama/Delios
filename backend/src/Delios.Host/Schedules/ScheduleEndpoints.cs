@@ -19,7 +19,7 @@ public sealed record SourceRequest(Guid DocumentId, ScheduleColumns? Columns = n
 /// <param name="OffsetDays">Days from the anchor: negative before, positive after. Empty: the project's lead before the start.</param>
 public sealed record NeedRequest(
     Guid DocumentId, string? Purpose, string[]? RequiredStatuses = null, string? Anchor = null, int? OffsetDays = null,
-    DateOnly? FixedDate = null, string? Department = null, Guid? TransmittalId = null);
+    DateOnly? FixedDate = null, string? Department = null, Guid? TransmittalId = null, bool FromList = false);
 
 /// <summary>Document Control's answer to a request to add a document to an action, when nothing is added: why.</summary>
 public sealed record ActivityAskAnswer(string? Note);
@@ -257,8 +257,6 @@ public static class ScheduleEndpoints
         Notifications.Notifier notifier, CancellationToken cancellationToken)
     {
         var access = ProjectAccessFilter.Of(http);
-        if (!(access.Holds(Verbs.Create) || access.Holds(Verbs.Revise) || access.Holds(Verbs.Control)))
-            return Problems.Forbidden("NEEDS_NOT_ALLOWED", "Your function cannot say what activities need.");
         var activity = await db.Activities.SingleOrDefaultAsync(a => a.Id == activityId && a.ProjectId == access.Project.Id, cancellationToken);
         if (activity is null) return NotFound();
         // Added in answer to a request: the request is this action's and still open, and not one management confirms.
@@ -273,9 +271,9 @@ public static class ScheduleEndpoints
         }
         var (need, document, problem) = await NewNeedAsync(db, clock, access, activity, request, cancellationToken);
         if (problem is not null) return problem;
-        // Without Document Control, the people of a discipline add for their own discipline only; Document Control
-        // and whoever plans keep adding for any.
-        var self = !access.Holds(Verbs.Control) && !access.Holds(Verbs.Plan);
+        // Document Control adds for any discipline; whoever plans only by uploading the requirements list. Without
+        // Document Control, the people of a discipline add for their own discipline only.
+        var self = !access.Holds(Verbs.Control) && !(request.FromList && access.Holds(Verbs.Plan));
         if (self)
         {
             if (await Delios.Host.Settings.ProjectAnswers.ControlDoesAsync(db, access.Project.Id, "ACTION_LINKS", cancellationToken))

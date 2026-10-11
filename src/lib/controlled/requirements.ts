@@ -304,6 +304,8 @@ const requirements: Handler = {
           body: {
             documentId: docId, purpose, requiredStatuses: [row.requiredStatus], anchor: "START",
             offsetDays: fixed ? null : -DEFAULT_LEAD_DAYS, fixedDate: fixed, department: row.department,
+            // Read from the requirements list: whoever plans may, by the list only.
+            fromList: true,
           },
         });
       }

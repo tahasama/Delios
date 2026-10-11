@@ -104,7 +104,7 @@ const departments: Handler = {
       const action = actions.get(row.actionCode);
       if (!action) continue;
       if (departmentsOf(action).join(",") !== row.departments.join(",")) {
-        await api(projectPath(t, `/activities/${action.id}/departments`), { method: "PUT", body: { departments: row.departments } });
+        await api(projectPath(t, `/activities/${action.id}/departments`), { method: "PUT", body: { departments: row.departments, fromList: true } });
         changed++;
       }
     }
