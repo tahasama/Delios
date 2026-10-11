@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, ChevronRight, X } from "lucide-react";
+import { ArrowRight, ChevronRight, Upload, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
@@ -97,35 +97,69 @@ export function NextStepBody({ status, items }: { status: React.ReactNode; items
  * is behind it ticked, what is ahead plain. Tells where it is without a
  * sentence about it.
  */
-export function StagePath({ stages, at, note, under }: {
+export function StagePath({ stages, at, note, under, pick }: {
   stages: string[];
   at: number;
   note?: React.ReactNode;
   /** One short line under each stage, read with the stage it belongs to. */
   under?: React.ReactNode[];
+  /**
+   * Stages that open something under the row (the schedule's uploads, for
+   * whoever plans): which can, which is open, and what pressing one does.
+   * "Open" is an underline, never the fill: the fill stays "where it stands".
+   */
+  pick?: { can: boolean[]; open: number | null; onPick: (index: number) => void; controls: (index: number) => string };
 }) {
   return (
     <div>
       <ol className={cn("flex flex-wrap gap-y-2", under ? "items-start gap-y-4 xl:flex-nowrap" : "items-center")}>
-        {stages.map((name, i) => (
-          <li key={name} className={cn("flex", under ? "items-start" : "items-center")}>
-            {i ? <span className={cn("mx-1 h-px w-3 sm:mx-1.5", under ? "mt-[13px] shrink-0 sm:w-6" : "sm:w-10", i <= at ? "bg-(--color-brand)" : "bg-line-strong")} aria-hidden /> : null}
-            <span className={under ? "flex flex-col items-center gap-1.5 text-center" : "contents"}>
+        {stages.map((name, i) => {
+          const pickable = !!pick?.can[i];
+          const open = pickable && pick!.open === i;
+          const pill = (
             <span
               className={cn(
                 "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-semibold",
                 i < at && "text-slate-500",
                 i === at && "bg-(--color-brand) text-white",
                 i > at && "text-slate-400 ring-1 ring-line-strong",
+                pickable && i < at && "ring-1 ring-line",
+                pickable && i !== at && "transition-colors group-hover:bg-tint group-hover:text-brand-ink",
+                open && i !== at && "text-brand-ink",
               )}
               aria-current={i === at ? "step" : undefined}
             >
               {i < at ? "✓" : null} {name}
+              {pickable ? <Upload aria-hidden className="h-3 w-3 opacity-70" /> : null}
             </span>
-            {under?.[i] ? <span className="px-2.5 text-[11px] leading-4 text-slate-500">{under[i]}</span> : null}
-            </span>
-          </li>
-        ))}
+          );
+          return (
+            <li key={name} className={cn("flex", under ? "items-start" : "items-center")}>
+              {i ? <span className={cn("mx-1 h-px w-3 sm:mx-1.5", under ? "mt-[13px] shrink-0 sm:w-6" : "sm:w-10", i <= at ? "bg-(--color-brand)" : "bg-line-strong")} aria-hidden /> : null}
+              <span
+                className={under || pick ? cn(
+                  "flex flex-col items-center gap-1.5 text-center",
+                  pick && "border-b-2 pb-1.5",
+                  pick && (open ? "border-(--color-brand)" : "border-transparent"),
+                ) : "contents"}
+              >
+                {pickable ? (
+                  <button
+                    type="button"
+                    onClick={() => pick!.onPick(i)}
+                    aria-expanded={open}
+                    aria-controls={pick!.controls(i)}
+                    title={`Upload the ${name.toLowerCase()} list`}
+                    className="group cursor-pointer rounded-full outline-none focus-visible:ring-3 focus-visible:ring-link/20"
+                  >
+                    {pill}
+                  </button>
+                ) : pill}
+                {under?.[i] ? <span className="px-2.5 text-[11px] leading-4 text-slate-500">{under[i]}</span> : null}
+              </span>
+            </li>
+          );
+        })}
       </ol>
       {note ? <p className="mt-2.5 text-[13px] text-slate-600">{note}</p> : null}
     </div>

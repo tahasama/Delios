@@ -128,8 +128,11 @@ conversation, write it into the right one in the same commit as the code.
   only when unticked is a reason obligatory. No released revision: a reason is
   obligatory. Always logged. Same on all three uploads.
 - Releasing a list document reads its Excel automatically (the schedule, when it
-  is the project's schedule; DPA and RQL by their type). The three upload buttons
-  stay, for no document, not released, no Excel attached, or a failed read.
+  is the project's schedule; DPA and RQL by their type). The three uploads stay,
+  for no document, not released, no Excel attached, or a failed read. They are
+  the stages Schedule, Disciplines and Requirements themselves, clickable (with
+  an upload icon) only for whoever may upload; "open" is an underline, the fill
+  stays "where it stands". Everyone else sees the plain row.
 - Actions get our own number (A00001…) and keep the planner's ID beside it.
 - Actions with no date are always counted on the plan ("N with no date — in the
   table"), never silently left out of the window.

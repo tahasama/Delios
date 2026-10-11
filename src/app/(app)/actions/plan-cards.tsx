@@ -3,15 +3,14 @@ import Link from "next/link";
 import { requireScope } from "@/lib/scope";
 import { planLists } from "@/lib/plan-lists";
 import { planProgress, PLAN_STAGES } from "@/lib/plan-progress";
-import { StagePath } from "../documents/[id]/next-step";
 import { PlanListPanel } from "./plan-list-panel";
 import { UploadSwitch } from "./upload-switch";
 
 /**
  * How far the schedule has come — the stages in a row, each with the revision
- * in force under it — and, for whoever plans the project, its three uploads in the order they are
- * done: the schedule, the disciplines each action concerns, the documents each
- * discipline needs.
+ * in force under it. For whoever plans the project, the first three stages are
+ * also its uploads: the schedule, the disciplines each action concerns, the
+ * documents each discipline needs.
  */
 export async function PlanCards({ from = null, to = null }: { from?: Date | null; to?: Date | null } = {}) {
   const ctx = await requireScope();
@@ -54,13 +53,11 @@ export async function PlanCards({ from = null, to = null }: { from?: Date | null
     ) : null,
   ];
 
-  const summary = (
-    <div className="min-w-0 flex-1 basis-[30rem]">
-      <StagePath stages={PLAN_STAGES} at={progress.at} under={under.map((node, i) => <Fragment key={i}>{node}</Fragment>)} />
-    </div>
-  );
-  if (!plans) return summary;
-
-  const LABEL: Record<string, string> = { SCHEDULE: "Schedule", DEPARTMENTS: "Disciplines", REQUIREMENTS: "Requirements" };
-  return <UploadSwitch line={summary} panels={lists.map((list) => ({ kind: list.kind, label: LABEL[list.kind], panel: <PlanListPanel list={list} control={ctx.can("CONTROL") || ctx.can("PLAN")} /> }))} />;
+  const keyed = under.map((node, i) => <Fragment key={i}>{node}</Fragment>);
+  // Whoever plans the project opens each list's upload from its own stage.
+  const STAGE: Record<string, number> = { SCHEDULE: 0, DEPARTMENTS: 1, REQUIREMENTS: 2 };
+  const panels = plans
+    ? lists.map((list) => ({ stage: STAGE[list.kind], kind: list.kind, panel: <PlanListPanel list={list} control={ctx.can("CONTROL") || ctx.can("PLAN")} /> }))
+    : [];
+  return <UploadSwitch stages={PLAN_STAGES} at={progress.at} under={keyed} panels={panels} />;
 }

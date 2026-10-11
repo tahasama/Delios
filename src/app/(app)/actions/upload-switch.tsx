@@ -1,42 +1,37 @@
 "use client";
 
 import { useState } from "react";
-import { Upload } from "lucide-react";
+import { StagePath } from "../documents/[id]/next-step";
 
 /**
- * The schedule's three uploads, one button each and in the order they are
- * done. A button opens its own form under the line and nothing else; pressing
- * it again, or another, closes it.
+ * The schedule's stages, and for whoever plans the project its three uploads
+ * on the stages themselves: Schedule, Disciplines and Requirements each open
+ * their own form under the row; pressing it again, or another, closes it.
+ * Documents ready opens nothing. Without uploads the row is shown as it is.
  */
-export function UploadSwitch({ line, panels }: {
-  line: React.ReactNode;
-  panels: { kind: string; label: string; panel: React.ReactNode }[];
+export function UploadSwitch({ stages, at, under, panels }: {
+  stages: string[];
+  at: number;
+  under: React.ReactNode[];
+  /** The upload form of each stage that has one, by its position in the row. */
+  panels: { stage: number; kind: string; panel: React.ReactNode }[];
 }) {
-  const [open, setOpen] = useState<string | null>(null);
-  const shown = panels.find((one) => one.kind === open) ?? null;
+  const [open, setOpen] = useState<number | null>(null);
+  const shown = panels.find((one) => one.stage === open) ?? null;
   return (
     <div>
-      <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-4">
-        {line}
-        {/* One small joined group: a button per list, in the order they are done. */}
-        <div className="control inline-flex shrink-0 items-stretch divide-x divide-line overflow-hidden border border-line">
-          {panels.map((one) => (
-            <button
-              key={one.kind}
-              type="button"
-              className={`inline-flex items-center gap-1.5 px-3 font-semibold transition-colors ${
-                open === one.kind ? "bg-tint text-brand-ink" : "text-slate-600 hover:bg-tint-soft hover:text-brand-ink"
-              }`}
-              aria-expanded={open === one.kind}
-              aria-controls={`upload-${one.kind}`}
-              onClick={() => setOpen(open === one.kind ? null : one.kind)}
-            >
-              <Upload aria-hidden className="h-3.5 w-3.5 opacity-70" /> {one.label}
-            </button>
-          ))}
-        </div>
-      </div>
-      {shown ? <div id={`upload-${shown.kind}`} className="mt-5 border-t border-line pt-4 pb-1">{shown.panel}</div> : null}
+      <StagePath
+        stages={stages}
+        at={at}
+        under={under}
+        pick={panels.length ? {
+          can: stages.map((_, i) => panels.some((one) => one.stage === i)),
+          open,
+          onPick: (i) => setOpen(open === i ? null : i),
+          controls: (i) => `upload-${panels.find((one) => one.stage === i)?.kind ?? i}`,
+        } : undefined}
+      />
+      {shown ? <div id={`upload-${shown.kind}`} className="mt-4 border-t border-line pt-4 pb-1">{shown.panel}</div> : null}
     </div>
   );
 }
