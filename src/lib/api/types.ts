@@ -61,7 +61,7 @@ export type RevisionWork = {
 };
 
 export type IssueWork = {
-  kind: "CARRY_OUT_REQUEST" | "DISPATCH_TRANSMITTAL" | "ACKNOWLEDGE_TRANSMITTAL" | "REGISTER_UNPLANNED" | "SEND_PLACEHOLDER";
+  kind: "CARRY_OUT_REQUEST" | "DISPATCH_TRANSMITTAL" | "ACKNOWLEDGE_TRANSMITTAL" | "REGISTER_UNPLANNED" | "SEND_PLACEHOLDER" | "SAY_WHO_RECEIVES";
   requestId: string | null;
   transmittalId: string | null;
   recipientId: string | null;
@@ -70,7 +70,7 @@ export type IssueWork = {
   who: string | null;
   dueDate: string | null;
   since: string;
-  /** SEND_PLACEHOLDER: the placeholder to fill. */
+  /** SEND_PLACEHOLDER: the placeholder to fill; CARRY_OUT_REQUEST and SAY_WHO_RECEIVES: the document. */
   documentId: string | null;
 };
 

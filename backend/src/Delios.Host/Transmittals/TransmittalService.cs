@@ -933,12 +933,26 @@ public sealed class TransmittalService(
                 from q in db.IssueRequests
                 join d in db.Documents on q.DocumentId equals d.Id
                 join r in db.Revisions on q.RevisionId equals r.Id
-                where q.ProjectId == projectId && q.Status == IssueRequestStatuses.Open && r.State == RevisionStates.Released
+                where q.ProjectId == projectId && q.Status == IssueRequestStatuses.Open && r.State == RevisionStates.Released && !q.Delegated
                 orderby q.RaisedAt
-                select new { q.Id, d.Number, r.Value, q.Reason, q.RaisedByName, q.RaisedAt }).ToListAsync(cancellationToken);
+                select new { q.Id, DocumentId = d.Id, d.Number, r.Value, q.Reason, q.RaisedByName, q.RaisedAt }).ToListAsync(cancellationToken);
             work.AddRange(requests.Select(q => new IssueWork("CARRY_OUT_REQUEST", q.Id, null, null, $"{q.Number} rev {q.Value}",
-                q.Reason, q.RaisedByName, null, q.RaisedAt.ToDateTimeOffset())));
+                q.Reason, q.RaisedByName, null, q.RaisedAt.ToDateTimeOffset(), q.DocumentId)));
         }
+
+        // "Who receives it" was left to whoever started the revision's review (the author when it was never reviewed):
+        // until they say, nothing is sent.
+        var leftToMe = await (
+            from q in db.IssueRequests
+            join d in db.Documents on q.DocumentId equals d.Id
+            join r in db.Revisions on q.RevisionId equals r.Id
+            where q.ProjectId == projectId && q.Status == IssueRequestStatuses.Open && q.Delegated
+                && (db.Reviews.Where(v => v.RevisionId == r.Id).OrderByDescending(v => v.StartedAt).Select(v => (Guid?)v.StartedById).FirstOrDefault()
+                    ?? r.AuthoredById) == access.UserId
+            orderby q.RaisedAt
+            select new { q.Id, DocumentId = d.Id, d.Number, r.Value, q.Reason, q.RaisedByName, q.RaisedAt }).ToListAsync(cancellationToken);
+        work.AddRange(leftToMe.Select(q => new IssueWork("SAY_WHO_RECEIVES", q.Id, null, null, $"{q.Number} rev {q.Value}",
+            q.Reason, q.RaisedByName, null, q.RaisedAt.ToDateTimeOffset(), q.DocumentId)));
 
         var carried = await CarriedPartiesAsync(access, cancellationToken);
         if (carried.Count > 0)

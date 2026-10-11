@@ -37,7 +37,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   // The backend's names for the acts each kind of the journal covers.
   const backendNames = (kinds: string[]) => Object.keys(ALIAS).filter((name) => kinds.includes(ALIAS[name])).concat(kinds).join(",");
 
-  const [work, checks, criticalDefects, activities, neverSent] = await Promise.all([
+  const [work, checks, criticalDefects, activities, neverSent, scheduleWork] = await Promise.all([
     api<Work>(projectPath(session, "/work")),
     controller ? api<{ lastRun: { integrity: number } | null }>(projectPath(session, "/checks")).catch(() => ({ lastRun: null })) : Promise.resolve({ lastRun: null }),
     controller ? api<unknown[]>(projectPath(session, "/defects"), { query: { severity: "CRITICAL" } }).then((d) => d.length).catch(() => 0) : Promise.resolve(0),
@@ -46,6 +46,10 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
     // needed it sent did not ask, and this is where that stops being invisible.
     controller
       ? api<{ documentId: string; documentNumber: string; title: string; revisionId: string; revision: string; status: string | null; releasedAt: string | null }[]>(projectPath(session, "/not-issued")).catch(() => [])
+      : Promise.resolve([]),
+    // What on the schedule waits for this person: their discipline's confirmations, a postponement to confirm, upkeep.
+    user.isInternal
+      ? api<{ kind: string; activityId: string | null; code: string | null; name: string | null; day: string | null; department: string | null; count: number; since: string | null }[]>(projectPath(session, "/activities-work")).catch(() => [])
       : Promise.resolve([]),
   ]);
   const lastRun = checks.lastRun;
@@ -147,10 +151,27 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
       href: `/documents/${w.documentId}`, code: w.documentNumber, rev: w.revision, title: w.title,
       tag: w.kind === "CORRECT_AND_RESUBMIT" ? "to correct" : "reviewed", tone: "amber", at: at(w.since), cta: "See comments",
     })),
-    unsent: neverSent.map<Row>((r) => ({
-      href: `/documents/${r.documentId}`, code: r.documentNumber, rev: r.revision, title: r.title,
-      tag: r.status ?? "released", tone: "violet", at: at(r.releasedAt), cta: "Ask to send",
-    })),
+    unsent: [
+      ...neverSent.map<Row>((r) => ({
+        href: `/documents/${r.documentId}`, code: r.documentNumber, rev: r.revision, title: r.title,
+        tag: r.status ?? "released", tone: "violet", at: at(r.releasedAt), cta: "Ask to send",
+      })),
+      // Asked for, released: Document Control sends it.
+      ...issuesOf(["CARRY_OUT_REQUEST"]).map<Row>((w) => ({
+        href: w.documentId ? `/documents/${w.documentId}#step-send-out` : "/transmittals", code: w.label.split(" ")[0], rev: w.label.split(" rev ")[1], title: `asked by ${w.who ?? "someone"}`,
+        tag: w.reason.toLowerCase(), tone: "violet", at: at(w.since), cta: "Send",
+      })),
+      // Left to this person to say who receives it.
+      ...issuesOf(["SAY_WHO_RECEIVES"]).map<Row>((w) => ({
+        href: w.documentId ? `/documents/${w.documentId}#step-send-out` : "/documents", code: w.label.split(" ")[0], rev: w.label.split(" rev ")[1], title: "who receives it was left to you",
+        tag: "say who", tone: "amber", at: at(w.since), cta: "Say who",
+      })),
+      // Sent to an organization outside the system: its dispatch is recorded here.
+      ...issuesOf(["DISPATCH_TRANSMITTAL"]).map<Row>((w) => ({
+        href: `/transmittals/${w.transmittalId}`, code: w.label, title: `to ${w.who ?? "an outside party"}`,
+        tag: "to dispatch", tone: "violet", at: at(w.since), cta: "Dispatch",
+      })),
+    ],
     owed: [
       ...issuesOf(["SEND_PLACEHOLDER"]).map<Row>((w) => ({
         href: `/transmittals/send?docs=${w.documentId}`, code: w.label.split(" ")[0], title: w.label.split(" ").slice(1).join(" "),
@@ -170,6 +191,10 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         href: `/documents/${w.documentId}`, code: w.documentNumber, rev: w.revision, title: w.title,
         tag: "received", tone: "sky", at: at(w.since), cta: "Check",
       })),
+      ...issuesOf(["ACKNOWLEDGE_TRANSMITTAL"]).map<Row>((w) => ({
+        href: `/transmittals/${w.transmittalId}`, code: w.label, title: `from ${w.who ?? "another organization"}`,
+        tag: w.dueDate && new Date(w.dueDate).getTime() < Date.now() ? "overdue" : "to acknowledge", tone: w.dueDate && new Date(w.dueDate).getTime() < Date.now() ? "amber" : "sky", at: at(w.since), cta: "Acknowledge",
+      })),
       ...issuesOf(["REGISTER_UNPLANNED"]).map<Row>((w) => ({
         href: `/transmittals/${w.transmittalId}`, code: w.reason, title: `from ${w.who ?? "another organization"} · ${w.label}`,
         tag: "unplanned", tone: "sky", at: at(w.since), cta: "Check",
@@ -179,8 +204,14 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
       href: `/documents/${w.documentId}`, code: w.documentNumber, rev: w.revision, title: w.title,
       tag: "accepted", tone: "emerald", at: at(w.since), cta: "Send for review",
     })),
-    // The requirements process has no counterpart in the backend yet.
-    requirements: [],
+    // The schedule: confirming a discipline's documents, a postponement, and the schedule's upkeep.
+    requirements: scheduleWork.map<Row>((w) => w.kind === "CONFIRM_DOCUMENTS"
+      ? { href: `/actions/${w.code}#confirm`, code: w.code ?? "", title: `${w.name} · ${w.department}: ${w.count} document${w.count === 1 ? "" : "s"} missing`, tag: w.day && new Date(w.day).getTime() < Date.now() ? "day passed" : "confirm", tone: w.day && new Date(w.day).getTime() < Date.now() ? "amber" : "sky", at: at(w.since), cta: "Confirm" }
+      : w.kind === "CONFIRM_POSTPONEMENT"
+        ? { href: `/actions/${w.code}#note`, code: w.code ?? "", title: `${w.name}: postponed, waiting for you to confirm`, tag: "postponed", tone: "amber", at: at(w.since), cta: "Confirm" }
+        : w.kind === "UNTAGGED"
+          ? { href: "/actions?view=table&untagged=1", code: `${w.count}`, title: `action${w.count === 1 ? "" : "s"} with no discipline tagged`, tag: "untagged", tone: "amber", at: null, cta: "Tag them" }
+          : { href: "/actions", code: w.code ?? "", title: `the schedule could not be read${w.name ? `: ${w.name}` : ""}`, tag: "read failed", tone: "amber", at: at(w.since), cta: "Upload" }),
     drafts: revisionsOf(["DRAFT"]).map<Row>((w) => ({
       href: `/documents/${w.documentId}#workflow`, code: w.documentNumber, rev: w.revision, title: w.title,
       tag: w.note === "READY" ? "file attached" : w.note === "REJECTED" ? "file refused" : "file scanning", tone: "plain", at: at(w.since), cta: "Continue",
@@ -204,12 +235,12 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
     { id: "release", tab: "Release", title: "Release or send back", icon: <FileStack />, accent: "teal",
       asks: "The reviewers decided; they are not released yet.",
       then: "Nobody may build from them, and no revision can start.", call: "Settle them" },
-    { id: "unsent", tab: "Not sent", title: "Released, never sent", icon: <Send />, accent: "violet",
-      asks: "Released, but nobody outside has been told yet.",
-      then: "Whoever needs them is working from an older issue.", call: "Ask for them to go out" },
-    { id: "requirements", tab: "Requirements", title: "Document requirements", icon: <ListChecks />, accent: "steel",
-      asks: "Asks in the requirements process, still open.",
-      then: "The schedule cannot say what it needs until answered.", call: "Work the list" },
+    { id: "unsent", tab: "To send", title: "To send out", icon: <Send />, accent: "violet",
+      asks: "Released documents waiting to go out: asked for, left to you to say who, or to dispatch.",
+      then: "Whoever needs them is working from an older issue.", call: "Send them" },
+    { id: "requirements", tab: "Schedule", title: "On the schedule", icon: <ListChecks />, accent: "steel",
+      asks: "Your discipline's documents to confirm, postponements to confirm, and the schedule's upkeep.",
+      then: "An action's day comes whether or not anyone answered.", call: "Answer them" },
     { id: "returned", tab: "Returned", title: "Came back to you", icon: <Undo2 />, accent: "blue",
       asks: "Your documents came back with the reviewers' comments.",
       then: "Each one is finished: the next revision starts fresh.", call: "Read the comments" },
@@ -225,7 +256,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   ];
 
   const all = Object.values(rows).flat();
-  const today = ["verdict", "release", "returned", "unsent", "owed"].flatMap((id) => rows[id]);
+  const today = ["verdict", "release", "returned", "unsent", "owed", "requirements"].flatMap((id) => rows[id]);
   const longest = Math.max(0, ...all.map((one) => daysOf(one.at) ?? 0));
   // Asked for one kind, the page becomes that one kind, in full.
   const opened = view ? ASPECTS.find((one) => one.id === view) : null;

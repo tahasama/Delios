@@ -45,6 +45,13 @@ public sealed record DecisionView(Guid Id, string Decision, DateOnly? PlannedSta
     string? ConfirmedBy = null, DateTimeOffset? ConfirmedAt = null, string? ConfirmNote = null,
     string? ReversedBy = null, DateTimeOffset? ReversedAt = null, string? ReversedReason = null);
 
+/// <summary>
+/// One thing on the schedule waiting for the person asking: CONFIRM_DOCUMENTS (their discipline confirms an action's
+/// documents), CONFIRM_POSTPONEMENT (whoever plans confirms a postponement), UNTAGGED (actions no discipline is
+/// tagged on), SCHEDULE_READ_FAILED (the schedule's last read failed).
+/// </summary>
+public sealed record ActionWork(string Kind, Guid? ActivityId, string? Code, string? Name, DateOnly? Day, string? Department, int Count, DateTimeOffset? Since);
+
 /// <summary>A notice a person sends: what it is about (its subject key), to whom, and what it says.</summary>
 public sealed record NoticeRequest(string? Subject, string? Title, string? Body, string? Link, Guid[]? People);
 
@@ -93,6 +100,7 @@ public static class ScheduleEndpoints
         project.MapDelete("/activities/{activityId:guid}/needs/{needId:guid}/waive", UnwaiveAsync);
         project.MapPost("/activities/{activityId:guid}/decisions", DecideAsync);
         project.MapGet("/notices", NoticesAsync);
+        project.MapGet("/activities-work", ActionWorkAsync);
         project.MapPost("/notices", SendNoticeAsync);
         project.MapPost("/activities/{activityId:guid}/decisions/{decisionId:guid}/confirm", ConfirmPostponementAsync);
         project.MapPost("/activities/{activityId:guid}/decisions/{decisionId:guid}/reverse", ReverseDecisionAsync);
@@ -384,6 +392,70 @@ public static class ScheduleEndpoints
         await audit.WriteAsync(http.User.Actor(), "ACTIVITY_DECISION", "Activity", activityId, activity.Code,
             $"{decision} by {responsible}: {reason}", access.Project.Id, cancellationToken);
         return await ActivityAsync(activityId, http, db, clock, cancellationToken);
+    }
+
+    /// <summary>GET /activities-work: what on the schedule waits for the person asking, for their home page.</summary>
+    private static async Task<IResult> ActionWorkAsync(HttpContext http, DeliosDbContext db, IClock clock, CancellationToken cancellationToken)
+    {
+        var access = ProjectAccessFilter.Of(http);
+        var work = new List<ActionWork>();
+        if (!access.IsInternal) return Results.Ok(work);
+        var projectId = access.Project.Id;
+        var today = WorkingCalendar.Today(clock, access.Project.TimeZone);
+        var catalog = await Catalog.LoadAsync(db, cancellationToken);
+        var decisions = await db.ActivityDecisions.AsNoTracking().Where(d => d.ProjectId == projectId && d.ReversedAt == null).ToListAsync(cancellationToken);
+        var postponed = decisions.Where(d => !ActionNotices.Proceeds(catalog, d.Decision)).ToList();
+        var postponedIds = postponed.Select(d => d.ActivityId).ToHashSet();
+
+        // Confirming documents: the departments this person answers for.
+        var mine = await db.Memberships.AsNoTracking().Where(m => m.ProjectId == projectId && m.UserId == access.UserId && m.Active && m.Department != null)
+            .Select(m => m.Department!).Distinct().ToListAsync(cancellationToken);
+        if (mine.Count > 0)
+        {
+            var window = await db.ScheduleSources.Where(x => x.ProjectId == projectId).Select(x => (int?)x.RiskWindowDays).SingleOrDefaultAsync(cancellationToken) ?? 7;
+            var activities = await db.Activities.AsNoTracking().Include(a => a.Requirements)
+                .Where(a => a.ProjectId == projectId && a.State == ActivityStates.Active && a.Start != null && a.Departments.Any(d => mine.Contains(d)))
+                .ToListAsync(cancellationToken);
+            var confirmed = await db.Set<Records.ReadinessConfirmation>().AsNoTracking()
+                .Where(c => c.ProjectId == projectId && c.RevokedAt == null && mine.Contains(c.Department))
+                .Select(c => new { c.ActivityId, c.Department }).ToListAsync(cancellationToken);
+            foreach (var activity in activities.Where(a => !postponedIds.Contains(a.Id)))
+            {
+                var day = activity.Start!.Value;
+                foreach (var department in activity.Departments.Where(mine.Contains))
+                {
+                    if (confirmed.Any(c => c.ActivityId == activity.Id && c.Department == department)) continue;
+                    var missing = activity.Requirements.Where(r => r.State == RequirementStates.Missing
+                        && (r.Department == null || string.Equals(r.Department, department, StringComparison.OrdinalIgnoreCase))).ToList();
+                    if (missing.Count == 0) continue;
+                    var from = missing.Select(r => day.PlusDays(-(r.RiskDays ?? window))).Min();
+                    if (from > today) continue;
+                    work.Add(new ActionWork("CONFIRM_DOCUMENTS", activity.Id, activity.Code, activity.Name, day.ToDateOnly(), department, missing.Count,
+                        from.AtStartOfDayInZone(DateTimeZone.Utc).ToDateTimeOffset()));
+                }
+            }
+        }
+
+        // Confirming a postponement: whoever plans the project.
+        if (access.Holds(Verbs.Plan))
+        {
+            var waiting = postponed.Where(d => d.ConfirmedAt == null).ToList();
+            var named = await db.Activities.AsNoTracking().Where(a => waiting.Select(w => w.ActivityId).Contains(a.Id))
+                .ToDictionaryAsync(a => a.Id, cancellationToken);
+            work.AddRange(waiting.Where(d => named.ContainsKey(d.ActivityId)).Select(d => new ActionWork("CONFIRM_POSTPONEMENT", d.ActivityId,
+                named[d.ActivityId].Code, named[d.ActivityId].Name, d.PlannedStart?.ToDateOnly(), null, 1, d.RecordedAt.ToDateTimeOffset())));
+        }
+
+        // The schedule's own upkeep: Document Control, or whoever plans.
+        if (access.Holds(Verbs.Control) || access.Holds(Verbs.Plan))
+        {
+            var untagged = await db.Activities.CountAsync(a => a.ProjectId == projectId && a.State == ActivityStates.Active && a.Departments.Length == 0, cancellationToken);
+            if (untagged > 0) work.Add(new ActionWork("UNTAGGED", null, null, null, null, null, untagged, null));
+            var last = await db.ScheduleImports.AsNoTracking().Where(i => i.ProjectId == projectId).OrderByDescending(i => i.ImportedAt).FirstOrDefaultAsync(cancellationToken);
+            if (last is { Status: ScheduleImportStatuses.Failed })
+                work.Add(new ActionWork("SCHEDULE_READ_FAILED", null, $"rev {last.RevisionValue}", last.Error, null, null, 1, last.ImportedAt.ToDateTimeOffset()));
+        }
+        return Results.Ok(work);
     }
 
     /// <summary>GET /notices?subject=…: every notice whose subject starts with it, oldest first.</summary>
