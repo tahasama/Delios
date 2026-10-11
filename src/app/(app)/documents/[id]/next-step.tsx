@@ -112,7 +112,7 @@ export function StagePath({ stages, at, note, under, pick }: {
 }) {
   return (
     <div>
-      <ol className={cn("flex gap-y-2", under ? "w-full max-w-4xl flex-wrap items-start gap-y-4" : "flex-wrap items-center")}>
+      <ol className={cn("flex gap-y-2", under ? "w-full max-w-3xl flex-wrap items-start gap-y-4" : "flex-wrap items-center")}>
         {stages.map((name, i) => {
           const pickable = !!pick?.can[i];
           const open = pickable && pick!.open === i;
