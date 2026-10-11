@@ -230,7 +230,7 @@ export default async function TransmittalDetailPage({ params, searchParams }: { 
                   <div className="asking flex flex-wrap items-center gap-3 border-t border-line px-5 py-2.5 sm:px-6">
                     <label className="min-w-0 flex-1">
                       <span className="sr-only">Files to keep with it</span>
-                      <input type="file" name="attachments" multiple className="plain w-full text-[11px] text-slate-500 file:mr-2 file:rounded file:border-0 file:bg-canvas-deep file:px-2 file:py-0.5 file:text-[11px] file:font-semibold file:text-slate-700" />
+                      <input type="file" name="attachments" multiple className="plain w-full text-slate-500" />
                     </label>
                     <button className="ask">Keep with it</button>
                   </div>
@@ -348,7 +348,7 @@ export default async function TransmittalDetailPage({ params, searchParams }: { 
                         </label>
                         <label className="min-w-0">
                           <span className="sr-only">Proof it went</span>
-                          <input type="file" name="evidence" required={person.party?.evidenceRequired ?? true} className="plain w-full text-[11px] text-slate-500 file:mr-2 file:rounded file:border-0 file:bg-canvas-deep file:px-2 file:py-0.5 file:text-[11px] file:font-semibold file:text-slate-700" title="The email you sent, or the receipt their system gave you" />
+                          <input type="file" name="evidence" required={person.party?.evidenceRequired ?? true} className="plain w-full text-slate-500" title="The email you sent, or the receipt their system gave you" />
                         </label>
                         <label className="min-w-0">
                           <span className="sr-only">Their reference</span>

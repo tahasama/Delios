@@ -170,7 +170,7 @@ export function ReviewsRegister({ plate, rows, total, filters, filterOptions, fa
               name="q"
               defaultValue={filters.q}
               placeholder={'A space narrows, a comma widens: pump ME  ·  RV-0021, RV-0034  ·  "feed pump"'}
-              className="plain w-full py-2! pl-6! text-[13.5px]!"
+              className="plain w-full pl-6!"
             />
           </label>
           <button className="ask" data-on={facets.length ? "true" : "false"} disabled={pending}>

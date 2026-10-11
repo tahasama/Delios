@@ -341,7 +341,7 @@ export function NewTransmittalForm({
                   name="attachments"
                   multiple
                   onChange={(e) => setFiles(e.target.files?.length ?? 0)}
-                  className="plain w-full py-1.5 text-[12px] text-slate-500 file:mr-2 file:rounded file:border-0 file:bg-canvas-deep file:px-2 file:py-0.5 file:text-[11px] file:font-semibold file:text-slate-700"
+                  className="plain w-full py-1.5 text-[12px] text-slate-500"
                 />
               </Ask>
               {asks("message") ? (

@@ -76,7 +76,7 @@ export async function SupplierPackage({ pkg }: { pkg: LegacyPackage }) {
               </Td>
               <Td className="text-xs">
                 {canSendRow(r.state) ? (
-                  <input type="file" name={`file_${r.doc.id}`} className="block w-56 text-xs" />
+                  <input type="file" name={`file_${r.doc.id}`} className="block w-56" />
                 ) : staff && r.state === "AWAITING_CHECK" && r.transmittal ? (
                   <Link href={`/transmittals/${r.transmittal.id}`} className="font-semibold text-link hover:underline">Check {r.transmittal.number} →</Link>
                 ) : staff && r.state === "TO_ROUTE" && r.transmittal ? (

@@ -30,6 +30,17 @@ conversation, write it into the right one in the same commit as the code.
 - No code written inside the page (no inline scripts, no `dangerouslySetInnerHTML`).
   Display preferences (theme, sidebar width) live in cookies the server reads.
 
+## Design — locked in by the owner
+
+- The look of Schedule & actions is the reference for every page, card and
+  form, including the hidden ones (panels, popovers, details).
+- One control size everywhere, set once in `src/app/globals.css` on `:root`:
+  `--control-h` (2rem), `--control-text` (13px), `--control-radius`. Every
+  field, dropdown, button and file field stands that height with that text.
+- Use the shared pieces only: `btn()` and `inputCls` (`src/components/ui.tsx`),
+  `.ask`, `.plain`, `ActionForm`. Never give a field or button its own height,
+  padding or text size on a page; never restyle the file button locally.
+
 ## Rules that must never break
 
 ### Reviews

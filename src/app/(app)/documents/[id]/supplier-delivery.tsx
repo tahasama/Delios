@@ -61,7 +61,7 @@ export async function SupplierDelivery({ documentId }: { documentId: string }) {
     label: hasFile ? "Replace the file" : "Attach your file",
     body: (
       <ActionForm action={attachSupplierFileAction} submitLabel="Attach" size="sm" hidden={{ documentId }}>
-        <input type="file" name="file" required className="block w-full text-xs" />
+        <input type="file" name="file" required className="block w-full" />
         <p className="text-[11px] text-slate-500">A PDF is what people read; send the editable original as well if it was asked for.</p>
       </ActionForm>
     ),

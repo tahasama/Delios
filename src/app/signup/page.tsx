@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useActionState, useState } from "react";
 import { signupAction } from "@/lib/actions/signup";
 import { APP_NAME } from "@/lib/standard";
-import { inputCls } from "@/components/ui";
+import { inputCls, btn } from "@/components/ui";
 import { MissingSummary } from "@/components/form";
 import { collectInvalid, type MissingField } from "@/components/form-validation";
 import { PROJECT_KINDS } from "@/lib/profiles/kinds";
@@ -133,7 +133,7 @@ export default function SignupPage() {
             <MissingSummary missing={missing} />
             {state?.error ? <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{state.error}</p> : null}
 
-            <button type="submit" disabled={pending} className="w-full rounded-lg bg-brand px-4 py-2.5 text-sm font-medium text-white transition hover:bg-brand-hover disabled:opacity-50">
+            <button type="submit" disabled={pending} className={`${btn("primary")} w-full`}>
               {pending ? "Creating your organization…" : "Create organization"}
             </button>
           </form>

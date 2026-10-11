@@ -198,7 +198,7 @@ export function TransmittalRegister({ rows, total, filters, filterOptions, expor
               name="q"
               defaultValue={filters.q}
               placeholder={'A space narrows, a comma widens: TR pumps  ·  TRN-001, TRN-002  ·  "for approval"'}
-              className="plain w-full py-1.5! pl-6! text-[13px]!"
+              className="plain w-full pl-6!"
             />
           </label>
           {/* Nothing is asked of the database until this is pressed: one query

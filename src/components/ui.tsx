@@ -118,9 +118,10 @@ export function SeverityChip({ severity }: { severity: string }) {
 }
 
 export function btn(variant: "primary" | "secondary" | "danger" | "ghost" = "primary", size: "sm" | "md" = "md") {
-  const base = "inline-flex items-center justify-center gap-1.5 rounded-lg font-semibold transition-colors outline-none focus-visible:ring-3 focus-visible:ring-link/20 disabled:cursor-not-allowed disabled:opacity-50";
-  // Sized as the register's buttons (.ask), so a form's button and a sheet's read as one family.
-  const sizes = size === "sm" ? "min-h-8 px-3 py-1.5 text-xs" : "min-h-8 px-3.5 py-1.5 text-[13px]";
+  const base = "inline-flex items-center justify-center gap-1.5 rounded-(--control-radius) font-semibold transition-colors outline-none focus-visible:ring-3 focus-visible:ring-link/20 disabled:cursor-not-allowed disabled:opacity-50";
+  // The app's one control size (--control-h): every button stands the same
+  // height as every field and every .ask. "sm" keeps a narrower side padding only.
+  const sizes = size === "sm" ? "h-(--control-h) px-3 text-(length:--control-text)" : "h-(--control-h) px-3.5 text-(length:--control-text)";
   const variants = {
     primary: "bg-brand text-white hover:bg-brand-hover",
     secondary: "border border-line-strong bg-surface text-slate-700 hover:border-brand-line hover:bg-tint",
@@ -207,7 +208,7 @@ export function Field({
 }
 
 export const inputCls =
-  "w-full rounded-none border-0 border-b border-line-strong bg-transparent px-0.5 py-1.5 text-[13px] text-slate-800 outline-none transition-colors placeholder:text-slate-400 hover:border-slate-400 focus:border-brand-line disabled:cursor-not-allowed disabled:text-slate-500";
+  "w-full min-h-(--control-h) rounded-none border-0 border-b border-line-strong bg-transparent px-0.5 py-1 text-(length:--control-text) text-slate-800 outline-none transition-colors placeholder:text-slate-400 hover:border-slate-400 focus:border-brand-line disabled:cursor-not-allowed disabled:text-slate-500";
 
 export function EmptyState({ title, body, action }: { title: string; body?: string; action?: React.ReactNode }) {
   return (

@@ -305,7 +305,7 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
               name="q"
               defaultValue={filters.q}
               placeholder={'A space narrows, a comma widens: pump ME  ·  P-101, P-102  ·  "feed pump"'}
-              className="plain w-full py-2! pl-6! text-[13.5px]!"
+              className="plain w-full pl-6!"
             />
           </label>
           {/* Nothing is asked of the database until this is pressed. A query
@@ -399,7 +399,7 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
               required
               maxLength={60}
               placeholder="Keep this view as…"
-              className="plain py-1! text-[12.5px]! w-44"
+              className="plain w-44"
             />
             <button className="stencil text-brand-ink hover:underline">Keep</button>
           </form>

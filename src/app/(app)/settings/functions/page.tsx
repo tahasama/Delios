@@ -222,14 +222,14 @@ export default async function FunctionsPage() {
                   <ActionForm action={updateFunctionAction} submitLabel="Save" size="sm" hidden={{ functionId: fn.id, name: fn.name }} className="flex flex-wrap items-center gap-3 space-y-0">
                     <label className="flex items-center gap-2 text-xs text-slate-600">
                       Department
-                      <select name="department" defaultValue={fn.department ?? ""} className="rounded-md border border-line-strong px-1.5 py-1 text-xs" title="The department this job sits in — optional">
+                      <select name="department" defaultValue={fn.department ?? ""} className="rounded-md border border-line-strong px-1.5" title="The department this job sits in — optional">
                         <option value="">no department</option>
                         {disciplines.map((d) => <option key={d.code} value={d.code}>{d.label}</option>)}
                       </select>
                     </label>
                     <label className="flex items-center gap-2 text-xs text-slate-600">
                       Clearance
-                      <select name="clearance" defaultValue={fn.clearance ?? ""} className="rounded-md border border-line-strong px-1.5 py-1 text-xs" title="The most confidential level this job reads without being named on the document">
+                      <select name="clearance" defaultValue={fn.clearance ?? ""} className="rounded-md border border-line-strong px-1.5" title="The most confidential level this job reads without being named on the document">
                         <option value="">no limit</option>
                         {confidentialities.map((c) => <option key={c.code} value={c.code}>up to {c.label}</option>)}
                       </select>

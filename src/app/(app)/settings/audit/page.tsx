@@ -160,7 +160,7 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
               name="q"
               defaultValue={sp.q ?? ""}
               placeholder="number, person, detail"
-              className="plain mt-2 w-full text-[13px]!"
+              className="plain mt-2 w-full"
             />
 
             <p className="slip-label mt-4">When</p>

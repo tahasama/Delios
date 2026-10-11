@@ -185,7 +185,7 @@ export default async function AdminConfigPage({ searchParams }: { searchParams: 
                     name="q"
                     defaultValue={q}
                     placeholder={`Search ${set.title.toLowerCase()} by code or label…`}
-                    className="plain w-full py-1.5! pl-6! text-[13px]!"
+                    className="plain w-full pl-6!"
                   />
                 </label>
                 <label className="min-w-0">

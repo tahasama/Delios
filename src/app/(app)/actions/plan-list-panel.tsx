@@ -13,8 +13,8 @@ const STATE: Record<string, string> = {
 };
 const said = (state: string) => STATE[state] ?? state.replaceAll("_", " ").toLowerCase();
 
-// Its button takes the sheet's control size from the stylesheet; only its look is set here.
-const fileInputLook = "text-slate-600 file:mr-3 file:border file:border-line-strong file:bg-surface file:font-semibold file:text-brand-ink";
+// The file button takes the app's control size and look from the stylesheet.
+const fileInputLook = "text-slate-600";
 const fileInput = `block w-full ${fileInputLook}`;
 const fileInputInline = `block ${fileInputLook}`;
 

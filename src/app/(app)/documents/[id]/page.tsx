@@ -267,10 +267,10 @@ export default async function DocumentDetailPage({
           <ActionForm action={editRevisionAction} submitLabel="Save" size="sm" hidden={{ revisionId: working!.id, id: doc.id, hasFiles: working!.files.length ? "yes" : "no" }}>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Field label="PDF" hint={workingHasPdf ? "replaces the one there" : "what people will read — needed before it is sent"}>
-                <input type="file" name="renditionFile" accept=".pdf" className="block w-full text-xs" />
+                <input type="file" name="renditionFile" accept=".pdf" className="block w-full" />
               </Field>
               <Field label="Source file" hint="the editable original; for a schedule or a list, its .xlsx or .csv — read on release">
-                <input type="file" name="nativeFile" className="block w-full text-xs" />
+                <input type="file" name="nativeFile" className="block w-full" />
                 {listTemplate}
               </Field>
             </div>
@@ -481,8 +481,8 @@ export default async function DocumentDetailPage({
                 )}
               </Asked>
               <Added fields={revisionPolicy.own} className="sm:col-span-2" />
-              <Field label="PDF" hint="optional now — what people will read; needed before it is sent"><input type="file" name="renditionFile" accept=".pdf" className="block w-full text-xs" /></Field>
-              <Field label="Native file" hint="optional — the editable original (.docx, .dwg, .xlsx…)"><input type="file" name="nativeFile" className="block w-full text-xs" />{listTemplate}</Field>
+              <Field label="PDF" hint="optional now — what people will read; needed before it is sent"><input type="file" name="renditionFile" accept=".pdf" className="block w-full" /></Field>
+              <Field label="Native file" hint="optional — the editable original (.docx, .dwg, .xlsx…)"><input type="file" name="nativeFile" className="block w-full" />{listTemplate}</Field>
             </div>
           </ActionForm>
         </>) },

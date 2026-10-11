@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { ChevronLeft, X } from "lucide-react";
+import { btn } from "@/components/ui";
 
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const WEEKDAYS = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
@@ -160,8 +161,8 @@ export function DateWindow({ fields, on, from, to }: {
               <div className="flex items-center justify-between border-t border-line px-1 pt-1.5">
                 <span className="rounded bg-tint px-1.5 py-0.5 text-[10px] font-medium text-brand-ink">{start && end && start !== end ? "A window" : start ? "One day — click another for a window" : "Pick a day, or two"}</span>
                 <span className="flex gap-1">
-                  <button type="button" onClick={clear} className="rounded px-1.5 py-0.5 text-[11px] font-semibold text-slate-500 hover:bg-slate-100">Clear</button>
-                  <button type="button" onClick={apply} disabled={!held} className="rounded bg-brand px-2 py-0.5 text-[11px] font-semibold text-white disabled:opacity-40">Apply</button>
+                  <button type="button" onClick={clear} className={btn("ghost", "sm")}>Clear</button>
+                  <button type="button" onClick={apply} disabled={!held} className={btn("primary", "sm")}>Apply</button>
                 </span>
               </div>
             </>

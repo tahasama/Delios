@@ -126,7 +126,7 @@ export default async function ExposuresPage() {
                 {controller ? (
                   <div className="mt-2 max-w-lg">
                     <ActionForm action={recordVoidReassessmentAction} submitLabel="Record reassessment" size="sm" hidden={{ revisionId: r.id }}>
-                      <input name="note" className="w-full rounded-lg border border-line-strong px-2 py-1.5 text-xs" placeholder="What was built from it, and the outcome of the reassessment" />
+                      <input name="note" className="w-full rounded-lg border border-line-strong px-2" placeholder="What was built from it, and the outcome of the reassessment" />
                     </ActionForm>
                   </div>
                 ) : null}

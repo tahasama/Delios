@@ -22,7 +22,7 @@ const PRODUCER_LABEL: Record<string, string> = {
 };
 
 const STEPS = ["What it is", "How it is described"];
-const field = "plain w-full py-1.5 text-[13px]";
+const field = "plain w-full";
 
 /** A labelled question, in the register's vocabulary: stencil label, plain field. */
 function Ask({ label, hint, required, children, className }: { label: string; hint?: string; required?: boolean; children: React.ReactNode; className?: string }) {
@@ -163,7 +163,7 @@ export function NewDocumentForm({
                     </div>
                   ) : (
                     <Ask label="The file you received" required hint="a PDF opens in the viewer; any other format is kept as the source file" className="sm:col-span-2">
-                      <input type="file" name="nativeFile" required className={cn(field, "text-[12px] text-slate-500 file:mr-2 file:rounded file:border-0 file:bg-canvas-deep file:px-2 file:py-0.5 file:text-[11px] file:font-semibold file:text-slate-700")} onChange={(e) => setHasFile(!!e.target.files?.length)} />
+                      <input type="file" name="nativeFile" required className={cn(field, "text-slate-500")} onChange={(e) => setHasFile(!!e.target.files?.length)} />
                     </Ask>
                   )}
                 </>
@@ -317,10 +317,10 @@ export function NewDocumentForm({
               <>
                 {/* The same two files a new revision takes: what people read, and the editable original. */}
                 <Ask label="PDF" required={must("file")} hint={must("file") ? "this project registers nothing without its file — the PDF or the native file" : "optional — what people will read; needed before it is sent"}>
-                  <input type="file" name="renditionFile" accept=".pdf" className={cn(field, "text-[12px] text-slate-500 file:mr-2 file:rounded file:border-0 file:bg-canvas-deep file:px-2 file:py-0.5 file:text-[11px] file:font-semibold file:text-slate-700")} onChange={(e) => setPdf(!!e.target.files?.length)} />
+                  <input type="file" name="renditionFile" accept=".pdf" className={cn(field, "text-slate-500")} onChange={(e) => setPdf(!!e.target.files?.length)} />
                 </Ask>
                 <Ask label="Native file" hint="optional — the editable original (.docx, .dwg, .xlsx…)">
-                  <input type="file" name="nativeFile" className={cn(field, "text-[12px] text-slate-500 file:mr-2 file:rounded file:border-0 file:bg-canvas-deep file:px-2 file:py-0.5 file:text-[11px] file:font-semibold file:text-slate-700")} onChange={(e) => setNative(!!e.target.files?.length)} />
+                  <input type="file" name="nativeFile" className={cn(field, "text-slate-500")} onChange={(e) => setNative(!!e.target.files?.length)} />
                 </Ask>
               </>
             )}

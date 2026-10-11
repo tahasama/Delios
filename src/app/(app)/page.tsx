@@ -6,6 +6,7 @@ import { requireScope } from "@/lib/scope";
 import { fmtDate, fmtDateTime } from "@/lib/utils";
 import { DateWindow } from "@/components/date-window";
 import { Search } from "lucide-react";
+import { btn } from "@/components/ui";
 import { ArrowRight, CheckCheck, FileStack, Inbox, ListChecks, MessageSquare, PenLine, Plus, Send, Share2, Undo2, Upload } from "lucide-react";
 
 
@@ -332,7 +333,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
                       name="q"
                       defaultValue={sp.q ?? ""}
                       placeholder="A number, a person, a detail"
-                      className="plain w-full py-1.5! pl-6! text-[13px]!"
+                      className="plain w-full pl-6!"
                     />
                   </label>
                   <label className="shrink-0">
@@ -839,7 +840,7 @@ function Line({ row }: { row: Row }) {
       <span className={`min-w-12 text-right font-mono text-xs tabular-nums whitespace-nowrap ${days !== null && days >= 5 ? "font-semibold text-amber-700" : "text-slate-400"}`}>
         {days === null ? "—" : days === 0 ? "today" : `${days}d`}
       </span>
-      <Link href={row.href} className="inline-block rounded-md border border-line-strong px-2.5 py-1 text-[12.5px] font-semibold whitespace-nowrap text-brand-ink transition hover:border-brand-line hover:bg-tint">
+      <Link href={row.href} className={`${btn("secondary", "sm")} whitespace-nowrap text-brand-ink`}>
         {row.cta}
       </Link>
     </div>
