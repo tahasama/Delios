@@ -807,6 +807,8 @@ public static class ProjectRecordEndpoints
             ask = await db.Transmittals.SingleOrDefaultAsync(t => t.Id == askId && t.ProjectId == access.Project.Id && t.ActivityId == activityId, c);
             if (ask is null) return Problems.NotFound("REQUEST_NOT_FOUND", $"No request about {activity.Code} by that number.");
             if (ask.ActivityAnsweredAt is not null) return Problems.Conflict("ALREADY_ANSWERED", $"{ask.ActivityAnsweredByName} already answered {ask.Number}.");
+            if (ask.ActivityConfirm)
+                return Problems.Conflict("NEEDS_CONFIRMATION", $"{ask.Number} needs management's confirmation: check it and send it on; it is applied once confirmed.");
         }
         var was = string.Join(", ", activity.Departments);
         activity.Departments = departments;

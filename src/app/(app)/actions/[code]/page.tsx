@@ -21,9 +21,10 @@ import { movedPhrase } from "../moved";
 import { actionState, stateLabel, dayHasPassed, riskFrom, isPostponed, DEFAULT_RISK_DAYS, type ActionState } from "@/lib/action-state";
 import { mayUploadLists } from "@/lib/permissions";
 import { NotifyPanel } from "@/components/notify-panel";
-import { LinksCard, type Ask } from "./links-card";
-import { actionWork } from "@/lib/api/schedule";
-import { backendTransmittal, addressees } from "@/lib/api/transmittals";
+import { LinksCard, proposalText, type Ask } from "./links-card";
+import { activityRequests } from "@/lib/api/schedule";
+import { confirmActionRequestAction, refuseActionRequestAction } from "@/lib/actions/action-links";
+import { addressees } from "@/lib/api/transmittals";
 import { registerByNumber } from "@/lib/api/register";
 
 export const dynamic = "force-dynamic";
@@ -102,20 +103,20 @@ export default async function ActionDetailPage({ params, searchParams }: { param
     message: `Please add the discipline … to ${action.code}, ${action.name}, on ${fmtDate(action.scheduledDate)}.\n\nWhy it concerns us: …`,
   })}`;
 
-  // Setting disciplines and documents by hand, and the requests about them still waiting: Document Control only.
-  const asks: Ask[] = control
-    ? await Promise.all((await actionWork(ctx)).filter((w) => w.kind === "ADD_TO_ACTION" && w.activityId === action.id && w.transmittalId).map(async (w) => {
-        const t = await backendTransmittal(ctx, w.transmittalId!);
-        return {
-          transmittalId: w.transmittalId!, number: w.number ?? "", from: w.from ?? "Someone", since: w.since, kind: w.ask ?? "DOCUMENT",
-          subject: t?.subject ?? "", message: t?.message ?? null,
-          documentIds: [...new Set((t?.items ?? []).map((one) => one.documentId).filter((id): id is string => !!id))],
-        };
-      }))
-    : [];
-  const pickDocuments = control
-    ? [...(await registerByNumber(ctx)).values()].map((d) => ({ id: d.id, name: d.number, detail: d.title }))
-    : [];
+  // The requests about this action not yet answered: Document Control sees them all; whoever is asked to
+  // confirm one sees that one, at the top of the page.
+  const requests = await activityRequests(ctx, action.id);
+  const asks: Ask[] = control ? requests : [];
+  const mine = requests.filter((one) => one.checkedAt && one.confirmerId === ctx.user.id);
+  // Who may be asked to confirm: everyone on the project, those holding Manage first and marked so.
+  const managers = new Set((await holders(ctx.projectId, "MANAGE").catch(() => [])).map((one) => one.id));
+  const confirmers = (await addressees(ctx)).people
+    .map((one) => ({ id: one.id, name: one.name, detail: [managers.has(one.id) ? "Manage · recommended" : null, one.organization, one.function].filter(Boolean).join(" · ") }))
+    .sort((a, b) => Number(managers.has(b.id)) - Number(managers.has(a.id)) || a.name.localeCompare(b.name));
+  // The register, read once: document numbers for what a checked request will add, and Document Control's pick list.
+  const register = mine.length || control ? [...(await registerByNumber(ctx)).values()] : [];
+  const numberOf = new Map(register.map((d) => [d.id, d.number] as const));
+  const pickDocuments = control ? register.map((d) => ({ id: d.id, name: d.number, detail: d.title })) : [];
 
   // Which disciplines stand confirmed, by the card's own rule: a confirmation by hand (or frozen by the
   // system on the day), or, before the day, every one of its documents released at its status.
@@ -241,6 +242,43 @@ export default async function ActionDetailPage({ params, searchParams }: { param
           </div>
         }
       />
+
+      {/* A request checked by Document Control, waiting on this person's confirmation. */}
+      {mine.length ? (
+        <section id="your-confirmation" className="register register-sheet register-sheet-open scroll-mt-24">
+          <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
+            <span className="stencil mr-1 text-slate-500">Your confirmation</span>
+            <span className="text-[11px] text-slate-500">confirmed, it is applied by itself; refused, nothing changes</span>
+          </div>
+          <ul className="divide-y divide-line">
+            {mine.map((one) => (
+              <li key={one.id} className="space-y-3 px-5 py-3.5 sm:px-6">
+                <div className="space-y-1 text-xs leading-5">
+                  <p className="font-semibold text-slate-800">
+                    {one.from} asks for {one.kind === "DISCIPLINE" ? "a missing discipline" : "a document"} to be added
+                    <span className="ml-1.5 font-normal text-slate-500">· <Link href={`/transmittals/${one.id}`} className="text-link hover:underline">{one.number}</Link>, {fmtDate(one.at)}</span>
+                  </p>
+                  <p className="whitespace-pre-line text-slate-600">{one.message ?? one.subject}</p>
+                  <p className="text-slate-700">
+                    Checked by {one.checkedBy}, {fmtDate(one.checkedAt)}. {proposalText(one.proposal, one.kind, (id) => numberOf.get(id) ?? "a document", deptLabel)}
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-start gap-3">
+                  <ActionForm action={confirmActionRequestAction} submitLabel="Confirm" size="sm" hidden={{ transmittalId: one.id, code: action.code }} className="space-y-0" />
+                  <details className="min-w-0 flex-1 text-xs">
+                    <summary className="cursor-pointer font-semibold text-link">Refuse</summary>
+                    <ActionForm action={refuseActionRequestAction} submitLabel="Refuse" variant="secondary" size="sm" hidden={{ transmittalId: one.id, code: action.code }} className="mt-2 space-y-3">
+                      <Field label="Why" required hint={`${one.from} and Document Control are told`}>
+                        <textarea name="note" required rows={2} className={inputCls} />
+                      </Field>
+                    </ActionForm>
+                  </details>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       {/* Who is concerned and what was decided, with the progress beside them. */}
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_280px]">
@@ -379,6 +417,7 @@ export default async function ActionDetailPage({ params, searchParams }: { param
               documents={pickDocuments}
               asks={asks}
               count={action.entries.length}
+              confirmers={confirmers}
             />
           ) : null}
 

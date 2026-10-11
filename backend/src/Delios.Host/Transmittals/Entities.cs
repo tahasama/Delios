@@ -126,6 +126,18 @@ public sealed class Transmittal
     public Instant? ActivityAnsweredAt { get; set; }
     public string? ActivityAnsweredByName { get; set; }
     public string? ActivityAnswer { get; set; }
+    /// <summary>
+    /// Raised where the project wants management to confirm these requests: Document Control checks it and says
+    /// exactly what would change (<see cref="ActivityProposal"/>, JSON), management confirms or refuses, and the
+    /// change is applied by itself on confirmation. Fixed when raised, so a later change of setting leaves it be.
+    /// </summary>
+    public bool ActivityConfirm { get; set; }
+    public string? ActivityProposal { get; set; }
+    public Instant? ActivityCheckedAt { get; set; }
+    public string? ActivityCheckedByName { get; set; }
+    /// <summary>Who is asked to confirm: management is proposed first, anyone on the project may be chosen.</summary>
+    public Guid? ActivityConfirmerId { get; set; }
+    public string? ActivityConfirmerName { get; set; }
     /// <summary>On something received: how it arrived, as whoever recorded it wrote it down.</summary>
     public string? ReceiptNote { get; set; }
     /// <summary>The organization's own fields, name to value, as JSON.</summary>

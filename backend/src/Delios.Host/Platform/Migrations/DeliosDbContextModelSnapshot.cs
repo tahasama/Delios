@@ -4332,9 +4332,33 @@ namespace Delios.Host.Platform.Migrations
                         .HasColumnType("text")
                         .HasColumnName("activity_ask_kind");
 
+                    b.Property<Instant?>("ActivityCheckedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("activity_checked_at");
+
+                    b.Property<string>("ActivityCheckedByName")
+                        .HasColumnType("text")
+                        .HasColumnName("activity_checked_by_name");
+
+                    b.Property<bool>("ActivityConfirm")
+                        .HasColumnType("boolean")
+                        .HasColumnName("activity_confirm");
+
+                    b.Property<Guid?>("ActivityConfirmerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("activity_confirmer_id");
+
+                    b.Property<string>("ActivityConfirmerName")
+                        .HasColumnType("text")
+                        .HasColumnName("activity_confirmer_name");
+
                     b.Property<Guid?>("ActivityId")
                         .HasColumnType("uuid")
                         .HasColumnName("activity_id");
+
+                    b.Property<string>("ActivityProposal")
+                        .HasColumnType("text")
+                        .HasColumnName("activity_proposal");
 
                     b.Property<string>("Direction")
                         .IsRequired()

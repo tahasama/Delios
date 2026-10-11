@@ -360,7 +360,7 @@ export function noticeHistory(notices: NoticeView[], now = new Date()): { count:
  * a postponement to confirm, a request to add a document to an action, the schedule's upkeep.
  */
 export type ActionWork = {
-  kind: "CONFIRM_DOCUMENTS" | "CONFIRM_POSTPONEMENT" | "ADD_TO_ACTION" | "UNTAGGED" | "SCHEDULE_READ_FAILED";
+  kind: "CONFIRM_DOCUMENTS" | "CONFIRM_POSTPONEMENT" | "ADD_TO_ACTION" | "CONFIRM_ACTION_REQUEST" | "UNTAGGED" | "SCHEDULE_READ_FAILED";
   activityId: string | null; code: string | null; name: string | null; day: string | null; department: string | null;
   count: number; since: string | null; transmittalId: string | null; number: string | null; from: string | null;
   /** On a request about an action: a document to add, or a missing discipline to tag. */
@@ -369,3 +369,17 @@ export type ActionWork = {
 
 export const actionWork = cache(async (scope: Scope): Promise<ActionWork[]> =>
   api<ActionWork[]>(projectPath(scope, "/activities-work")).catch(() => []));
+
+/** What a request will change once management confirms it, as Document Control checked it. */
+export type ActivityProposal = { documentIds: string[] | null; department: string | null; departments: string[] | null; purpose: string | null; statuses: string[] | null };
+
+/** A request about an action not yet answered (GET /activities/{id}/requests). */
+export type ActivityRequest = {
+  id: string; number: string; from: string; at: string; kind: "DOCUMENT" | "DISCIPLINE"; subject: string; message: string | null;
+  /** Management confirms it: Document Control checks it first, then whoever is asked confirms or refuses. */
+  confirm: boolean; checkedAt: string | null; checkedBy: string | null; confirmerId: string | null; confirmerName: string | null;
+  proposal: ActivityProposal | null; documentIds: string[];
+};
+
+export const activityRequests = cache(async (scope: Scope, activityId: string): Promise<ActivityRequest[]> =>
+  api<ActivityRequest[]>(projectPath(scope, `/activities/${activityId}/requests`)).catch(() => []));

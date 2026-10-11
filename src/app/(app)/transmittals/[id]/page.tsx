@@ -190,10 +190,18 @@ export default async function TransmittalDetailPage({ params, searchParams }: { 
         <Banner tone={ask.answeredAt ? "info" : "warn"} title={`Asks for ${ask.kind === "DISCIPLINE" ? "a missing discipline" : "a document"} to be added to ${askedOf.code}`}>
           {ask.answeredAt
             ? <>Answered by {ask.answeredBy}, {fmtDate(ask.answeredAt)}: {ask.answer} </>
-            : <>{askedOf.name}. Not answered yet. </>}
-          <Link href={`/actions/${askedOf.code}${!ask.answeredAt && ctx.can("CONTROL") ? "#asked" : ""}`} className="font-semibold text-link hover:underline">
-            {!ask.answeredAt && ctx.can("CONTROL") ? "Answer it on the action" : "Open the action"}
-          </Link>
+            : ask.checkedAt
+              ? <>{askedOf.name}. Checked by {ask.checkedBy}, {fmtDate(ask.checkedAt)}; with {ask.confirmerName} to confirm. </>
+              : <>{askedOf.name}. Not answered yet{ask.confirm ? "; Document Control checks it, then management confirms it" : ""}. </>}
+          {(() => {
+            const yours = !ask.answeredAt && !!ask.checkedAt && ask.confirmerId === ctx.user.id;
+            const toCheck = !ask.answeredAt && !ask.checkedAt && ctx.can("CONTROL");
+            return (
+              <Link href={`/actions/${askedOf.code}${yours ? "#your-confirmation" : toCheck ? "#asked" : ""}`} className="font-semibold text-link hover:underline">
+                {yours ? "Confirm or refuse it on the action" : toCheck ? (ask.confirm ? "Check it on the action" : "Answer it on the action") : "Open the action"}
+              </Link>
+            );
+          })()}
         </Banner>
       ) : null}
       {t.status === "REJECTED" ? (

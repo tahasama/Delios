@@ -138,3 +138,64 @@ export async function answerActionRequestAction(_prev: State | undefined, formDa
   refresh(code, transmittalId);
   return { ok: "Answered." };
 }
+
+/**
+ * Document Control checks a request that management confirms: what will change
+ * (the documents and the discipline needing them, or the disciplines), and who
+ * confirms it. Nothing changes yet; whoever confirms is told.
+ */
+export async function checkActionRequestAction(_prev: State | undefined, formData: FormData): Promise<State> {
+  const ctx = await requireScope();
+  if (!ctx.can("CONTROL")) return { error: "Document Control checks these requests." };
+  const transmittalId = String(formData.get("transmittalId") ?? "");
+  const code = String(formData.get("code") ?? "");
+  const confirmerId = String(formData.get("confirmerId") ?? "") || null;
+  if (!confirmerId) return { error: "Choose who confirms it." };
+  const [reasons, statuses] = await Promise.all([getActiveSet("REASONS_FOR_ISSUE"), getActiveSet("STATUSES")]);
+  const { purpose, status } = needDefaults(reasons, statuses);
+  try {
+    await api(projectPath(ctx, `/transmittals/${transmittalId}/activity-check`), {
+      body: {
+        confirmerId,
+        documentIds: formData.getAll("documentIds").map(String).filter(Boolean),
+        department: String(formData.get("department") ?? "") || null,
+        departments: formData.has("departmentsGiven") ? formData.getAll("departments").map(String).filter(Boolean) : null,
+        purpose, statuses: status ? [status] : [],
+      },
+    });
+  } catch (e) {
+    return { error: refusal(e).message };
+  }
+  refresh(code, transmittalId);
+  return { ok: "Checked, and sent on to confirm." };
+}
+
+/** Whoever was asked confirms the request: what Document Control checked is applied by itself. */
+export async function confirmActionRequestAction(_prev: State | undefined, formData: FormData): Promise<State> {
+  const ctx = await requireScope();
+  const transmittalId = String(formData.get("transmittalId") ?? "");
+  const code = String(formData.get("code") ?? "");
+  try {
+    await api(projectPath(ctx, `/transmittals/${transmittalId}/activity-confirm`), { method: "POST" });
+  } catch (e) {
+    return { error: refusal(e).message };
+  }
+  refresh(code, transmittalId);
+  return { ok: "Confirmed, and applied." };
+}
+
+/** Whoever was asked refuses the request, saying why; nothing changes. */
+export async function refuseActionRequestAction(_prev: State | undefined, formData: FormData): Promise<State> {
+  const ctx = await requireScope();
+  const transmittalId = String(formData.get("transmittalId") ?? "");
+  const code = String(formData.get("code") ?? "");
+  const note = String(formData.get("note") ?? "").trim();
+  if (!note) return { error: "Say why it is refused; whoever asked reads it." };
+  try {
+    await api(projectPath(ctx, `/transmittals/${transmittalId}/activity-refuse`), { body: { note } });
+  } catch (e) {
+    return { error: refusal(e).message };
+  }
+  refresh(code, transmittalId);
+  return { ok: "Refused." };
+}

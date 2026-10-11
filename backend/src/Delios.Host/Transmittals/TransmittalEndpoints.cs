@@ -84,7 +84,9 @@ public sealed record TransmittalView(Guid Id, string Number, string Direction, s
     string? FollowKind = null, ActivityAsk? Activity = null);
 
 /// <summary>A transmittal's ask to add a document to a schedule action, and how Document Control answered it, if it has.</summary>
-public sealed record ActivityAsk(Guid Id, DateTimeOffset? AnsweredAt, string? AnsweredBy, string? Answer, string Kind = "DOCUMENT");
+public sealed record ActivityAsk(Guid Id, DateTimeOffset? AnsweredAt, string? AnsweredBy, string? Answer, string Kind = "DOCUMENT",
+    bool Confirm = false, DateTimeOffset? CheckedAt = null, string? CheckedBy = null, Guid? ConfirmerId = null, string? ConfirmerName = null,
+    Schedules.ActivityProposal? Proposal = null);
 
 /// <summary>
 /// HTTP endpoints for issuing: distribution, issue requests, transmittals, acknowledgement, dispatch and proof upload.
@@ -363,5 +365,7 @@ public static class TransmittalEndpoints
         thread?.Follows, thread?.FollowedBy ?? [], t.ReceiptNote,
         t.Extras is null ? null : System.Text.Json.JsonDocument.Parse(t.Extras).RootElement.Clone(), t.FollowKind,
         t.ActivityId is { } activityId ? new ActivityAsk(activityId, t.ActivityAnsweredAt?.ToDateTimeOffset(), t.ActivityAnsweredByName, t.ActivityAnswer,
-            t.ActivityAskKind ?? "DOCUMENT") : null);
+            t.ActivityAskKind ?? "DOCUMENT", t.ActivityConfirm, t.ActivityCheckedAt?.ToDateTimeOffset(), t.ActivityCheckedByName,
+            t.ActivityConfirmerId, t.ActivityConfirmerName,
+            t.ActivityProposal is null ? null : System.Text.Json.JsonSerializer.Deserialize<Schedules.ActivityProposal>(t.ActivityProposal)) : null);
 }
