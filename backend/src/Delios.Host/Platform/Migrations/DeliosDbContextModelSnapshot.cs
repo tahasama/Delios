@@ -428,6 +428,18 @@ namespace Delios.Host.Platform.Migrations
                         .HasColumnType("character varying(64)")
                         .HasColumnName("doc_type");
 
+                    b.Property<string>("EndReason")
+                        .HasColumnType("text")
+                        .HasColumnName("end_reason");
+
+                    b.Property<Instant?>("EndedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("ended_at");
+
+                    b.Property<string>("EndedByName")
+                        .HasColumnType("text")
+                        .HasColumnName("ended_by_name");
+
                     b.Property<string>("Extras")
                         .HasColumnType("jsonb")
                         .HasColumnName("extras");
@@ -474,6 +486,18 @@ namespace Delios.Host.Platform.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("legal_hold_by_name");
 
+                    b.Property<string>("LegalHoldLiftReason")
+                        .HasColumnType("text")
+                        .HasColumnName("legal_hold_lift_reason");
+
+                    b.Property<Instant?>("LegalHoldLiftedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("legal_hold_lifted_at");
+
+                    b.Property<string>("LegalHoldLiftedByName")
+                        .HasColumnType("text")
+                        .HasColumnName("legal_hold_lifted_by_name");
+
                     b.Property<string>("LegalHoldReason")
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)")
@@ -506,6 +530,18 @@ namespace Delios.Host.Platform.Migrations
                     b.Property<LocalDate?>("ReceivedDate")
                         .HasColumnType("date")
                         .HasColumnName("received_date");
+
+                    b.Property<string>("ReinstateReason")
+                        .HasColumnType("text")
+                        .HasColumnName("reinstate_reason");
+
+                    b.Property<Instant?>("ReinstatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("reinstated_at");
+
+                    b.Property<string>("ReinstatedByName")
+                        .HasColumnType("text")
+                        .HasColumnName("reinstated_by_name");
 
                     b.Property<string>("RetentionClass")
                         .HasMaxLength(64)
@@ -912,6 +948,18 @@ namespace Delios.Host.Platform.Migrations
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid")
                         .HasColumnName("tenant_id");
+
+                    b.Property<string>("UnvoidReason")
+                        .HasColumnType("text")
+                        .HasColumnName("unvoid_reason");
+
+                    b.Property<Instant?>("UnvoidedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("unvoided_at");
+
+                    b.Property<string>("UnvoidedByName")
+                        .HasColumnType("text")
+                        .HasColumnName("unvoided_by_name");
 
                     b.Property<string>("Value")
                         .IsRequired()
@@ -2056,6 +2104,10 @@ namespace Delios.Host.Platform.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<string>("AcceptNote")
+                        .HasColumnType("text")
+                        .HasColumnName("accept_note");
+
                     b.Property<Instant?>("AcceptedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("accepted_at");
@@ -2992,6 +3044,10 @@ namespace Delios.Host.Platform.Migrations
                         .HasColumnType("character varying(100)")
                         .HasColumnName("route_name");
 
+                    b.Property<string>("SendBacks")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("send_backs");
+
                     b.Property<Instant>("StartedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -3119,6 +3175,10 @@ namespace Delios.Host.Platform.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
                         .HasColumnName("reclassified_by_name");
+
+                    b.Property<string>("ReclassifyNote")
+                        .HasColumnType("text")
+                        .HasColumnName("reclassify_note");
 
                     b.Property<string>("Resolution")
                         .HasMaxLength(2000)

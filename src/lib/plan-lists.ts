@@ -21,6 +21,8 @@ export type PlanListDocument = {
   read: boolean;
   /** A later revision on its way, not in force yet. */
   pending: { value: string; state: string } | null;
+  /** Its list was read from an uploaded file said to differ from it as released: when, by whom, and why. */
+  differs: { at: Date; by: string | null; why: string } | null;
 };
 
 export type PlanList = {
@@ -56,6 +58,7 @@ export async function planLists(scope: { projectId: string }): Promise<PlanList[
         id: one.id, number: one.number, title: one.title, latestRevisionValue: one.latestRevision, latestRevisionState: one.latestRevisionState,
         released: released ? { id: released.id, value: released.value } : null,
         read: false,
+        differs: null,
         pending: last && last !== released && !["SUPERSEDED", "VOID"].includes(last.state) ? { value: last.value, state: last.state } : null,
       };
     }));
@@ -76,6 +79,14 @@ export async function planLists(scope: { projectId: string }): Promise<PlanList[
   const readLabels = new Set(uploaded.flatMap((set) => set.versions).filter((v) => v.state === "APPROVED" && v.sourceName).map((v) => v.sourceName!));
   for (const doc of schedules) if (doc.released) doc.read = source.imports.some((one) => one.revisionId === doc.released!.id && one.status === "DONE");
   for (const doc of [...departments, ...requirements]) if (doc.released) doc.read = readLabels.has(`${doc.number} rev ${doc.released.value}`);
+  // A file uploaded for the revision in force that its uploader said differs from it: why, shown beside it.
+  const allVersions = uploaded.flatMap((set) => set.versions).filter((v) => v.state === "APPROVED");
+  for (const doc of [...schedules, ...departments, ...requirements]) {
+    if (!doc.released) continue;
+    const label = `${doc.number} rev ${doc.released.value}`;
+    const last = allVersions.filter((v) => v.sourceName === label).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
+    if (last?.decisionReason) doc.differs = { at: last.createdAt, by: last.decidedByName ?? last.submittedByName, why: last.decisionReason };
+  }
   // Whether what is in force came from an upload with no document, later than any document's read.
   const versionsOf = (kind: string) => uploaded.filter((set) => set.kind === kind).flatMap((set) => set.versions).filter((v) => v.state === "APPROVED");
   const newest = (dates: Date[]) => dates.reduce<Date | null>((top, one) => (!top || one > top ? one : top), null);

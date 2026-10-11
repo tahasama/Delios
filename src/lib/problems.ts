@@ -179,5 +179,6 @@ export async function findingsOfType(t: { projectId: string }, checkId: string, 
     label: d.label,
     document: documentOf(d),
     fix: fixFor(d.checkId, d.documentId),
+    accepted: d.status === "ACCEPTED" ? { by: d.acceptedBy, why: d.acceptedReason } : null,
   }));
 }

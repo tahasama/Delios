@@ -301,6 +301,12 @@ public sealed class DocumentService(
         var before = document.State;
         document.State = state;
         document.UpdatedAt = clock.GetCurrentInstant();
+        document.EndedAt = document.UpdatedAt;
+        document.EndedByName = access.UserName;
+        document.EndReason = reason;
+        document.ReinstatedAt = null;
+        document.ReinstatedByName = null;
+        document.ReinstateReason = null;
         await db.SaveChangesAsync(cancellationToken);
         await audit.WriteAsync(new Actor(access.UserId, access.UserName), "STATE_TRANSITION", "Document", document.Id,
             document.Number, $"{before} → {state}: {reason}", document.ProjectId, cancellationToken);
@@ -329,6 +335,9 @@ public sealed class DocumentService(
         var before = document.State;
         document.State = document.LatestRevisionState is null ? DocumentStates.Planned : DocumentStates.Active;
         document.UpdatedAt = clock.GetCurrentInstant();
+        document.ReinstatedAt = document.UpdatedAt;
+        document.ReinstatedByName = access.UserName;
+        document.ReinstateReason = reason;
         await db.SaveChangesAsync(cancellationToken);
         await audit.WriteAsync(new Actor(access.UserId, access.UserName), "STATE_TRANSITION", "Document", document.Id,
             document.Number, $"{before} → {document.State}: reinstated. {reason}", document.ProjectId, cancellationToken);

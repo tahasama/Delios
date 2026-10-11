@@ -41,7 +41,7 @@ export function NotifyPanel({ subject, title, body, link, people, chosen, histor
       <ActionForm action={sendNoticeAction} submitLabel="Send" hidden={{ subject, title, link }} className="mt-3 space-y-3">
         <SearchPick items={people} name="people" initial={chosen} label="To" hint="take anyone off, or add others by name" required />
         <Field label="Message" hint="what they read with it">
-          <textarea name="body" rows={3} defaultValue={body} className={inputCls} />
+          <textarea name="body" rows={3} maxLength={4000} defaultValue={body} className={inputCls} />
         </Field>
         {history.lastTo.length ? <p className="text-[11px] text-slate-500">Last sent to {history.lastTo.join(", ")}.</p> : null}
       </ActionForm>

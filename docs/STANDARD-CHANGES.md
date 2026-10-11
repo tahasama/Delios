@@ -748,6 +748,21 @@ person who asked is told. Each change is kept in the activity log.
 **Depends on it:** `Transmittal.ActivityId/ActivityAnswered*`, `/transmittals/{id}/activity-answer`, `NeedRequest.TransmittalId`,
 `ADD_TO_ACTION` Home work, `LinksCard`, `needDefaults`.
 
+## 40 · What people write is kept, and shown where it matters
+
+**Clause:** §5 *Records* and §11 *Review and approval*.
+
+**Must say:** everything a person writes and the system keeps (a comment, an
+explanation, a reason, a note, an answer, a message) is shown with the thing it
+is about and to the people it is for, not only in the activity log. A later act
+never erases it: taking a void back, lifting a hold, reinstating a document,
+sending a route back to an earlier step, or submitting corrected files keeps
+what was written before, beside what answers it. A text that is too long is
+refused, never cut.
+
+**Depends on it:** `Written` (`Revision.Unvoided*`, `Document.Ended*/Reinstated*/LegalHoldLifted*`), `Review.SendBacks`,
+`ReviewComment.ReclassifyNote`, `Package.AcceptNote`, the revision row, the review page's "Sent back".
+
 ## Still open — decided in conversation, not yet built
 
 - **Escalation** where somebody refuses to acknowledge carrying an action

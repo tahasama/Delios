@@ -27,7 +27,7 @@ public sealed record PackageView(Guid Id, string Number, string Title, string? D
     DateTimeOffset? ShortfallAcceptedAt, string? ShortfallAcceptedBy, DateTimeOffset? ClosedAt, string? ClosedBy,
     string? ClosureNote, DateTimeOffset? AcceptedAt, string? AcceptedBy, string CreatedBy, IReadOnlyList<MemberView> Members,
     IReadOnlyList<PackageTransmittal> Transmittals, string Kind, Guid? SupplierPartyId, string? Supplier, string? PurchaseOrder,
-    IReadOnlyList<string>? Reasons = null, System.Text.Json.JsonElement? Extras = null);
+    IReadOnlyList<string>? Reasons = null, System.Text.Json.JsonElement? Extras = null, string? AcceptNote = null);
 
 /// <summary>A transmittal raised for a package: a delivery, a request to its supplier, or what the supplier sent back.</summary>
 public sealed record PackageTransmittal(Guid Id, string Number, string Direction, DateTimeOffset IssuedAt, int Items);
@@ -128,6 +128,6 @@ public static class PackageEndpoints
                 r.DueDate?.ToDateOnly())).ToList(),
             await packages.TransmittalsAsync(p, cancellationToken), p.Kind, p.SupplierPartyId,
             await packages.SupplierNameAsync(p, cancellationToken), p.PurchaseOrder, [p.Reason, .. p.OtherReasons],
-            p.Extras is null ? null : System.Text.Json.JsonDocument.Parse(p.Extras).RootElement.Clone());
+            p.Extras is null ? null : System.Text.Json.JsonDocument.Parse(p.Extras).RootElement.Clone(), p.AcceptNote);
     }
 }

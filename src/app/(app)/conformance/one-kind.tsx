@@ -59,6 +59,10 @@ export async function OneKind({
                   {one.fix.label} <ArrowRight className="h-3.5 w-3.5" />
                 </Link>
               </div>
+              {/* Accepted: by whom and why, with the finding it answers. */}
+              {one.accepted?.why ? (
+                <p className="mt-1 whitespace-pre-line text-xs text-amber-900">Accepted{one.accepted.by ? ` by ${one.accepted.by}` : ""}: {one.accepted.why}</p>
+              ) : null}
               {controller && one.status === "OPEN" ? (
                 <details className="mt-1.5">
                   <summary className="cursor-pointer text-[11px] font-semibold text-slate-400 hover:text-slate-700">Fixed it, or accept it as it is…</summary>

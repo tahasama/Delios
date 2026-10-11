@@ -66,6 +66,8 @@ public sealed class Package
     public string? ClosureNote { get; set; }
     public Instant? AcceptedAt { get; set; }
     public string? AcceptedByName { get; set; }
+    /// <summary>What the acceptance authority wrote when accepting it, shown with the acceptance.</summary>
+    public string? AcceptNote { get; set; }
     public Guid CreatedById { get; set; }
     public required string CreatedByName { get; set; }
     public Instant CreatedAt { get; set; }

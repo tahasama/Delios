@@ -31,7 +31,7 @@ export type LegacyPackage = {
   acceptanceAuthorityId: string; acceptanceAuthorityName: string; acceptanceAuthorityIds: string | null;
   membershipRule: string | null; membershipFilter: string | null; membershipExcluded: string | null;
   assessedAt: Date | null; shortfall: string | null; shortfallIssuedAt: Date | null; shortfallAcceptedBy: string | null;
-  closedAt: Date | null; deliveredAt: Date | null; closureNote: string | null; acceptedAt: Date | null; acceptedByName: string | null;
+  closedAt: Date | null; deliveredAt: Date | null; closureNote: string | null; acceptedAt: Date | null; acceptedByName: string | null; acceptNote: string | null;
   transmittalId: string | null; createdAt: Date;
   members: LegacyMember[];
   /** The backend's package, for what the old record did not carry. */
@@ -141,7 +141,7 @@ async function legacyOf(scope: Scope, view: PackageView, createdAt: string, deta
     membershipFilter: narrowing ? JSON.stringify(filter) : null, membershipExcluded: JSON.stringify(view.excluded),
     assessedAt: date(view.assessedAt), shortfall, shortfallIssuedAt: date(view.shortfallIssuedAt), shortfallAcceptedBy: view.shortfallAcceptedBy,
     closedAt: date(view.closedAt), deliveredAt: delivered ? date(view.closedAt) : null, closureNote: view.closureNote,
-    acceptedAt: date(view.acceptedAt), acceptedByName: view.acceptedBy, transmittalId: outgoing[0]?.id ?? null,
+    acceptedAt: date(view.acceptedAt), acceptedByName: view.acceptedBy, acceptNote: view.acceptNote ?? null, transmittalId: outgoing[0]?.id ?? null,
     createdAt: new Date(createdAt),
     members: view.members.map((m) => ({
       id: `${view.id}-${m.documentId}`, documentId: m.documentId, requiredStatus: m.required.join(","),

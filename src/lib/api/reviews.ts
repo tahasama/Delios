@@ -70,6 +70,7 @@ function commentsOf(review: ReviewView, step: number) {
     id: one.id, authorId: one.authorId, authorName: one.author, text: one.text, progressionPreventing: one.blocking,
     status: one.status === "OPEN" ? "OPEN" : "CLOSED", closesWith: one.closesWith, closesWithStep: one.closesWithStep,
     resolution: one.resolution, createdAt: new Date(one.createdAt),
+    reclassified: one.reclassifiedAt ? { at: new Date(one.reclassifiedAt), by: one.reclassifiedBy ?? "", note: one.reclassifyNote ?? null } : null,
   }));
 }
 
@@ -121,6 +122,8 @@ async function readCycle(scope: Scope, review: ReviewView) {
     returnedToOriginatorAt: review.state === "RETURNED" && review.closedAt ? new Date(review.closedAt) : null,
     withdrawn: review.state === "WITHDRAWN" ? { note: review.returnNote, at: review.closedAt ? new Date(review.closedAt) : null } : null,
     comments: commentsOf(review, step.number),
+    // Each time the route was sent back, with the answers the reset steps had given.
+    sendBacks: review.sendBacks ?? [],
     // What an answer said in its own words: reviews answered before comments were kept as review comments.
     answerNotes: step.participants.filter((one) => one.note).map((one) => ({ by: one.name, text: one.note!, at: one.answeredAt ? new Date(one.answeredAt) : null })),
     assignments: [...step.participants.map((one, index) => ({

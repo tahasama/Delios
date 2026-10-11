@@ -82,7 +82,7 @@ export default async function PackageDetailPage({ params, searchParams }: { para
 
   const sentOn = delivery.length ? <> on {delivery.map((one, i) => <span key={one.id}>{i ? ", " : ""}<Link href={`/transmittals/${one.id}`} className="font-mono font-semibold text-link hover:underline">{one.number}</Link></span>)}</> : null;
   const note = pkg.acceptedAt
-    ? <>Delivered {fmtDate(pkg.deliveredAt ?? pkg.closedAt!)}{sentOn}, accepted by <strong className="text-slate-800">{pkg.acceptedByName}</strong> {fmtDate(pkg.acceptedAt)}.</>
+    ? <>Delivered {fmtDate(pkg.deliveredAt ?? pkg.closedAt!)}{sentOn}, accepted by <strong className="text-slate-800">{pkg.acceptedByName}</strong> {fmtDate(pkg.acceptedAt)}{pkg.acceptNote ? <>: <span className="whitespace-pre-line">{pkg.acceptNote}</span></> : "."}</>
     : pkg.closedAt
     ? <>Delivered {fmtDate(pkg.deliveredAt ?? pkg.closedAt)}{sentOn}. Waiting for <strong className="text-slate-800">{pkg.acceptanceAuthorityName}</strong> to accept it.</>
     : waitingAcceptance ? <>{readyCount} of {total} ready. Waiting for <strong className="text-slate-800">{pkg.acceptanceAuthorityName}</strong> to accept what is missing.</>

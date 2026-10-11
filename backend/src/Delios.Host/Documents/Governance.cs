@@ -142,6 +142,7 @@ public static class GovernanceEndpoints
         comment.Class = code;
         comment.ReclassifiedAt = clock.GetCurrentInstant();
         comment.ReclassifiedByName = access.UserName;
+        comment.ReclassifyNote = string.IsNullOrWhiteSpace(r.Note) ? null : r.Note.Trim();
         await db.SaveChangesAsync(c);
         await audit.WriteAsync(Who(access), "COMMENT_RECLASSIFIED", "Review", review.Id, review.Number,
             $"{(r.Blocking ? "Now stops the release" : "No longer stops the release")}: \"{(comment.Text.Length > 120 ? comment.Text[..120] + "…" : comment.Text)}\""

@@ -104,6 +104,11 @@ public sealed class Review
     public Instant? ApprovalWithdrawnAt { get; set; }
     public string? ApprovalWithdrawnByName { get; set; }
     public string? ApprovalWithdrawnReason { get; set; }
+    /// <summary>
+    /// Each time the route was sent back to a step: who, when, why, and the answers the steps it reset had given,
+    /// as JSON (a list of <see cref="SendBack"/>). Sending back never erases what people answered.
+    /// </summary>
+    public string? SendBacks { get; set; }
     /// <summary>Row version, changed by the database on each update; used to detect two saves of the same review at once.</summary>
     public uint Version { get; set; }
     public List<ReviewStep> Steps { get; set; } = [];
@@ -229,6 +234,8 @@ public sealed class ReviewComment
     public bool? OriginalBlocking { get; set; }
     public Instant? ReclassifiedAt { get; set; }
     public string? ReclassifiedByName { get; set; }
+    /// <summary>Why it was reclassified, in the words of whoever did it, when they said.</summary>
+    public string? ReclassifyNote { get; set; }
 }
 
 /// <summary>What settles a comment: the next revision (REVISION) or a later step of the same route (STEP).</summary>
@@ -316,3 +323,9 @@ public static class ReviewSets
     /// </summary>
     public const string ControlOutcomes = "CONTROL_OUTCOMES";
 }
+
+/// <summary>The route sent back to a step: who, when, why, and what the steps it reset had answered.</summary>
+public sealed record SendBack(DateTimeOffset At, string By, int ToStep, string Reason, string? Note, IReadOnlyList<EarlierAnswer> Answers);
+
+/// <summary>An answer a step had given before the route was sent back over it: kept, shown with the review.</summary>
+public sealed record EarlierAnswer(int Step, string Title, string Who, string? Answer, string? Status, string? Note, DateTimeOffset? At);

@@ -88,6 +88,11 @@ export function PlanListPanel({ list, control }: { list: PlanList; control: bool
                   {doc.released ? ` · in force: rev ${doc.released.value}${doc.read ? ", list read" : ", list not read yet"}` : " · nothing released yet"}
                   {doc.pending ? ` · rev ${doc.pending.value} ${said(doc.pending.state)}` : ""}
                 </span>
+                {doc.differs ? (
+                  <span className="block whitespace-pre-line text-amber-900">
+                    Read from a file that differs from rev {doc.released?.value} as released, uploaded {fmtDate(doc.differs.at)}{doc.differs.by ? ` by ${doc.differs.by}` : ""}. Why: {doc.differs.why}
+                  </span>
+                ) : null}
               </li>
             ))}
           </ul>

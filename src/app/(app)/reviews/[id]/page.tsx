@@ -288,6 +288,35 @@ export default async function ReviewCyclePage({ params }: { params: Promise<{ id
             {rendition ? <iframe src={`/api/files/${rendition.id}`} title={`${doc.docNumber} revision ${rev.value}`} className="block h-160 w-full bg-canvas"/> : <div className="grid h-48 place-items-center bg-canvas/50 p-6 text-center"><div><FileText className="mx-auto h-8 w-8 text-slate-400"/><p className="mt-2 text-sm font-semibold text-slate-700">No PDF attached</p><Link href={`/documents/${doc.id}#workflow`} className="mt-2 inline-block text-xs font-semibold text-link hover:underline">Attach it on the document →</Link></div></div>}
           </section>
 
+          {/* Each time the route was sent back: who, when, why, and what the steps it
+              reset had answered. Sending back never erases an answer. */}
+          {cycle.sendBacks.length ? (
+            <Card title="Sent back" description="What the steps had answered before the route went back.">
+              <ul className="space-y-3">
+                {cycle.sendBacks.map((back, index) => (
+                  <li key={index} className="space-y-1.5 text-xs leading-5">
+                    <p className="whitespace-pre-line text-slate-700">
+                      <span className="font-semibold text-slate-900">Back to step {back.toStep}</span> — {back.by}, {fmtDateTime(back.at)} · {back.reason}
+                      {back.note ? <span className="block text-slate-600">{back.note}</span> : null}
+                    </p>
+                    {back.answers.length ? (
+                      <ul className="space-y-1.5 border-l border-line pl-3">
+                        {back.answers.map((one, i) => (
+                          <li key={i} className="text-slate-600">
+                            <span className="font-semibold text-slate-800">{one.step}. {one.title}</span> · {one.who}
+                            {one.answer ? ` · ${verdictLabel(one.answer)}` : ""}{one.status ? ` at ${one.status}` : ""}
+                            {one.at ? <span className="text-slate-400"> · {fmtDateTime(one.at)}</span> : null}
+                            {one.note ? <span className="block whitespace-pre-line text-slate-600">{one.note}</span> : null}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : <p className="text-slate-500">No step had answered yet.</p>}
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          ) : null}
+
           {/* Comments are written with the answer, under the verdict or advice
               that needs them; this lists them.
               Document Control, or the revision's author, may change whether an
@@ -303,6 +332,13 @@ export default async function ReviewCyclePage({ params }: { params: Promise<{ id
                         {comment.authorName} · {fmtDateTime(comment.createdAt)}
                         {comment.progressionPreventing ? (comment.status === "OPEN" ? " · stops the release" : " · settled") : null}
                       </p>
+                      {/* Reclassified: by whom, when, and why, kept with the comment. */}
+                      {comment.reclassified ? (
+                        <p className="mt-1 whitespace-pre-line text-[11px] text-slate-600">
+                          {comment.progressionPreventing ? "Made to stop the release" : "No longer stops the release"} — {comment.reclassified.by}, {fmtDate(comment.reclassified.at)}
+                          {comment.reclassified.note ? `: ${comment.reclassified.note}` : ""}
+                        </p>
+                      ) : null}
                       {mayComment && comment.authorId === user.id && comment.status === "OPEN" ? (
                         <div className="mt-2 flex flex-wrap items-start gap-3">
                           <details>
@@ -322,7 +358,7 @@ export default async function ReviewCyclePage({ params }: { params: Promise<{ id
                           <summary className="cursor-pointer text-[11px] font-semibold text-link">{comment.progressionPreventing ? "Let it no longer stop the release" : "Make it stop the release"}</summary>
                           <div className="mt-2">
                             <ActionForm action={reclassifyCommentAction} submitLabel="Reclassify" size="sm" hidden={{ cycleId: cycle.id, commentId: comment.id, ...(comment.progressionPreventing ? {} : { prevent: "on" }) }}>
-                              <Field label="Why" hint="optional — kept with the comment"><input name="note" className={inputCls} /></Field>
+                              <Field label="Why" hint="optional — shown with the comment"><input name="note" className={inputCls} /></Field>
                             </ActionForm>
                           </div>
                         </details>

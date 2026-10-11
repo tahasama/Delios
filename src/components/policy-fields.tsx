@@ -52,7 +52,7 @@ export function Added({ fields, values, className }: { fields: OwnField[]; value
         return (
           <Field key={field.key} label={field.label} required={required} hint={field.help ?? undefined} className={className}>
             {field.control === "LONG_TEXT" ? (
-              <textarea name={name} required={required} defaultValue={value} rows={3} className={inputCls} />
+              <textarea name={name} required={required} defaultValue={value} rows={3} maxLength={2000} className={inputCls} />
             ) : field.control === "CHOICE" ? (
               <select name={name} required={required} defaultValue={value} className={inputCls}>
                 <option value="">{required ? "Choose…" : "—"}</option>

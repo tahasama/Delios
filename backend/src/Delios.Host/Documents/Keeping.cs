@@ -89,6 +89,9 @@ public sealed class KeepingService(
         revision.VoidedAt = now;
         revision.VoidReason = reason;
         revision.VoidAuthority = access.UserName;
+        revision.UnvoidedAt = null;
+        revision.UnvoidedByName = null;
+        revision.UnvoidReason = null;
         db.Enqueue(Reviews.RevisionMarked.RoutingKey, new Reviews.RevisionMarked(revision.TenantId, revision.Id, FileKinds.Void, $"Void: {reason}"));
         if (request.Reassessment?.Trim() is { Length: > 0 } reassessment)
         {
@@ -136,9 +139,10 @@ public sealed class KeepingService(
         var now = clock.GetCurrentInstant();
         var back = revision.ReleasedAt is not null ? RevisionStates.Released : RevisionStates.InPreparation;
         revision.State = back;
-        revision.VoidedAt = null;
-        revision.VoidReason = null;
-        revision.VoidAuthority = null;
+        // The void stays on record beside its taking back: the revision says both.
+        revision.UnvoidedAt = clock.GetCurrentInstant();
+        revision.UnvoidedByName = access.UserName;
+        revision.UnvoidReason = reason;
         if (document.LatestRevisionId == revision.Id) document.LatestRevisionState = back;
         document.UpdatedAt = now;
         var label = $"{document.Number} rev {revision.Value}";
@@ -210,9 +214,22 @@ public sealed class KeepingService(
         if (reason.Length == 0)
             return Problems.Invalid("REASON_REQUIRED", request.On ? "Say why it is held: the claim, dispute or instruction." : "Say why the hold is lifted.");
         document.LegalHold = request.On;
-        document.LegalHoldReason = request.On ? reason : null;
-        document.LegalHoldAt = request.On ? clock.GetCurrentInstant() : null;
-        document.LegalHoldByName = request.On ? access.UserName : null;
+        if (request.On)
+        {
+            document.LegalHoldReason = reason;
+            document.LegalHoldAt = clock.GetCurrentInstant();
+            document.LegalHoldByName = access.UserName;
+            document.LegalHoldLiftedAt = null;
+            document.LegalHoldLiftedByName = null;
+            document.LegalHoldLiftReason = null;
+        }
+        else
+        {
+            // Lifted: the hold's reason stays, with why it was lifted beside it.
+            document.LegalHoldLiftedAt = clock.GetCurrentInstant();
+            document.LegalHoldLiftedByName = access.UserName;
+            document.LegalHoldLiftReason = reason;
+        }
         await audit.WriteAsync(new Actor(access.UserId, access.UserName), "LEGAL_HOLD", "Document", document.Id, document.Number,
             request.On ? $"Legal hold: it may not be retired nor any revision voided. {reason}" : $"Legal hold lifted. {reason}",
             access.Project.Id, cancellationToken);

@@ -271,7 +271,9 @@ public static class DocumentEndpoints
         d.CreatedAt.ToDateTimeOffset(), d.UpdatedAt.ToDateTimeOffset(), d.Revisions.Select(View).ToList(), d.CreatedById,
         d.LegalHold, d.LegalHoldReason, d.PreviousNumber, d.LegacyScheme, d.AppVersion,
         d.Extras is null ? null : System.Text.Json.JsonDocument.Parse(d.Extras).RootElement.Clone(), d.ConfirmedAt?.ToDateTimeOffset(),
-        d.ConfirmedByName, d.CorrectsId, d.LegalHoldAt?.ToDateTimeOffset(), d.LegalHoldByName);
+        d.ConfirmedByName, d.CorrectsId, d.LegalHoldAt?.ToDateTimeOffset(), d.LegalHoldByName,
+        Written.Of(d.LegalHoldLiftedAt, d.LegalHoldLiftedByName, d.LegalHoldLiftReason), Written.Of(d.EndedAt, d.EndedByName, d.EndReason),
+        Written.Of(d.ReinstatedAt, d.ReinstatedByName, d.ReinstateReason));
 
     /// <summary>Turns a revision entity, with its submissions and files, into the shape the API returns.</summary>
     private static RevisionView View(Revision r) => new(
@@ -283,5 +285,6 @@ public static class DocumentEndpoints
         r.Files.Select(f => new FileView(f.Id, f.Name, f.Kind, f.ContentType, f.Size, f.Sha256, f.Status,
             f.StatusDetail, f.DetectedType, f.CreatedAt.ToDateTimeOffset(), f.DerivedFromId, f.Submission)).ToList(),
         r.AuthoredById, r.AuthoredByParty, r.ReleasedByName, r.ReturnedAt?.ToDateTimeOffset(), r.HeldAt?.ToDateTimeOffset(), r.HeldReason,
-        r.HeldByName, r.VoidedAt?.ToDateTimeOffset(), r.VoidReason, r.VoidAuthority, r.VoidReassessment);
+        r.HeldByName, r.VoidedAt?.ToDateTimeOffset(), r.VoidReason, r.VoidAuthority, r.VoidReassessment,
+        Written.Of(r.UnvoidedAt, r.UnvoidedByName, r.UnvoidReason));
 }

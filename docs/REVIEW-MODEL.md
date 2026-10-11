@@ -467,6 +467,12 @@ and words of their own; everyone on the route is told, with their name. Nobody's
 verdict is quietly undone, and a rewind used as a do-over is visible rather than
 prevented.
 
+**What the reset steps had answered is kept.** Every send-back is recorded with
+the review: who, when, the reason and their words, and each answer the steps it
+reset had given (who, the verdict or advice, the status, their note, an outside
+party's recorded answer). The review page shows them under "Sent back". The
+steps open again empty; nothing anybody wrote is erased.
+
 **The control function has two acts there, and which it may take depends on the
 verdict.** A final verdict — accepted, accepted with comments — can be released:
 the status goes in force and the previous revision is superseded. A verdict that

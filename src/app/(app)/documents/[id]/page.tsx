@@ -110,15 +110,6 @@ export default async function DocumentDetailPage({
   ]);
   const mayRetire = controller || (!withdrawIsControl && doc.createdById === user.id);
   // Withdrawn is for a document that was released; cancelled for one that never was.
-  // What happened to each revision, with its reason: its own events, and the
-  // document's while it was the newest (cancelled, withdrawn, held…).
-  const eventsOf = (revId: string) => {
-    const index = doc.revisions.findIndex((one) => one.id === revId);
-    const from = doc.revisions[index]?.createdAt;
-    const until = index > 0 ? doc.revisions[index - 1].createdAt : null;
-    return auditEvents.filter((e) => e.entityId === revId
-      || (e.entityType === "Document" && from && e.ts >= from && (!until || e.ts < until)));
-  };
   const lastReleased = doc.revisions.find((one) => one.state === "RELEASED" || one.state === "SUPERSEDED");
   const everReleased = !!lastReleased;
 
@@ -533,6 +524,12 @@ export default async function DocumentDetailPage({
           {doc.legalHoldReason ?? "No reason was recorded."} While held it cannot be retired and no revision voided. New revisions and reviews go on.
         </Banner>
       ) : null}
+      {/* Ended: why, where its state is read. */}
+      {(doc.state === "CANCELLED" || doc.state === "WITHDRAWN") && doc.ended ? (
+        <Banner tone="danger" title={`${doc.state === "CANCELLED" ? "Cancelled" : "Withdrawn"} ${fmtDate(doc.ended.at)} — ${doc.ended.by}`}>
+          <span className="whitespace-pre-line">{doc.ended.reason}</span>
+        </Banner>
+      ) : null}
       {sp.released ? (
         <Banner tone="good" title={`Released${sp.superseded ? ` · rev ${sp.superseded} superseded` : ""}`}>
           This revision is now the one in use.{sp.issued && sp.issued !== "0" ? ` It was issued as the decision asked: ${sp.issued} transmittal${sp.issued === "1" ? "" : "s"} raised.` : " Nobody has been told yet."}
@@ -656,13 +653,30 @@ export default async function DocumentDetailPage({
                 ) : canEdit && doc.kind !== "RECORD" ? (
                   <p className="mt-4 text-xs text-slate-500">To change these details, start a new revision: they change with it.</p>
                 ) : null}
+                {/* What was decided about it and is over now, each with why: the hold that was lifted, the end that was taken back. */}
+                {(!doc.legalHold && doc.holdLifted) || (doc.reinstated && doc.state !== "CANCELLED" && doc.state !== "WITHDRAWN") ? (
+                  <div className="mt-4 space-y-2 border-t border-line pt-3 text-xs leading-5 text-slate-600">
+                    {!doc.legalHold && doc.holdLifted ? (
+                      <p className="whitespace-pre-line">
+                        <span className="font-semibold text-slate-800">Legal hold lifted</span> {fmtDate(doc.holdLifted.at)} by {doc.holdLifted.by}: {doc.holdLifted.reason}
+                        {doc.legalHoldReason ? <span className="block text-slate-500">It had been held {fmtDate(doc.legalHoldAt)}{doc.legalHoldBy ? ` by ${doc.legalHoldBy}` : ""}: {doc.legalHoldReason}</span> : null}
+                      </p>
+                    ) : null}
+                    {doc.reinstated && doc.state !== "CANCELLED" && doc.state !== "WITHDRAWN" ? (
+                      <p className="whitespace-pre-line">
+                        <span className="font-semibold text-slate-800">Reinstated</span> {fmtDate(doc.reinstated.at)} by {doc.reinstated.by}: {doc.reinstated.reason}
+                        {doc.ended ? <span className="block text-slate-500">It had been ended {fmtDate(doc.ended.at)} by {doc.ended.by}: {doc.ended.reason}</span> : null}
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
                 {/* Two different intentions, kept apart: hold keeps it as it is; ending it says it is finished. */}
                 {controller ? (
                   <details className="mt-3">
                     <summary className="cursor-pointer list-none text-xs font-semibold text-slate-500">{doc.legalHold ? "Lift the legal hold…" : "Put on legal hold…"}</summary>
                     <div className="mt-3 max-w-md">
                       <ActionForm action={setLegalHoldAction} submitLabel={doc.legalHold ? "Lift legal hold" : "Put on legal hold"} size="sm" variant="secondary" hidden={{ documentId: doc.id, hold: doc.legalHold ? "off" : "on" }}>
-                        <Field label={doc.legalHold ? "Why it is lifted" : "Why it is held"} required hint={doc.legalHold ? "kept in the activity log" : "while held it cannot be ended and no revision voided; work on it goes on"}>
+                        <Field label={doc.legalHold ? "Why it is lifted" : "Why it is held"} required hint={doc.legalHold ? "shown on the document with the hold's own reason" : "while held it cannot be ended and no revision voided; work on it goes on"}>
                           <input name="reason" required className={inputCls} placeholder={doc.legalHold ? "e.g. Claim settled" : "e.g. Claim 42 from the contractor"} />
                         </Field>
                       </ActionForm>
@@ -764,7 +778,7 @@ export default async function DocumentDetailPage({
                 {doc.revisions.map((rev, index) => (
                   /* Only the newest revision can still be acted on. Everything
                      before it is frozen as it was issued. */
-                  <RevisionRow key={rev.id} rev={rev} latest={index === 0} followedBy={index > 0 ? { value: doc.revisions[index - 1].value, why: doc.revisions[index - 1].reasonForRevision } : null} statusLabel={label(statuses, rev.statusCode)} stateLabel={stateName(names, rev.state, { together, held: !!rev.heldAt })} controller={controller} userId={user.id} userRole={user.role} voidIsControl={voidIsControl} held={doc.legalHold} events={eventsOf(rev.id)} />
+                  <RevisionRow key={rev.id} rev={rev} latest={index === 0} followedBy={index > 0 ? { value: doc.revisions[index - 1].value, why: doc.revisions[index - 1].reasonForRevision } : null} statusLabel={label(statuses, rev.statusCode)} stateLabel={stateName(names, rev.state, { together, held: !!rev.heldAt })} controller={controller} userId={user.id} userRole={user.role} voidIsControl={voidIsControl} held={doc.legalHold} />
                 ))}
               </ul>
             ) : <Empty>No revision yet.</Empty>,
@@ -934,7 +948,7 @@ function prettyState(value: string) { return value.replaceAll("_", " ").toLowerC
 type RevData = LegacyRevision;
 
 /** One line per revision; its record and its per-revision controls open in place. */
-function RevisionRow({ rev, latest, followedBy, statusLabel, stateLabel, controller, userId, userRole, voidIsControl, held = false, events = [] }: { rev: RevData; latest: boolean; followedBy: { value: string; why: string | null } | null; statusLabel: string | null; stateLabel: string; controller: boolean; userId: string; userRole: string; voidIsControl: boolean; held?: boolean; events?: { id: string; actorName: string; action: string; detail: string | null; ts: Date }[] }) {
+function RevisionRow({ rev, latest, followedBy, statusLabel, stateLabel, controller, userId, userRole, voidIsControl, held = false }: { rev: RevData; latest: boolean; followedBy: { value: string; why: string | null } | null; statusLabel: string | null; stateLabel: string; controller: boolean; userId: string; userRole: string; voidIsControl: boolean; held?: boolean }) {
   const state = rev.state as RevState;
   const pdf = rev.files.find((f) => f.kind === "RENDITION");
   const native = rev.files.find((f) => f.kind === "NATIVE");
@@ -973,18 +987,37 @@ function RevisionRow({ rev, latest, followedBy, statusLabel, stateLabel, control
             ))}
           </dl>
 
-          {/* What happened to this revision, each with who, when and why. */}
-          {events.length ? (
-            <div>
-              <p className="text-[11px] text-slate-400">What happened to it</p>
-              <ul className="mt-1 space-y-1">
-                {[...events].reverse().map((e) => (
-                  <li key={e.id} className="text-xs text-slate-700">
-                    <span className="text-slate-400">{fmtDate(e.ts)}</span> · <span className="font-semibold">{prettyState(e.action)}</span> · {e.actorName}
-                    {e.detail ? <span className="block pl-3 text-slate-500">{plain(e.detail)}</span> : null}
-                  </li>
-                ))}
-              </ul>
+          {/* Each submission Document Control judged, with what it said when it sent one back. */}
+          {rev.backend.submissions.some((one) => one.note) ? (
+            <ul className="space-y-1 text-xs leading-5">
+              {rev.backend.submissions.filter((one) => one.note).map((one) => (
+                <li key={one.number} className="whitespace-pre-line text-slate-600">
+                  <span className="font-semibold text-slate-800">Submission {one.number}</span>
+                  {one.outcome ? ` · ${prettyState(one.outcome)}` : ""}{one.decidedBy ? ` by ${one.decidedBy}` : ""}{one.decidedAt ? `, ${fmtDate(one.decidedAt)}` : ""}: {one.note}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+
+          {/* On hold, and why: kept on the row once a later revision is the one shown at the top. */}
+          {rev.heldAt && rev.heldReason ? (
+            <p className="whitespace-pre-line text-xs leading-5 text-red-800">
+              <span className="font-semibold">On hold</span> since {fmtDate(rev.heldAt)}{rev.heldByName ? ` by ${rev.heldByName}` : ""}: {rev.heldReason}
+            </p>
+          ) : null}
+
+          {/* The void on this revision, and its taking back, each with who, when and why. */}
+          {rev.voidReason && rev.voidedAt ? (
+            <div className="space-y-1 text-xs leading-5">
+              <p className={`whitespace-pre-line ${state === "VOID" ? "text-red-800" : "text-slate-500"}`}>
+                <span className="font-semibold">Voided</span> {fmtDate(rev.voidedAt)}{rev.voidAuthority ? ` by ${rev.voidAuthority}` : ""}: {rev.voidReason}
+                {rev.voidReassessment ? <span className="block text-slate-600">Impact on work already done: {rev.voidReassessment}</span> : null}
+              </p>
+              {state !== "VOID" && rev.backend.unvoided ? (
+                <p className="whitespace-pre-line text-emerald-800">
+                  <span className="font-semibold">Void taken back</span> {fmtDate(rev.backend.unvoided.at)} by {rev.backend.unvoided.by}: {rev.backend.unvoided.reason}
+                </p>
+              ) : null}
             </div>
           ) : null}
 

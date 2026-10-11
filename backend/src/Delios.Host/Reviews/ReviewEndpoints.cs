@@ -27,7 +27,7 @@ public sealed record StepView(int Number, string Title, string? Function, string
 /// <summary>A review comment as sent to the client. <c>Step</c> and <c>ClosesWithStep</c> count from 1.</summary>
 public sealed record CommentView(Guid Id, int Step, string Author, string Text, string Class, bool Blocking,
     string ClosesWith, int? ClosesWithStep, string Status, string? Resolution, string? ClosedBy, DateTimeOffset CreatedAt, Guid AuthorId,
-    bool? OriginalBlocking = null, DateTimeOffset? ReclassifiedAt = null, string? ReclassifiedBy = null);
+    bool? OriginalBlocking = null, DateTimeOffset? ReclassifiedAt = null, string? ReclassifiedBy = null, string? ReclassifyNote = null);
 
 /// <summary>The full review as sent to the client: its state, its steps and its comments. Built by <see cref="ReviewEndpoints.View(Review)"/>.</summary>
 public sealed record ReviewView(Guid Id, string Number, Guid DocumentId, Guid RevisionId, string Route, string State,
@@ -35,7 +35,7 @@ public sealed record ReviewView(Guid Id, string Number, Guid DocumentId, Guid Re
     DateTimeOffset? DecidedAt, DateTimeOffset? ClosedAt, string? ClosedBy, string? ReturnNote,
     IReadOnlyList<StepView> Steps, IReadOnlyList<CommentView> Comments, DateTimeOffset? ApprovalWithdrawnAt = null,
     string? ApprovalWithdrawnBy = null, string? ApprovalWithdrawnReason = null, string VerdictSet = ReviewSets.Verdicts,
-    Guid? StartedById = null);
+    Guid? StartedById = null, IReadOnlyList<SendBack>? SendBacks = null);
 
 /// <summary>
 /// The HTTP endpoints for reviews: listing routes, starting a review, commenting, answering, releasing, returning, rewinding and dispatching steps.
@@ -240,11 +240,12 @@ public static class ReviewEndpoints
             s.TransmittalId, s.DispatchedAt?.ToDateTimeOffset(), s.DispatchChannel, s.DispatchRef, s.DispatchedByName,
             s.ForeignAnswer, s.RecordedByName, s.EvidenceFileId, s.WarnedAt?.ToDateTimeOffset())).ToList(),
         r.Comments.Where(c => c.Status != CommentStatuses.Withdrawn).OrderBy(c => c.CreatedAt).Select(View).ToList(),
-        r.ApprovalWithdrawnAt?.ToDateTimeOffset(), r.ApprovalWithdrawnByName, r.ApprovalWithdrawnReason, r.VerdictSet, r.StartedById);
+        r.ApprovalWithdrawnAt?.ToDateTimeOffset(), r.ApprovalWithdrawnByName, r.ApprovalWithdrawnReason, r.VerdictSet, r.StartedById,
+        r.SendBacks is null ? [] : System.Text.Json.JsonSerializer.Deserialize<List<SendBack>>(r.SendBacks) ?? []);
 
     /// <summary>Converts a review comment entity into the <see cref="CommentView"/> sent to clients.</summary>
     private static CommentView View(ReviewComment c) => new(
         c.Id, c.StepIndex + 1, c.AuthorName, c.Text, c.Class, c.Blocking, c.ClosesWith, c.ClosesWithStep, c.Status,
         c.Resolution, c.ClosedByName, c.CreatedAt.ToDateTimeOffset(), c.AuthorId, c.OriginalBlocking, c.ReclassifiedAt?.ToDateTimeOffset(),
-        c.ReclassifiedByName);
+        c.ReclassifiedByName, c.ReclassifyNote);
 }

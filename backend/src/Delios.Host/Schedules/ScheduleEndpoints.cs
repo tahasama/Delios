@@ -545,6 +545,9 @@ public static class ScheduleEndpoints
             return Problems.Forbidden("NOTICE_NOT_ALLOWED", "Document Control, whoever plans the project, or whoever started the review sends these notices.");
         var title = request.Title?.Trim() ?? "";
         if (subject.Length == 0 || title.Length == 0) return Problems.Invalid("NOTICE_INCOMPLETE", "Say what the notice is about.");
+        // What is written is kept whole: too long is refused, never cut.
+        if (title.Length > 300 || (request.Body?.Trim().Length ?? 0) > 4000)
+            return Problems.Invalid("NOTICE_TOO_LONG", "Keep the title under 300 characters and the message under 4000.");
         var chosen = (request.People ?? []).Distinct().ToArray();
         // Only people on this project are told.
         var people = await db.Memberships.AsNoTracking().Where(m => m.ProjectId == access.Project.Id && m.Active && chosen.Contains(m.UserId))

@@ -1545,6 +1545,20 @@ public sealed class ReviewService(
         }
 
         var reset = review.Steps.Where(s => s.Index >= index).ToList();
+        // What the reset steps had answered is kept with the review, with who sent it back and why.
+        var answers = reset.OrderBy(s => s.Index).SelectMany(s => s.Participants.Where(p => p.AnsweredAt is not null)
+                .OrderBy(p => p.AnsweredAt)
+                .Select(p => new EarlierAnswer(s.Index + 1, s.Title, p.AnsweredByName ?? p.UserName, p.Answer, p.GrantedStatus, p.Note,
+                    p.AnsweredAt?.ToDateTimeOffset()))
+                .Concat(s.ForeignAnswer is { } foreign
+                    ? [new EarlierAnswer(s.Index + 1, s.Title, s.PartyName ?? s.RecordedByName ?? "", s.Answer, null,
+                        $"{foreign}{(s.RecordedByName is null ? "" : $" (recorded by {s.RecordedByName})")}", s.CompletedAt?.ToDateTimeOffset())]
+                    : []))
+            .ToList();
+        var sendBacks = review.SendBacks is null ? [] : JsonSerializer.Deserialize<List<SendBack>>(review.SendBacks) ?? [];
+        sendBacks.Add(new SendBack(clock.GetCurrentInstant().ToDateTimeOffset(), access.UserName, index + 1, reason,
+            string.IsNullOrWhiteSpace(note) ? null : note.Trim(), answers));
+        review.SendBacks = JsonSerializer.Serialize(sendBacks);
         var seats = reset.SelectMany(s => s.Participants).ToList();
         db.ReviewParticipants.RemoveRange(seats);
         foreach (var s in reset)

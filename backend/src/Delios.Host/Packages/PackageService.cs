@@ -483,6 +483,7 @@ public sealed class PackageService(
         package.State = PackageStates.Accepted;
         package.AcceptedAt = clock.GetCurrentInstant();
         package.AcceptedByName = access.UserName;
+        package.AcceptNote = string.IsNullOrWhiteSpace(request.Note) ? null : request.Note.Trim();
         await audit.WriteAsync(Actor(access), "PACKAGE_ACCEPTED", "Package", package.Id, package.Number,
             $"Accepted by {access.UserName}. {request.Note}".Trim(), package.ProjectId, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);

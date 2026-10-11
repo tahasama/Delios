@@ -57,6 +57,8 @@ public static class ListUploadEndpoints
         if (!Lists.TryGetValue(request.Kind ?? "", out var list)) return Problems.Invalid("LIST_UNKNOWN", "Choose the schedule, the disciplines per action or the document requirements.");
         var project = access.Project;
         var reason = request.Reason?.Trim() ?? "";
+        // A reason is kept whole, never cut: one too long is refused, not shortened.
+        if (reason.Length > 2000) return Problems.Invalid("REASON_TOO_LONG", "Keep the reason under 2000 characters.");
 
         // The released revision the file is the list of, or none, knowingly.
         Revision? revision = null;
@@ -155,7 +157,7 @@ public static class ListUploadEndpoints
             CreatedAt = now,
             DecidedByName = access.UserName,
             DecidedAt = now,
-            DecisionReason = reason.Length == 0 ? null : reason.Length > 2000 ? reason[..2000] : reason,
+            DecisionReason = reason.Length == 0 ? null : reason,
             AppliedAt = now,
             AppliedSummary = note,
         });

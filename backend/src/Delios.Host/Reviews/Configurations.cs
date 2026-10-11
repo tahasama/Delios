@@ -29,6 +29,7 @@ internal sealed class ReviewConfiguration : IEntityTypeConfiguration<Review>
         b.HasOne<Project>().WithMany().HasForeignKey(x => x.ProjectId).OnDelete(DeleteBehavior.Restrict);
         b.HasOne<Document>().WithMany().HasForeignKey(x => x.DocumentId).OnDelete(DeleteBehavior.Restrict);
         b.HasOne<Revision>().WithMany().HasForeignKey(x => x.RevisionId).OnDelete(DeleteBehavior.Restrict);
+        b.Property(x => x.SendBacks).HasColumnType("jsonb");
         b.HasMany(x => x.Steps).WithOne().HasForeignKey(x => x.ReviewId).OnDelete(DeleteBehavior.Restrict);
         b.HasMany(x => x.Comments).WithOne().HasForeignKey(x => x.ReviewId).OnDelete(DeleteBehavior.Restrict);
         b.HasIndex(x => new { x.ProjectId, x.Number }).IsUnique();

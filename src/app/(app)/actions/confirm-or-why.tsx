@@ -16,7 +16,7 @@ export function ConfirmOrWhy({ revision }: { revision: string }) {
         <span>This file is {revision} as released; I take responsibility for it matching.</span>
       </label>
       {vouched ? null : (
-        <Field label="It differs from the released revision — why" required hint="kept in the activity log">
+        <Field label="It differs from the released revision — why" required hint="shown beside that revision on this page">
           <input name="reason" required className={inputCls} placeholder="e.g. The approver is away; the stamped scan follows" />
         </Field>
       )}

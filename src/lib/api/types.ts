@@ -117,7 +117,12 @@ export type DocumentView = {
   legalHold: boolean; legalHoldReason: string | null; legalHoldAt?: string | null; legalHoldBy?: string | null; previousNumber: string | null; legacyScheme: string | null; appVersion: string | null;
   extras: Record<string, string> | null;
   confirmedAt?: string | null; confirmedByName?: string | null; correctsId?: string | null;
+  /** The hold lifted; the document cancelled or withdrawn; reinstated after. Each kept beside what it answers. */
+  holdLifted?: Written | null; ended?: Written | null; reinstated?: Written | null;
 };
+
+/** Something a person decided and wrote down: when, who, and why, in their words. */
+export type Written = { at: string; by: string; reason: string };
 
 export type RevisionView = {
   id: string; value: string; series: string; state: string; filesState: string; reasonForRevision: string | null;
@@ -129,6 +134,8 @@ export type RevisionView = {
   authoredById: string; authoredByParty: string | null; releasedByName: string | null; returnedAt: string | null;
   heldAt: string | null; heldReason: string | null; heldByName: string | null;
   voidedAt: string | null; voidReason: string | null; voidAuthority: string | null; voidReassessment: string | null;
+  /** A void taken back; the void's own reason stays beside it. */
+  unvoided?: Written | null;
 };
 
 /** GET /documents/{id}/context (DocumentContext.cs). */
@@ -176,8 +183,10 @@ export type ReviewView = {
   comments: {
     id: string; step: number; author: string; text: string; class: string; blocking: boolean; closesWith: string; closesWithStep: number | null;
     status: string; resolution: string | null; closedBy: string | null; createdAt: string; authorId: string;
-    originalBlocking?: boolean | null; reclassifiedAt?: string | null; reclassifiedBy?: string | null;
+    originalBlocking?: boolean | null; reclassifiedAt?: string | null; reclassifiedBy?: string | null; reclassifyNote?: string | null;
   }[];
+  /** Each time the route was sent back to a step, with what the steps it reset had answered: kept, never erased. */
+  sendBacks?: SendBack[];
   approvalWithdrawnAt?: string | null; approvalWithdrawnBy?: string | null; approvalWithdrawnReason?: string | null;
   verdictSet?: string;
   /** Who started the review: they may notify its people by hand. */
@@ -273,6 +282,8 @@ export type PackageView = {
   shortfallIssuedAt: string | null; shortfallAcceptedAt: string | null; shortfallAcceptedBy: string | null;
   closedAt: string | null; closedBy: string | null; closureNote: string | null;
   acceptedAt: string | null; acceptedBy: string | null; createdBy: string;
+  /** What the acceptance authority wrote when accepting it. */
+  acceptNote?: string | null;
   members: {
     documentId: string; documentNumber: string; title: string; revision: string | null; status: string | null; required: string[]; ready: boolean; byRule: boolean;
     /** Supply: when the supplier was asked for it; its latest revision and where that stands; when it is due. */
@@ -294,4 +305,10 @@ export type ActivitySummary = {
   externalId?: string | null;
   /** The latest schedule read moved it: the dates before, and which read ("rev C", "a direct upload"). */
   moved?: { wasStart: string | null; wasFinish: string | null; in: string; at: string } | null;
+};
+
+/** The route sent back to a step: who, when, why, and what the steps it reset had answered. */
+export type SendBack = {
+  at: string; by: string; toStep: number; reason: string; note: string | null;
+  answers: { step: number; title: string; who: string; answer: string | null; status: string | null; note: string | null; at: string | null }[];
 };

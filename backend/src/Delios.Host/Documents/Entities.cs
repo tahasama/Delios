@@ -166,6 +166,18 @@ public sealed class Document
     public string? LegalHoldReason { get; set; }
     public Instant? LegalHoldAt { get; set; }
     public string? LegalHoldByName { get; set; }
+    /// <summary>The hold lifted: who, when and why. The hold's own reason stays beside it. Cleared when it is held again.</summary>
+    public Instant? LegalHoldLiftedAt { get; set; }
+    public string? LegalHoldLiftedByName { get; set; }
+    public string? LegalHoldLiftReason { get; set; }
+    /// <summary>Cancelled or withdrawn: who, when and why, shown where its state is. Kept when it is reinstated.</summary>
+    public Instant? EndedAt { get; set; }
+    public string? EndedByName { get; set; }
+    public string? EndReason { get; set; }
+    /// <summary>Reinstated after it was ended: who, when and why. Cleared when it is ended again.</summary>
+    public Instant? ReinstatedAt { get; set; }
+    public string? ReinstatedByName { get; set; }
+    public string? ReinstateReason { get; set; }
     public Guid CreatedById { get; set; }
     public required string CreatedByName { get; set; }
     public Instant CreatedAt { get; set; }
@@ -245,6 +257,13 @@ public sealed class Revision
     public string? VoidAuthority { get; set; }
     public string? VoidReassessment { get; set; }
     public Instant? VoidReassessedAt { get; set; }
+    /// <summary>
+    /// A void taken back: who, when and why. The void's own reason stays beside it, so the revision says both.
+    /// Cleared when it is voided again.
+    /// </summary>
+    public Instant? UnvoidedAt { get; set; }
+    public string? UnvoidedByName { get; set; }
+    public string? UnvoidReason { get; set; }
     /// <summary>
     /// Which set of files is the revision's now. A submission Document Control
     /// returned for a correction is replaced by the next one under the same

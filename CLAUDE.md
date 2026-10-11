@@ -46,6 +46,13 @@ conversation, write it into the right one in the same commit as the code.
 
 ## Rules that must never break
 
+### What people write
+- Everything a person writes and the app keeps (comments, explanations,
+  reasons, notes, answers, messages) is shown in the place where it matters:
+  with the thing it is about, to the people it is for. Never only in a log.
+  Nothing written is erased by a later step: a take-back, a send-back or a
+  correction is kept beside what it answers.
+
 ### Reviews
 - Every route step names who answers it: people, a function, or an outside
   party. Never empty. Screens always show the actual names, on every step,
@@ -138,8 +145,10 @@ conversation, write it into the right one in the same commit as the code.
   withdrawn, archived, void, legal hold. The state column stays.
 - Every reason (cancel, withdraw, reinstate, void, take back, hold, withdraw
   from review) is in the document's History tab, in full and never cut off,
-  and under "What happened to it" in the Revisions tab on the revision it
-  happened to (document-level events go to the revision newest at the time).
+  and where it matters: an end in a banner, a void on its revision's row, a
+  lifted hold or a reinstatement in Details beside the reason it answers.
+  Taking something back never erases the reason it answers. No list in the
+  Revisions tab repeats History or Reviews.
 
 ### Schedule & actions
 - The schedule (SCH), disciplines per action (DPA) and requirements (RQL) are

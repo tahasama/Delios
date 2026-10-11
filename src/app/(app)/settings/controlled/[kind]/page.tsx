@@ -260,6 +260,7 @@ export default async function ControlledKindPage({ params }: { params: Promise<{
                         </span>
                       ) : null}
                       {v.decisionReason ? <span className="text-slate-400">— {v.decisionReason}</span> : null}
+                      {v.notes ? <span className="basis-full whitespace-pre-line text-slate-600">{v.notes}</span> : null}
                     </li>
                   ))}
                 </ul>

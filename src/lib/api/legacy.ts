@@ -1,7 +1,7 @@
 import "server-only";
 import { cache } from "react";
 import { api, ApiProblem, projectPath } from "./client";
-import type { DocumentView, ReviewView, RevisionView } from "./types";
+import type { DocumentView, ReviewView, RevisionView, Written } from "./types";
 
 /**
  * The screens were written against the old database's shapes: a document with
@@ -69,6 +69,7 @@ export type LegacyDocument = {
   retentionClass: string | null; state: string; kind: string; confirmedAt: Date | null; confirmedByName: string | null; disposedAt: Date | null;
   disposedBy: string | null; disposalBasis: string | null; legalHold: boolean;
   legalHoldReason: string | null; legalHoldAt: Date | null; legalHoldBy: string | null; isPlaceholder: boolean; previousId: string | null;
+  holdLifted: Written | null; ended: Written | null; reinstated: Written | null;
   legacyScheme: string | null; createdDate: Date; receivedDate: Date | null; plannedDate: Date | null; appVersion: string | null;
   createdById: string; createdByName: string; createdAt: Date; updatedAt: Date;
   revisions: LegacyRevision[];
@@ -191,6 +192,7 @@ export const legacyDocument = cache(async (scope: Scope, id: string): Promise<Le
     criticality: doc.criticality, confidentiality: doc.confidentiality, retentionClass: doc.retentionClass, state: doc.state, kind: doc.kind,
     confirmedAt: date(doc.confirmedAt ?? null), confirmedByName: doc.confirmedByName ?? null, disposedAt: null, disposedBy: null, disposalBasis: null, legalHold: doc.legalHold,
     legalHoldReason: doc.legalHoldReason ?? null, legalHoldAt: date(doc.legalHoldAt ?? null), legalHoldBy: doc.legalHoldBy ?? null,
+    holdLifted: doc.holdLifted ?? null, ended: doc.ended ?? null, reinstated: doc.reinstated ?? null,
     isPlaceholder: doc.isPlaceholder, previousId: doc.previousNumber, legacyScheme: doc.legacyScheme, createdDate: new Date(doc.createdAt), receivedDate: date(doc.receivedDate),
     plannedDate: date(doc.plannedDate), appVersion: doc.appVersion, createdById: doc.createdById, createdByName: doc.createdByName,
     createdAt: new Date(doc.createdAt), updatedAt: new Date(doc.updatedAt),
