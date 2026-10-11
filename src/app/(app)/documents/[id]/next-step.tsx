@@ -112,14 +112,14 @@ export function StagePath({ stages, at, note, under, pick }: {
 }) {
   return (
     <div>
-      <ol className={cn("flex gap-y-2", under ? "w-full flex-wrap items-start gap-y-4 lg:w-3/4 lg:flex-nowrap" : "flex-wrap items-center")}>
+      <ol className={cn("flex gap-y-2", under ? "w-full max-w-4xl flex-wrap items-start gap-y-4" : "flex-wrap items-center")}>
         {stages.map((name, i) => {
           const pickable = !!pick?.can[i];
           const open = pickable && pick!.open === i;
           const pill = (
             <span
               className={cn(
-                "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-semibold",
+                "inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-[12px] font-semibold",
                 i < at && "text-slate-500",
                 i === at && "bg-(--color-brand) text-white",
                 i > at && "text-slate-400 ring-1 ring-line-strong",
@@ -139,7 +139,7 @@ export function StagePath({ stages, at, note, under, pick }: {
               {i ? <span className={cn("h-px", under ? "mx-3 mt-[13px] min-w-6 flex-1" : "mx-1 w-3 sm:mx-1.5 sm:w-10", i <= at ? "bg-(--color-brand)" : "bg-line-strong")} aria-hidden /> : null}
               <span
                 className={under || pick ? cn(
-                  "flex flex-col items-center gap-1.5 text-center",
+                  "flex shrink-0 flex-col items-center gap-1.5 text-center",
                   pick && "border-b-2 pb-1.5",
                   pick && (open ? "border-(--color-brand)" : "border-transparent"),
                 ) : "contents"}
@@ -156,7 +156,7 @@ export function StagePath({ stages, at, note, under, pick }: {
                     {pill}
                   </button>
                 ) : pill}
-                {under?.[i] ? <span className="px-2.5 text-[11px] leading-4 text-slate-500">{under[i]}</span> : null}
+                {under?.[i] ? <span className="whitespace-nowrap px-2.5 text-[11px] leading-4 text-slate-500">{under[i]}</span> : null}
               </span>
             </li>
           );
