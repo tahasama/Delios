@@ -11,15 +11,8 @@ import { isEmptyTitle } from "@/lib/standard";
 import type { OwnField } from "@/lib/field-policy";
 import { OwnFields } from "./own-fields";
 
-type Opt = { code: string; label: string; meaning?: string | null; appliesTo?: string | null; criticality?: string | null; decides?: string | null };
+type Opt = { code: string; label: string; meaning?: string | null; appliesTo?: string | null; criticality?: string | null; decides?: string | null; record?: boolean };
 
-const PRODUCER_LABEL: Record<string, string> = {
-  ENG: "Internal engineering",
-  CTR: "A contractor (under contract)",
-  VND: "An equipment vendor / supplier",
-  TPY: "A third party (certifier, authority, consultant)",
-  CLT: "The client / owner",
-};
 
 const STEPS = ["What it is", "How it is described"];
 const field = "plain w-full";
@@ -168,18 +161,14 @@ export function NewDocumentForm({
                   )}
                 </>
               ) : (
-                <Ask label="Will it be revised?" required hint="a record is fixed once confirmed — minutes, a test result">
-                  <select name="kind" className={field} defaultValue="DOCUMENT">
-                    <option value="DOCUMENT">Yes — a document; new revisions replace old ones</option>
-                    <option value="RECORD">No — a record; fixed once confirmed</option>
-                  </select>
-                </Ask>
+                // Whether it is revised follows its type: a record type (Settings, on the type) is fixed once confirmed.
+                <input type="hidden" name="kind" value={docTypes.find((t) => t.code === docType)?.record ? "RECORD" : "DOCUMENT"} />
               )}
-              <Ask label={received ? "Who sent it?" : "Who produces it?"} required>
+              <Ask label={received ? "Who sent it?" : "Deliverable type"} required hint={received ? undefined : "who produces it: it picks the numbering"}>
                 <select name="deliverableType" required className={field} value={producer} onChange={(e) => setProducer(e.target.value)}>
                   <option value="" disabled>Choose…</option>
                   {deliverableTypes.filter((o) => !received || o.code !== "ENG").map((o) => (
-                    <option key={o.code} value={o.code}>{PRODUCER_LABEL[o.code] ?? o.label}</option>
+                    <option key={o.code} value={o.code}>{o.label}</option>
                   ))}
                 </select>
               </Ask>
@@ -211,7 +200,8 @@ export function NewDocumentForm({
 
             {ready ? (
               <p className="rounded-lg bg-tint-soft px-3.5 py-2.5 text-xs text-brand-ink">
-                A <strong>{docTypeLabel}</strong> owned by <strong>{disciplineLabel}</strong>, produced by <strong>{(PRODUCER_LABEL[producer] ?? "").toLowerCase()}</strong>.
+                A <strong>{docTypeLabel}</strong> owned by <strong>{disciplineLabel}</strong>, {deliverableTypes.find((o) => o.code === producer)?.label.toLowerCase() ?? producer}.
+                {docTypes.find((t) => t.code === docType)?.record ? " A record: fixed once confirmed, never revised." : " Revised: each new revision replaces the last."}
                 {external ? " It gets a supplier number." : " It gets an internal number."}
               </p>
             ) : null}
@@ -278,9 +268,10 @@ export function NewDocumentForm({
                 ) : null}
               </>
             ) : null}
-            <Ask label={labels["criticality"]} required hint="how serious an error in it would be">
-              <select name="criticality" required className={field} value={shownCriticality} onChange={(e) => { setCriticality(e.target.value); setOwnCriticality(true); }}>
-                <option value="" disabled>Choose…</option>
+            {/* Filled in from the type's recommendation; optional, and the person may choose another. */}
+            <Ask label={labels["criticality"]} hint="how serious an error in it would be — optional">
+              <select name="criticality" className={field} value={shownCriticality} onChange={(e) => { setCriticality(e.target.value); setOwnCriticality(true); }}>
+                <option value="">—</option>
                 {criticalities.map((o) => <option key={o.code} value={o.code}>{o.label}{o.code === recommended?.code ? " (recommended)" : ""}</option>)}
               </select>
               {recommended ? (

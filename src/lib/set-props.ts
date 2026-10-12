@@ -52,6 +52,7 @@ export const SET_PROP_FIELDS: Record<string, PropField[]> = {
   DOCUMENT_TYPES: [
     { key: "review", label: "Reviewed before release", type: "choice", options: REVIEW_NEED, read: (props) => (props.review === false ? "NO" : "YES"), hint: "asked when the type is published; a type that is not reviewed goes from Prepare straight to release" },
     { key: "appliesTo", label: "Who produces it", type: "select", options: ["Supplier", "Non-supplier", "Unclassified"], hint: "supplier documents carry the supplier fields in their number" },
+    { key: "record", label: "A record — fixed once confirmed, never revised", type: "bool", hint: "minutes, a test result, a photo: documents of this type are registered as records, nobody is asked" },
  { key: "describesAsset", label: "Describes equipment — link it to an asset", type: "bool", hint: "" },
     { key: "readsRequirements", label: "Is a document requirements list — read when released", type: "bool", hint: "the spreadsheet on each released revision becomes what the activities need" },
     { key: "criticality", label: "Recommended criticality", type: "set", setKey: "CRITICALITY", hint: "filled in when a document of this type is created; whoever creates it may choose another" },

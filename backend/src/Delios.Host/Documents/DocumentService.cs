@@ -100,7 +100,10 @@ public sealed class DocumentService(
                 new { fields = missing }));
         }
 
-        var kind = request.Kind?.ToUpperInvariant() == DocumentKinds.Record ? DocumentKinds.Record : DocumentKinds.Document;
+        // A record type (Settings, on the type) is always a record: nobody is asked whether it is revised.
+        var recordType = (await Catalog.LoadAsync(db, cancellationToken)).Prop(ValueSets.DocumentTypes, request.DocType!, "record")
+            is { ValueKind: System.Text.Json.JsonValueKind.True };
+        var kind = recordType || request.Kind?.ToUpperInvariant() == DocumentKinds.Record ? DocumentKinds.Record : DocumentKinds.Document;
         // The project's own code is in Settings, whatever was published before.
         await ProjectCodes.EnsurePublishedAsync(db, access.Project.TenantId, access.Project.Code, access.Project.Name, cancellationToken);
         var allocation = await numbering.AllocateAsync(access.Project.TenantId, access.Project.Id, request.DeliverableType,

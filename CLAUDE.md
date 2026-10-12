@@ -112,8 +112,12 @@ conversation, write it into the right one in the same commit as the code.
   and is always in the Settings list of project codes (added there automatically);
   it is never asked for and never refused.
 - Criticality: the document type recommends a level (Settings, on the type);
-  it is filled in on create and marked "(recommended)"; the person may choose
-  another. Each level shows its meaning and what it decides.
+  it is filled in on create and marked "(recommended)"; it is optional, and the
+  person may choose another.
+- Whether a document is revised follows its type: a type marked "a record"
+  (Settings, on the type) registers records, fixed once confirmed; nobody is
+  asked. The form's first field is "Deliverable type" (who produces it; it
+  picks the numbering), in the published values' own words. Each level shows its meaning and what it decides.
 
 - A document exchanged with a supplier (one with a placeholder, from its
   supply package) is held by one side at a time, and only the holder changes

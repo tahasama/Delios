@@ -57,6 +57,8 @@ export default async function NewDocumentPage({ searchParams }: { searchParams: 
     appliesTo: typeof r.props?.appliesTo === "string" ? r.props.appliesTo : null,
     // A document type's recommended criticality, filled in when it is chosen.
     criticality: typeof r.props?.criticality === "string" ? r.props.criticality : null,
+    // A type that is a record (minutes, a test result) is fixed once confirmed: nobody is asked whether it is revised.
+    record: r.props?.record === true,
     // What a criticality level decides: who approves it and how long it is kept.
     decides: [
       r.props?.approval ? `approved by ${String(r.props.approval).toLowerCase()}` : null,
