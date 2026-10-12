@@ -9,7 +9,7 @@ import { RecipientPicker, type Company } from "./recipient-picker";
 import type { OwnField } from "@/lib/field-policy";
 import { OwnFields } from "@/app/(app)/documents/new/own-fields";
 import { cn } from "@/lib/utils";
-import { Search } from "lucide-react";
+import { Minus, Plus, Search, X } from "lucide-react";
 
 type Opt = { code: string; label: string; props: Record<string, unknown> };
 type RevOpt = { id: string; label: string; released: boolean; number: string; rev: string; status: string | null; title: string };
@@ -112,6 +112,8 @@ export function NewTransmittalForm({
   const [subject, setSubject] = useState(prefill?.subject ?? "");
   const [message, setMessage] = useState(prefill?.message ?? "");
   const [find, setFind] = useState("");
+  // The register's revisions open only when asked: "Add documents".
+  const [addingDocs, setAddingDocs] = useState(false);
   const [chosen, setChosen] = useState<string[]>([...new Set([...(preselectedRevisionIds ?? []), ...(prefill?.revisionIds ?? [])])]);
   // Creating a transmittal sends nothing by itself. Saying so, and offering to
   // do both at once, is why people stopped finding a draft they thought they had sent.
@@ -351,6 +353,28 @@ export function NewTransmittalForm({
             </div>
           ) : null}
           {outgoing && !placeholders && !askingBack && askable.length ? <AskPlaceholders askable={askable} /> : null}
+          {/* What is enclosed, and "Add documents" to open the register's revisions. */}
+          <div className="flex flex-wrap items-start gap-2 border-b border-line px-5 py-3 sm:px-6">
+            {picked.length ? (
+              <ul className="w-full space-y-1">
+                {picked.map((r) => (
+                  <li key={r.id} className="flex items-center gap-x-3 text-[12.5px]">
+                    <span className="font-mono font-semibold text-slate-900">{r.number}</span>
+                    <span className="font-mono text-slate-600">{r.rev}</span>
+                    {r.status ? <span className="code-chip">{r.status}</span> : null}
+                    <span className="min-w-0 flex-1 truncate text-slate-500">{r.title}</span>
+                    <button type="button" onClick={() => toggle(r.id)} className="rounded-sm p-0.5 text-slate-400 hover:text-red-700" aria-label={`Take ${r.number} out`}><X className="h-3.5 w-3.5" /></button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="w-full text-xs text-slate-500">No document enclosed yet{outgoing ? " — a letter alone is fine too" : ""}.</p>
+            )}
+            <button type="button" onClick={() => setAddingDocs((was) => !was)} aria-expanded={addingDocs} data-on={addingDocs ? "true" : undefined} className="ask inline-flex items-center gap-1.5">
+              {addingDocs ? <Minus className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />} {addingDocs ? "Done adding" : "Add documents"}
+            </button>
+          </div>
+          {addingDocs ? (<>
           <div className="asking flex items-center gap-2 border-b border-line px-5 py-2.5 sm:px-6">
             <Search className="h-3.5 w-3.5 shrink-0 text-slate-400" />
             <label className="min-w-0 flex-1">
@@ -382,9 +406,11 @@ export function NewTransmittalForm({
             </ul>
           )}
 
-          {/* A revision chosen from a link, then filtered out of the visible
-              list, is still enclosed — so it travels in a field of its own. */}
-          {chosen.filter((id) => !choices.some((r) => r.id === id)).map((id) => (
+
+
+          </>) : null}
+          {/* What is enclosed travels in fields of its own, whether or not the list is open or shows it. */}
+          {chosen.filter((id) => !addingDocs || !choices.some((r) => r.id === id)).map((id) => (
             <input key={id} type="hidden" name="revisionIds" value={id} />
           ))}
 

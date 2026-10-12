@@ -150,8 +150,14 @@ conversation, write it into the right one in the same commit as the code.
   out" (not sent yet). A document sent to the supplier is never taken out
   ("You can't take out a document sent to <supplier>"; backend
   SENT_TO_SUPPLIER). The list shows, per document: where it stands, sent to the
-  supplier (day), sent back (day, late or not), planned (day, and ready /
-  submitted / overdue / at risk / in N days), and what is next for us.
+  supplier (day), sent back (day, late or not), issued after review (the day
+  the review's answer went back: returned, or released and issued), planned
+  (the earliest day an action needs it, else its planned day, else the
+  package's; with ready / submitted / overdue / at risk / in N days; none reads
+  "on no action" in red), and what is next for us. The supplier's page shows the
+  same "answered" day.
+- A new transmittal's documents open with "Add documents"; what is enclosed is
+  listed above it, each removable.
 - `unshare-package <email> <package-number>` (backend command) puts a supplier's
   package back to not shared, for testing; logged.
 - A supplier package has two pages. Ours (Document Control and above): plate,

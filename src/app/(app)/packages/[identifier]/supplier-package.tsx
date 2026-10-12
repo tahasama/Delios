@@ -81,7 +81,7 @@ export async function SupplierPackage({ pkg }: { pkg: LegacyPackage }) {
     const holds = mine.filter((r) => WITH_SUPPLIER.includes(r.state));
     const where = packageStage(pkg, rows, "theirs");
     const table = (
-      <DataTable className="rounded-none border-0 shadow-none" exportName={pkg.identifier} id="supplier-package-theirs" head={<tr><Th>Document</Th><Th>Where it stands</Th><Th>Submit by</Th><Th>Comments to take in</Th><Th>Your file</Th></tr>}>
+      <DataTable className="rounded-none border-0 shadow-none" exportName={pkg.identifier} id="supplier-package-theirs" head={<tr><Th>Document</Th><Th>Where it stands</Th><Th>Submit by</Th><Th>Answered by {org}</Th><Th>Comments to take in</Th><Th>Your file</Th></tr>}>
         {mine.map((r) => {
           const stage = lineStage(r, true, "theirs");
           return (
@@ -97,6 +97,7 @@ export async function SupplierPackage({ pkg }: { pkg: LegacyPackage }) {
                 {r.reason ? <p className="mt-1 max-w-72 text-[11px] text-slate-600">&ldquo;{r.reason}&rdquo;</p> : null}
               </Td>
               <Td className="whitespace-nowrap text-xs"><SubmitBy row={r} /></Td>
+              <Td className="whitespace-nowrap text-xs">{r.issuedBack ? fmtDate(r.issuedBack) : <span className="text-slate-400">not yet</span>}</Td>
               <Td className="min-w-64 max-w-md text-xs text-slate-600"><Comments row={r} /></Td>
               <Td className="text-xs">
                 {mayUpload && WITH_SUPPLIER.includes(r.state)
@@ -174,6 +175,7 @@ export async function SupplierPackage({ pkg }: { pkg: LegacyPackage }) {
       stage: lineStage(r, isSent, "ours"), reason: r.reason,
       sent: requestedAt.get(r.doc.id) ?? null,
       returned: r.revision?.submittedAt ? r.revision.submittedAt.toISOString() : null, returnedLate: r.arrivedOnTime === false,
+      issuedBack: r.issuedBack ? r.issuedBack.toISOString() : null,
       planned: r.due ? r.due.toISOString() : null, plannedWord: said?.word ?? null, plannedTone: said?.tone ?? null,
       withThem: isSent && WITH_SUPPLIER.includes(r.state),
       next: !isSent ? { label: `send it to ${supplierName}` }
@@ -232,9 +234,10 @@ export async function SupplierPackage({ pkg }: { pkg: LegacyPackage }) {
               <p className="text-xs leading-5 text-slate-600">{shared ? "Seen" : "Will be seen"} by {supplierName}&rsquo;s people on this project: {pkg.view.supplierPeople.join(", ")}.</p>
             ) : null}
             {!shared ? (
-              <p className="rounded-md bg-amber-50 px-3 py-2.5 text-xs leading-5 text-amber-900 ring-1 ring-amber-200">
-                Share it with {supplierName} before sending them anything: they find what is asked of them here. Sharing is for good. Its name, number and rule can be changed, and the package deleted, only until it is shared.
-              </p>
+              <div className="space-y-1 rounded-md bg-amber-50 px-3 py-2.5 text-xs leading-5 text-amber-900 ring-1 ring-amber-200">
+                <p>Sharing can&rsquo;t be undone: once you share this package, {supplierName} can always see it, and you can no longer rename it, change its rule or delete it.</p>
+                <p>Share it before you send {supplierName} any document: this package is where they find what you ask of them.</p>
+              </div>
             ) : notSent.length ? (
               <p className="text-xs leading-5 text-slate-600">
                 <strong className="font-semibold text-slate-800">{notSent.length} document{notSent.length === 1 ? " is" : "s are"} not sent to {supplierName} yet.</strong> Tick them in the list below and send them from the bar: each is sent once, on a transmittal.
@@ -244,7 +247,7 @@ export async function SupplierPackage({ pkg }: { pkg: LegacyPackage }) {
               {!shared ? (
                 <Act icon={Share2} label={`Share with ${supplierName}`} primary>
                   <ActionForm action={sharePackageAction} submitLabel={`Share with ${supplierName}`} size="sm" hidden={{ packageId: pkg.id }} confirmText={`Once shared, ${supplierName} sees this package for good. Continue?`}>
-                    <p className="text-xs leading-5 text-slate-600">Once shared, {supplierName} sees this package for good, with only the documents sent to them on a transmittal. Its name, number and rule are fixed from then on.</p>
+                    <p className="text-xs leading-5 text-slate-600">Once shared, {supplierName} sees this package for good, with only the documents sent to them on a transmittal. You can no longer rename it, change its rule or delete it.</p>
                   </ActionForm>
                 </Act>
               ) : null}
@@ -269,7 +272,7 @@ export async function SupplierPackage({ pkg }: { pkg: LegacyPackage }) {
               ) : null}
               {listLink}
             </div>
-            {shared ? <p className="text-[11px] text-slate-500">Shared: its name, number and rule are fixed, and it is kept.</p> : null}
+            {shared ? <p className="text-[11px] text-slate-500">Shared: it can no longer be renamed, have its rule changed or be deleted.</p> : null}
           </div>
         </section>
       ) : null}

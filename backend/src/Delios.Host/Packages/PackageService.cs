@@ -390,6 +390,13 @@ public sealed class PackageService(
         var released = await db.Revisions.AsNoTracking()
             .Where(r => ids.Contains(r.DocumentId) && r.State == RevisionStates.Released)
             .Select(r => new { r.Id, r.DocumentId, r.Value, r.StatusCode }).ToListAsync(cancellationToken);
+        // When it is planned: the earliest day an action of the schedule needs it; else the document's own planned day;
+        // else the package's date.
+        var needed = (await (from n in db.Requirements
+                             join a in db.Activities on n.ActivityId equals a.Id
+                             where ids.Contains(n.DocumentId) && a.State == Schedules.ActivityStates.Active && n.NeededBy != null
+                             select new { n.DocumentId, n.NeededBy }).AsNoTracking().ToListAsync(cancellationToken))
+            .GroupBy(n => n.DocumentId).ToDictionary(g => g.Key, g => g.Min(n => n.NeededBy));
         return package.Members.Select(m =>
         {
             var current = released.FirstOrDefault(r => r.DocumentId == m.DocumentId);
@@ -397,7 +404,8 @@ public sealed class PackageService(
             var ready = current?.StatusCode is { } status && required.Contains(status);
             var d = documents[m.DocumentId];
             return new Readiness(m, d.Number, d.Title, current?.Value, current?.StatusCode, required, ready, current?.Id,
-                d.LatestRevisionValue, d.LatestRevisionState, d.PlannedDate ?? package.CompletionDate);
+                d.LatestRevisionValue, d.LatestRevisionState,
+                (needed.TryGetValue(m.DocumentId, out var day) ? day : null) ?? d.PlannedDate ?? package.CompletionDate);
         }).OrderBy(r => r.DocumentNumber).ToList();
     }
 
