@@ -925,8 +925,9 @@ public sealed class TransmittalService(
     }
 
     /// <summary>
-    /// One task waiting for a person in issuing. <c>Kind</c> is CARRY_OUT_REQUEST, DISPATCH_TRANSMITTAL or
-    /// ACKNOWLEDGE_TRANSMITTAL; the ids say which record it points to.
+    /// One task waiting for a person in issuing. <c>Kind</c> is CARRY_OUT_REQUEST, DISPATCH_TRANSMITTAL,
+    /// ACKNOWLEDGE_TRANSMITTAL, REGISTER_UNPLANNED, SEND_PLACEHOLDER or RESEND_TO_SUPPLIER (taken back from a supplier,
+    /// not sent to them again yet); the ids say which record it points to.
     /// </summary>
     public sealed record IssueWork(string Kind, Guid? RequestId, Guid? TransmittalId, Guid? RecipientId, string Label,
         string Reason, string? Who, DateOnly? DueDate, DateTimeOffset Since, Guid? DocumentId = null);
@@ -993,6 +994,14 @@ public sealed class TransmittalService(
             work.AddRange(unplanned.Select(x => new IssueWork("REGISTER_UNPLANNED", null, x.Id, null,
                 x.DocumentNumber.Length > 0 ? $"{x.DocumentNumber} {x.Title}" : x.Title, x.Number, x.FromName, null,
                 x.IssuedAt.ToDateTimeOffset())));
+
+            // Taken back from a supplier to change it: waits on Document Control until it is sent to them again.
+            var takenBack = await db.Documents.AsNoTracking()
+                .Where(d => d.ProjectId == projectId && d.UnlockedAt != null && (d.RelockedAt == null || d.RelockedAt < d.UnlockedAt))
+                .OrderBy(d => d.UnlockedAt)
+                .Select(d => new { d.Id, d.Number, d.Title, d.UnlockReason, d.UnlockedByName, d.UnlockedAt }).ToListAsync(cancellationToken);
+            work.AddRange(takenBack.Select(x => new IssueWork("RESEND_TO_SUPPLIER", null, null, null, $"{x.Number} {x.Title}",
+                x.UnlockReason ?? "", x.UnlockedByName, null, x.UnlockedAt!.Value.ToDateTimeOffset(), x.Id)));
         }
 
         // Another organization: the placeholders it was asked for and has not sent yet, with when each is due.
@@ -1004,6 +1013,8 @@ public sealed class TransmittalService(
                 join d in db.Documents on i.DocumentId equals d.Id
                 where t.ProjectId == projectId && i.Kind == TransmittalItemKinds.Placeholder && d.Originator == code
                     && d.IsPlaceholder && (d.State == DocumentStates.Planned || d.State == DocumentStates.Active)
+                    // Taken back by Document Control: not theirs to send until it comes back to them.
+                    && !(d.UnlockedAt != null && (d.RelockedAt == null || d.RelockedAt < d.UnlockedAt))
                 select new { t.Id, DocumentId = d.Id, d.Number, d.Title, Number_ = t.Number, i.DueDate, t.IssuedAt }).ToListAsync(cancellationToken);
             work.AddRange(asked.GroupBy(x => x.DocumentId).Select(g => g.OrderByDescending(x => x.IssuedAt).First())
                 .OrderBy(x => x.DueDate ?? LocalDate.MaxIsoValue).ThenBy(x => x.Number)

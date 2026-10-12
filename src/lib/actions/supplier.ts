@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { requireScope } from "@/lib/scope";
 import { randomUUID } from "node:crypto";
 import { isController, isAdmin, hasVerb } from "@/lib/auth";
-import { supplyReason, chosenSupplierStatus } from "@/lib/supplier-status";
+import { supplyReason, sentFor } from "@/lib/supplier-status";
 import { api, projectPath, refusal } from "@/lib/api/client";
 import { upload } from "@/lib/api/uploads";
 import { backendDocument, backendRevision } from "@/lib/api/legacy";
@@ -74,8 +74,7 @@ export async function submitSupplierPackageAction(_prev: { error?: string; ok?: 
   const onBehalf = user.partyCode !== partyCode;
   let sent: TransmittalView;
   try {
-    // What the supplier says it is issued for (IFI, IFR, IFA…): its own choice.
-    const status = await chosenSupplierStatus(formData, pkg.reason);
+    const status = await sentFor(pkg.reason);
     const planned = await Promise.all(chosen.map(async ({ m, upload: file }) => ({
       documentId: m.documentId, fileIds: [await upload(ctx, { documentId: m.documentId }, file)], status,
     })));
@@ -109,7 +108,7 @@ export async function attachSupplierFileAction(_prev: { error?: string; ok?: str
   if (!(file instanceof File) || file.size === 0) return { error: "Choose the file." };
   try {
     const reason = await supplyReason();
-    const status = await chosenSupplierStatus(formData);
+    const status = await sentFor(reason.code);
     const fromPartyId = await partyIdFor(ctx, user, doc.originator);
     const fileIds = [await upload(ctx, { documentId }, file)];
     const sent = await api<TransmittalView>(projectPath(ctx, "/transmittals/incoming"), {
@@ -180,4 +179,40 @@ async function partyIdFor(ctx: Awaited<ReturnType<typeof requireScope>>, user: {
 export async function sendSupplierFromRegisterAction(formData: FormData): Promise<void> {
   const result = await sendSupplierDocumentsAction(undefined, formData);
   redirect(result.ok ? `/documents?sent=${encodeURIComponent(result.ok)}` : `/documents?sendError=${encodeURIComponent(result.error ?? "Nothing was sent.")}`);
+}
+
+/**
+ * Document Control takes a document back from its supplier (empty or with a file) to change it, saying why. Until
+ * it is sent to them again it is ours to change; the supplier is told not to send it meanwhile.
+ */
+export async function unlockSupplierAction(_prev: { error?: string; ok?: string } | undefined, formData: FormData): Promise<{ error?: string; ok?: string }> {
+  const ctx = await requireScope();
+  const documentId = String(formData.get("documentId") ?? "");
+  const reason = String(formData.get("reason") ?? "").trim();
+  if (!reason) return { error: "Say why it is taken back." };
+  try {
+    await api(projectPath(ctx, `/documents/${documentId}/unlock`), { body: { reason } });
+  } catch (e) {
+    return { error: refusal(e).message };
+  }
+  revalidatePath(`/documents/${documentId}`);
+  return { ok: "Unlocked: change what you need, then send it to the supplier again." };
+}
+
+/**
+ * Sends a document taken back to its supplier again, on a transmittal, and locks it to them once more. A revision
+ * not yet reviewed stays the same revision.
+ */
+export async function resendSupplierAction(_prev: { error?: string; ok?: string } | undefined, formData: FormData): Promise<{ error?: string; ok?: string }> {
+  const ctx = await requireScope();
+  const documentId = String(formData.get("documentId") ?? "");
+  const reason = String(formData.get("note") ?? "").trim() || null;
+  try {
+    await api(projectPath(ctx, `/documents/${documentId}/resend`), { body: { reason } });
+  } catch (e) {
+    return { error: refusal(e).message };
+  }
+  revalidatePath(`/documents/${documentId}`);
+  revalidatePath("/documents");
+  return { ok: "Sent to the supplier again." };
 }

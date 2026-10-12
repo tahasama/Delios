@@ -62,3 +62,52 @@ export function stateName(
   }
   return names[state as RevState as StateNameCode] ?? REV_STATE_LABEL[state as RevState] ?? state;
 }
+
+/**
+ * A document asked of a supplier reads in the supplier's own set of states, not ours: sent (to the supplier),
+ * received (from them), accepted (Document Control's check), returned (by that check, with why), in review, released
+ * & issued, returned (rejected by the review). Unlocked: Document Control took it back to change it. The backend
+ * works the stage out the same way (`Register.SupplierStage`).
+ */
+export const SUPPLIER_STAGES = ["UNLOCKED", "SENT", "RECEIVED", "ACCEPTED", "RETURNED_CHECK", "IN_REVIEW", "RELEASED", "RETURNED_REVIEW"] as const;
+export type SupplierStage = (typeof SUPPLIER_STAGES)[number];
+
+export const SUPPLIER_STAGE_LABEL: Record<SupplierStage, string> = {
+  UNLOCKED: "Unlocked",
+  SENT: "Sent",
+  RECEIVED: "Received",
+  ACCEPTED: "Accepted",
+  RETURNED_CHECK: "Returned",
+  IN_REVIEW: "In review",
+  RELEASED: "Released & issued",
+  RETURNED_REVIEW: "Returned",
+};
+
+/** Where a document asked of a supplier stands; null when it was not asked of one. */
+export function supplierStage(
+  asked: boolean,
+  unlocked: boolean,
+  latest: { state: string; resentAt?: Date | string | null; returnedAt?: Date | string | null } | null,
+): SupplierStage | null {
+  if (!asked) return null;
+  if (unlocked) return "UNLOCKED";
+  if (!latest) return "SENT";
+  switch (latest.state) {
+    case "RECEIVED": return "RECEIVED";
+    case "IN_PREPARATION": return "ACCEPTED";
+    case "CORRECTING": {
+      const sent = latest.resentAt ? new Date(latest.resentAt).getTime() : null;
+      const back = latest.returnedAt ? new Date(latest.returnedAt).getTime() : null;
+      return sent !== null && (back === null || sent > back) ? "SENT" : "RETURNED_CHECK";
+    }
+    case "IN_REVIEW": return "IN_REVIEW";
+    case "RELEASED": return "RELEASED";
+    case "RETURNED": return "RETURNED_REVIEW";
+    default: return null;
+  }
+}
+
+/** The word for a supplier's stage; released reads as our released does (with the hold, and the project's policy). */
+export function supplierStageName(names: StateNames, stage: SupplierStage, released?: { together: boolean; held?: boolean }): string {
+  return stage === "RELEASED" ? stateName(names, "RELEASED", released) : SUPPLIER_STAGE_LABEL[stage];
+}

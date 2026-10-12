@@ -165,6 +165,10 @@ public sealed class IncomingService(
             var document = await db.Documents.AsNoTracking().SingleOrDefaultAsync(d => d.Id == item.DocumentId && d.ProjectId == access.Project.Id, cancellationToken);
             if (document is null || document.Originator != party.Code)
                 return (null, Problems.Forbidden("NOT_THEIRS", $"Only {party.Name}'s own placeholders are filled by {party.Name}.", new { documentId = item.DocumentId }));
+            // Taken back by Document Control to change it: it is sent to them again when ready.
+            if (document.Unlocked)
+                return (null, Problems.Conflict("TAKEN_BACK", $"{document.Number} was taken back by {document.UnlockedByName} to change it: it comes back to {party.Name} once ready.",
+                    new { documentId = document.Id, reason = document.UnlockReason }));
             var incoming = new Incoming(status, onBehalf ? party.Code : null);
             var files = new StartRevisionRequest(item.FileIds);
             var latest = document.LatestRevisionId is { } latestId

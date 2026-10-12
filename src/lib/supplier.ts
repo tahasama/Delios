@@ -1,5 +1,6 @@
 import { legacyDocument, documentContext } from "./api/legacy";
 import type { LegacyPackage } from "./api/packages";
+import { supplierStage } from "./state-names";
 
 /**
  * Where each document a supplier owes us stands, in the two stages Document
@@ -18,14 +19,15 @@ export type SupplierState =
   | "RETURNED"        // review asked for changes; back with the supplier
   | "APPROVED";       // review passed (awaiting or after release)
 
+/** In the supplier's own set of states, the same words as the register and the document page (`SUPPLIER_STAGE_LABEL`). */
 export const STATE_LABEL: Record<SupplierState, string> = {
-  NOT_SENT: "Not sent",
-  AWAITING_CHECK: "Waiting for our check",
-  REJECTED: "Rejected — resend",
-  TO_ROUTE: "Accepted — to route",
+  NOT_SENT: "Sent",
+  AWAITING_CHECK: "Received",
+  REJECTED: "Returned",
+  TO_ROUTE: "Accepted",
   IN_REVIEW: "In review",
-  RETURNED: "Returned — resubmit",
-  APPROVED: "Approved",
+  RETURNED: "Returned",
+  APPROVED: "Released & issued",
 };
 
 /** Whose court the ball is in. */
@@ -56,7 +58,7 @@ function stateOf(revisionState: string | null): SupplierState {
     case "RECEIVED": return "AWAITING_CHECK";
     case "CORRECTING": return "REJECTED";
     case "IN_PREPARATION": return "TO_ROUTE";
-    case "IN_REVIEW": return "IN_REVIEW";
+    case "IN_REVIEW": case "NOT_RELEASED": return "IN_REVIEW";
     case "RETURNED": return "RETURNED";
     case "RELEASED": case "SUPERSEDED": return "APPROVED";
     default: return "NOT_SENT";
@@ -87,7 +89,9 @@ export async function supplierRows(t: { projectId: string }, pkg: LegacyPackage)
     const rev = doc?.revisions[0];
     if (!doc || !rev) return light;
     const cycle = rev.cycles[rev.cycles.length - 1] ?? null;
-    const state = stateOf(rev.backend.state);
+    // Sent back to the supplier after Document Control took it back: with them, not returned.
+    const resent = rev.backend.state === "CORRECTING" && supplierStage(true, false, { state: rev.backend.state, resentAt: rev.backend.resent?.at, returnedAt: rev.backend.returnedAt }) === "SENT";
+    const state = resent ? "NOT_SENT" : stateOf(rev.backend.state);
     const incoming = (context?.transmittals ?? [])
       .filter((one) => one.direction === "INCOMING" && one.revisionId === rev.id)
       .sort((a, b) => b.issuedAt.localeCompare(a.issuedAt))[0] ?? null;

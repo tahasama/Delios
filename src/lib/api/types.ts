@@ -58,10 +58,12 @@ export type RevisionWork = {
   submission: number;
   note: string | null;
   since: string;
+  /** Sent to the supplier again after Document Control took it back, rather than returned by its check. */
+  resent?: boolean;
 };
 
 export type IssueWork = {
-  kind: "CARRY_OUT_REQUEST" | "DISPATCH_TRANSMITTAL" | "ACKNOWLEDGE_TRANSMITTAL" | "REGISTER_UNPLANNED" | "SEND_PLACEHOLDER" | "SAY_WHO_RECEIVES";
+  kind: "CARRY_OUT_REQUEST" | "DISPATCH_TRANSMITTAL" | "ACKNOWLEDGE_TRANSMITTAL" | "REGISTER_UNPLANNED" | "SEND_PLACEHOLDER" | "SAY_WHO_RECEIVES" | "RESEND_TO_SUPPLIER";
   requestId: string | null;
   transmittalId: string | null;
   recipientId: string | null;
@@ -104,6 +106,8 @@ export type RegisterRow = {
   verdict: string | null; decidedBy: string | null; plannedDate: string | null; issuedAt: string | null;
   createdAt: string; updatedAt: string; revisionStartedAt: string | null; fileAddedAt: string | null;
   packages: number; activities: { code: string; name: string }[];
+  /** Asked of a supplier: where it stands in the supplier's set (`SupplierStage`); null otherwise. */
+  supplier?: string | null;
 };
 
 /** GET /documents/{id} (Contracts.cs DocumentView). */
@@ -119,6 +123,8 @@ export type DocumentView = {
   confirmedAt?: string | null; confirmedByName?: string | null; correctsId?: string | null;
   /** The hold lifted; the document cancelled or withdrawn; reinstated after. Each kept beside what it answers. */
   holdLifted?: Written | null; ended?: Written | null; reinstated?: Written | null;
+  /** Asked of a supplier and taken back by Document Control to change it; sent to them again (locked once more). */
+  unlocked?: Written | null; relocked?: Written | null;
 };
 
 /** Something a person decided and wrote down: when, who, and why, in their words. */
@@ -136,6 +142,8 @@ export type RevisionView = {
   voidedAt: string | null; voidReason: string | null; voidAuthority: string | null; voidReassessment: string | null;
   /** A void taken back; the void's own reason stays beside it. */
   unvoided?: Written | null;
+  /** Sent to its supplier again after it was taken back: the same revision comes back from them. */
+  resent?: Written | null;
 };
 
 /** GET /documents/{id}/context (DocumentContext.cs). */

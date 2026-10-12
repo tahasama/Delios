@@ -57,7 +57,8 @@ public sealed record RegisterRow(
     string? Revision, string? RevisionState, Guid? LatestRevisionId, Guid? ReleasedRevisionId, string? ReleasedRevision,
     string? ProposedStatus, string? ReleasedStatus, DateTimeOffset? ReleasedAt,
     string? Verdict, string? DecidedBy, DateOnly? PlannedDate, DateTimeOffset? IssuedAt, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt,
-    DateTimeOffset? RevisionStartedAt, DateTimeOffset? FileAddedAt, int Packages, IReadOnlyList<RegisterActivity> Activities);
+    DateTimeOffset? RevisionStartedAt, DateTimeOffset? FileAddedAt, int Packages, IReadOnlyList<RegisterActivity> Activities,
+    string? Supplier = null);
 
 public sealed record RegisterActivity(string Code, string Name);
 
@@ -320,13 +321,40 @@ public static class RegisterEndpoints
         return ordered.ThenBy(d => d.Number);
     }
 
+    /// <summary>
+    /// Where a document asked of a supplier stands, in the supplier's set: UNLOCKED (taken back by Document Control, to change
+    /// it), SENT (with the supplier: asked, or sent to them again), RECEIVED, ACCEPTED, RETURNED_CHECK (by Document
+    /// Control's check), IN_REVIEW, RELEASED, RETURNED_REVIEW (rejected by the review). Null for a document not asked of
+    /// a supplier, which reads in our own states.
+    /// </summary>
+    public static string? SupplierStage(bool asked, bool takenBack, string? state, Instant? resentAt, Instant? returnedAt)
+    {
+        if (!asked) return null;
+        if (takenBack) return "UNLOCKED";
+        return state switch
+        {
+            null => "SENT",
+            RevisionStates.Received => "RECEIVED",
+            RevisionStates.InPreparation => "ACCEPTED",
+            RevisionStates.Correcting => resentAt is { } sent && (returnedAt is not { } back || sent > back) ? "SENT" : "RETURNED_CHECK",
+            RevisionStates.InReview => "IN_REVIEW",
+            RevisionStates.Released => "RELEASED",
+            RevisionStates.Returned => "RETURNED_REVIEW",
+            _ => null,
+        };
+    }
+
     /// <summary>Every fact the rows show, for the documents given, in their order.</summary>
     public static async Task<List<RegisterRow>> RowsAsync(DeliosDbContext db, List<Guid> ids, CancellationToken cancellationToken)
     {
         if (ids.Count == 0) return [];
         var docs = await db.Documents.AsNoTracking().Where(d => ids.Contains(d.Id)).ToDictionaryAsync(d => d.Id, cancellationToken);
         var revisions = await db.Revisions.AsNoTracking().Where(r => ids.Contains(r.DocumentId))
-            .Select(r => new { r.Id, r.DocumentId, r.Value, r.State, r.StatusCode, r.ReleasedAt, r.CreatedAt }).ToListAsync(cancellationToken);
+            .Select(r => new { r.Id, r.DocumentId, r.Value, r.State, r.StatusCode, r.ReleasedAt, r.CreatedAt, r.ResentAt, r.ReturnedAt }).ToListAsync(cancellationToken);
+        // Asked of a supplier: a placeholder went out to them. Where it stands is read in the supplier's own words.
+        var asked = (await db.TransmittalItems.AsNoTracking()
+            .Where(i => i.DocumentId != null && ids.Contains(i.DocumentId.Value) && i.Kind == TransmittalItemKinds.Placeholder)
+            .Select(i => i.DocumentId!.Value).Distinct().ToListAsync(cancellationToken)).ToHashSet();
         var latestIds = docs.Values.Where(d => d.LatestRevisionId != null).Select(d => d.LatestRevisionId!.Value).ToList();
         var decided = await (from r in db.Reviews
                              where latestIds.Contains(r.RevisionId) && r.Verdict != null
@@ -370,7 +398,7 @@ public static class RegisterEndpoints
                 verdict?.Verdict, decider, d.PlannedDate?.ToDateOnly(), issued.TryGetValue(id, out var at) ? at.ToDateTimeOffset() : null,
                 d.CreatedAt.ToDateTimeOffset(), d.UpdatedAt.ToDateTimeOffset(), latest?.CreatedAt.ToDateTimeOffset(),
                 files.TryGetValue(id, out var added) ? added.ToDateTimeOffset() : null, packages.GetValueOrDefault(id),
-                activities.GetValueOrDefault(id) ?? []);
+                activities.GetValueOrDefault(id) ?? [], SupplierStage(asked.Contains(id), d.Unlocked, latest?.State, latest?.ResentAt, latest?.ReturnedAt));
         }).ToList();
     }
 

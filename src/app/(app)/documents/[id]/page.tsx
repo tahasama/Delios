@@ -13,7 +13,7 @@ import { Chip, StateChip, Banner, btn, Field, inputCls } from "@/components/ui";
 import { ActionForm } from "@/components/form";
 import { Asked, Added } from "@/components/policy-fields";
 import { DOC_STATE_LABEL, DOC_STATE_COLOR, REV_STATE_COLOR, revStateColor, type DocState, type RevState } from "@/lib/standard";
-import { stateNames, stateName } from "@/lib/state-names";
+import { stateNames, stateName, supplierStage, supplierStageName } from "@/lib/state-names";
 import { revisionGround } from "@/lib/revision-ground";
 import { typeSkipsReview } from "@/lib/review-need";
 import { ownFields, readExtras, formPolicy } from "@/lib/field-policy";
@@ -42,6 +42,7 @@ import { ArrowLeft, ChevronRight, Download, ExternalLink, FileText, Send } from 
 import { hasVerb } from "@/lib/auth";
 import { activityList } from "@/lib/api/schedule";
 import { addDocumentToActionAction } from "@/lib/actions/action-links";
+import { unlockSupplierAction, resendSupplierAction } from "@/lib/actions/supplier";
 import { addressees } from "@/lib/api/transmittals";
 
 export const dynamic = "force-dynamic";
@@ -97,9 +98,12 @@ export default async function DocumentDetailPage({
   const canEdit = mayContributeToDocument(user, doc) && !["WITHDRAWN", "CANCELLED"].includes(doc.state);
   // Asked of a supplier (a placeholder went out to them): its files and what it is issued for are theirs from then
   // on. Nobody of ours starts a revision or changes its files; the backend refuses it too (ASKED_OF_SUPPLIER).
-  const askedOf = user.isInternal && doc.originator && context.transmittals.some((t) => t.direction === "OUTGOING" && t.itemKind === "PLACEHOLDER")
-    ? (await addressees(ctx)).parties.find((p) => p.code === doc.originator)?.name ?? null
+  // Document Control may take it back (unlock it) to change anything, until it sends it to them again.
+  const supplierName = doc.originator && context.transmittals.some((t) => t.direction === "OUTGOING" && t.itemKind === "PLACEHOLDER")
+    ? (await addressees(ctx).catch(() => ({ parties: [] as { code: string; name: string }[] }))).parties.find((p) => p.code === doc.originator)?.name ?? null
     : null;
+  const unlocked = !!supplierName && !!doc.unlocked && (!doc.relocked || new Date(doc.relocked.at) < new Date(doc.unlocked.at));
+  const askedOf = user.isInternal && supplierName && !unlocked ? supplierName : null;
   const controller = isController(user) || isAdmin(user);
   // Document Control adds it to a schedule action from here too: the actions with a discipline tagged that do not need it yet.
   const mayAddToAction = ctx.can("CONTROL") && !["WITHDRAWN", "CANCELLED"].includes(doc.state);
@@ -476,14 +480,43 @@ export default async function DocumentDetailPage({
         </>) },
       ] : []),
 
-      // Asked of a supplier: the next revision is theirs, sent on a transmittal; ours only waits for it.
-      ...(askedOf && !working && doc.kind !== "RECORD" ? [
-        { key: "asked", label: `Next revision: from ${askedOf}`, body: (
+      // Asked of a supplier: locked to them. Document Control may take it back to change anything, saying why.
+      ...(askedOf ? [
+        { key: "asked", label: `Locked to ${askedOf}`, body: (<>
           <p className="text-xs leading-5 text-slate-600">
-            It was asked of {askedOf}. Only {askedOf} sends its files and says what it is issued for (IFI, IFR, IFA…), on a transmittal.
-            {controller ? " If they sent it outside the system, record it for them from their supply package." : ""}
+            It was asked of {askedOf}: only {askedOf} sends its files, on a transmittal. Nobody of ours starts a revision or replaces its files.
           </p>
-        ) },
+          {controller ? (
+            <details className="mt-3 text-xs">
+              <summary className="ask cursor-pointer list-none [&::-webkit-details-marker]:hidden">Unlock it, to change it</summary>
+              <ActionForm action={unlockSupplierAction} submitLabel="Unlock" size="sm" variant="secondary" hidden={{ documentId: doc.id }} className="mt-3 space-y-3">
+                <Field label="Why" required hint={`${askedOf} is told not to send it until it comes back to them`}>
+                  <textarea name="reason" required rows={2} maxLength={2000} className={inputCls} />
+                </Field>
+              </ActionForm>
+            </details>
+          ) : null}
+        </>) },
+      ] : []),
+      // Taken back: ours to change, until it is sent to the supplier again.
+      ...(unlocked && supplierName ? [
+        { key: "resend", primary: controller, open: controller, label: `Unlocked — send it to ${supplierName} again`, body: (<>
+          <p className="whitespace-pre-line text-xs leading-5 text-slate-600">
+            Unlocked by {doc.unlocked!.by}, {fmtDate(new Date(doc.unlocked!.at))}: {doc.unlocked!.reason}
+            <span className="mt-1 block text-slate-500">
+              {working && ["IN_PREPARATION", "RECEIVED", "CORRECTING"].includes(working.state)
+                ? `Rev ${working.value} goes back to ${supplierName} as it is: they send it again under rev ${working.value}.`
+                : `${supplierName} is asked for it again.`}
+            </span>
+          </p>
+          {controller ? (
+            <ActionForm action={resendSupplierAction} submitLabel={`Send to ${supplierName} again`} size="sm" hidden={{ documentId: doc.id }} className="mt-3 space-y-3">
+              <Field label="Message" hint={`what ${supplierName} reads with it: what changed`}>
+                <textarea name="note" rows={2} maxLength={4000} className={inputCls} />
+              </Field>
+            </ActionForm>
+          ) : null}
+        </>) },
       ] : []),
       ...(canEdit && !askedOf && !working && doc.kind !== "RECORD" ? [
         { key: "revise", primary: ground.kind !== "OWN", label: ground.kind === "FIRST" ? "Start the first revision" : ground.kind === "ASKED" ? `New revision — answer rev ${doc.revisions[0]?.value}` : "Start a new revision", open: !doc.revisions.length, body: (<>
@@ -530,7 +563,14 @@ export default async function DocumentDetailPage({
 
   // Released, then held for an outside approval: on hold is what it is now.
   const onHold = shown?.state === "RELEASED" && !!shown.heldAt;
-  const stateLabel = shown
+  // Asked of a supplier: its newest revision reads in the supplier's own set (sent, received, accepted…).
+  const newest = doc.revisions[0]?.backend ?? null;
+  const stage = supplierName && (!shown || shown.id === doc.revisions[0]?.id)
+    ? supplierStage(true, unlocked, newest ? { state: newest.state, resentAt: newest.resent?.at, returnedAt: newest.returnedAt } : null)
+    : null;
+  const stateLabel = stage
+    ? supplierStageName(names, stage, { together, held: onHold })
+    : shown
     ? stateName(names, shown.state, { together, held: onHold })
     : DOC_STATE_LABEL[doc.state as DocState] ?? doc.state;
   const stateColor = onHold ? "bg-red-50 text-red-800 ring-red-200" : shown ? revStateColor(shown.state) : DOC_STATE_COLOR[doc.state as DocState] ?? "";
@@ -672,7 +712,7 @@ export default async function DocumentDetailPage({
                   <p className="mt-4 text-xs text-slate-500">To change these details, start a new revision: they change with it.</p>
                 ) : null}
                 {/* What was decided about it and is over now, each with why: the hold that was lifted, the end that was taken back. */}
-                {(!doc.legalHold && doc.holdLifted) || (doc.reinstated && doc.state !== "CANCELLED" && doc.state !== "WITHDRAWN") ? (
+                {(!doc.legalHold && doc.holdLifted) || (doc.reinstated && doc.state !== "CANCELLED" && doc.state !== "WITHDRAWN") || (doc.unlocked && !unlocked) ? (
                   <div className="mt-4 space-y-2 border-t border-line pt-3 text-xs leading-5 text-slate-600">
                     {!doc.legalHold && doc.holdLifted ? (
                       <p className="whitespace-pre-line">
@@ -684,6 +724,13 @@ export default async function DocumentDetailPage({
                       <p className="whitespace-pre-line">
                         <span className="font-semibold text-slate-800">Reinstated</span> {fmtDate(doc.reinstated.at)} by {doc.reinstated.by}: {doc.reinstated.reason}
                         {doc.ended ? <span className="block text-slate-500">It had been ended {fmtDate(doc.ended.at)} by {doc.ended.by}: {doc.ended.reason}</span> : null}
+                      </p>
+                    ) : null}
+                    {/* Taken back from the supplier and sent to them again: the reason stays with it. */}
+                    {doc.unlocked && !unlocked ? (
+                      <p className="whitespace-pre-line">
+                        <span className="font-semibold text-slate-800">Sent to {supplierName ?? "the supplier"} again</span>{doc.relocked ? ` ${fmtDate(new Date(doc.relocked.at))} by ${doc.relocked.by}` : ""}
+                        <span className="block text-slate-500">It had been unlocked {fmtDate(new Date(doc.unlocked.at))} by {doc.unlocked.by}: {doc.unlocked.reason}</span>
                       </p>
                     ) : null}
                   </div>

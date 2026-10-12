@@ -784,16 +784,20 @@ under.
 **Clause:** §9 *Information from suppliers and contractors*.
 
 **Must say:** once a placeholder has been sent to a supplier, the document is
-locked to it: only the supplier sends its files and says what each revision is
-issued for (for information, for review, for approval…), always on a
-transmittal. Nobody of ours starts a revision of it or replaces its files;
-Document Control may record, for the supplier, what the supplier sent outside
-the system. Our own details of the document (discipline, criticality…) stay
-ours. A notice about a supplier's missing document proposes that supplier's
-people, who are sent to the document itself.
+locked to it: only the supplier sends its files, always on a transmittal.
+Nobody of ours starts a revision of it or replaces its files. Document Control
+may unlock it, with a reason, to change anything; the supplier is told and may
+not send it until Document Control sends it to them again, which locks it once
+more. A revision not yet reviewed goes back as it is and returns under the same
+value: only a release, or a review that returns it, makes the next one a new
+revision. A supplier's document is read in its own states: sent, received,
+accepted, returned (by Document Control's check, with why), in review, released
+and issued, returned (rejected by the review); unlocked while taken back. A
+notice about a supplier's missing document proposes that supplier's people, who
+are sent to the document itself.
 
-**Depends on it:** `ASKED_OF_SUPPLIER`, `DocumentService.AskedOfSupplierAsync`, `NoticeRequest.OutsideLink`,
-`supplierStatusChoices`.
+**Depends on it:** `ASKED_OF_SUPPLIER`, `TAKEN_BACK`, `/documents/{id}/unlock|resend`, `Document.UnlockedAt/RelockedAt`,
+`Revision.ResentAt`, `RESEND_TO_SUPPLIER`, `Register.SupplierStage`, `supplierStage`, `NoticeRequest.OutsideLink`.
 
 ## Still open — decided in conversation, not yet built
 

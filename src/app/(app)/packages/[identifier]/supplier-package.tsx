@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireScope } from "@/lib/scope";
 import { isController, isAdmin, hasVerb } from "@/lib/auth";
-import { Chip, DataTable, Th, Td, Field, inputCls } from "@/components/ui";
+import { Chip, DataTable, Th, Td } from "@/components/ui";
 import { FileTally } from "./file-tally";
 import { removePackageMemberAction, addPackageMemberAction, setPackageRuleAction } from "@/lib/actions/planning";
 import { parseExcluded, parseFilter, ownerIds } from "@/lib/package-rule";
@@ -11,7 +11,6 @@ import { RuleFields } from "../rule-fields";
 import { manageItems } from "../manage-items";
 import { ActionForm } from "@/components/form";
 import { submitSupplierPackageAction } from "@/lib/actions/supplier";
-import { supplierStatusChoices } from "@/lib/supplier-status";
 import { supplierRows, supplierFigures, STATE_LABEL, WITH_SUPPLIER, type SupplierState } from "@/lib/supplier";
 import { fmtDate } from "@/lib/utils";
 import { ArrowLeft, Download } from "lucide-react";
@@ -40,8 +39,6 @@ export async function SupplierPackage({ pkg }: { pkg: LegacyPackage }) {
   const rows = await supplierRows(ctx, pkg);
   const f = supplierFigures(rows);
   const org = (await getMe())?.tenant.name ?? "us";
-  // What the documents sent are issued for is the supplier's to say.
-  const issuedFor = await supplierStatusChoices(pkg.view.reason);
   // The supplier sends its own files; for a supplier not on the system,
   // Document Control attaches what arrived, line by line, on their behalf.
   const supplierMayUpload = isSupplier && (hasVerb(user, "CREATE") || hasVerb(user, "REVISE"));
@@ -196,11 +193,6 @@ export async function SupplierPackage({ pkg }: { pkg: LegacyPackage }) {
           <ActionForm action={submitSupplierPackageAction} submitLabel={isSupplier ? `Send to ${org}` : "Enter and send for review"} hidden={{ packageId: pkg.id }}>
             {table}
             <div className="space-y-1 px-5 sm:px-6">
-              <Field label="Issued for" required hint={isSupplier ? `what you send them to ${org} for` : `what ${pkg.recipientName} sent them for`}>
-                <select name="status" required defaultValue={issuedFor.initial} className={inputCls}>
-                  {issuedFor.options.map((one) => <option key={one.code} value={one.code}>{one.code} — {one.label}</option>)}
-                </select>
-              </Field>
               {!isSupplier ? <p className="text-[12px] text-slate-500">Received outside the system? Attach each file to its line — the delivery list&apos;s titles say which is which. Files go in under our numbers; the supplier&apos;s own number can stay inside the document. The review form opens next.</p> : null}
               {waiting ? <FileTally waiting={waiting} who={isSupplier ? "you" : pkg.recipientName} /> : <p className="text-[12px] text-slate-500">Nothing is waiting on you right now.</p>}
             </div>

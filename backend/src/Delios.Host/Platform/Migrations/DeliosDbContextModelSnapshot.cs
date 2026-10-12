@@ -543,6 +543,14 @@ namespace Delios.Host.Platform.Migrations
                         .HasColumnType("text")
                         .HasColumnName("reinstated_by_name");
 
+                    b.Property<Instant?>("RelockedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("relocked_at");
+
+                    b.Property<string>("RelockedByName")
+                        .HasColumnType("text")
+                        .HasColumnName("relocked_by_name");
+
                     b.Property<string>("RetentionClass")
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)")
@@ -568,6 +576,18 @@ namespace Delios.Host.Platform.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
                         .HasColumnName("title");
+
+                    b.Property<string>("UnlockReason")
+                        .HasColumnType("text")
+                        .HasColumnName("unlock_reason");
+
+                    b.Property<Instant?>("UnlockedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("unlocked_at");
+
+                    b.Property<string>("UnlockedByName")
+                        .HasColumnType("text")
+                        .HasColumnName("unlocked_by_name");
 
                     b.Property<Instant>("UpdatedAt")
                         .ValueGeneratedOnAdd()
@@ -910,6 +930,18 @@ namespace Delios.Host.Platform.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
                         .HasColumnName("released_by_name");
+
+                    b.Property<Instant?>("ResentAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("resent_at");
+
+                    b.Property<string>("ResentByName")
+                        .HasColumnType("text")
+                        .HasColumnName("resent_by_name");
+
+                    b.Property<string>("ResentNote")
+                        .HasColumnType("text")
+                        .HasColumnName("resent_note");
 
                     b.Property<Instant?>("ReturnedAt")
                         .HasColumnType("timestamp with time zone")

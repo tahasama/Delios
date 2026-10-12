@@ -140,7 +140,7 @@ public sealed class ControlService(DeliosDbContext db, AuditLog audit, IClock cl
     /// draft, where its files are (<c>FilesStates</c>).
     /// </summary>
     public sealed record RevisionWork(string Kind, Guid DocumentId, string DocumentNumber, string Title, Guid RevisionId,
-        string Revision, int Submission, string? Note, DateTimeOffset Since);
+        string Revision, int Submission, string? Note, DateTimeOffset Since, bool Resent = false);
 
     /// <summary>
     /// What waits on this person about revisions: submissions to accept and accepted ones to send for review (Document
@@ -157,7 +157,7 @@ public sealed class ControlService(DeliosDbContext db, AuditLog audit, IClock cl
             join d in db.Documents on r.DocumentId equals d.Id
             where r.ProjectId == projectId
                 && ((control && r.State == RevisionStates.Received)
-                    || (r.State == RevisionStates.Correcting && (r.AuthoredById == me || (party != null && r.AuthoredByParty == party)))
+                    || (r.State == RevisionStates.Correcting && (r.AuthoredById == me || (party != null && (r.AuthoredByParty == party || d.Originator == party))))
                     || (r.State == RevisionStates.Returned && d.LatestRevisionId == r.Id && r.AuthoredById == me)
                     || (r.State == RevisionStates.InPreparation && control && r.AuthoredByParty != null
                         && db.Parties.Any(p => p.Code == r.AuthoredByParty && !p.IsInternal))
@@ -174,6 +174,8 @@ public sealed class ControlService(DeliosDbContext db, AuditLog audit, IClock cl
                 r.Submission,
                 r.ReturnedReason,
                 r.ReturnedAt,
+                r.ResentNote,
+                r.ResentAt,
                 r.CreatedAt,
                 r.AuthoredById,
                 r.AuthoredByParty,
@@ -192,15 +194,21 @@ public sealed class ControlService(DeliosDbContext db, AuditLog audit, IClock cl
                 RevisionStates.Returned => "RETURNED_BY_REVIEW",
                 _ => control && fromOutside ? "TO_ROUTE" : "DRAFT",
             };
+            // Sent to the supplier again after Document Control took it back, rather than returned by its check.
+            var resent = kind == "CORRECT_AND_RESUBMIT" && x.ResentAt is { } sentAgain && (x.ReturnedAt is not { } back || sentAgain > back);
             var note = kind switch
             {
-                "CORRECT_AND_RESUBMIT" => x.ReturnedReason,
+                // Sent to them again after Document Control took it back: what they were told; else why it was returned.
+                "CORRECT_AND_RESUBMIT" => resent ? x.ResentNote : x.ReturnedReason,
                 "RETURNED_BY_REVIEW" => x.ReturnedReason ?? x.ControlOutcome,
                 "DRAFT" => x.FilesState,
                 _ => null,
             };
-            var since = kind is "CORRECT_AND_RESUBMIT" or "RETURNED_BY_REVIEW" ? x.ReturnedAt ?? x.CreatedAt : x.CreatedAt;
-            return new RevisionWork(kind, x.DocumentId, x.Number, x.Title, x.Id, x.Value, x.Submission, note, since.ToDateTimeOffset());
+            var since = kind is "CORRECT_AND_RESUBMIT" or "RETURNED_BY_REVIEW" ? Latest(x.ReturnedAt, x.ResentAt) ?? x.CreatedAt : x.CreatedAt;
+            return new RevisionWork(kind, x.DocumentId, x.Number, x.Title, x.Id, x.Value, x.Submission, note, since.ToDateTimeOffset(), resent);
         }).ToList();
     }
+
+    /// <summary>The later of two moments, either of which may be missing.</summary>
+    private static Instant? Latest(Instant? a, Instant? b) => a is null ? b : b is null ? a : a > b ? a : b;
 }

@@ -273,7 +273,8 @@ public static class DocumentEndpoints
         d.Extras is null ? null : System.Text.Json.JsonDocument.Parse(d.Extras).RootElement.Clone(), d.ConfirmedAt?.ToDateTimeOffset(),
         d.ConfirmedByName, d.CorrectsId, d.LegalHoldAt?.ToDateTimeOffset(), d.LegalHoldByName,
         Written.Of(d.LegalHoldLiftedAt, d.LegalHoldLiftedByName, d.LegalHoldLiftReason), Written.Of(d.EndedAt, d.EndedByName, d.EndReason),
-        Written.Of(d.ReinstatedAt, d.ReinstatedByName, d.ReinstateReason));
+        Written.Of(d.ReinstatedAt, d.ReinstatedByName, d.ReinstateReason),
+        Written.Of(d.UnlockedAt, d.UnlockedByName, d.UnlockReason), Written.Of(d.RelockedAt, d.RelockedByName, "Sent to the supplier again"));
 
     /// <summary>Turns a revision entity, with its submissions and files, into the shape the API returns.</summary>
     private static RevisionView View(Revision r) => new(
@@ -286,5 +287,5 @@ public static class DocumentEndpoints
             f.StatusDetail, f.DetectedType, f.CreatedAt.ToDateTimeOffset(), f.DerivedFromId, f.Submission)).ToList(),
         r.AuthoredById, r.AuthoredByParty, r.ReleasedByName, r.ReturnedAt?.ToDateTimeOffset(), r.HeldAt?.ToDateTimeOffset(), r.HeldReason,
         r.HeldByName, r.VoidedAt?.ToDateTimeOffset(), r.VoidReason, r.VoidAuthority, r.VoidReassessment,
-        Written.Of(r.UnvoidedAt, r.UnvoidedByName, r.UnvoidReason));
+        Written.Of(r.UnvoidedAt, r.UnvoidedByName, r.UnvoidReason), Written.Of(r.ResentAt, r.ResentByName, r.ResentNote ?? ""));
 }

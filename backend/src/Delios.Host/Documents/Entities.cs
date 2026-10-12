@@ -178,6 +178,17 @@ public sealed class Document
     public Instant? ReinstatedAt { get; set; }
     public string? ReinstatedByName { get; set; }
     public string? ReinstateReason { get; set; }
+    /// <summary>
+    /// Asked of a supplier, then taken back by Document Control to change it: who, when and why. Locked again when it
+    /// is sent to the supplier again (<see cref="RelockedAt"/>); the reason is kept.
+    /// </summary>
+    public Instant? UnlockedAt { get; set; }
+    public string? UnlockedByName { get; set; }
+    public string? UnlockReason { get; set; }
+    public Instant? RelockedAt { get; set; }
+    public string? RelockedByName { get; set; }
+    /// <summary>Taken back from its supplier and not sent to them again yet: ours to change.</summary>
+    public bool Unlocked => UnlockedAt is { } at && (RelockedAt is not { } back || back < at);
     public Guid CreatedById { get; set; }
     public required string CreatedByName { get; set; }
     public Instant CreatedAt { get; set; }
@@ -264,6 +275,13 @@ public sealed class Revision
     public Instant? UnvoidedAt { get; set; }
     public string? UnvoidedByName { get; set; }
     public string? UnvoidReason { get; set; }
+    /// <summary>
+    /// Sent to its supplier again after Document Control took it back: who, when and what was said. The supplier's
+    /// next submission comes under the same revision. Kept afterwards.
+    /// </summary>
+    public Instant? ResentAt { get; set; }
+    public string? ResentByName { get; set; }
+    public string? ResentNote { get; set; }
     /// <summary>
     /// Which set of files is the revision's now. A submission Document Control
     /// returned for a correction is replaced by the next one under the same

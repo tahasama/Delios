@@ -70,6 +70,8 @@ export type LegacyDocument = {
   disposedBy: string | null; disposalBasis: string | null; legalHold: boolean;
   legalHoldReason: string | null; legalHoldAt: Date | null; legalHoldBy: string | null; isPlaceholder: boolean; previousId: string | null;
   holdLifted: Written | null; ended: Written | null; reinstated: Written | null;
+  /** Taken back from its supplier (and when it was sent to them again). Unlocked while the first is the later. */
+  unlocked: Written | null; relocked: Written | null;
   legacyScheme: string | null; createdDate: Date; receivedDate: Date | null; plannedDate: Date | null; appVersion: string | null;
   createdById: string; createdByName: string; createdAt: Date; updatedAt: Date;
   revisions: LegacyRevision[];
@@ -193,6 +195,7 @@ export const legacyDocument = cache(async (scope: Scope, id: string): Promise<Le
     confirmedAt: date(doc.confirmedAt ?? null), confirmedByName: doc.confirmedByName ?? null, disposedAt: null, disposedBy: null, disposalBasis: null, legalHold: doc.legalHold,
     legalHoldReason: doc.legalHoldReason ?? null, legalHoldAt: date(doc.legalHoldAt ?? null), legalHoldBy: doc.legalHoldBy ?? null,
     holdLifted: doc.holdLifted ?? null, ended: doc.ended ?? null, reinstated: doc.reinstated ?? null,
+    unlocked: doc.unlocked ?? null, relocked: doc.relocked ?? null,
     isPlaceholder: doc.isPlaceholder, previousId: doc.previousNumber, legacyScheme: doc.legacyScheme, createdDate: new Date(doc.createdAt), receivedDate: date(doc.receivedDate),
     plannedDate: date(doc.plannedDate), appVersion: doc.appVersion, createdById: doc.createdById, createdByName: doc.createdByName,
     createdAt: new Date(doc.createdAt), updatedAt: new Date(doc.updatedAt),

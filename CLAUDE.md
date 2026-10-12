@@ -115,10 +115,20 @@ conversation, write it into the right one in the same commit as the code.
   another. Each level shows its meaning and what it decides.
 
 - A document asked of a supplier (a placeholder sent to them) is locked to
-  them: only the supplier sends its files and says what it is issued for (IFI,
-  IFR, IFA…), on a transmittal. Nobody of ours starts a revision or replaces
-  its files (backend: ASKED_OF_SUPPLIER); Document Control may record what the
-  supplier sent outside the system, for them. Our details stay editable.
+  them: only the supplier sends its files, on a transmittal; what it is issued
+  for is set automatically from the request. Nobody of ours starts a revision
+  or replaces its files (backend: ASKED_OF_SUPPLIER).
+- Document Control (or an administrator) may unlock it, empty or with a file,
+  with a reason, to change anything; the supplier is told and cannot send it
+  meanwhile; it is on Document Control's Home until "Send to the supplier
+  again" locks it once more. A revision not yet reviewed goes back as it is
+  and comes back under the same value: only a release, or a review that
+  returns it, makes the supplier's next one a new revision.
+- A supplier's document reads in its own states (register, document page,
+  package, the supplier's panel): Sent, Received, Accepted, Returned (by
+  Document Control's check, with why), In review, Released & issued, Returned
+  (rejected by the review); Unlocked while taken back. `supplierStage` and
+  `Register.SupplierStage` work it out the same way.
 - A notice about a supplier's missing document proposes that supplier's
   people (chosen, marked recommended); they are sent to the document, since
   the schedule is ours only.

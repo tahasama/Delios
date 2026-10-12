@@ -742,10 +742,13 @@ public sealed class DocumentService(
         return (document, null);
     }
 
-    /// <summary>The supplier's name when the document is another organization's and a placeholder for it went out to them; else null.</summary>
+    /// <summary>
+    /// The supplier's name when the document is another organization's, a placeholder for it went out to them, and
+    /// Document Control has not taken it back; else null.
+    /// </summary>
     public async Task<string?> AskedOfSupplierAsync(Document document, CancellationToken cancellationToken)
     {
-        if (document.Originator is not { } originator) return null;
+        if (document.Originator is not { } originator || document.Unlocked) return null;
         var supplier = await db.Parties.AsNoTracking().Where(p => p.Code == originator && !p.IsInternal).Select(p => p.Name)
             .FirstOrDefaultAsync(cancellationToken);
         if (supplier is null) return null;

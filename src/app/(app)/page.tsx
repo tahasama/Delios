@@ -180,7 +180,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
       })),
       ...(user.isInternal ? [] : revisionsOf(["CORRECT_AND_RESUBMIT"])).map<Row>((w) => ({
         href: `/transmittals/send?docs=${w.documentId}`, code: w.documentNumber, rev: w.revision, title: w.title,
-        tag: "returned", tone: "amber", at: at(w.since), cta: "Upload",
+        tag: w.resent ? "sent again" : "returned", tone: "amber", at: at(w.since), cta: "Upload",
       })),
     ],
     review: advice.map<Row>((w) => ({
@@ -199,6 +199,11 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
       ...issuesOf(["REGISTER_UNPLANNED"]).map<Row>((w) => ({
         href: `/transmittals/${w.transmittalId}`, code: w.reason, title: `from ${w.who ?? "another organization"} · ${w.label}`,
         tag: "unplanned", tone: "sky", at: at(w.since), cta: "Check",
+      })),
+      // Unlocked to change it: sent to the supplier again from the document.
+      ...issuesOf(["RESEND_TO_SUPPLIER"]).map<Row>((w) => ({
+        href: `/documents/${w.documentId}#step-resend`, code: w.label.split(" ")[0], title: `${w.label.split(" ").slice(1).join(" ")} · unlocked by ${w.who ?? "Document Control"}: ${w.reason}`,
+        tag: "unlocked", tone: "amber", at: at(w.since), cta: "Send again",
       })),
     ],
     route: revisionsOf(["TO_ROUTE"]).map<Row>((w) => ({

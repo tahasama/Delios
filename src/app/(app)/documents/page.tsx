@@ -1,3 +1,4 @@
+import type { SupplierStage } from "@/lib/state-names";
 import { requireScope } from "@/lib/scope";
 import { api, projectPath } from "@/lib/api/client";
 import { getMe } from "@/lib/api/me";
@@ -73,7 +74,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
   const { policy } = await import("@/lib/control-activities");
   const together = (await policy(scope, "POLICY_RELEASE")) === "TOGETHER";
   // What this organization calls each state; the states themselves are fixed.
-  const { stateNames, stateName } = await import("@/lib/state-names");
+  const { stateNames, stateName, supplierStageName, SUPPLIER_STAGES } = await import("@/lib/state-names");
   const names = await stateNames(scope);
   const sp = await searchParams;
   const q = (sp.q ?? "").trim();
@@ -168,7 +169,10 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
       docState: doc.state, docStateLabel: DOC_STATE_LABEL[doc.state as DocState] ?? doc.state,
       revision: doc.revision,
       revState: latestState,
-      revStateLabel: latestState
+      // Asked of a supplier: read in the supplier's own set (sent, received, accepted…).
+      revStateLabel: doc.supplier && (SUPPLIER_STAGES as readonly string[]).includes(doc.supplier)
+        ? supplierStageName(names, doc.supplier as SupplierStage, { together, held: false })
+        : latestState
         ? stateName(names, latestState, { together, held: false })
         : "No revision yet",
       onHold: null as string | null,

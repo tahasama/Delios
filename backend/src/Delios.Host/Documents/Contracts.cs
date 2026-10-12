@@ -56,7 +56,7 @@ public sealed record RevisionView(
     IReadOnlyList<SubmissionView> Submissions, IReadOnlyList<FileView> Files, Guid AuthoredById, string? AuthoredByParty,
     string? ReleasedByName, DateTimeOffset? ReturnedAt, DateTimeOffset? HeldAt = null, string? HeldReason = null, string? HeldByName = null,
     DateTimeOffset? VoidedAt = null, string? VoidReason = null, string? VoidAuthority = null, string? VoidReassessment = null,
-    Written? Unvoided = null);
+    Written? Unvoided = null, Written? Resent = null);
 
 /// <summary>Something a person decided and wrote down: when, who, and why, in their words.</summary>
 public sealed record Written(DateTimeOffset At, string By, string Reason)
@@ -73,7 +73,8 @@ public sealed record DocumentView(
     string CreatedByName, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt, IReadOnlyList<RevisionView> Revisions, Guid CreatedById,
     bool LegalHold = false, string? LegalHoldReason = null, string? PreviousNumber = null, string? LegacyScheme = null, string? AppVersion = null,
     System.Text.Json.JsonElement? Extras = null, DateTimeOffset? ConfirmedAt = null, string? ConfirmedByName = null, Guid? CorrectsId = null,
-    DateTimeOffset? LegalHoldAt = null, string? LegalHoldBy = null, Written? HoldLifted = null, Written? Ended = null, Written? Reinstated = null);
+    DateTimeOffset? LegalHoldAt = null, string? LegalHoldBy = null, Written? HoldLifted = null, Written? Ended = null, Written? Reinstated = null,
+    Written? Unlocked = null, Written? Relocked = null);
 
 /// <summary>One page of the register. <c>Next</c> is the value to pass as <c>after</c> for the next page; null on the last page.</summary>
 public sealed record DocumentPage(IReadOnlyList<DocumentSummary> Items, string? Next);

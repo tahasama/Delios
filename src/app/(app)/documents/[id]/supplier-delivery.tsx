@@ -1,18 +1,19 @@
 import { requireScope } from "@/lib/scope";
 import { ActionForm } from "@/components/form";
-import { attachSupplierFileAction, sendSupplierDocumentsAction } from "@/lib/actions/supplier";
+import { attachSupplierFileAction } from "@/lib/actions/supplier";
+import { supplierStage } from "@/lib/state-names";
+import { fmtDate } from "@/lib/utils";
 import { NextStepBody, StagePath, type StepItem } from "./next-step";
 import { cn } from "@/lib/utils";
 import { hasVerb } from "@/lib/auth";
 import { getMe } from "@/lib/api/me";
-import { legacyDocument, documentContext } from "@/lib/api/legacy";
-import { supplierStatusChoices } from "@/lib/supplier-status";
-import { Field, inputCls } from "@/components/ui";
+import { legacyDocument } from "@/lib/api/legacy";
 
 /**
- * What a supplier sees on a document it owes us: attach the file, then send it.
- * The Send button exists only once a file is attached. After that it is with
- * us — checked by Document Control, then reviewed.
+ * What a supplier sees on a document it owes us, in its own set of states: sent
+ * to it, received, accepted, in review, released & issued; returned (by the
+ * check, or by the review) brings it back to them. Attaching sends it, on one
+ * transmittal. While Document Control has taken it back, nothing is sent.
  */
 export async function SupplierDelivery({ documentId }: { documentId: string }) {
   const ctx = await requireScope();
@@ -20,59 +21,33 @@ export async function SupplierDelivery({ documentId }: { documentId: string }) {
   // Read-only stays read-only: uploading is a right Document Control gives.
   const mayUpload = hasVerb(user, "CREATE") || hasVerb(user, "REVISE");
   const org = (await getMe())?.tenant.name ?? "us";
-  const latest = (await legacyDocument(ctx, documentId))?.revisions[0] ?? null;
-  const incoming = latest
-    ? (await documentContext(ctx, documentId)).transmittals
-        .filter((t) => t.revisionId === latest.id && t.direction === "INCOMING")
-        // A transmittal is not turned back in the backend; Document Control returns the revision for a correction.
-        .map((t) => ({ status: "SENT", rejectionReason: null as string | null, number: t.number, direction: t.direction }))
-    : [];
-  const rejected = incoming.find((t) => t.status === "REJECTED") ?? null;
-  const hasFile = !!(latest?.renditionFileId || latest?.nativeFileId);
-  const preparing = !latest || latest.state === "IN_PREPARATION";
-  const waitingToSend = preparing && hasFile && (!latest?.submittedAt || !!rejected);
-  const toAttach = preparing && (!hasFile || !!rejected || !latest?.submittedAt);
-
-  const at = !latest || (preparing && !hasFile) ? 0
-    : waitingToSend ? 1
-    : preparing ? 2
-    : latest.state === "IN_REVIEW" || latest.state === "NOT_RELEASED" ? 3
-    : 4;
-  const note = rejected && waitingToSend ? <>{org} turned it back{rejected.rejectionReason ? <>: <em>{rejected.rejectionReason}</em></> : null}. Attach the corrected file and send it again.</>
-    : at === 0 ? <>Attach your file. It goes in under this number; your own number can stay inside the document.</>
-    : at === 1 ? <>Rev {latest!.value} has its file. Send it when you are ready.</>
-    : at === 2 ? <>Sent. {org} checks it, then accepts it for review or turns it back with a reason.</>
-    : at === 3 ? <>With {org}: under review.</>
-    : <>Reviewed and in use.</>;
-
-  // What it is issued for is the supplier's to say, each time it sends.
-  const issuedFor = await supplierStatusChoices();
+  const doc = await legacyDocument(ctx, documentId);
+  const latest = doc?.revisions[0] ?? null;
+  // Taken back by Document Control to change it: not theirs to send until it comes back to them.
+  const unlocked = !!doc?.unlocked && (!doc.relocked || new Date(doc.relocked.at) < new Date(doc.unlocked.at));
+  const stage = supplierStage(true, unlocked, latest ? { state: latest.backend.state, resentAt: latest.backend.resent?.at, returnedAt: latest.backend.returnedAt } : null);
+  const toSend = stage === "SENT" || stage === "RETURNED_CHECK" || stage === "RETURNED_REVIEW";
+  const at = stage === "RECEIVED" ? 1 : stage === "ACCEPTED" ? 2 : stage === "IN_REVIEW" ? 3 : stage === "RELEASED" ? 4 : 0;
+  const note = stage === "UNLOCKED" ? <>{org} took it back to change it ({doc!.unlocked!.by}, {fmtDate(new Date(doc!.unlocked!.at))}): <em>{doc!.unlocked!.reason}</em>. Do not send it for now: it comes back to you once changed.</>
+    : stage === "SENT" && latest ? <>{org} sent rev {latest.value} back to you{latest.backend.resent?.reason ? <>: <em>{latest.backend.resent.reason}</em></> : null}. Send it again: it stays rev {latest.value}.</>
+    : stage === "SENT" ? <>Attach your file and send it. It goes in under this number; your own number can stay inside the document.</>
+    : stage === "RETURNED_CHECK" ? <>{org} returned rev {latest!.value}{latest!.returnedReason ? <>: <em>{latest!.returnedReason}</em></> : null}. Correct it and send it again: it stays rev {latest!.value}.</>
+    : stage === "RETURNED_REVIEW" ? <>The review returned rev {latest!.value}{latest!.returnedReason ? <>: <em>{latest!.returnedReason}</em></> : null}. Send the next revision.</>
+    : stage === "RECEIVED" ? <>Received. {org} checks it, then accepts it or returns it with a reason.</>
+    : stage === "ACCEPTED" ? <>Accepted by {org}.</>
+    : stage === "IN_REVIEW" ? <>With {org}: in review.</>
+    : <>Released and in use.</>;
 
   const items: StepItem[] = [];
-  if (mayUpload && waitingToSend && latest) items.push({
-    key: "send",
+  if (mayUpload && toSend) items.push({
+    key: "attach",
     primary: true,
+    open: true,
     label: `Send to ${org}`,
     body: (
-      <ActionForm action={sendSupplierDocumentsAction} submitLabel={`Send rev ${latest.value}`} size="sm" hidden={{ revisionId: latest.id }}>
-        <p className="text-xs text-slate-500">One transmittal carries it to {org}&apos;s Document Control.</p>
-      </ActionForm>
-    ),
-  });
-  if (mayUpload && toAttach) items.push({
-    key: "attach",
-    primary: !waitingToSend,
-    open: at === 0,
-    label: hasFile ? "Replace the file" : "Attach your file",
-    body: (
-      <ActionForm action={attachSupplierFileAction} submitLabel="Attach" size="sm" hidden={{ documentId }}>
+      <ActionForm action={attachSupplierFileAction} submitLabel="Send" size="sm" hidden={{ documentId }}>
         <input type="file" name="file" required className="block w-full" />
-        <Field label="Issued for" required hint={`what you send it to ${org} for`}>
-          <select name="status" required defaultValue={issuedFor.initial} className={inputCls}>
-            {issuedFor.options.map((one) => <option key={one.code} value={one.code}>{one.code} — {one.label}</option>)}
-          </select>
-        </Field>
-        <p className="text-[11px] text-slate-500">A PDF is what people read; send the editable original as well if it was asked for.</p>
+        <p className="text-[11px] text-slate-500">A PDF is what people read; send the editable original as well if it was asked for. One transmittal carries it to {org}&apos;s Document Control.</p>
       </ActionForm>
     ),
   });
@@ -84,7 +59,7 @@ export async function SupplierDelivery({ documentId }: { documentId: string }) {
         <span className="stencil text-slate-600">Your delivery</span>
         <span className="text-[11px] text-slate-500">asked of you by {org}</span>
       </div>
-      <NextStepBody items={items} status={<StagePath stages={["Attach", "Send", "Checked", "Reviewed"]} at={at} note={<>{note}{!mayUpload && at < 2 ? <span className="mt-1 block text-[12px] text-amber-700">Your access is read-only. Ask {org}&apos;s Document Control for the right to upload.</span> : null}</>} />} />
+      <NextStepBody items={items} status={<StagePath stages={["Sent", "Received", "Accepted", "In review", "Released & issued"]} at={at} note={<>{note}{!mayUpload && toSend ? <span className="mt-1 block text-[12px] text-amber-700">Your access is read-only. Ask {org}&apos;s Document Control for the right to upload.</span> : null}</>} />} />
     </section>
   );
 }
