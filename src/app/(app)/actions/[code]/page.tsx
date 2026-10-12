@@ -316,89 +316,114 @@ export default async function ActionDetailPage({ params, searchParams }: { param
                 const late = !!c && !c.automatic && !!action.scheduledDate && c.confirmedAt !== null && c.confirmedAt.getTime() >= action.scheduledDate.getTime() + 86_400_000;
                 const members = people.filter((one) => one.department === d);
                 const sent = notices.filter((one) => one.subject.endsWith(`:${d}`));
+                // Where it stands, in one short chip: the line under it says how and by whom.
+                const chip = c
+                  ? c.available ? { word: c.automatic ? "Confirmed automatically" : "Confirmed", tone: "bg-emerald-50 text-emerald-800 ring-emerald-200" }
+                    : { word: "Not going ahead", tone: "bg-red-50 text-red-800 ring-red-200" }
+                  : automatic ? { word: "Confirmed automatically", tone: "bg-emerald-50 text-emerald-800 ring-emerald-200" }
+                  : missing.length && !open && opens ? { word: `Opens ${fmtDate(opens)}`, tone: "bg-slate-100 text-slate-600 ring-slate-200" }
+                  : { word: "Not confirmed", tone: "bg-amber-50 text-amber-900 ring-amber-200" };
+                const them = missing.length === 1 ? "it" : "them";
                 return (
-                  <li key={d} className="space-y-2.5 px-5 py-3.5 sm:px-6">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div className="min-w-0 space-y-0.5">
-                        <p className="text-sm font-semibold text-slate-800">
-                          {deptLabel(d)}
-                          <span className="ml-1.5 text-xs font-normal text-slate-500">· {deptEntries.length - missing.length} of {deptEntries.length} ready</span>
-                        </p>
-                        {c?.automatic ? (
-                          <p className="text-xs text-emerald-700">Confirmed automatically on the day: every document was released at its status.</p>
-                        ) : c ? (
-                          <p className={`whitespace-pre-line text-xs ${c.available ? "text-emerald-700" : "text-red-700"}`}>
-                            {c.available ? (missing.length ? "Going ahead without them" : "Available") : "Not available"} — {c.confirmedByName}, {fmtDate(c.confirmedAt)}
-                            {late ? <span className="ml-1.5 rounded-sm bg-amber-50 px-1 font-semibold text-amber-800 ring-1 ring-amber-200">after the day</span> : null}
-                            {c.note ? <span className="block text-slate-600">{c.note}</span> : null}
-                          </p>
-                        ) : automatic ? (
-                          <p className="text-xs text-emerald-700">Confirmed automatically: all {deptEntries.length} released at their status.</p>
-                        ) : missing.length && !open && opens ? (
-                          <p className="text-xs text-slate-500">{missing.length} not ready yet. Confirmation opens {fmtDate(opens)}.</p>
-                        ) : (
-                          <p className="text-xs text-amber-800">Not confirmed{passed && missing.length ? " — the day has passed with documents missing" : ""}.</p>
-                        )}
-                        {taken ? (
-                          <p className="whitespace-pre-line text-[11px] text-slate-500">
-                            {taken.confirmedByName}&rsquo;s confirmation was taken back by {taken.revokedByName}, {fmtDate(taken.revokedAt)}: {taken.revokedReason}
-                          </p>
-                        ) : null}
-                      </div>
-                      {/* Without Document Control, the discipline chooses its own documents; otherwise it asks. */}
-                      {selfLinks && me.department === d ? (
-                        <Link href={`/documents?pick=${encodeURIComponent(action.code)}`} className="text-xs font-semibold text-link hover:underline">Add or take off documents, in the register</Link>
-                      ) : !selfLinks && mine ? (
-                        <Link href={requestHref(d)} className="text-xs font-semibold text-link hover:underline">Request a document</Link>
-                      ) : null}
+                  <li key={d} className="space-y-3 px-5 py-4 sm:px-6">
+                    <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                      <p className="text-sm font-semibold text-slate-800">
+                        {deptLabel(d)}
+                        <span className="ml-1.5 text-xs font-normal text-slate-500">· {deptEntries.length - missing.length} of {deptEntries.length} ready</span>
+                      </p>
+                      <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ${chip.tone}`}>{chip.word}</span>
                     </div>
 
-                    {mine && open && !c ? (
-                      <details className="group text-xs">
-                        <summary className="ask cursor-pointer list-none [&::-webkit-details-marker]:hidden">Confirm</summary>
-                        <ActionForm action={confirmReadinessAction} submitLabel="Record" hidden={{ actionId: action.id, department: d }} className="mt-3 space-y-3">
-                          <fieldset className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs font-medium text-slate-700">
-                            <legend className="sr-only">Does {deptLabel(d)} go ahead?</legend>
-                            <label className="flex items-center gap-1.5"><input type="radio" name="available" value="yes" required /> Going ahead without them</label>
-                            <label className="flex items-center gap-1.5"><input type="radio" name="available" value="no" required /> Not available</label>
-                          </fieldset>
-                          <Field
-                            label={passed ? "Why it went ahead without them, and whether they came after the day" : "Why it can go ahead without them, or what is missing"}
-                            required
-                            hint={`${missing.length} not ready: ${missing.map((e) => e.document.docNumber).join(", ")}`}
-                          >
-                            <textarea name="note" required rows={3} className={inputCls} />
-                          </Field>
-                        </ActionForm>
-                      </details>
+                    {/* How it was confirmed, by whom and why; or a confirmation taken back. */}
+                    {c ? (
+                      <p className="whitespace-pre-line text-xs leading-5 text-slate-600">
+                        {c.automatic ? "On the day, every document was released at its status." : <>{c.available ? (missing.length ? "Going ahead without them" : "Available") : "Not going ahead without them"} — {c.confirmedByName}, {fmtDate(c.confirmedAt)}</>}
+                        {late ? <span className="ml-1.5 rounded-sm bg-amber-50 px-1 font-semibold text-amber-800 ring-1 ring-amber-200">after the day</span> : null}
+                        {c.note ? <span className="block">{c.note}</span> : null}
+                      </p>
+                    ) : automatic ? (
+                      <p className="text-xs text-slate-600">All {deptEntries.length} released at their status.</p>
+                    ) : null}
+                    {taken ? (
+                      <p className="whitespace-pre-line text-[11px] text-slate-500">
+                        {taken.confirmedByName}&rsquo;s confirmation was taken back by {taken.revokedByName}, {fmtDate(taken.revokedAt)}: {taken.revokedReason}
+                      </p>
                     ) : null}
 
-                    {c && !c.automatic && control ? (
-                      <details className="text-xs">
-                        <summary className="cursor-pointer font-semibold text-link">Take this confirmation back</summary>
-                        <ActionForm action={revokeReadinessAction} submitLabel="Take it back" hidden={{ actionId: action.id, department: d }} className="mt-2 space-y-3">
-                          <Field label="Why" required hint="kept with it; the discipline confirms again">
-                            <textarea name="reason" required rows={2} className={inputCls} />
-                          </Field>
-                        </ActionForm>
-                      </details>
+                    {/* What is not ready, and the question the discipline answers about it. */}
+                    {missing.length && !c ? (
+                      <div className="rounded-md bg-tint-soft px-3 py-2.5 text-xs leading-5 ring-1 ring-line">
+                        <p className="font-semibold text-slate-800">{missing.length === 1 ? "1 document is not ready" : `${missing.length} documents are not ready`}</p>
+                        <ul className="mt-1 space-y-0.5">
+                          {missing.map((e) => (
+                            <li key={e.id} className="flex flex-wrap gap-x-2">
+                              <Link href={`/documents/${e.documentId}`} className="font-mono font-semibold text-brand-ink hover:underline">{e.document.docNumber}</Link>
+                              <span className="text-slate-600">{e.document.title}</span>
+                              <span className="text-slate-500">· {standing(e)}{e.requiredStatus ? `, needed at ${e.requiredStatus}` : ""}</span>
+                            </li>
+                          ))}
+                        </ul>
+                        <p className="mt-2 text-slate-700">
+                          {open
+                            ? passed
+                              ? `The day has passed. Did ${deptLabel(d)} go ahead with the action without ${them}? Confirm, and say why.`
+                              : `Does ${deptLabel(d)} confirm going ahead with the action without ${them}? Confirm, and say why.`
+                            : opens ? `If ${them === "it" ? "it is" : "they are"} still not ready, ${deptLabel(d)} confirms from ${fmtDate(opens)} whether it goes ahead without ${them}.` : null}
+                        </p>
+                      </div>
                     ) : null}
 
-                    {mayNotify && missing.length ? (
-                      <NotifyPanel
-                        subject={`activity:${action.id}:manual:${d}`}
-                        title={`${action.code} on ${fmtDate(action.scheduledDate)}: ${deptLabel(d)} has ${missing.length} of ${deptEntries.length} documents missing`}
-                        body={[
-                          `${action.name} is planned for ${fmtDate(action.scheduledDate)}.`,
-                          `Still missing: ${missing.map((e) => e.document.docNumber).join(", ")}.`,
-                          passed ? "Confirm on the action's page and say why it went ahead without them." : "Send the documents, or confirm on the action's page and say why it can go ahead without them.",
-                        ].join("\n\n")}
-                        link={`/actions/${action.code}`}
-                        people={pickPeople}
-                        chosen={members.map((one) => one.id)}
-                        history={noticeHistory(sent)}
-                      />
-                    ) : null}
+                    {/* What can be done, on one row: an opened form takes the whole width under it. */}
+                    <div className="flex flex-wrap items-start gap-2">
+                      {mine && open && !c ? (
+                        <details className="group text-xs open:basis-full">
+                          <summary className="ask cursor-pointer list-none [&::-webkit-details-marker]:hidden">Confirm</summary>
+                          <ActionForm action={confirmReadinessAction} submitLabel="Record" hidden={{ actionId: action.id, department: d }} className="mt-3 space-y-3">
+                            <fieldset className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs font-medium text-slate-700">
+                              <legend className="sr-only">Does {deptLabel(d)} go ahead?</legend>
+                              <label className="flex items-center gap-1.5"><input type="radio" name="available" value="yes" required /> Going ahead without {them}</label>
+                              <label className="flex items-center gap-1.5"><input type="radio" name="available" value="no" required /> Not without {them}</label>
+                            </fieldset>
+                            <Field label={passed ? `Why it went ahead without ${them}, and whether ${them === "it" ? "it" : "they"} came after the day` : `Why it can go ahead without ${them}, or why not`} required>
+                              <textarea name="note" required rows={3} className={inputCls} />
+                            </Field>
+                          </ActionForm>
+                        </details>
+                      ) : null}
+                      {mayNotify && missing.length ? (
+                        <div className="has-[details[open]]:basis-full">
+                          <NotifyPanel
+                            subject={`activity:${action.id}:manual:${d}`}
+                            title={`${action.code} on ${fmtDate(action.scheduledDate)}: ${deptLabel(d)} has ${missing.length} of ${deptEntries.length} documents missing`}
+                            body={[
+                              `${action.name} is planned for ${fmtDate(action.scheduledDate)}.`,
+                              `Still missing: ${missing.map((e) => e.document.docNumber).join(", ")}.`,
+                              passed ? "Confirm on the action's page and say why it went ahead without them." : "Send the documents, or confirm on the action's page and say why it can go ahead without them.",
+                            ].join("\n\n")}
+                            link={`/actions/${action.code}`}
+                            people={pickPeople}
+                            chosen={members.map((one) => one.id)}
+                            history={noticeHistory(sent)}
+                          />
+                        </div>
+                      ) : null}
+                      {/* Without Document Control, the discipline chooses its own documents; otherwise it asks. */}
+                      {selfLinks && me.department === d ? (
+                        <Link href={`/documents?pick=${encodeURIComponent(action.code)}`} className="ask">Add or take off documents</Link>
+                      ) : !selfLinks && mine ? (
+                        <Link href={requestHref(d)} className="ask">Request a document</Link>
+                      ) : null}
+                      {c && !c.automatic && control ? (
+                        <details className="text-xs open:basis-full">
+                          <summary className="ask cursor-pointer list-none [&::-webkit-details-marker]:hidden">Take this confirmation back</summary>
+                          <ActionForm action={revokeReadinessAction} submitLabel="Take it back" hidden={{ actionId: action.id, department: d }} className="mt-3 space-y-3">
+                            <Field label="Why" required hint="kept with it; the discipline confirms again">
+                              <textarea name="reason" required rows={2} className={inputCls} />
+                            </Field>
+                          </ActionForm>
+                        </details>
+                      ) : null}
+                    </div>
                   </li>
                 );
               })}

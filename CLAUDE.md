@@ -195,6 +195,11 @@ conversation, write it into the right one in the same commit as the code.
   still taken, always with why (and whether the documents came after).
   Document Control can take a person's confirmation back, with a reason; it is
   kept, marked, and the discipline confirms again.
+- Each discipline under "Disciplines concerned": its name and ready count with
+  one status chip; the documents not ready listed with where each stands; the
+  question in plain words ("Does Mechanical confirm going ahead with the action
+  without it? Confirm, and say why"); then one row of buttons (Confirm, Notify,
+  Request a document), an opened form taking the width under them.
 - Automatic notices (worker job, once each): at risk → each discipline still
   short and not confirmed; day passed → the same. Confirmed disciplines and
   postponed actions are not notified. A discipline that never answers stays open.
