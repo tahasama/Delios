@@ -260,7 +260,9 @@ public sealed class PackageService(
         var supplier = await db.Parties.AsNoTracking().SingleAsync(p => p.Id == package.SupplierPartyId, cancellationToken);
         var members = await transmittals.MembersAsync(access.Project, cancellationToken);
         var message = string.IsNullOrWhiteSpace(request.Message) ? null : request.Message.Trim();
-        var sent = await transmittals.RaiseAsync(new TransmittalService.Raise(access.Project, Actor(access), package.Reason,
+        var placeholderReason = (await Catalog.LoadAsync(db, cancellationToken)).IsActive(TransmittalSets.Reasons, TransmittalService.PlaceholderReason)
+            ? TransmittalService.PlaceholderReason : package.Reason;
+        var sent = await transmittals.RaiseAsync(new TransmittalService.Raise(access.Project, Actor(access), placeholderReason,
             $"{package.Number}: {documents.Count} document(s) to send", message, supplier, supplier.Name, [],
             TransmittalService.AddresseesOf(supplier, members), ResponseDue: package.CompletionDate, PackageId: package.Id,
             Placeholders: documents.Select(d => (d, d.PlannedDate ?? package.CompletionDate)).ToList()), cancellationToken);
@@ -314,19 +316,9 @@ public sealed class PackageService(
             return Fail(Problems.Conflict("PACKAGE_SHARED", "It is shared with its supplier: its name, number and description no longer change."));
         var title = request.Title?.Trim() ?? "";
         if (title.Length == 0) return Fail(Problems.Invalid("TITLE_REQUIRED", "Give the package a title."));
-        // Renumbered only before anyone outside saw it: once shared, or once a transmittal named it, its number stays.
-        var number = request.Number?.Trim().ToUpperInvariant();
-        if (number is { Length: > 0 } && number != package.Number)
-        {
-            if (package.SharedAt is not null || await db.Transmittals.AnyAsync(t => t.PackageId == package.Id, cancellationToken))
-                return Fail(Problems.Conflict("NUMBER_IN_USE", "It was shared or sent: its number no longer changes."));
-            if (number.Length > 60) return Fail(Problems.Invalid("NUMBER_TOO_LONG", "Keep the number under 60 characters."));
-            if (await db.Packages.AnyAsync(p => p.ProjectId == package.ProjectId && p.Number == number, cancellationToken))
-                return Fail(Problems.Conflict("NUMBER_TAKEN", $"{number} is another package's number."));
-            await audit.WriteAsync(Actor(access), "PACKAGE_RENUMBERED", "Package", package.Id, number,
-                $"Renumbered from {package.Number}.", package.ProjectId, cancellationToken);
-            package.Number = number;
-        }
+        // A package's number comes from its numbering scheme and never changes once made.
+        if (request.Number?.Trim() is { Length: > 0 } asked && !string.Equals(asked, package.Number, StringComparison.OrdinalIgnoreCase))
+            return Fail(Problems.Conflict("NUMBER_FIXED", "A package's number comes from its numbering scheme and never changes."));
         var was = package.Title;
         package.Title = title;
         package.Description = Blank(request.Description);
@@ -390,13 +382,6 @@ public sealed class PackageService(
         var released = await db.Revisions.AsNoTracking()
             .Where(r => ids.Contains(r.DocumentId) && r.State == RevisionStates.Released)
             .Select(r => new { r.Id, r.DocumentId, r.Value, r.StatusCode }).ToListAsync(cancellationToken);
-        // When it is planned: the earliest day an action of the schedule needs it; else the document's own planned day;
-        // else the package's date.
-        var needed = (await (from n in db.Requirements
-                             join a in db.Activities on n.ActivityId equals a.Id
-                             where ids.Contains(n.DocumentId) && a.State == Schedules.ActivityStates.Active && n.NeededBy != null
-                             select new { n.DocumentId, n.NeededBy }).AsNoTracking().ToListAsync(cancellationToken))
-            .GroupBy(n => n.DocumentId).ToDictionary(g => g.Key, g => g.Min(n => n.NeededBy));
         return package.Members.Select(m =>
         {
             var current = released.FirstOrDefault(r => r.DocumentId == m.DocumentId);
@@ -404,8 +389,7 @@ public sealed class PackageService(
             var ready = current?.StatusCode is { } status && required.Contains(status);
             var d = documents[m.DocumentId];
             return new Readiness(m, d.Number, d.Title, current?.Value, current?.StatusCode, required, ready, current?.Id,
-                d.LatestRevisionValue, d.LatestRevisionState,
-                (needed.TryGetValue(m.DocumentId, out var day) ? day : null) ?? d.PlannedDate ?? package.CompletionDate);
+                d.LatestRevisionValue, d.LatestRevisionState, d.PlannedDate ?? package.CompletionDate);
         }).OrderBy(r => r.DocumentNumber).ToList();
     }
 

@@ -32,6 +32,9 @@ public sealed class TransmittalService(
     DeliosDbContext db, Numbering numbering, AuditLog audit, FileStorage storage, IClock clock,
     IOptions<StorageOptions> storageOptions, Notifications.Notifier notifier)
 {
+    /// <summary>The reason a placeholder is sent with, set by itself: issued for use.</summary>
+    public const string PlaceholderReason = "IFU";
+
     // ── Distribution ──────────────────────────────────────────────────────────
 
     /// <summary>
@@ -477,6 +480,8 @@ public sealed class TransmittalService(
             // Due as the request says, or as planned for that document.
             var asDue = request.ResponseDue is { } rd ? LocalDate.FromDateOnly(rd) : (LocalDate?)null;
             placeholders = asked.Select(d => (d, asDue ?? d.PlannedDate)).ToList();
+            // What a placeholder is issued for is set by itself: for use (IFU), where the organization publishes it.
+            if (catalog.IsActive(TransmittalSets.Reasons, PlaceholderReason)) reason = PlaceholderReason;
         }
 
         var items = revisions.Select(r => (documents[r.DocumentId], r)).OrderBy(i => i.Item1.Number).ToList();
@@ -710,8 +715,11 @@ public sealed class TransmittalService(
         var placed = (raise.Placeholders ?? []).Select(x => x.Document.Id).ToList();
         if (placed.Count > 0)
         {
-            foreach (var x in raise.Placeholders!) x.Document.WithSupplier = true;
-            await db.Documents.Where(d => placed.Contains(d.Id)).ExecuteUpdateAsync(d => d.SetProperty(x => x.WithSupplier, true), cancellationToken);
+            // The documents are the ones loaded when the transmittal was prepared: changed there, saved once with it
+            // (a second, direct update would leave them out of date and the save would be refused).
+            var held = new Dictionary<Guid, Document>();
+            foreach (var id in placed)
+                if (await db.Documents.FindAsync([id], cancellationToken) is { } one) { one.WithSupplier = true; held[id] = one; }
             // Its line in the supplier's package says it was asked, whichever way it went (package or register).
             var askedAt = clock.GetCurrentInstant();
             await db.PackageMembers.Where(m => placed.Contains(m.DocumentId) && m.RequestedAt == null
@@ -732,8 +740,7 @@ public sealed class TransmittalService(
             if (unreviewed.Count > 0)
             {
                 var back = unreviewed.Select(r => r.DocumentId).ToList();
-                await db.Documents.Where(d => back.Contains(d.Id)).ExecuteUpdateAsync(d => d.SetProperty(x => x.LatestRevisionState, RevisionStates.Correcting), cancellationToken);
-                foreach (var x in raise.Placeholders!.Where(x => back.Contains(x.Document.Id))) x.Document.LatestRevisionState = RevisionStates.Correcting;
+                foreach (var id in back) if (held.TryGetValue(id, out var one)) one.LatestRevisionState = RevisionStates.Correcting;
             }
         }
         var addressed = raise.Recipients

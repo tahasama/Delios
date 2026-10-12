@@ -568,6 +568,8 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
     /// <summary>Why an information transmittal is sent: words alone, a request or an answer.</summary>
     private static readonly (string Code, string Label, object? Props)[] InformationReasons =
     [
+        // A placeholder sent to a supplier carries it by itself: they fill it and send it back.
+        ("IFU", "Issued for use", new { response = true, family = "Data" }),
         ("REQUEST", "Request", new { response = true, responseDays = 7, family = "Information" }),
         ("RFI", "Request for information", new { response = true, responseDays = 7, family = "Information" }),
         ("ANSWER", "Answer", new { response = false, family = "Information" }),
@@ -575,7 +577,8 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
     ];
 
     /// <summary>
-    /// A setup made before transmittals had two kinds gains the information reasons it lacks; the reasons it has are
+    /// A setup made before transmittals had two kinds gains the reasons it lacks (the information ones, and IFU for
+    /// placeholders); the reasons it has are
     /// not touched (one without a kind reads as data).
     /// </summary>
     private async Task<bool> EnsureInformationReasonsAsync(Guid t, CancellationToken cancellationToken)

@@ -161,7 +161,8 @@ export default async function NewTransmittalPage({ searchParams }: { searchParam
           userIds: following ? followTo : answering ? answerTo : supplierTo.length ? supplierTo : (sp.users ?? "").split(",").filter(Boolean),
           copyIds: following ? followCopies : answerCopies,
           outsiders: sp.to,
-          reason: following?.reasonForIssue ?? (askingBack.length ? requestReason?.code : undefined) ?? sp.reason,
+          reason: following?.reasonForIssue ?? (askingBack.length ? requestReason?.code : undefined)
+            ?? (placeholders.length && reasons.some((r) => r.code === "IFU") ? "IFU" : undefined) ?? sp.reason,
           party: answering && answering.direction === "INCOMING" ? answering.issuingParty : sp.party,
           subject: askingBack.length && !sp.subject
             ? `${askingBack.length === 1 ? askingBack[0].number : `${askingBack.length} documents`}: back for an update`

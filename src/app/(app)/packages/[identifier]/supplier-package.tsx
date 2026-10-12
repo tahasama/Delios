@@ -81,7 +81,7 @@ export async function SupplierPackage({ pkg }: { pkg: LegacyPackage }) {
     const holds = mine.filter((r) => WITH_SUPPLIER.includes(r.state));
     const where = packageStage(pkg, rows, "theirs");
     const table = (
-      <DataTable className="rounded-none border-0 shadow-none" exportName={pkg.identifier} id="supplier-package-theirs" head={<tr><Th>Document</Th><Th>Where it stands</Th><Th>Submit by</Th><Th>Answered by {org}</Th><Th>Comments to take in</Th><Th>Your file</Th></tr>}>
+      <DataTable className="rounded-none border-0 shadow-none" exportName={pkg.identifier} id="supplier-package-theirs" head={<tr><Th>Document</Th><Th>Where it stands</Th><Th>Submit by</Th><Th>Released &amp; issued</Th><Th>Comments to take in</Th><Th>Your file</Th></tr>}>
         {mine.map((r) => {
           const stage = lineStage(r, true, "theirs");
           return (
@@ -97,7 +97,7 @@ export async function SupplierPackage({ pkg }: { pkg: LegacyPackage }) {
                 {r.reason ? <p className="mt-1 max-w-72 text-[11px] text-slate-600">&ldquo;{r.reason}&rdquo;</p> : null}
               </Td>
               <Td className="whitespace-nowrap text-xs"><SubmitBy row={r} /></Td>
-              <Td className="whitespace-nowrap text-xs">{r.issuedBack ? fmtDate(r.issuedBack) : <span className="text-slate-400">not yet</span>}</Td>
+              <Td className="whitespace-nowrap text-xs">{r.issued ? fmtDate(r.issued) : <span className="text-slate-400">not yet</span>}</Td>
               <Td className="min-w-64 max-w-md text-xs text-slate-600"><Comments row={r} /></Td>
               <Td className="text-xs">
                 {mayUpload && WITH_SUPPLIER.includes(r.state)
@@ -160,7 +160,7 @@ export async function SupplierPackage({ pkg }: { pkg: LegacyPackage }) {
   // Until it is shared, its name, number and rule may change, and it may be deleted (while none of its documents
   // was sent to the supplier). Once shared, all of that is fixed.
   const sentAny = pkg.view.members.some((m) => m.requestedAt) || pkg.view.transmittals.length > 0;
-  const edit = !shared ? manageItems(pkg, { mayEdit: true, mayRenumber: !pkg.view.transmittals.length, mayDelete: false }).find((one) => one.key === "edit") ?? null : null;
+  const edit = !shared ? manageItems(pkg, { mayEdit: true, mayDelete: false }).find((one) => one.key === "edit") ?? null : null;
   // The supplier's documents not in the package, for "Add documents".
   const others = pkg.partyCode
     ? (await api<RegisterPage>(projectPath(ctx, "/register"), { query: { supplier: pkg.partyCode, per: 500 } }).catch(() => null))?.rows ?? []
@@ -175,7 +175,7 @@ export async function SupplierPackage({ pkg }: { pkg: LegacyPackage }) {
       stage: lineStage(r, isSent, "ours"), reason: r.reason,
       sent: requestedAt.get(r.doc.id) ?? null,
       returned: r.revision?.submittedAt ? r.revision.submittedAt.toISOString() : null, returnedLate: r.arrivedOnTime === false,
-      issuedBack: r.issuedBack ? r.issuedBack.toISOString() : null,
+      issued: r.issued ? r.issued.toISOString() : null,
       planned: r.due ? r.due.toISOString() : null, plannedWord: said?.word ?? null, plannedTone: said?.tone ?? null,
       withThem: isSent && WITH_SUPPLIER.includes(r.state),
       next: !isSent ? { label: `send it to ${supplierName}` }

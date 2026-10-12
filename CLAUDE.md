@@ -136,11 +136,12 @@ conversation, write it into the right one in the same commit as the code.
   by itself with the first document (`SupplyFiling`) only when that supplier has
   no package yet: a package already there (made by hand or by itself) takes it,
   the one for its order first, else the supplier's one with no order.
-  Document Control (and above) looks after it. Until it is shared: rename,
-  renumber, narrow by a rule, and delete it (made by hand or by itself) while
+  Document Control (and above) looks after it. A package's number comes from
+  its numbering scheme and never changes (backend NUMBER_FIXED). Until it is
+  shared: rename, narrow by a rule, and delete it (made by hand or by itself) while
   none of its documents was sent to the supplier; its documents stay in the
-  register and are filed again. Once shared, name, number and rule are fixed
-  (backend PACKAGE_SHARED) and it is kept.
+  register and are filed again. Once shared, name and rule are fixed (backend
+  PACKAGE_SHARED) and it is kept.
 - On our package page, "Add documents" opens, in place, a short register of
   the supplier's documents not in the package: search, tick, add. The list of
   the package's documents has ticks; ticking opens a bar under it: "Send to
@@ -150,12 +151,11 @@ conversation, write it into the right one in the same commit as the code.
   out" (not sent yet). A document sent to the supplier is never taken out
   ("You can't take out a document sent to <supplier>"; backend
   SENT_TO_SUPPLIER). The list shows, per document: where it stands, sent to the
-  supplier (day), sent back (day, late or not), issued after review (the day
-  the review's answer went back: returned, or released and issued), planned
-  (the earliest day an action needs it, else its planned day, else the
-  package's; with ready / submitted / overdue / at risk / in N days; none reads
-  "on no action" in red), and what is next for us. The supplier's page shows the
-  same "answered" day.
+  supplier (day), sent back (day, late or not), released & issued (day),
+  planned (the document's planned day, from the requirements list that feeds the
+  schedule, else the package's; with ready / submitted / overdue / at risk / in
+  N days; none reads "on no action" in red), and what is next for us. The
+  supplier's page shows the same released & issued day.
 - A new transmittal's documents open with "Add documents"; what is enclosed is
   listed above it, each removable.
 - `unshare-package <email> <package-number>` (backend command) puts a supplier's
@@ -250,8 +250,11 @@ conversation, write it into the right one in the same commit as the code.
   (`REASONS_FOR_ISSUE` prop `family`). No "sent by" and no date: it is the
   person signed in, today. "Received from outside the system" (Document Control)
   is a tick, and only then are who sent it and when asked.
+- A placeholder sent to its supplier is issued for use: reason IFU ("Issued for
+  use", family Data), set by itself on the transmittal (never chosen) where it is
+  published.
 - Information reasons: REQUEST, RFI, ANSWER, CONFIRMATION (family Information);
-  an existing demo gains them with `seed-demo`. A reason with no family is data.
+  an existing demo gains them, and IFU, with `seed-demo`. A reason with no family is data.
 - A new transmittal lets Document Control ask placeholders not asked yet, one
   supplier's at a time ("Ask placeholders of a supplier").
 

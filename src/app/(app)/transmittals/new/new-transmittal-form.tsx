@@ -279,10 +279,18 @@ export function NewTransmittalForm({
                 </Ask>
               )}
               <Ask label={says("reason", "Why")} required hint={outgoing ? "what they should do with it" : "what they sent it for"} className="lg:col-span-2">
-                <select name="reasonForIssue" required className={field} value={reasonCode} onChange={(e) => setReasonCode(e.target.value)}>
-                  <option value="" disabled>{familyReasons.length ? "Choose…" : "None published for this kind"}</option>
-                  {familyReasons.map((r) => <option key={r.code} value={r.code}>{r.label}</option>)}
-                </select>
+                {/* Placeholders go for use: the reason is set by itself, never chosen. */}
+                {outgoing && placeholders && !placeholders.mixed && reasons.some((r) => r.code === "IFU") ? (
+                  <>
+                    <input type="hidden" name="reasonForIssue" value="IFU" />
+                    <p className={cn(field, "flex items-center text-slate-700")}>IFU — {reasons.find((r) => r.code === "IFU")?.label}<span className="ml-2 text-[11px] text-slate-400">set for placeholders</span></p>
+                  </>
+                ) : (
+                  <select name="reasonForIssue" required className={field} value={reasonCode} onChange={(e) => setReasonCode(e.target.value)}>
+                    <option value="" disabled>{familyReasons.length ? "Choose…" : "None published for this kind"}</option>
+                    {familyReasons.map((r) => <option key={r.code} value={r.code}>{r.label}</option>)}
+                  </select>
+                )}
               </Ask>
               {!recording ? null : (
                 <Ask label="Date received" required>

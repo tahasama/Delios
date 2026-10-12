@@ -178,8 +178,9 @@ public sealed class IncomingService(
                 : await documents.StartRevisionAsync(access, document.Id, files, cancellationToken, incoming);
             if (problem is not null) return (null, problem);
             // Sent to us: ours to check and review; they change it again only once it is handed back.
-            if (document.WithSupplier is not null)
-                await db.Documents.Where(d => d.Id == document.Id).ExecuteUpdateAsync(d => d.SetProperty(x => x.WithSupplier, false), cancellationToken);
+            // Changed on the document as loaded (the one the revision just updated), saved with the rest.
+            if (document.WithSupplier is not null && await db.Documents.FindAsync([document.Id], cancellationToken) is { } held)
+                held.WithSupplier = false;
             transmittal.Items.Add(Item(transmittal, TransmittalItemKinds.Submission, document, revision!, status, revision!.Submission));
         }
 

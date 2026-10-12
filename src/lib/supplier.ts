@@ -44,8 +44,8 @@ export type SupplierRow = {
   outcome: string | null; // review outcome code
   transmittal: { id: string; number: string } | null;
   submissions: number;    // revisions ever submitted — 1 means first-time
-  /** When the review's answer went back to them: returned with its comments, or released and issued. */
-  issuedBack: Date | null;
+  /** When it was released and issued. */
+  issued: Date | null;
   /** Every comment made on the revision, for the list that goes back to the supplier. */
   comments: { by: string; text: string; blocking: boolean; settled: boolean; review: string | null; rev: string }[];
 };
@@ -80,7 +80,7 @@ export async function supplierRows(t: { projectId: string }, pkg: LegacyPackage)
       doc: { id: m.documentId, docNumber: m.documentNumber, title: m.title, isPlaceholder: !m.latestRevision },
       revision: m.latestRevision ? { id: "", value: m.latestRevision, submittedAt: null, statusCode: m.status } : null,
       state: stateOf(m.latestState), due, late: false, arrivedOnTime: null, reason: null, outcome: null, transmittal: null,
-      submissions: m.latestRevision ? 1 : 0, comments: [], issuedBack: null,
+      submissions: m.latestRevision ? 1 : 0, comments: [], issued: null,
     };
     light.late = light.state === "NOT_SENT" && !!due && due.getTime() < now;
     if (!pkg.detail || !m.latestRevision) return light;
@@ -108,7 +108,7 @@ export async function supplierRows(t: { projectId: string }, pkg: LegacyPackage)
       outcome: cycle?.outcome ?? null,
       transmittal: incoming ? { id: incoming.id, number: incoming.number } : null,
       submissions: doc.revisions.filter((r) => r.submittedAt).length,
-      issuedBack: state === "RETURNED" ? rev.returnedAt : state === "APPROVED" ? rev.issuedAt ?? rev.releasedAt : null,
+      issued: state === "APPROVED" ? rev.issuedAt ?? rev.releasedAt : null,
       // The comments of the latest revision's reviews — the ones its verdict
       // rests on. A revision not yet reviewed has none, and shows none.
       comments: rev.cycles.flatMap((cy) => cy.comments.map((one) => ({ by: one.authorName, text: one.text, blocking: one.progressionPreventing, settled: one.status === "CLOSED", review: cy.number, rev: rev.value }))),

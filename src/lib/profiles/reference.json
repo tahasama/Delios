@@ -123,6 +123,11 @@
           }
         },
         {
+          "code": "IFU",
+          "label": "Issued for use",
+          "props": { "maturity": "A number to fill", "reviewCycle": false, "response": true, "acceptancePeriodDays": 5, "family": "Data" }
+        },
+        {
           "code": "RFI",
           "label": "Request for information",
           "sort": 8,

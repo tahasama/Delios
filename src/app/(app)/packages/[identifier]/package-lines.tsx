@@ -15,8 +15,8 @@ export type PackageLine = {
   sent: string | null;
   /** When the supplier last sent it back. */
   returned: string | null; returnedLate: boolean;
-  /** When the review's answer went back to them: returned with comments, or released and issued. */
-  issuedBack: string | null;
+  /** When it was released and issued. */
+  issued: string | null;
   planned: string | null; plannedWord: string | null; plannedTone: string | null;
   /** The supplier holds it now: it can be asked back for an update. */
   withThem: boolean;
@@ -107,7 +107,7 @@ export function PackageLines({ packageId, supplier, shared, lines, candidates, c
           <DataTable className="rounded-none border-0 shadow-none" exportName="package" id="supplier-package-lines" defaultHidden={["Comments"]}
             head={<tr>
               <Th className="w-10"><input type="checkbox" aria-label="Tick every document" checked={all} onChange={() => setTicked(all ? [] : lines.map((one) => one.id))} /></Th>
-              <Th>Document</Th><Th>Where it stands</Th><Th>Sent to supplier</Th><Th>Sent back</Th><Th>Issued after review</Th><Th>Planned</Th><Th>Next</Th><Th>Comments</Th>
+              <Th>Document</Th><Th>Where it stands</Th><Th>Sent to supplier</Th><Th>Sent back</Th><Th>Released &amp; issued</Th><Th>Planned</Th><Th>Next</Th><Th>Comments</Th>
             </tr>}>
             {lines.map((one) => {
               const on = ticked.includes(one.id);
@@ -126,7 +126,7 @@ export function PackageLines({ packageId, supplier, shared, lines, candidates, c
                   </Td>
                   <Td className="whitespace-nowrap text-xs">{day(one.sent) ?? <span className="text-slate-400">not yet</span>}</Td>
                   <Td className="whitespace-nowrap text-xs">{one.returned ? <span className={one.returnedLate ? "text-red-700" : undefined}>{day(one.returned)}{one.returnedLate ? " — late" : ""}</span> : <span className="text-slate-400">not yet</span>}</Td>
-                  <Td className="whitespace-nowrap text-xs">{day(one.issuedBack) ?? <span className="text-slate-400">not yet</span>}</Td>
+                  <Td className="whitespace-nowrap text-xs">{day(one.issued) ?? <span className="text-slate-400">not yet</span>}</Td>
                   <Td className="whitespace-nowrap text-xs">
                     {day(one.planned) ?? <span className="text-red-700">on no action</span>}
                     {one.plannedWord ? <span className={`block text-[11px] ${one.plannedTone ?? ""}`}>{one.plannedWord}</span> : null}
