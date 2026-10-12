@@ -613,10 +613,10 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
           <Link href={`/actions/${picking.code}`} className="ml-auto rounded-sm px-3 py-2 text-xs font-semibold text-white/70 hover:bg-white/10 hover:text-white">Back without saving</Link>
         </ActionForm>
       </div>
-    ) : selected.length ? <div className="dock sticky bottom-4 z-30 mx-auto flex max-w-4xl flex-wrap items-center gap-2 rounded-sm border border-white/10 bg-brand-strong p-2.5 text-white shadow-[0_8px_30px_rgb(0_0_0/0.18)]">
+    ) : selected.length ? <div className="dock sticky bottom-4 z-30 mx-auto flex max-w-5xl flex-wrap items-center gap-2 rounded-sm border border-white/10 bg-brand-strong p-2.5 text-white shadow-[0_8px_30px_rgb(0_0_0/0.18)]">
       <span className="px-2 font-mono text-sm tabular-nums">{allMatching ? total.toLocaleString("en-GB") : selected.length}<span className="ml-1.5 text-[10px] uppercase tracking-[0.12em] text-white/60">selected</span></span>
-      {userCanAct ? (selectedRevisionIds.length ? <Link href={`/reviews/send?revisions=${encodeURIComponent(selectedRevisionIds.join(","))}`} className="inline-flex items-center gap-1.5 rounded-sm bg-[#d9a441] px-3 py-2 text-xs font-semibold text-brand-ink"><GitPullRequestArrow className="h-4 w-4" /> Send for review ({selectedRevisionIds.length})</Link> : <span className="inline-flex items-center gap-1.5 rounded-sm bg-white/10 px-3 py-2 text-xs font-semibold text-white/55" title="Only documents with a revision being prepared can be sent"><GitPullRequestArrow className="h-4 w-4" /> Nothing ready to send</span>) : null}
-      {transmittableRows.length ? <Link href={transmittalHref} className="inline-flex items-center gap-1.5 rounded-sm bg-white/10 px-3 py-2 text-xs font-semibold hover:bg-white/15"><ArrowLeftRight className="h-4 w-4" /> Create transmittal ({transmittableRows.length})</Link> : <span className="inline-flex items-center gap-1.5 rounded-sm bg-white/10 px-3 py-2 text-xs font-semibold text-white/55" title="Only current released revisions may be sent on an outgoing transmittal"><ArrowLeftRight className="h-4 w-4" /> No released revision to transmit</span>}
+      {userCanAct ? (selectedRevisionIds.length ? <Link href={`/reviews/send?revisions=${encodeURIComponent(selectedRevisionIds.join(","))}`} className="inline-flex items-center gap-1.5 rounded-sm bg-[#d9a441] px-3 py-2 text-xs font-semibold text-brand-ink"><GitPullRequestArrow className="h-4 w-4" /> Send for review ({selectedRevisionIds.length})</Link> : null) : null}
+      {transmittableRows.length ? <Link href={transmittalHref} className="inline-flex items-center gap-1.5 rounded-sm bg-white/10 px-3 py-2 text-xs font-semibold hover:bg-white/15"><ArrowLeftRight className="h-4 w-4" /> Create transmittal ({transmittableRows.length})</Link> : null}
       {supplier && !supplier.readOnly ? (() => {
         const sendable = selectedRows.map((row) => row.sendRevisionId).filter((id): id is string => !!id);
         return sendable.length ? (
@@ -624,7 +624,7 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
             {sendable.map((id) => <input key={id} type="hidden" name="revisionId" value={id} />)}
             <button type="submit" className="inline-flex items-center gap-1.5 rounded-sm bg-[#d9a441] px-3 py-2 text-xs font-semibold text-brand-ink"><Send className="h-4 w-4" /> Send to {supplier.to} ({sendable.length})</button>
           </form>
-        ) : <span className="inline-flex items-center gap-1.5 rounded-sm bg-white/10 px-3 py-2 text-xs font-semibold text-white/55" title="Only documents with a file attached and not yet sent"><Send className="h-4 w-4" /> Nothing ready to send</span>;
+        ) : null;
       })() : null}
       {userCanAct ? <Link href={`/packages/add?docs=${encodeURIComponent(selected.join(","))}`} className="inline-flex items-center gap-1.5 rounded-sm bg-white/10 px-3 py-2 text-xs font-semibold hover:bg-white/15"><PackagePlus className="h-4 w-4" /> Add to package</Link> : null}
       {mayAddToAction ? <Link href={`/actions/add?docs=${encodeURIComponent(selected.join(","))}`} className="inline-flex items-center gap-1.5 rounded-sm bg-white/10 px-3 py-2 text-xs font-semibold hover:bg-white/15"><CalendarCheck className="h-4 w-4" /> Add to action</Link> : null}
@@ -635,7 +635,7 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
       >
         <Download className="h-4 w-4" /> Export {allMatching ? "all matching" : "selected"}
       </a>
-      <button onClick={() => { setSelected([]); setAllMatching(false); }} className="ml-auto rounded-lg p-2 text-white/60 hover:bg-white/10 hover:text-white" aria-label="Clear selection"><X className="h-4 w-4" /></button>
+      <button onClick={() => { setSelected([]); setAllMatching(false); }} className="ml-auto rounded-sm p-2 text-white/60 hover:bg-white/10 hover:text-white" aria-label="Clear selection"><X className="h-4 w-4" /></button>
     </div> : null}
   </>;
 }
