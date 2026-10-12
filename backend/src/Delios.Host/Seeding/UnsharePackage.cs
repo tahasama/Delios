@@ -19,6 +19,8 @@ public sealed class UnsharePackage(DeliosDbContext db, TenantContext tenant, Aud
         var name = await db.SignInNames.AsNoTracking().SingleOrDefaultAsync(n => n.NormalizedEmail == normalized, cancellationToken);
         if (name is null) return $"No one signs in as {email}.";
         tenant.Set(name.TenantId);
+        // The organization is applied when a transaction starts: without one, no row of it is seen.
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         var wanted = number.Trim().ToUpperInvariant();
         var package = await db.Packages.SingleOrDefaultAsync(p => p.Number == wanted && p.Kind == PackageKinds.Supply, cancellationToken);
         if (package is null) return $"No supplier package numbered {number}.";
@@ -28,6 +30,7 @@ public sealed class UnsharePackage(DeliosDbContext db, TenantContext tenant, Aud
         await audit.WriteAsync(Actor.System, "PACKAGE_UNSHARED", "Package", package.Id, package.Number,
             "Put back to not shared from the command line, for testing.", package.ProjectId, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
         return $"{package.Number} is no longer shared; share it again from its page.";
     }
 }
