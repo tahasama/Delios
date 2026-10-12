@@ -543,14 +543,6 @@ namespace Delios.Host.Platform.Migrations
                         .HasColumnType("text")
                         .HasColumnName("reinstated_by_name");
 
-                    b.Property<Instant?>("RelockedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("relocked_at");
-
-                    b.Property<string>("RelockedByName")
-                        .HasColumnType("text")
-                        .HasColumnName("relocked_by_name");
-
                     b.Property<string>("RetentionClass")
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)")
@@ -577,18 +569,6 @@ namespace Delios.Host.Platform.Migrations
                         .HasColumnType("character varying(500)")
                         .HasColumnName("title");
 
-                    b.Property<string>("UnlockReason")
-                        .HasColumnType("text")
-                        .HasColumnName("unlock_reason");
-
-                    b.Property<Instant?>("UnlockedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("unlocked_at");
-
-                    b.Property<string>("UnlockedByName")
-                        .HasColumnType("text")
-                        .HasColumnName("unlocked_by_name");
-
                     b.Property<Instant>("UpdatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -600,6 +580,10 @@ namespace Delios.Host.Platform.Migrations
                         .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("xid")
                         .HasColumnName("xmin");
+
+                    b.Property<bool?>("WithSupplier")
+                        .HasColumnType("boolean")
+                        .HasColumnName("with_supplier");
 
                     b.HasKey("Id")
                         .HasName("pk_documents");
@@ -741,6 +725,87 @@ namespace Delios.Host.Platform.Migrations
                         .HasDatabaseName("ix_document_snapshots_document_id_captured_at");
 
                     b.ToTable("document_snapshots", (string)null);
+                });
+
+            modelBuilder.Entity("Delios.Host.Documents.HandBackRequest", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<bool?>("Accepted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("accepted");
+
+                    b.Property<string>("Answer")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("answer");
+
+                    b.Property<Instant?>("AnsweredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("answered_at");
+
+                    b.Property<string>("AnsweredByName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("answered_by_name");
+
+                    b.Property<Instant>("AskedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("asked_at");
+
+                    b.Property<Guid>("AskedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("asked_by_id");
+
+                    b.Property<string>("AskedByName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("asked_by_name");
+
+                    b.Property<Guid>("DocumentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("document_id");
+
+                    b.Property<bool>("FromSupplier")
+                        .HasColumnType("boolean")
+                        .HasColumnName("from_supplier");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("kind");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("project_id");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("reason");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_hand_back_requests");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_hand_back_requests_tenant_id");
+
+                    b.HasIndex("DocumentId", "AskedAt")
+                        .HasDatabaseName("ix_hand_back_requests_document_id_asked_at");
+
+                    b.HasIndex("ProjectId", "AnsweredAt")
+                        .HasDatabaseName("ix_hand_back_requests_project_id_answered_at");
+
+                    b.ToTable("hand_back_requests", (string)null);
                 });
 
             modelBuilder.Entity("Delios.Host.Documents.NumberCounter", b =>
@@ -5099,6 +5164,23 @@ namespace Delios.Host.Platform.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_document_snapshots_tenants_tenant_id");
+                });
+
+            modelBuilder.Entity("Delios.Host.Documents.HandBackRequest", b =>
+                {
+                    b.HasOne("Delios.Host.Documents.Document", null)
+                        .WithMany()
+                        .HasForeignKey("DocumentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_hand_back_requests_documents_document_id");
+
+                    b.HasOne("Delios.Host.Identity.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_hand_back_requests_tenants_tenant_id");
                 });
 
             modelBuilder.Entity("Delios.Host.Documents.NumberCounter", b =>

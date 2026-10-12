@@ -120,6 +120,8 @@ public sealed class ControlService(DeliosDbContext db, AuditLog audit, IClock cl
             revision.ReturnedReason = note;
         }
         Record(revision, outcome, note, access.UserName);
+        // Returned by the check: back with the supplier, who corrects it.
+        if (act == Return && document.WithSupplier is not null) document.WithSupplier = true;
         document.LatestRevisionState = revision.State;
         document.UpdatedAt = now;
         await audit.WriteAsync(new Actor(access.UserId, access.UserName), act == Accept ? "SUBMISSION_ACCEPTED" : "RETURNED_TO_SENDER",

@@ -30,6 +30,15 @@ Everything below follows from that sentence.
 
 "Approval" disappears as a separate act: it is a verdict at the deciding step.
 
+A verdict set is the organization's — any codes, any names — but every value
+says one of four meanings, chosen when the set is made: **accepted**;
+**accepted with comments** (released, the comments go into the next revision);
+**rejected** (back to the author, a new revision before anything is released);
+**for information** (taken as it is, its content not reviewed). Everything that
+follows a verdict reads the meaning, never the code: release, the next
+revision, and who holds a supplier's document (with comments or rejected → the
+supplier; accepted or for information → us).
+
 ## 2 · What each record holds
 
 ### Route step (template)

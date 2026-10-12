@@ -66,14 +66,13 @@ export function stateName(
 /**
  * A document asked of a supplier reads in the supplier's own set of states, not ours: sent (to the supplier),
  * received (from them), accepted (Document Control's check), returned (by that check, with why), in review, released
- * & issued, returned (rejected by the review). Unlocked: Document Control took it back to change it. The backend
+ * & issued, returned (rejected by the review). Who holds it (who may change it) is said beside it. The backend
  * works the stage out the same way (`Register.SupplierStage`).
  */
-export const SUPPLIER_STAGES = ["UNLOCKED", "SENT", "RECEIVED", "ACCEPTED", "RETURNED_CHECK", "IN_REVIEW", "RELEASED", "RETURNED_REVIEW"] as const;
+export const SUPPLIER_STAGES = ["SENT", "RECEIVED", "ACCEPTED", "RETURNED_CHECK", "IN_REVIEW", "RELEASED", "RETURNED_REVIEW"] as const;
 export type SupplierStage = (typeof SUPPLIER_STAGES)[number];
 
 export const SUPPLIER_STAGE_LABEL: Record<SupplierStage, string> = {
-  UNLOCKED: "Unlocked",
   SENT: "Sent",
   RECEIVED: "Received",
   ACCEPTED: "Accepted",
@@ -86,11 +85,9 @@ export const SUPPLIER_STAGE_LABEL: Record<SupplierStage, string> = {
 /** Where a document asked of a supplier stands; null when it was not asked of one. */
 export function supplierStage(
   asked: boolean,
-  unlocked: boolean,
   latest: { state: string; resentAt?: Date | string | null; returnedAt?: Date | string | null } | null,
 ): SupplierStage | null {
   if (!asked) return null;
-  if (unlocked) return "UNLOCKED";
   if (!latest) return "SENT";
   switch (latest.state) {
     case "RECEIVED": return "RECEIVED";

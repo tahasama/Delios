@@ -17,8 +17,13 @@ public sealed record VoidRequest(string? Reason, string? Reassessment = null);
 public sealed record ReassessmentRequest(string? Note);
 /// <summary>Body of putting a document on legal hold, or lifting it.</summary>
 public sealed record LegalHoldRequest(bool On, string? Reason = null);
-/// <summary>Body of taking a document back from its supplier (why), or sending it to them again (what they are told).</summary>
-public sealed record SupplierLockRequest(string? Reason);
+/// <summary>Body of sending a supplier's document to them for an update (what they are told), or asking it back (why).</summary>
+public sealed record SupplierNoteRequest(string? Note);
+/// <summary>Body of answering an ask to hand a document back: accepted or not, and why (required to refuse).</summary>
+public sealed record AnswerAskRequest(bool Accept, string? Answer = null);
+/// <summary>An ask to hand a supplier's document back (RETURN_FOR_UPDATE), with its answer.</summary>
+public sealed record HandBackView(Guid Id, string Kind, bool FromSupplier, string AskedBy, string Reason, DateTimeOffset AskedAt,
+    DateTimeOffset? AnsweredAt, string? AnsweredBy, bool? Accepted, string? Answer);
 /// <summary>Body of naming readers of a closed document.</summary>
 public sealed record ReadersRequest(Guid[]? UserIds, string? Reason = null);
 
@@ -239,64 +244,166 @@ public sealed class KeepingService(
         return Results.NoContent();
     }
 
-    // ── A document asked of a supplier: taken back, and sent again ────────────
+    // ── A supplier's document: who holds it, handing it over, asking for it back ──
 
     /// <summary>
-    /// Document Control (or an administrator) takes back a document asked of a supplier, empty or with a file, to
-    /// change whatever needs changing. A reason is required. Until it is sent to the supplier again it is ours: the
-    /// supplier cannot send it, and our people work on it as on any document.
+    /// Document Control (or an administrator) sends a supplier's document we hold to the supplier, for them to update
+    /// it: they hold it from then on. A revision not yet reviewed goes as it is and comes back under the same value;
+    /// only a release, or a review that returns it, makes their next one a new revision.
     /// </summary>
-    public async Task<IResult> UnlockAsync(
-        HttpContext http, ProjectAccess access, Guid documentId, SupplierLockRequest request, CancellationToken cancellationToken)
+    public async Task<IResult> SendToSupplierAsync(
+        HttpContext http, ProjectAccess access, Guid documentId, SupplierNoteRequest request, CancellationToken cancellationToken)
     {
-        var document = await VisibleAsync(access, documentId, cancellationToken);
-        if (document is null) return Problems.NotFound("DOCUMENT_NOT_FOUND", "No such document.");
-        if (!access.Allows(Verbs.Control, document.Facts) && !await Keepers.ConfiguresAsync(http))
-            return Problems.Forbidden("CONTROL_ONLY", "Document Control takes a document back from its supplier.");
+        var document = await db.Documents.SingleOrDefaultAsync(d => d.Id == documentId && d.ProjectId == access.Project.Id, cancellationToken);
+        if (document is null || await VisibleAsync(access, documentId, cancellationToken) is null)
+            return Problems.NotFound("DOCUMENT_NOT_FOUND", "No such document.");
+        if (!access.IsInternal || (!access.Allows(Verbs.Control, document.Facts) && !await Keepers.ConfiguresAsync(http)))
+            return Problems.Forbidden("CONTROL_ONLY", "Document Control sends a document to its supplier.");
         var supplier = await SupplierOfAsync(document, cancellationToken);
-        if (supplier is null || !await AskedAsync(document.Id, cancellationToken))
-            return Problems.Conflict("NOT_ASKED_OF_SUPPLIER", "Only a document asked of a supplier is taken back from them.");
-        if (document.Unlocked) return Results.NoContent();
-        var reason = request.Reason?.Trim() ?? "";
-        if (reason.Length == 0) return Problems.Invalid("REASON_REQUIRED", $"Say why it is taken back from {supplier.Name}.");
-        if (reason.Length > 2000) return Problems.Invalid("REASON_TOO_LONG", "Keep the reason under 2000 characters.");
-        document.UnlockedAt = clock.GetCurrentInstant();
-        document.UnlockedByName = access.UserName;
-        document.UnlockReason = reason;
-        await audit.WriteAsync(new Actor(access.UserId, access.UserName), "SUPPLIER_UNLOCKED", "Document", document.Id, document.Number,
-            $"Taken back from {supplier.Name}, to be changed and sent to them again. {reason}", access.Project.Id, cancellationToken);
-        // The supplier is told it is not theirs to send until it comes back to them.
-        var theirs = await db.Users.AsNoTracking().Where(u => u.PartyId == supplier.Id && u.Active).Select(u => u.Id).ToListAsync(cancellationToken);
-        await notifier.NotifyAsync(access.Project.TenantId, access.Project.Id, theirs, Notifications.NotificationKinds.General,
-            $"{document.Number} taken back by {access.UserName}",
-            $"Do not send it for now: it comes back to you once changed.\n\n{reason}", $"/documents/{document.Id}", cancellationToken);
+        if (supplier is null || document.WithSupplier is null)
+            return Problems.Conflict("NOT_EXCHANGED", "Only a document asked of a supplier is sent to them for an update.");
+        if (document.WithSupplier == true) return Problems.Conflict("WITH_SUPPLIER", $"It is with {supplier.Name} already.");
+        var note = request.Note?.Trim() is { Length: > 0 } written ? written : null;
+        if (note is { Length: > 4000 }) return Problems.Invalid("NOTE_TOO_LONG", "Keep the message under 4000 characters.");
+        var (sent, refused) = await HandToSupplierAsync(access, document, supplier, note, cancellationToken);
+        if (refused is not null) return refused;
+        await audit.WriteAsync(new Actor(access.UserId, access.UserName), "SENT_TO_SUPPLIER", "Document", document.Id, document.Number,
+            $"Sent to {supplier.Name} for an update on {sent}." + (note is null ? "" : $" {note}"), access.Project.Id, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         return Results.NoContent();
     }
 
     /// <summary>
-    /// Sends a document taken back to its supplier again, on a transmittal, and locks it to them once more. A revision
-    /// not yet reviewed stays the same revision: the supplier's next submission comes under it. Only a release, or a
-    /// review that sends it back, makes their next one a new revision.
+    /// The side that does not hold a supplier's document asks the holder to hand it back for an update (RETURN_FOR_UPDATE),
+    /// saying why. On our side Document Control (or an administrator) asks; on theirs, whoever of the supplier may
+    /// upload. One ask open at a time; the holder is told, and answers on the document or from their Home.
     /// </summary>
-    public async Task<IResult> ResendAsync(
-        HttpContext http, ProjectAccess access, Guid documentId, SupplierLockRequest request, CancellationToken cancellationToken)
+    public async Task<IResult> AskBackAsync(
+        HttpContext http, ProjectAccess access, Guid documentId, SupplierNoteRequest request, CancellationToken cancellationToken)
     {
-        var document = await db.Documents.SingleOrDefaultAsync(d => d.Id == documentId && d.ProjectId == access.Project.Id, cancellationToken);
-        if (document is null || await VisibleAsync(access, documentId, cancellationToken) is null)
-            return Problems.NotFound("DOCUMENT_NOT_FOUND", "No such document.");
-        if (!access.Allows(Verbs.Control, document.Facts) && !await Keepers.ConfiguresAsync(http))
-            return Problems.Forbidden("CONTROL_ONLY", "Document Control sends a document to its supplier again.");
-        if (!document.Unlocked) return Problems.Conflict("NOT_TAKEN_BACK", "It is with its supplier already.");
+        var document = await VisibleAsync(access, documentId, cancellationToken);
+        if (document is null) return Problems.NotFound("DOCUMENT_NOT_FOUND", "No such document.");
         var supplier = await SupplierOfAsync(document, cancellationToken);
-        if (supplier is null) return Problems.Conflict("NOT_ASKED_OF_SUPPLIER", "Only a document asked of a supplier is sent to them again.");
+        if (supplier is null || document.WithSupplier is null)
+            return Problems.Conflict("NOT_EXCHANGED", "Only a document exchanged with a supplier is asked back.");
+        var fromSupplier = !access.IsInternal;
+        if (fromSupplier && !await SupplierMayAsync(access, document))
+            return Problems.Forbidden("NOT_ALLOWED", $"Whoever of {supplier.Name} may upload asks for it back.");
+        if (!fromSupplier && !access.Allows(Verbs.Control, document.Facts) && !await Keepers.ConfiguresAsync(http))
+            return Problems.Forbidden("CONTROL_ONLY", "Document Control asks a supplier to hand a document back.");
+        // Asked of the side that holds it: the supplier asks us when we hold it, we ask them when they do.
+        if (document.WithSupplier == fromSupplier)
+            return Problems.Conflict("ALREADY_YOURS", "It is with you already: change it, then send it.");
+        if (await db.HandBackRequests.AnyAsync(a => a.DocumentId == document.Id && a.AnsweredAt == null, cancellationToken))
+            return Problems.Conflict("ALREADY_ASKED", "It has been asked back already; wait for the answer.");
+        var reason = request.Note?.Trim() ?? "";
+        if (reason.Length == 0) return Problems.Invalid("REASON_REQUIRED", "Say why you need it back.");
+        if (reason.Length > 2000) return Problems.Invalid("REASON_TOO_LONG", "Keep the reason under 2000 characters.");
+        var ask = new HandBackRequest
+        {
+            TenantId = access.Project.TenantId,
+            ProjectId = access.Project.Id,
+            DocumentId = document.Id,
+            FromSupplier = fromSupplier,
+            AskedById = access.UserId,
+            AskedByName = access.UserName,
+            Reason = reason,
+            AskedAt = clock.GetCurrentInstant(),
+        };
+        db.HandBackRequests.Add(ask);
+        await audit.WriteAsync(new Actor(access.UserId, access.UserName), "ASKED_BACK", "Document", document.Id, document.Number,
+            $"{(fromSupplier ? supplier.Name : "We")} asked for it back to update it: {reason}", access.Project.Id, cancellationToken);
+        await notifier.NotifyAsync(access.Project.TenantId, access.Project.Id, await HoldersAsync(document, supplier, !fromSupplier, cancellationToken),
+            Notifications.NotificationKinds.General, $"{document.Number}: asked back for update by {access.UserName}",
+            $"{reason}\n\nAccept to hand it over, or refuse and say why.", $"/documents/{document.Id}", cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
+        return Results.NoContent();
+    }
+
+    /// <summary>
+    /// The holder answers an ask to hand a supplier's document back. Accepted, the document passes to whoever asked (a
+    /// revision not yet reviewed passes as it is, under the same value); refused, nothing changes, and why is required.
+    /// The one who asked is told either way.
+    /// </summary>
+    public async Task<IResult> AnswerAskAsync(
+        HttpContext http, ProjectAccess access, Guid askId, AnswerAskRequest request, CancellationToken cancellationToken)
+    {
+        var ask = await db.HandBackRequests.SingleOrDefaultAsync(a => a.Id == askId && a.ProjectId == access.Project.Id, cancellationToken);
+        if (ask is null) return Problems.NotFound("ASK_NOT_FOUND", "No such request.");
+        if (ask.AnsweredAt is not null) return Problems.Conflict("ALREADY_ANSWERED", "It has been answered already.");
+        var document = await db.Documents.SingleOrDefaultAsync(d => d.Id == ask.DocumentId, cancellationToken);
+        if (document is null || await VisibleAsync(access, ask.DocumentId, cancellationToken) is null)
+            return Problems.NotFound("DOCUMENT_NOT_FOUND", "No such document.");
+        var supplier = await SupplierOfAsync(document, cancellationToken);
+        if (supplier is null) return Problems.Conflict("NOT_EXCHANGED", "Only a document exchanged with a supplier is asked back.");
+        // The holder answers: we, when the supplier asked; the supplier, when we asked.
+        var mayAnswer = ask.FromSupplier
+            ? access.IsInternal && (access.Allows(Verbs.Control, document.Facts) || await Keepers.ConfiguresAsync(http))
+            : !access.IsInternal && await SupplierMayAsync(access, document);
+        if (!mayAnswer)
+            return Problems.Forbidden("NOT_THE_HOLDER", ask.FromSupplier ? "Document Control answers this." : $"{supplier.Name} answers this.");
+        var answer = request.Answer?.Trim() is { Length: > 0 } written ? written : null;
+        if (!request.Accept && answer is null) return Problems.Invalid("REASON_REQUIRED", "Say why it is refused.");
+        if (answer is { Length: > 2000 }) return Problems.Invalid("ANSWER_TOO_LONG", "Keep the answer under 2000 characters.");
+
+        string? sent = null;
+        if (request.Accept)
+        {
+            if (ask.FromSupplier)
+            {
+                // To the supplier, on a transmittal, like any send of ours.
+                var (number, refused) = await HandToSupplierAsync(access, document, supplier, answer ?? $"Handed back at your request: {ask.Reason}", cancellationToken);
+                if (refused is not null) return refused;
+                sent = number;
+            }
+            else
+            {
+                // Back with us: a revision they had not sent yet stays theirs under its value; ours to work on now.
+                var latest = document.LatestRevisionId is { } id ? await db.Revisions.SingleAsync(r => r.Id == id, cancellationToken) : null;
+                if (latest?.State is RevisionStates.Correcting)
+                {
+                    latest.State = RevisionStates.InPreparation;
+                    document.LatestRevisionState = latest.State;
+                }
+                document.WithSupplier = false;
+                document.UpdatedAt = clock.GetCurrentInstant();
+            }
+        }
+        ask.AnsweredAt = clock.GetCurrentInstant();
+        ask.AnsweredByName = access.UserName;
+        ask.Accepted = request.Accept;
+        ask.Answer = answer;
+        await audit.WriteAsync(new Actor(access.UserId, access.UserName), request.Accept ? "HANDED_BACK" : "HAND_BACK_REFUSED", "Document",
+            document.Id, document.Number,
+            (request.Accept ? $"Handed back to {(ask.FromSupplier ? supplier.Name : "us")}{(sent is null ? "" : $" on {sent}")}." : "Refused to hand it back.")
+            + (answer is null ? "" : $" {answer}") + $" Asked by {ask.AskedByName}: {ask.Reason}", access.Project.Id, cancellationToken);
+        await notifier.NotifyAsync(access.Project.TenantId, access.Project.Id, [ask.AskedById], Notifications.NotificationKinds.General,
+            $"{document.Number}: {(request.Accept ? "handed back to you" : "not handed back")}",
+            answer ?? (request.Accept ? "It is yours to update now." : null), $"/documents/{document.Id}", cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
+        return Results.NoContent();
+    }
+
+    /// <summary>Every ask to hand the document back, newest first, with its answer.</summary>
+    public async Task<IReadOnlyList<HandBackView>?> AsksAsync(ProjectAccess access, Guid documentId, CancellationToken cancellationToken)
+    {
+        if (await VisibleAsync(access, documentId, cancellationToken) is null) return null;
+        return (await db.HandBackRequests.AsNoTracking().Where(a => a.DocumentId == documentId).OrderByDescending(a => a.AskedAt)
+                .ToListAsync(cancellationToken))
+            .Select(a => new HandBackView(a.Id, a.Kind, a.FromSupplier, a.AskedByName, a.Reason, a.AskedAt.ToDateTimeOffset(),
+                a.AnsweredAt?.ToDateTimeOffset(), a.AnsweredByName, a.Accepted, a.Answer)).ToList();
+    }
+
+    /// <summary>
+    /// Hands the document to its supplier on a transmittal, the way it was first asked of them (reason, package, due
+    /// date): a revision not yet reviewed goes as it is and comes back under the same value. Does not save.
+    /// </summary>
+    private async Task<(string? Number, IResult? Problem)> HandToSupplierAsync(
+        ProjectAccess access, Document document, Party supplier, string? note, CancellationToken cancellationToken)
+    {
         var latest = document.LatestRevisionId is { } latestId ? await db.Revisions.SingleAsync(r => r.Id == latestId, cancellationToken) : null;
         if (latest?.State is RevisionStates.InReview)
-            return Problems.Conflict("IN_REVIEW", $"Rev {latest.Value} is in review (or decided and not released): withdraw it from review, or release it, first.");
-        var note = request.Reason?.Trim() is { Length: > 0 } written ? written : null;
-        if (note is { Length: > 4000 }) return Problems.Invalid("NOTE_TOO_LONG", "Keep the message under 4000 characters.");
-
-        // The way it was asked the first time: its reason, package and due date.
+            return (null, Problems.Conflict("IN_REVIEW", $"Rev {latest.Value} is in review (or decided and not released): withdraw it from review, or release it, first."));
         var asked = await (from i in db.TransmittalItems
                            join t in db.Transmittals on i.TransmittalId equals t.Id
                            where i.DocumentId == document.Id && i.Kind == TransmittalItemKinds.Placeholder
@@ -304,12 +411,10 @@ public sealed class KeepingService(
                            select new { t.Reason, t.PackageId, i.DueDate }).FirstAsync(cancellationToken);
         var members = await transmittals.MembersAsync(access.Project, cancellationToken);
         var sent = await transmittals.RaiseAsync(new TransmittalService.Raise(access.Project, new Actor(access.UserId, access.UserName), asked.Reason,
-            $"{document.Number}: sent to you again", note, supplier, supplier.Name, [],
+            $"{document.Number}: sent to you for an update", note, supplier, supplier.Name, [],
             TransmittalService.AddresseesOf(supplier, members), PackageId: asked.PackageId,
             Placeholders: [(document, asked.DueDate)]), cancellationToken);
-
         var now = clock.GetCurrentInstant();
-        // Not reviewed yet: the same revision goes back to the supplier, who sends it again under its value.
         if (latest?.State is RevisionStates.Received or RevisionStates.InPreparation or RevisionStates.Correcting)
         {
             latest.State = RevisionStates.Correcting;
@@ -318,26 +423,27 @@ public sealed class KeepingService(
             latest.ResentNote = note;
             document.LatestRevisionState = latest.State;
         }
-        document.RelockedAt = now;
-        document.RelockedByName = access.UserName;
+        document.WithSupplier = true;
         document.UpdatedAt = now;
-        await audit.WriteAsync(new Actor(access.UserId, access.UserName), "SUPPLIER_RESENT", "Document", document.Id, document.Number,
-            $"Sent to {supplier.Name} again on {sent.Number}"
-            + (latest?.State == RevisionStates.Correcting ? $"; rev {latest.Value} comes back under the same value." : ".")
-            + (note is null ? "" : $" {note}"), access.Project.Id, cancellationToken);
-        await db.SaveChangesAsync(cancellationToken);
-        return Results.NoContent();
+        return (sent.Number, null);
     }
+
+    /// <summary>Whoever answers for the side holding the document: Document Control for us, the supplier's uploaders for them.</summary>
+    private async Task<List<Guid>> HoldersAsync(Document document, Party supplier, bool supplierHolds, CancellationToken cancellationToken) =>
+        supplierHolds
+            ? await db.Users.AsNoTracking().Where(u => u.PartyId == supplier.Id && u.Active).Select(u => u.Id).ToListAsync(cancellationToken)
+            : await notifier.ControlHoldersAsync(document.ProjectId, cancellationToken);
+
+    /// <summary>Whether this person is of the supplier that produces the document and may upload for it.</summary>
+    private Task<bool> SupplierMayAsync(ProjectAccess access, Document document) =>
+        Task.FromResult(!access.IsInternal && access.PartyCode == document.Originator
+            && (access.Allows(Verbs.Create, document.Facts) || access.Allows(Verbs.Revise, document.Facts)));
 
     /// <summary>The outside organization that produces the document; null for our own.</summary>
     private Task<Party?> SupplierOfAsync(Document document, CancellationToken cancellationToken) =>
         document.Originator is { } code
             ? db.Parties.AsNoTracking().FirstOrDefaultAsync(p => p.Code == code && !p.IsInternal, cancellationToken)
             : Task.FromResult<Party?>(null);
-
-    /// <summary>Whether a placeholder for the document went out to its supplier.</summary>
-    private Task<bool> AskedAsync(Guid documentId, CancellationToken cancellationToken) =>
-        db.TransmittalItems.AnyAsync(i => i.DocumentId == documentId && i.Kind == TransmittalItemKinds.Placeholder, cancellationToken);
 
     // ── Readers of a closed document ──────────────────────────────────────────
 
@@ -467,12 +573,17 @@ public static class KeepingEndpoints
         project.MapPost("/documents/{documentId:guid}/legal-hold",
             (Guid documentId, LegalHoldRequest r, HttpContext h, KeepingService s, CancellationToken c) =>
                 s.LegalHoldAsync(h, ProjectAccessFilter.Of(h), documentId, r, c));
-        project.MapPost("/documents/{documentId:guid}/unlock",
-            (Guid documentId, SupplierLockRequest r, HttpContext h, KeepingService s, CancellationToken c) =>
-                s.UnlockAsync(h, ProjectAccessFilter.Of(h), documentId, r, c));
-        project.MapPost("/documents/{documentId:guid}/resend",
-            (Guid documentId, SupplierLockRequest r, HttpContext h, KeepingService s, CancellationToken c) =>
-                s.ResendAsync(h, ProjectAccessFilter.Of(h), documentId, r, c));
+        project.MapPost("/documents/{documentId:guid}/send-to-supplier",
+            (Guid documentId, SupplierNoteRequest r, HttpContext h, KeepingService s, CancellationToken c) =>
+                s.SendToSupplierAsync(h, ProjectAccessFilter.Of(h), documentId, r, c));
+        project.MapGet("/documents/{documentId:guid}/asks", async (Guid documentId, HttpContext h, KeepingService s, CancellationToken c) =>
+            await s.AsksAsync(ProjectAccessFilter.Of(h), documentId, c) is { } rows ? Results.Ok(rows) : Problems.NotFound("DOCUMENT_NOT_FOUND", "No such document."));
+        project.MapPost("/documents/{documentId:guid}/asks",
+            (Guid documentId, SupplierNoteRequest r, HttpContext h, KeepingService s, CancellationToken c) =>
+                s.AskBackAsync(h, ProjectAccessFilter.Of(h), documentId, r, c));
+        project.MapPost("/asks/{askId:guid}/answer",
+            (Guid askId, AnswerAskRequest r, HttpContext h, KeepingService s, CancellationToken c) =>
+                s.AnswerAskAsync(h, ProjectAccessFilter.Of(h), askId, r, c));
         project.MapGet("/documents/{documentId:guid}/readers", async (Guid documentId, HttpContext h, KeepingService s, CancellationToken c) =>
             await s.ReadersAsync(ProjectAccessFilter.Of(h), documentId, c) is { } rows ? Results.Ok(rows) : Problems.NotFound("DOCUMENT_NOT_FOUND", "No such document."));
         project.MapPost("/documents/{documentId:guid}/readers",

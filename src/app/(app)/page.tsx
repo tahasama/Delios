@@ -200,10 +200,10 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         href: `/transmittals/${w.transmittalId}`, code: w.reason, title: `from ${w.who ?? "another organization"} · ${w.label}`,
         tag: "unplanned", tone: "sky", at: at(w.since), cta: "Check",
       })),
-      // Unlocked to change it: sent to the supplier again from the document.
-      ...issuesOf(["RESEND_TO_SUPPLIER"]).map<Row>((w) => ({
-        href: `/documents/${w.documentId}#step-resend`, code: w.label.split(" ")[0], title: `${w.label.split(" ").slice(1).join(" ")} · unlocked by ${w.who ?? "Document Control"}: ${w.reason}`,
-        tag: "unlocked", tone: "amber", at: at(w.since), cta: "Send again",
+      // The other side asks for a supplier's document back to update it: its holder answers (us, or the supplier).
+      ...issuesOf(["ANSWER_HAND_BACK"]).map<Row>((w) => ({
+        href: `/documents/${w.documentId}#step-asked-back`, code: w.label.split(" ")[0], title: `${w.label.split(" ").slice(1).join(" ")} · asked back by ${w.who ?? "the other side"}: ${w.reason}`,
+        tag: "asked back", tone: "amber", at: at(w.since), cta: "Answer",
       })),
     ],
     route: revisionsOf(["TO_ROUTE"]).map<Row>((w) => ({

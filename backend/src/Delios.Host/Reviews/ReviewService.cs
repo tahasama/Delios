@@ -1409,6 +1409,10 @@ public sealed class ReviewService(
         }
         document.State = DocumentStates.Active;
         document.LatestRevisionState = RevisionStates.Released;
+        // A supplier's document: a verdict with comments for the next revision hands it to them; accepted, or for
+        // information, it stays with us. Read from the verdict's meaning, whatever the organization calls it.
+        if (document.WithSupplier is not null)
+            document.WithSupplier = review.Verdict is { } verdict && SupplierHold.HandsToSupplier(await Catalog.LoadAsync(db, cancellationToken), review.VerdictSet, verdict);
         document.UpdatedAt = now;
         review.State = ReviewStates.Released;
         review.ClosedAt = now;
@@ -1475,6 +1479,7 @@ public sealed class ReviewService(
         revision.ReturnedAt = now;
         revision.ReturnedReason = note;
         document.LatestRevisionState = RevisionStates.Returned;
+        if (document.WithSupplier is not null) document.WithSupplier = true;
         document.UpdatedAt = now;
         review.State = ReviewStates.Returned;
         review.ReturnNote = note;
@@ -1503,6 +1508,7 @@ public sealed class ReviewService(
         revision.ReturnedAt = now;
         revision.ReturnedReason = note;
         document.LatestRevisionState = RevisionStates.Correcting;
+        if (document.WithSupplier is not null) document.WithSupplier = true;
         document.UpdatedAt = now;
         review.State = ReviewStates.Returned;
         review.ReturnNote = note;

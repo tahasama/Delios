@@ -45,6 +45,7 @@ public sealed class DeliosDbContext(DbContextOptions<DeliosDbContext> options)
     public DbSet<Revision> Revisions => Set<Revision>();
     public DbSet<StoredFile> StoredFiles => Set<StoredFile>();
     public DbSet<DocumentAccess> DocumentAccess => Set<DocumentAccess>();
+    public DbSet<HandBackRequest> HandBackRequests => Set<HandBackRequest>();
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
     public DbSet<IdempotencyRecord> IdempotencyRecords => Set<IdempotencyRecord>();
 

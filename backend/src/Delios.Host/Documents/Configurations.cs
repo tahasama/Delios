@@ -273,3 +273,21 @@ internal sealed class IdempotencyRecordConfiguration : IEntityTypeConfiguration<
         b.Property(x => x.CreatedAt).HasDefaultValueSql("now()");
     }
 }
+
+/// <summary>Tells EF Core how to store <see cref="HandBackRequest"/>: asks to hand a supplier's document back, kept per document.</summary>
+internal sealed class HandBackRequestConfiguration : IEntityTypeConfiguration<HandBackRequest>
+{
+    /// <summary>Sets up the table: foreign keys, indexes and column lengths.</summary>
+    public void Configure(EntityTypeBuilder<HandBackRequest> b)
+    {
+        b.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
+        b.HasOne<Document>().WithMany().HasForeignKey(x => x.DocumentId).OnDelete(DeleteBehavior.Restrict);
+        b.HasIndex(x => new { x.DocumentId, x.AskedAt });
+        b.HasIndex(x => new { x.ProjectId, x.AnsweredAt });
+        b.Property(x => x.Kind).HasMaxLength(40);
+        b.Property(x => x.AskedByName).HasMaxLength(200);
+        b.Property(x => x.AnsweredByName).HasMaxLength(200);
+        b.Property(x => x.Reason).HasMaxLength(2000);
+        b.Property(x => x.Answer).HasMaxLength(2000);
+    }
+}

@@ -165,10 +165,10 @@ public sealed class IncomingService(
             var document = await db.Documents.AsNoTracking().SingleOrDefaultAsync(d => d.Id == item.DocumentId && d.ProjectId == access.Project.Id, cancellationToken);
             if (document is null || document.Originator != party.Code)
                 return (null, Problems.Forbidden("NOT_THEIRS", $"Only {party.Name}'s own placeholders are filled by {party.Name}.", new { documentId = item.DocumentId }));
-            // Taken back by Document Control to change it: it is sent to them again when ready.
-            if (document.Unlocked)
-                return (null, Problems.Conflict("TAKEN_BACK", $"{document.Number} was taken back by {document.UnlockedByName} to change it: it comes back to {party.Name} once ready.",
-                    new { documentId = document.Id, reason = document.UnlockReason }));
+            // With us: they send it again only once it is handed back to them (a return, or an ask we accepted).
+            if (document.WithSupplier == false)
+                return (null, Problems.Conflict("HELD_BY_US", $"{document.Number} is with us: ask for it back to update it.",
+                    new { documentId = document.Id }));
             var incoming = new Incoming(status, onBehalf ? party.Code : null);
             var files = new StartRevisionRequest(item.FileIds);
             var latest = document.LatestRevisionId is { } latestId
@@ -177,6 +177,9 @@ public sealed class IncomingService(
                 ? await documents.ResubmitAsync(access, document.Id, latest.Id, files, cancellationToken, incoming)
                 : await documents.StartRevisionAsync(access, document.Id, files, cancellationToken, incoming);
             if (problem is not null) return (null, problem);
+            // Sent to us: ours to check and review; they change it again only once it is handed back.
+            if (document.WithSupplier is not null)
+                await db.Documents.Where(d => d.Id == document.Id).ExecuteUpdateAsync(d => d.SetProperty(x => x.WithSupplier, false), cancellationToken);
             transmittal.Items.Add(Item(transmittal, TransmittalItemKinds.Submission, document, revision!, status, revision!.Submission));
         }
 

@@ -58,7 +58,7 @@ public sealed record RegisterRow(
     string? ProposedStatus, string? ReleasedStatus, DateTimeOffset? ReleasedAt,
     string? Verdict, string? DecidedBy, DateOnly? PlannedDate, DateTimeOffset? IssuedAt, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt,
     DateTimeOffset? RevisionStartedAt, DateTimeOffset? FileAddedAt, int Packages, IReadOnlyList<RegisterActivity> Activities,
-    string? Supplier = null);
+    string? Supplier = null, bool? WithSupplier = null);
 
 public sealed record RegisterActivity(string Code, string Name);
 
@@ -322,15 +322,13 @@ public static class RegisterEndpoints
     }
 
     /// <summary>
-    /// Where a document asked of a supplier stands, in the supplier's set: UNLOCKED (taken back by Document Control, to change
-    /// it), SENT (with the supplier: asked, or sent to them again), RECEIVED, ACCEPTED, RETURNED_CHECK (by Document
+    /// Where a document asked of a supplier stands, in the supplier's set: SENT (with the supplier: asked, or sent to them again), RECEIVED, ACCEPTED, RETURNED_CHECK (by Document
     /// Control's check), IN_REVIEW, RELEASED, RETURNED_REVIEW (rejected by the review). Null for a document not asked of
     /// a supplier, which reads in our own states.
     /// </summary>
-    public static string? SupplierStage(bool asked, bool takenBack, string? state, Instant? resentAt, Instant? returnedAt)
+    public static string? SupplierStage(bool asked, string? state, Instant? resentAt, Instant? returnedAt)
     {
         if (!asked) return null;
-        if (takenBack) return "UNLOCKED";
         return state switch
         {
             null => "SENT",
@@ -398,7 +396,7 @@ public static class RegisterEndpoints
                 verdict?.Verdict, decider, d.PlannedDate?.ToDateOnly(), issued.TryGetValue(id, out var at) ? at.ToDateTimeOffset() : null,
                 d.CreatedAt.ToDateTimeOffset(), d.UpdatedAt.ToDateTimeOffset(), latest?.CreatedAt.ToDateTimeOffset(),
                 files.TryGetValue(id, out var added) ? added.ToDateTimeOffset() : null, packages.GetValueOrDefault(id),
-                activities.GetValueOrDefault(id) ?? [], SupplierStage(asked.Contains(id), d.Unlocked, latest?.State, latest?.ResentAt, latest?.ReturnedAt));
+                activities.GetValueOrDefault(id) ?? [], SupplierStage(asked.Contains(id), latest?.State, latest?.ResentAt, latest?.ReturnedAt), d.WithSupplier);
         }).ToList();
     }
 

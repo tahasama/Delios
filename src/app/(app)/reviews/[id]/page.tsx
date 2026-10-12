@@ -5,6 +5,7 @@ import { isController, isAdmin } from "@/lib/auth";
 import { Card, Chip, Banner, Field, inputCls } from "@/components/ui";
 import { ActionForm } from "@/components/form";
 import { ADVICE_LABEL, OUTCOME_CONSEQUENCES } from "@/lib/standard";
+import { verdictEffect, VERDICT_EFFECT_BLURB } from "@/lib/verdict-effect";
 import { fmtDate, fmtDateTime } from "@/lib/utils";
 import { myAdvice, dueState } from "@/lib/workflow";
 import { reviewCycle, reviewRun, earlierSteps, routeSteps, waitingOn } from "@/lib/api/reviews";
@@ -52,6 +53,12 @@ export default async function ReviewCyclePage({ params }: { params: Promise<{ id
     ?? ADVICE_LABEL[code]
     ?? OUTCOME_CONSEQUENCES[code]?.label
     ?? code;
+  // What the verdict means, read from its meaning in the organization's list (any codes, the same four meanings);
+  // an old record's consequence name falls back to the Standard's sentence.
+  const verdictBlurb = (code: string) => {
+    const row = outcomes.find((one) => one.code === code);
+    return row ? VERDICT_EFFECT_BLURB[verdictEffect(row.props)] : OUTCOME_CONSEQUENCES[code]?.blurb;
+  };
   const controller = isController(user) || isAdmin(user);
   // Notifying the people the review still waits on, by hand: Document Control, or whoever started it.
   const notify = cycle.status === "OPEN" && !cycle.withdrawn && (controller || (!!cycle.openedById && cycle.openedById === user.id))
@@ -435,7 +442,7 @@ export default async function ReviewCyclePage({ params }: { params: Promise<{ id
               ? <DelegateForm cycleId={cycle.id} verb={handVerb} candidates={handCandidates} throughControl={handThroughControl} strict={handStrict} />
               : null}
           >
-            {cycle.outcome ? <div><p className="text-sm font-semibold text-slate-900">{cycle.binding ? <><span className="font-mono">{cycle.outcome}</span> · {verdictLabel(cycle.outcome)}</> : verdictLabel(cycle.outcome)}</p><p className="mt-1 text-xs leading-5 text-slate-500">{OUTCOME_CONSEQUENCES[cycle.outcome]?.blurb}</p>              {/* What the verdict said. A verdict that reads "Comments" and
+            {cycle.outcome ? <div><p className="text-sm font-semibold text-slate-900">{cycle.binding ? <><span className="font-mono">{cycle.outcome}</span> · {verdictLabel(cycle.outcome)}</> : verdictLabel(cycle.outcome)}</p><p className="mt-1 text-xs leading-5 text-slate-500">{verdictBlurb(cycle.outcome)}</p>              {/* What the verdict said. A verdict that reads "Comments" and
                   shows no comments is not a record of anything. */}
               {cycle.answerNotes.length ? (
                 <ul className="mt-3 space-y-2 border-t border-line pt-3">

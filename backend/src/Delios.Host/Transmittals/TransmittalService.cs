@@ -656,6 +656,13 @@ public sealed class TransmittalService(
             RevisionValue = "",
             DueDate = x.Due,
         }));
+        // A placeholder sent hands the document to the supplier: only they change it now.
+        var placed = (raise.Placeholders ?? []).Select(x => x.Document.Id).ToList();
+        if (placed.Count > 0)
+        {
+            foreach (var x in raise.Placeholders!) x.Document.WithSupplier = true;
+            await db.Documents.Where(d => placed.Contains(d.Id)).ExecuteUpdateAsync(d => d.SetProperty(x => x.WithSupplier, true), cancellationToken);
+        }
         var addressed = raise.Recipients
             .Concat((raise.Copies ?? []).Where(c => !raise.Recipients.Any(r => r.UserId == c.UserId))).ToList();
         transmittal.Recipients = addressed.Select(a => new TransmittalRecipient
@@ -926,8 +933,9 @@ public sealed class TransmittalService(
 
     /// <summary>
     /// One task waiting for a person in issuing. <c>Kind</c> is CARRY_OUT_REQUEST, DISPATCH_TRANSMITTAL,
-    /// ACKNOWLEDGE_TRANSMITTAL, REGISTER_UNPLANNED, SEND_PLACEHOLDER or RESEND_TO_SUPPLIER (taken back from a supplier,
-    /// not sent to them again yet); the ids say which record it points to.
+    /// ACKNOWLEDGE_TRANSMITTAL, REGISTER_UNPLANNED, SEND_PLACEHOLDER (a placeholder, or the next revision a review asked
+    /// of a supplier) or ANSWER_HAND_BACK (the holder of a supplier's document asked to hand it back); the ids say which
+    /// record it points to.
     /// </summary>
     public sealed record IssueWork(string Kind, Guid? RequestId, Guid? TransmittalId, Guid? RecipientId, string Label,
         string Reason, string? Who, DateOnly? DueDate, DateTimeOffset Since, Guid? DocumentId = null);
@@ -995,13 +1003,14 @@ public sealed class TransmittalService(
                 x.DocumentNumber.Length > 0 ? $"{x.DocumentNumber} {x.Title}" : x.Title, x.Number, x.FromName, null,
                 x.IssuedAt.ToDateTimeOffset())));
 
-            // Taken back from a supplier to change it: waits on Document Control until it is sent to them again.
-            var takenBack = await db.Documents.AsNoTracking()
-                .Where(d => d.ProjectId == projectId && d.UnlockedAt != null && (d.RelockedAt == null || d.RelockedAt < d.UnlockedAt))
-                .OrderBy(d => d.UnlockedAt)
-                .Select(d => new { d.Id, d.Number, d.Title, d.UnlockReason, d.UnlockedByName, d.UnlockedAt }).ToListAsync(cancellationToken);
-            work.AddRange(takenBack.Select(x => new IssueWork("RESEND_TO_SUPPLIER", null, null, null, $"{x.Number} {x.Title}",
-                x.UnlockReason ?? "", x.UnlockedByName, null, x.UnlockedAt!.Value.ToDateTimeOffset(), x.Id)));
+            // A supplier asks for one of their documents back to update it: Document Control answers.
+            var asksToUs = await (from a in db.HandBackRequests
+                                  join d in db.Documents on a.DocumentId equals d.Id
+                                  where a.ProjectId == projectId && a.FromSupplier && a.AnsweredAt == null
+                                  orderby a.AskedAt
+                                  select new { a.Id, DocumentId = d.Id, d.Number, d.Title, a.Reason, a.AskedByName, a.AskedAt }).ToListAsync(cancellationToken);
+            work.AddRange(asksToUs.Select(x => new IssueWork("ANSWER_HAND_BACK", null, null, null, $"{x.Number} {x.Title}",
+                x.Reason, x.AskedByName, null, x.AskedAt.ToDateTimeOffset(), x.DocumentId)));
         }
 
         // Another organization: the placeholders it was asked for and has not sent yet, with when each is due.
@@ -1012,14 +1021,26 @@ public sealed class TransmittalService(
                 join t in db.Transmittals on i.TransmittalId equals t.Id
                 join d in db.Documents on i.DocumentId equals d.Id
                 where t.ProjectId == projectId && i.Kind == TransmittalItemKinds.Placeholder && d.Originator == code
-                    && d.IsPlaceholder && (d.State == DocumentStates.Planned || d.State == DocumentStates.Active)
-                    // Taken back by Document Control: not theirs to send until it comes back to them.
-                    && !(d.UnlockedAt != null && (d.RelockedAt == null || d.RelockedAt < d.UnlockedAt))
+                    && (d.State == DocumentStates.Planned || d.State == DocumentStates.Active)
+                    // A placeholder to fill, or the next revision a review asked of them (they hold it after it).
+                    && (d.IsPlaceholder || (d.WithSupplier == true
+                        && (d.LatestRevisionState == RevisionStates.Returned || d.LatestRevisionState == RevisionStates.Released)))
+                    // Only while they hold it: with us, they ask for it back first.
+                    && d.WithSupplier != false
                 select new { t.Id, DocumentId = d.Id, d.Number, d.Title, Number_ = t.Number, i.DueDate, t.IssuedAt }).ToListAsync(cancellationToken);
             work.AddRange(asked.GroupBy(x => x.DocumentId).Select(g => g.OrderByDescending(x => x.IssuedAt).First())
                 .OrderBy(x => x.DueDate ?? LocalDate.MaxIsoValue).ThenBy(x => x.Number)
                 .Select(x => new IssueWork("SEND_PLACEHOLDER", null, x.Id, null, $"{x.Number} {x.Title}", x.Number_, null,
                     x.DueDate?.ToDateOnly(), x.IssuedAt.ToDateTimeOffset(), x.DocumentId)));
+
+            // We asked them to hand one of their documents back: they answer.
+            var asksToThem = await (from a in db.HandBackRequests
+                                    join d in db.Documents on a.DocumentId equals d.Id
+                                    where a.ProjectId == projectId && !a.FromSupplier && a.AnsweredAt == null && d.Originator == code
+                                    orderby a.AskedAt
+                                    select new { DocumentId = d.Id, d.Number, d.Title, a.Reason, a.AskedByName, a.AskedAt }).ToListAsync(cancellationToken);
+            work.AddRange(asksToThem.Select(x => new IssueWork("ANSWER_HAND_BACK", null, null, null, $"{x.Number} {x.Title}",
+                x.Reason, x.AskedByName, null, x.AskedAt.ToDateTimeOffset(), x.DocumentId)));
         }
 
         var me = access.UserId;

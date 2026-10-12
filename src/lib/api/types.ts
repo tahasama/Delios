@@ -63,7 +63,7 @@ export type RevisionWork = {
 };
 
 export type IssueWork = {
-  kind: "CARRY_OUT_REQUEST" | "DISPATCH_TRANSMITTAL" | "ACKNOWLEDGE_TRANSMITTAL" | "REGISTER_UNPLANNED" | "SEND_PLACEHOLDER" | "SAY_WHO_RECEIVES" | "RESEND_TO_SUPPLIER";
+  kind: "CARRY_OUT_REQUEST" | "DISPATCH_TRANSMITTAL" | "ACKNOWLEDGE_TRANSMITTAL" | "REGISTER_UNPLANNED" | "SEND_PLACEHOLDER" | "SAY_WHO_RECEIVES" | "ANSWER_HAND_BACK";
   requestId: string | null;
   transmittalId: string | null;
   recipientId: string | null;
@@ -108,6 +108,14 @@ export type RegisterRow = {
   packages: number; activities: { code: string; name: string }[];
   /** Asked of a supplier: where it stands in the supplier's set (`SupplierStage`); null otherwise. */
   supplier?: string | null;
+  /** Exchanged with a supplier: true while they hold it, false while we do. */
+  withSupplier?: boolean | null;
+};
+
+/** An ask to hand a supplier's document back for an update (RETURN_FOR_UPDATE), with its answer. */
+export type HandBack = {
+  id: string; kind: string; fromSupplier: boolean; askedBy: string; reason: string; askedAt: string;
+  answeredAt: string | null; answeredBy: string | null; accepted: boolean | null; answer: string | null;
 };
 
 /** GET /documents/{id} (Contracts.cs DocumentView). */
@@ -123,8 +131,8 @@ export type DocumentView = {
   confirmedAt?: string | null; confirmedByName?: string | null; correctsId?: string | null;
   /** The hold lifted; the document cancelled or withdrawn; reinstated after. Each kept beside what it answers. */
   holdLifted?: Written | null; ended?: Written | null; reinstated?: Written | null;
-  /** Asked of a supplier and taken back by Document Control to change it; sent to them again (locked once more). */
-  unlocked?: Written | null; relocked?: Written | null;
+  /** Exchanged with a supplier: who holds it, the only side that may change it (true the supplier, false us); null otherwise. */
+  withSupplier?: boolean | null;
 };
 
 /** Something a person decided and wrote down: when, who, and why, in their words. */

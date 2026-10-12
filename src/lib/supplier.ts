@@ -90,7 +90,7 @@ export async function supplierRows(t: { projectId: string }, pkg: LegacyPackage)
     if (!doc || !rev) return light;
     const cycle = rev.cycles[rev.cycles.length - 1] ?? null;
     // Sent back to the supplier after Document Control took it back: with them, not returned.
-    const resent = rev.backend.state === "CORRECTING" && supplierStage(true, false, { state: rev.backend.state, resentAt: rev.backend.resent?.at, returnedAt: rev.backend.returnedAt }) === "SENT";
+    const resent = rev.backend.state === "CORRECTING" && supplierStage(true, { state: rev.backend.state, resentAt: rev.backend.resent?.at, returnedAt: rev.backend.returnedAt }) === "SENT";
     const state = resent ? "NOT_SENT" : stateOf(rev.backend.state);
     const incoming = (context?.transmittals ?? [])
       .filter((one) => one.direction === "INCOMING" && one.revisionId === rev.id)

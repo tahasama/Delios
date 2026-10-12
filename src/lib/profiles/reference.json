@@ -2449,7 +2449,8 @@
           "label": "For information only — no review needed",
           "props": {
             "proceed": true,
-            "resubmit": false
+            "resubmit": false,
+            "information": true
           }
         }
       ]

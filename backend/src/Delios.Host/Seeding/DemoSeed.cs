@@ -297,10 +297,11 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
             ("IFC", "Issued for construction", new { executes = true }),
             ("AFC", "Approved for construction", new { executes = true }));
         Set(ReviewSets.Verdicts,
-            ("C1", "Accepted", new { proceed = true }),
-            ("C2", "Accepted with comments", new { proceed = true }),
-            ("C3", "Rejected: revise and resubmit", new { proceed = false }),
-            ("C4", "For information only", new { proceed = true }));
+            // Each says one of the four meanings (accepted, with comments, rejected, for information); the names are ours.
+            ("C1", "Accepted", new { proceed = true, resubmit = false, information = false }),
+            ("C2", "Accepted with comments", new { proceed = true, resubmit = true, information = false }),
+            ("C3", "Rejected: revise and resubmit", new { proceed = false, resubmit = true, information = false }),
+            ("C4", "For information only", new { proceed = true, resubmit = false, information = true }));
         Set(ReviewSets.Advice,
             ("NO_COMMENT", "No comment", new { comments = "none" }),
             ("COMMENTS", "Comments, none blocking", new { comments = "some" }),

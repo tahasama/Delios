@@ -24,7 +24,7 @@ import {
   prepareRevisionAction, editRevisionAction, withdrawRevisionAction, releaseRevisionAction, voidRevisionAction, unvoidRevisionAction, returnAtGateAction, liftHoldAction, returnHeldAction,
 } from "@/lib/actions/revisions";
 import { parseRecipients, noRecipients, mayRequestIssue, requestChoices, authorOf, issuePolicy, decisionLetsItOut, requestsOn } from "@/lib/issue-requests";
-import { legacyDocument, documentContext, type LegacyRevision } from "@/lib/api/legacy";
+import { legacyDocument, documentContext, handBacks, type LegacyRevision } from "@/lib/api/legacy";
 import { requestIssueAction, carryOutRequestAction, cancelRequestAction } from "@/lib/actions/issue-requests";
 import { RequestIssue } from "./request-issue";
 import { ReturnTarget } from "./return-target";
@@ -42,7 +42,7 @@ import { ArrowLeft, ChevronRight, Download, ExternalLink, FileText, Send } from 
 import { hasVerb } from "@/lib/auth";
 import { activityList } from "@/lib/api/schedule";
 import { addDocumentToActionAction } from "@/lib/actions/action-links";
-import { unlockSupplierAction, resendSupplierAction } from "@/lib/actions/supplier";
+import { sendToSupplierAction, askBackAction, answerAskAction } from "@/lib/actions/supplier";
 import { addressees } from "@/lib/api/transmittals";
 
 export const dynamic = "force-dynamic";
@@ -102,8 +102,11 @@ export default async function DocumentDetailPage({
   const supplierName = doc.originator && context.transmittals.some((t) => t.direction === "OUTGOING" && t.itemKind === "PLACEHOLDER")
     ? (await addressees(ctx).catch(() => ({ parties: [] as { code: string; name: string }[] }))).parties.find((p) => p.code === doc.originator)?.name ?? null
     : null;
-  const unlocked = !!supplierName && !!doc.unlocked && (!doc.relocked || new Date(doc.relocked.at) < new Date(doc.unlocked.at));
-  const askedOf = user.isInternal && supplierName && !unlocked ? supplierName : null;
+  // One side holds it at a time, and only the holder changes it; the other asks for it back, and the holder accepts.
+  const withSupplier = supplierName ? doc.withSupplier ?? null : null;
+  const askedOf = user.isInternal && supplierName && withSupplier === true ? supplierName : null;
+  const asks = supplierName ? await handBacks(ctx, doc.id) : [];
+  const openAsk = asks.find((one) => !one.answeredAt) ?? null;
   const controller = isController(user) || isAdmin(user);
   // Document Control adds it to a schedule action from here too: the actions with a discipline tagged that do not need it yet.
   const mayAddToAction = ctx.can("CONTROL") && !["WITHDRAWN", "CANCELLED"].includes(doc.state);
@@ -295,7 +298,7 @@ export default async function DocumentDetailPage({
           <ActionForm action={editRevisionAction} submitLabel="Save" size="sm" hidden={{ revisionId: working!.id, id: doc.id, hasFiles: working!.files.length ? "yes" : "no" }}>
             {/* A supplier's: its files and what it is issued for are theirs; only our details change here. */}
             {askedOf ? (
-              <p className="text-xs text-slate-500">Its files and what it is issued for are {askedOf}&rsquo;s: they send corrections on a transmittal.</p>
+              <p className="text-xs text-slate-500">It is with {askedOf}: its files are theirs to change, until they send it or hand it back.</p>
             ) : <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Field label="PDF" hint={workingHasPdf ? "replaces the one there" : "what people will read — needed before it is sent"}>
                 <input type="file" name="renditionFile" accept=".pdf" className="block w-full" />
@@ -480,17 +483,22 @@ export default async function DocumentDetailPage({
         </>) },
       ] : []),
 
-      // Asked of a supplier: locked to them. Document Control may take it back to change anything, saying why.
+      // A supplier's document with the supplier: only they change it. Document Control may ask for it back, saying why.
       ...(askedOf ? [
-        { key: "asked", label: `Locked to ${askedOf}`, body: (<>
+        { key: "asked", label: `With ${askedOf}`, open: !!openAsk, body: (<>
           <p className="text-xs leading-5 text-slate-600">
-            It was asked of {askedOf}: only {askedOf} sends its files, on a transmittal. Nobody of ours starts a revision or replaces its files.
+            {askedOf} holds it: only {askedOf} changes it, and sends it to us on a transmittal. To update it ourselves, ask them to hand it back.
           </p>
-          {controller ? (
-            <details className="mt-3 text-xs">
-              <summary className="ask cursor-pointer list-none [&::-webkit-details-marker]:hidden">Unlock it, to change it</summary>
-              <ActionForm action={unlockSupplierAction} submitLabel="Unlock" size="sm" variant="secondary" hidden={{ documentId: doc.id }} className="mt-3 space-y-3">
-                <Field label="Why" required hint={`${askedOf} is told not to send it until it comes back to them`}>
+          {openAsk && !openAsk.fromSupplier ? (
+            <p className="mt-2 whitespace-pre-line rounded-md bg-tint-soft px-3 py-2.5 text-xs leading-5 text-slate-700 ring-1 ring-line">
+              <span className="font-semibold text-slate-800">Asked back</span> by {openAsk.askedBy}, {fmtDate(new Date(openAsk.askedAt))}: {openAsk.reason}
+              <span className="block text-amber-800">Waiting for {askedOf} to answer.</span>
+            </p>
+          ) : controller ? (
+            <details className="mt-3 text-xs open:basis-full">
+              <summary className="ask cursor-pointer list-none [&::-webkit-details-marker]:hidden">Ask for it back</summary>
+              <ActionForm action={askBackAction} submitLabel="Ask" size="sm" hidden={{ documentId: doc.id }} className="mt-3 space-y-3">
+                <Field label="Why we need it back" required hint={`${askedOf} reads it, then hands it back or refuses with why`}>
                   <textarea name="reason" required rows={2} maxLength={2000} className={inputCls} />
                 </Field>
               </ActionForm>
@@ -498,25 +506,40 @@ export default async function DocumentDetailPage({
           ) : null}
         </>) },
       ] : []),
-      // Taken back: ours to change, until it is sent to the supplier again.
-      ...(unlocked && supplierName ? [
-        { key: "resend", primary: controller, open: controller, label: `Unlocked — send it to ${supplierName} again`, body: (<>
-          <p className="whitespace-pre-line text-xs leading-5 text-slate-600">
-            Unlocked by {doc.unlocked!.by}, {fmtDate(new Date(doc.unlocked!.at))}: {doc.unlocked!.reason}
-            <span className="mt-1 block text-slate-500">
-              {working && ["IN_PREPARATION", "RECEIVED", "CORRECTING"].includes(working.state)
-                ? `Rev ${working.value} goes back to ${supplierName} as it is: they send it again under rev ${working.value}.`
-                : `${supplierName} is asked for it again.`}
-            </span>
-          </p>
-          {controller ? (
-            <ActionForm action={resendSupplierAction} submitLabel={`Send to ${supplierName} again`} size="sm" hidden={{ documentId: doc.id }} className="mt-3 space-y-3">
-              <Field label="Message" hint={`what ${supplierName} reads with it: what changed`}>
-                <textarea name="note" rows={2} maxLength={4000} className={inputCls} />
-              </Field>
-            </ActionForm>
-          ) : null}
-        </>) },
+      // With us: the supplier may ask for it back, and Document Control answers; or we send it to them for an update.
+      ...(user.isInternal && supplierName && withSupplier === false ? [
+        openAsk && openAsk.fromSupplier
+          ? { key: "asked-back", primary: controller, open: true, label: `${supplierName} asks for it back`, body: (<>
+              <p className="whitespace-pre-line rounded-md bg-tint-soft px-3 py-2.5 text-xs leading-5 text-slate-700 ring-1 ring-line">
+                <span className="font-semibold text-slate-800">{openAsk.askedBy}</span>, {fmtDate(new Date(openAsk.askedAt))}: {openAsk.reason}
+                <span className="mt-1 block text-slate-600">Does Document Control hand it back to {supplierName} to update it?{working && ["IN_PREPARATION", "RECEIVED"].includes(working.state) ? ` Rev ${working.value} goes as it is and comes back under the same value.` : ""}</span>
+              </p>
+              {controller ? (
+                <ActionForm action={answerAskAction} submitLabel="Answer" size="sm" hidden={{ askId: openAsk.id, documentId: doc.id }} className="mt-3 space-y-3">
+                  <fieldset className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs font-medium text-slate-700">
+                    <legend className="sr-only">Hand it back?</legend>
+                    <label className="flex items-center gap-1.5"><input type="radio" name="accept" value="yes" required /> Hand it back</label>
+                    <label className="flex items-center gap-1.5"><input type="radio" name="accept" value="no" required /> Keep it</label>
+                  </fieldset>
+                  <Field label="Why" hint={`${supplierName} reads it; required to keep it`}>
+                    <textarea name="answer" rows={2} maxLength={2000} className={inputCls} />
+                  </Field>
+                </ActionForm>
+              ) : null}
+            </>) }
+          : { key: "send-to-supplier", label: `With us — send it to ${supplierName} for an update`, body: (<>
+              <p className="text-xs leading-5 text-slate-600">
+                We hold it: only we change it now. Sending it to {supplierName} hands it to them to update it.
+                {working && ["IN_PREPARATION", "RECEIVED"].includes(working.state) ? ` Rev ${working.value} goes as it is and comes back under the same value.` : ""}
+              </p>
+              {controller ? (
+                <ActionForm action={sendToSupplierAction} submitLabel={`Send to ${supplierName}`} size="sm" hidden={{ documentId: doc.id }} className="mt-3 space-y-3">
+                  <Field label="Message" hint={`what ${supplierName} reads with it: what to update`}>
+                    <textarea name="note" rows={2} maxLength={4000} className={inputCls} />
+                  </Field>
+                </ActionForm>
+              ) : null}
+            </>) },
       ] : []),
       ...(canEdit && !askedOf && !working && doc.kind !== "RECORD" ? [
         { key: "revise", primary: ground.kind !== "OWN", label: ground.kind === "FIRST" ? "Start the first revision" : ground.kind === "ASKED" ? `New revision — answer rev ${doc.revisions[0]?.value}` : "Start a new revision", open: !doc.revisions.length, body: (<>
@@ -566,7 +589,7 @@ export default async function DocumentDetailPage({
   // Asked of a supplier: its newest revision reads in the supplier's own set (sent, received, accepted…).
   const newest = doc.revisions[0]?.backend ?? null;
   const stage = supplierName && (!shown || shown.id === doc.revisions[0]?.id)
-    ? supplierStage(true, unlocked, newest ? { state: newest.state, resentAt: newest.resent?.at, returnedAt: newest.returnedAt } : null)
+    ? supplierStage(true, newest ? { state: newest.state, resentAt: newest.resent?.at, returnedAt: newest.returnedAt } : null)
     : null;
   const stateLabel = stage
     ? supplierStageName(names, stage, { together, held: onHold })
@@ -712,7 +735,7 @@ export default async function DocumentDetailPage({
                   <p className="mt-4 text-xs text-slate-500">To change these details, start a new revision: they change with it.</p>
                 ) : null}
                 {/* What was decided about it and is over now, each with why: the hold that was lifted, the end that was taken back. */}
-                {(!doc.legalHold && doc.holdLifted) || (doc.reinstated && doc.state !== "CANCELLED" && doc.state !== "WITHDRAWN") || (doc.unlocked && !unlocked) ? (
+                {(!doc.legalHold && doc.holdLifted) || (doc.reinstated && doc.state !== "CANCELLED" && doc.state !== "WITHDRAWN") || asks.some((one) => one.answeredAt) ? (
                   <div className="mt-4 space-y-2 border-t border-line pt-3 text-xs leading-5 text-slate-600">
                     {!doc.legalHold && doc.holdLifted ? (
                       <p className="whitespace-pre-line">
@@ -726,13 +749,13 @@ export default async function DocumentDetailPage({
                         {doc.ended ? <span className="block text-slate-500">It had been ended {fmtDate(doc.ended.at)} by {doc.ended.by}: {doc.ended.reason}</span> : null}
                       </p>
                     ) : null}
-                    {/* Taken back from the supplier and sent to them again: the reason stays with it. */}
-                    {doc.unlocked && !unlocked ? (
-                      <p className="whitespace-pre-line">
-                        <span className="font-semibold text-slate-800">Sent to {supplierName ?? "the supplier"} again</span>{doc.relocked ? ` ${fmtDate(new Date(doc.relocked.at))} by ${doc.relocked.by}` : ""}
-                        <span className="block text-slate-500">It had been unlocked {fmtDate(new Date(doc.unlocked.at))} by {doc.unlocked.by}: {doc.unlocked.reason}</span>
+                    {/* Every ask to hand it back, with its answer beside it. */}
+                    {asks.filter((one) => one.answeredAt).map((one) => (
+                      <p key={one.id} className="whitespace-pre-line">
+                        <span className="font-semibold text-slate-800">{one.accepted ? "Handed back" : "Not handed back"}</span> to {one.fromSupplier ? supplierName : "us"}, {fmtDate(new Date(one.answeredAt!))} by {one.answeredBy}{one.answer ? `: ${one.answer}` : ""}
+                        <span className="block text-slate-500">Asked by {one.askedBy}, {fmtDate(new Date(one.askedAt))}: {one.reason}</span>
                       </p>
-                    ) : null}
+                    ))}
                   </div>
                 ) : null}
                 {/* Two different intentions, kept apart: hold keeps it as it is; ending it says it is finished. */}

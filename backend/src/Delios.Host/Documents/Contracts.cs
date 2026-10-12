@@ -74,7 +74,7 @@ public sealed record DocumentView(
     bool LegalHold = false, string? LegalHoldReason = null, string? PreviousNumber = null, string? LegacyScheme = null, string? AppVersion = null,
     System.Text.Json.JsonElement? Extras = null, DateTimeOffset? ConfirmedAt = null, string? ConfirmedByName = null, Guid? CorrectsId = null,
     DateTimeOffset? LegalHoldAt = null, string? LegalHoldBy = null, Written? HoldLifted = null, Written? Ended = null, Written? Reinstated = null,
-    Written? Unlocked = null, Written? Relocked = null);
+    bool? WithSupplier = null);
 
 /// <summary>One page of the register. <c>Next</c> is the value to pass as <c>after</c> for the next page; null on the last page.</summary>
 public sealed record DocumentPage(IReadOnlyList<DocumentSummary> Items, string? Next);

@@ -1,7 +1,7 @@
 import "server-only";
 import { cache } from "react";
 import { api, ApiProblem, projectPath } from "./client";
-import type { DocumentView, ReviewView, RevisionView, Written } from "./types";
+import type { DocumentView, ReviewView, RevisionView, Written, HandBack } from "./types";
 
 /**
  * The screens were written against the old database's shapes: a document with
@@ -70,8 +70,8 @@ export type LegacyDocument = {
   disposedBy: string | null; disposalBasis: string | null; legalHold: boolean;
   legalHoldReason: string | null; legalHoldAt: Date | null; legalHoldBy: string | null; isPlaceholder: boolean; previousId: string | null;
   holdLifted: Written | null; ended: Written | null; reinstated: Written | null;
-  /** Taken back from its supplier (and when it was sent to them again). Unlocked while the first is the later. */
-  unlocked: Written | null; relocked: Written | null;
+  /** Exchanged with a supplier: true while they hold it (only they change it), false while we do; null otherwise. */
+  withSupplier: boolean | null;
   legacyScheme: string | null; createdDate: Date; receivedDate: Date | null; plannedDate: Date | null; appVersion: string | null;
   createdById: string; createdByName: string; createdAt: Date; updatedAt: Date;
   revisions: LegacyRevision[];
@@ -109,6 +109,10 @@ export const backendDocument = cache(async (scope: Scope, id: string): Promise<D
 /** Reviews, transmittals, packages, activities and history around one document. */
 export const documentContext = cache(async (scope: Scope, id: string): Promise<BackendContext> =>
   api<BackendContext>(projectPath(scope, `/documents/${id}/context`)));
+
+/** Every ask to hand a supplier's document back, newest first, with its answer. */
+export const handBacks = cache(async (scope: Scope, id: string): Promise<HandBack[]> =>
+  api<HandBack[]>(projectPath(scope, `/documents/${id}/asks`)).catch(() => []));
 
 /** One review in full: its steps, who sits on them and the comments. */
 export const backendReview = cache(async (scope: Scope, id: string): Promise<ReviewView> =>
@@ -195,7 +199,7 @@ export const legacyDocument = cache(async (scope: Scope, id: string): Promise<Le
     confirmedAt: date(doc.confirmedAt ?? null), confirmedByName: doc.confirmedByName ?? null, disposedAt: null, disposedBy: null, disposalBasis: null, legalHold: doc.legalHold,
     legalHoldReason: doc.legalHoldReason ?? null, legalHoldAt: date(doc.legalHoldAt ?? null), legalHoldBy: doc.legalHoldBy ?? null,
     holdLifted: doc.holdLifted ?? null, ended: doc.ended ?? null, reinstated: doc.reinstated ?? null,
-    unlocked: doc.unlocked ?? null, relocked: doc.relocked ?? null,
+    withSupplier: doc.withSupplier ?? null,
     isPlaceholder: doc.isPlaceholder, previousId: doc.previousNumber, legacyScheme: doc.legacyScheme, createdDate: new Date(doc.createdAt), receivedDate: date(doc.receivedDate),
     plannedDate: date(doc.plannedDate), appVersion: doc.appVersion, createdById: doc.createdById, createdByName: doc.createdByName,
     createdAt: new Date(doc.createdAt), updatedAt: new Date(doc.updatedAt),

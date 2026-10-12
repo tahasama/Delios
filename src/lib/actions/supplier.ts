@@ -182,37 +182,53 @@ export async function sendSupplierFromRegisterAction(formData: FormData): Promis
 }
 
 /**
- * Document Control takes a document back from its supplier (empty or with a file) to change it, saying why. Until
- * it is sent to them again it is ours to change; the supplier is told not to send it meanwhile.
+ * Document Control sends a supplier's document we hold to the supplier for an update: they hold it from then on.
+ * A revision not yet reviewed goes as it is and comes back under the same value.
  */
-export async function unlockSupplierAction(_prev: { error?: string; ok?: string } | undefined, formData: FormData): Promise<{ error?: string; ok?: string }> {
+export async function sendToSupplierAction(_prev: { error?: string; ok?: string } | undefined, formData: FormData): Promise<{ error?: string; ok?: string }> {
   const ctx = await requireScope();
   const documentId = String(formData.get("documentId") ?? "");
-  const reason = String(formData.get("reason") ?? "").trim();
-  if (!reason) return { error: "Say why it is taken back." };
+  const note = String(formData.get("note") ?? "").trim() || null;
   try {
-    await api(projectPath(ctx, `/documents/${documentId}/unlock`), { body: { reason } });
-  } catch (e) {
-    return { error: refusal(e).message };
-  }
-  revalidatePath(`/documents/${documentId}`);
-  return { ok: "Unlocked: change what you need, then send it to the supplier again." };
-}
-
-/**
- * Sends a document taken back to its supplier again, on a transmittal, and locks it to them once more. A revision
- * not yet reviewed stays the same revision.
- */
-export async function resendSupplierAction(_prev: { error?: string; ok?: string } | undefined, formData: FormData): Promise<{ error?: string; ok?: string }> {
-  const ctx = await requireScope();
-  const documentId = String(formData.get("documentId") ?? "");
-  const reason = String(formData.get("note") ?? "").trim() || null;
-  try {
-    await api(projectPath(ctx, `/documents/${documentId}/resend`), { body: { reason } });
+    await api(projectPath(ctx, `/documents/${documentId}/send-to-supplier`), { body: { note } });
   } catch (e) {
     return { error: refusal(e).message };
   }
   revalidatePath(`/documents/${documentId}`);
   revalidatePath("/documents");
-  return { ok: "Sent to the supplier again." };
+  return { ok: "Sent to the supplier for an update." };
+}
+
+/** The side that does not hold a supplier's document asks the holder to hand it back for an update, saying why. */
+export async function askBackAction(_prev: { error?: string; ok?: string } | undefined, formData: FormData): Promise<{ error?: string; ok?: string }> {
+  const ctx = await requireScope();
+  const documentId = String(formData.get("documentId") ?? "");
+  const note = String(formData.get("reason") ?? "").trim();
+  if (!note) return { error: "Say why you need it back." };
+  try {
+    await api(projectPath(ctx, `/documents/${documentId}/asks`), { body: { note } });
+  } catch (e) {
+    return { error: refusal(e).message };
+  }
+  revalidatePath(`/documents/${documentId}`);
+  revalidatePath("/");
+  return { ok: "Asked. You are told when they answer." };
+}
+
+/** The holder answers an ask to hand the document back: accepted, it passes to whoever asked; refused, with why. */
+export async function answerAskAction(_prev: { error?: string; ok?: string } | undefined, formData: FormData): Promise<{ error?: string; ok?: string }> {
+  const ctx = await requireScope();
+  const askId = String(formData.get("askId") ?? "");
+  const documentId = String(formData.get("documentId") ?? "");
+  const accept = String(formData.get("accept") ?? "") === "yes";
+  const answer = String(formData.get("answer") ?? "").trim() || null;
+  if (!accept && !answer) return { error: "Say why it is refused." };
+  try {
+    await api(projectPath(ctx, `/asks/${askId}/answer`), { body: { accept, answer } });
+  } catch (e) {
+    return { error: refusal(e).message };
+  }
+  revalidatePath(`/documents/${documentId}`);
+  revalidatePath("/");
+  return { ok: accept ? "Handed back." : "Refused; they are told why." };
 }

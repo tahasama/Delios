@@ -731,31 +731,23 @@ public sealed class DocumentService(
             return (null, Problems.Conflict("DOCUMENT_NOT_OPEN",
                 $"The document is {document.State.ToLowerInvariant()}.", new { state = document.State }));
         }
-        // Asked of a supplier: from then on its files and what it is issued for are the supplier's, sent on a
-        // transmittal (or recorded by Document Control for them). Nobody of ours starts a revision or changes its files.
-        if (incoming is null && access.IsInternal && await AskedOfSupplierAsync(document, cancellationToken) is { } supplier)
+        // A supplier's document while the supplier holds it: only they change it, sending it on a transmittal (or
+        // Document Control recording what they sent). Ours to change again once it is handed back to us.
+        if (incoming is null && access.IsInternal && await HeldBySupplierAsync(document, cancellationToken) is { } supplier)
         {
             return (null, Problems.Conflict("ASKED_OF_SUPPLIER",
-                $"It was asked of {supplier}: only {supplier} sends its files and says what it is issued for, on a transmittal.",
+                $"It is with {supplier}: only {supplier} changes it now. Ask them to hand it back to update it.",
                 new { supplier }));
         }
         return (document, null);
     }
 
-    /// <summary>
-    /// The supplier's name when the document is another organization's, a placeholder for it went out to them, and
-    /// Document Control has not taken it back; else null.
-    /// </summary>
-    public async Task<string?> AskedOfSupplierAsync(Document document, CancellationToken cancellationToken)
-    {
-        if (document.Originator is not { } originator || document.Unlocked) return null;
-        var supplier = await db.Parties.AsNoTracking().Where(p => p.Code == originator && !p.IsInternal).Select(p => p.Name)
-            .FirstOrDefaultAsync(cancellationToken);
-        if (supplier is null) return null;
-        var asked = await db.TransmittalItems.AsNoTracking().AnyAsync(i => i.DocumentId == document.Id
-            && i.Kind == Transmittals.TransmittalItemKinds.Placeholder, cancellationToken);
-        return asked ? supplier : null;
-    }
+    /// <summary>The supplier's name when the document is exchanged with a supplier and the supplier holds it; else null.</summary>
+    public async Task<string?> HeldBySupplierAsync(Document document, CancellationToken cancellationToken) =>
+        document.WithSupplier == true && document.Originator is { } originator
+            ? await db.Parties.AsNoTracking().Where(p => p.Code == originator && !p.IsInternal).Select(p => p.Name).FirstOrDefaultAsync(cancellationToken)
+              ?? originator
+            : null;
 
     /// <summary>The scheme routed to the deliverable type, else the organization's default.</summary>
     private async Task<RevisionScheme?> RevisionSchemeForAsync(string deliverableType, CancellationToken cancellationToken) =>

@@ -779,25 +779,43 @@ under.
 **Depends on it:** `ACTION_LINKS`, `PROJECT_PEOPLE`, `CONFIRM:{act}`, `Verbs.Manage`, `Transmittal.ActivityConfirm/ActivityProposal`,
 `Membership.PendingSince/Refused*`, `/activity-check|confirm|refuse`, `/people/pending|confirm|refuse`.
 
-## 42 · A document asked of a supplier is the supplier's to send
+## 42 · A supplier's document is held by one side at a time
 
 **Clause:** §9 *Information from suppliers and contractors*.
 
-**Must say:** once a placeholder has been sent to a supplier, the document is
-locked to it: only the supplier sends its files, always on a transmittal.
-Nobody of ours starts a revision of it or replaces its files. Document Control
-may unlock it, with a reason, to change anything; the supplier is told and may
-not send it until Document Control sends it to them again, which locks it once
-more. A revision not yet reviewed goes back as it is and returns under the same
-value: only a release, or a review that returns it, makes the next one a new
-revision. A supplier's document is read in its own states: sent, received,
+**Must say:** a document exchanged with a supplier (one asked of them by a
+placeholder) is held by one side at a time, and only the holder changes it,
+so that two sides never overwrite each other's work. The placeholder sent, the
+supplier holds it; once they send it, we hold it; our check returning it hands
+it back to them; after the review, a verdict accepting it or taking it for
+information leaves it with us, and one with comments to take into the next
+revision, or one rejecting it, hands it to them. The side that does not hold
+it asks the holder to hand it back for an update, saying why; the holder
+accepts or refuses with why, and the one who asked is told. A revision not yet
+reviewed passes as it is and returns under the same value; only a release, or
+a review that returns it, makes the next one a new revision. A document with no
+placeholder (a letter, minutes) is not held: the supplier may send another at
+any time. A supplier's document is read in its own states: sent, received,
 accepted, returned (by Document Control's check, with why), in review, released
-and issued, returned (rejected by the review); unlocked while taken back. A
-notice about a supplier's missing document proposes that supplier's people, who
-are sent to the document itself.
+and issued, returned (rejected by the review). A notice about a supplier's
+missing document proposes that supplier's people, who are sent to the document
+itself.
 
-**Depends on it:** `ASKED_OF_SUPPLIER`, `TAKEN_BACK`, `/documents/{id}/unlock|resend`, `Document.UnlockedAt/RelockedAt`,
-`Revision.ResentAt`, `RESEND_TO_SUPPLIER`, `Register.SupplierStage`, `supplierStage`, `NoticeRequest.OutsideLink`.
+**Depends on it:** `Document.WithSupplier`, `HandBackRequest` (RETURN_FOR_UPDATE), `/documents/{id}/asks`,
+`/asks/{id}/answer`, `/documents/{id}/send-to-supplier`, `ASKED_OF_SUPPLIER`, `HELD_BY_US`, `ANSWER_HAND_BACK`,
+`SupplierHold.HandsToSupplier`, `Register.SupplierStage`, `supplierStage`, `NoticeRequest.OutsideLink`.
+
+## 43 · A verdict list says four meanings, whatever its names
+
+**Clause:** §9.3 *Review outcomes*.
+
+**Must say:** an organization names its own verdicts, but each one says one of
+four things: accepted; accepted with comments, to take into the next revision;
+rejected, back to the author for a new revision; for information, its content
+not reviewed. What follows a verdict (release, a next revision, who holds a
+supplier's document) is read from that meaning, never from a code.
+
+**Depends on it:** `VERDICT_EFFECT` (`proceed`, `resubmit`, `information`), `verdictEffect`, `SupplierHold`.
 
 ## Still open — decided in conversation, not yet built
 

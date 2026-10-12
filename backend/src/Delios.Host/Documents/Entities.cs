@@ -179,16 +179,13 @@ public sealed class Document
     public string? ReinstatedByName { get; set; }
     public string? ReinstateReason { get; set; }
     /// <summary>
-    /// Asked of a supplier, then taken back by Document Control to change it: who, when and why. Locked again when it
-    /// is sent to the supplier again (<see cref="RelockedAt"/>); the reason is kept.
+    /// Who holds a document asked of a supplier, the only side that may change it: true the supplier, false us, null
+    /// a document not exchanged with a supplier (no placeholder sent). Handed over by each send — our placeholder or
+    /// our send to them, their submission — by Document Control's check returning it, by the review (a verdict with
+    /// comments to take into the next revision, or one that sends it back, hands it to them), and by an ask to hand
+    /// it back that the holder accepts (<see cref="HandBackRequest"/>).
     /// </summary>
-    public Instant? UnlockedAt { get; set; }
-    public string? UnlockedByName { get; set; }
-    public string? UnlockReason { get; set; }
-    public Instant? RelockedAt { get; set; }
-    public string? RelockedByName { get; set; }
-    /// <summary>Taken back from its supplier and not sent to them again yet: ours to change.</summary>
-    public bool Unlocked => UnlockedAt is { } at && (RelockedAt is not { } back || back < at);
+    public bool? WithSupplier { get; set; }
     public Guid CreatedById { get; set; }
     public required string CreatedByName { get; set; }
     public Instant CreatedAt { get; set; }
@@ -473,4 +470,35 @@ public sealed class DocumentAccess
     public string? AddedByName { get; set; }
     public string? Reason { get; set; }
     public Instant CreatedAt { get; set; }
+}
+
+/// <summary>
+/// One side of a supplier exchange asks the side holding the document to hand it back for an update (kind
+/// RETURN_FOR_UPDATE): why, and the holder's answer with why. Accepted, the document passes to the one who asked.
+/// Kept, every one, beside the document. Moves into request transmittals once those exist.
+/// </summary>
+public sealed class HandBackRequest
+{
+    public Guid Id { get; set; } = Guid.CreateVersion7();
+    public Guid TenantId { get; set; }
+    public Guid ProjectId { get; set; }
+    public Guid DocumentId { get; set; }
+    /// <summary>RETURN_FOR_UPDATE: hand the document back so the one asking can update it.</summary>
+    public string Kind { get; set; } = HandBackKinds.ReturnForUpdate;
+    /// <summary>True when the supplier asks us; false when we ask the supplier.</summary>
+    public bool FromSupplier { get; set; }
+    public Guid AskedById { get; set; }
+    public required string AskedByName { get; set; }
+    public required string Reason { get; set; }
+    public Instant AskedAt { get; set; }
+    public Instant? AnsweredAt { get; set; }
+    public string? AnsweredByName { get; set; }
+    public bool? Accepted { get; set; }
+    public string? Answer { get; set; }
+}
+
+/// <summary>The kinds of <see cref="HandBackRequest"/>.</summary>
+public static class HandBackKinds
+{
+    public const string ReturnForUpdate = "RETURN_FOR_UPDATE";
 }

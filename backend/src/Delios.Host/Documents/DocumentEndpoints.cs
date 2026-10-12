@@ -274,7 +274,7 @@ public static class DocumentEndpoints
         d.ConfirmedByName, d.CorrectsId, d.LegalHoldAt?.ToDateTimeOffset(), d.LegalHoldByName,
         Written.Of(d.LegalHoldLiftedAt, d.LegalHoldLiftedByName, d.LegalHoldLiftReason), Written.Of(d.EndedAt, d.EndedByName, d.EndReason),
         Written.Of(d.ReinstatedAt, d.ReinstatedByName, d.ReinstateReason),
-        Written.Of(d.UnlockedAt, d.UnlockedByName, d.UnlockReason), Written.Of(d.RelockedAt, d.RelockedByName, "Sent to the supplier again"));
+        d.WithSupplier);
 
     /// <summary>Turns a revision entity, with its submissions and files, into the shape the API returns.</summary>
     private static RevisionView View(Revision r) => new(
