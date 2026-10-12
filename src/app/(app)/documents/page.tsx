@@ -1,3 +1,4 @@
+import { plannedState, plannedProgress } from "@/lib/planned-state";
 import { legacyPackageByNumber } from "@/lib/api/packages";
 import type { SupplierStage } from "@/lib/state-names";
 import { requireScope } from "@/lib/scope";
@@ -8,7 +9,8 @@ import { RegisterPlate } from "./register-plate";
 import { OUTCOME_CONSEQUENCES, DOC_STATES, DOC_STATE_LABEL, DOC_MEANING, REV_STATES, REV_MEANING, type DocState, type RevState } from "@/lib/standard";
 import { getSet } from "@/lib/config";
 import { DocumentRegister } from "./document-register";
-import { activityDetail } from "@/lib/api/schedule";
+import { activityDetail, scheduleSource } from "@/lib/api/schedule";
+import { DEFAULT_RISK_DAYS } from "@/lib/action-state";
 import { controlDoes } from "@/lib/control-activities";
 import { hasVerb } from "@/lib/auth";
 import { Banner } from "@/components/ui";
@@ -152,6 +154,8 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
   // a review up, and the comments on it, live on the review.
   const supplierView = !user.isInternal && !!user.partyCode;
   const hostName = supplierView ? (await getMe())?.tenant.name ?? "Our client" : null;
+  // The project's risk window: from it, a planned date not met yet reads "at risk".
+  const riskDays = user.isInternal ? (await scheduleSource(scope)).source?.riskWindowDays ?? DEFAULT_RISK_DAYS : DEFAULT_RISK_DAYS;
   const all = register.rows.map((doc) => {
     // A revision whose review is decided and not yet released reads as not released.
     const latestState = doc.revisionState === "IN_REVIEW" && doc.verdict ? "NOT_RELEASED" : doc.revisionState;
@@ -194,6 +198,8 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
       releasedForUse: released && doc.releasedStatus ? statusUse.get(doc.releasedStatus) ?? null : null,
       createdDate: doc.createdAt, updatedAt: doc.updatedAt,
       plannedSubmissionDate: doc.plannedDate,
+      // What the planned date says today: ready, submitted, overdue, at risk, or days left.
+      plannedState: plannedState(doc.plannedDate, plannedProgress(!!doc.releasedRevisionId, doc.revisionState, doc.supplier), riskDays),
       issueDate: released ? doc.issuedAt : null, releasedAt: released ? doc.releasedAt : null,
       // The function that decided, not the person.
       decidedBy: doc.decidedBy ? decidingFunction(doc.decidedBy, null) : null,

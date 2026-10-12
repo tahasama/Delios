@@ -1,3 +1,5 @@
+import { plannedState, plannedProgress } from "@/lib/planned-state";
+import { DEFAULT_RISK_DAYS } from "@/lib/action-state";
 import { ReadersPanel } from "./readers-panel";
 import { documentAssets, projectAssets } from "@/lib/api/records";
 import { documentReaders, projectReaders } from "@/lib/api/readers";
@@ -40,7 +42,7 @@ import { Timeline } from "@/components/timeline";
 import { DocTabs } from "./doc-tabs";
 import { ArrowLeft, ChevronRight, Download, ExternalLink, FileText, Send } from "lucide-react";
 import { hasVerb } from "@/lib/auth";
-import { activityList } from "@/lib/api/schedule";
+import { activityList, scheduleSource } from "@/lib/api/schedule";
 import { addDocumentToActionAction } from "@/lib/actions/action-links";
 import { sendToSupplierAction, askBackAction, answerAskAction } from "@/lib/actions/supplier";
 import { addressees } from "@/lib/api/transmittals";
@@ -253,6 +255,10 @@ export default async function DocumentDetailPage({
     ["Confidentiality", label(confidentialities, doc.confidentiality)],
     ["Retention", label(retentions, doc.retentionClass)],
     ["Received", doc.receivedDate ? fmtDate(doc.receivedDate) : null],
+    // The planned date, with what it says today: ready, submitted, overdue, at risk, or days left.
+    ["Planned submission", doc.plannedDate ? [fmtDate(doc.plannedDate), plannedState(doc.plannedDate,
+      plannedProgress(doc.revisions.some((r) => r.state === "RELEASED"), doc.revisions[0]?.backend.state ?? null),
+      user.isInternal ? (await scheduleSource(ctx)).source?.riskWindowDays ?? DEFAULT_RISK_DAYS : DEFAULT_RISK_DAYS)?.word].filter(Boolean).join(" · ") : null],
     ["Created", fmtDate(doc.createdDate)],
     ["Previous number", doc.previousId],
     // Whatever this organization asks for itself, read back under its own name.

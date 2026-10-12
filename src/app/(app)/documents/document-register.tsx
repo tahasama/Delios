@@ -45,7 +45,9 @@ type RegisterRow = {
   releasedFor: string | null; releasedForLabel: string | null; releasedForUse: string | null; proposedFor: string | null;
   /** Released, then put on hold for an outside approval: not for use. */
   onHold: string | null;
-  createdDate: string; updatedAt: string; plannedSubmissionDate: string | null; issueDate: string | null; releasedAt: string | null;
+  createdDate: string; updatedAt: string; plannedSubmissionDate: string | null;
+  /** What the planned date says today: ready, submitted, overdue, at risk, days left. */
+  plannedState?: { word: string; tone: string } | null; issueDate: string | null; releasedAt: string | null;
   decidedBy: string | null; packageCount: number; hasReleased: boolean; reviewRevisionId: string | null;
   fileAdded: string | null; revStarted: string | null; decidedByDelegated: boolean;
 };
@@ -782,7 +784,7 @@ The revision is not released, so this status is not in force.`} href={GUIDE.STAT
     cellClass: "max-w-40 truncate text-xs text-slate-600",
     cell: (row) => row.retentionLabel ?? <Muted />,
   },
-  { key: "planned", sort: "planned", label: "Planned submission", headClass: "text-right", cellClass: "whitespace-nowrap text-right font-mono text-xs tabular-nums", cell: (row) => row.plannedSubmissionDate ? date(row.plannedSubmissionDate) : <Muted /> },
+  { key: "planned", sort: "planned", label: "Planned submission", headClass: "text-right", cellClass: "whitespace-nowrap text-right font-mono text-xs tabular-nums", cell: (row) => row.plannedSubmissionDate ? <>{date(row.plannedSubmissionDate)}{row.plannedState ? <span className={`block font-sans text-[11px] ${row.plannedState.tone}`}>{row.plannedState.word}</span> : null}</> : <Muted /> },
   { key: "issued", sort: "issued", label: "Issued", headClass: "text-right", cellClass: "whitespace-nowrap text-right font-mono text-xs tabular-nums", cell: (row) => row.issueDate ? date(row.issueDate) : <Muted /> },
   { key: "released", sort: "released", label: "Released", headClass: "text-right", cellClass: "whitespace-nowrap text-right font-mono text-xs tabular-nums", cell: (row) => row.releasedAt ? date(row.releasedAt) : <Muted /> },
   {

@@ -14,6 +14,7 @@ import { ActionForm } from "@/components/form";
 import { submitSupplierPackageAction } from "@/lib/actions/supplier";
 import { supplierRows, supplierFigures, STATE_LABEL, WITH_SUPPLIER, type SupplierState } from "@/lib/supplier";
 import { fmtDate } from "@/lib/utils";
+import { plannedState } from "@/lib/planned-state";
 import { supplierStamp, type SupplierStage } from "@/lib/state-names";
 import { ArrowLeft, Download } from "lucide-react";
 import { getMe } from "@/lib/api/me";
@@ -70,8 +71,12 @@ export async function SupplierPackage({ pkg }: { pkg: LegacyPackage }) {
               </Td>
               <Td className="whitespace-nowrap text-xs">
                 {fmtDate(r.due)}
-                {r.revision?.submittedAt ? <span className={`block text-[11px] ${r.arrivedOnTime ? "text-emerald-700" : "text-red-700"}`}>sent {fmtDate(r.revision.submittedAt)}{r.arrivedOnTime ? "" : " — late"}</span>
-                  : r.late ? <span className="block text-[11px] text-red-700">overdue</span> : null}
+                {(() => {
+                  // What the date says today, as on every planned date: ready, submitted, overdue, at risk, days left.
+                  const said = plannedState(r.due, r.state === "APPROVED" ? "released" : ["AWAITING_CHECK", "TO_ROUTE", "IN_REVIEW"].includes(r.state) ? "submitted" : "none");
+                  return said ? <span className={`block text-[11px] ${said.tone}`}>{said.word}</span> : null;
+                })()}
+                {r.revision?.submittedAt ? <span className={`block text-[11px] ${r.arrivedOnTime ? "text-slate-500" : "text-red-700"}`}>sent {fmtDate(r.revision.submittedAt)}{r.arrivedOnTime ? "" : " — late"}</span> : null}
               </Td>
               <Td>
                 <Chip className={TONE[r.state]}>{STATE_LABEL[r.state]}{r.state === "RETURNED" && r.outcome ? ` · ${r.outcome}` : ""}</Chip>
