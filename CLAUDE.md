@@ -270,8 +270,11 @@ conversation, write it into the right one in the same commit as the code.
 - Where a document got late: its checkpoints are named for the act (Sending
   for review, each review step, Release, Issue) and their dates say whether it
   happened. Before a review exists, sending for review is due the route's days
-  before the day it is needed (the route that serves the document). Route
-  steps lists only the review's own steps.
+  working days before the day it is needed (the route that serves the
+  document, in the project's calendar). Route steps lists only the review's
+  own steps. Released and issued as one act (the default): one checkpoint and
+  one column "Released & issued", "Done <day>" over "Needed by <day>"; when the
+  project separates them, two columns, Released and Issued.
 - Under each stage of Schedule & actions: the revision in force, "Uploaded
   directly" (with the day) when a direct upload is newer, "Not released yet",
   or "None yet".

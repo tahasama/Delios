@@ -36,6 +36,19 @@ public static class WorkingCalendar
         return date;
     }
 
+    /// <summary>The working day that many working days before <paramref name="end"/>: counting back, as a deadline is.</summary>
+    public static LocalDate SubtractWorkingDays(LocalDate end, int days, IReadOnlyCollection<int> weekendDays)
+    {
+        if (weekendDays.Count >= 7) throw new ArgumentException("A week needs at least one working day.", nameof(weekendDays));
+        var date = end;
+        for (var taken = 0; taken < days;)
+        {
+            date = date.PlusDays(-1);
+            if (!weekendDays.Contains((int)date.DayOfWeek)) taken++;
+        }
+        return date;
+    }
+
     /// <summary>Today at the site.</summary>
     public static LocalDate Today(IClock clock, string timeZone) =>
         clock.GetCurrentInstant().InZone(DateTimeZoneProviders.Tzdb.GetZoneOrNull(timeZone) ?? DateTimeZone.Utc).Date;

@@ -206,6 +206,7 @@ export default async function ActionDetailPage({ params, searchParams }: { param
           answered in the table under them. */}
       <NeededTable
         rows={needed}
+        together={together}
         exportHref={`/api/export/baseline?ids=${action.id}`}
         empty={depts.length ? undefined : "Tag the disciplines first, under Disciplines and documents."}
         chips={depts.length > 1 ? (

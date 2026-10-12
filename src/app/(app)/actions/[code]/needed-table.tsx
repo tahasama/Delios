@@ -93,7 +93,11 @@ type Column = {
 /** A day that never came sorts after every day that did. */
 const LAST = Number.MAX_SAFE_INTEGER;
 
-const COLUMNS: Column[] = [
+/** The columns, by whether released and issued are one act here (one column) or two (one each). */
+function columnsFor(together: boolean): Column[] {
+  // How many checkpoints close the chain: one (release & issue) or two (release, issue).
+  const tail = together ? 1 : 2;
+  return [
   {
     key: "source",
     label: "Where it got late",
@@ -147,8 +151,8 @@ const COLUMNS: Column[] = [
     note: "Every step of the route, in order, with the day it answered and the day it was given.",
     cellClass: "text-xs",
     cell: (row) => {
-      // Between sending for review and the last two (release, issue): the review's own steps.
-      const middle = row.chain.slice(1, -2);
+      // Between sending for review and the release (and issue): the review's own steps.
+      const middle = row.chain.slice(1, -tail);
       if (!middle.length) return <span className="text-slate-500">no route yet</span>;
       return (
         <span className="block space-y-0.5">
@@ -164,19 +168,26 @@ const COLUMNS: Column[] = [
       );
     },
   },
-  {
+  // One act: one column, done when it went out. Separate: the release and the issue, each its own column.
+  ...(together ? [{
     key: "issued",
     label: "Released & issued",
-    by: (row) => row.chain[row.chain.length - 1]?.atSort ?? LAST,
+    by: (row: NeededRow) => row.chain[row.chain.length - 1]?.atSort ?? LAST,
     cellClass: "whitespace-nowrap text-xs",
-    // Release and issue each with its own day: together when they are one act, apart when they are not.
-    cell: (row) => row.chain.length > 2 ? (
-      <span className="block space-y-1">
-        <span className="block"><span className="font-medium text-slate-600">Release </span><MomentCell one={row.chain[row.chain.length - 2]} /></span>
-        <span className="block"><span className="font-medium text-slate-600">Issue </span><MomentCell one={row.chain[row.chain.length - 1]} /></span>
-      </span>
-    ) : <MomentCell one={null} />,
-  },
+    cell: (row: NeededRow) => <MomentCell done one={row.chain.length > 1 ? row.chain[row.chain.length - 1] : null} />,
+  }] : [{
+    key: "released",
+    label: "Released",
+    by: (row: NeededRow) => row.chain[row.chain.length - 2]?.atSort ?? LAST,
+    cellClass: "whitespace-nowrap text-xs",
+    cell: (row: NeededRow) => <MomentCell done one={row.chain.length > 2 ? row.chain[row.chain.length - 2] : null} />,
+  }, {
+    key: "issued",
+    label: "Issued",
+    by: (row: NeededRow) => row.chain[row.chain.length - 1]?.atSort ?? LAST,
+    cellClass: "whitespace-nowrap text-xs",
+    cell: (row: NeededRow) => <MomentCell done one={row.chain.length > 2 ? row.chain[row.chain.length - 1] : null} />,
+  }]),
   { key: "discipline", label: "Discipline", by: (row) => row.discipline, cellClass: "text-xs", cell: (row) => row.discipline },
   { key: "from", label: "From", by: (row) => row.from, cellClass: "text-xs", cell: (row) => row.from },
   { key: "approved", label: "Approved by", by: (row) => row.approvedBy, cellClass: "text-xs", cell: (row) => row.approvedBy },
@@ -203,18 +214,20 @@ const COLUMNS: Column[] = [
       : <Chip className={row.late ? "bg-red-100 text-red-800 ring-red-300" : "bg-amber-100 text-amber-800 ring-amber-300"}>{row.late ? "late" : "no"}</Chip>,
   },
 ];
+}
 
-function MomentCell({ one }: { one: Moment | null }) {
+/** One moment: the day it happened ("Done …" where it closes the chain), and the day it was due. */
+function MomentCell({ one, done }: { one: Moment | null; done?: boolean }) {
   if (!one) return <span className="text-slate-400">&mdash;</span>;
   return (
     <>
-      <span className={`font-mono tabular-nums ${one.late ? "font-semibold text-red-700" : ""}`}>{one.at ?? "not yet"}</span>
+      <span className={`font-mono tabular-nums ${one.late ? "font-semibold text-red-700" : ""}`}>{one.at ? `${done ? "Done " : ""}${one.at}` : "not yet"}</span>
       {one.due ? <span className="block text-[11px] text-slate-500">{one.deadline} {one.due}</span> : null}
     </>
   );
 }
 
-export function NeededTable({ rows, chips, plate, exportHref, empty, link }: {
+export function NeededTable({ rows, chips, plate, exportHref, empty, link, together = true }: {
   rows: NeededRow[];
   /** The discipline tabs, where there is more than one discipline. */
   chips?: React.ReactNode;
@@ -226,6 +239,8 @@ export function NeededTable({ rows, chips, plate, exportHref, empty, link }: {
   empty?: string;
   /** The way on to the requirements list, for whoever keeps it. */
   link?: React.ReactNode;
+  /** Released and issued are one act on this project (POLICY_RELEASE): one column for both. */
+  together?: boolean;
 }) {
   // The height the schedule's plan set, so every table in the app ends on the
   // same line.
@@ -249,12 +264,13 @@ export function NeededTable({ rows, chips, plate, exportHref, empty, link }: {
     } catch {}
   }, []);
 
+  const all = useMemo(() => columnsFor(together), [together]);
   const columns = useMemo(() => {
-    if (!order) return COLUMNS;
-    const byKey = new Map(COLUMNS.map((column) => [column.key, column]));
+    if (!order) return all;
+    const byKey = new Map(all.map((column) => [column.key, column]));
     const moved = order.map((key) => byKey.get(key)).filter((column): column is Column => !!column);
-    return [...moved, ...COLUMNS.filter((column) => !order.includes(column.key))];
-  }, [order]);
+    return [...moved, ...all.filter((column) => !order.includes(column.key))];
+  }, [order, all]);
 
   const remember = (keys: string[]) => {
     setOrder(keys);
@@ -302,7 +318,7 @@ export function NeededTable({ rows, chips, plate, exportHref, empty, link }: {
     // columns, so it carries its ordering here.
     const by = sort.key === "document"
       ? (row: NeededRow) => row.docNumber
-      : COLUMNS.find((one) => one.key === sort.key)?.by;
+      : all.find((one) => one.key === sort.key)?.by;
     if (!by) return matched;
     return [...matched].sort((a, b) => {
       const x = by(a) ?? "";
@@ -389,7 +405,7 @@ export function NeededTable({ rows, chips, plate, exportHref, empty, link }: {
           <DataTable
             id="action-needed"
             className="rounded-none border-0 shadow-none"
-            defaultHidden={["Approved by", "Sending for review", "Route steps", "Released & issued"]}
+            defaultHidden={["Approved by", "Sending for review", "Route steps", "Released & issued", "Released", "Issued"]}
             fill
             stretch={!!cardHeight}
             onMove={move}

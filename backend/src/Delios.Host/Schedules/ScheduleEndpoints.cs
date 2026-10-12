@@ -908,6 +908,10 @@ public static class ScheduleEndpoints
         // Before a review starts, the route it will take is the one that serves the document: its days are what
         // sending for review has to leave before the day the document is needed.
         var routes = await db.ReviewRoutes.AsNoTracking().Where(r => r.Active).ToListAsync(cancellationToken);
+        // Released and issued as one act unless the project (or else the organization) separates them: then one checkpoint.
+        var policy = await db.Settings.AsNoTracking().Where(s => s.Key == "POLICY_RELEASE" && (s.ProjectId == access.Project.Id || s.ProjectId == null))
+            .Select(s => new { s.ProjectId, s.Value }).ToListAsync(cancellationToken);
+        var together = (policy.FirstOrDefault(p => p.ProjectId == access.Project.Id)?.Value ?? policy.FirstOrDefault(p => p.ProjectId == null)?.Value ?? "TOGETHER") != "SEPARATE";
         foreach (var need in activity.Requirements)
         {
             var document = await db.Documents.AsNoTracking().SingleAsync(d => d.Id == need.DocumentId, cancellationToken);
@@ -932,8 +936,9 @@ public static class ScheduleEndpoints
             // Named for the act, not as if it happened: whether it did is the checkpoint's own date.
             var checkpoints = new List<Checkpoint>
             {
+                // Step days are working days in the project's calendar, so the route is counted back the same way.
                 Point(today, zone, external ? "Sending in, by the supplier" : "Sending for review", "Submission due",
-                    due?.PlusDays(-routeDays), review?.StartedAt,
+                    due is { } needed ? WorkingCalendar.SubtractWorkingDays(needed, routeDays, access.Project.WeekendDays) : null, review?.StartedAt,
                     external ? document.Originator ?? "the supplier" : revision?.AuthoredByName ?? document.CreatedByName),
             };
             foreach (var step in review?.Steps.OrderBy(s => s.Index) ?? Enumerable.Empty<ReviewStep>())
@@ -941,8 +946,14 @@ public static class ScheduleEndpoints
                 checkpoints.Add(Point(today, zone, step.PartyName is null ? $"Review step {step.Index + 1}: {step.Title}" : $"{step.PartyName}: {step.Title}",
                     "Step due", step.DueDate, step.CompletedAt, step.PartyName ?? step.FunctionCode ?? "the step"));
             }
-            checkpoints.Add(Point(today, zone, "Release", "Needed by", due, revision?.ReleasedAt, "Document Control"));
-            checkpoints.Add(Point(today, zone, "Issue", "Needed by", due, issued, "Document Control"));
+            if (together)
+                // One act: done when it went out, which is the release itself.
+                checkpoints.Add(Point(today, zone, "Release & issue", "Needed by", due, issued, "Document Control"));
+            else
+            {
+                checkpoints.Add(Point(today, zone, "Release", "Needed by", due, revision?.ReleasedAt, "Document Control"));
+                checkpoints.Add(Point(today, zone, "Issue", "Needed by", due, issued, "Document Control"));
+            }
             result.Add(new NeedLateness(need.Id, document.Number, need.State, checkpoints, checkpoints.FirstOrDefault(c => c.Late)));
         }
         return Results.Ok(result);
