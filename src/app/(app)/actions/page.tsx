@@ -223,8 +223,7 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
       departments: departmentsOf(row).map((one) => deptLabel.get(one) ?? one),
       date: row.scheduledDate ? fmtDate(row.scheduledDate) : null,
       finish: row.finishDate && row.scheduledDate && row.finishDate > row.scheduledDate ? fmtDate(row.finishDate) : null,
-      // Start and finish both count: work on the 12th and 13th lasts two days.
-      days: row.finishDate && row.scheduledDate ? Math.round((row.finishDate.getTime() - row.scheduledDate.getTime()) / 86_400_000) + 1 : null,
+      // When, and how long: start and finish both count, so work on the 12th and 13th lasts two days. Said once.
       when: datePhrase(row.daysUntil, row.finishDate && row.scheduledDate ? Math.round((row.finishDate.getTime() - row.scheduledDate.getTime()) / 86_400_000) + 1 : null),
       late: row.daysUntil !== null && row.daysUntil < 0,
       readiness: row.readiness,

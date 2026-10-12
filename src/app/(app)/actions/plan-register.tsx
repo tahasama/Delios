@@ -26,9 +26,8 @@ export type PlanTableRow = {
   name: string;
   departments: string[];
   date: string | null;
-  /** The day the work ends, when the schedule gives one, and how many days it lasts. */
+  /** The day the work ends, when the schedule gives one; how long it lasts is said in `when`. */
   finish: string | null;
-  days: number | null;
   when: string;
   late: boolean;
   readiness: "DONE" | "LATE_RECEIPT" | "READY" | "AT_RISK" | "NOT_READY" | "UPCOMING" | "UNKNOWN";
