@@ -11,6 +11,7 @@ conversation, write it into the right one in the same commit as the code.
 | `docs/STANDARD-CHANGES.md` | What the original Document Management Standard must change to match what we built. Every new rule about controlling information goes here. |
 | `docs/REVIEW-MODEL.md` | The review model: routes, steps, advice, verdicts, release |
 | `docs/BEHAVIOUR-CHANGES.md` | What behaves differently since the screens moved onto the backend |
+| `docs/DETAIL-STYLE.md` | The reference style (Schedule & actions, the action page): what "apply the same" means |
 | `docs/gaps/*.md` | Known gaps per area |
 | `PRODUCT.md` | Product context and users |
 
@@ -41,8 +42,11 @@ conversation, write it into the right one in the same commit as the code.
 
 ## Design — locked in by the owner
 
-- The look of Schedule & actions is the reference for every page, card and
-  form, including the hidden ones (panels, popovers, details).
+- The look of Schedule & actions and of the action page is the reference for
+  every page, card and form, including the hidden ones (panels, popovers,
+  details). It is written down, with the exact classes, in
+  `docs/DETAIL-STYLE.md`. When the owner says "apply the same", follow that
+  file to the letter; do not restyle the reference pages.
 - One control size everywhere, set once in `src/app/globals.css` on `:root`:
   `--control-h` (2rem), `--control-text` (13px), `--control-radius`. Every
   field, dropdown, button and file field stands that height with that text.
