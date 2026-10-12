@@ -135,8 +135,23 @@ conversation, write it into the right one in the same commit as the code.
   filed in that supplier's package, one per supplier and purchase order, made
   by itself with the first document (`SupplyFiling`). Document Control (and
   above) looks after it: renames it any time; renumbers it, or deletes it while
-  empty, only until it is shared or sent; adds what was missed through "Add
-  documents" (the register opened for the package, `pick=pkg:<number>`).
+  empty, only until it is shared or sent; adds or takes out documents through
+  "Add or take out documents": the register opened for the package
+  (`pick=pkg:<number>`, filtered on that supplier and order), tick to add,
+  untick to take out, then save. One already sent to the supplier stays (backend
+  SENT_TO_SUPPLIER; its tick is locked).
+- A supplier package has two pages. Ours (Document Control and above): plate,
+  counts (sent to supplier, received, held by them / by us, approved first
+  time), "The package" with one row of icon buttons (Share once, Send to
+  <supplier> (n), Add or take out documents, Narrow by a rule, Edit, Delete
+  while allowed, Delivery list), and the documents with where each stands and
+  what is next for us. Nothing is uploaded on our page: no file fields, no
+  "enter and send for review" (what reaches us outside the system is recorded on
+  a transmittal, "Received from outside the system"). The supplier's page: only
+  what was sent to it, in its words, the comments to take in, a file field
+  beside each document it holds, and "Send to <us>".
+- "Delivery list" downloads the package's own lines (`/api/packages/<n>/list`),
+  never the schedule's requirements list.
 - "Share with <supplier>" is pressed once, for good: until then the supplier
   does not see the package. Once shared, it sees there only the documents asked
   of it on a transmittal, and of its own documents only those exchanged with it.
@@ -151,11 +166,12 @@ conversation, write it into the right one in the same commit as the code.
   package lines), in the reader's words (`SUPPLIER_STAMP`): sent to supplier /
   to be transmitted; received / transmitted; accepted; returned / to correct;
   in review; released (with comments to take in: next revision due / to
-  revise); returned / to revise. Not asked yet: "number reserved" (register),
-  "not asked yet" (package). A supplier's package as a whole, in the packages
+  revise); returned / to revise. Not sent yet: "not sent to supplier" (register
+  and package; our own placeholders read "number reserved"). A supplier's package as a whole, in the packages
   list (`packageStage`): not shared, nothing sent yet, sent to supplier / to be
   transmitted, partly received / partly transmitted, received / transmitted,
-  complete; with how many are not asked yet.
+  complete; with how many are not sent to the supplier yet. The list and the
+  package page count the same way (`packageCounts`).
 - Document Control (and above) only, on supplier packages; delivery packages
   keep their owners.
 - The side that does not hold it asks the holder to hand it back for an update

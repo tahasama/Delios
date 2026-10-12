@@ -192,6 +192,13 @@ public sealed class PackageService(
         var ids = request.DocumentIds?.ToHashSet() ?? [];
         var going = package!.Members.Where(m => ids.Contains(m.DocumentId)).ToList();
         if (going.Count == 0) return Fail(Problems.Invalid("DOCUMENTS_REQUIRED", "Say which documents to take out."));
+        // A document already sent to its supplier on a transmittal stays in its package: that is where it was asked.
+        var sentIds = going.Where(m => m.RequestedAt is not null).Select(m => m.DocumentId).ToList();
+        var sent = sentIds.Count == 0 ? [] : await db.Documents.AsNoTracking().Where(d => sentIds.Contains(d.Id)).Select(d => d.Number).ToListAsync(cancellationToken);
+        if (sent.Count > 0)
+            return Fail(Problems.Conflict("SENT_TO_SUPPLIER",
+                $"{string.Join(", ", sent)} {(sent.Count == 1 ? "was" : "were")} sent to the supplier on a transmittal and stay{(sent.Count == 1 ? "s" : "")} in the package.",
+                new { documents = sent }));
         foreach (var member in going) package.Members.Remove(member);
         db.PackageMembers.RemoveRange(going);
         package.Excluded = package.Excluded.Union(going.Select(m => m.DocumentId)).ToArray();

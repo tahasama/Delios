@@ -101,6 +101,29 @@ export async function addPackageMemberAction(_prev: { error?: string } | undefin
   return {};
 }
 
+/**
+ * From the register opened for a supplier's package: what was ticked joins it, what was unticked leaves it (never one
+ * already sent to the supplier; the backend refuses). Back on the package, where the result is.
+ */
+export async function setPackageMembersAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
+  const packageId = String(formData.get("packageId") ?? "");
+  const adding = formData.getAll("add").map(String).filter(Boolean);
+  const leaving = formData.getAll("remove").map(String).filter(Boolean);
+  if (!adding.length && !leaving.length) return { error: "Nothing changed: tick a document to add it, untick one to take it out." };
+  let number: string | undefined;
+  if (leaving.length) {
+    const out = await onPackage(packageId, "/members/remove", { documentIds: leaving });
+    if (out.error) return { error: out.error };
+    number = out.number;
+  }
+  if (adding.length) {
+    const added = await onPackage(packageId, "/members", { documentIds: adding, requiredStatuses: null });
+    if (added.error) return { error: added.error };
+    number = added.number;
+  }
+  redirect(`/packages/${number}`);
+}
+
 /** §15.6 — the completion date triggers assessment; §15.7 shortfall record. */
 export async function assessPackageAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
   const { error } = await onPackage(String(formData.get("packageId") ?? ""), "/assess", undefined);

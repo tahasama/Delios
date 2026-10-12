@@ -1,260 +1,286 @@
 import Link from "next/link";
 import { requireScope } from "@/lib/scope";
 import { isController, isAdmin, hasVerb } from "@/lib/auth";
-import { Chip, DataTable, Th, Td } from "@/components/ui";
+import { DataTable, Th, Td, Field, inputCls, ToneChip } from "@/components/ui";
 import { FileTally } from "./file-tally";
-import { removePackageMemberAction, addPackageMemberAction, setPackageRuleAction, sharePackageAction, requestSupplyAction } from "@/lib/actions/planning";
-import { Field, inputCls } from "@/components/ui";
+import { setPackageRuleAction, sharePackageAction, requestSupplyAction } from "@/lib/actions/planning";
 import { parseExcluded, parseFilter } from "@/lib/package-rule";
-import { NextStepBody, type StepItem } from "@/app/(app)/documents/[id]/next-step";
 import { RevisionChecklist } from "@/components/revision-checklist";
 import { RuleFields } from "../rule-fields";
 import { manageItems } from "../manage-items";
 import { ActionForm } from "@/components/form";
 import { submitSupplierPackageAction } from "@/lib/actions/supplier";
-import { supplierRows, supplierFigures, packageStage, STATE_LABEL, WITH_SUPPLIER, type SupplierState } from "@/lib/supplier";
+import { supplierRows, supplierFigures, packageStage, packageCounts, lineStage, WITH_SUPPLIER, type SupplierRow } from "@/lib/supplier";
 import { fmtDate } from "@/lib/utils";
 import { plannedState } from "@/lib/planned-state";
-import { supplierStamp, type SupplierStage } from "@/lib/state-names";
-import { ArrowLeft, Download } from "lucide-react";
+import { ArrowLeft, Download, Filter, ListChecks, Pencil, Send, Share2, Trash2 } from "lucide-react";
 import { getMe } from "@/lib/api/me";
-import { documentsByIds, type LegacyPackage } from "@/lib/api/packages";
+import type { LegacyPackage } from "@/lib/api/packages";
 
-/** A package line's state as the supplier's stage, for its stamp. */
-const STAGE_OF: Record<SupplierState, SupplierStage> = {
-  NOT_SENT: "SENT", AWAITING_CHECK: "RECEIVED", REJECTED: "RETURNED_CHECK", TO_ROUTE: "ACCEPTED",
-  IN_REVIEW: "IN_REVIEW", RETURNED: "RETURNED_REVIEW", APPROVED: "RELEASED",
-};
+/** What the planned date says today, as on every planned date: ready, submitted, overdue, at risk, days left. */
+function SubmitBy({ row }: { row: SupplierRow }) {
+  const said = plannedState(row.due, row.state === "APPROVED" ? "released" : ["AWAITING_CHECK", "TO_ROUTE", "IN_REVIEW"].includes(row.state) ? "submitted" : "none");
+  return (
+    <>
+      {fmtDate(row.due)}
+      {said ? <span className={`block text-[11px] ${said.tone}`}>{said.word}</span> : null}
+      {row.revision?.submittedAt ? <span className={`block text-[11px] ${row.arrivedOnTime ? "text-slate-500" : "text-red-700"}`}>sent {fmtDate(row.revision.submittedAt)}{row.arrivedOnTime ? "" : " — late"}</span> : null}
+    </>
+  );
+}
 
-const TONE: Record<SupplierState, string> = {
-  NOT_SENT: "bg-slate-100 text-slate-700 ring-slate-200",
-  AWAITING_CHECK: "bg-sky-100 text-sky-800 ring-sky-200",
-  REJECTED: "bg-red-100 text-red-800 ring-red-200",
-  TO_ROUTE: "bg-indigo-100 text-indigo-800 ring-indigo-200",
-  IN_REVIEW: "bg-amber-100 text-amber-800 ring-amber-200",
-  RETURNED: "bg-orange-100 text-orange-800 ring-orange-200",
-  APPROVED: "bg-emerald-100 text-emerald-800 ring-emerald-200",
-};
+function Comments({ row }: { row: SupplierRow }) {
+  return row.comments.length ? (
+    <ul className="space-y-1">
+      {row.comments.map((one, i) => (
+        <li key={i} className={one.blocking && !one.settled ? "text-red-700" : undefined}>
+          <span className="font-mono text-slate-400">rev {one.rev} · </span><span className="font-semibold">{one.by}</span>{one.blocking ? <span className="text-[10px] uppercase tracking-wide"> · blocking</span> : null}: {one.text}
+        </li>
+      ))}
+    </ul>
+  ) : <span className="text-slate-300">·</span>;
+}
+
+/** One act of the package's row of buttons: a link, or a form that opens across the sheet under the row. */
+function Act({ icon: Icon, label, href, primary, children }: { icon: typeof Send; label: string; href?: string; primary?: boolean; children?: React.ReactNode }) {
+  if (href) return <Link href={href} className="ask inline-flex items-center gap-1.5"><Icon className="h-3.5 w-3.5" /> {label}</Link>;
+  return (
+    <details className="text-xs open:basis-full">
+      <summary className="ask inline-flex w-fit cursor-pointer list-none items-center gap-1.5 [&::-webkit-details-marker]:hidden" data-on={primary ? "true" : undefined}>
+        <Icon className="h-3.5 w-3.5" /> {label}
+      </summary>
+      <div className="mt-3 rounded-md bg-tint-soft px-3 py-3 ring-1 ring-line">{children}</div>
+    </details>
+  );
+}
 
 /**
- * Everything one supplier owes us, and where each item stands. The supplier
- * attaches files here and sends them; that is the only way they arrive.
+ * One supplier's package. Two readers, two pages:
+ *  - ours (Document Control and above): whether it is shared, what is sent to the supplier, where each document
+ *    stands and who holds it, and the acts on the package; nothing is uploaded here, the supplier sends its files;
+ *  - the supplier's: only what was asked of it, in its own words, and a file field beside each document it holds.
  */
 export async function SupplierPackage({ pkg }: { pkg: LegacyPackage }) {
   const ctx = await requireScope();
   const { user } = ctx;
   const staff = isController(user) || isAdmin(user);
-  const isSupplier = !!user.partyCode && user.partyCode === pkg.partyCode;
+  const isSupplier = !user.isInternal && !!user.partyCode && user.partyCode === pkg.partyCode;
   const rows = await supplierRows(ctx, pkg);
-  const f = supplierFigures(rows);
   const org = (await getMe())?.tenant.name ?? "us";
-  // The supplier sends its own files; for a supplier not on the system,
-  // Document Control attaches what arrived, line by line, on their behalf.
-  const supplierMayUpload = isSupplier && (hasVerb(user, "CREATE") || hasVerb(user, "REVISE"));
-  const canSendRow = (s: SupplierState) => (supplierMayUpload || staff) && WITH_SUPPLIER.includes(s);
-
-  const shared = pkg.view.sharedAt ? new Date(pkg.view.sharedAt) : null;
-  // Asked once, on a transmittal: what is not asked yet can be ticked and sent; what was asked is handed back and forth.
   const asked = new Set(pkg.view.members.filter((m) => m.requestedAt).map((m) => m.documentId));
-  const table = (
-    <div>
-      <DataTable className="rounded-none border-0 shadow-none" exportName={pkg.identifier} id={isSupplier ? "supplier-package-own" : "supplier-package"} defaultHidden={["Comments"]} head={<tr><Th>Document</Th><Th>Submit by</Th><Th>Status</Th><Th>Comments</Th><Th>{isSupplier ? "Your file" : "Next, or the file they sent"}</Th></tr>}>
-          {rows.map((r) => (
+  const listHref = `/api/packages/${encodeURIComponent(pkg.identifier)}/list`;
+  const listLink = <a href={listHref} className="ask inline-flex items-center gap-1.5"><Download className="h-3.5 w-3.5" /> Delivery list</a>;
+  const plateCode = <p className="font-mono text-[12.5px] font-semibold tracking-tight text-slate-500">{pkg.identifier}</p>;
+
+  // ── The supplier's page ──────────────────────────────────────────────────────
+  if (isSupplier) {
+    const mine = rows.filter((r) => asked.has(r.doc.id));
+    const mayUpload = hasVerb(user, "CREATE") || hasVerb(user, "REVISE");
+    const holds = mine.filter((r) => WITH_SUPPLIER.includes(r.state));
+    const where = packageStage(pkg, rows, "theirs");
+    const table = (
+      <DataTable className="rounded-none border-0 shadow-none" exportName={pkg.identifier} id="supplier-package-theirs" head={<tr><Th>Document</Th><Th>Where it stands</Th><Th>Submit by</Th><Th>Comments to take in</Th><Th>Your file</Th></tr>}>
+        {mine.map((r) => {
+          const stage = lineStage(r, true, "theirs");
+          return (
             <tr key={r.doc.id}>
               <Td>
-                <Link href={`/documents/${r.doc.id}`} className="font-mono text-[13px] font-semibold text-brand-ink hover:underline">{r.doc.docNumber}</Link>
+                <Link href={`/documents/${r.doc.id}`} className="doc-number">{r.doc.docNumber}</Link>
                 {r.revision ? <span className="ml-1.5 font-mono text-xs text-slate-400">rev {r.revision.value}</span> : null}
-                {asked.has(r.doc.id)
-                  ? <span className="stamp ml-2 text-sky-700">{supplierStamp(STAGE_OF[r.state], isSupplier ? "theirs" : "ours")}</span>
-                  : <span className="stamp ml-2 text-slate-400">not asked yet</span>}
                 <span className="block max-w-80 truncate text-xs text-slate-500">{r.doc.title}</span>
               </Td>
-              <Td className="whitespace-nowrap text-xs">
-                {fmtDate(r.due)}
-                {(() => {
-                  // What the date says today, as on every planned date: ready, submitted, overdue, at risk, days left.
-                  const said = plannedState(r.due, r.state === "APPROVED" ? "released" : ["AWAITING_CHECK", "TO_ROUTE", "IN_REVIEW"].includes(r.state) ? "submitted" : "none");
-                  return said ? <span className={`block text-[11px] ${said.tone}`}>{said.word}</span> : null;
-                })()}
-                {r.revision?.submittedAt ? <span className={`block text-[11px] ${r.arrivedOnTime ? "text-slate-500" : "text-red-700"}`}>sent {fmtDate(r.revision.submittedAt)}{r.arrivedOnTime ? "" : " — late"}</span> : null}
-              </Td>
-              <Td>
-                <Chip className={TONE[r.state]}>{STATE_LABEL[r.state]}{r.state === "RETURNED" && r.outcome ? ` · ${r.outcome}` : ""}</Chip>
-                {r.reason ? <p className="mt-1 max-w-72 text-[11px] text-slate-600">“{r.reason}”</p> : null}
-              </Td>
-              <Td className="min-w-64 max-w-md text-xs text-slate-600">
-                {r.comments.length ? (
-                  <ul className="space-y-1">
-                    {r.comments.map((one, i) => (
-                      <li key={i} className={one.blocking && !one.settled ? "text-red-700" : undefined}>
-                        <span className="font-mono text-slate-400">rev {one.rev} · </span><span className="font-semibold">{one.by}</span>{one.blocking ? <span className="text-[10px] uppercase tracking-wide"> · blocking</span> : null}: {one.text}
-                      </li>
-                    ))}
-                  </ul>
-                ) : <span className="text-slate-300">·</span>}
-              </Td>
               <Td className="text-xs">
-                {canSendRow(r.state) ? (
-                  <input type="file" name={`file_${r.doc.id}`} className="block w-56" />
-                ) : staff && r.state === "AWAITING_CHECK" && r.transmittal ? (
-                  <Link href={`/transmittals/${r.transmittal.id}`} className="font-semibold text-link hover:underline">Check {r.transmittal.number} →</Link>
-                ) : staff && r.state === "TO_ROUTE" && r.transmittal ? (
-                  <Link href={`/transmittals/${r.transmittal.id}`} className="font-semibold text-link hover:underline">Send for review →</Link>
-                ) : r.state === "APPROVED" ? (
-                  <span className="text-emerald-700">done{r.revision?.statusCode ? ` · ${r.revision.statusCode}` : ""}</span>
-                ) : WITH_SUPPLIER.includes(r.state) ? (
-                  <span className="text-slate-400">with {pkg.recipientName}</span>
-                ) : (
-                  <span className="text-slate-400">with {org}</span>
-                )}
+                <ToneChip tone={stage.tone}>{stage.word}</ToneChip>
+                <span className="mt-1 block text-[11px] text-slate-500">{stage.holder}</span>
+                {r.reason ? <p className="mt-1 max-w-72 text-[11px] text-slate-600">&ldquo;{r.reason}&rdquo;</p> : null}
+              </Td>
+              <Td className="whitespace-nowrap text-xs"><SubmitBy row={r} /></Td>
+              <Td className="min-w-64 max-w-md text-xs text-slate-600"><Comments row={r} /></Td>
+              <Td className="text-xs">
+                {mayUpload && WITH_SUPPLIER.includes(r.state)
+                  ? <input type="file" name={`file_${r.doc.id}`} className="block w-56" />
+                  : <span className="text-slate-400">{stage.holder}</span>}
               </Td>
             </tr>
-          ))}
+          );
+        })}
       </DataTable>
-      {!rows.length ? <p className="mt-2 rounded-2xl border border-dashed border-line-strong px-5 py-8 text-center text-sm text-slate-400">No documents are expected from {pkg.recipientName} yet. Create placeholders with {pkg.recipientName} as the supplier and they appear here.</p> : null}
-    </div>
-  );
+    );
+    return (
+      <div className="space-y-4">
+        <section className="register register-sheet register-sheet-open">
+          <div className="flex flex-col-reverse gap-3 px-5 pt-6 pb-3 sm:px-6 lg:flex-row lg:items-start lg:justify-between">
+            <div className="min-w-0 flex-1">
+              {plateCode}
+              <h1 className="plate-name mt-1 min-w-0">What {org} expects from you</h1>
+              <p className="plate-meta mt-2">{mine.length} document{mine.length === 1 ? "" : "s"} &middot; everything by {fmtDate(pkg.completionDate)}</p>
+              <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">
+                Attach the file next to each document you send, then press Send to {org}. {org} checks it, then accepts it for review or returns it with why.
+              </p>
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
+              {listLink}
+              <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap ring-1 ${where.tone}`}>{where.word}</span>
+            </div>
+          </div>
+        </section>
+        <section className="register register-sheet register-sheet-open">
+          <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
+            <span className="stencil mr-1 text-slate-500">Your documents</span>
+            <span className="text-[11px] text-slate-500">{holds.length} with you · {mine.length - holds.length} with {org}</span>
+          </div>
+          {!mine.length ? (
+            <p className="px-5 py-8 text-center text-sm text-slate-400 sm:px-6">Nothing is asked of you here yet. What {org} asks of you arrives on a transmittal and appears here.</p>
+          ) : mayUpload && holds.length ? (
+            <ActionForm action={submitSupplierPackageAction} submitLabel={`Send to ${org}`} hidden={{ packageId: pkg.id }}>
+              {table}
+              <div className="px-5 sm:px-6"><FileTally waiting={holds.length} who="you" /></div>
+            </ActionForm>
+          ) : table}
+        </section>
+      </div>
+    );
+  }
 
-  const waiting = rows.filter((r) => canSendRow(r.state)).length;
-  // What Document Control can do to the package itself: narrow it, take
-  // documents out or put them back, rename it, delete it.
+  // ── Our page ─────────────────────────────────────────────────────────────────
+  const f = supplierFigures(rows);
+  const shared = pkg.view.sharedAt ? new Date(pkg.view.sharedAt) : null;
+  const where = packageStage(pkg, rows, "ours");
+  const notSent = rows.filter((r) => !asked.has(r.doc.id));
+  // The same counts as the packages list: sent, received, who holds what was sent, late.
+  const counts = packageCounts(pkg, rows);
+  const { withThem, withUs } = counts;
   const excluded = parseExcluded(pkg.membershipExcluded);
-  // The rule a supplier package was made with only names the supplier; a
-  // narrowing rule is one with a filter behind it.
+  // The rule a supplier package was made with only names the supplier; a narrowing rule is one with a filter behind it.
   const narrowed = parseFilter(pkg.membershipFilter) ? pkg.membershipRule : null;
-  const outDocs = excluded.length ? await documentsByIds(ctx, excluded) : [];
-  // A supplier's package is Document Control's (and an administrator's) alone.
-  const mayManage = staff;
-  const notAsked = rows.filter((r) => !asked.has(r.doc.id));
-  const manage: StepItem[] = mayManage ? [
-    ...(!shared ? [{
-      key: "share",
-      primary: true,
-      label: `Share with ${pkg.recipientName}`,
-      body: (
-        <ActionForm action={sharePackageAction} submitLabel={`Share with ${pkg.recipientName}`} size="sm" hidden={{ packageId: pkg.id }} confirmText={`Once shared, ${pkg.recipientName} sees this package for good. Continue?`}>
-          <p className="text-xs leading-5 text-slate-600">
-            Until it is shared, {pkg.recipientName} does not see this package. Once shared, they see it for good, with the documents asked of them on a transmittal and nothing else. It cannot be taken back.
-          </p>
-        </ActionForm>
-      ),
-    }] : []),
-    {
-      key: "send",
-      primary: !!shared && notAsked.length > 0,
-      label: notAsked.length ? `Send placeholders to ${pkg.recipientName} (${notAsked.length} not asked yet)` : `Send placeholders to ${pkg.recipientName}`,
-      body: !shared ? (
-        <p className="text-xs text-slate-600">Share the package with {pkg.recipientName} first: they find what is asked of them there.</p>
-      ) : notAsked.length ? (
-        <ActionForm action={requestSupplyAction} submitLabel="Send on one transmittal" size="sm" hidden={{ packageId: pkg.id }}>
-          <p className="text-xs leading-5 text-slate-600">Tick what to ask of {pkg.recipientName}. Each is asked once; from then on they hold it, and it is handed back and forth by asking for it back.</p>
-          <div className="-mx-5 border-y border-line sm:-mx-6">
-            <RevisionChecklist name="documentId" initial={notAsked.map((r) => r.doc.id)} rows={notAsked.map((r) => ({ id: r.doc.id, number: r.doc.docNumber, rev: "—", status: null, title: r.doc.title }))} />
-          </div>
-          <Field label="Message" hint={`what ${pkg.recipientName} reads with it`}>
-            <textarea name="message" rows={2} maxLength={4000} className={inputCls} />
-          </Field>
-        </ActionForm>
-      ) : <p className="text-xs text-slate-600">Every document in it has been asked of {pkg.recipientName}.</p>,
-    },
-    { key: "add", label: "Add documents", href: `/documents?pick=${encodeURIComponent(`pkg:${pkg.identifier}`)}` },
-    {
-      key: "remove",
-      label: "Take documents out",
-      body: (
-        <ActionForm action={removePackageMemberAction} submitLabel="Take the ticked documents out" size="sm" variant="secondary" hidden={{ packageId: pkg.id }}>
-          <div className="-mx-5 border-y border-line sm:-mx-6">
-            <RevisionChecklist name="documentId" rows={rows.map((r) => ({ id: r.doc.id, number: r.doc.docNumber, rev: r.revision?.value ?? "—", status: r.revision?.statusCode ?? null, title: r.doc.title }))} />
-          </div>
-        </ActionForm>
-      ),
-    },
-    ...(outDocs.length ? [{
-      key: "back",
-      label: `Put back (${outDocs.length} taken out)`,
-      body: (
-        <ActionForm action={addPackageMemberAction} submitLabel="Put the ticked documents back" size="sm" hidden={{ packageId: pkg.id }}>
-          <div className="-mx-5 border-y border-line sm:-mx-6">
-            <RevisionChecklist name="documentId" rows={outDocs.map((d) => ({ id: d.id, number: d.docNumber, rev: "—", status: null, title: d.title }))} />
-          </div>
-        </ActionForm>
-      ),
-    }] : []),
-    {
-      key: "rule",
-      label: narrowed ? "Change the rule" : "Narrow by a rule",
-      body: (
-        <ActionForm action={setPackageRuleAction} submitLabel="Save the rule" size="sm" hidden={{ packageId: pkg.id }}>
-          <p className="text-xs text-slate-500">Only documents from {pkg.recipientName} that match all you choose stay in the package — for example only Electrical, or only technical datasheets. New ones that match join by themselves. Clear every choice to take everything from them again.</p>
-          <RuleFields supplier initial={parseFilter(pkg.membershipFilter)} />
-        </ActionForm>
-      ),
-    },
-    // Renumbered, or deleted while empty, only until it is shared or sent.
-    ...manageItems(pkg, { mayEdit: true, mayRenumber: !shared && !pkg.view.transmittals.length, mayDelete: !shared && !rows.length && !pkg.view.transmittals.length }),
-  ] : [];
+  const supplierName = pkg.recipientName;
+  // The register opened for this package, on this supplier's documents (and its order): tick to add, untick to take out.
+  const pickHref = `/documents?pick=${encodeURIComponent(`pkg:${pkg.identifier}`)}${pkg.partyCode ? `&supplier=${encodeURIComponent(pkg.partyCode)}` : ""}${pkg.view.purchaseOrder ? `&po=${encodeURIComponent(pkg.view.purchaseOrder)}` : ""}`;
+  const [edit, remove] = (() => {
+    const items = manageItems(pkg, { mayEdit: true, mayRenumber: !shared && !pkg.view.transmittals.length, mayDelete: !shared && !rows.length && !pkg.view.transmittals.length });
+    return [items.find((one) => one.key === "edit") ?? null, items.find((one) => one.key === "delete") ?? null];
+  })();
 
   return (
     <div className="space-y-4">
       <section className="register register-sheet register-sheet-open">
         <div className="flex flex-col-reverse gap-3 px-5 pt-6 pb-3 sm:px-6 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0 flex-1">
-            <p className="font-mono text-[12.5px] font-semibold tracking-tight text-slate-500">{pkg.identifier}</p>
-            <h1 className="plate-name mt-1 min-w-0">{isSupplier ? `What ${org} expects from you` : pkg.title ?? `From ${pkg.recipientName}`}</h1>
+            {plateCode}
+            <h1 className="plate-name mt-1 min-w-0">{pkg.title ?? `From ${supplierName}`}</h1>
             <p className="plate-meta mt-2">
-              {f.planned} document{f.planned === 1 ? "" : "s"} &middot; everything by {fmtDate(pkg.completionDate)} &middot; needed at <span className="font-mono font-semibold text-slate-700">{pkg.requiredStatus}</span>
+              {supplierName}{pkg.view.purchaseOrder ? ` · order ${pkg.view.purchaseOrder}` : ""} &middot; {f.planned} document{f.planned === 1 ? "" : "s"} &middot; everything by {fmtDate(pkg.completionDate)} &middot; needed at <span className="font-mono font-semibold text-slate-700">{pkg.requiredStatus}</span>
             </p>
             <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">
-              {isSupplier
-                ? `Attach a file next to each document you deliver, then send. ${org} checks it and either accepts it for review or returns it with a reason.`
-                : `Every document whose supplier is ${pkg.recipientName}${narrowed ? ` — only those ${narrowed.replace(/^every document /, "")} —` : ""} is in this package${excluded.length ? `, less ${excluded.length} taken out` : ""}. The supplier sends from here; nothing else counts as arrived.`}
+              Every document from {supplierName}{narrowed ? ` ${narrowed.replace(/^every document /, "")}` : ""} is filed here{excluded.length ? `, less ${excluded.length} taken out` : ""}. A document reaches {supplierName} only when it is sent on a transmittal; {supplierName} sends its files back from its side of this package.
             </p>
             {pkg.description ? <p className="mt-1.5 max-w-3xl text-[13px] leading-5 text-slate-600">{pkg.description}</p> : null}
           </div>
-          <div className="flex shrink-0 items-center gap-2 lg:justify-end">
-            {pkg.partyCode ? <a href={`/api/requirements/sheet?sender=${encodeURIComponent(pkg.partyCode)}`} className="ask inline-flex items-center gap-1.5"><Download className="h-3.5 w-3.5" /> Delivery list</a> : null}
+          <div className="flex shrink-0 items-center gap-2">
             {staff ? <Link href="/packages" className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-semibold text-slate-500 hover:bg-slate-100"><ArrowLeft className="h-4 w-4" /> Packages</Link> : null}
-            {/* Where the package as a whole stands, in the reader's words — the same chip as the packages list. */}
-            {(() => { const where = packageStage(pkg, rows, isSupplier ? "theirs" : "ours"); return <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap ring-1 ${where.tone}`}>{where.word}</span>; })()}
+            <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap ring-1 ${where.tone}`}>{where.word}</span>
           </div>
         </div>
         <div className="grid grid-cols-2 border-t border-line sm:grid-cols-4">
-          <Figure label="Sent" value={`${f.arrived} of ${f.planned}`} hint={`${f.submissionProgress}% · ${f.notArrivedLate} overdue`} />
-          <Figure label="On time" value={`${f.onSchedule}%`} hint={`${f.late} late`} />
-          <Figure label="Waiting on" value={`${f.pendingOurs} us · ${f.pendingSupplier} them`} hint="review vs supplier" />
+          <Figure label="Sent to supplier" value={`${counts.sent} of ${counts.total}`} hint={counts.notSent ? `${counts.notSent} not sent yet` : "all sent"} />
+          <Figure label="Received" value={`${counts.received} of ${counts.total}`} hint={`${counts.late} overdue`} />
+          <Figure label="Held" value={`${withThem} by them · ${withUs} by us`} hint="who has to act next" />
           <Figure label="Approved first time" value={`${f.firstTime}%`} hint={`${f.approved} approved`} />
         </div>
       </section>
 
-      {manage.length ? (
-        <section className="register register-sheet register-sheet-open">
+      {staff ? (
+        <section id="package" className="register register-sheet register-sheet-open">
           <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
             <span className="stencil mr-1 text-slate-500">The package</span>
+            <span className="text-[11px] text-slate-500">
+              {shared ? `shared with ${supplierName} ${fmtDate(shared)}${pkg.view.sharedBy ? ` by ${pkg.view.sharedBy}` : ""}` : `not shared: ${supplierName} does not see it yet`}
+            </span>
           </div>
-          <NextStepBody
-            items={manage}
-            status={<p className="text-[13px] text-slate-600">
-              {shared ? <>Shared with {pkg.recipientName} {fmtDate(shared)}{pkg.view.sharedBy ? ` by ${pkg.view.sharedBy}` : ""}. </> : <>Not shared with {pkg.recipientName} yet: they do not see it. </>}
-              {narrowed ? <>Only documents from {pkg.recipientName} {narrowed.replace(/^every document /, "")}.</> : <>Everything from {pkg.recipientName}{pkg.view.purchaseOrder ? ` under ${pkg.view.purchaseOrder}` : ""}.</>}{excluded.length ? <> {excluded.length} taken out by hand.</> : null}
-            </p>}
-          />
+          <div className="space-y-3 px-5 py-4 sm:px-6">
+            {!shared ? (
+              <p className="rounded-md bg-amber-50 px-3 py-2.5 text-xs leading-5 text-amber-900 ring-1 ring-amber-200">
+                Share it with {supplierName} before sending them anything: they find what is asked of them here. Sharing is for good.
+              </p>
+            ) : notSent.length ? (
+              <p className="text-xs leading-5 text-slate-600">
+                <strong className="font-semibold text-slate-800">{notSent.length} document{notSent.length === 1 ? " is" : "s are"} not sent to {supplierName} yet.</strong> Send them on a transmittal: each is sent once, and from then on handed back and forth.
+              </p>
+            ) : null}
+            <div className="flex flex-wrap items-start gap-2">
+              {!shared ? (
+                <Act icon={Share2} label={`Share with ${supplierName}`} primary>
+                  <ActionForm action={sharePackageAction} submitLabel={`Share with ${supplierName}`} size="sm" hidden={{ packageId: pkg.id }} confirmText={`Once shared, ${supplierName} sees this package for good. Continue?`}>
+                    <p className="text-xs leading-5 text-slate-600">Once shared, {supplierName} sees this package for good, with only the documents sent to them on a transmittal.</p>
+                  </ActionForm>
+                </Act>
+              ) : null}
+              {shared && notSent.length ? (
+                <Act icon={Send} label={`Send to ${supplierName} (${notSent.length})`} primary>
+                  <ActionForm action={requestSupplyAction} submitLabel="Send on one transmittal" size="sm" hidden={{ packageId: pkg.id }}>
+                    <p className="text-xs leading-5 text-slate-600">Tick what to send to {supplierName}. From then on they hold it.</p>
+                    <div className="overflow-hidden rounded-md bg-surface ring-1 ring-line">
+                      <RevisionChecklist name="documentId" initial={notSent.map((r) => r.doc.id)} rows={notSent.map((r) => ({ id: r.doc.id, number: r.doc.docNumber, rev: "—", status: null, title: r.doc.title }))} />
+                    </div>
+                    <Field label="Message" hint={`what ${supplierName} reads with it — optional`}>
+                      <textarea name="message" rows={2} maxLength={4000} className={inputCls} />
+                    </Field>
+                  </ActionForm>
+                </Act>
+              ) : null}
+              <Act icon={ListChecks} label="Add or take out documents" href={pickHref} />
+              <Act icon={Filter} label={narrowed ? "Change the rule" : "Narrow by a rule"}>
+                <ActionForm action={setPackageRuleAction} submitLabel="Save the rule" size="sm" hidden={{ packageId: pkg.id }}>
+                  <p className="text-xs text-slate-500">Only documents from {supplierName} that match all you choose stay in the package. New ones that match join by themselves. Clear every choice to take everything from them again.</p>
+                  <RuleFields supplier initial={parseFilter(pkg.membershipFilter)} />
+                </ActionForm>
+              </Act>
+              {edit ? <Act icon={Pencil} label={typeof edit.label === "string" ? edit.label : "Edit"}>{edit.body}</Act> : null}
+              {remove ? <Act icon={Trash2} label="Delete the package">{remove.body}</Act> : null}
+              {listLink}
+            </div>
+          </div>
         </section>
       ) : null}
 
       <section className="register register-sheet register-sheet-open">
         <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
-          <span className="stencil mr-1 text-slate-500">{isSupplier ? "Send documents" : "Documents"}</span>
-          <span className="text-[11px] text-slate-500">{f.pendingSupplier} with {isSupplier ? "you" : pkg.recipientName} · {f.pendingOurs} with {isSupplier ? org : "us"}</span>
+          <span className="stencil mr-1 text-slate-500">Documents</span>
+          <span className="text-[11px] text-slate-500">{withThem} with {supplierName} · {withUs} with us{notSent.length ? ` · ${notSent.length} not sent to them yet` : ""}</span>
         </div>
-        {supplierMayUpload || (staff && waiting) ? (
-          <ActionForm action={submitSupplierPackageAction} submitLabel={isSupplier ? `Send to ${org}` : "Enter and send for review"} hidden={{ packageId: pkg.id }}>
-            {table}
-            <div className="space-y-1 px-5 sm:px-6">
-              {!isSupplier ? <p className="text-[12px] text-slate-500">Received outside the system? Attach each file to its line — the delivery list&apos;s titles say which is which. Files go in under our numbers; the supplier&apos;s own number can stay inside the document. The review form opens next.</p> : null}
-              {waiting ? <FileTally waiting={waiting} who={isSupplier ? "you" : pkg.recipientName} /> : <p className="text-[12px] text-slate-500">Nothing is waiting on you right now.</p>}
-            </div>
-          </ActionForm>
-        ) : table}
+        {rows.length ? (
+          <DataTable className="rounded-none border-0 shadow-none" exportName={pkg.identifier} id="supplier-package-ours" defaultHidden={["Comments"]} head={<tr><Th>Document</Th><Th>Where it stands</Th><Th>Submit by</Th><Th>Next</Th><Th>Comments</Th></tr>}>
+            {rows.map((r) => {
+              const stage = lineStage(r, asked.has(r.doc.id), "ours");
+              return (
+                <tr key={r.doc.id}>
+                  <Td>
+                    <Link href={`/documents/${r.doc.id}`} className="doc-number">{r.doc.docNumber}</Link>
+                    {r.revision ? <span className="ml-1.5 font-mono text-xs text-slate-400">rev {r.revision.value}</span> : null}
+                    <span className="block max-w-80 truncate text-xs text-slate-500">{r.doc.title}</span>
+                  </Td>
+                  <Td className="text-xs">
+                    <ToneChip tone={stage.tone}>{stage.word}</ToneChip>
+                    {stage.holder ? <span className="mt-1 block text-[11px] text-slate-500">{stage.holder}</span> : null}
+                    {r.reason ? <p className="mt-1 max-w-72 text-[11px] text-slate-600">&ldquo;{r.reason}&rdquo;</p> : null}
+                  </Td>
+                  <Td className="whitespace-nowrap text-xs"><SubmitBy row={r} /></Td>
+                  <Td className="text-xs">
+                    {!asked.has(r.doc.id) ? <span className="text-slate-400">send it to {supplierName}</span>
+                      : r.state === "AWAITING_CHECK" && r.transmittal ? <Link href={`/transmittals/${r.transmittal.id}`} className="font-semibold text-link hover:underline">Check {r.transmittal.number}</Link>
+                      : r.state === "TO_ROUTE" ? <Link href={`/documents/${r.doc.id}#workflow`} className="font-semibold text-link hover:underline">Send for review</Link>
+                      : r.state === "APPROVED" ? <span className="text-emerald-700">released{r.revision?.statusCode ? ` at ${r.revision.statusCode}` : ""}</span>
+                      : WITH_SUPPLIER.includes(r.state) ? <span className="text-slate-400">waiting on {supplierName}</span>
+                      : <span className="text-slate-400">in review</span>}
+                  </Td>
+                  <Td className="min-w-64 max-w-md text-xs text-slate-600"><Comments row={r} /></Td>
+                </tr>
+              );
+            })}
+          </DataTable>
+        ) : (
+          <p className="px-5 py-8 text-center text-sm text-slate-400 sm:px-6">No documents from {supplierName} yet. Register them with {supplierName} as the supplier, or add them with &ldquo;Add or take out documents&rdquo;.</p>
+        )}
       </section>
     </div>
   );

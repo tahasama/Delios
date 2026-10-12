@@ -458,7 +458,7 @@ function AskPlaceholders({ askable }: { askable: { supplier: string; items: { id
     <details className="border-b border-line">
       <summary className="flex cursor-pointer list-none flex-wrap items-center gap-2 px-5 py-2.5 text-xs text-slate-600 sm:px-6">
         <span className="ask">Ask placeholders of a supplier</span>
-        <span className="text-[11px] text-slate-500">{askable.reduce((n, one) => n + one.items.length, 0)} not asked yet</span>
+        <span className="text-[11px] text-slate-500">{askable.reduce((n, one) => n + one.items.length, 0)} not sent to their supplier yet</span>
       </summary>
       <div className="space-y-2 px-5 pb-3 sm:px-6">
         <select value={supplier} onChange={(event) => { setSupplier(event.target.value); setTicked([]); }} className="plain">

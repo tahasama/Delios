@@ -1,6 +1,6 @@
 "use client";
 
-import { addPackageMemberAction } from "@/lib/actions/planning";
+import { setPackageMembersAction } from "@/lib/actions/planning";
 import Link from "next/link";
 import { saveRegisterView, deleteRegisterView } from "@/lib/actions/register-views";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
@@ -107,7 +107,9 @@ type Column = {
 
 /** The register opened for one action: what it needs now, ticked; its disciplines, for what is added. */
 /** The register opened for something to choose documents for: an action (tick to add, untick to take off), or a supplier's package (tick to add). */
-type Picking = { kind: "action" | "package"; actionId: string; packageId: string; code: string; name: string; linked: string[]; disciplines: { code: string; label: string }[] };
+type Picking = { kind: "action" | "package"; actionId: string; packageId: string; code: string; name: string; linked: string[]; disciplines: { code: string; label: string }[];
+  /** In a supplier's package and already sent to the supplier: they stay, so they cannot be unticked. */
+  locked?: string[] };
 
 export function DocumentRegister({ rows, total, userCanAct, filters, filterOptions, exportHref, plate, paging, codes, sort, views, supplier, picking, mayAddToAction }: {
   /** Opened from an action, by Document Control: tick to add, untick to take off. */
@@ -237,6 +239,7 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
   };
   const selectedExportHref = allMatching ? exportHref : selected.length ? `/api/register/export?ids=${encodeURIComponent(selected.join(","))}` : exportHref;
   function toggle(id: string) {
+    if (picking?.locked?.includes(id)) return;
     setAllMatching(false);
     setSelected((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
   }
@@ -318,7 +321,7 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
         </p>
         <p className="mt-1 text-xs leading-5 text-slate-500">
           {picking.kind === "package"
-            ? "Ticked is what the package holds. Tick a document to add it; search and filter freely, the ticks stay. Then add below. Taking a document out is done on the package."
+            ? "Ticked is what the package holds; it opens on this supplier's documents. Tick a document to add it, untick one to take it out (one already sent to the supplier stays); search and filter freely, the ticks stay. Then save below."
             : "Ticked is what it needs. Tick a document to add it, untick one to take it off; search and filter freely, the ticks stay. Then save below."}
         </p>
       </section>
@@ -519,7 +522,7 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
               onChange={() => {
                 setAllMatching(false);
                 const page = rows.map((row) => row.id);
-                if (picking) setSelected((now) => pageSelected ? now.filter((id) => !page.includes(id)) : [...new Set([...now, ...page])]);
+                if (picking) setSelected((now) => pageSelected ? now.filter((id) => !page.includes(id) || !!picking.locked?.includes(id)) : [...new Set([...now, ...page])]);
                 else setSelected(pageSelected ? [] : page);
               }}
             />
@@ -565,7 +568,8 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
           const pin = on ? "bg-tint" : "bg-surface";
           return <tr key={row.id} className={on ? "[&>td]:bg-tint" : undefined}>
             <Td className={`rail ${RAIL[row.revState ?? "NONE"] ?? "rail-none"} ${frozen ? "sticky left-0 z-1" : ""} ${pin}`}>
-              <input aria-label={`Select ${row.docNumber}`} type="checkbox" checked={on} onChange={() => toggle(row.id)} />
+              <input aria-label={`Select ${row.docNumber}`} type="checkbox" checked={on} onChange={() => toggle(row.id)}
+                disabled={!!picking?.locked?.includes(row.id)} title={picking?.locked?.includes(row.id) ? "Sent to the supplier: it stays in the package" : undefined} />
             </Td>
             <Td className={`${frozen ? "sticky left-10 z-1" : ""} min-w-70 ${pin}`}>
               <span className="relative flex items-center gap-1.5">
@@ -575,7 +579,7 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
                 {row.docState === "CANCELLED" ? <span className="stamp text-slate-500">cancelled</span> : null}
                 {row.docState === "WITHDRAWN" ? <span className="stamp text-red-700">withdrawn</span> : null}
                 {row.docState === "ARCHIVED" ? <span className="stamp text-slate-500">archived</span> : null}
-                {row.supplierStamp ? <span className="stamp text-sky-700">{row.supplierStamp}</span> : row.placeholder ? <span className="stamp text-slate-500">number reserved</span> : null}
+                {row.supplierStamp ? <span className="stamp text-sky-700">{row.supplierStamp}</span> : row.placeholder ? <span className="stamp text-slate-500">{row.originator ? "not sent to supplier" : "number reserved"}</span> : null}
                 {row.onHold ? <span title={row.onHold} className="stamp text-red-700">not for use</span> : null}
               </span>
               <p className="doc-title mt-0.5 block truncate" title={row.title}>{row.title}</p>
@@ -616,14 +620,15 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
 
     {picking?.kind === "package" ? (
       <div className="dock palette-light sticky bottom-4 z-30 mx-auto w-fit max-w-full rounded-sm border border-white/10 bg-brand-strong p-2.5 text-white shadow-[0_8px_30px_rgb(0_0_0/0.18)]">
-        <ActionForm action={addPackageMemberAction} submitLabel="Add to the package" size="sm" hidden={{ packageId: picking.packageId, redirect: "1" }} className="flex flex-wrap items-center gap-2 space-y-0">
-          {adding.map((id) => <input key={id} type="hidden" name="documentId" value={id} />)}
+        <ActionForm action={setPackageMembersAction} submitLabel="Save" size="sm" hidden={{ packageId: picking.packageId }} className="flex flex-wrap items-center gap-2 space-y-0">
+          {adding.map((id) => <input key={id} type="hidden" name="add" value={id} />)}
+          {leaving.map((id) => <input key={id} type="hidden" name="remove" value={id} />)}
           <span className="px-2 text-xs">
             <span className="font-mono text-sm tabular-nums">{selected.length}</span>
             <span className="ml-1.5 text-[10px] uppercase tracking-[0.12em] text-white/60">ticked for {picking.code}</span>
-            {adding.length ? <span className="ml-2 text-white/80">{adding.length} to add</span> : <span className="ml-2 text-white/60">nothing to add yet</span>}
+            {adding.length || leaving.length ? <span className="ml-2 text-white/80">{adding.length} to add · {leaving.length} to take out</span> : <span className="ml-2 text-white/60">nothing changed yet</span>}
           </span>
-          <Link href={`/packages/${picking.code}`} className="ml-auto rounded-sm px-3 py-2 text-xs font-semibold text-white/70 hover:bg-white/10 hover:text-white">Back without adding</Link>
+          <Link href={`/packages/${picking.code}`} className="ml-auto rounded-sm px-3 py-2 text-xs font-semibold text-white/70 hover:bg-white/10 hover:text-white">Back without saving</Link>
         </ActionForm>
       </div>
     ) : picking ? (

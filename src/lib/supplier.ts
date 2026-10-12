@@ -1,6 +1,6 @@
 import { legacyDocument, documentContext } from "./api/legacy";
 import type { LegacyPackage } from "./api/packages";
-import { supplierStage } from "./state-names";
+import { supplierStage, supplierStamp, type SupplierStage } from "./state-names";
 
 /**
  * Where each document a supplier owes us stands, in the two stages Document
@@ -156,4 +156,49 @@ export function packageStage(pkg: LegacyPackage, rows: SupplierRow[], side: "our
   if (back === 0) return { word: side === "ours" ? "sent to supplier" : "to be transmitted", tone: amber, notAsked };
   if (back < lines.length) return { word: side === "ours" ? `partly received · ${back} of ${lines.length}` : `partly transmitted · ${back} of ${lines.length}`, tone: sky, notAsked };
   return { word: side === "ours" ? "received" : "transmitted", tone: sky, notAsked };
+}
+
+/** A package line's state as the supplier's stage. */
+export const STAGE_OF: Record<SupplierState, SupplierStage> = {
+  NOT_SENT: "SENT", AWAITING_CHECK: "RECEIVED", REJECTED: "RETURNED_CHECK", TO_ROUTE: "ACCEPTED",
+  IN_REVIEW: "IN_REVIEW", RETURNED: "RETURNED_REVIEW", APPROVED: "RELEASED",
+};
+
+const LINE_TONE: Record<SupplierStage, "done" | "waiting" | "refused" | "moving"> = {
+  SENT: "waiting", RECEIVED: "moving", ACCEPTED: "moving", RETURNED_CHECK: "refused",
+  IN_REVIEW: "moving", RELEASED: "done", RETURNED_REVIEW: "refused",
+};
+
+/**
+ * Where one line of a supplier's package stands, in the reader's words (the same stamps as the register): sent to
+ * supplier / to be transmitted, received / transmitted, accepted, returned / to correct, in review, released,
+ * returned / to revise. A line not sent to the supplier yet reads so (only we see it). Who holds it is said beside it.
+ */
+export function lineStage(row: SupplierRow, asked: boolean, side: "ours" | "theirs"): { word: string; tone: "done" | "waiting" | "refused" | "moving" | "idle"; holder: string } {
+  if (!asked) return { word: "not sent to supplier", tone: "idle", holder: "" };
+  const stage = STAGE_OF[row.state];
+  const theirs = WITH_SUPPLIER.includes(row.state);
+  return {
+    word: supplierStamp(stage, side),
+    tone: LINE_TONE[stage],
+    holder: side === "ours" ? (theirs ? "with the supplier" : "with us") : (theirs ? "with you" : "with us"),
+  };
+}
+
+/**
+ * A supplier package's counts, the same on its page and in the list: how many were sent to the supplier, how many
+ * came back, who holds what was sent, and how many are late (not back by their date).
+ */
+export function packageCounts(pkg: LegacyPackage, rows: SupplierRow[]) {
+  const asked = new Set(pkg.view.members.filter((m) => m.requestedAt).map((m) => m.documentId));
+  const sent = rows.filter((r) => asked.has(r.doc.id));
+  return {
+    total: rows.length,
+    sent: sent.length,
+    notSent: rows.length - sent.length,
+    received: sent.filter((r) => r.state !== "NOT_SENT").length,
+    withThem: sent.filter((r) => WITH_SUPPLIER.includes(r.state)).length,
+    withUs: sent.filter((r) => !WITH_SUPPLIER.includes(r.state) && r.state !== "APPROVED").length,
+    late: rows.filter((r) => r.state === "NOT_SENT" && r.late).length,
+  };
 }

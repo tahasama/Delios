@@ -250,6 +250,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
     ? await legacyPackageByNumber(scope, sp.pick.slice(4)).then((pkg) => pkg ? {
         kind: "package" as const, packageId: pkg.id, actionId: "", code: pkg.identifier, name: pkg.title ?? pkg.recipientName,
         linked: pkg.members.map((m) => m.documentId), disciplines: [] as { code: string; label: string }[],
+        locked: pkg.view.members.filter((m) => m.requestedAt).map((m) => m.documentId),
       } : null).catch(() => null)
     : null;
   const picking = packagePick ?? (sp.pick && !sp.pick.startsWith("pkg:") && (scope.can("CONTROL") || own)
@@ -261,7 +262,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
           actionId: one.id, code: one.code, name: one.name,
           linked: [...new Set(detail.needs.filter((need) => !own || need.department === own).map((need) => need.documentId))],
           disciplines: (own ? [own] : one.departments).map((code) => ({ code, label: disciplineLabel.get(code) ?? code })),
-          kind: "action" as const, packageId: "",
+          kind: "action" as const, packageId: "", locked: [] as string[],
         };
       })()
     : null);

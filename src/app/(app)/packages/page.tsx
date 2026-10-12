@@ -6,7 +6,7 @@ import { Asked, Added } from "@/components/policy-fields";
 import { formPolicy } from "@/lib/field-policy";
 import { createPackageAction } from "@/lib/actions/planning";
 import { createSupplierPackageAction } from "@/lib/actions/supplier";
-import { supplierRows, supplierFigures, packageStage } from "@/lib/supplier";
+import { supplierRows, packageCounts, packageStage } from "@/lib/supplier";
 import { isController, isAdmin } from "@/lib/auth";
 import { departmentsOf } from "@/lib/schedule";
 import { getActiveSet } from "@/lib/config";
@@ -43,12 +43,12 @@ export default async function PackagesPage({ searchParams }: { searchParams: Pro
   const statusMeaning = new Map(statuses.map((s) => [s.code, typeof s.props.may === "string" ? `${s.label}: ${s.props.may}` : s.label]));
   // Our own organization first: a package may be an internal handover.
   const parties = supplierOnly ? [] : await packageParties(ctx);
-  const supplierStats = new Map<string, ReturnType<typeof supplierFigures>>();
+  const supplierStats = new Map<string, ReturnType<typeof packageCounts>>();
   // Where each supplier's package stands as a whole, in the reader's words.
   const supplierStages = new Map<string, ReturnType<typeof packageStage>>();
   if (category === "SUPPLIER") for (const p of pkgs) {
     const lines = await supplierRows(ctx, p);
-    supplierStats.set(p.id, supplierFigures(lines));
+    supplierStats.set(p.id, packageCounts(p, lines));
     supplierStages.set(p.id, packageStage(p, lines, supplierOnly ? "theirs" : "ours"));
   }
   // "For the schedule": each action's documents, read as a package.
@@ -85,7 +85,9 @@ export default async function PackagesPage({ searchParams }: { searchParams: Pro
 
       {category === "SUPPLIER" ? (
         rows.length ? (
-          <DataTable className="rounded-none border-0 shadow-none" id="supplier-packages" exportName="supplier-packages" head={<tr><Th>Supplier</Th><Th>Where it stands</Th><Th>Sent</Th><Th>Overdue</Th><Th>Waiting on</Th><Th>Due</Th></tr>}>
+          <DataTable className="rounded-none border-0 shadow-none" id="supplier-packages" exportName="supplier-packages" head={supplierOnly
+            ? <tr><Th>Package</Th><Th>Where it stands</Th><Th>Transmitted</Th><Th>Overdue</Th><Th>With you</Th><Th>Due</Th></tr>
+            : <tr><Th>Supplier</Th><Th>Where it stands</Th><Th>Sent to supplier</Th><Th>Received</Th><Th>Overdue</Th><Th>Held</Th><Th>Due</Th></tr>}>
                 {rows.map((pkg) => {
                   const f = supplierStats.get(pkg.id)!;
                   const where = supplierStages.get(pkg.id)!;
@@ -94,11 +96,12 @@ export default async function PackagesPage({ searchParams }: { searchParams: Pro
                       <Td><Link href={`/packages/${pkg.identifier}`} className="font-semibold text-brand-ink hover:underline">{pkg.title ?? pkg.recipientName}</Link><span className="block font-mono text-[11px] text-slate-400">{pkg.identifier}</span></Td>
                       <Td className={`text-xs`}>
                         <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap ring-1 ${where.tone}`}>{where.word}</span>
-                        {where.notAsked ? <span className="mt-1 block text-[11px] text-slate-500">{where.notAsked} not asked yet</span> : null}
+                        {where.notAsked ? <span className="mt-1 block text-[11px] text-slate-500">{where.notAsked} not sent to supplier yet</span> : null}
                       </Td>
-                      <Td className={`text-xs`}>{f.arrived} of {f.planned} <span className="text-slate-400">({f.submissionProgress}%)</span></Td>
-                      <Td className={`text-xs ${f.notArrivedLate ? "font-semibold text-red-700" : "text-slate-400"}`}>{f.notArrivedLate || "—"}</Td>
-                      <Td className={`text-xs`}>{f.pendingOurs} with us · {f.pendingSupplier} with them</Td>
+                      {supplierOnly ? null : <Td className="text-xs">{f.sent} of {f.total}</Td>}
+                      <Td className="text-xs">{f.received} of {supplierOnly ? f.sent : f.total}</Td>
+                      <Td className={`text-xs ${f.late ? "font-semibold text-red-700" : "text-slate-400"}`}>{f.late || "—"}</Td>
+                      <Td className="text-xs">{supplierOnly ? f.withThem : `${f.withThem} by them · ${f.withUs} by us`}</Td>
                       <Td className={`whitespace-nowrap text-xs`}>{fmtDate(pkg.completionDate)}</Td>
                     </tr>
                   );
