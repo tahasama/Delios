@@ -122,6 +122,11 @@ conversation, write it into the right one in the same commit as the code.
   "for information" → we hold it; "accepted with comments" or "rejected" →
   they hold it (read from the verdict's meaning, never its code). What it is
   issued for is set automatically from the request.
+- A placeholder reaches its supplier only on a transmittal (our record of what
+  was asked, when, due when); adding it to a package is not asking. It is the
+  one exception to "only released revisions travel": Document Control, one
+  supplier's documents at a time, to that supplier or its people
+  (`ComposeRequest.PlaceholderIds`; register → Create transmittal).
 - The side that does not hold it asks the holder to hand it back for an update
   (RETURN_FOR_UPDATE, with why): Document Control on our side, whoever of the
   supplier may upload on theirs. The holder accepts or refuses with why; the

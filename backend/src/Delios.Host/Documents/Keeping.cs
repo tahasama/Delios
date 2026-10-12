@@ -414,17 +414,8 @@ public sealed class KeepingService(
             $"{document.Number}: sent to you for an update", note, supplier, supplier.Name, [],
             TransmittalService.AddresseesOf(supplier, members), PackageId: asked.PackageId,
             Placeholders: [(document, asked.DueDate)]), cancellationToken);
-        var now = clock.GetCurrentInstant();
-        if (latest?.State is RevisionStates.Received or RevisionStates.InPreparation or RevisionStates.Correcting)
-        {
-            latest.State = RevisionStates.Correcting;
-            latest.ResentAt = now;
-            latest.ResentByName = access.UserName;
-            latest.ResentNote = note;
-            document.LatestRevisionState = latest.State;
-        }
-        document.WithSupplier = true;
-        document.UpdatedAt = now;
+        // Raising it handed it over: a placeholder puts it with them, and a revision not yet reviewed goes as it is.
+        document.UpdatedAt = clock.GetCurrentInstant();
         return (sent.Number, null);
     }
 

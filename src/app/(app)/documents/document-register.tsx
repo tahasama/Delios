@@ -196,9 +196,13 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
   const selectedRows = useMemo(() => rows.filter((row) => selected.includes(row.id)), [rows, selected]);
   const selectedRevisionIds = selectedRows.map((row) => row.reviewRevisionId).filter((id): id is string => Boolean(id));
   const transmittableRows = selectedRows.filter((row) => row.hasReleased);
+  // The one exception to "only released revisions travel": an outside organization's document with nothing released,
+  // asked of them as a placeholder. Document Control's; the new transmittal keeps only a supplier's own.
+  const placeholderRows = mayAddToAction ? selectedRows.filter((row) => !row.hasReleased && !!row.originator) : [];
   // Opened for an action, the ticks span pages: the box at the top ticks or unticks this page only.
   const pageSelected = rows.length > 0 && (picking ? rows.every((row) => selected.includes(row.id)) : selected.length === rows.length);
-  const transmittalHref = `/transmittals/new?docs=${encodeURIComponent(transmittableRows.map((row) => row.id).join(","))}`;
+  const transmittalHref = `/transmittals/new?docs=${encodeURIComponent(transmittableRows.map((row) => row.id).join(","))}`
+    + (placeholderRows.length ? `&placeholders=${encodeURIComponent(placeholderRows.map((row) => row.id).join(","))}` : "");
   // Exporting every match needs no list of ids: the filters are the list.
   /**
    * The columns this reader is looking at, as the table's own preferences hold
@@ -616,7 +620,7 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
     ) : selected.length ? <div className="dock sticky bottom-4 z-30 mx-auto flex max-w-5xl flex-wrap items-center gap-2 rounded-sm border border-white/10 bg-brand-strong p-2.5 text-white shadow-[0_8px_30px_rgb(0_0_0/0.18)]">
       <span className="px-2 font-mono text-sm tabular-nums">{allMatching ? total.toLocaleString("en-GB") : selected.length}<span className="ml-1.5 text-[10px] uppercase tracking-[0.12em] text-white/60">selected</span></span>
       {userCanAct ? (selectedRevisionIds.length ? <Link href={`/reviews/send?revisions=${encodeURIComponent(selectedRevisionIds.join(","))}`} className="inline-flex items-center gap-1.5 rounded-sm bg-[#d9a441] px-3 py-2 text-xs font-semibold text-brand-ink"><GitPullRequestArrow className="h-4 w-4" /> Send for review ({selectedRevisionIds.length})</Link> : null) : null}
-      {transmittableRows.length ? <Link href={transmittalHref} className="inline-flex items-center gap-1.5 rounded-sm bg-white/10 px-3 py-2 text-xs font-semibold hover:bg-white/15"><ArrowLeftRight className="h-4 w-4" /> Create transmittal ({transmittableRows.length})</Link> : null}
+      {transmittableRows.length + placeholderRows.length ? <Link href={transmittalHref} className="inline-flex items-center gap-1.5 rounded-sm bg-white/10 px-3 py-2 text-xs font-semibold hover:bg-white/15"><ArrowLeftRight className="h-4 w-4" /> Create transmittal ({transmittableRows.length + placeholderRows.length})</Link> : null}
       {supplier && !supplier.readOnly ? (() => {
         const sendable = selectedRows.map((row) => row.sendRevisionId).filter((id): id is string => !!id);
         return sendable.length ? (

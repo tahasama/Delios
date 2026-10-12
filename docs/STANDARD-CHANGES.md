@@ -789,7 +789,10 @@ so that two sides never overwrite each other's work. The placeholder sent, the
 supplier holds it; once they send it, we hold it; our check returning it hands
 it back to them; after the review, a verdict accepting it or taking it for
 information leaves it with us, and one with comments to take into the next
-revision, or one rejecting it, hands it to them. The side that does not hold
+revision, or one rejecting it, hands it to them. A placeholder is asked of a
+supplier only on a transmittal — the record of what was asked, when, and by when
+— never by adding it to a package; it is the one thing other than a released
+revision a transmittal may carry, and only to the supplier that owes it. The side that does not hold
 it asks the holder to hand it back for an update, saying why; the holder
 accepts or refuses with why, and the one who asked is told. A revision not yet
 reviewed passes as it is and returns under the same value; only a release, or

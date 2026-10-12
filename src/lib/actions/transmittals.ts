@@ -28,6 +28,8 @@ export async function createTransmittalAction(_prev: { error?: string } | undefi
   const subject = String(formData.get("subject") ?? "").trim() || null;
   const message = String(formData.get("message") ?? "").trim() || null;
   const revisionIds = formData.getAll("revisionIds").map(String).filter(Boolean);
+  // A supplier's documents asked of them as placeholders (outgoing only).
+  const placeholderIds = direction === "OUTGOING" ? [...new Set(formData.getAll("placeholderIds").map(String).filter(Boolean))] : [];
   // What came with something received that is not in the register: their
   // letter, the email, the files they attached.
   const attachments = direction === "INCOMING" ? filesOf(formData, "attachments") : [];
@@ -46,7 +48,7 @@ export async function createTransmittalAction(_prev: { error?: string } | undefi
 
   if (!reasonForIssue) return { error: "Every transmittal states its reason for issue." };
   if (!dateOfIssue) return { error: "Date of issue is required." };
-  if (!revisionIds.length && !attachments.length && !message && !subject) return { error: "Enclose at least one revision, or write a subject and a message — a transmittal cannot be empty of both." };
+  if (!revisionIds.length && !placeholderIds.length && !attachments.length && !message && !subject) return { error: "Enclose at least one revision, or write a subject and a message — a transmittal cannot be empty of both." };
   if (direction === "OUTGOING" && !recipientUsers.length && !partyTo.length) return { error: "Name at least one person to send it to — a company on its own is not a recipient." };
   if (direction === "OUTGOING" && !subject) return { error: "Give the transmittal a subject — it is the first thing the recipient reads." };
   // Copies are our own people; an organization is sent to, never copied.
@@ -101,6 +103,7 @@ export async function createTransmittalAction(_prev: { error?: string } | undefi
         body: {
           revisionIds, userIds: recipientUsers, partyIds: partyTo, reason: reasonForIssue, subject, message, copyUserIds: chosenCc,
           draft: !issueNow, inReplyToId, followsId, followKind, issuedOn: dayOf(dateOfIssue), extras: Object.keys(extras).length ? extras : null, activityId, activityAsk,
+          placeholderIds: placeholderIds.length ? placeholderIds : null,
         },
         idempotencyKey: crypto.randomUUID(),
       });
