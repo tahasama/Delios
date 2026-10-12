@@ -28,7 +28,7 @@ public sealed record PackageView(Guid Id, string Number, string Title, string? D
     string? ClosureNote, DateTimeOffset? AcceptedAt, string? AcceptedBy, string CreatedBy, IReadOnlyList<MemberView> Members,
     IReadOnlyList<PackageTransmittal> Transmittals, string Kind, Guid? SupplierPartyId, string? Supplier, string? PurchaseOrder,
     IReadOnlyList<string>? Reasons = null, System.Text.Json.JsonElement? Extras = null, string? AcceptNote = null,
-    DateTimeOffset? SharedAt = null, string? SharedBy = null, bool AutoCreated = false);
+    DateTimeOffset? SharedAt = null, string? SharedBy = null, bool AutoCreated = false, IReadOnlyList<string>? SupplierPeople = null);
 
 /// <summary>A transmittal raised for a package: a delivery, a request to its supplier, or what the supplier sent back.</summary>
 public sealed record PackageTransmittal(Guid Id, string Number, string Direction, DateTimeOffset IssuedAt, int Items);
@@ -134,6 +134,7 @@ public static class PackageEndpoints
             await packages.TransmittalsAsync(p, cancellationToken), p.Kind, p.SupplierPartyId,
             await packages.SupplierNameAsync(p, cancellationToken), p.PurchaseOrder, [p.Reason, .. p.OtherReasons],
             p.Extras is null ? null : System.Text.Json.JsonDocument.Parse(p.Extras).RootElement.Clone(), p.AcceptNote,
-            p.SharedAt?.ToDateTimeOffset(), p.SharedByName, p.AutoCreated);
+            p.SharedAt?.ToDateTimeOffset(), p.SharedByName, p.AutoCreated,
+            outside ? null : (await packages.SupplierPeopleAsync(p, cancellationToken)).Select(x => x.Name).ToList());
     }
 }

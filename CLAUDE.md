@@ -153,7 +153,9 @@ conversation, write it into the right one in the same commit as the code.
 - "Delivery list" downloads the package's own lines (`/api/packages/<n>/list`),
   never the schedule's requirements list.
 - "Share with <supplier>" is pressed once, for good: until then the supplier
-  does not see the package. Once shared, it sees there only the documents asked
+  does not see the package. Sharing tells the supplier's people on the project.
+  Our package page names them, and warns when nobody of theirs is on the
+  project (then nobody of theirs sees it). Once shared, it sees there only the documents asked
   of it on a transmittal, and of its own documents only those exchanged with it.
 - A placeholder reaches its supplier only on a transmittal, from the package
   (tick some or all not asked yet) or from the register's "Create

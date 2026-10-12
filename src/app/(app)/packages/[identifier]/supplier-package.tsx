@@ -198,6 +198,14 @@ export async function SupplierPackage({ pkg }: { pkg: LegacyPackage }) {
             </span>
           </div>
           <div className="space-y-3 px-5 py-4 sm:px-6">
+            {/* Who of the supplier sees it: its people on this project. Nobody there, nobody sees it, shared or not. */}
+            {pkg.view.supplierPeople && !pkg.view.supplierPeople.length ? (
+              <p className="rounded-md bg-red-50 px-3 py-2.5 text-xs leading-5 text-red-900 ring-1 ring-red-200">
+                <strong className="font-semibold">Nobody from {supplierName} is on this project</strong>, so nobody of theirs can see this package, shared or not. Add their people on <Link href="/settings/users" className="font-semibold underline">People &amp; access</Link>.
+              </p>
+            ) : pkg.view.supplierPeople?.length ? (
+              <p className="text-xs leading-5 text-slate-600">{shared ? "Seen" : "Will be seen"} by {supplierName}&rsquo;s people on this project: {pkg.view.supplierPeople.join(", ")}.</p>
+            ) : null}
             {!shared ? (
               <p className="rounded-md bg-amber-50 px-3 py-2.5 text-xs leading-5 text-amber-900 ring-1 ring-amber-200">
                 Share it with {supplierName} before sending them anything: they find what is asked of them here. Sharing is for good.

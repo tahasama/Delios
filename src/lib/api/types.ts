@@ -315,6 +315,8 @@ export type PackageView = {
   reasons?: string[]; extras?: Record<string, string> | null;
   /** A supplier's package: shared with its supplier (once, for good), by whom; made by itself with its first document. */
   sharedAt?: string | null; sharedBy?: string | null; autoCreated?: boolean;
+  /** The supplier's people on this project: who sees it once shared. Ours only. */
+  supplierPeople?: string[] | null;
 };
 
 /** GET /activity (ActivityEndpoints.cs): one act of the project, for Home's journal and log. */

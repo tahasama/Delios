@@ -43,7 +43,8 @@ public sealed record NoteRequest(string? Note = null);
 /// delivery on transmittals, and acceptance. Delivering fixes the contents.
 /// </summary>
 public sealed class PackageService(
-    DeliosDbContext db, Numbering numbering, TransmittalService transmittals, AuditLog audit, IClock clock, SupplyFiling filing)
+    DeliosDbContext db, Numbering numbering, TransmittalService transmittals, AuditLog audit, IClock clock, SupplyFiling filing,
+    Notifications.Notifier notifier)
 {
     // ── Composing ─────────────────────────────────────────────────────────────
 
@@ -285,6 +286,11 @@ public sealed class PackageService(
         var supplier = await db.Parties.AsNoTracking().SingleAsync(p => p.Id == package.SupplierPartyId, cancellationToken);
         await audit.WriteAsync(Actor(access), "PACKAGE_SHARED", "Package", package.Id, package.Number,
             $"Shared with {supplier.Name}, for good.", package.ProjectId, cancellationToken);
+        var people = (await SupplierPeopleAsync(package, cancellationToken)).Select(p => p.Id).ToList();
+        if (people.Count > 0)
+            await notifier.NotifyAsync(access.Project.TenantId, package.ProjectId, people, Notifications.NotificationKinds.General,
+                $"{package.Number} is shared with you",
+                "What is asked of you appears here once it is sent to you on a transmittal.", $"/packages/{package.Number}", cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         return (package, null);
     }
@@ -603,6 +609,20 @@ public sealed class PackageService(
     }
 
     /// <summary>The supplier's name for a supply package; null for a delivery package.</summary>
+    /// <summary>
+    /// The supplier's people on the package's project (active, not waiting for confirmation): who sees it once shared,
+    /// and who is told.
+    /// </summary>
+    public async Task<IReadOnlyList<(Guid Id, string Name)>> SupplierPeopleAsync(Package package, CancellationToken cancellationToken)
+    {
+        if (package.SupplierPartyId is not { } party) return [];
+        var rows = await (from u in db.Users
+                          join m in db.Memberships on u.Id equals m.UserId
+                          where u.PartyId == party && u.Active && m.ProjectId == package.ProjectId && m.Active && m.PendingSince == null
+                          select new { u.Id, u.Name }).Distinct().AsNoTracking().ToListAsync(cancellationToken);
+        return rows.Select(r => (r.Id, r.Name)).ToList();
+    }
+
     public async Task<string?> SupplierNameAsync(Package package, CancellationToken cancellationToken) =>
         package.SupplierPartyId is { } id ? await db.Parties.Where(p => p.Id == id).Select(p => p.Name).SingleOrDefaultAsync(cancellationToken) : null;
 
