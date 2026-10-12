@@ -779,6 +779,22 @@ under.
 **Depends on it:** `ACTION_LINKS`, `PROJECT_PEOPLE`, `CONFIRM:{act}`, `Verbs.Manage`, `Transmittal.ActivityConfirm/ActivityProposal`,
 `Membership.PendingSince/Refused*`, `/activity-check|confirm|refuse`, `/people/pending|confirm|refuse`.
 
+## 42 · A document asked of a supplier is the supplier's to send
+
+**Clause:** §9 *Information from suppliers and contractors*.
+
+**Must say:** once a placeholder has been sent to a supplier, the document is
+locked to it: only the supplier sends its files and says what each revision is
+issued for (for information, for review, for approval…), always on a
+transmittal. Nobody of ours starts a revision of it or replaces its files;
+Document Control may record, for the supplier, what the supplier sent outside
+the system. Our own details of the document (discipline, criticality…) stay
+ours. A notice about a supplier's missing document proposes that supplier's
+people, who are sent to the document itself.
+
+**Depends on it:** `ASKED_OF_SUPPLIER`, `DocumentService.AskedOfSupplierAsync`, `NoticeRequest.OutsideLink`,
+`supplierStatusChoices`.
+
 ## Still open — decided in conversation, not yet built
 
 - **Transmittals as the one channel, in two families.** Transmittals will work

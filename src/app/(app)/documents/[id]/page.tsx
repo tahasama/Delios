@@ -42,6 +42,7 @@ import { ArrowLeft, ChevronRight, Download, ExternalLink, FileText, Send } from 
 import { hasVerb } from "@/lib/auth";
 import { activityList } from "@/lib/api/schedule";
 import { addDocumentToActionAction } from "@/lib/actions/action-links";
+import { addressees } from "@/lib/api/transmittals";
 
 export const dynamic = "force-dynamic";
 
@@ -94,6 +95,11 @@ export default async function DocumentDetailPage({
   const assetLinks = rels.map((r) => ({ rel: r, asset: assetById.get(r.toId) ?? assetById.get(r.fromId) }));
 
   const canEdit = mayContributeToDocument(user, doc) && !["WITHDRAWN", "CANCELLED"].includes(doc.state);
+  // Asked of a supplier (a placeholder went out to them): its files and what it is issued for are theirs from then
+  // on. Nobody of ours starts a revision or changes its files; the backend refuses it too (ASKED_OF_SUPPLIER).
+  const askedOf = user.isInternal && doc.originator && context.transmittals.some((t) => t.direction === "OUTGOING" && t.itemKind === "PLACEHOLDER")
+    ? (await addressees(ctx)).parties.find((p) => p.code === doc.originator)?.name ?? null
+    : null;
   const controller = isController(user) || isAdmin(user);
   // Document Control adds it to a schedule action from here too: the actions with a discipline tagged that do not need it yet.
   const mayAddToAction = ctx.can("CONTROL") && !["WITHDRAWN", "CANCELLED"].includes(doc.state);
@@ -281,9 +287,12 @@ export default async function DocumentDetailPage({
     : null;
   const editing = canEdit && working && working.state === "IN_PREPARATION";
   const lead: StepItem[] = editing ? [{
-    key: "edit", label: `Edit rev ${working!.value}`, open: !workingHasPdf, primary: !workingHasPdf, body: (
+    key: "edit", label: askedOf ? `Edit the details of rev ${working!.value}` : `Edit rev ${working!.value}`, open: !workingHasPdf && !askedOf, primary: !workingHasPdf && !askedOf, body: (
           <ActionForm action={editRevisionAction} submitLabel="Save" size="sm" hidden={{ revisionId: working!.id, id: doc.id, hasFiles: working!.files.length ? "yes" : "no" }}>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {/* A supplier's: its files and what it is issued for are theirs; only our details change here. */}
+            {askedOf ? (
+              <p className="text-xs text-slate-500">Its files and what it is issued for are {askedOf}&rsquo;s: they send corrections on a transmittal.</p>
+            ) : <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Field label="PDF" hint={workingHasPdf ? "replaces the one there" : "what people will read — needed before it is sent"}>
                 <input type="file" name="renditionFile" accept=".pdf" className="block w-full" />
               </Field>
@@ -291,7 +300,7 @@ export default async function DocumentDetailPage({
                 <input type="file" name="nativeFile" className="block w-full" />
                 {listTemplate}
               </Field>
-            </div>
+            </div>}
             {detailFields}
           </ActionForm>
     ),
@@ -467,7 +476,16 @@ export default async function DocumentDetailPage({
         </>) },
       ] : []),
 
-      ...(canEdit && !working && doc.kind !== "RECORD" ? [
+      // Asked of a supplier: the next revision is theirs, sent on a transmittal; ours only waits for it.
+      ...(askedOf && !working && doc.kind !== "RECORD" ? [
+        { key: "asked", label: `Next revision: from ${askedOf}`, body: (
+          <p className="text-xs leading-5 text-slate-600">
+            It was asked of {askedOf}. Only {askedOf} sends its files and says what it is issued for (IFI, IFR, IFA…), on a transmittal.
+            {controller ? " If they sent it outside the system, record it for them from their supply package." : ""}
+          </p>
+        ) },
+      ] : []),
+      ...(canEdit && !askedOf && !working && doc.kind !== "RECORD" ? [
         { key: "revise", primary: ground.kind !== "OWN", label: ground.kind === "FIRST" ? "Start the first revision" : ground.kind === "ASKED" ? `New revision — answer rev ${doc.revisions[0]?.value}` : "Start a new revision", open: !doc.revisions.length, body: (<>
           <ActionForm action={prepareRevisionAction} submitLabel="Start revision" hidden={{ documentId: doc.id }}>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

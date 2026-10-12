@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { requireScope } from "@/lib/scope";
 import { randomUUID } from "node:crypto";
 import { isController, isAdmin, hasVerb } from "@/lib/auth";
-import { getActiveSet } from "@/lib/config";
+import { supplyReason, chosenSupplierStatus } from "@/lib/supplier-status";
 import { api, projectPath, refusal } from "@/lib/api/client";
 import { upload } from "@/lib/api/uploads";
 import { backendDocument, backendRevision } from "@/lib/api/legacy";
@@ -74,7 +74,8 @@ export async function submitSupplierPackageAction(_prev: { error?: string; ok?: 
   const onBehalf = user.partyCode !== partyCode;
   let sent: TransmittalView;
   try {
-    const status = await sentFor(pkg.reason);
+    // What the supplier says it is issued for (IFI, IFR, IFA…): its own choice.
+    const status = await chosenSupplierStatus(formData, pkg.reason);
     const planned = await Promise.all(chosen.map(async ({ m, upload: file }) => ({
       documentId: m.documentId, fileIds: [await upload(ctx, { documentId: m.documentId }, file)], status,
     })));
@@ -108,7 +109,7 @@ export async function attachSupplierFileAction(_prev: { error?: string; ok?: str
   if (!(file instanceof File) || file.size === 0) return { error: "Choose the file." };
   try {
     const reason = await supplyReason();
-    const status = await sentFor(reason.code);
+    const status = await chosenSupplierStatus(formData);
     const fromPartyId = await partyIdFor(ctx, user, doc.originator);
     const fileIds = [await upload(ctx, { documentId }, file)];
     const sent = await api<TransmittalView>(projectPath(ctx, "/transmittals/incoming"), {
@@ -167,20 +168,6 @@ function mayDeliver(user: { partyCode: string | null; role: string; verbs?: stri
 
 function supplierMayUpload(user: unknown): boolean {
   return hasVerb(user as never, "CREATE") || hasVerb(user as never, "REVISE");
-}
-
-/** What a supplier's submission comes for: approval where the organization publishes it. */
-async function supplyReason() {
-  const reasons = await getActiveSet("REASONS_FOR_ISSUE");
-  return reasons.find((r) => /APPROV/i.test(r.code)) ?? reasons.find((r) => r.props.response === true) ?? reasons[0];
-}
-
-/** The status a submission is sent for, read from its reason: "For approval" → "Issued for approval". */
-async function sentFor(reasonCode: string): Promise<string> {
-  const [reasons, statuses] = await Promise.all([getActiveSet("REASONS_FOR_ISSUE"), getActiveSet("STATUSES")]);
-  const words = (reasons.find((r) => r.code === reasonCode)?.label ?? "").toLowerCase();
-  return (statuses.find((s) => words && s.label.toLowerCase().endsWith(words))
-    ?? statuses.find((s) => s.props.executes === false) ?? statuses[0])?.code ?? "";
 }
 
 /** The sending organization's id when Document Control records it for them; the supplier sends as itself. */

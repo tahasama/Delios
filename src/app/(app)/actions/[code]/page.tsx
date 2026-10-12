@@ -79,6 +79,15 @@ export default async function ActionDetailPage({ params, searchParams }: { param
   const mayNotify = mayUploadLists(ctx.user.verbs);
   const notices = await noticesAbout(ctx, `activity:${action.id}:`);
   const pickPeople = people.map((one) => ({ id: one.id, name: one.name, detail: one.department ? deptLabel(one.department) : one.functionName }));
+  // A document a supplier owes: that supplier's people are recommended for the notice, and chosen.
+  const book = await addressees(ctx);
+  const suppliersOf = (missing: (typeof action.entries)[number][]) => book.parties
+    .filter((p) => missing.some((e) => e.document.originator === p.code))
+    .map((p) => ({
+      party: p,
+      docs: missing.filter((e) => e.document.originator === p.code),
+      people: book.people.filter((one) => one.organization === p.name),
+    }));
   // Asking for a document the list missed: a transmittal to Document Control, the file attached there.
   const controllers = await holders(ctx.projectId, "CONTROL").catch(() => []);
   const requestHref = (department: string) => `/transmittals/new?${new URLSearchParams({
@@ -115,7 +124,7 @@ export default async function ActionDetailPage({ params, searchParams }: { param
   const mine = requests.filter((one) => one.checkedAt && one.confirmerId === ctx.user.id);
   // Who may be asked to confirm: everyone on the project, those holding Manage first and marked so.
   const managers = new Set((await holders(ctx.projectId, "MANAGE").catch(() => [])).map((one) => one.id));
-  const confirmers = (await addressees(ctx)).people
+  const confirmers = book.people
     .map((one) => ({ id: one.id, name: one.name, detail: [managers.has(one.id) ? "Manage · recommended" : null, one.organization, one.function].filter(Boolean).join(" · ") }))
     .sort((a, b) => Number(managers.has(b.id)) - Number(managers.has(a.id)) || a.name.localeCompare(b.name));
   // The register, read once: document numbers for what a checked request will add, and Document Control's pick list.
@@ -316,6 +325,9 @@ export default async function ActionDetailPage({ params, searchParams }: { param
                 const late = !!c && !c.automatic && !!action.scheduledDate && c.confirmedAt !== null && c.confirmedAt.getTime() >= action.scheduledDate.getTime() + 86_400_000;
                 const members = people.filter((one) => one.department === d);
                 const sent = notices.filter((one) => one.subject.endsWith(`:${d}`));
+                const owing = suppliersOf(missing);
+                const owingPeople = owing.flatMap((s) => s.people.map((one) => ({ id: one.id, name: one.name, detail: `${s.party.name} · recommended` })));
+                const owedDocs = owing.flatMap((s) => s.docs);
                 // Where it stands, in one short chip: the line under it says how and by whom.
                 const chip = c
                   ? c.available ? { word: c.automatic ? "Confirmed automatically" : "Confirmed", tone: "bg-emerald-50 text-emerald-800 ring-emerald-200" }
@@ -399,10 +411,12 @@ export default async function ActionDetailPage({ params, searchParams }: { param
                               `${action.name} is planned for ${fmtDate(action.scheduledDate)}.`,
                               `Still missing: ${missing.map((e) => e.document.docNumber).join(", ")}.`,
                               passed ? "Confirm on the action's page and say why it went ahead without them." : "Send the documents, or confirm on the action's page and say why it can go ahead without them.",
+                              ...owing.map((s) => `${s.party.name}: please send ${s.docs.map((e) => e.document.docNumber).join(", ")} on a transmittal${s.docs.some((e) => e.requiredBy) ? `, by ${fmtDate(s.docs.map((e) => e.requiredBy).sort((a, b) => a.getTime() - b.getTime())[0])}` : ""}.`),
                             ].join("\n\n")}
                             link={`/actions/${action.code}`}
-                            people={pickPeople}
-                            chosen={members.map((one) => one.id)}
+                            outsideLink={owedDocs.length === 1 ? `/documents/${owedDocs[0].documentId}` : owedDocs.length ? "/documents" : undefined}
+                            people={[...owingPeople, ...pickPeople.filter((one) => !owingPeople.some((o) => o.id === one.id))]}
+                            chosen={[...members.map((one) => one.id), ...owingPeople.map((one) => one.id)]}
                             history={noticeHistory(sent)}
                           />
                         </div>

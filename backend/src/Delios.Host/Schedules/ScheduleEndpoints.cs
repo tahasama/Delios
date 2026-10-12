@@ -74,7 +74,8 @@ public sealed record ActionWork(string Kind, Guid? ActivityId, string? Code, str
     Guid? TransmittalId = null, string? Number = null, string? From = null, string? Ask = null);
 
 /// <summary>A notice a person sends: what it is about (its subject key), to whom, and what it says.</summary>
-public sealed record NoticeRequest(string? Subject, string? Title, string? Body, string? Link, Guid[]? People);
+/// <summary>Body of a notice sent by hand. <c>OutsideLink</c>: the page another organization's people are sent to, since they cannot open the schedule.</summary>
+public sealed record NoticeRequest(string? Subject, string? Title, string? Body, string? Link, Guid[]? People, string? OutsideLink = null);
 
 /// <summary>One notice as the screens list it.</summary>
 public sealed record NoticeView(Guid Id, string Subject, bool Automatic, string Title, string? Body, string[] Recipients, string SentBy, DateTimeOffset SentAt);
@@ -821,8 +822,9 @@ public static class ScheduleEndpoints
             .Select(m => m.UserId).Distinct().ToListAsync(cancellationToken);
         if (people.Count == 0) return Problems.Invalid("NO_ONE", "Choose at least one person on this project.");
         var link = request.Link is { Length: > 0 } l && l.StartsWith('/') ? l : null;
+        var outsideLink = request.OutsideLink is { Length: > 0 } o && o.StartsWith('/') ? o : null;
         var notice = await NoticeLog.SendAsync(db, notifier, clock, access.Project.TenantId, access.Project.Id, subject, false, access.UserName,
-            title, request.Body?.Trim() is { Length: > 0 } b ? b : null, link, people, cancellationToken);
+            title, request.Body?.Trim() is { Length: > 0 } b ? b : null, link, people, cancellationToken, outsideLink);
         await db.SaveChangesAsync(cancellationToken);
         await audit.WriteAsync(http.User.Actor(), "NOTICE_SENT", "Notice", notice.Id, subject,
             $"{title} — to {string.Join(", ", notice.RecipientNames)}", access.Project.Id, cancellationToken);

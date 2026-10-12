@@ -6,6 +6,8 @@ import { cn } from "@/lib/utils";
 import { hasVerb } from "@/lib/auth";
 import { getMe } from "@/lib/api/me";
 import { legacyDocument, documentContext } from "@/lib/api/legacy";
+import { supplierStatusChoices } from "@/lib/supplier-status";
+import { Field, inputCls } from "@/components/ui";
 
 /**
  * What a supplier sees on a document it owes us: attach the file, then send it.
@@ -43,6 +45,9 @@ export async function SupplierDelivery({ documentId }: { documentId: string }) {
     : at === 3 ? <>With {org}: under review.</>
     : <>Reviewed and in use.</>;
 
+  // What it is issued for is the supplier's to say, each time it sends.
+  const issuedFor = await supplierStatusChoices();
+
   const items: StepItem[] = [];
   if (mayUpload && waitingToSend && latest) items.push({
     key: "send",
@@ -62,6 +67,11 @@ export async function SupplierDelivery({ documentId }: { documentId: string }) {
     body: (
       <ActionForm action={attachSupplierFileAction} submitLabel="Attach" size="sm" hidden={{ documentId }}>
         <input type="file" name="file" required className="block w-full" />
+        <Field label="Issued for" required hint={`what you send it to ${org} for`}>
+          <select name="status" required defaultValue={issuedFor.initial} className={inputCls}>
+            {issuedFor.options.map((one) => <option key={one.code} value={one.code}>{one.code} — {one.label}</option>)}
+          </select>
+        </Field>
         <p className="text-[11px] text-slate-500">A PDF is what people read; send the editable original as well if it was asked for.</p>
       </ActionForm>
     ),

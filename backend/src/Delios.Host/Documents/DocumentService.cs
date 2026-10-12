@@ -731,7 +731,27 @@ public sealed class DocumentService(
             return (null, Problems.Conflict("DOCUMENT_NOT_OPEN",
                 $"The document is {document.State.ToLowerInvariant()}.", new { state = document.State }));
         }
+        // Asked of a supplier: from then on its files and what it is issued for are the supplier's, sent on a
+        // transmittal (or recorded by Document Control for them). Nobody of ours starts a revision or changes its files.
+        if (incoming is null && access.IsInternal && await AskedOfSupplierAsync(document, cancellationToken) is { } supplier)
+        {
+            return (null, Problems.Conflict("ASKED_OF_SUPPLIER",
+                $"It was asked of {supplier}: only {supplier} sends its files and says what it is issued for, on a transmittal.",
+                new { supplier }));
+        }
         return (document, null);
+    }
+
+    /// <summary>The supplier's name when the document is another organization's and a placeholder for it went out to them; else null.</summary>
+    public async Task<string?> AskedOfSupplierAsync(Document document, CancellationToken cancellationToken)
+    {
+        if (document.Originator is not { } originator) return null;
+        var supplier = await db.Parties.AsNoTracking().Where(p => p.Code == originator && !p.IsInternal).Select(p => p.Name)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (supplier is null) return null;
+        var asked = await db.TransmittalItems.AsNoTracking().AnyAsync(i => i.DocumentId == document.Id
+            && i.Kind == Transmittals.TransmittalItemKinds.Placeholder, cancellationToken);
+        return asked ? supplier : null;
     }
 
     /// <summary>The scheme routed to the deliverable type, else the organization's default.</summary>

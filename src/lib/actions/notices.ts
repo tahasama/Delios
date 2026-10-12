@@ -19,6 +19,8 @@ export async function sendNoticeAction(_prev: State | undefined, formData: FormD
         title: String(formData.get("title") ?? ""),
         body: String(formData.get("body") ?? "").trim() || null,
         link: link || null,
+        // A supplier's people cannot open the schedule: they are sent to their own document.
+        outsideLink: String(formData.get("outsideLink") ?? "") || null,
         people,
       },
     });

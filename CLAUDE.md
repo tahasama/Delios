@@ -114,6 +114,15 @@ conversation, write it into the right one in the same commit as the code.
   it is filled in on create and marked "(recommended)"; the person may choose
   another. Each level shows its meaning and what it decides.
 
+- A document asked of a supplier (a placeholder sent to them) is locked to
+  them: only the supplier sends its files and says what it is issued for (IFI,
+  IFR, IFA…), on a transmittal. Nobody of ours starts a revision or replaces
+  its files (backend: ASKED_OF_SUPPLIER); Document Control may record what the
+  supplier sent outside the system, for them. Our details stay editable.
+- A notice about a supplier's missing document proposes that supplier's
+  people (chosen, marked recommended); they are sent to the document, since
+  the schedule is ours only.
+
 - Released and issued are one act unless the organization sets POLICY_RELEASE =
   SEPARATE: a release needs someone to send to (an open request naming people
   or organizations, or the people named on the release form); the backend

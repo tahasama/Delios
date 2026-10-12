@@ -13,13 +13,15 @@ import { Bell } from "lucide-react";
  * long since the first notice on the same matter (automatic or not) and how
  * many have gone.
  */
-export function NotifyPanel({ subject, title, body, link, people, chosen, history, label = "Notify" }: {
+export function NotifyPanel({ subject, title, body, link, outsideLink, people, chosen, history, label = "Notify" }: {
   /** What the notice is about, as the backend keys it: notices on the same subject are counted together. */
   subject: string;
   title: string;
   body: string;
   /** The page the notice opens. */
   link: string;
+  /** The page it opens for another organization's people (a supplier), who cannot open {@link link}. */
+  outsideLink?: string;
   /** Everyone on the project who can be told. */
   people: PickItem[];
   /** Who it goes to unless changed. */
@@ -38,7 +40,7 @@ export function NotifyPanel({ subject, title, body, link, people, chosen, histor
             : "none sent yet"}
         </span>
       </summary>
-      <ActionForm action={sendNoticeAction} submitLabel="Send" hidden={{ subject, title, link }} className="mt-3 space-y-3">
+      <ActionForm action={sendNoticeAction} submitLabel="Send" hidden={{ subject, title, link, ...(outsideLink ? { outsideLink } : {}) }} className="mt-3 space-y-3">
         <SearchPick items={people} name="people" initial={chosen} label="To" hint="take anyone off, or add others by name" required />
         <Field label="Message" hint="what they read with it">
           <textarea name="body" rows={3} maxLength={4000} defaultValue={body} className={inputCls} />
