@@ -58,6 +58,8 @@ export type LegacyRevision = {
   supersededById: string | null; voidedAt: Date | null; voidReason: string | null; voidAuthority: string | null; voidReassessment: string | null;
   submittedAt: Date | null; submittedById: string | null; submittedByName: string | null; authoredById: string | null; authoredByName: string | null;
   authoredByParty: string | null; uploadedById: string | null; uploadedByName: string | null; createdAt: Date; extras: string | null;
+  /** Sent in by another organization and not accepted by the check yet (or sent back by it): its files are not the document's. */
+  awaitingCheck?: boolean;
   files: LegacyFile[]; approvals: LegacyApproval[]; cycles: LegacyCycle[];
   /** The backend's own reading of it: RECEIVED, CORRECTING… and its files' scan. */
   backend: RevisionView;
@@ -151,13 +153,25 @@ export function revisionOf(documentId: string, r: RevisionView, reviews: ReviewV
   const cycles = mine.filter((one) => one.steps.length).map((one, i) => cycleOf(one, i + 1));
   const decided = mine.filter((one) => one.verdict).sort((a, b) => (b.decidedAt ?? "").localeCompare(a.decidedAt ?? ""));
   const pending = mine.some((one) => one.state === "DECIDED");
+  // What another organization sent becomes the document only once Document Control's check accepts it. Until then
+  // (waiting for the check), or once the check sent it back, its files belong to the transmittal it came on: the
+  // document keeps what it had (a placeholder: nothing; handed back for an update: the submission accepted before).
+  const resentAt = r.resent?.at ? new Date(r.resent.at).getTime() : null;
+  const returnedAt = r.returnedAt ? new Date(r.returnedAt).getTime() : null;
+  const awaitingCheck = !!r.authoredByParty && (r.state === "RECEIVED"
+    || (r.state === "CORRECTING" && !(resentAt !== null && (returnedAt === null || resentAt > returnedAt))));
+  // Handed back to them for an update: the submission in force when it was handed back had been accepted.
+  const acceptedBefore = resentAt === null ? 0
+    : Math.max(0, ...r.submissions.filter((one) => new Date(one.submittedAt).getTime() <= resentAt).map((one) => one.number));
+  const keptSubmission = awaitingCheck ? acceptedBefore : r.submission;
+  const kept = awaitingCheck ? r.files.filter((f) => f.submission === keptSubmission) : r.files;
   // The files of the newest submission come first: that is what a screen reads as "the" file.
-  const files = [...r.files].sort((a, b) => b.submission - a.submission || b.createdAt.localeCompare(a.createdAt)).map((f) => ({
+  const files = [...kept].sort((a, b) => b.submission - a.submission || b.createdAt.localeCompare(a.createdAt)).map((f) => ({
     id: f.id, name: f.name, path: "", size: f.size, mime: f.contentType, sha256: f.sha256, kind: f.kind, revisionId: r.id, cycleId: null,
     uploadedById: r.authoredById, uploadedByName: r.authoredByName, createdAt: new Date(f.createdAt), transmittalId: null, status: f.status,
     submission: f.submission,
   }));
-  const current = files.filter((f) => f.submission === r.submission);
+  const current = files.filter((f) => f.submission === keptSubmission);
   const issued = transmittals.filter((t) => t.revisionId === r.id && t.direction === "OUTGOING" && !t.forReview)
     .sort((a, b) => a.issuedAt.localeCompare(b.issuedAt))[0];
   return {
@@ -172,7 +186,7 @@ export function revisionOf(documentId: string, r: RevisionView, reviews: ReviewV
     issuedAt: date(issued?.issuedAt), supersededAt: date(r.supersededAt), supersededById: null, voidedAt: date(r.voidedAt), voidReason: r.voidReason, voidAuthority: r.voidAuthority,
     voidReassessment: r.voidReassessment, submittedAt: date(r.submissions[0]?.submittedAt), submittedById: r.authoredById, submittedByName: r.submissions[0]?.submittedBy ?? null,
     authoredById: r.authoredById, authoredByName: r.authoredByName, authoredByParty: r.authoredByParty, uploadedById: r.authoredById,
-    uploadedByName: r.authoredByName, createdAt: new Date(r.createdAt), extras: null, files,
+    uploadedByName: r.authoredByName, createdAt: new Date(r.createdAt), extras: null, files, awaitingCheck,
     approvals: decided.map((one) => {
       const deciding = one.steps.find((s) => s.deciding);
       const by = deciding?.participants.find((p) => p.answer && p.answer !== "NONE");

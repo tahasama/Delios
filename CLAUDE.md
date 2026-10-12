@@ -261,6 +261,12 @@ conversation, write it into the right one in the same commit as the code.
   words alone read Received. Never "Accepted" before or against the check.
 - A submission returned by the check tells whoever sent it and their
   organization's people on the project, with why.
+- What another organization sends becomes the document only when Document
+  Control's check accepts it. Until then, and after the check sends it back,
+  its files belong to the transmittal it came on (each line carries that
+  submission's own files, checked there): the document keeps what it had (a
+  placeholder: nothing; handed back for an update: the submission accepted
+  before). `revisionOf` (`awaitingCheck`).
 - "Files that came with it" shows on a received transmittal only when files
   came with it.
 - A placeholder sent to its supplier is issued for use: reason IFU ("Issued for
