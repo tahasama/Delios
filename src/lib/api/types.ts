@@ -220,6 +220,8 @@ export type TransmittalLogRow = {
   recipients: { id: string; name: string; seen: boolean; kind: "TO" | "CC"; organization: string | null }[];
   responseRequired: boolean; responseDue: string | null; forReview: boolean;
   direction: "OUTGOING" | "INCOMING"; from: string | null; theirReference: string | null;
+  /** What came in: what Document Control's check said of its documents; null for anything else. */
+  check?: "TO_CHECK" | "RETURNED" | "PARTLY_RETURNED" | "ACCEPTED" | null;
 };
 
 /** GET /transmittals/{id} (TransmittalEndpoints TransmittalView). */

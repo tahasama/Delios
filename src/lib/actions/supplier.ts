@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { requireScope } from "@/lib/scope";
 import { randomUUID } from "node:crypto";
 import { isController, isAdmin, hasVerb } from "@/lib/auth";
-import { supplyReason, sentFor } from "@/lib/supplier-status";
+import { supplyReason, submittedFor } from "@/lib/supplier-status";
 import { api, projectPath, refusal } from "@/lib/api/client";
 import { upload } from "@/lib/api/uploads";
 import { backendDocument, backendRevision } from "@/lib/api/legacy";
@@ -74,7 +74,7 @@ export async function submitSupplierPackageAction(_prev: { error?: string; ok?: 
   const onBehalf = user.partyCode !== partyCode;
   let sent: TransmittalView;
   try {
-    const status = await sentFor(pkg.reason);
+    const status = await submittedFor(pkg.reason);
     const planned = await Promise.all(chosen.map(async ({ m, upload: file }) => ({
       documentId: m.documentId, fileIds: [await upload(ctx, { documentId: m.documentId }, file)], status,
     })));
@@ -108,7 +108,7 @@ export async function attachSupplierFileAction(_prev: { error?: string; ok?: str
   if (!(file instanceof File) || file.size === 0) return { error: "Choose the file." };
   try {
     const reason = await supplyReason();
-    const status = await sentFor(reason.code);
+    const status = await submittedFor(reason.code);
     const fromPartyId = await partyIdFor(ctx, user, doc.originator);
     const fileIds = [await upload(ctx, { documentId }, file)];
     const sent = await api<TransmittalView>(projectPath(ctx, "/transmittals/incoming"), {

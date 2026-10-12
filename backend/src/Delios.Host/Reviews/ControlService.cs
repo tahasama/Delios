@@ -20,7 +20,7 @@ public sealed record ControlRequest(string? Outcome = null, string? Note = null,
 /// back to be corrected under the same revision; only a change to what it says
 /// needs a new one.
 /// </summary>
-public sealed class ControlService(DeliosDbContext db, AuditLog audit, IClock clock)
+public sealed class ControlService(DeliosDbContext db, AuditLog audit, IClock clock, Notifications.Notifier notifier)
 {
     /// <summary>The acts Document Control performs; a control outcome's published <c>act</c> property names one of them.</summary>
     public const string Accept = "accept", Return = "return", Release = "release";
@@ -130,6 +130,22 @@ public sealed class ControlService(DeliosDbContext db, AuditLog audit, IClock cl
                 : $"Submission {revision.Submission} returned{(outcome is null ? "" : $" ({outcome})")}: {note} "
                   + (newRevision ? "The next revision replaces it." : "It comes back corrected under the same revision."),
             document.ProjectId, cancellationToken);
+        // Returned: whoever sent it, and the people of the organization it came from on this project, are told why.
+        if (act == Return)
+        {
+            var party = revision.AuthoredByParty ?? document.Originator;
+            var theirs = party is null ? [] : await (from u in db.Users
+                                                     join p in db.Parties on u.PartyId equals p.Id
+                                                     join m in db.Memberships on u.Id equals m.UserId
+                                                     where p.Code == party && !p.IsInternal && u.Active && m.ProjectId == document.ProjectId && m.Active && m.PendingSince == null
+                                                     select u.Id).Distinct().ToListAsync(cancellationToken);
+            var told = theirs.Append(revision.AuthoredById).Where(id => id != Guid.Empty && id != access.UserId).Distinct().ToList();
+            if (told.Count > 0)
+                await notifier.NotifyAsync(access.Project.TenantId, document.ProjectId, told, Notifications.NotificationKinds.General,
+                    $"{document.Number} rev {revision.Value}: returned to correct",
+                    $"{note}\n\n{(newRevision ? "The next revision replaces it." : "Correct it and send it again under the same revision.")}",
+                    $"/documents/{document.Id}", cancellationToken);
+        }
         await db.SaveChangesAsync(cancellationToken);
         return (revision, null);
     }

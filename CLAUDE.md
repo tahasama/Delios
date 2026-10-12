@@ -254,6 +254,15 @@ conversation, write it into the right one in the same commit as the code.
   (`REASONS_FOR_ISSUE` prop `family`). No "sent by" and no date: it is the
   person signed in, today. "Received from outside the system" (Document Control)
   is a tick, and only then are who sent it and when asked.
+- A supplier's submission is issued for review (IFR) where IFR is published;
+  the review then confirms or changes it.
+- What came in reads, in the transmittal list, as its check answered: To check,
+  Returned / Partly returned, Accepted (read from the documents it carried);
+  words alone read Received. Never "Accepted" before or against the check.
+- A submission returned by the check tells whoever sent it and their
+  organization's people on the project, with why.
+- "Files that came with it" shows on a received transmittal only when files
+  came with it.
 - A placeholder sent to its supplier is issued for use: reason IFU ("Issued for
   use", family Data), set by itself on the transmittal (never chosen) where it is
   published; the data / information choice is not shown then.

@@ -155,7 +155,12 @@ export default async function TransmittalsPage({ searchParams }: { searchParams:
     const outgoing = item.direction === "OUTGOING";
     // Everything the backend holds was sent; what arrived waits on us while
     // something on it is still to be registered.
-    const state = outgoing || item.status === "TO_REGISTER" ? "ISSUED" : "ACCEPTED";
+    // What arrived reads as its check answered: to check, returned (all or some), accepted. Words alone, with no
+    // document to check, simply arrived.
+    const state = outgoing ? "ISSUED"
+      : item.status === "TO_REGISTER" || item.check === "TO_CHECK" ? "ISSUED"
+      : item.check === "RETURNED" || item.check === "PARTLY_RETURNED" ? "REJECTED"
+      : item.check === "ACCEPTED" ? "ACCEPTED" : "CLOSED";
     const due = item.responseDue ? new Date(`${item.responseDue}T00:00:00`) : null;
     return {
       id: item.id,
@@ -170,7 +175,9 @@ export default async function TransmittalsPage({ searchParams }: { searchParams:
       documents: item.documents,
       status: state,
       // What arrived and has not been answered is said as the job it is.
-      statusLabel: !outgoing && state === "ISSUED" ? "To check" : STATUS_LABEL[state] ?? state.toLowerCase(),
+      statusLabel: !outgoing && state === "ISSUED" ? "To check"
+        : item.check === "RETURNED" ? "Returned" : item.check === "PARTLY_RETURNED" ? "Partly returned"
+        : !outgoing && state === "CLOSED" ? "Received" : STATUS_LABEL[state] ?? state.toLowerCase(),
       // Seen is the backend's: a person acknowledged it, or an organization
       // with no accounts here was sent it by one of ours.
       recipients: item.recipients.filter((person) => person.kind !== "CC").map((person) => ({ id: person.id, name: person.name, seen: person.seen })),

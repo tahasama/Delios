@@ -216,7 +216,8 @@ export default async function TransmittalDetailPage({ params, searchParams }: { 
               the email, what they attached. Kept as the record of what arrived;
               one becomes a document only when somebody makes it one — and then
               it is found in the register by its own content. */}
-          {t.direction === "INCOMING" && (t.files.length || controller) ? (
+          {/* Only when files came with it: a transmittal sent through the system carries its documents, nothing loose. */}
+          {t.direction === "INCOMING" && t.files.length ? (
             <section id="files" className="register register-sheet register-sheet-open">
               <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2 sm:px-6">
                 <span className="stencil mr-1 text-slate-400">Files that came with it</span>
@@ -254,7 +255,7 @@ export default async function TransmittalDetailPage({ params, searchParams }: { 
                   <div className="asking flex flex-wrap items-center gap-3 border-t border-line px-5 py-2.5 sm:px-6">
                     <label className="min-w-0 flex-1">
                       <span className="sr-only">Files to keep with it</span>
-                      <input type="file" name="attachments" multiple className="plain w-full text-slate-500" />
+                      <input type="file" name="attachments" multiple className="block w-full" />
                     </label>
                     <button className="ask">Keep with it</button>
                   </div>

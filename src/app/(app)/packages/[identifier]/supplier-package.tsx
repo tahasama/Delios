@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireScope } from "@/lib/scope";
 import { isController, isAdmin, hasVerb } from "@/lib/auth";
-import { DataTable, Th, Td, Field, inputCls, ToneChip } from "@/components/ui";
+import { DataTable, Th, Td, Field, inputCls, ToneChip, btn } from "@/components/ui";
 import { FileTally } from "./file-tally";
 import { setPackageRuleAction, sharePackageAction, deletePackageAction } from "@/lib/actions/planning";
 import { PackageLines, type PackageLine } from "./package-lines";
@@ -135,9 +135,13 @@ export async function SupplierPackage({ pkg }: { pkg: LegacyPackage }) {
           {!mine.length ? (
             <p className="px-5 py-8 text-center text-sm text-slate-400 sm:px-6">Nothing is asked of you here yet. What {org} asks of you arrives on a transmittal and appears here.</p>
           ) : mayUpload && holds.length ? (
-            <ActionForm action={submitSupplierPackageAction} submitLabel={`Send to ${org}`} hidden={{ packageId: pkg.id }}>
+            <ActionForm action={submitSupplierPackageAction} hideSubmit hidden={{ packageId: pkg.id }} className="space-y-0">
               {table}
-              <div className="px-5 sm:px-6"><FileTally waiting={holds.length} who="you" /></div>
+              {/* The sheet's own footer: what will go, and the one button, inside the sheet's margins. */}
+              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line px-5 py-3 sm:px-6">
+                <FileTally waiting={holds.length} who="you" />
+                <button type="submit" className={btn("primary", "md")}>Send to {org}</button>
+              </div>
             </ActionForm>
           ) : table}
         </section>

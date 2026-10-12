@@ -24,7 +24,7 @@ public sealed record LogRecipient(Guid Id, string Name, bool Seen, string Kind =
 public sealed record LogRow(
     Guid Id, string Number, string Subject, string Reason, string ToName, string IssuedBy, DateTimeOffset IssuedAt, int Documents,
     string Status, IReadOnlyList<LogRecipient> Recipients, bool ResponseRequired, DateOnly? ResponseDue, bool ForReview,
-    string Direction, string? From, string? TheirReference);
+    string Direction, string? From, string? TheirReference, string? Check = null);
 
 /// <summary>
 /// The transmittal log: every transmittal the caller may see, with what each
@@ -185,6 +185,26 @@ public static class TransmittalLogEndpoints
         var stepIds = list.Values.Where(t => t.ReviewStepId != null).Select(t => t.ReviewStepId!.Value).ToList();
         var answered = (await db.ReviewSteps.AsNoTracking().Where(s => stepIds.Contains(s.Id) && s.CompletedAt != null).Select(s => s.Id)
             .ToListAsync(cancellationToken)).ToHashSet();
+        // What Document Control's check said of what came in, read from each document it carried: this submission still
+        // waiting (RECEIVED), sent back (a later submission exists, or it is back with them), or accepted.
+        var sentIn = list.Values.Where(t => t.Direction == TransmittalDirections.Incoming)
+            .SelectMany(t => t.Items).Where(i => i.Kind == TransmittalItemKinds.Submission && i.RevisionId != null)
+            .Select(i => i.RevisionId!.Value).Distinct().ToList();
+        var revisions = await db.Revisions.AsNoTracking().Where(r => sentIn.Contains(r.Id))
+            .Select(r => new { r.Id, r.State, r.Submission }).ToDictionaryAsync(r => r.Id, cancellationToken);
+        string? CheckOf(Transmittal t)
+        {
+            var mine = t.Items.Where(i => i.Kind == TransmittalItemKinds.Submission && i.RevisionId is { } r && revisions.ContainsKey(r)).ToList();
+            if (t.Direction != TransmittalDirections.Incoming || mine.Count == 0) return null;
+            var answers = mine.Select(i =>
+            {
+                var r = revisions[i.RevisionId!.Value];
+                if (i.Submission is { } sub && r.Submission > sub) return "RETURNED";
+                return r.State == RevisionStates.Received ? "TO_CHECK" : r.State == RevisionStates.Correcting ? "RETURNED" : "ACCEPTED";
+            }).ToList();
+            return answers.Contains("TO_CHECK") ? "TO_CHECK" : answers.All(a => a == "RETURNED") ? "RETURNED"
+                : answers.Contains("RETURNED") ? "PARTLY_RETURNED" : "ACCEPTED";
+        }
         return ids.Where(list.ContainsKey).Select(id =>
         {
             var t = list[id];
@@ -197,7 +217,7 @@ public static class TransmittalLogEndpoints
                 : States.Complete;
             return new LogRow(t.Id, t.Number, t.Subject, t.Reason, t.ToName, t.IssuedByName, t.IssuedAt.ToDateTimeOffset(), t.Items.Count, status,
                 t.Recipients.OrderBy(r => r.Name).Select(r => new LogRecipient(r.Id, r.Name, r.UserId is null ? r.DispatchedAt is not null : r.AcknowledgedAt is not null, r.Kind, r.Organization)).ToList(),
-                t.ResponseRequired, t.ResponseDue?.ToDateOnly(), t.ReviewStepId is not null, t.Direction, t.FromName, t.TheirReference);
+                t.ResponseRequired, t.ResponseDue?.ToDateOnly(), t.ReviewStepId is not null, t.Direction, t.FromName, t.TheirReference, CheckOf(t));
         }).ToList();
     }
 }

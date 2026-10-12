@@ -13,3 +13,12 @@ export async function sentFor(reasonCode: string): Promise<string> {
   return (statuses.find((s) => words && s.label.toLowerCase().endsWith(words))
     ?? statuses.find((s) => s.props.executes === false) ?? statuses[0])?.code ?? "";
 }
+
+/**
+ * What a supplier's submission is issued for: IFR (for review), as every revision starts, where it is published;
+ * the review then confirms it or changes it. Otherwise read from the reason, as before.
+ */
+export async function submittedFor(reasonCode: string): Promise<string> {
+  const statuses = await getActiveSet("STATUSES");
+  return statuses.find((s) => s.code === "IFR")?.code ?? sentFor(reasonCode);
+}
