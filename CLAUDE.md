@@ -152,8 +152,7 @@ conversation, write it into the right one in the same commit as the code.
   ("You can't take out a document sent to <supplier>"; backend
   SENT_TO_SUPPLIER). The list shows, per document: where it stands, sent to the
   supplier (day), sent back (day, late or not), released & issued (day),
-  planned (the document's planned day, from the requirements list that feeds the
-  schedule, else the package's; with ready / submitted / overdue / at risk / in
+  planned (the document's planned day, else the package's; with ready / submitted / overdue / at risk / in
   N days; none reads "on no action" in red), and what is next for us. The
   supplier's page shows the same released & issued day.
 - A new transmittal's documents open with "Add documents"; what is enclosed is
@@ -212,6 +211,11 @@ conversation, write it into the right one in the same commit as the code.
   Document Control's check, with why), In review, Released & issued, Returned
   (rejected by the review); who holds it is said beside it. `supplierStage` and
   `RegisterEndpoints.SupplierStage` work it out the same way.
+- A document the schedule needs is planned for the earliest day an active
+  action needs it (`Readiness.RestateAsync` writes `Document.PlannedDate`
+  whenever needs are worked out): the same date on the action, the register's
+  Planned column, the document and its package. One no action needs keeps the
+  date a person gave it.
 - A planned date says what it means today, the same everywhere (register,
   document Details, package lines, the supplier's schedule; `plannedState`):
   ready (released), submitted (received, accepted, in review), overdue · N
@@ -252,7 +256,14 @@ conversation, write it into the right one in the same commit as the code.
   is a tick, and only then are who sent it and when asked.
 - A placeholder sent to its supplier is issued for use: reason IFU ("Issued for
   use", family Data), set by itself on the transmittal (never chosen) where it is
-  published.
+  published; the data / information choice is not shown then.
+- "Received from outside the system" is not offered when the transmittal is
+  already about something of ours going out (documents chosen in the register
+  or a package, placeholders, an ask back, a follow-up of ours).
+- A transmittal made for a package's documents is titled in one line: "<package>
+  — N documents submitted to <supplier>" ("asked back from" for an ask back),
+  with a short message; the documents are listed on it, never in the title or
+  message.
 - Information reasons: REQUEST, RFI, ANSWER, CONFIRMATION (family Information);
   an existing demo gains them, and IFU, with `seed-demo`. A reason with no family is data.
 - A new transmittal lets Document Control ask placeholders not asked yet, one

@@ -279,6 +279,7 @@ export async function SupplierPackage({ pkg }: { pkg: LegacyPackage }) {
 
       <PackageLines
         packageId={pkg.id}
+        packageNumber={pkg.identifier}
         supplier={supplierName}
         shared={!!shared}
         lines={lines}

@@ -112,6 +112,9 @@ export function NewTransmittalForm({
   const [subject, setSubject] = useState(prefill?.subject ?? "");
   const [message, setMessage] = useState(prefill?.message ?? "");
   const [find, setFind] = useState("");
+  // Already about something of ours going out: chosen in the register or a package, asked back, or followed up.
+  const sendingOurs = !!placeholders || !!askingBack || !!preselectedRevisionIds?.length || !!prefill?.revisionIds?.length || !!prefill?.following;
+  const fixedForPlaceholders = !!placeholders && !placeholders.mixed && reasons.some((r) => r.code === "IFU");
   // The register's revisions open only when asked: "Add documents".
   const [addingDocs, setAddingDocs] = useState(false);
   const [chosen, setChosen] = useState<string[]>([...new Set([...(preselectedRevisionIds ?? []), ...(prefill?.revisionIds ?? [])])]);
@@ -254,7 +257,9 @@ export function NewTransmittalForm({
             {/* Sent by us, today: nobody is asked either. What reached us outside the system is the exception, ticked. */}
             <input type="hidden" name="direction" value={direction} />
             {recording ? null : <input type="hidden" name="dateOfIssue" value={new Date().toISOString().slice(0, 10)} />}
-            {mayRecordReceived ? (
+            {/* Something of ours being sent (chosen in the register or a package, asked back, followed up) is never
+                something received: the tick is not offered. */}
+            {mayRecordReceived && !sendingOurs ? (
               <label className="flex w-fit items-center gap-2 text-xs font-medium text-slate-700">
                 <input type="checkbox" checked={!outgoing} onChange={(e) => setDirection(e.target.checked ? "INCOMING" : "OUTGOING")} />
                 Received from outside the system
@@ -262,7 +267,8 @@ export function NewTransmittalForm({
               </label>
             ) : null}
 
-            <fieldset className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs font-medium text-slate-700">
+            {/* Placeholders are issued for use: data, by itself. */}
+            {fixedForPlaceholders ? null : <fieldset className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs font-medium text-slate-700">
               <legend className="sr-only">What kind of transmittal</legend>
               {FAMILIES.map((one) => (
                 <label key={one.code} className="flex items-center gap-1.5">
@@ -270,7 +276,7 @@ export function NewTransmittalForm({
                   {one.label} <span className="font-normal text-slate-500">— {one.says}</span>
                 </label>
               ))}
-            </fieldset>
+            </fieldset>}
 
             <div className="asking grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-4">
               {!recording ? null : (
@@ -280,7 +286,7 @@ export function NewTransmittalForm({
               )}
               <Ask label={says("reason", "Why")} required hint={outgoing ? "what they should do with it" : "what they sent it for"} className="lg:col-span-2">
                 {/* Placeholders go for use: the reason is set by itself, never chosen. */}
-                {outgoing && placeholders && !placeholders.mixed && reasons.some((r) => r.code === "IFU") ? (
+                {outgoing && fixedForPlaceholders ? (
                   <>
                     <input type="hidden" name="reasonForIssue" value="IFU" />
                     <p className={cn(field, "flex items-center text-slate-700")}>IFU — {reasons.find((r) => r.code === "IFU")?.label}<span className="ml-2 text-[11px] text-slate-400">set for placeholders</span></p>

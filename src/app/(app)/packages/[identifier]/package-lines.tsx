@@ -31,8 +31,9 @@ export type Candidate = { id: string; number: string; title: string; where: stri
  * supplier, asks them back for an update (each on a transmittal), or takes them out. "Add documents" opens the
  * supplier's other documents here, in a short register, to tick and add.
  */
-export function PackageLines({ packageId, supplier, shared, lines, candidates, counts }: {
+export function PackageLines({ packageId, packageNumber, supplier, shared, lines, candidates, counts }: {
   packageId: string;
+  packageNumber: string;
   supplier: string;
   shared: boolean;
   lines: PackageLine[];
@@ -160,11 +161,11 @@ export function PackageLines({ packageId, supplier, shared, lines, candidates, c
           <span className="px-2 font-mono text-sm tabular-nums">{chosen.length}<span className="ml-1.5 text-[10px] uppercase tracking-[0.12em] text-white/60">ticked</span></span>
           {toSend.length ? (
             shared
-              ? <Link href={`/transmittals/new?placeholders=${encodeURIComponent(toSend.map((one) => one.id).join(","))}`} className="inline-flex items-center gap-1.5 rounded-sm bg-[#d9a441] px-3 py-2 text-xs font-semibold text-brand-ink"><Send className="h-4 w-4" /> Send to {supplier} ({toSend.length})</Link>
+              ? <Link href={`/transmittals/new?placeholders=${encodeURIComponent(toSend.map((one) => one.id).join(","))}&pkg=${encodeURIComponent(packageNumber)}`} className="inline-flex items-center gap-1.5 rounded-sm bg-[#d9a441] px-3 py-2 text-xs font-semibold text-brand-ink"><Send className="h-4 w-4" /> Send to {supplier} ({toSend.length})</Link>
               : <span className="px-2 text-xs text-white/70">Share the package before sending anything to {supplier}.</span>
           ) : null}
           {toAskBack.length ? (
-            <Link href={`/transmittals/new?askBack=${encodeURIComponent(toAskBack.map((one) => one.id).join(","))}`} className="inline-flex items-center gap-1.5 rounded-sm bg-white/10 px-3 py-2 text-xs font-semibold hover:bg-white/15"><Undo2 className="h-4 w-4" /> Ask back for an update ({toAskBack.length})</Link>
+            <Link href={`/transmittals/new?askBack=${encodeURIComponent(toAskBack.map((one) => one.id).join(","))}&pkg=${encodeURIComponent(packageNumber)}`} className="inline-flex items-center gap-1.5 rounded-sm bg-white/10 px-3 py-2 text-xs font-semibold hover:bg-white/15"><Undo2 className="h-4 w-4" /> Ask back for an update ({toAskBack.length})</Link>
           ) : null}
           {toSend.length ? (
             <ActionForm action={setPackageMembersAction} submitLabel={`Take out (${toSend.length})`} size="sm" variant="secondary" hidden={{ packageId }} className="space-y-0">

@@ -263,7 +263,7 @@ public sealed class PackageService(
         var placeholderReason = (await Catalog.LoadAsync(db, cancellationToken)).IsActive(TransmittalSets.Reasons, TransmittalService.PlaceholderReason)
             ? TransmittalService.PlaceholderReason : package.Reason;
         var sent = await transmittals.RaiseAsync(new TransmittalService.Raise(access.Project, Actor(access), placeholderReason,
-            $"{package.Number}: {documents.Count} document(s) to send", message, supplier, supplier.Name, [],
+            $"{package.Number} — {documents.Count} document{(documents.Count == 1 ? "" : "s")} submitted to {supplier.Name}", message, supplier, supplier.Name, [],
             TransmittalService.AddresseesOf(supplier, members), ResponseDue: package.CompletionDate, PackageId: package.Id,
             Placeholders: documents.Select(d => (d, d.PlannedDate ?? package.CompletionDate)).ToList()), cancellationToken);
         var now = clock.GetCurrentInstant();

@@ -14,7 +14,7 @@ import type { RegisterPage } from "@/lib/api/types";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "New transmittal" };
 
-type Search = { doc?: string; docs?: string; direction?: string; revisions?: string; users?: string; to?: string; reason?: string; party?: string; subject?: string; message?: string; replyTo?: string; follows?: string; kind?: string; activity?: string; ask?: string; placeholders?: string; askBack?: string };
+type Search = { doc?: string; docs?: string; direction?: string; revisions?: string; users?: string; to?: string; reason?: string; party?: string; subject?: string; message?: string; replyTo?: string; follows?: string; kind?: string; activity?: string; ask?: string; placeholders?: string; askBack?: string; pkg?: string };
 
 export default async function NewTransmittalPage({ searchParams }: { searchParams: Promise<Search> }) {
   const ctx = await requireScope();
@@ -164,17 +164,20 @@ export default async function NewTransmittalPage({ searchParams }: { searchParam
           reason: following?.reasonForIssue ?? (askingBack.length ? requestReason?.code : undefined)
             ?? (placeholders.length && reasons.some((r) => r.code === "IFU") ? "IFU" : undefined) ?? sp.reason,
           party: answering && answering.direction === "INCOMING" ? answering.issuingParty : sp.party,
+          // One short line whatever the count: the package, how many, to whom. The documents are listed on it.
           subject: askingBack.length && !sp.subject
-            ? `${askingBack.length === 1 ? askingBack[0].number : `${askingBack.length} documents`}: back for an update`
+            ? `${sp.pkg ? `${sp.pkg} — ` : ""}${askingBack.length} document${askingBack.length === 1 ? "" : "s"} asked back from ${supplier!.name}`
             : placeholders.length && !following && !answering && !sp.subject
-            ? `${placeholders.length === 1 ? placeholders[0].number : `${placeholders.length} documents`} to send`
+            ? `${sp.pkg ? `${sp.pkg} — ` : ""}${placeholders.length} document${placeholders.length === 1 ? "" : "s"} submitted to ${supplier!.name}`
             // The subject stays the first one's: the mention says what it follows, no prefix needed.
             : following
               ? following.subject ?? undefined
               : answering
                 ? answering.subject ?? undefined
                 : sp.subject,
-          message: sp.message,
+          message: sp.message ?? (placeholders.length && !following && !answering
+            ? `Please provide the ${placeholders.length === 1 ? "document" : "documents"} listed on this transmittal, each by its planned date.`
+            : undefined),
           answering: answering ? { id: answering.id, number: answering.number, subject: answering.subject } : undefined,
           following: following ? { id: following.id, number: following.number, kind: followKind, rejection: following.rejectionReason } : undefined,
           activity: asked ? { id: asked.activity.id, code: asked.activity.code, ask: sp.ask === "DISCIPLINE" ? "DISCIPLINE" : "DOCUMENT" } : undefined,

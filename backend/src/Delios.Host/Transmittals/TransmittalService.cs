@@ -487,7 +487,7 @@ public sealed class TransmittalService(
         var items = revisions.Select(r => (documents[r.DocumentId], r)).OrderBy(i => i.Item1.Number).ToList();
         var subject = subjectGiven ? request.Subject!.Trim()
             : items.Count == 1 && placeholders.Count == 0 ? $"{Label(items[0].Item1, items[0].r)}, {items[0].r.StatusCode}"
-            : items.Count == 0 && placeholders.Count > 0 ? $"{placeholders.Count} document(s) to send"
+            : items.Count == 0 && placeholders.Count > 0 ? $"{placeholders.Count} document{(placeholders.Count == 1 ? "" : "s")} submitted to {supplierTo!.Name}"
             : $"{items.Count + placeholders.Count} documents";
         var message = messageGiven ? request.Message!.Trim() : null;
         var due = request.ResponseDue is { } d ? LocalDate.FromDateOnly(d) : (LocalDate?)null;

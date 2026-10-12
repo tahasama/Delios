@@ -91,6 +91,22 @@ public static class Readiness
                 ? activity.Requirements.Where(r => r.State == RequirementStates.Missing).Select(r => (LocalDate?)day.PlusDays(-(r.RiskDays ?? window))).Min()
                 : null;
         }
+
+        // A document the schedule needs is planned for the earliest day an active action needs it: the same date on the
+        // register, the document and its package as on the action. One the schedule does not need keeps its own.
+        var here = activities.Where(a => a.State == ActivityStates.Active).SelectMany(a => a.Requirements)
+            .Where(r => r.NeededBy is not null).Select(r => new { r.DocumentId, r.NeededBy }).ToList();
+        var elsewhere = await (from r in db.Requirements.AsNoTracking()
+                               join a in db.Activities.AsNoTracking() on r.ActivityId equals a.Id
+                               where documentIds.Contains(r.DocumentId) && !activityIds.Contains(a.Id) && a.State == ActivityStates.Active && r.NeededBy != null
+                               select new { r.DocumentId, r.NeededBy }).ToListAsync(cancellationToken);
+        var earliest = here.Concat(elsewhere).GroupBy(r => r.DocumentId).ToDictionary(g => g.Key, g => g.Min(r => r.NeededBy));
+        if (earliest.Count > 0)
+        {
+            var planned = earliest.Keys.ToList();
+            foreach (var document in await db.Documents.Where(d => planned.Contains(d.Id)).ToListAsync(cancellationToken))
+                if (document.PlannedDate != earliest[document.Id]) document.PlannedDate = earliest[document.Id];
+        }
     }
 
     /// <summary>Every activity (active or removed) that needs this document: the ones its release may change.</summary>
