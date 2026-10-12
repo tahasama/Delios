@@ -788,6 +788,13 @@ under.
   a request, confirmation request, RFI…) and data (IFR, IFA, IFP…). Until then,
   answers to a request about an action are notices, and the transmittal records
   where the request stands.
+- **Every transmittal and every notification also goes by email**, showing what
+  the app shows, so there is a double proof: inside the app, and outside by
+  email. Already there: each notification can queue an email (kept in the
+  email log with its state, by kind: transmittal, review, notification),
+  switched off until the installation names a mail server. To come: the email
+  carrying the whole transmittal as the app shows it, and every notification
+  sent, not only some kinds.
 
 - **Escalation** where somebody refuses to acknowledge carrying an action
   without its documents. Agreed to be the Standard's and the DMP's business
