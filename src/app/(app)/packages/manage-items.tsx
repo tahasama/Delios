@@ -4,13 +4,15 @@ import { updatePackageAction, deletePackageAction } from "@/lib/actions/planning
 import type { StepItem } from "@/app/(app)/documents/[id]/next-step";
 
 /** Renaming and deleting a package — the same on a delivery and a supplier package. */
-export function manageItems(pkg: { id: string; title: string | null; description: string | null; recipientName: string }, { mayEdit, mayDelete }: { mayEdit: boolean; mayDelete: boolean }): StepItem[] {
+export function manageItems(pkg: { id: string; title: string | null; description: string | null; recipientName: string; identifier?: string }, { mayEdit, mayDelete, mayRenumber = false }: { mayEdit: boolean; mayDelete: boolean; mayRenumber?: boolean }): StepItem[] {
   const items: StepItem[] = [];
   if (mayEdit) items.push({
     key: "edit",
-    label: "Edit name and description",
+    label: mayRenumber ? "Edit number, name and description" : "Edit name and description",
     body: (
-      <ActionForm action={updatePackageAction} submitLabel="Save" size="sm" hidden={{ packageId: pkg.id }}>
+      <ActionForm action={updatePackageAction} submitLabel="Save" size="sm" hidden={{ packageId: pkg.id, was: pkg.identifier ?? "" }}>
+        {/* Renumbered only before anyone outside saw it: once shared or sent, its number stays. */}
+        {mayRenumber ? <Field label="Number" hint="changes only until it is shared or sent"><input name="number" defaultValue={pkg.identifier ?? ""} className={inputCls} /></Field> : null}
         <Field label="Name" required><input name="title" required defaultValue={pkg.title ?? ""} placeholder={pkg.recipientName} className={inputCls} /></Field>
         <Field label="Description" hint="optional"><textarea name="description" rows={2} defaultValue={pkg.description ?? ""} className={inputCls} /></Field>
       </ActionForm>

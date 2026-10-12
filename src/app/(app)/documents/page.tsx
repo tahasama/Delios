@@ -1,3 +1,4 @@
+import { legacyPackageByNumber } from "@/lib/api/packages";
 import type { SupplierStage } from "@/lib/state-names";
 import { requireScope } from "@/lib/scope";
 import { api, projectPath } from "@/lib/api/client";
@@ -166,6 +167,8 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
       retentionClass: doc.retentionClass,
       retentionLabel: doc.retentionClass ? retentionLabel.get(doc.retentionClass) ?? pretty(doc.retentionClass) : null,
       placeholder: doc.isPlaceholder,
+      // Asked of its supplier on a transmittal (the supplier's own states begin at "Sent").
+      requested: !!doc.supplier,
       docState: doc.state, docStateLabel: DOC_STATE_LABEL[doc.state as DocState] ?? doc.state,
       revision: doc.revision,
       revState: latestState,
@@ -233,7 +236,14 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
   // Opened for an action, by Document Control: what it needs now starts ticked.
   // Without Document Control, the people of a discipline open it for their own discipline's documents only.
   const own = !scope.can("CONTROL") && !(await controlDoes(scope, "ACTION_LINKS")) ? user.department ?? null : null;
-  const picking = sp.pick && (scope.can("CONTROL") || own)
+  // Opened for a supplier's package ("pkg:<number>"), by Document Control: its documents start ticked; tick to add.
+  const packagePick = sp.pick?.startsWith("pkg:") && scope.can("CONTROL")
+    ? await legacyPackageByNumber(scope, sp.pick.slice(4)).then((pkg) => pkg ? {
+        kind: "package" as const, packageId: pkg.id, actionId: "", code: pkg.identifier, name: pkg.title ?? pkg.recipientName,
+        linked: pkg.members.map((m) => m.documentId), disciplines: [] as { code: string; label: string }[],
+      } : null).catch(() => null)
+    : null;
+  const picking = packagePick ?? (sp.pick && !sp.pick.startsWith("pkg:") && (scope.can("CONTROL") || own)
     ? await (async () => {
         const one = activities.find((a) => a.code === sp.pick);
         const detail = one ? await activityDetail(scope, one.id) : null;
@@ -242,10 +252,11 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
           actionId: one.id, code: one.code, name: one.name,
           linked: [...new Set(detail.needs.filter((need) => !own || need.department === own).map((need) => need.documentId))],
           disciplines: (own ? [own] : one.departments).map((code) => ({ code, label: disciplineLabel.get(code) ?? code })),
+          kind: "action" as const, packageId: "",
         };
       })()
-    : null;
-  if (picking) query.set("pick", picking.code);
+    : null);
+  if (picking) query.set("pick", picking.kind === "package" ? `pkg:${picking.code}` : picking.code);
 
 
   return <div className="space-y-4">
@@ -262,7 +273,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
       sort={{ key: sort, dir }}
       picking={picking}
       mayAddToAction={scope.can("CONTROL")}
-      userCanAct={!isReadOnly(user)} filters={{ pick: picking?.code ?? "", q, terms, state, rev: revState, status: statusCode, verdict: verdictCode, supplier, po, discipline, docType, view, criticality, confidentiality, deliverable, phase: sp.phase ?? "", action: sp.action ?? "", on: dateOn, from: sp.from ?? "", to: sp.to ?? "" }} filterOptions={{ states: DOC_STATES.map((code) => ({ code, label: DOC_STATE_LABEL[code] ?? code })), revStates: [
+      userCanAct={!isReadOnly(user)} filters={{ pick: picking ? (picking.kind === "package" ? `pkg:${picking.code}` : picking.code) : "", q, terms, state, rev: revState, status: statusCode, verdict: verdictCode, supplier, po, discipline, docType, view, criticality, confidentiality, deliverable, phase: sp.phase ?? "", action: sp.action ?? "", on: dateOn, from: sp.from ?? "", to: sp.to ?? "" }} filterOptions={{ states: DOC_STATES.map((code) => ({ code, label: DOC_STATE_LABEL[code] ?? code })), revStates: [
       { code: "NONE", label: "No revision yet" },
       { code: "IN_PREPARATION", label: names.IN_PREPARATION },
       { code: "IN_REVIEW", label: names.IN_REVIEW },

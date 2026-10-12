@@ -15,7 +15,7 @@ namespace Delios.Host.Documents;
 /// </summary>
 public sealed class DocumentService(
     DeliosDbContext db, Numbering numbering, FileStorage storage, AuditLog audit, IClock clock,
-    IOptions<StorageOptions> storageOptions, Transmittals.Supersession supersession)
+    IOptions<StorageOptions> storageOptions, Transmittals.Supersession supersession, Packages.SupplyFiling supplyFiling)
 {
     /// <summary>
     /// Registers a new document: checks the title, the coded values and the fields the deliverable type requires,
@@ -152,6 +152,8 @@ public sealed class DocumentService(
             document.Number,
             $"{(kind == DocumentKinds.Record ? "Record, fixed evidence never revised" : "Document, placeholder")}; state Planned. Number allocated by the system.",
             access.Project.Id, cancellationToken);
+        // Another organization's: filed in its supplier's package (made by itself when there is none). Not asked yet.
+        await supplyFiling.FileAsync(access.Project, document, new Actor(access.UserId, access.UserName), cancellationToken);
         return (document, null);
     }
 
@@ -779,7 +781,7 @@ public static class DocumentQueries
 {
     /// <summary>
     /// The documents of the project this person may read. Another party sees what
-    /// it produces, and what was transmitted to its people. A restricted
+    /// it produces once asked of it (or sent by it), and what was transmitted to its people. A restricted
     /// confidentiality level is read by the people named on the document, its
     /// creator, whoever it was transmitted to, and Document Control.
     /// </summary>
@@ -793,7 +795,12 @@ public static class DocumentQueries
             .Select(i => i.DocumentId);
         if (!access.IsInternal)
         {
-            query = query.Where(d => d.Originator == access.PartyCode || sentToMe.Contains(d.Id));
+            // Of what it produces, only what passed between us on a transmittal: a placeholder asked of it, what it
+            // sent. A document of theirs we registered and have not asked for yet stays ours.
+            var exchanged = db.TransmittalItems.Where(i => i.Kind == Transmittals.TransmittalItemKinds.Placeholder
+                || i.Kind == Transmittals.TransmittalItemKinds.Submission || i.Kind == Transmittals.TransmittalItemKinds.Unplanned)
+                .Select(i => i.DocumentId);
+            query = query.Where(d => (d.Originator == access.PartyCode && exchanged.Contains(d.Id)) || sentToMe.Contains(d.Id));
         }
         if (!access.Holds(Verbs.Control) && restricted.Count > 0)
         {

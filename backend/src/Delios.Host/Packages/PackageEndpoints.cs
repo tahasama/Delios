@@ -27,7 +27,8 @@ public sealed record PackageView(Guid Id, string Number, string Title, string? D
     DateTimeOffset? ShortfallAcceptedAt, string? ShortfallAcceptedBy, DateTimeOffset? ClosedAt, string? ClosedBy,
     string? ClosureNote, DateTimeOffset? AcceptedAt, string? AcceptedBy, string CreatedBy, IReadOnlyList<MemberView> Members,
     IReadOnlyList<PackageTransmittal> Transmittals, string Kind, Guid? SupplierPartyId, string? Supplier, string? PurchaseOrder,
-    IReadOnlyList<string>? Reasons = null, System.Text.Json.JsonElement? Extras = null, string? AcceptNote = null);
+    IReadOnlyList<string>? Reasons = null, System.Text.Json.JsonElement? Extras = null, string? AcceptNote = null,
+    DateTimeOffset? SharedAt = null, string? SharedBy = null, bool AutoCreated = false);
 
 /// <summary>A transmittal raised for a package: a delivery, a request to its supplier, or what the supplier sent back.</summary>
 public sealed record PackageTransmittal(Guid Id, string Number, string Direction, DateTimeOffset IssuedAt, int Items);
@@ -66,6 +67,8 @@ public static class PackageEndpoints
         project.MapPost("/{packageId:guid}/deliver", DeliverAsync);
         project.MapPost("/{packageId:guid}/accept", (Guid packageId, NoteRequest r, HttpContext h, PackageService s, CancellationToken c) =>
             Act(h, s, (a) => s.AcceptAsync(a, packageId, r, c)));
+        project.MapPost("/{packageId:guid}/share", (Guid packageId, HttpContext h, PackageService s, CancellationToken c) =>
+            Act(h, s, (a) => s.ShareAsync(a, packageId, c)));
         project.MapPost("/{packageId:guid}/request", (Guid packageId, SupplyRequest r, HttpContext h, PackageService s, CancellationToken c) =>
             Act(h, s, (a) => s.RequestAsync(a, packageId, r, c)));
         project.MapPut("/{packageId:guid}", (Guid packageId, RenameRequest r, HttpContext h, PackageService s, CancellationToken c) =>
@@ -91,7 +94,7 @@ public static class PackageEndpoints
     /// <summary>GET one package, brought up to date with its rule.</summary>
     private static async Task<IResult> GetAsync(Guid packageId, HttpContext http, PackageService packages, CancellationToken cancellationToken) =>
         await packages.ReadAsync(ProjectAccessFilter.Of(http), packageId, cancellationToken) is { } package
-            ? Results.Ok(await ViewAsync(packages, package, cancellationToken))
+            ? Results.Ok(await ViewAsync(packages, package, cancellationToken, outside: !ProjectAccessFilter.Of(http).IsInternal))
             : Problems.NotFound("PACKAGE_NOT_FOUND", "No such package.");
 
     /// <summary>POST deliver: sends the ready documents on transmittals and fixes the package's contents.</summary>
@@ -115,9 +118,11 @@ public static class PackageEndpoints
     /// <summary>
     /// Builds the full package view, working out each member's readiness and looking up the transmittal numbers.
     /// </summary>
-    private static async Task<PackageView> ViewAsync(PackageService packages, Package p, CancellationToken cancellationToken)
+    private static async Task<PackageView> ViewAsync(PackageService packages, Package p, CancellationToken cancellationToken, bool outside = false)
     {
         var readiness = await packages.ReadinessAsync(p, cancellationToken);
+        // Its supplier sees what was asked of it on a transmittal, and nothing else.
+        if (outside) readiness = readiness.Where(r => r.Member.RequestedAt is not null).ToList();
         return new PackageView(p.Id, p.Number, p.Title, p.Description, p.Reason, p.RequiredStatuses, p.CompletionDate?.ToDateOnly(),
             p.Rule, p.Excluded, p.RecipientPartyIds, p.OwnerIds, p.AcceptorIds, p.State, p.AssessedAt?.ToDateTimeOffset(), p.Shortfall,
             p.ShortfallIssuedAt?.ToDateTimeOffset(), p.ShortfallAcceptedAt?.ToDateTimeOffset(), p.ShortfallAcceptedByName,
@@ -128,6 +133,7 @@ public static class PackageEndpoints
                 r.DueDate?.ToDateOnly())).ToList(),
             await packages.TransmittalsAsync(p, cancellationToken), p.Kind, p.SupplierPartyId,
             await packages.SupplierNameAsync(p, cancellationToken), p.PurchaseOrder, [p.Reason, .. p.OtherReasons],
-            p.Extras is null ? null : System.Text.Json.JsonDocument.Parse(p.Extras).RootElement.Clone(), p.AcceptNote);
+            p.Extras is null ? null : System.Text.Json.JsonDocument.Parse(p.Extras).RootElement.Clone(), p.AcceptNote,
+            p.SharedAt?.ToDateTimeOffset(), p.SharedByName, p.AutoCreated);
     }
 }

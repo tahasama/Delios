@@ -70,7 +70,7 @@ const field = "plain w-full py-1.5 text-[13px]";
  * only released revisions, and a received transmittal has no subject of ours.
  */
 export function NewTransmittalForm({
-  reasons, revisions, companies, ourOrganization, defaultDirection, preselectedRevisionIds, prefill, fields, labels, ownFields, placeholders,
+  reasons, revisions, companies, ourOrganization, defaultDirection, preselectedRevisionIds, prefill, fields, labels, ownFields,
 }: {
   reasons: Opt[];
   revisions: RevOpt[];
@@ -82,11 +82,6 @@ export function NewTransmittalForm({
   defaultDirection: "OUTGOING" | "INCOMING";
   preselectedRevisionIds?: string[];
   prefill?: Prefill;
-  /**
-   * A supplier's documents with nothing released, asked of that supplier: the one exception to "only released
-   * revisions travel". Sent to that supplier alone. `mixed`: documents of several suppliers were chosen.
-   */
-  placeholders?: { to: string; items: { id: string; number: string; title: string }[]; mixed: boolean };
   /** What this organization asks for: must be filled, may be left, or not asked. */
   fields: Record<string, "REQUIRED" | "OPTIONAL" | "OFF">;
   /** Its own words for them. */
@@ -304,29 +299,6 @@ export function NewTransmittalForm({
             outgoing ? "only released revisions can be sent — tick what goes, or send a letter alone" : "tick what arrived, or record a message alone",
             <span className="font-mono text-[11px] tabular-nums text-slate-500">{chosen.length} chosen</span>,
           )}
-          {outgoing && placeholders ? (
-            placeholders.mixed ? (
-              <p className="border-b border-line bg-amber-50 px-5 py-2.5 text-xs text-amber-900 sm:px-6">
-                The placeholders chosen belong to several suppliers: send one supplier&rsquo;s at a time, from the register.
-              </p>
-            ) : (
-              <div className="border-b border-line px-5 py-3 sm:px-6">
-                <p className="text-xs leading-5 text-slate-600">
-                  <span className="font-semibold text-slate-800">{placeholders.items.length === 1 ? "1 placeholder" : `${placeholders.items.length} placeholders`} asked of {placeholders.to}</span>
-                  {" "}&mdash; nothing of them is released yet; {placeholders.to} fills them and sends them back on a transmittal of its own. It goes to {placeholders.to} alone.
-                </p>
-                <ul className="mt-1.5 space-y-0.5">
-                  {placeholders.items.map((one) => (
-                    <li key={one.id} className="flex gap-x-2 text-[12.5px]">
-                      <input type="hidden" name="placeholderIds" value={one.id} />
-                      <span className="font-mono font-semibold text-slate-900">{one.number}</span>
-                      <span className="truncate text-slate-500">{one.title}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )
-          ) : null}
           <div className="asking flex items-center gap-2 border-b border-line px-5 py-2.5 sm:px-6">
             <Search className="h-3.5 w-3.5 shrink-0 text-slate-400" />
             <label className="min-w-0 flex-1">

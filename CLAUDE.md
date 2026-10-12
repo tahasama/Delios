@@ -122,11 +122,21 @@ conversation, write it into the right one in the same commit as the code.
   "for information" → we hold it; "accepted with comments" or "rejected" →
   they hold it (read from the verdict's meaning, never its code). What it is
   issued for is set automatically from the request.
-- A placeholder reaches its supplier only on a transmittal (our record of what
-  was asked, when, due when); adding it to a package is not asking. It is the
-  one exception to "only released revisions travel": Document Control, one
-  supplier's documents at a time, to that supplier or its people
-  (`ComposeRequest.PlaceholderIds`; register → Create transmittal).
+- Every document registered with an outside organization as its originator is
+  filed in that supplier's package, one per supplier and purchase order, made
+  by itself with the first document (`SupplyFiling`). Document Control (and
+  above) looks after it: renames it any time; renumbers it, or deletes it while
+  empty, only until it is shared or sent; adds what was missed through "Add
+  documents" (the register opened for the package, `pick=pkg:<number>`).
+- "Share with <supplier>" is pressed once, for good: until then the supplier
+  does not see the package. Once shared, it sees there only the documents asked
+  of it on a transmittal, and of its own documents only those exchanged with it.
+- A placeholder reaches its supplier only on a transmittal, from the package:
+  tick some or all of those not asked yet, send on one transmittal (our record
+  of what was asked, when, due when). Each is asked once; after that it is
+  handed back and forth (ask it back, send it for an update). The register
+  stamps it "requested" instead of "number reserved". Adding to a package is
+  not asking.
 - The side that does not hold it asks the holder to hand it back for an update
   (RETURN_FOR_UPDATE, with why): Document Control on our side, whoever of the
   supplier may upload on theirs. The holder accepts or refuses with why; the

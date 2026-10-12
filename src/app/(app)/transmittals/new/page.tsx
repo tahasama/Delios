@@ -14,7 +14,7 @@ import type { RegisterPage } from "@/lib/api/types";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "New transmittal" };
 
-type Search = { doc?: string; docs?: string; direction?: string; revisions?: string; users?: string; to?: string; reason?: string; party?: string; subject?: string; message?: string; replyTo?: string; follows?: string; kind?: string; activity?: string; ask?: string; placeholders?: string };
+type Search = { doc?: string; docs?: string; direction?: string; revisions?: string; users?: string; to?: string; reason?: string; party?: string; subject?: string; message?: string; replyTo?: string; follows?: string; kind?: string; activity?: string; ask?: string };
 
 export default async function NewTransmittalPage({ searchParams }: { searchParams: Promise<Search> }) {
   const ctx = await requireScope();
@@ -86,18 +86,6 @@ export default async function NewTransmittalPage({ searchParams }: { searchParam
     return released ? [released.id] : [];
   });
 
-  // A supplier's documents with nothing released, asked of them as placeholders: the one exception to "only released
-  // revisions travel". Only Document Control asks; only one supplier's at a time, sent to that supplier.
-  const askedIds = ctx.can("CONTROL") ? [...new Set((sp.placeholders ?? "").split(",").map((one) => one.trim()).filter(Boolean))] : [];
-  const askedDocs = (await Promise.all(askedIds.map((one) => backendDocument(ctx, one))))
-    .filter((d): d is NonNullable<typeof d> => !!d && !d.revisions.some((r) => r.state === "RELEASED" || r.state === "SUPERSEDED"));
-  const owners = [...new Set(askedDocs.map((d) => d.originator))];
-  const supplier = owners.length === 1 ? found.parties.find((p) => p.code === owners[0]) ?? null : null;
-  const placeholders = supplier ? askedDocs.map((d) => ({ id: d.id, number: d.number, title: d.title })) : [];
-  // Sent to that supplier: its people on this project, or the organization itself when none has an account.
-  const supplierPeople = supplier ? found.people.filter((one) => one.organization === supplier.name).map((one) => one.id) : [];
-  const supplierTo = supplier ? (supplierPeople.length ? supplierPeople : [`party:${supplier.id}`]) : [];
-
   return (
     <div>
       <PageHeader
@@ -127,17 +115,14 @@ export default async function NewTransmittalPage({ searchParams }: { searchParam
         // received opens the other way.
         defaultDirection={sp.direction === "INCOMING" ? "INCOMING" : "OUTGOING"}
         preselectedRevisionIds={preselected}
-        placeholders={placeholders.length ? { to: supplier!.name, items: placeholders, mixed: owners.length > 1 } : askedIds.length && owners.length > 1 ? { to: "", items: [], mixed: true } : undefined}
         prefill={{
           revisionIds: following ? following.items.map((one) => one.revisionId) : (sp.revisions ?? "").split(",").filter(Boolean),
-          userIds: following ? followTo : answering ? answerTo : supplierTo.length ? supplierTo : (sp.users ?? "").split(",").filter(Boolean),
+          userIds: following ? followTo : answering ? answerTo : (sp.users ?? "").split(",").filter(Boolean),
           copyIds: following ? followCopies : answerCopies,
           outsiders: sp.to,
           reason: following?.reasonForIssue ?? sp.reason,
           party: answering && answering.direction === "INCOMING" ? answering.issuingParty : sp.party,
-          subject: placeholders.length && !following && !answering && !sp.subject
-            ? `${placeholders.length === 1 ? placeholders[0].number : `${placeholders.length} documents`} to send`
-            : following
+          subject: following
             ? `${followKind === "REPLACES" ? "Replaces" : "Supplement to"} ${following.number}${following.subject ? ` — ${following.subject}` : ""}`
             : answering
               ? `RE: ${answering.subject ?? answering.number}`

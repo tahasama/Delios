@@ -23,6 +23,12 @@ public sealed class Catalog
     public bool IsActive(string setKey, string code) =>
         _sets.TryGetValue(setKey, out var set) && set.TryGetValue(code, out var v) && v.Status == ValueStatus.Active;
 
+    /// <summary>The set's active values, in their published order: code and label.</summary>
+    public IReadOnlyList<(string Code, string Label)> Active(string setKey) =>
+        _sets.TryGetValue(setKey, out var set)
+            ? set.Values.Where(v => v.Status == ValueStatus.Active).OrderBy(v => v.Sort).Select(v => (v.Code, v.Label)).ToList()
+            : [];
+
     /// <summary>One property of a value's <c>Props</c> JSON, or null when the value or the property does not exist.</summary>
     public JsonElement? Prop(string setKey, string code, string prop) =>
         _sets.TryGetValue(setKey, out var set) && set.TryGetValue(code, out var v)

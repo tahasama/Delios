@@ -311,6 +311,8 @@ export type PackageView = {
   transmittals: { id: string; number: string; direction: "OUTGOING" | "INCOMING"; issuedAt: string; items: number }[];
   kind: "DELIVERY" | "SUPPLY"; supplierPartyId: string | null; supplier: string | null; purchaseOrder: string | null;
   reasons?: string[]; extras?: Record<string, string> | null;
+  /** A supplier's package: shared with its supplier (once, for good), by whom; made by itself with its first document. */
+  sharedAt?: string | null; sharedBy?: string | null; autoCreated?: boolean;
 };
 
 /** GET /activity (ActivityEndpoints.cs): one act of the project, for Home's journal and log. */

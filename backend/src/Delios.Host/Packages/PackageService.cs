@@ -20,10 +20,10 @@ public sealed record CreatePackageRequest(
     Dictionary<string, string?>? Extras = null);
 
 /// <summary>Body of renaming a package.</summary>
-public sealed record RenameRequest(string? Title, string? Description = null);
+public sealed record RenameRequest(string? Title, string? Description = null, string? Number = null);
 
 /// <summary>Body of asking a supplier for the placeholders of a supply package not asked for yet.</summary>
-public sealed record SupplyRequest(string? Message = null);
+public sealed record SupplyRequest(string? Message = null, Guid[]? DocumentIds = null);
 
 /// <summary>
 /// Body for adding or removing documents. <c>RequiredStatuses</c> applies only to the documents being added.
@@ -236,9 +236,15 @@ public sealed class PackageService(
         if (problem is not null) return Fail(problem);
         if (package!.Kind != PackageKinds.Supply)
             return Fail(Problems.Conflict("NOT_A_SUPPLY_PACKAGE", "Only a supply package asks a supplier for documents."));
+        if (package.SharedAt is null)
+            return Fail(Problems.Conflict("NOT_SHARED", "Share the package with its supplier first: they see what is asked of them there."));
         await SyncAsync(package, cancellationToken);
-        var asking = package.Members.Where(m => m.RequestedAt is null).ToList();
-        if (asking.Count == 0) return Fail(Problems.Conflict("NOTHING_TO_REQUEST", "Every document in it has been asked for already."));
+        // The documents ticked, never asked before: a placeholder is asked once; after, it is handed back and forth.
+        var chosen = request.DocumentIds?.ToHashSet();
+        var asking = package.Members.Where(m => m.RequestedAt is null && (chosen is null || chosen.Contains(m.DocumentId))).ToList();
+        if (asking.Count == 0) return Fail(Problems.Conflict("NOTHING_TO_REQUEST", "Tick documents not asked for yet."));
+        if (chosen is not null && package.Members.Any(m => chosen.Contains(m.DocumentId) && m.RequestedAt is not null))
+            return Fail(Problems.Conflict("ALREADY_REQUESTED", "Some ticked documents were asked for already: to change one, ask for it back from its page."));
         var ids = asking.Select(m => m.DocumentId).ToList();
         var documents = await db.Documents.AsNoTracking().Where(d => ids.Contains(d.Id)).OrderBy(d => d.Number).ToListAsync(cancellationToken);
         var supplier = await db.Parties.AsNoTracking().SingleAsync(p => p.Id == package.SupplierPartyId, cancellationToken);
@@ -256,6 +262,26 @@ public sealed class PackageService(
         return (package, null);
     }
 
+    /// <summary>
+    /// Document Control shares a supplier's package with that supplier, once and for good: from then on its people see
+    /// it, with the documents asked of them on a transmittal and nothing else. Its people are told.
+    /// </summary>
+    public async Task<(Package? Package, IResult? Problem)> ShareAsync(ProjectAccess access, Guid id, CancellationToken cancellationToken)
+    {
+        var (package, problem) = await ComposableAsync(access, id, cancellationToken);
+        if (problem is not null) return Fail(problem);
+        if (package!.Kind != PackageKinds.Supply)
+            return Fail(Problems.Conflict("NOT_A_SUPPLY_PACKAGE", "Only a supplier's package is shared with its supplier."));
+        if (package.SharedAt is not null) return (package, null);
+        package.SharedAt = clock.GetCurrentInstant();
+        package.SharedByName = access.UserName;
+        var supplier = await db.Parties.AsNoTracking().SingleAsync(p => p.Id == package.SupplierPartyId, cancellationToken);
+        await audit.WriteAsync(Actor(access), "PACKAGE_SHARED", "Package", package.Id, package.Number,
+            $"Shared with {supplier.Name}, for good.", package.ProjectId, cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
+        return (package, null);
+    }
+
     // ── Name, and deleting an empty one ───────────────────────────────────────
 
     /// <summary>Renames a package and changes its description. Its owners or Document Control do this, at any time.</summary>
@@ -266,8 +292,23 @@ public sealed class PackageService(
         if (package is null) return Fail(NotFound());
         if (!access.IsInternal || (!package.OwnerIds.Contains(access.UserId) && !access.Holds(Verbs.Control)))
             return Fail(Problems.Forbidden("OWNER_ONLY", "Its owners or Document Control rename a package."));
+        if (package.Kind == PackageKinds.Supply && !access.Holds(Verbs.Control))
+            return Fail(Problems.Forbidden("CONTROL_ONLY", "Document Control looks after a supplier's package."));
         var title = request.Title?.Trim() ?? "";
         if (title.Length == 0) return Fail(Problems.Invalid("TITLE_REQUIRED", "Give the package a title."));
+        // Renumbered only before anyone outside saw it: once shared, or once a transmittal named it, its number stays.
+        var number = request.Number?.Trim().ToUpperInvariant();
+        if (number is { Length: > 0 } && number != package.Number)
+        {
+            if (package.SharedAt is not null || await db.Transmittals.AnyAsync(t => t.PackageId == package.Id, cancellationToken))
+                return Fail(Problems.Conflict("NUMBER_IN_USE", "It was shared or sent: its number no longer changes."));
+            if (number.Length > 60) return Fail(Problems.Invalid("NUMBER_TOO_LONG", "Keep the number under 60 characters."));
+            if (await db.Packages.AnyAsync(p => p.ProjectId == package.ProjectId && p.Number == number, cancellationToken))
+                return Fail(Problems.Conflict("NUMBER_TAKEN", $"{number} is another package's number."));
+            await audit.WriteAsync(Actor(access), "PACKAGE_RENUMBERED", "Package", package.Id, number,
+                $"Renumbered from {package.Number}.", package.ProjectId, cancellationToken);
+            package.Number = number;
+        }
         var was = package.Title;
         package.Title = title;
         package.Description = Blank(request.Description);
@@ -289,6 +330,8 @@ public sealed class PackageService(
             return Problems.Conflict("PACKAGE_NOT_EMPTY", "Take its documents out first: only an empty package is deleted.");
         if (await db.Transmittals.AnyAsync(t => t.PackageId == package.Id, cancellationToken))
             return Problems.Conflict("PACKAGE_HAS_GONE_OUT", "A transmittal went out for it; it is kept.");
+        if (package.SharedAt is not null)
+            return Problems.Conflict("PACKAGE_SHARED", "It was shared with its supplier; it is kept.");
         db.Packages.Remove(package);
         await audit.WriteAsync(Actor(access), "PACKAGE_DELETED", "Package", package.Id, package.Number,
             $"{package.Title}: deleted while empty.{(Blank(reason) is { } why ? $" {why}" : "")}", package.ProjectId, cancellationToken);
@@ -571,7 +614,10 @@ public sealed class PackageService(
         if (rule.AssetIds.Length > 0)
             query = query.Where(d => db.Set<Records.DocumentAsset>().Any(l => l.DocumentId == d.Id && rule.AssetIds.Contains(l.AssetId)));
         // A supplier with several orders: each supply package holds what its own order covers.
-        if (package.Kind == PackageKinds.Supply && package.PurchaseOrder is { } order) query = query.Where(d => d.ContractRef == order);
+        // A supplier's packages are one per purchase order: one with none holds what is under none.
+        if (package.Kind == PackageKinds.Supply)
+            query = package.PurchaseOrder is { } order ? query.Where(d => d.ContractRef == order)
+                : query.Where(d => d.ContractRef == null || d.ContractRef == "");
         // What a supplier owes is what was planned; something it sent unplanned (an RFI, an NCR) and we registered is not.
         if (package.Kind == PackageKinds.Supply)
             query = query.Where(d => !db.TransmittalItems.Any(i => i.DocumentId == d.Id && i.Kind == TransmittalItemKinds.Unplanned));
@@ -612,6 +658,9 @@ public sealed class PackageService(
         if (package is null) return (null, NotFound());
         if (!access.IsInternal || (!package.OwnerIds.Contains(access.UserId) && !access.Holds(Verbs.Control)))
             return (null, Problems.Forbidden("OWNER_ONLY", "Its owners or Document Control change and deliver a package."));
+        // A supplier's package is Document Control's alone.
+        if (package.Kind == PackageKinds.Supply && !access.Holds(Verbs.Control))
+            return (null, Problems.Forbidden("CONTROL_ONLY", "Document Control looks after a supplier's package."));
         if (package.State != PackageStates.Open) return (null, Closed(package));
         return (package, null);
     }
@@ -634,7 +683,8 @@ public sealed class PackageService(
         var query = db.Packages.Where(p => p.ProjectId == access.Project.Id);
         if (access.IsInternal) return query;
         var code = access.PartyCode;
-        return query.Where(p => p.Kind == PackageKinds.Supply && db.Parties.Any(x => x.Id == p.SupplierPartyId && x.Code == code));
+        // Shared with them, once and for good; until then the package is ours alone.
+        return query.Where(p => p.Kind == PackageKinds.Supply && p.SharedAt != null && db.Parties.Any(x => x.Id == p.SupplierPartyId && x.Code == code));
     }
 
     /// <summary>The supplier's code for a supply package; null for a delivery package.</summary>

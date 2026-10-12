@@ -140,6 +140,7 @@ public static class PlatformSetup
         services.AddScoped<Transmittals.TransmittalService>();
         services.AddScoped<Transmittals.IncomingService>();
         services.AddScoped<Packages.PackageService>();
+        services.AddScoped<Packages.SupplyFiling>();
         services.AddOptions<Search.SearchOptions>().BindConfiguration(Search.SearchOptions.Section);
         services.AddScoped<Search.SearchService>();
         services.AddOptions<Extraction.ExtractionOptions>().BindConfiguration(Extraction.ExtractionOptions.Section);

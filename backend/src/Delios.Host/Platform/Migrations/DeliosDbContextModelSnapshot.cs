@@ -2347,6 +2347,10 @@ namespace Delios.Host.Platform.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("assessed_at");
 
+                    b.Property<bool>("AutoCreated")
+                        .HasColumnType("boolean")
+                        .HasColumnName("auto_created");
+
                     b.Property<Instant?>("ClosedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("closed_at");
@@ -2445,6 +2449,14 @@ namespace Delios.Host.Platform.Migrations
                     b.Property<Instant?>("RuleCeasedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("rule_ceased_at");
+
+                    b.Property<Instant?>("SharedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("shared_at");
+
+                    b.Property<string>("SharedByName")
+                        .HasColumnType("text")
+                        .HasColumnName("shared_by_name");
 
                     b.Property<Instant?>("ShortfallAcceptedAt")
                         .HasColumnType("timestamp with time zone")

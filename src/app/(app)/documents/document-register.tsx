@@ -1,5 +1,6 @@
 "use client";
 
+import { addPackageMemberAction } from "@/lib/actions/planning";
 import Link from "next/link";
 import { saveRegisterView, deleteRegisterView } from "@/lib/actions/register-views";
 import { useEffect, useMemo, useState, useTransition } from "react";
@@ -30,6 +31,8 @@ type RegisterRow = {
   /** For an outside organization: who asked it of them. Their sendable revision, once a file is on it. */
   receivedFrom?: string | null; sendRevisionId?: string | null; contractRef: string | null; criticality: string | null;
   confidentiality: string | null; retentionClass: string | null; retentionLabel: string | null; placeholder: boolean;
+  /** A supplier's placeholder asked of them on a transmittal: stamped "requested" instead of "number reserved". */
+  requested?: boolean;
   docTypeLabel: string; disciplineLabel: string; deliverableLabel: string;
   /** What the newest revision serves, and the activities that list this document. */
   phase: string | null; phaseLabel: string | null;
@@ -99,7 +102,8 @@ type Column = {
 };
 
 /** The register opened for one action: what it needs now, ticked; its disciplines, for what is added. */
-type Picking = { actionId: string; code: string; name: string; linked: string[]; disciplines: { code: string; label: string }[] };
+/** The register opened for something to choose documents for: an action (tick to add, untick to take off), or a supplier's package (tick to add). */
+type Picking = { kind: "action" | "package"; actionId: string; packageId: string; code: string; name: string; linked: string[]; disciplines: { code: string; label: string }[] };
 
 export function DocumentRegister({ rows, total, userCanAct, filters, filterOptions, exportHref, plate, paging, codes, sort, views, supplier, picking, mayAddToAction }: {
   /** Opened from an action, by Document Control: tick to add, untick to take off. */
@@ -196,13 +200,9 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
   const selectedRows = useMemo(() => rows.filter((row) => selected.includes(row.id)), [rows, selected]);
   const selectedRevisionIds = selectedRows.map((row) => row.reviewRevisionId).filter((id): id is string => Boolean(id));
   const transmittableRows = selectedRows.filter((row) => row.hasReleased);
-  // The one exception to "only released revisions travel": an outside organization's document with nothing released,
-  // asked of them as a placeholder. Document Control's; the new transmittal keeps only a supplier's own.
-  const placeholderRows = mayAddToAction ? selectedRows.filter((row) => !row.hasReleased && !!row.originator) : [];
   // Opened for an action, the ticks span pages: the box at the top ticks or unticks this page only.
   const pageSelected = rows.length > 0 && (picking ? rows.every((row) => selected.includes(row.id)) : selected.length === rows.length);
-  const transmittalHref = `/transmittals/new?docs=${encodeURIComponent(transmittableRows.map((row) => row.id).join(","))}`
-    + (placeholderRows.length ? `&placeholders=${encodeURIComponent(placeholderRows.map((row) => row.id).join(","))}` : "");
+  const transmittalHref = `/transmittals/new?docs=${encodeURIComponent(transmittableRows.map((row) => row.id).join(","))}`;
   // Exporting every match needs no list of ids: the filters are the list.
   /**
    * The columns this reader is looking at, as the table's own preferences hold
@@ -302,11 +302,13 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
     {picking ? (
       <section className="register register-sheet register-sheet-open mb-5 px-5 py-3.5 sm:px-6">
         <p className="text-sm font-semibold text-slate-900">
-          Documents for <Link href={`/actions/${picking.code}`} className="font-mono text-brand-ink hover:underline">{picking.code}</Link>
+          Documents for <Link href={picking.kind === "package" ? `/packages/${picking.code}` : `/actions/${picking.code}`} className="font-mono text-brand-ink hover:underline">{picking.code}</Link>
           <span className="ml-2 font-normal text-slate-600">{picking.name}</span>
         </p>
         <p className="mt-1 text-xs leading-5 text-slate-500">
-          Ticked is what it needs. Tick a document to add it, untick one to take it off; search and filter freely, the ticks stay. Then save below.
+          {picking.kind === "package"
+            ? "Ticked is what the package holds. Tick a document to add it; search and filter freely, the ticks stay. Then add below. Taking a document out is done on the package."
+            : "Ticked is what it needs. Tick a document to add it, untick one to take it off; search and filter freely, the ticks stay. Then save below."}
         </p>
       </section>
     ) : null}
@@ -560,7 +562,7 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
                 {row.docState === "CANCELLED" ? <span className="stamp text-slate-500">cancelled</span> : null}
                 {row.docState === "WITHDRAWN" ? <span className="stamp text-red-700">withdrawn</span> : null}
                 {row.docState === "ARCHIVED" ? <span className="stamp text-slate-500">archived</span> : null}
-                {row.placeholder ? <span className="stamp text-slate-500">number reserved</span> : null}
+                {row.placeholder ? row.requested ? <span className="stamp text-sky-700">requested</span> : <span className="stamp text-slate-500">number reserved</span> : null}
                 {row.onHold ? <span title={row.onHold} className="stamp text-red-700">not for use</span> : null}
               </span>
               <p className="doc-title mt-0.5 block truncate" title={row.title}>{row.title}</p>
@@ -599,7 +601,19 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
       ) : null}
     </section>
 
-    {picking ? (
+    {picking?.kind === "package" ? (
+      <div className="dock sticky bottom-4 z-30 mx-auto max-w-4xl rounded-sm border border-white/10 bg-brand-strong p-2.5 text-white shadow-[0_8px_30px_rgb(0_0_0/0.18)]">
+        <ActionForm action={addPackageMemberAction} submitLabel="Add to the package" size="sm" hidden={{ packageId: picking.packageId, redirect: "1" }} className="flex flex-wrap items-center gap-2 space-y-0">
+          {adding.map((id) => <input key={id} type="hidden" name="documentId" value={id} />)}
+          <span className="px-2 text-xs">
+            <span className="font-mono text-sm tabular-nums">{selected.length}</span>
+            <span className="ml-1.5 text-[10px] uppercase tracking-[0.12em] text-white/60">ticked for {picking.code}</span>
+            {adding.length ? <span className="ml-2 text-white/80">{adding.length} to add</span> : <span className="ml-2 text-white/60">nothing to add yet</span>}
+          </span>
+          <Link href={`/packages/${picking.code}`} className="ml-auto rounded-sm px-3 py-2 text-xs font-semibold text-white/70 hover:bg-white/10 hover:text-white">Back without adding</Link>
+        </ActionForm>
+      </div>
+    ) : picking ? (
       <div className="dock sticky bottom-4 z-30 mx-auto max-w-4xl rounded-sm border border-white/10 bg-brand-strong p-2.5 text-white shadow-[0_8px_30px_rgb(0_0_0/0.18)]">
         <ActionForm action={setActionDocumentsAction} submitLabel="Save" size="sm" hidden={{ actionId: picking.actionId }} className="flex flex-wrap items-center gap-2 space-y-0">
           {selected.map((id) => <input key={id} type="hidden" name="documentIds" value={id} />)}
@@ -620,7 +634,7 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
     ) : selected.length ? <div className="dock sticky bottom-4 z-30 mx-auto flex max-w-5xl flex-wrap items-center gap-2 rounded-sm border border-white/10 bg-brand-strong p-2.5 text-white shadow-[0_8px_30px_rgb(0_0_0/0.18)]">
       <span className="px-2 font-mono text-sm tabular-nums">{allMatching ? total.toLocaleString("en-GB") : selected.length}<span className="ml-1.5 text-[10px] uppercase tracking-[0.12em] text-white/60">selected</span></span>
       {userCanAct ? (selectedRevisionIds.length ? <Link href={`/reviews/send?revisions=${encodeURIComponent(selectedRevisionIds.join(","))}`} className="inline-flex items-center gap-1.5 rounded-sm bg-[#d9a441] px-3 py-2 text-xs font-semibold text-brand-ink"><GitPullRequestArrow className="h-4 w-4" /> Send for review ({selectedRevisionIds.length})</Link> : null) : null}
-      {transmittableRows.length + placeholderRows.length ? <Link href={transmittalHref} className="inline-flex items-center gap-1.5 rounded-sm bg-white/10 px-3 py-2 text-xs font-semibold hover:bg-white/15"><ArrowLeftRight className="h-4 w-4" /> Create transmittal ({transmittableRows.length + placeholderRows.length})</Link> : null}
+      {transmittableRows.length ? <Link href={transmittalHref} className="inline-flex items-center gap-1.5 rounded-sm bg-white/10 px-3 py-2 text-xs font-semibold hover:bg-white/15"><ArrowLeftRight className="h-4 w-4" /> Create transmittal ({transmittableRows.length})</Link> : null}
       {supplier && !supplier.readOnly ? (() => {
         const sendable = selectedRows.map((row) => row.sendRevisionId).filter((id): id is string => !!id);
         return sendable.length ? (

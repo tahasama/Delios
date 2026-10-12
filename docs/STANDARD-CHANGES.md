@@ -789,10 +789,13 @@ so that two sides never overwrite each other's work. The placeholder sent, the
 supplier holds it; once they send it, we hold it; our check returning it hands
 it back to them; after the review, a verdict accepting it or taking it for
 information leaves it with us, and one with comments to take into the next
-revision, or one rejecting it, hands it to them. A placeholder is asked of a
-supplier only on a transmittal — the record of what was asked, when, and by when
-— never by adding it to a package; it is the one thing other than a released
-revision a transmittal may carry, and only to the supplier that owes it. The side that does not hold
+revision, or one rejecting it, hands it to them. Every document of
+an outside organization is filed in that supplier's package (one per supplier
+and purchase order, made by itself), which Document Control shares with the
+supplier once and for good. A placeholder is asked of a supplier only on a
+transmittal raised from that package — the record of what was asked, when, and
+by when — and is asked once; adding a document to a package asks nothing. The
+supplier sees only what was asked of it or exchanged with it. The side that does not hold
 it asks the holder to hand it back for an update, saying why; the holder
 accepts or refuses with why, and the one who asked is told. A revision not yet
 reviewed passes as it is and returns under the same value; only a release, or

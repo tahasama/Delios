@@ -3,8 +3,9 @@ import { requireScope } from "@/lib/scope";
 import { isController, isAdmin, hasVerb } from "@/lib/auth";
 import { Chip, DataTable, Th, Td } from "@/components/ui";
 import { FileTally } from "./file-tally";
-import { removePackageMemberAction, addPackageMemberAction, setPackageRuleAction } from "@/lib/actions/planning";
-import { parseExcluded, parseFilter, ownerIds } from "@/lib/package-rule";
+import { removePackageMemberAction, addPackageMemberAction, setPackageRuleAction, sharePackageAction, requestSupplyAction } from "@/lib/actions/planning";
+import { Field, inputCls } from "@/components/ui";
+import { parseExcluded, parseFilter } from "@/lib/package-rule";
 import { NextStepBody, type StepItem } from "@/app/(app)/documents/[id]/next-step";
 import { RevisionChecklist } from "@/components/revision-checklist";
 import { RuleFields } from "../rule-fields";
@@ -44,6 +45,9 @@ export async function SupplierPackage({ pkg }: { pkg: LegacyPackage }) {
   const supplierMayUpload = isSupplier && (hasVerb(user, "CREATE") || hasVerb(user, "REVISE"));
   const canSendRow = (s: SupplierState) => (supplierMayUpload || staff) && WITH_SUPPLIER.includes(s);
 
+  const shared = pkg.view.sharedAt ? new Date(pkg.view.sharedAt) : null;
+  // Asked once, on a transmittal: what is not asked yet can be ticked and sent; what was asked is handed back and forth.
+  const asked = new Set(pkg.view.members.filter((m) => m.requestedAt).map((m) => m.documentId));
   const table = (
     <div>
       <DataTable className="rounded-none border-0 shadow-none" exportName={pkg.identifier} id={isSupplier ? "supplier-package-own" : "supplier-package"} defaultHidden={["Comments"]} head={<tr><Th>Document</Th><Th>Submit by</Th><Th>Status</Th><Th>Comments</Th><Th>{isSupplier ? "Your file" : "Next, or the file they sent"}</Th></tr>}>
@@ -52,6 +56,7 @@ export async function SupplierPackage({ pkg }: { pkg: LegacyPackage }) {
               <Td>
                 <Link href={`/documents/${r.doc.id}`} className="font-mono text-[13px] font-semibold text-brand-ink hover:underline">{r.doc.docNumber}</Link>
                 {r.revision ? <span className="ml-1.5 font-mono text-xs text-slate-400">rev {r.revision.value}</span> : null}
+                {!isSupplier ? <span className={`stamp ml-2 ${asked.has(r.doc.id) ? "text-sky-700" : "text-slate-400"}`}>{asked.has(r.doc.id) ? "requested" : "not asked yet"}</span> : null}
                 <span className="block max-w-80 truncate text-xs text-slate-500">{r.doc.title}</span>
               </Td>
               <Td className="whitespace-nowrap text-xs">
@@ -104,9 +109,41 @@ export async function SupplierPackage({ pkg }: { pkg: LegacyPackage }) {
   // narrowing rule is one with a filter behind it.
   const narrowed = parseFilter(pkg.membershipFilter) ? pkg.membershipRule : null;
   const outDocs = excluded.length ? await documentsByIds(ctx, excluded) : [];
-  // Admin, Document Control, or whoever created the package.
-  const mayManage = staff || ownerIds(pkg).includes(user.id);
+  // A supplier's package is Document Control's (and an administrator's) alone.
+  const mayManage = staff;
+  const notAsked = rows.filter((r) => !asked.has(r.doc.id));
   const manage: StepItem[] = mayManage ? [
+    ...(!shared ? [{
+      key: "share",
+      primary: true,
+      label: `Share with ${pkg.recipientName}`,
+      body: (
+        <ActionForm action={sharePackageAction} submitLabel={`Share with ${pkg.recipientName}`} size="sm" hidden={{ packageId: pkg.id }} confirmText={`Once shared, ${pkg.recipientName} sees this package for good. Continue?`}>
+          <p className="text-xs leading-5 text-slate-600">
+            Until it is shared, {pkg.recipientName} does not see this package. Once shared, they see it for good, with the documents asked of them on a transmittal and nothing else. It cannot be taken back.
+          </p>
+        </ActionForm>
+      ),
+    }] : []),
+    {
+      key: "send",
+      primary: !!shared && notAsked.length > 0,
+      label: notAsked.length ? `Send placeholders to ${pkg.recipientName} (${notAsked.length} not asked yet)` : `Send placeholders to ${pkg.recipientName}`,
+      body: !shared ? (
+        <p className="text-xs text-slate-600">Share the package with {pkg.recipientName} first: they find what is asked of them there.</p>
+      ) : notAsked.length ? (
+        <ActionForm action={requestSupplyAction} submitLabel="Send on one transmittal" size="sm" hidden={{ packageId: pkg.id }}>
+          <p className="text-xs leading-5 text-slate-600">Tick what to ask of {pkg.recipientName}. Each is asked once; from then on they hold it, and it is handed back and forth by asking for it back.</p>
+          <div className="-mx-5 border-y border-line sm:-mx-6">
+            <RevisionChecklist name="documentId" initial={notAsked.map((r) => r.doc.id)} rows={notAsked.map((r) => ({ id: r.doc.id, number: r.doc.docNumber, rev: "—", status: null, title: r.doc.title }))} />
+          </div>
+          <Field label="Message" hint={`what ${pkg.recipientName} reads with it`}>
+            <textarea name="message" rows={2} maxLength={4000} className={inputCls} />
+          </Field>
+        </ActionForm>
+      ) : <p className="text-xs text-slate-600">Every document in it has been asked of {pkg.recipientName}.</p>,
+    },
+    { key: "add", label: "Add documents", href: `/documents?pick=${encodeURIComponent(`pkg:${pkg.identifier}`)}` },
     {
       key: "remove",
       label: "Take documents out",
@@ -139,7 +176,8 @@ export async function SupplierPackage({ pkg }: { pkg: LegacyPackage }) {
         </ActionForm>
       ),
     },
-    ...manageItems(pkg, { mayEdit: true, mayDelete: true }),
+    // Renumbered, or deleted while empty, only until it is shared or sent.
+    ...manageItems(pkg, { mayEdit: true, mayRenumber: !shared && !pkg.view.transmittals.length, mayDelete: !shared && !rows.length && !pkg.view.transmittals.length }),
   ] : [];
 
   return (
@@ -179,7 +217,10 @@ export async function SupplierPackage({ pkg }: { pkg: LegacyPackage }) {
           </div>
           <NextStepBody
             items={manage}
-            status={<p className="text-[13px] text-slate-600">{narrowed ? <>Only documents from {pkg.recipientName} {narrowed.replace(/^every document /, "")}.</> : <>Everything from {pkg.recipientName}.</>}{excluded.length ? <> {excluded.length} taken out by hand.</> : null}</p>}
+            status={<p className="text-[13px] text-slate-600">
+              {shared ? <>Shared with {pkg.recipientName} {fmtDate(shared)}{pkg.view.sharedBy ? ` by ${pkg.view.sharedBy}` : ""}. </> : <>Not shared with {pkg.recipientName} yet: they do not see it. </>}
+              {narrowed ? <>Only documents from {pkg.recipientName} {narrowed.replace(/^every document /, "")}.</> : <>Everything from {pkg.recipientName}{pkg.view.purchaseOrder ? ` under ${pkg.view.purchaseOrder}` : ""}.</>}{excluded.length ? <> {excluded.length} taken out by hand.</> : null}
+            </p>}
           />
         </section>
       ) : null}

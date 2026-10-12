@@ -21,6 +21,14 @@ public sealed class Package
     public Guid? SupplierPartyId { get; set; }
     /// <summary>For a supply package: the purchase order it is under, as written on it. Optional.</summary>
     public string? PurchaseOrder { get; set; }
+    /// <summary>
+    /// For a supply package: when Document Control shared it with its supplier, once and for good. Until then the
+    /// supplier does not see it; after, it sees the documents asked of it on a transmittal, and nothing else.
+    /// </summary>
+    public Instant? SharedAt { get; set; }
+    public string? SharedByName { get; set; }
+    /// <summary>Made by itself when the first document for its supplier (and purchase order) was registered.</summary>
+    public bool AutoCreated { get; set; }
     public required string Title { get; set; }
     public string? Description { get; set; }
     /// <summary>Further reasons for issue, after the one its transmittals go for; named on them.</summary>

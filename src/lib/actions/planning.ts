@@ -146,9 +146,32 @@ export async function setPackageRuleAction(_prev: { error?: string } | undefined
 export async function updatePackageAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
   const title = String(formData.get("title") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim() || null;
+  // Renumbered only before it was shared or sent; the backend refuses otherwise.
+  const number = String(formData.get("number") ?? "").trim() || null;
+  const was = String(formData.get("was") ?? "");
   if (!title) return { error: "Give the package a name." };
-  const { error } = await onPackage(String(formData.get("packageId") ?? ""), "", { title, description }, "PUT");
+  const { error, number: now } = await onPackage(String(formData.get("packageId") ?? ""), "", { title, description, number }, "PUT");
+  if (error) return { error };
+  if (now && was && now !== was) redirect(`/packages/${now}`);
+  return {};
+}
+
+/** Document Control shares a supplier's package with that supplier: once, and for good. */
+export async function sharePackageAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
+  const { error } = await onPackage(String(formData.get("packageId") ?? ""), "/share", {});
   return error ? { error } : {};
+}
+
+/**
+ * Document Control asks the supplier, on one transmittal, for the ticked placeholders not asked yet: from then on the
+ * supplier holds them and sees them in the shared package.
+ */
+export async function requestSupplyAction(_prev: { error?: string; ok?: string } | undefined, formData: FormData): Promise<{ error?: string; ok?: string }> {
+  const documentIds = formData.getAll("documentId").map(String).filter(Boolean);
+  if (!documentIds.length) return { error: "Tick the placeholders to send." };
+  const message = String(formData.get("message") ?? "").trim() || null;
+  const { error } = await onPackage(String(formData.get("packageId") ?? ""), "/request", { documentIds, message });
+  return error ? { error } : { ok: `${documentIds.length} placeholder${documentIds.length === 1 ? "" : "s"} sent on one transmittal.` };
 }
 
 /**
