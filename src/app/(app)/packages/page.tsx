@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requireScope } from "@/lib/scope";
-import { Field, inputCls, Info } from "@/components/ui";
+import { Field, inputCls, Info, ToneChip, DataTable, Th, Td } from "@/components/ui";
 import { ActionForm } from "@/components/form";
 import { Asked, Added } from "@/components/policy-fields";
 import { formPolicy } from "@/lib/field-policy";
@@ -65,17 +65,15 @@ export default async function PackagesPage({ searchParams }: { searchParams: Pro
     { code: "DELIVERY", label: "To deliver", says: "documents we hand to an organization by a date, on one transmittal" },
   ] as const;
   const here = tabs.find((one) => one.code === category)!;
-  const th = "stencil px-3 py-2 text-left font-normal text-slate-500 first:pl-5 sm:first:pl-6";
-  const td = "px-3 py-2.5 align-top first:pl-5 sm:first:pl-6";
 
   return <div className="space-y-4">
     <section className="register register-sheet register-sheet-open">
-      <div className="border-b border-line px-5 pt-6 pb-3 sm:px-6">
+      <div className="border-b border-line px-5 pt-5 pb-2.5 sm:px-6">
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
           <h1 className="plate-title min-w-0 text-slate-950">Packages</h1>
           <a href="/api/export/packages" className="ask inline-flex items-center gap-1.5"><Download className="h-3.5 w-3.5"/> Export CSV</a>
         </div>
-        <p className="mt-1 max-w-2xl text-[11.5px] leading-4 text-slate-500">{supplierOnly ? "What your company is asked to send, and where each document stands." : here.says.charAt(0).toUpperCase() + here.says.slice(1) + "."}</p>
+        <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">{supplierOnly ? "What your company is asked to send, and where each document stands." : here.says.charAt(0).toUpperCase() + here.says.slice(1) + "."}</p>
         {(
           <nav className="seg mt-3 w-fit max-w-full">
             {tabs.map((c) => (
@@ -87,51 +85,41 @@ export default async function PackagesPage({ searchParams }: { searchParams: Pro
 
       {category === "SUPPLIER" ? (
         rows.length ? (
-          <div className="overflow-x-auto">
-            <table className="w-full text-[13px]">
-              <thead className="border-b border-line bg-tint-soft"><tr><th className={th}>Supplier</th><th className={th}>Where it stands</th><th className={th}>Sent</th><th className={th}>Overdue</th><th className={th}>Waiting on</th><th className={th}>Due</th></tr></thead>
-              <tbody className="divide-y divide-line">
+          <DataTable className="rounded-none border-0 shadow-none" id="supplier-packages" exportName="supplier-packages" head={<tr><Th>Supplier</Th><Th>Where it stands</Th><Th>Sent</Th><Th>Overdue</Th><Th>Waiting on</Th><Th>Due</Th></tr>}>
                 {rows.map((pkg) => {
                   const f = supplierStats.get(pkg.id)!;
                   const where = supplierStages.get(pkg.id)!;
                   return (
-                    <tr key={pkg.id} className="hover:bg-tint-soft">
-                      <td className={td}><Link href={`/packages/${pkg.identifier}`} className="font-semibold text-brand-ink hover:underline">{pkg.title ?? pkg.recipientName}</Link><span className="block font-mono text-[11px] text-slate-400">{pkg.identifier}</span></td>
-                      <td className={`${td} text-xs`}>
+                    <tr key={pkg.id}>
+                      <Td><Link href={`/packages/${pkg.identifier}`} className="font-semibold text-brand-ink hover:underline">{pkg.title ?? pkg.recipientName}</Link><span className="block font-mono text-[11px] text-slate-400">{pkg.identifier}</span></Td>
+                      <Td className={`text-xs`}>
                         <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap ring-1 ${where.tone}`}>{where.word}</span>
                         {where.notAsked ? <span className="mt-1 block text-[11px] text-slate-500">{where.notAsked} not asked yet</span> : null}
-                      </td>
-                      <td className={`${td} text-xs`}>{f.arrived} of {f.planned} <span className="text-slate-400">({f.submissionProgress}%)</span></td>
-                      <td className={`${td} text-xs ${f.notArrivedLate ? "font-semibold text-red-700" : "text-slate-400"}`}>{f.notArrivedLate || "—"}</td>
-                      <td className={`${td} text-xs`}>{f.pendingOurs} with us · {f.pendingSupplier} with them</td>
-                      <td className={`${td} whitespace-nowrap text-xs`}>{fmtDate(pkg.completionDate)}</td>
+                      </Td>
+                      <Td className={`text-xs`}>{f.arrived} of {f.planned} <span className="text-slate-400">({f.submissionProgress}%)</span></Td>
+                      <Td className={`text-xs ${f.notArrivedLate ? "font-semibold text-red-700" : "text-slate-400"}`}>{f.notArrivedLate || "—"}</Td>
+                      <Td className={`text-xs`}>{f.pendingOurs} with us · {f.pendingSupplier} with them</Td>
+                      <Td className={`whitespace-nowrap text-xs`}>{fmtDate(pkg.completionDate)}</Td>
                     </tr>
                   );
                 })}
-              </tbody>
-            </table>
-          </div>
+          </DataTable>
         ) : <p className="px-5 py-8 text-center text-sm text-slate-400 sm:px-6">{supplierOnly ? "Nothing is expected from you yet. When documents are requested from your company they appear here." : "No supplier packages yet. One lists every document you expect from one supplier; they send from it."}</p>
       ) : rows.length ? (
-        <div className="overflow-x-auto">
-          <table className="w-full text-[13px]">
-            <thead className="border-b border-line bg-tint-soft"><tr><th className={th}>Package</th><th className={th}>State</th><th className={th}>Ready <Info>Ready: the document&apos;s current released revision carries the status the package asks for.</Info></th><th className={th}>Due</th><th className={th}>Accepted by</th></tr></thead>
-            <tbody className="divide-y divide-line">
+        <DataTable className="rounded-none border-0 shadow-none" id="delivery-packages" exportName="delivery-packages" head={<tr><Th>Package</Th><Th>State</Th><Th title="Ready: the document's current released revision carries the status the package asks for.">Ready</Th><Th>Due</Th><Th>Accepted by</Th></tr>}>
               {rows.map((pkg) => {
                 const percent = pkg.total ? Math.round(pkg.ready / pkg.total * 100) : 0;
                 return (
-                  <tr key={pkg.id} className="hover:bg-tint-soft">
-                    <td className={td}><Link href={`/packages/${pkg.identifier}`} className="font-mono text-[13px] font-semibold text-brand-ink hover:underline">{pkg.identifier}</Link><span className="block max-w-80 truncate text-[13px] text-slate-800">{pkg.title ?? `Delivery to ${pkg.recipientName}`}</span><span className="block max-w-80 truncate text-xs text-slate-500">to {pkg.recipientName}</span></td>
-                    <td className={td}><Status state={pkg.state}/></td>
-                    <td className={td}><div className="flex items-center gap-2"><div className="h-1.5 w-20 overflow-hidden rounded-full bg-canvas-deep"><div className={`h-full rounded-full ${percent === 100 ? "bg-emerald-500" : "bg-[#d9a441]"}`} style={{ width: `${percent}%` }}/></div><span className="text-xs text-slate-600">{pkg.ready} of {pkg.total} at {statusList(pkg.requiredStatus).join(" or ")}<Info>{statusList(pkg.requiredStatus).map((code) => `${code} — ${statusMeaning.get(code) ?? code}`).join("\n")}</Info></span></div></td>
-                    <td className={`${td} whitespace-nowrap text-xs`}>{fmtDate(pkg.completionDate)}{!pkg.closedAt ? <span className={`block text-[11px] ${pkg.days < 0 ? "text-red-700" : "text-slate-400"}`}>{pkg.days < 0 ? `${Math.abs(pkg.days)} days late` : `in ${pkg.days} days`}</span> : null}</td>
-                    <td className={`${td} text-xs`}>{pkg.acceptanceAuthorityName}</td>
+                  <tr key={pkg.id}>
+                    <Td><Link href={`/packages/${pkg.identifier}`} className="font-mono text-[13px] font-semibold text-brand-ink hover:underline">{pkg.identifier}</Link><span className="block max-w-80 truncate text-[13px] text-slate-800">{pkg.title ?? `Delivery to ${pkg.recipientName}`}</span><span className="block max-w-80 truncate text-xs text-slate-500">to {pkg.recipientName}</span></Td>
+                    <Td><Status state={pkg.state}/></Td>
+                    <Td><div className="flex items-center gap-2"><div className="h-1.5 w-20 overflow-hidden rounded-full bg-canvas-deep"><div className={`h-full rounded-full ${percent === 100 ? "bg-emerald-500" : "bg-[#d9a441]"}`} style={{ width: `${percent}%` }}/></div><span className="text-xs text-slate-600">{pkg.ready} of {pkg.total} at {statusList(pkg.requiredStatus).join(" or ")}<Info>{statusList(pkg.requiredStatus).map((code) => `${code} — ${statusMeaning.get(code) ?? code}`).join("\n")}</Info></span></div></Td>
+                    <Td className={`whitespace-nowrap text-xs`}>{fmtDate(pkg.completionDate)}{!pkg.closedAt ? <span className={`block text-[11px] ${pkg.days < 0 ? "text-red-700" : "text-slate-400"}`}>{pkg.days < 0 ? `${Math.abs(pkg.days)} days late` : `in ${pkg.days} days`}</span> : null}</Td>
+                    <Td className={`text-xs`}>{pkg.acceptanceAuthorityName}</Td>
                   </tr>
                 );
               })}
-            </tbody>
-          </table>
-        </div>
+        </DataTable>
       ) : <p className="px-5 py-8 text-center text-sm text-slate-400 sm:px-6">No delivery packages yet. One groups documents we hand to an organization together by a date.</p>}
     </section>
 
@@ -192,4 +180,7 @@ export default async function PackagesPage({ searchParams }: { searchParams: Pro
   </div>;
 }
 
-function Status({ state }: { state: string }) { const cls = state === "READY" || state === "CLOSED" || state === "ACCEPTED" ? "bg-emerald-100 text-emerald-800" : state === "OVERDUE" ? "bg-red-100 text-red-800" : state === "SHORTFALL" ? "bg-amber-100 text-amber-800" : "bg-slate-100 text-slate-600"; return <span className={`rounded-md px-2 py-0.5 text-[10px] font-bold ${cls}`}>{state === "CLOSED" ? "delivered" : state.toLowerCase()}</span>; }
+function Status({ state }: { state: string }) {
+  const tone = state === "READY" || state === "CLOSED" || state === "ACCEPTED" ? "done" : state === "OVERDUE" ? "refused" : state === "SHORTFALL" ? "waiting" : "idle";
+  return <ToneChip tone={tone}>{state === "CLOSED" ? "delivered" : state.toLowerCase()}</ToneChip>;
+}

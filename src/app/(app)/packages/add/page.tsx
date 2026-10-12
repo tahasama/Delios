@@ -35,7 +35,7 @@ export default async function AddToPackagePage({ searchParams }: { searchParams:
         </div>
       </section>
       <section className="register register-sheet register-sheet-open">
-        <div className="border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6"><span className="stencil text-slate-600">Documents and package</span></div>
+        <div className="border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6"><span className="stencil mr-1 text-slate-500">Documents and package</span></div>
         <div className="px-5 py-4 sm:px-6">
         <ul className="mb-4 space-y-1 text-xs">
           {docs.map((d) => (

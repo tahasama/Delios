@@ -3,7 +3,7 @@
 import { addPackageMemberAction } from "@/lib/actions/planning";
 import Link from "next/link";
 import { saveRegisterView, deleteRegisterView } from "@/lib/actions/register-views";
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowDown, ArrowLeftRight, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, Download, GitPullRequestArrow, Minus, PackagePlus, Pin, PinOff, Plus, Search, Send, X } from "lucide-react";
 import { sendSupplierFromRegisterAction as sendFromRegister } from "@/lib/actions/supplier";
@@ -140,6 +140,9 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
   const [frozen, setFrozen] = useState(true);
   // The filters asked least often are folded away until somebody asks for them,
   // and unfold themselves whenever one of them is doing something.
+  // Apply is lit only while typed words or dates wait to be applied; a dropdown applies by itself.
+  const [dirty, setDirty] = useState(false);
+  useEffect(() => setDirty(false), [filters.q, filters.on, filters.from, filters.to]);
   const [extra, setExtra] = useState(!!filters.criticality || !!filters.confidentiality || !!filters.deliverable || !!filters.phase || !!filters.action);
   useEffect(() => {
     if (filters.criticality || filters.confidentiality || filters.deliverable || filters.phase || filters.action) setExtra(true);
@@ -299,7 +302,7 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
   if (filters.docType) facets.push({ key: "type", label: labelIn(filterOptions.types, filters.docType), without: drop("docType") });
   if (filters.criticality) facets.push({ key: "criticality", label: labelIn(filterOptions.criticalities, filters.criticality), without: drop("criticality") });
   if (filters.confidentiality) facets.push({ key: "confidentiality", label: labelIn(filterOptions.confidentialities, filters.confidentiality), without: drop("confidentiality") });
-  if (filters.deliverable) facets.push({ key: "produced by", label: labelIn(filterOptions.deliverables, filters.deliverable), without: drop("deliverable") });
+  if (filters.deliverable) facets.push({ key: "deliverable type", label: labelIn(filterOptions.deliverables, filters.deliverable), without: drop("deliverable") });
   if (filters.phase) facets.push({ key: "phase", label: labelIn(filterOptions.phases, filters.phase), without: drop("phase") });
   if (filters.action) facets.push({ key: "owed by", label: labelIn(filterOptions.actions, filters.action), without: drop("action") });
 
@@ -308,8 +311,8 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
 
   return <>
     {picking ? (
-      <section className="register register-sheet register-sheet-open mb-5 px-5 py-3.5 sm:px-6">
-        <p className="text-sm font-semibold text-slate-900">
+      <section className="register register-sheet register-sheet-open mb-4 px-5 py-3.5 sm:px-6">
+        <p className="text-sm font-semibold text-slate-800">
           Documents for <Link href={picking.kind === "package" ? `/packages/${picking.code}` : `/actions/${picking.code}`} className="font-mono text-brand-ink hover:underline">{picking.code}</Link>
           <span className="ml-2 font-normal text-slate-600">{picking.name}</span>
         </p>
@@ -320,7 +323,7 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
         </p>
       </section>
     ) : null}
-    <section className="register register-sheet register-sheet-open mb-5">
+    <section className="register register-sheet register-sheet-open mb-4">
       {plate}
 
       {/* Search gets its own line: it is how most people arrive, and it takes
@@ -330,11 +333,13 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
         action="/documents"
         onSubmit={(event) => {
           event.preventDefault();
+          setDirty(false);
           const data = new FormData(event.currentTarget);
           const params = new URLSearchParams();
           for (const [key, value] of data.entries()) if (value && key !== "view") params.set(key, String(value));
           go(`/documents${params.size ? `?${params}` : ""}`);
         }}
+        onChange={(event) => { if (!(event.target as HTMLElement).dataset.instant) setDirty(true); }}
         className="asking border-b border-line px-5 py-3.5 sm:px-6"
       >
         {/* Opened for an action: narrowing keeps it open for that action. */}
@@ -355,7 +360,7 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
               thousands cannot afford. */}
           {/* One button, one state: while the answer is being fetched it says so
               in place, rather than beside a word that is no longer true. */}
-          <button className="ask" data-on={facets.length ? "true" : "false"} disabled={pending}>
+          <button className="ask" data-on={dirty ? "true" : "false"} disabled={pending}>
             {pending ? "Filtering" : "Apply"}
           </button>
         </div>
@@ -391,7 +396,7 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
           {extra ? <>
             <Filter name="criticality" value={filters.criticality} empty="Criticality" options={filterOptions.criticalities} />
             <Filter name="confidentiality" value={filters.confidentiality} empty="Confidentiality" options={filterOptions.confidentialities} />
-            <Filter name="deliverable" value={filters.deliverable} empty="Produced by" options={filterOptions.deliverables} />
+            <Filter name="deliverable" value={filters.deliverable} empty="Deliverable type" options={filterOptions.deliverables} />
             <Filter name="phase" value={filters.phase} empty="Phase" options={filterOptions.phases} />
             {filterOptions.actions.length ? <Filter name="action" value={filters.action} empty="Owed by activity" options={filterOptions.actions} /> : null}
           </> : <>
@@ -457,9 +462,9 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
 
       {facets.length ? (
         <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2 sm:px-6">
-          <span className="stencil mr-1 text-slate-400">Showing</span>
+          <span className="stencil mr-1 text-slate-500">Showing</span>
           {facets.map((facet) => (
-            <button key={`${facet.key}-${facet.label}`} type="button" onClick={() => go(facet.without)} className="facet" title="Remove this filter">
+            <button key={`${facet.key}-${facet.label}`} type="button" onClick={() => go(facet.without)} className="facet" title="Remove this filter" aria-label={`Remove the filter ${facet.key}: ${facet.label}`}>
               <span className="facet-key">{facet.key}</span>
               <span className="font-medium">{facet.label}</span>
               <X className="h-3 w-3" />
@@ -797,6 +802,9 @@ The revision is not released, so this status is not in force.`} href={GUIDE.STAT
 
 /** A filter on a rule: it submits its form on change, and shows when it is on. */
 function Filter({ name, value, empty, options, disabled }: { name: string; value: string; empty: string; options: Opt[]; disabled?: boolean }) {
+  // Picked with the pointer, it applies at once; with the keyboard, on leaving the box (as on the schedule).
+  const pointer = useRef(false);
+  const waiting = useRef(false);
   return (
     <label className="min-w-0 flex-1">
       <span className="sr-only">{empty}</span>
@@ -805,7 +813,19 @@ function Filter({ name, value, empty, options, disabled }: { name: string; value
         defaultValue={value}
         disabled={disabled}
         data-on={value ? "true" : "false"}
+        data-instant="true"
         className="plain w-full disabled:cursor-not-allowed disabled:opacity-40"
+        onPointerDown={() => { pointer.current = true; }}
+        onKeyDown={() => { pointer.current = false; }}
+        onChange={(event) => {
+          if (pointer.current) event.currentTarget.form?.requestSubmit();
+          else waiting.current = true;
+        }}
+        onBlur={(event) => {
+          if (!waiting.current) return;
+          waiting.current = false;
+          event.currentTarget.form?.requestSubmit();
+        }}
       >
         <option value="">{empty}</option>
         {options.map((option) => <option key={option.code} value={option.code}>{option.label}</option>)}

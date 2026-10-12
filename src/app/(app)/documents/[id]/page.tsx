@@ -634,7 +634,7 @@ export default async function DocumentDetailPage({
           one name, then the facts of the revision in hand, then what it is
           classified as. The way back and the files sit to the right. */}
       <section className="register register-sheet register-sheet-open">
-        <div className="flex flex-col-reverse gap-3 px-5 pt-6 pb-4 sm:px-6 lg:flex-row lg:items-start lg:justify-between">
+        <div className="flex flex-col-reverse gap-3 px-5 pt-6 pb-3 sm:px-6 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0 flex-1">
             <p className="flex flex-wrap items-center gap-2 font-mono text-[12.5px] font-semibold tracking-tight text-slate-500">
               {doc.docNumber}
@@ -648,14 +648,13 @@ export default async function DocumentDetailPage({
             <h1 className="plate-name mt-1 min-w-0">{doc.title}</h1>
             <p className="plate-meta mt-2 flex flex-wrap items-center gap-x-2 gap-y-1">
               {shown ? <span className="font-mono font-semibold text-slate-800">Rev {shown.value}</span> : null}
-              <StateChip label={stateLabel} color={stateColor} />
               {current?.heldAt ? <span className="stamp font-sans text-red-700">not for use</span> : null}
               {shown?.statusCode ? <span>&middot; {shown.statusCode} — {label(statuses, shown.statusCode)}</span> : null}
               {/* The plate is about the revision in use; this says what the one
                   after it is doing, in the register's words. */}
               {current && working ? <span className="text-amber-700">&middot; rev {working.value} {stateName(names, working.state).toLowerCase()}</span> : null}
             </p>
-            <p className="mt-1 max-w-3xl text-[11.5px] leading-4 text-slate-400">
+            <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">
               {[
                 label(types, doc.docType),
                 label(disciplines, doc.discipline),
@@ -668,6 +667,7 @@ export default async function DocumentDetailPage({
           </div>
           <div className="flex shrink-0 flex-wrap items-center gap-2 lg:justify-end">
             <Link href="/documents" className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-semibold text-slate-500 hover:bg-slate-100"><ArrowLeft className="h-4 w-4" /> Documents</Link>
+            <StateChip label={stateLabel} color={stateColor} />
             {pdf ? <a href={`/api/files/${pdf.id}`} target="_blank" className="ask inline-flex items-center gap-1.5"><ExternalLink className="h-3.5 w-3.5" /> Open PDF</a> : null}
             {native ? <a href={`/api/files/${native.id}?dl=1`} className="ask inline-flex items-center gap-1.5"><Download className="h-3.5 w-3.5" /> Source file</a> : null}
             {current && !current.heldAt ? <Link href={`/transmittals/new?doc=${doc.id}`} className="ask inline-flex items-center gap-1.5"><Send className="h-3.5 w-3.5" /> Issue</Link> : null}

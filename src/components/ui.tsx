@@ -95,6 +95,19 @@ export function Card({
  * than a pill, because the register stamps and chips are square and a rounded
  * pill is the one shape that says "web app" out loud.
  */
+/** The reference status chip (Schedule & actions): one word, one of four tones. */
+export const TONE = {
+  done: "bg-emerald-50 text-emerald-800 ring-emerald-200",
+  waiting: "bg-amber-50 text-amber-900 ring-amber-200",
+  refused: "bg-red-50 text-red-800 ring-red-200",
+  idle: "bg-slate-100 text-slate-600 ring-slate-200",
+  moving: "bg-sky-50 text-sky-800 ring-sky-200",
+} as const;
+
+export function ToneChip({ tone, children, title }: { tone: keyof typeof TONE; children: React.ReactNode; title?: string }) {
+  return <span title={title} className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap ring-1", TONE[tone])}>{children}</span>;
+}
+
 export function Chip({ children, className, title }: { children: React.ReactNode; className?: string; title?: string }) {
   return (
     <span title={title} className={cn("inline-flex items-center whitespace-nowrap rounded-[0.3rem] px-1.5 py-0.5 text-[11px] font-semibold leading-[1.35] ring-1 ring-inset", className ?? "bg-canvas-deep text-slate-700 ring-line")}>

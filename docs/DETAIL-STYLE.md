@@ -16,6 +16,7 @@ Reference files, read them before styling anything:
 | Stages under a masthead | `StagePath` in `documents/[id]/next-step.tsx` (`under`, `pick`) |
 | Telling people by hand | `components/notify-panel.tsx` |
 | Progress | `components/timeline.tsx` |
+| Status chip | `ToneChip` / `TONE` in `components/ui.tsx` (done, waiting, refused, idle, moving) |
 | Controls | `btn()`, `inputCls`, `Field` in `components/ui.tsx`; `ActionForm` in `components/form.tsx`; `.ask`, `.plain` in `globals.css` |
 
 ## One size for every control
@@ -71,6 +72,11 @@ Dates read from today, never "overdue": "40 days ago · lasted 3 days", "Today",
 
 Page spacing is `space-y-4`.
 
+Applied the same way to the document register (masthead, filters that apply on
+pick, Apply lit only while words or dates wait), the document page (state chip
+on the right beside the way back), the packages list (`DataTable`, `ToneChip`)
+and both package pages (plate, sheet heads, Progress aside at 280px).
+
 ## Every sheet
 
 ```tsx
@@ -102,6 +108,8 @@ Top to bottom, every row that asks something of the reader:
    - waiting `bg-amber-50 text-amber-900 ring-amber-200`
    - not going ahead / refused `bg-red-50 text-red-800 ring-red-200`
    - not yet open `bg-slate-100 text-slate-600 ring-slate-200`
+
+   Built once as `ToneChip` (`components/ui.tsx`); use it rather than writing the classes again.
 2. **Who did it, when and why** (`whitespace-pre-line text-xs leading-5
    text-slate-600`), the reason on its own line. A take-back is kept under it in
    `text-[11px] text-slate-500`.

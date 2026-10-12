@@ -13,7 +13,7 @@ export function RegisterPlate({ project, canCreate }: {
   canCreate: boolean;
 }) {
   return (
-    <div className="border-b border-line px-5 pt-6 pb-3 sm:px-6">
+    <div className="border-b border-line px-5 pt-5 pb-2.5 sm:px-6">
       {/* The project is named in the header of every page and in the switcher
           beside it. Repeating it here is a line of chrome that says nothing the
           reader did not already know. */}
@@ -25,7 +25,7 @@ export function RegisterPlate({ project, canCreate }: {
           </ButtonLink>
         ) : null}
       </div>
-      <p className="mt-1 max-w-xl text-[11.5px] leading-4 text-slate-500">
+      <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">
         Every controlled document on this project, one row each, showing the revision in hand now.
       </p>
     </div>
