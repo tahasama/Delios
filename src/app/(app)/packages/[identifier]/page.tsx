@@ -192,7 +192,7 @@ export default async function PackageDetailPage({ params, searchParams }: { para
       </section>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_280px]">
-        <section className="register register-sheet register-sheet-open">
+        <section data-dt-frame className="register register-sheet">
           <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
             <span className="stencil mr-1 text-slate-500">Documents</span>
             <span className="text-[11px] text-slate-500">{readyCount} of {total} released at the status they need{pkg.membershipRule && !pkg.closedAt ? ` · ${pkg.membershipRule} joins by itself` : ""}</span>

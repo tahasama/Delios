@@ -67,7 +67,7 @@ export default async function PackagesPage({ searchParams }: { searchParams: Pro
   const here = tabs.find((one) => one.code === category)!;
 
   return <div className="space-y-4">
-    <section className="register register-sheet register-sheet-open">
+    <section data-dt-frame className="register register-sheet">
       <div className="border-b border-line px-5 pt-5 pb-2.5 sm:px-6">
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
           <h1 className="plate-title min-w-0 text-slate-950">Packages</h1>

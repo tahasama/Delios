@@ -124,7 +124,7 @@ export async function SupplierPackage({ pkg }: { pkg: LegacyPackage }) {
             </div>
           </div>
         </section>
-        <section className="register register-sheet register-sheet-open">
+        <section data-dt-frame className="register register-sheet">
           <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
             <span className="stencil mr-1 text-slate-500">Your documents</span>
             <span className="text-[11px] text-slate-500">{holds.length} with you · {mine.length - holds.length} with {org}</span>
@@ -243,7 +243,7 @@ export async function SupplierPackage({ pkg }: { pkg: LegacyPackage }) {
         </section>
       ) : null}
 
-      <section className="register register-sheet register-sheet-open">
+      <section data-dt-frame className="register register-sheet">
         <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
           <span className="stencil mr-1 text-slate-500">Documents</span>
           <span className="text-[11px] text-slate-500">{withThem} with {supplierName} · {withUs} with us{notSent.length ? ` · ${notSent.length} not sent to them yet` : ""}</span>
