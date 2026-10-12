@@ -43,7 +43,7 @@ public sealed record NoteRequest(string? Note = null);
 /// delivery on transmittals, and acceptance. Delivering fixes the contents.
 /// </summary>
 public sealed class PackageService(
-    DeliosDbContext db, Numbering numbering, TransmittalService transmittals, AuditLog audit, IClock clock)
+    DeliosDbContext db, Numbering numbering, TransmittalService transmittals, AuditLog audit, IClock clock, SupplyFiling filing)
 {
     // ── Composing ─────────────────────────────────────────────────────────────
 
@@ -542,6 +542,9 @@ public sealed class PackageService(
     public async Task<IReadOnlyList<PackageSummary>> ListAsync(ProjectAccess access, CancellationToken cancellationToken)
     {
         if (!access.Holds(Verbs.Read)) return [];
+        // Supplier documents registered before packages were made by themselves join their package now.
+        if (access.IsInternal && access.Holds(Verbs.Control))
+            await filing.FileUnfiledAsync(access.Project, Actor(access), cancellationToken);
         var rows = await Visible(access)
             .OrderByDescending(p => p.CreatedAt).Take(500)
             .Select(p => new

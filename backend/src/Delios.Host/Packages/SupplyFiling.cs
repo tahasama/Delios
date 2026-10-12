@@ -17,6 +17,25 @@ namespace Delios.Host.Packages;
 /// </summary>
 public sealed class SupplyFiling(DeliosDbContext db, Numbering numbering, AuditLog audit, IClock clock)
 {
+    /// <summary>
+    /// Files every document of an outside organization not in any of its supplier's packages yet: those registered
+    /// before packages were made by themselves, or by a way that did not file them. Each goes where a new one would.
+    /// </summary>
+    public async Task<int> FileUnfiledAsync(Project project, Actor actor, CancellationToken cancellationToken)
+    {
+        var outside = db.Parties.Where(p => !p.IsInternal && p.Active).Select(p => p.Code);
+        var unfiled = await db.Documents
+            .Where(d => d.ProjectId == project.Id && d.Kind != DocumentKinds.Record && d.Originator != null && outside.Contains(d.Originator)
+                && (d.State == DocumentStates.Planned || d.State == DocumentStates.Active)
+                && !db.PackageMembers.Any(m => m.DocumentId == d.Id && db.Packages.Any(p => p.Id == m.PackageId && p.Kind == PackageKinds.Supply))
+                && !db.Packages.Any(p => p.Kind == PackageKinds.Supply && p.Excluded.Contains(d.Id))
+                // Something it sent unplanned and we registered is not something it owes.
+                && !db.TransmittalItems.Any(i => i.DocumentId == d.Id && i.Kind == TransmittalItemKinds.Unplanned))
+            .OrderBy(d => d.CreatedAt).Take(500).ToListAsync(cancellationToken);
+        foreach (var document in unfiled) await FileAsync(project, document, actor, cancellationToken);
+        return unfiled.Count;
+    }
+
     /// <summary>Files a document just registered into its supplier's package, making the package when there is none. Saves.</summary>
     public async Task FileAsync(Project project, Document document, Actor actor, CancellationToken cancellationToken)
     {
