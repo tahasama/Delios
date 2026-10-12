@@ -272,7 +272,9 @@ export type Addressees = {
 export type IssueRequestView = {
   id: string; revisionId: string; reason: string; userIds: string[]; partyIds: string[]; note: string | null; offDistributionReason: string | null;
   raisedBy: string; raisedAt: string; status: string; closedAt: string | null; closedBy: string | null; transmittals: string[];
-  raisedById: string; transmittalIds: string[];
+  raisedById: string; transmittalIds: string[]; delegated?: boolean; approverPartyId?: string | null; approvalState?: string | null;
+  /** Who Document Control took off it when releasing. */
+  releaseNote?: string | null;
 };
 
 /** GET /documents/{id}/distribution (DistributionView): who the matrix proposes, everyone else, and the parties. */

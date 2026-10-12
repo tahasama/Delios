@@ -23,6 +23,10 @@ export function buildProps(setKey: string, formData: FormData, existing?: string
       const picked = f.options.find((o) => o.value === String(formData.get(`prop_${f.key}`) ?? ""));
       if (picked) Object.assign(props, picked.sets);
     } else if (f.type === "bool") props[f.key] = formData.get(`prop_${f.key}`) === "on";
+    else if (f.type === "sets") {
+      const codes = formData.getAll(`prop_${f.key}`).map(String).filter(Boolean);
+      props[f.key] = codes.length ? codes : undefined;
+    }
     else if (f.type === "int") {
       const v = String(formData.get(`prop_${f.key}`) ?? "").trim();
       props[f.key] = v === "" ? undefined : Number(v);

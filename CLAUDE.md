@@ -111,6 +111,10 @@ conversation, write it into the right one in the same commit as the code.
   and a native file. The project code comes from the project the user is in
   and is always in the Settings list of project codes (added there automatically);
   it is never asked for and never refused.
+- Each deliverable type has its own document types: a type names the
+  deliverable types it belongs to (Settings, on the type, "Deliverable types");
+  the new-document form lists only those. A type naming none falls back to
+  "Who produces it" (supplier or not).
 - Criticality: the document type recommends a level (Settings, on the type);
   it is filled in on create and marked "(recommended)"; it is optional, and the
   person may choose another.
@@ -190,6 +194,17 @@ conversation, write it into the right one in the same commit as the code.
   SEPARATE: a release needs someone to send to (an open request naming people
   or organizations, or the people named on the release form); the backend
   refuses otherwise (ISSUE_REQUIRED). The release sends it.
+- Release is offered only for a decided revision (never in Prepare). Document
+  Control does not say who receives it: the decider or whoever asked did. The
+  release form shows them, each removable (the request keeps who was taken off,
+  by whom, when: `IssueRequest.ReleaseNote`), and "Add people or organizations".
+  No outside-approval tick and no "leave it to" on release; those are the
+  decider's. "Ask for rev X to be sent" opens straight on its form (who, why),
+  without "leave it to" or outside approval.
+- Send for review starts on the recommended route (the most specific that
+  serves the documents, marked "(recommended)"); each step starts with the
+  recommended people (the route's, or the matrix's for the discipline when the
+  step names nobody). The sender may change both.
 
 ### Transmittals
 - One "Follow up" answers or completes a transmittal: a new one mentioning the
@@ -199,6 +214,10 @@ conversation, write it into the right one in the same commit as the code.
   (`REASONS_FOR_ISSUE` prop `family`). No "sent by" and no date: it is the
   person signed in, today. "Received from outside the system" (Document Control)
   is a tick, and only then are who sent it and when asked.
+- Information reasons: REQUEST, RFI, ANSWER, CONFIRMATION (family Information);
+  an existing demo gains them with `seed-demo`. A reason with no family is data.
+- A new transmittal lets Document Control ask placeholders not asked yet, one
+  supplier's at a time ("Ask placeholders of a supplier").
 
 ### Home
 - Home's to-do lists everything the signed-in person has to do, whatever it

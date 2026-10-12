@@ -55,6 +55,7 @@ export default async function NewDocumentPage({ searchParams }: { searchParams: 
       .filter((x): x is string => typeof x === "string" && x.length > 0)[0] ?? null,
     // Who produces this kind of document, where the value says so.
     appliesTo: typeof r.props?.appliesTo === "string" ? r.props.appliesTo : null,
+    deliverables: Array.isArray(r.props?.deliverables) ? (r.props.deliverables as unknown[]).map(String) : null,
     // A document type's recommended criticality, filled in when it is chosen.
     criticality: typeof r.props?.criticality === "string" ? r.props.criticality : null,
     // A type that is a record (minutes, a test result) is fixed once confirmed: nobody is asked whether it is revised.

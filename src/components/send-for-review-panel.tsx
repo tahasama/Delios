@@ -37,6 +37,8 @@ export async function SendForReview({ revisionIds }: { revisionIds: string[] }) 
     name: t.name,
     description: t.description,
     isDefault: t.isDefault,
+    // The backend lists the routes that serve these documents most specific first: the first is the one recommended.
+    recommended: t.id === applicable[0]?.id,
     verdicts: setViews.get(t.verdictSet ?? "REVIEW_OUTCOMES") ?? null,
     // The last step decides; earlier steps advise. Its people are whoever holds the step's function, and whoever it names.
     steps: t.steps.map((s, i) => {
@@ -46,7 +48,16 @@ export async function SendForReview({ revisionIds }: { revisionIds: string[] }) 
         title: s.title || (deciding ? "Decision" : `Review ${i + 1}`),
         act: deciding ? "APPROVAL" as const : "REVIEW" as const,
         mode: s.mode === "ALL" ? "ALL" as const : "ANY_OF" as const,
-        proposed: pool.filter((p) => p.functionId === s.functionCode || (s.userIds ?? []).includes(p.id)).map((p) => ({ id: p.id, why: p.functionId === s.functionCode ? `${p.functionName} (route)` : "named on the route" })),
+        // Recommended: whoever the route names or its function holds; a step naming nobody takes the people the
+        // distribution matrix gives for the documents' discipline. The sender may change any of them.
+        proposed: (() => {
+          const named = pool.filter((p) => p.functionId === s.functionCode || (s.userIds ?? []).includes(p.id))
+            .map((p) => ({ id: p.id, why: p.functionId === s.functionCode ? `${p.functionName} · recommended by the route` : "recommended · named on the route" }));
+          if (named.length || s.functionCode || (s.userIds ?? []).length) return named;
+          const disciplines = new Set(docs.map((d) => d.discipline).filter(Boolean));
+          return pool.filter((p) => p.department && disciplines.has(p.department))
+            .map((p) => ({ id: p.id, why: `${p.functionName} · recommended by the matrix` }));
+        })(),
         fromFunctions: s.functionCode ? [pool.find((p) => p.functionId === s.functionCode)?.functionName ?? s.functionCode] : [],
       };
     }),

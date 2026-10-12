@@ -615,7 +615,7 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
     </section>
 
     {picking?.kind === "package" ? (
-      <div className="dock sticky bottom-4 z-30 mx-auto w-fit max-w-full rounded-sm border border-white/10 bg-brand-strong p-2.5 text-white shadow-[0_8px_30px_rgb(0_0_0/0.18)]">
+      <div className="dock palette-light sticky bottom-4 z-30 mx-auto w-fit max-w-full rounded-sm border border-white/10 bg-brand-strong p-2.5 text-white shadow-[0_8px_30px_rgb(0_0_0/0.18)]">
         <ActionForm action={addPackageMemberAction} submitLabel="Add to the package" size="sm" hidden={{ packageId: picking.packageId, redirect: "1" }} className="flex flex-wrap items-center gap-2 space-y-0">
           {adding.map((id) => <input key={id} type="hidden" name="documentId" value={id} />)}
           <span className="px-2 text-xs">
@@ -627,7 +627,7 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
         </ActionForm>
       </div>
     ) : picking ? (
-      <div className="dock sticky bottom-4 z-30 mx-auto w-fit max-w-full rounded-sm border border-white/10 bg-brand-strong p-2.5 text-white shadow-[0_8px_30px_rgb(0_0_0/0.18)]">
+      <div className="dock palette-light sticky bottom-4 z-30 mx-auto w-fit max-w-full rounded-sm border border-white/10 bg-brand-strong p-2.5 text-white shadow-[0_8px_30px_rgb(0_0_0/0.18)]">
         <ActionForm action={setActionDocumentsAction} submitLabel="Save" size="sm" hidden={{ actionId: picking.actionId }} className="flex flex-wrap items-center gap-2 space-y-0">
           {selected.map((id) => <input key={id} type="hidden" name="documentIds" value={id} />)}
           <span className="px-2 text-xs">
@@ -638,7 +638,7 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
           <Link href={`/actions/${picking.code}`} className="ml-auto rounded-sm px-3 py-2 text-xs font-semibold text-white/70 hover:bg-white/10 hover:text-white">Back without saving</Link>
         </ActionForm>
       </div>
-    ) : selected.length ? <div className="dock sticky bottom-4 z-30 mx-auto flex w-fit max-w-full flex-wrap items-center gap-2 rounded-sm border border-white/10 bg-brand-strong p-2.5 text-white shadow-[0_8px_30px_rgb(0_0_0/0.18)]">
+    ) : selected.length ? <div className="dock palette-light sticky bottom-4 z-30 mx-auto flex w-fit max-w-full flex-wrap items-center gap-2 rounded-sm border border-white/10 bg-brand-strong p-2.5 text-white shadow-[0_8px_30px_rgb(0_0_0/0.18)]">
       <span className="px-2 font-mono text-sm tabular-nums">{allMatching ? total.toLocaleString("en-GB") : selected.length}<span className="ml-1.5 text-[10px] uppercase tracking-[0.12em] text-white/60">selected</span></span>
       {userCanAct ? (selectedRevisionIds.length ? <Link href={`/reviews/send?revisions=${encodeURIComponent(selectedRevisionIds.join(","))}`} className="inline-flex items-center gap-1.5 rounded-sm bg-[#d9a441] px-3 py-2 text-xs font-semibold text-brand-ink"><GitPullRequestArrow className="h-4 w-4" /> Send for review ({selectedRevisionIds.length})</Link> : null) : null}
       {transmittableRows.length + placeholderRows.length ? <Link href={transmittalHref} className="inline-flex items-center gap-1.5 rounded-sm bg-white/10 px-3 py-2 text-xs font-semibold hover:bg-white/15"><ArrowLeftRight className="h-4 w-4" /> Create transmittal ({transmittableRows.length + placeholderRows.length})</Link> : null}

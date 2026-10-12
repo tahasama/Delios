@@ -102,6 +102,18 @@ export default async function NewTransmittalPage({ searchParams }: { searchParam
   const supplierPeople = supplier ? found.people.filter((one) => one.organization === supplier.name).map((one) => one.id) : [];
   const supplierTo = supplier ? (supplierPeople.length ? supplierPeople : [`party:${supplier.id}`]) : [];
 
+  // Placeholders not asked yet, per supplier: Document Control may ask them on a new transmittal, one supplier's at a time.
+  const askable = ctx.can("CONTROL") && ctx.user.isInternal && !placeholders.length
+    ? [...register.rows.filter((d) => d.originator && !d.releasedRevisionId && !d.supplier && d.state !== "CANCELLED" && d.state !== "WITHDRAWN")
+        .reduce((by, d) => {
+          const name = found.parties.find((p) => p.code === d.originator)?.name;
+          if (!name) return by;
+          by.set(name, [...(by.get(name) ?? []), { id: d.id, number: d.number, title: d.title }]);
+          return by;
+        }, new Map<string, { id: string; number: string; title: string }[]>())]
+        .map(([supplier, items]) => ({ supplier, items }))
+    : [];
+
   return (
     <div>
       <PageHeader
@@ -132,6 +144,7 @@ export default async function NewTransmittalPage({ searchParams }: { searchParam
         // Another organization's people send to us; Document Control may record what reached us outside the system.
         defaultDirection={!ctx.user.isInternal || (sp.direction === "INCOMING" && ctx.can("CONTROL")) ? "INCOMING" : "OUTGOING"}
         mayRecordReceived={ctx.user.isInternal && ctx.can("CONTROL")}
+        askable={askable}
         outsider={!ctx.user.isInternal}
         preselectedRevisionIds={preselected}
         placeholders={placeholders.length ? { to: supplier!.name, items: placeholders, mixed: owners.length > 1 } : askedIds.length && owners.length > 1 ? { to: "", items: [], mixed: true } : undefined}

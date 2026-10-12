@@ -26,6 +26,7 @@ internal sealed class IssueRequestConfiguration : IEntityTypeConfiguration<Issue
         b.Property(x => x.OffDistributionReason).HasMaxLength(2000);
         b.Property(x => x.RaisedByName).HasMaxLength(200);
         b.Property(x => x.ApprovalState).HasMaxLength(16);
+        b.Property(x => x.ReleaseNote).HasMaxLength(2000);
         b.Property(x => x.Status).HasMaxLength(16);
         b.Property(x => x.ClosedByName).HasMaxLength(200);
         b.Property(x => x.RaisedAt).HasDefaultValueSql("now()");

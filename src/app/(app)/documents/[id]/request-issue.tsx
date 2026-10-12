@@ -22,7 +22,7 @@ export type PickReason = { code: string; label: string };
  * A document we produced may need somebody outside to approve it before it is
  * released; that is asked first, because it changes what releasing means.
  */
-export function RequestIssue({ reasons, proposed, others, parties, author, onDecision, ours = true, askWho = true }: {
+export function RequestIssue({ reasons, proposed, others, parties, author, onDecision, ours = true, askWho = true, asking = false }: {
   /** The published reasons for issue. */
   reasons: PickReason[];
   /** Our people the matrix puts on the distribution for this document. */
@@ -42,6 +42,8 @@ export function RequestIssue({ reasons, proposed, others, parties, author, onDec
    * only the outside approval is offered.
    */
   askWho?: boolean;
+  /** Somebody asking for it to be sent says who and why; leaving it to the author is the decider's answer only. */
+  asking?: boolean;
 }) {
   const [choice, setChoice] = useState<"SEND" | "AUTHOR">("SEND");
   // Some of our revisions cannot be released until somebody outside has
@@ -83,11 +85,11 @@ export function RequestIssue({ reasons, proposed, others, parties, author, onDec
       ) : null}
 
       {askWho ? (<>
-      <div className="space-y-1.5">
+      {asking ? null : <div className="space-y-1.5">
         {onDecision ? <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Once it is released</p> : null}
         {option("SEND", "Say who receives it")}
         {option("AUTHOR", <>Leave it to {author ?? "whoever started the review"} — they are notified, and ask for it themselves when they know who needs it</>)}
-      </div>
+      </div>}
       {chosen === "AUTHOR" ? <input type="hidden" name="delegateNextStep" value="on" /> : null}
 
       {chosen === "SEND" ? (

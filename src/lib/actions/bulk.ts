@@ -378,6 +378,7 @@ async function importSets(ctx: Awaited<ReturnType<typeof requireScope>>, formDat
         props[field.key] =
           field.type === "bool" ? /^(yes|true|1)$/i.test(given)
           : field.type === "int" ? Number(given)
+          : field.type === "sets" ? given.split(/[,;]/).map((one) => one.trim()).filter(Boolean)
           : given;
       });
       const asJson = Object.keys(props).length ? JSON.stringify(props) : null;

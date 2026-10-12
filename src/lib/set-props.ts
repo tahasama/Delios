@@ -34,6 +34,8 @@ export type PropField =
   | { key: string; label: string; type: "select"; options: string[]; hint?: string }
   /** One value of another published list, offered from that list. */
   | { key: string; label: string; type: "set"; setKey: string; hint?: string }
+  /** Several values of another published list, kept as a list of codes. */
+  | { key: string; label: string; type: "sets"; setKey: string; hint?: string }
   /** One plain question whose answer sets several stored properties at once. */
   | { key: string; label: string; type: "choice"; options: ChoiceOption[]; read: (props: Record<string, unknown>) => string; hint?: string };
 
@@ -51,7 +53,8 @@ const REVIEW_NEED: ChoiceOption[] = [
 export const SET_PROP_FIELDS: Record<string, PropField[]> = {
   DOCUMENT_TYPES: [
     { key: "review", label: "Reviewed before release", type: "choice", options: REVIEW_NEED, read: (props) => (props.review === false ? "NO" : "YES"), hint: "asked when the type is published; a type that is not reviewed goes from Prepare straight to release" },
-    { key: "appliesTo", label: "Who produces it", type: "select", options: ["Supplier", "Non-supplier", "Unclassified"], hint: "supplier documents carry the supplier fields in their number" },
+    { key: "deliverables", label: "Deliverable types", type: "sets", setKey: "DELIVERABLE_TYPES", hint: "the deliverable types this document type belongs to; the new-document form offers it only for those. None ticked: read from \"Who produces it\"" },
+    { key: "appliesTo", label: "Who produces it", type: "select", options: ["Supplier", "Non-supplier", "Unclassified"], hint: "used when no deliverable type is ticked; supplier documents carry the supplier fields in their number" },
     { key: "record", label: "A record — fixed once confirmed, never revised", type: "bool", hint: "minutes, a test result, a photo: documents of this type are registered as records, nobody is asked" },
  { key: "describesAsset", label: "Describes equipment — link it to an asset", type: "bool", hint: "" },
     { key: "readsRequirements", label: "Is a document requirements list — read when released", type: "bool", hint: "the spreadsheet on each released revision becomes what the activities need" },

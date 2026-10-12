@@ -41,6 +41,8 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
             await db.SaveChangesAsync(cancellationToken);
             issuing |= await EnsureCorrespondenceSetupAsync(existing.Id, cancellationToken);
             await db.SaveChangesAsync(cancellationToken);
+            issuing |= await EnsureInformationReasonsAsync(existing.Id, cancellationToken);
+            await db.SaveChangesAsync(cancellationToken);
             await upgrade.CommitAsync(cancellationToken);
             logger.LogInformation(reviews || issuing ? "The demo tenant exists; what it lacked was added" : "The demo tenant already exists; nothing to do");
             return;
@@ -346,6 +348,7 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
             ("PRICING", "For pricing", new { response = true, responseDays = 15, family = "Data" }),
             ("EXECUTION", "For execution", new { response = false, executes = true, family = "Data" }),
             ("RECORD", "For record", new { response = false, family = "Data" }),
+            .. InformationReasons,
         ]);
         var scheme = new NumberingScheme
         {
@@ -557,6 +560,39 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
                 ("CARRIED", "Went ahead without them", new { proceeds = true }),
                 ("STOPPED", "Stopped until they come", new { proceeds = false }),
             ]);
+            added = true;
+        }
+        return added;
+    }
+
+    /// <summary>Why an information transmittal is sent: words alone, a request or an answer.</summary>
+    private static readonly (string Code, string Label, object? Props)[] InformationReasons =
+    [
+        ("REQUEST", "Request", new { response = true, responseDays = 7, family = "Information" }),
+        ("RFI", "Request for information", new { response = true, responseDays = 7, family = "Information" }),
+        ("ANSWER", "Answer", new { response = false, family = "Information" }),
+        ("CONFIRMATION", "Confirmation", new { response = false, family = "Information" }),
+    ];
+
+    /// <summary>
+    /// A setup made before transmittals had two kinds gains the information reasons it lacks; the reasons it has are
+    /// not touched (one without a kind reads as data).
+    /// </summary>
+    private async Task<bool> EnsureInformationReasonsAsync(Guid t, CancellationToken cancellationToken)
+    {
+        var have = await db.ValueEntries.Where(v => v.SetKey == Transmittals.TransmittalSets.Reasons).Select(v => new { v.Code, v.Sort })
+            .ToListAsync(cancellationToken);
+        if (have.Count == 0) return false;
+        var sort = have.Max(v => v.Sort) + 1;
+        var added = false;
+        foreach (var (code, label, props) in InformationReasons)
+        {
+            if (have.Any(v => v.Code == code)) continue;
+            db.ValueEntries.Add(new ValueEntry
+            {
+                TenantId = t, SetKey = Transmittals.TransmittalSets.Reasons, Code = code, Label = label, Sort = sort++,
+                Props = props is null ? null : JsonSerializer.SerializeToDocument(props),
+            });
             added = true;
         }
         return added;

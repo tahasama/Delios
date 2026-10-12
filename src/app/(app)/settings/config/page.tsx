@@ -66,7 +66,7 @@ export default async function AdminConfigPage({ searchParams }: { searchParams: 
   const propFields = propFieldsFor(currentKey);
   // The other lists a property picks from, such as a document type's recommended criticality.
   const lists: Record<string, { code: string; label: string }[]> = Object.fromEntries(await Promise.all(
-    [...new Set((propFields ?? []).flatMap((f) => (f.type === "set" ? [f.setKey] : [])))].map(async (key) =>
+    [...new Set((propFields ?? []).flatMap((f) => (f.type === "set" || f.type === "sets" ? [f.setKey] : [])))].map(async (key) =>
       [key, (await getSet(key)).filter((v) => v.status === "ACTIVE").map((v) => ({ code: v.code, label: v.label }))] as const)));
   const values = allValues.filter((v) =>
     (show === "ALL" || v.status === show) &&
@@ -302,6 +302,22 @@ export default async function AdminConfigPage({ searchParams }: { searchParams: 
 }
 
 function PropInput({ field, value, lists }: { field: PropField; value: unknown; lists: Record<string, { code: string; label: string }[]> }) {
+  if (field.type === "sets") {
+    const ticked = Array.isArray(value) ? value.map(String) : [];
+    return (
+      <fieldset className="sm:col-span-2">
+        <legend className="mb-1 text-xs font-semibold text-slate-700">{field.label}{field.hint ? <span className="ml-1 font-normal text-slate-400">{field.hint}</span> : null}</legend>
+        <div className="flex flex-wrap gap-x-4 gap-y-1.5">
+          {(lists[field.setKey] ?? []).map((o) => (
+            <label key={o.code} className="flex items-center gap-2 text-sm text-slate-700">
+              <input type="checkbox" name={`prop_${field.key}`} value={o.code} defaultChecked={ticked.includes(o.code)} />
+              <span>{o.label} <span className="font-mono text-xs text-slate-400">{o.code}</span></span>
+            </label>
+          ))}
+        </div>
+      </fieldset>
+    );
+  }
   if (field.type === "set") {
     return (
       <Field label={field.label} hint={field.hint}>

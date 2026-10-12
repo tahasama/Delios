@@ -242,6 +242,15 @@ export async function releaseRevisionAction(_prev: Result | undefined, formData:
   // with nobody to send to unless the organization keeps the two apart.
   const named = issueAsk(requestFromForm(formData));
   const issue = named && !named.delegated ? named : null;
+  // Of what was asked, who Document Control keeps; anyone left out is taken off, and the request says so.
+  const kept = formData.getAll("keptRequest").map(String).map((requestId) => {
+    const keep = formData.getAll(`keep_${requestId}`).map(String);
+    return {
+      requestId,
+      userIds: keep.filter((one) => one.startsWith("u:")).map((one) => one.slice(2)),
+      partyIds: keep.filter((one) => one.startsWith("p:")).map((one) => one.slice(2)),
+    };
+  });
   let documentId: string;
   try {
     let review = await reviewOfRevision(ctx, revisionId);
@@ -255,10 +264,10 @@ export async function releaseRevisionAction(_prev: Result | undefined, formData:
       }
       documentId = review.documentId;
       // Where nobody holds Document Control it is already released.
-      if (review.state !== "RELEASED") await api(projectPath(ctx, `/reviews/${review.id}/release`), { body: { status: statusCode, outcome: text(formData, "outcome") || null, issue } });
+      if (review.state !== "RELEASED") await api(projectPath(ctx, `/reviews/${review.id}/release`), { body: { status: statusCode, outcome: text(formData, "outcome") || null, issue, kept } });
     } else {
       documentId = review.documentId;
-      await api(projectPath(ctx, `/reviews/${review.id}/release`), { body: { status: statusCode, outcome: text(formData, "outcome") || null, issue } });
+      await api(projectPath(ctx, `/reviews/${review.id}/release`), { body: { status: statusCode, outcome: text(formData, "outcome") || null, issue, kept } });
     }
   } catch (e) {
     return failed(e);

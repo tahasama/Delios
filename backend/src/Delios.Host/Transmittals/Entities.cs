@@ -41,6 +41,8 @@ public sealed class IssueRequest
     /// <summary>When it was carried out or cancelled; empty while it is still open.</summary>
     public Instant? ClosedAt { get; set; }
     public string? ClosedByName { get; set; }
+    /// <summary>Who Document Control took off it when releasing, by whom and when; kept beside what was asked.</summary>
+    public string? ReleaseNote { get; set; }
     /// <summary>
     /// Row version kept by the database; EF Core uses it to detect two people changing the same request at once.
     /// </summary>

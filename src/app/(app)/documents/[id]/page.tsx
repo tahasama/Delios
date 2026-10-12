@@ -11,7 +11,7 @@ import { preflight } from "@/lib/rules/preflight";
 import { PreflightPanel, Guarded } from "@/components/preflight";
 import Link from "next/link";
 import { isController, isAdmin, mayContributeToDocument } from "@/lib/auth";
-import { Chip, StateChip, Banner, btn, Field, inputCls } from "@/components/ui";
+import { Chip, ToneChip, StateChip, Banner, btn, Field, inputCls } from "@/components/ui";
 import { ActionForm } from "@/components/form";
 import { Asked, Added } from "@/components/policy-fields";
 import { DOC_STATE_LABEL, DOC_STATE_COLOR, REV_STATE_COLOR, revStateColor, type DocState, type RevState } from "@/lib/standard";
@@ -25,10 +25,11 @@ import { updateDocumentAction, reinstateDocumentAction, linkAssetAction, unlinkR
 import {
   prepareRevisionAction, editRevisionAction, withdrawRevisionAction, releaseRevisionAction, voidRevisionAction, unvoidRevisionAction, returnAtGateAction, liftHoldAction, returnHeldAction,
 } from "@/lib/actions/revisions";
-import { parseRecipients, noRecipients, mayRequestIssue, requestChoices, authorOf, issuePolicy, decisionLetsItOut, requestsOn } from "@/lib/issue-requests";
+import { parseRecipients, mayRequestIssue, requestChoices, issuePolicy, decisionLetsItOut, requestsOn } from "@/lib/issue-requests";
 import { legacyDocument, documentContext, handBacks, type LegacyRevision } from "@/lib/api/legacy";
 import { requestIssueAction, carryOutRequestAction, cancelRequestAction } from "@/lib/actions/issue-requests";
 import { RequestIssue } from "./request-issue";
+import { ReleaseRecipients } from "./release-recipients";
 import { ReturnTarget } from "./return-target";
 import { CopyPicker } from "@/app/(app)/transmittals/new/recipient-picker";
 import { recipientCompanies } from "@/lib/recipients";
@@ -183,24 +184,33 @@ export default async function DocumentDetailPage({
   const mayAsk = carrying ? await mayRequestIssue(ctx, carrying.id, user.id) || controller : false;
   const askChoices = mayAsk && carrying && policy.asked ? await requestChoices(ctx, doc) : null;
   const issueReasons = askChoices ? await getActiveSet("REASONS_FOR_ISSUE") : [];
-  const revisionAuthor = carrying ? await authorOf(ctx, carrying.id) : null;
   // Released and issued are one act unless the organization keeps them apart: when no request names who receives
   // it, the release asks, with the same fields as asking for it to be sent.
   const releaseTogether = (await controlPolicy(ctx, "POLICY_RELEASE")) !== "SEPARATE";
-  const namedToSend = requests.some((one) => one.status === "OPEN" && !one.delegated && !noRecipients(parseRecipients(one.recipients)));
-  const releaseChoices = controller && working && releaseTogether && !namedToSend ? await requestChoices(ctx, doc) : null;
+  // Releasing, Document Control does not say who receives it: whoever decided the review or asked for it to be
+  // sent did. It sees them, may take anyone off, and may add others (needed when nobody named anyone).
+  const releaseChoices = controller && working?.state === "NOT_RELEASED" ? await requestChoices(ctx, doc) : null;
   const releaseReasons = releaseChoices ? await getActiveSet("REASONS_FOR_ISSUE") : [];
-  const releaseAuthor = releaseChoices && working ? await authorOf(ctx, working.id) : null;
+  const reasonLabel = new Map(releaseReasons.map((one) => [one.code, one.label] as const));
+  const openAsks = requests.filter((one) => one.status === "OPEN");
   const whoReceives = releaseChoices ? (
-    <div className="mb-3 space-y-2 rounded-lg border border-line px-3.5 py-3">
-      <p className="text-xs font-semibold text-slate-700">Who receives it — released and issued go together</p>
-      <RequestIssue
-        author={releaseAuthor}
+    <div className="mb-3 rounded-lg border border-line px-3.5 py-3">
+      <ReleaseRecipients
+        asked={openAsks.filter((one) => !one.delegated).map((one) => {
+          const to = parseRecipients(one.recipients);
+          return {
+            id: one.id, reason: reasonLabel.get(one.reason) ?? one.reason, askedBy: one.raisedByName,
+            people: to.internalUserIds.map((id) => ({ id, name: requestNames.people.get(id) ?? id })),
+            parties: to.partyIds.map((id) => ({ id, name: requestNames.parties.get(id) ?? id })),
+          };
+        })}
+        leftTo={openAsks.filter((one) => one.delegated).map((one) => one.raisedByName)}
+        choices={{
+          people: [...releaseChoices.proposed.map((one) => ({ id: one.id, name: one.name, detail: one.basis ? `${one.basis} · recommended` : "recommended" })), ...releaseChoices.others.map((one) => ({ id: one.id, name: one.name, detail: one.organization }))],
+          parties: releaseChoices.parties,
+        }}
         reasons={releaseReasons.map((one) => ({ code: one.code, label: one.label }))}
-        proposed={releaseChoices.proposed}
-        others={releaseChoices.others}
-        parties={releaseChoices.parties}
-        ours={releaseChoices.ours}
+        required={releaseTogether}
       />
     </div>
   ) : null;
@@ -346,9 +356,9 @@ export default async function DocumentDetailPage({
                   <li key={one.id} className="rounded-xl border border-line bg-slate-50 px-3.5 py-3 text-xs">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-semibold text-slate-800">{one.reason}</span>
-                      <Chip className={one.status === "DONE" ? "bg-emerald-100 text-emerald-800 ring-emerald-300" : "bg-amber-100 text-amber-800 ring-amber-300"}>
-                        {one.status === "DONE" ? "sent" : "waiting"}
-                      </Chip>
+                      <ToneChip tone={one.status === "DONE" ? "done" : one.status === "CANCELLED" ? "idle" : "waiting"}>
+                        {one.status === "DONE" ? "sent" : one.status === "CANCELLED" ? "taken off" : "waiting"}
+                      </ToneChip>
                       <span className="text-slate-400">asked by {one.raisedByName}, {fmtDate(one.raisedAt)}</span>
                     </div>
                     {one.delegated ? (
@@ -362,6 +372,7 @@ export default async function DocumentDetailPage({
                       </p>
                     )}
                     {one.note ? <p className="mt-1 text-[11px] text-slate-500">{one.note}</p> : null}
+                    {one.releaseNote ? <p className="mt-1 whitespace-pre-line text-[11px] text-slate-500">{one.releaseNote}</p> : null}
                     {one.status === "DONE" && one.transmittal ? (
                       <p className="mt-1.5 text-[11px] text-slate-500">
                         Sent {fmtDate(one.carriedOutAt)} by {one.carriedOutBy} ·{" "}
@@ -394,22 +405,20 @@ export default async function DocumentDetailPage({
             </p>
           )}
 
+          {/* Asking is the form itself: opening the step is the one click. */}
           {askChoices ? (
-            <details className="mt-3 border-t border-line pt-3">
-              <summary className="cursor-pointer text-xs font-semibold text-link">Ask for it to be sent</summary>
-              <div className="mt-2">
-                <ActionForm action={requestIssueAction} submitLabel="Ask" size="sm" hidden={{ revisionId: carrying.id }}>
-                  <RequestIssue
-                    author={revisionAuthor}
-                    reasons={issueReasons.map((one) => ({ code: one.code, label: one.label }))}
-                    proposed={askChoices.proposed}
-                    others={askChoices.others}
-                    parties={askChoices.parties}
-                    ours={askChoices.ours}
-                  />
-                </ActionForm>
-              </div>
-            </details>
+            <div className="mt-3 border-t border-line pt-3">
+              <ActionForm action={requestIssueAction} submitLabel="Ask for it to be sent" size="sm" hidden={{ revisionId: carrying.id }}>
+                <RequestIssue
+                  asking
+                  reasons={issueReasons.map((one) => ({ code: one.code, label: one.label }))}
+                  proposed={askChoices.proposed}
+                  others={askChoices.others}
+                  parties={askChoices.parties}
+                  ours={false}
+                />
+              </ActionForm>
+            </div>
           ) : null}
         </>) },
       ] : []),
@@ -437,7 +446,7 @@ export default async function DocumentDetailPage({
         </>) },
       ] : []),
 
-      ...(controller && working ? [
+      ...(controller && working?.state === "NOT_RELEASED" ? [
         { key: "release", primary: decisionFinal && working.state === "NOT_RELEASED", label: decisionFinal ? `Release rev ${working.value}` : `Send rev ${working.value} back`, open: run?.status === "DONE" || working.approvals.some((a) => !a.withdrawnAt), body: (<>
           {decisionFinal ? <PreflightPanel result={await preflight("RELEASE", { revisionId: working.id }, ctx)} className="mb-3" /> : null}
           {/* What was asked for is read on its own card; releasing carries out

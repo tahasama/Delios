@@ -192,13 +192,14 @@ export async function returnRecipients(t: Tenant, revisionId: string): Promise<{
 /** The requests on a revision, as the screens read them: who asked, for what, to whom, and the transmittal it went in. */
 export async function requestsOn(t: Tenant, revisionId: string) {
   const rows = await api<IssueRequestView[]>(projectPath(t, `/revisions/${revisionId}/issue-requests`));
-  return rows.filter((one) => one.status !== "CANCELLED").map((one) => ({
+  // A request cancelled because everyone on it was taken off at release stays, with who took them off.
+  return rows.filter((one) => one.status !== "CANCELLED" || !!one.releaseNote).map((one) => ({
     id: one.id, revisionId: one.revisionId, reason: one.reason, status: one.status, note: one.note,
     recipients: JSON.stringify({ internalUserIds: one.userIds, partyIds: one.partyIds }),
     raisedById: one.raisedById, raisedByName: one.raisedBy, raisedAt: new Date(one.raisedAt),
     carriedOutAt: one.status === "DONE" && one.closedAt ? new Date(one.closedAt) : null, carriedOutBy: one.status === "DONE" ? one.closedBy : null,
-    // Leaving it to the author, and an outside approval before release, are not kept by the backend.
-    delegated: false, needsApproval: false, approverId: null as string | null,
+    delegated: !!one.delegated, needsApproval: !!one.approverPartyId, approverId: one.approverPartyId ?? null,
+    releaseNote: one.releaseNote ?? null,
     transmittal: one.transmittalIds[0] ? { id: one.transmittalIds[0], number: one.transmittals[0] ?? "" } : null,
   }));
 }

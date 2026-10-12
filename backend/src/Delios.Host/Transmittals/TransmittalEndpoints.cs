@@ -27,7 +27,8 @@ public sealed record DistributionView(IReadOnlyList<Person> Proposed, IReadOnlyL
 public sealed record IssueRequestView(Guid Id, Guid RevisionId, string Reason, IReadOnlyList<Guid> UserIds,
     IReadOnlyList<Guid> PartyIds, string? Note, string? OffDistributionReason, string RaisedBy, DateTimeOffset RaisedAt,
     string Status, DateTimeOffset? ClosedAt, string? ClosedBy, IReadOnlyList<string> Transmittals, Guid RaisedById = default,
-    IReadOnlyList<Guid>? TransmittalIds = null, bool Delegated = false, Guid? ApproverPartyId = null, string? ApprovalState = null);
+    IReadOnlyList<Guid>? TransmittalIds = null, bool Delegated = false, Guid? ApproverPartyId = null, string? ApprovalState = null,
+    string? ReleaseNote = null);
 
 /// <summary>
 /// Answer after asking for or carrying out an issue request: the request and the numbers of any transmittals raised.

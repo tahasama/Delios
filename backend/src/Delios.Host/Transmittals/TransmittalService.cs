@@ -1324,7 +1324,7 @@ public sealed class TransmittalService(
     public static IssueRequestView View(IssueRequest r, IReadOnlyList<string> transmittals, IReadOnlyList<Guid>? transmittalIds = null) => new(
         r.Id, r.RevisionId, r.Reason, r.UserIds, r.PartyIds, r.Note, r.OffDistributionReason, r.RaisedByName,
         r.RaisedAt.ToDateTimeOffset(), r.Status, r.ClosedAt?.ToDateTimeOffset(), r.ClosedByName, transmittals, r.RaisedById,
-        transmittalIds ?? [], r.Delegated, r.ApproverPartyId, r.ApprovalState);
+        transmittalIds ?? [], r.Delegated, r.ApproverPartyId, r.ApprovalState, r.ReleaseNote);
 
     /// <summary>
     /// Whether a request can become transmittals now: it names somebody, no outside

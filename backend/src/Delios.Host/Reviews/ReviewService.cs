@@ -27,7 +27,14 @@ public sealed record AnswerRequest(string? Verdict = null, string? Status = null
     string? ForeignAnswer = null, Guid? EvidenceFileId = null, int? ClosesWithStep = null);
 /// <summary>Body of a release request. <c>Status</c>, if given, must equal the status the deciding step granted.</summary>
 /// <param name="Outcome">Document Control's outcome to record, from its own published set.</param>
-public sealed record ReleaseRequest(string? Status = null, string? Outcome = null, Transmittals.IssueAsk? Issue = null);
+public sealed record ReleaseRequest(string? Status = null, string? Outcome = null, Transmittals.IssueAsk? Issue = null,
+    IReadOnlyList<KeptRecipients>? Kept = null);
+
+/// <summary>
+/// Of an open request asking who receives the revision, the people and organizations Document Control keeps when
+/// releasing. Anyone left out is taken off that request, and the request says so; nobody is added this way.
+/// </summary>
+public sealed record KeptRecipients(Guid RequestId, Guid[]? UserIds, Guid[]? PartyIds);
 /// <summary>Body of a return request: Document Control sends the revision back to its author, or the route back to a step. <c>Note</c> is required; <c>Reason</c> is required when going back to a step.</summary>
 /// <param name="ToStep">Null sends the revision back to its author; a step number (from 1) sends the route back to that step.</param>
 /// <param name="Outcome">
@@ -1064,6 +1071,7 @@ public sealed class ReviewService(
         if (await ApprovalOwedAsync(review.RevisionId, cancellationToken) is { } owed) return (null, owed);
         var (outcome, outcomeProblem) = ControlService.Pick(catalog, request.Outcome, ControlService.Release);
         if (outcomeProblem is not null) return (null, outcomeProblem);
+        await KeepRecipientsAsync(access, review.RevisionId, request.Kept, cancellationToken);
         if (await IssueWithReleaseAsync(access, review.RevisionId, request.Issue, cancellationToken) is { } noOne) return (null, noOne);
         await ReleaseCoreAsync(access, review, status, access.UserName, cancellationToken);
         control.Record(await db.Revisions.SingleAsync(r => r.Id == review.RevisionId, cancellationToken), outcome, null, access.UserName);
@@ -1094,6 +1102,41 @@ public sealed class ReviewService(
         if (named || await ReleasePolicyAsync(access.Project.Id, cancellationToken) == "SEPARATE") return null;
         return Problems.Invalid("ISSUE_REQUIRED",
             "Released and issued go together here: say who receives it (our own people, an outside party, or both), and why.");
+    }
+
+    /// <summary>
+    /// Releasing, Document Control may take people or organizations off what was asked (never add to a request; it
+    /// names others on the release itself). The request keeps who asked and why, and says who was taken off, by whom
+    /// and when. A request left naming nobody is closed as cancelled, with the same note.
+    /// </summary>
+    private async Task KeepRecipientsAsync(ProjectAccess access, Guid revisionId, IReadOnlyList<KeptRecipients>? kept, CancellationToken cancellationToken)
+    {
+        if (kept is null || kept.Count == 0) return;
+        var ids = kept.Select(k => k.RequestId).ToList();
+        var requests = await db.IssueRequests.Where(r => ids.Contains(r.Id) && r.RevisionId == revisionId
+            && r.Status == IssueRequestStatuses.Open && !r.Delegated).ToListAsync(cancellationToken);
+        var now = clock.GetCurrentInstant();
+        foreach (var request in requests)
+        {
+            var keep = kept.First(k => k.RequestId == request.Id);
+            var users = request.UserIds.Where(id => (keep.UserIds ?? []).Contains(id)).ToArray();
+            var parties = request.PartyIds.Where(id => (keep.PartyIds ?? []).Contains(id)).ToArray();
+            var offUsers = request.UserIds.Except(users).ToList();
+            var offParties = request.PartyIds.Except(parties).ToList();
+            if (offUsers.Count + offParties.Count == 0) continue;
+            var names = (await db.Users.AsNoTracking().Where(u => offUsers.Contains(u.Id)).Select(u => u.Name).ToListAsync(cancellationToken))
+                .Concat(await db.Parties.AsNoTracking().Where(p => offParties.Contains(p.Id)).Select(p => p.Name).ToListAsync(cancellationToken));
+            var note = $"Taken off at release by {access.UserName}, {now.ToDateTimeOffset():d MMM yyyy}: {string.Join(", ", names)}.";
+            request.ReleaseNote = request.ReleaseNote is null ? note : $"{request.ReleaseNote}\n{note}";
+            request.UserIds = users;
+            request.PartyIds = parties;
+            if (users.Length + parties.Length == 0)
+            {
+                request.Status = IssueRequestStatuses.Cancelled;
+                request.ClosedAt = now;
+                request.ClosedByName = access.UserName;
+            }
+        }
     }
 
     /// <summary>The project's answer to POLICY_RELEASE, else the organization's; TOGETHER when neither said.</summary>

@@ -11,7 +11,7 @@ import { SearchPick } from "@/components/search-pick";
 
 export type SendPerson = { id: string; name: string; functionName: string; inMatrix?: boolean };
 export type SendStep = { title: string; act: "REVIEW" | "APPROVAL"; mode: string; proposed: { id: string; why: string }[]; fromFunctions: string[] };
-export type SendRoute = { id: string; name: string; description: string | null; isDefault: boolean; steps: SendStep[]; verdicts: { title: string; values: { code: string; label: string; effectLabel: string }[] } | null };
+export type SendRoute = { id: string; name: string; description: string | null; isDefault: boolean; recommended?: boolean; steps: SendStep[]; verdicts: { title: string; values: { code: string; label: string; effectLabel: string }[] } | null };
 
 const MODE: Record<string, string> = {
   ALL: "all give input, any order",
@@ -41,7 +41,8 @@ export function SendForReviewForm({ revisionIds, routes, reviewers, approvers, e
   /** Fields this organization added to the sending of a review. */
   ownFields?: OwnField[];
 }) {
-  const [routeId, setRouteId] = useState(routes.find((r) => r.isDefault)?.id ?? routes[0]?.id ?? "");
+  // The route that serves these documents most closely starts chosen; the sender may take another.
+  const [routeId, setRouteId] = useState(routes.find((r) => r.recommended)?.id ?? routes.find((r) => r.isDefault)?.id ?? routes[0]?.id ?? "");
   const route = routes.find((r) => r.id === routeId);
   const [attempt] = useState(() => crypto.randomUUID());
   if (!routes.length) return <p className="text-sm text-amber-800">No review route applies to {revisionIds.length > 1 ? "all of these documents" : "this document"}. Review routes are set up in Settings → Review routes.</p>;
@@ -50,9 +51,9 @@ export function SendForReviewForm({ revisionIds, routes, reviewers, approvers, e
     <ActionForm action={sendForReviewAction} submitLabel={revisionIds.length > 1 ? `Send ${revisionIds.length} documents` : "Send"} size="sm" hidden={{}}>
       <input type="hidden" name="attempt" value={attempt} />
       {revisionIds.map((id) => <input key={id} type="hidden" name="revisionIds" value={id} />)}
-      <Field label="Route" required>
+      <Field label="Route" required hint={routes.length > 1 ? "the recommended one serves what you are sending most closely; the choice is yours" : undefined}>
         <select name="templateId" required className={inputCls} value={routeId} onChange={(e) => setRouteId(e.target.value)}>
-          {routes.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+          {routes.map((r) => <option key={r.id} value={r.id}>{r.name}{r.recommended ? " (recommended)" : ""}</option>)}
         </select>
       </Field>
       {route?.description ? <p className="-mt-1 text-xs text-slate-500">{route.description}</p> : null}

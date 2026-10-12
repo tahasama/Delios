@@ -2698,6 +2698,21 @@
             "responsePeriodDays": 7,
             "family": "Information"
           }
+        },
+        {
+          "code": "RFI",
+          "label": "Request for information",
+          "props": { "maturity": "Whatever exists", "reviewCycle": false, "response": true, "acceptancePeriodDays": 5, "responsePeriodDays": 7, "family": "Information" }
+        },
+        {
+          "code": "ANSWER",
+          "label": "Answer",
+          "props": { "maturity": "Whatever exists", "reviewCycle": false, "response": false, "acceptancePeriodDays": 5, "family": "Information" }
+        },
+        {
+          "code": "CONFIRMATION",
+          "label": "Confirmation",
+          "props": { "maturity": "Whatever exists", "reviewCycle": false, "response": false, "acceptancePeriodDays": 5, "family": "Information" }
         }
       ]
     },

@@ -4500,6 +4500,11 @@ namespace Delios.Host.Platform.Migrations
                         .HasColumnType("character varying(64)")
                         .HasColumnName("reason");
 
+                    b.Property<string>("ReleaseNote")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("release_note");
+
                     b.Property<Guid>("RevisionId")
                         .HasColumnType("uuid")
                         .HasColumnName("revision_id");

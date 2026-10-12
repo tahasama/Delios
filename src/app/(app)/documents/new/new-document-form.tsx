@@ -11,7 +11,7 @@ import { isEmptyTitle } from "@/lib/standard";
 import type { OwnField } from "@/lib/field-policy";
 import { OwnFields } from "./own-fields";
 
-type Opt = { code: string; label: string; meaning?: string | null; appliesTo?: string | null; criticality?: string | null; decides?: string | null; record?: boolean };
+type Opt = { code: string; label: string; meaning?: string | null; appliesTo?: string | null; deliverables?: string[] | null; criticality?: string | null; decides?: string | null; record?: boolean };
 
 
 const STEPS = ["What it is", "How it is described"];
@@ -85,11 +85,12 @@ export function NewDocumentForm({
   const [ownCriticality, setOwnCriticality] = useState(false);
   const shownCriticality = ownCriticality ? criticality : recommended?.code ?? criticality;
   const level = criticalities.find((o) => o.code === shownCriticality) ?? null;
-  // Each type says who produces it. Once the producer is chosen, the list is
-  // the types that belong to them — two hundred names narrows to the ones that
-  // can be right. A type that says nothing is offered either way.
+  // Each deliverable type has its own document types: a type names the deliverable types it belongs to (Settings,
+  // on the type). Once the deliverable type is chosen, the list is those types. A type that names none falls back
+  // to who produces it (supplier or not); one that says nothing is offered either way.
   const supplierDoc = producer !== "" && producer !== "ENG";
   const typesForProducer = docTypes.filter((one) => {
+    if (producer && one.deliverables?.length) return one.deliverables.includes(producer);
     if (!one.appliesTo || one.appliesTo === "Unclassified" || !producer) return true;
     return supplierDoc ? one.appliesTo === "Supplier" : one.appliesTo === "Non-supplier";
   });
@@ -181,7 +182,7 @@ export function NewDocumentForm({
                 items={typesForProducer.map((o) => ({ id: o.code, name: o.label, detail: o.code }))}
                 label="Type"
                 required
-                hint={producer ? `${typesForProducer.length} types ${supplierDoc ? "a supplier produces" : "we produce"} — click to see them, or type to narrow` : "click to see the list, or type to narrow it"}
+                hint={producer ? `${typesForProducer.length} types for ${deliverableTypes.find((o) => o.code === producer)?.label.toLowerCase() ?? producer} — click to see them, or type to narrow` : "click to see the list, or type to narrow it"}
                 placeholder="e.g. drawing, datasheet, DSW…"
                 onChange={(ids) => setDocType(ids[0] ?? "")}
               />
