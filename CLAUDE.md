@@ -191,6 +191,15 @@ conversation, write it into the right one in the same commit as the code.
   or organizations, or the people named on the release form); the backend
   refuses otherwise (ISSUE_REQUIRED). The release sends it.
 
+### Transmittals
+- One "Follow up" answers or completes a transmittal: a new one mentioning the
+  one it follows (ours: documents and people carried over; theirs: back to
+  whoever sent it). The subject is not prefixed ("RE:", "Supplement to").
+- The form asks the family (data or information), then a reason of that family
+  (`REASONS_FOR_ISSUE` prop `family`). No "sent by" and no date: it is the
+  person signed in, today. "Received from outside the system" (Document Control)
+  is a tick, and only then are who sent it and when asked.
+
 ### Home
 - Home's to-do lists everything the signed-in person has to do, whatever it
   is: reviews to decide or advise, releases, documents returned, things to send

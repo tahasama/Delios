@@ -49,7 +49,11 @@ export default async function NewTransmittalPage({ searchParams }: { searchParam
   // it is addressed, the people copied in on the question are copied in on the
   // answer, and the subject carries the thread. All of it is editable — it is a
   // starting point, not a rule.
-  const question = sp.replyTo ? await backendTransmittal(ctx, sp.replyTo) : null;
+  // "Follow up" is the one way to answer or complete a transmittal: one we sent is completed (its documents and people
+  // carried over); anything else is answered, back to whoever sent it. Either way the new one mentions it.
+  const followed = sp.follows ? await backendTransmittal(ctx, sp.follows) : null;
+  const followedIsOurs = !!followed && ctx.user.isInternal && followed.direction === "OUTGOING";
+  const question = sp.replyTo ? await backendTransmittal(ctx, sp.replyTo) : followed && !followedIsOurs ? followed : null;
   const answering = question
     ? { id: question.id, number: question.number, subject: question.subject as string | null, direction: question.direction, issuingParty: question.from ?? question.issuedBy }
     : null;
@@ -67,8 +71,8 @@ export default async function NewTransmittalPage({ searchParams }: { searchParam
   // copy of the first — its reason, its people, its documents — and the sender
   // changes what was missing. The first stays exactly as it went.
   const followKind = sp.kind === "REPLACES" ? "REPLACES" : "SUPPLEMENT";
-  const first = sp.follows ? await backendTransmittal(ctx, sp.follows) : null;
-  const following = first && first.direction === "OUTGOING"
+  const first = followedIsOurs ? followed : null;
+  const following = first
     ? { id: first.id, number: first.number, subject: first.subject as string | null, reasonForIssue: first.reason, rejectionReason: null as string | null, items: first.items.filter((one) => one.revisionId).map((one) => ({ revisionId: one.revisionId! })) }
     : null;
   const followTo = first && following
@@ -125,7 +129,10 @@ export default async function NewTransmittalPage({ searchParams }: { searchParam
         // Sending is what the form is mostly for, so it opens on sending —
         // replies included. Only a link that asks to record something
         // received opens the other way.
-        defaultDirection={sp.direction === "INCOMING" ? "INCOMING" : "OUTGOING"}
+        // Another organization's people send to us; Document Control may record what reached us outside the system.
+        defaultDirection={!ctx.user.isInternal || (sp.direction === "INCOMING" && ctx.can("CONTROL")) ? "INCOMING" : "OUTGOING"}
+        mayRecordReceived={ctx.user.isInternal && ctx.can("CONTROL")}
+        outsider={!ctx.user.isInternal}
         preselectedRevisionIds={preselected}
         placeholders={placeholders.length ? { to: supplier!.name, items: placeholders, mixed: owners.length > 1 } : askedIds.length && owners.length > 1 ? { to: "", items: [], mixed: true } : undefined}
         prefill={{
@@ -137,11 +144,12 @@ export default async function NewTransmittalPage({ searchParams }: { searchParam
           party: answering && answering.direction === "INCOMING" ? answering.issuingParty : sp.party,
           subject: placeholders.length && !following && !answering && !sp.subject
             ? `${placeholders.length === 1 ? placeholders[0].number : `${placeholders.length} documents`} to send`
+            // The subject stays the first one's: the mention says what it follows, no prefix needed.
             : following
-            ? `${followKind === "REPLACES" ? "Replaces" : "Supplement to"} ${following.number}${following.subject ? ` — ${following.subject}` : ""}`
-            : answering
-              ? `RE: ${answering.subject ?? answering.number}`
-              : sp.subject,
+              ? following.subject ?? undefined
+              : answering
+                ? answering.subject ?? undefined
+                : sp.subject,
           message: sp.message,
           answering: answering ? { id: answering.id, number: answering.number, subject: answering.subject } : undefined,
           following: following ? { id: following.id, number: following.number, kind: followKind, rejection: following.rejectionReason } : undefined,

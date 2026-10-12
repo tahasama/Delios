@@ -81,7 +81,9 @@ export default async function TransmittalDetailPage({ params, searchParams }: { 
   const replyOverdue = !t.answers.length && t.responseRequired && !!t.responseDueDate && t.responseDueDate.getTime() < Date.now();
   // Anybody it reached may answer it — the people it was addressed to, the
   // people copied in who have a question of their own, and whoever raised it.
-  const replyHref = `/transmittals/new?replyTo=${t.id}`;
+  // One way to answer or complete it: a new transmittal that follows it. Ours, it carries its documents and people;
+  // theirs, it goes back to whoever sent it.
+  const followHref = `/transmittals/new?follows=${t.id}`;
 
   // How often each of these documents has gone out before this transmittal —
   // the third issue of a drawing is a fact about the drawing, not a detail.
@@ -389,24 +391,24 @@ export default async function TransmittalDetailPage({ params, searchParams }: { 
           {/* What was sent after it. A transmittal is never changed once it
               went: a person or a document left out goes on a supplement, and a
               package they rejected goes again on one that replaces it. */}
-          {t.direction === "OUTGOING" && (t.status !== "DRAFT" || t.follows) ? (
+          {t.status !== "DRAFT" || t.follows ? (
             <section id="followed" className="register register-sheet register-sheet-open">
               <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2 sm:px-6">
                 <span className="stencil mr-1 text-slate-400">Follow-ups</span>
                 <span className="text-[11px] text-slate-400">
-                  {t.followedBy.length
-                    ? `${t.followedBy.length} sent after it to complete or correct it`
-                    : "a sent transmittal never changes — anything missed or wrong goes on a new one, listed here"}
+                  {t.followedBy.length + t.answers.length
+                    ? `${t.followedBy.length + t.answers.length} sent after it, each mentioning it`
+                    : "a sent transmittal never changes — an answer, or anything missed, goes on a new one that follows it, listed here"}
                 </span>
-                {controller && t.status !== "DRAFT" ? (
-                  t.status === "REJECTED"
+                {t.status !== "DRAFT" ? (
+                  t.status === "REJECTED" && controller && t.direction === "OUTGOING"
                     ? <Link href={`/transmittals/new?follows=${t.id}&kind=REPLACES`} className="ask ml-auto">Send the corrected package</Link>
-                    : <Link href={`/transmittals/new?follows=${t.id}&kind=SUPPLEMENT`} className="ask ml-auto">Send a follow-up</Link>
+                    : <Link href={followHref} className="ask ml-auto">Follow up</Link>
                 ) : null}
               </div>
               {t.follows ? (
                 <p className="border-b border-line px-5 py-2 text-[11px] text-slate-500 sm:px-6">
-                  {t.followKind === "REPLACES" ? "This replaces " : "This is a supplement to "}
+                  {t.followKind === "REPLACES" ? "This replaces " : "This follows "}
                   <Link href={`/transmittals/${t.follows.id}`} className="font-mono font-semibold text-link hover:underline">{t.follows.number}</Link>
                   {t.follows.subject ? <> &mdash; {t.follows.subject}</> : null}.
                 </p>
@@ -417,7 +419,7 @@ export default async function TransmittalDetailPage({ params, searchParams }: { 
                     <li key={one.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-2.5 sm:px-6">
                       <div className="min-w-0">
                         <p className="text-sm">
-                          <span className="stencil mr-2 text-slate-400">{one.followKind === "REPLACES" ? "Replaced by" : "Supplement"}</span>
+                          <span className="stencil mr-2 text-slate-400">{one.followKind === "REPLACES" ? "Replaced by" : "Followed by"}</span>
                           <Link href={`/transmittals/${one.id}`} className="doc-number">{one.number}</Link>
                         </p>
                         <p className="text-[11px] text-slate-400">
@@ -449,12 +451,11 @@ export default async function TransmittalDetailPage({ params, searchParams }: { 
                         : `an answer is due by ${fmtDate(t.responseDueDate)}`
                       : "no answer is owed — anybody it reached may still send one"}
                 </span>
-                <Link href={replyHref} className="ask ml-auto">Reply</Link>
               </div>
 
               {t.inReplyTo ? (
                 <p className="border-b border-line px-5 py-2 text-[11px] text-slate-500 sm:px-6">
-                  This is itself an answer to{" "}
+                  This follows{" "}
                   <Link href={`/transmittals/${t.inReplyTo.id}`} className="font-mono font-semibold text-link hover:underline">{t.inReplyTo.number}</Link>
                   {t.inReplyTo.subject ? <> &mdash; {t.inReplyTo.subject}</> : null}.
                 </p>
@@ -480,7 +481,7 @@ export default async function TransmittalDetailPage({ params, searchParams }: { 
                 </ul>
               ) : (
                 <p className="px-5 py-3.5 text-xs text-slate-500 sm:px-6">
-                  Nothing has come back yet. An answer is a transmittal of its own — Reply opens one addressed to whoever sent this,
+                  Nothing has come back yet. An answer is a transmittal of its own — Follow up opens one addressed to whoever sent this,
                   with the people copied in carried over, and you can change any of that before it goes.
                 </p>
               )}

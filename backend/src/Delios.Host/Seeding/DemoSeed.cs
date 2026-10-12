@@ -339,12 +339,13 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
 
         AddSet(t, Transmittals.TransmittalSets.Reasons,
         [
-            ("INFORMATION", "For information", new { response = false }),
-            ("REVIEW", "For review", new { response = true, responseDays = 10 }),
-            ("APPROVAL", "For approval", new { response = true, responseDays = 10 }),
-            ("PRICING", "For pricing", new { response = true, responseDays = 15 }),
-            ("EXECUTION", "For execution", new { response = false, executes = true }),
-            ("RECORD", "For record", new { response = false }),
+            // Each says its kind: data carries documents; information, a request or an answer.
+            ("INFORMATION", "For information", new { response = false, family = "Data" }),
+            ("REVIEW", "For review", new { response = true, responseDays = 10, family = "Data" }),
+            ("APPROVAL", "For approval", new { response = true, responseDays = 10, family = "Data" }),
+            ("PRICING", "For pricing", new { response = true, responseDays = 15, family = "Data" }),
+            ("EXECUTION", "For execution", new { response = false, executes = true, family = "Data" }),
+            ("RECORD", "For record", new { response = false, family = "Data" }),
         ]);
         var scheme = new NumberingScheme
         {

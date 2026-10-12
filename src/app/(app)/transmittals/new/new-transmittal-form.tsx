@@ -8,7 +8,7 @@ import { RecipientPicker, type Company } from "./recipient-picker";
 import type { OwnField } from "@/lib/field-policy";
 import { OwnFields } from "@/app/(app)/documents/new/own-fields";
 import { cn } from "@/lib/utils";
-import { ArrowDownLeft, ArrowUpRight, Search } from "lucide-react";
+import { Search } from "lucide-react";
 
 type Opt = { code: string; label: string; props: Record<string, unknown> };
 type RevOpt = { id: string; label: string; released: boolean; number: string; rev: string; status: string | null; title: string };
@@ -30,20 +30,16 @@ export type Prefill = {
 
 const STEPS = ["Which way, and why", "What goes with it", "Who gets it"];
 
-/** The two things this form can be for, each said in a sentence, because the
- *  second is not a forward: it records something that has already arrived. */
-const WAYS = {
-  OUTGOING: {
-    title: "We are sending",
-    says: "Documents, or a letter, going from us to named people. They are notified here, and their opening it is the receipt.",
-    Icon: ArrowUpRight,
-  },
-  INCOMING: {
-    title: "We received",
-    says: "Something that reached us outside this system — by email, post, or a supplier's own portal. Recording it gives the transmittal its own number and puts it in the transmittal register for Document Control to accept. The files that came with it are kept with it, and become register documents only when you make them one. To pass something on to colleagues, send instead.",
-    Icon: ArrowDownLeft,
-  },
-} as const;
+/**
+ * The two kinds of transmittal, chosen first; each lists its own reasons. Data carries documents (for review, for
+ * approval, for execution…); information carries a request, an answer, a confirmation sought, an RFI. A reason says
+ * its kind on its published value (Settings: "Kind of transmittal"); one that says nothing is data.
+ */
+export const FAMILIES = [
+  { code: "DATA", label: "Data transmittal", says: "documents: for review, for approval, for execution…" },
+  { code: "INFO", label: "Information transmittal", says: "a request, an answer, a confirmation, an RFI" },
+] as const;
+export const familyOf = (props: Record<string, unknown>) => (props.family === "Information" ? "INFO" : "DATA");
 
 /** A field in this form: its name in stencil above it, and a short hint beside the name. */
 function Ask({ label, hint, required, children, className }: { label: string; hint?: string; required?: boolean; children: React.ReactNode; className?: string }) {
@@ -70,7 +66,7 @@ const field = "plain w-full py-1.5 text-[13px]";
  * only released revisions, and a received transmittal has no subject of ours.
  */
 export function NewTransmittalForm({
-  reasons, revisions, companies, ourOrganization, defaultDirection, preselectedRevisionIds, prefill, fields, labels, ownFields, placeholders,
+  reasons, revisions, companies, ourOrganization, defaultDirection, preselectedRevisionIds, prefill, fields, labels, ownFields, placeholders, mayRecordReceived, outsider = false,
 }: {
   reasons: Opt[];
   revisions: RevOpt[];
@@ -80,6 +76,10 @@ export function NewTransmittalForm({
   companies: Company[];
   ourOrganization: string;
   defaultDirection: "OUTGOING" | "INCOMING";
+  /** Document Control records what reached us outside the system: a tick, never the default. */
+  mayRecordReceived?: boolean;
+  /** Another organization's person: what they send comes to us, today; nobody asks them who sent it or when. */
+  outsider?: boolean;
   preselectedRevisionIds?: string[];
   prefill?: Prefill;
   /**
@@ -97,6 +97,12 @@ export function NewTransmittalForm({
   const [step, setStep] = useState(1);
   const [direction, setDirection] = useState(defaultDirection);
   const [reasonCode, setReasonCode] = useState(prefill?.reason && reasons.some((r) => r.code === prefill.reason) ? prefill.reason : "");
+  // Data or information, chosen first; the reasons listed are that kind's.
+  const [family, setFamily] = useState<"DATA" | "INFO">(() => {
+    const given = reasons.find((r) => r.code === prefill?.reason);
+    return given ? familyOf(given.props) : "DATA";
+  });
+  const familyReasons = reasons.filter((r) => familyOf(r.props) === family);
   const [party, setParty] = useState(prefill?.party ?? "");
   const [subject, setSubject] = useState(prefill?.subject ?? "");
   const [message, setMessage] = useState(prefill?.message ?? "");
@@ -115,6 +121,8 @@ export function NewTransmittalForm({
   const says = (key: string, fallback: string) => labels[key] ?? fallback;
 
   const outgoing = direction === "OUTGOING";
+  // Document Control recording what reached us outside the system: who sent it, and when, are asked.
+  const recording = !outgoing && !outsider;
   const needsReview = reasons.find((r) => r.code === reasonCode)?.props.reviewCycle === true;
   const choices = useMemo(() => {
     const pool = outgoing ? revisions.filter((r) => r.released) : revisions;
@@ -132,7 +140,7 @@ export function NewTransmittalForm({
   }, [chosen, revisions]);
 
   // What each step needs answered before the next one makes sense.
-  const askedFirst = Boolean(reasonCode) && (outgoing || party.trim().length > 0);
+  const askedFirst = Boolean(reasonCode) && (!recording || party.trim().length > 0);
   // A transmittal may carry a message alone — a clarification, a notice, an
   // answer — so enclosures are optional, but it may not be empty of both.
   const saysSomething = chosen.length > 0 || (!outgoing && files > 0) || (outgoing ? subject.trim().length > 0 : message.trim().length > 0);
@@ -192,7 +200,7 @@ export function NewTransmittalForm({
           <>
             <input type="hidden" name="inReplyTo" value={prefill.answering.id} />
             <p className="mb-4 rounded-lg border border-line bg-tint-soft px-4 py-2.5 text-xs text-slate-600">
-              Answering <Link href={`/transmittals/${prefill.answering.id}`} className="font-mono font-semibold text-link hover:underline">{prefill.answering.number}</Link>
+              Follows <Link href={`/transmittals/${prefill.answering.id}`} className="font-mono font-semibold text-link hover:underline">{prefill.answering.number}</Link>
               {prefill.answering.subject ? <> &mdash; {prefill.answering.subject}</> : null}.
               {" "}The people it was sent to and copied in are carried over; change any of them in step 3.
             </p>
@@ -222,7 +230,7 @@ export function NewTransmittalForm({
             <input type="hidden" name="followsId" value={prefill.following.id} />
             <input type="hidden" name="followKind" value={prefill.following.kind} />
             <p className="mb-4 rounded-lg border border-line bg-tint-soft px-4 py-2.5 text-xs text-slate-600">
-              {prefill.following.kind === "REPLACES" ? "Replaces " : "Supplement to "}
+              {prefill.following.kind === "REPLACES" ? "Replaces " : "Follows "}
               <Link href={`/transmittals/${prefill.following.id}`} className="font-mono font-semibold text-link hover:underline">{prefill.following.number}</Link>
               {prefill.following.kind === "REPLACES"
                 ? <>, which they rejected{prefill.following.rejection ? <> &mdash; &ldquo;{prefill.following.rejection}&rdquo;</> : null}. Its documents and people are carried over: swap in the corrected revisions in step 2.</>
@@ -232,56 +240,49 @@ export function NewTransmittalForm({
           </>
         ) : null}
 
-        {/* ── 1 · Which way, and why ───────────────────────────────────────── */}
+        {/* ── 1 · What kind, and why ───────────────────────────────────────── */}
         <section className={cn("register register-sheet register-sheet-open", step !== 1 && "hidden")}>
-          {band(1, "whether it leaves us or has reached us, and what it is for")}
+          {band(1, recording ? "what reached us outside the system, from whom, and what for" : "what kind of transmittal, and what it is for")}
           <div className="space-y-5 px-5 py-5 sm:px-6">
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2" role="radiogroup" aria-label="Which way">
-              {(["OUTGOING", "INCOMING"] as const).map((d) => {
-                const way = WAYS[d];
-                const on = direction === d;
-                return (
-                  <label
-                    key={d}
-                    className={cn(
-                      "flex cursor-pointer items-start gap-3 rounded-lg border px-4 py-3 transition-colors",
-                      on ? "border-brand-line bg-tint" : "border-line hover:border-line-strong hover:bg-tint-soft",
-                    )}
-                  >
-                    <input type="radio" name="direction" value={d} checked={on} onChange={() => setDirection(d)} className="sr-only" />
-                    <span className={cn("mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-md", on ? "bg-brand text-white" : "bg-canvas-deep text-slate-500")}>
-                      <way.Icon className="h-4 w-4" />
-                    </span>
-                    <span className="min-w-0">
-                      <span className={cn("block text-sm font-semibold", on ? "text-brand-ink" : "text-slate-800")}>{way.title}</span>
-                      <span className="mt-0.5 block text-[11.5px] leading-4 text-slate-500">{way.says}</span>
-                    </span>
-                  </label>
-                );
-              })}
-            </div>
+            {/* Sent by us, today: nobody is asked either. What reached us outside the system is the exception, ticked. */}
+            <input type="hidden" name="direction" value={direction} />
+            {recording ? null : <input type="hidden" name="dateOfIssue" value={new Date().toISOString().slice(0, 10)} />}
+            {mayRecordReceived ? (
+              <label className="flex w-fit items-center gap-2 text-xs font-medium text-slate-700">
+                <input type="checkbox" checked={!outgoing} onChange={(e) => setDirection(e.target.checked ? "INCOMING" : "OUTGOING")} />
+                Received from outside the system
+                <span className="font-normal text-slate-500">— by email, post or their own portal; recorded here, Document Control accepts it</span>
+              </label>
+            ) : null}
+
+            <fieldset className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs font-medium text-slate-700">
+              <legend className="sr-only">What kind of transmittal</legend>
+              {FAMILIES.map((one) => (
+                <label key={one.code} className="flex items-center gap-1.5">
+                  <input type="radio" name="family" value={one.code} checked={family === one.code} onChange={() => { setFamily(one.code); setReasonCode(""); }} />
+                  {one.label} <span className="font-normal text-slate-500">— {one.says}</span>
+                </label>
+              ))}
+            </fieldset>
 
             <div className="asking grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-4">
-              {outgoing ? (
-                <div className="min-w-0">
-                  <span className="stencil mb-1.5 block text-slate-500">Sent by</span>
-                  <p className="py-1.5 text-[13px] font-medium text-slate-700">{ourOrganization}</p>
-                </div>
-              ) : (
+              {!recording ? null : (
                 <Ask label="Received from" required>
                   <input name="issuingParty" required className={field} placeholder="Company name" value={party} onChange={(e) => setParty(e.target.value)} />
                 </Ask>
               )}
               <Ask label={says("reason", "Why")} required hint={outgoing ? "what they should do with it" : "what they sent it for"} className="lg:col-span-2">
                 <select name="reasonForIssue" required className={field} value={reasonCode} onChange={(e) => setReasonCode(e.target.value)}>
-                  <option value="" disabled>Choose…</option>
-                  {reasons.map((r) => <option key={r.code} value={r.code}>{r.label}</option>)}
+                  <option value="" disabled>{familyReasons.length ? "Choose…" : "None published for this kind"}</option>
+                  {familyReasons.map((r) => <option key={r.code} value={r.code}>{r.label}</option>)}
                 </select>
               </Ask>
-              <Ask label={outgoing ? "Date sent" : "Date received"} required>
-                <input type="date" name="dateOfIssue" required className={field} defaultValue={new Date().toISOString().slice(0, 10)} />
-              </Ask>
-              {outgoing ? null : (
+              {!recording ? null : (
+                <Ask label="Date received" required>
+                  <input type="date" name="dateOfIssue" required className={field} defaultValue={new Date().toISOString().slice(0, 10)} />
+                </Ask>
+              )}
+              {!recording ? null : (
                 <Ask label="Note" hint="optional" className="sm:col-span-2 lg:col-span-4">
                   <input name="notes" className={field} placeholder="Anything worth writing down about how it arrived" />
                 </Ask>
@@ -294,7 +295,7 @@ export function NewTransmittalForm({
           </div>
           {foot(null,
             <button type="button" onClick={() => setStep(2)} disabled={!askedFirst} data-on={askedFirst ? "true" : undefined} className="ask disabled:cursor-not-allowed disabled:opacity-50">Continue</button>,
-            askedFirst ? null : outgoing ? "Say why it is sent." : "Say who sent it and why.",
+            askedFirst ? null : recording ? "Say who sent it and why." : "Say why it is sent.",
           )}
         </section>
 
@@ -429,10 +430,10 @@ export function NewTransmittalForm({
           </div>
           {foot(2,
             <button type="submit" disabled={!people} data-on={people ? "true" : undefined} className="ask disabled:cursor-not-allowed disabled:opacity-50">
-              {outgoing ? (issueNow ? "Create and send it" : "Create it as a draft") : "Record receipt"}
+              {outgoing ? (issueNow ? "Create and send it" : "Create it as a draft") : outsider ? "Send it" : "Record receipt"}
             </button>,
             // What is about to happen, in one line, beside the button that does it.
-            !people ? "Name at least one person it is addressed to." : `${picked.length ? `${picked.length} document${picked.length === 1 ? "" : "s"}` : "No documents"}${!outgoing && files ? ` + ${files} file${files === 1 ? "" : "s"}` : ""}${!outgoing && !picked.length && !files ? " — accepted as it is recorded" : ""} · ${reasonLabel ?? "no reason chosen"} · ${outgoing ? `from ${ourOrganization}` : `from ${party.trim() || "an unnamed party"}`}`,
+            !people ? "Name at least one person it is addressed to." : `${picked.length ? `${picked.length} document${picked.length === 1 ? "" : "s"}` : "No documents"}${!outgoing && files ? ` + ${files} file${files === 1 ? "" : "s"}` : ""}${!outgoing && !picked.length && !files ? " — accepted as it is recorded" : ""} · ${reasonLabel ?? "no reason chosen"} · ${outgoing ? `from ${ourOrganization}` : outsider ? `to ${ourOrganization}` : `from ${party.trim() || "an unnamed party"}`}`,
           )}
         </section>
       </ActionForm>

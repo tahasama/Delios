@@ -226,7 +226,8 @@ Whether the response period of §11.12 has been met is then read from the
 existence of a linked answer, not from a note somebody typed.
 
 **Depends on it:** `Transmittal.inReplyToId`; the exchange on the transmittal
-page; `/transmittals/new?replyTo=`.
+page; `/transmittals/new?follows=` (see §45: answering and completing are one
+"Follow up").
 
 ---
 
@@ -835,6 +836,32 @@ postponed activity reads "date to be confirmed". Every planned date reads the
 same way for everyone: ready, submitted, overdue, at risk, or days left.
 
 **Depends on it:** `/supplier-schedule`, `/needed`, `plannedState`.
+
+## 45 · One "Follow up"; two families of transmittal; a receipt is ticked
+
+**Clause:** §11.1 *Transmittals*, §11.2 *Reasons for issue*, §11.5 *Receipt*.
+
+**Must say:** answering a transmittal and completing one are the same act,
+**Follow up**: a new transmittal, with its own number, that mentions the one it
+follows. Following one we sent carries over its documents and people (a
+supplement); following anything else goes back to whoever sent it, with the
+people copied in carried over (an answer). The subject stays the first one's;
+no "RE:" or "Supplement to" is written into it — the mention says it. A package
+they rejected is still sent again on one that **replaces** it.
+
+A transmittal is either a **data** transmittal (documents for review, approval,
+construction…) or an **information** transmittal (a request, an answer, a
+confirmation…). The sender picks the family, then a reason from that family's
+published list (`REASONS_FOR_ISSUE` prop `family`: Data | Information).
+
+The sender is the person signed in and the date is today: neither is asked.
+Recording one received outside the system is a tick, "Received from outside the
+system" (Document Control only), and only then are who sent it and when asked.
+
+**Depends on it:** `followsId` / `inReplyToId`, `REASONS_FOR_ISSUE.family`; the
+transmittal form and page.
+
+---
 
 ## Still open — decided in conversation, not yet built
 

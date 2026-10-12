@@ -81,6 +81,7 @@ export const SET_PROP_FIELDS: Record<string, PropField[]> = {
     { key: "meaning", label: "What it means", type: "text" },
   ],
   REASONS_FOR_ISSUE: [
+    { key: "family", label: "Kind of transmittal", type: "select", options: ["Data", "Information"], hint: "data carries documents (review, approval, execution…); information carries a request, an answer, a confirmation, an RFI. Unset is data" },
  { key: "maturity", label: "Required maturity", type: "text", hint: "what state the revision must be in" },
  { key: "reviewCycle", label: "Needs a review", type: "bool", hint: "received documents go down a review route once accepted" },
     { key: "response", label: "Needs a reply", type: "bool", hint: "the recipient must answer within the reply period" },

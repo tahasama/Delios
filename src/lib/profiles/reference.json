@@ -2625,7 +2625,8 @@
             "maturity": "Whatever exists",
             "reviewCycle": false,
             "response": false,
-            "acceptancePeriodDays": 5
+            "acceptancePeriodDays": 5,
+            "family": "Data"
           }
         },
         {
@@ -2636,7 +2637,8 @@
             "reviewCycle": true,
             "response": true,
             "acceptancePeriodDays": 5,
-            "responsePeriodDays": 14
+            "responsePeriodDays": 14,
+            "family": "Data"
           }
         },
         {
@@ -2647,7 +2649,8 @@
             "reviewCycle": true,
             "response": true,
             "acceptancePeriodDays": 5,
-            "responsePeriodDays": 14
+            "responsePeriodDays": 14,
+            "family": "Data"
           }
         },
         {
@@ -2658,7 +2661,8 @@
             "reviewCycle": false,
             "response": true,
             "acceptancePeriodDays": 5,
-            "responsePeriodDays": 21
+            "responsePeriodDays": 21,
+            "family": "Data"
           }
         },
         {
@@ -2668,7 +2672,8 @@
             "maturity": "Approved and current",
             "reviewCycle": false,
             "response": false,
-            "acceptancePeriodDays": 5
+            "acceptancePeriodDays": 5,
+            "family": "Data"
           }
         },
         {
@@ -2678,7 +2683,8 @@
             "maturity": "Final; reflects what was done",
             "reviewCycle": false,
             "response": false,
-            "acceptancePeriodDays": 5
+            "acceptancePeriodDays": 5,
+            "family": "Data"
           }
         },
         {
@@ -2689,7 +2695,8 @@
             "reviewCycle": false,
             "response": true,
             "acceptancePeriodDays": 5,
-            "responsePeriodDays": 7
+            "responsePeriodDays": 7,
+            "family": "Information"
           }
         }
       ]
