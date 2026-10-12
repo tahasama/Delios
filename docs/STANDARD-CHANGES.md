@@ -823,6 +823,19 @@ supplier's document) is read from that meaning, never from a code.
 
 **Depends on it:** `VERDICT_EFFECT` (`proceed`, `resubmit`, `information`), `verdictEffect`, `SupplierHold`.
 
+## 44 · A supplier sees where its documents are needed, and nothing else of the plan
+
+**Clause:** §9 *Information from suppliers and contractors*, §14 *Planning and readiness of activities*.
+
+**Must say:** a supplier is shown the activities that need its documents, each
+with its date, and in each only its own documents, with where each stands and
+whether it is on time, at risk or overdue. It is never shown other parties'
+documents, our disciplines, confirmations, notices, or why an activity moved; a
+postponed activity reads "date to be confirmed". Every planned date reads the
+same way for everyone: ready, submitted, overdue, at risk, or days left.
+
+**Depends on it:** `/supplier-schedule`, `/needed`, `plannedState`.
+
 ## Still open — decided in conversation, not yet built
 
 - **Transmittals as the one channel, in two families.** Transmittals will work

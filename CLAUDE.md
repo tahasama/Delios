@@ -166,7 +166,17 @@ conversation, write it into the right one in the same commit as the code.
   package, the supplier's panel): Sent, Received, Accepted, Returned (by
   Document Control's check, with why), In review, Released & issued, Returned
   (rejected by the review); who holds it is said beside it. `supplierStage` and
-  `Register.SupplierStage` work it out the same way.
+  `RegisterEndpoints.SupplierStage` work it out the same way.
+- A planned date says what it means today, the same everywhere (register,
+  document Details, package lines, the supplier's schedule; `plannedState`):
+  ready (released), submitted (received, accepted, in review), overdue · N
+  days, due today, at risk · N days left (inside the risk window), in N days.
+- A supplier sees, of our schedule, only "Where your documents are needed"
+  (`/needed`, in its menu as Schedule; `/supplier-schedule`): the actions that
+  need its documents, and in each only its own documents, with their stamps
+  in its words and the planned-date state. Never other documents,
+  disciplines, confirmations, notices, or why an action moved; a postponed one
+  reads "date to be confirmed". Our schedule pages stay ours.
 - A notice about a supplier's missing document proposes that supplier's
   people (chosen, marked recommended); they are sent to the document, since
   the schedule is ours only.

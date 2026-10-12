@@ -70,12 +70,10 @@ function primaryNav(p: NavPermissions): NavItem[] {
     [
       { href: "/", label: "Home", description: "What is waiting on me", icon: LayoutDashboard, exact: true },
       { href: "/documents", label: "Documents", description: "The register", icon: FileText, when: p.canRead },
-      {
-        href: "/actions",
-        label: "Schedule & actions",
-        description: "What is needed, and when",
-        icon: CalendarRange,
-      },
+      // Another organization sees, of the schedule, only the actions that need its documents.
+      p.external
+        ? { href: "/needed", label: "Schedule", description: "Where your documents are needed", icon: CalendarRange }
+        : { href: "/actions", label: "Schedule & actions", description: "What is needed, and when", icon: CalendarRange },
       {
         href: "/transmittals",
         label: "Transmittals",
