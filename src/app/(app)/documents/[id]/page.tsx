@@ -13,7 +13,7 @@ import { Chip, StateChip, Banner, btn, Field, inputCls } from "@/components/ui";
 import { ActionForm } from "@/components/form";
 import { Asked, Added } from "@/components/policy-fields";
 import { DOC_STATE_LABEL, DOC_STATE_COLOR, REV_STATE_COLOR, revStateColor, type DocState, type RevState } from "@/lib/standard";
-import { stateNames, stateName, supplierStage, supplierStageName } from "@/lib/state-names";
+import { stateNames, stateName, supplierStage, supplierStageName, supplierStamp } from "@/lib/state-names";
 import { revisionGround } from "@/lib/revision-ground";
 import { typeSkipsReview } from "@/lib/review-need";
 import { ownFields, readExtras, formPolicy } from "@/lib/field-policy";
@@ -591,6 +591,12 @@ export default async function DocumentDetailPage({
   const stage = supplierName && (!shown || shown.id === doc.revisions[0]?.id)
     ? supplierStage(true, newest ? { state: newest.state, resentAt: newest.resent?.at, returnedAt: newest.returnedAt } : null)
     : null;
+  // Its stamp beside the number, in the reader's words: ours ("sent to supplier", "received"…), or, for the supplier
+  // reading its own, theirs ("to be transmitted", "transmitted"…).
+  const exchangedStage = doc.originator && context.transmittals.some((t) => t.itemKind === "PLACEHOLDER")
+    ? supplierStage(true, newest ? { state: newest.state, resentAt: newest.resent?.at, returnedAt: newest.returnedAt } : null)
+    : null;
+  const exchangeStamp = exchangedStage ? supplierStamp(exchangedStage, user.isInternal ? "ours" : "theirs", doc.withSupplier) : null;
   const stateLabel = stage
     ? supplierStageName(names, stage, { together, held: onHold })
     : shown
@@ -625,6 +631,7 @@ export default async function DocumentDetailPage({
           <div className="min-w-0 flex-1">
             <p className="flex flex-wrap items-center gap-2 font-mono text-[12.5px] font-semibold tracking-tight text-slate-500">
               {doc.docNumber}
+              {exchangeStamp ? <span className="stamp font-sans text-sky-700">{exchangeStamp}</span> : null}
               {doc.state === "CANCELLED" ? <span className="stamp font-sans text-slate-500">cancelled</span> : null}
               {doc.state === "WITHDRAWN" ? <span className="stamp font-sans text-red-700">withdrawn</span> : null}
               {doc.state === "ARCHIVED" ? <span className="stamp font-sans text-slate-500">archived</span> : null}

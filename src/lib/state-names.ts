@@ -108,3 +108,24 @@ export function supplierStage(
 export function supplierStageName(names: StateNames, stage: SupplierStage, released?: { together: boolean; held?: boolean }): string {
   return stage === "RELEASED" ? stateName(names, "RELEASED", released) : SUPPLIER_STAGE_LABEL[stage];
 }
+
+/**
+ * The stamp beside a supplier's document number, in the words of whoever reads it: we sent it, they have it to
+ * transmit; they transmitted it, we received it; and so on. Null for a document not asked of a supplier (a
+ * placeholder of ours reads "number reserved").
+ */
+export const SUPPLIER_STAMP: Record<SupplierStage, { ours: string; theirs: string }> = {
+  SENT: { ours: "sent to supplier", theirs: "to be transmitted" },
+  RECEIVED: { ours: "received", theirs: "transmitted" },
+  ACCEPTED: { ours: "accepted", theirs: "accepted" },
+  RETURNED_CHECK: { ours: "returned", theirs: "to correct" },
+  IN_REVIEW: { ours: "in review", theirs: "in review" },
+  RELEASED: { ours: "released", theirs: "released" },
+  RETURNED_REVIEW: { ours: "returned", theirs: "to revise" },
+};
+
+/** The stamp for a stage, on our side or the supplier's; released with comments to take in reads "next revision due". */
+export function supplierStamp(stage: SupplierStage, side: "ours" | "theirs", withSupplier?: boolean | null): string {
+  if (stage === "RELEASED" && withSupplier) return side === "ours" ? "next revision due" : "to revise";
+  return SUPPLIER_STAMP[stage][side];
+}

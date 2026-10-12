@@ -793,8 +793,8 @@ revision, or one rejecting it, hands it to them. Every document of
 an outside organization is filed in that supplier's package (one per supplier
 and purchase order, made by itself), which Document Control shares with the
 supplier once and for good. A placeholder is asked of a supplier only on a
-transmittal raised from that package — the record of what was asked, when, and
-by when — and is asked once; adding a document to a package asks nothing. The
+transmittal — raised from that package, or from the register, one supplier's at a
+time — the record of what was asked, when, and by when — and is asked once; adding a document to a package asks nothing. The
 supplier sees only what was asked of it or exchanged with it. The side that does not hold
 it asks the holder to hand it back for an update, saying why; the holder
 accepts or refuses with why, and the one who asked is told. A revision not yet

@@ -136,3 +136,24 @@ export function supplierFigures(rows: SupplierRow[]) {
     firstTime: pct(approved.filter((r) => r.submissions <= 1).length, approved.length),
   };
 }
+
+/**
+ * Where a supplier's package stands as a whole, in the reader's words: not shared yet (ours only); nothing sent yet;
+ * sent, nothing back (theirs: to be transmitted); partly received (partly transmitted); all received
+ * (transmitted); complete, every document released. `notAsked`: lines not asked of the supplier yet.
+ */
+export function packageStage(pkg: LegacyPackage, rows: SupplierRow[], side: "ours" | "theirs"): { word: string; tone: string; notAsked: number } {
+  const asked = new Set(pkg.view.members.filter((m) => m.requestedAt).map((m) => m.documentId));
+  const lines = rows.filter((r) => asked.has(r.doc.id));
+  const notAsked = side === "ours" ? rows.length - lines.length : 0;
+  const back = lines.filter((r) => r.state !== "NOT_SENT").length;
+  const done = lines.filter((r) => r.state === "APPROVED").length;
+  const slate = "bg-slate-100 text-slate-600 ring-slate-200", amber = "bg-amber-50 text-amber-900 ring-amber-200";
+  const sky = "bg-sky-50 text-sky-800 ring-sky-200", green = "bg-emerald-50 text-emerald-800 ring-emerald-200";
+  if (side === "ours" && !pkg.view.sharedAt) return { word: "not shared", tone: slate, notAsked };
+  if (!lines.length) return { word: side === "ours" ? "nothing sent yet" : "nothing asked yet", tone: slate, notAsked };
+  if (done === lines.length && !notAsked) return { word: "complete", tone: green, notAsked };
+  if (back === 0) return { word: side === "ours" ? "sent to supplier" : "to be transmitted", tone: amber, notAsked };
+  if (back < lines.length) return { word: side === "ours" ? `partly received · ${back} of ${lines.length}` : `partly transmitted · ${back} of ${lines.length}`, tone: sky, notAsked };
+  return { word: side === "ours" ? "received" : "transmitted", tone: sky, notAsked };
+}

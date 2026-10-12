@@ -75,7 +75,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
   const { policy } = await import("@/lib/control-activities");
   const together = (await policy(scope, "POLICY_RELEASE")) === "TOGETHER";
   // What this organization calls each state; the states themselves are fixed.
-  const { stateNames, stateName, supplierStageName, SUPPLIER_STAGES } = await import("@/lib/state-names");
+  const { stateNames, stateName, supplierStageName, supplierStamp, SUPPLIER_STAGES } = await import("@/lib/state-names");
   const names = await stateNames(scope);
   const sp = await searchParams;
   const q = (sp.q ?? "").trim();
@@ -169,6 +169,9 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
       placeholder: doc.isPlaceholder,
       // Asked of its supplier on a transmittal (the supplier's own states begin at "Sent").
       requested: !!doc.supplier,
+      // Its stamp, in the reader's words: ours ("sent to supplier", "received"…) or the supplier's ("to be transmitted"…).
+      supplierStamp: doc.supplier && (SUPPLIER_STAGES as readonly string[]).includes(doc.supplier)
+        ? supplierStamp(doc.supplier as SupplierStage, user.isInternal ? "ours" : "theirs", doc.withSupplier) : null,
       docState: doc.state, docStateLabel: DOC_STATE_LABEL[doc.state as DocState] ?? doc.state,
       revision: doc.revision,
       revState: latestState,

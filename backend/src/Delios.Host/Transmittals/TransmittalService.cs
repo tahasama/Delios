@@ -328,13 +328,14 @@ public sealed class TransmittalService(
         Guid[]? RevisionIds, Guid[]? UserIds, Guid[]? PartyIds, string? Reason, string? Subject = null, string? Message = null,
         DateOnly? ResponseDue = null, Guid[]? CopyUserIds = null, bool Draft = false, Guid? InReplyToId = null, Guid? FollowsId = null,
         string? FollowKind = null, DateOnly? IssuedOn = null, Dictionary<string, string?>? Extras = null, Guid? ActivityId = null,
-        string? ActivityAsk = null);
+        string? ActivityAsk = null, Guid[]? PlaceholderIds = null);
 
     /// <summary>A compose request checked: what it carries, to whom, and when it is dated.</summary>
     private sealed record Prepared(
         string Reason, string Subject, string? Message, LocalDate? Due, List<(Document Document, Revision Revision)> Items,
         List<Addressee> People, List<Party> Parties, List<Addressee> Copies, Instant IssuedAt, Guid? InReplyToId, Guid? FollowsId,
-        string? FollowKind, string? Extras, List<Member> Members, Guid? ActivityId = null, string? ActivityAsk = null);
+        string? FollowKind, string? Extras, List<Member> Members, Guid? ActivityId = null, string? ActivityAsk = null,
+        List<(Document Document, LocalDate? Due)>? Placeholders = null, Party? Supplier = null);
 
     /// <summary>
     /// Issues released revisions directly, without an issue request: one transmittal to the project's own people
@@ -351,7 +352,15 @@ public sealed class TransmittalService(
         var sent = new List<Transmittal>();
         Raise Of(Party? to, string toName, IReadOnlyList<Addressee> recipients) => new(access.Project, actor, p.Reason, p.Subject, p.Message,
             to, toName, p.Items, recipients, ResponseDue: p.Due, Copies: p.Copies, IssuedAt: p.IssuedAt, InReplyToId: p.InReplyToId,
-            FollowsId: p.FollowsId, FollowKind: p.FollowKind, Extras: p.Extras, ActivityId: p.ActivityId, ActivityAsk: p.ActivityAsk);
+            FollowsId: p.FollowsId, FollowKind: p.FollowKind, Extras: p.Extras, ActivityId: p.ActivityId, ActivityAsk: p.ActivityAsk,
+            Placeholders: p.Placeholders);
+        // Placeholders go to the supplier that owes them, alone: one transmittal, to its people named (or all of them).
+        if (p.Supplier is { } supplier)
+        {
+            sent.Add(await RaiseAsync(Of(supplier, supplier.Name, p.People.Count > 0 ? p.People : AddresseesOf(supplier, p.Members)), cancellationToken));
+            await db.SaveChangesAsync(cancellationToken);
+            return (sent, null);
+        }
         if (p.People.Count > 0 || p.Parties.Count == 0) sent.Add(await RaiseAsync(Of(null, "Internal distribution", p.People), cancellationToken));
         foreach (var party in p.Parties) sent.Add(await RaiseAsync(Of(party, party.Name, AddresseesOf(party, p.Members)), cancellationToken));
         foreach (var (document, revision) in p.Items)
@@ -367,10 +376,11 @@ public sealed class TransmittalService(
     {
         static (Prepared?, IResult?) Fail(IResult problem) => (null, problem);
         var revisionIds = request.RevisionIds?.Distinct().ToList() ?? [];
+        var placeholderIds = request.PlaceholderIds?.Distinct().ToList() ?? [];
         var subjectGiven = request.Subject?.Trim() is { Length: > 0 };
         var messageGiven = request.Message?.Trim() is { Length: > 0 };
         if (revisionIds.Count > 500) return Fail(Problems.Invalid("ITEMS_REQUIRED", "Choose at most 500 released revisions."));
-        if (revisionIds.Count == 0 && !(subjectGiven && messageGiven))
+        if (revisionIds.Count == 0 && placeholderIds.Count == 0 && !(subjectGiven && messageGiven))
             return Fail(Problems.Invalid("ITEMS_REQUIRED", "Enclose at least one released revision, or write a subject and a message: a letter says something."));
         var catalog = await Catalog.LoadAsync(db, cancellationToken);
         var reason = request.Reason?.Trim() ?? "";
@@ -388,7 +398,7 @@ public sealed class TransmittalService(
             return Fail(Problems.Conflict("ON_HOLD", $"{Label(documents[held.DocumentId], held)} is on hold, not for use."));
         if (documents.Values.FirstOrDefault(d => !access.Allows(Verbs.Control, d.Facts) && !access.Allows(Verbs.Transmit, d.Facts)) is { } refused)
             return Fail(Problems.Forbidden("TRANSMIT_NOT_ALLOWED", $"Your function does not issue {refused.Number}."));
-        if (revisionIds.Count == 0 && !access.IsInternal)
+        if (revisionIds.Count == 0 && placeholderIds.Count == 0 && !access.IsInternal)
             return Fail(Problems.Forbidden("TRANSMIT_NOT_ALLOWED", "Only the project's own people write letters here."));
 
         var members = await MembersAsync(access.Project, cancellationToken);
@@ -431,13 +441,53 @@ public sealed class TransmittalService(
             return Fail(Problems.NotFound("ACTIVITY_NOT_FOUND", "The action it is about is not in this project's schedule."));
         var ask = request.ActivityId is null ? null : request.ActivityAsk == "DISCIPLINE" ? "DISCIPLINE" : "DOCUMENT";
 
+        // Placeholders: the one exception to "only released revisions travel" — a supplier's document with nothing
+        // released yet, asked of that supplier (theirs alone, from Document Control), with the day it is due.
+        var placeholders = new List<(Document Document, LocalDate? Due)>();
+        Party? supplierTo = null;
+        if (placeholderIds.Count > 0)
+        {
+            var asked = await DocumentQueries.Visible(db, access, catalog.RestrictedLevels())
+                .Where(d => placeholderIds.Contains(d.Id)).OrderBy(d => d.Number).ToListAsync(cancellationToken);
+            if (asked.Count != placeholderIds.Count)
+                return Fail(Problems.NotFound("DOCUMENT_NOT_FOUND", "A document chosen does not exist or is not yours to see."));
+            if (asked.FirstOrDefault(d => !access.Allows(Verbs.Control, d.Facts)) is { } notControl)
+                return Fail(Problems.Forbidden("CONTROL_ONLY", $"Document Control asks a supplier for {notControl.Number}."));
+            var owners = asked.Select(d => d.Originator).Distinct().ToList();
+            var owner = owners.Count == 1 && owners[0] is { } code
+                ? await db.Parties.AsNoTracking().FirstOrDefaultAsync(p => p.Code == code && !p.IsInternal && p.Active, cancellationToken) : null;
+            // To that supplier alone: the organization itself, or its own people.
+            var theirs = owner is not null && parties.All(p => p.Id == owner.Id)
+                && people.All(a => members.Any(m => m.UserId == a.UserId && m.PartyId == owner.Id));
+            if (owner is null || !theirs)
+                return Fail(Problems.Invalid("PLACEHOLDER_TO_ITS_SUPPLIER",
+                    "A placeholder goes to the outside organization that owes it, alone: send one supplier's documents at a time, to that supplier or its people."));
+            supplierTo = owner;
+            var latestIds = asked.Where(d => d.LatestRevisionId != null).Select(d => d.LatestRevisionId!.Value).ToList();
+            var inReview = await db.Revisions.AsNoTracking().Where(r => latestIds.Contains(r.Id) && r.State == RevisionStates.InReview)
+                .Select(r => r.DocumentId).ToListAsync(cancellationToken);
+            // Asked once: after that it is handed back and forth (asked back, sent for an update).
+            var askedBefore = await db.TransmittalItems.AsNoTracking()
+                .Where(i => i.DocumentId != null && placeholderIds.Contains(i.DocumentId.Value) && i.Kind == TransmittalItemKinds.Placeholder)
+                .Select(i => i.DocumentId!.Value).ToListAsync(cancellationToken);
+            if (asked.FirstOrDefault(d => askedBefore.Contains(d.Id)) is { } again)
+                return Fail(Problems.Conflict("ALREADY_REQUESTED", $"{again.Number} was asked of its supplier already: to change it, ask for it back from its page."));
+            if (asked.FirstOrDefault(d => inReview.Contains(d.Id)) is { } reviewing)
+                return Fail(Problems.Conflict("IN_REVIEW", $"{reviewing.Number} is in review: withdraw it from review, or release it, first."));
+            // Due as the request says, or as planned for that document.
+            var asDue = request.ResponseDue is { } rd ? LocalDate.FromDateOnly(rd) : (LocalDate?)null;
+            placeholders = asked.Select(d => (d, asDue ?? d.PlannedDate)).ToList();
+        }
+
         var items = revisions.Select(r => (documents[r.DocumentId], r)).OrderBy(i => i.Item1.Number).ToList();
         var subject = subjectGiven ? request.Subject!.Trim()
-            : items.Count == 1 ? $"{Label(items[0].Item1, items[0].r)}, {items[0].r.StatusCode}" : $"{items.Count} documents";
+            : items.Count == 1 && placeholders.Count == 0 ? $"{Label(items[0].Item1, items[0].r)}, {items[0].r.StatusCode}"
+            : items.Count == 0 && placeholders.Count > 0 ? $"{placeholders.Count} document(s) to send"
+            : $"{items.Count + placeholders.Count} documents";
         var message = messageGiven ? request.Message!.Trim() : null;
         var due = request.ResponseDue is { } d ? LocalDate.FromDateOnly(d) : (LocalDate?)null;
         return (new Prepared(reason, subject, message, due, items, people, parties, copies, issuedAt!.Value, answered?.Id, followed?.Id,
-            followKind, Documents.OwnFields.Write(null, request.Extras), members, request.ActivityId, ask), null);
+            followKind, Documents.OwnFields.Write(null, request.Extras), members, request.ActivityId, ask, placeholders, supplierTo), null);
     }
 
     // ── Drafts ────────────────────────────────────────────────────────────────
@@ -662,6 +712,11 @@ public sealed class TransmittalService(
         {
             foreach (var x in raise.Placeholders!) x.Document.WithSupplier = true;
             await db.Documents.Where(d => placed.Contains(d.Id)).ExecuteUpdateAsync(d => d.SetProperty(x => x.WithSupplier, true), cancellationToken);
+            // Its line in the supplier's package says it was asked, whichever way it went (package or register).
+            var askedAt = clock.GetCurrentInstant();
+            await db.PackageMembers.Where(m => placed.Contains(m.DocumentId) && m.RequestedAt == null
+                    && db.Packages.Any(p => p.Id == m.PackageId && p.Kind == Packages.PackageKinds.Supply))
+                .ExecuteUpdateAsync(m => m.SetProperty(x => x.RequestedAt, askedAt), cancellationToken);
             // A revision not yet reviewed goes to them as it is: they send it back under the same value.
             var unreviewed = await db.Revisions.Where(r => placed.Contains(r.DocumentId) && db.Documents.Any(d => d.LatestRevisionId == r.Id)
                 && (r.State == RevisionStates.Received || r.State == RevisionStates.InPreparation || r.State == RevisionStates.Correcting))

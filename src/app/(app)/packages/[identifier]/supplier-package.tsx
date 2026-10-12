@@ -14,9 +14,16 @@ import { ActionForm } from "@/components/form";
 import { submitSupplierPackageAction } from "@/lib/actions/supplier";
 import { supplierRows, supplierFigures, STATE_LABEL, WITH_SUPPLIER, type SupplierState } from "@/lib/supplier";
 import { fmtDate } from "@/lib/utils";
+import { supplierStamp, type SupplierStage } from "@/lib/state-names";
 import { ArrowLeft, Download } from "lucide-react";
 import { getMe } from "@/lib/api/me";
 import { documentsByIds, type LegacyPackage } from "@/lib/api/packages";
+
+/** A package line's state as the supplier's stage, for its stamp. */
+const STAGE_OF: Record<SupplierState, SupplierStage> = {
+  NOT_SENT: "SENT", AWAITING_CHECK: "RECEIVED", REJECTED: "RETURNED_CHECK", TO_ROUTE: "ACCEPTED",
+  IN_REVIEW: "IN_REVIEW", RETURNED: "RETURNED_REVIEW", APPROVED: "RELEASED",
+};
 
 const TONE: Record<SupplierState, string> = {
   NOT_SENT: "bg-slate-100 text-slate-700 ring-slate-200",
@@ -56,7 +63,9 @@ export async function SupplierPackage({ pkg }: { pkg: LegacyPackage }) {
               <Td>
                 <Link href={`/documents/${r.doc.id}`} className="font-mono text-[13px] font-semibold text-brand-ink hover:underline">{r.doc.docNumber}</Link>
                 {r.revision ? <span className="ml-1.5 font-mono text-xs text-slate-400">rev {r.revision.value}</span> : null}
-                {!isSupplier ? <span className={`stamp ml-2 ${asked.has(r.doc.id) ? "text-sky-700" : "text-slate-400"}`}>{asked.has(r.doc.id) ? "requested" : "not asked yet"}</span> : null}
+                {asked.has(r.doc.id)
+                  ? <span className="stamp ml-2 text-sky-700">{supplierStamp(STAGE_OF[r.state], isSupplier ? "theirs" : "ours")}</span>
+                  : <span className="stamp ml-2 text-slate-400">not asked yet</span>}
                 <span className="block max-w-80 truncate text-xs text-slate-500">{r.doc.title}</span>
               </Td>
               <Td className="whitespace-nowrap text-xs">

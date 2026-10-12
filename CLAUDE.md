@@ -131,12 +131,24 @@ conversation, write it into the right one in the same commit as the code.
 - "Share with <supplier>" is pressed once, for good: until then the supplier
   does not see the package. Once shared, it sees there only the documents asked
   of it on a transmittal, and of its own documents only those exchanged with it.
-- A placeholder reaches its supplier only on a transmittal, from the package:
-  tick some or all of those not asked yet, send on one transmittal (our record
-  of what was asked, when, due when). Each is asked once; after that it is
-  handed back and forth (ask it back, send it for an update). The register
-  stamps it "requested" instead of "number reserved". Adding to a package is
-  not asking.
+- A placeholder reaches its supplier only on a transmittal, from the package
+  (tick some or all not asked yet) or from the register's "Create
+  transmittal" (one supplier's at a time, to that supplier) — both ways, the
+  record of what was asked, when, due when. Each is asked once (backend
+  ALREADY_REQUESTED); after that it is handed back and forth (ask it back,
+  send it for an update). Its package line is marked asked either way. Adding
+  to a package is not asking.
+- Stamps beside a supplier's document number (register, document page,
+  package lines), in the reader's words (`SUPPLIER_STAMP`): sent to supplier /
+  to be transmitted; received / transmitted; accepted; returned / to correct;
+  in review; released (with comments to take in: next revision due / to
+  revise); returned / to revise. Not asked yet: "number reserved" (register),
+  "not asked yet" (package). A supplier's package as a whole, in the packages
+  list (`packageStage`): not shared, nothing sent yet, sent to supplier / to be
+  transmitted, partly received / partly transmitted, received / transmitted,
+  complete; with how many are not asked yet.
+- Document Control (and above) only, on supplier packages; delivery packages
+  keep their owners.
 - The side that does not hold it asks the holder to hand it back for an update
   (RETURN_FOR_UPDATE, with why): Document Control on our side, whoever of the
   supplier may upload on theirs. The holder accepts or refuses with why; the

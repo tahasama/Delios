@@ -6,7 +6,7 @@ import { Asked, Added } from "@/components/policy-fields";
 import { formPolicy } from "@/lib/field-policy";
 import { createPackageAction } from "@/lib/actions/planning";
 import { createSupplierPackageAction } from "@/lib/actions/supplier";
-import { supplierRows, supplierFigures } from "@/lib/supplier";
+import { supplierRows, supplierFigures, packageStage } from "@/lib/supplier";
 import { isController, isAdmin } from "@/lib/auth";
 import { departmentsOf } from "@/lib/schedule";
 import { getActiveSet } from "@/lib/config";
@@ -44,7 +44,13 @@ export default async function PackagesPage({ searchParams }: { searchParams: Pro
   // Our own organization first: a package may be an internal handover.
   const parties = supplierOnly ? [] : await packageParties(ctx);
   const supplierStats = new Map<string, ReturnType<typeof supplierFigures>>();
-  if (category === "SUPPLIER") for (const p of pkgs) supplierStats.set(p.id, supplierFigures(await supplierRows(ctx, p)));
+  // Where each supplier's package stands as a whole, in the reader's words.
+  const supplierStages = new Map<string, ReturnType<typeof packageStage>>();
+  if (category === "SUPPLIER") for (const p of pkgs) {
+    const lines = await supplierRows(ctx, p);
+    supplierStats.set(p.id, supplierFigures(lines));
+    supplierStages.set(p.id, packageStage(p, lines, supplierOnly ? "theirs" : "ours"));
+  }
   // "For the schedule": each action's documents, read as a package.
   const rows = pkgs.map((pkg) => {
     const ready = pkg.members.filter((member) => meetsStatus(member.document.revisions[0]?.statusCode, member.requiredStatus)).length;
@@ -83,13 +89,18 @@ export default async function PackagesPage({ searchParams }: { searchParams: Pro
         rows.length ? (
           <div className="overflow-x-auto">
             <table className="w-full text-[13px]">
-              <thead className="border-b border-line bg-tint-soft"><tr><th className={th}>Supplier</th><th className={th}>Sent</th><th className={th}>Overdue</th><th className={th}>Waiting on</th><th className={th}>Due</th></tr></thead>
+              <thead className="border-b border-line bg-tint-soft"><tr><th className={th}>Supplier</th><th className={th}>Where it stands</th><th className={th}>Sent</th><th className={th}>Overdue</th><th className={th}>Waiting on</th><th className={th}>Due</th></tr></thead>
               <tbody className="divide-y divide-line">
                 {rows.map((pkg) => {
                   const f = supplierStats.get(pkg.id)!;
+                  const where = supplierStages.get(pkg.id)!;
                   return (
                     <tr key={pkg.id} className="hover:bg-tint-soft">
                       <td className={td}><Link href={`/packages/${pkg.identifier}`} className="font-semibold text-brand-ink hover:underline">{pkg.title ?? pkg.recipientName}</Link><span className="block font-mono text-[11px] text-slate-400">{pkg.identifier}</span></td>
+                      <td className={`${td} text-xs`}>
+                        <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap ring-1 ${where.tone}`}>{where.word}</span>
+                        {where.notAsked ? <span className="mt-1 block text-[11px] text-slate-500">{where.notAsked} not asked yet</span> : null}
+                      </td>
                       <td className={`${td} text-xs`}>{f.arrived} of {f.planned} <span className="text-slate-400">({f.submissionProgress}%)</span></td>
                       <td className={`${td} text-xs ${f.notArrivedLate ? "font-semibold text-red-700" : "text-slate-400"}`}>{f.notArrivedLate || "—"}</td>
                       <td className={`${td} text-xs`}>{f.pendingOurs} with us · {f.pendingSupplier} with them</td>
