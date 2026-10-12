@@ -67,7 +67,7 @@ const field = "plain w-full py-1.5 text-[13px]";
  * only released revisions, and a received transmittal has no subject of ours.
  */
 export function NewTransmittalForm({
-  reasons, revisions, companies, ourOrganization, defaultDirection, preselectedRevisionIds, prefill, fields, labels, ownFields, placeholders, askable = [], mayRecordReceived, outsider = false,
+  reasons, revisions, companies, ourOrganization, defaultDirection, preselectedRevisionIds, prefill, fields, labels, ownFields, placeholders, askable = [], askingBack, mayRecordReceived, outsider = false,
 }: {
   reasons: Opt[];
   revisions: RevOpt[];
@@ -88,6 +88,8 @@ export function NewTransmittalForm({
    * revisions travel". Sent to that supplier alone. `mixed`: documents of several suppliers were chosen.
    */
   placeholders?: { to: string; items: { id: string; number: string; title: string }[]; mixed: boolean };
+  /** A supplier's documents it holds, asked back for an update on this transmittal; the asks are raised when it is sent. */
+  askingBack?: { to: string; items: { id: string; number: string; title: string }[] };
   /** Placeholders not asked yet, per supplier, that Document Control may ask on this transmittal: one supplier's at a time. */
   askable?: { supplier: string; items: { id: string; number: string; title: string }[] }[];
   /** What this organization asks for: must be filled, may be left, or not asked. */
@@ -331,7 +333,24 @@ export function NewTransmittalForm({
               </div>
             )
           ) : null}
-          {outgoing && !placeholders && askable.length ? <AskPlaceholders askable={askable} /> : null}
+          {outgoing && askingBack ? (
+            <div className="border-b border-line px-5 py-3 sm:px-6">
+              <p className="text-xs leading-5 text-slate-600">
+                <span className="font-semibold text-slate-800">{askingBack.items.length === 1 ? "1 document" : `${askingBack.items.length} documents`} asked back from {askingBack.to} for an update</span>
+                {" "}&mdash; {askingBack.to} holds {askingBack.items.length === 1 ? "it" : "them"} now. Say why in the message: they accept and hand {askingBack.items.length === 1 ? "it" : "them"} back, or refuse and say why. It is sent now, not kept as a draft.
+              </p>
+              <ul className="mt-1.5 space-y-0.5">
+                {askingBack.items.map((one) => (
+                  <li key={one.id} className="flex gap-x-2 text-[12.5px]">
+                    <input type="hidden" name="askBackIds" value={one.id} />
+                    <span className="font-mono font-semibold text-slate-900">{one.number}</span>
+                    <span className="truncate text-slate-500">{one.title}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+          {outgoing && !placeholders && !askingBack && askable.length ? <AskPlaceholders askable={askable} /> : null}
           <div className="asking flex items-center gap-2 border-b border-line px-5 py-2.5 sm:px-6">
             <Search className="h-3.5 w-3.5 shrink-0 text-slate-400" />
             <label className="min-w-0 flex-1">

@@ -216,6 +216,8 @@ public sealed class PackageService(
     {
         var (package, problem) = await ComposableAsync(access, id, cancellationToken);
         if (problem is not null) return Fail(problem);
+        if (package!.Kind == PackageKinds.Supply && package.SharedAt is not null)
+            return Fail(Problems.Conflict("PACKAGE_SHARED", "It is shared with its supplier: its rule no longer changes."));
         if (await SupplierCodeAsync(package!, cancellationToken) is { } supplierCode)
             request = (request ?? new RuleRequest()) with { Originators = [supplierCode] };
         if ((RuleProblem(await Catalog.LoadAsync(db, cancellationToken), request) ?? await OriginatorsProblemAsync(request, cancellationToken)) is { } bad)
@@ -307,6 +309,9 @@ public sealed class PackageService(
             return Fail(Problems.Forbidden("OWNER_ONLY", "Its owners or Document Control rename a package."));
         if (package.Kind == PackageKinds.Supply && !access.Holds(Verbs.Control))
             return Fail(Problems.Forbidden("CONTROL_ONLY", "Document Control looks after a supplier's package."));
+        // What its supplier sees stays as it saw it: once shared, a supplier's package keeps its name and number.
+        if (package.Kind == PackageKinds.Supply && package.SharedAt is not null)
+            return Fail(Problems.Conflict("PACKAGE_SHARED", "It is shared with its supplier: its name, number and description no longer change."));
         var title = request.Title?.Trim() ?? "";
         if (title.Length == 0) return Fail(Problems.Invalid("TITLE_REQUIRED", "Give the package a title."));
         // Renumbered only before anyone outside saw it: once shared, or once a transmittal named it, its number stays.
@@ -339,16 +344,30 @@ public sealed class PackageService(
     {
         var (package, problem) = await ComposableAsync(access, id, cancellationToken);
         if (problem is not null) return problem;
-        if (package!.Members.Count > 0)
+        // A supplier's package, made by hand or by itself, is deleted while it is not shared and none of its documents
+        // was sent to the supplier: its documents leave it (they stay in the register) and are filed again, into
+        // another package of that supplier when there is one.
+        var supply = package!.Kind == PackageKinds.Supply;
+        if (supply && package.Members.Any(m => m.RequestedAt is not null))
+            return Problems.Conflict("SENT_TO_SUPPLIER", "Some of its documents were sent to the supplier on a transmittal; it is kept.");
+        if (!supply && package.Members.Count > 0)
             return Problems.Conflict("PACKAGE_NOT_EMPTY", "Take its documents out first: only an empty package is deleted.");
         if (await db.Transmittals.AnyAsync(t => t.PackageId == package.Id, cancellationToken))
             return Problems.Conflict("PACKAGE_HAS_GONE_OUT", "A transmittal went out for it; it is kept.");
         if (package.SharedAt is not null)
             return Problems.Conflict("PACKAGE_SHARED", "It was shared with its supplier; it is kept.");
+        var held = package.Members.Count;
+        if (held > 0)
+        {
+            db.PackageMembers.RemoveRange(package.Members);
+            await db.SaveChangesAsync(cancellationToken);
+        }
         db.Packages.Remove(package);
         await audit.WriteAsync(Actor(access), "PACKAGE_DELETED", "Package", package.Id, package.Number,
-            $"{package.Title}: deleted while empty.{(Blank(reason) is { } why ? $" {why}" : "")}", package.ProjectId, cancellationToken);
+            $"{package.Title}: deleted before it was shared{(held > 0 ? $"; its {held} document(s) stay in the register" : ", empty")}.{(Blank(reason) is { } why ? $" {why}" : "")}",
+            package.ProjectId, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
+        if (held > 0) await filing.FileUnfiledAsync(access.Project, Actor(access), cancellationToken);
         return null;
     }
 

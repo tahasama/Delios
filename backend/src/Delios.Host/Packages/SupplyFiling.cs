@@ -43,10 +43,12 @@ public sealed class SupplyFiling(DeliosDbContext db, Numbering numbering, AuditL
         var supplier = await db.Parties.AsNoTracking().FirstOrDefaultAsync(p => p.Code == code && !p.IsInternal && p.Active, cancellationToken);
         if (supplier is null) return;
         var order = string.IsNullOrWhiteSpace(document.ContractRef) ? null : document.ContractRef.Trim();
-        var package = await db.Packages.Include(p => p.Members)
-            .Where(p => p.ProjectId == project.Id && p.Kind == PackageKinds.Supply && p.SupplierPartyId == supplier.Id
-                && p.State == PackageStates.Open && p.PurchaseOrder == order)
-            .OrderBy(p => p.CreatedAt).FirstOrDefaultAsync(cancellationToken);
+        // A package already made for this supplier, by hand or by itself, takes it: the one for its order first, else
+        // one for the supplier as a whole (no order). Only when there is none is a package made by itself.
+        var mine = db.Packages.Include(p => p.Members)
+            .Where(p => p.ProjectId == project.Id && p.Kind == PackageKinds.Supply && p.SupplierPartyId == supplier.Id && p.State == PackageStates.Open);
+        var package = await mine.Where(p => p.PurchaseOrder == order).OrderBy(p => p.CreatedAt).FirstOrDefaultAsync(cancellationToken)
+            ?? (order is null ? null : await mine.Where(p => p.PurchaseOrder == null).OrderBy(p => p.CreatedAt).FirstOrDefaultAsync(cancellationToken));
         var now = clock.GetCurrentInstant();
         if (package is null)
         {

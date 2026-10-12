@@ -12,7 +12,7 @@ public static class Commands
     /// True when the first command-line argument names one of these commands. Program.cs then runs the command instead of starting the web server.
     /// </summary>
     public static bool IsCommand(string[] args) =>
-        args.Length > 0 && args[0] is DatabaseMigrator.Command or "create-tenant" or "seed-demo" or "reindex" or "grant-all";
+        args.Length > 0 && args[0] is DatabaseMigrator.Command or "create-tenant" or "seed-demo" or "reindex" or "grant-all" or "unshare-package";
 
     /// <summary>
     /// Runs the command named by the first argument and returns the process exit code (0 success, 2 wrong usage or refused).
@@ -69,9 +69,14 @@ public static class Commands
                 await Console.Out.WriteLineAsync(said);
                 return said.StartsWith("No one") ? 2 : 0;
 
+            case "unshare-package" when args.Length == 3:
+                var unshared = await services.GetRequiredService<UnsharePackage>().RunAsync(args[1], args[2]);
+                await Console.Out.WriteLineAsync(unshared);
+                return unshared.Contains("no longer shared") ? 0 : 2;
+
             default:
                 await Console.Error.WriteLineAsync(
-                    "Usage: migrate | create-tenant <slug> <name> <admin-email> <admin-name> | seed-demo | reindex | grant-all <email>");
+                    "Usage: migrate | create-tenant <slug> <name> <admin-email> <admin-name> | seed-demo | reindex | grant-all <email> | unshare-package <email> <package-number>");
                 return 2;
         }
     }

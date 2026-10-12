@@ -133,19 +133,31 @@ conversation, write it into the right one in the same commit as the code.
   issued for is set automatically from the request.
 - Every document registered with an outside organization as its originator is
   filed in that supplier's package, one per supplier and purchase order, made
-  by itself with the first document (`SupplyFiling`). Document Control (and
-  above) looks after it: renames it any time; renumbers it, or deletes it while
-  empty, only until it is shared or sent; adds or takes out documents through
-  "Add or take out documents": the register opened for the package
-  (`pick=pkg:<number>`, filtered on that supplier and order), tick to add,
-  untick to take out, then save. One already sent to the supplier stays (backend
-  SENT_TO_SUPPLIER; its tick is locked).
+  by itself with the first document (`SupplyFiling`) only when that supplier has
+  no package yet: a package already there (made by hand or by itself) takes it,
+  the one for its order first, else the supplier's one with no order.
+  Document Control (and above) looks after it. Until it is shared: rename,
+  renumber, narrow by a rule, and delete it (made by hand or by itself) while
+  none of its documents was sent to the supplier; its documents stay in the
+  register and are filed again. Once shared, name, number and rule are fixed
+  (backend PACKAGE_SHARED) and it is kept.
+- On our package page, "Add documents" opens, in place, a short register of
+  the supplier's documents not in the package: search, tick, add. The list of
+  the package's documents has ticks; ticking opens a bar under it: "Send to
+  <supplier>" (not sent yet; starts a transmittal, `?placeholders=`), "Ask back
+  for an update" (held by the supplier; starts a transmittal, `?askBack=`, the
+  ask raised on each document when it is sent, with the message as why), "Take
+  out" (not sent yet). A document sent to the supplier is never taken out
+  ("You can't take out a document sent to <supplier>"; backend
+  SENT_TO_SUPPLIER). The list shows, per document: where it stands, sent to the
+  supplier (day), sent back (day, late or not), planned (day, and ready /
+  submitted / overdue / at risk / in N days), and what is next for us.
+- `unshare-package <email> <package-number>` (backend command) puts a supplier's
+  package back to not shared, for testing; logged.
 - A supplier package has two pages. Ours (Document Control and above): plate,
   counts (sent to supplier, received, held by them / by us, approved first
-  time), "The package" with one row of icon buttons (Share once, Send to
-  <supplier> (n), Add or take out documents, Narrow by a rule, Edit, Delete
-  while allowed, Delivery list), and the documents with where each stands and
-  what is next for us. Nothing is uploaded on our page: no file fields, no
+  time), "The package" with one row of icon buttons (Share once; until shared:
+  Narrow by a rule, Edit, Delete; Delivery list), and the documents (above). Nothing is uploaded on our page: no file fields, no
   "enter and send for review" (what reaches us outside the system is recorded on
   a transmittal, "Received from outside the system"). The supplier's page: only
   what was sent to it, in its words, the comments to take in, a file field

@@ -30,6 +30,8 @@ export async function createTransmittalAction(_prev: { error?: string } | undefi
   const revisionIds = formData.getAll("revisionIds").map(String).filter(Boolean);
   // A supplier's documents asked of them as placeholders (outgoing only).
   const placeholderIds = direction === "OUTGOING" ? [...new Set(formData.getAll("placeholderIds").map(String).filter(Boolean))] : [];
+  // A supplier's documents it holds, asked back for an update on this transmittal (outgoing only).
+  const askBackIds = direction === "OUTGOING" ? [...new Set(formData.getAll("askBackIds").map(String).filter(Boolean))] : [];
   // What came with something received that is not in the register: their
   // letter, the email, the files they attached.
   const attachments = direction === "INCOMING" ? filesOf(formData, "attachments") : [];
@@ -51,6 +53,8 @@ export async function createTransmittalAction(_prev: { error?: string } | undefi
   if (!revisionIds.length && !placeholderIds.length && !attachments.length && !message && !subject) return { error: "Enclose at least one revision, or write a subject and a message — a transmittal cannot be empty of both." };
   if (direction === "OUTGOING" && !recipientUsers.length && !partyTo.length) return { error: "Name at least one person to send it to — a company on its own is not a recipient." };
   if (direction === "OUTGOING" && !subject) return { error: "Give the transmittal a subject — it is the first thing the recipient reads." };
+  if (askBackIds.length && !issueNow) return { error: "Asking for documents back goes with the transmittal: send it now rather than keeping a draft." };
+  if (askBackIds.length && !message) return { error: "Say in the message why you need them back: the supplier reads it with the ask." };
   // Copies are our own people; an organization is sent to, never copied.
   if (chosenCc.some(isParty)) return { error: "Copy people in, not organizations: send to an organization instead." };
 
@@ -108,6 +112,10 @@ export async function createTransmittalAction(_prev: { error?: string } | undefi
         idempotencyKey: crypto.randomUUID(),
       });
       landing = sent.length === 1 ? `/transmittals/${sent[0].id}` : `/transmittals?q=${encodeURIComponent(sent.map((one) => one.number).join(","))}`;
+      // The ask itself, on each document: the supplier accepts or refuses it there, and the transmittal is its record.
+      for (const documentId of askBackIds) {
+        await api(projectPath(ctx, `/documents/${documentId}/asks`), { body: { note: `${message} (${sent.map((one) => one.number).join(", ")})` } });
+      }
     }
   } catch (e) {
     return { error: refusal(e).message };

@@ -3,9 +3,11 @@ import { requireScope } from "@/lib/scope";
 import { isController, isAdmin, hasVerb } from "@/lib/auth";
 import { DataTable, Th, Td, Field, inputCls, ToneChip } from "@/components/ui";
 import { FileTally } from "./file-tally";
-import { setPackageRuleAction, sharePackageAction, requestSupplyAction } from "@/lib/actions/planning";
+import { setPackageRuleAction, sharePackageAction, deletePackageAction } from "@/lib/actions/planning";
+import { PackageLines, type PackageLine } from "./package-lines";
+import { api, projectPath } from "@/lib/api/client";
+import type { RegisterPage } from "@/lib/api/types";
 import { parseExcluded, parseFilter } from "@/lib/package-rule";
-import { RevisionChecklist } from "@/components/revision-checklist";
 import { RuleFields } from "../rule-fields";
 import { manageItems } from "../manage-items";
 import { ActionForm } from "@/components/form";
@@ -13,7 +15,7 @@ import { submitSupplierPackageAction } from "@/lib/actions/supplier";
 import { supplierRows, supplierFigures, packageStage, packageCounts, lineStage, WITH_SUPPLIER, type SupplierRow } from "@/lib/supplier";
 import { fmtDate } from "@/lib/utils";
 import { plannedState } from "@/lib/planned-state";
-import { ArrowLeft, Download, Filter, ListChecks, Pencil, Send, Share2, Trash2 } from "lucide-react";
+import { ArrowLeft, Download, Filter, Pencil, Send, Share2, Trash2 } from "lucide-react";
 import { getMe } from "@/lib/api/me";
 import type { LegacyPackage } from "@/lib/api/packages";
 
@@ -154,12 +156,35 @@ export async function SupplierPackage({ pkg }: { pkg: LegacyPackage }) {
   // The rule a supplier package was made with only names the supplier; a narrowing rule is one with a filter behind it.
   const narrowed = parseFilter(pkg.membershipFilter) ? pkg.membershipRule : null;
   const supplierName = pkg.recipientName;
-  // The register opened for this package, on this supplier's documents (and its order): tick to add, untick to take out.
-  const pickHref = `/documents?pick=${encodeURIComponent(`pkg:${pkg.identifier}`)}${pkg.partyCode ? `&supplier=${encodeURIComponent(pkg.partyCode)}` : ""}${pkg.view.purchaseOrder ? `&po=${encodeURIComponent(pkg.view.purchaseOrder)}` : ""}`;
-  const [edit, remove] = (() => {
-    const items = manageItems(pkg, { mayEdit: true, mayRenumber: !shared && !pkg.view.transmittals.length, mayDelete: !shared && !rows.length && !pkg.view.transmittals.length });
-    return [items.find((one) => one.key === "edit") ?? null, items.find((one) => one.key === "delete") ?? null];
-  })();
+  // Until it is shared, its name, number and rule may change, and it may be deleted (while none of its documents
+  // was sent to the supplier). Once shared, all of that is fixed.
+  const sentAny = pkg.view.members.some((m) => m.requestedAt) || pkg.view.transmittals.length > 0;
+  const edit = !shared ? manageItems(pkg, { mayEdit: true, mayRenumber: !pkg.view.transmittals.length, mayDelete: false }).find((one) => one.key === "edit") ?? null : null;
+  // The supplier's documents not in the package, for "Add documents".
+  const others = pkg.partyCode
+    ? (await api<RegisterPage>(projectPath(ctx, "/register"), { query: { supplier: pkg.partyCode, per: 500 } }).catch(() => null))?.rows ?? []
+    : [];
+  const members = new Set(rows.map((r) => r.doc.id));
+  const requestedAt = new Map(pkg.view.members.map((m) => [m.documentId, m.requestedAt] as const));
+  const lines: PackageLine[] = rows.map((r) => {
+    const isSent = asked.has(r.doc.id);
+    const said = plannedState(r.due, r.state === "APPROVED" ? "released" : ["AWAITING_CHECK", "TO_ROUTE", "IN_REVIEW"].includes(r.state) ? "submitted" : "none");
+    return {
+      id: r.doc.id, number: r.doc.docNumber, title: r.doc.title, rev: r.revision?.value ?? null,
+      stage: lineStage(r, isSent, "ours"), reason: r.reason,
+      sent: requestedAt.get(r.doc.id) ?? null,
+      returned: r.revision?.submittedAt ? r.revision.submittedAt.toISOString() : null, returnedLate: r.arrivedOnTime === false,
+      planned: r.due ? r.due.toISOString() : null, plannedWord: said?.word ?? null, plannedTone: said?.tone ?? null,
+      withThem: isSent && WITH_SUPPLIER.includes(r.state),
+      next: !isSent ? { label: `send it to ${supplierName}` }
+        : r.state === "AWAITING_CHECK" && r.transmittal ? { label: `Check ${r.transmittal.number}`, href: `/transmittals/${r.transmittal.id}` }
+        : r.state === "TO_ROUTE" ? { label: "Send for review", href: `/documents/${r.doc.id}#workflow` }
+        : r.state === "APPROVED" ? { label: `released${r.revision?.statusCode ? ` at ${r.revision.statusCode}` : ""}`, tone: "text-emerald-700" }
+        : WITH_SUPPLIER.includes(r.state) ? { label: `waiting on ${supplierName}` }
+        : { label: "in review" },
+      comments: r.comments.map((c) => ({ by: c.by, text: c.text, blocking: c.blocking, settled: c.settled, rev: c.rev })),
+    };
+  });
 
   return (
     <div className="space-y-4">
@@ -208,88 +233,58 @@ export async function SupplierPackage({ pkg }: { pkg: LegacyPackage }) {
             ) : null}
             {!shared ? (
               <p className="rounded-md bg-amber-50 px-3 py-2.5 text-xs leading-5 text-amber-900 ring-1 ring-amber-200">
-                Share it with {supplierName} before sending them anything: they find what is asked of them here. Sharing is for good.
+                Share it with {supplierName} before sending them anything: they find what is asked of them here. Sharing is for good. Its name, number and rule can be changed, and the package deleted, only until it is shared.
               </p>
             ) : notSent.length ? (
               <p className="text-xs leading-5 text-slate-600">
-                <strong className="font-semibold text-slate-800">{notSent.length} document{notSent.length === 1 ? " is" : "s are"} not sent to {supplierName} yet.</strong> Send them on a transmittal: each is sent once, and from then on handed back and forth.
+                <strong className="font-semibold text-slate-800">{notSent.length} document{notSent.length === 1 ? " is" : "s are"} not sent to {supplierName} yet.</strong> Tick them in the list below and send them from the bar: each is sent once, on a transmittal.
               </p>
             ) : null}
             <div className="flex flex-wrap items-start gap-2">
               {!shared ? (
                 <Act icon={Share2} label={`Share with ${supplierName}`} primary>
                   <ActionForm action={sharePackageAction} submitLabel={`Share with ${supplierName}`} size="sm" hidden={{ packageId: pkg.id }} confirmText={`Once shared, ${supplierName} sees this package for good. Continue?`}>
-                    <p className="text-xs leading-5 text-slate-600">Once shared, {supplierName} sees this package for good, with only the documents sent to them on a transmittal.</p>
+                    <p className="text-xs leading-5 text-slate-600">Once shared, {supplierName} sees this package for good, with only the documents sent to them on a transmittal. Its name, number and rule are fixed from then on.</p>
                   </ActionForm>
                 </Act>
               ) : null}
-              {shared && notSent.length ? (
-                <Act icon={Send} label={`Send to ${supplierName} (${notSent.length})`} primary>
-                  <ActionForm action={requestSupplyAction} submitLabel="Send on one transmittal" size="sm" hidden={{ packageId: pkg.id }}>
-                    <p className="text-xs leading-5 text-slate-600">Tick what to send to {supplierName}. From then on they hold it.</p>
-                    <div className="overflow-hidden rounded-md bg-surface ring-1 ring-line">
-                      <RevisionChecklist name="documentId" initial={notSent.map((r) => r.doc.id)} rows={notSent.map((r) => ({ id: r.doc.id, number: r.doc.docNumber, rev: "—", status: null, title: r.doc.title }))} />
-                    </div>
-                    <Field label="Message" hint={`what ${supplierName} reads with it — optional`}>
-                      <textarea name="message" rows={2} maxLength={4000} className={inputCls} />
-                    </Field>
+              {!shared ? (
+                <Act icon={Filter} label={narrowed ? "Change the rule" : "Narrow by a rule"}>
+                  <ActionForm action={setPackageRuleAction} submitLabel="Save the rule" size="sm" hidden={{ packageId: pkg.id }}>
+                    <p className="text-xs text-slate-500">Only documents from {supplierName} that match all you choose stay in the package. New ones that match join by themselves. Clear every choice to take everything from them again. Possible until the package is shared.</p>
+                    <RuleFields supplier initial={parseFilter(pkg.membershipFilter)} />
                   </ActionForm>
                 </Act>
               ) : null}
-              <Act icon={ListChecks} label="Add or take out documents" href={pickHref} />
-              <Act icon={Filter} label={narrowed ? "Change the rule" : "Narrow by a rule"}>
-                <ActionForm action={setPackageRuleAction} submitLabel="Save the rule" size="sm" hidden={{ packageId: pkg.id }}>
-                  <p className="text-xs text-slate-500">Only documents from {supplierName} that match all you choose stay in the package. New ones that match join by themselves. Clear every choice to take everything from them again.</p>
-                  <RuleFields supplier initial={parseFilter(pkg.membershipFilter)} />
-                </ActionForm>
-              </Act>
               {edit ? <Act icon={Pencil} label={typeof edit.label === "string" ? edit.label : "Edit"}>{edit.body}</Act> : null}
-              {remove ? <Act icon={Trash2} label="Delete the package">{remove.body}</Act> : null}
+              {!shared && !sentAny ? (
+                <Act icon={Trash2} label="Delete the package">
+                  <ActionForm action={deletePackageAction} submitLabel="Delete the package" size="sm" variant="danger" hidden={{ packageId: pkg.id }} confirmText="The package is deleted. Its documents stay in the register. Continue?">
+                    <p className="text-xs leading-5 text-slate-600">
+                      Its documents stay in the register{rows.length ? ` (${rows.length})` : ""} and are filed again: into another package of {supplierName} when there is one, else into one made by itself. Its number is not given out again.
+                    </p>
+                    <Field label="Why" required hint="goes on the record"><input name="reason" required className={inputCls} /></Field>
+                  </ActionForm>
+                </Act>
+              ) : null}
               {listLink}
             </div>
+            {shared ? <p className="text-[11px] text-slate-500">Shared: its name, number and rule are fixed, and it is kept.</p> : null}
           </div>
         </section>
       ) : null}
 
-      <section data-dt-frame className="register register-sheet">
-        <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
-          <span className="stencil mr-1 text-slate-500">Documents</span>
-          <span className="text-[11px] text-slate-500">{withThem} with {supplierName} · {withUs} with us{notSent.length ? ` · ${notSent.length} not sent to them yet` : ""}</span>
-        </div>
-        {rows.length ? (
-          <DataTable className="rounded-none border-0 shadow-none" exportName={pkg.identifier} id="supplier-package-ours" defaultHidden={["Comments"]} head={<tr><Th>Document</Th><Th>Where it stands</Th><Th>Submit by</Th><Th>Next</Th><Th>Comments</Th></tr>}>
-            {rows.map((r) => {
-              const stage = lineStage(r, asked.has(r.doc.id), "ours");
-              return (
-                <tr key={r.doc.id}>
-                  <Td>
-                    <Link href={`/documents/${r.doc.id}`} className="doc-number">{r.doc.docNumber}</Link>
-                    {r.revision ? <span className="ml-1.5 font-mono text-xs text-slate-400">rev {r.revision.value}</span> : null}
-                    <span className="block max-w-80 truncate text-xs text-slate-500">{r.doc.title}</span>
-                  </Td>
-                  <Td className="text-xs">
-                    <ToneChip tone={stage.tone}>{stage.word}</ToneChip>
-                    {stage.holder ? <span className="mt-1 block text-[11px] text-slate-500">{stage.holder}</span> : null}
-                    {r.reason ? <p className="mt-1 max-w-72 text-[11px] text-slate-600">&ldquo;{r.reason}&rdquo;</p> : null}
-                  </Td>
-                  <Td className="whitespace-nowrap text-xs"><SubmitBy row={r} /></Td>
-                  <Td className="text-xs">
-                    {!asked.has(r.doc.id) ? <span className="text-slate-400">send it to {supplierName}</span>
-                      : r.state === "AWAITING_CHECK" && r.transmittal ? <Link href={`/transmittals/${r.transmittal.id}`} className="font-semibold text-link hover:underline">Check {r.transmittal.number}</Link>
-                      : r.state === "TO_ROUTE" ? <Link href={`/documents/${r.doc.id}#workflow`} className="font-semibold text-link hover:underline">Send for review</Link>
-                      : r.state === "APPROVED" ? <span className="text-emerald-700">released{r.revision?.statusCode ? ` at ${r.revision.statusCode}` : ""}</span>
-                      : WITH_SUPPLIER.includes(r.state) ? <span className="text-slate-400">waiting on {supplierName}</span>
-                      : <span className="text-slate-400">in review</span>}
-                  </Td>
-                  <Td className="min-w-64 max-w-md text-xs text-slate-600"><Comments row={r} /></Td>
-                </tr>
-              );
-            })}
-          </DataTable>
-        ) : (
-          <p className="px-5 py-8 text-center text-sm text-slate-400 sm:px-6">No documents from {supplierName} yet. Register them with {supplierName} as the supplier, or add them with &ldquo;Add or take out documents&rdquo;.</p>
-        )}
-      </section>
+      <PackageLines
+        packageId={pkg.id}
+        supplier={supplierName}
+        shared={!!shared}
+        lines={lines}
+        candidates={others.filter((d) => !members.has(d.id) && d.state !== "CANCELLED" && d.state !== "WITHDRAWN").map((d) => ({
+          id: d.id, number: d.number, title: d.title,
+          where: d.releasedRevision ? `rev ${d.releasedRevision} released` : d.revision ? `rev ${d.revision}` : "no revision yet",
+        }))}
+        counts={`${withThem} with ${supplierName} · ${withUs} with us${notSent.length ? ` · ${notSent.length} not sent to them yet` : ""}`}
+      />
     </div>
   );
 }

@@ -14,7 +14,7 @@ import type { RegisterPage } from "@/lib/api/types";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "New transmittal" };
 
-type Search = { doc?: string; docs?: string; direction?: string; revisions?: string; users?: string; to?: string; reason?: string; party?: string; subject?: string; message?: string; replyTo?: string; follows?: string; kind?: string; activity?: string; ask?: string; placeholders?: string };
+type Search = { doc?: string; docs?: string; direction?: string; revisions?: string; users?: string; to?: string; reason?: string; party?: string; subject?: string; message?: string; replyTo?: string; follows?: string; kind?: string; activity?: string; ask?: string; placeholders?: string; askBack?: string };
 
 export default async function NewTransmittalPage({ searchParams }: { searchParams: Promise<Search> }) {
   const ctx = await requireScope();
@@ -95,9 +95,16 @@ export default async function NewTransmittalPage({ searchParams }: { searchParam
   const askedIds = ctx.can("CONTROL") ? [...new Set((sp.placeholders ?? "").split(",").map((one) => one.trim()).filter(Boolean))] : [];
   const askedDocs = (await Promise.all(askedIds.map((one) => backendDocument(ctx, one))))
     .filter((d): d is NonNullable<typeof d> => !!d && !d.revisions.some((r) => r.state === "RELEASED" || r.state === "SUPERSEDED"));
-  const owners = [...new Set(askedDocs.map((d) => d.originator))];
+  // A supplier's documents it holds, asked back for an update: the ask goes on this transmittal, to that supplier.
+  const backIds = ctx.can("CONTROL") && !askedIds.length ? [...new Set((sp.askBack ?? "").split(",").map((one) => one.trim()).filter(Boolean))] : [];
+  const backDocs = (await Promise.all(backIds.map((one) => backendDocument(ctx, one))))
+    .filter((d): d is NonNullable<typeof d> => !!d && d.withSupplier === true);
+  const owners = [...new Set([...askedDocs, ...backDocs].map((d) => d.originator))];
   const supplier = owners.length === 1 ? found.parties.find((p) => p.code === owners[0]) ?? null : null;
   const placeholders = supplier ? askedDocs.map((d) => ({ id: d.id, number: d.number, title: d.title })) : [];
+  const askingBack = supplier ? backDocs.map((d) => ({ id: d.id, number: d.number, title: d.title })) : [];
+  // Asking back is an information transmittal: a request.
+  const requestReason = reasons.find((r) => r.code === "REQUEST") ?? reasons.find((r) => r.props.family === "Information") ?? null;
   // Sent to that supplier: its people on this project, or the organization itself when none has an account.
   const supplierPeople = supplier ? found.people.filter((one) => one.organization === supplier.name).map((one) => one.id) : [];
   const supplierTo = supplier ? (supplierPeople.length ? supplierPeople : [`party:${supplier.id}`]) : [];
@@ -145,6 +152,7 @@ export default async function NewTransmittalPage({ searchParams }: { searchParam
         defaultDirection={!ctx.user.isInternal || (sp.direction === "INCOMING" && ctx.can("CONTROL")) ? "INCOMING" : "OUTGOING"}
         mayRecordReceived={ctx.user.isInternal && ctx.can("CONTROL")}
         askable={askable}
+        askingBack={askingBack.length ? { to: supplier!.name, items: askingBack } : undefined}
         outsider={!ctx.user.isInternal}
         preselectedRevisionIds={preselected}
         placeholders={placeholders.length ? { to: supplier!.name, items: placeholders, mixed: owners.length > 1 } : askedIds.length && owners.length > 1 ? { to: "", items: [], mixed: true } : undefined}
@@ -153,9 +161,11 @@ export default async function NewTransmittalPage({ searchParams }: { searchParam
           userIds: following ? followTo : answering ? answerTo : supplierTo.length ? supplierTo : (sp.users ?? "").split(",").filter(Boolean),
           copyIds: following ? followCopies : answerCopies,
           outsiders: sp.to,
-          reason: following?.reasonForIssue ?? sp.reason,
+          reason: following?.reasonForIssue ?? (askingBack.length ? requestReason?.code : undefined) ?? sp.reason,
           party: answering && answering.direction === "INCOMING" ? answering.issuingParty : sp.party,
-          subject: placeholders.length && !following && !answering && !sp.subject
+          subject: askingBack.length && !sp.subject
+            ? `${askingBack.length === 1 ? askingBack[0].number : `${askingBack.length} documents`}: back for an update`
+            : placeholders.length && !following && !answering && !sp.subject
             ? `${placeholders.length === 1 ? placeholders[0].number : `${placeholders.length} documents`} to send`
             // The subject stays the first one's: the mention says what it follows, no prefix needed.
             : following

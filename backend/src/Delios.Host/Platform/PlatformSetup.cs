@@ -184,6 +184,7 @@ public static class PlatformSetup
         }
         services.AddScoped<Seeding.TenantSetup>();
         services.AddScoped<Seeding.DemoSeed>();
+        services.AddScoped<Seeding.UnsharePackage>();
         services.AddScoped<Seeding.GrantAll>();
         services.AddSingleton<IPasswordHasher<User>, PasswordHasher<User>>();
         services.AddAuthentication(SessionAuthenticationHandler.SchemeName)
