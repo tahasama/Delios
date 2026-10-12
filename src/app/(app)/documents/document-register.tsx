@@ -630,12 +630,6 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
             <span className="ml-1.5 text-[10px] uppercase tracking-[0.12em] text-white/60">ticked for {picking.code}</span>
             {adding.length || leaving.length ? <span className="ml-2 text-white/80">{adding.length} to add · {leaving.length} to take off</span> : <span className="ml-2 text-white/60">nothing changed yet</span>}
           </span>
-          {adding.length ? (
-            <select name="department" required defaultValue={picking.disciplines.length === 1 ? picking.disciplines[0].code : ""} className={`${inputCls} w-auto text-slate-900`} aria-label="For which discipline">
-              <option value="" disabled hidden>For which discipline</option>
-              {picking.disciplines.map((d) => <option key={d.code} value={d.code}>{d.label}</option>)}
-            </select>
-          ) : null}
           <Link href={`/actions/${picking.code}`} className="ml-auto rounded-sm px-3 py-2 text-xs font-semibold text-white/70 hover:bg-white/10 hover:text-white">Back without saving</Link>
         </ActionForm>
       </div>

@@ -125,7 +125,7 @@ export function cycleOf(review: ReviewView, sequence: number): LegacyCycle {
   const closed = review.state === "RELEASED" || review.state === "RETURNED" || review.state === "WITHDRAWN";
   return {
     id: review.id, number: review.number, revisionId: review.revisionId, mode: deciding?.mode ?? "PARALLEL", sequence,
-    status: closed ? "CLOSED" : "OPEN", withdrawn: review.state === "WITHDRAWN", openedById: "", openedByName: review.startedBy, transmittalId: deciding?.transmittalId ?? null,
+    status: closed ? "CLOSED" : "OPEN", withdrawn: review.state === "WITHDRAWN", openedById: review.startedById ?? "", openedByName: review.startedBy, transmittalId: deciding?.transmittalId ?? null,
     submittedAt: new Date(review.startedAt), receivedAt: new Date(review.startedAt), issuedToReviewAt: new Date(review.startedAt),
     returnedFromReviewAt: date(review.decidedAt), returnedToOriginatorAt: review.state === "RETURNED" ? date(review.closedAt) : null,
     dueAt: date(review.steps.find((s) => s.state === "OPEN")?.dueDate ?? null), outcome: review.verdict, outcomeAt: date(review.decidedAt),

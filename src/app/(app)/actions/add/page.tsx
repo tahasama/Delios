@@ -35,7 +35,7 @@ export default async function AddToActionPage({ searchParams }: { searchParams: 
         <div className="flex flex-col-reverse gap-3 px-5 pt-6 pb-4 sm:px-6 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0 flex-1">
             <h1 className="plate-name min-w-0">Add to a schedule action</h1>
-            <p className="plate-meta mt-2">{docs.length} document{docs.length === 1 ? "" : "s"}, for one discipline the action concerns</p>
+            <p className="plate-meta mt-2">{docs.length} document{docs.length === 1 ? "" : "s"}, each for its own discipline</p>
           </div>
           <Link href="/documents" className="inline-flex shrink-0 items-center gap-1.5 self-start rounded-lg px-2.5 py-2 text-xs font-semibold text-slate-500 hover:bg-slate-100"><ArrowLeft className="h-4 w-4" /> Documents</Link>
         </div>
@@ -65,12 +65,7 @@ export default async function AddToActionPage({ searchParams }: { searchParams: 
                   placeholder="Type a number or a name"
                   items={tagged.map((a) => ({ id: a.id, name: `${a.code} · ${a.name}`, detail: [a.start ? fmtDate(a.start) : null, a.departments.map(label).join(", ")].filter(Boolean).join(" · ") }))}
                 />
-                <Field label="For" required hint="a discipline the action concerns">
-                  <select name="department" required defaultValue="" className={inputCls}>
-                    <option value="" disabled hidden>Discipline</option>
-                    {used.map((code) => <option key={code} value={code}>{label(code)}</option>)}
-                  </select>
-                </Field>
+                <p className="self-end text-[11px] text-slate-500">Each document is needed for its own discipline: the action must concern it.</p>
               </div>
             </ActionForm>
           )}

@@ -334,7 +334,8 @@ async function RunActivePanel({ run, user, extra }: { run: { id: string; templat
           ),
         });
   } else if (step?.cycleId) {
-    items.push({ key: "comments", label: "Comments and markups", href: `/reviews/${step.cycleId}` });
+    // Not on this step: the review is read on its own page, its comments with it.
+    items.push({ key: "comments", label: "Open the review — where it stands, and its comments", href: `/reviews/${step.cycleId}` });
   }
   items.push(...extra);
 

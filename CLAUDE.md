@@ -97,7 +97,8 @@ conversation, write it into the right one in the same commit as the code.
   its first revision). Once out of preparation, a change takes a new revision;
   the backend refuses otherwise. Records keep their own details edit.
 - In review: "Withdraw from review" with a reason, on the document page and the
-  review page. The review stays in the register as **Withdrawn** with its
+  review page, by whoever started the review or Document Control (and above);
+  the author alone does not (backend STARTER_OR_CONTROL). The review stays in the register as **Withdrawn** with its
   reason and comments; everyone on the route is told. The revision can then be
   sent again.
 - Revisions are never skipped, and an upload elsewhere never creates one.
@@ -310,7 +311,9 @@ conversation, write it into the right one in the same commit as the code.
   needs starts ticked: tick to add (for one of its disciplines), untick to
   take off, then save. The ticks stay through search, filters and pages. The
   register's selection has "Add to action" too, and so has a document's
-  "Used in" tab. A document added by hand gets the same purpose and status
+  "Used in" tab. A document is always needed for its own discipline (its
+  metadata), never one chosen when adding it; only actions that concern that
+  discipline take it. A document added by hand gets the same purpose and status
   as the requirements list uses when it says nothing (`needDefaults`), due by
   the project's lead before the day.
 - With Document Control, only Document Control adds documents and disciplines

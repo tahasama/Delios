@@ -113,7 +113,8 @@ export default async function DocumentDetailPage({
   // Document Control adds it to a schedule action from here too: the actions with a discipline tagged that do not need it yet.
   const mayAddToAction = ctx.can("CONTROL") && !["WITHDRAWN", "CANCELLED"].includes(doc.state);
   const actionChoices = mayAddToAction
-    ? (await activityList(ctx)).filter((a) => a.departments.length && !doc.baselineEntries.some((e) => e.action.code === a.code))
+    // Only actions that concern the document's own discipline: it is needed for that discipline, never another.
+    ? (await activityList(ctx)).filter((a) => a.departments.includes(doc.discipline) && !doc.baselineEntries.some((e) => e.action.code === a.code))
     : [];
 
   // A closed document — above the open confidentiality levels — is read by the
@@ -317,7 +318,7 @@ export default async function DocumentDetailPage({
             {detailFields}
           </ActionForm>
     ),
-  }] : canEdit && working && working.state === "IN_REVIEW" ? [{
+  }] : working && working.state === "IN_REVIEW" && (controller || working.cycles.some((one) => one.status === "OPEN" && one.openedById === user.id)) ? [{
     key: "withdraw", label: `Withdraw rev ${working.value} from review to edit it`, body: (
           <ActionForm action={withdrawRevisionAction} submitLabel="Withdraw from review" size="sm" variant="secondary" hidden={{ revisionId: working.id }}>
             <Field label="Why" hint="the review closes as withdrawn, its comments kept, and everyone on it is told; send it again once edited" required>
@@ -966,18 +967,14 @@ export default async function DocumentDetailPage({
                   <details className="border-t border-line py-3">
                     <summary className="cursor-pointer list-none text-xs font-semibold text-link">+ Add to a schedule action</summary>
                     <div className="mt-2 max-w-md">
-                      <ActionForm action={addDocumentToActionAction} submitLabel="Add" size="sm" hidden={{ documentIds: doc.id }} className="space-y-3">
+                      <ActionForm action={addDocumentToActionAction} submitLabel="Add" size="sm" hidden={{ documentIds: doc.id, department: doc.discipline }} className="space-y-3">
                         <Field label="Action" required>
                           <select name="actionId" required className={inputCls} defaultValue="">
                             <option value="" disabled hidden>Action</option>
                             {actionChoices.map((a) => <option key={a.id} value={a.id}>{a.code} · {a.name}{a.start ? ` · ${fmtDate(a.start)}` : ""}</option>)}
                           </select>
                         </Field>
-                        <Field label="For" required hint="a discipline the action concerns">
-                          <select name="department" required className={inputCls} defaultValue={doc.discipline}>
-                            {disciplines.filter((d) => d.status === "ACTIVE").map((d) => <option key={d.code} value={d.code}>{d.label}</option>)}
-                          </select>
-                        </Field>
+                        <p className="text-[11px] text-slate-500">For {label(disciplines, doc.discipline)}, its discipline: only actions that concern it are listed.</p>
                       </ActionForm>
                     </div>
                   </details>

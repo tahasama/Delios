@@ -1447,6 +1447,9 @@ public sealed class ReviewService(
             .Where(r => r.RevisionId == revisionId && (r.State == ReviewStates.InProgress || r.State == ReviewStates.Decided))
             .OrderByDescending(r => r.StartedAt).FirstOrDefaultAsync(cancellationToken);
         if (review is null) return Problems.Conflict("NO_OPEN_REVIEW", "This revision has no open review to withdraw.");
+        // Whoever started the review, or Document Control (and above): never anyone else, and always with why.
+        if (review.StartedById != access.UserId && !access.Holds(Verbs.Control))
+            return Problems.Forbidden("STARTER_OR_CONTROL", "Whoever started the review, or Document Control, takes a revision out of it.");
         var now = clock.GetCurrentInstant();
         var revision = await db.Revisions.SingleAsync(r => r.Id == revisionId, cancellationToken);
         var document = await db.Documents.SingleAsync(d => d.Id == review.DocumentId, cancellationToken);

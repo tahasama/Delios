@@ -380,9 +380,10 @@ export default async function ReviewCyclePage({ params }: { params: Promise<{ id
         </div>
 
         <aside className="space-y-4">
-          {/* The author or Document Control takes the revision back out of review
-              to change it. The review stays in the register as withdrawn. */}
-          {rev.state === "IN_REVIEW" && !cycle.withdrawn && (controller || rev.authoredById === user.id) ? (
+          {/* Whoever started the review, or Document Control (and above), takes the
+              revision back out of it to change it, with why. The review stays in
+              the register as withdrawn. */}
+          {rev.state === "IN_REVIEW" && !cycle.withdrawn && (controller || (!!cycle.openedById && cycle.openedById === user.id)) ? (
             <Card title="Withdraw from review">
               <ActionForm action={withdrawRevisionAction} submitLabel="Withdraw" variant="danger" size="sm" hidden={{ revisionId: rev.id }}>
                 <Field label="Why" required hint="everyone on the route is told; the review is kept as withdrawn">

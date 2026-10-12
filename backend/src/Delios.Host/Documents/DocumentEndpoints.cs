@@ -210,8 +210,6 @@ public static class DocumentEndpoints
         var access = ProjectAccessFilter.Of(http);
         var revision = await db.Revisions.AsNoTracking().SingleOrDefaultAsync(r => r.Id == revisionId && r.DocumentId == documentId, cancellationToken);
         if (revision is null) return Problems.NotFound("REVISION_NOT_FOUND", "No such revision.");
-        if (revision.AuthoredById != access.UserId && !access.Holds(Verbs.Control))
-            return Problems.Forbidden("AUTHOR_OR_CONTROL", "Its author or Document Control takes a revision out of review.");
         if (revision.State != RevisionStates.InReview)
             return Problems.Conflict("NOT_IN_REVIEW", $"Revision {revision.Value} is not in review.");
         var reason = request.ChangeDescription?.Trim() ?? "";

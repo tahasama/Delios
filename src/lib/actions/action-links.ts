@@ -8,6 +8,13 @@ import { getActiveSet } from "@/lib/config";
 import { needDefaults } from "@/lib/schedule";
 import { activityDetail } from "@/lib/api/schedule";
 import { controlDoes } from "@/lib/control-activities";
+import { backendDocument } from "@/lib/api/legacy";
+
+/** Each document's own discipline: an action needs a document for that discipline, never another. */
+async function disciplinesOf(ctx: Awaited<ReturnType<typeof requireScope>>, ids: string[]): Promise<Map<string, string>> {
+  const docs = await Promise.all(ids.map((id) => backendDocument(ctx, id).catch(() => null)));
+  return new Map(docs.filter((d): d is NonNullable<typeof d> => !!d).map((d) => [d.id, d.discipline] as const));
+}
 
 type State = { error?: string; ok?: string };
 
@@ -53,11 +60,11 @@ export async function addDocumentToActionAction(_prev: State | undefined, formDa
   if (!ctx.can("CONTROL")) return { error: "Document Control adds documents to an action." };
   const actionId = String(formData.get("actionId") ?? "");
   const documentIds = formData.getAll("documentIds").map(String).filter(Boolean);
+  // A request answered names the discipline it was asked for; otherwise each document is needed for its own.
   const department = String(formData.get("department") ?? "") || null;
   const transmittalId = String(formData.get("transmittalId") ?? "") || null;
   if (!actionId) return { error: "Choose the action." };
   if (!documentIds.length) return { error: "Choose the document to add." };
-  if (!department) return { error: "Say which discipline needs it." };
   // Needed by a discipline the action concerns: tag it on the action first.
   const detail = await activityDetail(ctx, actionId);
   const action = detail?.activity;
@@ -66,7 +73,10 @@ export async function addDocumentToActionAction(_prev: State | undefined, formDa
   const already = new Set(detail!.needs.map((one) => one.documentId));
   const fresh = documentIds.filter((id) => !already.has(id));
   if (!fresh.length) return { error: `${action.code} already needs ${documentIds.length === 1 ? "it" : "all of them"}.` };
-  if (!action.departments.includes(department)) return { error: `${action.code} does not concern ${department}: tag it on the action first.` };
+  const own = await disciplinesOf(ctx, fresh);
+  const forOf = (id: string) => department ?? own.get(id) ?? "";
+  const outside = fresh.filter((id) => !action.departments.includes(forOf(id)));
+  if (outside.length) return { error: `${action.code} does not concern ${[...new Set(outside.map(forOf))].join(", ")}: tag it on the action first, or choose another action.` };
   const code = action.code;
   const [reasons, statuses] = await Promise.all([getActiveSet("REASONS_FOR_ISSUE"), getActiveSet("STATUSES")]);
   const { purpose, status } = needDefaults(reasons, statuses);
@@ -74,7 +84,7 @@ export async function addDocumentToActionAction(_prev: State | undefined, formDa
     // The request is answered by the first document added for it.
     for (const [i, documentId] of fresh.entries()) {
       await api(projectPath(ctx, `/activities/${actionId}/needs`), {
-        body: { documentId, purpose, requiredStatuses: status ? [status] : [], anchor: "START", department, transmittalId: i === 0 ? transmittalId : null },
+        body: { documentId, purpose, requiredStatuses: status ? [status] : [], anchor: "START", department: forOf(documentId), transmittalId: i === 0 ? transmittalId : null },
       });
     }
   } catch (e) {
@@ -99,7 +109,7 @@ export async function setActionDocumentsAction(_prev: State | undefined, formDat
   if (!ctx.can("CONTROL") && !own) return { error: "Document Control chooses an action's documents." };
   const actionId = String(formData.get("actionId") ?? "");
   const ticked = new Set(formData.getAll("documentIds").map(String).filter(Boolean));
-  const department = own ?? (String(formData.get("department") ?? "") || null);
+
   const detail = await activityDetail(ctx, actionId);
   if (!detail) return { error: "That action is no longer in the schedule." };
   const activity = detail.activity;
@@ -107,14 +117,16 @@ export async function setActionDocumentsAction(_prev: State | undefined, formDat
   const linked = new Set(needs.map((one) => one.documentId));
   const adding = [...ticked].filter((id) => !linked.has(id));
   const leaving = needs.filter((one) => !ticked.has(one.documentId));
-  if (adding.length && !department) return { error: "Say which discipline needs the documents ticked." };
-  if (adding.length && !activity.departments.includes(department!)) return { error: `${activity.code} does not concern ${department}: tag it on the action first.` };
+  // Each document is needed for its own discipline (without Document Control, only one's own discipline's).
+  const disciplineOf = await disciplinesOf(ctx, adding);
+  const outside = adding.filter((id) => !activity.departments.includes(disciplineOf.get(id) ?? "") || (own && disciplineOf.get(id) !== own));
+  if (outside.length) return { error: `${outside.length} ticked document${outside.length === 1 ? " is" : "s are"} of a discipline ${activity.code} does not concern${own ? ", or not yours" : ""}: tag it on the action first, or untick ${outside.length === 1 ? "it" : "them"}.` };
   const [reasons, statuses] = await Promise.all([getActiveSet("REASONS_FOR_ISSUE"), getActiveSet("STATUSES")]);
   const { purpose, status } = needDefaults(reasons, statuses);
   try {
     for (const documentId of adding) {
       await api(projectPath(ctx, `/activities/${actionId}/needs`), {
-        body: { documentId, purpose, requiredStatuses: status ? [status] : [], anchor: "START", department },
+        body: { documentId, purpose, requiredStatuses: status ? [status] : [], anchor: "START", department: disciplineOf.get(documentId) },
       });
     }
     for (const need of leaving) await api(projectPath(ctx, `/activities/${actionId}/needs/${need.id}`), { method: "DELETE" });
