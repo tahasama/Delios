@@ -93,6 +93,10 @@ public sealed class FileQueueConsumer(
                     await scope.ServiceProvider.GetRequiredService<Extraction.ExtractionProcessor>().ProcessAsync(
                         Read<Extraction.FileExtract>(delivery), stoppingToken);
                     break;
+                case Notifications.PushRequested.RoutingKey:
+                    await scope.ServiceProvider.GetRequiredService<Notifications.PushSender>().ProcessAsync(
+                        Read<Notifications.PushRequested>(delivery), stoppingToken);
+                    break;
                 case Notifications.EmailRequested.RoutingKey:
                     await scope.ServiceProvider.GetRequiredService<Notifications.EmailSender>().ProcessAsync(
                         Read<Notifications.EmailRequested>(delivery), stoppingToken);

@@ -152,6 +152,9 @@ public sealed class Notifier(DeliosDbContext db, IClock clock, IOptions<EmailOpt
         var now = clock.GetCurrentInstant();
         var people = await db.Users.AsNoTracking().Where(u => ids.Contains(u.Id) && u.Active)
             .Select(u => new { u.Id, u.Email, u.Name }).ToListAsync(cancellationToken);
+        // Pops up in the browsers of those who turned it on: the worker pushes it.
+        var pushed = await db.Set<PushSubscription>().AsNoTracking().Where(s => ids.Contains(s.UserId)).Select(s => s.UserId).Distinct()
+            .ToListAsync(cancellationToken);
         foreach (var person in people)
         {
             var notification = new Notification
@@ -166,6 +169,7 @@ public sealed class Notifier(DeliosDbContext db, IClock clock, IOptions<EmailOpt
                 CreatedAt = now,
             };
             db.Add(notification);
+            if (pushed.Contains(person.Id)) db.Enqueue(PushRequested.RoutingKey, new PushRequested(tenantId, notification.Id));
             Queue(tenantId, projectId, emailKind, person.Email, person.Name, title,
                 $"{body}{(link is null ? "" : $"\n\n{Url(link)}")}", "Notification", notification.Id);
         }

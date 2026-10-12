@@ -89,7 +89,7 @@ public static class Topology
 
     /// <summary>Email: each one to the mail server on its own, apart from every other job.</summary>
     public static readonly WorkQueue Mail = new("delios.mail", "delios.mail.retry",
-        [Host.Notifications.EmailRequested.RoutingKey], Prefetch: 4);
+        [Host.Notifications.EmailRequested.RoutingKey, Host.Notifications.PushRequested.RoutingKey], Prefetch: 4);
 
     /// <summary>Every work queue; the worker runs one <see cref="FileQueueConsumer"/> per entry.</summary>
     public static readonly WorkQueue[] Queues = [Files, Extraction, Checks, Mail];

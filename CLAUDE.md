@@ -123,6 +123,14 @@ conversation, write it into the right one in the same commit as the code.
   documents to confirm, postponements to confirm, untagged actions, a failed
   schedule read). Every new kind of work gets a row there.
 
+### Pop-up notifications
+- Every notification can also pop up in the person's browsers, even when no
+  DELIOS page is open (browser push, `public/sw.js`); clicking it opens the
+  page it is about. Turned on per browser on Notifications (the browser asks
+  first); which groups pop up (Reviews, Documents, Everything else) is the
+  person's choice. Nothing leaves only by pop-up: the notification is still on
+  Notifications and Home. The installation's push keys are made once and kept.
+
 ### Demo data
 - `scripts/demo-schedule.mjs` fills a fresh demo through the API following the
   app's real flow (releases say who receives them and are sent; confirmations,

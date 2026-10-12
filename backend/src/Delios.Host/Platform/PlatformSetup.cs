@@ -152,6 +152,8 @@ public static class PlatformSetup
         services.AddOptions<Notifications.EmailOptions>().BindConfiguration(Notifications.EmailOptions.Section);
         services.AddScoped<Notifications.Notifier>();
         services.AddScoped<Notifications.EmailSender>();
+        services.AddScoped<Notifications.PushSender>();
+        services.AddSingleton<Notifications.EmailOptionsAccessor>();
         services.AddSingleton<Notifications.IMailTransport, Notifications.SmtpTransport>();
         services.AddHttpClient(Extraction.ExtractionProcessor.HttpClientName, (sp, c) =>
             c.Timeout = TimeSpan.FromSeconds(sp.GetRequiredService<IOptions<Extraction.ExtractionOptions>>().Value.TimeoutSeconds));
@@ -319,6 +321,7 @@ public static class PlatformSetup
             app.MapDirectoryEndpoints();
             Seeding.SignUpEndpoints.MapSignUpEndpoints(app);
             Notifications.NotificationEndpoints.MapNotificationEndpoints(app);
+            Notifications.PushEndpoints.MapPushEndpoints(app);
             Documents.CatalogAdminEndpoints.MapCatalogAdminEndpoints(app);
             Documents.DocumentEndpoints.MapDocumentEndpoints(app);
             Reviews.ReviewEndpoints.MapReviewEndpoints(app);

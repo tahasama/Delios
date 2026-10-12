@@ -120,6 +120,8 @@ public sealed class User
     public bool Active { get; set; } = true;
     /// <summary>Configures the tenant: people, projects, functions, the matrix.</summary>
     public bool IsAdmin { get; set; }
+    /// <summary>The groups of notifications this person does not want popping up in their browsers (see <c>PushGroups</c>).</summary>
+    public string[] PushOff { get; set; } = [];
     /// <summary>
     /// Wrong passwords or codes in a row. Reaching <c>IdentityEndpoints.MaxFailedSignIns</c> locks the account and resets this to 0.
     /// </summary>

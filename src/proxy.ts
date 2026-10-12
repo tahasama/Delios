@@ -3,7 +3,8 @@ import type { NextRequest } from "next/server";
 
 // Registering an organization is the one self-service path, so it must be
 // reachable without a session. Everything else needs one.
-const PUBLIC = ["/login", "/signup", "/_next", "/favicon", "/icon", "/robots.txt"];
+// The pop-up notifications script is fetched by the browser on its own, sometimes without the page.
+const PUBLIC = ["/login", "/signup", "/_next", "/favicon", "/icon", "/robots.txt", "/sw.js"];
 
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;

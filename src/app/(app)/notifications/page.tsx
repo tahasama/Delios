@@ -3,7 +3,8 @@ import { requireScope } from "@/lib/scope";
 import { PageHeader, EmptyState } from "@/components/ui";
 import { timeAgo } from "@/lib/utils";
 import { getNotifications, markAllNotificationsRead } from "@/lib/api/me";
-import { forgetShortLived } from "@/lib/api/client";
+import { api, forgetShortLived } from "@/lib/api/client";
+import { PushSettings } from "@/components/push-settings";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Notifications" };
@@ -11,6 +12,9 @@ export const metadata = { title: "Notifications" };
 export default async function NotificationsPage() {
   await requireScope();
   const { rows } = await getNotifications(60);
+  // Pop-ups in this person's browsers, and which groups pop up.
+  const push = await api<{ publicKey: string; devices: { endpoint: string; device: string | null; createdAt: string }[]; off: string[] }>("/api/push")
+    .catch(() => null);
   const list = rows.map((n) => ({ id: n.id, title: n.title, body: n.body, link: n.link, read: n.readAt !== null, createdAt: new Date(n.createdAt) }));
   // As before: opening the page reads them all.
   if (list.some((n) => !n.read)) {
@@ -21,6 +25,7 @@ export default async function NotificationsPage() {
   return (
     <div className="space-y-4">
       <PageHeader title="Notifications" subtitle="Updates that involve you, including submissions, decisions, supersessions and transmittals." />
+      {push ? <PushSettings publicKey={push.publicKey} devices={push.devices} off={push.off} /> : null}
       {list.length === 0 ? (
         <EmptyState title="Nothing yet" body="You will be notified when reviews, approvals, issues and obsolescence involve you." />
       ) : (
