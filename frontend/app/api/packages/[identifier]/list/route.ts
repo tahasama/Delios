@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getScope } from "@/lib/core/scope";
 import { toCsv } from "@/lib/core/csv";
-import { legacyPackageByNumber } from "@/lib/api/packages";
+import { packageByNumber } from "@/lib/api/packages";
 import { supplierRows, lineStage } from "@/lib/packages/supplier";
 
 /**
@@ -12,11 +12,11 @@ export async function GET(_req: Request, { params }: { params: Promise<{ identif
   const scope = await getScope();
   if (!scope) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { identifier } = await params;
-  const pkg = await legacyPackageByNumber(scope, decodeURIComponent(identifier)).catch(() => null);
+  const pkg = await packageByNumber(scope, decodeURIComponent(identifier)).catch(() => null);
   if (!pkg) return NextResponse.json({ error: "No such package." }, { status: 404 });
   const side = scope.user.isInternal ? "ours" : "theirs";
-  const asked = new Set(pkg.view.members.filter((m) => m.requestedAt).map((m) => m.documentId));
-  const rows = (await supplierRows(scope, { ...pkg, detail: false })).filter((row) => side === "ours" || asked.has(row.doc.id));
+  const asked = new Set(pkg.members.filter((m) => m.requestedAt).map((m) => m.documentId));
+  const rows = (await supplierRows(scope, pkg)).filter((row) => side === "ours" || asked.has(row.doc.id));
   const day = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : "");
   const lines = [
     ["Number", "Title", "Revision", "Submit by", "Where it stands"],
@@ -28,7 +28,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ identif
   return new NextResponse(toCsv(lines), {
     headers: {
       "content-type": "text/csv; charset=utf-8",
-      "content-disposition": `attachment; filename="${pkg.identifier}-${new Date().toISOString().slice(0, 10)}.csv"`,
+      "content-disposition": `attachment; filename="${pkg.number}-${new Date().toISOString().slice(0, 10)}.csv"`,
     },
   });
 }

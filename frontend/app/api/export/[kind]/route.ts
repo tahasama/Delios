@@ -9,7 +9,8 @@ import { roleLabel } from "@/lib/settings/profiles/roles";
 import { getSet, getSets } from "@/lib/settings/config";
 import { api, ApiProblem, projectPath } from "@/lib/api/client";
 import { adminAudit } from "@/lib/api/admin";
-import { legacyPackages } from "@/lib/api/packages";
+import { packagesOf } from "@/lib/api/packages";
+import { reasonsOf } from "@/lib/packages/package-rule";
 import { activityLateness, planActions } from "@/lib/api/schedule";
 import { passOn, registerRows } from "@/lib/api/register";
 
@@ -142,14 +143,13 @@ async function extract(req: Request, { params }: { params: Promise<{ kind: strin
     }
     name = "actions-baseline";
   } else if (kind === "packages") {
-    const pkgs = [...(await legacyPackages(ctx, "DELIVERY")), ...(await legacyPackages(ctx, "SUPPLIER"))].sort((a, b) => a.identifier.localeCompare(b.identifier));
+    const pkgs = [...(await packagesOf(ctx, "DELIVERY")), ...(await packagesOf(ctx, "SUPPLY"))].sort((a, b) => a.number.localeCompare(b.number));
     rows = [["Package", "Title", "Type", "Purpose", "Recipient", "Completion date", "Required status", "Composition owner", "Acceptance authority", "Closed at", "Member document", "Member required status", "Member current status"]];
     for (const p of pkgs) {
-      if (!p.members.length) rows.push([p.identifier, p.title ?? "", p.type, p.purpose, p.recipientName, p.completionDate?.toISOString().slice(0, 10) ?? "", p.requiredStatus, p.compositionOwnerName, p.acceptanceAuthorityName, p.closedAt?.toISOString().slice(0, 10) ?? "", "", "", ""]);
-      for (const m of p.members) {
-        const cur = m.document.revisions[0];
-        rows.push([p.identifier, p.title ?? "", p.type, p.purpose, p.recipientName, p.completionDate?.toISOString().slice(0, 10) ?? "", p.requiredStatus, p.compositionOwnerName, p.acceptanceAuthorityName, p.closedAt?.toISOString().slice(0, 10) ?? "", m.document.docNumber, m.requiredStatus, cur?.statusCode ?? "not released"]);
-      }
+      const head = [p.number, p.title ?? "", p.rule ? "ACCUMULATED" : "DEFINED", reasonsOf(p).join(","), p.names.to, p.completionDate ?? "",
+        p.requiredStatuses.join(","), p.names.owners, p.names.acceptors, p.closedAt ? new Date(p.closedAt).toISOString().slice(0, 10) : ""];
+      if (!p.members.length) rows.push([...head, "", "", ""]);
+      for (const m of p.members) rows.push([...head, m.documentNumber, m.required.join(","), m.status ?? "not released"]);
     }
   } else if (kind === "transmittals") {
     // The transmittal log as the backend writes it: the ticked ones, or every one the filters match.

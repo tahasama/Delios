@@ -7,7 +7,7 @@ import { getActiveSet } from "@/lib/settings/config";
 import { fmtDate } from "@/lib/core/utils";
 import { ArrowLeft } from "lucide-react";
 import { SearchPick } from "@/components/search-pick";
-import { documentsByIds, legacyPackages } from "@/lib/api/packages";
+import { documentsByIds, packagesOf } from "@/lib/api/packages";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Add to package" };
@@ -19,7 +19,7 @@ export default async function AddToPackagePage({ searchParams }: { searchParams:
   const [docs, packages, statuses] = await Promise.all([
     documentsByIds(ctx, ids),
     // Supplier packages fill themselves; schedule packages come from the requirements list.
-    legacyPackages(ctx, "DELIVERY").then((all) => all.filter((p) => !p.closedAt)),
+    packagesOf(ctx, "DELIVERY").then((all) => all.filter((p) => !p.closedAt)),
     getActiveSet("STATUSES"),
   ]);
 
@@ -55,7 +55,7 @@ export default async function AddToPackagePage({ searchParams }: { searchParams:
                   <option value="" disabled>Choose…</option>
                   {packages.map((p) => {
                     const already = docs.filter((d) => p.members.some((m) => m.documentId === d.id)).length;
-                    return <option key={p.id} value={p.id}>{p.identifier} — {p.title ?? p.recipientName}, due {fmtDate(p.completionDate)}{already ? ` (${already} already in it)` : ""}</option>;
+                    return <option key={p.id} value={p.id}>{p.number} — {p.title ?? p.names.to}, due {fmtDate(p.completionDate)}{already ? ` (${already} already in it)` : ""}</option>;
                   })}
                 </select>
               </Field>

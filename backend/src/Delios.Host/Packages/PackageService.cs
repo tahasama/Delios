@@ -637,6 +637,29 @@ public sealed class PackageService(
     public async Task<string?> SupplierNameAsync(Package package, CancellationToken cancellationToken) =>
         package.SupplierPartyId is { } id ? await db.Parties.Where(p => p.Id == id).Select(p => p.Name).SingleOrDefaultAsync(cancellationToken) : null;
 
+    /// <summary>
+    /// A package's people in words. It goes to its supplier, or to its recipients (one that is not an outside
+    /// organization is us, by the organization's name). Delivered: closed by delivering, or accepted after going out.
+    /// </summary>
+    public async Task<PackageNames> NamesAsync(Package package, IReadOnlyList<PackageTransmittal> transmittals, CancellationToken cancellationToken)
+    {
+        var people = package.OwnerIds.Concat(package.AcceptorIds).ToList();
+        var names = await db.Users.AsNoTracking().Where(u => people.Contains(u.Id)).ToDictionaryAsync(u => u.Id, u => u.Name, cancellationToken);
+        string Names(IEnumerable<Guid> ids) => string.Join(", ", ids.Select(id => names.GetValueOrDefault(id)).OfType<string>());
+        var partyIds = package.RecipientPartyIds.Append(package.SupplierPartyId ?? Guid.Empty).ToList();
+        var parties = await db.Parties.AsNoTracking().Where(p => partyIds.Contains(p.Id)).ToDictionaryAsync(p => p.Id, cancellationToken);
+        var us = await db.Tenants.AsNoTracking().Where(t => t.Id == package.TenantId).Select(t => t.Name).FirstOrDefaultAsync(cancellationToken) ?? "us";
+        var supplier = package.SupplierPartyId is { } s ? parties.GetValueOrDefault(s) : null;
+        var to = package.Kind == PackageKinds.Supply ? supplier?.Name ?? ""
+            : string.Join(", ", package.RecipientPartyIds.Select(id => parties.GetValueOrDefault(id) is { IsInternal: false } p ? p.Name : us));
+        var owners = Names(package.OwnerIds);
+        var delivered = package.State == PackageStates.Delivered
+            || (package.State == PackageStates.Accepted && transmittals.Any(t => t.Direction == Transmittals.TransmittalDirections.Outgoing));
+        return new PackageNames(to, owners.Length > 0 ? owners : package.CreatedByName, Names(package.AcceptorIds),
+            supplier?.Code ?? package.Rule?.Originators.FirstOrDefault(), package.CreatedAt.ToDateTimeOffset(),
+            delivered ? package.ClosedAt?.ToDateTimeOffset() : null);
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     /// <summary>

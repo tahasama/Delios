@@ -1,3 +1,5 @@
+import type { PackageView } from "@/lib/api/types";
+
 /**
  * A delivery package may carry a rule (§15.1, accumulated): every document that
  * matches its filter belongs to it, including documents created later, until
@@ -15,26 +17,6 @@ export type PackageFilter = {
   docTypes?: string[];
   originators?: string[];
 };
-
-export function parseFilter(raw: string | null | undefined): PackageFilter | null {
-  if (!raw) return null;
-  try {
-    const one = JSON.parse(raw) as PackageFilter;
-    return isEmpty(one) ? null : one;
-  } catch {
-    return null;
-  }
-}
-
-export function parseExcluded(raw: string | null | undefined): string[] {
-  if (!raw) return [];
-  try {
-    const ids = JSON.parse(raw);
-    return Array.isArray(ids) ? ids.map(String) : [];
-  } catch {
-    return [];
-  }
-}
 
 export function isEmpty(filter: PackageFilter): boolean {
   return !filter.assetIds?.length && !filter.disciplines?.length && !filter.docTypes?.length && !filter.originators?.length;
@@ -74,19 +56,24 @@ export function statusList(required: string): string[] {
   return required.split(",").map((one) => one.trim()).filter(Boolean);
 }
 
-/** A released status meets a need when it is any one of the statuses asked for. */
-export function meetsStatus(statusCode: string | null | undefined, required: string): boolean {
-  return !!statusCode && statusList(required).includes(statusCode);
+/** What narrows a package's rule, or null when nothing does (a supplier's package always names its supplier: that is not narrowing). */
+export function ruleFilter(pkg: PackageView): PackageFilter | null {
+  const filter: PackageFilter = {
+    disciplines: pkg.rule?.disciplines ?? [], docTypes: pkg.rule?.docTypes ?? [],
+    originators: pkg.kind === "SUPPLY" ? [] : pkg.rule?.originators ?? [], assetIds: pkg.rule?.assetIds ?? [],
+  };
+  return isEmpty(filter) ? null : filter;
 }
 
-/** The organizations a package goes to, oldest packages holding only one. */
-export function recipientIds(pkg: { recipientPartyIds: string | null; recipientPartyId: string | null }): string[] {
-  const many = parseExcluded(pkg.recipientPartyIds);
-  return many.length ? many : pkg.recipientPartyId ? [pkg.recipientPartyId] : [];
+/** The rule in words, or null when it has none; a delivery package's rule that narrows nothing takes every document. */
+export async function ruleWords(pkg: PackageView): Promise<string | null> {
+  const filter = ruleFilter(pkg);
+  const words = filter ? await describeFilter(filter) : null;
+  return pkg.kind === "SUPPLY" ? words : pkg.rule ? words ?? "every document" : null;
 }
 
-/** Everyone who may accept the package — any one of them does. */
-export function acceptorIds(pkg: { acceptanceAuthorityIds: string | null; acceptanceAuthorityId: string }): string[] {
-  const many = parseExcluded(pkg.acceptanceAuthorityIds);
-  return many.length ? many : [pkg.acceptanceAuthorityId].filter(Boolean);
-}
+/** The reasons a package goes out for, the first being its main one. */
+export const reasonsOf = (pkg: PackageView): string[] => (pkg.reasons?.length ? pkg.reasons : [pkg.reason]);
+
+/** What is still missing, once readiness was checked; null when nothing is or it was not checked. */
+export const shortfallOf = (pkg: PackageView) => (pkg.assessedAt && pkg.shortfall.length ? pkg.shortfall : null);

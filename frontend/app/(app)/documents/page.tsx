@@ -1,5 +1,5 @@
 import { plannedState, plannedProgress } from "@/lib/schedule/planned-state";
-import { legacyPackageByNumber } from "@/lib/api/packages";
+import { packageByNumber } from "@/lib/api/packages";
 import type { SupplierStage } from "@/lib/core/state-names";
 import { requireScope } from "@/lib/core/scope";
 import { api, projectPath } from "@/lib/api/client";
@@ -247,10 +247,10 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
   const own = !scope.can("CONTROL") && !(await controlDoes(scope, "ACTION_LINKS")) ? user.department ?? null : null;
   // Opened for a supplier's package ("pkg:<number>"), by Document Control: its documents start ticked; tick to add.
   const packagePick = sp.pick?.startsWith("pkg:") && scope.can("CONTROL")
-    ? await legacyPackageByNumber(scope, sp.pick.slice(4)).then((pkg) => pkg ? {
-        kind: "package" as const, packageId: pkg.id, actionId: "", code: pkg.identifier, name: pkg.title ?? pkg.recipientName,
+    ? await packageByNumber(scope, sp.pick.slice(4)).then((pkg) => pkg ? {
+        kind: "package" as const, packageId: pkg.id, actionId: "", code: pkg.number, name: pkg.title ?? pkg.names.to,
         linked: pkg.members.map((m) => m.documentId), disciplines: [] as { code: string; label: string }[],
-        locked: pkg.view.members.filter((m) => m.requestedAt).map((m) => m.documentId),
+        locked: pkg.members.filter((m) => m.requestedAt).map((m) => m.documentId),
       } : null).catch(() => null)
     : null;
   const picking = packagePick ?? (sp.pick && !sp.pick.startsWith("pkg:") && (scope.can("CONTROL") || own)

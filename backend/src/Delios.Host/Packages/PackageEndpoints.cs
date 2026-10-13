@@ -28,7 +28,15 @@ public sealed record PackageView(Guid Id, string Number, string Title, string? D
     string? ClosureNote, DateTimeOffset? AcceptedAt, string? AcceptedBy, string CreatedBy, IReadOnlyList<MemberView> Members,
     IReadOnlyList<PackageTransmittal> Transmittals, string Kind, Guid? SupplierPartyId, string? Supplier, string? PurchaseOrder,
     IReadOnlyList<string>? Reasons = null, System.Text.Json.JsonElement? Extras = null, string? AcceptNote = null,
-    DateTimeOffset? SharedAt = null, string? SharedBy = null, bool AutoCreated = false, IReadOnlyList<string>? SupplierPeople = null);
+    DateTimeOffset? SharedAt = null, string? SharedBy = null, bool AutoCreated = false, IReadOnlyList<string>? SupplierPeople = null,
+    PackageNames? Names = null);
+
+/// <summary>
+/// A package's people and dates in words: who it goes to (its supplier, or its recipients), who puts it together
+/// (else whoever opened it) and who accepts it, the supplier's code, when it was opened, and when it was delivered.
+/// </summary>
+public sealed record PackageNames(string To, string Owners, string Acceptors, string? SupplierCode, DateTimeOffset CreatedAt,
+    DateTimeOffset? DeliveredAt);
 
 /// <summary>A transmittal raised for a package: a delivery, a request to its supplier, or what the supplier sent back.</summary>
 public sealed record PackageTransmittal(Guid Id, string Number, string Direction, DateTimeOffset IssuedAt, int Items);
@@ -52,6 +60,8 @@ public static class PackageEndpoints
         project.MapGet("", ListAsync);
         project.MapPost("", CreateAsync).AddEndpointFilter<IdempotencyFilter>();
         project.MapGet("/{packageId:guid}", GetAsync);
+        project.MapGet("/views", ViewsAsync);
+        project.MapGet("/by-number/{number}", ByNumberAsync);
         project.MapPost("/{packageId:guid}/members", (Guid packageId, MembersRequest r, HttpContext h, PackageService s, CancellationToken c) =>
             Act(h, s, (a) => s.AddAsync(a, packageId, r, c)));
         project.MapPost("/{packageId:guid}/members/remove", (Guid packageId, MembersRequest r, HttpContext h, PackageService s, CancellationToken c) =>
@@ -97,6 +107,30 @@ public static class PackageEndpoints
             ? Results.Ok(await ViewAsync(packages, package, cancellationToken, outside: !ProjectAccessFilter.Of(http).IsInternal))
             : Problems.NotFound("PACKAGE_NOT_FOUND", "No such package.");
 
+    /// <summary>
+    /// GET every package of one kind (DELIVERY or SUPPLY) in full, each brought up to date with its rule: soonest due
+    /// first, those with no date last.
+    /// </summary>
+    private static async Task<IResult> ViewsAsync(string? kind, HttpContext http, PackageService packages, CancellationToken cancellationToken)
+    {
+        var access = ProjectAccessFilter.Of(http);
+        var views = new List<PackageView>();
+        foreach (var row in (await packages.ListAsync(access, cancellationToken)).Where(r => kind is null || r.Kind == kind))
+            if (await packages.ReadAsync(access, row.Id, cancellationToken) is { } package)
+                views.Add(await ViewAsync(packages, package, cancellationToken, outside: !access.IsInternal));
+        return Results.Ok(views.OrderBy(v => v.CompletionDate is null).ThenBy(v => v.CompletionDate).ToList());
+    }
+
+    /// <summary>GET one package by its number, brought up to date with its rule.</summary>
+    private static async Task<IResult> ByNumberAsync(string number, HttpContext http, PackageService packages, CancellationToken cancellationToken)
+    {
+        var access = ProjectAccessFilter.Of(http);
+        var row = (await packages.ListAsync(access, cancellationToken)).FirstOrDefault(r => r.Number == number);
+        return row is not null && await packages.ReadAsync(access, row.Id, cancellationToken) is { } package
+            ? Results.Ok(await ViewAsync(packages, package, cancellationToken, outside: !access.IsInternal))
+            : Problems.NotFound("PACKAGE_NOT_FOUND", "No such package.");
+    }
+
     /// <summary>POST deliver: sends the ready documents on transmittals and fixes the package's contents.</summary>
     private static async Task<IResult> DeliverAsync(
         Guid packageId, DeliverRequest request, HttpContext http, PackageService packages, CancellationToken cancellationToken)
@@ -121,6 +155,7 @@ public static class PackageEndpoints
     private static async Task<PackageView> ViewAsync(PackageService packages, Package p, CancellationToken cancellationToken, bool outside = false)
     {
         var readiness = await packages.ReadinessAsync(p, cancellationToken);
+        var transmittals = await packages.TransmittalsAsync(p, cancellationToken);
         // Its supplier sees what was asked of it on a transmittal, and nothing else.
         if (outside) readiness = readiness.Where(r => r.Member.RequestedAt is not null).ToList();
         return new PackageView(p.Id, p.Number, p.Title, p.Description, p.Reason, p.RequiredStatuses, p.CompletionDate?.ToDateOnly(),
@@ -131,10 +166,11 @@ public static class PackageEndpoints
             readiness.Select(r => new MemberView(r.Member.DocumentId, r.DocumentNumber, r.Title, r.Revision, r.Status, r.Required,
                 r.Ready, r.Member.ByRule, r.Member.RequestedAt?.ToDateTimeOffset(), r.LatestRevision, r.LatestState,
                 r.DueDate?.ToDateOnly())).ToList(),
-            await packages.TransmittalsAsync(p, cancellationToken), p.Kind, p.SupplierPartyId,
+            transmittals, p.Kind, p.SupplierPartyId,
             await packages.SupplierNameAsync(p, cancellationToken), p.PurchaseOrder, [p.Reason, .. p.OtherReasons],
             p.Extras is null ? null : System.Text.Json.JsonDocument.Parse(p.Extras).RootElement.Clone(), p.AcceptNote,
             p.SharedAt?.ToDateTimeOffset(), p.SharedByName, p.AutoCreated,
-            outside ? null : (await packages.SupplierPeopleAsync(p, cancellationToken)).Select(x => x.Name).ToList());
+            outside ? null : (await packages.SupplierPeopleAsync(p, cancellationToken)).Select(x => x.Name).ToList(),
+            await packages.NamesAsync(p, transmittals, cancellationToken));
     }
 }

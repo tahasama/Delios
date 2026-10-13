@@ -7,7 +7,7 @@ import { setPackageRuleAction, sharePackageAction, deletePackageAction } from "@
 import { PackageLines, type PackageLine } from "./package-lines";
 import { api, projectPath } from "@/lib/api/client";
 import type { RegisterPage } from "@/lib/api/types";
-import { parseExcluded, parseFilter } from "@/lib/packages/package-rule";
+import { ruleFilter, ruleWords } from "@/lib/packages/package-rule";
 import { RuleFields } from "../rule-fields";
 import { manageItems } from "../manage-items";
 import { ActionForm } from "@/components/form";
@@ -17,7 +17,7 @@ import { fmtDate } from "@/lib/core/utils";
 import { plannedState } from "@/lib/schedule/planned-state";
 import { ArrowLeft, Download, Filter, Pencil, Send, Share2, Trash2 } from "lucide-react";
 import { getMe } from "@/lib/api/me";
-import type { LegacyPackage } from "@/lib/api/packages";
+import type { PackageView } from "@/lib/api/types";
 
 /** What the planned date says today, as on every planned date: ready, submitted, overdue, at risk, days left. */
 function SubmitBy({ row }: { row: SupplierRow }) {
@@ -62,17 +62,17 @@ function Act({ icon: Icon, label, href, primary, children }: { icon: typeof Send
  *    stands and who holds it, and the acts on the package; nothing is uploaded here, the supplier sends its files;
  *  - the supplier's: only what was asked of it, in its own words, and a file field beside each document it holds.
  */
-export async function SupplierPackage({ pkg }: { pkg: LegacyPackage }) {
+export async function SupplierPackage({ pkg }: { pkg: PackageView }) {
   const ctx = await requireScope();
   const { user } = ctx;
   const staff = isController(user) || isAdmin(user);
-  const isSupplier = !user.isInternal && !!user.partyCode && user.partyCode === pkg.partyCode;
-  const rows = await supplierRows(ctx, pkg);
+  const isSupplier = !user.isInternal && !!user.partyCode && user.partyCode === pkg.names.supplierCode;
+  const rows = await supplierRows(ctx, pkg, true);
   const org = (await getMe())?.tenant.name ?? "us";
-  const asked = new Set(pkg.view.members.filter((m) => m.requestedAt).map((m) => m.documentId));
-  const listHref = `/api/packages/${encodeURIComponent(pkg.identifier)}/list`;
+  const asked = new Set(pkg.members.filter((m) => m.requestedAt).map((m) => m.documentId));
+  const listHref = `/api/packages/${encodeURIComponent(pkg.number)}/list`;
   const listLink = <a href={listHref} className="ask inline-flex items-center gap-1.5"><Download className="h-3.5 w-3.5" /> Delivery list</a>;
-  const plateCode = <p className="font-mono text-[12.5px] font-semibold tracking-tight text-slate-500">{pkg.identifier}</p>;
+  const plateCode = <p className="font-mono text-[12.5px] font-semibold tracking-tight text-slate-500">{pkg.number}</p>;
 
   // ── The supplier's page ──────────────────────────────────────────────────────
   if (isSupplier) {
@@ -81,7 +81,7 @@ export async function SupplierPackage({ pkg }: { pkg: LegacyPackage }) {
     const holds = mine.filter((r) => WITH_SUPPLIER.includes(r.state));
     const where = packageStage(pkg, rows, "theirs");
     const table = (
-      <DataTable className="rounded-none border-0 shadow-none" exportName={pkg.identifier} id="supplier-package-theirs" head={<tr><Th>Document</Th><Th>Where it stands</Th><Th>Submit by</Th><Th>Released &amp; issued</Th><Th>Comments to take in</Th><Th>Your file</Th></tr>}>
+      <DataTable className="rounded-none border-0 shadow-none" exportName={pkg.number} id="supplier-package-theirs" head={<tr><Th>Document</Th><Th>Where it stands</Th><Th>Submit by</Th><Th>Released &amp; issued</Th><Th>Comments to take in</Th><Th>Your file</Th></tr>}>
         {mine.map((r) => {
           const stage = lineStage(r, true, "theirs");
           return (
@@ -151,26 +151,26 @@ export async function SupplierPackage({ pkg }: { pkg: LegacyPackage }) {
 
   // ── Our page ─────────────────────────────────────────────────────────────────
   const f = supplierFigures(rows);
-  const shared = pkg.view.sharedAt ? new Date(pkg.view.sharedAt) : null;
+  const shared = pkg.sharedAt ? new Date(pkg.sharedAt) : null;
   const where = packageStage(pkg, rows, "ours");
   const notSent = rows.filter((r) => !asked.has(r.doc.id));
   // The same counts as the packages list: sent, received, who holds what was sent, late.
   const counts = packageCounts(pkg, rows);
   const { withThem, withUs } = counts;
-  const excluded = parseExcluded(pkg.membershipExcluded);
+  const excluded = pkg.excluded;
   // The rule a supplier package was made with only names the supplier; a narrowing rule is one with a filter behind it.
-  const narrowed = parseFilter(pkg.membershipFilter) ? pkg.membershipRule : null;
-  const supplierName = pkg.recipientName;
+  const narrowed = await ruleWords(pkg);
+  const supplierName = pkg.names.to;
   // Until it is shared, its name, number and rule may change, and it may be deleted (while none of its documents
   // was sent to the supplier). Once shared, all of that is fixed.
-  const sentAny = pkg.view.members.some((m) => m.requestedAt) || pkg.view.transmittals.length > 0;
+  const sentAny = pkg.members.some((m) => m.requestedAt) || pkg.transmittals.length > 0;
   const edit = !shared ? manageItems(pkg, { mayEdit: true, mayDelete: false }).find((one) => one.key === "edit") ?? null : null;
   // The supplier's documents not in the package, for "Add documents".
-  const others = pkg.partyCode
-    ? (await api<RegisterPage>(projectPath(ctx, "/register"), { query: { supplier: pkg.partyCode, per: 500 } }).catch(() => null))?.rows ?? []
+  const others = pkg.names.supplierCode
+    ? (await api<RegisterPage>(projectPath(ctx, "/register"), { query: { supplier: pkg.names.supplierCode, per: 500 } }).catch(() => null))?.rows ?? []
     : [];
   const members = new Set(rows.map((r) => r.doc.id));
-  const requestedAt = new Map(pkg.view.members.map((m) => [m.documentId, m.requestedAt] as const));
+  const requestedAt = new Map(pkg.members.map((m) => [m.documentId, m.requestedAt] as const));
   const lines: PackageLine[] = rows.map((r) => {
     const isSent = asked.has(r.doc.id);
     const said = plannedState(r.due, r.state === "APPROVED" ? "released" : ["AWAITING_CHECK", "TO_ROUTE", "IN_REVIEW"].includes(r.state) ? "submitted" : "none");
@@ -200,7 +200,7 @@ export async function SupplierPackage({ pkg }: { pkg: LegacyPackage }) {
             {plateCode}
             <h1 className="plate-name mt-1 min-w-0">{pkg.title ?? `From ${supplierName}`}</h1>
             <p className="plate-meta mt-2">
-              {supplierName}{pkg.view.purchaseOrder ? ` · order ${pkg.view.purchaseOrder}` : ""} &middot; {f.planned} document{f.planned === 1 ? "" : "s"} &middot; everything by {fmtDate(pkg.completionDate)} &middot; needed at <span className="font-mono font-semibold text-slate-700">{pkg.requiredStatus}</span>
+              {supplierName}{pkg.purchaseOrder ? ` · order ${pkg.purchaseOrder}` : ""} &middot; {f.planned} document{f.planned === 1 ? "" : "s"} &middot; everything by {fmtDate(pkg.completionDate)} &middot; needed at <span className="font-mono font-semibold text-slate-700">{pkg.requiredStatuses.join(",")}</span>
             </p>
             <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">
               Every document from {supplierName}{narrowed ? ` ${narrowed.replace(/^every document /, "")}` : ""} is filed here{excluded.length ? `, less ${excluded.length} taken out` : ""}. A document reaches {supplierName} only when it is sent on a transmittal; {supplierName} sends its files back from its side of this package.
@@ -225,17 +225,17 @@ export async function SupplierPackage({ pkg }: { pkg: LegacyPackage }) {
           <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
             <span className="stencil mr-1 text-slate-500">The package</span>
             <span className="text-[11px] text-slate-500">
-              {shared ? `shared with ${supplierName} ${fmtDate(shared)}${pkg.view.sharedBy ? ` by ${pkg.view.sharedBy}` : ""}` : `not shared: ${supplierName} does not see it yet`}
+              {shared ? `shared with ${supplierName} ${fmtDate(shared)}${pkg.sharedBy ? ` by ${pkg.sharedBy}` : ""}` : `not shared: ${supplierName} does not see it yet`}
             </span>
           </div>
           <div className="space-y-3 px-5 py-4 sm:px-6">
             {/* Who of the supplier sees it: its people on this project. Nobody there, nobody sees it, shared or not. */}
-            {pkg.view.supplierPeople && !pkg.view.supplierPeople.length ? (
+            {pkg.supplierPeople && !pkg.supplierPeople.length ? (
               <p className="rounded-md bg-red-50 px-3 py-2.5 text-xs leading-5 text-red-900 ring-1 ring-red-200">
                 <strong className="font-semibold">Nobody from {supplierName} is on this project</strong>, so nobody of theirs can see this package, shared or not. Add their people on <Link href="/settings/users" className="font-semibold underline">People &amp; access</Link>.
               </p>
-            ) : pkg.view.supplierPeople?.length ? (
-              <p className="text-xs leading-5 text-slate-600">{shared ? "Seen" : "Will be seen"} by {supplierName}&rsquo;s people on this project: {pkg.view.supplierPeople.join(", ")}.</p>
+            ) : pkg.supplierPeople?.length ? (
+              <p className="text-xs leading-5 text-slate-600">{shared ? "Seen" : "Will be seen"} by {supplierName}&rsquo;s people on this project: {pkg.supplierPeople.join(", ")}.</p>
             ) : null}
             {!shared ? (
               <div className="space-y-1 rounded-md bg-amber-50 px-3 py-2.5 text-xs leading-5 text-amber-900 ring-1 ring-amber-200">
@@ -259,7 +259,7 @@ export async function SupplierPackage({ pkg }: { pkg: LegacyPackage }) {
                 <Act icon={Filter} label={narrowed ? "Change the rule" : "Narrow by a rule"}>
                   <ActionForm action={setPackageRuleAction} submitLabel="Save the rule" size="sm" hidden={{ packageId: pkg.id }}>
                     <p className="text-xs text-slate-500">Only documents from {supplierName} that match all you choose stay in the package. New ones that match join by themselves. Clear every choice to take everything from them again. Possible until the package is shared.</p>
-                    <RuleFields supplier initial={parseFilter(pkg.membershipFilter)} />
+                    <RuleFields supplier initial={ruleFilter(pkg)} />
                   </ActionForm>
                 </Act>
               ) : null}
@@ -283,7 +283,7 @@ export async function SupplierPackage({ pkg }: { pkg: LegacyPackage }) {
 
       <PackageLines
         packageId={pkg.id}
-        packageNumber={pkg.identifier}
+        packageNumber={pkg.number}
         supplier={supplierName}
         shared={!!shared}
         lines={lines}

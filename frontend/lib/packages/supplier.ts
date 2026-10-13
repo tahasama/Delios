@@ -1,5 +1,5 @@
 import { legacyDocument, documentContext } from "@/lib/api/legacy";
-import type { LegacyPackage } from "@/lib/api/packages";
+import type { PackageView } from "@/lib/api/types";
 import { supplierStage, supplierStamp, type SupplierStage } from "@/lib/core/state-names";
 
 /**
@@ -60,10 +60,10 @@ function stateOf(revisionState: string | null): SupplierState {
  * package alone; on the package's own page, from each document in full (when
  * it was sent, the comments, the transmittal it came on).
  */
-export async function supplierRows(t: { projectId: string }, pkg: LegacyPackage): Promise<SupplierRow[]> {
+export async function supplierRows(t: { projectId: string }, pkg: PackageView, detail = false): Promise<SupplierRow[]> {
   const now = Date.now();
-  return Promise.all(pkg.view.members.map(async (m): Promise<SupplierRow> => {
-    const due = m.dueDate ? new Date(m.dueDate) : pkg.completionDate;
+  return Promise.all(pkg.members.map(async (m): Promise<SupplierRow> => {
+    const due = m.dueDate ? new Date(m.dueDate) : pkg.completionDate ? new Date(pkg.completionDate) : null;
     const light: SupplierRow = {
       doc: { id: m.documentId, docNumber: m.documentNumber, title: m.title, isPlaceholder: !m.latestRevision },
       revision: m.latestRevision ? { id: "", value: m.latestRevision, submittedAt: null, statusCode: m.status } : null,
@@ -71,7 +71,7 @@ export async function supplierRows(t: { projectId: string }, pkg: LegacyPackage)
       submissions: m.latestRevision ? 1 : 0, comments: [], issued: null,
     };
     light.late = light.state === "NOT_SENT" && !!due && due.getTime() < now;
-    if (!pkg.detail || !m.latestRevision) return light;
+    if (!detail || !m.latestRevision) return light;
     const [doc, context] = await Promise.all([
       legacyDocument(t, m.documentId).catch(() => null),
       documentContext(t, m.documentId).catch(() => null),
@@ -133,15 +133,15 @@ export function supplierFigures(rows: SupplierRow[]) {
  * sent, nothing back (theirs: to be transmitted); partly received (partly transmitted); all received
  * (transmitted); complete, every document released. `notAsked`: lines not asked of the supplier yet.
  */
-export function packageStage(pkg: LegacyPackage, rows: SupplierRow[], side: "ours" | "theirs"): { word: string; tone: string; notAsked: number } {
-  const asked = new Set(pkg.view.members.filter((m) => m.requestedAt).map((m) => m.documentId));
+export function packageStage(pkg: PackageView, rows: SupplierRow[], side: "ours" | "theirs"): { word: string; tone: string; notAsked: number } {
+  const asked = new Set(pkg.members.filter((m) => m.requestedAt).map((m) => m.documentId));
   const lines = rows.filter((r) => asked.has(r.doc.id));
   const notAsked = side === "ours" ? rows.length - lines.length : 0;
   const back = lines.filter((r) => r.state !== "NOT_SENT").length;
   const done = lines.filter((r) => r.state === "APPROVED").length;
   const slate = "bg-slate-100 text-slate-600 ring-slate-200", amber = "bg-amber-50 text-amber-900 ring-amber-200";
   const sky = "bg-sky-50 text-sky-800 ring-sky-200", green = "bg-emerald-50 text-emerald-800 ring-emerald-200";
-  if (side === "ours" && !pkg.view.sharedAt) return { word: "not shared", tone: slate, notAsked };
+  if (side === "ours" && !pkg.sharedAt) return { word: "not shared", tone: slate, notAsked };
   if (!lines.length) return { word: side === "ours" ? "nothing sent yet" : "nothing asked yet", tone: slate, notAsked };
   if (done === lines.length && !notAsked) return { word: "complete", tone: green, notAsked };
   if (back === 0) return { word: side === "ours" ? "sent to supplier" : "to be transmitted", tone: amber, notAsked };
@@ -180,8 +180,8 @@ export function lineStage(row: SupplierRow, asked: boolean, side: "ours" | "thei
  * A supplier package's counts, the same on its page and in the list: how many were sent to the supplier, how many
  * came back, who holds what was sent, and how many are late (not back by their date).
  */
-export function packageCounts(pkg: LegacyPackage, rows: SupplierRow[]) {
-  const asked = new Set(pkg.view.members.filter((m) => m.requestedAt).map((m) => m.documentId));
+export function packageCounts(pkg: PackageView, rows: SupplierRow[]) {
+  const asked = new Set(pkg.members.filter((m) => m.requestedAt).map((m) => m.documentId));
   const sent = rows.filter((r) => asked.has(r.doc.id));
   return {
     total: rows.length,

@@ -14,8 +14,8 @@ import { Download } from "lucide-react";
 import { isReadOnly } from "@/lib/core/auth";
 import { SearchPick } from "@/components/search-pick";
 import { RuleFields } from "./rule-fields";
-import { meetsStatus, statusList } from "@/lib/packages/package-rule";
-import { legacyPackages, ourPeople, packageParties } from "@/lib/api/packages";
+import { statusList, shortfallOf } from "@/lib/packages/package-rule";
+import { packagesOf, ourPeople, packageParties } from "@/lib/api/packages";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Packages" };
@@ -33,7 +33,7 @@ export default async function PackagesPage({ searchParams }: { searchParams: Pro
   // addressed to them — and nothing else; the tenant client sees to that.
   const category = requested === "DELIVERY" ? "DELIVERY" : "SUPPLIER";
   const [pkgs, reasons, statuses, users] = await Promise.all([
-    legacyPackages(ctx, category),
+    packagesOf(ctx, category === "SUPPLIER" ? "SUPPLY" : "DELIVERY"),
     getActiveSet("REASONS_FOR_ISSUE"), getActiveSet("STATUSES"),
     // Anyone on the project may put a package together or accept it.
     ourPeople(ctx),
@@ -52,10 +52,10 @@ export default async function PackagesPage({ searchParams }: { searchParams: Pro
   }
   // "For the schedule": each action's documents, read as a package.
   const rows = pkgs.map((pkg) => {
-    const ready = pkg.members.filter((member) => meetsStatus(member.document.revisions[0]?.statusCode, member.requiredStatus)).length;
+    const ready = pkg.members.filter((member) => member.ready).length;
     const total = pkg.members.length;
-    const days = pkg.completionDate ? Math.ceil((pkg.completionDate.getTime() - Date.now()) / 86_400_000) : 0;
-    const state = pkg.acceptedAt ? "ACCEPTED" : pkg.closedAt ? "CLOSED" : pkg.shortfall ? "SHORTFALL" : pkg.assessedAt ? "READY" : days < 0 ? "OVERDUE" : "OPEN";
+    const days = pkg.completionDate ? Math.ceil((new Date(pkg.completionDate).getTime() - Date.now()) / 86_400_000) : 0;
+    const state = pkg.acceptedAt ? "ACCEPTED" : pkg.closedAt ? "CLOSED" : shortfallOf(pkg) ? "SHORTFALL" : pkg.assessedAt ? "READY" : days < 0 ? "OVERDUE" : "OPEN";
     return { ...pkg, ready, total, days, state };
   });
 
@@ -92,7 +92,7 @@ export default async function PackagesPage({ searchParams }: { searchParams: Pro
                   const where = supplierStages.get(pkg.id)!;
                   return (
                     <tr key={pkg.id}>
-                      <Td><Link href={`/packages/${pkg.identifier}`} className="font-semibold text-brand-ink hover:underline">{pkg.title ?? pkg.recipientName}</Link><span className="block font-mono text-[11px] text-slate-400">{pkg.identifier}</span></Td>
+                      <Td><Link href={`/packages/${pkg.number}`} className="font-semibold text-brand-ink hover:underline">{pkg.title ?? pkg.names.to}</Link><span className="block font-mono text-[11px] text-slate-400">{pkg.number}</span></Td>
                       <Td className={`text-xs`}>
                         <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap ring-1 ${where.tone}`}>{where.word}</span>
                         {where.notAsked ? <span className="mt-1 block text-[11px] text-slate-500">{where.notAsked} not sent to supplier yet</span> : null}
@@ -113,11 +113,11 @@ export default async function PackagesPage({ searchParams }: { searchParams: Pro
                 const percent = pkg.total ? Math.round(pkg.ready / pkg.total * 100) : 0;
                 return (
                   <tr key={pkg.id}>
-                    <Td><Link href={`/packages/${pkg.identifier}`} className="font-mono text-[13px] font-semibold text-brand-ink hover:underline">{pkg.identifier}</Link><span className="block max-w-80 truncate text-[13px] text-slate-800">{pkg.title ?? `Delivery to ${pkg.recipientName}`}</span><span className="block max-w-80 truncate text-xs text-slate-500">to {pkg.recipientName}</span></Td>
+                    <Td><Link href={`/packages/${pkg.number}`} className="font-mono text-[13px] font-semibold text-brand-ink hover:underline">{pkg.number}</Link><span className="block max-w-80 truncate text-[13px] text-slate-800">{pkg.title ?? `Delivery to ${pkg.names.to}`}</span><span className="block max-w-80 truncate text-xs text-slate-500">to {pkg.names.to}</span></Td>
                     <Td><Status state={pkg.state}/></Td>
-                    <Td><div className="flex items-center gap-2"><div className="h-1.5 w-20 overflow-hidden rounded-full bg-canvas-deep"><div className={`h-full rounded-full ${percent === 100 ? "bg-emerald-500" : "bg-[#d9a441]"}`} style={{ width: `${percent}%` }}/></div><span className="text-xs text-slate-600">{pkg.ready} of {pkg.total} at {statusList(pkg.requiredStatus).join(" or ")}<Info>{statusList(pkg.requiredStatus).map((code) => `${code} — ${statusMeaning.get(code) ?? code}`).join("\n")}</Info></span></div></Td>
+                    <Td><div className="flex items-center gap-2"><div className="h-1.5 w-20 overflow-hidden rounded-full bg-canvas-deep"><div className={`h-full rounded-full ${percent === 100 ? "bg-emerald-500" : "bg-[#d9a441]"}`} style={{ width: `${percent}%` }}/></div><span className="text-xs text-slate-600">{pkg.ready} of {pkg.total} at {pkg.requiredStatuses.join(" or ")}<Info>{pkg.requiredStatuses.map((code) => `${code} — ${statusMeaning.get(code) ?? code}`).join("\n")}</Info></span></div></Td>
                     <Td className={`whitespace-nowrap text-xs`}>{fmtDate(pkg.completionDate)}{!pkg.closedAt ? <span className={`block text-[11px] ${pkg.days < 0 ? "text-red-700" : "text-slate-400"}`}>{pkg.days < 0 ? `${Math.abs(pkg.days)} days late` : `in ${pkg.days} days`}</span> : null}</Td>
-                    <Td className={`text-xs`}>{pkg.acceptanceAuthorityName}</Td>
+                    <Td className={`text-xs`}>{pkg.names.acceptors}</Td>
                   </tr>
                 );
               })}

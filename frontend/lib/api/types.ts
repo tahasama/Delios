@@ -304,6 +304,11 @@ export type PackageView = {
   sharedAt?: string | null; sharedBy?: string | null; autoCreated?: boolean;
   /** The supplier's people on this project: who sees it once shared. Ours only. */
   supplierPeople?: string[] | null;
+  /**
+   * Its people and dates in words: who it goes to (its supplier, or its recipients), who puts it together and who
+   * accepts it, the supplier's code, when it was opened, when it was delivered.
+   */
+  names: { to: string; owners: string; acceptors: string; supplierCode: string | null; createdAt: string; deliveredAt: string | null };
 };
 
 /** GET /activity (ActivityEndpoints.cs): one act of the project, for Home's journal and log. */
