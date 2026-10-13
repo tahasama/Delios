@@ -58,6 +58,16 @@ public static class IdentityEndpoints
         me.MapPost("/setup", MyMfaSetupAsync);
         me.MapPost("/confirm", MyMfaConfirmAsync);
         me.MapPost("/disable", MyMfaDisableAsync);
+        app.MapGet("/api/me/mfa", MyMfaAsync).WithTags("Auth").AddEndpointFilter<TransactionFilter>();
+    }
+
+    /// <summary><c>GET /api/me/mfa</c>: whether the signed-in user has two-step sign-in on, and whether the organization requires it.</summary>
+    private static async Task<IResult> MyMfaAsync(HttpContext http, DeliosDbContext db, CancellationToken cancellationToken)
+    {
+        var userId = http.User.UserId();
+        var on = await db.Users.AsNoTracking().Where(u => u.Id == userId).Select(u => u.MfaEnabledAt != null).SingleAsync(cancellationToken);
+        var required = await db.Tenants.AsNoTracking().Where(t => t.Id == http.User.TenantId()).Select(t => t.MfaRequired).SingleAsync(cancellationToken);
+        return Results.Ok(new { on, required });
     }
 
     /// <summary>

@@ -54,7 +54,7 @@ const FAMILIES: Family[] = [
     edge: "edge-keep",
     actions: ["METADATA_CHANGE", "FILE_UPLOADED", "CHECK_RUN", "PACKAGE_CREATED", "RELATIONSHIP", "TEMPLATE_SAVED", "TEMPLATE_REMOVED", "CONFIG_VALUE_RETIRED", "PERMISSION_RULE_PUBLISHED", "SCOPE_UPDATED", "CONTROL_SETTING_CHANGED", "PROJECT_OPENED", "USER_CREATED", "USER_UPDATED", "VISITOR_CREATED"],
   },
-  { id: "access", label: "Who read what", edge: "edge-keep", actions: ["DOWNLOAD", "LOGIN", "ACCESS_GRANTED", "ACCESS_WITHDRAWN"] },
+  { id: "access", label: "Who read what", edge: "edge-keep", actions: ["DOWNLOAD", "LOGIN", "SIGN_IN", "SIGN_IN_MFA", "SIGN_IN_FAILED", "ACCOUNT_LOCKED", "ACCESS_GRANTED", "ACCESS_WITHDRAWN", "ACCESS_REFUSED", "PASSWORD_RESET_ASKED", "PASSWORD_RESET", "MFA_ENABLED", "MFA_DISABLED", "MFA_RESET", "SECURITY_POLICY_CHANGED"] },
 ];
 
 const familyOf = (action: string) => FAMILIES.find((f) => f.actions.includes(action));

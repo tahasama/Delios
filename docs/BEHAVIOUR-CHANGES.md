@@ -327,6 +327,15 @@ then the person signs in again.
   the outbox, so on a developer's machine the link can be read there.
 - An organization that signs in through its own provider gets no link, except for its administrators.
 
+**Sign-in & security (Settings, administrators).**
+- Whether two-step sign-in is asked of everyone, and how many people have it on.
+- The people who have it on, each with "Turn it off" for someone who lost their phone and recovery codes.
+
+**Your sign-in (the menu under your name).**
+- Turn your own two-step sign-in on (key, then a code, then the recovery codes once), or off with a code.
+  Where the organization requires it, it stays on.
+- The password is changed through "Forgot your password?", so only whoever reads your email can change it.
+
 **Two-step sign-in.**
 - After the password, the sign-in page asks for the code from the authenticator app; a recovery code also works.
 - Where the organization requires two-step sign-in and the person has not set it up, the page shows the key to

@@ -4,7 +4,7 @@ import { PageHeader, Banner, Chip } from "@/components/ui";
 import { SETUP_PAGES, SETUP_GROUPS, maySetup, type SetupPage } from "./setup-pages";
 import { families } from "@/lib/families";
 import {
-  FolderKanban, Building2, Gauge, Tags, FileDigit, BadgeCheck, Users, FileUp, Workflow, ScrollText, Layers, Route, ClipboardList, ArrowRight,
+  FolderKanban, Building2, Gauge, Tags, FileDigit, BadgeCheck, Users, FileUp, Workflow, ScrollText, Layers, Route, ClipboardList, ArrowRight, KeyRound,
   type LucideIcon,
 } from "lucide-react";
 
@@ -27,6 +27,7 @@ const ICON: Record<string, LucideIcon> = {
   "/settings/workflow-templates": Workflow,
   "/settings/functions": BadgeCheck,
   "/settings/users": Users,
+  "/settings/security": KeyRound,
   "/settings/controlled": FileUp,
   "/settings/audit": ScrollText,
 };
