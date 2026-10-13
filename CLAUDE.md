@@ -11,6 +11,7 @@ conversation, write it into the right one in the same commit as the code.
 | `docs/STANDARD-CHANGES.md` | What the original Document Management Standard must change to match what we built. Every new rule about controlling information goes here. |
 | `docs/REVIEW-MODEL.md` | The review model: routes, steps, advice, verdicts, release |
 | `docs/STRUCTURE.md` | Where everything is, by area; where to look when debugging or adding a feature |
+| `docs/ORGANIZATIONS.md` | Organizations working together (collaborator, guest, not on DELIOS), linked accounts, the organization's admin page |
 | `docs/BEHAVIOUR-CHANGES.md` | What behaves differently since the screens moved onto the backend |
 | `docs/DETAIL-STYLE.md` | The reference style (Schedule & actions, the action page): what "apply the same" means |
 | `docs/gaps/*.md` | Known gaps per area |

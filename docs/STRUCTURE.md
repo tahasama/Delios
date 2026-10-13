@@ -170,6 +170,7 @@ deploy/
 ```
 docs/
 ├── STRUCTURE.md          this file
+├── ORGANIZATIONS.md      organizations working together, and the organization's admin page
 ├── STANDARD-CHANGES.md   what the Document Management Standard must change to match the app
 ├── REVIEW-MODEL.md       the review model
 ├── BEHAVIOUR-CHANGES.md  what behaves differently since the screens moved onto the backend
