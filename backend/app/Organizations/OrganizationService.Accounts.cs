@@ -13,6 +13,9 @@ public sealed record JoinPersonRequest(Guid UserId, bool Active = true);
 public sealed record ElsewhereView(Guid TenantId, string Organization, bool Home, IReadOnlyList<ElsewhereProject> Projects);
 public sealed record ElsewhereProject(Guid Id, string Code, string Name);
 
+/** A guest account another organization made for one of our people, before our two organizations were linked. */
+public sealed record GuestAccount(Guid Id, string Name, string Email, bool Active);
+
 public sealed partial class OrganizationService
 {
     /// <summary>Linked accounts have no password of their own: this never matches a hash.</summary>
@@ -177,5 +180,84 @@ public sealed partial class OrganizationService
                              select a).AsNoTracking().FirstOrDefaultAsync(cancellationToken);
         if (account is null) return null;
         return account.HostTenantId == targetTenantId ? (account.HostTenantId, account.HostUserId) : (account.HomeTenantId, account.HomeUserId);
+    }
+    // ── Guests whose company joins DELIOS later ───────────────────────────────
+
+    /// <summary>
+    /// The guest accounts another organization made for our people before we linked: accounts inside theirs, standing
+    /// for the party they know us by, not yet brought over to us.
+    /// </summary>
+    public async Task<IReadOnlyList<GuestAccount>> GuestsAsync(Guid linkId, CancellationToken cancellationToken)
+    {
+        var link = await db.OrganizationLinks.AsNoTracking()
+            .SingleOrDefaultAsync(l => l.Id == linkId && l.GuestTenantId == tenant.Required && l.State == LinkStates.Linked, cancellationToken);
+        if (link is null) return [];
+        return await TenantScope.RunAsync(scopes, link.HostTenantId, async (_, hostDb) =>
+            await hostDb.Users.AsNoTracking().Where(u => u.PartyId == link.HostPartyId && u.HomeTenantId == null)
+                .OrderBy(u => u.Name).Select(u => new GuestAccount(u.Id, u.Name, u.Email, u.Active)).ToListAsync(cancellationToken),
+            cancellationToken);
+    }
+
+    /// <summary>
+    /// Brings a guest account over: the person gets their own account here, with the same email, password and
+    /// two-step sign-in, and signs in here from now on; the account in the other organization becomes the one standing
+    /// for them, with everything it did and every project it is on. Their sessions there end.
+    /// </summary>
+    public async Task<IResult?> BringOverAsync(Actor actor, Guid linkId, Guid hostUserId, CancellationToken cancellationToken)
+    {
+        var me = tenant.Required;
+        var link = await db.OrganizationLinks.AsNoTracking()
+            .SingleOrDefaultAsync(l => l.Id == linkId && l.GuestTenantId == me && l.State == LinkStates.Linked, cancellationToken);
+        if (link is null) return Problems.NotFound("LINK_NOT_FOUND", "No such organization we work with.");
+        var guest = await TenantScope.RunAsync(scopes, link.HostTenantId, async (_, hostDb) =>
+            await hostDb.Users.AsNoTracking().SingleOrDefaultAsync(u => u.Id == hostUserId && u.PartyId == link.HostPartyId && u.HomeTenantId == null,
+                cancellationToken), cancellationToken);
+        if (guest is null) return Problems.NotFound("GUEST_NOT_FOUND", "No such guest account of ours there.");
+        if (await db.Users.AnyAsync(u => u.NormalizedEmail == guest.NormalizedEmail, cancellationToken))
+            return Problems.Conflict("EMAIL_TAKEN", $"{guest.Email} already has an account here.");
+
+        // Their sign-in name moves here: the account there stops being one you sign in to.
+        await db.SignInNames.Where(n => n.NormalizedEmail == guest.NormalizedEmail && n.TenantId == link.HostTenantId).ExecuteDeleteAsync(cancellationToken);
+        var home = new User
+        {
+            TenantId = me,
+            Email = guest.Email,
+            NormalizedEmail = guest.NormalizedEmail,
+            Name = guest.Name,
+            PasswordHash = guest.PasswordHash,
+            Active = guest.Active,
+            MfaSecretProtected = guest.MfaSecretProtected,
+            MfaEnabledAt = guest.MfaEnabledAt,
+            RecoveryCodeHashes = guest.RecoveryCodeHashes,
+        };
+        db.Users.Add(home);
+        db.AccountLinks.Add(new AccountLink
+        {
+            LinkId = link.Id,
+            HomeTenantId = me,
+            HomeUserId = home.Id,
+            HostTenantId = link.HostTenantId,
+            HostUserId = guest.Id,
+            CreatedAt = clock.GetCurrentInstant(),
+        });
+        await audit.WriteAsync(actor, "GUEST_BROUGHT_OVER", "User", home.Id, home.Email,
+            $"{home.Name} was a guest at {await HostNameAsync(link.HostTenantId, cancellationToken)}: now one of ours, still on their projects.",
+            cancellationToken: cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
+        await TenantScope.RunAsync(scopes, link.HostTenantId, async (services, hostDb) =>
+        {
+            var stand = await hostDb.Users.SingleAsync(u => u.Id == guest.Id, cancellationToken);
+            stand.HomeTenantId = me;
+            stand.PasswordHash = NoPassword;
+            stand.MfaSecretProtected = null;
+            stand.MfaEnabledAt = null;
+            stand.RecoveryCodeHashes = [];
+            await services.GetRequiredService<AuditLog>().WriteAsync(new Actor(null, $"{actor.Name} ({link.HostPartyName})"), "GUEST_BROUGHT_OVER",
+                "User", stand.Id, stand.Email, $"{stand.Name} now signs in with {link.HostPartyName}'s own DELIOS; this account stands for them here.",
+                cancellationToken: cancellationToken);
+            await hostDb.SaveChangesAsync(cancellationToken);
+            await services.GetRequiredService<SessionStore>().ForgetAllAsync(stand.Id, revoke: true, cancellationToken);
+        }, cancellationToken);
+        return null;
     }
 }

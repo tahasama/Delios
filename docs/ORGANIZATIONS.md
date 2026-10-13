@@ -25,8 +25,9 @@ A company can move up later without losing anything:
 Not on DELIOS ──> Collaborator   they register; we link our record of them to their organization.
                                  Their people then see everything recorded for them, under the same
                                  code and the same document numbers.
-Guest ─────────> Collaborator   their company registers; the guest accounts are linked to their
-                                 people's own accounts. History stays.
+Guest ─────────> Collaborator   their company registers and links; its administrator brings each guest
+                                 account over (organization page): the person signs in at home from then
+                                 on, with the same email and password, and keeps every project here.
 ```
 
 ## How it works underneath
@@ -86,3 +87,5 @@ with the owner's approval.
 4. The admin page: projects, people, companies, defaults, security and audit.
 5. Moving up: a "not on DELIOS" party, or guests, linked to an organization that registers later.
 ```
+
+All five steps are built.

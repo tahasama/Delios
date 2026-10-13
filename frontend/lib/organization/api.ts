@@ -45,3 +45,7 @@ export const projectOrganizations = cache(async (scope: { projectId: string }): 
 
 /** Where the signed-in person can switch to: other organizations' projects they are on, or home. */
 export const elsewhere = cache(async (): Promise<Elsewhere[]> => api<Elsewhere[]>("/api/me/elsewhere").catch(() => []));
+
+/** The guest accounts another organization made for our people before we linked, not yet brought over. */
+export const guestAccounts = cache(async (linkId: string): Promise<{ id: string; name: string; email: string; active: boolean }[]> =>
+  api<{ id: string; name: string; email: string; active: boolean }[]>(`/api/organization/joined/${linkId}/guests`).catch(() => []));

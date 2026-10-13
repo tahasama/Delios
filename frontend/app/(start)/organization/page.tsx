@@ -5,9 +5,9 @@ import { ActionForm } from "@/components/form";
 import { Card, DataTable, Th, Td, Chip, Field, inputCls, btn } from "@/components/ui";
 import { ArrowLeft, LogOut } from "lucide-react";
 import { adminParties, adminProjects, adminUsers } from "@/lib/settings/api-admin";
-import { organizationLinks, joinedProjects } from "@/lib/organization/api";
+import { organizationLinks, joinedProjects, guestAccounts } from "@/lib/organization/api";
 import { projectDefaults } from "@/lib/organization/defaults";
-import { acceptLinkAction, refuseLinkAction, endLinkAction, joinPersonAction, makeDefaultsAction } from "@/lib/organization/forms";
+import { acceptLinkAction, refuseLinkAction, endLinkAction, joinPersonAction, makeDefaultsAction, bringOverAction } from "@/lib/organization/forms";
 import { PARTY_KINDS } from "@/lib/settings/party-kinds";
 import { contractRoleOptions } from "@/lib/settings/contract-roles";
 import { fmtDate } from "@/lib/core/utils";
@@ -41,6 +41,9 @@ export default async function OrganizationPage() {
   /** Where each of our people works elsewhere: the projects of other organizations' they are on. */
   const elsewhereOf = (userId: string) => joined.filter((p) => p.ourPeople.some((one) => one.userId === userId && one.active));
   const history = links.filter((one) => one.state === "REFUSED" || one.state === "ENDED");
+  // Guest accounts other organizations made for our people before we linked: brought over, they sign in here.
+  const linkedAsGuest = links.filter((one) => one.side === "GUEST" && one.state === "LINKED");
+  const guestsThere = new Map(await Promise.all(linkedAsGuest.map(async (one) => [one.id, await guestAccounts(one.id)] as const)));
 
   return (
     <div className="min-h-screen bg-canvas">
@@ -170,6 +173,21 @@ export default async function OrganizationPage() {
                 <Td className="text-xs">we work on their projects</Td>
                 <Td className="text-xs">
                   linked since {fmtDate(one.answeredAt)}
+                  {guestsThere.get(one.id)?.length ? (
+                    <div className="mt-2 rounded-lg bg-tint-soft p-2">
+                      <p className="text-[11px] text-slate-600">Guest accounts {one.organization} made for our people before we linked. Brought over, they sign in here with the same password and keep their projects there.</p>
+                      <ul className="mt-1 space-y-1">
+                        {guestsThere.get(one.id)!.map((guest) => (
+                          <li key={guest.id} className="flex items-center justify-between gap-2">
+                            <span className="text-[11px] text-slate-700">{guest.name} <span className="text-slate-400">{guest.email}</span></span>
+                            <ActionForm action={bringOverAction} hideSubmit hidden={{ linkId: one.id, guestId: guest.id }} className="space-y-0">
+                              <button className="text-[11px] font-semibold text-link hover:underline">bring over</button>
+                            </ActionForm>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
                   <details className="mt-1"><summary className="cursor-pointer text-[11px] font-semibold text-link">End the link</summary>
                     <div className="mt-2 w-72">
                       <ActionForm action={endLinkAction} submitLabel="End the link" size="sm" variant="secondary" hidden={{ linkId: one.id }}>

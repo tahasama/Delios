@@ -138,3 +138,14 @@ export async function makeDefaultsAction(_prev: Result | undefined, formData: Fo
   revalidatePath("/organization");
   return { ok: `New projects now start with ${project.code}'s choices. Projects already open keep theirs.` };
 }
+
+/** A guest account another organization made for one of our people becomes theirs here: same email, same password. */
+export async function bringOverAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
+  try {
+    await api(`/api/organization/joined/${text(formData, "linkId")}/guests/${text(formData, "guestId")}/bring`, { body: {} });
+  } catch (e) {
+    return failed(e);
+  }
+  revalidatePath("/organization");
+  return { ok: "Brought over. They sign in here from now on, with the same password, and keep their projects there." };
+}

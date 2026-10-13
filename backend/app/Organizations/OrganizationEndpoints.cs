@@ -43,6 +43,12 @@ public static class OrganizationEndpoints
             HttpContext http, OrganizationService orgs, DeliosDbContext db, CancellationToken c) =>
             await orgs.JoinPersonAsync(await ActorAsync(http, db, c), linkId, projectId, request, c) ?? Results.NoContent());
 
+        admins.MapGet("/joined/{linkId:guid}/guests", async (Guid linkId, OrganizationService orgs, CancellationToken c) =>
+            Results.Ok(await orgs.GuestsAsync(linkId, c)));
+        admins.MapPost("/joined/{linkId:guid}/guests/{hostUserId:guid}/bring", async (Guid linkId, Guid hostUserId, HttpContext http,
+            OrganizationService orgs, DeliosDbContext db, CancellationToken c) =>
+            await orgs.BringOverAsync(await ActorAsync(http, db, c), linkId, hostUserId, c) ?? Results.NoContent());
+
         // Ending a link: either side; ours as host is Document Control's too.
         app.MapPost("/api/organization/links/{linkId:guid}/end", async (Guid linkId, NoteRequest request, HttpContext http,
             OrganizationService orgs, DeliosDbContext db, CancellationToken c) =>
