@@ -262,6 +262,8 @@ The repository: `backend/` (API and worker), `frontend/` (the Next.js screens; r
 - What came in reads, in the transmittal list, as its check answered: To check,
   Returned / Partly returned, Accepted (read from the documents it carried);
   words alone read Received. Never "Accepted" before or against the check.
+  One rule for the list and the transmittal page (`Arrivals`); the check is kept on the submission
+  (`SubmissionRecord.Check`), never overwritten by a later release or return.
 - A submission returned by the check tells whoever sent it and their
   organization's people on the project, with why.
 - What another organization sends becomes the document only when Document
