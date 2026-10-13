@@ -32,15 +32,15 @@ export default async function SetupPage() {
     // The account-wide role a function stands for is read from what it may do.
     adminFunctions().then((all) => all.filter((f) => f.active).map((f) => {
       const verbs = new Set(f.rules.flatMap((r) => r.verbs));
-      const legacyRole = verbs.has("CONFIGURE") ? "ADMIN" : verbs.has("CONTROL") ? "CONTROLLER" : verbs.has("APPROVE") ? "APPROVER"
+      const role = verbs.has("CONFIGURE") ? "ADMIN" : verbs.has("CONTROL") ? "CONTROLLER" : verbs.has("APPROVE") ? "APPROVER"
         : verbs.has("REVIEW") ? "REVIEWER" : verbs.has("CREATE") || verbs.has("REVISE") ? "AUTHOR" : "VIEWER";
-      return { ...f, legacyRole };
+      return { ...f, role };
     })),
     adminUsers().then((all) => all.filter((u) => u.active).sort((a, b) => a.createdAt.localeCompare(b.createdAt))
       .map((u) => ({ id: u.id, name: u.name, email: u.email, role: u.isAdmin ? "ADMIN" : "VIEWER" }))),
     getSets().then((all) => all.length),
   ]);
-  const labelFor = (role: string) => functions.find((f) => f.legacyRole === role)?.name ?? role;
+  const labelFor = (role: string) => functions.find((f) => f.role === role)?.name ?? role;
   const roleOptions = await contractRoleOptions();
 
   return (

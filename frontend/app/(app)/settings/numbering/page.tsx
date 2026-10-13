@@ -5,7 +5,7 @@ import { ActionForm } from "@/components/form";
 import { removeNumberingSchemeAction, saveSchemeRoutingAction } from "@/lib/forms/admin";
 import { NumberingSchemeBuilder } from "./numbering-scheme-builder";
 import { getSets, getActiveSet } from "@/lib/settings/config";
-import { legacyNumbering } from "@/lib/api/admin";
+import { numberingForEditor } from "@/lib/api/admin";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Numbering" };
@@ -66,7 +66,7 @@ export default async function NumberingPage() {
     return <PageHeader title="Numbering" subtitle="Administrators and the control function." />;
   }
   const [{ schemes, routing }, sets, deliverables] = await Promise.all([
-    legacyNumbering(),
+    numberingForEditor(),
     getSets(),
     getActiveSet("DELIVERABLE_TYPES"),
   ]);

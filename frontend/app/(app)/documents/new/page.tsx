@@ -2,7 +2,7 @@ import { fieldRules, fieldLabels, ownFields } from "@/lib/settings/field-policy"
 import { getActiveSet } from "@/lib/settings/config";
 import { requireScope } from "@/lib/core/scope";
 import { mayCreateDocument } from "@/lib/core/auth";
-import { legacyNumbering } from "@/lib/api/admin";
+import { numberingForEditor } from "@/lib/api/admin";
 import { Banner, PageHeader } from "@/components/ui";
 import { NewDocumentForm } from "./new-document-form";
 
@@ -37,7 +37,7 @@ export default async function NewDocumentPage({ searchParams }: { searchParams: 
   const [fields, labels, own] = await Promise.all([fieldRules(ctx, "DOCUMENT"), fieldLabels(ctx, "DOCUMENT"), ownFields(ctx, "DOCUMENT")]);
   // Numbering and routes are read where Document Control keeps them; anybody
   // else gets none, and the backend still checks every value on submit.
-  const { routing, schemes } = await legacyNumbering().catch(() => ({ routing: [], schemes: [] }));
+  const { routing, schemes } = await numberingForEditor().catch(() => ({ routing: [], schemes: [] }));
   const routings = routing.filter((r) => r.status === "ACTIVE");
   const numberingSets: Record<string, string[]> = {};
   for (const r of routings) {

@@ -46,7 +46,7 @@ function Line({ label, children }: { label: string; children: React.ReactNode })
   );
 }
 
-import { adminFunctions, legacyNumbering, legacyRoutes, orEmpty, scopeConfig } from "@/lib/api/admin";
+import { adminFunctions, numberingForEditor, routesForEditor, orEmpty, scopeConfig } from "@/lib/api/admin";
 import { backendDocument } from "@/lib/api/legacy";
 
 export async function DocumentManagementPlan({ readiness }: { readiness: { title: string; done: boolean; todo: string }[] }) {
@@ -59,9 +59,9 @@ export async function DocumentManagementPlan({ readiness }: { readiness: { title
   ] = await Promise.all([
     scopeConfig(ctx.projectId),
     getSets(),
-    legacyNumbering().then((n) => n.schemes),
-    legacyNumbering().then((n) => n.routing),
-    legacyRoutes().then((all) => [...all].sort((a, b) => Number(b.isDefault) - Number(a.isDefault) || a.name.localeCompare(b.name))),
+    numberingForEditor().then((n) => n.schemes),
+    numberingForEditor().then((n) => n.routing),
+    routesForEditor().then((all) => [...all].sort((a, b) => Number(b.isDefault) - Number(a.isDefault) || a.name.localeCompare(b.name))),
     // Who receives what is the matrix's Receive rows.
     orEmpty(adminFunctions).then((all) => all.flatMap((f) => f.rules.filter((r) => r.verbs.includes("RECEIVE")))),
     // Published exceptions to the standard are not kept by the backend yet.

@@ -9,7 +9,7 @@ import { upload, filesOf } from "@/lib/api/uploads";
 import { requestFromForm, issueAsk } from "@/lib/transmittals/issue-requests";
 import { formPolicy, checkForm } from "@/lib/settings/field-policy";
 import { setOrgSetting } from "@/lib/api/settings";
-import { adminParties, backendRoute, PARTY_KEY, type LegacyRouteStep } from "@/lib/api/admin";
+import { adminParties, backendRoute, PARTY_KEY, type EditorRouteStep } from "@/lib/api/admin";
 import { hasVerb } from "@/lib/core/auth";
 
 /**
@@ -40,7 +40,7 @@ export async function saveTemplateAction(_prev: { error?: string } | undefined, 
       return { error: "The document-class scope is invalid." };
     }
   }
-  let steps: LegacyRouteStep[];
+  let steps: EditorRouteStep[];
   try { steps = JSON.parse(String(formData.get("steps") ?? "[]")); } catch { return { error: "Steps are not valid JSON." }; }
   if (!Array.isArray(steps) || steps.length === 0) return { error: "Add at least one step." };
   const route = await backendRoute(classes, steps);

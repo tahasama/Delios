@@ -163,7 +163,7 @@ export type Actor = {
   functionCode: string;
   functionName: string;
   clearance: number;
-  legacyRole: string;
+  role: string;
   rules: Rule[];
   /** The contract role of the project this actor is being judged on. */
   projectRole: string | null;

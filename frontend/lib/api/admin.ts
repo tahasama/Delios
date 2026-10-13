@@ -100,13 +100,13 @@ const SET_BY_SOURCE = Object.fromEntries(Object.entries(SOURCE_BY_SET).map(([set
 /** What the screen calls a record kind, and the backend's name for it. */
 export const RECORD_KIND: Record<string, string> = { TRANSMITTAL: "@TRANSMITTAL", REVIEW: "@REVIEW", PACKAGE: "@PACKAGE", ACTION: "@ACTION" };
 
-type LegacyScheme = {
+type EditorScheme = {
   id: string; name: string; delimiter: string; active: boolean; notes: string | null;
   fields: { id: string; position: number; label: string; valueSetKey: string | null; rule: string | null }[];
 };
 
 /** A backend part as the screen writes it: a list it reads, or a rule. */
-function legacyField(field: SchemeField, index: number, schemeId: string): LegacyScheme["fields"][number] {
+function editorField(field: SchemeField, index: number, schemeId: string): EditorScheme["fields"][number] {
   const base = { id: `${schemeId}-${index}`, position: index + 1, label: field.label };
   if (field.source === "SEQUENCE") return { ...base, valueSetKey: null, rule: `COUNTER:DIGITS(${field.digits ?? 4})` };
   if (field.source === "FIXED") return { ...base, valueSetKey: null, rule: `FIXED(${field.value ?? ""})` };
@@ -125,10 +125,10 @@ export function backendField(label: string, valueSetKey: string, rule: string): 
 }
 
 /** The schemes and what each numbers, in the screen's shapes. */
-export async function legacyNumbering() {
+export async function numberingForEditor() {
   const numbering = await adminNumbering();
-  const schemes: LegacyScheme[] = numbering.schemes.map((s) => ({
-    id: s.id, name: s.name, delimiter: s.delimiter, active: s.active, notes: null, fields: s.fields.map((f, i) => legacyField(f, i, s.id)),
+  const schemes: EditorScheme[] = numbering.schemes.map((s) => ({
+    id: s.id, name: s.name, delimiter: s.delimiter, active: s.active, notes: null, fields: s.fields.map((f, i) => editorField(f, i, s.id)),
   }));
   const kindOf = Object.fromEntries(Object.entries(RECORD_KIND).map(([screen, backend]) => [backend, screen]));
   const routing = numbering.routing.map((r) => ({
@@ -141,7 +141,7 @@ export async function legacyNumbering() {
 // ── Functions, as the matrix screen reads them ───────────────────────────────
 
 /** Functions with their rows, in the screen's shapes: verbs as a JSON list, a holders count. */
-export async function legacyFunctions() {
+export async function functionsForMatrix() {
   const functions = await adminFunctions();
   return [...functions]
     .sort((a, b) => Number(b.active) - Number(a.active) || a.name.localeCompare(b.name))
@@ -194,7 +194,7 @@ export function asMatrixRules(rules: AdminRule[]) {
 export const PARTY_KEY = "PARTY:";
 type PartyAnswers = { kind?: string; contactId?: string | null; backupId?: string | null };
 
-export async function legacyParties() {
+export async function partiesWithAnswers() {
   const { orgSettings } = await import("./settings");
   const [parties, users, answers] = await Promise.all([adminParties(), adminUsers(), orgSettings()]);
   const person = (id: string | null | undefined) => {
@@ -221,19 +221,19 @@ export async function legacyParties() {
 // outside party; the backend's step is answered by the holders of one
 // function (by code) or by one party (by code), the first answer or all.
 
-export type LegacyRouteStep = {
+export type EditorRouteStep = {
   act: "REVIEW" | "APPROVAL"; partyId?: string; mode: "ANY_OF" | "ALL_CONSOLIDATOR" | "SERIAL" | "ALL"; participantIds: string[];
   functionIds?: string[]; title?: string; days?: number; grantsStatuses?: string[];
 };
 
-export async function legacyRoutes() {
+export async function routesForEditor() {
   const [routes, parties] = await Promise.all([adminRoutes(), adminParties()]);
   return routes.filter((r) => r.active).map((r) => ({
     id: r.id, name: r.name, description: r.description, isDefault: r.isDefault, outcomeSetKey: (r.verdictSet ?? "REVIEW_OUTCOMES") as string | null, createdAt: new Date(0),
     classes: r.patterns.length
       ? JSON.stringify(r.patterns.map((p) => Object.fromEntries(Object.entries(p).filter(([, v]) => v))))
       : "*",
-    steps: JSON.stringify(r.steps.map((s, i): LegacyRouteStep => ({
+    steps: JSON.stringify(r.steps.map((s, i): EditorRouteStep => ({
       act: i === r.steps.length - 1 ? "APPROVAL" : "REVIEW",
       partyId: s.partyCode ? parties.find((p) => p.code === s.partyCode)?.id : undefined,
       mode: s.mode === "ALL" ? "ALL" : "ANY_OF",
@@ -247,7 +247,7 @@ export async function legacyRoutes() {
 }
 
 /** A screen route as the backend takes it; what the backend cannot say is reported, not dropped in silence. */
-export async function backendRoute(classes: string, steps: LegacyRouteStep[]): Promise<{ patterns: unknown[]; steps: unknown[] } | { error: string }> {
+export async function backendRoute(classes: string, steps: EditorRouteStep[]): Promise<{ patterns: unknown[]; steps: unknown[] } | { error: string }> {
   const parties = await adminParties();
   if (steps.some((s) => (s.functionIds ?? []).length > 1)) return { error: "A step is answered by the holders of one function: choose one per step." };
   if (steps.some((s) => !s.partyId && !(s.functionIds ?? []).length && !s.participantIds.length)) return { error: "Say who answers each step: a function, people of ours, or an outside organization." };

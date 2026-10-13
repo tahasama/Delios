@@ -7,7 +7,7 @@ import { hasVerb } from "@/lib/core/auth";
 import { ArrowRight } from "lucide-react";
 import { verdictSets } from "@/lib/reviews/verdict-sets";
 import { isVerdictSet } from "@/lib/settings/set-props";
-import { adminFunctions, adminParties, adminUsers, legacyRoutes } from "@/lib/api/admin";
+import { adminFunctions, adminParties, adminUsers, routesForEditor } from "@/lib/api/admin";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Review routes" };
@@ -18,7 +18,7 @@ export default async function WorkflowTemplatesPage() {
   const { user: me } = await requireScope();
   const admin = hasVerb(me, "ROUTES");
   const [templates, sets, users, classValues, functions, outsideParties] = await Promise.all([
-    legacyRoutes(),
+    routesForEditor(),
     getSets(),
     adminUsers().then((all) => all.filter((u) => u.active).map((u) => ({
       id: u.id, name: u.name, role: "", party: u.partyId ? { name: u.partyName ?? "", isInternal: u.internal } : null,

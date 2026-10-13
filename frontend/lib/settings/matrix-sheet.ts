@@ -120,7 +120,7 @@ export async function buildSheet(
   for (const value of levelValues) if (typeof value.props.level === "number") levels.set(value.code, value.props.level);
   const projectRole = me?.projects.find((p) => p.id === t.projectId)?.contractRole ?? null;
   const actors: (Actor | null)[] = functions.map((f) => ({
-    functionId: f.id, functionCode: f.code, functionName: f.name, clearance: 0, legacyRole: "VIEWER", levels, projectRole,
+    functionId: f.id, functionCode: f.code, functionName: f.name, clearance: 0, role: "VIEWER", levels, projectRole,
     rules: asMatrixRules(f.rules).map((r) => ({ ...r, verbs: r.verbs as Verb[] })),
   }));
   const columns = functions.map((f) => ({ code: f.code, name: f.name }));

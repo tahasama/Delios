@@ -274,7 +274,7 @@ async function actorsOf(t: Tenant, functions: AdminFunction[]): Promise<Map<stri
   for (const value of levelValues) if (typeof value.props.level === "number") levels.set(value.code, value.props.level);
   const projectRole = me?.projects.find((p) => p.id === t.projectId)?.contractRole ?? null;
   return new Map(functions.map((f) => [f.code, {
-    functionId: f.id, functionCode: f.code, functionName: f.name, clearance: 0, legacyRole: "VIEWER", levels, projectRole,
+    functionId: f.id, functionCode: f.code, functionName: f.name, clearance: 0, role: "VIEWER", levels, projectRole,
     rules: asMatrixRules(f.rules).map((r) => ({ ...r, verbs: r.verbs as Verb[] })),
   } as Actor] as const));
 }

@@ -13,7 +13,7 @@ import {
 import { VERBS, VERB_LABEL, VERB_BLURB, type Verb } from "@/lib/core/permissions";
 import { CONTRACT_ROLES } from "@/lib/settings/profiles/roles";
 import { Check, Minus } from "lucide-react";
-import { legacyFunctions } from "@/lib/api/admin";
+import { functionsForMatrix } from "@/lib/api/admin";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Functions & permissions" };
@@ -39,7 +39,7 @@ export default async function FunctionsPage() {
   // give itself more: an administrator's own function stays with administrators.
 
   const [functions, disciplines, docTypes, deliverableTypes, criticalities, confidentialities] = await Promise.all([
-    legacyFunctions(),
+    functionsForMatrix(),
     getActiveSet("DISCIPLINES"),
     getActiveSet("DOCUMENT_TYPES"),
     getActiveSet("DELIVERABLE_TYPES"),

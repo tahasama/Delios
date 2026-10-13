@@ -7,7 +7,7 @@ import { formPolicy } from "@/lib/settings/field-policy";
 import { savePartyAction, deletePartyAction } from "@/lib/forms/workflow";
 import { PartyKindFields } from "./party-fields";
 import { PARTY_KINDS } from "@/lib/settings/party-kinds";
-import { adminFunctions, adminUsers, legacyParties } from "@/lib/api/admin";
+import { adminFunctions, adminUsers, partiesWithAnswers } from "@/lib/api/admin";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Organizations" };
@@ -19,7 +19,7 @@ export default async function AdminPartiesPage() {
   const policy = await formPolicy(ctx, "PARTY");
   if (!maySetup(me, SETUP_PAGES.find((p) => p.href === "/settings/parties")!)) return <PageHeader title="Organizations" subtitle="Administrators and the control function." />;
   const [parties] = await Promise.all([
-    legacyParties(),
+    partiesWithAnswers(),
   ]);
   const people = (await adminUsers()).filter((one) => one.active).map((one) => ({ id: one.id, name: one.name, email: one.email, partyId: one.partyId }));
   // A function is named on an organization by its code: the one that carries its exchange.

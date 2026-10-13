@@ -43,7 +43,7 @@ export type Scope = {
   project: ProjectSummary;
   /**
    * The function held on this project, with its rules and clearance. This is
-   * the authority; `role` below is its legacy name.
+   * the authority; `role` below is the role those verbs amount to.
    */
   actor: Actor;
   /** The user's role *in this project*, derived from their function. */
@@ -62,8 +62,8 @@ export type Scope = {
   why: (verb: Verb, target?: DocumentClass | null) => string;
 };
 
-/** The old role name a function's verbs amount to, for the few screens that still speak in roles. */
-function legacyRoleOf(verbs: string[]): Role {
+/** The role a function's verbs amount to (administrator, Document Control, approver…), for the screens that ask by role. */
+function roleOf(verbs: string[]): Role {
   if (verbs.includes("CONFIGURE")) return "ADMIN" as Role;
   if (verbs.includes("CONTROL")) return "CONTROLLER" as Role;
   if (verbs.includes("APPROVE")) return "APPROVER" as Role;
@@ -115,7 +115,7 @@ export const getScope = cache(async (): Promise<Scope | null> => {
     clearance: chosen.function.clearance
       ? Math.max(0, (values.CONFIDENTIALITY ?? []).findIndex((one) => one.code === chosen.function.clearance))
       : Number.MAX_SAFE_INTEGER,
-    legacyRole: legacyRoleOf(verbs),
+    role: roleOf(verbs),
     levels,
     projectRole: chosen.contractRole,
     rules: rules.map((r) => ({
@@ -123,7 +123,7 @@ export const getScope = cache(async (): Promise<Scope | null> => {
       confidentiality: r.confidentiality, projectRole: r.projectRole, family: null, familyTypes: null, verbs: r.verbs as Verb[],
     })),
   };
-  const role = actor.legacyRole as Role;
+  const role = actor.role as Role;
   const held = [...new Set(actor.rules.filter((r) => r.projectRole === null || r.projectRole === chosen.contractRole).flatMap((r) => r.verbs))];
   return {
     user: { ...user, role, verbs: held, functionName: actor.functionName, department: chosen.department ?? null },
