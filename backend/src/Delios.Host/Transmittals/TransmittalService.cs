@@ -641,6 +641,38 @@ public sealed class TransmittalService(
         IReadOnlyList<Addressee>? Copies = null, Instant? IssuedAt = null, Guid? InReplyToId = null, Guid? FollowsId = null,
         string? FollowKind = null, string? Extras = null, Guid? ActivityId = null, string? ActivityAsk = null);
 
+    /// <summary>
+    /// The whole transmittal, as its page shows it, for the email each person it goes to receives: number, project,
+    /// subject, who sent it and when, to whom and who is copied in, what it is issued for and by when an answer is
+    /// due, the message, and every document with its revision and status.
+    /// </summary>
+    private static string TransmittalEmail(Project project, Transmittal t, Catalog catalog, IReadOnlyList<Addressee> addressed, string? ours, string listed)
+    {
+        static string Who(Addressee a) => a.Organization is null || a.Organization == a.Name ? a.Name : $"{a.Name} ({a.Organization})";
+        var to = addressed.Where(a => a.Kind != RecipientKinds.Cc).Select(Who).ToList();
+        var copies = addressed.Where(a => a.Kind == RecipientKinds.Cc).Select(Who).ToList();
+        var text = new System.Text.StringBuilder();
+        text.AppendLine($"Transmittal {t.Number} · {project.Code} {project.Name}");
+        text.AppendLine(t.Subject);
+        text.AppendLine();
+        text.AppendLine($"From: {t.IssuedByName}{(ours is null ? "" : $" ({ours})")}, {t.IssuedAt.InZone(DateTimeZoneProviders.Tzdb.GetZoneOrNull(project.TimeZone) ?? DateTimeZone.Utc).Date:yyyy-MM-dd}");
+        if (to.Count > 0) text.AppendLine($"To: {string.Join(", ", to)}");
+        if (copies.Count > 0) text.AppendLine($"Copied in: {string.Join(", ", copies)}");
+        text.AppendLine($"Issued for: {catalog.Label(TransmittalSets.Reasons, t.Reason)}");
+        if (t.ResponseDue is { } due) text.AppendLine($"Answer by: {due:yyyy-MM-dd}");
+        if (!string.IsNullOrWhiteSpace(t.Message))
+        {
+            text.AppendLine();
+            text.AppendLine(t.Message);
+        }
+        text.AppendLine();
+        text.AppendLine(t.Items.Count == 0 ? "No documents: the message is the transmittal." : $"Documents ({t.Items.Count}):");
+        if (t.Items.Count > 0) text.AppendLine(listed);
+        text.AppendLine();
+        text.Append("Open it to see the files and acknowledge it:");
+        return text.ToString();
+    }
+
     /// <summary>A numbered transmittal. What it records is never changed afterwards.</summary>
     public async Task<Transmittal> RaiseAsync(Raise raise, CancellationToken cancellationToken)
     {
@@ -774,7 +806,8 @@ public sealed class TransmittalService(
         await notifier.NotifyAsync(project.TenantId, project.Id, addressed.Where(a => a.UserId is not null).Select(a => a.UserId!.Value),
             Notifications.NotificationKinds.TransmittalReceived, $"{number}: {raise.Subject}",
             $"{raise.Reason} from {raise.Actor.Name}{(due is null ? "" : $", answer by {due:yyyy-MM-dd}")}.\n{listed}{(raise.Message is null ? "" : $"\n\n{raise.Message}")}",
-            $"/transmittals/{transmittal.Id}", cancellationToken, Notifications.EmailKinds.Transmittal);
+            $"/transmittals/{transmittal.Id}", cancellationToken, Notifications.EmailKinds.Transmittal,
+            TransmittalEmail(project, transmittal, catalog, addressed, ours, listed));
         return transmittal;
     }
 

@@ -983,11 +983,14 @@ project without being on it.
   where the request stands.
 - **Every transmittal and every notification also goes by email**, showing what
   the app shows, so there is a double proof: inside the app, and outside by
-  email. Already there: each notification can queue an email (kept in the
-  email log with its state, by kind: transmittal, review, notification),
-  switched off until the installation names a mail server. To come: the email
-  carrying the whole transmittal as the app shows it, and every notification
-  sent, not only some kinds.
+  email. Built: every notification queues its email (kept in the email log
+  with its state, by kind: transmittal, review, notification), and a
+  transmittal's email carries the whole transmittal as its page shows it
+  (number, project, subject, from, to, copied in, issued for, answer by,
+  message, every document with revision and status, the link). Switched off
+  until the installation names a mail server. Still to come: an organization
+  with nobody on the system receiving it by email directly (today one of ours
+  sends it, and the dispatch is recorded).
 
 - **Escalation** where somebody refuses to acknowledge carrying an action
   without its documents. Agreed to be the Standard's and the DMP's business

@@ -144,11 +144,12 @@ public sealed class Notifier(DeliosDbContext db, IClock clock, IOptions<EmailOpt
 
     /// <summary>
     /// Notifies each person once (repeats and empty ids are ignored), and emails those with an address when
-    /// notification email is on. <paramref name="link"/> is a path on the screens.
+    /// notification email is on. <paramref name="link"/> is a path on the screens. <paramref name="emailBody"/>, when
+    /// given, is what the email says in place of the notification's short text (a whole transmittal, for one).
     /// </summary>
     public async Task NotifyAsync(
         Guid tenantId, Guid? projectId, IEnumerable<Guid> userIds, string kind, string title, string? body, string? link,
-        CancellationToken cancellationToken, string emailKind = EmailKinds.Notification)
+        CancellationToken cancellationToken, string emailKind = EmailKinds.Notification, string? emailBody = null)
     {
         var ids = userIds.Where(id => id != Guid.Empty).Distinct().ToList();
         if (ids.Count == 0) return;
@@ -174,7 +175,7 @@ public sealed class Notifier(DeliosDbContext db, IClock clock, IOptions<EmailOpt
             db.Add(notification);
             if (pushed.Contains(person.Id)) db.Enqueue(PushRequested.RoutingKey, new PushRequested(tenantId, notification.Id));
             Queue(tenantId, projectId, emailKind, person.Email, person.Name, title,
-                $"{body}{(link is null ? "" : $"\n\n{Url(link)}")}", "Notification", notification.Id);
+                $"{emailBody ?? body}{(link is null ? "" : $"\n\n{Url(link)}")}", "Notification", notification.Id);
         }
     }
 

@@ -95,6 +95,18 @@ public sealed class TransmittalTests(Infrastructure infrastructure) : IClassFixt
         Assert.Equal("P1001-DEMO-DEMO-TR-0001", outcome.GetProperty("transmittals")[0].GetString());
         Assert.Equal("DONE", outcome.GetProperty("request").GetProperty("status").GetString());
 
+        // Its email is the whole transmittal, as the page shows it.
+        var admin = await app.SignedInAsync("admin@demo.local");
+        var outbox = await GetAsync(admin, "/api/admin/emails?kind=TRANSMITTAL");
+        var body = outbox.GetProperty("rows").EnumerateArray().Select(e => e.GetProperty("body").GetString()!)
+            .Single(b => b.Contains("P1001-DEMO-DEMO-TR-0001"));
+        Assert.Contains("Transmittal P1001-DEMO-DEMO-TR-0001", body);
+        Assert.Contains("From: ", body);
+        Assert.Contains("To: ", body);
+        Assert.Contains("Issued for: ", body);
+        Assert.Contains("Documents (1):", body);
+        Assert.Contains("/transmittals/", body);
+
         notIssued = await GetAsync(controller, P(p, "/not-issued"));
         Assert.DoesNotContain(notIssued.EnumerateArray(), x => x.GetProperty("revisionId").GetGuid() == p.Revision);
 
