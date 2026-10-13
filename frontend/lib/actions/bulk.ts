@@ -151,23 +151,6 @@ export async function importBulkAction(_prev: BulkResult | undefined, formData: 
       if (errs.length) rows.push({ line, ok: false, message: errs.join("; ") });
       else { valid++; rows.push({ line, ok: true, message: `Will create placeholder: ${GET(o, "Producer") || "ENG"}/${GET(o, "Type")}/${GET(o, "Discipline")}` }); }
     }
-  } else if (kind === "baseline") {
-    const statuses = await getActiveSet("STATUSES");
-    const docNumbers = new Set((await registerByNumber(ctx)).keys());
-    for (let i = 0; i < objects.length; i++) {
-      const o = objects[i];
-      const line = i + 2;
-      const errs: string[] = [];
-      if (!GET(o, "Action Code")) errs.push("Action Code missing");
-      if (!GET(o, "Document Number")) errs.push("Document Number missing");
-      else if (!docNumbers.has(GET(o, "Document Number"))) errs.push(`Document ${GET(o, "Document Number")} is not in the register`);
-      if (!GET(o, "Required Status")) errs.push("Required Status missing");
-      else if (!statuses.some((s) => s.code === GET(o, "Required Status"))) errs.push(`Status "${GET(o, "Required Status")}" not published`);
-      if (!GET(o, "Required By")) errs.push("Required By missing");
-      else if (isNaN(new Date(GET(o, "Required By")).getTime())) errs.push("Required By is not a date (use YYYY-MM-DD)");
-      if (errs.length) rows.push({ line, ok: false, message: errs.join("; ") });
-      else { valid++; rows.push({ line, ok: true, message: `${GET(o, "Document Number")} → ${GET(o, "Required Status")} by ${GET(o, "Required By")}` }); }
-    }
   } else if (kind === "people") {
     // A whole team arrives at once, in a spreadsheet, like everything else here.
     if (!ctx.can("CONFIGURE") && !ctx.can("CONTROL")) return { error: "Adding people needs Configure or Control." };
@@ -262,10 +245,6 @@ export async function importBulkAction(_prev: BulkResult | undefined, formData: 
           how: "Registered from a deliverable list.",
         });
         done++;
-      } else if (kind === "baseline") {
-        // Activities come from the schedule, and what each needs is agreed
-        // through Schedule & actions; neither is imported here.
-        throw new Error("Importing the actions baseline is not supported yet.");
       } else if (kind === "people") {
         const fn = (await adminFunctions()).find((f) => f.active && f.name.toLowerCase() === GET(o, "Function").toLowerCase());
         if (!fn) throw new Error(`no published function called "${GET(o, "Function")}"`);

@@ -6,10 +6,10 @@ on the provider's own page before you pay.
 
 Short version:
 - **Fixed now:** uploaded files could run script when opened. See section 6.
-- **Add before launch:** security headers (section 6), Cloudflare in front (section 3), and a password-reset flow
-  (section 5). Also have the legal documents written (section 1).
-- **Before a server goes on the internet:** close the internal service ports that `deploy/compose.yaml`
-  publishes (section 8).
+- **Done:** security headers on every page (section 6); internal service ports reachable from the machine
+  itself only (section 8); the screens run in a container behind Caddy (`--profile web`).
+- **Add before launch:** Cloudflare in front (section 3), and a password-reset flow (section 5). Also have the
+  legal documents written (section 1).
 - **Already in place:** sign-in limits, ownership checks on every request, IDs that cannot be guessed, an
   organization wall inside the database, and an audit trail.
 
@@ -140,9 +140,8 @@ To add:
 
 ## 6. Hidden-frame attacks and security headers
 
-**Today the app sends no security headers at all:** no `Content-Security-Policy`, no `frame-ancestors`, no
-`X-Frame-Options`, no `Strict-Transport-Security`. Another site could load DELIOS in an invisible frame and trick
-a signed-in user into clicking (clickjacking).
+**Done:** every page now says it may be framed only by our own pages, so another site cannot load DELIOS in an
+invisible frame and trick a signed-in user into clicking (clickjacking).
 
 **Fixed now** (no change to any screen): opening an uploaded file used to show it inside the app's own address,
 whatever it was. An uploaded HTML file would have run as the person opening it. Now:
@@ -151,12 +150,14 @@ whatever it was. An uploaded HTML file would have run as the person opening it. 
 - Files may be framed only by our own pages.
 - Downloads run nothing even if a browser opens them.
 
-**To add before launch:** headers on every page, set in Caddy or in `next.config.ts`:
-- `Content-Security-Policy: frame-ancestors 'self'`. This blocks the hidden-frame attack and still lets our own
-  review page show the PDF.
-- `Strict-Transport-Security`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: same-origin` and a strict
-  `Permissions-Policy`.
-- Later, a full content security policy with nonces, which needs some care with Next.js.
+**Headers on every page** (`frontend/next.config.ts`):
+- `Content-Security-Policy: frame-ancestors 'self'` and `X-Frame-Options: SAMEORIGIN`. Our own review page still
+  shows the PDF.
+- `Strict-Transport-Security` (one year), `X-Content-Type-Options: nosniff`,
+  `Referrer-Policy: strict-origin-when-cross-origin`, and a `Permissions-Policy` refusing camera, microphone and
+  location.
+- No `X-Powered-By` banner.
+- **Later:** a full content security policy with nonces, which needs some care with Next.js.
 
 ---
 
@@ -186,8 +187,8 @@ firewall only filters known attack patterns.
   - Docker kept up to date;
   - the database and the other internal services never published on a public port.
 
-**This last point is not the case today.** `deploy/compose.yaml` publishes these on every network interface of
-the machine, which is handy on a laptop but dangerous on a server:
+**Done.** `deploy/compose.yaml` publishes these on `127.0.0.1` only: reachable from the machine itself (handy on
+a laptop, and for `dotnet run`), never from outside, whatever `ufw` says:
 
 | Service | Ports |
 |---|---|
@@ -199,8 +200,9 @@ the machine, which is handy on a laptop but dangerous on a server:
 | SeaweedFS | 8333 |
 | ClamAV | 3310 |
 
-Docker opens these ports **past `ufw`**, so the firewall alone does not close them. Before going live, give
-production a compose override that publishes only Caddy (80 and 443), or binds the rest to `127.0.0.1`.
+Docker opens published ports **past `ufw`**, which is why binding to `127.0.0.1` matters. Grafana, Prometheus,
+Alertmanager and the API's own entrance (8080) are bound the same way. Only Caddy's site (`HTTP_PORT`,
+`HTTPS_PORT`: 80 and 443 in production) faces the internet.
 
 ---
 

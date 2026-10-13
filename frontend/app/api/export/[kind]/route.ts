@@ -221,13 +221,6 @@ async function extract(req: Request, { params }: { params: Promise<{ kind: strin
       ["P1001-50-ME-DWG-00001", "Feed pump P-103 — general arrangement", "", "", "", "", "", "", "", "SAFETY", "", "", "", "", "CTR-2026-11"],
     ];
     name = "template-deliverable-list";
-  } else if (kind === "template-baseline") {
-    rows = [
-      ["Action Code", "Action Name", "Action Date", "Document Number", "Required Status", "Required By"],
-      ["A0042", "Foundation concrete pour - area 20", "2026-10-01", "P1001-20-ST-DSW-00001", "IFC", "2026-09-24"],
-      ["A0042", "Foundation concrete pour - area 20", "2026-10-01", "P1001-20-CI-REP-00001", "IFC", "2026-09-24"],
-    ];
-    name = "template-baseline";
   } else if (kind === "template-schedule") {
     rows = [
       ["Activity ID", "Action Code", "Activity Name", "Baseline Date", "Forecast Date"],

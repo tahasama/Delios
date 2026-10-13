@@ -215,9 +215,11 @@ storage settings of every app server at the shared services.
 
 ## Domain and HTTPS
 
-In `deploy/.env`: `SITE_ADDRESS=app.example.com`, publish ports 80 and 443 in
-the `caddy` service, and set `Auth__SecureCookie` back to `true` (remove the
-override). Caddy obtains and renews the certificate itself.
+In `deploy/.env`: `SITE_ADDRESS=app.example.com`, `HTTP_PORT=80`, `HTTPS_PORT=443`,
+`PUBLIC_URL=https://app.example.com`, and `SECURE_COOKIE=true`. Start with
+`--profile app --profile web`: the screens run in the `web` container behind Caddy.
+Caddy obtains and renews the certificate itself. The API's own entrance (8080)
+stays on 127.0.0.1.
 
 ## Two-step sign-in (MFA)
 

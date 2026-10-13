@@ -43,6 +43,9 @@ npm run dev                                                                  # h
 
 On macOS or Linux the same, with `sh deploy/init-env.sh` and `cp .env.example .env`.
 
+To run the screens in a container too (as on a server), add `--profile web` to the `up` command and open
+http://localhost:3080; then `npm run dev` is not needed.
+
 Demo passwords are all `demo1234`:
 
 | Account | Role |

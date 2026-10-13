@@ -1,22 +1,35 @@
-# The one way in. Locally it answers on :8080 over HTTP; in production set
+# Two ways in.
+#
+# :8080 is the API, for the screens (the web container, or `npm run dev` on the
+# developer's machine). It is published on 127.0.0.1 only: nobody outside the
+# machine reaches it.
+#
+# SITE_ADDRESS is where people go: the screens, plus the one backend address a
+# browser is sent to by an identity provider (single sign-on). Locally it answers
+# on :80 (published as http://localhost:3080) over HTTP; in production set
 # SITE_ADDRESS to the domain (app.example.com) and Caddy obtains and renews the
 # TLS certificate itself.
-{$SITE_ADDRESS::80} {
+
+(api) {
+	reverse_proxy {
+		dynamic a api 8080 {
+			refresh 5s
+		}
+		lb_policy round_robin
+		lb_try_duration 10s
+		fail_duration 30s
+		unhealthy_status 502 503 504
+	}
+}
+
+:8080 {
 	encode zstd gzip
 
 	# The API, spread over however many api nodes are running. Nodes are found by
 	# name, so `--scale api=3` needs no change here. A node that fails is skipped
 	# for 30 seconds and the request retried on another.
 	handle /api/* {
-		reverse_proxy {
-			dynamic a api 8080 {
-				refresh 5s
-			}
-			lb_policy round_robin
-			lb_try_duration 10s
-			fail_duration 30s
-			unhealthy_status 502 503 504
-		}
+		import api
 	}
 
 	# Health and metrics stay on the internal network; they are never served here.
@@ -24,8 +37,24 @@
 		respond 404
 	}
 
-	# The Next.js app joins here once it runs in a container (plan step 6).
 	handle {
 		respond "DELIOS: the API is at /api." 200
+	}
+}
+
+{$SITE_ADDRESS::80} {
+	encode zstd gzip
+
+	handle /api/auth/sso/* {
+		import api
+	}
+
+	handle /health/* {
+		respond 404
+	}
+
+	# The screens (the web profile).
+	handle {
+		reverse_proxy web:3000
 	}
 }
