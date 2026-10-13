@@ -8,7 +8,7 @@ import { isController, isAdmin, hasVerb } from "@/lib/core/auth";
 import { supplyReason, submittedFor } from "@/lib/packages/supplier-status";
 import { api, projectPath, refusal } from "@/lib/api/client";
 import { upload } from "@/lib/api/uploads";
-import { backendDocument, backendRevision } from "@/lib/api/legacy";
+import { backendDocument, backendRevision } from "@/lib/api/documents";
 import { addressees, packageView } from "@/lib/api/packages";
 import type { PackageView, TransmittalView } from "@/lib/api/types";
 

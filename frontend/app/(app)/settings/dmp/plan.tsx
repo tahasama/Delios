@@ -47,7 +47,7 @@ function Line({ label, children }: { label: string; children: React.ReactNode })
 }
 
 import { adminFunctions, numberingForEditor, routesForEditor, orEmpty, scopeConfig } from "@/lib/api/admin";
-import { backendDocument } from "@/lib/api/legacy";
+import { backendDocument } from "@/lib/api/documents";
 
 export async function DocumentManagementPlan({ readiness }: { readiness: { title: string; done: boolean; todo: string }[] }) {
   const ctx = await requireScope();

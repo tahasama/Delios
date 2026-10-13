@@ -1,7 +1,7 @@
 import "server-only";
 import { cache } from "react";
 import { api, apiFetch, ApiProblem, projectPath, type Query } from "./client";
-import { backendDocument, backendRevision, backendReview, legacyDocument, type LegacyDocument, type LegacyRevision } from "./legacy";
+import { backendDocument, backendRevision, backendReview, documentPage, type PageDocument, type PageRevision } from "./documents";
 import type { RegisterPage, ReviewsPage, ReviewView, TransmittalView } from "./types";
 import type { RunData, WfRuntimeStep } from "@/lib/reviews/workflow";
 import { getMe } from "./me";
@@ -99,8 +99,8 @@ async function standIn(scope: Scope, review: ReviewView, step: Step) {
 }
 
 async function readCycle(scope: Scope, review: ReviewView) {
-  const doc = (await legacyDocument(scope, review.documentId)) as LegacyDocument;
-  const rev = doc.revisions.find((one) => one.id === review.revisionId) as LegacyRevision;
+  const doc = (await documentPage(scope, review.documentId)) as PageDocument;
+  const rev = doc.revisions.find((one) => one.id === review.revisionId) as PageRevision;
   const step = focusOf(review);
   const by = answered(step);
   const outcome = step.deciding ? review.verdict : step.answer;

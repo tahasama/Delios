@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireScope } from "@/lib/core/scope";
 import { api, projectPath, refusal } from "@/lib/api/client";
-import { backendRevision } from "@/lib/api/legacy";
+import { backendRevision } from "@/lib/api/documents";
 
 /**
  * Records confirmed and corrected, approvals withdrawn, comments reclassified.

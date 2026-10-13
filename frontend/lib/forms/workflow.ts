@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireScope } from "@/lib/core/scope";
 import { api, projectPath, refusal } from "@/lib/api/client";
-import { backendRevision, backendReview } from "@/lib/api/legacy";
+import { backendRevision, backendReview } from "@/lib/api/documents";
 import { upload, filesOf } from "@/lib/api/uploads";
 import { requestFromForm, issueAsk } from "@/lib/transmittals/issue-requests";
 import { formPolicy, checkForm } from "@/lib/settings/field-policy";

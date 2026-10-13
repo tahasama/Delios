@@ -56,7 +56,28 @@ public sealed record RevisionView(
     IReadOnlyList<SubmissionView> Submissions, IReadOnlyList<FileView> Files, Guid AuthoredById, string? AuthoredByParty,
     string? ReleasedByName, DateTimeOffset? ReturnedAt, DateTimeOffset? HeldAt = null, string? HeldReason = null, string? HeldByName = null,
     DateTimeOffset? VoidedAt = null, string? VoidReason = null, string? VoidAuthority = null, string? VoidReassessment = null,
-    Written? Unvoided = null, Written? Resent = null);
+    Written? Unvoided = null, Written? Resent = null, RevisionReading? Reading = null);
+
+/// <summary>
+/// What a revision amounts to, said once for every screen. <c>AwaitingCheck</c>: sent in by another organization and
+/// not accepted by Document Control's check yet, or sent back by it; its files then belong to the transmittal it came
+/// on, and the document keeps <c>KeptSubmission</c>'s (a placeholder: none, 0; handed back for an update: the
+/// submission accepted before). <c>Decided</c>: its review is decided and it waits for release, carrying what the
+/// decider granted (<c>Granted</c>). <c>IssuedAt</c>: when it first went out on a transmittal (not for a review step).
+/// </summary>
+public sealed record RevisionReading(bool AwaitingCheck, int KeptSubmission, bool Decided = false, string? Granted = null,
+    DateTimeOffset? IssuedAt = null)
+{
+    internal static RevisionReading Of(Revision r)
+    {
+        var resent = r.ResentAt;
+        var awaiting = r.AuthoredByParty is not null && (r.State == RevisionStates.Received
+            || (r.State == RevisionStates.Correcting && !(resent is { } again && (r.ReturnedAt is not { } back || again > back))));
+        var acceptedBefore = resent is not { } handed ? 0
+            : r.Submissions.Where(s => s.SubmittedAt <= handed).Select(s => s.Number).DefaultIfEmpty(0).Max();
+        return new RevisionReading(awaiting, awaiting ? acceptedBefore : r.Submission);
+    }
+}
 
 /// <summary>Something a person decided and wrote down: when, who, and why, in their words.</summary>
 public sealed record Written(DateTimeOffset At, string By, string Reason)

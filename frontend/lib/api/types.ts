@@ -128,6 +128,12 @@ export type RevisionView = {
   unvoided?: Written | null;
   /** Sent to its supplier again after it was taken back: the same revision comes back from them. */
   resent?: Written | null;
+  /**
+   * What it amounts to (Documents/Contracts.cs RevisionReading): waiting for, or sent back by, the check on arrival
+   * (its files then belong to the transmittal; the document keeps `keptSubmission`'s); decided and waiting for release,
+   * with what was granted; when it first went out. Present on GET /documents/{id}.
+   */
+  reading?: { awaitingCheck: boolean; keptSubmission: number; decided: boolean; granted: string | null; issuedAt: string | null } | null;
 };
 /** GET /documents/{id}/routes (ReviewEndpoints RouteView). */
 export type RouteView = { id: string; name: string; description: string | null; isDefault: boolean; verdictSet?: string; steps: { title: string; functionCode: string | null; partyCode: string | null; mode: string; reason: string | null; userIds?: string[] }[] };

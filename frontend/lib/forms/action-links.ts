@@ -8,7 +8,7 @@ import { getActiveSet } from "@/lib/settings/config";
 import { needDefaults } from "@/lib/schedule/schedule";
 import { activityDetail } from "@/lib/api/schedule";
 import { controlDoes } from "@/lib/settings/control-activities";
-import { backendDocument } from "@/lib/api/legacy";
+import { backendDocument } from "@/lib/api/documents";
 
 /** Each document's own discipline: an action needs a document for that discipline, never another. */
 async function disciplinesOf(ctx: Awaited<ReturnType<typeof requireScope>>, ids: string[]): Promise<Map<string, string>> {

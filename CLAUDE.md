@@ -271,7 +271,7 @@ The repository: `backend/` (API and worker), `frontend/` (the Next.js screens; r
   its files belong to the transmittal it came on (each line carries that
   submission's own files, checked there): the document keeps what it had (a
   placeholder: nothing; handed back for an update: the submission accepted
-  before). `revisionOf` (`awaitingCheck`).
+  before). `RevisionReading` (backend, `AwaitingCheck`).
 - "Files that came with it" shows on a received transmittal only when files
   came with it.
 - A placeholder sent to its supplier is issued for use: reason IFU ("Issued for

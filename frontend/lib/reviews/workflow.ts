@@ -38,7 +38,7 @@ const STANDARD_ADVICE = { none: "NO_COMMENT", some: "COMMENTS", blocking: "COMME
  * records it: the code, and the counts it was worked out from.
  */
 export async function myAdvice(t: Tenant, cycleId: string, userId: string): Promise<{ code: string; comments: number; blocking: number }> {
-  const { backendReview } = await import("@/lib/api/legacy");
+  const { backendReview } = await import("@/lib/api/documents");
   const mine = (await backendReview(t, cycleId)).comments.filter((c) => c.authorId === userId).map((c) => ({ progressionPreventing: c.blocking }));
   return { code: await adviceCode(adviceFor(mine)), comments: mine.length, blocking: mine.filter((c) => c.progressionPreventing).length };
 }
@@ -106,7 +106,7 @@ export type RunData = {
 
 export async function getRunForRevision(t: Tenant, revisionId: string): Promise<RunData | null> {
   // A run is the newest review of the revision; its steps as the route recorded them.
-  const { backendRevision, documentContext, backendReview } = await import("@/lib/api/legacy");
+  const { backendRevision, documentContext, backendReview } = await import("@/lib/api/documents");
   const revision = await backendRevision(t, revisionId);
   const latest = (await documentContext(t, revision.documentId)).reviews
     .filter((one) => one.revisionId === revisionId)

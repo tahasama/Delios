@@ -9,7 +9,7 @@ import {
   type Preflight,
   type Subject,
 } from "@/lib/conformance/rules/registry";
-import { backendDocument, backendRevision } from "@/lib/api/legacy";
+import { backendDocument, backendRevision } from "@/lib/api/documents";
 
 /**
  * Ask whether an act is allowed, before anyone commits to it.

@@ -5,7 +5,7 @@ import { requireScope } from "@/lib/core/scope";
 import { revalidatePath } from "next/cache";
 import { getActiveSet } from "@/lib/settings/config";
 import { api, projectPath, refusal } from "@/lib/api/client";
-import { backendRevision, backendReview, reviewOfRevision } from "@/lib/api/legacy";
+import { backendRevision, backendReview, reviewOfRevision } from "@/lib/api/documents";
 import { upload, filesOf } from "@/lib/api/uploads";
 import { requestFromForm, issueAsk } from "@/lib/transmittals/issue-requests";
 

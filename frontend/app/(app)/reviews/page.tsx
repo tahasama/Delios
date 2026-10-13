@@ -1,8 +1,6 @@
 import { isReadOnly } from "@/lib/core/auth";
-import { after } from "next/server";
 import { requireScope } from "@/lib/core/scope";
 import { dueState } from "@/lib/reviews/workflow";
-import { warnLateReviews } from "@/lib/reviews/review-risk";
 import { getSet } from "@/lib/settings/config";
 import { reviewsPage, valuesInUse, waitingOn, dueDay, workingDaysBetween } from "@/lib/api/reviews";
 import { ReviewsRegister, type ReviewRow } from "./reviews-register";
@@ -66,7 +64,6 @@ export default async function ReviewsPage({ searchParams }: { searchParams: Prom
   const ctx = await requireScope();
   // One automatic warning per review that is about to miss its date. After that
   // it is Document Control's call, and their chase is a transmittal.
-  after(() => warnLateReviews(ctx).catch(() => {}));
   const sp = await searchParams;
   const status = VIEWS.some((v) => v.id === sp.status) ? sp.status! : "ALL";
   const q = (sp.q ?? "").trim();

@@ -2,7 +2,7 @@ import "server-only";
 import { api, projectPath } from "@/lib/api/client";
 import { getActiveSet } from "@/lib/settings/config";
 import { scheduleSource } from "@/lib/api/schedule";
-import { backendDocument } from "@/lib/api/legacy";
+import { backendDocument } from "@/lib/api/documents";
 import { controlledSets } from "@/lib/api/admin";
 
 /**

@@ -1,4 +1,4 @@
-import { legacyDocument, documentContext } from "@/lib/api/legacy";
+import { documentPage, documentContext } from "@/lib/api/documents";
 import type { PackageView } from "@/lib/api/types";
 import { supplierStage, supplierStamp, type SupplierStage } from "@/lib/core/state-names";
 
@@ -73,7 +73,7 @@ export async function supplierRows(t: { projectId: string }, pkg: PackageView, d
     light.late = light.state === "NOT_SENT" && !!due && due.getTime() < now;
     if (!detail || !m.latestRevision) return light;
     const [doc, context] = await Promise.all([
-      legacyDocument(t, m.documentId).catch(() => null),
+      documentPage(t, m.documentId).catch(() => null),
       documentContext(t, m.documentId).catch(() => null),
     ]);
     const rev = doc?.revisions[0];

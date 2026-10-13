@@ -1,6 +1,6 @@
 import type { Tenant } from "@/lib/core/tenant";
 import { verdictMeaning } from "@/lib/reviews/verdict";
-import { legacyDocument } from "@/lib/api/legacy";
+import { documentPage } from "@/lib/api/documents";
 
 /**
  * Why a document may have a next revision, read from what happened to the one
@@ -21,7 +21,7 @@ type RevisionGround =
   | { kind: "OWN" };
 
 export async function revisionGround(t: Tenant, documentId: string): Promise<RevisionGround> {
-  const doc = await legacyDocument(t, documentId);
+  const doc = await documentPage(t, documentId);
   const last = doc?.revisions[0];
   if (!last) return { kind: "FIRST" };
 

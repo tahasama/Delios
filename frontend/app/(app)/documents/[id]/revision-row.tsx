@@ -6,7 +6,7 @@ import { fmtDate } from "@/lib/core/utils";
 import {
   voidRevisionAction, unvoidRevisionAction
 } from "@/lib/forms/revisions";
-import { type LegacyRevision } from "@/lib/api/legacy";
+import { type PageRevision } from "@/lib/api/documents";
 import { withdrawApprovalAction } from "@/lib/forms/governance";
 import { ChevronRight } from "lucide-react";
 
@@ -29,7 +29,7 @@ export function UsedIn({ kind, href, code, text, children }: { kind: string; hre
 
 export function prettyState(value: string) { return value.replaceAll("_", " ").toLowerCase(); }
 
-export type RevData = LegacyRevision;
+export type RevData = PageRevision;
 
 /** One line per revision; its record and its per-revision controls open in place. */
 export function RevisionRow({ rev, latest, followedBy, statusLabel, stateLabel, controller, userId, userRole, voidIsControl, held = false }: { rev: RevData; latest: boolean; followedBy: { value: string; why: string | null } | null; statusLabel: string | null; stateLabel: string; controller: boolean; userId: string; userRole: string; voidIsControl: boolean; held?: boolean }) {

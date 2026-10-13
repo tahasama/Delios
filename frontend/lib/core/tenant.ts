@@ -7,6 +7,4 @@
 export type Tenant = {
   orgId: string;
   projectId: string;
-  /** The data comes from the backend now (`frontend/lib/api`); this marks what still reaches for the old client. */
-  db: { readonly movedToBackend: true };
 };

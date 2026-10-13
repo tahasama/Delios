@@ -8,7 +8,7 @@ import { mayCreateDocument } from "@/lib/core/auth";
 import { getActiveSet, getSet } from "@/lib/settings/config";
 import { fieldRules, missingRequired, ownFields, takeExtras } from "@/lib/settings/field-policy";
 import { api, projectPath, refusal } from "@/lib/api/client";
-import { backendDocument } from "@/lib/api/legacy";
+import { backendDocument } from "@/lib/api/documents";
 import { upload, filesOf } from "@/lib/api/uploads";
 
 // G.1 — Creating a new document. "No controlled information shall be produced

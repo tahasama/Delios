@@ -106,7 +106,33 @@ public static class DocumentEndpoints
             // One query per collection: a single join would repeat every revision once per file.
             .AsSplitQuery()
             .SingleOrDefaultAsync(d => d.Id == documentId, cancellationToken);
-        return document is null ? Problems.NotFound("DOCUMENT_NOT_FOUND", "No such document.") : Results.Ok(View(document));
+        if (document is null) return Problems.NotFound("DOCUMENT_NOT_FOUND", "No such document.");
+        // Decided and waiting for release (with what the decider granted), and when each revision first went out.
+        var decided = await db.Reviews.AsNoTracking().Where(r => r.DocumentId == documentId && r.State == Reviews.ReviewStates.Decided)
+            .Select(r => new { r.RevisionId, r.GrantedStatus }).ToListAsync(cancellationToken);
+        var issued = await (from i in db.TransmittalItems
+                            join t in db.Transmittals on i.TransmittalId equals t.Id
+                            where i.DocumentId == documentId && i.RevisionId != null && t.Direction == Transmittals.TransmittalDirections.Outgoing
+                                && t.ReviewStepId == null
+                            group t by i.RevisionId into g
+                            select new { RevisionId = g.Key!.Value, First = g.Min(t => t.IssuedAt) }).ToDictionaryAsync(x => x.RevisionId, x => x.First, cancellationToken);
+        var view = View(document);
+        return Results.Ok(view with
+        {
+            Revisions = view.Revisions.Select(r =>
+            {
+                var ruling = decided.FirstOrDefault(d => d.RevisionId == r.Id);
+                return r with
+                {
+                    Reading = r.Reading! with
+                    {
+                        Decided = ruling is not null && r.State is RevisionStates.InReview,
+                        Granted = ruling?.GrantedStatus,
+                        IssuedAt = issued.TryGetValue(r.Id, out var first) ? first.ToDateTimeOffset() : null,
+                    },
+                };
+            }).ToList(),
+        });
     }
 
     /// <summary>
@@ -285,5 +311,6 @@ public static class DocumentEndpoints
             f.StatusDetail, f.DetectedType, f.CreatedAt.ToDateTimeOffset(), f.DerivedFromId, f.Submission)).ToList(),
         r.AuthoredById, r.AuthoredByParty, r.ReleasedByName, r.ReturnedAt?.ToDateTimeOffset(), r.HeldAt?.ToDateTimeOffset(), r.HeldReason,
         r.HeldByName, r.VoidedAt?.ToDateTimeOffset(), r.VoidReason, r.VoidAuthority, r.VoidReassessment,
-        Written.Of(r.UnvoidedAt, r.UnvoidedByName, r.UnvoidReason), Written.Of(r.ResentAt, r.ResentByName, r.ResentNote ?? ""));
+        Written.Of(r.UnvoidedAt, r.UnvoidedByName, r.UnvoidReason), Written.Of(r.ResentAt, r.ResentByName, r.ResentNote ?? ""),
+        RevisionReading.Of(r));
 }

@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireScope } from "@/lib/core/scope";
 import { refusal } from "@/lib/api/client";
-import { backendRevision } from "@/lib/api/legacy";
+import { backendRevision } from "@/lib/api/documents";
 import { cancelRequest, carryOutRequest, noRecipients, raiseRequest, requestFromForm } from "@/lib/transmittals/issue-requests";
 
 /**

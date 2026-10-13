@@ -18,7 +18,7 @@ import { fmtDate } from "@/lib/core/utils";
 import { confirmRecordAction, correctRecordAction } from "@/lib/forms/governance";
 import { SendForReview } from "@/components/send-for-review-panel";
 import { isController } from "@/lib/core/auth";
-import { legacyDocument, backendReview, backendDocument } from "@/lib/api/legacy";
+import { documentPage, backendReview, backendDocument } from "@/lib/api/documents";
 
 type DocLite = {
   id: string;
@@ -48,7 +48,7 @@ export async function WorkflowPanel({ doc, user, lead = [], extra: after = [] }:
   if (doc.kind === "RECORD") return <RecordPanel doc={doc} extra={extra} />;
 
   const ctx = await requireScope();
-  const revs = (await legacyDocument(ctx, doc.id))?.revisions ?? [];
+  const revs = (await documentPage(ctx, doc.id))?.revisions ?? [];
   const run = revs[0] ? await getRunForRevision(ctx, revs[0].id) : null;
   const inPrep = revs.find((r) => r.state === "IN_PREPARATION");
   const released = revs.find((r) => r.state === "RELEASED");
@@ -237,7 +237,7 @@ async function RunActivePanel({ run, user, extra }: { run: { id: string; templat
   // The status the revision arrives at this step carrying, so the person either
   // changes it or confirms it on purpose.
   const carrying = activeCycle
-    ? (await legacyDocument(ctx, review.documentId))?.revisions.find((one) => one.id === activeCycle.revisionId)?.statusCode ?? null
+    ? (await documentPage(ctx, review.documentId))?.revisions.find((one) => one.id === activeCycle.revisionId)?.statusCode ?? null
     : null;
   // The last step answers from the verdicts; every earlier one from the advice list.
   const outcomeSetKey = run.currentStep === run.steps.length - 1 ? activeCycle?.outcomeSetKey ?? "REVIEW_OUTCOMES" : "REVIEW_ADVICE";
@@ -251,7 +251,7 @@ async function RunActivePanel({ run, user, extra }: { run: { id: string; templat
   // The deciding step is offered the first request.
   const askWho = (await issuePolicy(ctx)).asked;
   const nextStep = deciding && activeCycle && !activeCycle.outcome
-    ? await requestChoices(ctx, (await legacyDocument(ctx, review.documentId))!)
+    ? await requestChoices(ctx, (await documentPage(ctx, review.documentId))!)
     : null;
   const issueReasons = nextStep ? await getActiveSet("REASONS_FOR_ISSUE") : [];
   const author = nextStep && activeCycle ? await authorOf(ctx, activeCycle.revisionId) : null;

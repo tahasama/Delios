@@ -32,6 +32,6 @@ export async function contractRoleOptions(_db?: unknown, _orgId?: string): Promi
   });
 }
 
-export async function isContractRole(_db: unknown, _orgId: string, code: string): Promise<boolean> {
+export async function isContractRole(code: string): Promise<boolean> {
   return (await contractRoleOptions()).some((r) => r.code === code);
 }

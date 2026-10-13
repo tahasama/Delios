@@ -10,7 +10,7 @@ import { ACTION_STATES, isPostponed } from "@/lib/schedule/action-state";
 import { fmtDate } from "@/lib/core/utils";
 import { getSet } from "@/lib/settings/config";
 import { api } from "@/lib/api/client";
-import { backendDocument } from "@/lib/api/legacy";
+import { backendDocument } from "@/lib/api/documents";
 import { planActions, scheduleSource, type PlanAction } from "@/lib/api/schedule";
 import { PlanCards } from "./plan-cards";
 import { PlanPlate } from "./plan-plate";

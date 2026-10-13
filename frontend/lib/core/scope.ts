@@ -9,9 +9,9 @@ import { api, forgetShortLived } from "@/lib/api/client";
 import { getMe } from "@/lib/api/me";
 
 /**
- * The scope is the request-bound tenancy: who is signed in, which project they
- * are looking at, and a Prisma client already narrowed to it. Application code
- * reaches the register through `scope.db` and nothing else.
+ * The scope is the request-bound tenancy: who is signed in and which project
+ * they are looking at. Every read and write goes to the backend through `api()`
+ * (`frontend/lib/api/client.ts`) with the project in its path.
  */
 
 // ── Resolving the active project ─────────────────────────────────────────────
@@ -29,13 +29,6 @@ export type ProjectSummary = {
   status: string;
 };
 
-/**
- * The data used to come from a Prisma client narrowed to the scope. It comes
- * from the backend now, through `api()` in `frontend/lib/api/client.ts`; this marks
- * every place that still reaches for the old client.
- */
-export type RemovedDb = { readonly movedToBackend: true };
-
 export type Scope = {
   orgId: string;
   projectId: string;
@@ -52,7 +45,6 @@ export type Scope = {
   available: ProjectSummary[];
   /** True when the signed-in person's account lives in another organization. */
   isGuest: boolean;
-  db: RemovedDb;
   /** May the signed-in person do this, here? */
   can: (verb: Verb, target?: DocumentClass | null) => boolean;
   /** §5.7 — is this confidentiality within their clearance? */
@@ -134,7 +126,6 @@ export const getScope = cache(async (): Promise<Scope | null> => {
     role,
     available,
     isGuest: false,
-    db: { movedToBackend: true },
     can: (verb, target) => can(actor, verb, target),
     verbs: (target) => verbsFor(actor, target),
     why: (verb, target) => explain(actor, verb, target),

@@ -8,7 +8,7 @@ import { NextStepBody, StagePath, type StepItem } from "./next-step";
 import { cn } from "@/lib/core/utils";
 import { hasVerb } from "@/lib/core/auth";
 import { getMe } from "@/lib/api/me";
-import { legacyDocument, handBacks } from "@/lib/api/legacy";
+import { documentPage, handBacks } from "@/lib/api/documents";
 
 /**
  * What a supplier sees on a document it owes us, in its own set of states: sent
@@ -22,7 +22,7 @@ export async function SupplierDelivery({ documentId }: { documentId: string }) {
   // Read-only stays read-only: uploading is a right Document Control gives.
   const mayUpload = hasVerb(user, "CREATE") || hasVerb(user, "REVISE");
   const org = (await getMe())?.tenant.name ?? "us";
-  const doc = await legacyDocument(ctx, documentId);
+  const doc = await documentPage(ctx, documentId);
   const latest = doc?.revisions[0] ?? null;
   // One side holds it at a time, and only the holder changes it: the other asks for it back.
   const holds = doc?.withSupplier !== false;

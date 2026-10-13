@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requireScope } from "@/lib/core/scope";
-import { backendDocument } from "@/lib/api/legacy";
+import { backendDocument } from "@/lib/api/documents";
 import { documentSnapshots } from "@/lib/api/snapshots";
 import { notFound } from "next/navigation";
 import { parseSnapshotPayload, summarizeSnapshotChange } from "@/lib/documents/history";

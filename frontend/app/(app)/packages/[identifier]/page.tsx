@@ -7,7 +7,7 @@ import { ActionForm } from "@/components/form";
 import { addPackageMemberAction, removePackageMemberAction, setPackageRuleAction, assessPackageAction, issueShortfallAction, closePackageAction, acceptShortfallAction, acceptPackageAction } from "@/lib/forms/planning";
 import { ruleFilter, ruleWords, statusList, reasonsOf, shortfallOf } from "@/lib/packages/package-rule";
 import { packageByNumber, deliveryCandidates } from "@/lib/api/packages";
-import { legacyDocument } from "@/lib/api/legacy";
+import { documentPage } from "@/lib/api/documents";
 import { SearchPick } from "@/components/search-pick";
 import { isAdmin } from "@/lib/core/auth";
 import { RuleFields } from "../rule-fields";
@@ -46,7 +46,7 @@ export default async function PackageDetailPage({ params, searchParams }: { para
   ]);
   // Each document's latest revision and what its reviews said — the comments
   // column shows those, and nothing from older revisions.
-  const latestRevs = (await Promise.all(pkg.members.map((m) => legacyDocument(ctx, m.documentId).catch(() => null))))
+  const latestRevs = (await Promise.all(pkg.members.map((m) => documentPage(ctx, m.documentId).catch(() => null))))
     .flatMap((doc) => (doc?.revisions[0] ? [{ documentId: doc.id, value: doc.revisions[0].value, cycles: doc.revisions[0].cycles }] : []));
   const latestComments = new Map<string, { rev: string; comments: { by: string; text: string; blocking: boolean; settled: boolean }[] }>();
   for (const one of latestRevs) {

@@ -7,7 +7,7 @@ import { holdersOf } from "@/lib/core/permissions";
 import { recipientCompanies } from "@/lib/transmittals/recipients";
 import { NewTransmittalForm } from "./new-transmittal-form";
 import { api, projectPath } from "@/lib/api/client";
-import { backendDocument } from "@/lib/api/legacy";
+import { backendDocument } from "@/lib/api/documents";
 import { addressees, backendTransmittal, ourOrganizationName } from "@/lib/api/transmittals";
 import type { RegisterPage } from "@/lib/api/types";
 

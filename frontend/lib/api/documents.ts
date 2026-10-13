@@ -4,51 +4,48 @@ import { api, ApiProblem, projectPath } from "./client";
 import type { DocumentView, ReviewView, RevisionView, Written, HandBack } from "./types";
 
 /**
- * The screens were written against the old database's shapes: a document with
- * its revisions, each with its files, approvals and review cycles. The data now
- * comes from the backend; these build the same shapes from it, so a screen
- * changes only the line that loads its data.
- *
- * How the backend's records map:
- *   a review            → a review cycle (its comments, everyone seated on it)
- *   the review's verdict → the cycle's outcome, and the revision's approval
- *   decided, not yet released (review DECIDED) → revision state NOT_RELEASED
+ * A document as its page shows it: its revisions (newest first), each with its
+ * files, decisions and reviews (one review cycle per review, with its comments
+ * and everyone seated on it), and the actions and packages it is in. Built from
+ * the backend's document, its context and its reviews; what a revision amounts
+ * to (waiting for the check, decided and not released, granted, first issued) is
+ * the backend's reading (RevisionReading), not worked out here.
  */
 
 type Scope = { projectId: string };
 
-export type LegacyFile = {
+export type PageFile = {
   id: string; name: string; path: string; size: number; mime: string; sha256: string; kind: string; revisionId: string | null;
   cycleId: string | null; uploadedById: string | null; uploadedByName: string | null; createdAt: Date; transmittalId: string | null;
   status: string; submission: number;
 };
 
-type LegacyComment = {
+type PageComment = {
   id: string; cycleId: string; authorId: string; authorName: string; text: string; classification: string; progressionPreventing: boolean;
   closesWith: string; closesWithStep: number | null; status: string; resolution: string | null; closedAt: Date | null;
   reclassifiedAt: Date | null; reclassifiedByName: string | null; originalProgressionPreventing: boolean | null; createdAt: Date;
 };
 
-type LegacyAssignment = { id: string; cycleId: string; userId: string; userName: string; order: number; completedAt: Date | null };
+type PageAssignment = { id: string; cycleId: string; userId: string; userName: string; order: number; completedAt: Date | null };
 
-export type LegacyCycle = {
+export type PageCycle = {
   id: string; number: string | null; revisionId: string; mode: string; sequence: number; status: string; openedById: string; openedByName: string;
   /** Taken back out of review to be changed. */
   withdrawn?: boolean;
   transmittalId: string | null; submittedAt: Date; receivedAt: Date | null; issuedToReviewAt: Date | null; returnedFromReviewAt: Date | null;
   returnedToOriginatorAt: Date | null; dueAt: Date | null; outcome: string | null; outcomeAt: Date | null; outcomeByName: string | null;
   outcomeNote: string | null; binding: boolean; partyId: string | null; dispatchedAt: Date | null; issueRequestId: string | null; createdAt: Date;
-  comments: LegacyComment[]; assignments: LegacyAssignment[];
-  /** The backend's review, for screens that need more than the old cycle carried. */
+  comments: PageComment[]; assignments: PageAssignment[];
+  /** The backend's review, for what the cycle does not carry. */
   review: ReviewView;
 };
 
-export type LegacyApproval = {
+export type PageApproval = {
   id: string; revisionId: string; approverId: string; approverName: string; approverRole: string; matrixVersion: number; decidedAt: Date;
   note: string | null; withdrawnAt: Date | null; withdrawnBy: string | null; withdrawnReason: string | null;
 };
 
-export type LegacyRevision = {
+export type PageRevision = {
   id: string; documentId: string; value: string; series: string; state: string; statusCode: string | null; statusSetAt: Date | null;
   statusSetByName: string | null; returnedAt: Date | null; returnedReason: string | null; heldAt: Date | null; heldReason: string | null;
   heldByName: string | null; phase: string | null; reasonForRevision: string | null; changeDescription: string | null;
@@ -60,12 +57,12 @@ export type LegacyRevision = {
   authoredByParty: string | null; uploadedById: string | null; uploadedByName: string | null; createdAt: Date; extras: string | null;
   /** Sent in by another organization and not accepted by the check yet (or sent back by it): its files are not the document's. */
   awaitingCheck?: boolean;
-  files: LegacyFile[]; approvals: LegacyApproval[]; cycles: LegacyCycle[];
+  files: PageFile[]; approvals: PageApproval[]; cycles: PageCycle[];
   /** The backend's own reading of it: RECEIVED, CORRECTING… and its files' scan. */
   backend: RevisionView;
 };
 
-export type LegacyDocument = {
+export type PageDocument = {
   id: string; extras: string | null; projectId: string; docNumber: string; title: string; deliverableType: string; docType: string; discipline: string;
   originator: string | null; subProject: string | null; contractRef: string | null; criticality: string | null; confidentiality: string | null;
   retentionClass: string | null; state: string; kind: string; confirmedAt: Date | null; confirmedByName: string | null; disposedAt: Date | null;
@@ -76,7 +73,7 @@ export type LegacyDocument = {
   withSupplier: boolean | null;
   legacyScheme: string | null; createdDate: Date; receivedDate: Date | null; plannedDate: Date | null; appVersion: string | null;
   createdById: string; createdByName: string; createdAt: Date; updatedAt: Date;
-  revisions: LegacyRevision[];
+  revisions: PageRevision[];
   baselineEntries: { id: string; requiredBy: Date | null; requiredStatus: string; purpose: string; state: string; waiverNote: string | null;
     action: { id: string; code: string; name: string; scheduledDate: Date | null } }[];
   packageMembers: { id: string; requiredStatus: string; package: { id: string; identifier: string; title: string; recipientName: string; state: string; category: string } }[];
@@ -120,8 +117,8 @@ export const handBacks = cache(async (scope: Scope, id: string): Promise<HandBac
 export const backendReview = cache(async (scope: Scope, id: string): Promise<ReviewView> =>
   api<ReviewView>(projectPath(scope, `/reviews/${id}`)));
 
-/** A review as the old review cycle read: one cycle per review, binding when it has a deciding step. */
-function cycleOf(review: ReviewView, sequence: number): LegacyCycle {
+/** A review as a review cycle on the document page: one per review, binding when it has a deciding step. */
+function cycleOf(review: ReviewView, sequence: number): PageCycle {
   const deciding = review.steps.find((s) => s.deciding) ?? review.steps[review.steps.length - 1];
   const decider = deciding?.participants.find((p) => p.answer && p.answer !== "NONE")?.name ?? deciding?.participants[0]?.name ?? null;
   const closed = review.state === "RELEASED" || review.state === "RETURNED" || review.state === "WITHDRAWN";
@@ -146,44 +143,33 @@ function cycleOf(review: ReviewView, sequence: number): LegacyCycle {
   };
 }
 
-/** A revision as the old database held it. */
-function revisionOf(documentId: string, r: RevisionView, reviews: ReviewView[], transmittals: ContextTransmittal[]): LegacyRevision {
+/** A revision as the document page shows it. */
+function revisionOf(documentId: string, r: RevisionView, reviews: ReviewView[]): PageRevision {
   const mine = reviews.filter((one) => one.revisionId === r.id).sort((a, b) => a.startedAt.localeCompare(b.startedAt));
   // A type that is not reviewed goes on to release through a review with no steps: no cycle, and its rule stands in for an approval.
   const cycles = mine.filter((one) => one.steps.length).map((one, i) => cycleOf(one, i + 1));
   const decided = mine.filter((one) => one.verdict).sort((a, b) => (b.decidedAt ?? "").localeCompare(a.decidedAt ?? ""));
-  const pending = mine.some((one) => one.state === "DECIDED");
-  // What another organization sent becomes the document only once Document Control's check accepts it. Until then
-  // (waiting for the check), or once the check sent it back, its files belong to the transmittal it came on: the
-  // document keeps what it had (a placeholder: nothing; handed back for an update: the submission accepted before).
-  const resentAt = r.resent?.at ? new Date(r.resent.at).getTime() : null;
-  const returnedAt = r.returnedAt ? new Date(r.returnedAt).getTime() : null;
-  const awaitingCheck = !!r.authoredByParty && (r.state === "RECEIVED"
-    || (r.state === "CORRECTING" && !(resentAt !== null && (returnedAt === null || resentAt > returnedAt))));
-  // Handed back to them for an update: the submission in force when it was handed back had been accepted.
-  const acceptedBefore = resentAt === null ? 0
-    : Math.max(0, ...r.submissions.filter((one) => new Date(one.submittedAt).getTime() <= resentAt).map((one) => one.number));
-  const keptSubmission = awaitingCheck ? acceptedBefore : r.submission;
-  const kept = awaitingCheck ? r.files.filter((f) => f.submission === keptSubmission) : r.files;
+  // The backend says what it amounts to (RevisionReading): waiting for the check, decided, granted, first issued.
+  const reading = r.reading ?? { awaitingCheck: false, keptSubmission: r.submission, decided: false, granted: null, issuedAt: null };
+  const awaitingCheck = reading.awaitingCheck;
+  const kept = awaitingCheck ? r.files.filter((f) => f.submission === reading.keptSubmission) : r.files;
   // The files of the newest submission come first: that is what a screen reads as "the" file.
   const files = [...kept].sort((a, b) => b.submission - a.submission || b.createdAt.localeCompare(a.createdAt)).map((f) => ({
     id: f.id, name: f.name, path: "", size: f.size, mime: f.contentType, sha256: f.sha256, kind: f.kind, revisionId: r.id, cycleId: null,
     uploadedById: r.authoredById, uploadedByName: r.authoredByName, createdAt: new Date(f.createdAt), transmittalId: null, status: f.status,
     submission: f.submission,
   }));
-  const current = files.filter((f) => f.submission === keptSubmission);
-  const issued = transmittals.filter((t) => t.revisionId === r.id && t.direction === "OUTGOING" && !t.forReview)
-    .sort((a, b) => a.issuedAt.localeCompare(b.issuedAt))[0];
+  const current = files.filter((f) => f.submission === reading.keptSubmission);
   return {
     id: r.id, documentId, value: r.value, series: r.series,
-    state: r.state === "IN_REVIEW" && pending ? "NOT_RELEASED" : r.state,
+    state: reading.decided ? "NOT_RELEASED" : r.state,
     // Decided and waiting for release: what the decider granted is what it carries.
-    statusCode: (r.state === "NOT_RELEASED" || (r.state === "IN_REVIEW" && pending) ? mine.find((one) => one.state === "DECIDED")?.grantedStatus : null) ?? r.statusCode ?? null, statusSetAt: date(decided[0]?.decidedAt), statusSetByName: null, returnedAt: date(r.returnedAt), returnedReason: r.returnedReason,
+    statusCode: (reading.decided ? reading.granted : null) ?? r.statusCode ?? null, statusSetAt: date(decided[0]?.decidedAt), statusSetByName: null, returnedAt: date(r.returnedAt), returnedReason: r.returnedReason,
     heldAt: date(r.heldAt), heldReason: r.heldReason, heldByName: r.heldByName, phase: null, reasonForRevision: r.reasonForRevision, changeDescription: r.changeDescription,
-    plannedSubmissionDate: null, issueDate: date(issued?.issuedAt), nativeFileId: current.find((f) => f.kind === "NATIVE")?.id ?? null,
+    plannedSubmissionDate: null, issueDate: date(reading.issuedAt), nativeFileId: current.find((f) => f.kind === "NATIVE")?.id ?? null,
     renditionFileId: current.find((f) => f.kind === "RENDITION")?.id ?? null, appVersion: null, authorizationReason: null, authorizedById: null,
     authorizedByName: null, authorizedAt: null, releasedAt: date(r.releasedAt), releasedById: null, releasedByName: r.releasedByName,
-    issuedAt: date(issued?.issuedAt), supersededAt: date(r.supersededAt), supersededById: null, voidedAt: date(r.voidedAt), voidReason: r.voidReason, voidAuthority: r.voidAuthority,
+    issuedAt: date(reading.issuedAt), supersededAt: date(r.supersededAt), supersededById: null, voidedAt: date(r.voidedAt), voidReason: r.voidReason, voidAuthority: r.voidAuthority,
     voidReassessment: r.voidReassessment, submittedAt: date(r.submissions[0]?.submittedAt), submittedById: r.authoredById, submittedByName: r.submissions[0]?.submittedBy ?? null,
     authoredById: r.authoredById, authoredByName: r.authoredByName, authoredByParty: r.authoredByParty, uploadedById: r.authoredById,
     uploadedByName: r.authoredByName, createdAt: new Date(r.createdAt), extras: null, files, awaitingCheck,
@@ -200,8 +186,8 @@ function revisionOf(documentId: string, r: RevisionView, reviews: ReviewView[], 
   };
 }
 
-/** A document as the old database held it, with its revisions, cycles, approvals, activities and packages. */
-export const legacyDocument = cache(async (scope: Scope, id: string): Promise<LegacyDocument | null> => {
+/** A document as its page shows it, with its revisions, review cycles, decisions, actions and packages. */
+export const documentPage = cache(async (scope: Scope, id: string): Promise<PageDocument | null> => {
   const doc = await backendDocument(scope, id);
   if (!doc) return null;
   const context = await documentContext(scope, id);
@@ -217,7 +203,7 @@ export const legacyDocument = cache(async (scope: Scope, id: string): Promise<Le
     isPlaceholder: doc.isPlaceholder, previousId: doc.previousNumber, legacyScheme: doc.legacyScheme, createdDate: new Date(doc.createdAt), receivedDate: date(doc.receivedDate),
     plannedDate: date(doc.plannedDate), appVersion: doc.appVersion, createdById: doc.createdById, createdByName: doc.createdByName,
     createdAt: new Date(doc.createdAt), updatedAt: new Date(doc.updatedAt),
-    revisions: doc.revisions.map((r) => revisionOf(doc.id, r, reviews, context.transmittals))
+    revisions: doc.revisions.map((r) => revisionOf(doc.id, r, reviews))
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()),
     baselineEntries: context.activities.map((a) => ({
       id: a.needId, requiredBy: date(a.neededBy), requiredStatus: a.requiredStatuses.join(","), purpose: a.purpose, state: a.state, waiverNote: a.waiverNote,

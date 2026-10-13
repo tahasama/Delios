@@ -25,7 +25,7 @@ import {
   prepareRevisionAction, editRevisionAction, withdrawRevisionAction, releaseRevisionAction, returnAtGateAction, liftHoldAction, returnHeldAction,
 } from "@/lib/forms/revisions";
 import { parseRecipients, mayRequestIssue, requestChoices, issuePolicy, decisionLetsItOut, requestsOn } from "@/lib/transmittals/issue-requests";
-import { legacyDocument, documentContext, handBacks } from "@/lib/api/legacy";
+import { documentPage, documentContext, handBacks } from "@/lib/api/documents";
 import { requestIssueAction, carryOutRequestAction, cancelRequestAction } from "@/lib/forms/issue-requests";
 import { RequestIssue } from "./request-issue";
 import { ReleaseRecipients } from "./release-recipients";
@@ -67,7 +67,7 @@ export default async function DocumentDetailPage({
   const { id } = await params;
   const sp = await searchParams;
 
-  const doc = await legacyDocument(ctx, id);
+  const doc = await documentPage(ctx, id);
   if (!doc) notFound();
 
   const context = await documentContext(ctx, id);

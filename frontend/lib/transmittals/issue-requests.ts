@@ -1,7 +1,7 @@
 import type { Tenant } from "@/lib/core/tenant";
 import { api, projectPath } from "@/lib/api/client";
 import { holders as holdersOfVerb } from "@/lib/api/settings";
-import { revisionStanding } from "@/lib/api/legacy";
+import { revisionStanding } from "@/lib/api/documents";
 import type { Distribution, IssueRequestView } from "@/lib/api/types";
 /**
  * Asking for a revision to be sent somewhere.
