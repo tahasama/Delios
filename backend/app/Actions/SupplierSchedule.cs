@@ -2,6 +2,7 @@ using System.Text.Json;
 using Delios.Host.Documents;
 using Delios.Host.Identity;
 using Delios.Host.Platform;
+using Delios.Host.Tenancy;
 using Delios.Host.Transmittals;
 using Microsoft.EntityFrameworkCore;
 
@@ -26,6 +27,7 @@ public static class SupplierSchedule
     public static void MapSupplierSchedule(this IEndpointRouteBuilder app)
     {
         var project = app.MapGroup("/api/projects/{projectId:guid}").WithTags("Schedule")
+            .AddEndpointFilter<TransactionFilter>()
             .AddEndpointFilter<ProjectAccessFilter>();
         project.MapGet("/supplier-schedule", ReadAsync);
     }

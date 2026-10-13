@@ -152,9 +152,12 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
     returned: [
       ...revisionsOf(["RETURNED_BY_REVIEW"]),
       ...(user.isInternal ? revisionsOf(["CORRECT_AND_RESUBMIT"]) : []),
+      // A supplier's document released with comments: theirs to take in and send again as the next revision.
+      ...revisionsOf(["NEXT_REVISION_DUE"]),
     ].map<Row>((w) => ({
       href: `/documents/${w.documentId}`, code: w.documentNumber, rev: w.revision, title: w.title,
-      tag: w.kind === "CORRECT_AND_RESUBMIT" ? "to correct" : "reviewed", tone: "amber", at: at(w.since), cta: "See comments",
+      tag: w.kind === "CORRECT_AND_RESUBMIT" ? "to correct" : w.kind === "NEXT_REVISION_DUE" ? "next revision due" : "reviewed",
+      tone: "amber", at: at(w.since), cta: "See comments",
     })),
     unsent: [
       ...neverSent.map<Row>((r) => ({

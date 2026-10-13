@@ -119,9 +119,12 @@ public sealed partial class ReviewService
         await transmittals.CarryOutOpenAsync(access.Project, actor, revision, document, cancellationToken);
         await audit.WriteAsync(actor, "RELEASED", "Revision", revision.Id, $"{document.Number} rev {revision.Value}",
             $"Released at {status} on review {review.Number}.", review.ProjectId, cancellationToken);
-        await TellAsync(review, [review.StartedById, revision.AuthoredById], Notifications.NotificationKinds.Released,
-            $"{TransmittalService.Label(document, revision)} released at {status}", $"Review {review.Number}.", cancellationToken,
-            $"/documents/{document.Id}");
+        // Handed back to its supplier with comments for the next revision: their people are told too.
+        var supplier = document.WithSupplier == true ? await SupplierHold.PeopleAsync(db, document, revision, cancellationToken) : [];
+        await TellAsync(review, [review.StartedById, revision.AuthoredById, .. supplier], Notifications.NotificationKinds.Released,
+            $"{TransmittalService.Label(document, revision)} released at {status}",
+            document.WithSupplier == true ? $"Review {review.Number}. Its comments go into your next revision." : $"Review {review.Number}.",
+            cancellationToken, $"/documents/{document.Id}");
         foreach (var old in earlier)
         {
             await audit.WriteAsync(actor, "SUPERSEDED", "Revision", old.Id, $"{document.Number} rev {old.Value}",
@@ -188,7 +191,8 @@ public sealed partial class ReviewService
         await CloseApprovalsAsync(revision.Id, review.Id, by, cancellationToken);
         await audit.WriteAsync(Audit.Actor.System, "RETURNED_TO_AUTHOR", "Revision", revision.Id,
             $"{document.Number} rev {revision.Value}", $"{note} The next revision replaces it.", review.ProjectId, cancellationToken);
-        await TellAsync(review, [review.StartedById, revision.AuthoredById], Notifications.NotificationKinds.ReviewReturned,
+        var supplier = document.WithSupplier == true ? await SupplierHold.PeopleAsync(db, document, revision, cancellationToken) : [];
+        await TellAsync(review, [review.StartedById, revision.AuthoredById, .. supplier], Notifications.NotificationKinds.ReviewReturned,
             $"{TransmittalService.Label(document, revision)} returned: a new revision is needed", note, cancellationToken, $"/documents/{document.Id}");
     }
 
@@ -220,7 +224,8 @@ public sealed partial class ReviewService
         await audit.WriteAsync(Audit.Actor.System, "RETURNED_FOR_CORRECTION", "Revision", revision.Id,
             $"{document.Number} rev {revision.Value}",
             $"Back to {to}: {note} Corrected files come back under rev {revision.Value}; no new revision.", review.ProjectId, cancellationToken);
-        await TellAsync(review, [review.StartedById, revision.AuthoredById], Notifications.NotificationKinds.ReviewReturned,
+        var supplier = document.WithSupplier == true ? await SupplierHold.PeopleAsync(db, document, revision, cancellationToken) : [];
+        await TellAsync(review, [review.StartedById, revision.AuthoredById, .. supplier], Notifications.NotificationKinds.ReviewReturned,
             $"{TransmittalService.Label(document, revision)} returned for correction", note, cancellationToken, $"/documents/{document.Id}");
     }
 

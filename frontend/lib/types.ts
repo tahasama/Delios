@@ -25,7 +25,7 @@ export type WorkItem = {
 };
 
 export type RevisionWork = {
-  kind: "ACCEPT_SUBMISSION" | "CORRECT_AND_RESUBMIT" | "RETURNED_BY_REVIEW" | "TO_ROUTE" | "DRAFT";
+  kind: "ACCEPT_SUBMISSION" | "CORRECT_AND_RESUBMIT" | "RETURNED_BY_REVIEW" | "NEXT_REVISION_DUE" | "TO_ROUTE" | "DRAFT";
   documentId: string;
   documentNumber: string;
   title: string;

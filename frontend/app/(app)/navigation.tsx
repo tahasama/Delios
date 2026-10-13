@@ -70,10 +70,8 @@ function primaryNav(p: NavPermissions): NavItem[] {
     [
       { href: "/", label: "Home", description: "What is waiting on me", icon: LayoutDashboard, exact: true },
       { href: "/documents", label: "Documents", description: "The register", icon: FileText, when: p.canRead },
-      // Another organization sees, of the schedule, only the actions that need its documents.
-      p.external
-        ? { href: "/needed", label: "Schedule", description: "Where your documents are needed", icon: CalendarRange }
-        : { href: "/actions", label: "Schedule & actions", description: "What is needed, and when", icon: CalendarRange },
+      // The same entry for everyone; another organization's people land on the actions that need their documents (/needed).
+      { href: "/actions", label: "Schedule & actions", description: "What is needed, and when", icon: CalendarRange, also: ["/needed"] },
       {
         href: "/transmittals",
         label: "Transmittals",

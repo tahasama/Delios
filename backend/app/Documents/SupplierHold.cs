@@ -1,4 +1,6 @@
 using System.Text.Json;
+using Delios.Host.Platform;
+using Microsoft.EntityFrameworkCore;
 
 namespace Delios.Host.Documents;
 
@@ -16,4 +18,19 @@ public static class SupplierHold
     public static bool HandsToSupplier(Catalog catalog, string verdictSet, string verdict) =>
         catalog.Prop(verdictSet, verdict, "proceed") is not { ValueKind: JsonValueKind.True }
         || catalog.Prop(verdictSet, verdict, "resubmit") is { ValueKind: JsonValueKind.True };
+
+    /// <summary>
+    /// The people of the organization a document came from, on its project: told whenever it is handed back to them
+    /// (returned by the check, sent back by its review, or released with comments for their next revision).
+    /// </summary>
+    public static async Task<List<Guid>> PeopleAsync(DeliosDbContext db, Document document, Revision revision, CancellationToken cancellationToken)
+    {
+        var party = revision.AuthoredByParty ?? document.Originator;
+        if (party is null) return [];
+        return await (from u in db.Users
+                      join p in db.Parties on u.PartyId equals p.Id
+                      join m in db.Memberships on u.Id equals m.UserId
+                      where p.Code == party && !p.IsInternal && u.Active && m.ProjectId == document.ProjectId && m.Active && m.PendingSince == null
+                      select u.Id).Distinct().ToListAsync(cancellationToken);
+    }
 }

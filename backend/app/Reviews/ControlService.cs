@@ -138,12 +138,7 @@ public sealed class ControlService(DeliosDbContext db, AuditLog audit, IClock cl
         // Returned: whoever sent it, and the people of the organization it came from on this project, are told why.
         if (act == Return)
         {
-            var party = revision.AuthoredByParty ?? document.Originator;
-            var theirs = party is null ? [] : await (from u in db.Users
-                                                     join p in db.Parties on u.PartyId equals p.Id
-                                                     join m in db.Memberships on u.Id equals m.UserId
-                                                     where p.Code == party && !p.IsInternal && u.Active && m.ProjectId == document.ProjectId && m.Active && m.PendingSince == null
-                                                     select u.Id).Distinct().ToListAsync(cancellationToken);
+            var theirs = await SupplierHold.PeopleAsync(db, document, revision, cancellationToken);
             var told = theirs.Append(revision.AuthoredById).Where(id => id != Guid.Empty && id != access.UserId).Distinct().ToList();
             if (told.Count > 0)
                 await notifier.NotifyAsync(access.Project.TenantId, document.ProjectId, told, Notifications.NotificationKinds.General,
@@ -158,7 +153,8 @@ public sealed class ControlService(DeliosDbContext db, AuditLog audit, IClock cl
     /// <summary>
     /// One entry in a person's to-do list about a revision. <c>Kind</c>: ACCEPT_SUBMISSION (Document Control checks
     /// what arrived), CORRECT_AND_RESUBMIT (returned to its sender for a correction), RETURNED_BY_REVIEW (its review
-    /// sent it back to its author; the next revision replaces it), TO_ROUTE (accepted from another organization, not
+    /// sent it back to its author; the next revision replaces it), NEXT_REVISION_DUE (a supplier's document released
+    /// with comments for their next revision, theirs to send), TO_ROUTE (accepted from another organization, not
     /// yet sent for review) or DRAFT (the author's own, in preparation). <c>Note</c> is why it was returned, or, for a
     /// draft, where its files are (<c>FilesStates</c>).
     /// </summary>
@@ -181,7 +177,11 @@ public sealed class ControlService(DeliosDbContext db, AuditLog audit, IClock cl
             where r.ProjectId == projectId
                 && ((control && r.State == RevisionStates.Received)
                     || (r.State == RevisionStates.Correcting && (r.AuthoredById == me || (party != null && (r.AuthoredByParty == party || d.Originator == party))))
-                    || (r.State == RevisionStates.Returned && d.LatestRevisionId == r.Id && r.AuthoredById == me)
+                    || (r.State == RevisionStates.Returned && d.LatestRevisionId == r.Id
+                        && (r.AuthoredById == me || (party != null && (r.AuthoredByParty == party || d.Originator == party))))
+                    // Released with comments for their next revision: theirs to send again.
+                    || (r.State == RevisionStates.Released && d.LatestRevisionId == r.Id && d.WithSupplier == true
+                        && party != null && (r.AuthoredByParty == party || d.Originator == party))
                     || (r.State == RevisionStates.InPreparation && control && r.AuthoredByParty != null
                         && db.Parties.Any(p => p.Code == r.AuthoredByParty && !p.IsInternal))
                     || (r.State == RevisionStates.InPreparation && r.AuthoredById == me && party == null))
@@ -203,7 +203,8 @@ public sealed class ControlService(DeliosDbContext db, AuditLog audit, IClock cl
                 r.AuthoredById,
                 r.AuthoredByParty,
                 r.FilesState,
-                r.ControlOutcome
+                r.ControlOutcome,
+                r.ReleasedAt
             })
             .ToListAsync(cancellationToken);
         var outside = (await db.Parties.AsNoTracking().Where(p => !p.IsInternal).Select(p => p.Code).ToListAsync(cancellationToken)).ToHashSet();
@@ -215,6 +216,7 @@ public sealed class ControlService(DeliosDbContext db, AuditLog audit, IClock cl
                 RevisionStates.Received => "ACCEPT_SUBMISSION",
                 RevisionStates.Correcting => "CORRECT_AND_RESUBMIT",
                 RevisionStates.Returned => "RETURNED_BY_REVIEW",
+                RevisionStates.Released => "NEXT_REVISION_DUE",
                 _ => control && fromOutside ? "TO_ROUTE" : "DRAFT",
             };
             // Sent to the supplier again after Document Control took it back, rather than returned by its check.
@@ -224,10 +226,12 @@ public sealed class ControlService(DeliosDbContext db, AuditLog audit, IClock cl
                 // Sent to them again after Document Control took it back: what they were told; else why it was returned.
                 "CORRECT_AND_RESUBMIT" => resent ? x.ResentNote : x.ReturnedReason,
                 "RETURNED_BY_REVIEW" => x.ReturnedReason ?? x.ControlOutcome,
+                "NEXT_REVISION_DUE" => x.ControlOutcome,
                 "DRAFT" => x.FilesState,
                 _ => null,
             };
-            var since = kind is "CORRECT_AND_RESUBMIT" or "RETURNED_BY_REVIEW" ? Latest(x.ReturnedAt, x.ResentAt) ?? x.CreatedAt : x.CreatedAt;
+            var since = kind is "CORRECT_AND_RESUBMIT" or "RETURNED_BY_REVIEW" ? Latest(x.ReturnedAt, x.ResentAt) ?? x.CreatedAt
+                : kind == "NEXT_REVISION_DUE" ? x.ReleasedAt ?? x.CreatedAt : x.CreatedAt;
             return new RevisionWork(kind, x.DocumentId, x.Number, x.Title, x.Id, x.Value, x.Submission, note, since.ToDateTimeOffset(), resent);
         }).ToList();
     }

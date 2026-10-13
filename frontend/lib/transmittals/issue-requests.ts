@@ -1,5 +1,5 @@
 import type { Tenant } from "@/lib/core/tenant";
-import { api, projectPath } from "@/lib/client";
+import { api, ApiProblem, projectPath } from "@/lib/client";
 import { holders as holdersOfVerb } from "@/lib/settings/api";
 import { revisionStanding } from "@/lib/documents/api";
 import type { Distribution, IssueRequestView } from "@/lib/types";
@@ -142,7 +142,10 @@ export async function requestChoices(
   doc: { id?: string; deliverableType: string; docType: string; discipline: string; criticality: string | null; confidentiality: string | null; originator?: string | null },
 ) {
   // Who the matrix proposes, everyone else on the project, and the organizations on it: the backend's distribution.
-  const found = await api<Distribution>(projectPath(t, `/documents/${doc.id}/distribution`));
+  const found = await api<Distribution>(projectPath(t, `/documents/${doc.id}/distribution`)).catch((e) => {
+    if (e instanceof ApiProblem && e.status === 403) return { proposed: [], others: [], parties: [] } as unknown as Distribution;
+    throw e;
+  });
   return {
     proposed: found.proposed.map((one) => ({ id: one.id, name: one.name, organization: one.function, basis: one.function })),
     others: found.others.map((person) => ({ id: person.id, name: person.name, organization: person.organization ?? "Unassigned organization" })),
@@ -184,7 +187,11 @@ export async function returnRecipients(t: Tenant, revisionId: string): Promise<{
 
 /** The requests on a revision, as the screens read them: who asked, for what, to whom, and the transmittal it went in. */
 export async function requestsOn(t: Tenant, revisionId: string) {
-  const rows = await api<IssueRequestView[]>(projectPath(t, `/revisions/${revisionId}/issue-requests`));
+  // Who it is sent to is ours to read: another organization's people see none of it.
+  const rows = await api<IssueRequestView[]>(projectPath(t, `/revisions/${revisionId}/issue-requests`)).catch((e) => {
+    if (e instanceof ApiProblem && e.status === 403) return [] as IssueRequestView[];
+    throw e;
+  });
   // A request cancelled because everyone on it was taken off at release stays, with who took them off.
   return rows.filter((one) => one.status !== "CANCELLED" || !!one.releaseNote).map((one) => ({
     id: one.id, revisionId: one.revisionId, reason: one.reason, status: one.status, note: one.note,
