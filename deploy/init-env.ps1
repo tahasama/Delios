@@ -1,4 +1,4 @@
-# Windows version of deploy/init-env.sh: creates deploy/.env with a random
+# Windows version of deploy/init-env.sh: creates .env (the project folder) with a random
 # password for every service, once. Never commit that file.
 #
 #   powershell -ExecutionPolicy Bypass -File deploy\init-env.ps1
@@ -6,7 +6,7 @@
 # If the .NET SDK is installed, it also stores the same credentials as
 # user-secrets for `dotnet run`, outside the repository.
 $ErrorActionPreference = 'Stop'
-$envFile = Join-Path $PSScriptRoot '.env'
+$envFile = Join-Path $PSScriptRoot '..\.env'
 
 function New-Secret {
     $chars = [char[]]'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'

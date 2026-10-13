@@ -26,7 +26,7 @@ What behaves differently from the old app, and why: [BEHAVIOUR-CHANGES.md](BEHAV
 - Editing a document's details (each change audited); withdrawing, cancelling or archiving a document.
 - Review views carry who sat on each step and who wrote each comment; holders carry their function code; a project's code can change.
 - The organization's own answers with no table (list names, scope statement, state names, form rules, own fields, an organization's contact, a project's type and dates) live in the backend's settings store.
-- Notifications, and an email outbox with sending switched off (`Email:*` in `deploy/.env`).
+- Notifications, and an email outbox with sending switched off (`Email:*` in `.env`).
 - Review delegation; changing or taking back a comment; releasing a type that is not reviewed.
 - Voiding and its reassessment; an outside approval before use, with holds; legal hold; readers of a closed document; previous number, legacy scheme, application and own fields on a document; a snapshot of the document at each change.
 - Transmittal copies, drafts, letters with no documents, chosen dates, answers and follow-ups, telling again, opening counts, arrival notes and who something received is for, own fields.

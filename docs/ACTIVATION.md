@@ -5,7 +5,7 @@ When an alert says it is needed, this page says how to switch it on, and how to
 check it worked. Nothing here needs code changes.
 
 Commands assume the repository root. `C` below stands for
-`docker compose -f deploy/compose.yaml`. Settings go in `deploy/.env` (never
+`docker compose`. Settings go in `.env` (never
 committed), which Compose reads automatically. `sh deploy/init-env.sh` creates
 it once with a random password for every service; Compose refuses to start
 without it. In production, keep a copy of it, and of `BACKUP_CIPHER_PASS`,
@@ -17,10 +17,10 @@ somewhere other than the server.
 frontend positive.** Until then everything stays local: SeaweedFS for files,
 backups on the server's own disk, no domain, alerts nowhere. At go-live, every
 product switches together, from this list, in this order. Each step is a
-setting in `deploy/.env`, nothing in code.
+setting in `.env`, nothing in code.
 
 1. **Server:** a Hetzner VPS, Docker installed, the repository cloned, `sh deploy/init-env.sh`
-   run on it (new passwords, never the development ones). Keep a copy of `deploy/.env` off the server.
+   run on it (new passwords, never the development ones). Keep a copy of `.env` off the server.
 2. **Mode:** `APP_ENVIRONMENT=Production`. Demo data is then refused.
 3. **Files:** a Hetzner Object Storage bucket (versioning on), then
    `STORAGE_ENDPOINT=https://<region>.your-objectstorage.com`,
@@ -54,7 +54,7 @@ C --profile app --profile monitoring up -d
 
 | Where | What |
 |---|---|
-| Grafana, http://localhost:3301 (`admin`, password `GRAFANA_ADMIN_PASSWORD` in `deploy/.env`) | The **DELIOS overview** dashboard: firing alerts at the top, then API, files and messages, database, backups and server |
+| Grafana, http://localhost:3301 (`admin`, password `GRAFANA_ADMIN_PASSWORD` in `.env`) | The **DELIOS overview** dashboard: firing alerts at the top, then API, files and messages, database, backups and server |
 | Alertmanager, http://localhost:9093 | Every alert currently firing |
 | Prometheus, http://localhost:9090 | The raw measurements and the alert rules |
 
@@ -76,7 +76,7 @@ By default alerts show in Grafana and Alertmanager but reach nobody. To be told:
 3. Put the secret (SMTP password, bot token, webhook URL) in
    `deploy/monitoring/alertmanager/secrets/`, under the file name the config
    names. That folder is never committed.
-4. In `deploy/.env`: `ALERT_CHANNEL=telegram` (for example).
+4. In `.env`: `ALERT_CHANNEL=telegram` (for example).
 5. `C --profile monitoring up -d alertmanager`
 
 **Check:** stop the worker for three minutes (`C stop worker`). A WorkerDown
@@ -89,7 +89,7 @@ the backup loop takes a full backup weekly and an incremental daily. Stored
 files are copied to a second location every 6 hours.
 
 In development the backup repository and the file copy are Docker volumes. For
-production, both must leave the server. In `deploy/.env`:
+production, both must leave the server. In `.env`:
 
 ```bash
 BACKUP_REPO_TYPE=s3
@@ -123,7 +123,7 @@ audit chain. It prints `PASSED` and records the time it took: that is the
 recovery time to expect. Schedule it on the host, for example in cron:
 
 ```
-0 3 1 * * cd /srv/delios && docker compose -f deploy/compose.yaml --profile drill run --rm restore-drill
+0 3 1 * * cd /srv/delios && docker compose --profile drill run --rm restore-drill
 ```
 
 **Alert:** RestoreDrillOverdue (no passing drill for 35 days).
@@ -163,7 +163,7 @@ to the backup repository if streaming falls behind.
 When the primary is lost:
 
 1. `C exec -u postgres postgres-standby pg_ctl promote -D /var/lib/postgresql/data`
-2. In `deploy/.env`: `DB_HOST=postgres-standby`, then `C up -d api worker`.
+2. In `.env`: `DB_HOST=postgres-standby`, then `C up -d api worker`.
 3. The old primary must not come back as a primary. Rebuild it as the new
    standby once the incident is over.
 
@@ -172,7 +172,7 @@ When the primary is lost:
 **Alert:** RegisterSearchSlow or ApiSlow while the database is the busy part.
 
 1. Run the standby (above).
-2. In `deploy/.env`:
+2. In `.env`:
    `DB_READ_CONNECTION=Host=postgres-standby;Database=delios;Username=delios;Password=...`
 3. `C up -d api`
 
@@ -184,7 +184,7 @@ the primary on their own.
 
 **Alert:** DatabaseConnectionsHigh.
 
-1. In `deploy/.env`: `DB_HOST=pgbouncer` and `DB_OPTIONS=No Reset On Close=true`
+1. In `.env`: `DB_HOST=pgbouncer` and `DB_OPTIONS=No Reset On Close=true`
 2. `C --profile app --profile pgbouncer up -d`
 
 Migrations keep connecting to Postgres directly. Transaction pooling is safe
@@ -217,7 +217,7 @@ storage settings of every app server at the shared services.
 
 ## Domain and HTTPS
 
-In `deploy/.env`: `SITE_ADDRESS=app.example.com`, `HTTP_PORT=80`, `HTTPS_PORT=443`,
+In `.env`: `SITE_ADDRESS=app.example.com`, `HTTP_PORT=80`, `HTTPS_PORT=443`,
 `PUBLIC_URL=https://app.example.com`, and `SECURE_COOKIE=true`. Start with
 `--profile app`: the screens run in the `web` container behind Caddy.
 Caddy obtains and renews the certificate itself. The API's own entrance (8080)
@@ -248,7 +248,7 @@ speaks OpenID Connect). Nothing to install; it is configured per organization.
 1. In the identity provider, register an application (a "web" app, confidential
    client) with the redirect address `https://<your domain>/api/auth/sso/callback`.
    Note its issuer address, client id and client secret.
-2. In `deploy/.env` set `PUBLIC_URL=https://<your domain>`, then
+2. In `.env` set `PUBLIC_URL=https://<your domain>`, then
    `docker compose ... up -d` so the API knows its own address.
 3. An administrator sends:
    ```
@@ -280,8 +280,8 @@ Postgres, so the index never widens anyone's view. It holds register entries onl
 never file content (that waits for content extraction, which is off).
 
 1. Give the server 2 GB more memory (the index uses `SEARCH_HEAP`, 1g by default).
-2. In `deploy/.env`: `SEARCH_PROVIDER=opensearch`.
-3. `docker compose -f deploy/compose.yaml --profile app --profile search up -d`
+2. In `.env`: `SEARCH_PROVIDER=opensearch`.
+3. `docker compose --profile app --profile search up -d`
 4. The worker fills the index from the register by itself; `docker compose logs worker`
    shows "Sent N document(s) to the search index". 10,000 documents take a minute or two.
 5. The search answer says `"provider": "opensearch"`.
@@ -305,9 +305,9 @@ search and in OpenSearch alike. Who may see a document is unchanged.
 bring into search.
 
 1. Install the service (about 1.5 GB to download, 1 GB of memory): in
-   `deploy/.env` set `EXTRACTION_URL=http://tika:9998` and, for scanned pages in
+   `.env` set `EXTRACTION_URL=http://tika:9998` and, for scanned pages in
    other languages, `OCR_LANGUAGES=eng+fra` (Tesseract codes joined with `+`).
-2. `docker compose -f deploy/compose.yaml --profile app --profile extraction up -d`
+2. `docker compose --profile app --profile extraction up -d`
 3. With the client's written agreement, an administrator sets the project:
    `PUT /api/admin/projects/{projectId}/extraction {"mode": "ON_DEMAND"}` (read only
    what somebody asks for) or `{"mode": "AUTOMATIC"}` (every file, once it passes
@@ -338,7 +338,7 @@ work the same way.
 2. Allow browsers to upload and download directly: in the account's
    *Resource sharing (CORS)* for Blob service, add your site address as allowed
    origin, methods `GET, HEAD, PUT`, allowed headers `*`, exposed headers `*`.
-3. In `deploy/.env`:
+3. In `.env`:
    ```
    STORAGE_PROVIDER=azure
    AZURE_STORAGE_CONNECTION_STRING=DefaultEndpointsProtocol=https;AccountName=...;AccountKey=...;EndpointSuffix=core.windows.net

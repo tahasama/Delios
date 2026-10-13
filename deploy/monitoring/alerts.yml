@@ -17,7 +17,7 @@ groups:
         labels: { severity: critical }
         annotations:
           summary: "An API node is not answering ({{ $labels.instance }})."
-          action: "docker compose -f deploy/compose.yaml --profile app ps api; check its logs."
+          action: "docker compose --profile app ps api; check its logs."
 
       - alert: WorkerDown
         expr: up{job="worker"} == 0 or absent(up{job="worker"})
@@ -25,7 +25,7 @@ groups:
         labels: { severity: critical }
         annotations:
           summary: "A worker is not answering: uploaded files are not being scanned."
-          action: "docker compose -f deploy/compose.yaml --profile app ps worker; check its logs."
+          action: "docker compose --profile app ps worker; check its logs."
 
       - alert: PostgresDown
         expr: pg_up == 0
@@ -126,7 +126,7 @@ groups:
         labels: { severity: warning }
         annotations:
           summary: "No restore drill has passed in 35 days. A backup never restored is not a backup."
-          action: "docker compose -f deploy/compose.yaml --profile drill run --rm restore-drill"
+          action: "docker compose --profile drill run --rm restore-drill"
 
       - alert: WalArchivingFailing
         expr: min(delios_backup_archive_check_ok) == 0

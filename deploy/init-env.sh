@@ -1,5 +1,5 @@
 #!/bin/sh
-# Creates deploy/.env with a random password for every service, once. The file
+# Creates .env (the project folder) with a random password for every service, once. The file
 # is never committed; Compose reads it on every command. Run it again and it
 # leaves an existing file alone.
 #
@@ -9,7 +9,7 @@
 # user-secrets for `dotnet run`, outside the repository.
 set -eu
 here=$(cd "$(dirname "$0")" && pwd)
-env_file="$here/.env"
+env_file="$here/../.env"
 
 random() { LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 32; }
 

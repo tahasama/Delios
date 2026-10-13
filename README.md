@@ -32,9 +32,9 @@ Everything runs in Docker, the screens included; the .NET 10 SDK and Node are ne
 On Windows (PowerShell), from the repository folder:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File deploy\init-env.ps1                 # once: random passwords into deploy\.env (never committed)
-docker compose -f deploy/compose.yaml --profile app up -d --build             # http://localhost:3080
-docker compose -f deploy/compose.yaml --profile app run --rm migrate seed-demo
+powershell -ExecutionPolicy Bypass -File deploy\init-env.ps1                 # once: random passwords into .env (never committed)
+docker compose --profile app up -d --build             # http://localhost:3080
+docker compose --profile app run --rm migrate seed-demo
 ```
 
 On macOS or Linux the same, with `sh deploy/init-env.sh`.
@@ -60,7 +60,7 @@ To work on the backend, run only the dependencies in Docker and the API from the
 (`init-env` also stored the credentials as .NET user-secrets, outside the repository):
 
 ```bash
-docker compose -f deploy/compose.yaml up -d
+docker compose up -d
 dotnet run --project backend/src/Delios.Host -- migrate
 dotnet run --project backend/src/Delios.Host -- seed-demo
 dotnet run --project backend/src/Delios.Host                # API on http://localhost:5000
@@ -68,13 +68,13 @@ dotnet test backend                                         # tests start their 
 ```
 
 After pulling changes that touch `deploy/postgres`, rebuild and recreate the
-database volume: `docker compose -f deploy/compose.yaml down -v`, then `up --build`.
+database volume: `docker compose down -v`, then `up --build`.
 
 Add `--profile monitoring` for Grafana (http://localhost:3301, user `admin`, password
-`GRAFANA_ADMIN_PASSWORD` in `deploy/.env`),
+`GRAFANA_ADMIN_PASSWORD` in `.env`),
 Prometheus (:9090) and Alertmanager (:9093). Backups run from the start; the
 monthly restore drill is
-`docker compose -f deploy/compose.yaml --profile drill run --rm restore-drill`.
+`docker compose --profile drill run --rm restore-drill`.
 Everything switched off until needed (standby, read replica, PgBouncer, more
 nodes, alert notifications) is in [docs/ACTIVATION.md](docs/ACTIVATION.md).
 

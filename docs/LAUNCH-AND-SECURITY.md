@@ -85,7 +85,7 @@ when a large customer asks for more rules or bot analytics.
 ## 4. Email
 
 The backend sends through plain **SMTP**, so any provider below works with a settings change only. The
-settings are `Email:*` in `deploy/.env`.
+settings are `Email:*` in `.env`.
 
 Approximate cost for 100,000 emails a month:
 
@@ -191,7 +191,7 @@ firewall only filters known attack patterns.
   - Docker kept up to date;
   - the database and the other internal services never published on a public port.
 
-**Done.** `deploy/compose.yaml` publishes these on `127.0.0.1` only: reachable from the machine itself (handy on
+**Done.** `compose.yaml` publishes these on `127.0.0.1` only: reachable from the machine itself (handy on
 a laptop, and for `dotnet run`), never from outside, whatever `ufw` says:
 
 | Service | Ports |
@@ -266,7 +266,7 @@ wall off.
 
 ## 11. Secrets
 
-- **Today:** secrets live in `deploy/.env`, which git ignores. `init-env.sh` and `init-env.ps1` generate random
+- **Today:** secrets live in `.env`, which git ignores. `init-env.sh` and `init-env.ps1` generate random
   values. Kubernetes has its own example file. Nothing secret is committed.
 - **To add for production:**
   - Keep secrets in a secret manager: Docker or Kubernetes secrets, or Infisical or Doppler (Infisical can be

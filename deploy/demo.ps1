@@ -13,8 +13,8 @@ try { Invoke-WebRequest -Uri "$Api/api/me" -UseBasicParsing -ErrorAction Stop | 
 catch {
     if (-not $_.Exception.Response) {
         Write-Host "Nothing answers at $Api. Start the backend first:" -ForegroundColor Yellow
-        Write-Host '  docker compose -f deploy/compose.yaml --profile app up -d --build'
-        Write-Host '  docker compose -f deploy/compose.yaml ps        (api and worker should say healthy)'
+        Write-Host '  docker compose --profile app up -d --build'
+        Write-Host '  docker compose ps        (api and worker should say healthy)'
         exit 1
     }
 }

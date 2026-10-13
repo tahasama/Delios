@@ -208,9 +208,9 @@ Queues are declared in `Messaging/RabbitMq.cs` (`Topology`).
 
 | What | Command (from the repository root unless said) |
 |---|---|
-| The whole stack | `sh deploy/init-env.sh` once, then `docker compose -f deploy/compose.yaml --profile app up -d` |
-| Create or update the database | `docker compose -f deploy/compose.yaml --profile app run --rm migrate` |
-| The demo organization | `docker compose -f deploy/compose.yaml --profile app run --rm migrate seed-demo` |
+| The whole stack | `sh deploy/init-env.sh` once, then `docker compose --profile app up -d` |
+| Create or update the database | `docker compose --profile app run --rm migrate` |
+| The demo organization | `docker compose --profile app run --rm migrate seed-demo` |
 | A walk through every feature | `pwsh deploy/demo.ps1` (needs the stack and the demo organization) |
 | Build | `cd backend && dotnet build` |
 | Tests (needs Docker running) | `cd backend && dotnet test` |
@@ -227,7 +227,7 @@ is at `/api/openapi/v1.json`. RabbitMQ's own page is on port 15672.
 (search for it: `grep -rn TITLE_REQUIRED backend/src`) and a `traceId`. The
 code leads to the line that refused; the trace id finds the request in the logs.
 
-**Logs.** `docker compose -f deploy/compose.yaml logs -f api` (or `worker`).
+**Logs.** `docker compose logs -f api` (or `worker`).
 Each line is JSON: `@m` is the message, `@l` the level, `@x` the exception.
 One line per request says the path, status and time. Search them for the trace id.
 
@@ -271,5 +271,5 @@ right-click the test, Debug. The test starts its own database and queue.
 | When is an activity ready? | `Schedules/Readiness.cs` |
 | What does check XX-00 test? | `Checks/Catalog.cs`, search the id |
 | How is a report counted? | `Reports/ReportBuilder.cs` |
-| Every setting and its default | `Platform/Options.cs`; production values in `deploy/compose.yaml` |
+| Every setting and its default | `Platform/Options.cs`; production values in `compose.yaml` |
 | What to switch on, and how | `docs/ACTIVATION.md` |

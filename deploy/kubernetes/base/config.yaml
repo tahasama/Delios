@@ -1,5 +1,5 @@
 # Settings that are not secret. Secrets (connection strings, keys) live in the
-# delios-secrets Secret, made from deploy/.env-style lines: see secrets.example.env.
+# delios-secrets Secret, made from .env-style lines: see secrets.example.env.
 apiVersion: v1
 kind: ConfigMap
 metadata:

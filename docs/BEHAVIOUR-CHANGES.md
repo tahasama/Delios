@@ -378,7 +378,7 @@ the installation sets its keys.
 - Notifications are kept and shown in the bell and on the Notifications page; opening the page reads
   them all, as before.
 - **Email is off by default.** Every email is still written down (the outbox) and marked "off". Turn
-  sending on in `deploy/.env`: one switch for everything, then one each for transmittals, reviews and
+  sending on in `.env`: one switch for everything, then one each for transmittals, reviews and
   notifications.
 
 ---

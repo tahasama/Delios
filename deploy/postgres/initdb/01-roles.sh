@@ -1,6 +1,6 @@
 #!/bin/sh
 # Runs once, when the data volume is first created. Passwords come from the
-# environment (deploy/.env), never from the repository.
+# environment (.env), never from the repository.
 set -eu
 psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname postgres \
   -v app_password="$DB_APP_PASSWORD" \
