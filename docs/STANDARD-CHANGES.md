@@ -79,13 +79,15 @@ to it.
 everybody on the project. Anything above them is readable by **people named on
 the document itself**, kept by whoever is answerable for its content — its
 author or whoever uploaded the file — plus an administrator, because somebody
-must be able to. There is no clearance attribute on a person.
+must be able to. A function may carry a clearance (§46).
 
 **Why:** clearance made confidentiality a property of rank. On a project the
 people who may read a closed document are chosen deliberately, one by one.
 
 **Depends on it:** `closedDocumentFilter` and `CLOSED_MODELS` in
 `src/lib/tenant.ts`; the access list on the document page.
+
+**Amended by §46:** a function may carry a clearance, confirmed by the owner.
 
 ---
 
@@ -860,6 +862,113 @@ system" (Document Control only), and only then are who sent it and when asked.
 
 **Depends on it:** `followsId` / `inReplyToId`, `REASONS_FOR_ISSUE.family`; the
 transmittal form and page.
+
+---
+
+## 46 · A function may be limited to a confidentiality level
+
+**Clause:** §5.7 *Confidentiality*. Amends §3.
+
+**Must say:** a function may carry a **clearance**: the most confidential level
+its holders read without being named. A document above it is read only by the
+people named on it, whoever registered it, and whoever it was sent to. This
+holds for every function, the control function included. No clearance means no
+limit. People whose clearance does not reach a document are not proposed as
+its recipients, nor seated on its review. The levels are ordered by the
+published confidentiality list (its `level` where given, else its order).
+
+**Replaces** §3's "no clearance": clearance belongs to a function, never to a
+person. Confirmed by the owner.
+
+**Depends on it:** `Function.Clearance`, `Identity/Clearance.cs`,
+`DocumentQueries.Visible`; the clearance choice on Functions & permissions.
+
+---
+
+## 47 · Correspondence is a deliverable type, released without review
+
+**Clause:** §3.1 *Document types*. Extends §19.
+
+**Must say:** the organization publishes a deliverable type **Correspondence
+(COR)**, numbered like engineering documents. Its document types are not
+reviewed before release: minutes (MOM), letters (LET), site and progress
+reports (SRP), photos and survey records (PHO), test certificates and
+inspection records (TCR), delivery notes (DLN), permits (PMT), vendor
+catalogues and manuals (VCM), requests for information (RFI). The organization
+may rename, retire or add types; whether each is reviewed stays the type's own
+answer (§19).
+
+**Depends on it:** `DemoSeed.EnsureCorrespondenceSetupAsync`;
+`releaseRevisionAction` (sends a not-reviewed type on).
+
+---
+
+## 48 · A released requirements list is read on release, all or nothing
+
+**Clause:** §11 *Planning*, §14.3. Extends §32.
+
+**Must say:** a document requirements list is a controlled document (type
+**RQL**, or any type published as a requirements list). It is reviewed as a
+PDF; when its revision is released, its spreadsheet is read into the
+requirements automatically. One wrong line applies nothing, and the control
+function is told why. The upload by Document Control or Plan (§32) remains the
+manual way.
+
+**Depends on it:** `Schedules/RequirementsImporter.cs`, type property
+`readsRequirements`.
+
+---
+
+## 49 · A needed document is shown whatever its state
+
+**Clause:** §14.3 *Baseline entries*. Extends §5.
+
+**Must say:** a document an action needs is listed from the register whatever
+its state — placeholder, in review, released, released and issued — with that
+state shown in the organization's own words. It counts as ready only as §5
+says; showing it tells people it exists, not that it may be used.
+
+**Depends on it:** `src/lib/api/schedule.ts` (`latest`), the action page.
+
+---
+
+## 50 · Numbers from a range issued to a party; none without registering
+
+**Clause:** §4 *Numbering*.
+
+**Must say:** a number is given only when a document is registered. Where a
+range has been issued to a party for the same start of number, it is drawn
+first, lowest range first, until exhausted; then the project counter resumes.
+A number already used is skipped, so the two never give the same number.
+
+**Depends on it:** `Numbering.FromRangeAsync`, `number_ranges`.
+
+---
+
+## 51 · Superseded revisions are told to whoever received them; a late review is warned once
+
+**Clause:** §11.8 *Distribution*, §9.4 *Review periods*.
+
+**Must say:** when a revision is superseded, everybody who received the
+earlier one is told, and the control function can see who has not been told.
+A reviewer who has not answered is warned once, the working day before the
+step falls due (the project's working days and time zone). A void revision's
+viewable copy is marked VOID on every page, like ON HOLD (§17).
+
+**Depends on it:** `Transmittals/Supersession.cs` (`/exposures/untold`),
+`Reviews/ReviewWarnings.cs`, `Stamping.MarkAsync`.
+
+---
+
+## 52 · An administrator who opens a project joins it, on the record
+
+**Clause:** §2 *Roles*.
+
+**Must say:** an administrator not on a project who opens it is added to it
+with the administrator function, and the audit trail says so. No one reads a
+project without being on it.
+
+**Depends on it:** `POST /api/admin/projects/{id}/join`.
 
 ---
 

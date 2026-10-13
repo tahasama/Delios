@@ -58,9 +58,8 @@ Each item says: what you did before, what happens now, and why.
 - Someone named on a route but not on the project is skipped. If nobody is left, the review is refused
   with a message saying which step has nobody.
 - On the deciding step, at least one person named must hold a function that may approve the document.
-- Before: you could also pick people per step when sending for review. Now the people picked on the
-  "send for review" form are ignored: the route decides. To change who reviews, change the route or who
-  holds the function.
+- The route proposes who answers each step; the sender may change the people on each step for that
+  review, and the record says so (see CLAUDE.md, Reviews).
 
 **A route's own verdict list.**
 - A route can decide from its own list instead of the review outcomes (the "outcome set" on the routes
@@ -74,18 +73,11 @@ Each item says: what you did before, what happens now, and why.
 - The delegate answers and comments **in the holder's place**: the record says
   "Aisha Approver for Eli Engineer", and the step shows the holder answered, by the delegate.
 
-**Writing, changing or taking back a comment before the step is answered.**
-- The review page has a **Comments** card under the document.
-- Whoever sits on the open step writes comments there, says whether each stops the release, and where the route
-  has later steps, which step settles it.
-- Until they answer, they can change or take back their own comments.
-- Document Control, or the revision's author, can switch an open comment between "stops the release" and not,
-  with a reason.
-- A comment taken back is **kept on record**, marked withdrawn, and no longer shown or counted.
-  (The old app deleted it.)
+**Writing, changing or taking back a comment before the step is answ**Comments go with the answer.**
+- Comments are written with the verdict or advice, under that choice, and are obligatory only when the
+  choice carries comments. There is no separate comment box (this replaced the earlier Comments card).
 
-**Releasing a document type that is not reviewed.**
-- "Send on for release" works. Behind the scenes it creates a review with **no steps**, already
+elease" works. Behind the scenes it creates a review with **no steps**, already
   decided at the status you chose; Document Control releases it like any decided review (or it is
   released at once where nobody holds Document Control).
 - It does not appear in the reviews list. It does use a review number (RV-…) from the same series,
