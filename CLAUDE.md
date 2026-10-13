@@ -397,6 +397,13 @@ The repository: `backend/` (API and worker), `frontend/` (the Next.js screens; r
   many notices were sent on that matter and days since the first (automatic
   ones counted). Kept in the notice log. Sent by Document Control, Plan
   holders, or (about a review) whoever started it.
+- Requests, confirmations and answers travel as transmittals in one thread
+  (Standard §54, `ActionLetters`): a checked request asks its confirmer
+  (Request), the confirmation or answer replies to whoever asked (Confirmation /
+  Answer, Document Control copied in), a postponement asks whoever plans
+  (Request, the concerned copied in) and its confirmation or take-back replies;
+  people to confirm likewise. Answering one acknowledges it. Automatic notices
+  and escalation stay notifications.
 - "Request a document" (concerned discipline or Document Control) opens a
   transmittal to Document Control with the file attached; Document Control
   adds the number to the action. No status or date is asked.

@@ -451,6 +451,7 @@ public static class DirectoryEndpoints
     {
         var clock = http.RequestServices.GetRequiredService<IClock>();
         var notifier = http.RequestServices.GetRequiredService<Notifications.Notifier>();
+        var transmittals = http.RequestServices.GetRequiredService<Transmittals.TransmittalService>();
         var by = (await db.Users.AsNoTracking().SingleAsync(u => u.Id == http.User.UserId(), cancellationToken)).Name;
         var confirmer = confirmerId is { } cid ? await db.Users.AsNoTracking().SingleOrDefaultAsync(u => u.Id == cid && u.Active, cancellationToken) : null;
         membership.Active = false;
@@ -466,7 +467,13 @@ public static class DirectoryEndpoints
         membership.RefusedReason = null;
         var told = confirmer is not null ? [confirmer.Id] : await Schedules.NoticeLog.HoldersAsync(db, membership.ProjectId, Verbs.Manage, cancellationToken);
         var person = (await db.Users.AsNoTracking().SingleAsync(u => u.Id == membership.UserId, cancellationToken)).Name;
-        if (told.Count > 0)
+        // Asked on a transmittal: whoever confirms answers it, in the same thread.
+        var project = await db.Projects.AsNoTracking().SingleAsync(p => p.Id == membership.ProjectId, cancellationToken);
+        var letter = await Schedules.ActionLetters.SendAsync(db, transmittals, clock, project, new Actor(http.User.UserId(), by), Schedules.ActionLetters.Request,
+            $"{person} to confirm on {project.Code}", $"{by} added {person} to {project.Code}; they join once confirmed. Confirm or refuse it on “People to confirm”.",
+            told, [], null, cancellationToken);
+        membership.ConfirmTransmittalId = letter?.Id;
+        if (letter is null && told.Count > 0)
             await notifier.NotifyAsync(membership.TenantId, membership.ProjectId, told.Distinct(), Notifications.NotificationKinds.General,
                 $"{person} to confirm on the project", $"{by} added {person}; they join once confirmed.", "/people/confirm", cancellationToken);
         return $"waiting for {confirmer?.Name ?? "management"} to confirm";

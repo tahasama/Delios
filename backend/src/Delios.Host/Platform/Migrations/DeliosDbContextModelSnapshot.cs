@@ -1563,6 +1563,10 @@ namespace Delios.Host.Platform.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("active");
 
+                    b.Property<Guid?>("ConfirmTransmittalId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("confirm_transmittal_id");
+
                     b.Property<Instant?>("ConfirmedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("confirmed_at");
@@ -4037,6 +4041,10 @@ namespace Delios.Host.Platform.Migrations
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid")
                         .HasColumnName("tenant_id");
+
+                    b.Property<Guid?>("TransmittalId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("transmittal_id");
 
                     b.HasKey("Id")
                         .HasName("pk_activity_decisions");

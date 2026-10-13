@@ -245,6 +245,8 @@ public sealed class Membership
     public Instant? RefusedAt { get; set; }
     public string? RefusedByName { get; set; }
     public string? RefusedReason { get; set; }
+    /// <summary>The transmittal that asked management to confirm this person: the answer replies to it.</summary>
+    public Guid? ConfirmTransmittalId { get; set; }
 }
 
 /// <summary>A signed-in browser. The cookie holds a random token; only its hash is stored.</summary>

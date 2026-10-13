@@ -14,19 +14,21 @@ namespace Delios.Host.Schedules;
 public static class NoticeLog
 {
     /// <summary>
-    /// Tells the people (repeats and blanks ignored) and keeps the notice. Does not save: the caller does. People of
+    /// Tells the people (repeats and blanks ignored) and keeps the notice. Does not save: the caller does. With
+    /// <paramref name="tell"/> false the notice is only kept: a transmittal told them. People of
     /// another organization (a supplier) cannot open the schedule: they are given <paramref name="outsideLink"/>, the
     /// page of theirs it is about, instead of <paramref name="link"/>.
     /// </summary>
     public static async Task<Notice> SendAsync(DeliosDbContext db, Notifications.Notifier notifier, IClock clock,
         Guid tenantId, Guid projectId, string subject, bool automatic, string sentByName, string title, string? body, string? link,
-        IEnumerable<Guid> people, CancellationToken cancellationToken, string? outsideLink = null)
+        IEnumerable<Guid> people, CancellationToken cancellationToken, string? outsideLink = null, bool tell = true)
     {
         var ids = people.Where(id => id != Guid.Empty).Distinct().ToArray();
         var names = await db.Users.AsNoTracking().Where(u => ids.Contains(u.Id)).OrderBy(u => u.Name).Select(u => u.Name).ToArrayAsync(cancellationToken);
         var outside = await db.Users.AsNoTracking().Where(u => ids.Contains(u.Id) && u.PartyId != null && !u.Party!.IsInternal)
             .Select(u => u.Id).ToListAsync(cancellationToken);
-        var inside = ids.Except(outside).ToArray();
+        var inside = tell ? ids.Except(outside).ToArray() : [];
+        if (!tell) outside.Clear();
         if (inside.Length > 0)
             await notifier.NotifyAsync(tenantId, projectId, inside, Notifications.NotificationKinds.General, title, body, link, cancellationToken);
         if (outside.Count > 0)

@@ -988,15 +988,35 @@ the action; the notice is the record.
 
 ---
 
+## 54 · Requests, confirmations and answers travel as transmittals, in one thread
+
+**Clause:** §11.1 *Transmittals*, §11.2 *Reasons for issue*. Extends §15 and §45.
+
+**Must say:** a request about the work, its answer, a confirmation sought and
+given all travel as transmittals (words alone, the information family), each
+answer replying to what it answers, so the thread is the record:
+
+| What | Reason | To | Copied in |
+|---|---|---|---|
+| A request about an action checked, management's confirmation sought | Request | whoever is asked to confirm | — |
+| That request confirmed | Confirmation | whoever asked | the control function |
+| Refused, nothing to add, or applied | Answer | whoever asked | the control function, when somebody else settled it |
+| An action postponed: whoever plans asked to confirm | Request | whoever plans | the people the action concerns |
+| The postponement confirmed | Confirmation | whoever recorded it | the people concerned, the control function |
+| The decision taken back | Answer | whoever recorded it, whoever plans | the people concerned |
+| A person added to a project, management's confirmation sought | Request | whoever confirms | — |
+| The person confirmed, or refused | Confirmation, or Answer | whoever added them | — |
+
+Answering a transmittal one was asked on acknowledges it. Escalation and the
+automatic notices about an action stay notices (§53).
+
+**Depends on it:** `Schedules/ActionLetters.cs`; `ActivityDecision.TransmittalId`,
+`Membership.ConfirmTransmittalId`.
+
+---
+
 ## Still open — decided in conversation, not yet built
 
-- **Transmittals as the one channel, in two families.** Transmittals will work
-  like email: a request, its answer, a confirmation sought and given all travel
-  as transmittals in one thread. The kinds a user picks before sending fall in
-  two families, never named as such on screen: information (request, answer to
-  a request, confirmation request, RFI…) and data (IFR, IFA, IFP…). Until then,
-  answers to a request about an action are notices, and the transmittal records
-  where the request stands.
 - **Every transmittal and every notification also goes by email**, showing what
   the app shows, so there is a double proof: inside the app, and outside by
   email. Built: every notification queues its email (kept in the email log

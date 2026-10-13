@@ -248,6 +248,8 @@ public sealed class ActivityDecision
     public string? ReversedByName { get; set; }
     public Instant? ReversedAt { get; set; }
     public string? ReversedReason { get; set; }
+    /// <summary>The transmittal that asked whoever plans to confirm a postponement: its confirmation answers it.</summary>
+    public Guid? TransmittalId { get; set; }
 }
 
 /// <summary>

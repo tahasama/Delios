@@ -255,7 +255,7 @@ public static class ScheduleEndpoints
     /// </summary>
     private static async Task<IResult> AddNeedAsync(
         Guid activityId, NeedRequest request, HttpContext http, DeliosDbContext db, IClock clock, AuditLog audit,
-        Notifications.Notifier notifier, CancellationToken cancellationToken)
+        Notifications.Notifier notifier, TransmittalService transmittals, CancellationToken cancellationToken)
     {
         var access = ProjectAccessFilter.Of(http);
         var activity = await db.Activities.SingleOrDefaultAsync(a => a.Id == activityId && a.ProjectId == access.Project.Id, cancellationToken);
@@ -287,7 +287,7 @@ public static class ScheduleEndpoints
         await db.SaveChangesAsync(cancellationToken);
         await Readiness.RestateAsync(db, clock, [activity.Id], cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
-        if (ask is not null) await AnswerAsync(db, notifier, clock, access, ask, activity, $"{document!.Number} added to {activity.Code}.", cancellationToken);
+        if (ask is not null) await AnswerAsync(db, transmittals, clock, access, ask, activity, $"{document!.Number} added to {activity.Code}.", cancellationToken);
         if (self) await TellPlannersAsync(db, notifier, access, activity, $"{access.UserName} added {document!.Number}", $"{activity.Code} now needs {document.Number} for {need!.Department}.", cancellationToken);
         await audit.WriteAsync(http.User.Actor(), "NEED_ADDED", "Activity", activity.Id, activity.Code,
             $"Needs {document!.Number} for {need!.Purpose}, by {need.NeededBy?.ToString() ?? "a date not yet known"}"
@@ -348,7 +348,7 @@ public static class ScheduleEndpoints
     /// the right action…), saying why. Whoever asked is told, as when a document is added.
     /// </summary>
     private static async Task<IResult> AnswerActivityAskAsync(Guid transmittalId, ActivityAskAnswer request, HttpContext http,
-        DeliosDbContext db, IClock clock, AuditLog audit, Notifications.Notifier notifier, CancellationToken cancellationToken)
+        DeliosDbContext db, IClock clock, AuditLog audit, TransmittalService transmittals, CancellationToken cancellationToken)
     {
         var access = ProjectAccessFilter.Of(http);
         if (!access.Holds(Verbs.Control)) return Problems.Forbidden("CONTROL_ONLY", "Document Control answers a request to add a document to an action.");
@@ -360,7 +360,7 @@ public static class ScheduleEndpoints
         if (ask.ActivityCheckedAt is not null)
             return Problems.Conflict("WITH_MANAGEMENT", $"It was checked and is with {ask.ActivityConfirmerName}, who confirms or refuses it.");
         var activity = await db.Activities.AsNoTracking().SingleAsync(a => a.Id == activityId, cancellationToken);
-        await AnswerAsync(db, notifier, clock, access, ask, activity, $"Nothing added: {note}", cancellationToken);
+        await AnswerAsync(db, transmittals, clock, access, ask, activity, $"Nothing added: {note}", cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         await audit.WriteAsync(http.User.Actor(), "ACTIVITY_REQUEST_ANSWERED", "Transmittal", ask.Id, ask.Number, note, access.Project.Id, cancellationToken);
         return Results.NoContent();
@@ -386,7 +386,7 @@ public static class ScheduleEndpoints
     /// the project may be chosen). Nothing changes yet; whoever confirms is told.
     /// </summary>
     private static async Task<IResult> CheckActivityAskAsync(Guid transmittalId, ActivityCheckRequest request, HttpContext http,
-        DeliosDbContext db, IClock clock, AuditLog audit, Notifications.Notifier notifier, CancellationToken cancellationToken)
+        DeliosDbContext db, IClock clock, AuditLog audit, TransmittalService transmittals, CancellationToken cancellationToken)
     {
         var access = ProjectAccessFilter.Of(http);
         if (!access.Holds(Verbs.Control)) return Problems.Forbidden("CONTROL_ONLY", "Document Control checks these requests.");
@@ -433,9 +433,10 @@ public static class ScheduleEndpoints
         ask.ActivityCheckedByName = access.UserName;
         ask.ActivityConfirmerId = confirmer.Id;
         ask.ActivityConfirmerName = confirmer.Name;
-        await notifier.NotifyAsync(access.Project.TenantId, access.Project.Id, [confirmer.Id], Notifications.NotificationKinds.General,
-            $"{activity.Code}: your confirmation is asked", $"{ask.IssuedByName} asked, {access.UserName} checked it: {activity.Code} {what}.",
-            $"/actions/{activity.Code}#your-confirmation", cancellationToken);
+        await ActionLetters.SendAsync(db, transmittals, clock, access.Project, new Actor(access.UserId, access.UserName), ActionLetters.Request,
+            ask.Subject, $"{ask.IssuedByName} asked, and {access.UserName} checked it: {activity.Code} {what}. "
+            + $"Your confirmation is asked: confirm or refuse it under “Your confirmation” on {activity.Code}.",
+            [confirmer.Id], [], ask.Id, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         await audit.WriteAsync(http.User.Actor(), "ACTIVITY_REQUEST_CHECKED", "Transmittal", ask.Id, ask.Number,
             $"{activity.Code} {what}. Sent to {confirmer.Name} to confirm.", access.Project.Id, cancellationToken);
@@ -447,7 +448,7 @@ public static class ScheduleEndpoints
     /// and Document Control, are told.
     /// </summary>
     private static async Task<IResult> ConfirmActivityAskAsync(Guid transmittalId, HttpContext http,
-        DeliosDbContext db, IClock clock, AuditLog audit, Notifications.Notifier notifier, CancellationToken cancellationToken)
+        DeliosDbContext db, IClock clock, AuditLog audit, TransmittalService transmittals, CancellationToken cancellationToken)
     {
         var access = ProjectAccessFilter.Of(http);
         var (ask, activity, problem) = await ConfirmingAsync(db, access, transmittalId, cancellationToken);
@@ -483,24 +484,24 @@ public static class ScheduleEndpoints
                 await audit.WriteAsync(http.User.Actor(), "NEED_ADDED", "Activity", activity.Id, activity.Code,
                     $"Needs {string.Join(", ", added)}, as {ask.Number} asked and {access.UserName} confirmed.", access.Project.Id, cancellationToken);
         }
-        await AnswerAsync(db, notifier, clock, access, ask, activity!, $"Confirmed by {access.UserName}: {done}.", cancellationToken);
-        await TellControlAsync(db, notifier, access, activity!, $"{ask.Number} confirmed", $"{access.UserName} confirmed it: {done}.", cancellationToken);
+        await AnswerAsync(db, transmittals, clock, access, ask, activity!, $"Confirmed by {access.UserName}: {done}.", cancellationToken,
+            ActionLetters.Confirmation, copyControl: true);
         await audit.WriteAsync(http.User.Actor(), "ACTIVITY_REQUEST_CONFIRMED", "Transmittal", ask.Id, ask.Number, done, access.Project.Id, cancellationToken);
         return Results.NoContent();
     }
 
     /// <summary>Whoever was asked refuses the request, saying why: nothing changes, and whoever asked and Document Control are told.</summary>
     private static async Task<IResult> RefuseActivityAskAsync(Guid transmittalId, ActivityAskAnswer request, HttpContext http,
-        DeliosDbContext db, IClock clock, AuditLog audit, Notifications.Notifier notifier, CancellationToken cancellationToken)
+        DeliosDbContext db, IClock clock, AuditLog audit, TransmittalService transmittals, CancellationToken cancellationToken)
     {
         var access = ProjectAccessFilter.Of(http);
         var note = request.Note?.Trim() ?? "";
         if (note.Length == 0) return Problems.Invalid("REASON_REQUIRED", "Say why it is refused; whoever asked reads it.");
         var (ask, activity, problem) = await ConfirmingAsync(db, access, transmittalId, cancellationToken);
         if (problem is not null) return problem;
-        await AnswerAsync(db, notifier, clock, access, ask!, activity!, $"Refused by {access.UserName}: {note}", cancellationToken);
-        await TellControlAsync(db, notifier, access, activity!, $"{ask!.Number} refused", $"{access.UserName} refused it: {note}", cancellationToken);
-        await audit.WriteAsync(http.User.Actor(), "ACTIVITY_REQUEST_REFUSED", "Transmittal", ask.Id, ask.Number, note, access.Project.Id, cancellationToken);
+        await AnswerAsync(db, transmittals, clock, access, ask!, activity!, $"Refused by {access.UserName}: {note}", cancellationToken,
+            copyControl: true);
+        await audit.WriteAsync(http.User.Actor(), "ACTIVITY_REQUEST_REFUSED", "Transmittal", ask!.Id, ask.Number, note, access.Project.Id, cancellationToken);
         return Results.NoContent();
     }
 
@@ -558,26 +559,20 @@ public static class ScheduleEndpoints
                 $"{activity.Code}: {title}", body, $"/actions/{activity.Code}", cancellationToken);
     }
 
-    /// <summary>Tells Document Control on the project how a request it checked was settled.</summary>
-    private static async Task TellControlAsync(DeliosDbContext db, Notifications.Notifier notifier, ProjectAccess access, Activity activity,
-        string title, string body, CancellationToken cancellationToken)
-    {
-        var control = await NoticeLog.HoldersAsync(db, access.Project.Id, Verbs.Control, cancellationToken);
-        if (control.Count > 0)
-            await notifier.NotifyAsync(access.Project.TenantId, access.Project.Id, control.Distinct(), Notifications.NotificationKinds.General,
-                $"{activity.Code}: {title}", body, $"/actions/{activity.Code}", cancellationToken);
-    }
-
-    /// <summary>Closes a request to add a document to an action with what was done, and tells whoever asked.</summary>
-    internal static async Task AnswerAsync(DeliosDbContext db, Notifications.Notifier notifier, IClock clock, ProjectAccess access,
-        Transmittal ask, Activity activity, string answer, CancellationToken cancellationToken)
+    /// <summary>
+    /// Closes a request about an action with what was done, and answers whoever asked on a transmittal replying to
+    /// theirs (Document Control copied in when <paramref name="copyControl"/>: a request it checked was settled by somebody else).
+    /// </summary>
+    internal static async Task AnswerAsync(DeliosDbContext db, TransmittalService transmittals, IClock clock, ProjectAccess access,
+        Transmittal ask, Activity activity, string answer, CancellationToken cancellationToken, string reason = ActionLetters.Answer,
+        bool copyControl = false)
     {
         ask.ActivityAnsweredAt = clock.GetCurrentInstant();
         ask.ActivityAnsweredByName = access.UserName;
         ask.ActivityAnswer = answer;
-        if (ask.IssuedById is { } asker)
-            await notifier.NotifyAsync(access.Project.TenantId, access.Project.Id, [asker], Notifications.NotificationKinds.General,
-                $"{ask.Number}: {access.UserName} answered", answer, $"/actions/{activity.Code}", cancellationToken);
+        var control = copyControl ? await NoticeLog.HoldersAsync(db, access.Project.Id, Verbs.Control, cancellationToken) : [];
+        await ActionLetters.SendAsync(db, transmittals, clock, access.Project, new Actor(access.UserId, access.UserName), reason,
+            ask.Subject, $"{answer} ({activity.Code} {activity.Name})", ask.IssuedById is { } asker ? [asker] : [], control, ask.Id, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
     }
 
@@ -647,7 +642,7 @@ public static class ScheduleEndpoints
     /// <summary>The activity went ahead without its documents, or was stopped for them: who decided, why, and whose delay it was.</summary>
     private static async Task<IResult> DecideAsync(
         Guid activityId, DecisionRequest request, HttpContext http, DeliosDbContext db, IClock clock, AuditLog audit,
-        Notifications.Notifier notifier, CancellationToken cancellationToken)
+        Notifications.Notifier notifier, TransmittalService transmittals, CancellationToken cancellationToken)
     {
         var access = ProjectAccessFilter.Of(http);
         if (!(access.Holds(Verbs.Control) || access.Holds(Verbs.Approve)))
@@ -663,7 +658,7 @@ public static class ScheduleEndpoints
         var reason = request.Reason?.Trim() ?? "";
         if (responsible.Length == 0 || reason.Length == 0)
             return Problems.Invalid("DECISION_INCOMPLETE", "Say who carries the decision and why.");
-        db.ActivityDecisions.Add(new ActivityDecision
+        var row = new ActivityDecision
         {
             TenantId = access.Project.TenantId,
             ProjectId = access.Project.Id,
@@ -676,16 +671,21 @@ public static class ScheduleEndpoints
             DelayReason = request.DelayReason?.Trim(),
             RecordedByName = access.UserName,
             RecordedAt = clock.GetCurrentInstant(),
-        });
-        // Postponed: everyone the activity concerns is told, and whoever plans the project is asked to confirm it.
+        };
+        db.ActivityDecisions.Add(row);
+        // Postponed: whoever plans the project is asked to confirm it on a transmittal, everyone the activity concerns
+        // copied in. The notice log keeps it too, so the action counts it with its other notices.
         if (!ActionNotices.Proceeds(await Catalog.LoadAsync(db, cancellationToken), decision))
         {
-            var people = await ConcernedAsync(db, access.Project.Id, activity, cancellationToken);
-            people.AddRange(await NoticeLog.HoldersAsync(db, access.Project.Id, Verbs.Plan, cancellationToken));
+            var concerned = await ConcernedAsync(db, access.Project.Id, activity, cancellationToken);
+            var planners = await NoticeLog.HoldersAsync(db, access.Project.Id, Verbs.Plan, cancellationToken);
+            var title = $"{activity.Code} is postponed: whoever plans the project, confirm it";
+            var body = $"{activity.Name}. {responsible} decided: {reason} Confirm it on the action's page and say what changes, so a new schedule revision can follow.";
+            var letter = await ActionLetters.SendAsync(db, transmittals, clock, access.Project, new Actor(access.UserId, access.UserName), ActionLetters.Request,
+                $"{activity.Code} postponed", body, planners, concerned, null, cancellationToken);
+            row.TransmittalId = letter?.Id;
             await NoticeLog.SendAsync(db, notifier, clock, access.Project.TenantId, access.Project.Id, $"activity:{activityId}:postponed", false,
-                access.UserName, $"{activity.Code} is postponed: whoever plans the project, confirm it",
-                $"{activity.Name}. {responsible} decided: {reason} Confirm it on the action's page and say what changes, so a new schedule revision can follow.",
-                $"/actions/{activity.Code}", people, cancellationToken);
+                access.UserName, title, body, $"/actions/{activity.Code}", [.. concerned, .. planners], cancellationToken, tell: letter is null);
         }
         await db.SaveChangesAsync(cancellationToken);
         await audit.WriteAsync(http.User.Actor(), "ACTIVITY_DECISION", "Activity", activityId, activity.Code,
@@ -844,7 +844,7 @@ public static class ScheduleEndpoints
     /// expected. Everyone concerned and Document Control are told.
     /// </summary>
     private static async Task<IResult> ConfirmPostponementAsync(Guid activityId, Guid decisionId, DecisionNoteRequest request, HttpContext http,
-        DeliosDbContext db, IClock clock, AuditLog audit, Notifications.Notifier notifier, CancellationToken cancellationToken)
+        DeliosDbContext db, IClock clock, AuditLog audit, Notifications.Notifier notifier, TransmittalService transmittals, CancellationToken cancellationToken)
     {
         var access = ProjectAccessFilter.Of(http);
         if (!access.Holds(Verbs.Plan)) return Problems.Forbidden("PLAN_ONLY", "Whoever plans the project confirms a postponement.");
@@ -860,10 +860,15 @@ public static class ScheduleEndpoints
         row.ConfirmedByName = access.UserName;
         row.ConfirmedAt = clock.GetCurrentInstant();
         row.ConfirmNote = note;
-        var people = await ConcernedAsync(db, access.Project.Id, activity, cancellationToken);
-        people.AddRange(await NoticeLog.HoldersAsync(db, access.Project.Id, Verbs.Control, cancellationToken));
+        var concerned = await ConcernedAsync(db, access.Project.Id, activity, cancellationToken);
+        var control = await NoticeLog.HoldersAsync(db, access.Project.Id, Verbs.Control, cancellationToken);
+        var asked = await AskOfAsync(db, row.TransmittalId, cancellationToken);
+        var letter = await ActionLetters.SendAsync(db, transmittals, clock, access.Project, new Actor(access.UserId, access.UserName), ActionLetters.Confirmation,
+            asked?.Subject ?? $"{activity.Code} postponed", $"Postponement of {activity.Code} {activity.Name} confirmed by {access.UserName}: {note}",
+            asked?.IssuedById is { } recorder ? [recorder] : control, [.. concerned, .. control], asked?.Id, cancellationToken);
         await NoticeLog.SendAsync(db, notifier, clock, access.Project.TenantId, access.Project.Id, $"activity:{activityId}:postponed", false,
-            access.UserName, $"{activity.Code}: postponement confirmed by {access.UserName}", note, $"/actions/{activity.Code}", people, cancellationToken);
+            access.UserName, $"{activity.Code}: postponement confirmed by {access.UserName}", note, $"/actions/{activity.Code}",
+            [.. concerned, .. control], cancellationToken, tell: letter is null);
         await db.SaveChangesAsync(cancellationToken);
         await audit.WriteAsync(http.User.Actor(), "POSTPONEMENT_CONFIRMED", "Activity", activityId, activity.Code, note, access.Project.Id, cancellationToken);
         return await ActivityAsync(activityId, http, db, clock, cancellationToken);
@@ -871,7 +876,7 @@ public static class ScheduleEndpoints
 
     /// <summary>Document Control takes a decision back, with why (a planner who would not confirm, a mistake). Kept, marked.</summary>
     private static async Task<IResult> ReverseDecisionAsync(Guid activityId, Guid decisionId, DecisionNoteRequest request, HttpContext http,
-        DeliosDbContext db, IClock clock, AuditLog audit, Notifications.Notifier notifier, CancellationToken cancellationToken)
+        DeliosDbContext db, IClock clock, AuditLog audit, Notifications.Notifier notifier, TransmittalService transmittals, CancellationToken cancellationToken)
     {
         var access = ProjectAccessFilter.Of(http);
         if (!access.Holds(Verbs.Control)) return Problems.Forbidden("CONTROL_ONLY", "Document Control takes a decision back.");
@@ -884,14 +889,23 @@ public static class ScheduleEndpoints
         row.ReversedByName = access.UserName;
         row.ReversedAt = clock.GetCurrentInstant();
         row.ReversedReason = reason;
-        var people = await ConcernedAsync(db, access.Project.Id, activity, cancellationToken);
-        people.AddRange(await NoticeLog.HoldersAsync(db, access.Project.Id, Verbs.Plan, cancellationToken));
+        var concerned = await ConcernedAsync(db, access.Project.Id, activity, cancellationToken);
+        var planners = await NoticeLog.HoldersAsync(db, access.Project.Id, Verbs.Plan, cancellationToken);
+        var asked = await AskOfAsync(db, row.TransmittalId, cancellationToken);
+        var letter = await ActionLetters.SendAsync(db, transmittals, clock, access.Project, new Actor(access.UserId, access.UserName), ActionLetters.Answer,
+            asked?.Subject ?? $"{activity.Code}: decision taken back", $"The decision on {activity.Code} {activity.Name} ({row.Decision}) was taken back by {access.UserName}: {reason}",
+            asked?.IssuedById is { } recorder ? [recorder, .. planners] : planners, concerned, asked?.Id, cancellationToken);
         await NoticeLog.SendAsync(db, notifier, clock, access.Project.TenantId, access.Project.Id, $"activity:{activityId}:postponed", false,
-            access.UserName, $"{activity.Code}: the decision was taken back by {access.UserName}", reason, $"/actions/{activity.Code}", people, cancellationToken);
+            access.UserName, $"{activity.Code}: the decision was taken back by {access.UserName}", reason, $"/actions/{activity.Code}",
+            [.. concerned, .. planners], cancellationToken, tell: letter is null);
         await db.SaveChangesAsync(cancellationToken);
         await audit.WriteAsync(http.User.Actor(), "DECISION_REVERSED", "Activity", activityId, activity.Code, reason, access.Project.Id, cancellationToken);
         return await ActivityAsync(activityId, http, db, clock, cancellationToken);
     }
+
+    /// <summary>The transmittal that asked, to reply to it in the same thread; null for one recorded before they were sent.</summary>
+    private static Task<Transmittal?> AskOfAsync(DeliosDbContext db, Guid? transmittalId, CancellationToken cancellationToken) =>
+        transmittalId is { } id ? db.Transmittals.AsNoTracking().SingleOrDefaultAsync(t => t.Id == id, cancellationToken) : Task.FromResult<Transmittal?>(null);
 
     /// <summary>
     /// For each need, the chain of checkpoints its document went through, and the

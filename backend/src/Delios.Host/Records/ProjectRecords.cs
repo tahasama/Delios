@@ -349,9 +349,11 @@ public static class ProjectRecordEndpoints
         p.MapPut("/activities/{activityId:guid}/departments", SetDepartmentsAsync);
         p.MapGet("/people/pending", PendingPeopleAsync);
         p.MapPost("/people/{membershipId:guid}/confirm", (Guid membershipId, HttpContext h, DeliosDbContext db, AuditLog audit, IClock clock,
-            Notifications.Notifier notifier, CancellationToken c) => SettlePersonAsync(membershipId, null, h, db, audit, clock, notifier, c));
+            Notifications.Notifier notifier, Transmittals.TransmittalService transmittals, CancellationToken c) =>
+            SettlePersonAsync(membershipId, null, h, db, audit, clock, notifier, transmittals, c));
         p.MapPost("/people/{membershipId:guid}/refuse", (Guid membershipId, RefusePersonRequest r, HttpContext h, DeliosDbContext db, AuditLog audit,
-            IClock clock, Notifications.Notifier notifier, CancellationToken c) => SettlePersonAsync(membershipId, r.Note ?? "", h, db, audit, clock, notifier, c));
+            IClock clock, Notifications.Notifier notifier, Transmittals.TransmittalService transmittals, CancellationToken c) =>
+            SettlePersonAsync(membershipId, r.Note ?? "", h, db, audit, clock, notifier, transmittals, c));
         p.MapGet("/sender-issues", async (HttpContext h, DeliosDbContext db, CancellationToken c) =>
             Results.Ok(await db.Set<SenderIssue>().AsNoTracking().Where(x => x.ProjectId == ProjectAccessFilter.Of(h).Project.Id)
                 .OrderByDescending(x => x.IssuedAt).ToListAsync(c)));
@@ -816,7 +818,7 @@ public static class ProjectRecordEndpoints
     /// record). Whoever was named, or anyone holding Manage when nobody was. Whoever added them is told.
     /// </summary>
     private static async Task<IResult> SettlePersonAsync(Guid membershipId, string? refusal, HttpContext h, DeliosDbContext db, AuditLog audit,
-        IClock clock, Notifications.Notifier notifier, CancellationToken c)
+        IClock clock, Notifications.Notifier notifier, Transmittals.TransmittalService transmittals, CancellationToken c)
     {
         var access = ProjectAccessFilter.Of(h);
         var membership = await db.Memberships.SingleOrDefaultAsync(m => m.Id == membershipId && m.ProjectId == access.Project.Id, c);
@@ -843,20 +845,26 @@ public static class ProjectRecordEndpoints
         await db.SaveChangesAsync(c);
         var said = refusal is null ? $"{person.Name} confirmed on the project by {access.UserName}." : $"{person.Name} refused by {access.UserName}: {refusal.Trim()}";
         await audit.WriteAsync(Who(access), refusal is null ? "PERSON_CONFIRMED" : "PERSON_REFUSED", "User", person.Id, person.Name, said, access.Project.Id, c);
-        // Whoever added them is told, and the person themselves once they are on.
+        // Whoever added them is answered on the transmittal that asked; the person themselves is told once they are on.
+        var asked = membership.ConfirmTransmittalId is { } askId ? await db.Transmittals.AsNoTracking().SingleOrDefaultAsync(t => t.Id == askId, c) : null;
+        var adder = membership.ProposedById is { } id ? new List<Guid> { id } : [];
+        var letter = await Schedules.ActionLetters.SendAsync(db, transmittals, clock, access.Project, Who(access),
+            refusal is null ? Schedules.ActionLetters.Confirmation : Schedules.ActionLetters.Answer,
+            asked?.Subject ?? $"{person.Name} to confirm on {access.Project.Code}", said, adder, [], asked?.Id, c);
         var told = new List<Guid>();
-        if (membership.ProposedById is { } adder) told.Add(adder);
+        if (letter is null) told.AddRange(adder);
         if (refusal is null) told.Add(person.Id);
         if (told.Count > 0)
             await notifier.NotifyAsync(access.Project.TenantId, access.Project.Id, told.Distinct(), Notifications.NotificationKinds.General,
                 refusal is null ? $"{person.Name} is on the project" : $"{person.Name} was not confirmed", said, "/", c);
+        await db.SaveChangesAsync(c);
         return Results.NoContent();
     }
 
     private sealed record DepartmentsRequest(string[]? Departments, Guid? TransmittalId = null, bool FromList = false);
 
     private static async Task<IResult> SetDepartmentsAsync(Guid activityId, HttpContext h, DeliosDbContext db, AuditLog audit, IClock clock,
-        Notifications.Notifier notifier, CancellationToken c)
+        Transmittals.TransmittalService transmittals, CancellationToken c)
     {
         var access = ProjectAccessFilter.Of(h);
         // Document Control tags by hand; whoever plans only by uploading the disciplines-per-action list.
@@ -883,7 +891,7 @@ public static class ProjectRecordEndpoints
         activity.Departments = departments;
         await db.SaveChangesAsync(c);
         if (ask is not null)
-            await Schedules.ScheduleEndpoints.AnswerAsync(db, notifier, clock, access, ask, activity,
+            await Schedules.ScheduleEndpoints.AnswerAsync(db, transmittals, clock, access, ask, activity,
                 $"{activity.Code} now concerns {(departments.Length == 0 ? "no discipline" : string.Join(", ", departments.Select(d => catalog.Label(ValueSets.Disciplines, d))))}.", c);
         await audit.WriteAsync(Who(access), "ACTIVITY_DEPARTMENTS", "Activity", activity.Id, activity.Code,
             $"{(was.Length == 0 ? "none" : was)} → {(departments.Length == 0 ? "none" : string.Join(", ", departments))}", access.Project.Id, c);
