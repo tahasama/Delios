@@ -79,7 +79,7 @@ to it.
 everybody on the project. Anything above them is readable by **people named on
 the document itself**, kept by whoever is answerable for its content — its
 author or whoever uploaded the file — plus an administrator, because somebody
-must be able to. There is no clearance attribute on a person.
+must be able to. A function may carry a clearance (§46).
 
 **Why:** clearance made confidentiality a property of rank. On a project the
 people who may read a closed document are chosen deliberately, one by one.
@@ -87,9 +87,7 @@ people who may read a closed document are chosen deliberately, one by one.
 **Depends on it:** `closedDocumentFilter` and `CLOSED_MODELS` in
 `src/lib/tenant.ts`; the access list on the document page.
 
-**Amended by §46:** a function may now carry a clearance. The owner asked for
-it; §46 says how the two fit, and still needs the owner's confirmation that it
-replaces the last sentence above.
+**Amended by §46:** a function may carry a clearance, confirmed by the owner.
 
 ---
 
@@ -879,8 +877,8 @@ limit. People whose clearance does not reach a document are not proposed as
 its recipients, nor seated on its review. The levels are ordered by the
 published confidentiality list (its `level` where given, else its order).
 
-**Open:** §3 says "no clearance attribute on a person". Clearance here belongs
-to a function, not a person; the owner confirms the wording.
+**Replaces** §3's "no clearance": clearance belongs to a function, never to a
+person. Confirmed by the owner.
 
 **Depends on it:** `Function.Clearance`, `Identity/Clearance.cs`,
 `DocumentQueries.Visible`; the clearance choice on Functions & permissions.
