@@ -172,6 +172,7 @@ public static class IdentityEndpoints
     {
         var (token, expires) = await sessions.CreateAsync(user, cancellationToken);
         await audit.WriteAsync(new Actor(user.Id, user.Name), action, "User", user.Id, user.Email, cancellationToken: cancellationToken);
+        await KnownDevices.NoteAsync(http, user, cancellationToken);
         SessionAuthenticationHandler.WriteCookie(http.Response, token, expires, cookie);
     }
 

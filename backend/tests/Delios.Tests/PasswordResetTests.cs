@@ -107,4 +107,31 @@ public sealed class PasswordResetTests(Infrastructure infrastructure) : IClassFi
         using var signedIn = await app.Factory.CreateClient().PostAsJsonAsync("/api/auth/sign-in", new { email = "lena@lakeside.test", password = "a-long-password" });
         Assert.Equal(HttpStatusCode.NoContent, signedIn.StatusCode);
     }
+
+    [Fact]
+    public async Task A_sign_in_from_a_new_browser_is_emailed_to_the_person_but_not_the_first_one()
+    {
+        await using var app = await TestApp.StartAsync(infrastructure);
+        var admin = await app.SignedInAsync("admin@demo.local");
+        async Task SignInFrom(string device)
+        {
+            var client = app.Factory.CreateClient();
+            client.DefaultRequestHeaders.Add("X-Delios-Device", device);
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0) Chrome/130.0 Safari/537.36");
+            using var response = await client.PostAsJsonAsync("/api/auth/sign-in", new { email = "viewer@demo.local", password = "demo1234" });
+            Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        }
+        async Task<List<string>> AlertsAsync() =>
+            (await admin.GetFromJsonAsync<JsonElement>("/api/admin/emails?kind=ACCOUNT")).GetProperty("rows").EnumerateArray()
+                .Where(e => e.GetProperty("subject").GetString() == "New sign-in to your DELIOS account").Select(e => e.GetProperty("body").GetString()!).ToList();
+
+        await SignInFrom("laptop");
+        Assert.Empty(await AlertsAsync());
+        await SignInFrom("laptop");
+        Assert.Empty(await AlertsAsync());
+        await SignInFrom("somewhere-else");
+        var alert = Assert.Single(await AlertsAsync());
+        Assert.Contains("Chrome on Windows", alert);
+        Assert.Contains("/forgot-password", alert);
+    }
 }

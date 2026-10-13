@@ -1,4 +1,5 @@
 import { cache } from "react";
+import { randomBytes } from "crypto";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getMe } from "./api/me";
@@ -6,6 +7,23 @@ import type { Role } from "./standard";
 import { heldVerbs } from "./permissions";
 
 const COOKIE = "edms_session";
+const DEVICE_COOKIE = "edms_device";
+
+/** This browser's id, made once and kept a year: a sign-in from a browser never seen before is emailed to the person. */
+export async function deviceId(): Promise<string> {
+  const jar = await cookies();
+  const known = jar.get(DEVICE_COOKIE)?.value;
+  if (known) return known;
+  const made = randomBytes(24).toString("base64url");
+  jar.set(DEVICE_COOKIE, made, {
+    httpOnly: true,
+    sameSite: "lax",
+    path: "/",
+    maxAge: 60 * 60 * 24 * 365,
+    secure: process.env.NODE_ENV === "production",
+  });
+  return made;
+}
 
 /** Keeps the backend's session token in the browser's session cookie. */
 export async function createSession(token: string) {

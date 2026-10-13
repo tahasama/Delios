@@ -36,6 +36,8 @@ type ApiOptions = {
   query?: Query;
   /** Makes a create safe to repeat: the same key gives back the first answer. */
   idempotencyKey?: string;
+  /** This browser's id (the sign-in calls): a sign-in from a browser never seen before is emailed to the person. */
+  device?: string;
 };
 
 function url(path: string, query?: Query): string {
@@ -57,6 +59,11 @@ export async function apiFetch(path: string, options: ApiOptions = {}): Promise<
   const sendHeaders: Record<string, string> = { Accept: "application/json" };
   if (session) sendHeaders.Cookie = `${BACKEND_COOKIE}=${session}`;
   if (forwarded) sendHeaders["X-Forwarded-For"] = forwarded;
+  if (options.device) {
+    sendHeaders["X-Delios-Device"] = options.device;
+    const agent = incoming.get("user-agent");
+    if (agent) sendHeaders["User-Agent"] = agent;
+  }
   if (options.idempotencyKey) sendHeaders["Idempotency-Key"] = options.idempotencyKey;
   if (options.body !== undefined) sendHeaders["Content-Type"] = "application/json";
   const started = TRACE ? performance.now() : 0;

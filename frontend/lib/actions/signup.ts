@@ -1,7 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { createSession } from "@/lib/auth";
+import { createSession, deviceId } from "@/lib/auth";
 import { apiFetch, problemOf } from "@/lib/api/client";
 import { PROJECT_KINDS } from "@/lib/profiles/kinds";
 import { CONTRACT_ROLES } from "@/lib/profiles/roles";  // signup predates the organization, so the built-in list is all there is
@@ -56,6 +56,7 @@ export async function signupAction(_prev: SignupState | undefined, formData: For
   try {
     response = await apiFetch("/api/auth/sign-up", {
       method: "POST",
+      device: await deviceId(),
       body: {
         organizationName, name, email, password,
         projectCode: wantsProject ? projectCode : null, projectName: wantsProject ? projectName : null, contractRole: wantsProject ? projectRole : null,

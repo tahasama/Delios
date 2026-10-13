@@ -1553,6 +1553,49 @@ namespace Delios.Host.Platform.Migrations
                     b.ToTable("identity_providers", (string)null);
                 });
 
+            modelBuilder.Entity("Delios.Host.Identity.KnownDevice", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<byte[]>("DeviceHash")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("device_hash");
+
+                    b.Property<Instant>("FirstSeenAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("first_seen_at");
+
+                    b.Property<string>("Label")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("label");
+
+                    b.Property<Instant>("LastSeenAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_seen_at");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_known_devices");
+
+                    b.HasIndex("UserId", "DeviceHash")
+                        .IsUnique()
+                        .HasDatabaseName("ix_known_devices_user_id_device_hash");
+
+                    b.ToTable("known_devices", (string)null);
+                });
+
             modelBuilder.Entity("Delios.Host.Identity.Membership", b =>
                 {
                     b.Property<Guid>("Id")

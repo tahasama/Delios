@@ -32,6 +32,7 @@ public sealed class DeliosDbContext(DbContextOptions<DeliosDbContext> options)
     public DbSet<PermissionRule> PermissionRules => Set<PermissionRule>();
     public DbSet<Membership> Memberships => Set<Membership>();
     public DbSet<Session> Sessions => Set<Session>();
+    public DbSet<KnownDevice> KnownDevices => Set<KnownDevice>();
     public DbSet<IdentityProvider> IdentityProviders => Set<IdentityProvider>();
     public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
 

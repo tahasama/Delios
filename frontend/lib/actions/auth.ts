@@ -1,7 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { createSession, destroySession } from "@/lib/auth";
+import { createSession, destroySession, deviceId } from "@/lib/auth";
 import { apiFetch, problemOf } from "@/lib/api/client";
 
 type LoginState = {
@@ -35,7 +35,7 @@ async function secondStep(formData: FormData, next: string): Promise<LoginState>
   if (!code) return { ...again, error: "Type the code your authenticator app shows." };
   let response: Response;
   try {
-    response = await apiFetch(step === "MFA_SETUP" ? "/api/auth/mfa/confirm" : "/api/auth/mfa", { method: "POST", body: { challenge, code } });
+    response = await apiFetch(step === "MFA_SETUP" ? "/api/auth/mfa/confirm" : "/api/auth/mfa", { method: "POST", body: { challenge, code }, device: await deviceId() });
   } catch {
     return { ...again, error: "The server does not answer. Try again in a moment." };
   }
@@ -80,7 +80,7 @@ export async function loginAction(_prev: LoginState | undefined, formData: FormD
   // the sign-in. A person belongs to one organization, so the email says which.
   let response: Response;
   try {
-    response = await apiFetch("/api/auth/sign-in", { method: "POST", body: { email, password } });
+    response = await apiFetch("/api/auth/sign-in", { method: "POST", body: { email, password }, device: await deviceId() });
   } catch {
     return { error: "The server does not answer. Try again in a moment.", email };
   }
