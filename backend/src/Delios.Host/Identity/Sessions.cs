@@ -8,7 +8,8 @@ using NodaTime;
 namespace Delios.Host.Identity;
 
 /// <summary>What a valid session says. Plain types only: it is cached in Redis as JSON.</summary>
-public sealed record SessionInfo(Guid SessionId, Guid TenantId, Guid UserId, string UserName, bool IsAdmin, DateTimeOffset ExpiresAt);
+public sealed record SessionInfo(
+    Guid SessionId, Guid TenantId, Guid UserId, string UserName, bool IsAdmin, DateTimeOffset ExpiresAt, DateTimeOffset StartedAt = default);
 
 /// <summary>
 /// Sessions live in Postgres, so any node can check them and signing out ends
@@ -18,6 +19,11 @@ public sealed class SessionStore(DeliosDbContext db, TenantContext tenant, Hybri
 {
     /// <summary>How long a new or renewed session stays valid before the user has to sign in again (12 hours).</summary>
     public static readonly Duration Lifetime = Duration.FromHours(12);
+    /// <summary>
+    /// The longest a session lasts however much it is used (7 days): then the person signs in again, so a stolen or
+    /// forgotten session cannot be kept alive for ever.
+    /// </summary>
+    public static readonly Duration MaxAge = Duration.FromDays(7);
     /// <summary>
     /// Cache settings for session checks: a result is reused for at most 30 seconds, both in this process's memory and in Redis.
     /// </summary>
@@ -58,12 +64,19 @@ public sealed class SessionStore(DeliosDbContext db, TenantContext tenant, Hybri
             CacheFor, cancellationToken: cancellationToken);
     }
 
-    /// <summary>Pushes the expiry forward once half the lifetime has passed.</summary>
+    /// <summary>Pushes the expiry forward once half the lifetime has passed, never past <see cref="MaxAge"/> from the start.</summary>
     public async Task<Instant?> RenewIfDueAsync(string token, SessionInfo session, CancellationToken cancellationToken)
     {
         var now = clock.GetCurrentInstant();
-        if (Instant.FromDateTimeOffset(session.ExpiresAt) - now > Lifetime / 2) return null;
+        var current = Instant.FromDateTimeOffset(session.ExpiresAt);
+        if (current - now > Lifetime / 2) return null;
         var expires = now + Lifetime;
+        if (session.StartedAt != default)
+        {
+            var last = Instant.FromDateTimeOffset(session.StartedAt) + MaxAge;
+            if (expires > last) expires = last;
+        }
+        if (expires <= current) return null;
         await db.Sessions.Where(s => s.Id == session.SessionId)
             .ExecuteUpdateAsync(s => s.SetProperty(x => x.ExpiresAt, expires), cancellationToken);
         await cache.RemoveAsync(Key(Hash(token)), cancellationToken);
@@ -105,8 +118,9 @@ public sealed class SessionStore(DeliosDbContext db, TenantContext tenant, Hybri
     private async Task<SessionInfo?> LoadAsync(byte[] hash, CancellationToken cancellationToken)
     {
         var now = clock.GetCurrentInstant();
+        var oldest = now - MaxAge;
         var session = await db.Sessions.AsNoTracking()
-            .Where(s => s.TokenHash == hash && s.RevokedAt == null && s.ExpiresAt > now)
+            .Where(s => s.TokenHash == hash && s.RevokedAt == null && s.ExpiresAt > now && s.CreatedAt > oldest)
             .SingleOrDefaultAsync(cancellationToken);
         if (session is null) return null;
 
@@ -122,7 +136,8 @@ public sealed class SessionStore(DeliosDbContext db, TenantContext tenant, Hybri
 
         return person is null || !tenantActive
             ? null
-            : new SessionInfo(session.Id, session.TenantId, session.UserId, person.Name, person.IsAdmin, session.ExpiresAt.ToDateTimeOffset());
+            : new SessionInfo(session.Id, session.TenantId, session.UserId, person.Name, person.IsAdmin, session.ExpiresAt.ToDateTimeOffset(),
+                session.CreatedAt.ToDateTimeOffset());
     }
 
     /// <summary>

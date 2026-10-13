@@ -125,14 +125,17 @@ visibility filter as everything else. What remains is cost: limit the length of 
 Cloudflare rate rule on `/api/*/search`.
 
 **Signatures and expiry.**
-- **Sessions:** last 12 hours and renew while in use. The cookie is `httpOnly`, `SameSite=Lax`, and `Secure` in production.
+- **Sessions:** last 12 hours and renew while in use, but never beyond 7 days from sign-in: then the person signs
+  in again. The cookie is `httpOnly`, `SameSite=Lax`, and `Secure` in production. A password reset ends every
+  session of that account.
+- **Refused requests:** a 403 to a signed-in person is written in the audit trail as `ACCESS_REFUSED` (what was
+  asked and why), once an hour per person and address.
 - **Two-step challenge:** expires after 5 minutes.
 - **Upload links:** signed, valid 15 minutes.
 - **Download links:** signed, valid 5 minutes. Every download is audited.
 
 To add:
-- a maximum session age (for example 7 days, even while in use);
-- "sign out everywhere";
+- "sign out everywhere" (a password reset already does it);
 - signatures on outgoing webhooks, if we ever send them.
 
 ---

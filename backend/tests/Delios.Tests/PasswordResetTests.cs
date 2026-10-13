@@ -49,4 +49,21 @@ public sealed class PasswordResetTests(Infrastructure infrastructure) : IClassFi
         var (forged, forgedBody) = await Flow.PostAsync(anonymous, "/api/auth/password/reset", new { token = "nonsense", password = "another-password" });
         Assert.Equal((HttpStatusCode.BadRequest, "RESET_LINK_INVALID"), (forged, Flow.Code(forgedBody)));
     }
+
+    [Fact]
+    public async Task A_refused_request_is_recorded_once_an_hour_per_person_and_address()
+    {
+        await using var app = await TestApp.StartAsync(infrastructure);
+        var admin = await app.SignedInAsync("admin@demo.local");
+        var engineer = await app.SignedInAsync("engineer@demo.local");
+        for (var i = 0; i < 3; i++)
+        {
+            using var refused = await engineer.PutAsJsonAsync("/api/admin/security", new { mfaRequired = true });
+            Assert.Equal(HttpStatusCode.Forbidden, refused.StatusCode);
+        }
+
+        var audit = await admin.GetFromJsonAsync<JsonElement>("/api/admin/audit?action=ACCESS_REFUSED");
+        var row = Assert.Single(audit.GetProperty("rows").EnumerateArray());
+        Assert.Contains("PUT /api/admin/security: ADMIN_ONLY", row.GetProperty("detail").GetString());
+    }
 }

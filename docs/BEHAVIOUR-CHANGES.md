@@ -312,6 +312,12 @@ row. If a type is added to the family later, re-import the row to cover it. Rule
     saying so.
 - The order of the levels is the confidentiality list's own order, or its `level` property where one is set.
 
+**Sessions end after 7 days.** A session still renews while in use, but never beyond 7 days from signing in;
+then the person signs in again.
+
+**Refused requests are recorded.** When someone signed in is refused (403), the audit trail records
+`ACCESS_REFUSED` with what was asked and why, once an hour per person and address.
+
 **Forgot password.**
 - "Forgot your password?" on the sign-in page asks for the email and sends a link to choose a new password.
 - The link works once, within 30 minutes, and stops working as soon as the password changes any other way.
