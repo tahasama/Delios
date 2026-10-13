@@ -80,7 +80,6 @@ export default async function ControlledKindPage({ params }: { params: Promise<{
   const mayApprove = ctx.can("CONFIGURE") || (!!handler.ownerApproves && (ctx.can("CONTROL") || mayOwn));
   if (!mayChange && !mayApprove) return <PageHeader title={handler.title} subtitle={ctx.why("CONFIGURE")} />;
 
-  const projectId = handler.level === "PROJECT" ? ctx.projectId : null;
   const [sets, valueSets] = await Promise.all([
     controlledSets(ctx),
     handler.kind === "VALUE_SET" ? getSets() : Promise.resolve([]),

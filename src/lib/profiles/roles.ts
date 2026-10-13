@@ -1,44 +1,4 @@
-/**
- * What this organization is contracted to do on a project — EPC, PMC and the
- * rest — and the distribution matrix each role starts from.
- *
- * The sector profile (`kinds.ts`) decides the vocabulary: which disciplines and
- * document types exist. The contract role decides something different and far
- * harder to guess afterwards: where approval sits, and who the documents go out
- * to. An organization running a PMC project does not approve its own drawings;
- * one running EPC does. A single matrix cannot be right for both, which is why
- * a rule may state the role it is for (`PermissionRule.projectRole`).
- *
- * These are starting points, not behaviour. A role matrix is published once, as
- * ordinary rules, and from then on it is the organization's — corrected through
- * the matrix review route like any other controlled change.
- */
-
-/** Functions the role matrices need beyond the catalogue in `bootstrap.ts`. */
-export const ROLE_FUNCTIONS = [
-  {
-    code: "DESIGN_OFFICE", name: "Design office / architect", legacyRole: "APPROVER", clearance: 2, sort: 10,
-    description: "The office that holds design responsibility. On a management contract it reviews and approves its own technical content.",
-  },
-  {
-    code: "CONTRACTOR", name: "Contractor", legacyRole: "AUTHOR", clearance: 2, sort: 11,
-    description: "The party executing the works, who submits what the contract obliges them to submit.",
-  },
-  {
-    code: "SUPPLIER", name: "Supplier / vendor", legacyRole: "AUTHOR", clearance: 2, sort: 12,
-    description: "A supplier of equipment or materials, submitting vendor data against a purchase order.",
-  },
-  {
-    code: "CONTROL_OFFICE", name: "Control office / inspector", legacyRole: "REVIEWER", clearance: 2, sort: 13,
-    description: "A third party who inspects, witnesses or certifies, and approves no design.",
-  },
-  {
-    code: "CLIENT", name: "Client representative", legacyRole: "APPROVER", clearance: 3, sort: 14,
-    description: "The client or their representative, who receives and — where the contract says so — approves.",
-  },
-] as const;
-
-export type RoleRule = {
+type RoleRule = {
   functionCode: string;
   /** Who produced it, from DELIVERABLE_TYPES: ENG CTR VND TPY CLT. Absent means any. */
   deliverableType?: string;
@@ -48,7 +8,7 @@ export type RoleRule = {
   note: string;
 };
 
-export type ContractRole = {
+type ContractRole = {
   code: string;
   label: string;
   /** Where approval sits, in one line, for the person choosing at creation. */

@@ -3,8 +3,8 @@
 import { useState } from "react";
 import { Field, inputCls } from "@/components/ui";
 
-export type ReturnStep = { number: number; title: string };
-export type ReturnReason = { code: string; label: string; meaning?: string | null };
+type ReturnStep = { number: number; title: string };
+type ReturnReason = { code: string; label: string; meaning?: string | null };
 
 /**
  * Where a revision goes back to, and why.

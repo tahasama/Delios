@@ -14,7 +14,7 @@ function isValidatable(el: Element): el is Validatable {
 }
 
 /** The words a person would use for a field, not its `name` attribute. */
-export function labelFor(el: Validatable): string {
+function labelFor(el: Validatable): string {
   const id = el.getAttribute("id");
   if (id) {
     const label = el.ownerDocument.querySelector(`label[for="${CSS.escape(id)}"]`);

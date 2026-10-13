@@ -40,7 +40,7 @@ export function codeFor(verbs: Verb[]): (typeof MATRIX_CODES)[number] | null {
 export const EMPTY_CELL = "-";
 
 /** One line of the sheet: what the row is about, and a letter per function. */
-export type SheetRow = {
+type SheetRow = {
   deliverableType: string;
   docType: string;
   discipline: string;
@@ -51,7 +51,7 @@ export type SheetRow = {
   cells: string[];
 };
 
-export type Sheet = {
+type Sheet = {
   /** Function codes, in column order. */
   columns: { code: string; name: string }[];
   rows: SheetRow[];

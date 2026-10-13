@@ -6,7 +6,7 @@ import { Field, inputCls } from "@/components/ui";
 import { SearchPick } from "@/components/search-pick";
 
 type Named = { id: string; name: string };
-export type AskedRequest = { id: string; reason: string; askedBy: string; people: Named[]; parties: Named[] };
+type AskedRequest = { id: string; reason: string; askedBy: string; people: Named[]; parties: Named[] };
 
 /**
  * Who receives the revision when it is released. Document Control does not choose this: it was said by whoever

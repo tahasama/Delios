@@ -148,7 +148,7 @@ export async function deletePermissionRuleAction(_prev: Result | undefined, form
  * document. A verb granted only for certain documents is left alone: that is
  * a narrowing, and it is removed where it was made.
  */
-export async function toggleFunctionVerbAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
+async function toggleFunctionVerbAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
   const ctx = await requireAccessScope();
   const functionId = String(formData.get("functionId") ?? "");
   const verb = String(formData.get("verb") ?? "");

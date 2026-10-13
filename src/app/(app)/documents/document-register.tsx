@@ -13,7 +13,6 @@ import { Th, Td, Info } from "@/components/ui";
 import { useCardHeight } from "@/components/card-height";
 import { ActionForm } from "@/components/form";
 import { setActionDocumentsAction } from "@/lib/actions/action-links";
-import { inputCls } from "@/components/ui";
 import { CalendarCheck } from "lucide-react";
 
 /** Available from the Columns menu; off until someone wants them. */
@@ -53,7 +52,7 @@ type RegisterRow = {
 };
 type Opt = { code: string; label: string };
 
-export type Paging = {
+type Paging = {
   page: number;
   pages: number;
   perPage: number;

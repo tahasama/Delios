@@ -1,7 +1,7 @@
 import { getSet } from "./config";
 import { verdictEffect, VERDICT_EFFECT_SHORT } from "./verdict-effect";
 
-export type VerdictSetView = { key: string; title: string; values: { code: string; label: string; effect: string; effectLabel: string }[] };
+type VerdictSetView = { key: string; title: string; values: { code: string; label: string; effect: string; effectLabel: string }[] };
 
 /** The verdict sets a route can use, as people see them: title, codes and what each does. */
 export async function verdictSets(_t: unknown, keys: string[]): Promise<Map<string, VerdictSetView>> {

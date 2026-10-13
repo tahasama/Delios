@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export type ChecklistRow = { id: string; number: string; rev: string; status: string | null; title: string };
+type ChecklistRow = { id: string; number: string; rev: string; status: string | null; title: string };
 
 /**
  * Documents to tick, as a new transmittal lists them: a search above, five rows

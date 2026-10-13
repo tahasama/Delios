@@ -10,8 +10,3 @@ export type Tenant = {
   /** The data comes from the backend now (`src/lib/api`); this marks what still reaches for the old client. */
   db: { readonly movedToBackend: true };
 };
-
-/** A tenant named explicitly, outside a request. */
-export function tenantFor(orgId: string, projectId: string): Tenant {
-  return { orgId, projectId, db: { movedToBackend: true } };
-}

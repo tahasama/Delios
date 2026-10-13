@@ -1,4 +1,3 @@
-import { isAdmin } from "@/lib/auth";
 import { SETUP_PAGES, maySetup } from "../setup-pages";
 import { requireScope } from "@/lib/scope";
 import { PageHeader, Card, DataTable, Th, Td, Chip, Field, inputCls } from "@/components/ui";

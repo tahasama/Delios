@@ -39,10 +39,9 @@ export default async function ReviewCyclePage({ params }: { params: Promise<{ id
   const cycle = await reviewCycle(ctx, id);
   if (!cycle) notFound();
 
-  const [outcomes, adviceCodes, commentClasses, statuses] = await Promise.all([
+  const [outcomes, adviceCodes, statuses] = await Promise.all([
     getActiveSet(cycle.outcomeSetKey ?? "REVIEW_OUTCOMES"),
     getActiveSet("REVIEW_ADVICE"),
-    getActiveSet("COMMENT_CLASSES"),
     getActiveSet("STATUSES"),
   ]);
   // The steps before this one answered from the advice list, so both lists are
@@ -135,7 +134,6 @@ export default async function ReviewCyclePage({ params }: { params: Promise<{ id
   })));
 
   const reserves = cycle.comments.filter((comment) => comment.progressionPreventing && comment.status === "OPEN");
-  const myComments = cycle.comments.filter((comment) => comment.authorId === user.id);
   const canRecordOutcome = (assigned || controller) && !cycle.outcome && !cycle.withdrawn && Boolean(cycle.issuedToReviewAt);
   // Writing comments: whoever sits on the open step, until they answer it.
   const mayComment = cycle.status === "OPEN" && assigned && !cycle.outcome && !cycle.withdrawn && Boolean(cycle.issuedToReviewAt);

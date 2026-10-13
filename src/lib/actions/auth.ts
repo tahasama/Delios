@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { createSession, destroySession } from "@/lib/auth";
 import { apiFetch, problemOf } from "@/lib/api/client";
 
-export type LoginState = {
+type LoginState = {
   error?: string;
   /** Present when the credentials match an account in more than one organization. */
   chooseOrg?: { slug: string; name: string }[];

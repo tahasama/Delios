@@ -90,18 +90,6 @@ export function PreflightPanel({
   );
 }
 
-/** One line, for placing beside a button without a full panel. */
-export function PreflightBadge({ result }: { result: Preflight }) {
-  const Icon = result.blocked.length ? CircleX : result.warnings.length ? CircleAlert : Check;
-  const tone = result.blocked.length ? "text-red-700" : result.warnings.length ? "text-amber-800" : "text-emerald-700";
-  return (
-    <span className={cn("inline-flex items-start gap-1.5 text-[11px] leading-snug", tone)}>
-      <Icon className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
-      {result.summary}
-    </span>
-  );
-}
-
 /**
  * A control that states why it cannot be used, rather than being mysteriously
  * greyed out. When blocked it renders as text, not a dead button.

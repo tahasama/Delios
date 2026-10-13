@@ -14,7 +14,7 @@ import { CARD_KEY, PLAN_CARD_HEIGHT } from "@/lib/plan-card";
  * A browser that has never opened the plan has no number, and those registers
  * fall back to filling the window as they always did.
  */
-export { CARD_KEY, PLAN_FIRST, PLAN_ROW, CARD_CHROME, PLAN_CARD_HEIGHT } from "@/lib/plan-card";
+;
 
 export function useCardHeight(): number {
   const [height, setHeight] = useState<number>(PLAN_CARD_HEIGHT);

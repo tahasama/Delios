@@ -2,7 +2,7 @@ import { cache } from "react";
 import { orgSettings } from "./api/settings";
 
 /** The organization setting that holds a state's name: STATE_NAME:RELEASED. */
-export const STATE_NAME_KEY = "STATE_NAME:";
+const STATE_NAME_KEY = "STATE_NAME:";
 import { REV_STATE_LABEL, type RevState } from "./standard";
 
 /**
@@ -29,10 +29,10 @@ export const STATE_NAMES = [
   { code: "VOID", default: REV_STATE_LABEL.VOID, means: "Treated as never valid." },
 ] as const;
 
-export type StateNameCode = (typeof STATE_NAMES)[number]["code"];
-export type StateNames = Record<StateNameCode, string>;
+type StateNameCode = (typeof STATE_NAMES)[number]["code"];
+type StateNames = Record<StateNameCode, string>;
 
-export const DEFAULT_STATE_NAMES = Object.fromEntries(STATE_NAMES.map((one) => [one.code, one.default])) as StateNames;
+const DEFAULT_STATE_NAMES = Object.fromEntries(STATE_NAMES.map((one) => [one.code, one.default])) as StateNames;
 
 export const STATE_NAME_MAX = 40;
 
@@ -72,7 +72,7 @@ export function stateName(
 export const SUPPLIER_STAGES = ["SENT", "RECEIVED", "ACCEPTED", "RETURNED_CHECK", "IN_REVIEW", "RELEASED", "RETURNED_REVIEW"] as const;
 export type SupplierStage = (typeof SUPPLIER_STAGES)[number];
 
-export const SUPPLIER_STAGE_LABEL: Record<SupplierStage, string> = {
+const SUPPLIER_STAGE_LABEL: Record<SupplierStage, string> = {
   SENT: "Sent",
   RECEIVED: "Received",
   ACCEPTED: "Accepted",
@@ -114,7 +114,7 @@ export function supplierStageName(names: StateNames, stage: SupplierStage, relea
  * transmit; they transmitted it, we received it; and so on. Null for a document not asked of a supplier (a
  * placeholder of ours reads "number reserved").
  */
-export const SUPPLIER_STAMP: Record<SupplierStage, { ours: string; theirs: string }> = {
+const SUPPLIER_STAMP: Record<SupplierStage, { ours: string; theirs: string }> = {
   SENT: { ours: "sent to supplier", theirs: "to be transmitted" },
   RECEIVED: { ours: "received", theirs: "transmitted" },
   ACCEPTED: { ours: "accepted", theirs: "accepted" },

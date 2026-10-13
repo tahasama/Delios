@@ -1,6 +1,6 @@
 import type { Tenant } from "./tenant";
 import { parseCsv } from "./csv";
-import { buildSheet, codeFor, EMPTY_CELL, MATRIX_CODES } from "./matrix-sheet";
+import { buildSheet, codeFor, EMPTY_CELL } from "./matrix-sheet";
 import { verbsFor, type Actor, type Verb } from "./permissions";
 import { getActiveSet } from "./config";
 import { api, refusal } from "./api/client";
@@ -19,7 +19,7 @@ import { getMe } from "./api/me";
  * Nothing is written until the change list has been looked at: the importer runs
  * dry by default, exactly like the other bulk imports.
  */
-export const CELL_VERBS: Record<string, Verb[]> = {
+const CELL_VERBS: Record<string, Verb[]> = {
   A: ["READ", "REVIEW", "APPROVE", "RECEIVE"],
   R: ["READ", "REVIEW", "RECEIVE"],
   C: ["READ", "CONTROL", "TRANSMIT", "RECEIVE"],
@@ -29,9 +29,9 @@ export const CELL_VERBS: Record<string, Verb[]> = {
 };
 
 /** Every letter a cell may carry, including the empty one. */
-export const CELL_LETTERS = [...Object.keys(CELL_VERBS), EMPTY_CELL];
+const CELL_LETTERS = [...Object.keys(CELL_VERBS), EMPTY_CELL];
 
-export type CellChange = {
+type CellChange = {
   /** The line in the file, for the report. */
   line: number;
   functionCode: string;
@@ -47,7 +47,7 @@ export type CellChange = {
   to: string;
 };
 
-export type ReadResult = {
+type ReadResult = {
   /** Cells whose letter differs from what the matrix says today. */
   changes: CellChange[];
   /** Lines that could not be read, with the reason. */
@@ -160,7 +160,7 @@ async function familyTypes(): Promise<Map<string, string[]>> {
   return out;
 }
 
-export type ApplyReport = { line: number; ok: boolean; message: string; wrote: boolean };
+type ApplyReport = { line: number; ok: boolean; message: string; wrote: boolean };
 
 /**
  * Write the changes.
@@ -277,9 +277,4 @@ async function actorsOf(t: Tenant, functions: AdminFunction[]): Promise<Map<stri
     functionId: f.id, functionCode: f.code, functionName: f.name, clearance: 0, legacyRole: "VIEWER", levels, projectRole,
     rules: asMatrixRules(f.rules).map((r) => ({ ...r, verbs: r.verbs as Verb[] })),
   } as Actor] as const));
-}
-
-/** The letter-to-verbs convention, for the legend and the import screen. */
-export function cellLegend(): string {
-  return MATRIX_CODES.map((code) => `${code.letter} ${code.label.toLowerCase()}`).join(" · ");
 }

@@ -1,7 +1,7 @@
 import { cache } from "react";
 import { api, apiShortLived } from "./api/client";
 
-export type ValueRow = { code: string; label: string; status: string; props: Record<string, unknown> };
+type ValueRow = { code: string; label: string; status: string; props: Record<string, unknown> };
 
 // Value sets are published at organization level (Annex C — the configuration
 // gateway) and are the same for every project the organization runs. They are
@@ -42,16 +42,9 @@ export const getValue = cache(async (setKey: string, code: string | null | undef
   if (!code) return null;
   return (await readSet(setKey)).find((row) => row.code === code) ?? null;
 });
-
-/** Friendly label with code, e.g. "CI — Civil". Falls back to the raw code. */
-export function fmtValue(row: ValueRow | null | undefined, code?: string | null): string {
-  if (row) return `${row.code} — ${row.label}`;
-  return code ?? "—";
-}
-
 /** Where a set's title, description and group are kept: the organization's settings, one key per set. */
 export const SET_KEY = "SET:";
-export type SetInfo = { key: string; title: string; description: string | null; group: string | null; version: number };
+type SetInfo = { key: string; title: string; description: string | null; group: string | null; version: number };
 
 /**
  * The published sets: every list that holds values, and every list an
@@ -72,7 +65,3 @@ export const getSets = cache(async (): Promise<SetInfo[]> => {
     return { key, title: info.title ?? humane.charAt(0).toUpperCase() + humane.slice(1), description: info.description ?? null, group: info.group ?? null, version: info.version ?? 1 };
   });
 });
-
-export async function isSetConfigured(setKey: string): Promise<boolean> {
-  return (await readSet(setKey)).length > 0;
-}

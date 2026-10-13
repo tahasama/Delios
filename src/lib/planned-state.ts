@@ -5,9 +5,9 @@ import { DEFAULT_RISK_DAYS } from "./action-state";
  * supplier's package): ready (released), submitted (with whoever checks or reviews it), or, while nothing is in yet,
  * overdue, at risk (inside the risk window), today, or in so many days.
  */
-export type PlannedState = { word: string; tone: string };
+type PlannedState = { word: string; tone: string };
 
-export const PLANNED_TONE = {
+const PLANNED_TONE = {
   ready: "text-emerald-700",
   submitted: "text-sky-700",
   late: "text-red-700",

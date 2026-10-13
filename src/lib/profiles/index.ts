@@ -1,7 +1,5 @@
 import type { Tenant } from "../tenant";
-import { handlerFor, summariseDiff } from "../controlled/registry";
 import "../controlled/handlers";
-import reference from "./reference.json";
 import industrial from "./industrial.json";
 import energy from "./energy.json";
 import construction from "./construction.json";
@@ -16,11 +14,9 @@ import construction from "./construction.json";
  * To change a starting list, edit the JSON. To add a project type, add a file
  * and list it below.
  */
-export type ProfileValue = { code: string; label: string; sort?: number; props?: Record<string, unknown> };
+type ProfileValue = { code: string; label: string; sort?: number; props?: Record<string, unknown> };
 export type ProfileSet = { key: string; title?: string; description?: string; values: ProfileValue[] };
 export type Profile = { id: string; projectKind?: string; name: string; description: string; sets: ProfileSet[] };
-
-export const REFERENCE = reference as Profile;
 export const PROFILES = [industrial, energy, construction] as Profile[];
 
 export { PROJECT_KINDS } from "./kinds";

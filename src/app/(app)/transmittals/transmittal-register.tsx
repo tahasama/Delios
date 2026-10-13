@@ -30,7 +30,7 @@ type Row = {
 type Opt = { code: string; label: string };
 type Filters = { q: string; terms: string[]; way: string; status: string; reason: string; party: string; on: string; from: string; to: string };
 
-export type Paging = {
+type Paging = {
   page: number; pages: number; perPage: number; sizes: number[];
   from: number; to: number;
   /** The filters as a query string, without page or per. */

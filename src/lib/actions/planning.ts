@@ -186,18 +186,6 @@ export async function sharePackageAction(_prev: { error?: string } | undefined, 
 }
 
 /**
- * Document Control asks the supplier, on one transmittal, for the ticked placeholders not asked yet: from then on the
- * supplier holds them and sees them in the shared package.
- */
-export async function requestSupplyAction(_prev: { error?: string; ok?: string } | undefined, formData: FormData): Promise<{ error?: string; ok?: string }> {
-  const documentIds = formData.getAll("documentId").map(String).filter(Boolean);
-  if (!documentIds.length) return { error: "Tick the placeholders to send." };
-  const message = String(formData.get("message") ?? "").trim() || null;
-  const { error } = await onPackage(String(formData.get("packageId") ?? ""), "/request", { documentIds, message });
-  return error ? { error } : { ok: `${documentIds.length} placeholder${documentIds.length === 1 ? "" : "s"} sent on one transmittal.` };
-}
-
-/**
  * Delete a package that holds nothing and never went anywhere. Its documents
  * stay in the register; only the package goes. The number is not given out again.
  */

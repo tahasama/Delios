@@ -24,7 +24,7 @@ export type PackageLine = {
   comments: { by: string; text: string; blocking: boolean; settled: boolean; rev: string }[];
 };
 
-export type Candidate = { id: string; number: string; title: string; where: string };
+type Candidate = { id: string; number: string; title: string; where: string };
 
 /**
  * The documents of a supplier's package, ours to work on: tick lines, and the bar under the list sends them to the

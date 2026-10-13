@@ -2,7 +2,7 @@ import "server-only";
 import { cache } from "react";
 import { cookies } from "next/headers";
 import { redirect, notFound } from "next/navigation";
-import { getCurrentUser, atLeast, type SessionUser } from "./auth";
+import { getCurrentUser, type SessionUser } from "./auth";
 import type { Role } from "./standard";
 import { can, verbsFor, explain, type Actor, type Verb, type DocumentClass } from "./permissions";
 import { api, forgetShortLived } from "./api/client";
@@ -16,7 +16,7 @@ import { getMe } from "./api/me";
 
 // ── Resolving the active project ─────────────────────────────────────────────
 
-export const PROJECT_COOKIE = "edms_project";
+const PROJECT_COOKIE = "edms_project";
 
 export type ProjectSummary = {
   id: string;
@@ -159,12 +159,6 @@ export async function requireScope(): Promise<Scope> {
 export async function requireInternalScope(): Promise<Scope> {
   const scope = await requireScope();
   if (!scope.user.isInternal) notFound();
-  return scope;
-}
-
-export async function requireScopeRole(roles: Role[]): Promise<Scope> {
-  const scope = await requireScope();
-  if (!roles.some((r) => atLeast(scope.user, r))) redirect("/?denied=1");
   return scope;
 }
 

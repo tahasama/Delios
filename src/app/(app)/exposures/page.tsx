@@ -2,7 +2,7 @@ import Link from "next/link";
 import { unresolvedVoids } from "@/lib/api/readers";
 import { requireScope } from "@/lib/scope";
 import { isController, isAdmin } from "@/lib/auth";
-import { PageHeader, Card, Chip, Banner, inputCls, btn } from "@/components/ui";
+import { PageHeader, Card, Chip, Banner, btn } from "@/components/ui";
 import { ActionForm } from "@/components/form";
 import { EXPOSURES } from "@/lib/standard";
 import { recordVoidReassessmentAction } from "@/lib/actions/revisions";

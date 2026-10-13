@@ -1,8 +1,7 @@
 import Link from "next/link";
-import { isAdmin } from "@/lib/auth";
 import { SETUP_PAGES, maySetup } from "../setup-pages";
 import { requireScope } from "@/lib/scope";
-import { PageHeader, DataTable, Th, Td, Chip, Card, Field, inputCls, btn } from "@/components/ui";
+import { PageHeader, DataTable, Th, Td, Card, Field, inputCls, btn } from "@/components/ui";
 import { ActionForm } from "@/components/form";
 import { Asked, Added } from "@/components/policy-fields";
 import { formPolicy } from "@/lib/field-policy";

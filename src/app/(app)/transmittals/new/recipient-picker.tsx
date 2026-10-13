@@ -79,7 +79,7 @@ export function RecipientPicker({ companies, preselected = [], preselectedCopies
 }
 
 /** One list: its search, what the search finds, and who is on it. */
-export function Block({ label, hint, required, copy, everyone, companies, chosen, onAdd, onRemove }: {
+function Block({ label, hint, required, copy, everyone, companies, chosen, onAdd, onRemove }: {
   label: string;
   hint: string;
   required?: boolean;

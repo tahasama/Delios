@@ -23,13 +23,13 @@ export type LegacyFile = {
   status: string; submission: number;
 };
 
-export type LegacyComment = {
+type LegacyComment = {
   id: string; cycleId: string; authorId: string; authorName: string; text: string; classification: string; progressionPreventing: boolean;
   closesWith: string; closesWithStep: number | null; status: string; resolution: string | null; closedAt: Date | null;
   reclassifiedAt: Date | null; reclassifiedByName: string | null; originalProgressionPreventing: boolean | null; createdAt: Date;
 };
 
-export type LegacyAssignment = { id: string; cycleId: string; userId: string; userName: string; order: number; completedAt: Date | null };
+type LegacyAssignment = { id: string; cycleId: string; userId: string; userName: string; order: number; completedAt: Date | null };
 
 export type LegacyCycle = {
   id: string; number: string | null; revisionId: string; mode: string; sequence: number; status: string; openedById: string; openedByName: string;
@@ -82,13 +82,13 @@ export type LegacyDocument = {
   packageMembers: { id: string; requiredStatus: string; package: { id: string; identifier: string; title: string; recipientName: string; state: string; category: string } }[];
 };
 
-export type ContextTransmittal = {
+type ContextTransmittal = {
   id: string; number: string; reason: string; toName: string; issuedAt: string; revision: string; forReview: boolean; direction: string;
   revisionId: string | null; fromName: string | null; itemKind: string;
   recipients: { name: string; organization: string | null; person: boolean; openedAt: string | null; acknowledgedAt: string | null; dispatchedAt: string | null }[];
 };
 
-export type BackendContext = {
+type BackendContext = {
   reviews: { id: string; number: string; revisionId: string; revision: string; routeName: string; state: string; verdict: string | null; grantedStatus: string | null; startedAt: string; decidedAt: string | null }[];
   transmittals: ContextTransmittal[];
   packages: { id: string; number: string; title: string; state: string; kind: string; required: string[]; to: string }[];
@@ -121,7 +121,7 @@ export const backendReview = cache(async (scope: Scope, id: string): Promise<Rev
   api<ReviewView>(projectPath(scope, `/reviews/${id}`)));
 
 /** A review as the old review cycle read: one cycle per review, binding when it has a deciding step. */
-export function cycleOf(review: ReviewView, sequence: number): LegacyCycle {
+function cycleOf(review: ReviewView, sequence: number): LegacyCycle {
   const deciding = review.steps.find((s) => s.deciding) ?? review.steps[review.steps.length - 1];
   const decider = deciding?.participants.find((p) => p.answer && p.answer !== "NONE")?.name ?? deciding?.participants[0]?.name ?? null;
   const closed = review.state === "RELEASED" || review.state === "RETURNED" || review.state === "WITHDRAWN";
@@ -147,7 +147,7 @@ export function cycleOf(review: ReviewView, sequence: number): LegacyCycle {
 }
 
 /** A revision as the old database held it. */
-export function revisionOf(documentId: string, r: RevisionView, reviews: ReviewView[], transmittals: ContextTransmittal[]): LegacyRevision {
+function revisionOf(documentId: string, r: RevisionView, reviews: ReviewView[], transmittals: ContextTransmittal[]): LegacyRevision {
   const mine = reviews.filter((one) => one.revisionId === r.id).sort((a, b) => a.startedAt.localeCompare(b.startedAt));
   // A type that is not reviewed goes on to release through a review with no steps: no cycle, and its rule stands in for an approval.
   const cycles = mine.filter((one) => one.steps.length).map((one, i) => cycleOf(one, i + 1));

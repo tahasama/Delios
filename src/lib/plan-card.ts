@@ -15,11 +15,11 @@
  * to fill a tall screen.
  */
 export const PLAN_FIRST = 25;
-export const PLAN_ROW = 30;
+const PLAN_ROW = 30;
 
 /** What the plan spends on everything that is not a bar: the band carrying the
  *  dates, the padding under the last bar, and the footer. */
-export const CARD_CHROME = 6 + 20 + 16 + 45;
+const CARD_CHROME = 6 + 20 + 16 + 45;
 
 /**
  * The height a plan of twelve bars comes to. Two things use it: the plan, as

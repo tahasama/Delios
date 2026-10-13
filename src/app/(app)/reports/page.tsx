@@ -1,8 +1,7 @@
 import Link from "next/link";
 import { requireScope } from "@/lib/scope";
-import { PageHeader, Card, DataTable, Th, Td, Chip, EmptyState, inputCls, btn } from "@/components/ui";
+import { PageHeader, Card, DataTable, Th, Td, EmptyState, inputCls, btn } from "@/components/ui";
 import { fmtDate } from "@/lib/utils";
-import { getSet } from "@/lib/config";
 import { buildReport, filterRows, REPORT_IDS, type ReportId, type Cell, type Segment, type Bar } from "@/lib/reports";
 
 export const dynamic = "force-dynamic";

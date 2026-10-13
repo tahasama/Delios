@@ -1,7 +1,5 @@
 import type { Tenant } from "./tenant";
-import { meetsRequirement } from "./readiness";
-
-export type RiskAction = {
+type RiskAction = {
   id: string;
   code: string;
   name: string;
@@ -10,22 +8,6 @@ export type RiskAction = {
   riskNotifiedAt: Date | null;
   entries: { department: string | null; requiredStatus: string; document: { discipline: string; docNumber: string; revisions: { statusCode: string | null; meets?: boolean }[] } }[];
 };
-
-/** Which departments are short, and by how much. */
-export function shortfall(action: RiskAction) {
-  const short = new Map<string, { missing: number; total: number; numbers: string[] }>();
-  for (const e of action.entries) {
-    const dept = e.department ?? e.document.discipline;
-    const row = short.get(dept) ?? { missing: 0, total: 0, numbers: [] };
-    row.total++;
-    if (!meetsRequirement(e.document.revisions, e.requiredStatus)) {
-      row.missing++;
-      row.numbers.push(`${e.document.docNumber} at ${e.requiredStatus}`);
-    }
-    short.set(dept, row);
-  }
-  return [...short.entries()].filter(([, r]) => r.missing).map(([department, r]) => ({ department, ...r }));
-}
 
 /**
  * The first warning goes out by itself. When an activity first shows as at

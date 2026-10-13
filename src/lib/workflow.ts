@@ -1,6 +1,4 @@
 import type { Tenant } from "./tenant";
-import { holdersOf } from "./permissions";
-
 // Configuration-first workflow engine. A WorkflowTemplate is a list of steps:
 //   { act: REVIEW | APPROVAL, mode: ANY_OF | ALL_CONSOLIDATOR | SERIAL, participantIds: [], outcomeSetKey? }
 // The engine runs the steps in order against a revision:
@@ -20,14 +18,7 @@ import { holdersOf } from "./permissions";
 // verdict, and only people who may approve the document take it. A binding
 // verdict that permits release is recorded as the release approval; one that
 // does not returns the route to the author. There is no separate approval act.
-
-/**
- * Two lists, one per kind of step. An advisory step says what its comments
- * amount to; only the deciding step gives a verdict. Keeping them apart is why
- * an adviser cannot reach a final code, and a decider cannot file advice.
- */
-export const VERDICT_SET = "REVIEW_OUTCOMES";
-export const ADVICE_SET = "REVIEW_ADVICE";
+const ADVICE_SET = "REVIEW_ADVICE";
 
 /**
  * What an adviser's comments amount to. An adviser is not asked: the answer is
@@ -35,7 +26,7 @@ export const ADVICE_SET = "REVIEW_ADVICE";
  * disagree. A blocking comment is the whole of "I object"; no comment is the
  * whole of "nothing to say".
  */
-export function adviceFor(comments: { progressionPreventing: boolean }[]): "none" | "some" | "blocking" {
+function adviceFor(comments: { progressionPreventing: boolean }[]): "none" | "some" | "blocking" {
   if (comments.some((c) => c.progressionPreventing)) return "blocking";
   return comments.length ? "some" : "none";
 }
@@ -57,13 +48,6 @@ async function adviceCode(kind: "none" | "some" | "blocking"): Promise<string> {
   const values = await getActiveSet(ADVICE_SET);
   const meant = values.find((one) => (one.props as { comments?: string }).comments === kind);
   return meant?.code ?? STANDARD_ADVICE[kind];
-}
-
-/** Which list a step answers from: the last step decides, the rest advise. */
-export function setKeyForStep(stepIndex: number, stepCount: number, stepSetKey?: string | null, templateSetKey?: string | null): string {
-  const decides = stepIndex === stepCount - 1;
-  if (decides) return templateSetKey ?? stepSetKey ?? VERDICT_SET;
-  return stepSetKey ?? ADVICE_SET;
 }
 
 export type WfStep = {
@@ -89,24 +73,11 @@ export type WfStep = {
    */
   grantsStatuses?: string[];
 };
-
-/** Working days only: a review that opens on Friday is not late on Monday. */
-export function addWorkingDays(from: Date, days: number): Date {
-  const out = new Date(from);
-  let left = Math.max(0, Math.round(days));
-  while (left > 0) {
-    out.setDate(out.getDate() + 1);
-    const day = out.getDay();
-    if (day !== 0 && day !== 6) left--;
-  }
-  return out;
-}
-
 /**
  * Where a step stands against its date. "At risk" is its last day: time to
  * warn whoever holds it, while they can still answer on time.
  */
-export type DueState = "none" | "on time" | "at risk" | "overdue";
+type DueState = "none" | "on time" | "at risk" | "overdue";
 export function dueState(dueAt: Date | null | undefined, closed: boolean, now = new Date()): DueState {
   if (!dueAt) return "none";
   if (closed) return "on time";
@@ -132,26 +103,6 @@ export type RunData = {
   currentStep: number;
   status: string;
 };
-
-/** Whose verdict binds on the deciding step: the last person of a serial or consolidated step, or everyone. */
-export function bindsOnStep(step: { mode?: string; participantIds: string[] }, userId: string): boolean {
-  if (step.mode === "SERIAL" || step.mode === "ALL_CONSOLIDATOR") return step.participantIds[step.participantIds.length - 1] === userId;
-  return true;
-}
-
-/** Every route ends in its decision: the last step binds (Approve), the rest advise (Review). */
-export function normalizeRoute<S extends { act: "REVIEW" | "APPROVAL" }>(steps: S[]): S[] {
-  return steps.map((s, i) => ({ ...s, act: i === steps.length - 1 ? "APPROVAL" : "REVIEW" }));
-}
-
-export function parseSteps(json: string): WfRuntimeStep[] {
-  try {
-    const steps = JSON.parse(json) as WfRuntimeStep[];
-    return steps.map((s) => ({ ...s, status: s.status ?? "pending", decidedBy: s.decidedBy ?? [] }));
-  } catch {
-    return [];
-  }
-}
 
 export async function getRunForRevision(t: Tenant, revisionId: string): Promise<RunData | null> {
   // A run is the newest review of the revision; its steps as the route recorded them.
@@ -195,19 +146,4 @@ export async function eligiblePeople(t: Tenant, docs: DocClass[], act: "REVIEW" 
     .filter((one) => lists.every((list) => list.some((other) => other.id === one.id)))
     .map((one) => ({ id: one.id, name: one.name, functionId: one.functionCode, functionName: one.functionName, department: one.department }));
   return [...new Map(out.map((one) => [one.id, one])).values()].sort((a, b) => a.name.localeCompare(b.name));
-}
-
-export type Proposal = { id: string; why: string };
-
-/**
- * Who a step proposes, and why: the holders of the step's functions, or else
- * those whose department is the documents' discipline.
- */
-export async function proposeForStep(t: Tenant, docs: DocClass[], step: { act: "REVIEW" | "APPROVAL"; mode?: string; participantIds: string[]; functionIds?: string[] }): Promise<Proposal[]> {
-  const eligible = await eligiblePeople(t, docs, step.act);
-  const named = eligible.filter((p) => step.participantIds.includes(p.id) || (step.functionIds ?? []).includes(p.functionId))
-    .map((p) => ({ id: p.id, why: step.participantIds.includes(p.id) ? "named in the route" : `${p.functionName} (route)` }));
-  if (named.length || step.participantIds.length || (step.functionIds ?? []).length) return named;
-  const disciplines = new Set(docs.map((d) => d.discipline).filter(Boolean));
-  return eligible.filter((p) => p.department && disciplines.has(p.department)).map((p) => ({ id: p.id, why: `${p.department} department` }));
 }

@@ -148,11 +148,6 @@ export async function recordStepOutcomeAction(_prev: Result | undefined, formDat
   return answer(text(formData, "runId"), formData, text(formData, "comment") || null);
 }
 
-export async function recordStepApprovalAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
-  if (!text(formData, "outcome")) return { error: "Choose an outcome." };
-  return answer(text(formData, "runId"), formData, text(formData, "note") || null);
-}
-
 // ── Parties (§0.3) ───────────────────────────────────────────────────────────
 
 /** A party is never deleted: revoking it ends its people's access and keeps every record meaning what it meant. */
@@ -204,19 +199,6 @@ export async function savePartyAction(_prev: { error?: string } | undefined, for
     return failed(e);
   }
   revalidatePath("/settings/parties");
-  revalidatePath("/settings/users");
-  return {};
-}
-
-export async function setUserPartyAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
-  await requireScope();
-  const userId = text(formData, "userId");
-  const partyId = text(formData, "partyId") || null;
-  try {
-    await api(`/api/admin/users/${userId}`, { method: "PUT", body: partyId ? { partyId } : { clearParty: true } });
-  } catch (e) {
-    return failed(e);
-  }
   revalidatePath("/settings/users");
   return {};
 }

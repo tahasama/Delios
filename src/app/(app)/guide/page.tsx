@@ -53,7 +53,7 @@ const SETUP: CapabilityItem[] = [
 
 export default async function GuidePage() {
   const ctx = await requireScope();
-  const { user, orgId, project } = ctx;
+  const { user, project } = ctx;
   const canControl = isController(user);
   const canConfigure = isAdmin(user);
   const [documents, reviews, actions, transmittals] = await Promise.all([

@@ -21,11 +21,10 @@ export default async function NewDocumentPage({ searchParams }: { searchParams: 
   if (!mayCreateDocument(user)) {
     return <div><PageHeader title="Create a document" /><Banner tone="warn" title={user.isInternal ? "Read-only access" : "External party access"}>{user.isInternal ? "Your current access is read-only. Document Control can grant a contribution role when needed." : "External parties do not create register entries. Document Control creates and assigns a placeholder to your organization; you can then contribute files and revisions to that controlled entry."}</Banner></div>;
   }
-  const [deliverableTypes, docTypes, disciplines, projects, subprojects, suppliers, pos, criticalities, confidentialities, retentionClasses] = await Promise.all([
+  const [deliverableTypes, docTypes, disciplines, subprojects, suppliers, pos, criticalities, confidentialities, retentionClasses] = await Promise.all([
     getActiveSet("DELIVERABLE_TYPES"),
     getActiveSet("DOCUMENT_TYPES"),
     getActiveSet("DISCIPLINES"),
-    getActiveSet("PROJECT_CODES"),
     getActiveSet("SUBPROJECTS"),
     getActiveSet("SUPPLIER_CODES"),
     getActiveSet("PURCHASE_ORDERS"),

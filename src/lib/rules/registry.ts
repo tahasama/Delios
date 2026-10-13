@@ -1,5 +1,3 @@
-import type { Tenant } from "../tenant";
-import type { SessionUser } from "../auth";
 import type { Verb } from "../permissions";
 
 /**
@@ -56,7 +54,7 @@ export const INTENT_VERB: Record<Intent, Verb> = {
   WITHDRAW: "CONTROL",
 };
 
-export type Verdict = "OK" | "WARN" | "BLOCK";
+type Verdict = "OK" | "WARN" | "BLOCK";
 
 export type GateOutcome = {
   verdict: Verdict;
@@ -76,38 +74,6 @@ export type Subject = {
   statusCode?: string;
   outcomeCode?: string;
 };
-
-export type GateContext = Tenant & {
-  user: SessionUser;
-  can: (verb: Verb, target?: { discipline?: string | null; docType?: string | null; deliverableType?: string | null; criticality?: string | null; confidentiality?: string | null } | null) => boolean;
-  why: (verb: Verb, target?: { discipline?: string | null; docType?: string | null; deliverableType?: string | null; criticality?: string | null; confidentiality?: string | null } | null) => string;
-};
-
-export type Gate = {
-  id: string;
-  intent: Intent;
-  /** Short label for the checklist line. */
-  title: string;
-  clause: string;
-  /** The Annex H check this prevents, where one exists — keeps the two traceable. */
-  preventsCheck?: string;
-  evaluate(ctx: GateContext, subject: Subject): Promise<GateOutcome>;
-};
-
-const GATES: Gate[] = [];
-
-export function registerGate(gate: Gate) {
-  GATES.push(gate);
-}
-
-export function gatesFor(intent: Intent): Gate[] {
-  return GATES.filter((g) => g.intent === intent);
-}
-
-export function allGates(): Gate[] {
-  return [...GATES];
-}
-
 // ── The verdict ──────────────────────────────────────────────────────────────
 
 export type GateLine = GateOutcome & { id: string; title: string; clause: string };
@@ -140,7 +106,3 @@ export function summarise(intent: Intent, lines: GateLine[]): Preflight {
 }
 
 // ── Small helpers gates share ────────────────────────────────────────────────
-
-export const ok = (message: string): GateOutcome => ({ verdict: "OK", message });
-export const warn = (message: string, remedy?: string): GateOutcome => ({ verdict: "WARN", message, remedy });
-export const block = (message: string, remedy?: string): GateOutcome => ({ verdict: "BLOCK", message, remedy });

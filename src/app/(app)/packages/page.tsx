@@ -8,7 +8,6 @@ import { createPackageAction } from "@/lib/actions/planning";
 import { createSupplierPackageAction } from "@/lib/actions/supplier";
 import { supplierRows, packageCounts, packageStage } from "@/lib/supplier";
 import { isController, isAdmin } from "@/lib/auth";
-import { departmentsOf } from "@/lib/schedule";
 import { getActiveSet } from "@/lib/config";
 import { fmtDate } from "@/lib/utils";
 import { Download } from "lucide-react";

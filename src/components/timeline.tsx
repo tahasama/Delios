@@ -1,6 +1,6 @@
 import { fmtDate, fmtDateTime } from "@/lib/utils";
 
-export type TimelinePoint = {
+type TimelinePoint = {
   /** What happened, in the fewest words that stay true. */
   label: string;
   /** When it happened; null means it has not happened yet. */

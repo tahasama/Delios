@@ -13,7 +13,7 @@ import { CONTRACT_ROLES } from "./profiles/roles";
  * Where the set has not been published yet, the built-in list stands in, so a
  * project can always be opened.
  */
-export type RoleOption = { code: string; label: string; approval: string; description: string };
+type RoleOption = { code: string; label: string; approval: string; description: string };
 
 export async function contractRoleOptions(_db?: unknown, _orgId?: string): Promise<RoleOption[]> {
   const published = await getActiveSet("CONTRACT_ROLES").catch(() => []);

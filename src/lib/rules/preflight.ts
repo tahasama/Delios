@@ -65,17 +65,4 @@ async function classOf(scope: Scope, subject: Subject) {
     : null;
 }
 
-/**
- * The same question, asked by the act itself. Throws with the reason so the
- * refusal a person sees is word for word what the checklist showed them.
- */
-export async function enforce(intent: Intent, subject: Subject, scope?: Scope): Promise<Preflight> {
-  const result = await preflight(intent, subject, scope);
-  if (!result.ok) {
-    const first = result.blocked[0];
-    throw new Error(first.remedy ? `${first.message} ${first.remedy}` : first.message);
-  }
-  return result;
-}
-
-export type { Preflight, Intent, Subject };
+;

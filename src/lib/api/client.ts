@@ -9,7 +9,7 @@ import { cookies, headers } from "next/headers";
  */
 
 /** Where the backend answers. Set DELIOS_API_URL; the default suits a local Docker Compose stack. */
-export const API_URL = (process.env.DELIOS_API_URL ?? "http://localhost:8080").replace(/\/$/, "");
+const API_URL = (process.env.DELIOS_API_URL ?? "http://localhost:8080").replace(/\/$/, "");
 
 /** The browser's session cookie (the name the app always used); it holds the backend's session token. */
 export const SESSION_COOKIE = "edms_session";
@@ -30,7 +30,7 @@ export class ApiProblem extends Error {
 
 export type Query = Record<string, string | number | boolean | null | undefined | (string | number)[]>;
 
-export type ApiOptions = {
+type ApiOptions = {
   method?: "GET" | "POST" | "PUT" | "DELETE";
   body?: unknown;
   query?: Query;

@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { requireScope } from "@/lib/scope";
-import { hasVerb } from "@/lib/auth";
 import { PageHeader, Banner, Chip } from "@/components/ui";
 import { SETUP_PAGES, SETUP_GROUPS, maySetup, type SetupPage } from "./setup-pages";
 import { families } from "@/lib/families";
@@ -42,7 +41,7 @@ const TONE: Record<SetupPage["group"], string> = {
 
 export default async function AdminPage() {
   const ctx = await requireScope();
-  const { user, db } = ctx;
+  const { user } = ctx;
   // Administrators see every page; someone granted a single verb sees the page it opens.
   const open = SETUP_PAGES.filter((p) => maySetup(user, p));
   if (!open.length) {
@@ -55,14 +54,13 @@ export default async function AdminPage() {
   }
 
   // One live figure per card, so the hub says what is there, not just where to go.
-  const [projects, parties, sets, schemes, functions, people, rules, pending, routes, events, acts, fieldsSet] = await Promise.all([
+  const [projects, parties, sets, schemes, functions, people, pending, routes, events, acts, fieldsSet] = await Promise.all([
     orEmpty(adminProjects).then((all) => all.filter((p) => p.status === "ACTIVE").length),
     orEmpty(adminParties).then((all) => all.filter((p) => p.active).length),
     getSets().then((all) => all.length),
     adminNumbering().then((n) => n.schemes.filter((s) => s.active).length).catch(() => 0),
     orEmpty(adminFunctions).then((all) => all.filter((f) => f.active).length),
     orEmpty(adminUsers).then((all) => all.filter((u) => u.memberships.some((m) => m.projectId === ctx.projectId && m.active)).length),
-    orEmpty(adminFunctions).then((all) => all.reduce((n, f) => n + f.rules.length, 0)),
     // Controlled changes to configuration are not kept by the backend.
     Promise.resolve(0),
     orEmpty(adminRoutes).then((all) => all.filter((r) => r.active).length),

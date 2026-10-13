@@ -36,10 +36,10 @@ import { reviewOfRequest } from "./api/reviews";
  */
 
 /** The document facts the matrix reads. */
-export type Target = DocumentClass;
+type Target = DocumentClass;
 
 /** A hand-over on record for a review: who handed it to whom, until when, and where it stands. */
-export type DelegationRecord = {
+type DelegationRecord = {
   id: string; fromUserId: string; toUserId: string; verb: string; status: string; endDate: Date; reason: string | null;
   refusedReason: string | null; askedByName: string | null; grantedByName: string | null;
   fromUser: { name: string }; toUser: { name: string };
@@ -92,41 +92,4 @@ export async function delegationFlag(
   { toUserId }: { target: Target; verb: Verb; toUserId: string; toName: string },
 ): Promise<string | null> {
   return flags().get(toUserId) ?? null;
-}
-
-/**
- * Why this delegation may not exist, or null when it may. The backend applies
- * the rest of the rule when the hand-over is made.
- */
-export async function delegationRefusal(
-  _t: Tenant,
-  { fromUserId, toUserId }:
-    { target: Target; verb: Verb; fromUserId: string; fromName: string; toUserId: string; toName: string },
-): Promise<string | null> {
-  if (fromUserId === toUserId) return "A step cannot be handed to the person who already holds it.";
-  return null;
-}
-
-/**
- * The delegation, if any, that lets `userId` act in somebody else's place here.
- * The backend seats the person a step was handed to; this is not asked separately.
- */
-export async function delegationInForce(
-  _t: Tenant,
-  _asked: { userId: string; verb: Verb; target: Target; cycleId?: string | null },
-): Promise<{ id: string; fromUserId: string; fromUser: { id: string; name: string } } | null> {
-  return null;
-}
-
-/**
- * May this person answer a review cycle — as one of its reviewers, or holding a
- * delegation from one of them? The name it is answered in is returned with it,
- * because the record says whose step was answered and who answered it.
- */
-export async function mayAnswerCycle(
-  t: Tenant,
-  { cycleId }: { cycleId: string; userId: string; verb: Verb },
-): Promise<{ ok: boolean; onBehalfOf: string | null }> {
-  const me = await api<{ seated: boolean; onBehalfOf: string | null }>(projectPath(t, `/reviews/${cycleId}/me`)).catch(() => null);
-  return { ok: !!me?.seated, onBehalfOf: me?.onBehalfOf ?? null };
 }

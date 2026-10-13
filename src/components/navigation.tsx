@@ -55,7 +55,7 @@ type NavItem = {
   when?: boolean;
 };
 
-export type NavPermissions = {
+type NavPermissions = {
   canRead: boolean;
   canTransmit: boolean;
   canControl: boolean;
@@ -110,7 +110,7 @@ function isActive(pathname: string, item: NavItem) {
    railBelow it snaps to an icon rail, where labels show as tooltips. The width
    lives in a CSS variable on <html> and in a cookie, which the server reads to
    send every page at that width (app/layout.tsx), so the layout never jumps. */
-export const SIDEBAR = { default: 268, rail: 76, min: 76, max: 360, railBelow: 180 } as const;
+const SIDEBAR = { default: 268, rail: 76, min: 76, max: 360, railBelow: 180 } as const;
 
 function setSidebarWidth(w: number, persist: boolean) {
   const root = document.documentElement;

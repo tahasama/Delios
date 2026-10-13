@@ -18,7 +18,7 @@ import { holders } from "./api/settings";
  * standing role stands in. Everywhere inside a project the matrix decides and
  * this table is never consulted.
  */
-export const ROLE_FALLBACK_VERBS: Record<string, string[]> = {
+const ROLE_FALLBACK_VERBS: Record<string, string[]> = {
   ADMIN: ["READ", "CREATE", "REVISE", "REVIEW", "APPROVE", "TRANSMIT", "RECEIVE", "ACCEPT", "CONTROL", "CONFIGURE"],
   CONTROLLER: ["READ", "CREATE", "REVISE", "TRANSMIT", "RECEIVE", "ACCEPT", "CONTROL"],
   APPROVER: ["READ", "REVIEW", "APPROVE", "RECEIVE"],
@@ -91,9 +91,9 @@ export const VERB_BLURB: Record<Verb, string> = {
  * the matrix grants it — which is how an administrator authorizes Document
  * Control to read the matrix or maintain review routes.
  */
-export const ORGANIZATION_VERBS: Verb[] = ["PLAN", "ROUTES", "MATRIX"];
+const ORGANIZATION_VERBS: Verb[] = ["PLAN", "ROUTES", "MATRIX"];
 
-export function implies(held: readonly string[], verb: Verb): boolean {
+function implies(held: readonly string[], verb: Verb): boolean {
   return held.includes(verb) || (ORGANIZATION_VERBS.includes(verb) && held.includes("CONFIGURE"));
 }
 
@@ -102,7 +102,7 @@ export function implies(held: readonly string[], verb: Verb): boolean {
  * come from the CONFIDENTIALITY value set's `level` property; this ordering is
  * the fallback when a value has not declared one.
  */
-export const DEFAULT_CONFIDENTIALITY_LEVEL: Record<string, number> = {
+const DEFAULT_CONFIDENTIALITY_LEVEL: Record<string, number> = {
   PUBLIC: 1,
   INTERNAL: 2,
   RESTRICTED: 3,
@@ -125,16 +125,6 @@ export function openConfidentiality(
   const marked = values.filter((one) => one.props?.default === true).map((one) => levels.get(one.code) ?? 2);
   const ceiling = marked.length ? Math.max(...marked) : 2;
   return values.filter((one) => (levels.get(one.code) ?? 1) <= ceiling).map((one) => one.code);
-}
-
-export function confidentialityLevel(
-  code: string | null | undefined,
-  levels?: Map<string, number>,
-): number {
-  if (!code) return 1;
-  const declared = levels?.get(code);
-  if (typeof declared === "number") return declared;
-  return DEFAULT_CONFIDENTIALITY_LEVEL[code.toUpperCase()] ?? 1;
 }
 
 // ── The actor ────────────────────────────────────────────────────────────────
@@ -180,17 +170,6 @@ export type Actor = {
   /** Confidentiality code → level, as this organization published it. */
   levels: Map<string, number>;
 };
-
-function parseVerbs(json: string): Verb[] {
-  try {
-    const raw = JSON.parse(json);
-    if (!Array.isArray(raw)) return [];
-    return raw.filter((v): v is Verb => (VERBS as readonly string[]).includes(v));
-  } catch {
-    return [];
-  }
-}
-
 // ── The decision ─────────────────────────────────────────────────────────────
 
 /**

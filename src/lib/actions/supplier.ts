@@ -126,7 +126,7 @@ export async function attachSupplierFileAction(_prev: { error?: string; ok?: str
  * Send what was attached: one or several documents, one incoming transmittal
  * to Document Control. From a document page, or a selection in the register.
  */
-export async function sendSupplierDocumentsAction(_prev: { error?: string; ok?: string } | undefined, formData: FormData): Promise<{ error?: string; ok?: string }> {
+async function sendSupplierDocumentsAction(_prev: { error?: string; ok?: string } | undefined, formData: FormData): Promise<{ error?: string; ok?: string }> {
   const ctx = await requireScope();
   const { user } = ctx;
   const ids = [...new Set(formData.getAll("revisionId").map(String).filter(Boolean))];

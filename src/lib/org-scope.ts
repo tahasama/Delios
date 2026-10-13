@@ -3,26 +3,7 @@ import { cache } from "react";
 import { redirect } from "next/navigation";
 import { getCurrentUser, isAdmin, type SessionUser } from "./auth";
 import { getMe } from "./api/me";
-
-/**
- * An organization exists before its projects do. Someone who has just
- * registered one has no membership anywhere, so `requireScope()` — which is
- * built around an active project — has nothing to give them.
- *
- * This is the surface for that moment: organization-level only. Value sets,
- * functions, people and the project list all live at organization level, so
- * they are all reachable here. Nothing in a register is, because there is no
- * register yet.
- */
-
-/**
- * A project id that matches no row. The scoped client still narrows every
- * project-scoped read, so an organization-level session sees an empty register
- * rather than everybody's.
- */
-const NO_PROJECT = "__no_project__";
-
-export type OrgScope = {
+type OrgScope = {
   user: SessionUser;
   orgId: string;
   organization: { id: string; slug: string; name: string };
@@ -30,7 +11,7 @@ export type OrgScope = {
   projectCount: number;
 };
 
-export const getOrgScope = cache(async (): Promise<OrgScope | null> => {
+const getOrgScope = cache(async (): Promise<OrgScope | null> => {
   const user = await getCurrentUser();
   const me = await getMe();
   if (!user || !me) return null;
@@ -53,4 +34,4 @@ export async function requireOrgAdmin(): Promise<OrgScope> {
   return scope;
 }
 
-export { NO_PROJECT };
+;

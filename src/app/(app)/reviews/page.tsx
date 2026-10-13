@@ -164,13 +164,6 @@ export default async function ReviewsPage({ searchParams }: { searchParams: Prom
     facets.push({ key: said(DATE_FIELDS.map((f) => ({ code: f.key, label: f.label })), dateOn).toLowerCase(), label: window, without: drop("on") });
   }
 
-  /** The same question, another page of it. */
-  const step = (to: number) => {
-    const params = new URLSearchParams(drop("page" as keyof Search).split("?")[1] ?? "");
-    if (perPage !== 50) params.set("per", String(perPage));
-    if (to > 1) params.set("page", String(to));
-    return `/reviews${params.size ? `?${params}` : ""}`;
-  };
   const proceeds = new Map<string, boolean>([...Object.entries(OUTCOME_CONSEQUENCES).map(([k, v]) => [k, v.proceed] as [string, boolean]), ...verdicts.map((v) => [v.code, v.props.proceed === true] as [string, boolean])]);
 
   /** The same question, another page of it. */

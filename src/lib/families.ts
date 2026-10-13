@@ -1,4 +1,4 @@
-import { getActiveSet, getValue } from "./config";
+import { getActiveSet } from "./config";
 import type { Tenant } from "./tenant";
 
 /**
@@ -86,7 +86,7 @@ export function familyOf(
   return first ? published.find((f) => f.code === first) ?? null : null;
 }
 
-export type TypeFamily = {
+type TypeFamily = {
   code: string;
   label: string;
   family: Family | null;
@@ -103,27 +103,4 @@ export async function typesByFamily(t: Tenant): Promise<TypeFamily[]> {
     label: type.label,
     family: familyOf(type.code, type.props, published),
   }));
-}
-
-/**
- * What a review route must ask for, for one document type.
- *
- * Read when a route starts, never stored on the template: a template written
- * last year must not keep asking for a stamp a family rule stopped requiring
- * last week.
- */
-export async function stampRuleFor(t: Tenant, docType: string | null | undefined): Promise<{ rule: StampRule; family: Family | null }> {
-  if (!docType) return { rule: "NONE", family: null };
-  const published = await families(t);
-  const type = await getValue("DOCUMENT_TYPES", docType);
-  const family = familyOf(docType, type?.props ?? {}, published);
-  return { rule: family?.stamp ?? "NONE", family };
-}
-
-/** One line for the route screen, in the words the person needs. */
-export function stampNotice(rule: StampRule, family: Family | null): string | null {
-  if (!family || rule === "NONE") return null;
-  return rule === "BEFORE"
-    ? `${family.label}: a stamped copy must come back before this revision can be released.`
-    : `${family.label}: the verdict releases it, and a stamped copy is owed afterwards.`;
 }

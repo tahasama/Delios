@@ -6,10 +6,10 @@ import { requireScope } from "@/lib/scope";
 import { api, projectPath, refusal } from "@/lib/api/client";
 import { controlledVersions, type ControlledRow } from "@/lib/api/records";
 import { parseCsv } from "@/lib/csv";
-import { handlerFor, summariseDiff, canDecide, canSubmit, type DiffLine } from "@/lib/controlled/registry";
+import { handlerFor, summariseDiff, canDecide, canSubmit } from "@/lib/controlled/registry";
 import "@/lib/controlled/handlers";
 
-export type ControlledState = {
+type ControlledState = {
   error?: string;
   ok?: string;
   /** Row-level problems, so a rejected upload says exactly what to fix. */
@@ -149,14 +149,4 @@ export async function discardControlledVersionAction(_prev: ControlledState | un
   }
   revalidatePath("/settings/controlled", "layout");
   return { ok: `Draft ${version.versionLabel} discarded.` };
-}
-
-export async function readDiff(json: string | null): Promise<DiffLine[]> {
-  if (!json) return [];
-  try {
-    const raw = JSON.parse(json) as unknown;
-    return Array.isArray(raw) ? (raw as DiffLine[]) : [];
-  } catch {
-    return [];
-  }
 }

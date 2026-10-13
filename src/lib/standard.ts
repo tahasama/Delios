@@ -11,16 +11,6 @@ export const ROLE_LABEL: Record<Role, string> = {
   AUTHOR: "Author / Originator",
   VIEWER: "Viewer",
 };
-
-export const ROLE_BLURB: Record<Role, string> = {
-  ADMIN: "Full access — configuration, users, authority matrix, audit.",
-  CONTROLLER: "The designated control function: numbers, custody, releases, transmittals, obsolescence.",
-  APPROVER: "Releases approval decisions for revisions within their authority.",
-  REVIEWER: "Performs assigned reviews and records comment sheets.",
-  AUTHOR: "Creates documents and revisions, submits for review and approval.",
-  VIEWER: "Read-only access to released, current information.",
-};
-
 /**
  * A title that only repeats the document type says nothing: the type field
  * already holds it, and nobody can find the document by it. One list, used by
@@ -47,15 +37,7 @@ export const REV_STATE_LABEL: Record<RevState, string> = {
   SUPERSEDED: "Superseded",
   VOID: "Void",
 };
-/**
- * A revision carries a status the whole way through its route — what it is
- * issued for at each step. Whether anybody may act on that status is the state:
- * Not released means the route is finished and Document Control has not
- * published it, so the status is decided but not in force.
- */
-export function revStateLabel(state: string): string {
-  return REV_STATE_LABEL[state as RevState] ?? state;
-}
+
 export function revStateColor(state: string): string {
   return REV_STATE_COLOR[state as RevState] ?? "";
 }
@@ -122,20 +104,8 @@ export const REASON_LABEL: Record<ReasonForIssue, string> = {
   REQUEST: "Request",
 };
 // Reason → which revision maturity it requires (§2.6)
-export const REASON_MATURITY: Record<ReasonForIssue, string> = {
-  INFORMATION: "Whatever exists",
-  REVIEW: "Sufficient to be understood",
-  APPROVAL: "Complete and internally consistent",
-  PRICING: "Scope fully defined",
-  EXECUTION: "Approved and current",
-  RECORD: "Final; reflects what was done",
-  REQUEST: "Whatever exists",
-};
 // Which reasons open a review cycle per revision (§11.11)
-export const REASONS_WITH_REVIEW: ReasonForIssue[] = ["REVIEW", "APPROVAL"];
 // Which reasons require a response
-export const REASONS_WITH_RESPONSE: ReasonForIssue[] = ["REVIEW", "APPROVAL", "PRICING", "REQUEST"];
-
 // §12.6 — the five exposure conditions
 export const EXPOSURES = [
   { key: "UNPROPAGATED_SUPERSESSION", label: "Replaced, but recipients not told", detail: "A newer revision exists; people who got the old one were never informed.", who: "Document Control" },
@@ -161,7 +131,6 @@ export const ACCEPTANCE_CONDITIONS = [
  * said, something was said, or something was said that stops the release.
  */
 export const ADVICE_CODES = ["NO_COMMENT", "COMMENTS", "COMMENTS_BLOCKING"] as const;
-export type AdviceCode = (typeof ADVICE_CODES)[number];
 export const ADVICE_LABEL: Record<string, string> = {
   NO_COMMENT: "No comments",
   COMMENTS: "Comments, none blocking",
@@ -172,14 +141,6 @@ export const ADVICE_MEANING: Record<string, string> = {
   COMMENTS: "The step left comments; none of them stops the release.",
   COMMENTS_BLOCKING: "The step left a comment that stops the release until it is settled.",
 };
-
-/**
- * The conditions that only make sense when something is enclosed. A transmittal
- * carrying a message alone — a clarification, a notice, an answer — is checked
- * on the rest, and these are recorded as not applicable rather than failed.
- */
-export const ENCLOSURE_CONDITIONS = ["a", "b", "d"] as const;
-
 // D.7 — recommended review outcome set (proceed / resubmission consequences §9.3)
 export const OUTCOME_CONSEQUENCES: Record<string, { proceed: boolean; resubmit: boolean; label: string; blurb: string }> = {
   APPROVED: { proceed: true, resubmit: false, label: "Approved", blurb: "Fit for the use its status permits. Nothing outstanding." },
@@ -189,11 +150,6 @@ export const OUTCOME_CONSEQUENCES: Record<string, { proceed: boolean; resubmit: 
 };
 
 // §3.5 — fields that shall never be encoded in the document number
-export const EXCLUDED_FROM_NUMBER = ["revision", "status", "date", "person"];
-
 // §6.2 — letters excluded from alphabetic revision series
-export const EXCLUDED_REV_LETTERS = ["I", "O", "Q", "S", "X", "Z"];
-
-export const STANDARD_NAME = "Document Management Standard";
 export const STANDARD_VERSION = "1.0";
 export const APP_NAME = "DELIOS · EDMS";

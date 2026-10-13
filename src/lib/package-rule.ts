@@ -90,9 +90,3 @@ export function acceptorIds(pkg: { acceptanceAuthorityIds: string | null; accept
   const many = parseExcluded(pkg.acceptanceAuthorityIds);
   return many.length ? many : [pkg.acceptanceAuthorityId].filter(Boolean);
 }
-
-/** Everyone who puts the package together. */
-export function ownerIds(pkg: { compositionOwnerIds: string | null; compositionOwnerId: string }): string[] {
-  const many = parseExcluded(pkg.compositionOwnerIds);
-  return many.length ? many : [pkg.compositionOwnerId].filter(Boolean);
-}

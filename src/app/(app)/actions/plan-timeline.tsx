@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { fmtDate } from "@/lib/utils";
 
-export type PlanRow = {
+type PlanRow = {
   code: string;
   name: string;
   /** The latest schedule read moved its dates: the sentence that says so. */

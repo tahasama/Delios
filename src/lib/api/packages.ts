@@ -43,7 +43,7 @@ export type LegacyPackage = {
 const date = (iso: string | null | undefined) => (iso ? new Date(iso) : null);
 
 /** The project's packages, newest first. */
-export const packageList = cache(async (scope: Scope): Promise<PackageSummary[]> =>
+const packageList = cache(async (scope: Scope): Promise<PackageSummary[]> =>
   api<PackageSummary[]>(projectPath(scope, "/packages")));
 
 /** One package in full, or null when it does not exist or is not the reader's to see. */
@@ -166,9 +166,4 @@ export async function legacyPackageByNumber(scope: Scope, number: string): Promi
   const row = (await packageList(scope)).find((one) => one.number === number);
   const view = row ? await packageView(scope, row.id) : null;
   return view ? legacyOf(scope, view, row!.createdAt, true) : null;
-}
-
-/** The package's number, for the page to refresh after an act on it. */
-export async function numberOf(scope: Scope, id: string): Promise<string | null> {
-  return (await packageView(scope, id))?.number ?? null;
 }

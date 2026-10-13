@@ -11,7 +11,7 @@ import { useTransition } from "react";
  * Apply to press. It is the register's asking row — plain choices on the
  * sheet — kept to one line, because four choices do not need a grid.
  */
-export type Choice = { name: string; value: string; empty: string; options: { code: string; label: string }[]; disabled?: boolean };
+type Choice = { name: string; value: string; empty: string; options: { code: string; label: string }[]; disabled?: boolean };
 
 export function CheckFilters({ base, choices, count, narrowed }: { base: string; choices: Choice[]; count: string; narrowed: boolean }) {
   const router = useRouter();

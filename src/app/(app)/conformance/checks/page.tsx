@@ -210,23 +210,6 @@ export default async function ChecksPage({ searchParams }: { searchParams: Promi
   );
 }
 
-/** One entry in the family rail. */
-/** One entry in the family rail. */
-/** A filter on a rule, in the register's own hand: a plain choice, applied on Apply. */
-function Choice({ name, value, empty, options }: { name: string; value: string; empty: string; options: { code: string; label: string }[] }) {
-  return (
-    <label className="min-w-0">
-      <span className="sr-only">{empty}</span>
-      <select name={name} defaultValue={value} data-on={value ? "true" : "false"} className="plain w-full">
-        <option value="">{empty}</option>
-        {options.map((o) => (
-          <option key={o.code} value={o.code}>{o.label}</option>
-        ))}
-      </select>
-    </label>
-  );
-}
-
 function Family({ href, label, count, active }: { href: string; label: string; count: number; active: boolean }) {
   return (
     <Link

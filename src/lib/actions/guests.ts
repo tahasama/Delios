@@ -5,7 +5,7 @@ import { requireScope } from "@/lib/scope";
 import { api, refusal } from "@/lib/api/client";
 import { adminFunctions, adminParties } from "@/lib/api/admin";
 
-export type GuestState = { error?: string; ok?: string };
+type GuestState = { error?: string; ok?: string };
 
 /**
  * There are two honest ways to give an outsider access, and they differ in who
@@ -61,18 +61,4 @@ export async function createVisitorAction(_prev: GuestState | undefined, formDat
   }
   revalidatePath("/settings/users");
   return { ok: `${name} of ${party.name} can sign in now as ${fn.name}. Give them the password yourself — nothing is emailed.` };
-}
-
-/** Take a guest or visitor off a project without touching their account. */
-export async function removeFromProjectAction(_prev: GuestState | undefined, formData: FormData): Promise<GuestState> {
-  const ctx = await requireScope();
-  const userId = String(formData.get("userId") ?? "");
-  if (userId === ctx.user.id) return { error: "You cannot remove yourself from the project you are working in." };
-  try {
-    await api(`/api/admin/projects/${ctx.projectId}/members`, { method: "PUT", body: { userId, active: false } });
-  } catch (e) {
-    return { error: refusal(e).message };
-  }
-  revalidatePath("/settings/users");
-  return { ok: `Removed from ${ctx.project.code}.` };
 }

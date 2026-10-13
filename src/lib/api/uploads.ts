@@ -12,7 +12,7 @@ import { api, projectPath } from "./client";
 type Ticket = { fileId: string; method: string; url: string; headers: Record<string, string>; expiresAt: string };
 
 /** Where an upload goes: a document's next files, proof filed on a review or a transmittal, or a file sent to us that belongs to no document yet. */
-export type UploadTarget = { documentId: string } | { reviewId: string } | { transmittalId: string } | { loose: true; proof?: boolean };
+type UploadTarget = { documentId: string } | { reviewId: string } | { transmittalId: string } | { loose: true; proof?: boolean };
 
 /** Uploads one file and returns its id; throws the backend's refusal. */
 export async function upload(scope: { projectId: string }, target: UploadTarget, file: File): Promise<string> {

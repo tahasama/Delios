@@ -18,7 +18,7 @@ async function hasControlFunction(t: Tenant): Promise<boolean> {
  * agreed per project — and the override decides what people see, not only what
  * the server allows.
  */
-export type ControlActivity = {
+type ControlActivity = {
   key: string;
   title: string;
   /** What the act is, in the words of somebody doing it. */
@@ -140,12 +140,6 @@ export const CONFIRMABLE: Record<string, string> = {
 
 export const CONFIRM_KEY = (key: string) => `CONFIRM:${key}`;
 
-/** A request for this act needs management's confirmation on this project. */
-export async function needsConfirmation(t: Tenant, key: string): Promise<boolean> {
-  if (!CONFIRMABLE[key]) return false;
-  return (await answers(t)).get(CONFIRM_KEY(key)) === "ON" && (await controlDoes(t, key));
-}
-
 /** Has the organization left this act out? */
 export async function actIsOff(t: Tenant, key: string): Promise<boolean> {
   if (!SKIPPABLE[key]) return false;
@@ -245,7 +239,7 @@ export async function carrierRefusal(
  * what. Each is a genuine choice between two honest ways of running a project:
  * the app holds an opinion — the first option — and never more than that.
  */
-export type Policy = {
+type Policy = {
   key: string;
   title: string;
   text: string;

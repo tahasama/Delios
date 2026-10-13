@@ -10,7 +10,7 @@ import { api, refusal } from "@/lib/api/client";
 import { adminFunctions, adminParties, adminUsers } from "@/lib/api/admin";
 import { orgSettings, setOrgSetting, setProjectSetting } from "@/lib/api/settings";
 
-export type SetupState = { error?: string; ok?: string };
+type SetupState = { error?: string; ok?: string };
 
 const CODE = /^[A-Z0-9][A-Z0-9-]{0,15}$/;
 
@@ -64,7 +64,7 @@ export async function openFirstProjectAction(_prev: SetupState | undefined, form
  * project opens.
  */
 export async function addPersonAction(_prev: SetupState | undefined, formData: FormData): Promise<SetupState> {
-  const scope = await requireOrgAdmin();
+  await requireOrgAdmin();
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const name = String(formData.get("name") ?? "").trim();
   const functionId = String(formData.get("functionId") ?? "").trim();

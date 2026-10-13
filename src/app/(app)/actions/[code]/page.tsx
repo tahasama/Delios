@@ -54,7 +54,6 @@ export default async function ActionDetailPage({ params, searchParams }: { param
   const depts = departmentsOf(action);
   const control = ctx.can("CONTROL");
   // Only administrators read the audit trail, so only they are sent to it.
-  const admin = ctx.can("CONFIGURE");
   const me = { department: ctx.user.department ?? null };
   const entries = dept ? action.entries.filter((e) => e.department === dept) : action.entries;
   // Which of the three moments slipped, for each document, and who writes the

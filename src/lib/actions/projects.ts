@@ -9,7 +9,7 @@ import { api, refusal } from "@/lib/api/client";
 import { setProjectSetting } from "@/lib/api/settings";
 import { adminProjects, adminUsers } from "@/lib/api/admin";
 
-export type ProjectState = { error?: string; ok?: string };
+type ProjectState = { error?: string; ok?: string };
 
 const CODE = /^[A-Z0-9][A-Z0-9-]{0,15}$/;
 

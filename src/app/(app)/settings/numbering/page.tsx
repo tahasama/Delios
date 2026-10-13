@@ -1,6 +1,6 @@
 import { SETUP_PAGES, maySetup } from "../setup-pages";
 import { requireScope } from "@/lib/scope";
-import { PageHeader, Card, DataTable, Th, Td, Field, inputCls } from "@/components/ui";
+import { PageHeader, Card, DataTable, Th, Td, inputCls } from "@/components/ui";
 import { ActionForm } from "@/components/form";
 import { removeNumberingSchemeAction, saveSchemeRoutingAction } from "@/lib/actions/admin";
 import { NumberingSchemeBuilder } from "./numbering-scheme-builder";

@@ -9,7 +9,7 @@ import { sendForReviewAction } from "@/lib/actions/workflow";
 import { ArrowRight } from "lucide-react";
 import { SearchPick } from "@/components/search-pick";
 
-export type SendPerson = { id: string; name: string; functionName: string; inMatrix?: boolean };
+type SendPerson = { id: string; name: string; functionName: string; inMatrix?: boolean };
 export type SendStep = { title: string; act: "REVIEW" | "APPROVAL"; mode: string; proposed: { id: string; why: string }[]; fromFunctions: string[] };
 export type SendRoute = { id: string; name: string; description: string | null; isDefault: boolean; recommended?: boolean; steps: SendStep[]; verdicts: { title: string; values: { code: string; label: string; effectLabel: string }[] } | null };
 

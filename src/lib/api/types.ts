@@ -1,27 +1,3 @@
-/**
- * The shapes the backend answers with, as TypeScript types. Each matches a
- * record in backend/src/Delios.Host; the comment names it.
- */
-
-/** GET /api/me (IdentityEndpoints.MeAsync). */
-export type Me = {
-  user: { id: string; name: string; email: string; isAdmin: boolean; party: { code: string; name: string; isInternal: boolean } | null };
-  tenant: { slug: string; name: string };
-  projects: MeProject[];
-};
-
-export type MeProject = {
-  id: string;
-  code: string;
-  name: string;
-  timeZone: string;
-  function: { code: string; name: string };
-  verbs: string[];
-};
-
-/** POST /api/auth/sign-in when a second step is needed (SignInStep). */
-export type SignInStep = { next: "MFA_CODE" | "MFA_SETUP"; challenge: string };
-
 /** GET /api/projects/{id}/work (ReviewService.WorkAsync). */
 export type Work = {
   steps: WorkItem[];
@@ -153,16 +129,6 @@ export type RevisionView = {
   /** Sent to its supplier again after it was taken back: the same revision comes back from them. */
   resent?: Written | null;
 };
-
-/** GET /documents/{id}/context (DocumentContext.cs). */
-export type DocumentContext = {
-  reviews: { id: string; number: string; revisionId: string; revision: string; routeName: string; state: string; verdict: string | null; grantedStatus: string | null; startedAt: string; decidedAt: string | null }[];
-  transmittals: { id: string; number: string; reason: string; toName: string; issuedAt: string; revision: string; forReview: boolean }[];
-  packages: { id: string; number: string; title: string; state: string }[];
-  activities: { activityId: string; code: string; name: string; purpose: string; neededBy: string | null; state: string; waiverNote: string | null }[];
-  history: { at: string; actor: string | null; action: string; entityType: string | null; entityId?: string | null; entityLabel: string | null; detail: string | null }[];
-};
-
 /** GET /documents/{id}/routes (ReviewEndpoints RouteView). */
 export type RouteView = { id: string; name: string; description: string | null; isDefault: boolean; verdictSet?: string; steps: { title: string; functionCode: string | null; partyCode: string | null; mode: string; reason: string | null; userIds?: string[] }[] };
 
@@ -208,10 +174,6 @@ export type ReviewView = {
   /** Who started the review: they may notify its people by hand. */
   startedById?: string | null;
 };
-
-/** GET /reviews/{id}/me. */
-export type ReviewMe = { seated: boolean; answered: boolean; control: boolean };
-
 /** GET /transmittals/log (TransmittalLog.cs). */
 export type TransmittalLog = { total: number; page: number; pages: number; per: number; sizes: number[]; rows: TransmittalLogRow[] };
 export type TransmittalLogRow = {

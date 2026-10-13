@@ -41,23 +41,6 @@ export async function prepareRevisionAction(_prev: Result | undefined, formData:
   return {};
 }
 
-export async function uploadRevisionFilesAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
-  const ctx = await requireScope();
-  const revisionId = text(formData, "revisionId");
-  const files = filesOf(formData, "nativeFile", "renditionFile");
-  if (!files.length) return { error: "Choose at least one file." };
-  let documentId: string;
-  try {
-    documentId = (await backendRevision(ctx, revisionId)).documentId;
-    const fileIds = await Promise.all(files.map((file) => upload(ctx, { documentId }, file)));
-    await api(projectPath(ctx, `/documents/${documentId}/revisions/${revisionId}/files`), { body: { fileIds } });
-  } catch (e) {
-    return failed(e);
-  }
-  revalidatePath(`/documents/${documentId}`);
-  return {};
-}
-
 /**
  * Edit a revision not yet released, in one go: its files and the document's
  * details. A new file replaces the one of its kind as a new submission of the
@@ -111,28 +94,6 @@ export async function issueToReviewAction(_prev: Result | undefined, formData: F
   return {};
 }
 
-export async function addCommentAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
-  const ctx = await requireScope();
-  const cycleId = text(formData, "cycleId");
-  const body = text(formData, "text");
-  if (!body) return { error: "Comment text is required." };
-  // One question, asked once: does this comment stop the release? The published
-  // classification is still what gets stored.
-  const blocking = formData.get("blocking") === "on";
-  const classes = await getActiveSet("COMMENT_CLASSES");
-  const classification = classes.find((c) => (c.props.progressionPreventing === true || c.props.blocking === true) === blocking)?.code
-    ?? (blocking ? "BLOCKING" : "NON_BLOCKING");
-  try {
-    await api(projectPath(ctx, `/reviews/${cycleId}/comments`), {
-      body: { text: body, class: classification, closesWithStep: Number(formData.get("closesWithStep") ?? "") || null },
-    });
-  } catch (e) {
-    return failed(e);
-  }
-  revalidatePath(`/reviews/${cycleId}`);
-  return {};
-}
-
 /** Taking a comment back before the step is answered: until then it is a draft. */
 export async function removeCommentAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
   const ctx = await requireScope();
@@ -165,22 +126,6 @@ export async function editCommentAction(_prev: Result | undefined, formData: For
   if (!cycleId) return { error: "Say which review the comment is on." };
   try {
     await api(projectPath(ctx, `/reviews/${cycleId}/comments/${commentId}`), { method: "PUT", body: { text: body, class: classification } });
-  } catch (e) {
-    return failed(e);
-  }
-  revalidatePath(`/reviews/${cycleId}`);
-  return {};
-}
-
-/** Close a progression-preventing comment — only with a recorded resolution (§9.6). */
-export async function closeCommentAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
-  const ctx = await requireScope();
-  const commentId = text(formData, "commentId");
-  const cycleId = text(formData, "cycleId");
-  const resolution = text(formData, "resolution");
-  if (!resolution) return { error: "A progression-preventing comment is closed only with a recorded resolution." };
-  try {
-    await api(projectPath(ctx, `/reviews/${cycleId}/comments/${commentId}/close`), { body: { resolution } });
   } catch (e) {
     return failed(e);
   }

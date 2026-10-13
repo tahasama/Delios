@@ -164,33 +164,6 @@ export function ButtonLink({
   );
 }
 
-/**
- * A block of a form: what this part is about on the left, the fields on the
- * right. Long forms read as a few short sections instead of one column of
- * boxes.
- */
-export function FormSection({ title, help, children, className }: { title: string; help?: string; children: React.ReactNode; className?: string }) {
-  return (
-    <section className={cn("grid grid-cols-1 gap-x-8 gap-y-4 border-t border-line py-6 first:border-t-0 first:pt-0 md:grid-cols-[220px_minmax(0,1fr)]", className)}>
-      <div>
-        <h3 className="stencil text-slate-500">{title}</h3>
-        {help ? <p className="mt-1.5 text-[11px] leading-4 text-slate-400">{help}</p> : null}
-      </div>
-      <div className="space-y-4">{children}</div>
-    </section>
-  );
-}
-
-/** The bar that closes a form: what happens next on the left, the buttons on the right. */
-export function FormActions({ children, note }: { children: React.ReactNode; note?: React.ReactNode }) {
-  return (
-    <div className="sticky bottom-0 -mx-5 mt-2 flex flex-wrap items-center justify-between gap-3 border-t border-line bg-surface/95 px-5 py-3 backdrop-blur sm:-mx-6 sm:px-6">
-      <p className="min-w-0 text-[11px] leading-4 text-slate-400">{note}</p>
-      <div className="flex items-center gap-2">{children}</div>
-    </div>
-  );
-}
-
 export function Field({
   label,
   hint,
@@ -281,32 +254,6 @@ export function Td({ children, className, colSpan, title }: { children?: React.R
 
 export { DataTable } from "./data-table";
 
-/**
- * One figure and what it counts. The register already has a way of setting a
- * number that is read at a glance — `.plate-figure` over `.plate-label`, mono
- * and tabular so a column of them lines up — so this uses it rather than
- * inventing a second one. The figure comes first and its name sits under it,
- * which is the order the plate uses.
- */
-export function Stat({ label, value, hint, href, tone = "default" }: { label: string; value: React.ReactNode; hint?: string; href?: string; tone?: "default" | "warn" | "danger" | "good" }) {
-  const tones = {
-    default: "text-slate-900",
-    good: "text-emerald-700",
-    warn: "text-amber-700",
-    danger: "text-red-700",
-  };
-  const body = (
-    <div className="register register-sheet h-full px-5 py-4 transition-colors group-hover:border-brand-line group-hover:bg-tint-soft">
-      <span className={cn("plate-figure", tones[tone])}>{value}</span>
-      <span className="plate-label transition-colors group-hover:text-brand-ink">{label}</span>
-      {hint ? <p className="mt-1.5 text-[11px] leading-4 text-slate-400">{hint}</p> : null}
-    </div>
-  );
-  // Only a figure you can follow lights up, so the hover says "this is a way in"
-  // rather than decorating every tile on the page.
-  return href ? <Link href={href} className="group block">{body}</Link> : body;
-}
-
 export function Banner({ tone = "info", title, children }: { tone?: "info" | "warn" | "danger" | "good"; title?: string; children?: React.ReactNode }) {
   const tones = {
     info: "border-sky-200 bg-sky-50 text-sky-900",
@@ -323,22 +270,5 @@ export function Banner({ tone = "info", title, children }: { tone?: "info" | "wa
         {children ? <div className={cn("leading-5", title ? "mt-1" : "")}>{children}</div> : null}
       </div>
     </div>
-  );
-}
-
-export function Clause({ children }: { children: React.ReactNode }) {
-  return <span className="ml-1 rounded-sm bg-canvas-deep px-1.5 py-0.5 font-mono text-[10px] text-slate-500">{children}</span>;
-}
-
-export function KeyValue({ items }: { items: { label: string; value: React.ReactNode; clause?: string }[] }) {
-  return (
-    <dl className="grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-2 xl:grid-cols-3">
-      {items.map((it) => (
-        <div key={it.label}>
-          <dt className="stencil text-slate-400">{it.label}</dt>
-          <dd className="mt-1 text-[13px] text-slate-800">{it.value}</dd>
-        </div>
-      ))}
-    </dl>
   );
 }

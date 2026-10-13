@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-export type DocTab = { id: string; label: string; count?: number; content: React.ReactNode };
+type DocTab = { id: string; label: string; count?: number; content: React.ReactNode };
 
 /**
  * Tabs that switch in place. The server renders every panel once; switching

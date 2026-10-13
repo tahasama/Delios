@@ -16,8 +16,8 @@ import { documentView, registerByNumber } from "@/lib/api/register";
 // Bulk in/out — document controllers live in spreadsheets. Templates, preview,
 // then execute. No one fills a form per line.
 
-export type BulkRowReport = { line: number; ok: boolean; message: string; wrote?: boolean };
-export type BulkResult = { error?: string; ok?: string; rows?: BulkRowReport[]; imported?: number; failed?: number; dryRun?: boolean };
+type BulkRowReport = { line: number; ok: boolean; message: string; wrote?: boolean };
+type BulkResult = { error?: string; ok?: string; rows?: BulkRowReport[]; imported?: number; failed?: number; dryRun?: boolean };
 
 /**
  * Read the upload, whichever of the two shapes it came in.

@@ -19,7 +19,7 @@ const long = (value: string) => {
 };
 
 /** The chosen window, written the way the register writes any other date. */
-export function dateWindowLabel(from: string, to: string) {
+function dateWindowLabel(from: string, to: string) {
   if (!from) return "";
   return !to || to === from ? long(from) : `${short(from)} – ${long(to)}`;
 }

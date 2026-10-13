@@ -1,11 +1,8 @@
-import type { SessionUser } from "./auth";
 import type { Tenant } from "./tenant";
 import { api, projectPath } from "./api/client";
 import { holders as holdersOfVerb } from "./api/settings";
 import { revisionStanding } from "./api/legacy";
 import type { Distribution, IssueRequestView } from "./api/types";
-import { holdersOf } from "./permissions";
-
 /**
  * Asking for a revision to be sent somewhere.
  *
@@ -23,14 +20,14 @@ import { holdersOf } from "./permissions";
  * asks, a released revision is simply not issued, and the record says so.
  */
 
-export type RequestRecipients = {
+type RequestRecipients = {
   /** Our own people. The distribution matrix proposes them; the asker adjusts. */
   internalUserIds: string[];
   /** Organizations on this project. */
   partyIds: string[];
 };
 
-export const NO_RECIPIENTS: RequestRecipients = { internalUserIds: [], partyIds: [] };
+const NO_RECIPIENTS: RequestRecipients = { internalUserIds: [], partyIds: [] };
 
 export function parseRecipients(json: string | null | undefined): RequestRecipients {
   if (!json) return NO_RECIPIENTS;
@@ -51,7 +48,7 @@ export function parseRecipients(json: string | null | undefined): RequestRecipie
   }
 }
 
-export function recipientsFromForm(formData: FormData): RequestRecipients {
+function recipientsFromForm(formData: FormData): RequestRecipients {
   const many = (key: string) => formData.getAll(key).map(String).filter(Boolean);
   return { internalUserIds: many("internalUserIds"), partyIds: many("partyIds") };
 }
@@ -121,7 +118,7 @@ export async function authorOf(t: Tenant, revisionId: string): Promise<string | 
  * Nothing here is configured twice. Who holds which function is the matrix's
  * business, and this reads it.
  */
-export async function hasControlFunction(t: Tenant): Promise<boolean> {
+async function hasControlFunction(t: Tenant): Promise<boolean> {
   return (await holdersOfVerb(t.projectId, "CONTROL")).length > 0;
 }
 
@@ -133,10 +130,6 @@ export async function issuePolicy(t: Tenant): Promise<{ controlReleases: boolean
   const { policy } = await import("./control-activities");
   const asked = (await policy(t, "POLICY_RELEASE")) !== "SEPARATE";
   return { controlReleases: control, asked };
-}
-
-export async function issueGateIsControl(t: Tenant): Promise<boolean> {
-  return hasControlFunction(t);
 }
 
 /**

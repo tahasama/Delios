@@ -18,18 +18,6 @@ export type SupplierState =
   | "IN_REVIEW"
   | "RETURNED"        // review asked for changes; back with the supplier
   | "APPROVED";       // review passed (awaiting or after release)
-
-/** In the supplier's own set of states, the same words as the register and the document page (`SUPPLIER_STAGE_LABEL`). */
-export const STATE_LABEL: Record<SupplierState, string> = {
-  NOT_SENT: "Sent",
-  AWAITING_CHECK: "Received",
-  REJECTED: "Returned",
-  TO_ROUTE: "Accepted",
-  IN_REVIEW: "In review",
-  RETURNED: "Returned",
-  APPROVED: "Released & issued",
-};
-
 /** Whose court the ball is in. */
 export const WITH_SUPPLIER: SupplierState[] = ["NOT_SENT", "REJECTED", "RETURNED"];
 
@@ -162,7 +150,7 @@ export function packageStage(pkg: LegacyPackage, rows: SupplierRow[], side: "our
 }
 
 /** A package line's state as the supplier's stage. */
-export const STAGE_OF: Record<SupplierState, SupplierStage> = {
+const STAGE_OF: Record<SupplierState, SupplierStage> = {
   NOT_SENT: "SENT", AWAITING_CHECK: "RECEIVED", REJECTED: "RETURNED_CHECK", TO_ROUTE: "ACCEPTED",
   IN_REVIEW: "IN_REVIEW", RETURNED: "RETURNED_REVIEW", APPROVED: "RELEASED",
 };

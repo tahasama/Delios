@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireScope } from "@/lib/scope";
-import { Field, inputCls } from "@/components/ui";
 import { ActionForm } from "@/components/form";
 import { SearchPick } from "@/components/search-pick";
 import { addDocumentToActionAction } from "@/lib/actions/action-links";
@@ -27,7 +26,6 @@ export default async function AddToActionPage({ searchParams }: { searchParams: 
   const label = (code: string) => disciplines.find((d) => d.code === code)?.label ?? code;
   // Only actions that concern a discipline can need a document.
   const tagged = actions.filter((a) => a.departments.length).sort((a, b) => a.code.localeCompare(b.code));
-  const used = [...new Set(tagged.flatMap((a) => a.departments))].sort((a, b) => label(a).localeCompare(label(b)));
 
   return (
     <div className="space-y-4">

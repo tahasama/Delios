@@ -15,7 +15,7 @@ type Opt = { code: string; label: string; props: Record<string, unknown> };
 type RevOpt = { id: string; label: string; released: boolean; number: string; rev: string; status: string | null; title: string };
 type UserOpt = { id: string; name: string; role: string };
 /** Anything the form can start filled in with — from a link such as "Send rev B to them". */
-export type Prefill = {
+type Prefill = {
   revisionIds?: string[];
   userIds?: string[];
   /** People copied in on the question, copied in on the answer. */
@@ -36,11 +36,11 @@ const STEPS = ["Which way, and why", "What goes with it", "Who gets it"];
  * approval, for execution…); information carries a request, an answer, a confirmation sought, an RFI. A reason says
  * its kind on its published value (Settings: "Kind of transmittal"); one that says nothing is data.
  */
-export const FAMILIES = [
+const FAMILIES = [
   { code: "DATA", label: "Data transmittal", says: "documents: for review, for approval, for execution…" },
   { code: "INFO", label: "Information transmittal", says: "a request, an answer, a confirmation, an RFI" },
 ] as const;
-export const familyOf = (props: Record<string, unknown>) => (props.family === "Information" ? "INFO" : "DATA");
+const familyOf = (props: Record<string, unknown>) => (props.family === "Information" ? "INFO" : "DATA");
 
 /** A field in this form: its name in stencil above it, and a short hint beside the name. */
 function Ask({ label, hint, required, children, className }: { label: string; hint?: string; required?: boolean; children: React.ReactNode; className?: string }) {

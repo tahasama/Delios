@@ -6,7 +6,7 @@ import { apiFetch, problemOf } from "@/lib/api/client";
 import { PROJECT_KINDS } from "@/lib/profiles/kinds";
 import { CONTRACT_ROLES } from "@/lib/profiles/roles";  // signup predates the organization, so the built-in list is all there is
 
-export type SignupState = { error?: string; values?: Record<string, string> };
+type SignupState = { error?: string; values?: Record<string, string> };
 
 /**
  * The only self-service path into the system: registering an organization.

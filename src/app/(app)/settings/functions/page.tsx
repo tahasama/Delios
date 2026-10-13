@@ -1,5 +1,4 @@
 import { requireScope } from "@/lib/scope";
-import { isAdmin } from "@/lib/auth";
 import { SETUP_PAGES, maySetup } from "../setup-pages";
 import { PageHeader, Card, Chip, DataTable, Field, Th, Td, inputCls } from "@/components/ui";
 import { ActionForm } from "@/components/form";
@@ -38,7 +37,6 @@ export default async function FunctionsPage() {
   }
   // Document Control maintains the matrix, but not the authority that could
   // give itself more: an administrator's own function stays with administrators.
-  const mayChangeAdminFunctions = isAdmin(me);
 
   const [functions, disciplines, docTypes, deliverableTypes, criticalities, confidentialities] = await Promise.all([
     legacyFunctions(),

@@ -84,7 +84,7 @@ async function fileName(scope: Scope, fileId: string): Promise<string | null> {
   return encoded ? decodeURIComponent(encoded) : /filename="?([^";]+)"?/i.exec(disposition)?.[1] ?? null;
 }
 
-export type ReviewCycle = Awaited<ReturnType<typeof readCycle>>;
+type ReviewCycle = Awaited<ReturnType<typeof readCycle>>;
 
 /**
  * Somebody a step was handed to sits on it in its holder's place while the
@@ -212,7 +212,7 @@ export async function waitingOn(scope: Scope, id: string): Promise<{ revisionId:
   return { revisionId: review.revisionId, userIds: (open?.participants ?? []).filter((one) => !one.answeredAt).map((one) => one.userId) };
 }
 
-export type SendableRevision = {
+type SendableRevision = {
   id: string; documentId: string; value: string; statusCode: string | null; renditionFileId: string | null; nativeFileId: string | null;
   document: { docNumber: string; title: string };
 };

@@ -3,7 +3,7 @@ import { requireScope } from "@/lib/scope";
 import { stateNames, stateName } from "@/lib/state-names";
 import { getActiveSet } from "@/lib/config";
 import { PageHeader, Card, DataTable, Th, Td, Chip } from "@/components/ui";
-import { ADVICE_CODES, ADVICE_LABEL, ADVICE_MEANING, DOC_STATES, DOC_STATE_LABEL, DOC_STATE_COLOR, DOC_MEANING, REV_STATES, REV_STATE_COLOR, REV_MEANING, EMPTY_TITLE_WORDS, type DocState, type RevState } from "@/lib/standard";
+import { ADVICE_CODES, ADVICE_LABEL, ADVICE_MEANING, DOC_STATES, DOC_STATE_LABEL, DOC_STATE_COLOR, DOC_MEANING, REV_STATES, REV_STATE_COLOR, REV_MEANING, EMPTY_TITLE_WORDS } from "@/lib/standard";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { VERDICT_EFFECT, verdictEffect } from "@/lib/verdict-effect";
 

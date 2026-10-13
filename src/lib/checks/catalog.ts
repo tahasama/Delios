@@ -127,9 +127,6 @@ export const CATALOG: CheckDef[] = [
 ];
 
 export const CHECK_BY_ID = new Map(CATALOG.map((c) => [c.id, c]));
-/** Check families in catalogue order — the letters before the dash (ID, MD, RV…). */
-export const FAMILIES = [...new Set(CATALOG.map((c) => c.id.split("-")[0]))];
-
 /** The checks about information that is no longer current but may still be in somebody's hands. */
 const OUT_OF_DATE = new Set(["RO-08", "IS-02", "OB-01", "OB-02", "OB-04", "OB-07"]);
 for (const c of CATALOG) if (OUT_OF_DATE.has(c.id)) c.outOfDate = true;

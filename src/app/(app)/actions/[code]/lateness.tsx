@@ -5,7 +5,7 @@ import { fmtDate } from "@/lib/utils";
 import { recordActionNoteAction, confirmPostponementAction, reverseDecisionAction } from "@/lib/actions/action-notes";
 import type { LegacyNote } from "@/lib/api/schedule";
 
-export type Note = LegacyNote;
+type Note = LegacyNote;
 
 /** The answer to "Went ahead?", the same as the schedule's column says it. */
 export type WentAhead = "NOT_YET" | "WITH_DOCUMENTS" | "MISSING_DOCUMENTS" | "POSTPONED";

@@ -6,7 +6,7 @@ import { profileForKind, missingFromProfile, type Profile } from "@/lib/profiles
 import { draftProfileAction } from "@/lib/actions/profiles";
 import { isAdmin } from "@/lib/auth";
 import { holdersOf } from "@/lib/permissions";
-import { Banner, Card, Chip, Field, PageHeader, inputCls } from "@/components/ui";
+import { Card, Field, PageHeader, inputCls } from "@/components/ui";
 import { ActionForm } from "@/components/form";
 import { DocumentManagementPlan } from "./plan";
 import { PlanTabs } from "./tabs";
@@ -29,7 +29,7 @@ export default async function PlanPage({ searchParams }: { searchParams: Promise
   if (!isAdmin(user)) return <PageHeader title="The plan" subtitle="Administrators only." />;
 
   const REQUIRED = ["DELIVERABLE_TYPES", "DOCUMENT_TYPES", "DISCIPLINES", "PHASES", "CRITICALITY", "CONFIDENTIALITY", "STATUSES", "REVIEW_OUTCOMES", "REASONS_FOR_ISSUE", "RETENTION_CLASSES"];
-  const [scope, requiredSets, schemes, routings, externalParties, members, withDepartment, rules, templates, actions, calls, lastRun, projects] = await Promise.all([
+  const [scope, requiredSets, schemes, routings, externalParties, members, withDepartment, rules, templates, actions, lastRun, projects] = await Promise.all([
     scopeConfig(ctx.projectId),
     Promise.all(REQUIRED.map(async (key) => ({ key, title: (await getSets()).find((one) => one.key === key)?.title ?? key, _count: { values: (await getSet(key)).length } }))),
     adminNumbering().then((n) => n.schemes.filter((one) => one.active).length).catch(() => 0),
@@ -41,7 +41,6 @@ export default async function PlanPage({ searchParams }: { searchParams: Promise
     orEmpty(adminRoutes).then((all) => all.filter((r) => r.active).length),
     // Which departments each activity calls on, the calls sent, and the last conformance run are not read here yet.
     Promise.resolve([] as { departments: string }[]),
-    Promise.resolve(0),
     Promise.resolve(null as { ranAt: Date; integrity: number } | null),
     orEmpty(adminProjects).then(async (all) => Promise.all(all.filter((p) => p.status === "ACTIVE").map(async (p) => {
       let info: { kind?: string } = {};
@@ -87,7 +86,6 @@ export default async function PlanPage({ searchParams }: { searchParams: Promise
  { title: "Measure it, and keep measuring", text: "Run the checks within the measurement interval, so the register's result is current rather than historical.", href: "/conformance/checks", action: "Assurance", icon: Gauge, done: measuredRecently, evidence: lastRun ? `last run ${fmtDate(lastRun.ranAt)}${measuredRecently ? "" : " — overdue"} · ${lastRun.integrity.toFixed(0)}% clear` : "never measured", todo: `Run the checks. The project asks for them at least every ${scope?.measurementIntervalDays ?? 30} days.` },
   ];
   const completed = steps.filter((step) => step.done).length;
-  const percentage = Math.round((completed / steps.length) * 100);
   const next = steps.find((step) => !step.done);
 
   return (

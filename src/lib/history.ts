@@ -1,15 +1,4 @@
-import type { Tenant } from "@/lib/tenant";
-
-export type SnapshotContext = {
-  eventType: string;
-  eventLabel?: string | null;
-  actorName: string;
-  auditEventId?: string | null;
-  revisionId?: string | null;
-  capturedAt?: Date;
-};
-
-export type SnapshotRevision = {
+type SnapshotRevision = {
   id: string;
   value: string;
   series: string;

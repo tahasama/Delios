@@ -336,4 +336,4 @@ const requirements: Handler = {
 };
 
 register(requirements);
-export { requirements };
+;

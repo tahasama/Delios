@@ -10,11 +10,11 @@ import { api, projectPath } from "./api/client";
  * is opened (backend/src/Delios.Host/Reports); this turns its answer into the
  * page's shapes.
  */
-export type Figure = { label: string; value: string | number; tone?: "good" | "warn" | "bad" };
+type Figure = { label: string; value: string | number; tone?: "good" | "warn" | "bad" };
 export type Segment = { key: string; label: string; tone: "good" | "info" | "warn" | "bad" | "muted" };
 export type Bar = { label: string; values: Record<string, number> };
 export type Cell = string | number | { text: string; href?: string; tone?: "good" | "warn" | "bad" };
-export type Report = {
+type Report = {
   id: ReportId;
   title: string;
   question: string;
@@ -36,7 +36,7 @@ export type ReportId = "register" | "deliveries" | "reviews" | "transmittals" | 
 
 export const REPORT_IDS: ReportId[] = ["register", "deliveries", "reviews", "transmittals", "readiness"];
 
-export function cellText(c: Cell): string {
+function cellText(c: Cell): string {
   return typeof c === "object" ? c.text : String(c);
 }
 

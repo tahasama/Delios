@@ -1,15 +1,6 @@
 import type { SessionUser } from "@/lib/auth";
 import { checksOf, runAndWait } from "@/lib/api/conformance";
 
-export type CheckOutcome = {
-  checkId: string;
-  result: "PASS" | "FAIL" | "NEEDS_SETUP" | "BY_HAND" | "OFF" | "NOT_EXECUTABLE";
-  failingCount: number;
-  ms: number;
-  /** What has to be set up, or why it is off, when that is the answer. */
-  note?: string | null;
-};
-
 /**
  * Run the catalogue against the register. The backend asks every check, keeps
  * the defects it finds (opening, keeping and closing them) and counts the

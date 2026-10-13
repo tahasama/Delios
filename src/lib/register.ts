@@ -16,7 +16,7 @@ import { api, projectPath } from "./api/client";
  * person is allowed — those belong to the caller.
  */
 
-export type RegisterInput = {
+type RegisterInput = {
   title: string;
   deliverableType: string;
   docType: string;
@@ -40,7 +40,7 @@ export type RegisterInput = {
   at?: Date;
 };
 
-export type Registered = { id: string; docNumber: string };
+type Registered = { id: string; docNumber: string };
 
 /** A date as the day the backend takes. */
 function day(at: Date | null | undefined): string | null {
@@ -71,31 +71,4 @@ export async function registerDocument(t: Tenant, _user: SessionUser, input: Reg
     },
   });
   return { id: doc.id, docNumber: doc.number };
-}
-
-export type RevisionInput = {
-  /** What the revision is called. The caller decides the sequence. */
-  value: string;
-  statusCode?: string | null;
-  phase?: string | null;
-  reasonForRevision?: string | null;
-  plannedSubmissionDate?: Date | null;
-  /** Who authorised a revision nobody's verdict asked for. */
-  authorizedByName?: string | null;
-  authorizationReason?: string | null;
-  /** When it was started, where that is not now. */
-  at?: Date;
-};
-
-/**
- * Start a revision, and say so.
- *
- * A revision that nothing authorised and whose start was never logged is a
- * finding in its own right, so the backend authorises and logs it. It also
- * decides what the revision is called; files follow later.
- */
-export async function startRevision(t: Tenant, _user: SessionUser, documentId: string, input: RevisionInput) {
-  return api<{ id: string; value: string; state: string }>(projectPath(t, `/documents/${documentId}/revisions`), {
-    body: { fileIds: [], reasonForRevision: input.reasonForRevision ?? input.authorizationReason ?? null, filesLater: true },
-  });
 }

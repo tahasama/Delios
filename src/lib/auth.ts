@@ -76,33 +76,6 @@ export async function requireUser(): Promise<SessionUser> {
   return user;
 }
 
-/** The verb each old role name stood for, so `requireRole` reads the matrix. */
-const ROLE_VERB: Record<Role, string> = {
-  VIEWER: "READ",
-  AUTHOR: "CREATE",
-  REVIEWER: "REVIEW",
-  APPROVER: "APPROVE",
-  CONTROLLER: "CONTROL",
-  ADMIN: "CONFIGURE",
-};
-
-export async function requireRole(roles: Role[]): Promise<SessionUser> {
-  const user = await requireUser();
-  if (!roles.some((r) => hasVerb(user, ROLE_VERB[r]))) redirect("/?denied=1");
-  return user;
-}
-
-export async function requireAdmin(): Promise<SessionUser> {
-  const user = await requireUser();
-  if (!hasVerb(user, "CONFIGURE")) redirect("/?denied=1");
-  return user;
-}
-
-/** Holds the verb the named role stood for. */
-export function atLeast(user: SessionUser | null, role: Role): boolean {
-  return hasVerb(user, ROLE_VERB[role]);
-}
-
 /** The control function: Control, or Configure. */
 export function isController(user: SessionUser | null): boolean {
   // Configuring a project is not working in it. An administrator sets the app
@@ -137,10 +110,3 @@ export function mayContributeToDocument(user: SessionUser | null, document: { or
 export async function getSessionUser(): Promise<SessionUser | null> {
   return getCurrentUser();
 }
-
-/** The session is the backend's: a token is good when the backend says who it belongs to. */
-export async function verifySessionToken(token: string): Promise<string | null> {
-  return token ? (await getCurrentUser())?.id ?? null : null;
-}
-
-export const SESSION_COOKIE = COOKIE;

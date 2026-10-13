@@ -20,7 +20,7 @@ const COLUMNS = ["Action Code", "Activity Code", "Activity Name", "Activity Desc
 /** What the same columns used to be called, so an older file still uploads. */
 const ALIASES = { Date: ["Activity Date"], "Activity Code": ["Activity ID"] };
 
-export function splitDepartments(raw: string): string[] {
+function splitDepartments(raw: string): string[] {
   return [...new Set(raw.toUpperCase().split(/[\s,;|/]+/).map((s) => s.trim()).filter(Boolean))].sort();
 }
 
@@ -113,4 +113,4 @@ const departments: Handler = {
 };
 
 register(departments);
-export { departments };
+;

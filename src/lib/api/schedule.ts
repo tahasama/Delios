@@ -1,7 +1,7 @@
 import "server-only";
 import { cache } from "react";
 import { api, ApiProblem, projectPath } from "./client";
-import { backendDocument, backendRevision } from "./legacy";
+import { backendDocument } from "./legacy";
 import type { ActivitySummary, DocumentView } from "./types";
 
 /**
@@ -42,24 +42,24 @@ export type DecisionView = {
 
 export type ActivityDetail = { activity: ActivitySummary; needs: NeedView[]; decisions: DecisionView[] };
 
-export type CheckpointView = { name: string; deadline: string; due: string | null; at: string | null; late: boolean; owedBy: string };
-export type NeedLateness = { requirementId: string; documentNumber: string; state: string; checkpoints: CheckpointView[]; cause: CheckpointView | null };
+type CheckpointView = { name: string; deadline: string; due: string | null; at: string | null; late: boolean; owedBy: string };
+type NeedLateness = { requirementId: string; documentNumber: string; state: string; checkpoints: CheckpointView[]; cause: CheckpointView | null };
 
 /** A NodaTime date as the backend sends it inside stored records: an ISO day, or the object with its parts. */
 type LocalDateJson = string | { year: number; month: number; day: number } | null;
 
-export type ScheduleImportView = {
+type ScheduleImportView = {
   id: string; revisionId: string; revisionValue: string; fileId: string | null; status: "DONE" | "FAILED"; error: string | null; importedAt: string;
   added: number; moved: number; changed: number; removed: number; unchanged: number; unmatchedDepartments: string[];
   changes: { code: string; name: string; type: "NEW" | "MOVED" | "CHANGED" | "REMOVED"; oldStart: LocalDateJson; newStart: LocalDateJson; oldFinish: LocalDateJson; newFinish: LocalDateJson }[];
 };
 
-export type ScheduleSourceView = { id: string; documentId: string; defaultLeadDays: number; riskWindowDays: number };
+type ScheduleSourceView = { id: string; documentId: string; defaultLeadDays: number; riskWindowDays: number };
 
 const date = (iso: string | null | undefined) => (iso ? new Date(iso) : null);
 
 /** A day from the backend, at midnight UTC as the old dates were kept. */
-export function dayOf(value: LocalDateJson | undefined): Date | null {
+function dayOf(value: LocalDateJson | undefined): Date | null {
   if (!value) return null;
   if (typeof value === "string") return new Date(`${value.slice(0, 10)}T00:00:00.000Z`);
   return new Date(Date.UTC(value.year, value.month - 1, value.day));
@@ -91,7 +91,7 @@ export const activityLateness = cache(async (scope: Scope, id: string): Promise<
   api<NeedLateness[]>(projectPath(scope, `/activities/${id}/lateness`)).catch(orNothing([] as NeedLateness[])));
 
 /** The activity with this code, also one the schedule has since dropped; null when there is none. */
-export const activityByCode = cache(async (scope: Scope, code: string): Promise<ActivitySummary | null> => {
+const activityByCode = cache(async (scope: Scope, code: string): Promise<ActivitySummary | null> => {
   const found = await api<ActivitySummary[]>(projectPath(scope, "/activities"), { query: { q: code, includeRemoved: true } })
     .catch(orNothing([] as ActivitySummary[]));
   return found.find((one) => one.code === code) ?? null;
@@ -261,7 +261,7 @@ function legacyAction(detail: ActivityDetail, documents: Map<string, DocumentVie
 }
 
 /** The label of the schedule read in force, e.g. "rev B", or null when none has been read. */
-export const versionInForce = cache(async (scope: Scope): Promise<string | null> => {
+const versionInForce = cache(async (scope: Scope): Promise<string | null> => {
   const latest = (await scheduleSource(scope)).imports.find((one) => one.status === "DONE");
   return latest ? `rev ${latest.revisionValue}` : null;
 });
@@ -288,57 +288,9 @@ export const legacyActions = cache(async (scope: Scope): Promise<LegacyAction[]>
 });
 
 // ── Schedule versions ────────────────────────────────────────────────────────
-
-export type LegacyScheduleVersion = {
-  id: string; versionLabel: string; /** PUBLISHED (in force), SUPERSEDED or FAILED. */
-  status: string; sourceName: string; notes: string | null;
-  importedAt: Date | null; importedByName: string; publishedAt: Date | null; publishedByName: string | null;
-  _count: { activities: number };
-  /** The read as the backend keeps it. */
-  view: ScheduleImportView;
-  /** The schedule document's revision that was read. */
-  revision: { id: string; value: string; state: string; statusCode: string | null; releasedAt: Date | null; document: { id: string; docNumber: string; title: string } } | null;
-};
-
-/**
- * Every read of the schedule document, newest first, as schedule versions. A
- * revision is read when it is released, so the day of its release is the day
- * the read came into force; the latest good read is the one in force.
- */
-export const scheduleVersions = cache(async (scope: Scope): Promise<LegacyScheduleVersion[]> => {
-  const { imports } = await scheduleSource(scope);
-  const inForce = imports.find((one) => one.status === "DONE") ?? null;
-  // The project may have named another schedule document since: each read says which revision it was.
-  const documents = await inBatches(imports, async (one) => {
-    const revision = await backendRevision(scope, one.revisionId).catch(orNothing(null));
-    return revision ? backendDocument(scope, revision.documentId) : null;
-  });
-  return imports.map((one, index) => {
-    const document = documents[index];
-    const revision = document?.revisions.find((r) => r.id === one.revisionId) ?? null;
-    const releasedAt = date(revision?.releasedAt);
-    return {
-      id: one.id,
-      versionLabel: `rev ${one.revisionValue}`,
-      status: one.status === "FAILED" ? "FAILED" : one === inForce ? "PUBLISHED" : "SUPERSEDED",
-      sourceName: document?.number ?? "Schedule",
-      notes: one.error,
-      importedAt: releasedAt,
-      importedByName: revision?.releasedByName ?? "the system",
-      publishedAt: one.status === "DONE" ? releasedAt : null,
-      publishedByName: one.status === "DONE" ? revision?.releasedByName ?? "the system" : null,
-      _count: { activities: one.added + one.moved + one.changed + one.unchanged },
-      view: one,
-      revision: revision && document
-        ? { id: revision.id, value: revision.value, state: revision.state, statusCode: revision.statusCode, releasedAt, document: { id: document.id, docNumber: document.number, title: document.title } }
-        : null,
-    };
-  });
-});
-
 // ── Notices ──────────────────────────────────────────────────────────────────
 
-export type NoticeView = { id: string; subject: string; automatic: boolean; title: string; body: string | null; recipients: string[]; sentBy: string; sentAt: string };
+type NoticeView = { id: string; subject: string; automatic: boolean; title: string; body: string | null; recipients: string[]; sentBy: string; sentAt: string };
 
 /** Every notice whose subject starts with this, oldest first: what the notify panels count from. */
 export const noticesAbout = cache(async (scope: Scope, subject: string): Promise<NoticeView[]> =>
@@ -359,7 +311,7 @@ export function noticeHistory(notices: NoticeView[], now = new Date()): { count:
  * What on the schedule waits for the person asking (GET /activities-work): their discipline's confirmations,
  * a postponement to confirm, a request to add a document to an action, the schedule's upkeep.
  */
-export type ActionWork = {
+type ActionWork = {
   kind: "CONFIRM_DOCUMENTS" | "CONFIRM_POSTPONEMENT" | "ADD_TO_ACTION" | "CONFIRM_ACTION_REQUEST" | "CONFIRM_PERSON" | "UNTAGGED" | "SCHEDULE_READ_FAILED";
   activityId: string | null; code: string | null; name: string | null; day: string | null; department: string | null;
   count: number; since: string | null; transmittalId: string | null; number: string | null; from: string | null;

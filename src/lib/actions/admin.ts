@@ -63,24 +63,6 @@ export async function createUserAction(_prev: Result | undefined, formData: Form
   return {};
 }
 
-export async function updateUserAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
-  const ctx = await requireScope();
-  const userId = text(formData, "userId");
-  const functionId = text(formData, "functionId");
-  try {
-    await api(`/api/admin/users/${userId}`, { method: "PUT", body: { active: formData.get("active") === "on" } });
-    if (functionId || formData.has("department")) {
-      await api(`/api/admin/projects/${ctx.projectId}/members`, {
-        method: "PUT", body: { userId, functionId: functionId || null, department: text(formData, "department") || null, active: true },
-      });
-    }
-  } catch (e) {
-    return failed(e);
-  }
-  revalidatePath("/settings/users");
-  return {};
-}
-
 export async function addConfigValueAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
   await requireScope();
   const setKey = text(formData, "setKey");
@@ -240,24 +222,6 @@ export async function addExceptionAction(_prev: Result | undefined, formData: Fo
     return failed(e);
   }
   revalidatePath("/settings/dmp");
-  return {};
-}
-
-/** A range of numbers given to a named party. */
-export async function issueNumberRangeAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
-  const ctx = await requireScope();
-  const prefix = text(formData, "prefix");
-  const from = Number(formData.get("from") ?? "");
-  const to = Number(formData.get("to") ?? "");
-  const issuedTo = text(formData, "issuedTo");
-  if (!prefix || !issuedTo) return { error: "Prefix and the named party are required." };
-  if (!Number.isFinite(from) || !Number.isFinite(to) || from < 1 || to < from) return { error: "The range must be from ≤ to, starting at 1." };
-  try {
-    await api(projectPath(ctx, "/number-ranges"), { body: { prefix, from, to, issuedTo } });
-  } catch (e) {
-    return failed(e);
-  }
-  revalidatePath("/settings/numbering");
   return {};
 }
 

@@ -5,7 +5,7 @@ import { api, projectPath } from "./client";
 type Scope = { projectId: string };
 const day = (value: string | null | undefined) => (value ? new Date(`${value.slice(0, 10)}T00:00:00`) : null);
 
-export type AssetRow = {
+type AssetRow = {
   id: string; code: string; name: string; area: string | null; system: string | null; unit: string | null; description: string | null;
   extras: Record<string, string> | null; active: boolean; documents: number;
 };
@@ -35,7 +35,7 @@ export async function projectExceptions(scope: Scope) {
   return rows.map((one) => ({ ...one, startDate: day(one.startDate)!, reviewPoint: day(one.reviewPoint) }));
 }
 
-export type CallRow = {
+type CallRow = {
   id: string; department: string; activityCodes: string[]; dueOn: string; issuedAt: string; issuedByName: string; reminders: number;
   lastRemindedAt: string | null; answeredAt: string | null; answerNote: string | null;
 };
@@ -51,12 +51,6 @@ export const readinessAnswers = cache(async (scope: Scope) =>
     automatic?: boolean; revokedAt?: string | null; revokedByName?: string | null; revokedReason?: string | null;
   }[]>(
     projectPath(scope, "/readiness")).catch(() => []));
-
-/** The requirements list as issued to each sender, newest first. */
-export const senderIssues = cache(async (scope: Scope) =>
-  api<{ id: string; sender: string; entryCount: number; needIds: string[]; issuedByName: string; issuedAt: string }[]>(
-    projectPath(scope, "/sender-issues")).catch(() => []));
-
 export type ControlledRow = {
   id: string; projectId: string | null; kind: string; key: string; title: string; versionLabel: string; state: string; submittedById: string | null; rowCount: number;
   sourceName: string | null; sourceSize: number | null; sourceHash: string | null; notes: string | null; payload: unknown; diff: unknown;

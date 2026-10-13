@@ -12,13 +12,13 @@ import type { RegisterPage } from "./types";
  */
 
 /** GET /checks (CheckEndpoints.cs CheckView): one check, its last result, and why it is off when it is. */
-export type CheckView = {
+type CheckView = {
   id: string; phase: string; condition: string; method: string; severity: string; owner: string;
   result: string | null; failing: number | null; note: string | null; offBecause: string | null;
 };
 
 /** One run (CheckEndpoints.cs RunView). */
-export type RunView = {
+type RunView = {
   id: string; status: "QUEUED" | "RUNNING" | "DONE" | "FAILED"; requestedBy: string; requestedAt: string; finishedAt: string | null;
   executed: number; passed: number; failed: number; needsSetup: number; off: number; integrity: number; coverage: number;
   openCritical: number; error: string | null;
@@ -32,7 +32,7 @@ export type DefectView = {
   closedAt: string | null; acceptedReason: string | null; acceptedBy: string | null;
 };
 
-export type ChecksAnswer = { lastRun: RunView | null; checks: CheckView[] };
+type ChecksAnswer = { lastRun: RunView | null; checks: CheckView[] };
 
 /** The checks are the project's own people's to read; anybody else is shown none. */
 async function orNothing<T>(load: () => Promise<T>, nothing: T): Promise<T> {
@@ -53,7 +53,7 @@ export const liveDefects = cache(async (projectId: string): Promise<DefectView[]
   orNothing(() => api<DefectView[]>(projectPath({ projectId }, "/defects")), []));
 
 /** One run, as it stands now. */
-export async function runOf(scope: { projectId: string }, runId: string): Promise<RunView> {
+async function runOf(scope: { projectId: string }, runId: string): Promise<RunView> {
   return api<RunView>(projectPath(scope, `/checks/runs/${runId}`));
 }
 
@@ -87,7 +87,7 @@ export function flawedDocuments(defects: DefectView[]): number {
 export const CHECK_OFF_KEY = "CHECK_OFF:";
 
 /** A switched-off check, with who decided and when where this application recorded it. */
-export type OptOut = { id: string; checkId: string; reason: string; setByName: string; setAt: Date | null };
+type OptOut = { id: string; checkId: string; reason: string; setByName: string; setAt: Date | null };
 
 /** The checks the project switched off: the backend's reason, and who and when from the settings. */
 export async function optOutsOf(projectId: string): Promise<OptOut[]> {

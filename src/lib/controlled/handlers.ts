@@ -7,7 +7,6 @@ import {
   register,
   headerIndex,
   cell,
-  parseDate,
   diffByKey,
   type Handler,
   type ParseIssue,
@@ -165,13 +164,6 @@ const SCHEDULE_COLUMNS = [
   "Date",
   "Responsible Party",
 ];
-
-/** What the same columns used to be called, so an older file still uploads. */
-const SCHEDULE_ALIASES = {
-  "Activity Code": ["Activity ID"],
-  Date: ["Forecast Date", "Baseline Date", "Activity Date"],
-};
-
 const schedule: Handler = {
   kind: "SCHEDULE",
   title: "Project schedule",
@@ -304,7 +296,7 @@ register(distributionMatrix);
 register(schedule);
 register(valueSet);
 
-export { distributionMatrix, schedule, valueSet };
+;
 
 // Registered alongside the others so every entry point that loads handlers sees it.
 import "./departments";

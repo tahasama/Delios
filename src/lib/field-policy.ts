@@ -78,7 +78,7 @@ export const CONTROL_LABEL: Record<Control, string> = {
   PEOPLE: "People on the project",
 };
 
-export type FieldDef = {
+type FieldDef = {
   kind: FieldKind;
   /** The name the form and the server action know it by. */
   key: string;
@@ -104,7 +104,7 @@ export type FieldDef = {
   fixed?: string;
 };
 
-export const FIELDS: FieldDef[] = [
+const FIELDS: FieldDef[] = [
   // ── Registering a document ──
   { control: "TEXT", kind: "DOCUMENT", key: "title", label: "Title", text: "What it is about, in the words somebody searching would use.", fallback: "REQUIRED", fixed: "A document nobody can find by name is not in a register." },
   { control: "CHOICE", setKey: "DOCUMENT_TYPES", computedBy: "The number is built from it, and it decides the review route.", kind: "DOCUMENT", key: "docType", label: "Document type", text: "Drawing, calculation, datasheet — from the published list.", fallback: "REQUIRED", fixed: "The type decides the number, the route and how long it is kept." },

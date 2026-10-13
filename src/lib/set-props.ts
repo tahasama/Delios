@@ -42,7 +42,7 @@ export type PropField =
 import type { ChoiceOption } from "./verdict-effect";
 
 import { VERDICT_EFFECT, verdictEffect } from "./verdict-effect";
-export { VERDICT_EFFECT, verdictEffect, VERDICT_EFFECT_SHORT } from "./verdict-effect";
+;
 
 /** Whether a document type goes down a review route before it is released. */
 const REVIEW_NEED: ChoiceOption[] = [

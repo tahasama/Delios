@@ -11,8 +11,8 @@
  */
 import { api, projectPath } from "@/lib/api/client";
 
-export type Recipient = { key: string; name: string; organization: string | null; userId: string | null; via: string };
-export type Untold = {
+type Recipient = { key: string; name: string; organization: string | null; userId: string | null; via: string };
+type Untold = {
   document: { id: string; docNumber: string; title: string };
   old: { id: string; value: string; supersededAt: Date | null };
   current: { id: string; value: string; statusCode: string | null } | null;

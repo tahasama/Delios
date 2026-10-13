@@ -21,7 +21,7 @@ import { holders } from "./api/settings";
  *
  * The backend works the chain out; this reads it.
  */
-export type Checkpoint = {
+type Checkpoint = {
   /**
    * The step, named as the people on the job name it: an outside approval is
    * not "the decision", and a drawing a supplier owes us is not "sent for
@@ -39,7 +39,7 @@ export type Checkpoint = {
   owedBy: string;
 };
 
-export type DocumentLateness = {
+type DocumentLateness = {
   docNumber: string;
   title: string;
   requiredStatus: string;

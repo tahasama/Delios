@@ -6,7 +6,7 @@ import { api, projectPath } from "@/lib/api/client";
 import { getMe } from "@/lib/api/me";
 import type { ActivitySummary, RegisterPage } from "@/lib/api/types";
 import { RegisterPlate } from "./register-plate";
-import { OUTCOME_CONSEQUENCES, DOC_STATES, DOC_STATE_LABEL, DOC_MEANING, REV_STATES, REV_MEANING, type DocState, type RevState } from "@/lib/standard";
+import { OUTCOME_CONSEQUENCES, DOC_STATES, DOC_STATE_LABEL, DOC_MEANING, REV_STATES, REV_MEANING, type DocState } from "@/lib/standard";
 import { getSet } from "@/lib/config";
 import { DocumentRegister } from "./document-register";
 import { activityDetail, scheduleSource } from "@/lib/api/schedule";

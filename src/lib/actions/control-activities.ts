@@ -262,7 +262,7 @@ export async function addOwnFieldAction(_prev: { error?: string; ok?: string } |
 }
 
 /** Remove a field the organization added. Answers already given are left where they are. */
-export async function removeOwnFieldAction(_prev: { error?: string; ok?: string } | undefined, formData: FormData): Promise<{ error?: string; ok?: string }> {
+async function removeOwnFieldAction(_prev: { error?: string; ok?: string } | undefined, formData: FormData): Promise<{ error?: string; ok?: string }> {
   const ctx = await requireScope();
   if (!isAdmin(ctx.user)) return { error: "Only an administrator removes a field." };
   const id = String(formData.get("id") ?? "");

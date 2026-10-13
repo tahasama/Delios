@@ -8,16 +8,15 @@ import { controlDoes, policy as controlPolicy } from "@/lib/control-activities";
 import { notFound } from "next/navigation";
 import { requireScope } from "@/lib/scope";
 import { preflight } from "@/lib/rules/preflight";
-import { PreflightPanel, Guarded } from "@/components/preflight";
+import { PreflightPanel } from "@/components/preflight";
 import Link from "next/link";
 import { isController, isAdmin, mayContributeToDocument } from "@/lib/auth";
-import { Chip, ToneChip, StateChip, Banner, btn, Field, inputCls } from "@/components/ui";
+import { Chip, ToneChip, StateChip, Banner, Field, inputCls } from "@/components/ui";
 import { ActionForm } from "@/components/form";
 import { Asked, Added } from "@/components/policy-fields";
 import { DOC_STATE_LABEL, DOC_STATE_COLOR, REV_STATE_COLOR, revStateColor, type DocState, type RevState } from "@/lib/standard";
 import { stateNames, stateName, supplierStage, supplierStageName, supplierStamp } from "@/lib/state-names";
 import { revisionGround } from "@/lib/revision-ground";
-import { typeSkipsReview } from "@/lib/review-need";
 import { ownFields, readExtras, formPolicy } from "@/lib/field-policy";
 import { fmtDate, timeAgo, plain } from "@/lib/utils";
 import { getActiveSet, getSet, getValue } from "@/lib/config";
@@ -42,7 +41,6 @@ import { SupplierDelivery } from "./supplier-delivery";
 import { Timeline } from "@/components/timeline";
 import { DocTabs } from "./doc-tabs";
 import { ArrowLeft, ChevronRight, Download, ExternalLink, FileText, Send } from "lucide-react";
-import { hasVerb } from "@/lib/auth";
 import { activityList, scheduleSource } from "@/lib/api/schedule";
 import { addDocumentToActionAction } from "@/lib/actions/action-links";
 import { sendToSupplierAction, askBackAction, answerAskAction } from "@/lib/actions/supplier";
@@ -177,7 +175,6 @@ export default async function DocumentDetailPage({
   // not — and then whoever starts it says why.
   const ground = doc.isPlaceholder ? { kind: "FIRST" as const } : await revisionGround(ctx, doc.id);
   // A type the organization does not review never goes down a route.
-  const reviewed = !(await typeSkipsReview(ctx, doc.docType));
   const sentOut = !!current && transmittalItems.some((item) => item.revisionId === current.id && item.transmittal.direction === "OUTGOING");
   // Where releasing means go ahead, nobody is asked who receives it.
   const policy = await issuePolicy(ctx);

@@ -12,7 +12,7 @@ import type { Tenant } from "../tenant";
  * `src/lib/actions/controlled.ts` and is the same for every kind.
  */
 
-export const CONTROLLED_KINDS = [
+const CONTROLLED_KINDS = [
   "DISTRIBUTION_MATRIX",
   "SCHEDULE",
   "VALUE_SET",
@@ -173,7 +173,7 @@ export function summariseDiff(lines: DiffLine[]): string {
 
 // ── The state machine ────────────────────────────────────────────────────────
 
-export type VersionState = "DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED" | "SUPERSEDED";
+type VersionState = "DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED" | "SUPERSEDED";
 
 /**
  * Whether a decision may be taken, and if not, why. Kept as a pure function so

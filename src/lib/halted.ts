@@ -13,7 +13,7 @@ import type { RegisterPage } from "./api/types";
  * The four consequences of the Standard are the floor; an organization that
  * publishes its own outcome list says, per code, whether work proceeds.
  */
-export async function haltingVerdicts(): Promise<string[]> {
+async function haltingVerdicts(): Promise<string[]> {
   const rows = await getSet("REVIEW_OUTCOMES");
   const codes = new Set<string>();
   for (const [code, one] of Object.entries(OUTCOME_CONSEQUENCES)) if (!one.proceed) codes.add(code);
@@ -25,7 +25,7 @@ export async function haltingVerdicts(): Promise<string[]> {
 }
 
 /** A released revision a binding verdict says nobody may work from. */
-export type HaltedRevision = { id: string; documentId: string; value: string; document: { docNumber: string; title: string }; verdict: string; decidedBy: string | null };
+type HaltedRevision = { id: string; documentId: string; value: string; document: { docNumber: string; title: string }; verdict: string; decidedBy: string | null };
 
 /**
  * Released, and the review that decided it says the work may not proceed — a

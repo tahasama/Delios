@@ -4,19 +4,19 @@ import { cookies } from "next/headers";
 import { api, apiShortLived, ApiProblem, SESSION_COOKIE } from "./client";
 
 /** A rule of the permission matrix as the backend holds it (the function's rows). */
-export type MeRule = {
+type MeRule = {
   deliverableType: string | null; docType: string | null; discipline: string | null; criticality: string | null;
   confidentiality: string | null; projectRole: string | null; verbs: string[];
 };
 
 /** A project the person is on, with their function, department and the function's rules. */
-export type MeProject = {
+type MeProject = {
   id: string; code: string; name: string; timeZone: string; contractRole: string; kind?: string; status: string; department: string | null;
   function: { id: string; code: string; name: string; clearance?: string | null }; verbs: string[]; rules: MeRule[];
 };
 
 /** GET /api/me: who is signed in, their organization, and the projects they are on. */
-export type Me = {
+type Me = {
   user: { id: string; name: string; email: string; isAdmin: boolean; party: { code: string; name: string; isInternal: boolean } | null };
   tenant: { slug: string; name: string };
   projects: MeProject[];
@@ -34,7 +34,7 @@ export const getMe = cache(async (): Promise<Me | null> => {
 });
 
 /** A notification as GET /api/me/notifications returns it. */
-export type MeNotification = {
+type MeNotification = {
   id: string; projectId: string | null; kind: string; title: string; body: string | null; link: string | null;
   createdAt: string; readAt: string | null;
 };

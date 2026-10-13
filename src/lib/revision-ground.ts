@@ -15,7 +15,7 @@ import { legacyDocument } from "./api/legacy";
  *            another, so whoever starts it says why, and the reason stays
  *            visible next to the revision it follows.
  */
-export type RevisionGround =
+type RevisionGround =
   | { kind: "FIRST" }
   | { kind: "ASKED"; why: string; comments: number }
   | { kind: "OWN" };

@@ -1,16 +1,7 @@
 import { plain } from "./utils";
-import { CHECK_BY_ID, type Phase } from "./checks/catalog";
+import { CHECK_BY_ID } from "./checks/catalog";
 import { liveDefects, type DefectView } from "./api/conformance";
-
-/**
- * The check results turned into a work list: which documents have problems,
- * what each problem is in plain words, who fixes it, and where.
- */
-export type Problem = { id: string; checkId: string; severity: string; text: string; todo: string; owner: string; status: string; fix: { label: string; href: string } };
-export type ProblemDocument = { id: string; docNumber: string; title: string; worst: string; problems: Problem[] };
-
 export const OWNER_LABEL: Record<string, string> = { CF: "Document Control", OR: "Originator", RV: "Reviewer", OG: "Organization" };
-const RANK: Record<string, number> = { CRITICAL: 0, MAJOR: 1, MINOR: 2, ADVISORY: 3 };
 
 /** Where a problem of this family is fixed on the document page. */
 function fixFor(checkId: string, documentId: string | null): { label: string; href: string } {
@@ -71,7 +62,7 @@ export function todoOf(checkId: string): string {
 }
 
 /** The finding's own sentence, without clause references and Standard jargon. */
-export function plainProblem(text: string): string {
+function plainProblem(text: string): string {
   return plain(text).replace(/\s*—\s*structural contradiction/gi, "").replace(/\s*▲/g, "").replace(/\s*\/\s*[A-Z]{2}-\d{2}/g, "").replace(/\.$/, "") ;
 }
 
@@ -90,79 +81,6 @@ function documentOf(d: DefectView): { id: string; docNumber: string; title: stri
 /** The defects not closed, narrowed to one owner when asked. */
 async function defectsOf(t: { projectId: string }, owner?: string) {
   return (await liveDefects(t.projectId)).filter((d) => !owner || d.owner === owner);
-}
-
-export async function problemDocuments(t: { projectId: string }, owner?: string) {
-  const defects = (await defectsOf(t, owner)).map((d) => ({ ...d, ownerRole: d.owner, documentRef: documentOf(d) }));
-  const byDoc = new Map<string, ProblemDocument>();
-  const general: Problem[] = [];
-  for (const d of defects) {
-    const p: Problem = {
-      id: d.id, checkId: d.checkId, severity: d.severity, owner: OWNER_LABEL[d.ownerRole] ?? d.ownerRole,
-      text: plainProblem(d.description),
-      todo: todoOf(d.checkId),
-      status: d.status,
-      fix: fixFor(d.checkId, d.documentId),
-    };
-    if (!d.documentRef) { general.push(p); continue; }
-    const row = byDoc.get(d.documentRef.id) ?? { id: d.documentRef.id, docNumber: d.documentRef.docNumber, title: d.documentRef.title, worst: d.severity, problems: [] };
-    row.problems.push(p);
-    if (RANK[d.severity] < RANK[row.worst]) row.worst = d.severity;
-    byDoc.set(d.documentRef.id, row);
-  }
-  const documents = [...byDoc.values()]
-    .map((r) => ({ ...r, problems: r.problems.sort((a, b) => RANK[a.severity] - RANK[b.severity]) }))
-    .sort((a, b) => RANK[a.worst] - RANK[b.worst] || b.problems.length - a.problems.length || a.docNumber.localeCompare(b.docNumber));
-  return { documents, general: general.sort((a, b) => RANK[a.severity] - RANK[b.severity]) };
-}
-
-/**
- * The same findings counted by what is wrong, not by which document has it.
- *
- * A register of ten thousand documents produces a list of documents nobody can
- * read. Twenty-five kinds of problem, each with a count, is a page you can act
- * on: you fix a kind of problem, not a document at a time.
- */
-export type ProblemType = {
-  checkId: string;
-  phase: Phase;
-  severity: string;
-  /** What is wrong, in the words of the check. */
-  what: string;
-  /** What to do about it. */
-  todo: string;
-  owner: string;
-  documents: number;
-  findings: number;
-  accepted: number;
-};
-
-export async function problemTypes(t: { projectId: string }, owner?: string): Promise<ProblemType[]> {
-  const defects = (await defectsOf(t, owner)).map((d) => ({ checkId: d.checkId, severity: d.severity, ownerRole: d.owner, documentId: d.documentId, status: d.status }));
-  const byCheck = new Map<string, { severity: string; owner: string; docs: Set<string>; findings: number; accepted: number }>();
-  for (const d of defects) {
-    const row = byCheck.get(d.checkId) ?? { severity: d.severity, owner: OWNER_LABEL[d.ownerRole] ?? d.ownerRole, docs: new Set<string>(), findings: 0, accepted: 0 };
-    row.findings++;
-    if (d.status === "ACCEPTED") row.accepted++;
-    if (d.documentId) row.docs.add(d.documentId);
-    byCheck.set(d.checkId, row);
-  }
-  const out: ProblemType[] = [];
-  for (const [checkId, row] of byCheck) {
-    const meta = CHECK_BY_ID.get(checkId);
-    out.push({
-      checkId,
-      phase: meta?.phase ?? "RUNNING",
-      severity: row.severity,
-      what: plainProblem(meta?.condition ?? checkId),
-      todo: todoOf(checkId),
-      owner: row.owner,
-      documents: row.docs.size,
-      findings: row.findings,
-      accepted: row.accepted,
-    });
-  }
-  return out.sort((a, b) => RANK[a.severity] - RANK[b.severity] || b.findings - a.findings);
 }
 
 /** Every finding of one kind, newest first, for the drill-down. */

@@ -225,7 +225,7 @@ export const legacyTransmittal = cache(async (scope: Scope, id: string) => {
   };
 });
 
-export type LegacyTransmittal = NonNullable<Awaited<ReturnType<typeof legacyTransmittal>>>;
+type LegacyTransmittal = NonNullable<Awaited<ReturnType<typeof legacyTransmittal>>>;
 
 /**
  * Who of ours carries each organization a transmittal went to by hand, and
@@ -253,32 +253,6 @@ export async function carriersOf(scope: Scope, t: LegacyTransmittal): Promise<Ma
 export async function dispatchOf(scope: Scope, recipientId: string): Promise<string | null> {
   const found = (await work(scope)).issues.find((one) => one.kind === "DISPATCH_TRANSMITTAL" && one.recipientId === recipientId);
   return found?.transmittalId ?? null;
-}
-
-/**
- * The unplanned item a file came on, for registering it. The backend keeps the
- * file on its item, so it is found among what still waits to be registered.
- */
-export async function unplannedItemOfFile(scope: Scope, fileId: string): Promise<{ transmittal: TransmittalView; item: TransmittalItem } | null> {
-  const waiting = await transmittalLog(scope, { status: "TO_REGISTER", per: 250 });
-  for (const row of waiting.rows) {
-    const t = await backendTransmittal(scope, row.id);
-    const item = t?.items.find((one) => one.kind === "UNPLANNED" && !one.registeredAt && one.files.some((f) => f.id === fileId));
-    if (t && item) return { transmittal: t, item };
-  }
-  return null;
-}
-
-/** What registering an unplanned item takes (RegisterDocumentRequest): what is left empty is taken from the item. */
-export type RegisterItem = {
-  title?: string | null; deliverableType?: string | null; docType?: string | null; discipline?: string | null; subproject?: string | null;
-  contractRef?: string | null; criticality?: string | null; confidentiality?: string | null; retentionClass?: string | null;
-  receivedDate?: string | null; plannedDate?: string | null; kind?: string | null;
-};
-
-/** Document Control puts an unplanned item in the register, under our numbering; throws the backend's refusal. */
-export async function registerUnplannedItem(scope: Scope, transmittalId: string, itemId: string, body: RegisterItem): Promise<TransmittalView> {
-  return api<TransmittalView>(projectPath(scope, `/transmittals/${transmittalId}/items/${itemId}/register`), { body });
 }
 
 /** The drafts the reader may see, newest first: written, not sent, no number yet. */

@@ -7,7 +7,7 @@ export async function supplyReason() {
 }
 
 /** The status a submission is sent for, read from its reason: "For approval" → "Issued for approval". */
-export async function sentFor(reasonCode: string): Promise<string> {
+async function sentFor(reasonCode: string): Promise<string> {
   const [reasons, statuses] = await Promise.all([getActiveSet("REASONS_FOR_ISSUE"), getActiveSet("STATUSES")]);
   const words = (reasons.find((r) => r.code === reasonCode)?.label ?? "").toLowerCase();
   return (statuses.find((s) => words && s.label.toLowerCase().endsWith(words))

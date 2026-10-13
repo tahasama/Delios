@@ -4,9 +4,9 @@ import { useState } from "react";
 import { Field, inputCls } from "@/components/ui";
 import { SearchPick } from "@/components/search-pick";
 
-export type PickPerson = { id: string; name: string; organization: string; /** Why the matrix proposes them. */ basis?: string | null };
-export type PickParty = { id: string; name: string };
-export type PickReason = { code: string; label: string };
+type PickPerson = { id: string; name: string; organization: string; /** Why the matrix proposes them. */ basis?: string | null };
+type PickParty = { id: string; name: string };
+type PickReason = { code: string; label: string };
 
 /**
  * Asking for a revision to be sent somewhere.

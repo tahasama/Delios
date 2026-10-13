@@ -1,9 +1,8 @@
 import "server-only";
 
 import { SET_PROP_FIELDS } from "./set-props";
-export { SET_PROP_FIELDS } from "./set-props";
 export type { PropField } from "./set-props";
-export { VERDICT_EFFECT, verdictEffect, VERDICT_EFFECT_SHORT } from "./verdict-effect";
+;
 
 /**
  * Build the JSON props blob from submitted form fields for a given set.

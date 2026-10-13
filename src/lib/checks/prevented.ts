@@ -13,7 +13,7 @@
  * would flatter the number instead of informing it.
  */
 
-export type PreventedRule = {
+type PreventedRule = {
   /** What would be wrong, in the same words a check would use. */
   condition: string;
   /** What refuses it, and when. */

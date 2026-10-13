@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { requireScope } from "@/lib/scope";
 import { mayContributeToDocument, type SessionUser } from "@/lib/auth";
 import { Chip, Field, inputCls } from "@/components/ui";
@@ -299,11 +298,6 @@ async function RunActivePanel({ run, user, extra }: { run: { id: string; templat
       </ul>
     </div>
   ) : null;
-  // An adviser's own comments, so the form can hold their advice to them.
-  const ownRows = step?.cycleId
-    ? review.comments.filter((c) => c.authorId === user.id && c.step === run.currentStep + 1).map((c) => ({ progressionPreventing: c.blocking }))
-    : [];
-  const ownComments = { total: ownRows.length, blocking: ownRows.filter((c) => c.progressionPreventing).length };
 
   const waitingOn = step && step.status === "active"
     ? participants.filter((p) => step.participantIds.includes(p.id) && !(step.mode === "ALL" && (step.decidedBy ?? []).includes(p.id)))

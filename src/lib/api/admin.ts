@@ -7,7 +7,7 @@ import { api } from "./client";
  * them (`/api/admin/...`). Read here; changed by the settings actions.
  */
 
-export type AdminMembership = {
+type AdminMembership = {
   id: string; projectId: string; projectCode: string; projectName: string; functionId: string; functionCode: string; functionName: string;
   department: string | null; active: boolean;
   /** Added while management confirms who joins: waiting, or refused with why, or confirmed. */
@@ -16,12 +16,12 @@ export type AdminMembership = {
   confirmedAt?: string | null; confirmedByName?: string | null;
 };
 
-export type AdminUser = {
+type AdminUser = {
   id: string; name: string; email: string; active: boolean; isAdmin: boolean; partyId: string | null; partyCode: string | null;
   partyName: string | null; internal: boolean; mfa: boolean; lockedUntil: string | null; createdAt: string; memberships: AdminMembership[];
 };
 
-export type AdminProject = {
+type AdminProject = {
   id: string; code: string; name: string; contractRole: string; kind?: string; status: string; timeZone: string; weekendDays: number[];
   contentExtraction: string; createdAt: string; members: number; documents: number;
 };
@@ -35,32 +35,32 @@ export type AdminRule = {
 
 export type AdminFunction = { id: string; code: string; name: string; active: boolean; holders: number; rules: AdminRule[]; clearance?: string | null };
 
-export type AdminParty = {
+type AdminParty = {
   id: string; code: string; name: string; isInternal: boolean; active: boolean; participation: string; custodianFunction: string | null;
   externalSystem: string | null; evidenceRequired: boolean; people: number;
 };
 
-export type SchemeField = { label: string; source: string; value: string | null; digits: number | null };
+type SchemeField = { label: string; source: string; value: string | null; digits: number | null };
 
-export type AdminNumbering = {
+type AdminNumbering = {
   schemes: { id: string; name: string; delimiter: string; active: boolean; fields: SchemeField[] }[];
   routing: { id: string; deliverableType: string; schemeId: string; active: boolean }[];
   revisionSchemes: { id: string; name: string; isDefault: boolean; forwardOnly: boolean; series: { code: string; label: string; kind: string; prefix: string; start: string }[] }[];
   revisionRouting: { deliverableType: string; schemeId: string }[];
 };
 
-export type RouteStepView = {
+type RouteStepView = {
   title: string; functionCode: string | null; partyCode: string | null; reason: string | null; mode: string; days: number | null; grantsStatuses: string[];
   userIds?: string[];
 };
 
-export type AdminRoute = {
+type AdminRoute = {
   id: string; name: string; description: string | null; isDefault: boolean; active: boolean; verdictSet?: string | null;
   patterns: { deliverableType: string | null; docType: string | null; discipline: string | null; criticality: string | null; originator: string | null }[];
   steps: RouteStepView[];
 };
 
-export type AuditPage = {
+type AuditPage = {
   total: number; page: number; per: number; pages: number; actions: { action: string; count: number }[];
   rows: { id: number; at: string; actorId: string | null; actorName: string; action: string; entityType: string | null; entityId: string | null;
     entityLabel: string | null; detail: string | null; projectId: string | null }[];
@@ -100,13 +100,13 @@ const SET_BY_SOURCE = Object.fromEntries(Object.entries(SOURCE_BY_SET).map(([set
 /** What the screen calls a record kind, and the backend's name for it. */
 export const RECORD_KIND: Record<string, string> = { TRANSMITTAL: "@TRANSMITTAL", REVIEW: "@REVIEW", PACKAGE: "@PACKAGE", ACTION: "@ACTION" };
 
-export type LegacyScheme = {
+type LegacyScheme = {
   id: string; name: string; delimiter: string; active: boolean; notes: string | null;
   fields: { id: string; position: number; label: string; valueSetKey: string | null; rule: string | null }[];
 };
 
 /** A backend part as the screen writes it: a list it reads, or a rule. */
-export function legacyField(field: SchemeField, index: number, schemeId: string): LegacyScheme["fields"][number] {
+function legacyField(field: SchemeField, index: number, schemeId: string): LegacyScheme["fields"][number] {
   const base = { id: `${schemeId}-${index}`, position: index + 1, label: field.label };
   if (field.source === "SEQUENCE") return { ...base, valueSetKey: null, rule: `COUNTER:DIGITS(${field.digits ?? 4})` };
   if (field.source === "FIXED") return { ...base, valueSetKey: null, rule: `FIXED(${field.value ?? ""})` };
@@ -192,7 +192,7 @@ export function asMatrixRules(rules: AdminRule[]) {
 // settings under PARTY:<id>. How it takes part is the backend's.
 
 export const PARTY_KEY = "PARTY:";
-export type PartyAnswers = { kind?: string; contactId?: string | null; backupId?: string | null };
+type PartyAnswers = { kind?: string; contactId?: string | null; backupId?: string | null };
 
 export async function legacyParties() {
   const { orgSettings } = await import("./settings");
@@ -274,12 +274,12 @@ export async function backendRoute(classes: string, steps: LegacyRouteStep[]): P
 // uploads the versions, newest first. The organization's lists and the
 // project's are read together.
 
-export type ControlledVersionRow = {
+type ControlledVersionRow = {
   id: string; key: string; title: string; state: string; versionLabel: string; rowCount: number; decidedAt: Date | null; decidedByName: string | null;
   decisionReason: string | null; createdAt: Date; submittedAt: Date | null; submittedById: string | null; submittedByName: string | null;
   sourceName: string | null; notes: string | null; diff: string | null;
 };
-export type ControlledSetRow = { id: string; key: string; title: string; kind: string; projectId: string | null; versions: ControlledVersionRow[] };
+type ControlledSetRow = { id: string; key: string; title: string; kind: string; projectId: string | null; versions: ControlledVersionRow[] };
 
 export async function controlledSets(scope?: { projectId: string }): Promise<ControlledSetRow[]> {
   const { controlledVersions } = await import("./records");

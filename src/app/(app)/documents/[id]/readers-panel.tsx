@@ -4,7 +4,7 @@ import { fmtDate } from "@/lib/utils";
 import { addDocumentReaderAction, removeDocumentReaderAction } from "@/lib/actions/document-access";
 import { SearchPick } from "@/components/search-pick";
 
-export type Reader = { id: string; name: string; addedByName: string; reason: string | null; at: Date };
+type Reader = { id: string; name: string; addedByName: string; reason: string | null; at: Date };
 
 /**
  * Who may read a closed document.

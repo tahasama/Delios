@@ -3,7 +3,7 @@ import type { Tenant } from "./tenant";
 import { api, projectPath } from "./api/client";
 import type { Addressees } from "./api/types";
 
-export type RecipientCompany = { key: string; name: string; people: { id: string; name: string; job: string | null }[]; offline?: string };
+type RecipientCompany = { key: string; name: string; people: { id: string; name: string; job: string | null }[]; offline?: string };
 
 /**
  * Everyone something can be sent to, by company: the people with an account
