@@ -114,6 +114,8 @@ public static partial class ScheduleEndpoints
         project.MapGet("/schedule", SourceAsync);
         project.MapPut("/schedule", SetSourceAsync);
         project.MapPost("/schedule/import", ImportAsync);
+        project.MapGet("/plan", PlanAsync);
+        project.MapGet("/plan/{code}", PlanActionAsync);
         project.MapGet("/activities", ActivitiesAsync);
         project.MapGet("/activities/{activityId:guid}", ActivityAsync);
         project.MapPost("/activities/{activityId:guid}/needs", AddNeedAsync);

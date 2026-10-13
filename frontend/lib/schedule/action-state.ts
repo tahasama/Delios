@@ -1,5 +1,3 @@
-import { meetsRequirement } from "@/lib/schedule/readiness";
-
 /**
  * Where an action stands, said once for every page that shows it. The schedule
  * and the action's own page used to work it out each in their own way, and an
@@ -35,9 +33,9 @@ export const DEFAULT_RISK_DAYS = 7;
 const DAY = 86_400_000;
 
 type Stateful = {
-  scheduledDate: Date | null;
+  start: Date | null;
   lastMetAt: Date | null;
-  entries: { requiredBy: Date; requiredStatus: string; riskDays?: number | null; document: { revisions: { statusCode: string | null; meets?: boolean }[] } }[];
+  needs: { neededBy: Date; state: string; riskDays?: number | null }[];
 };
 
 /** The start of the day `now` falls in: a day passes at midnight, not 24 hours after it began. */
@@ -48,18 +46,18 @@ function startOfDay(now: Date): Date {
 }
 
 /** Whether the action's day is over: before today, not merely earlier than this minute. */
-export function dayHasPassed(action: { scheduledDate: Date | null }, now = new Date()): boolean {
-  return !!action.scheduledDate && action.scheduledDate < startOfDay(now);
+export function dayHasPassed(action: { start: Date | null }, now = new Date()): boolean {
+  return !!action.start && action.start < startOfDay(now);
 }
 
 export function actionState(action: Stateful, riskDays = DEFAULT_RISK_DAYS, now = new Date()): ActionState {
-  const total = action.entries.length;
+  const total = action.needs.length;
   if (!total) return "UNKNOWN";
-  const missing = action.entries.filter((entry) => !meetsRequirement(entry.document.revisions, entry.requiredStatus));
+  const missing = action.needs.filter((entry) => entry.state !== "MET");
   const passed = dayHasPassed(action, now);
   if (!missing.length) {
     if (!passed) return "READY";
-    const afterwards = !!action.lastMetAt && !!action.scheduledDate && action.lastMetAt > action.scheduledDate;
+    const afterwards = !!action.lastMetAt && !!action.start && action.lastMetAt > action.start;
     return afterwards ? "LATE_RECEIPT" : "DONE";
   }
   if (passed) return "NOT_READY";
@@ -73,13 +71,13 @@ export function actionState(action: Stateful, riskDays = DEFAULT_RISK_DAYS, now 
  * backend writes the same day (Activity.RiskFrom). Null when nothing is missing
  * or there is no day.
  */
-export function riskFrom<E extends Stateful["entries"][number]>(
-  action: { scheduledDate: Date | null; entries: E[] }, riskDays = DEFAULT_RISK_DAYS, only?: (entry: E) => boolean,
+export function riskFrom<E extends Stateful["needs"][number]>(
+  action: { start: Date | null; needs: E[] }, riskDays = DEFAULT_RISK_DAYS, only?: (entry: E) => boolean,
 ): Date | null {
-  if (!action.scheduledDate) return null;
-  const missing = action.entries.filter((entry) => (!only || only(entry)) && !meetsRequirement(entry.document.revisions, entry.requiredStatus));
+  if (!action.start) return null;
+  const missing = action.needs.filter((entry) => (!only || only(entry)) && entry.state !== "MET");
   if (!missing.length) return null;
-  const day = startOfDay(action.scheduledDate).getTime();
+  const day = startOfDay(action.start).getTime();
   return new Date(Math.min(...missing.map((entry) => day - (entry.riskDays ?? riskDays) * DAY)));
 }
 
@@ -88,6 +86,6 @@ export function riskFrom<E extends Stateful["entries"][number]>(
  * does not proceed, not taken back by Document Control. The schedule and the
  * action's page both ask this.
  */
-export function isPostponed(action: { notes: { decision: string; reversedAt?: Date | null }[] }, postponeCodes: string[]): boolean {
-  return action.notes.some((note) => postponeCodes.includes(note.decision) && !note.reversedAt);
+export function isPostponed(action: { decisions: { decision: string; reversedAt?: Date | null }[] }, postponeCodes: string[]): boolean {
+  return action.decisions.some((note) => postponeCodes.includes(note.decision) && !note.reversedAt);
 }

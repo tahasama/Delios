@@ -1,8 +1,7 @@
 import "server-only";
 import { cache } from "react";
 import { api, ApiProblem, projectPath } from "./client";
-import { backendDocument } from "./legacy";
-import type { ActivitySummary, DocumentView } from "./types";
+import type { ActivitySummary } from "./types";
 
 /**
  * The schedule as the old screens read it. The backend keeps activities read
@@ -56,15 +55,6 @@ type ScheduleImportView = {
 
 type ScheduleSourceView = { id: string; documentId: string; defaultLeadDays: number; riskWindowDays: number };
 
-const date = (iso: string | null | undefined) => (iso ? new Date(iso) : null);
-
-/** A day from the backend, at midnight UTC as the old dates were kept. */
-function dayOf(value: LocalDateJson | undefined): Date | null {
-  if (!value) return null;
-  if (typeof value === "string") return new Date(`${value.slice(0, 10)}T00:00:00.000Z`);
-  return new Date(Date.UTC(value.year, value.month - 1, value.day));
-}
-
 /** Another organization's people do not read the schedule: for them it is empty. */
 function orNothing<T>(fallback: T) {
   return (e: unknown): T => {
@@ -89,202 +79,103 @@ export const activityDetail = cache(async (scope: Scope, id: string): Promise<Ac
 /** For each need of an activity, the checkpoints its document went through and the first that slipped. */
 export const activityLateness = cache(async (scope: Scope, id: string): Promise<NeedLateness[]> =>
   api<NeedLateness[]>(projectPath(scope, `/activities/${id}/lateness`)).catch(orNothing([] as NeedLateness[])));
+// ── The plan, as the schedule screens show it ─────────────────────────────────
 
-/** The activity with this code, also one the schedule has since dropped; null when there is none. */
-const activityByCode = cache(async (scope: Scope, code: string): Promise<ActivitySummary | null> => {
-  const found = await api<ActivitySummary[]>(projectPath(scope, "/activities"), { query: { q: code, includeRemoved: true } })
-    .catch(orNothing([] as ActivitySummary[]));
-  return found.find((one) => one.code === code) ?? null;
-});
-
-// ── The old shapes ───────────────────────────────────────────────────────────
-
-export type LegacyEntry = {
-  id: string; actionId: string; documentId: string; department: string | null;
-  /** What the need asks for: the statuses it names, or its purpose. */
+/** One thing an action needs: a document, for what (the statuses it names, or its purpose), by when, and where it stands. */
+export type PlanNeed = {
+  id: string; documentId: string; department: string | null;
   requiredStatus: string;
-  requiredBy: Date; manualDate: boolean; leadBusinessDays: number | null;
+  neededBy: Date;
+  /** The date was set by hand rather than counted from the action's day. */
+  manualDate: boolean;
+  /** Working days before the action's day, when counted from it. */
+  leadDays: number | null;
   /** This document's own risk window, in days before the action's day; null uses the project's. */
   riskDays: number | null;
-  submittedBy: string | null; approvedBy: string | null; createdAt: Date | null; updatedAt: Date | null;
+  /** The backend's answer: MET when its released revision serves the need. */
+  state: "MISSING" | "MET" | "WAIVED";
   document: {
-    id: string; docNumber: string; title: string; discipline: string; docType: string; originator: string | null; isPlaceholder: boolean;
-    /** The released revision, carrying the backend's answer on whether it serves this need. */
-    revisions: { value: string; state: string; statusCode: string | null; meets: boolean }[];
+    id: string; number: string; title: string; discipline: string; docType: string; originator: string | null; isPlaceholder: boolean;
+    /** The revision in force, and whether it serves this need. */
+    released: { value: string; statusCode: string | null; meets: boolean } | null;
     /** Its newest revision, whatever its state: where it stands when it is not released yet. */
-    latest?: { value: string; state: string; statusCode: string | null; held: boolean } | null;
+    latest: { value: string; state: string; statusCode: string | null; held: boolean } | null;
   };
-  state: NeedView["state"];
 };
 
-export type LegacyNote = {
-  id: string; decision: string; plannedDate: Date | null; responsibleName: string; reason: string;
-  delayResponsible: string | null; delayReason: string | null; recordedByName: string; createdAt: Date;
+export type PlanDecision = {
+  id: string; decision: string; plannedStart: Date | null; responsibleName: string; reason: string;
+  delayOwedBy: string | null; delayReason: string | null; recordedBy: string; recordedAt: Date;
   /** A postponement confirmed by whoever plans, with what changes. */
-  confirmedByName: string | null; confirmedAt: Date | null; confirmNote: string | null;
+  confirmedBy: string | null; confirmedAt: Date | null; confirmNote: string | null;
   /** Taken back by Document Control, with why: it no longer counts. */
-  reversedByName: string | null; reversedAt: Date | null; reversedReason: string | null;
+  reversedBy: string | null; reversedAt: Date | null; reversedReason: string | null;
 };
 
-export type LegacyAction = {
-  id: string; code: string; name: string; description: string | null; ownerName: string | null;
-  /** Departments (disciplines) as "CI,EL". */
-  departments: string | null; scheduledDate: Date | null; finishDate: Date | null;
-  createdAt: Date | null; riskNotifiedAt: Date | null; lastMetAt: Date | null; scheduleRef: string | null;
-  needCount: number; state: string;
+/** An action in force with everything its row and its page show, as the backend sends it (GET /plan). */
+export type PlanAction = {
+  id: string; code: string; name: string; responsible: string | null;
+  /** The planner's own ID for it, kept beside our number. */
+  externalId: string | null;
+  departments: string[]; start: Date | null; finish: Date | null;
+  /** When the last of its documents arrived, once none is missing. */
+  lastMetAt: Date | null;
+  needCount: number;
   /** The latest schedule read moved its dates: what they were, and which read moved them. */
   moved: { wasStart: Date | null; wasFinish: Date | null; in: string } | null;
-  /** The backend's readiness label (NONE, READY, READY_WITH_WAIVERS, AT_RISK, PENDING). */
-  readiness: string;
-  entries: LegacyEntry[];
-  /** Departments confirming their documents are there: not kept by the backend. */
+  /** By department, then by the day each is needed. */
+  needs: PlanNeed[];
+  /** Each discipline's answer on going ahead; one taken back by Document Control is kept, marked. */
   confirmations: {
     department: string; available: boolean; note: string | null; confirmedByName: string; confirmedAt: Date | null;
     /** Written by the system when the day passed with every document released. */
     automatic: boolean;
-    /** Taken back by Document Control: it then counts as not confirmed. */
     revokedAt: Date | null; revokedByName: string | null; revokedReason: string | null;
   }[];
-  notes: LegacyNote[];
-  scheduleActivities: { scheduleVersion: { versionLabel: string } }[];
+  /** Newest first. */
+  decisions: PlanDecision[];
 };
 
-/** Every document a list of needs names, read once each. */
-async function documentsOf(scope: Scope, needs: NeedView[]): Promise<Map<string, DocumentView | null>> {
-  const ids = [...new Set(needs.map((one) => one.documentId))];
-  const found = await inBatches(ids, (id) => backendDocument(scope, id));
-  return new Map(ids.map((id, index) => [id, found[index]]));
-}
+type Plan = { versionInForce: string | null; actions: PlanAction[] };
 
-/** Runs `load` over the items a few at a time, so a long schedule does not open a thousand requests at once. */
-async function inBatches<T, R>(items: T[], load: (item: T) => Promise<R>, size = 8): Promise<R[]> {
-  const out: R[] = [];
-  for (let i = 0; i < items.length; i += size) out.push(...(await Promise.all(items.slice(i, i + size).map(load))));
-  return out;
-}
-
-type Confirmation = LegacyAction["confirmations"][number] & { activityId: string };
-
-/** Each department's readiness answers, by activity. */
-async function confirmationsOf(scope: Scope): Promise<Confirmation[]> {
-  const { readinessAnswers } = await import("./records");
-  return (await readinessAnswers(scope)).map((one) => ({
-    activityId: one.activityId, department: one.department, available: one.available, note: one.note,
-    confirmedByName: one.confirmedByName, confirmedAt: new Date(one.confirmedAt),
-    automatic: !!one.automatic, revokedAt: one.revokedAt ? new Date(one.revokedAt) : null,
-    revokedByName: one.revokedByName ?? null, revokedReason: one.revokedReason ?? null,
-  }));
-}
-
-function legacyAction(detail: ActivityDetail, documents: Map<string, DocumentView | null>, versionLabel: string | null, confirmations: Confirmation[] = []): LegacyAction {
-  const { activity, needs, decisions } = detail;
-  const scheduledDate = dayOf(activity.start);
-  // By department, then by the day each is needed, as the action's list was kept.
-  const entries = [...needs].sort((a, b) => (a.department ?? "").localeCompare(b.department ?? "") || (a.neededBy ?? "").localeCompare(b.neededBy ?? "")).map((need): LegacyEntry => {
-    const document = documents.get(need.documentId) ?? null;
-    const released = document?.revisions.find((one) => one.state === "RELEASED") ?? null;
-    return {
-      id: need.id,
-      actionId: activity.id,
-      documentId: need.documentId,
-      department: need.department,
-      requiredStatus: need.requiredStatuses.length ? need.requiredStatuses.join("/") : need.purpose,
-      requiredBy: dayOf(need.neededBy) ?? scheduledDate ?? new Date(),
-      manualDate: !!need.fixedDate,
-      leadBusinessDays: need.anchor === "START" && need.offsetDays <= 0 ? -need.offsetDays : null,
-      riskDays: need.riskDays ?? null,
-      submittedBy: null,
-      approvedBy: null,
-      createdAt: null,
-      updatedAt: null,
-      document: {
-        id: need.documentId,
-        docNumber: need.documentNumber,
-        title: need.title,
-        discipline: document?.discipline ?? "",
-        docType: document?.docType ?? "",
-        originator: document?.originator ?? null,
-        isPlaceholder: document?.isPlaceholder ?? false,
-        revisions: need.currentRevision
-          ? [{ value: need.currentRevision, state: released?.state ?? "RELEASED", statusCode: need.currentStatus, meets: need.state === "MET" }]
-          : [],
-        latest: (() => {
-          const newest = document?.revisions.slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
-          return newest ? { value: newest.value, state: newest.state, statusCode: newest.statusCode, held: !!newest.heldAt } : null;
-        })(),
-      },
-      state: need.state,
-    };
-  });
-  // The last of them to arrive, once nothing is missing: what says whether they were there in time.
-  const covered = needs.length > 0 && needs.every((one) => one.state === "MET");
-  const arrivals = needs.map((one) => date(one.metAt)).filter((one): one is Date => !!one).sort((a, b) => b.getTime() - a.getTime());
+/** The backend sends days and moments as text; the screens count with dates. Nothing else changes. */
+function datesOf(raw: Plan): Plan {
+  const at = (iso: string | null | undefined) => (iso ? new Date(iso) : null);
+  const day = (iso: string | null | undefined) => (iso ? new Date(`${iso.slice(0, 10)}T00:00:00.000Z`) : null);
+  type Raw = Record<string, unknown> & { [key: string]: never };
   return {
-    id: activity.id,
-    code: activity.code,
-    name: activity.name,
-    description: null,
-    ownerName: activity.responsible,
-    departments: activity.departments.length ? activity.departments.join(",") : null,
-    scheduledDate,
-    finishDate: dayOf(activity.finish),
-    createdAt: null,
-    riskNotifiedAt: null,
-    lastMetAt: covered ? arrivals[0] ?? null : null,
-    // The planner's own ID for it, kept beside our number.
-    scheduleRef: activity.externalId ?? null,
-    moved: activity.moved ? { wasStart: dayOf(activity.moved.wasStart), wasFinish: dayOf(activity.moved.wasFinish), in: activity.moved.in } : null,
-    needCount: activity.needs,
-    state: activity.state,
-    readiness: activity.readiness,
-    entries,
-    confirmations: confirmations.filter((one) => one.activityId === activity.id),
-    notes: [...decisions].reverse().map((one) => ({
-      id: one.id,
-      decision: one.decision,
-      plannedDate: dayOf(one.plannedStart),
-      responsibleName: one.responsibleName,
-      reason: one.reason,
-      delayResponsible: one.delayOwedBy,
-      delayReason: one.delayReason,
-      recordedByName: one.recordedBy,
-      createdAt: new Date(one.recordedAt),
-      confirmedByName: one.confirmedBy ?? null,
-      confirmedAt: one.confirmedAt ? new Date(one.confirmedAt) : null,
-      confirmNote: one.confirmNote ?? null,
-      reversedByName: one.reversedBy ?? null,
-      reversedAt: one.reversedAt ? new Date(one.reversedAt) : null,
-      reversedReason: one.reversedReason ?? null,
-    })),
-    scheduleActivities: versionLabel ? [{ scheduleVersion: { versionLabel } }] : [],
+    versionInForce: raw.versionInForce,
+    actions: raw.actions.map((a) => {
+      const r = a as unknown as Raw & PlanAction;
+      return {
+        ...r,
+        start: day(r.start as unknown as string), finish: day(r.finish as unknown as string), lastMetAt: at(r.lastMetAt as unknown as string),
+        moved: r.moved ? { ...r.moved, wasStart: day(r.moved.wasStart as unknown as string), wasFinish: day(r.moved.wasFinish as unknown as string) } : null,
+        needs: r.needs.map((n) => ({ ...n, neededBy: day(n.neededBy as unknown as string)! })),
+        confirmations: r.confirmations.map((c) => ({ ...c, confirmedAt: at(c.confirmedAt as unknown as string), revokedAt: at(c.revokedAt as unknown as string) })),
+        decisions: r.decisions.map((d) => ({
+          ...d, plannedStart: day(d.plannedStart as unknown as string), recordedAt: at(d.recordedAt as unknown as string)!,
+          confirmedAt: at(d.confirmedAt as unknown as string), reversedAt: at(d.reversedAt as unknown as string),
+        })),
+      };
+    }),
   };
 }
 
-/** The label of the schedule read in force, e.g. "rev B", or null when none has been read. */
-const versionInForce = cache(async (scope: Scope): Promise<string | null> => {
-  const latest = (await scheduleSource(scope)).imports.find((one) => one.status === "DONE");
-  return latest ? `rev ${latest.revisionValue}` : null;
-});
+/** Every action in force, in one answer from the backend; another organization's people get none. */
+const plan = cache(async (scope: Scope): Promise<Plan> =>
+  datesOf(await api<Plan>(projectPath(scope, "/plan")).catch(orNothing({ versionInForce: null, actions: [] } as Plan))));
 
-/** One activity in the old shape, by its code; null when there is none. */
-export const legacyActionByCode = cache(async (scope: Scope, code: string): Promise<LegacyAction | null> => {
-  const summary = await activityByCode(scope, code);
-  const detail = summary ? await activityDetail(scope, summary.id) : null;
-  if (!detail) return null;
-  return legacyAction(detail, await documentsOf(scope, detail.needs), await versionInForce(scope), await confirmationsOf(scope));
-});
+/** Every action in force, with its needs, decisions and confirmations. */
+export const planActions = cache(async (scope: Scope): Promise<PlanAction[]> => (await plan(scope)).actions);
 
-/**
- * Every activity in force, in the old shape, with its needs and decisions.
- * The backend's list carries counts only, so each activity is read on its own.
- */
-export const legacyActions = cache(async (scope: Scope): Promise<LegacyAction[]> => {
-  const list = await activityList(scope);
-  const details = (await inBatches(list, (one) => activityDetail(scope, one.id))).filter((one): one is ActivityDetail => !!one);
-  const [documents, label, confirmations] = await Promise.all([
-    documentsOf(scope, details.flatMap((one) => one.needs)), versionInForce(scope), confirmationsOf(scope),
-  ]);
-  return details.map((one) => legacyAction(one, documents, label, confirmations));
+/** The schedule read in force, e.g. "rev B", or null when none has been read. */
+export const planVersion = cache(async (scope: Scope): Promise<string | null> => (await plan(scope)).versionInForce);
+
+/** One action by its code, also one the schedule has since dropped; null when there is none. */
+export const planActionByCode = cache(async (scope: Scope, code: string): Promise<PlanAction | null> => {
+  const one = await api<Plan>(projectPath(scope, `/plan/${encodeURIComponent(code)}`)).catch(orNothing(null as Plan | null));
+  return one ? datesOf(one).actions[0] ?? null : null;
 });
 
 // ── Schedule versions ────────────────────────────────────────────────────────

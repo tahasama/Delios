@@ -6,9 +6,9 @@ type PlanRow = {
   name: string;
   /** The latest schedule read moved its dates: the sentence that says so. */
   moved?: string | null;
-  scheduledDate: Date | null;
+  start: Date | null;
   /** The day the work ends, when the schedule gives one: the work itself is drawn from start to finish. */
-  finishDate?: Date | null;
+  finish?: Date | null;
   /** The earliest date a document is needed for this activity. */
   firstNeeded: Date | null;
   readiness: "DONE" | "LATE_RECEIPT" | "READY" | "AT_RISK" | "NOT_READY" | "UPCOMING" | "UNKNOWN";
@@ -61,7 +61,7 @@ export function PlanTimeline({ rows, window, fit }: {
    */
   fit?: number;
 }) {
-  const dated = rows.filter((r) => r.scheduledDate);
+  const dated = rows.filter((r) => r.start);
   // Every action here lacks a date: there is nothing to draw, and that is said.
   if (!dated.length) {
     return rows.length ? (
@@ -70,8 +70,8 @@ export function PlanTimeline({ rows, window, fit }: {
       </p>
     ) : null;
   }
-  const starts = dated.map((r) => (r.firstNeeded ?? r.scheduledDate!).getTime());
-  const ends = dated.map((r) => r.scheduledDate!.getTime());
+  const starts = dated.map((r) => (r.firstNeeded ?? r.start!).getTime());
+  const ends = dated.map((r) => r.start!.getTime());
   const now = Date.now();
   const min = window ? window.from.getTime() : Math.min(...starts, now) - 3 * DAY;
   const max = window ? window.to.getTime() : Math.max(...ends, now) + 3 * DAY;
@@ -134,8 +134,8 @@ export function PlanTimeline({ rows, window, fit }: {
           </div>
           <ul className="relative space-y-2.5 pt-3">
           {dated.map((r) => {
-            const start = (r.firstNeeded ?? r.scheduledDate!).getTime();
-            const end = r.scheduledDate!.getTime();
+            const start = (r.firstNeeded ?? r.start!).getTime();
+            const end = r.start!.getTime();
             // A bar that starts before the window is drawn from its edge, not
             // off the side of it — otherwise it runs back over the names.
             const rawLeft = at(Math.min(start, end));
@@ -155,13 +155,13 @@ export function PlanTimeline({ rows, window, fit }: {
                     className={`absolute top-1/2 h-2.5 -translate-y-1/2 ${TONE[r.readiness]} ${fromBefore ? "rounded-r-full" : "rounded-full"}`}
                     style={{ left: `${left}%`, width: `${width}%` }}
                     role="img"
-                    aria-label={`${STATE_WORD[r.readiness]}: ${r.firstNeeded ? `documents needed from ${fmtDate(r.firstNeeded)}, ` : ""}work on ${fmtDate(r.scheduledDate)}, ${r.ready} of ${r.total} ready`}
-                    title={`${r.code}: documents needed from ${fmtDate(r.firstNeeded)} · work on ${fmtDate(r.scheduledDate)} · ${r.ready} of ${r.total} ready`}
+                    aria-label={`${STATE_WORD[r.readiness]}: ${r.firstNeeded ? `documents needed from ${fmtDate(r.firstNeeded)}, ` : ""}work on ${fmtDate(r.start)}, ${r.ready} of ${r.total} ready`}
+                    title={`${r.code}: documents needed from ${fmtDate(r.firstNeeded)} · work on ${fmtDate(r.start)} · ${r.ready} of ${r.total} ready`}
                   />
                   {/* The work itself, start to finish, as a dark block on the end of the bar;
                       with no finish date, a tick on its day. */}
                   {(() => {
-                    const finish = r.finishDate && r.finishDate.getTime() > end ? r.finishDate.getTime() : end;
+                    const finish = r.finish && r.finish.getTime() > end ? r.finish.getTime() : end;
                     const from = Math.max(at(end), 0);
                     const to = Math.min(at(finish), 100);
                     if (to < 0 || from > 100) return null;
@@ -170,8 +170,8 @@ export function PlanTimeline({ rows, window, fit }: {
                         className="absolute top-1/2 h-3.5 -translate-y-1/2 rounded bg-slate-700"
                         style={{ left: `${from}%`, width: `max(4px, ${Math.max(to - from, 0)}%)` }}
                         role="img"
-                        aria-label={r.finishDate ? `Work from ${fmtDate(r.scheduledDate)} to ${fmtDate(r.finishDate)}` : `Work on ${fmtDate(r.scheduledDate)}`}
-                        title={r.finishDate ? `Work from ${fmtDate(r.scheduledDate)} to ${fmtDate(r.finishDate)}` : `Work on ${fmtDate(r.scheduledDate)}`}
+                        aria-label={r.finish ? `Work from ${fmtDate(r.start)} to ${fmtDate(r.finish)}` : `Work on ${fmtDate(r.start)}`}
+                        title={r.finish ? `Work from ${fmtDate(r.start)} to ${fmtDate(r.finish)}` : `Work on ${fmtDate(r.start)}`}
                       />
                     );
                   })()}

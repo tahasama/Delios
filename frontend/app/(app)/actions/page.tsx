@@ -6,15 +6,12 @@ import { mayUploadLists } from "@/lib/core/permissions";
 import { clearance } from "@/lib/schedule/requirements-process";
 import { readSearch, readDay } from "@/lib/documents/register-query";
 import { PLAN_CARD_HEIGHT, PLAN_FIRST } from "@/lib/schedule/plan-card";
-import { meetsRequirement } from "@/lib/schedule/readiness";
 import { ACTION_STATES, DEFAULT_RISK_DAYS, actionState, dayHasPassed, isPostponed } from "@/lib/schedule/action-state";
 import { fmtDate } from "@/lib/core/utils";
 import { getSet } from "@/lib/settings/config";
 import { api } from "@/lib/api/client";
 import { backendDocument } from "@/lib/api/legacy";
-import { legacyActions, scheduleSource, type LegacyAction } from "@/lib/api/schedule";
-import { after } from "next/server";
-import { warnOnceAtRisk } from "@/lib/schedule/risk-notice";
+import { planActions, scheduleSource, type PlanAction } from "@/lib/api/schedule";
 import { PlanCards } from "./plan-cards";
 import { PlanPlate } from "./plan-plate";
 import { PlanTimeline } from "./plan-timeline";
@@ -41,12 +38,12 @@ const PAGE_SIZES = [25, 50, 100, 200];
 const DATE_FIELDS = [{ code: "date", label: "Action date" }];
 
 /** Ordered by a column, ascending; an action with no date comes last. */
-const byCode = (a: LegacyAction, b: LegacyAction) => a.code.localeCompare(b.code);
-const SORTS: Record<string, (a: LegacyAction, b: LegacyAction) => number> = {
+const byCode = (a: PlanAction, b: PlanAction) => a.code.localeCompare(b.code);
+const SORTS: Record<string, (a: PlanAction, b: PlanAction) => number> = {
   code: byCode,
   name: (a, b) => a.name.localeCompare(b.name),
-  date: (a, b) => (a.scheduledDate?.getTime() ?? Infinity) - (b.scheduledDate?.getTime() ?? Infinity) || byCode(a, b),
-  documents: (a, b) => a.entries.length - b.entries.length || byCode(a, b),
+  date: (a, b) => (a.start?.getTime() ?? Infinity) - (b.start?.getTime() ?? Infinity) || byCode(a, b),
+  documents: (a, b) => a.needs.length - b.needs.length || byCode(a, b),
 };
 
 /** The states, said once for the schedule and the action's own page alike. */
@@ -96,7 +93,7 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
 
   const sortKey = sp.sort && SORTS[sp.sort] ? sp.sort : "date";
   const dir = sp.dir === "desc" ? "desc" : "asc";
-  const orderBy = (a: LegacyAction, b: LegacyAction) => (dir === "desc" ? -1 : 1) * SORTS[sortKey](a, b);
+  const orderBy = (a: PlanAction, b: PlanAction) => (dir === "desc" ? -1 : 1) * SORTS[sortKey](a, b);
 
   const perPage = PAGE_SIZES.includes(Number(sp.per)) ? Number(sp.per) : 50;
   const page = Math.max(1, Number(sp.page) || 1);
@@ -113,51 +110,51 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
 
   // Where each action stands is one rule, shared with the action's own page;
   // the schedule is read whole and filtered here.
-  const met = (action: LegacyAction) => action.entries.filter((entry) => meetsRequirement(entry.document.revisions, entry.requiredStatus)).length;
-  const shortOfWhatItNeeds = (action: LegacyAction) => met(action) !== action.entries.length;
-  const afterTheDay = (action: LegacyAction) => !!action.lastMetAt && !!action.scheduledDate && action.lastMetAt > action.scheduledDate;
+  const met = (action: PlanAction) => action.needs.filter((entry) => entry.state === "MET").length;
+  const shortOfWhatItNeeds = (action: PlanAction) => met(action) !== action.needs.length;
+  const afterTheDay = (action: PlanAction) => !!action.lastMetAt && !!action.start && action.lastMetAt > action.start;
 
   // The work happened without everything it needed: its day has passed and, on
   // that day, either something was still missing or the last of it had not yet
   // arrived. Both readings of "short on the day", in one clause.
-  const shortOnTheDay = (a: LegacyAction) => a.entries.length > 0 && dayHasPassed(a) && (shortOfWhatItNeeds(a) || afterTheDay(a));
+  const shortOnTheDay = (a: PlanAction) => a.needs.length > 0 && dayHasPassed(a) && (shortOfWhatItNeeds(a) || afterTheDay(a));
   // Postponed: a decision of the organization's that does not proceed, not taken back.
   const postponeCodes = (await getActiveSet("ACTIVITY_DECISIONS")).filter((one) => one.props.proceeds !== true).map((one) => one.code);
-  const postponed = (a: LegacyAction) => isPostponed(a, postponeCodes);
+  const postponed = (a: PlanAction) => isPostponed(a, postponeCodes);
   // Went ahead? Once its day has passed: with its documents, with documents
   // missing, or not at all because Document Control postponed it.
-  const HAPPENED_WHERE: Record<string, (action: LegacyAction) => boolean> = {
-    WITH: (a) => a.entries.length > 0 && dayHasPassed(a) && !shortOnTheDay(a) && !postponed(a),
+  const HAPPENED_WHERE: Record<string, (action: PlanAction) => boolean> = {
+    WITH: (a) => a.needs.length > 0 && dayHasPassed(a) && !shortOnTheDay(a) && !postponed(a),
     WITHOUT: (a) => shortOnTheDay(a) && !postponed(a),
     STOPPED: (a) => postponed(a),
   };
 
   const has = (text: string | null | undefined, word: string) => !!text && text.toLowerCase().includes(word.toLowerCase());
-  const inWindow = (a: LegacyAction) =>
-    !(planFrom || planTo) || (!!a.scheduledDate && (!planFrom || a.scheduledDate >= planFrom) && (!planTo || a.scheduledDate <= planTo));
-  const outsideWindow = (a: LegacyAction) =>
+  const inWindow = (a: PlanAction) =>
+    !(planFrom || planTo) || (!!a.start && (!planFrom || a.start >= planFrom) && (!planTo || a.start <= planTo));
+  const outsideWindow = (a: PlanAction) =>
     (!code || a.code === code)
     && (!state || actionState(a, riskDays) === state)
     && (!happened || HAPPENED_WHERE[happened](a))
-    && (sp.nodate !== "1" || !a.scheduledDate)
+    && (sp.nodate !== "1" || !a.start)
     && (sp.untagged !== "1" || departmentsOf(a).length === 0)
     // A discipline is what an action is tagged with and what a document
     // belongs to — the same list, so the filter answers for both.
-    && (!discipline || departmentsOf(a).includes(discipline) || a.entries.some((e) => e.document.discipline === discipline))
+    && (!discipline || departmentsOf(a).includes(discipline) || a.needs.some((e) => e.document.discipline === discipline))
     // Type and supplier are facts about the documents an action needs, so an
     // action matches when one of its documents does.
-    && (!(docType || supplier) || a.entries.some((e) => (!docType || e.document.docType === docType) && (!supplier || e.document.originator === supplier)))
+    && (!(docType || supplier) || a.needs.some((e) => (!docType || e.document.docType === docType) && (!supplier || e.document.originator === supplier)))
     // A space narrows, a comma widens: every word of a part must be found
     // somewhere on the action, and any part may be the one that matches.
     && (!searches.length || searches.some((search) => search.words.every((word) =>
-      has(a.code, word) || has(a.name, word) || has(a.description, word) || has(a.scheduleRef, word)
-      || a.entries.some((e) => has(e.document.docNumber, word) || has(e.document.title, word)))));
-  const where = (a: LegacyAction) => outsideWindow(a) && inWindow(a);
+      has(a.code, word) || has(a.name, word) || has(a.externalId, word)
+      || a.needs.some((e) => has(e.document.number, word) || has(e.document.title, word)))));
+  const where = (a: PlanAction) => outsideWindow(a) && inWindow(a);
 
   // What the window holds, and what the schedule holds: a plan that says "of
   // 16" while the table says 33 is a page arguing with itself.
   const [schedule, source, disciplineRows, typeRows, supplierRows] = await Promise.all([
-    legacyActions(ctx),
+    planActions(ctx),
     scheduleSource(ctx),
     getSet("DISCIPLINES"),
     getSet("DOCUMENT_TYPES"),
@@ -172,7 +169,7 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
   // Undated actions have no place in a window of days: they are counted on
   // their own, every time, so they never quietly drop out of the plan.
   const allMatching = schedule.filter(outsideWindow);
-  const undatedAll = allMatching.filter((one) => !one.scheduledDate).length;
+  const undatedAll = allMatching.filter((one) => !one.start).length;
   const everywhere = windowed ? allMatching.length : 0;
   // The table pages through them; the plan draws as many as it has been asked
   // for, and offers to draw more.
@@ -188,20 +185,20 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
 
   const deptLabel = new Map(disciplineRows.map((one) => [one.code, one.label]));
   const rows = actions.map((action) => {
-    const total = action.entries.length;
-    const missing = action.entries.filter((entry) => !meetsRequirement(entry.document.revisions, entry.requiredStatus));
+    const total = action.needs.length;
+    const missing = action.needs.filter((entry) => entry.state !== "MET");
     const ready = total - missing.length;
-    const daysUntil = action.scheduledDate ? Math.ceil((action.scheduledDate.getTime() - Date.now()) / 86_400_000) : null;
-    const firstNeeded = action.entries.map((one) => one.requiredBy).filter(Boolean).sort((a, b) => a!.getTime() - b!.getTime())[0] ?? null;
+    const daysUntil = action.start ? Math.ceil((action.start.getTime() - Date.now()) / 86_400_000) : null;
+    const firstNeeded = action.needs.map((one) => one.neededBy).filter(Boolean).sort((a, b) => a!.getTime() - b!.getTime())[0] ?? null;
     // The next document still owed — what a controller chases first.
-    const nextNeeded = missing.map((one) => one.requiredBy).filter(Boolean).sort((a, b) => a!.getTime() - b!.getTime())[0] ?? null;
+    const nextNeeded = missing.map((one) => one.neededBy).filter(Boolean).sort((a, b) => a!.getTime() - b!.getTime())[0] ?? null;
     const readiness: Readiness = actionState(action, riskDays);
     // What became of the work, which is not the same question as whether its
     // documents arrived. The day passing is the work happening; only Document
     // Control saying it was postponed takes that back.
     const passed = dayHasPassed(action);
     const shortOnTheDay = missing.length > 0
-      || (!!action.lastMetAt && !!action.scheduledDate && action.lastMetAt > action.scheduledDate);
+      || (!!action.lastMetAt && !!action.start && action.lastMetAt > action.start);
     const happened: Happened = postponed(action)
       ? "POSTPONED"
       : !passed
@@ -210,31 +207,26 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
     return { ...action, total, ready, missing, daysUntil, readiness, firstNeeded, nextNeeded, happened };
   });
 
-  // The first time an action shows as at risk, its disciplines are told once,
-  // by the system. Done after the page is served so nothing waits on it.
-  const newlyAtRisk = rows.filter((row) => (row.readiness === "AT_RISK" || row.readiness === "NOT_READY") && !row.riskNotifiedAt);
-  if (newlyAtRisk.length && ctx.can("CONTROL")) after(() => warnOnceAtRisk(ctx, newlyAtRisk));
-
   const tableRows: PlanTableRow[] = rows.map((row) => {
     const clear = clearance(row);
     return {
       id: row.id,
       code: row.code,
-      plannerId: row.scheduleRef && row.scheduleRef !== row.code ? row.scheduleRef : null,
-      moved: movedPhrase(row.moved, row.scheduledDate, row.finishDate),
+      plannerId: row.externalId && row.externalId !== row.code ? row.externalId : null,
+      moved: movedPhrase(row.moved, row.start, row.finish),
       name: row.name,
       departments: departmentsOf(row).map((one) => deptLabel.get(one) ?? one),
-      date: row.scheduledDate ? fmtDate(row.scheduledDate) : null,
-      finish: row.finishDate && row.scheduledDate && row.finishDate > row.scheduledDate ? fmtDate(row.finishDate) : null,
+      date: row.start ? fmtDate(row.start) : null,
+      finish: row.finish && row.start && row.finish > row.start ? fmtDate(row.finish) : null,
       // When, and how long: start and finish both count, so work on the 12th and 13th lasts two days. Said once.
-      when: datePhrase(row.daysUntil, row.finishDate && row.scheduledDate ? Math.round((row.finishDate.getTime() - row.scheduledDate.getTime()) / 86_400_000) + 1 : null),
+      when: datePhrase(row.daysUntil, row.finish && row.start ? Math.round((row.finish.getTime() - row.start.getTime()) / 86_400_000) + 1 : null),
       late: row.daysUntil !== null && row.daysUntil < 0,
       readiness: row.readiness,
       ready: row.ready,
       total: row.total,
       nextNeeded: row.nextNeeded ? fmtDate(row.nextNeeded) : null,
       nextOverdue: !!row.nextNeeded && row.nextNeeded.getTime() < Date.now(),
-      missing: row.missing.map((one) => ({ docNumber: one.document.docNumber, status: one.requiredStatus })),
+      missing: row.missing.map((one) => ({ docNumber: one.document.number, status: one.requiredStatus })),
       happened: row.happened,
       // The stamp under the word: what the documents were on the day.
       happenedNote: !row.total
@@ -369,7 +361,7 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
         }
         plan={
           <PlanTimeline
-            rows={rows.map((row) => ({ code: row.code, name: row.name, moved: movedPhrase(row.moved, row.scheduledDate, row.finishDate), scheduledDate: row.scheduledDate, finishDate: row.finishDate, firstNeeded: row.firstNeeded, readiness: row.readiness, ready: row.ready, total: row.total }))}
+            rows={rows.map((row) => ({ code: row.code, name: row.name, moved: movedPhrase(row.moved, row.start, row.finish), start: row.start, finish: row.finish, firstNeeded: row.firstNeeded, readiness: row.readiness, ready: row.ready, total: row.total }))}
             window={planFrom && planTo ? { from: planFrom, to: planTo } : undefined}
             fit={PLAN_FIRST}
           />

@@ -28,8 +28,8 @@ export function daysBefore(date: Date, days: number): Date {
 }
 
 /** Departments stored on an action, as a list. */
-export function departmentsOf(action: { departments: string | null }): string[] {
-  return (action.departments ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+export function departmentsOf(action: { departments: readonly string[] }): string[] {
+  return [...action.departments];
 }
 
 // ── Comparing two schedule versions ─────────────────────────────────────────

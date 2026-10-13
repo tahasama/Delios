@@ -1,7 +1,7 @@
 import { register, headerIndex, cell, parseDate, diffByKey, type Handler, type ParseIssue, type ParseResult } from "@/lib/settings/controlled/registry";
 import { DEFAULT_LEAD_DAYS, departmentsOf, needDefaults } from "@/lib/schedule/schedule";
 import { api, projectPath } from "@/lib/api/client";
-import { legacyActions } from "@/lib/api/schedule";
+import { planActions } from "@/lib/api/schedule";
 import { registerByNumber } from "@/lib/api/register";
 import { adminFunctions, orEmpty } from "@/lib/api/admin";
 import { requirementCalls } from "@/lib/api/records";
@@ -99,7 +99,7 @@ const requirements: Handler = {
     if (missing.length) return { ok: false, issues: [{ line: 1, message: `Missing column(s): ${missing.join(", ")}. Download the template and keep its header row.` }] };
 
     const [actions, docs, functions, types, statuses, disciplines, subprojects, pos, parties] = await Promise.all([
-      legacyActions(t), registerByNumber(t), orEmpty(adminFunctions), getActiveSet("DOCUMENT_TYPES"), getActiveSet("STATUSES"),
+      planActions(t), registerByNumber(t), orEmpty(adminFunctions), getActiveSet("DOCUMENT_TYPES"), getActiveSet("STATUSES"),
       getActiveSet("DISCIPLINES"), getActiveSet("SUBPROJECTS"), getActiveSet("PURCHASE_ORDERS"),
       api<{ code: string }[]>("/api/parties").catch(() => [] as { code: string }[]),
     ]);
@@ -198,33 +198,33 @@ const requirements: Handler = {
   },
 
   async current(t) {
-    const actions = await legacyActions(t);
-    return actions.flatMap((a) => a.entries.map((e): RequirementRow => ({
+    const actions = await planActions(t);
+    return actions.flatMap((a) => a.needs.map((e): RequirementRow => ({
       actionCode: a.code,
       department: e.department ?? e.document.discipline,
       discipline: e.document.discipline,
-      docNumber: e.document.docNumber,
+      docNumber: e.document.number,
       title: e.document.title,
       // What is already in force says nothing about equipment; a sheet that
       // adds one links it when it is applied.
       assetCode: null,
       docType: e.document.docType,
-      submittedBy: e.submittedBy ?? e.document.originator,
-      approvedBy: e.approvedBy ?? "",
+      submittedBy: e.document.originator,
+      approvedBy: "",
       requiredStatus: e.requiredStatus,
-      neededBy: e.manualDate ? e.requiredBy.toISOString().slice(0, 10) : null,
+      neededBy: e.manualDate ? e.neededBy.toISOString().slice(0, 10) : null,
       projectCode: null, subProject: null, po: null,
     })));
   },
 
   async exportRows(t) {
-    const actions = await legacyActions(t);
+    const actions = await planActions(t);
     const iso = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : "");
     const rows: string[][] = [];
     for (const action of actions) {
       const departments = departmentsOf(action);
       for (const department of departments) {
-        const mine = action.entries.filter((e) => (e.department ?? e.document.discipline) === department);
+        const mine = action.needs.filter((e) => (e.department ?? e.document.discipline) === department);
         // What is already required, then blank lines to write more on: a sheet
         // with no room to write is a sheet nobody can answer.
         const lines = mine.length + BLANK_LINES;
@@ -232,10 +232,10 @@ const requirements: Handler = {
           const entry = mine[i];
           const head = i === 0;
           rows.push([
-            head ? department : "", head ? action.code : "", head ? action.name : "", head ? action.description ?? "" : "",
-            head ? iso(action.scheduledDate) : "", entry?.document.docNumber ?? "", entry?.document.discipline ?? "", entry?.document.docType ?? "",
-            entry?.submittedBy ?? entry?.document.originator ?? "", entry?.manualDate ? iso(entry.requiredBy) : "", entry?.requiredStatus ?? "",
-            entry?.approvedBy ?? "", "", "", "", "",
+            head ? department : "", head ? action.code : "", head ? action.name : "", "",
+            head ? iso(action.start) : "", entry?.document.number ?? "", entry?.document.discipline ?? "", entry?.document.docType ?? "",
+            entry?.document.originator ?? "", entry?.manualDate ? iso(entry.neededBy) : "", entry?.requiredStatus ?? "",
+            "", "", "", "", "",
           ]);
         }
       }
@@ -258,7 +258,7 @@ const requirements: Handler = {
   async apply(t, payload, _key, versionLabel) {
     const rows = payload as RequirementRow[];
     const [actions, docs, reasons, deliverables] = await Promise.all([
-      legacyActions(t), registerByNumber(t), getActiveSet("REASONS_FOR_ISSUE"), getActiveSet("DELIVERABLE_TYPES"),
+      planActions(t), registerByNumber(t), getActiveSet("REASONS_FOR_ISSUE"), getActiveSet("DELIVERABLE_TYPES"),
     ]);
     const actionByCode = new Map(actions.map((a) => [a.code, a]));
     // What the document is needed for: the reason that builds from it.
@@ -294,10 +294,10 @@ const requirements: Handler = {
         await api(projectPath(t, `/documents/${docId}/assets`), { body: { assetCode: row.assetCode } }).catch(() => null);
       }
 
-      const existing = action.entries.find((e) => e.documentId === docId);
+      const existing = action.needs.find((e) => e.documentId === docId);
       const fixed = row.neededBy;
       const same = existing && existing.department === row.department && existing.requiredStatus === row.requiredStatus
-        && (existing.manualDate ? existing.requiredBy.toISOString().slice(0, 10) : null) === fixed;
+        && (existing.manualDate ? existing.neededBy.toISOString().slice(0, 10) : null) === fixed;
       if (!same) {
         if (existing) await api(projectPath(t, `/activities/${action.id}/needs/${existing.id}`), { method: "DELETE" });
         await api(projectPath(t, `/activities/${action.id}/needs`), {
@@ -318,7 +318,7 @@ const requirements: Handler = {
     // What an (action, department) no longer lists is no longer required.
     for (const { actionId, department, docIds } of keep.values()) {
       const action = actions.find((a) => a.id === actionId)!;
-      for (const stale of action.entries.filter((e) => e.department === department && !docIds.has(e.documentId))) {
+      for (const stale of action.needs.filter((e) => e.department === department && !docIds.has(e.documentId))) {
         await api(projectPath(t, `/activities/${actionId}/needs/${stale.id}`), { method: "DELETE" });
         dropped++;
       }

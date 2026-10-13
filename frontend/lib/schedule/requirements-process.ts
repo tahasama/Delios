@@ -1,7 +1,6 @@
-import { meetsRequirement } from "@/lib/schedule/readiness";
 import type { Tenant } from "@/lib/core/tenant";
 import { departmentsOf } from "@/lib/schedule/schedule";
-import { legacyActions } from "@/lib/api/schedule";
+import { planActions } from "@/lib/api/schedule";
 /**
  * From schedule to safe activity, in the order it happens:
  *
@@ -30,8 +29,8 @@ const REQUIREMENT_COLUMNS = [
 ];
 
 /** A sender key: a supplier's party code, or one of our departments. */
-function senderOf(entry: { submittedBy: string | null; document: { originator: string | null; discipline: string } }): string {
-  const party = entry.submittedBy ?? entry.document.originator;
+function senderOf(entry: { document: { originator: string | null; discipline: string } }): string {
+  const party = entry.document.originator;
   return party ? party : `DEPT:${entry.document.discipline}`;
 }
 
@@ -50,9 +49,9 @@ const iso = (d: Date | null | undefined) => (d ? d.toISOString().slice(0, 10) : 
 const SHEET_BLANK_LINES = 5;
 
 export async function departmentSheet(t: Tenant, department: string): Promise<string[][]> {
-  const actions = (await legacyActions(t)).map((a) => ({
+  const actions = (await planActions(t)).map((a) => ({
     ...a,
-    entries: a.entries.filter((e) => e.department === department).sort((x, y) => x.requiredBy.getTime() - y.requiredBy.getTime()),
+    entries: a.needs.filter((e) => e.department === department).sort((x, y) => x.neededBy.getTime() - y.neededBy.getTime()),
   }));
   // Equipment and material tags are not kept by the backend: the column comes back empty.
   const tagOf = (_documentId: string) => "";
@@ -68,15 +67,15 @@ export async function departmentSheet(t: Tenant, department: string): Promise<st
         head ? department : "",
         head ? a.code : "",
         head ? a.name : "",
-        head ? a.description ?? "" : "",
-        head ? iso(a.scheduledDate) : "",
-        e?.document.docNumber ?? "",
+        "",
+        head ? iso(a.start) : "",
+        e?.document.number ?? "",
         e?.document.discipline ?? "",
         e?.document.docType ?? "",
-        e?.submittedBy ?? "",
-        e?.manualDate ? iso(e.requiredBy) : "",
+        e?.document.originator ?? "",
+        e?.manualDate ? iso(e.neededBy) : "",
         e?.requiredStatus ?? "",
-        e?.approvedBy ?? "",
+        "",
         e ? tagOf(e.documentId) : "",
         "", "", "",
       ]);
@@ -87,14 +86,14 @@ export async function departmentSheet(t: Tenant, department: string): Promise<st
 
 /** What one sender is asked to deliver, and when — the base for their baseline. */
 export async function senderSheet(t: Tenant, sender: string): Promise<string[][]> {
-  const entries = (await legacyActions(t))
-    .flatMap((action) => action.entries.map((e) => ({ ...e, action })))
-    .sort((a, b) => a.requiredBy.getTime() - b.requiredBy.getTime() || a.document.docNumber.localeCompare(b.document.docNumber));
+  const entries = (await planActions(t))
+    .flatMap((action) => action.needs.map((e) => ({ ...e, action })))
+    .sort((a, b) => a.neededBy.getTime() - b.neededBy.getTime() || a.document.number.localeCompare(b.document.number));
   const rows: string[][] = [["Document Number", "Title", "Document Type", "Required Status", "Submit By", "Review Window Ends", "Approved By", "Needed For", "Activity", "Department"]];
   for (const e of entries.filter((x) => senderOf(x) === sender)) {
     rows.push([
-      e.document.docNumber, e.document.title, e.document.docType, e.requiredStatus, iso(e.requiredBy),
-      iso(e.action.scheduledDate), e.approvedBy ?? "", e.action.code, e.action.name, e.department ?? "",
+      e.document.number, e.document.title, e.document.docType, e.requiredStatus, iso(e.neededBy),
+      iso(e.action.start), "", e.action.code, e.action.name, e.department ?? "",
     ]);
   }
   return rows;
@@ -102,19 +101,19 @@ export async function senderSheet(t: Tenant, sender: string): Promise<string[][]
 
 /** An activity's departments, whether each has confirmed, and whether it may go ahead. */
 export function clearance(action: {
-  departments: string | null;
-  scheduledDate?: Date | null;
+  departments: readonly string[];
+  start?: Date | null;
   confirmations: { department: string; available: boolean; revokedAt?: Date | null }[];
-  entries?: { department: string | null; requiredStatus: string; document: { revisions: { statusCode: string | null; meets?: boolean }[] } }[];
+  needs?: { department: string | null; state: string }[];
 }) {
   const depts = departmentsOf(action);
   // A confirmation taken back no longer counts; before the day, a department whose documents are all released at
   // their status is confirmed by them.
   const kept = action.confirmations.filter((c) => !c.revokedAt);
-  const passed = !!action.scheduledDate && action.scheduledDate.getTime() < new Date().setHours(0, 0, 0, 0);
+  const passed = !!action.start && action.start.getTime() < new Date().setHours(0, 0, 0, 0);
   const releasedAll = (d: string) => {
-    const of = (action.entries ?? []).filter((e) => e.department === d || !e.department);
-    return of.length > 0 && of.every((e) => meetsRequirement(e.document.revisions, e.requiredStatus));
+    const of = (action.needs ?? []).filter((e) => e.department === d || !e.department);
+    return of.length > 0 && of.every((e) => e.state === "MET");
   };
   const confirmed = depts.filter((d) => kept.some((c) => c.department === d && c.available) || (!passed && !kept.some((c) => c.department === d) && releasedAll(d)));
   const short = depts.filter((d) => kept.some((c) => c.department === d && !c.available));

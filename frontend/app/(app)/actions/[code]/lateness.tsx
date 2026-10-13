@@ -3,9 +3,9 @@ import { SearchPick, type PickItem } from "@/components/search-pick";
 import { Field, inputCls } from "@/components/ui";
 import { fmtDate } from "@/lib/core/utils";
 import { recordActionNoteAction, confirmPostponementAction, reverseDecisionAction } from "@/lib/forms/action-notes";
-import type { LegacyNote } from "@/lib/api/schedule";
+import type { PlanDecision } from "@/lib/api/schedule";
 
-type Note = LegacyNote;
+type Note = PlanDecision;
 
 /** The answer to "Went ahead?", the same as the schedule's column says it. */
 export type WentAhead = "NOT_YET" | "WITH_DOCUMENTS" | "MISSING_DOCUMENTS" | "POSTPONED";
@@ -74,21 +74,21 @@ export function ActionNotes({ notes, actionId, mayNote, mayPlan, mayControl, ans
               <li key={note.id} className={`space-y-1 px-5 py-3 text-xs leading-5 sm:px-6 ${note.reversedAt ? "text-slate-500" : ""}`}>
                 <p className={`font-semibold ${note.reversedAt ? "text-slate-500 line-through" : postponement ? "text-slate-800" : "text-amber-800"}`}>
                   {postponement ? "Postponed" : "Missing documents"}
-                  {note.plannedDate ? <span className="font-normal text-slate-500 no-underline"> &middot; the day stood at {fmtDate(note.plannedDate)}</span> : null}
+                  {note.plannedStart ? <span className="font-normal text-slate-500 no-underline"> &middot; the day stood at {fmtDate(note.plannedStart)}</span> : null}
                 </p>
                 <p className="whitespace-pre-line text-slate-600"><strong className="font-semibold text-slate-800">{note.responsibleName}</strong> decided: {note.reason}</p>
-                {note.delayResponsible ? (
-                  <p className="whitespace-pre-line text-slate-600">Held up by <strong className="font-semibold text-slate-800">{note.delayResponsible}</strong>{note.delayReason ? `: ${note.delayReason}` : ""}</p>
+                {note.delayOwedBy ? (
+                  <p className="whitespace-pre-line text-slate-600">Held up by <strong className="font-semibold text-slate-800">{note.delayOwedBy}</strong>{note.delayReason ? `: ${note.delayReason}` : ""}</p>
                 ) : null}
                 {postponement && note.confirmedAt ? (
-                  <p className="whitespace-pre-line text-emerald-800">Confirmed by <strong className="font-semibold">{note.confirmedByName}</strong>, {fmtDate(note.confirmedAt)}: {note.confirmNote}</p>
+                  <p className="whitespace-pre-line text-emerald-800">Confirmed by <strong className="font-semibold">{note.confirmedBy}</strong>, {fmtDate(note.confirmedAt)}: {note.confirmNote}</p>
                 ) : postponement && !note.reversedAt ? (
                   <p className="text-amber-800">Waiting for whoever plans the project to confirm it.</p>
                 ) : null}
                 {note.reversedAt ? (
-                  <p className="whitespace-pre-line text-red-800">Taken back by <strong className="font-semibold">{note.reversedByName}</strong>, {fmtDate(note.reversedAt)}: {note.reversedReason}</p>
+                  <p className="whitespace-pre-line text-red-800">Taken back by <strong className="font-semibold">{note.reversedBy}</strong>, {fmtDate(note.reversedAt)}: {note.reversedReason}</p>
                 ) : null}
-                <p className="text-[11px] text-slate-500">Written down by {note.recordedByName}, {fmtDate(note.createdAt)}, and kept.</p>
+                <p className="text-[11px] text-slate-500">Written down by {note.recordedBy}, {fmtDate(note.recordedAt)}, and kept.</p>
 
                 {/* Whoever plans confirms it, with what changes for the next schedule revision. */}
                 {postponement && note === active && !note.confirmedAt && mayPlan ? (

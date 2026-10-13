@@ -10,7 +10,7 @@ import { getSet, getSets } from "@/lib/settings/config";
 import { api, ApiProblem, projectPath } from "@/lib/api/client";
 import { adminAudit } from "@/lib/api/admin";
 import { legacyPackages } from "@/lib/api/packages";
-import { activityLateness, legacyActions } from "@/lib/api/schedule";
+import { activityLateness, planActions } from "@/lib/api/schedule";
 import { passOn, registerRows } from "@/lib/api/register";
 
 // §16.6 — views are generated at time of use, carry a generation timestamp and
@@ -64,22 +64,22 @@ async function extract(req: Request, { params }: { params: Promise<{ kind: strin
     // An action's own sheet can tick documents rather than actions, and then the
     // file holds those documents of that action.
     const onlyDocs = new Set((query.get("docs") ?? "").split(",").map((one) => one.trim()).filter(Boolean));
-    const actions = (await legacyActions(ctx))
+    const actions = (await planActions(ctx))
       .filter((a) => !ticked.length || ticked.includes(a.id))
       .sort((a, b) => a.code.localeCompare(b.code))
-      .map((a) => ({ ...a, entries: a.entries.filter((e) => !onlyDocs.size || onlyDocs.has(e.document.docNumber)), notes: [...a.notes].reverse() }));
+      .map((a) => ({ ...a, entries: a.needs.filter((e) => !onlyDocs.size || onlyDocs.has(e.document.number)), notes: [...a.decisions].reverse() }));
     const now = Date.now();
     /** The same six words the schedule uses, so a file and a screen agree. */
     const state = (a: (typeof actions)[number]) => {
       if (!a.entries.length) return "Nothing listed";
       const met = a.entries.every((e) => e.state === "MET") && a.needCount > 0;
-      const past = !!a.scheduledDate && a.scheduledDate.getTime() < now;
+      const past = !!a.start && a.start.getTime() < now;
       if (met) {
         if (!past) return "Ready";
-        return a.lastMetAt && a.scheduledDate && a.lastMetAt > a.scheduledDate ? "Late receipt" : "Done";
+        return a.lastMetAt && a.start && a.lastMetAt > a.start ? "Late receipt" : "Done";
       }
       if (past) return "Overdue";
-      const nextNeededAt = a.entries.filter((e) => e.state === "MISSING").map((e) => e.requiredBy).sort((x, y) => x.getTime() - y.getTime())[0];
+      const nextNeededAt = a.entries.filter((e) => e.state === "MISSING").map((e) => e.neededBy).sort((x, y) => x.getTime() - y.getTime())[0];
       return nextNeededAt && nextNeededAt.getTime() - now <= 7 * 86_400_000 ? "At risk" : "Still ahead";
     };
     // Where each document's time went travels with it. The screen names the
@@ -110,17 +110,17 @@ async function extract(req: Request, { params }: { params: Promise<{ kind: strin
       // half the record.
       const note = a.notes[a.notes.length - 1] ?? null;
       const head = [
-        a.code, a.name, a.description ?? "", a.scheduledDate?.toISOString().slice(0, 10) ?? "",
-        a.departments ?? "", state(a), a.lastMetAt?.toISOString().slice(0, 10) ?? "",
+        a.code, a.name, "", a.start?.toISOString().slice(0, 10) ?? "",
+        a.departments.join(","), state(a), a.lastMetAt?.toISOString().slice(0, 10) ?? "",
         note ? (note.decision === "CARRIED" ? "Went ahead with missing documents" : "Postponed") : "",
-        note?.plannedDate?.toISOString().slice(0, 10) ?? "",
-        note?.responsibleName ?? "", note?.reason ?? "", note?.delayResponsible ?? "", note?.delayReason ?? "",
+        note?.plannedStart?.toISOString().slice(0, 10) ?? "",
+        note?.responsibleName ?? "", note?.reason ?? "", note?.delayOwedBy ?? "", note?.delayReason ?? "",
       ];
       const day = (at: Date | null | undefined) => at?.toISOString().slice(0, 10) ?? "";
       const chain = lateness.get(a.id) ?? [];
       if (!a.entries.length) rows.push([...head, ...Array(16).fill("")]);
       for (const e of a.entries) {
-        const row = chain.find((one) => one.docNumber === e.document.docNumber) ?? null;
+        const row = chain.find((one) => one.docNumber === e.document.number) ?? null;
         const points = row?.checkpoints ?? [];
         const first = points[0] ?? null;
         const last = points.length > 1 ? points[points.length - 1] : null;
@@ -131,7 +131,7 @@ async function extract(req: Request, { params }: { params: Promise<{ kind: strin
           .map((point) => `${point.name}: ${day(point.at) || "not yet"} (due ${day(point.due) || "no date"}, ${point.owedBy})`)
           .join(" | ");
         rows.push([
-          ...head, e.document.docNumber, e.requiredStatus, e.requiredBy.toISOString().slice(0, 10),
+          ...head, e.document.number, e.requiredStatus, e.neededBy.toISOString().slice(0, 10),
           row?.cause?.name ?? "", day(row?.cause?.at), row?.cause?.deadline ?? "", day(row?.cause?.due), row?.cause?.owedBy ?? "",
           day(first?.at), day(first?.due), first?.owedBy ?? "",
           steps,

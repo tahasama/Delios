@@ -1,7 +1,7 @@
 import { VERBS, type Verb } from "@/lib/core/permissions";
 import { api } from "@/lib/api/client";
 import { adminFunctions } from "@/lib/api/admin";
-import { legacyActions } from "@/lib/api/schedule";
+import { planActions } from "@/lib/api/schedule";
 import { getSet } from "@/lib/settings/config";
 import {
   register,
@@ -181,9 +181,9 @@ const schedule: Handler = {
   },
 
   async current(t) {
-    return (await legacyActions(t)).map((a): ActivityRow => ({
-      externalId: a.scheduleRef ?? a.code, actionCode: a.code, name: a.name, description: a.description,
-      date: a.scheduledDate ? a.scheduledDate.toISOString().slice(0, 10) : null, responsibleParty: a.ownerName,
+    return (await planActions(t)).map((a): ActivityRow => ({
+      externalId: a.externalId ?? a.code, actionCode: a.code, name: a.name, description: null,
+      date: a.start ? a.start.toISOString().slice(0, 10) : null, responsibleParty: a.responsible,
     }));
   },
 

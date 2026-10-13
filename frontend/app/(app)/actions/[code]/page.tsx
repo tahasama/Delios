@@ -2,7 +2,6 @@ import { ActionNotes, type WentAhead } from "./lateness";
 import { NeededTable, type NeededRow } from "./needed-table";
 import { latenessOf } from "@/lib/schedule/action-lateness";
 import { carrierRefusal, actIsOff } from "@/lib/settings/control-activities";
-import { meetsRequirement } from "@/lib/schedule/readiness";
 import Link from "next/link";
 import { requireScope } from "@/lib/core/scope";
 import { notFound } from "next/navigation";
@@ -16,7 +15,7 @@ import { ArrowLeft } from "lucide-react";
 import { getActiveSet } from "@/lib/settings/config";
 import { api } from "@/lib/api/client";
 import { holders } from "@/lib/api/settings";
-import { legacyActionByCode, scheduleSource, noticesAbout, noticeHistory } from "@/lib/api/schedule";
+import { planActionByCode, planVersion, scheduleSource, noticesAbout, noticeHistory } from "@/lib/api/schedule";
 import { movedPhrase } from "../moved";
 import { actionState, stateLabel, dayHasPassed, riskFrom, isPostponed, DEFAULT_RISK_DAYS, type ActionState } from "@/lib/schedule/action-state";
 import { mayUploadLists } from "@/lib/core/permissions";
@@ -37,38 +36,35 @@ export default async function ActionDetailPage({ params, searchParams }: { param
   const ctx = await requireScope();
   const { code } = await params;
   const { dept } = await searchParams;
-  const action = await legacyActionByCode(ctx, code);
+  const [action, version] = await Promise.all([planActionByCode(ctx, code), planVersion(ctx)]);
   if (!action) notFound();
 
-  const [disciplines, parties, functions] = await Promise.all([
+  const [disciplines, parties] = await Promise.all([
     getActiveSet("DISCIPLINES").then((rows) => [...rows].sort((a, b) => a.label.localeCompare(b.label))),
     // Suppliers are the organizations the project deals with.
     api<{ code: string; name: string }[]>("/api/parties").then((rows) => rows.map((one) => ({ code: one.code, label: one.name }))).catch(() => []),
-    // Who approves a document is not on a need in the backend: no function is named.
-    Promise.resolve([] as { code: string; name: string }[]),
   ]);
   const deptLabel = (c: string | null) => (c ? disciplines.find((d) => d.code === c)?.label ?? c : "—");
   const partyLabel = (c: string | null) => (c ? parties.find((p) => p.code === c)?.label ?? c : "Us");
-  const fnLabel = (c: string | null) => (c ? functions.find((f) => f.code === c)?.name ?? c : "—");
 
   const depts = departmentsOf(action);
   const control = ctx.can("CONTROL");
   // Only administrators read the audit trail, so only they are sent to it.
   const me = { department: ctx.user.department ?? null };
-  const entries = dept ? action.entries.filter((e) => e.department === dept) : action.entries;
+  const entries = dept ? action.needs.filter((e) => e.department === dept) : action.needs;
   // Which of the three moments slipped, for each document, and who writes the
   // note about what was decided.
   const lateness = await latenessOf(ctx, action.id);
   // Left out by the organization: the notes already written are still read.
   const mayNote = !(await actIsOff(ctx, "ACTION_NOTE")) && !(await carrierRefusal(ctx, "ACTION_NOTE", { control, standing: true }));
   // The latest schedule read moved its dates: said once, under the date.
-  const moved = movedPhrase(action.moved, action.scheduledDate, action.finishDate);
-  const readyCount = action.entries.filter((e) => meetsRequirement(e.document.revisions, e.requiredStatus)).length;
+  const moved = movedPhrase(action.moved, action.start, action.finish);
+  const readyCount = action.needs.filter((e) => e.state === "MET").length;
   // The earliest date a document is owed: where the activity's own clock starts.
-  const firstDue = action.entries.map((e) => e.requiredBy).filter(Boolean).sort((a, b) => a.getTime() - b.getTime())[0] ?? null;
+  const firstDue = action.needs.map((e) => e.neededBy).filter(Boolean).sort((a, b) => a.getTime() - b.getTime())[0] ?? null;
   // The same states the schedule uses, by the same rule, so the two pages never
   // disagree about one action.
-  const everything = action.entries.length > 0 && readyCount === action.entries.length;
+  const everything = action.needs.length > 0 && readyCount === action.needs.length;
   const riskDays = (await scheduleSource(ctx)).source?.riskWindowDays ?? DEFAULT_RISK_DAYS;
   const readiness = actionState(action, riskDays);
   // A department is a discipline: the people whose membership names one of them.
@@ -80,7 +76,7 @@ export default async function ActionDetailPage({ params, searchParams }: { param
   const pickPeople = people.map((one) => ({ id: one.id, name: one.name, detail: one.department ? deptLabel(one.department) : one.functionName }));
   // A document a supplier owes: that supplier's people are recommended for the notice, and chosen.
   const book = await addressees(ctx);
-  const suppliersOf = (missing: (typeof action.entries)[number][]) => book.parties
+  const suppliersOf = (missing: (typeof action.needs)[number][]) => book.parties
     .filter((p) => missing.some((e) => e.document.originator === p.code))
     .map((p) => ({
       party: p,
@@ -96,7 +92,7 @@ export default async function ActionDetailPage({ params, searchParams }: { param
     users: controllers.map((one) => one.id).join(","),
     subject: `Add a document to ${action.code} (${deptLabel(department)})`,
     message: [
-      `Please add the attached document to ${action.code}, ${action.name}, on ${fmtDate(action.scheduledDate)}, for ${deptLabel(department)}.`,
+      `Please add the attached document to ${action.code}, ${action.name}, on ${fmtDate(action.start)}, for ${deptLabel(department)}.`,
       "It was not on the requirements list.",
     ].join("\n\n"),
   })}`;
@@ -113,7 +109,7 @@ export default async function ActionDetailPage({ params, searchParams }: { param
     ask: "DISCIPLINE",
     users: controllers.map((one) => one.id).join(","),
     subject: `Add a discipline to ${action.code}`,
-    message: `Please add the discipline … to ${action.code}, ${action.name}, on ${fmtDate(action.scheduledDate)}.\n\nWhy it concerns us: …`,
+    message: `Please add the discipline … to ${action.code}, ${action.name}, on ${fmtDate(action.start)}.\n\nWhy it concerns us: …`,
   })}`;
 
   // The requests about this action not yet answered: Document Control sees them all; whoever is asked to
@@ -134,8 +130,8 @@ export default async function ActionDetailPage({ params, searchParams }: { param
   // Which disciplines stand confirmed, by the card's own rule: a confirmation by hand (or frozen by the
   // system on the day), or, before the day, every one of its documents released at its status.
   const confirmedDepts = depts.filter((d) => {
-    const own = action.entries.filter((e) => e.department === d || !e.department);
-    const ready = own.length > 0 && own.every((e) => meetsRequirement(e.document.revisions, e.requiredStatus));
+    const own = action.needs.filter((e) => e.department === d || !e.department);
+    const ready = own.length > 0 && own.every((e) => e.state === "MET");
     return action.confirmations.some((x) => x.department === d && !x.revokedAt) || (!dayHasPassed(action) && ready);
   });
   const confirmedAt = action.confirmations.filter((x) => !x.revokedAt).map((x) => x.confirmedAt).filter((x): x is Date => !!x)
@@ -146,11 +142,11 @@ export default async function ActionDetailPage({ params, searchParams }: { param
   // Which decisions mean "postponed" is the organization's list: those that do not proceed.
   const postponeCodes = (await getActiveSet("ACTIVITY_DECISIONS")).filter((one) => one.props.proceeds !== true).map((one) => one.code);
   const postponed = isPostponed(action, postponeCodes)
-    ? action.notes.find((note) => postponeCodes.includes(note.decision) && !note.reversedAt) ?? null
+    ? action.decisions.find((note) => postponeCodes.includes(note.decision) && !note.reversedAt) ?? null
     : null;
   const happened = !postponed && dayHasPassed(action);
   // Went ahead? Not yet before the day; after it, read from the documents unless postponed.
-  const missingCount = action.entries.length - readyCount;
+  const missingCount = action.needs.length - readyCount;
   const wentAhead: WentAhead = postponed ? "POSTPONED" : !dayHasPassed(action) ? "NOT_YET" : missingCount > 0 ? "MISSING_DOCUMENTS" : "WITH_DOCUMENTS";
 
   // One row per required document: what it is, whether it is there, and the
@@ -169,24 +165,24 @@ export default async function ActionDetailPage({ params, searchParams }: { param
     return `rev ${latest.value}${latest.statusCode ? ` · ${latest.statusCode}` : ""} · ${name.toLowerCase()}`;
   };
   const needed: NeededRow[] = entries.map((e) => {
-    const cur = e.document.revisions[0];
-    const ready = meetsRequirement(e.document.revisions, e.requiredStatus);
-    const slip = delayOf.get(e.document.docNumber) ?? null;
+    const ready = e.state === "MET";
+    const slip = delayOf.get(e.document.number) ?? null;
     return {
       id: e.id,
       documentId: e.documentId,
-      docNumber: e.document.docNumber,
+      docNumber: e.document.number,
       title: e.document.title,
       discipline: deptLabel(e.department),
-      from: partyLabel(e.submittedBy ?? e.document.originator),
-      approvedBy: fnLabel(e.approvedBy),
+      from: partyLabel(e.document.originator),
+      // The requirements list's approver is not kept by the backend.
+      approvedBy: "—",
       requiredStatus: e.requiredStatus,
-      submitBy: fmtDate(e.requiredBy),
-      submitBySort: e.requiredBy.getTime(),
-      submitNote: e.manualDate ? "fixed date" : `${e.leadBusinessDays ?? DEFAULT_LEAD_DAYS} days before`,
-      has: e.document.latest !== undefined ? standing(e) : cur ? `rev ${cur.value} \u00b7 ${cur.statusCode}` : e.document.isPlaceholder ? "not started" : "not released",
+      submitBy: fmtDate(e.neededBy),
+      submitBySort: e.neededBy.getTime(),
+      submitNote: e.manualDate ? "fixed date" : `${e.leadDays ?? DEFAULT_LEAD_DAYS} days before`,
+      has: standing(e),
       ready,
-      late: !ready && e.requiredBy < new Date(),
+      late: !ready && e.neededBy < new Date(),
       outstanding: !!slip?.outstanding,
       source: slip?.cause?.name ?? null,
       sourceAt: slip?.cause?.at ? fmtDate(slip.cause.at) : null,
@@ -223,7 +219,7 @@ export default async function ActionDetailPage({ params, searchParams }: { param
             {depts.map((d) => (
               <Link key={d} href={`/actions/${action.code}?dept=${d}`} className={`facet ${dept === d ? "font-semibold text-brand-ink" : ""}`}>
                 <span className="font-medium">{deptLabel(d)}</span>
-                <span className="font-mono tabular-nums">{action.entries.filter((e) => e.department === d).length}</span>
+                <span className="font-mono tabular-nums">{action.needs.filter((e) => e.department === d).length}</span>
               </Link>
             ))}
           </>
@@ -233,12 +229,12 @@ export default async function ActionDetailPage({ params, searchParams }: { param
             <div className="min-w-0 flex-1">
               <p className="font-mono text-[12.5px] font-semibold tracking-tight text-slate-500">
                 {action.code}
-                {action.scheduleRef && action.scheduleRef !== action.code ? <span className="ml-2 font-sans text-xs font-normal">planner&rsquo;s ID {action.scheduleRef}</span> : null}
+                {action.externalId && action.externalId !== action.code ? <span className="ml-2 font-sans text-xs font-normal">planner&rsquo;s ID {action.externalId}</span> : null}
               </p>
               <h1 className="plate-name mt-1 min-w-0">{action.name}</h1>
               <p className="plate-meta mt-2">
-                activity {fmtDate(action.scheduledDate)} &middot; {readyCount} of {action.entries.length} documents ready
-                {action.scheduleActivities[0] ? ` \u00b7 schedule ${action.scheduleActivities[0].scheduleVersion.versionLabel}` : ""}
+                activity {fmtDate(action.start)} &middot; {readyCount} of {action.needs.length} documents ready
+                {version ? ` \u00b7 schedule ${version}` : ""}
               </p>
               {moved ? (
                 <p className="mt-2 flex flex-wrap items-center gap-2 text-xs text-amber-800">
@@ -309,10 +305,10 @@ export default async function ActionDetailPage({ params, searchParams }: { param
           {depts.length ? (
             <ul className="divide-y divide-line">
               {depts.map((d) => {
-                const of = (e: (typeof action.entries)[number]) => e.department === d || !e.department;
+                const of = (e: (typeof action.needs)[number]) => e.department === d || !e.department;
                 // Requirements listed before departments existed count against every one.
-                const deptEntries = action.entries.filter(of);
-                const missing = deptEntries.filter((e) => !meetsRequirement(e.document.revisions, e.requiredStatus));
+                const deptEntries = action.needs.filter(of);
+                const missing = deptEntries.filter((e) => e.state !== "MET");
                 const c = action.confirmations.find((x) => x.department === d && !x.revokedAt) ?? null;
                 const taken = c ? null : action.confirmations.find((x) => x.department === d && x.revokedAt) ?? null;
                 const opens = riskFrom(action, riskDays, of);
@@ -321,7 +317,7 @@ export default async function ActionDetailPage({ params, searchParams }: { param
                 const automatic = !c && !passed && deptEntries.length > 0 && missing.length === 0;
                 const open = missing.length > 0 && (passed || (!!opens && opens.getTime() <= Date.now()));
                 const mine = me?.department === d || control;
-                const late = !!c && !c.automatic && !!action.scheduledDate && c.confirmedAt !== null && c.confirmedAt.getTime() >= action.scheduledDate.getTime() + 86_400_000;
+                const late = !!c && !c.automatic && !!action.start && c.confirmedAt !== null && c.confirmedAt.getTime() >= action.start.getTime() + 86_400_000;
                 const members = people.filter((one) => one.department === d);
                 const sent = notices.filter((one) => one.subject.endsWith(`:${d}`));
                 const owing = suppliersOf(missing);
@@ -368,7 +364,7 @@ export default async function ActionDetailPage({ params, searchParams }: { param
                         <ul className="mt-1 space-y-0.5">
                           {missing.map((e) => (
                             <li key={e.id} className="flex flex-wrap gap-x-2">
-                              <Link href={`/documents/${e.documentId}`} className="font-mono font-semibold text-brand-ink hover:underline">{e.document.docNumber}</Link>
+                              <Link href={`/documents/${e.documentId}`} className="font-mono font-semibold text-brand-ink hover:underline">{e.document.number}</Link>
                               <span className="text-slate-600">{e.document.title}</span>
                               <span className="text-slate-500">· {standing(e)}{e.requiredStatus ? `, needed at ${e.requiredStatus}` : ""}</span>
                             </li>
@@ -405,12 +401,12 @@ export default async function ActionDetailPage({ params, searchParams }: { param
                         <div className="has-[details[open]]:basis-full">
                           <NotifyPanel
                             subject={`activity:${action.id}:manual:${d}`}
-                            title={`${action.code} on ${fmtDate(action.scheduledDate)}: ${deptLabel(d)} has ${missing.length} of ${deptEntries.length} documents missing`}
+                            title={`${action.code} on ${fmtDate(action.start)}: ${deptLabel(d)} has ${missing.length} of ${deptEntries.length} documents missing`}
                             body={[
-                              `${action.name} is planned for ${fmtDate(action.scheduledDate)}.`,
-                              `Still missing: ${missing.map((e) => e.document.docNumber).join(", ")}.`,
+                              `${action.name} is planned for ${fmtDate(action.start)}.`,
+                              `Still missing: ${missing.map((e) => e.document.number).join(", ")}.`,
                               passed ? "Confirm on the action's page and say why it went ahead without them." : "Send the documents, or confirm on the action's page and say why it can go ahead without them.",
-                              ...owing.map((s) => `${s.party.name}: please send ${s.docs.map((e) => e.document.docNumber).join(", ")} on a transmittal${s.docs.some((e) => e.requiredBy) ? `, by ${fmtDate(s.docs.map((e) => e.requiredBy).sort((a, b) => a.getTime() - b.getTime())[0])}` : ""}.`),
+                              ...owing.map((s) => `${s.party.name}: please send ${s.docs.map((e) => e.document.number).join(", ")} on a transmittal${s.docs.some((e) => e.neededBy) ? `, by ${fmtDate(s.docs.map((e) => e.neededBy).sort((a, b) => a.getTime() - b.getTime())[0])}` : ""}.`),
                             ].join("\n\n")}
                             link={`/actions/${action.code}`}
                             outsideLink={owedDocs.length === 1 ? `/documents/${owedDocs[0].documentId}` : owedDocs.length ? "/documents" : undefined}
@@ -468,21 +464,21 @@ export default async function ActionDetailPage({ params, searchParams }: { param
               disciplines={disciplines.map((d) => ({ code: d.code, label: d.label }))}
               documents={pickDocuments}
               asks={asks}
-              count={action.entries.length}
+              count={action.needs.length}
               confirmers={confirmers}
             />
           ) : null}
 
           <ActionNotes
-            notes={action.notes}
+            notes={action.decisions}
             actionId={action.id}
             mayNote={mayNote}
             mayPlan={(ctx.user.verbs ?? []).includes("PLAN")}
             mayControl={control}
             answer={wentAhead}
             missing={missingCount}
-            total={action.entries.length}
-            day={action.scheduledDate ? fmtDate(action.scheduledDate) : null}
+            total={action.needs.length}
+            day={action.start ? fmtDate(action.start) : null}
             postponeCodes={postponeCodes}
             people={(await addressees(ctx)).people.map((one) => ({ id: one.id, name: one.name, detail: [one.organization, one.function].filter(Boolean).join(" · ") }))}
           />
@@ -492,15 +488,14 @@ export default async function ActionDetailPage({ params, searchParams }: { param
         <Card title="Progress">
           <Timeline
             points={[
-              { label: "Disciplines tagged", done: depts.length > 0, at: depts.length ? action.createdAt ?? null : null, holder: depts.length ? depts.map(deptLabel).join(", ") : "nobody yet" },
-              { label: "Documents listed", done: action.entries.length > 0, at: action.entries.length ? action.entries[0].createdAt ?? null : null, holder: action.entries.length ? `${action.entries.length} document${action.entries.length === 1 ? "" : "s"}` : "none listed" },
-              ...(action.riskNotifiedAt ? [{ label: "Warned automatically", at: action.riskNotifiedAt, holder: depts.map(deptLabel).join(", ") }] : []),
+              { label: "Disciplines tagged", done: depts.length > 0, at: null, holder: depts.length ? depts.map(deptLabel).join(", ") : "nobody yet" },
+              { label: "Documents listed", done: action.needs.length > 0, at: null, holder: action.needs.length ? `${action.needs.length} document${action.needs.length === 1 ? "" : "s"}` : "none listed" },
               // Ready, or when the first one is due: the due date is not a step of its own,
               // so a point never shows open between two that are done.
               everything
-                ? { label: "Every document ready", at: action.lastMetAt ?? null, done: true, holder: `${readyCount} of ${action.entries.length} ready` }
+                ? { label: "Every document ready", at: action.lastMetAt ?? null, done: true, holder: `${readyCount} of ${action.needs.length} ready` }
                 : { label: "Every document ready", at: firstDue, planned: !!firstDue && firstDue > new Date(),
-                    holder: `${readyCount} of ${action.entries.length} ready${firstDue && firstDue < new Date() ? ` · the first was due ${fmtDate(firstDue)}` : ""}` },
+                    holder: `${readyCount} of ${action.needs.length} ready${firstDue && firstDue < new Date() ? ` · the first was due ${fmtDate(firstDue)}` : ""}` },
               // Confirmed as the card says: by hand, or automatically when every document is released at its status.
               { label: "Disciplines confirmed", done: depts.length > 0 && confirmedDepts.length === depts.length,
                 at: depts.length > 0 && confirmedDepts.length === depts.length ? confirmedAt : null,
@@ -510,7 +505,7 @@ export default async function ActionDetailPage({ params, searchParams }: { param
               // takes that back.
               {
                 label: postponed ? "The work was postponed" : happened ? "The work happened" : "The work happens",
-                at: action.scheduledDate,
+                at: action.start,
                 planned: !happened && !postponed,
                 holder: postponed ? `${postponed.responsibleName}: ${postponed.reason}` : null,
               },

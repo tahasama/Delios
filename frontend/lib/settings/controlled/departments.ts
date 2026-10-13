@@ -1,7 +1,7 @@
 import { register, headerIndex, cell, diffByKey, type Handler, type ParseIssue, type ParseResult } from "@/lib/settings/controlled/registry";
 import { departmentsOf } from "@/lib/schedule/schedule";
 import { api, projectPath } from "@/lib/api/client";
-import { legacyActions } from "@/lib/api/schedule";
+import { planActions } from "@/lib/api/schedule";
 import { getActiveSet } from "@/lib/settings/config";
 
 /**
@@ -41,10 +41,10 @@ const departments: Handler = {
     const { index, missing } = headerIndex(rows, ["Action Code", "Departments"], ALIASES);
     if (missing.length) return { ok: false, issues: [{ line: 1, message: `Missing column(s): ${missing.join(", ")}. Download the list and keep its header row.` }] };
 
-    const [actions, disciplines] = await Promise.all([legacyActions(t), getActiveSet("DISCIPLINES")]);
+    const [actions, disciplines] = await Promise.all([planActions(t), getActiveSet("DISCIPLINES")]);
     const codes = new Set(actions.map((a) => a.code));
     const known = new Set(disciplines.map((d) => d.code));
-    const entries = actions.flatMap((a) => a.entries.map((e) => ({ department: e.department, code: a.code })));
+    const entries = actions.flatMap((a) => a.needs.map((e) => ({ department: e.department, code: a.code })));
 
     const issues: ParseIssue[] = [];
     const parsed: DepartmentRow[] = [];
@@ -76,12 +76,12 @@ const departments: Handler = {
   },
 
   async current(t) {
-    return (await legacyActions(t)).map((a): DepartmentRow => ({ actionCode: a.code, departments: departmentsOf(a) }));
+    return (await planActions(t)).map((a): DepartmentRow => ({ actionCode: a.code, departments: departmentsOf(a) }));
   },
 
   async exportRows(t) {
-    return (await legacyActions(t)).map((a) => [
-      a.code, a.scheduleRef ?? "", a.name, a.description ?? "", a.scheduledDate?.toISOString().slice(0, 10) ?? "", departmentsOf(a).join(", "),
+    return (await planActions(t)).map((a) => [
+      a.code, a.externalId ?? "", a.name, "", a.start?.toISOString().slice(0, 10) ?? "", departmentsOf(a).join(", "),
     ]);
   },
 
@@ -98,7 +98,7 @@ const departments: Handler = {
 
   async apply(t, payload) {
     const rows = payload as DepartmentRow[];
-    const actions = new Map((await legacyActions(t)).map((a) => [a.code, a]));
+    const actions = new Map((await planActions(t)).map((a) => [a.code, a]));
     let changed = 0;
     for (const row of rows) {
       const action = actions.get(row.actionCode);

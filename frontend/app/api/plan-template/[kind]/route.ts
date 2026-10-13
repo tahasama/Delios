@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getScope } from "@/lib/core/scope";
 import { toCsv } from "@/lib/core/csv";
-import { legacyActions } from "@/lib/api/schedule";
+import { planActions } from "@/lib/api/schedule";
 import { handlerFor } from "@/lib/settings/controlled/registry";
 import "@/lib/settings/controlled/handlers";
 
@@ -20,10 +20,10 @@ export async function GET(_req: Request, { params }: { params: Promise<{ kind: s
 
   let rows: (string | number | null)[][];
   if (kind === "SCHEDULE") {
-    const actions = await legacyActions(ctx);
+    const actions = await planActions(ctx);
     rows = [["Activity ID", "Activity Name", "Start", "Finish"],
       ...(actions.length
-        ? actions.map((one) => [one.scheduleRef ?? one.code, one.name, day(one.scheduledDate), day(one.finishDate)])
+        ? actions.map((one) => [one.externalId ?? one.code, one.name, day(one.start), day(one.finish)])
         : [["1010", "Foundation concrete pour — clarifier", "2026-09-21", "2026-09-22"]])];
   } else if (kind === "DEPARTMENTS" || kind === "REQUIREMENTS") {
     const handler = handlerFor(kind === "DEPARTMENTS" ? "ACTION_DEPARTMENTS" : "DOCUMENT_REQUIREMENTS");
