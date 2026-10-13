@@ -1,7 +1,7 @@
 import { ActionForm } from "@/components/form";
-import type { PackageView } from "@/lib/api/types";
+import type { PackageView } from "@/lib/types";
 import { Field, inputCls } from "@/components/ui";
-import { updatePackageAction, deletePackageAction } from "@/lib/forms/planning";
+import { updatePackageAction, deletePackageAction } from "@/lib/packages/forms";
 import type { StepItem } from "@/app/(app)/documents/[id]/next-step";
 
 /** Renaming and deleting a package — the same on a delivery and a supplier package. */

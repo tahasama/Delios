@@ -6,7 +6,7 @@ import "@/lib/settings/controlled/handlers";
 import { fmtDate } from "@/lib/core/utils";
 import { Grid3X3, CalendarRange, Tags, ArrowRight, CircleCheck, Clock, PencilLine } from "lucide-react";
 
-import { controlledSets } from "@/lib/api/admin";
+import { controlledSets } from "@/lib/settings/api-admin";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Controlled changes" };

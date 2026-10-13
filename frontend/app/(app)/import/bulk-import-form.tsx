@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useRef, useState } from "react";
-import { importBulkAction } from "@/lib/forms/bulk";
+import { importBulkAction } from "@/lib/documents/forms-import";
 import { Card, Chip, DataTable, Th, Td, btn, inputCls } from "@/components/ui";
 import { Download } from "lucide-react";
 

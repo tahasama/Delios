@@ -38,7 +38,7 @@ const STANDARD_ADVICE = { none: "NO_COMMENT", some: "COMMENTS", blocking: "COMME
  * records it: the code, and the counts it was worked out from.
  */
 export async function myAdvice(t: Tenant, cycleId: string, userId: string): Promise<{ code: string; comments: number; blocking: number }> {
-  const { backendReview } = await import("@/lib/api/documents");
+  const { backendReview } = await import("@/lib/documents/api");
   const mine = (await backendReview(t, cycleId)).comments.filter((c) => c.authorId === userId).map((c) => ({ progressionPreventing: c.blocking }));
   return { code: await adviceCode(adviceFor(mine)), comments: mine.length, blocking: mine.filter((c) => c.progressionPreventing).length };
 }
@@ -106,7 +106,7 @@ export type RunData = {
 
 export async function getRunForRevision(t: Tenant, revisionId: string): Promise<RunData | null> {
   // A run is the newest review of the revision; its steps as the route recorded them.
-  const { backendRevision, documentContext, backendReview } = await import("@/lib/api/documents");
+  const { backendRevision, documentContext, backendReview } = await import("@/lib/documents/api");
   const revision = await backendRevision(t, revisionId);
   const latest = (await documentContext(t, revision.documentId)).reviews
     .filter((one) => one.revisionId === revisionId)
@@ -139,7 +139,7 @@ type DocClass = { deliverableType: string; docType: string; discipline: string; 
  * project whose function holds the step's verb for every document's class.
  */
 export async function eligiblePeople(t: Tenant, docs: DocClass[], act: "REVIEW" | "APPROVAL") {
-  const { holders } = await import("@/lib/api/settings");
+  const { holders } = await import("@/lib/settings/api");
   const verb = act === "APPROVAL" ? "APPROVE" : "REVIEW";
   const lists = await Promise.all(docs.map((d) => holders(t.projectId, verb, d.deliverableType, d.docType, d.discipline, d.criticality, d.confidentiality)));
   const out = (lists[0] ?? [])

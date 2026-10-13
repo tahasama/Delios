@@ -12,7 +12,7 @@ import {
   attachTransmittalFilesAction,
   chaseTransmittalAction,
   markRecipientSentAction,
-} from "@/lib/forms/transmittals";
+} from "@/lib/transmittals/forms";
 import { preflight } from "@/lib/conformance/rules/preflight";
 import { PreflightPanel } from "@/components/preflight";
 import { ReceiptTracker } from "./receipt-tracker";
@@ -22,8 +22,8 @@ import { Timeline } from "@/components/timeline";
 import { SendForReview } from "@/components/send-for-review-panel";
 import { ArrowLeft } from "lucide-react";
 import { getActiveSet } from "@/lib/settings/config";
-import { carriersOf as carriersOfTransmittal, transmittalPage } from "@/lib/api/transmittals";
-import { activityDetail } from "@/lib/api/schedule";
+import { carriersOf as carriersOfTransmittal, transmittalPage } from "@/lib/transmittals/api";
+import { activityDetail } from "@/lib/actions/api";
 
 export const dynamic = "force-dynamic";
 

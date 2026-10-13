@@ -1,7 +1,7 @@
 import { VERBS, type Verb } from "@/lib/core/permissions";
-import { api } from "@/lib/api/client";
-import { adminFunctions } from "@/lib/api/admin";
-import { planActions } from "@/lib/api/schedule";
+import { api } from "@/lib/client";
+import { adminFunctions } from "@/lib/settings/api-admin";
+import { planActions } from "@/lib/actions/api";
 import { getSet } from "@/lib/settings/config";
 import {
   register,

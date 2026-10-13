@@ -34,7 +34,7 @@ fi
 if command -v dotnet >/dev/null 2>&1; then
   # shellcheck disable=SC1090
   . "$env_file"
-  project="$here/../backend/src/Delios.Host"
+  project="$here/../backend/app"
   dotnet user-secrets set "ConnectionStrings:Postgres" \
     "Host=localhost;Port=5432;Database=delios;Username=delios;Password=$DB_APP_PASSWORD" --project "$project" >/dev/null
   dotnet user-secrets set "ConnectionStrings:RabbitMq" \

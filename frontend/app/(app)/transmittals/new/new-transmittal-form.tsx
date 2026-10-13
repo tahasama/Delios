@@ -4,7 +4,7 @@ import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ActionForm } from "@/components/form";
-import { createTransmittalAction } from "@/lib/forms/transmittals";
+import { createTransmittalAction } from "@/lib/transmittals/forms";
 import { RecipientPicker, type Company } from "./recipient-picker";
 import type { OwnField } from "@/lib/settings/field-policy";
 import { OwnFields } from "@/app/(app)/documents/new/own-fields";

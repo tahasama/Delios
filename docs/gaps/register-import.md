@@ -1,7 +1,7 @@
 # Registering documents, import and exports: what the screens need that the backend lacks
 
 Screens and handlers: `/documents/new` (create or receive a document), `/import` (bulk import and the export list),
-`/api/export/{kind}`, `/api/register/export`, `/no-project`; actions `importBulkAction` (`frontend/lib/forms/bulk.ts`),
+`/api/export/{kind}`, `/api/register/export`, `/no-project`; actions `importBulkAction` (`frontend/lib/documents/forms-import.ts`),
 `saveRegisterView`/`deleteRegisterView`, `addDocumentReaderAction`/`removeDocumentReaderAction`,
 `linkControlledSourceAction`; helpers `frontend/lib/documents/register.ts`, `numbering.ts`, `numbering-records.ts`,
 `matrix-sheet.ts`, `deliverable-workbook.ts`, `sets-workbook.ts`.

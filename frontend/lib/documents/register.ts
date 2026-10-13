@@ -1,6 +1,6 @@
 import type { Tenant } from "@/lib/core/tenant";
 import type { SessionUser } from "@/lib/core/auth";
-import { api, projectPath } from "@/lib/api/client";
+import { api, projectPath } from "@/lib/client";
 
 /**
  * Registering a document — the act itself, once.

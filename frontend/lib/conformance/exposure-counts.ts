@@ -1,5 +1,5 @@
-import { api, projectPath } from "@/lib/api/client";
-import type { RegisterPage } from "@/lib/api/types";
+import { api, projectPath } from "@/lib/client";
+import type { RegisterPage } from "@/lib/types";
 /** A schedule need still waiting on a withdrawn document. */
 type OrphanedNeed = { id: string; documentId: string; document: { docNumber: string }; action: { code: string; name: string } };
 

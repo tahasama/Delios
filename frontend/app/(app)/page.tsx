@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { api, projectPath } from "@/lib/api/client";
-import { actionWork } from "@/lib/api/schedule";
-import type { ActivityRow, ActivitySummary, Work } from "@/lib/api/types";
+import { api, projectPath } from "@/lib/client";
+import { actionWork } from "@/lib/actions/api";
+import type { ActivityRow, ActivitySummary, Work } from "@/lib/types";
 import { requireScope } from "@/lib/core/scope";
 import { fmtDate, fmtDateTime } from "@/lib/core/utils";
 import { DateWindow } from "@/components/date-window";

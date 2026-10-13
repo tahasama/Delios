@@ -3,7 +3,7 @@ import { mayContributeToDocument, type SessionUser } from "@/lib/core/auth";
 import { Chip, Field, inputCls } from "@/components/ui";
 import { cn } from "@/lib/core/utils";
 import { ActionForm } from "@/components/form";
-import { recordStepOutcomeAction, submitForReleaseAction } from "@/lib/forms/workflow";
+import { recordStepOutcomeAction, submitForReleaseAction } from "@/lib/reviews/forms";
 import { typeSkipsReview } from "@/lib/reviews/review-need";
 import { decisionOptions, statusOptions } from "@/lib/reviews/decision-options";
 import { requestChoices, authorOf, issuePolicy } from "@/lib/transmittals/issue-requests";
@@ -15,10 +15,10 @@ import { Send, Rocket } from "lucide-react";
 import { NextStepBody, StagePath, type StepItem } from "./next-step";
 import { getRunForRevision, dueState, myAdvice, type WfRuntimeStep } from "@/lib/reviews/workflow";
 import { fmtDate } from "@/lib/core/utils";
-import { confirmRecordAction, correctRecordAction } from "@/lib/forms/governance";
+import { confirmRecordAction, correctRecordAction } from "@/lib/documents/forms-governance";
 import { SendForReview } from "@/components/send-for-review-panel";
 import { isController } from "@/lib/core/auth";
-import { documentPage, backendReview, backendDocument } from "@/lib/api/documents";
+import { documentPage, backendReview, backendDocument } from "@/lib/documents/api";
 
 type DocLite = {
   id: string;

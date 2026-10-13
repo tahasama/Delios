@@ -1,6 +1,6 @@
 import { cache } from "react";
 import type { Tenant } from "@/lib/core/tenant";
-import { projectSettings, holders } from "@/lib/api/settings";
+import { projectSettings, holders } from "@/lib/settings/api";
 
 /** Somebody on the project holds the control function. */
 async function hasControlFunction(t: Tenant): Promise<boolean> {

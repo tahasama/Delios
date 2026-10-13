@@ -1,13 +1,13 @@
 import { requireScope } from "@/lib/core/scope";
-import { projectExceptions } from "@/lib/api/records";
+import { projectExceptions } from "@/lib/records/api";
 import { PageHeader } from "@/components/ui";
 import { fmtDate, fmtDateTime } from "@/lib/core/utils";
 import { PrintButton } from "./print-button";
 import { AssuranceTabs } from "@/app/(app)/conformance/tabs";
 import { CATALOG, CHECK_BY_ID, PHASE_LABEL, type Phase } from "@/lib/conformance/checks/catalog";
 import { PREVENTED } from "@/lib/conformance/checks/prevented";
-import { checksOf, documentCount, flawedDocuments, liveDefects, optOutsOf, scopeOf } from "@/lib/api/conformance";
-import { getMe } from "@/lib/api/me";
+import { checksOf, documentCount, flawedDocuments, liveDefects, optOutsOf, scopeOf } from "@/lib/conformance/api";
+import { getMe } from "@/lib/account/api";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Conformance" };

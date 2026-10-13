@@ -4,13 +4,13 @@ import { PageHeader, Card, Chip, DataTable, Th, Td, Field, btn, inputCls } from 
 import { ActionForm } from "@/components/form";
 import { Asked, Added } from "@/components/policy-fields";
 import { formPolicy } from "@/lib/settings/field-policy";
-import { createProjectAction, renameProjectAction, setProjectStatusAction, openProjectAction } from "@/lib/forms/projects";
+import { createProjectAction, renameProjectAction, setProjectStatusAction, openProjectAction } from "@/lib/settings/forms-projects";
 import { fmtDate } from "@/lib/core/utils";
 import { FolderOpen, ArrowRight } from "lucide-react";
 import { PROJECT_KINDS } from "@/lib/settings/profiles/kinds";
 import { contractRoleOptions } from "@/lib/settings/contract-roles";
-import { adminProjects } from "@/lib/api/admin";
-import { projectSettings } from "@/lib/api/settings";
+import { adminProjects } from "@/lib/settings/api-admin";
+import { projectSettings } from "@/lib/settings/api";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Projects" };

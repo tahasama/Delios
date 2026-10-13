@@ -3,13 +3,13 @@ import { requireScope } from "@/lib/core/scope";
 import { isAdmin } from "@/lib/core/auth";
 import { PageHeader, Card, Chip, inputCls } from "@/components/ui";
 import { ActionForm } from "@/components/form";
-import { setFieldPolicyAction, addOwnFieldAction, removeOwnFieldOnRow } from "@/lib/forms/control-activities";
+import { setFieldPolicyAction, addOwnFieldAction, removeOwnFieldOnRow } from "@/lib/settings/forms-how-it-works";
 import {
   KINDS, KIND_LABEL, KIND_TAB, KIND_TEXT, RULE_LABEL, CONTROL_LABEL, fieldsOf, allFieldRules, FIELD_LABEL_KEY, storedOwnFields,
   type FieldKind, type FieldRule, type Control,
 } from "@/lib/settings/field-policy";
 import { getSets } from "@/lib/settings/config";
-import { orgSettings } from "@/lib/api/settings";
+import { orgSettings } from "@/lib/settings/api";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Forms & fields" };

@@ -1,13 +1,13 @@
 import { PageHeader, Card, Chip, EmptyState } from "@/components/ui";
 import { requireScope } from "@/lib/core/scope";
-import { deleteTemplateAction } from "@/lib/forms/workflow";
+import { deleteTemplateAction } from "@/lib/reviews/forms";
 import { getSets, getActiveSet } from "@/lib/settings/config";
 import { WorkflowTemplateBuilder, type WorkflowBuilderStep } from "./workflow-template-builder";
 import { hasVerb } from "@/lib/core/auth";
 import { ArrowRight } from "lucide-react";
 import { verdictSets } from "@/lib/reviews/verdict-sets";
 import { isVerdictSet } from "@/lib/settings/set-props";
-import { adminFunctions, adminParties, adminUsers, routesForEditor } from "@/lib/api/admin";
+import { adminFunctions, adminParties, adminUsers, routesForEditor } from "@/lib/settings/api-admin";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Review routes" };

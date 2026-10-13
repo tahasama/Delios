@@ -2,9 +2,9 @@ import Link from "next/link";
 import { requireScope } from "@/lib/core/scope";
 import { PageHeader, EmptyState } from "@/components/ui";
 import { timeAgo } from "@/lib/core/utils";
-import { getNotifications, markAllNotificationsRead } from "@/lib/api/me";
-import { api, forgetShortLived } from "@/lib/api/client";
-import { PushSettings } from "@/components/push-settings";
+import { getNotifications, markAllNotificationsRead } from "@/lib/account/api";
+import { api, forgetShortLived } from "@/lib/client";
+import { PushSettings } from "@/app/(app)/notifications/push-settings";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Notifications" };

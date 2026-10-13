@@ -2,7 +2,7 @@ import { cache } from "react";
 import { randomBytes } from "crypto";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { getMe } from "@/lib/api/me";
+import { getMe } from "@/lib/account/api";
 import type { Role } from "@/lib/core/standard";
 import { heldVerbs } from "@/lib/core/permissions";
 

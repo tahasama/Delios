@@ -65,7 +65,7 @@ to it.
 
 **Depends on it:** `openApprovalStep` / `settleApproval` in
 `frontend/lib/transmittals/issue-requests.ts`; the *External approval* checkpoint in
-`frontend/lib/schedule/action-lateness.ts`.
+`frontend/lib/actions/action-lateness.ts`.
 
 ---
 
@@ -156,7 +156,7 @@ after it inherit the delay rather than own it.
 **Why:** so nobody argues about it afterwards, and so a step never carries a
 delay that began before it.
 
-**Depends on it:** `frontend/lib/schedule/action-lateness.ts`; the delay columns on the action
+**Depends on it:** `frontend/lib/actions/action-lateness.ts`; the delay columns on the action
 page; the baseline export.
 
 ---
@@ -914,7 +914,7 @@ requirements automatically. One wrong line applies nothing, and the control
 function is told why. The upload by Document Control or Plan (§32) remains the
 manual way.
 
-**Depends on it:** `Schedules/RequirementsImporter.cs`, type property
+**Depends on it:** `Actions/RequirementsImporter.cs`, type property
 `readsRequirements`.
 
 ---
@@ -928,7 +928,7 @@ its state — placeholder, in review, released, released and issued — with tha
 state shown in the organization's own words. It counts as ready only as §5
 says; showing it tells people it exists, not that it may be used.
 
-**Depends on it:** `frontend/lib/api/schedule.ts` (`latest`), the action page.
+**Depends on it:** `frontend/lib/actions/api.ts` (`latest`), the action page.
 
 ---
 
@@ -1010,7 +1010,7 @@ answer replying to what it answers, so the thread is the record:
 Answering a transmittal one was asked on acknowledges it. Escalation and the
 automatic notices about an action stay notices (§53).
 
-**Depends on it:** `Schedules/ActionLetters.cs`; `ActivityDecision.TransmittalId`,
+**Depends on it:** `Actions/ActionLetters.cs`; `ActivityDecision.TransmittalId`,
 `Membership.ConfirmTransmittalId`.
 
 ---

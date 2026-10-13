@@ -1,10 +1,10 @@
 import { register, headerIndex, cell, parseDate, diffByKey, type Handler, type ParseIssue, type ParseResult } from "@/lib/settings/controlled/registry";
-import { DEFAULT_LEAD_DAYS, departmentsOf, needDefaults } from "@/lib/schedule/schedule";
-import { api, projectPath } from "@/lib/api/client";
-import { planActions } from "@/lib/api/schedule";
-import { registerByNumber } from "@/lib/api/register";
-import { adminFunctions, orEmpty } from "@/lib/api/admin";
-import { requirementCalls } from "@/lib/api/records";
+import { DEFAULT_LEAD_DAYS, departmentsOf, needDefaults } from "@/lib/actions/schedule";
+import { api, projectPath } from "@/lib/client";
+import { planActions } from "@/lib/actions/api";
+import { registerByNumber } from "@/lib/documents/api-register";
+import { adminFunctions, orEmpty } from "@/lib/settings/api-admin";
+import { requirementCalls } from "@/lib/records/api";
 import { getActiveSet } from "@/lib/settings/config";
 
 /**

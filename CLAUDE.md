@@ -10,6 +10,7 @@ conversation, write it into the right one in the same commit as the code.
 | `CLAUDE.md` (this file) | How to work with the owner, and the rules that must never break |
 | `docs/STANDARD-CHANGES.md` | What the original Document Management Standard must change to match what we built. Every new rule about controlling information goes here. |
 | `docs/REVIEW-MODEL.md` | The review model: routes, steps, advice, verdicts, release |
+| `docs/STRUCTURE.md` | Where everything is, by area; where to look when debugging or adding a feature |
 | `docs/BEHAVIOUR-CHANGES.md` | What behaves differently since the screens moved onto the backend |
 | `docs/DETAIL-STYLE.md` | The reference style (Schedule & actions, the action page): what "apply the same" means |
 | `docs/gaps/*.md` | Known gaps per area |
@@ -17,22 +18,10 @@ conversation, write it into the right one in the same commit as the code.
 
 ## Where things go
 
-- Root: `compose.yaml` and `.env` (from `.env.example`; `docker compose up`, the screens with
-  `--profile app` on localhost:3080), `CLAUDE.md`, `PRODUCT.md`, `README.md`.
-- `backend/src/Delios.Host/` (API and worker, one program): one folder per area (`Documents`, `Reviews`,
-  `Transmittals`, `Packages`, `Schedules`, `Records`, `Identity`, `Notifications`…), each with its
-  `Entities.cs`, `Configurations.cs`, `*Endpoints.cs` and `*Service.cs`; a big service is split into
-  partial files named for what they do (`ReviewService.Start.cs`). `Platform/` holds the database context and
-  `Migrations/`. Tests in `backend/tests/`.
-- `frontend/` (Next.js; run `npm` there): `app/` pages (helpers a page alone uses sit beside it),
-  `components/` shared pieces, `lib/` by area:
-  - `lib/api/` — the only place that calls the backend (`client.ts`), one file per area, types in `types.ts`;
-  - `lib/forms/` — the server actions forms post to;
-  - `lib/core/` — sign-in, scope, permissions, preferences, words for states;
-  - `lib/documents`, `reviews`, `transmittals`, `schedule`, `packages`, `settings`, `conformance` —
-    what each area's screens need beyond the API.
-- `deploy/` — Caddy, Postgres image, monitoring, file backup, Kubernetes, `init-env` scripts.
-- `docs/` — the files in the table above, and the runbooks.
+Everything is filed by area, under the same name everywhere: `backend/app/<Area>/`,
+`frontend/app/(app)/<area>/` (pages), `frontend/lib/<area>/` (`api.ts` reads, `forms*.ts` sends). The
+full map, the services and "where to look" are in `docs/STRUCTURE.md`: read it before adding a file,
+and keep it up to date when a folder is added or moved.
 
 **Rules live in the backend, once.** Where something stands (an action's state, a revision waiting for the
 check, a transmittal's status, a package's readiness) is worked out by the backend and read by every screen;
@@ -507,7 +496,7 @@ a screen only words it. A new rule goes in the backend, never in a page.
 
 ### Backend — limits and steps that bit before
 - An outbox routing key is at most 16 characters; `ControlledVersion.VersionLabel` too.
-- Migrations: `dotnet ef migrations add Name -p src/Delios.Host -s src/Delios.Host -o Platform/Migrations`
+- Migrations: `dotnet ef migrations add Name -p app -s app -o Platform/Migrations`
   (from `backend/`). Each new table gets `RowLevelSecurity.Enable(migrationBuilder, "<table>")`.
 - Row-level security is forced, even for the table owner: a data backfill loops over
   `tenants` and sets `set_config('app.tenant_id', …)` for each.

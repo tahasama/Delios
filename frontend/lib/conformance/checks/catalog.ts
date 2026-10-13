@@ -82,7 +82,7 @@ export const FAMILY_TITLES: Record<string, string> = {
 };
 
 /**
- * The checks the backend runs (backend/src/Delios.Host/Checks/Catalog.cs), in
+ * The checks the backend runs (backend/app/Checks/Catalog.cs), in
  * its order and its words. The backend asks them and keeps what they found;
  * this list is what the screens say about each one, so it says what the
  * backend asks — a check listed here and never asked would read as never run.

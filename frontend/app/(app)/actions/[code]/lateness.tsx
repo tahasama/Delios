@@ -2,8 +2,8 @@ import { ActionForm } from "@/components/form";
 import { SearchPick, type PickItem } from "@/components/search-pick";
 import { Field, inputCls } from "@/components/ui";
 import { fmtDate } from "@/lib/core/utils";
-import { recordActionNoteAction, confirmPostponementAction, reverseDecisionAction } from "@/lib/forms/action-notes";
-import type { PlanDecision } from "@/lib/api/schedule";
+import { recordActionNoteAction, confirmPostponementAction, reverseDecisionAction } from "@/lib/actions/forms-decisions";
+import type { PlanDecision } from "@/lib/actions/api";
 
 type Note = PlanDecision;
 

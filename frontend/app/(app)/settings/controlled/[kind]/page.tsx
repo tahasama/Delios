@@ -8,14 +8,14 @@ import {
   submitControlledVersionAction,
   decideControlledVersionAction,
   discardControlledVersionAction,
-} from "@/lib/forms/controlled";
+} from "@/lib/settings/forms-controlled";
 import { handlerFor, summariseDiff, PLAN_KINDS, type DiffLine } from "@/lib/settings/controlled/registry";
 import "@/lib/settings/controlled/handlers";
 import { getSets } from "@/lib/settings/config";
 import { fmtDate } from "@/lib/core/utils";
 import { ArrowLeft, Download, CircleCheck, CircleX, Clock, FileClock, Upload } from "lucide-react";
 
-import { controlledSets } from "@/lib/api/admin";
+import { controlledSets } from "@/lib/settings/api-admin";
 
 export const dynamic = "force-dynamic";
 

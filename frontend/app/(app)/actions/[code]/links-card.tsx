@@ -3,8 +3,8 @@ import { ActionForm } from "@/components/form";
 import { SearchPick, type PickItem } from "@/components/search-pick";
 import { Field, inputCls } from "@/components/ui";
 import { fmtDate } from "@/lib/core/utils";
-import { setDisciplinesAction, addDocumentToActionAction, answerActionRequestAction, checkActionRequestAction } from "@/lib/forms/action-links";
-import type { ActivityRequest, ActivityProposal } from "@/lib/api/schedule";
+import { setDisciplinesAction, addDocumentToActionAction, answerActionRequestAction, checkActionRequestAction } from "@/lib/actions/forms-links";
+import type { ActivityRequest, ActivityProposal } from "@/lib/actions/api";
 
 /** A request about this action, not yet answered: a document to add, or a missing discipline. */
 export type Ask = ActivityRequest;

@@ -4,8 +4,8 @@ import { Field, inputCls, Info, ToneChip, DataTable, Th, Td } from "@/components
 import { ActionForm } from "@/components/form";
 import { Asked, Added } from "@/components/policy-fields";
 import { formPolicy } from "@/lib/settings/field-policy";
-import { createPackageAction } from "@/lib/forms/planning";
-import { createSupplierPackageAction } from "@/lib/forms/supplier";
+import { createPackageAction } from "@/lib/packages/forms";
+import { createSupplierPackageAction } from "@/lib/packages/forms-supplier";
 import { supplierRows, packageCounts, packageStage } from "@/lib/packages/supplier";
 import { isController, isAdmin } from "@/lib/core/auth";
 import { getActiveSet } from "@/lib/settings/config";
@@ -15,7 +15,7 @@ import { isReadOnly } from "@/lib/core/auth";
 import { SearchPick } from "@/components/search-pick";
 import { RuleFields } from "./rule-fields";
 import { statusList, shortfallOf } from "@/lib/packages/package-rule";
-import { packagesOf, ourPeople, packageParties } from "@/lib/api/packages";
+import { packagesOf, ourPeople, packageParties } from "@/lib/packages/api";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Packages" };

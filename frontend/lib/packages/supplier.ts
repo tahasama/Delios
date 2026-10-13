@@ -1,5 +1,5 @@
-import { documentPage, documentContext } from "@/lib/api/documents";
-import type { PackageView } from "@/lib/api/types";
+import { documentPage, documentContext } from "@/lib/documents/api";
+import type { PackageView } from "@/lib/types";
 import { supplierStage, supplierStamp, type SupplierStage } from "@/lib/core/state-names";
 
 /**

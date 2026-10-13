@@ -1,0 +1,203 @@
+# Where things are
+
+One rule: **everything is filed by area, under the same name everywhere.** Something about transmittals lives
+in a folder called `transmittals` (or `Transmittals`) in every part of the app. To debug or add a feature, open
+that area's folder in each part, and nowhere else.
+
+The areas: documents, reviews, transmittals, packages, actions (the schedule and its actions), records (assets,
+exceptions), conformance (checks and reports), notifications, account (your sign-in), settings.
+
+## The whole repository
+
+```
+delios/
+├── compose.yaml          every service the app runs with (see "Services" below)
+├── .env                  passwords and addresses (made from .env.example; never committed)
+├── CLAUDE.md             how we work, and the rules that must never break
+├── PRODUCT.md            what the product is, and for whom
+├── README.md             how to start it
+│
+├── backend/              the API and the worker: one program
+├── frontend/             the screens
+├── deploy/               settings for the services, and for running on servers
+├── docs/                 what we agreed, and the runbooks
+└── .github/workflows/    the checks GitHub runs on every push
+```
+
+## backend/
+
+```
+backend/
+├── app/                  the program (API and worker)
+│   ├── Program.cs        start-up: what runs, in which order
+│   ├── Documents/        documents, revisions, files, the register
+│   ├── Reviews/          routes, steps, advice, verdicts, release
+│   ├── Transmittals/     sending, receiving, the check on arrival
+│   ├── Packages/         delivery packages and supplier packages
+│   ├── Actions/          the schedule, its actions, what each needs, notices
+│   ├── Records/          assets, exceptions, readiness answers
+│   ├── Checks/           conformance checks
+│   ├── Reports/          reports
+│   ├── Search/           full-text search
+│   ├── Identity/         people, sign-in, functions, organizations, who may do what
+│   ├── Settings/         the organization's and the project's settings and lists
+│   ├── Notifications/    notifications, email, pop-ups
+│   ├── Audit/            the audit trail
+│   ├── Extraction/       reading text out of files
+│   ├── Messaging/        the queue between the API and the worker
+│   ├── Tenancy/          keeping each organization's data apart
+│   ├── Seeding/          the demo data
+│   ├── Platform/         the database, Migrations/, shared plumbing
+│   ├── Resources/        files built into the program (fonts for stamped PDFs)
+│   └── appsettings.json  default settings (.env overrides them)
+├── tests/                the automated tests, one file per area (DocumentTests.cs…)
+├── Delios.slnx           ties app/ and tests/ together
+├── Directory.Build.props settings shared by both
+└── Dockerfile            builds the program into an image
+```
+
+Inside an area folder, the same names every time:
+
+```
+Transmittals/
+├── Entities.cs               what is stored (the tables)
+├── Configurations.cs         how it is stored (columns, lengths, indexes)
+├── TransmittalEndpoints.cs   the web addresses the screens call
+├── TransmittalService.cs     the work itself
+└── TransmittalService.*.cs   a big service split by what it does (…Composing.cs, …Reading.cs)
+```
+
+The program's internal name is still `Delios.Host` (in the code and the built file). Only the folder is `app`.
+
+## frontend/
+
+```
+frontend/
+├── app/                  the pages: a folder's name is its web address
+│   ├── layout.tsx        the outer frame of every page
+│   ├── (public)/         pages for someone not signed in
+│   │   ├── login/  signup/  confirm-email/  forgot-password/  reset-password/
+│   │   └── bot-check.tsx, form-validation.ts   pieces only these pages use
+│   ├── (start)/          signed in, not inside a project yet
+│   │   ├── setup/        after registering an organization: add people, open the first project
+│   │   └── no-project/   on no project yet
+│   ├── (app)/            inside a project
+│   │   ├── layout.tsx    the frame: menu, project switcher, theme
+│   │   ├── page.tsx      Home (with home-parts.tsx, tally.tsx)
+│   │   ├── documents/    + import/
+│   │   ├── reviews/
+│   │   ├── transmittals/ + exposures/
+│   │   ├── packages/
+│   │   ├── actions/      + needed/ (the supplier's view of the schedule)
+│   │   ├── assets/
+│   │   ├── conformance/  + reports/
+│   │   ├── notifications/
+│   │   ├── account/
+│   │   ├── guide/
+│   │   └── settings/     + distribution/, people/
+│   └── api/              file downloads (exports, delivery lists, templates)
+│
+├── lib/                  the code behind the pages, by area
+│   ├── client.ts         the one door to the backend: every call goes through it
+│   ├── types.ts          the shapes the backend answers with
+│   ├── core/             shared by every area: sign-in, scope, permissions, preferences, words for states
+│   ├── documents/
+│   ├── reviews/
+│   ├── transmittals/
+│   ├── packages/
+│   ├── actions/
+│   ├── records/
+│   ├── conformance/
+│   ├── account/
+│   └── settings/
+│
+├── components/           only the pieces several areas use
+│                         (ui.tsx: buttons and fields; form, data-table, timeline, search-pick,
+│                          send-for-review, notify-panel, preflight…)
+├── public/               files served as they are (sw.js, for pop-up notifications)
+├── scripts/              demo-schedule.mjs (fills a demo), gen-theme.mjs
+└── Dockerfile            builds the screens into an image
+```
+
+`+ import/`, `+ exposures/`, `+ needed/`, `+ reports/`, `+ distribution/`, `+ people/`: pages whose web
+address must stay as it is. They sit beside their area, and belong to it.
+
+Inside a `lib/` area folder, the same names every time:
+
+```
+lib/transmittals/
+├── api.ts                    reading from the backend
+├── api-<topic>.ts            more reading, when there is a lot (documents/api-register.ts)
+├── forms.ts                  what the area's forms send to the backend
+├── forms-<topic>.ts          more forms, by topic (documents/forms-revisions.ts)
+└── <anything else>.ts        what the screens need beyond that: words, small calculations
+```
+
+## Services (compose.yaml)
+
+These are ready-made programs Docker downloads and runs. We don't write them; their settings live in `deploy/`.
+
+```
+Always running:
+  postgres        the database                       settings: deploy/postgres/
+  valkey          Redis: sessions, cache
+  rabbitmq        the queue between the API and the worker
+  seaweedfs       file storage (PDFs, native files)
+  clamav          virus scan of uploads
+  caddy           the front door (https)             settings: deploy/caddy/
+  migrate         updates the database at start-up
+  api, worker     our backend                        code: backend/
+  web             our screens (profile "app")        code: frontend/
+
+Turned on only when needed (profiles):
+  pgbouncer, postgres-standby, file-backup, restore-drill    database extras
+  opensearch, tika                                           full-text search
+  prometheus, grafana, alertmanager, *-exporter              monitoring   settings: deploy/monitoring/
+```
+
+```
+deploy/
+├── postgres/             the database image, backups, restore drill
+├── caddy/                the front door
+├── monitoring/           Prometheus, Grafana, alerts
+├── file-backup/          copies of stored files
+├── kubernetes/           the same services, for a cluster later
+└── init-env.sh / .ps1    makes .env with fresh passwords
+```
+
+## docs/
+
+```
+docs/
+├── STRUCTURE.md          this file
+├── STANDARD-CHANGES.md   what the Document Management Standard must change to match the app
+├── REVIEW-MODEL.md       the review model
+├── BEHAVIOUR-CHANGES.md  what behaves differently since the screens moved onto the backend
+├── DETAIL-STYLE.md       the reference look (Schedule & actions, the action page)
+├── DOTNET-GUIDE.md       a guide to the backend for a newcomer
+├── ACTIVATION.md, LAUNCH-AND-SECURITY.md, SYSTEM.md, ARCHITECTURE.md   running and securing it
+└── gaps/                 known gaps, one file per area
+```
+
+## Where to look
+
+```
+A page shows something wrong ........ frontend/app/(app)/<area>/  then  frontend/lib/<area>/
+A rule is wrong (what something is) . backend/app/<Area>/            (rules live there, once)
+A form does not save ................ frontend/lib/<area>/forms*.ts  then  backend/app/<Area>/*Endpoints.cs
+A new table or column ............... backend/app/<Area>/Entities.cs, then a migration (Platform/Migrations/)
+A service will not start ............ compose.yaml  then  deploy/<service>/  and  .env
+A new feature ....................... its area's folder in each part; a new area gets the same name in all of them
+```
+
+## Rules for adding things
+
+- **A rule goes in the backend, once.** Where something stands (an action's state, a revision waiting for the
+  check, a transmittal's status, a package's readiness) is worked out there and read by every screen. A page
+  only words it.
+- **A file goes in its area.** A piece only one area uses lives in that area: beside its page (`app/(app)/<area>/`)
+  or in `lib/<area>/`. Only pieces several areas use go in `components/` or `lib/core/`.
+- **A new area gets one name**, the same in `backend/app/`, `frontend/app/(app)/` and `frontend/lib/`, and is
+  added to this file.
+- **Only `lib/client.ts` calls the backend.** Pages read through their area's `api.ts`; forms send through
+  its `forms*.ts`.

@@ -9,7 +9,7 @@
  * replacement travel only through it.
  * Whoever is left is who still holds an out-of-date revision without knowing.
  */
-import { api, projectPath } from "@/lib/api/client";
+import { api, projectPath } from "@/lib/client";
 
 type Recipient = { key: string; name: string; organization: string | null; userId: string | null; via: string };
 type Untold = {

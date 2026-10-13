@@ -2,10 +2,10 @@ import { SETUP_PAGES, maySetup } from "../setup-pages";
 import { requireScope } from "@/lib/core/scope";
 import { PageHeader, Card, DataTable, Th, Td, inputCls } from "@/components/ui";
 import { ActionForm } from "@/components/form";
-import { removeNumberingSchemeAction, saveSchemeRoutingAction } from "@/lib/forms/admin";
+import { removeNumberingSchemeAction, saveSchemeRoutingAction } from "@/lib/settings/forms-admin";
 import { NumberingSchemeBuilder } from "./numbering-scheme-builder";
 import { getSets, getActiveSet } from "@/lib/settings/config";
-import { numberingForEditor } from "@/lib/api/admin";
+import { numberingForEditor } from "@/lib/settings/api-admin";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Numbering" };

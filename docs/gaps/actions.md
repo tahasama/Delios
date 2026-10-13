@@ -1,6 +1,6 @@
 # Schedule & actions: what the screens need that the backend lacks
 
-Screens: `/actions` (plan and table), `/actions/[code]` (an activity and what it needs), `/actions/requirements`, `/actions/schedules`, `/actions/schedules/[id]`, the plan's upload cards. Actions: `frontend/lib/forms/requirements.ts`, `frontend/lib/forms/action-notes.ts`. Shared adapter: `frontend/lib/api/schedule.ts`.
+Screens: `/actions` (plan and table), `/actions/[code]` (an activity and what it needs), `/actions/requirements`, `/actions/schedules`, `/actions/schedules/[id]`, the plan's upload cards. Actions: `frontend/lib/actions/forms-readiness.ts`, `frontend/lib/actions/forms-decisions.ts`. Shared adapter: `frontend/lib/actions/api.ts`.
 
 How the screens map today: an activity is an action (its start is the action's date), a need is an entry on the action's list, a decision is a note (CARRIED / STOPPED), a read of the schedule document is a schedule version. A need counts as delivered when the backend says it is MET; a WAIVED need still counts as a missing document on these screens (they have no place for a waiver).
 

@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getScope } from "@/lib/core/scope";
 import { getSessionUser } from "@/lib/core/auth";
-import { api, ApiProblem, projectPath } from "@/lib/api/client";
-import type { TransmittalView } from "@/lib/api/types";
+import { api, ApiProblem, projectPath } from "@/lib/client";
+import type { TransmittalView } from "@/lib/types";
 
 // Opening a transmittal while signed in is the receipt. The backend records a
 // recipient's first opening when they read it, and their acknowledgement here;

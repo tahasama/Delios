@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { ActionForm } from "@/components/form";
 import { SearchPick } from "@/components/search-pick";
-import { createDocumentAction } from "@/lib/forms/documents";
+import { createDocumentAction } from "@/lib/documents/forms";
 import { cn } from "@/lib/core/utils";
 import { AlertTriangle } from "lucide-react";
 import { isEmptyTitle } from "@/lib/core/standard";

@@ -2,7 +2,7 @@
 
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { runChecksAction } from "@/lib/forms/conformance";
+import { runChecksAction } from "@/lib/conformance/forms";
 import { btn } from "@/components/ui";
 import { ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/core/utils";

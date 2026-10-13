@@ -1,11 +1,11 @@
 import Link from "next/link";
-import { unresolvedVoids } from "@/lib/api/readers";
+import { unresolvedVoids } from "@/lib/documents/api-readers";
 import { requireScope } from "@/lib/core/scope";
 import { isController, isAdmin } from "@/lib/core/auth";
 import { PageHeader, Card, Chip, Banner, btn } from "@/components/ui";
 import { ActionForm } from "@/components/form";
 import { EXPOSURES } from "@/lib/core/standard";
-import { recordVoidReassessmentAction } from "@/lib/forms/revisions";
+import { recordVoidReassessmentAction } from "@/lib/documents/forms-revisions";
 import { untoldRecipients, sendCurrentLink } from "@/lib/documents/supersession";
 import { haltedRevisions } from "@/lib/reviews/halted";
 import { orphanedNeeds } from "@/lib/conformance/exposure-counts";

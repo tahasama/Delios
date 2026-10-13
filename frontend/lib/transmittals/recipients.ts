@@ -1,6 +1,6 @@
 import "server-only";
 import type { Tenant } from "@/lib/core/tenant";
-import { addressees } from "@/lib/api/transmittals";
+import { addressees } from "@/lib/transmittals/api";
 
 type RecipientCompany = { key: string; name: string; people: { id: string; name: string; job: string | null }[]; offline?: string };
 

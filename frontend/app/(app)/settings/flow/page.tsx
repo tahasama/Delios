@@ -12,7 +12,7 @@ import { SceneDeck, type Flow, type Scene } from "./scene-deck";
 import { ActSwitch } from "./act-switch";
 import { cn } from "@/lib/core/utils";
 
-import { adminFunctions, adminNumbering, partiesWithAnswers, routesForEditor, orEmpty } from "@/lib/api/admin";
+import { adminFunctions, adminNumbering, partiesWithAnswers, routesForEditor, orEmpty } from "@/lib/settings/api-admin";
 import { getSet, getSets } from "@/lib/settings/config";
 
 export const dynamic = "force-dynamic";

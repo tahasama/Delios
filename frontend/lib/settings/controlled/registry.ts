@@ -9,7 +9,7 @@ import type { Tenant } from "@/lib/core/tenant";
  * tables, and how to read the live tables back out as a payload.
  *
  * The workflow — draft, submit, approve, supersede, audit — is written once in
- * `frontend/lib/forms/controlled.ts` and is the same for every kind.
+ * `frontend/lib/settings/forms-controlled.ts` and is the same for every kind.
  */
 
 const CONTROLLED_KINDS = [

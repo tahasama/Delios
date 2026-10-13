@@ -1,5 +1,5 @@
 import { cache } from "react";
-import { orgSettings } from "@/lib/api/settings";
+import { orgSettings } from "@/lib/settings/api";
 
 /** The organization setting that holds a state's name: STATE_NAME:RELEASED. */
 const STATE_NAME_KEY = "STATE_NAME:";

@@ -1,14 +1,14 @@
 import { requireScope } from "@/lib/core/scope";
 import { ActionForm } from "@/components/form";
-import { attachSupplierFileAction, askBackAction, answerAskAction } from "@/lib/forms/supplier";
+import { attachSupplierFileAction, askBackAction, answerAskAction } from "@/lib/packages/forms-supplier";
 import { Field, inputCls } from "@/components/ui";
 import { supplierStage } from "@/lib/core/state-names";
 import { fmtDate } from "@/lib/core/utils";
 import { NextStepBody, StagePath, type StepItem } from "./next-step";
 import { cn } from "@/lib/core/utils";
 import { hasVerb } from "@/lib/core/auth";
-import { getMe } from "@/lib/api/me";
-import { documentPage, handBacks } from "@/lib/api/documents";
+import { getMe } from "@/lib/account/api";
+import { documentPage, handBacks } from "@/lib/documents/api";
 
 /**
  * What a supplier sees on a document it owes us, in its own set of states: sent

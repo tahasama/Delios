@@ -1,7 +1,7 @@
 import { OUTCOME_CONSEQUENCES } from "@/lib/core/standard";
 import { getSet } from "@/lib/settings/config";
-import { api, projectPath } from "@/lib/api/client";
-import type { RegisterPage } from "@/lib/api/types";
+import { api, projectPath } from "@/lib/client";
+import type { RegisterPage } from "@/lib/types";
 
 /**
  * Verdict codes whose consequence is that the work may not proceed.

@@ -1,6 +1,6 @@
 import { plain } from "@/lib/core/utils";
 import { CHECK_BY_ID } from "@/lib/conformance/checks/catalog";
-import { liveDefects, type DefectView } from "@/lib/api/conformance";
+import { liveDefects, type DefectView } from "@/lib/conformance/api";
 export const OWNER_LABEL: Record<string, string> = { CF: "Document Control", OR: "Originator", RV: "Reviewer", OG: "Organization" };
 
 /** Where a problem of this family is fixed on the document page. */

@@ -1,8 +1,4 @@
 <Solution>
-  <Folder Name="/src/">
-    <Project Path="src/Delios.Host/Delios.Host.csproj" />
-  </Folder>
-  <Folder Name="/tests/">
-    <Project Path="tests/Delios.Tests/Delios.Tests.csproj" />
-  </Folder>
+  <Project Path="app/Delios.Host.csproj" />
+  <Project Path="tests/Delios.Tests.csproj" />
 </Solution>

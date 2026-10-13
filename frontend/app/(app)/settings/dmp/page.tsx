@@ -1,9 +1,9 @@
 import Link from "next/link";
-import { projectExceptions } from "@/lib/api/records";
+import { projectExceptions } from "@/lib/records/api";
 import { requireScope } from "@/lib/core/scope";
 import { CheckCircle2, CircleDashed, ArrowRight, Building2, Tags, FileDigit, Workflow, Users, ShieldCheck, CalendarClock, Gauge } from "lucide-react";
 import { profileForKind, missingFromProfile, type Profile } from "@/lib/settings/profiles";
-import { draftProfileAction } from "@/lib/forms/profiles";
+import { draftProfileAction } from "@/lib/settings/forms-profiles";
 import { isAdmin } from "@/lib/core/auth";
 import { holdersOf } from "@/lib/core/permissions";
 import { Card, Field, PageHeader, inputCls } from "@/components/ui";
@@ -11,11 +11,11 @@ import { ActionForm } from "@/components/form";
 import { DocumentManagementPlan } from "./plan";
 import { PlanTabs } from "./tabs";
 import { PrintButton } from "@/app/(app)/conformance/statement/print-button";
-import { setScopeAction, addExceptionAction } from "@/lib/forms/admin";
+import { setScopeAction, addExceptionAction } from "@/lib/settings/forms-admin";
 import { fmtDate } from "@/lib/core/utils";
 
-import { adminFunctions, adminNumbering, adminParties, adminProjects, adminRoutes, adminUsers, orEmpty, scopeConfig } from "@/lib/api/admin";
-import { projectSettings } from "@/lib/api/settings";
+import { adminFunctions, adminNumbering, adminParties, adminProjects, adminRoutes, adminUsers, orEmpty, scopeConfig } from "@/lib/settings/api-admin";
+import { projectSettings } from "@/lib/settings/api";
 import { getSet, getSets } from "@/lib/settings/config";
 
 export const dynamic = "force-dynamic";

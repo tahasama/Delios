@@ -1,12 +1,12 @@
 import { mayCreateDocument } from "@/lib/core/auth";
 import { requireScope } from "@/lib/core/scope";
-import { unreadNotifications } from "@/lib/api/me";
-import { Sidebar, MobileNav, SearchBox } from "@/components/navigation";
-import { ProjectSwitcher } from "@/components/project-switcher";
-import { logoutAction } from "@/lib/forms/auth";
+import { unreadNotifications } from "@/lib/account/api";
+import { Sidebar, MobileNav, SearchBox } from "@/app/(app)/navigation";
+import { ProjectSwitcher } from "@/app/(app)/project-switcher";
+import { logoutAction } from "@/lib/account/forms-sign-in";
 import { Bell, BookOpen, ChevronDown, LogOut, UserRound, KeyRound } from "lucide-react";
 import Link from "next/link";
-import { ThemeToggle } from "@/components/theme-toggle";
+import { ThemeToggle } from "@/app/(app)/theme-toggle";
 import { ROLE_LABEL } from "@/lib/core/standard";
 import type { Role } from "@/lib/core/standard";
 

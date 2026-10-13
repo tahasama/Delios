@@ -2,7 +2,7 @@ import Link from "next/link";
 import { requireScope } from "@/lib/core/scope";
 import { PageHeader, Card, Chip, SeverityChip, inputCls } from "@/components/ui";
 import { ActionForm } from "@/components/form";
-import { closeDefectAction, acceptDefectAction } from "@/lib/forms/conformance";
+import { closeDefectAction, acceptDefectAction } from "@/lib/conformance/forms";
 import { findingsOfType, todoOf, OWNER_LABEL } from "@/lib/core/problems";
 import { PHASE_LABEL, CHECK_BY_ID } from "@/lib/conformance/checks/catalog";
 import { ArrowRight, ArrowLeft } from "lucide-react";

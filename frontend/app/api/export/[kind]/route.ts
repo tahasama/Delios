@@ -7,12 +7,12 @@ import { buildDeliverableWorkbook } from "@/lib/documents/deliverable-workbook";
 import { buildSetsWorkbook } from "@/lib/settings/sets-workbook";
 import { roleLabel } from "@/lib/settings/profiles/roles";
 import { getSet, getSets } from "@/lib/settings/config";
-import { api, ApiProblem, projectPath } from "@/lib/api/client";
-import { adminAudit } from "@/lib/api/admin";
-import { packagesOf } from "@/lib/api/packages";
+import { api, ApiProblem, projectPath } from "@/lib/client";
+import { adminAudit } from "@/lib/settings/api-admin";
+import { packagesOf } from "@/lib/packages/api";
 import { reasonsOf } from "@/lib/packages/package-rule";
-import { activityLateness, planActions } from "@/lib/api/schedule";
-import { passOn, registerRows } from "@/lib/api/register";
+import { activityLateness, planActions } from "@/lib/actions/api";
+import { passOn, registerRows } from "@/lib/documents/api-register";
 
 // §16.6 — views are generated at time of use, carry a generation timestamp and
 // are never edited. Every register view can be extracted (CSV opens in Excel).

@@ -1,9 +1,9 @@
 import { getActiveSet } from "@/lib/settings/config";
 import { requireScope } from "@/lib/core/scope";
-import { projectAssets } from "@/lib/api/records";
+import { projectAssets } from "@/lib/records/api";
 import { SearchPick } from "@/components/search-pick";
 import type { PackageFilter } from "@/lib/packages/package-rule";
-import { outsideParties } from "@/lib/api/packages";
+import { outsideParties } from "@/lib/packages/api";
 
 /**
  * The rule a package fills itself by: any of tags, disciplines, document types

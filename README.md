@@ -61,9 +61,9 @@ To work on the backend, run only the dependencies in Docker and the API from the
 
 ```bash
 docker compose up -d
-dotnet run --project backend/src/Delios.Host -- migrate
-dotnet run --project backend/src/Delios.Host -- seed-demo
-dotnet run --project backend/src/Delios.Host                # API on http://localhost:5000
+dotnet run --project backend/app -- migrate
+dotnet run --project backend/app -- seed-demo
+dotnet run --project backend/app                # API on http://localhost:5000
 dotnet test backend                                         # tests start their own containers
 ```
 

@@ -9,11 +9,11 @@ import {
   savePermissionRuleAction,
   deletePermissionRuleAction,
   toggleFunctionVerb,
-} from "@/lib/forms/functions";
+} from "@/lib/settings/forms-functions";
 import { VERBS, VERB_LABEL, VERB_BLURB, type Verb } from "@/lib/core/permissions";
 import { CONTRACT_ROLES } from "@/lib/settings/profiles/roles";
 import { Check, Minus } from "lucide-react";
-import { functionsForMatrix } from "@/lib/api/admin";
+import { functionsForMatrix } from "@/lib/settings/api-admin";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Functions & permissions" };

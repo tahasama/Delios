@@ -1,5 +1,5 @@
 import { requireScope } from "@/lib/core/scope";
-import { addressees, ourOrganizationName, transmittalDrafts, transmittalLog } from "@/lib/api/transmittals";
+import { addressees, ourOrganizationName, transmittalDrafts, transmittalLog } from "@/lib/transmittals/api";
 import { REASONS_FOR_ISSUE, REASON_LABEL, type ReasonForIssue } from "@/lib/core/standard";
 import { TransmittalRegister } from "./transmittal-register";
 import { TransmittalPlate } from "./transmittal-plate";

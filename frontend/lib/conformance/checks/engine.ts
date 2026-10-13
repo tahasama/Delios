@@ -1,5 +1,5 @@
 import type { SessionUser } from "@/lib/core/auth";
-import { checksOf, runAndWait } from "@/lib/api/conformance";
+import { checksOf, runAndWait } from "@/lib/conformance/api";
 
 /**
  * Run the catalogue against the register. The backend asks every check, keeps

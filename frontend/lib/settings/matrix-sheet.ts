@@ -4,9 +4,9 @@ import { verbsFor, type Actor, type Verb } from "@/lib/core/permissions";
 import { familyOf, type Family } from "@/lib/settings/families";
 import { matrixDetail } from "@/lib/settings/control-activities";
 import { getActiveSet } from "@/lib/settings/config";
-import { adminFunctions, orEmpty, asMatrixRules } from "@/lib/api/admin";
-import { getMe } from "@/lib/api/me";
-import { registerByNumber } from "@/lib/api/register";
+import { adminFunctions, orEmpty, asMatrixRules } from "@/lib/settings/api-admin";
+import { getMe } from "@/lib/account/api";
+import { registerByNumber } from "@/lib/documents/api-register";
 
 /**
  * The distribution matrix as a sheet: one row per class of document, one column

@@ -2,7 +2,7 @@ import { isReadOnly } from "@/lib/core/auth";
 import { requireScope } from "@/lib/core/scope";
 import { dueState } from "@/lib/reviews/workflow";
 import { getSet } from "@/lib/settings/config";
-import { reviewsPage, valuesInUse, waitingOn, dueDay, workingDaysBetween } from "@/lib/api/reviews";
+import { reviewsPage, valuesInUse, waitingOn, dueDay, workingDaysBetween } from "@/lib/reviews/api";
 import { ReviewsRegister, type ReviewRow } from "./reviews-register";
 import { ReviewsPlate } from "./reviews-plate";
 import { fmtDate } from "@/lib/core/utils";

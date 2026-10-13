@@ -1,8 +1,8 @@
 import { cache } from "react";
 import type { Tenant } from "@/lib/core/tenant";
 import type { DocumentClass, Verb } from "@/lib/core/permissions";
-import { api, projectPath } from "@/lib/api/client";
-import { reviewOfRequest } from "@/lib/api/reviews";
+import { api, projectPath } from "@/lib/client";
+import { reviewOfRequest } from "@/lib/reviews/api";
 
 /**
  * Handing a review step to somebody else.

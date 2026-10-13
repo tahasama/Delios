@@ -5,9 +5,9 @@ import { REV_STATE_COLOR, type RevState } from "@/lib/core/standard";
 import { fmtDate } from "@/lib/core/utils";
 import {
   voidRevisionAction, unvoidRevisionAction
-} from "@/lib/forms/revisions";
-import { type PageRevision } from "@/lib/api/documents";
-import { withdrawApprovalAction } from "@/lib/forms/governance";
+} from "@/lib/documents/forms-revisions";
+import { type PageRevision } from "@/lib/documents/api";
+import { withdrawApprovalAction } from "@/lib/documents/forms-governance";
 import { ChevronRight } from "lucide-react";
 
 export function Empty({ children }: { children: React.ReactNode }) {

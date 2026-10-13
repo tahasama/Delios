@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getScope } from "@/lib/core/scope";
 import { toCsv } from "@/lib/core/csv";
-import { departmentSheet, senderSheet, isDepartmentSender } from "@/lib/schedule/requirements-process";
+import { departmentSheet, senderSheet, isDepartmentSender } from "@/lib/actions/requirements-process";
 
 /**
  * The sheets that travel between the steps: a department's part of the

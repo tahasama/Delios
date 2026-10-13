@@ -5,13 +5,13 @@ import { redirect, notFound } from "next/navigation";
 import { getCurrentUser, type SessionUser } from "@/lib/core/auth";
 import type { Role } from "@/lib/core/standard";
 import { can, verbsFor, explain, type Actor, type Verb, type DocumentClass } from "@/lib/core/permissions";
-import { api, forgetShortLived } from "@/lib/api/client";
-import { getMe } from "@/lib/api/me";
+import { api, forgetShortLived } from "@/lib/client";
+import { getMe } from "@/lib/account/api";
 
 /**
  * The scope is the request-bound tenancy: who is signed in and which project
  * they are looking at. Every read and write goes to the backend through `api()`
- * (`frontend/lib/api/client.ts`) with the project in its path.
+ * (`frontend/lib/client.ts`) with the project in its path.
  */
 
 // ── Resolving the active project ─────────────────────────────────────────────

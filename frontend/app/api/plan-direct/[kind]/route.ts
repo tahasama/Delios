@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getScope } from "@/lib/core/scope";
 import { toCsv } from "@/lib/core/csv";
-import { controlledVersions } from "@/lib/api/records";
+import { controlledVersions } from "@/lib/records/api";
 
 const STORED: Record<string, string> = { SCHEDULE: "SCHEDULE", DEPARTMENTS: "ACTION_DEPARTMENTS", REQUIREMENTS: "DOCUMENT_REQUIREMENTS" };
 

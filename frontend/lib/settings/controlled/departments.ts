@@ -1,7 +1,7 @@
 import { register, headerIndex, cell, diffByKey, type Handler, type ParseIssue, type ParseResult } from "@/lib/settings/controlled/registry";
-import { departmentsOf } from "@/lib/schedule/schedule";
-import { api, projectPath } from "@/lib/api/client";
-import { planActions } from "@/lib/api/schedule";
+import { departmentsOf } from "@/lib/actions/schedule";
+import { api, projectPath } from "@/lib/client";
+import { planActions } from "@/lib/actions/api";
 import { getActiveSet } from "@/lib/settings/config";
 
 /**

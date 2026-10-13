@@ -1,8 +1,8 @@
-import { plannedState, plannedProgress } from "@/lib/schedule/planned-state";
-import { DEFAULT_RISK_DAYS } from "@/lib/schedule/action-state";
+import { plannedState, plannedProgress } from "@/lib/actions/planned-state";
+import { DEFAULT_RISK_DAYS } from "@/lib/actions/action-state";
 import { ReadersPanel } from "./readers-panel";
-import { documentAssets, projectAssets } from "@/lib/api/records";
-import { documentReaders, projectReaders } from "@/lib/api/readers";
+import { documentAssets, projectAssets } from "@/lib/records/api";
+import { documentReaders, projectReaders } from "@/lib/documents/api-readers";
 import { openConfidentiality } from "@/lib/core/permissions";
 import { controlDoes, policy as controlPolicy } from "@/lib/settings/control-activities";
 import { notFound } from "next/navigation";
@@ -20,19 +20,19 @@ import { revisionGround } from "@/lib/documents/revision-ground";
 import { ownFields, readExtras, formPolicy } from "@/lib/settings/field-policy";
 import { fmtDate, timeAgo, plain } from "@/lib/core/utils";
 import { getActiveSet, getSet, getValue } from "@/lib/settings/config";
-import { updateDocumentAction, reinstateDocumentAction, linkAssetAction, unlinkRelationshipAction, endDocumentStateAction } from "@/lib/forms/documents";
+import { updateDocumentAction, reinstateDocumentAction, linkAssetAction, unlinkRelationshipAction, endDocumentStateAction } from "@/lib/documents/forms";
 import {
   prepareRevisionAction, editRevisionAction, withdrawRevisionAction, releaseRevisionAction, returnAtGateAction, liftHoldAction, returnHeldAction,
-} from "@/lib/forms/revisions";
+} from "@/lib/documents/forms-revisions";
 import { parseRecipients, mayRequestIssue, requestChoices, issuePolicy, decisionLetsItOut, requestsOn } from "@/lib/transmittals/issue-requests";
-import { documentPage, documentContext, handBacks } from "@/lib/api/documents";
-import { requestIssueAction, carryOutRequestAction, cancelRequestAction } from "@/lib/forms/issue-requests";
+import { documentPage, documentContext, handBacks } from "@/lib/documents/api";
+import { requestIssueAction, carryOutRequestAction, cancelRequestAction } from "@/lib/transmittals/forms-issue-requests";
 import { RequestIssue } from "./request-issue";
 import { ReleaseRecipients } from "./release-recipients";
 import { ReturnTarget } from "./return-target";
 import { CopyPicker } from "@/app/(app)/transmittals/new/recipient-picker";
 import { recipientCompanies } from "@/lib/transmittals/recipients";
-import { setLegalHoldAction } from "@/lib/forms/retention";
+import { setLegalHoldAction } from "@/lib/documents/forms-hold";
 import { getRunForRevision } from "@/lib/reviews/workflow";
 import { WorkflowPanel } from "./workflow-panel";
 import type { StepItem } from "./next-step";
@@ -40,10 +40,10 @@ import { SupplierDelivery } from "./supplier-delivery";
 import { Timeline } from "@/components/timeline";
 import { DocTabs } from "./doc-tabs";
 import { ArrowLeft, Download, ExternalLink, FileText, Send } from "lucide-react";
-import { activityList, scheduleSource } from "@/lib/api/schedule";
-import { addDocumentToActionAction } from "@/lib/forms/action-links";
-import { sendToSupplierAction, askBackAction, answerAskAction } from "@/lib/forms/supplier";
-import { addressees } from "@/lib/api/transmittals";
+import { activityList, scheduleSource } from "@/lib/actions/api";
+import { addDocumentToActionAction } from "@/lib/actions/forms-links";
+import { sendToSupplierAction, askBackAction, answerAskAction } from "@/lib/packages/forms-supplier";
+import { addressees } from "@/lib/transmittals/api";
 
 export const dynamic = "force-dynamic";
 

@@ -1,5 +1,5 @@
 import type { Tenant } from "@/lib/core/tenant";
-import { orgSettings } from "@/lib/api/settings";
+import { orgSettings } from "@/lib/settings/api";
 
 /**
  * Which fields a form asks for, and which it insists on.

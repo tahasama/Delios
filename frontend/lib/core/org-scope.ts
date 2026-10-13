@@ -2,7 +2,7 @@ import "server-only";
 import { cache } from "react";
 import { redirect } from "next/navigation";
 import { getCurrentUser, isAdmin, type SessionUser } from "@/lib/core/auth";
-import { getMe } from "@/lib/api/me";
+import { getMe } from "@/lib/account/api";
 type OrgScope = {
   user: SessionUser;
   orgId: string;

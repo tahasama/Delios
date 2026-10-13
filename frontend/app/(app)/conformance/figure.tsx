@@ -3,7 +3,7 @@ import { requireScope } from "@/lib/core/scope";
 import { fmtDateTime } from "@/lib/core/utils";
 import { untoldRecipients } from "@/lib/documents/supersession";
 import { haltedRevisions } from "@/lib/reviews/halted";
-import { checksOf, documentCount, flawedDocuments, liveDefects, optOutsOf, scopeOf } from "@/lib/api/conformance";
+import { checksOf, documentCount, flawedDocuments, liveDefects, optOutsOf, scopeOf } from "@/lib/conformance/api";
 
 /**
  * How the register stands, in one line of figures.

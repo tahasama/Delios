@@ -4,10 +4,10 @@ import { PageHeader, Card, DataTable, Th, Td, Chip, Field, inputCls } from "@/co
 import { ActionForm } from "@/components/form";
 import { Asked, Added } from "@/components/policy-fields";
 import { formPolicy } from "@/lib/settings/field-policy";
-import { savePartyAction, deletePartyAction } from "@/lib/forms/workflow";
+import { savePartyAction, deletePartyAction } from "@/lib/reviews/forms";
 import { PartyKindFields } from "./party-fields";
 import { PARTY_KINDS } from "@/lib/settings/party-kinds";
-import { adminFunctions, adminUsers, partiesWithAnswers } from "@/lib/api/admin";
+import { adminFunctions, adminUsers, partiesWithAnswers } from "@/lib/settings/api-admin";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Organizations" };

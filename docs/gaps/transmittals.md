@@ -1,7 +1,7 @@
 # Transmittals: what the screens need that the backend lacks
 
 The transmittal screens (`/transmittals`, `/transmittals/[id]`, `/transmittals/new`) and their actions
-(`frontend/lib/forms/transmittals.ts`) now run on the backend. Where the backend keeps nothing, the screens
+(`frontend/lib/transmittals/forms.ts`) now run on the backend. Where the backend keeps nothing, the screens
 show nothing and the actions answer "… is not supported yet." Each item: what, where, and the endpoint or
 field that would close it.
 
@@ -75,7 +75,7 @@ field that would close it.
     optionally `POST /transmittals/{id}/arrival { outcome, note }` applying to all its submissions.
 19. **Registering an unplanned item from its file.** Detail page "Make it a document →" links to
     `/documents/new?fromFile=<fileId>` (documents area). The backend registers by
-    `(transmittalId, itemId)`. `frontend/lib/api/transmittals.ts` has `unplannedItemOfFile(scope, fileId)` (scans
+    `(transmittalId, itemId)`. `frontend/lib/transmittals/api.ts` has `unplannedItemOfFile(scope, fileId)` (scans
     the TO_REGISTER log) and `registerUnplannedItem(...)` for that page to use.
     Want: `GET /files/{id}` → `{ transmittalId, transmittalItemId }`, or the item id in the link.
 

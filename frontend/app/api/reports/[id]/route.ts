@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getScope } from "@/lib/core/scope";
-import { projectPath } from "@/lib/api/client";
-import { passOnFile } from "@/lib/api/conformance";
+import { projectPath } from "@/lib/client";
+import { passOnFile } from "@/lib/conformance/api";
 import { REPORT_IDS, type ReportId } from "@/lib/conformance/reports";
 
 /** A report from the Reports page, as CSV, stamped with when it was counted (the backend writes the file). */

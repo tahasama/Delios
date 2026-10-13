@@ -11,7 +11,7 @@ says where it is and how it works.
 ```
 backend/
   Delios.slnx                    the "solution": the list of projects below
-  src/Delios.Host/               the application (one project, built into one program)
+  app/                           the application (one project, built into one program)
     Program.cs                   where the program starts
     Platform/                    start-up, settings, database context, errors, health, metrics
     Tenancy/                     keeping organizations apart; one transaction per request
@@ -21,7 +21,7 @@ backend/
     Reviews/                     review routes, reviews, release, stamping, Document Control's check
     Transmittals/                issuing documents to people and other organizations
     Packages/                    sets of documents delivered together
-    Schedules/                   the schedule, activities and what they need
+    Actions/                   the schedule, activities and what they need
     Checks/                      the checks engine and defect register
     Reports/                     the five reports and their exports
     Search/                      search (Postgres, or OpenSearch when switched on)
@@ -29,7 +29,7 @@ backend/
     Messaging/                   the outbox and RabbitMQ: work for the worker
     Seeding/                     the demo organization
     Platform/Migrations/         generated files that build and change the database schema
-  tests/Delios.Tests/            the automated tests
+  tests/                         the automated tests
 ```
 
 Each folder is a **module**: one part of the business. Inside a module the
@@ -197,7 +197,7 @@ Queues are declared in `Messaging/RabbitMq.cs` (`Topology`).
 
 1. Add the property to the class in `Documents/Entities.cs`.
 2. If it needs a length or an index, add it in the configuration.
-3. Create the migration, from `backend/src/Delios.Host`:
+3. Create the migration, from `backend/app`:
    `dotnet ef migrations add DocumentWeight -o Platform/Migrations`
 4. Read the generated file: it should only add your column.
 5. For a new table, add `RowLevelSecurity.Enable(migrationBuilder, "table_name");`
@@ -268,7 +268,7 @@ right-click the test, Debug. The test starts its own database and queue.
 | How is a number made? | `Documents/Numbering.cs` |
 | What happens on release? | `Reviews/ReviewService.cs`, then `Reviews/Stamping.cs` in the worker |
 | Who receives an issue? | `Transmittals/TransmittalService.cs` |
-| When is an activity ready? | `Schedules/Readiness.cs` |
+| When is an activity ready? | `Actions/Readiness.cs` |
 | What does check XX-00 test? | `Checks/Catalog.cs`, search the id |
 | How is a report counted? | `Reports/ReportBuilder.cs` |
 | Every setting and its default | `Platform/Options.cs`; production values in `compose.yaml` |

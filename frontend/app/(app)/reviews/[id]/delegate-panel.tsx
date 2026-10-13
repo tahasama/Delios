@@ -7,7 +7,7 @@ import {
   grantDelegationAction,
   refuseDelegationAction,
   endDelegationAction,
-} from "@/lib/forms/delegation";
+} from "@/lib/reviews/forms-delegation";
 
 export type DelegationRow = {
   id: string;

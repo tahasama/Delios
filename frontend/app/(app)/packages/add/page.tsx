@@ -2,12 +2,12 @@ import Link from "next/link";
 import { requireScope } from "@/lib/core/scope";
 import { Field, inputCls } from "@/components/ui";
 import { ActionForm } from "@/components/form";
-import { addPackageMemberAction } from "@/lib/forms/planning";
+import { addPackageMemberAction } from "@/lib/packages/forms";
 import { getActiveSet } from "@/lib/settings/config";
 import { fmtDate } from "@/lib/core/utils";
 import { ArrowLeft } from "lucide-react";
 import { SearchPick } from "@/components/search-pick";
-import { documentsByIds, packagesOf } from "@/lib/api/packages";
+import { documentsByIds, packagesOf } from "@/lib/packages/api";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Add to package" };

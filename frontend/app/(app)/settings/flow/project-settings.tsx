@@ -12,10 +12,10 @@ import {
   type ControlMode,
   type ProjectMode,
 } from "@/lib/settings/control-activities";
-import { setControlActivitiesAction, setPolicyAction, setStateNamesAction } from "@/lib/forms/control-activities";
+import { setControlActivitiesAction, setPolicyAction, setStateNamesAction } from "@/lib/settings/forms-how-it-works";
 import { STATE_NAMES, STATE_NAME_MAX, stateNames } from "@/lib/core/state-names";
-import { projectSettings } from "@/lib/api/settings";
-import { ESCALATE_AFTER_KEY, DEFAULT_ESCALATE_AFTER } from "@/lib/schedule/escalation";
+import { projectSettings } from "@/lib/settings/api";
+import { ESCALATE_AFTER_KEY, DEFAULT_ESCALATE_AFTER } from "@/lib/actions/escalation";
 
 /**
  * What the project has settled: who carries each act out, what releasing and

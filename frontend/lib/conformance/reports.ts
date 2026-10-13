@@ -1,4 +1,4 @@
-import { api, projectPath } from "@/lib/api/client";
+import { api, projectPath } from "@/lib/client";
 
 /**
  * The reports a project team reads. Each one answers one question with:
@@ -7,7 +7,7 @@ import { api, projectPath } from "@/lib/api/client";
  *   - the detailed list behind it — the actual documents, reviews,
  *     transmittals or activities — which is what the CSV exports.
  * Every figure is counted by the backend from the register when the report
- * is opened (backend/src/Delios.Host/Reports); this turns its answer into the
+ * is opened (backend/app/Reports); this turns its answer into the
  * page's shapes.
  */
 type Figure = { label: string; value: string | number; tone?: "good" | "warn" | "bad" };

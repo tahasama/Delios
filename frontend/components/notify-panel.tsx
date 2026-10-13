@@ -3,7 +3,7 @@
 import { ActionForm } from "@/components/form";
 import { Field, inputCls } from "@/components/ui";
 import { SearchPick, type PickItem } from "@/components/search-pick";
-import { sendNoticeAction } from "@/lib/forms/notices";
+import { sendNoticeAction } from "@/lib/actions/forms-notices";
 import { Bell } from "lucide-react";
 
 /**

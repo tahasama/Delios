@@ -6,10 +6,10 @@ import { PageHeader, DataTable, Th, Td, Card, Field, inputCls, btn } from "@/com
 import { ActionForm } from "@/components/form";
 import { Asked, Added } from "@/components/policy-fields";
 import { formPolicy } from "@/lib/settings/field-policy";
-import { createUserAction, savePersonAction } from "@/lib/forms/admin";
-import { inviteGuestAction, createVisitorAction } from "@/lib/forms/guests";
-import { adminFunctions, adminParties, adminProjects, adminUsers } from "@/lib/api/admin";
-import { getMe } from "@/lib/api/me";
+import { createUserAction, savePersonAction } from "@/lib/settings/forms-admin";
+import { inviteGuestAction, createVisitorAction } from "@/lib/settings/forms-guests";
+import { adminFunctions, adminParties, adminProjects, adminUsers } from "@/lib/settings/api-admin";
+import { getMe } from "@/lib/account/api";
 import { getActiveSet } from "@/lib/settings/config";
 
 export const dynamic = "force-dynamic";

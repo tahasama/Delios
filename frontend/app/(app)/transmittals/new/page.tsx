@@ -1,4 +1,4 @@
-import { activityDetail } from "@/lib/api/schedule";
+import { activityDetail } from "@/lib/actions/api";
 import { PageHeader } from "@/components/ui";
 import { formPolicy } from "@/lib/settings/field-policy";
 import { requireScope } from "@/lib/core/scope";
@@ -6,10 +6,10 @@ import { getActiveSet } from "@/lib/settings/config";
 import { holdersOf } from "@/lib/core/permissions";
 import { recipientCompanies } from "@/lib/transmittals/recipients";
 import { NewTransmittalForm } from "./new-transmittal-form";
-import { api, projectPath } from "@/lib/api/client";
-import { backendDocument } from "@/lib/api/documents";
-import { addressees, backendTransmittal, ourOrganizationName } from "@/lib/api/transmittals";
-import type { RegisterPage } from "@/lib/api/types";
+import { api, projectPath } from "@/lib/client";
+import { backendDocument } from "@/lib/documents/api";
+import { addressees, backendTransmittal, ourOrganizationName } from "@/lib/transmittals/api";
+import type { RegisterPage } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "New transmittal" };

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireScope } from "@/lib/core/scope";
-import { backendDocument } from "@/lib/api/documents";
-import { documentSnapshots } from "@/lib/api/snapshots";
+import { backendDocument } from "@/lib/documents/api";
+import { documentSnapshots } from "@/lib/documents/api-snapshots";
 import { notFound } from "next/navigation";
 import { parseSnapshotPayload, summarizeSnapshotChange } from "@/lib/documents/history";
 import { fmtDate, fmtDateTime } from "@/lib/core/utils";

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requireScope } from "@/lib/core/scope";
-import { preparingRevisions, revisionsInPreparation } from "@/lib/api/reviews";
+import { preparingRevisions, revisionsInPreparation } from "@/lib/reviews/api";
 import { PageHeader } from "@/components/ui";
 import { SendForReview } from "@/components/send-for-review-panel";
 import { RevisionChecklist } from "@/components/revision-checklist";

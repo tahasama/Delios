@@ -1,4 +1,4 @@
-import type { PackageView } from "@/lib/api/types";
+import type { PackageView } from "@/lib/types";
 
 /**
  * A delivery package may carry a rule (§15.1, accumulated): every document that
@@ -36,7 +36,7 @@ export async function describeFilter(filter: PackageFilter): Promise<string> {
     return codes.map((code) => values.find((one) => one.code === code)?.label ?? code).join(" or ");
   };
   if (filter.assetIds?.length) {
-    const { projectAssets } = await import("@/lib/api/records");
+    const { projectAssets } = await import("@/lib/records/api");
     const { requireScope } = await import("@/lib/core/scope");
     const tags = (await projectAssets(await requireScope())).filter((one) => filter.assetIds!.includes(one.id)).map((one) => one.code);
     parts.push(`tagged ${tags.join(" or ") || "with an asset no longer listed"}`);
@@ -44,7 +44,7 @@ export async function describeFilter(filter: PackageFilter): Promise<string> {
   if (filter.disciplines?.length) parts.push(`in ${await named("DISCIPLINES", filter.disciplines)}`);
   if (filter.docTypes?.length) parts.push(`of type ${await named("DOCUMENT_TYPES", filter.docTypes)}`);
   if (filter.originators?.length) {
-    const { outsideParties } = await import("@/lib/api/packages");
+    const { outsideParties } = await import("@/lib/packages/api");
     const parties = (await outsideParties()).filter((one) => filter.originators!.includes(one.code));
     parts.push(`from ${parties.map((one) => one.name).join(" or ") || filter.originators.join(" or ")}`);
   }

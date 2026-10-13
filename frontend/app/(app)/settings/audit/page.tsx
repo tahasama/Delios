@@ -4,7 +4,7 @@ import { isAdmin } from "@/lib/core/auth";
 import { PageHeader } from "@/components/ui";
 import { fmtDate, fmtDateTime } from "@/lib/core/utils";
 import { DateWindow } from "@/components/date-window";
-import { adminAudit } from "@/lib/api/admin";
+import { adminAudit } from "@/lib/settings/api-admin";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "The log" };

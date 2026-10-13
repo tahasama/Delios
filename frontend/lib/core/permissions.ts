@@ -1,5 +1,5 @@
 import type { Tenant } from "@/lib/core/tenant";
-import { holders } from "@/lib/api/settings";
+import { holders } from "@/lib/settings/api";
 
 /**
  * What someone may do, decided by the function they hold on the project rather

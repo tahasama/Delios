@@ -1,11 +1,11 @@
 import Link from "next/link";
 import { requireScope } from "@/lib/core/scope";
 import { redirect } from "next/navigation";
-import { api, projectPath } from "@/lib/api/client";
-import { getMe } from "@/lib/api/me";
+import { api, projectPath } from "@/lib/client";
+import { getMe } from "@/lib/account/api";
 import { fmtDate } from "@/lib/core/utils";
 import { SUPPLIER_STAGES, supplierStamp, type SupplierStage } from "@/lib/core/state-names";
-import { plannedState, plannedProgress } from "@/lib/schedule/planned-state";
+import { plannedState, plannedProgress } from "@/lib/actions/planned-state";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Where your documents are needed" };

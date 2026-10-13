@@ -6,8 +6,8 @@ import { PageHeader, Card, DataTable, Th, Td, btn, inputCls } from "@/components
 import { getActiveSet } from "@/lib/settings/config";
 import { MATRIX_CODES as CODE, buildSheet } from "@/lib/settings/matrix-sheet";
 import { roleFor } from "@/lib/settings/profiles/roles";
-import { adminFunctions, adminUsers, orEmpty } from "@/lib/api/admin";
-import { getMe } from "@/lib/api/me";
+import { adminFunctions, adminUsers, orEmpty } from "@/lib/settings/api-admin";
+import { getMe } from "@/lib/account/api";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Distribution matrix" };

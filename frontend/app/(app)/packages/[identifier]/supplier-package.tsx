@@ -3,21 +3,21 @@ import { requireScope } from "@/lib/core/scope";
 import { isController, isAdmin, hasVerb } from "@/lib/core/auth";
 import { DataTable, Th, Td, Field, inputCls, ToneChip, btn } from "@/components/ui";
 import { FileTally } from "./file-tally";
-import { setPackageRuleAction, sharePackageAction, deletePackageAction } from "@/lib/forms/planning";
+import { setPackageRuleAction, sharePackageAction, deletePackageAction } from "@/lib/packages/forms";
 import { PackageLines, type PackageLine } from "./package-lines";
-import { api, projectPath } from "@/lib/api/client";
-import type { RegisterPage } from "@/lib/api/types";
+import { api, projectPath } from "@/lib/client";
+import type { RegisterPage } from "@/lib/types";
 import { ruleFilter, ruleWords } from "@/lib/packages/package-rule";
 import { RuleFields } from "../rule-fields";
 import { manageItems } from "../manage-items";
 import { ActionForm } from "@/components/form";
-import { submitSupplierPackageAction } from "@/lib/forms/supplier";
+import { submitSupplierPackageAction } from "@/lib/packages/forms-supplier";
 import { supplierRows, supplierFigures, packageStage, packageCounts, lineStage, WITH_SUPPLIER, type SupplierRow } from "@/lib/packages/supplier";
 import { fmtDate } from "@/lib/core/utils";
-import { plannedState } from "@/lib/schedule/planned-state";
+import { plannedState } from "@/lib/actions/planned-state";
 import { ArrowLeft, Download, Filter, Pencil, Send, Share2, Trash2 } from "lucide-react";
-import { getMe } from "@/lib/api/me";
-import type { PackageView } from "@/lib/api/types";
+import { getMe } from "@/lib/account/api";
+import type { PackageView } from "@/lib/types";
 
 /** What the planned date says today, as on every planned date: ready, submitted, overdue, at risk, days left. */
 function SubmitBy({ row }: { row: SupplierRow }) {

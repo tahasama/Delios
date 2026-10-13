@@ -2,8 +2,8 @@ import Link from "next/link";
 import { fmtDate } from "@/lib/core/utils";
 import { ActionForm } from "@/components/form";
 import { Field, inputCls } from "@/components/ui";
-import { uploadPlanListAction, uploadLooseListAction } from "@/lib/forms/plan-lists";
-import type { PlanList } from "@/lib/schedule/plan-lists";
+import { uploadPlanListAction, uploadLooseListAction } from "@/lib/actions/forms-lists";
+import type { PlanList } from "@/lib/actions/plan-lists";
 import { ConfirmOrWhy } from "./confirm-or-why";
 import { Download, TriangleAlert } from "lucide-react";
 

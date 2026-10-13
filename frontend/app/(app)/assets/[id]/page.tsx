@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { projectAsset } from "@/lib/api/records";
+import { projectAsset } from "@/lib/records/api";
 import { requireScope } from "@/lib/core/scope";
 import { notFound } from "next/navigation";
 import { PageHeader, Card, DataTable, Th, Td, Chip, EmptyState } from "@/components/ui";

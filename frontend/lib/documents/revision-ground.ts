@@ -1,6 +1,6 @@
 import type { Tenant } from "@/lib/core/tenant";
 import { verdictMeaning } from "@/lib/reviews/verdict";
-import { documentPage } from "@/lib/api/documents";
+import { documentPage } from "@/lib/documents/api";
 
 /**
  * Why a document may have a next revision, read from what happened to the one

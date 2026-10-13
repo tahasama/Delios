@@ -1,5 +1,5 @@
 import { cache } from "react";
-import { api, apiShortLived } from "@/lib/api/client";
+import { api, apiShortLived } from "@/lib/client";
 
 type ValueRow = { code: string; label: string; status: string; props: Record<string, unknown> };
 
@@ -52,7 +52,7 @@ type SetInfo = { key: string; title: string; description: string | null; group: 
  * are the organization's settings; its values are the backend's.
  */
 export const getSets = cache(async (): Promise<SetInfo[]> => {
-  const { orgSettings } = await import("@/lib/api/settings");
+  const { orgSettings } = await import("@/lib/settings/api");
   const [counted, named] = await Promise.all([
     api<{ key: string; active: number; retired: number }[]>("/api/admin/value-sets").catch(() => []),
     orgSettings().catch(() => new Map<string, string>()),

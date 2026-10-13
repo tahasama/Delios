@@ -1,9 +1,9 @@
 import { requireScope } from "@/lib/core/scope";
 import { formPolicy } from "@/lib/settings/field-policy";
 import { eligiblePeople } from "@/lib/reviews/workflow";
-import { api, projectPath } from "@/lib/api/client";
-import { backendDocument, backendRevision } from "@/lib/api/documents";
-import type { Distribution, RouteView } from "@/lib/api/types";
+import { api, projectPath } from "@/lib/client";
+import { backendDocument, backendRevision } from "@/lib/documents/api";
+import type { Distribution, RouteView } from "@/lib/types";
 import { SendForReviewForm, type SendRoute } from "./send-for-review";
 import { verdictSets } from "@/lib/reviews/verdict-sets";
 import { matrixBinds } from "@/lib/settings/control-activities";

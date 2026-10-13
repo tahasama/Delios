@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getScope } from "@/lib/core/scope";
 import { toCsv } from "@/lib/core/csv";
-import { packageByNumber } from "@/lib/api/packages";
+import { packageByNumber } from "@/lib/packages/api";
 import { supplierRows, lineStage } from "@/lib/packages/supplier";
 
 /**

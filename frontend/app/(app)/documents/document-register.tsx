@@ -1,18 +1,18 @@
 "use client";
 
-import { setPackageMembersAction } from "@/lib/forms/planning";
+import { setPackageMembersAction } from "@/lib/packages/forms";
 import Link from "next/link";
-import { saveRegisterView, deleteRegisterView } from "@/lib/forms/register-views";
+import { saveRegisterView, deleteRegisterView } from "@/lib/documents/forms-register-views";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowDown, ArrowLeftRight, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, Download, GitPullRequestArrow, Minus, PackagePlus, Pin, PinOff, Plus, Search, Send, X } from "lucide-react";
-import { sendSupplierFromRegisterAction as sendFromRegister } from "@/lib/forms/supplier";
+import { sendSupplierFromRegisterAction as sendFromRegister } from "@/lib/packages/forms-supplier";
 import { DataTable } from "@/components/data-table";
 import { DateWindow } from "@/components/date-window";
 import { Th, Td, Info } from "@/components/ui";
 import { useCardHeight } from "@/components/card-height";
 import { ActionForm } from "@/components/form";
-import { setActionDocumentsAction } from "@/lib/forms/action-links";
+import { setActionDocumentsAction } from "@/lib/actions/forms-links";
 import { CalendarCheck } from "lucide-react";
 
 /** Available from the Columns menu; off until someone wants them. */

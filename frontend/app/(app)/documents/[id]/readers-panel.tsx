@@ -1,7 +1,7 @@
 import { ActionForm } from "@/components/form";
 import { Field, inputCls } from "@/components/ui";
 import { fmtDate } from "@/lib/core/utils";
-import { addDocumentReaderAction, removeDocumentReaderAction } from "@/lib/forms/document-access";
+import { addDocumentReaderAction, removeDocumentReaderAction } from "@/lib/documents/forms-readers";
 import { SearchPick } from "@/components/search-pick";
 
 type Reader = { id: string; name: string; addedByName: string; reason: string | null; at: Date };

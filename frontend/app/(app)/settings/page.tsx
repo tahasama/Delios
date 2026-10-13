@@ -9,8 +9,8 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-import { adminAudit, adminFunctions, adminNumbering, adminParties, adminProjects, adminRoutes, adminUsers, orEmpty } from "@/lib/api/admin";
-import { orgSettings, projectSettings } from "@/lib/api/settings";
+import { adminAudit, adminFunctions, adminNumbering, adminParties, adminProjects, adminRoutes, adminUsers, orEmpty } from "@/lib/settings/api-admin";
+import { orgSettings, projectSettings } from "@/lib/settings/api";
 import { getSets } from "@/lib/settings/config";
 
 export const dynamic = "force-dynamic";

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getScope } from "@/lib/core/scope";
 import { toCsv } from "@/lib/core/csv";
-import { planActions } from "@/lib/api/schedule";
+import { planActions } from "@/lib/actions/api";
 import { handlerFor } from "@/lib/settings/controlled/registry";
 import "@/lib/settings/controlled/handlers";
 

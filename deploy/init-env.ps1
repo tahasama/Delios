@@ -40,7 +40,7 @@ if (Test-Path $envFile) {
 if (Get-Command dotnet -ErrorAction SilentlyContinue) {
     $values = @{}
     Get-Content $envFile | Where-Object { $_ -match '^\s*([A-Z_]+)=(.*)$' } | ForEach-Object { $values[$Matches[1]] = $Matches[2] }
-    $project = Join-Path $PSScriptRoot '..\backend\src\Delios.Host'
+    $project = Join-Path $PSScriptRoot '..\backend\app'
     $secrets = [ordered]@{
         'ConnectionStrings:Postgres' = "Host=localhost;Port=5432;Database=delios;Username=delios;Password=$($values.DB_APP_PASSWORD)"
         'ConnectionStrings:RabbitMq' = "amqp://delios:$($values.RABBITMQ_PASSWORD)@localhost:5672/"

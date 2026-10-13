@@ -1,7 +1,7 @@
 import ExcelJS from "exceljs";
 import type { Tenant } from "@/lib/core/tenant";
 import { getActiveSet } from "@/lib/settings/config";
-import { getMe } from "@/lib/api/me";
+import { getMe } from "@/lib/account/api";
 
 /**
  * The deliverable list, as a workbook people can actually fill in.

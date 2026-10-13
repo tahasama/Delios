@@ -4,7 +4,7 @@ import { AssuranceTabs } from "@/app/(app)/conformance/tabs";
 import { PREVENTED } from "@/lib/conformance/checks/prevented";
 import { CATALOG } from "@/lib/conformance/checks/catalog";
 import { POLICIES, SKIPPABLE, SKIP_KEY, CONTROL_ACTIVITIES, policy } from "@/lib/settings/control-activities";
-import { projectSettings } from "@/lib/api/settings";
+import { projectSettings } from "@/lib/settings/api";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Default rules" };

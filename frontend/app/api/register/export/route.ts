@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { getScope } from "@/lib/core/scope";
 import { getSessionUser } from "@/lib/core/auth";
-import { projectPath } from "@/lib/api/client";
-import { passOn } from "@/lib/api/register";
+import { projectPath } from "@/lib/client";
+import { passOn } from "@/lib/documents/api-register";
 
 // §16.6 — a view: generated at time of use, carries generation date/time,
 // never edited. The flat document list is a view of the register (§16.1).

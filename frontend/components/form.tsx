@@ -3,7 +3,7 @@
 import { useActionState, useState } from "react";
 import { cn } from "@/lib/core/utils";
 import { btn } from "./ui";
-import { collectInvalid, type MissingField } from "./form-validation";
+import { collectInvalid, type MissingField } from "@/app/(public)/form-validation";
 
 type State = { error?: string; ok?: string; issues?: { line: number; message: string }[]; link?: { href: string; label: string } };
 

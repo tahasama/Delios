@@ -3,10 +3,10 @@ import { parseCsv } from "@/lib/core/csv";
 import { buildSheet, codeFor, EMPTY_CELL } from "@/lib/settings/matrix-sheet";
 import { verbsFor, type Actor, type Verb } from "@/lib/core/permissions";
 import { getActiveSet } from "@/lib/settings/config";
-import { api, refusal } from "@/lib/api/client";
-import { adminFunctions, asMatrixRules, rulesBody, type AdminFunction, type AdminRule } from "@/lib/api/admin";
+import { api, refusal } from "@/lib/client";
+import { adminFunctions, asMatrixRules, rulesBody, type AdminFunction, type AdminRule } from "@/lib/settings/api-admin";
 import { typesByFamily } from "@/lib/settings/families";
-import { getMe } from "@/lib/api/me";
+import { getMe } from "@/lib/account/api";
 
 /**
  * Reading a filled-in distribution matrix back.

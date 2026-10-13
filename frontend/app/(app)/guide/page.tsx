@@ -9,8 +9,8 @@ import { mayCreateDocument } from "@/lib/core/auth";
 import { Chip } from "@/components/ui";
 import { isAdmin, isController } from "@/lib/core/auth";
 import { contractRoleOptions } from "@/lib/settings/contract-roles";
-import { api, projectPath } from "@/lib/api/client";
-import { documentCount } from "@/lib/api/conformance";
+import { api, projectPath } from "@/lib/client";
+import { documentCount } from "@/lib/conformance/api";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Explore DELIOS" };

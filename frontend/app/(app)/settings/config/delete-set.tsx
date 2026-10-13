@@ -2,7 +2,7 @@
 
 import { useActionState } from "react";
 import { Trash2 } from "lucide-react";
-import { deleteSetAction } from "@/lib/forms/admin";
+import { deleteSetAction } from "@/lib/settings/forms-admin";
 
 /**
  * Deleting a set, as an icon beside the other things you do to one.

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireScope } from "@/lib/core/scope";
 import { PageHeader, ToneChip } from "@/components/ui";
-import { api } from "@/lib/api/client";
+import { api } from "@/lib/client";
 import { TwoStep } from "./two-step";
 
 export const dynamic = "force-dynamic";
