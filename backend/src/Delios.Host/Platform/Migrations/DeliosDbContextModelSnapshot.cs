@@ -1981,6 +1981,10 @@ namespace Delios.Host.Platform.Migrations
                         .HasColumnType("character varying(320)")
                         .HasColumnName("email");
 
+                    b.Property<bool>("EmailToConfirm")
+                        .HasColumnType("boolean")
+                        .HasColumnName("email_to_confirm");
+
                     b.Property<int>("FailedSignIns")
                         .HasColumnType("integer")
                         .HasColumnName("failed_sign_ins");

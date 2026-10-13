@@ -4,7 +4,7 @@ import type { NextRequest } from "next/server";
 // Registering an organization, and getting a new password, must be reachable
 // without a session. Everything else needs one.
 // The pop-up notifications script is fetched by the browser on its own, sometimes without the page.
-const PUBLIC = ["/login", "/signup", "/forgot-password", "/reset-password", "/_next", "/favicon", "/icon", "/robots.txt", "/sw.js"];
+const PUBLIC = ["/login", "/signup", "/forgot-password", "/reset-password", "/confirm-email", "/_next", "/favicon", "/icon", "/robots.txt", "/sw.js"];
 
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;

@@ -26,7 +26,8 @@ public static class SignUpEndpoints
 
     private static async Task<IResult> SignUpAsync(
         SignUpRequest request, HttpContext http, IConfiguration configuration, DeliosDbContext db, DemoSeed starter, SessionStore sessions,
-        AuditLog audit, IOptions<SessionCookieOptions> cookie, PasswordPolicy passwords, CancellationToken cancellationToken)
+        AuditLog audit, IOptions<SessionCookieOptions> cookie, PasswordPolicy passwords, IOptions<Notifications.EmailOptions> mail,
+        Notifications.Notifier notifier, Microsoft.AspNetCore.DataProtection.IDataProtectionProvider protection, CancellationToken cancellationToken)
     {
         if (!configuration.GetValue("SignUp:Enabled", false)) return Results.NotFound();
         var organization = request.OrganizationName?.Trim() ?? "";
@@ -49,6 +50,17 @@ public static class SignUpEndpoints
         // Read back under the new organization's row-level security, which applies inside a transaction.
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         var admin = await db.Users.SingleAsync(u => u.Id == adminId, cancellationToken);
+        // With email on, the address is proved before anyone signs in with it.
+        if (mail.Value.Enabled)
+        {
+            admin.EmailToConfirm = true;
+            EmailConfirmation.Send(admin, notifier, protection);
+            await db.SaveChangesAsync(cancellationToken);
+            await audit.WriteAsync(new Actor(admin.Id, admin.Name), "SIGN_UP", "User", admin.Id, admin.Email,
+                "Waiting for the email to be confirmed.", cancellationToken: cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return Results.Accepted(value: new { next = "CONFIRM_EMAIL" });
+        }
         await IdentityEndpoints.IssueAsync(http, admin, "SIGN_UP", sessions, audit, cookie.Value, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return Results.NoContent();

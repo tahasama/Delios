@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Suspense, useActionState, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { loginAction } from "@/lib/actions/auth";
+import { loginAction, resendConfirmationAction } from "@/lib/actions/auth";
 import { AuthShell } from "./shell";
 import { inputCls, btn } from "@/components/ui";
 import { MissingSummary } from "@/components/form";
@@ -105,6 +105,7 @@ function LoginForm() {
               </button>
             )}
           </form>
+          {state?.unconfirmed ? <ResendLink email={state.email ?? ""} /> : null}
           <p className="mt-6 text-center text-xs text-slate-500">
             Setting up a new organization?{" "}
             <Link href="/signup" className="font-semibold text-brand-ink hover:underline">Register one</Link>
@@ -119,6 +120,19 @@ function LoginForm() {
             </div>
           ) : null}
     </AuthShell>
+  );
+}
+
+/** The password was right but the email is not confirmed: the link can be sent again. */
+function ResendLink({ email }: { email: string }) {
+  const [state, formAction, pending] = useActionState(resendConfirmationAction, undefined);
+  if (state?.done) return <p className="mt-3 rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-700">Sent again to {email}. It works within two days.</p>;
+  return (
+    <form action={formAction} className="mt-3">
+      <input type="hidden" name="email" value={email} />
+      {state?.error ? <p role="alert" className="mb-2 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{state.error}</p> : null}
+      <button type="submit" disabled={pending} className={`${btn("secondary")} w-full`}>{pending ? "Sending…" : "Send the link again"}</button>
+    </form>
   );
 }
 

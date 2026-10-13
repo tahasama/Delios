@@ -110,6 +110,8 @@ public static class PasswordReset
         user.PasswordHash = hasher.HashPassword(user, request.Password!);
         user.FailedSignIns = 0;
         user.LockedUntil = null;
+        // The link came by email: the address is theirs.
+        user.EmailToConfirm = false;
         await db.SaveChangesAsync(cancellationToken);
         await sessions.ForgetAllAsync(user.Id, revoke: true, cancellationToken);
         await audit.WriteAsync(new Actor(user.Id, user.Name), "PASSWORD_RESET", "User", user.Id, user.Email,

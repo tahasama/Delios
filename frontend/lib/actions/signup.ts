@@ -6,7 +6,7 @@ import { apiFetch, problemOf } from "@/lib/api/client";
 import { PROJECT_KINDS } from "@/lib/profiles/kinds";
 import { CONTRACT_ROLES } from "@/lib/profiles/roles";  // signup predates the organization, so the built-in list is all there is
 
-type SignupState = { error?: string; values?: Record<string, string> };
+type SignupState = { error?: string; values?: Record<string, string>; confirmEmail?: string };
 
 /**
  * The only self-service path into the system: registering an organization.
@@ -69,6 +69,8 @@ export async function signupAction(_prev: SignupState | undefined, formData: For
     if (response.status === 404) return { error: "Registering an organization is switched off here. Ask the people who run this system.", values };
     return { error: (await problemOf(response)).message, values };
   }
+  // With email on, the address is confirmed first: the link is in their inbox.
+  if (response.status === 202) return { confirmEmail: email };
   const token = response.headers.getSetCookie().find((c) => c.startsWith("delios_session="))?.slice("delios_session=".length).split(";")[0];
   if (!token) redirect("/login");
   await createSession(token);

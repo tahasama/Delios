@@ -126,6 +126,11 @@ public sealed class User
     /// Wrong passwords or codes in a row. Reaching <c>IdentityEndpoints.MaxFailedSignIns</c> locks the account and resets this to 0.
     /// </summary>
     public int FailedSignIns { get; set; }
+    /// <summary>
+    /// Registered by sign-up while email is on, and the address not yet confirmed: sign-in waits for the link.
+    /// Everyone else (created by an administrator, from the command line) is not asked.
+    /// </summary>
+    public bool EmailToConfirm { get; set; }
     /// <summary>Sign-in is refused until this moment after too many failures. Null: not locked.</summary>
     public Instant? LockedUntil { get; set; }
     /// <summary>The authenticator secret, encrypted. Set at enrolment; in force once confirmed.</summary>

@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Delios.Tests;
 
@@ -65,5 +66,45 @@ public sealed class PasswordResetTests(Infrastructure infrastructure) : IClassFi
         var audit = await admin.GetFromJsonAsync<JsonElement>("/api/admin/audit?action=ACCESS_REFUSED");
         var row = Assert.Single(audit.GetProperty("rows").EnumerateArray());
         Assert.Contains("PUT /api/admin/security: ADMIN_ONLY", row.GetProperty("detail").GetString());
+    }
+
+    [Fact]
+    public async Task With_email_on_a_new_organization_confirms_its_email_before_signing_in()
+    {
+        var transport = new RecordingTransport();
+        await using var app = await TestApp.StartAsync(infrastructure,
+            settings =>
+            {
+                settings["SignUp:Enabled"] = "true";
+                settings["Email:Enabled"] = "true";
+            },
+            services => services.AddSingleton<Delios.Host.Notifications.IMailTransport>(transport));
+        app.StartWorker();
+        var anonymous = app.Factory.CreateClient();
+        var (made, madeBody) = await Flow.PostAsync(anonymous, "/api/auth/sign-up", new
+        {
+            organizationName = "Lakeside Power", name = "Lena Lake", email = "lena@lakeside.test", password = "a-long-password",
+        });
+        Assert.True(made == HttpStatusCode.Accepted, madeBody.ToString());
+
+        // The password is right, but the address is not proved yet.
+        var (waiting, waitingBody) = await Flow.PostAsync(anonymous, "/api/auth/sign-in", new { email = "lena@lakeside.test", password = "a-long-password" });
+        Assert.Equal((HttpStatusCode.Forbidden, "EMAIL_NOT_CONFIRMED"), (waiting, Flow.Code(waitingBody)));
+
+        System.Net.Mail.MailMessage? sent = null;
+        for (var i = 0; i < 100 && sent is null; i++)
+        {
+            sent = transport.Sent.FirstOrDefault(m => m.To.Any(t => t.Address == "lena@lakeside.test"));
+            if (sent is null) await Task.Delay(200);
+        }
+        Assert.NotNull(sent);
+        var token = Uri.UnescapeDataString(Regex.Match(sent!.Body, @"token=(\S+)").Groups[1].Value);
+        var (confirmed, _) = await Flow.PostAsync(anonymous, "/api/auth/confirm-email", new { token });
+        Assert.Equal(HttpStatusCode.NoContent, confirmed);
+        var (forged, forgedBody) = await Flow.PostAsync(anonymous, "/api/auth/confirm-email", new { token = "nonsense" });
+        Assert.Equal((HttpStatusCode.BadRequest, "CONFIRM_LINK_INVALID"), (forged, Flow.Code(forgedBody)));
+
+        using var signedIn = await app.Factory.CreateClient().PostAsJsonAsync("/api/auth/sign-in", new { email = "lena@lakeside.test", password = "a-long-password" });
+        Assert.Equal(HttpStatusCode.NoContent, signedIn.StatusCode);
     }
 }

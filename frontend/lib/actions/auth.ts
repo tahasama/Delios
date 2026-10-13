@@ -11,6 +11,8 @@ type LoginState = {
   email?: string;
   /** Two-step sign-in: the code is asked next. MFA_SETUP when the organization requires it and it is not set up yet. */
   mfa?: { step: "MFA_CODE" | "MFA_SETUP"; challenge: string; secret?: string; uri?: string };
+  /** The password was right but the email is not confirmed yet: offer to send the link again. */
+  unconfirmed?: boolean;
   /** Shown once, after two-step sign-in is set up: the codes that sign in without the app. */
   recoveryCodes?: string[];
   next?: string;
@@ -84,6 +86,7 @@ export async function loginAction(_prev: LoginState | undefined, formData: FormD
   }
   if (!response.ok) {
     const problem = await problemOf(response);
+    if (problem.code === "EMAIL_NOT_CONFIRMED") return { error: problem.message, email, unconfirmed: true };
     return { error: problem.code === "SIGN_IN_FAILED" ? "Those credentials do not match an active account." : problem.message, email };
   }
   const token = sessionOf(response);
@@ -128,6 +131,26 @@ export async function resetPasswordAction(_prev: PasswordState | undefined, form
   const password = String(formData.get("password") ?? "");
   if (password !== String(formData.get("confirm") ?? "")) return { error: "The two passwords are not the same." };
   const response = await apiFetch("/api/auth/password/reset", { method: "POST", body: { token, password } }).catch(() => null);
+  if (!response) return { error: "The server cannot be reached. Try again in a moment." };
+  if (response.status === 429) return { error: "Too many attempts. Wait a minute and try again." };
+  if (!response.ok) return { error: (await problemOf(response)).message };
+  return { done: true };
+}
+
+/** Sends the email confirmation link again. The answer is the same whether or not the account exists. */
+export async function resendConfirmationAction(_prev: PasswordState | undefined, formData: FormData): Promise<PasswordState> {
+  const email = String(formData.get("email") ?? "").trim();
+  if (!email) return { error: "Type the email you registered with." };
+  const response = await apiFetch("/api/auth/confirm-email/resend", { method: "POST", body: { email } }).catch(() => null);
+  if (!response) return { error: "The server cannot be reached. Try again in a moment." };
+  if (response.status === 429) return { error: "Too many attempts. Wait a minute and try again." };
+  return { done: true };
+}
+
+/** Confirms the email from the link. */
+export async function confirmEmailAction(_prev: PasswordState | undefined, formData: FormData): Promise<PasswordState> {
+  const token = String(formData.get("token") ?? "");
+  const response = await apiFetch("/api/auth/confirm-email", { method: "POST", body: { token } }).catch(() => null);
   if (!response) return { error: "The server cannot be reached. Try again in a moment." };
   if (response.status === 429) return { error: "Too many attempts. Wait a minute and try again." };
   if (!response.ok) return { error: (await problemOf(response)).message };

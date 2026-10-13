@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useActionState, useState } from "react";
+import { AuthShell } from "../login/shell";
 import { signupAction } from "@/lib/actions/signup";
 import { APP_NAME } from "@/lib/standard";
 import { inputCls, btn } from "@/components/ui";
@@ -16,6 +17,18 @@ export default function SignupPage() {
   const [state, formAction, pending] = useActionState(signupAction, undefined);
   const [missing, setMissing] = useState<MissingField[]>([]);
   const v = state?.values ?? {};
+
+  if (state?.confirmEmail) {
+    return (
+      <AuthShell>
+        <h2 className="text-xl font-semibold text-slate-900">Confirm your email</h2>
+        <p className="mt-2 text-sm text-slate-600">
+          Your organization is registered. We sent a link to <strong className="text-slate-800">{state.confirmEmail}</strong>: open it within two days, then sign in.
+        </p>
+        <Link href="/login" className={`${btn("primary")} mt-6 w-full`}>Go to sign in</Link>
+      </AuthShell>
+    );
+  }
 
   return (
     <div className="flex min-h-screen">

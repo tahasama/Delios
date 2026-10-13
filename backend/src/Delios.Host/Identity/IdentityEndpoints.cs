@@ -147,6 +147,14 @@ public static class IdentityEndpoints
         user.LockedUntil = null;
         await db.SaveChangesAsync(cancellationToken);
 
+        // Registered by sign-up and the address not confirmed yet: said only once the password was right.
+        if (user.EmailToConfirm)
+        {
+            await transaction.CommitAsync(cancellationToken);
+            return Problems.Problem(StatusCodes.Status403Forbidden, "EMAIL_NOT_CONFIRMED",
+                "Confirm your email first: open the link we sent you.", null);
+        }
+
         if (user.MfaEnabledAt is not null || organization.MfaRequired)
         {
             await transaction.CommitAsync(cancellationToken);
