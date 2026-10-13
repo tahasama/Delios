@@ -4,7 +4,7 @@ import { useState } from "react";
 import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
 import { ActionForm } from "@/components/form";
 import { Field, inputCls } from "@/components/ui";
-import { saveNumberingSchemeAction } from "@/lib/actions/admin";
+import { saveNumberingSchemeAction } from "@/lib/forms/admin";
 
 type NumberField = { label: string; valueSetKey: string; rule: string };
 

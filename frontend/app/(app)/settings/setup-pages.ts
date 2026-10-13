@@ -1,4 +1,4 @@
-import { heldVerbs } from "@/lib/permissions";
+import { heldVerbs } from "@/lib/core/permissions";
 /**
  * Every configuration screen, in one list.
  *

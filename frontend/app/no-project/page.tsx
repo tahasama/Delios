@@ -1,5 +1,5 @@
-import { requireUser } from "@/lib/auth";
-import { logoutAction } from "@/lib/actions/auth";
+import { requireUser } from "@/lib/core/auth";
+import { logoutAction } from "@/lib/forms/auth";
 import { btn } from "@/components/ui";
 import { FolderOpen, LogOut } from "lucide-react";
 

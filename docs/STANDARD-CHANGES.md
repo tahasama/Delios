@@ -6,7 +6,7 @@ design; each is a rule about how information is controlled, so the published
 document has to change before the application can claim conformance to it.
 
 The check catalogue is
-not generated from the document: `frontend/lib/checks/catalog.ts` is the
+not generated from the document: `frontend/lib/conformance/checks/catalog.ts` is the
 application's own list of what it can answer (see §21 below), so a change here
 is a change to the published document, and only then — if it names something
 the register can settle — a change to the catalogue.
@@ -64,8 +64,8 @@ returns it to review. The days it takes are inside the review time, not added
 to it.
 
 **Depends on it:** `openApprovalStep` / `settleApproval` in
-`frontend/lib/issue-requests.ts`; the *External approval* checkpoint in
-`frontend/lib/action-lateness.ts`.
+`frontend/lib/transmittals/issue-requests.ts`; the *External approval* checkpoint in
+`frontend/lib/schedule/action-lateness.ts`.
 
 ---
 
@@ -85,7 +85,7 @@ must be able to. A function may carry a clearance (§46).
 people who may read a closed document are chosen deliberately, one by one.
 
 **Depends on it:** `closedDocumentFilter` and `CLOSED_MODELS` in
-`frontend/lib/tenant.ts`; the access list on the document page.
+`frontend/lib/core/tenant.ts`; the access list on the document page.
 
 **Amended by §46:** a function may carry a clearance, confirmed by the owner.
 
@@ -101,7 +101,7 @@ administrator is an emergency power, not a qualification to answer in
 somebody's place; those holders are refused as ordinary targets, and the refusal
 says so.
 
-**Depends on it:** `frontend/lib/delegation.ts` — `delegateCandidates`,
+**Depends on it:** `frontend/lib/reviews/delegation.ts` — `delegateCandidates`,
 `delegationRefusal`, `byPrivilege`.
 
 ---
@@ -119,7 +119,7 @@ produced outside, where release is not ours to give, the required status alone
 counts — and which of the two readings applies is the project's published
 answer, not the reader's assumption (`POLICY_READY`: ISSUED | STATUS).
 
-**Depends on it:** `frontend/lib/readiness.ts`, the denormalised counters on
+**Depends on it:** `frontend/lib/schedule/readiness.ts`, the denormalised counters on
 `Action` (`needCount`, `metIssuedCount`, `metStatusCount`).
 
 ---
@@ -156,7 +156,7 @@ after it inherit the delay rather than own it.
 **Why:** so nobody argues about it afterwards, and so a step never carries a
 delay that began before it.
 
-**Depends on it:** `frontend/lib/action-lateness.ts`; the delay columns on the action
+**Depends on it:** `frontend/lib/schedule/action-lateness.ts`; the delay columns on the action
 page; the baseline export.
 
 ---
@@ -468,7 +468,7 @@ ignore the page. Coverage rose from 51% to 100% by removing questions nobody
 could answer, and the measured figure now means *of what can go wrong here, how
 much is watched*.
 
-**Depends on it:** `frontend/lib/checks/catalog.ts`, the Assurance section.
+**Depends on it:** `frontend/lib/conformance/checks/catalog.ts`, the Assurance section.
 
 ---
 
@@ -486,7 +486,7 @@ hold cannot be destroyed. Twenty such rules are published beside the checks.
 lower it, which makes the figure unfalsifiable — the one thing a conformance
 number must not be.
 
-**Depends on it:** `frontend/lib/checks/prevented.ts`, *Assurance → Default rules*.
+**Depends on it:** `frontend/lib/conformance/checks/prevented.ts`, *Assurance → Default rules*.
 
 ---
 
@@ -528,7 +528,7 @@ Two things override the organization's answer, and only ever to make a field
 stricter: a numbering scheme that draws on a field, and the type-to-field
 matrix.
 
-**Depends on it:** `frontend/lib/field-policy.ts`, `FieldPolicy`, `CustomField`,
+**Depends on it:** `frontend/lib/settings/field-policy.ts`, `FieldPolicy`, `CustomField`,
 *Settings → Forms & fields*; ten forms wired to it.
 
 ---

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getScope } from "@/lib/scope";
+import { getScope } from "@/lib/core/scope";
 import { api, ApiProblem, projectPath } from "@/lib/api/client";
 
 // Controlled file access. The backend decides whether this person may open the

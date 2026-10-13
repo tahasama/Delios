@@ -1,8 +1,8 @@
 import { ActionForm } from "@/components/form";
 import { SearchPick, type PickItem } from "@/components/search-pick";
 import { Field, inputCls } from "@/components/ui";
-import { fmtDate } from "@/lib/utils";
-import { recordActionNoteAction, confirmPostponementAction, reverseDecisionAction } from "@/lib/actions/action-notes";
+import { fmtDate } from "@/lib/core/utils";
+import { recordActionNoteAction, confirmPostponementAction, reverseDecisionAction } from "@/lib/forms/action-notes";
 import type { LegacyNote } from "@/lib/api/schedule";
 
 type Note = LegacyNote;

@@ -1,9 +1,9 @@
-import { requireScope } from "@/lib/scope";
+import { requireScope } from "@/lib/core/scope";
 import { PageHeader, Card, Chip } from "@/components/ui";
 import { AssuranceTabs } from "@/app/(app)/conformance/tabs";
-import { PREVENTED } from "@/lib/checks/prevented";
-import { CATALOG } from "@/lib/checks/catalog";
-import { POLICIES, SKIPPABLE, SKIP_KEY, CONTROL_ACTIVITIES, policy } from "@/lib/control-activities";
+import { PREVENTED } from "@/lib/conformance/checks/prevented";
+import { CATALOG } from "@/lib/conformance/checks/catalog";
+import { POLICIES, SKIPPABLE, SKIP_KEY, CONTROL_ACTIVITIES, policy } from "@/lib/settings/control-activities";
 import { projectSettings } from "@/lib/api/settings";
 
 export const dynamic = "force-dynamic";

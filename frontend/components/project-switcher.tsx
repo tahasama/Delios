@@ -1,9 +1,9 @@
 import { FolderOpen, Check, ChevronDown } from "lucide-react";
-import { switchProjectAction } from "@/lib/actions/project";
-import type { ProjectSummary } from "@/lib/scope";
-import { ROLE_LABEL } from "@/lib/standard";
-import { roleFor } from "@/lib/profiles/roles";
-import type { Role } from "@/lib/standard";
+import { switchProjectAction } from "@/lib/forms/project";
+import type { ProjectSummary } from "@/lib/core/scope";
+import { ROLE_LABEL } from "@/lib/core/standard";
+import { roleFor } from "@/lib/settings/profiles/roles";
+import type { Role } from "@/lib/core/standard";
 
 /**
  * Which project am I in, and what else may I open? Sits at the top-left of every

@@ -2,10 +2,10 @@
 
 import { useState } from "react";
 import { ActionForm } from "@/components/form";
-import type { OwnField } from "@/lib/field-policy";
+import type { OwnField } from "@/lib/settings/field-policy";
 import { OwnFields } from "@/app/(app)/documents/new/own-fields";
 import { Field, inputCls } from "@/components/ui";
-import { sendForReviewAction } from "@/lib/actions/workflow";
+import { sendForReviewAction } from "@/lib/forms/workflow";
 import { ArrowRight } from "lucide-react";
 import { SearchPick } from "@/components/search-pick";
 

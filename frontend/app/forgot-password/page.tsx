@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useActionState } from "react";
-import { forgotPasswordAction } from "@/lib/actions/auth";
+import { forgotPasswordAction } from "@/lib/forms/auth";
 import { inputCls, btn } from "@/components/ui";
 import { AuthShell } from "../login/shell";
 import { BotCheck } from "@/components/bot-check";

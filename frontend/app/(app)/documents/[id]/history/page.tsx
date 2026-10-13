@@ -1,10 +1,10 @@
 import Link from "next/link";
-import { requireScope } from "@/lib/scope";
+import { requireScope } from "@/lib/core/scope";
 import { backendDocument } from "@/lib/api/legacy";
 import { documentSnapshots } from "@/lib/api/snapshots";
 import { notFound } from "next/navigation";
-import { parseSnapshotPayload, summarizeSnapshotChange } from "@/lib/history";
-import { fmtDate, fmtDateTime } from "@/lib/utils";
+import { parseSnapshotPayload, summarizeSnapshotChange } from "@/lib/documents/history";
+import { fmtDate, fmtDateTime } from "@/lib/core/utils";
 import { Chip } from "@/components/ui";
 import { ArrowLeft, ChevronRight, Download } from "lucide-react";
 

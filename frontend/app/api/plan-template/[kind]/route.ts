@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
-import { getScope } from "@/lib/scope";
-import { toCsv } from "@/lib/csv";
+import { getScope } from "@/lib/core/scope";
+import { toCsv } from "@/lib/core/csv";
 import { legacyActions } from "@/lib/api/schedule";
-import { handlerFor } from "@/lib/controlled/registry";
-import "@/lib/controlled/handlers";
+import { handlerFor } from "@/lib/settings/controlled/registry";
+import "@/lib/settings/controlled/handlers";
 
 const day = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : "");
 

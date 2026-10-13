@@ -1,4 +1,4 @@
-import { requireInternalScope } from "@/lib/scope";
+import { requireInternalScope } from "@/lib/core/scope";
 import { SETUP_PAGES } from "./setup-pages";
 import { SettingsCrumb } from "./crumb";
 

@@ -1,15 +1,15 @@
 import Link from "next/link";
 import { SETUP_PAGES, maySetup } from "../setup-pages";
-import { requireScope } from "@/lib/scope";
+import { requireScope } from "@/lib/core/scope";
 import { PageHeader, DataTable, Th, Td, Card, Field, inputCls, btn } from "@/components/ui";
 import { ActionForm } from "@/components/form";
 import { Asked, Added } from "@/components/policy-fields";
-import { formPolicy } from "@/lib/field-policy";
-import { createUserAction, savePersonAction } from "@/lib/actions/admin";
-import { inviteGuestAction, createVisitorAction } from "@/lib/actions/guests";
+import { formPolicy } from "@/lib/settings/field-policy";
+import { createUserAction, savePersonAction } from "@/lib/forms/admin";
+import { inviteGuestAction, createVisitorAction } from "@/lib/forms/guests";
 import { adminFunctions, adminParties, adminProjects, adminUsers } from "@/lib/api/admin";
 import { getMe } from "@/lib/api/me";
-import { getActiveSet } from "@/lib/config";
+import { getActiveSet } from "@/lib/settings/config";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "People & access" };

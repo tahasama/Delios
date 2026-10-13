@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { ArrowRight, Check, Plus, Trash2, Users2, X } from "lucide-react";
 import { ActionForm } from "@/components/form";
 import { Field, Chip, inputCls } from "@/components/ui";
-import { saveTemplateAction } from "@/lib/actions/workflow";
+import { saveTemplateAction } from "@/lib/forms/workflow";
 
 export type WorkflowBuilderStep = {
   act: "REVIEW" | "APPROVAL";

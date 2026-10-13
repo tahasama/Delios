@@ -1,11 +1,11 @@
-import { requireScope } from "@/lib/scope";
-import { fmtDate } from "@/lib/utils";
-import { getSets, getActiveSet } from "@/lib/config";
-import { holdersOf } from "@/lib/permissions";
-import { policies, PROJECT_MODE_LABEL, controlSettings } from "@/lib/control-activities";
-import { stateNames, STATE_NAMES } from "@/lib/state-names";
-import { CATALOG, PHASE_LABEL, type Phase } from "@/lib/checks/catalog";
-import { PREVENTED } from "@/lib/checks/prevented";
+import { requireScope } from "@/lib/core/scope";
+import { fmtDate } from "@/lib/core/utils";
+import { getSets, getActiveSet } from "@/lib/settings/config";
+import { holdersOf } from "@/lib/core/permissions";
+import { policies, PROJECT_MODE_LABEL, controlSettings } from "@/lib/settings/control-activities";
+import { stateNames, STATE_NAMES } from "@/lib/core/state-names";
+import { CATALOG, PHASE_LABEL, type Phase } from "@/lib/conformance/checks/catalog";
+import { PREVENTED } from "@/lib/conformance/checks/prevented";
 
 /**
  * The Document Management Plan, written from what is configured.

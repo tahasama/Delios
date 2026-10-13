@@ -24,8 +24,8 @@ import {
   ShieldCheck,
   X,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { PREF, savePreference } from "@/lib/preferences";
+import { cn } from "@/lib/core/utils";
+import { PREF, savePreference } from "@/lib/core/preferences";
 
 /**
  * Five jobs, then two doors.

@@ -1,40 +1,40 @@
-import { plannedState, plannedProgress } from "@/lib/planned-state";
-import { DEFAULT_RISK_DAYS } from "@/lib/action-state";
+import { plannedState, plannedProgress } from "@/lib/schedule/planned-state";
+import { DEFAULT_RISK_DAYS } from "@/lib/schedule/action-state";
 import { ReadersPanel } from "./readers-panel";
 import { documentAssets, projectAssets } from "@/lib/api/records";
 import { documentReaders, projectReaders } from "@/lib/api/readers";
-import { openConfidentiality } from "@/lib/permissions";
-import { controlDoes, policy as controlPolicy } from "@/lib/control-activities";
+import { openConfidentiality } from "@/lib/core/permissions";
+import { controlDoes, policy as controlPolicy } from "@/lib/settings/control-activities";
 import { notFound } from "next/navigation";
-import { requireScope } from "@/lib/scope";
-import { preflight } from "@/lib/rules/preflight";
+import { requireScope } from "@/lib/core/scope";
+import { preflight } from "@/lib/conformance/rules/preflight";
 import { PreflightPanel } from "@/components/preflight";
 import Link from "next/link";
-import { isController, isAdmin, mayContributeToDocument } from "@/lib/auth";
+import { isController, isAdmin, mayContributeToDocument } from "@/lib/core/auth";
 import { Chip, ToneChip, StateChip, Banner, Field, inputCls } from "@/components/ui";
 import { ActionForm } from "@/components/form";
 import { Asked, Added } from "@/components/policy-fields";
-import { DOC_STATE_LABEL, DOC_STATE_COLOR, REV_STATE_COLOR, revStateColor, type DocState, type RevState } from "@/lib/standard";
-import { stateNames, stateName, supplierStage, supplierStageName, supplierStamp } from "@/lib/state-names";
-import { revisionGround } from "@/lib/revision-ground";
-import { ownFields, readExtras, formPolicy } from "@/lib/field-policy";
-import { fmtDate, timeAgo, plain } from "@/lib/utils";
-import { getActiveSet, getSet, getValue } from "@/lib/config";
-import { updateDocumentAction, reinstateDocumentAction, linkAssetAction, unlinkRelationshipAction, endDocumentStateAction } from "@/lib/actions/documents";
+import { DOC_STATE_LABEL, DOC_STATE_COLOR, REV_STATE_COLOR, revStateColor, type DocState, type RevState } from "@/lib/core/standard";
+import { stateNames, stateName, supplierStage, supplierStageName, supplierStamp } from "@/lib/core/state-names";
+import { revisionGround } from "@/lib/documents/revision-ground";
+import { ownFields, readExtras, formPolicy } from "@/lib/settings/field-policy";
+import { fmtDate, timeAgo, plain } from "@/lib/core/utils";
+import { getActiveSet, getSet, getValue } from "@/lib/settings/config";
+import { updateDocumentAction, reinstateDocumentAction, linkAssetAction, unlinkRelationshipAction, endDocumentStateAction } from "@/lib/forms/documents";
 import {
   prepareRevisionAction, editRevisionAction, withdrawRevisionAction, releaseRevisionAction, voidRevisionAction, unvoidRevisionAction, returnAtGateAction, liftHoldAction, returnHeldAction,
-} from "@/lib/actions/revisions";
-import { parseRecipients, mayRequestIssue, requestChoices, issuePolicy, decisionLetsItOut, requestsOn } from "@/lib/issue-requests";
+} from "@/lib/forms/revisions";
+import { parseRecipients, mayRequestIssue, requestChoices, issuePolicy, decisionLetsItOut, requestsOn } from "@/lib/transmittals/issue-requests";
 import { legacyDocument, documentContext, handBacks, type LegacyRevision } from "@/lib/api/legacy";
-import { requestIssueAction, carryOutRequestAction, cancelRequestAction } from "@/lib/actions/issue-requests";
+import { requestIssueAction, carryOutRequestAction, cancelRequestAction } from "@/lib/forms/issue-requests";
 import { RequestIssue } from "./request-issue";
 import { ReleaseRecipients } from "./release-recipients";
 import { ReturnTarget } from "./return-target";
 import { CopyPicker } from "@/app/(app)/transmittals/new/recipient-picker";
-import { recipientCompanies } from "@/lib/recipients";
-import { withdrawApprovalAction } from "@/lib/actions/governance";
-import { setLegalHoldAction } from "@/lib/actions/retention";
-import { getRunForRevision } from "@/lib/workflow";
+import { recipientCompanies } from "@/lib/transmittals/recipients";
+import { withdrawApprovalAction } from "@/lib/forms/governance";
+import { setLegalHoldAction } from "@/lib/forms/retention";
+import { getRunForRevision } from "@/lib/reviews/workflow";
 import { WorkflowPanel } from "./workflow-panel";
 import type { StepItem } from "./next-step";
 import { SupplierDelivery } from "./supplier-delivery";
@@ -42,8 +42,8 @@ import { Timeline } from "@/components/timeline";
 import { DocTabs } from "./doc-tabs";
 import { ArrowLeft, ChevronRight, Download, ExternalLink, FileText, Send } from "lucide-react";
 import { activityList, scheduleSource } from "@/lib/api/schedule";
-import { addDocumentToActionAction } from "@/lib/actions/action-links";
-import { sendToSupplierAction, askBackAction, answerAskAction } from "@/lib/actions/supplier";
+import { addDocumentToActionAction } from "@/lib/forms/action-links";
+import { sendToSupplierAction, askBackAction, answerAskAction } from "@/lib/forms/supplier";
 import { addressees } from "@/lib/api/transmittals";
 
 export const dynamic = "force-dynamic";
@@ -167,7 +167,7 @@ export default async function DocumentDetailPage({
   // Released and never sent to anybody: in use, and nobody told. True whether
   // or not this organization asks for issuing.
   // Released and issued as one act, or as two in order: the project's answer.
-  const { policy: projectPolicy } = await import("@/lib/control-activities");
+  const { policy: projectPolicy } = await import("@/lib/settings/control-activities");
   const together = (await projectPolicy(ctx, "POLICY_RELEASE")) === "TOGETHER";
   // What this organization calls each state; the states themselves are fixed.
   const names = await stateNames(ctx);
@@ -229,7 +229,7 @@ export default async function DocumentDetailPage({
   // Sending back, and the hold: who it goes back to is the record's answer —
   // the supplier, or whoever started the route — and who is copied in starts as
   // the people who sat on the route. Only Document Control sees either.
-  const { returnRecipients, pendingIssue } = await import("@/lib/issue-requests");
+  const { returnRecipients, pendingIssue } = await import("@/lib/transmittals/issue-requests");
   const held = current?.heldAt ? current : null;
   const sendBackOf = controller ? (working ?? held) : null;
   const [people, backTo, routePeople, heldApproval] = sendBackOf ? await Promise.all([

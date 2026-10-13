@@ -1,13 +1,13 @@
 import { Card, Field, inputCls } from "@/components/ui";
 import { SearchPick } from "@/components/search-pick";
 import { ActionForm } from "@/components/form";
-import { fmtDate } from "@/lib/utils";
+import { fmtDate } from "@/lib/core/utils";
 import {
   delegateReviewAction,
   grantDelegationAction,
   refuseDelegationAction,
   endDelegationAction,
-} from "@/lib/actions/delegation";
+} from "@/lib/forms/delegation";
 
 export type DelegationRow = {
   id: string;

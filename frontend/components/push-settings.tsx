@@ -4,7 +4,7 @@ import { useEffect, useState, useTransition } from "react";
 import { BellRing } from "lucide-react";
 import { ActionForm } from "@/components/form";
 import { btn } from "@/components/ui";
-import { subscribePushAction, unsubscribePushAction, setPushGroupsAction } from "@/lib/actions/push";
+import { subscribePushAction, unsubscribePushAction, setPushGroupsAction } from "@/lib/forms/push";
 
 const GROUPS = [
   { key: "REVIEWS", label: "Reviews", text: "a step waiting for you, an answer, a hand-over" },

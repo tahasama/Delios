@@ -1,10 +1,10 @@
 import Link from "next/link";
-import { requireScope } from "@/lib/scope";
+import { requireScope } from "@/lib/core/scope";
 import { PageHeader, Card, Chip, SeverityChip, inputCls } from "@/components/ui";
 import { ActionForm } from "@/components/form";
-import { closeDefectAction, acceptDefectAction } from "@/lib/actions/conformance";
-import { findingsOfType, todoOf, OWNER_LABEL } from "@/lib/problems";
-import { PHASE_LABEL, CHECK_BY_ID } from "@/lib/checks/catalog";
+import { closeDefectAction, acceptDefectAction } from "@/lib/forms/conformance";
+import { findingsOfType, todoOf, OWNER_LABEL } from "@/lib/core/problems";
+import { PHASE_LABEL, CHECK_BY_ID } from "@/lib/conformance/checks/catalog";
 import { ArrowRight, ArrowLeft } from "lucide-react";
 
 /** One kind of problem, and every document carrying it. */

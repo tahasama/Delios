@@ -1,12 +1,12 @@
-import { requireScope } from "@/lib/scope";
-import { formPolicy } from "@/lib/field-policy";
-import { eligiblePeople } from "@/lib/workflow";
+import { requireScope } from "@/lib/core/scope";
+import { formPolicy } from "@/lib/settings/field-policy";
+import { eligiblePeople } from "@/lib/reviews/workflow";
 import { api, projectPath } from "@/lib/api/client";
 import { backendDocument, backendRevision } from "@/lib/api/legacy";
 import type { Distribution, RouteView } from "@/lib/api/types";
 import { SendForReviewForm, type SendRoute } from "./send-for-review";
-import { verdictSets } from "@/lib/verdict-sets";
-import { matrixBinds } from "@/lib/control-activities";
+import { verdictSets } from "@/lib/reviews/verdict-sets";
+import { matrixBinds } from "@/lib/settings/control-activities";
 
 /**
  * Loads what the Send form needs for these revisions: the routes that apply

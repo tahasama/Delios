@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { getScope } from "@/lib/scope";
-import { getSessionUser } from "@/lib/auth";
+import { getScope } from "@/lib/core/scope";
+import { getSessionUser } from "@/lib/core/auth";
 import { projectPath } from "@/lib/api/client";
 import { passOn } from "@/lib/api/register";
 

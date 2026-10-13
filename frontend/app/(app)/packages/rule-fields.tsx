@@ -1,8 +1,8 @@
-import { getActiveSet } from "@/lib/config";
-import { requireScope } from "@/lib/scope";
+import { getActiveSet } from "@/lib/settings/config";
+import { requireScope } from "@/lib/core/scope";
 import { projectAssets } from "@/lib/api/records";
 import { SearchPick } from "@/components/search-pick";
-import type { PackageFilter } from "@/lib/package-rule";
+import type { PackageFilter } from "@/lib/packages/package-rule";
 import { outsideParties } from "@/lib/api/packages";
 
 /**

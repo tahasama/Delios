@@ -478,7 +478,7 @@ The repository: `backend/` (API and worker), `frontend/` (the Next.js screens; r
 - An action whose dates the latest schedule read moved carries a "moved" stamp
   in the table and on the plan; its page says "Moved by rev C: was … , now …".
   The stamp goes when a later read leaves its dates where they are.
-- Who may upload the lists is one rule, `mayUploadLists` (`frontend/lib/permissions.ts`):
+- Who may upload the lists is one rule, `mayUploadLists` (`frontend/lib/core/permissions.ts`):
   Control or Plan held outright, as the backend checks. Configure does not count.
 - "Documents ready" counts only the actions in a window: a month either side
   of today, or the dates the user filtered on. Never the whole schedule.

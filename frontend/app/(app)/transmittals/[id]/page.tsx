@@ -1,19 +1,19 @@
 import Link from "next/link";
-import { requireScope } from "@/lib/scope";
+import { requireScope } from "@/lib/core/scope";
 import { notFound } from "next/navigation";
-import { isController, isAdmin } from "@/lib/auth";
+import { isController, isAdmin } from "@/lib/core/auth";
 import { Card, Chip, Banner } from "@/components/ui";
 import { ActionForm } from "@/components/form";
-import { ACCEPTANCE_CONDITIONS, REASON_LABEL, type ReasonForIssue } from "@/lib/standard";
-import { fmtDate, fmtDateTime } from "@/lib/utils";
+import { ACCEPTANCE_CONDITIONS, REASON_LABEL, type ReasonForIssue } from "@/lib/core/standard";
+import { fmtDate, fmtDateTime } from "@/lib/core/utils";
 import {
   issueTransmittalAction,
   acceptTransmittalAction,
   attachTransmittalFilesAction,
   chaseTransmittalAction,
   markRecipientSentAction,
-} from "@/lib/actions/transmittals";
-import { preflight } from "@/lib/rules/preflight";
+} from "@/lib/forms/transmittals";
+import { preflight } from "@/lib/conformance/rules/preflight";
 import { PreflightPanel } from "@/components/preflight";
 import { ReceiptTracker } from "./receipt-tracker";
 import { NotifyAgain } from "./notify-again";
@@ -21,7 +21,7 @@ import { CarriedTable, type CarriedRow } from "./carried-table";
 import { Timeline } from "@/components/timeline";
 import { SendForReview } from "@/components/send-for-review-panel";
 import { ArrowLeft } from "lucide-react";
-import { getActiveSet } from "@/lib/config";
+import { getActiveSet } from "@/lib/settings/config";
 import { carriersOf as carriersOfTransmittal, legacyTransmittal, backendTransmittal } from "@/lib/api/transmittals";
 import { activityDetail } from "@/lib/api/schedule";
 

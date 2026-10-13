@@ -1,10 +1,10 @@
 import { SETUP_PAGES, maySetup } from "../setup-pages";
-import { requireScope } from "@/lib/scope";
+import { requireScope } from "@/lib/core/scope";
 import { PageHeader, Card, DataTable, Th, Td, inputCls } from "@/components/ui";
 import { ActionForm } from "@/components/form";
-import { removeNumberingSchemeAction, saveSchemeRoutingAction } from "@/lib/actions/admin";
+import { removeNumberingSchemeAction, saveSchemeRoutingAction } from "@/lib/forms/admin";
 import { NumberingSchemeBuilder } from "./numbering-scheme-builder";
-import { getSets, getActiveSet } from "@/lib/config";
+import { getSets, getActiveSet } from "@/lib/settings/config";
 import { legacyNumbering } from "@/lib/api/admin";
 
 export const dynamic = "force-dynamic";

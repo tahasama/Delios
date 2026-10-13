@@ -310,7 +310,7 @@ export type ScopeConfig = {
 
 export async function scopeConfig(projectId?: string): Promise<ScopeConfig | null> {
   const { orgSettings, projectSettings } = await import("./settings");
-  const { STANDARD_VERSION } = await import("../standard");
+  const { STANDARD_VERSION } = await import("@/lib/core/standard");
   const { getMe } = await import("./me");
   const [org, project, me] = await Promise.all([orgSettings(), projectId ? projectSettings(projectId) : Promise.resolve(new Map<string, string>()), getMe()]);
   let said: Partial<Omit<ScopeConfig, "effectiveDate"> & { effectiveDate: string }> = {};

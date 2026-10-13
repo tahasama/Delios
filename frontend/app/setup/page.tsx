@@ -1,15 +1,15 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { requireOrgAdmin } from "@/lib/org-scope";
-import { openFirstProjectAction, addPersonAction } from "@/lib/actions/setup";
-import { logoutAction } from "@/lib/actions/auth";
+import { requireOrgAdmin } from "@/lib/core/org-scope";
+import { openFirstProjectAction, addPersonAction } from "@/lib/forms/setup";
+import { logoutAction } from "@/lib/forms/auth";
 import { ActionForm } from "@/components/form";
 import { Field, inputCls, btn } from "@/components/ui";
 import { FolderPlus, UserPlus, Check, LogOut } from "lucide-react";
-import { PROJECT_KINDS } from "@/lib/profiles/kinds";
-import { contractRoleOptions } from "@/lib/contract-roles";
+import { PROJECT_KINDS } from "@/lib/settings/profiles/kinds";
+import { contractRoleOptions } from "@/lib/settings/contract-roles";
 import { adminFunctions, adminUsers } from "@/lib/api/admin";
-import { getSets } from "@/lib/config";
+import { getSets } from "@/lib/settings/config";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Set up your organization" };

@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { requireScope } from "@/lib/scope";
+import { requireScope } from "@/lib/core/scope";
 import { PageHeader, Banner, Chip } from "@/components/ui";
 import { SETUP_PAGES, SETUP_GROUPS, maySetup, type SetupPage } from "./setup-pages";
-import { families } from "@/lib/families";
+import { families } from "@/lib/settings/families";
 import {
   FolderKanban, Building2, Gauge, Tags, FileDigit, BadgeCheck, Users, FileUp, Workflow, ScrollText, Layers, Route, ClipboardList, ArrowRight, KeyRound,
   type LucideIcon,
@@ -10,7 +10,7 @@ import {
 
 import { adminAudit, adminFunctions, adminNumbering, adminParties, adminProjects, adminRoutes, adminUsers, orEmpty } from "@/lib/api/admin";
 import { orgSettings, projectSettings } from "@/lib/api/settings";
-import { getSets } from "@/lib/config";
+import { getSets } from "@/lib/settings/config";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Settings" };

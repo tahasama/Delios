@@ -1,7 +1,7 @@
 import "server-only";
 import { api, projectPath } from "./client";
 import type { DocumentView } from "./types";
-import type { DocumentSnapshotPayload } from "../history";
+import type { DocumentSnapshotPayload } from "@/lib/documents/history";
 
 type Scope = { projectId: string };
 type BackendSnapshot = {

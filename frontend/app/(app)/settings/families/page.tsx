@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { requireScope } from "@/lib/scope";
-import { isAdmin } from "@/lib/auth";
+import { requireScope } from "@/lib/core/scope";
+import { isAdmin } from "@/lib/core/auth";
 import { PageHeader, Card, DataTable, Th, Td, Chip } from "@/components/ui";
-import { families, typesByFamily, STAMP_RULES, type StampRule } from "@/lib/families";
+import { families, typesByFamily, STAMP_RULES, type StampRule } from "@/lib/settings/families";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Document families" };

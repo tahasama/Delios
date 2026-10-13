@@ -3,7 +3,7 @@ import { cache } from "react";
 import { api, apiFetch, ApiProblem, projectPath, type Query } from "./client";
 import { backendDocument, backendRevision, backendReview, legacyDocument, type LegacyDocument, type LegacyRevision } from "./legacy";
 import type { RegisterPage, ReviewsPage, ReviewView, TransmittalView } from "./types";
-import type { RunData, WfRuntimeStep } from "../workflow";
+import type { RunData, WfRuntimeStep } from "@/lib/reviews/workflow";
 import { getMe } from "./me";
 
 /**

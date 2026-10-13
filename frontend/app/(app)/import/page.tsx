@@ -1,5 +1,5 @@
 
-import { requireScope } from "@/lib/scope";
+import { requireScope } from "@/lib/core/scope";
 import { PageHeader, Card, ButtonLink } from "@/components/ui";
 import { Download } from "lucide-react";
 import { BulkImportForm } from "./bulk-import-form";

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { fmtDate } from "@/lib/utils";
+import { fmtDate } from "@/lib/core/utils";
 
 type PlanRow = {
   code: string;

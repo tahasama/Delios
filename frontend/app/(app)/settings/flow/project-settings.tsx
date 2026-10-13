@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireScope } from "@/lib/scope";
+import { requireScope } from "@/lib/core/scope";
 import { Card, Chip, inputCls } from "@/components/ui";
 import { ActionForm } from "@/components/form";
 import {
@@ -11,11 +11,11 @@ import {
   PROJECT_MODE_LABEL,
   type ControlMode,
   type ProjectMode,
-} from "@/lib/control-activities";
-import { setControlActivitiesAction, setPolicyAction, setStateNamesAction } from "@/lib/actions/control-activities";
-import { STATE_NAMES, STATE_NAME_MAX, stateNames } from "@/lib/state-names";
+} from "@/lib/settings/control-activities";
+import { setControlActivitiesAction, setPolicyAction, setStateNamesAction } from "@/lib/forms/control-activities";
+import { STATE_NAMES, STATE_NAME_MAX, stateNames } from "@/lib/core/state-names";
 import { projectSettings } from "@/lib/api/settings";
-import { ESCALATE_AFTER_KEY, DEFAULT_ESCALATE_AFTER } from "@/lib/escalation";
+import { ESCALATE_AFTER_KEY, DEFAULT_ESCALATE_AFTER } from "@/lib/schedule/escalation";
 
 /**
  * What the project has settled: who carries each act out, what releasing and

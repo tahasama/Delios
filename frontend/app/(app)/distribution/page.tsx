@@ -1,11 +1,11 @@
 import { Fragment } from "react";
 import Link from "next/link";
-import { requireScope } from "@/lib/scope";
-import { isAdmin } from "@/lib/auth";
+import { requireScope } from "@/lib/core/scope";
+import { isAdmin } from "@/lib/core/auth";
 import { PageHeader, Card, DataTable, Th, Td, btn, inputCls } from "@/components/ui";
-import { getActiveSet } from "@/lib/config";
-import { MATRIX_CODES as CODE, buildSheet } from "@/lib/matrix-sheet";
-import { roleFor } from "@/lib/profiles/roles";
+import { getActiveSet } from "@/lib/settings/config";
+import { MATRIX_CODES as CODE, buildSheet } from "@/lib/settings/matrix-sheet";
+import { roleFor } from "@/lib/settings/profiles/roles";
 import { adminFunctions, adminUsers, orEmpty } from "@/lib/api/admin";
 import { getMe } from "@/lib/api/me";
 
@@ -18,7 +18,7 @@ export const metadata = { title: "Distribution matrix" };
  * without being taught it, which is why it is the shape here — even though the
  * underlying data is the permission matrix rather than a separate list.
  *
- * The codes themselves live in `lib/matrix-sheet`, with the sheet people
+ * The codes themselves live in `lib/settings/matrix-sheet`, with the sheet people
  * download: the page and the file have to say the same thing.
  */
 

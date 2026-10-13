@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { myMfaAction } from "@/lib/actions/security";
+import { myMfaAction } from "@/lib/forms/security";
 import { btn, inputCls } from "@/components/ui";
 
 /** Turning your own two-step sign-in on (key, then a code, then the recovery codes once) or off (with a code). */

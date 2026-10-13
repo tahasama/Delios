@@ -1,14 +1,14 @@
-import { isReadOnly } from "@/lib/auth";
+import { isReadOnly } from "@/lib/core/auth";
 import { after } from "next/server";
-import { requireScope } from "@/lib/scope";
-import { dueState } from "@/lib/workflow";
-import { warnLateReviews } from "@/lib/review-risk";
-import { getSet } from "@/lib/config";
+import { requireScope } from "@/lib/core/scope";
+import { dueState } from "@/lib/reviews/workflow";
+import { warnLateReviews } from "@/lib/reviews/review-risk";
+import { getSet } from "@/lib/settings/config";
 import { reviewsPage, valuesInUse, waitingOn, dueDay, workingDaysBetween } from "@/lib/api/reviews";
 import { ReviewsRegister, type ReviewRow } from "./reviews-register";
 import { ReviewsPlate } from "./reviews-plate";
-import { fmtDate } from "@/lib/utils";
-import { ADVICE_LABEL, OUTCOME_CONSEQUENCES } from "@/lib/standard";
+import { fmtDate } from "@/lib/core/utils";
+import { ADVICE_LABEL, OUTCOME_CONSEQUENCES } from "@/lib/core/standard";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Reviews" };

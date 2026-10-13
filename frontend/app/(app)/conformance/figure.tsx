@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { requireScope } from "@/lib/scope";
-import { fmtDateTime } from "@/lib/utils";
-import { untoldRecipients } from "@/lib/supersession";
-import { haltedRevisions } from "@/lib/halted";
+import { requireScope } from "@/lib/core/scope";
+import { fmtDateTime } from "@/lib/core/utils";
+import { untoldRecipients } from "@/lib/documents/supersession";
+import { haltedRevisions } from "@/lib/reviews/halted";
 import { checksOf, documentCount, flawedDocuments, liveDefects, optOutsOf, scopeOf } from "@/lib/api/conformance";
 
 /**

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Suspense, useActionState, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { loginAction, resendConfirmationAction } from "@/lib/actions/auth";
+import { loginAction, resendConfirmationAction } from "@/lib/forms/auth";
 import { AuthShell } from "./shell";
 import { BotCheck } from "@/components/bot-check";
 import { inputCls, btn } from "@/components/ui";

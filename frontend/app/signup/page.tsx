@@ -4,13 +4,13 @@ import Link from "next/link";
 import { useActionState, useState } from "react";
 import { AuthShell } from "../login/shell";
 import { BotCheck } from "@/components/bot-check";
-import { signupAction } from "@/lib/actions/signup";
-import { APP_NAME } from "@/lib/standard";
+import { signupAction } from "@/lib/forms/signup";
+import { APP_NAME } from "@/lib/core/standard";
 import { inputCls, btn } from "@/components/ui";
 import { MissingSummary } from "@/components/form";
 import { collectInvalid, type MissingField } from "@/components/form-validation";
-import { PROJECT_KINDS } from "@/lib/profiles/kinds";
-import { CONTRACT_ROLES } from "@/lib/profiles/roles";
+import { PROJECT_KINDS } from "@/lib/settings/profiles/kinds";
+import { CONTRACT_ROLES } from "@/lib/settings/profiles/roles";
 
 const KINDS = PROJECT_KINDS;
 

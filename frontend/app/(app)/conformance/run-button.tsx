@@ -2,10 +2,10 @@
 
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { runChecksAction } from "@/lib/actions/conformance";
+import { runChecksAction } from "@/lib/forms/conformance";
 import { btn } from "@/components/ui";
 import { ShieldCheck } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/core/utils";
 
 export function RunChecksButton() {
   const [pending, start] = useTransition();

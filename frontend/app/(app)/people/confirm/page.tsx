@@ -1,9 +1,9 @@
-import { requireScope } from "@/lib/scope";
+import { requireScope } from "@/lib/core/scope";
 import { api, projectPath } from "@/lib/api/client";
 import { ActionForm } from "@/components/form";
 import { Field, inputCls } from "@/components/ui";
-import { fmtDate } from "@/lib/utils";
-import { confirmPersonAction, refusePersonAction } from "@/lib/actions/people";
+import { fmtDate } from "@/lib/core/utils";
+import { confirmPersonAction, refusePersonAction } from "@/lib/forms/people";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "People to confirm" };

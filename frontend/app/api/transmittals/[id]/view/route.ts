@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getScope } from "@/lib/scope";
-import { getSessionUser } from "@/lib/auth";
+import { getScope } from "@/lib/core/scope";
+import { getSessionUser } from "@/lib/core/auth";
 import { api, ApiProblem, projectPath } from "@/lib/api/client";
 import type { TransmittalView } from "@/lib/api/types";
 

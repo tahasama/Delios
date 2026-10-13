@@ -1,4 +1,4 @@
-import { APP_NAME } from "@/lib/standard";
+import { APP_NAME } from "@/lib/core/standard";
 
 /** The sign-in pages' frame: the brand panel, and the form beside it. */
 export function AuthShell({ children }: { children: React.ReactNode }) {

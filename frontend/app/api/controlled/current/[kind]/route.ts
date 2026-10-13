@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
-import { getScope } from "@/lib/scope";
-import { toCsv } from "@/lib/csv";
-import { handlerFor } from "@/lib/controlled/registry";
-import "@/lib/controlled/handlers";
+import { getScope } from "@/lib/core/scope";
+import { toCsv } from "@/lib/core/csv";
+import { handlerFor } from "@/lib/settings/controlled/registry";
+import "@/lib/settings/controlled/handlers";
 
 // Column header → the field a handler's payload uses for it.
 const COLUMN_FIELD: Record<string, string> = {

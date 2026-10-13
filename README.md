@@ -107,7 +107,7 @@ asked at all — and lets an organization add fields of its own, in the shape it
 likes. What the application computes with (the number is built from the type,
 the matrix answers by discipline, retention follows criticality) says so and
 stays as it is.
-Starting configuration is data, not code: `frontend/lib/profiles/reference.json` plus a
+Starting configuration is data, not code: `frontend/lib/settings/profiles/reference.json` plus a
 starter profile per project type (industrial, energy, construction).
 Configuration covers:
 value sets (document types, disciplines, statuses with execution flags, review

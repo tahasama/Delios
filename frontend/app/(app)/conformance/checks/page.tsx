@@ -1,17 +1,17 @@
 import Link from "next/link";
-import { requireScope } from "@/lib/scope";
-import { isAdmin, isController } from "@/lib/auth";
+import { requireScope } from "@/lib/core/scope";
+import { isAdmin, isController } from "@/lib/core/auth";
 import { PageHeader, Card, inputCls } from "@/components/ui";
 import { ActionForm } from "@/components/form";
-import { FAMILY_TITLES, PHASE_LABEL, PHASE_BLURB, CATALOG, CHECK_BY_ID, type Phase, type CheckDef } from "@/lib/checks/catalog";
-import { latestResults } from "@/lib/checks/engine";
+import { FAMILY_TITLES, PHASE_LABEL, PHASE_BLURB, CATALOG, CHECK_BY_ID, type Phase, type CheckDef } from "@/lib/conformance/checks/catalog";
+import { latestResults } from "@/lib/conformance/checks/engine";
 import { optOutsOf } from "@/lib/api/conformance";
 import { AssuranceTabs } from "@/app/(app)/conformance/tabs";
-import { retireCheckAction, restoreCheckAction } from "@/lib/actions/conformance";
-import { OWNER_LABEL } from "@/lib/problems";
+import { retireCheckAction, restoreCheckAction } from "@/lib/forms/conformance";
+import { OWNER_LABEL } from "@/lib/core/problems";
 import { OneKind } from "@/app/(app)/conformance/one-kind";
 import { CheckFilters } from "./check-filters";
-import { fmtDate } from "@/lib/utils";
+import { fmtDate } from "@/lib/core/utils";
 import { AssuranceFigure } from "@/app/(app)/conformance/figure";
 import { RunChecksButton } from "@/app/(app)/conformance/run-button";
 

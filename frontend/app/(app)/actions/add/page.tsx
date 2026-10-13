@@ -1,13 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { requireScope } from "@/lib/scope";
+import { requireScope } from "@/lib/core/scope";
 import { ActionForm } from "@/components/form";
 import { SearchPick } from "@/components/search-pick";
-import { addDocumentToActionAction } from "@/lib/actions/action-links";
+import { addDocumentToActionAction } from "@/lib/forms/action-links";
 import { activityList } from "@/lib/api/schedule";
 import { documentsByIds } from "@/lib/api/packages";
-import { getActiveSet } from "@/lib/config";
-import { fmtDate } from "@/lib/utils";
+import { getActiveSet } from "@/lib/settings/config";
+import { fmtDate } from "@/lib/core/utils";
 import { ArrowLeft } from "lucide-react";
 
 export const dynamic = "force-dynamic";

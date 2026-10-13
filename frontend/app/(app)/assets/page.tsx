@@ -1,11 +1,11 @@
 import Link from "next/link";
 import { projectAssets } from "@/lib/api/records";
-import { requireScope } from "@/lib/scope";
+import { requireScope } from "@/lib/core/scope";
 import { PageHeader, EmptyState, Card, Field, inputCls } from "@/components/ui";
 import { ActionForm } from "@/components/form";
 import { Asked, Added } from "@/components/policy-fields";
-import { formPolicy } from "@/lib/field-policy";
-import { addAssetAction, updateAssetAction, removeAssetAction } from "@/lib/actions/admin";
+import { formPolicy } from "@/lib/settings/field-policy";
+import { addAssetAction, updateAssetAction, removeAssetAction } from "@/lib/forms/admin";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Assets & tags" };

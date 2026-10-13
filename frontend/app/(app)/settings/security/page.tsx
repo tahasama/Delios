@@ -1,9 +1,9 @@
-import { requireScope } from "@/lib/scope";
+import { requireScope } from "@/lib/core/scope";
 import { PageHeader, ToneChip } from "@/components/ui";
 import { ActionForm } from "@/components/form";
 import { api } from "@/lib/api/client";
 import { adminUsers } from "@/lib/api/admin";
-import { setMfaRequiredAction, resetMfaAction } from "@/lib/actions/security";
+import { setMfaRequiredAction, resetMfaAction } from "@/lib/forms/security";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Sign-in & security" };

@@ -1,19 +1,19 @@
 import Link from "next/link";
 import { Lock } from "lucide-react";
 import { SETUP_PAGES, maySetup } from "../setup-pages";
-import { requireScope } from "@/lib/scope";
+import { requireScope } from "@/lib/core/scope";
 import { PageHeader, Chip, StateChip } from "@/components/ui";
 import { ProjectSettings } from "./project-settings";
-import { controlSettings, policies, PROJECT_MODE_LABEL, CONTROL_ACTIVITIES, SKIPPABLE } from "@/lib/control-activities";
-import { holdersOf } from "@/lib/permissions";
-import { REV_STATE_COLOR, type RevState } from "@/lib/standard";
-import { stateNames, stateName } from "@/lib/state-names";
+import { controlSettings, policies, PROJECT_MODE_LABEL, CONTROL_ACTIVITIES, SKIPPABLE } from "@/lib/settings/control-activities";
+import { holdersOf } from "@/lib/core/permissions";
+import { REV_STATE_COLOR, type RevState } from "@/lib/core/standard";
+import { stateNames, stateName } from "@/lib/core/state-names";
 import { SceneDeck, type Flow, type Scene } from "./scene-deck";
 import { ActSwitch } from "./act-switch";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/core/utils";
 
 import { adminFunctions, adminNumbering, legacyParties, legacyRoutes, orEmpty } from "@/lib/api/admin";
-import { getSet, getSets } from "@/lib/config";
+import { getSet, getSets } from "@/lib/settings/config";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Control room" };

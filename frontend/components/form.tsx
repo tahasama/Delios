@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/core/utils";
 import { btn } from "./ui";
 import { collectInvalid, type MissingField } from "./form-validation";
 

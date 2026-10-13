@@ -1,21 +1,21 @@
-import { plannedState, plannedProgress } from "@/lib/planned-state";
+import { plannedState, plannedProgress } from "@/lib/schedule/planned-state";
 import { legacyPackageByNumber } from "@/lib/api/packages";
-import type { SupplierStage } from "@/lib/state-names";
-import { requireScope } from "@/lib/scope";
+import type { SupplierStage } from "@/lib/core/state-names";
+import { requireScope } from "@/lib/core/scope";
 import { api, projectPath } from "@/lib/api/client";
 import { getMe } from "@/lib/api/me";
 import type { ActivitySummary, RegisterPage } from "@/lib/api/types";
 import { RegisterPlate } from "./register-plate";
-import { OUTCOME_CONSEQUENCES, DOC_STATES, DOC_STATE_LABEL, DOC_MEANING, REV_STATES, REV_MEANING, type DocState } from "@/lib/standard";
-import { getSet } from "@/lib/config";
+import { OUTCOME_CONSEQUENCES, DOC_STATES, DOC_STATE_LABEL, DOC_MEANING, REV_STATES, REV_MEANING, type DocState } from "@/lib/core/standard";
+import { getSet } from "@/lib/settings/config";
 import { DocumentRegister } from "./document-register";
 import { activityDetail, scheduleSource } from "@/lib/api/schedule";
-import { DEFAULT_RISK_DAYS } from "@/lib/action-state";
-import { controlDoes } from "@/lib/control-activities";
-import { hasVerb } from "@/lib/auth";
+import { DEFAULT_RISK_DAYS } from "@/lib/schedule/action-state";
+import { controlDoes } from "@/lib/settings/control-activities";
+import { hasVerb } from "@/lib/core/auth";
 import { Banner } from "@/components/ui";
-import { REGISTER_SORTS, readSearch } from "@/lib/register-query";
-import { isReadOnly } from "@/lib/auth";
+import { REGISTER_SORTS, readSearch } from "@/lib/documents/register-query";
+import { isReadOnly } from "@/lib/core/auth";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Documents" };
@@ -74,10 +74,10 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
   const scope = await requireScope();
   const { user, project } = scope;
   // Released and issued as one act, or as two in order: the project's answer.
-  const { policy } = await import("@/lib/control-activities");
+  const { policy } = await import("@/lib/settings/control-activities");
   const together = (await policy(scope, "POLICY_RELEASE")) === "TOGETHER";
   // What this organization calls each state; the states themselves are fixed.
-  const { stateNames, stateName, supplierStageName, supplierStamp, SUPPLIER_STAGES } = await import("@/lib/state-names");
+  const { stateNames, stateName, supplierStageName, supplierStamp, SUPPLIER_STAGES } = await import("@/lib/core/state-names");
   const names = await stateNames(scope);
   const sp = await searchParams;
   const q = (sp.q ?? "").trim();

@@ -1,22 +1,22 @@
 import Link from "next/link";
 import { projectExceptions } from "@/lib/api/records";
-import { requireScope } from "@/lib/scope";
+import { requireScope } from "@/lib/core/scope";
 import { CheckCircle2, CircleDashed, ArrowRight, Building2, Tags, FileDigit, Workflow, Users, ShieldCheck, CalendarClock, Gauge } from "lucide-react";
-import { profileForKind, missingFromProfile, type Profile } from "@/lib/profiles";
-import { draftProfileAction } from "@/lib/actions/profiles";
-import { isAdmin } from "@/lib/auth";
-import { holdersOf } from "@/lib/permissions";
+import { profileForKind, missingFromProfile, type Profile } from "@/lib/settings/profiles";
+import { draftProfileAction } from "@/lib/forms/profiles";
+import { isAdmin } from "@/lib/core/auth";
+import { holdersOf } from "@/lib/core/permissions";
 import { Card, Field, PageHeader, inputCls } from "@/components/ui";
 import { ActionForm } from "@/components/form";
 import { DocumentManagementPlan } from "./plan";
 import { PlanTabs } from "./tabs";
 import { PrintButton } from "@/app/(app)/conformance/statement/print-button";
-import { setScopeAction, addExceptionAction } from "@/lib/actions/admin";
-import { fmtDate } from "@/lib/utils";
+import { setScopeAction, addExceptionAction } from "@/lib/forms/admin";
+import { fmtDate } from "@/lib/core/utils";
 
 import { adminFunctions, adminNumbering, adminParties, adminProjects, adminRoutes, adminUsers, orEmpty, scopeConfig } from "@/lib/api/admin";
 import { projectSettings } from "@/lib/api/settings";
-import { getSet, getSets } from "@/lib/config";
+import { getSet, getSets } from "@/lib/settings/config";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "The plan" };

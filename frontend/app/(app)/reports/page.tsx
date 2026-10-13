@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { requireScope } from "@/lib/scope";
+import { requireScope } from "@/lib/core/scope";
 import { PageHeader, Card, DataTable, Th, Td, EmptyState, inputCls, btn } from "@/components/ui";
-import { fmtDate } from "@/lib/utils";
-import { buildReport, filterRows, REPORT_IDS, type ReportId, type Cell, type Segment, type Bar } from "@/lib/reports";
+import { fmtDate } from "@/lib/core/utils";
+import { buildReport, filterRows, REPORT_IDS, type ReportId, type Cell, type Segment, type Bar } from "@/lib/conformance/reports";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Reports" };

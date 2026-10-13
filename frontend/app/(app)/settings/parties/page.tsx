@@ -1,12 +1,12 @@
 import { SETUP_PAGES, maySetup } from "../setup-pages";
-import { requireScope } from "@/lib/scope";
+import { requireScope } from "@/lib/core/scope";
 import { PageHeader, Card, DataTable, Th, Td, Chip, Field, inputCls } from "@/components/ui";
 import { ActionForm } from "@/components/form";
 import { Asked, Added } from "@/components/policy-fields";
-import { formPolicy } from "@/lib/field-policy";
-import { savePartyAction, deletePartyAction } from "@/lib/actions/workflow";
+import { formPolicy } from "@/lib/settings/field-policy";
+import { savePartyAction, deletePartyAction } from "@/lib/forms/workflow";
 import { PartyKindFields } from "./party-fields";
-import { PARTY_KINDS } from "@/lib/party-kinds";
+import { PARTY_KINDS } from "@/lib/settings/party-kinds";
 import { adminFunctions, adminUsers, legacyParties } from "@/lib/api/admin";
 
 export const dynamic = "force-dynamic";

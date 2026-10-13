@@ -1,33 +1,33 @@
 import Link from "next/link";
-import { requireScope } from "@/lib/scope";
+import { requireScope } from "@/lib/core/scope";
 import { notFound } from "next/navigation";
-import { isController, isAdmin } from "@/lib/auth";
+import { isController, isAdmin } from "@/lib/core/auth";
 import { Card, Chip, Banner, Field, inputCls } from "@/components/ui";
 import { ActionForm } from "@/components/form";
-import { ADVICE_LABEL, OUTCOME_CONSEQUENCES } from "@/lib/standard";
-import { verdictEffect, VERDICT_EFFECT_BLURB } from "@/lib/verdict-effect";
-import { fmtDate, fmtDateTime } from "@/lib/utils";
-import { myAdvice, dueState } from "@/lib/workflow";
+import { ADVICE_LABEL, OUTCOME_CONSEQUENCES } from "@/lib/core/standard";
+import { verdictEffect, VERDICT_EFFECT_BLURB } from "@/lib/reviews/verdict-effect";
+import { fmtDate, fmtDateTime } from "@/lib/core/utils";
+import { myAdvice, dueState } from "@/lib/reviews/workflow";
 import { reviewCycle, reviewRun, earlierSteps, routeSteps, waitingOn } from "@/lib/api/reviews";
 import { holders } from "@/lib/api/settings";
 import { noticesAbout, noticeHistory } from "@/lib/api/schedule";
 import { NotifyPanel } from "@/components/notify-panel";
-import { rewindRouteAction } from "@/lib/actions/workflow";
-import { requestChoices, authorOf, issuePolicy } from "@/lib/issue-requests";
+import { rewindRouteAction } from "@/lib/forms/workflow";
+import { requestChoices, authorOf, issuePolicy } from "@/lib/transmittals/issue-requests";
 import { DelegatePanel, DelegateForm, type DelegationRow } from "./delegate-panel";
 import { AnswerCard } from "./answer-card";
-import { delegateCandidates, delegationFlag, delegationsOn } from "@/lib/delegation";
-import { controlDoes, actIsOff, matrixBinds } from "@/lib/control-activities";
+import { delegateCandidates, delegationFlag, delegationsOn } from "@/lib/reviews/delegation";
+import { controlDoes, actIsOff, matrixBinds } from "@/lib/settings/control-activities";
 import { RequestIssue } from "@/app/(app)/documents/[id]/request-issue";
 import { Timeline } from "@/components/timeline";
-import { getActiveSet } from "@/lib/config";
-import { decisionOptions, statusOptions } from "@/lib/decision-options";
-import { markDispatchedAction } from "@/lib/actions/workflow";
+import { getActiveSet } from "@/lib/settings/config";
+import { decisionOptions, statusOptions } from "@/lib/reviews/decision-options";
+import { markDispatchedAction } from "@/lib/forms/workflow";
 import { VerdictDecision } from "@/app/(app)/documents/[id]/verdict-status";
-import { preflight } from "@/lib/rules/preflight";
+import { preflight } from "@/lib/conformance/rules/preflight";
 import { Guarded } from "@/components/preflight";
-import { issueToReviewAction, withdrawRevisionAction, removeCommentAction, editCommentAction, recordOutcomeAction, returnToOriginatorAction } from "@/lib/actions/revisions";
-import { reclassifyCommentAction } from "@/lib/actions/governance";
+import { issueToReviewAction, withdrawRevisionAction, removeCommentAction, editCommentAction, recordOutcomeAction, returnToOriginatorAction } from "@/lib/forms/revisions";
+import { reclassifyCommentAction } from "@/lib/forms/governance";
 import { ArrowLeft, ExternalLink, FileText } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -162,7 +162,7 @@ export default async function ReviewCyclePage({ params }: { params: Promise<{ id
   // the route is told. A review the control function ran on its own still ends
   // by handing the outcome to the author.
   // Who carries these two out is the project's answer, and the buttons follow
-  // it: see `frontend/lib/control-activities.ts` and Settings → Who does what.
+  // it: see `frontend/lib/settings/control-activities.ts` and Settings → Who does what.
   const [returnIsControl, issueIsControl] = await Promise.all([
     controlDoes(ctx, "RETURN_OUTCOME"),
     controlDoes(ctx, "REVIEW_ISSUE"),

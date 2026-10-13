@@ -1,4 +1,4 @@
-import { fmtDate } from "@/lib/utils";
+import { fmtDate } from "@/lib/core/utils";
 
 type Moved = { wasStart: Date | null; wasFinish: Date | null; in: string } | null;
 

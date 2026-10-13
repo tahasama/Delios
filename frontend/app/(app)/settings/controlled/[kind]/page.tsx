@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { requireScope } from "@/lib/scope";
+import { requireScope } from "@/lib/core/scope";
 import { PageHeader, Card, Chip, Field, btn, inputCls } from "@/components/ui";
 import { ActionForm } from "@/components/form";
 import {
@@ -8,11 +8,11 @@ import {
   submitControlledVersionAction,
   decideControlledVersionAction,
   discardControlledVersionAction,
-} from "@/lib/actions/controlled";
-import { handlerFor, summariseDiff, PLAN_KINDS, type DiffLine } from "@/lib/controlled/registry";
-import "@/lib/controlled/handlers";
-import { getSets } from "@/lib/config";
-import { fmtDate } from "@/lib/utils";
+} from "@/lib/forms/controlled";
+import { handlerFor, summariseDiff, PLAN_KINDS, type DiffLine } from "@/lib/settings/controlled/registry";
+import "@/lib/settings/controlled/handlers";
+import { getSets } from "@/lib/settings/config";
+import { fmtDate } from "@/lib/core/utils";
 import { ArrowLeft, Download, CircleCheck, CircleX, Clock, FileClock, Upload } from "lucide-react";
 
 import { controlledSets } from "@/lib/api/admin";

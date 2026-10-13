@@ -1,10 +1,10 @@
-import { requireScope } from "@/lib/scope";
+import { requireScope } from "@/lib/core/scope";
 import { addressees, ourOrganizationName, transmittalDrafts, transmittalLog } from "@/lib/api/transmittals";
-import { REASONS_FOR_ISSUE, REASON_LABEL, type ReasonForIssue } from "@/lib/standard";
+import { REASONS_FOR_ISSUE, REASON_LABEL, type ReasonForIssue } from "@/lib/core/standard";
 import { TransmittalRegister } from "./transmittal-register";
 import { TransmittalPlate } from "./transmittal-plate";
-import { isReadOnly } from "@/lib/auth";
-import { getSet } from "@/lib/config";
+import { isReadOnly } from "@/lib/core/auth";
+import { getSet } from "@/lib/settings/config";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Transmittals" };

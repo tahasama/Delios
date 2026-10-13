@@ -4,11 +4,11 @@ import { useState } from "react";
 import Link from "next/link";
 import { ActionForm } from "@/components/form";
 import { SearchPick } from "@/components/search-pick";
-import { createDocumentAction } from "@/lib/actions/documents";
-import { cn } from "@/lib/utils";
+import { createDocumentAction } from "@/lib/forms/documents";
+import { cn } from "@/lib/core/utils";
 import { AlertTriangle } from "lucide-react";
-import { isEmptyTitle } from "@/lib/standard";
-import type { OwnField } from "@/lib/field-policy";
+import { isEmptyTitle } from "@/lib/core/standard";
+import type { OwnField } from "@/lib/settings/field-policy";
 import { OwnFields } from "./own-fields";
 
 type Opt = { code: string; label: string; meaning?: string | null; appliesTo?: string | null; deliverables?: string[] | null; criticality?: string | null; decides?: string | null; record?: boolean };

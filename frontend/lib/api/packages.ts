@@ -3,7 +3,7 @@ import { cache } from "react";
 import { api, ApiProblem, projectPath } from "./client";
 import { getMe } from "./me";
 import type { Addressees, PackageSummary, PackageView, RegisterPage } from "./types";
-import { describeFilter, type PackageFilter } from "../package-rule";
+import { describeFilter, type PackageFilter } from "@/lib/packages/package-rule";
 
 /**
  * Packages as the old screens read them. The backend keeps one package record

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireScope } from "@/lib/scope";
+import { requireScope } from "@/lib/core/scope";
 import { PageHeader, ToneChip } from "@/components/ui";
 import { api } from "@/lib/api/client";
 import { TwoStep } from "./two-step";

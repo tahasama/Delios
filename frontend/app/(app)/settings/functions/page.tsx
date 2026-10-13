@@ -1,17 +1,17 @@
-import { requireScope } from "@/lib/scope";
+import { requireScope } from "@/lib/core/scope";
 import { SETUP_PAGES, maySetup } from "../setup-pages";
 import { PageHeader, Card, Chip, DataTable, Field, Th, Td, inputCls } from "@/components/ui";
 import { ActionForm } from "@/components/form";
-import { getActiveSet } from "@/lib/config";
+import { getActiveSet } from "@/lib/settings/config";
 import {
   createFunctionAction,
   updateFunctionAction,
   savePermissionRuleAction,
   deletePermissionRuleAction,
   toggleFunctionVerb,
-} from "@/lib/actions/functions";
-import { VERBS, VERB_LABEL, VERB_BLURB, type Verb } from "@/lib/permissions";
-import { CONTRACT_ROLES } from "@/lib/profiles/roles";
+} from "@/lib/forms/functions";
+import { VERBS, VERB_LABEL, VERB_BLURB, type Verb } from "@/lib/core/permissions";
+import { CONTRACT_ROLES } from "@/lib/settings/profiles/roles";
 import { Check, Minus } from "lucide-react";
 import { legacyFunctions } from "@/lib/api/admin";
 

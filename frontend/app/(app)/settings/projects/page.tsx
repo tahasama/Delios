@@ -1,14 +1,14 @@
-import { requireScope } from "@/lib/scope";
-import { isAdmin } from "@/lib/auth";
+import { requireScope } from "@/lib/core/scope";
+import { isAdmin } from "@/lib/core/auth";
 import { PageHeader, Card, Chip, DataTable, Th, Td, Field, btn, inputCls } from "@/components/ui";
 import { ActionForm } from "@/components/form";
 import { Asked, Added } from "@/components/policy-fields";
-import { formPolicy } from "@/lib/field-policy";
-import { createProjectAction, renameProjectAction, setProjectStatusAction, openProjectAction } from "@/lib/actions/projects";
-import { fmtDate } from "@/lib/utils";
+import { formPolicy } from "@/lib/settings/field-policy";
+import { createProjectAction, renameProjectAction, setProjectStatusAction, openProjectAction } from "@/lib/forms/projects";
+import { fmtDate } from "@/lib/core/utils";
 import { FolderOpen, ArrowRight } from "lucide-react";
-import { PROJECT_KINDS } from "@/lib/profiles/kinds";
-import { contractRoleOptions } from "@/lib/contract-roles";
+import { PROJECT_KINDS } from "@/lib/settings/profiles/kinds";
+import { contractRoleOptions } from "@/lib/settings/contract-roles";
 import { adminProjects } from "@/lib/api/admin";
 import { projectSettings } from "@/lib/api/settings";
 

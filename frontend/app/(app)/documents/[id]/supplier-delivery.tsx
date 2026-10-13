@@ -1,12 +1,12 @@
-import { requireScope } from "@/lib/scope";
+import { requireScope } from "@/lib/core/scope";
 import { ActionForm } from "@/components/form";
-import { attachSupplierFileAction, askBackAction, answerAskAction } from "@/lib/actions/supplier";
+import { attachSupplierFileAction, askBackAction, answerAskAction } from "@/lib/forms/supplier";
 import { Field, inputCls } from "@/components/ui";
-import { supplierStage } from "@/lib/state-names";
-import { fmtDate } from "@/lib/utils";
+import { supplierStage } from "@/lib/core/state-names";
+import { fmtDate } from "@/lib/core/utils";
 import { NextStepBody, StagePath, type StepItem } from "./next-step";
-import { cn } from "@/lib/utils";
-import { hasVerb } from "@/lib/auth";
+import { cn } from "@/lib/core/utils";
+import { hasVerb } from "@/lib/core/auth";
 import { getMe } from "@/lib/api/me";
 import { legacyDocument, handBacks } from "@/lib/api/legacy";
 

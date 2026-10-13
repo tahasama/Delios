@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
-import { getScope } from "@/lib/scope";
+import { getScope } from "@/lib/core/scope";
 import { projectPath } from "@/lib/api/client";
 import { passOnFile } from "@/lib/api/conformance";
-import { REPORT_IDS, type ReportId } from "@/lib/reports";
+import { REPORT_IDS, type ReportId } from "@/lib/conformance/reports";
 
 /** A report from the Reports page, as CSV, stamped with when it was counted (the backend writes the file). */
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {

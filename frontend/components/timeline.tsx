@@ -1,4 +1,4 @@
-import { fmtDate, fmtDateTime } from "@/lib/utils";
+import { fmtDate, fmtDateTime } from "@/lib/core/utils";
 
 type TimelinePoint = {
   /** What happened, in the fewest words that stay true. */

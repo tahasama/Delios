@@ -1,7 +1,7 @@
 "use client";
 
 import { inputCls } from "@/components/ui";
-import type { OwnField } from "@/lib/field-policy";
+import type { OwnField } from "@/lib/settings/field-policy";
 
 /**
  * The fields this organization added, drawn as it asked for them.

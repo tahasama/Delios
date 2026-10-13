@@ -1,9 +1,9 @@
 import Link from "next/link";
-import { requireScope } from "@/lib/scope";
+import { requireScope } from "@/lib/core/scope";
 import { PageHeader, Banner } from "@/components/ui";
-import { allHandlers, summariseDiff, PLAN_KINDS, type DiffLine } from "@/lib/controlled/registry";
-import "@/lib/controlled/handlers";
-import { fmtDate } from "@/lib/utils";
+import { allHandlers, summariseDiff, PLAN_KINDS, type DiffLine } from "@/lib/settings/controlled/registry";
+import "@/lib/settings/controlled/handlers";
+import { fmtDate } from "@/lib/core/utils";
 import { Grid3X3, CalendarRange, Tags, ArrowRight, CircleCheck, Clock, PencilLine } from "lucide-react";
 
 import { controlledSets } from "@/lib/api/admin";

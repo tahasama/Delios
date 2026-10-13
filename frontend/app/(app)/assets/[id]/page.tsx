@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { projectAsset } from "@/lib/api/records";
-import { requireScope } from "@/lib/scope";
+import { requireScope } from "@/lib/core/scope";
 import { notFound } from "next/navigation";
 import { PageHeader, Card, DataTable, Th, Td, Chip, EmptyState } from "@/components/ui";
-import { DOC_STATE_LABEL, type DocState } from "@/lib/standard";
+import { DOC_STATE_LABEL, type DocState } from "@/lib/core/standard";
 
 export const dynamic = "force-dynamic";
 

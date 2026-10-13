@@ -4,11 +4,11 @@ import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ActionForm } from "@/components/form";
-import { createTransmittalAction } from "@/lib/actions/transmittals";
+import { createTransmittalAction } from "@/lib/forms/transmittals";
 import { RecipientPicker, type Company } from "./recipient-picker";
-import type { OwnField } from "@/lib/field-policy";
+import type { OwnField } from "@/lib/settings/field-policy";
 import { OwnFields } from "@/app/(app)/documents/new/own-fields";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/core/utils";
 import { Minus, Plus, Search, X } from "lucide-react";
 
 type Opt = { code: string; label: string; props: Record<string, unknown> };

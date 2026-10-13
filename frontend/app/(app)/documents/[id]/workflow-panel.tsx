@@ -1,23 +1,23 @@
-import { requireScope } from "@/lib/scope";
-import { mayContributeToDocument, type SessionUser } from "@/lib/auth";
+import { requireScope } from "@/lib/core/scope";
+import { mayContributeToDocument, type SessionUser } from "@/lib/core/auth";
 import { Chip, Field, inputCls } from "@/components/ui";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/core/utils";
 import { ActionForm } from "@/components/form";
-import { recordStepOutcomeAction, submitForReleaseAction } from "@/lib/actions/workflow";
-import { typeSkipsReview } from "@/lib/review-need";
-import { decisionOptions, statusOptions } from "@/lib/decision-options";
-import { requestChoices, authorOf, issuePolicy } from "@/lib/issue-requests";
+import { recordStepOutcomeAction, submitForReleaseAction } from "@/lib/forms/workflow";
+import { typeSkipsReview } from "@/lib/reviews/review-need";
+import { decisionOptions, statusOptions } from "@/lib/reviews/decision-options";
+import { requestChoices, authorOf, issuePolicy } from "@/lib/transmittals/issue-requests";
 import { RequestIssue } from "./request-issue";
-import { ADVICE_LABEL } from "@/lib/standard";
-import { getActiveSet } from "@/lib/config";
+import { ADVICE_LABEL } from "@/lib/core/standard";
+import { getActiveSet } from "@/lib/settings/config";
 import { VerdictDecision } from "./verdict-status";
 import { Send, Rocket } from "lucide-react";
 import { NextStepBody, StagePath, type StepItem } from "./next-step";
-import { getRunForRevision, dueState, myAdvice, type WfRuntimeStep } from "@/lib/workflow";
-import { fmtDate } from "@/lib/utils";
-import { confirmRecordAction, correctRecordAction } from "@/lib/actions/governance";
+import { getRunForRevision, dueState, myAdvice, type WfRuntimeStep } from "@/lib/reviews/workflow";
+import { fmtDate } from "@/lib/core/utils";
+import { confirmRecordAction, correctRecordAction } from "@/lib/forms/governance";
 import { SendForReview } from "@/components/send-for-review-panel";
-import { isController } from "@/lib/auth";
+import { isController } from "@/lib/core/auth";
 import { legacyDocument, backendReview, backendDocument } from "@/lib/api/legacy";
 
 type DocLite = {

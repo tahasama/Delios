@@ -1,6 +1,6 @@
 import { Check, CircleAlert, CircleX, Info } from "lucide-react";
-import { cn } from "@/lib/utils";
-import type { Preflight, GateLine } from "@/lib/rules/registry";
+import { cn } from "@/lib/core/utils";
+import type { Preflight, GateLine } from "@/lib/conformance/rules/registry";
 
 /**
  * The step check. Requirement 3: a person should always know whether what they

@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
-import { getScope } from "@/lib/scope";
-import { toCsv } from "@/lib/csv";
+import { getScope } from "@/lib/core/scope";
+import { toCsv } from "@/lib/core/csv";
 import { legacyPackageByNumber } from "@/lib/api/packages";
-import { supplierRows, lineStage } from "@/lib/supplier";
+import { supplierRows, lineStage } from "@/lib/packages/supplier";
 
 /**
  * A supplier's package as a list: its own documents, each with when it is due and where it stands, in the reader's

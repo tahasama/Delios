@@ -1,8 +1,8 @@
 # Conformance, reports and the smaller screens: what the screens need that the backend lacks
 
-Screens: `/conformance/checks` (catalogue, one-kind drill-down), `/conformance/statement`, `/conformance/rules`, `/exposures`, `/reports`, `/distribution`, `/guide`, `/notifications`, `/assets`, `/assets/[id]`. Actions: `frontend/lib/actions/conformance.ts`; `frontend/lib/matrix-read.ts` (the distribution-matrix import, used by `frontend/lib/actions/bulk.ts`). Route: `/api/reports/[id]`.
+Screens: `/conformance/checks` (catalogue, one-kind drill-down), `/conformance/statement`, `/conformance/rules`, `/exposures`, `/reports`, `/distribution`, `/guide`, `/notifications`, `/assets`, `/assets/[id]`. Actions: `frontend/lib/forms/conformance.ts`; `frontend/lib/settings/matrix-read.ts` (the distribution-matrix import, used by `frontend/lib/forms/bulk.ts`). Route: `/api/reports/[id]`.
 
-The check catalogue on the screens (`frontend/lib/checks/catalog.ts`) now mirrors the backend's 35 checks (`Checks/Catalog.cs`: ids, moments, wording, severity, owner). The old frontend list of ~100 checks is gone: the backend asks none of the others, so they would only ever read "never run". The frontend runners (`frontend/lib/checks/runners.ts`) are deleted; the backend runs the checks.
+The check catalogue on the screens (`frontend/lib/conformance/checks/catalog.ts`) now mirrors the backend's 35 checks (`Checks/Catalog.cs`: ids, moments, wording, severity, owner). The old frontend list of ~100 checks is gone: the backend asks none of the others, so they would only ever read "never run". The frontend runners (`frontend/lib/checks/runners.ts`) are deleted; the backend runs the checks.
 
 Kept in the project's settings store, because the backend has no table for them:
 - `CHECK_OFF:<checkId>` → `{"by": name, "at": ISO date}`: who switched a check off and when (written by `retireCheckAction`, cleared by `restoreCheckAction`).
@@ -40,7 +40,7 @@ Kept in the project's settings store, because the backend has no table for them:
 11. **Notifications.** `/notifications` lists the person's notifications and marks them read. The backend sends none. Today the page shows "Nothing yet".
     Want: `GET /api/me/notifications?take=60` → `[{ id, title, body, link, read, createdAt }]` and `POST /api/me/notifications/read`.
 
-12. **Assets and tags.** `/assets` and `/assets/[id]` list equipment, systems and areas and the documents linked to each; the actions (add, change, remove, link) are in `frontend/lib/actions/admin.ts`. The backend has no assets. Today the list is empty and an asset page is not found.
+12. **Assets and tags.** `/assets` and `/assets/[id]` list equipment, systems and areas and the documents linked to each; the actions (add, change, remove, link) are in `frontend/lib/forms/admin.ts`. The backend has no assets. Today the list is empty and an asset page is not found.
     Want: `GET|POST /api/projects/{id}/assets` (`{ id, code, name, area, system, unit, description }`), `PUT|DELETE /assets/{id}`, `GET /assets/{id}` with its documents (`[{ id, number, title, docType, discipline, state, current: { value, statusCode } }]`), and `POST|DELETE /documents/{id}/assets/{assetId}`.
 
 13. **Distribution matrix: holders per function on this project.** The matrix heads each function column with how many people hold it on this project. `AdminFunction.holders` counts across projects; the page counts memberships from `GET /api/admin/users` instead (Document Control and administrators only; anybody else sees 0). Want: `GET /api/projects/{id}/holders` without `verb` returning every holder with `functionId`, or `AdminFunction.holdersByProject`.

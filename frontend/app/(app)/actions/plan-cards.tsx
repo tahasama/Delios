@@ -1,9 +1,9 @@
 import { Fragment } from "react";
 import Link from "next/link";
-import { mayUploadLists } from "@/lib/permissions";
-import { requireScope } from "@/lib/scope";
-import { planLists } from "@/lib/plan-lists";
-import { planProgress, PLAN_STAGES } from "@/lib/plan-progress";
+import { mayUploadLists } from "@/lib/core/permissions";
+import { requireScope } from "@/lib/core/scope";
+import { planLists } from "@/lib/schedule/plan-lists";
+import { planProgress, PLAN_STAGES } from "@/lib/schedule/plan-progress";
 import { PlanListPanel } from "./plan-list-panel";
 import { UploadSwitch } from "./upload-switch";
 

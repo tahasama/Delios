@@ -1,10 +1,10 @@
 import { activityDetail } from "@/lib/api/schedule";
 import { PageHeader } from "@/components/ui";
-import { formPolicy } from "@/lib/field-policy";
-import { requireScope } from "@/lib/scope";
-import { getActiveSet } from "@/lib/config";
-import { holdersOf } from "@/lib/permissions";
-import { recipientCompanies } from "@/lib/recipients";
+import { formPolicy } from "@/lib/settings/field-policy";
+import { requireScope } from "@/lib/core/scope";
+import { getActiveSet } from "@/lib/settings/config";
+import { holdersOf } from "@/lib/core/permissions";
+import { recipientCompanies } from "@/lib/transmittals/recipients";
 import { NewTransmittalForm } from "./new-transmittal-form";
 import { api, projectPath } from "@/lib/api/client";
 import { backendDocument } from "@/lib/api/legacy";

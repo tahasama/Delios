@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import { IBM_Plex_Sans, IBM_Plex_Mono, Newsreader } from "next/font/google";
 import "./globals.css";
-import { APP_NAME } from "@/lib/standard";
+import { APP_NAME } from "@/lib/core/standard";
 import { cookies } from "next/headers";
-import { PREF, SIDEBAR_LIMITS } from "@/lib/preferences";
+import { PREF, SIDEBAR_LIMITS } from "@/lib/core/preferences";
 
 /**
  * The register is a technical document, so it is set in a technical face. Plex

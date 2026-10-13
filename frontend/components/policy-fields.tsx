@@ -1,5 +1,5 @@
 import { Field, inputCls } from "@/components/ui";
-import type { OwnField, Rules } from "@/lib/field-policy";
+import type { OwnField, Rules } from "@/lib/settings/field-policy";
 
 /**
  * A form drawn the way the organization asked for it.

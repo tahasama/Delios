@@ -1,14 +1,14 @@
-import { mayCreateDocument } from "@/lib/auth";
-import { requireScope } from "@/lib/scope";
+import { mayCreateDocument } from "@/lib/core/auth";
+import { requireScope } from "@/lib/core/scope";
 import { unreadNotifications } from "@/lib/api/me";
 import { Sidebar, MobileNav, SearchBox } from "@/components/navigation";
 import { ProjectSwitcher } from "@/components/project-switcher";
-import { logoutAction } from "@/lib/actions/auth";
+import { logoutAction } from "@/lib/forms/auth";
 import { Bell, BookOpen, ChevronDown, LogOut, UserRound, KeyRound } from "lucide-react";
 import Link from "next/link";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { ROLE_LABEL } from "@/lib/standard";
-import type { Role } from "@/lib/standard";
+import { ROLE_LABEL } from "@/lib/core/standard";
+import type { Role } from "@/lib/core/standard";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const ctx = await requireScope();

@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { requireScope } from "@/lib/scope";
-import { isAdmin } from "@/lib/auth";
+import { requireScope } from "@/lib/core/scope";
+import { isAdmin } from "@/lib/core/auth";
 import { PageHeader } from "@/components/ui";
-import { fmtDate, fmtDateTime } from "@/lib/utils";
+import { fmtDate, fmtDateTime } from "@/lib/core/utils";
 import { DateWindow } from "@/components/date-window";
 import { adminAudit } from "@/lib/api/admin";
 

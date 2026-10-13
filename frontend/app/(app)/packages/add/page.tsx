@@ -1,10 +1,10 @@
 import Link from "next/link";
-import { requireScope } from "@/lib/scope";
+import { requireScope } from "@/lib/core/scope";
 import { Field, inputCls } from "@/components/ui";
 import { ActionForm } from "@/components/form";
-import { addPackageMemberAction } from "@/lib/actions/planning";
-import { getActiveSet } from "@/lib/config";
-import { fmtDate } from "@/lib/utils";
+import { addPackageMemberAction } from "@/lib/forms/planning";
+import { getActiveSet } from "@/lib/settings/config";
+import { fmtDate } from "@/lib/core/utils";
 import { ArrowLeft } from "lucide-react";
 import { SearchPick } from "@/components/search-pick";
 import { documentsByIds, legacyPackages } from "@/lib/api/packages";

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Monitor, Moon, Sun } from "lucide-react";
-import { PREF, savePreference } from "@/lib/preferences";
+import { PREF, savePreference } from "@/lib/core/preferences";
 
 type Theme = "light" | "dark" | "system";
 const ORDER: Theme[] = ["light", "dark", "system"];

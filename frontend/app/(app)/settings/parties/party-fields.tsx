@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Field, inputCls } from "@/components/ui";
-import { PARTY_KINDS } from "@/lib/party-kinds";
+import { PARTY_KINDS } from "@/lib/settings/party-kinds";
 import { SearchPick } from "@/components/search-pick";
 
 

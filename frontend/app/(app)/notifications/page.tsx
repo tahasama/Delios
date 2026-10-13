@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { requireScope } from "@/lib/scope";
+import { requireScope } from "@/lib/core/scope";
 import { PageHeader, EmptyState } from "@/components/ui";
-import { timeAgo } from "@/lib/utils";
+import { timeAgo } from "@/lib/core/utils";
 import { getNotifications, markAllNotificationsRead } from "@/lib/api/me";
 import { api, forgetShortLived } from "@/lib/api/client";
 import { PushSettings } from "@/components/push-settings";

@@ -1,8 +1,8 @@
 "use client";
 
 import { useActionState, useEffect, useState } from "react";
-import { setOneControlActivityAction } from "@/lib/actions/control-activities";
-import { cn } from "@/lib/utils";
+import { setOneControlActivityAction } from "@/lib/forms/control-activities";
+import { cn } from "@/lib/core/utils";
 
 type Side = "CONTROL" | "SELF" | "OFF";
 

@@ -1,7 +1,7 @@
-import { fieldRules, fieldLabels, ownFields } from "@/lib/field-policy";
-import { getActiveSet } from "@/lib/config";
-import { requireScope } from "@/lib/scope";
-import { mayCreateDocument } from "@/lib/auth";
+import { fieldRules, fieldLabels, ownFields } from "@/lib/settings/field-policy";
+import { getActiveSet } from "@/lib/settings/config";
+import { requireScope } from "@/lib/core/scope";
+import { mayCreateDocument } from "@/lib/core/auth";
 import { legacyNumbering } from "@/lib/api/admin";
 import { Banner, PageHeader } from "@/components/ui";
 import { NewDocumentForm } from "./new-document-form";

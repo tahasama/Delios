@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/core/utils";
 import { AlertTriangle, CheckCircle2, Info as InfoIcon } from "lucide-react";
 
 // Shared, server-safe UI primitives. Buttons are plain <button>/<Link> so forms

@@ -1,14 +1,14 @@
 import Link from "next/link";
-import { requireScope } from "@/lib/scope";
+import { requireScope } from "@/lib/core/scope";
 import {
   ArrowLeftRight, ArrowRight, Boxes, CalendarRange, ChartNoAxesCombined,
   ClipboardCheck, FilePlus2, FileText, FolderKanban, Import, ListChecks,
   Network, Search, Settings, ShieldCheck, Tags, Users, Workflow,
 } from "lucide-react";
-import { mayCreateDocument } from "@/lib/auth";
+import { mayCreateDocument } from "@/lib/core/auth";
 import { Chip } from "@/components/ui";
-import { isAdmin, isController } from "@/lib/auth";
-import { contractRoleOptions } from "@/lib/contract-roles";
+import { isAdmin, isController } from "@/lib/core/auth";
+import { contractRoleOptions } from "@/lib/settings/contract-roles";
 import { api, projectPath } from "@/lib/api/client";
 import { documentCount } from "@/lib/api/conformance";
 

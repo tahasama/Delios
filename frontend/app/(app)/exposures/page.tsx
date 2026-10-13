@@ -1,14 +1,14 @@
 import Link from "next/link";
 import { unresolvedVoids } from "@/lib/api/readers";
-import { requireScope } from "@/lib/scope";
-import { isController, isAdmin } from "@/lib/auth";
+import { requireScope } from "@/lib/core/scope";
+import { isController, isAdmin } from "@/lib/core/auth";
 import { PageHeader, Card, Chip, Banner, btn } from "@/components/ui";
 import { ActionForm } from "@/components/form";
-import { EXPOSURES } from "@/lib/standard";
-import { recordVoidReassessmentAction } from "@/lib/actions/revisions";
-import { untoldRecipients, sendCurrentLink } from "@/lib/supersession";
-import { haltedRevisions } from "@/lib/halted";
-import { orphanedNeeds } from "@/lib/exposure-counts";
+import { EXPOSURES } from "@/lib/core/standard";
+import { recordVoidReassessmentAction } from "@/lib/forms/revisions";
+import { untoldRecipients, sendCurrentLink } from "@/lib/documents/supersession";
+import { haltedRevisions } from "@/lib/reviews/halted";
+import { orphanedNeeds } from "@/lib/conformance/exposure-counts";
 import { AssuranceTabs } from "@/app/(app)/conformance/tabs";
 
 export const dynamic = "force-dynamic";

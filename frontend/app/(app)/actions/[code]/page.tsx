@@ -1,29 +1,29 @@
 import { ActionNotes, type WentAhead } from "./lateness";
 import { NeededTable, type NeededRow } from "./needed-table";
-import { latenessOf } from "@/lib/action-lateness";
-import { carrierRefusal, actIsOff } from "@/lib/control-activities";
-import { meetsRequirement } from "@/lib/readiness";
+import { latenessOf } from "@/lib/schedule/action-lateness";
+import { carrierRefusal, actIsOff } from "@/lib/settings/control-activities";
+import { meetsRequirement } from "@/lib/schedule/readiness";
 import Link from "next/link";
-import { requireScope } from "@/lib/scope";
+import { requireScope } from "@/lib/core/scope";
 import { notFound } from "next/navigation";
 import { Card, Chip, Banner, Field, inputCls } from "@/components/ui";
 import { ActionForm } from "@/components/form";
-import { confirmReadinessAction, revokeReadinessAction } from "@/lib/actions/requirements";
-import { departmentsOf, DEFAULT_LEAD_DAYS } from "@/lib/schedule";
+import { confirmReadinessAction, revokeReadinessAction } from "@/lib/forms/requirements";
+import { departmentsOf, DEFAULT_LEAD_DAYS } from "@/lib/schedule/schedule";
 import { Timeline } from "@/components/timeline";
-import { fmtDate } from "@/lib/utils";
+import { fmtDate } from "@/lib/core/utils";
 import { ArrowLeft } from "lucide-react";
-import { getActiveSet } from "@/lib/config";
+import { getActiveSet } from "@/lib/settings/config";
 import { api } from "@/lib/api/client";
 import { holders } from "@/lib/api/settings";
 import { legacyActionByCode, scheduleSource, noticesAbout, noticeHistory } from "@/lib/api/schedule";
 import { movedPhrase } from "../moved";
-import { actionState, stateLabel, dayHasPassed, riskFrom, isPostponed, DEFAULT_RISK_DAYS, type ActionState } from "@/lib/action-state";
-import { mayUploadLists } from "@/lib/permissions";
+import { actionState, stateLabel, dayHasPassed, riskFrom, isPostponed, DEFAULT_RISK_DAYS, type ActionState } from "@/lib/schedule/action-state";
+import { mayUploadLists } from "@/lib/core/permissions";
 import { NotifyPanel } from "@/components/notify-panel";
 import { LinksCard, proposalText, type Ask } from "./links-card";
 import { activityRequests } from "@/lib/api/schedule";
-import { confirmActionRequestAction, refuseActionRequestAction, addOwnDisciplineAction } from "@/lib/actions/action-links";
+import { confirmActionRequestAction, refuseActionRequestAction, addOwnDisciplineAction } from "@/lib/forms/action-links";
 import { addressees } from "@/lib/api/transmittals";
 import { registerByNumber } from "@/lib/api/register";
 
@@ -103,7 +103,7 @@ export default async function ActionDetailPage({ params, searchParams }: { param
 
   // Who adds documents and disciplines to an action here: Document Control (asked by everyone else), or, without it,
   // the people of each discipline for their own.
-  const { controlDoes } = await import("@/lib/control-activities");
+  const { controlDoes } = await import("@/lib/settings/control-activities");
   const selfLinks = !(await controlDoes(ctx, "ACTION_LINKS"));
 
   // A discipline the action should concern and does not: anyone on the project may ask Document Control to add it.
@@ -159,8 +159,8 @@ export default async function ActionDetailPage({ params, searchParams }: { param
   const delayOf = new Map(lateness.rows.map((row) => [row.docNumber, row]));
   // Where each needed document stands, in the organization's own words for its states: it is listed whatever its
   // state, so people know it exists even before it is ready.
-  const { policy } = await import("@/lib/control-activities");
-  const { stateNames, stateName } = await import("@/lib/state-names");
+  const { policy } = await import("@/lib/settings/control-activities");
+  const { stateNames, stateName } = await import("@/lib/core/state-names");
   const [names, together] = await Promise.all([stateNames(ctx), policy(ctx, "POLICY_RELEASE").then((one) => one === "TOGETHER")]);
   const standing = (e: (typeof entries)[number]) => {
     const latest = e.document.latest;

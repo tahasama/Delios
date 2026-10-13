@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CARD_KEY, PLAN_CARD_HEIGHT } from "@/lib/plan-card";
+import { CARD_KEY, PLAN_CARD_HEIGHT } from "@/lib/schedule/plan-card";
 
 /**
  * One height for every register's card.
