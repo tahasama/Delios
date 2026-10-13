@@ -469,3 +469,13 @@ conversation, write it into the right one in the same commit as the code.
   Control or Plan held outright, as the backend checks. Configure does not count.
 - "Documents ready" counts only the actions in a window: a month either side
   of today, or the dates the user filtered on. Never the whole schedule.
+
+### Backend — limits and steps that bit before
+- An outbox routing key is at most 16 characters; `ControlledVersion.VersionLabel` too.
+- Migrations: `dotnet ef migrations add Name -p src/Delios.Host -s src/Delios.Host -o Platform/Migrations`
+  (from `backend/`). Each new table gets `RowLevelSecurity.Enable(migrationBuilder, "<table>")`.
+- Row-level security is forced, even for the table owner: a data backfill loops over
+  `tenants` and sets `set_config('app.tenant_id', …)` for each.
+- Organization defaults are added through `DemoSeed.Ensure*SetupAsync`, which adds only what is missing.
+- A function's clearance limits what its holders read (Standard §46); visibility always goes
+  through `DocumentQueries.Visible`.
