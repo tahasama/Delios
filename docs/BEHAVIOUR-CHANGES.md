@@ -334,7 +334,7 @@ then the person signs in again.
 **Refused requests are recorded.** When someone signed in is refused (403), the audit trail records
 `ACCESS_REFUSED` with what was asked and why, once an hour per person and address.
 
-**New passwords are stronger.** At least 12 characters (was 8), and never one published in a data breach. Passwords
+**New passwords are stronger.** At least 8 characters, and never one published in a data breach. Passwords
 already set keep working. The team import's first passwords are random.
 
 **Sign-up confirms the email** while email is on: the first administrator signs in after opening the emailed link;

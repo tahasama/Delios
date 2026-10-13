@@ -102,11 +102,11 @@ export default function SignupPage() {
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
                   <label htmlFor="password" className="mb-1 block text-xs font-medium text-slate-700">Password</label>
-                  <input id="password" name="password" type="password" autoComplete="new-password" required minLength={12} className={inputCls} placeholder="at least 12 characters" />
+                  <input id="password" name="password" type="password" autoComplete="new-password" required minLength={8} className={inputCls} placeholder="at least 8 characters" />
                 </div>
                 <div>
                   <label htmlFor="confirm" className="mb-1 block text-xs font-medium text-slate-700">Confirm</label>
-                  <input id="confirm" name="confirm" type="password" autoComplete="new-password" required minLength={12} className={inputCls} placeholder="repeat it" />
+                  <input id="confirm" name="confirm" type="password" autoComplete="new-password" required minLength={8} className={inputCls} placeholder="repeat it" />
                 </div>
               </div>
             </fieldset>

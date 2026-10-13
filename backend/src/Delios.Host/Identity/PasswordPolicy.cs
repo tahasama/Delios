@@ -22,7 +22,7 @@ public sealed class NewPasswordOptions
 public sealed class PasswordPolicy(IHttpClientFactory http, IOptions<NewPasswordOptions> options, ILogger<PasswordPolicy> logger)
 {
     /// <summary>The shortest new password accepted.</summary>
-    public const int MinLength = 12;
+    public const int MinLength = 8;
     public const string HttpClientName = "pwned-passwords";
 
     /// <summary>Why this password is refused, or null when it is accepted.</summary>

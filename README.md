@@ -27,24 +27,20 @@ docs/       what was agreed: start with CLAUDE.md, then docs/STANDARD-CHANGES.md
 
 ## Running it
 
-Everything but the screens runs in Docker; the .NET 10 SDK is needed only to work on the backend code.
+Everything runs in Docker, the screens included; the .NET 10 SDK and Node are needed only to change the code.
 
 On Windows (PowerShell), from the repository folder:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File deploy\init-env.ps1                 # once: random passwords into deploy\.env (never committed)
-docker compose -f deploy/compose.yaml --profile app up -d --build
+docker compose -f deploy/compose.yaml --profile app up -d --build             # http://localhost:3080
 docker compose -f deploy/compose.yaml --profile app run --rm migrate seed-demo
-cd frontend
-Copy-Item .env.example .env                                                  # once
-npm install
-npm run dev                                                                  # http://localhost:3000
 ```
 
-On macOS or Linux the same, with `sh deploy/init-env.sh` and `cp .env.example .env`.
+On macOS or Linux the same, with `sh deploy/init-env.sh`.
 
-To run the screens in a container too (as on a server), add `--profile web` to the `up` command and open
-http://localhost:3080; then `npm run dev` is not needed.
+**Changing the screens** and seeing each change at once: in `frontend/`, once `Copy-Item .env.example .env` and
+`npm install`, then `npm run dev` (http://localhost:3000). It talks to the same backend.
 
 Demo passwords are all `demo1234`:
 

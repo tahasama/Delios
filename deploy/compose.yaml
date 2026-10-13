@@ -2,10 +2,9 @@
 # Every password comes from deploy/.env: create it once with  sh deploy/init-env.sh
 #
 #   docker compose -f deploy/compose.yaml up -d                 dependencies only; run the API with dotnet run
-#   docker compose -f deploy/compose.yaml --profile app up -d   dependencies, migrations, API and worker,
-#                                                                behind Caddy on :8080
+#   docker compose -f deploy/compose.yaml --profile app up -d   everything: dependencies, migrations, API, worker
+#                                                                and the screens on http://localhost:3080
 #   add --scale api=2 --scale worker=2                           more nodes; Caddy and Prometheus find them
-#   add --profile web                                            the screens too, on http://localhost:3080
 #   add --profile monitoring                                     Prometheus :9090, Alertmanager :9093, Grafana :3301
 
 name: delios
@@ -45,7 +44,7 @@ x-backend: &backend
     Email__Reviews: ${EMAIL_REVIEWS:-true}
     Email__Notifications: ${EMAIL_NOTIFICATIONS:-true}
     Email__From: ${EMAIL_FROM:-delios@localhost}
-    Email__BaseUrl: ${PUBLIC_URL:-http://localhost:3000}
+    Email__BaseUrl: ${PUBLIC_URL:-http://localhost:3080}
     Email__Smtp__Host: ${SMTP_HOST:-}
     Email__Smtp__Port: ${SMTP_PORT:-587}
     Email__Smtp__User: ${SMTP_USER:-}
@@ -209,14 +208,14 @@ services:
     depends_on: [api]
 
   # The screens, behind Caddy at SITE_ADDRESS (http://localhost:3080 here).
-  # Not needed while working on them with `npm run dev`.
+  # Started with the rest of the app; `npm run dev` is only for changing them.
   web:
     build:
       context: ../frontend
       args:
         NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${TURNSTILE_SITE_KEY:-}
     image: delios-web
-    profiles: [web]
+    profiles: [app]
     restart: unless-stopped
     environment:
       DELIOS_API_URL: http://caddy:8080

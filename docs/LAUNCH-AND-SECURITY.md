@@ -7,7 +7,7 @@ on the provider's own page before you pay.
 Short version:
 - **Fixed now:** uploaded files could run script when opened. See section 6.
 - **Done:** security headers on every page (section 6); internal service ports reachable from the machine
-  itself only (section 8); the screens run in a container behind Caddy (`--profile web`).
+  itself only (section 8); the screens run in a container behind Caddy, started with the rest of the app.
 - **Add before launch:** Cloudflare in front (section 3). Also have the legal documents written (section 1).
 - **Already in place:** sign-in limits, ownership checks on every request, IDs that cannot be guessed, an
   organization wall inside the database, and an audit trail.
@@ -111,7 +111,7 @@ first email goes out.
 | **Rate limits on sign-in** | Done in the backend: 10 sign-ins a minute per IP, the same for the two-step code, and the account locks after repeated wrong passwords or codes. | A Cloudflare rate-limiting rule on `/api/auth/*`, so attacks are stopped before they reach the server. |
 | **Bot rules on high-value pages** | **Done:** Cloudflare Turnstile on sign-in, sign-up, forgot password and "send the link again", checked by the backend once per form. Off until the keys are set (`TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY`); if Cloudflare cannot be reached the request goes through and the sign-in limits still hold. | Super Bot Fight Mode at the edge. |
 | **Custom WAF rules (SQL injection, XSS, query strings, form fields, path traversal)** | In the app: every database query takes its values as parameters; the screens escape everything they show; stored file names are random IDs, never a path someone typed. | The Cloudflare managed rules (Pro) as the outer layer. Add a custom rule that blocks `/api/admin/*` from countries you never work in. |
-| **Leaked passwords** | **Done:** every new password has at least 12 characters and is refused when it appears in known breaches (Have I Been Pwned; only the first 5 characters of its SHA-1 hash leave the server). If the list cannot be reached, the password is accepted. Passwords set before stay valid. | Nothing. |
+| **Leaked passwords** | **Done:** every new password has at least 8 characters and is refused when it appears in known breaches (Have I Been Pwned; only the first 5 characters of its SHA-1 hash leave the server). If the list cannot be reached, the password is accepted. Passwords set before stay valid. | Nothing. |
 | **Email confirmed at sign-up** | **Done**, while email is on: the organization's first administrator signs in only after opening the link (two days; it can be sent again). A password reset proves the address too. | Nothing. |
 | **New browser alert** | **Done:** a sign-in from a browser the account was never used from is emailed to the person (when, which browser, from where, what to do). The first browser is only remembered. | Nothing. |
 | **Two-step sign-in** | The backend already had it. **The sign-in page now asks for the code**, and walks people through first-time setup with recovery codes. | Encourage administrators to require it for their organization (the setting exists). |

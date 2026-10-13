@@ -39,7 +39,7 @@ export async function createVisitorAction(_prev: GuestState | undefined, formDat
   const password = String(formData.get("password") ?? "");
   const projectIds = formData.getAll("projectIds").map(String).filter(Boolean);
   if (!name || !email) return { error: "Name and email are required." };
-  if (password.length < 12) return { error: "A password has at least 12 characters." };
+  if (password.length < 8) return { error: "A password has at least 8 characters." };
   if (!projectIds.length) return { error: "Choose at least one project." };
   const [functions, parties] = await Promise.all([adminFunctions(), adminParties()]);
   const fn = functions.find((one) => one.id === functionId && one.active);
