@@ -9,10 +9,6 @@ import { APP_NAME } from "@/lib/core/standard";
 import { inputCls, btn } from "@/components/ui";
 import { MissingSummary } from "@/components/form";
 import { collectInvalid, type MissingField } from "@/app/(public)/form-validation";
-import { PROJECT_KINDS } from "@/lib/settings/profiles/kinds";
-import { CONTRACT_ROLES } from "@/lib/settings/profiles/roles";
-
-const KINDS = PROJECT_KINDS;
 
 export default function SignupPage() {
   const [state, formAction, pending] = useActionState(signupAction, undefined);
@@ -65,7 +61,7 @@ export default function SignupPage() {
           </div>
 
           <h2 className="text-xl font-semibold text-slate-900">Create an organization</h2>
-          <p className="mt-1 text-sm text-slate-500">Three things: who you are, what you call yourselves, and the first project.</p>
+          <p className="mt-1 text-sm text-slate-500">Two things: what your organization is called, and who you are. Projects come next, from inside.</p>
 
           <form
             action={formAction}
@@ -108,39 +104,6 @@ export default function SignupPage() {
                   <label htmlFor="confirm" className="mb-1 block text-xs font-medium text-slate-700">Confirm</label>
                   <input id="confirm" name="confirm" type="password" autoComplete="new-password" required minLength={8} className={inputCls} placeholder="repeat it" />
                 </div>
-              </div>
-            </fieldset>
-
-            <fieldset className="space-y-3">
-              <legend className="mb-1 text-[11px] font-semibold uppercase tracking-widest text-slate-400">
-                First project <span className="font-normal normal-case tracking-normal text-slate-400">— optional</span>
-              </legend>
-              <p className="-mt-1 text-[11px] text-slate-400">
-                Leave this blank to decide later. You can add people first and open the project when you know what it is.
-              </p>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_130px]">
-                <div>
-                  <label htmlFor="projectName" className="mb-1 block text-xs font-medium text-slate-700">Project name</label>
-                  <input id="projectName" name="projectName" defaultValue={v.projectName} className={inputCls} placeholder="North plant upgrade" />
-                </div>
-                <div>
-                  <label htmlFor="projectCode" className="mb-1 block text-xs font-medium text-slate-700">Code</label>
-                  <input id="projectCode" name="projectCode" defaultValue={v.projectCode ?? ""} className={`${inputCls} uppercase`} placeholder="P1" />
-                </div>
-              </div>
-              <div>
-                <label htmlFor="projectKind" className="mb-1 block text-xs font-medium text-slate-700">Type</label>
-                <select id="projectKind" name="projectKind" defaultValue={v.projectKind ?? "GENERIC"} className={inputCls}>
-                  {KINDS.map((k) => <option key={k.code} value={k.code}>{k.label}</option>)}
-                </select>
-                <p className="mt-1 text-[11px] text-slate-400">Used for defaults only — it never changes how the rules behave.</p>
-              </div>
-              <div>
-                <label htmlFor="projectRole" className="mb-1 block text-xs font-medium text-slate-700">What your organization does on it</label>
-                <select id="projectRole" name="projectRole" defaultValue={v.projectRole ?? "GENERIC"} className={inputCls}>
-                  {CONTRACT_ROLES.map((r) => <option key={r.code} value={r.code}>{r.label}</option>)}
-                </select>
-                <p className="mt-1 text-[11px] text-slate-400">Decides where approval sits, and the distribution matrix this project starts from. Correctable afterwards.</p>
               </div>
             </fieldset>
 
