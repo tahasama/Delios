@@ -1,6 +1,7 @@
 import { cache } from "react";
 import type { Tenant } from "@/lib/core/tenant";
 import { projectSettings, holders } from "@/lib/settings/api";
+import { ESCALATE_AFTER_KEY, DEFAULT_ESCALATE_AFTER } from "@/lib/actions/escalation";
 
 /** Somebody on the project holds the control function. */
 async function hasControlFunction(t: Tenant): Promise<boolean> {
@@ -355,7 +356,11 @@ export async function policy(t: Tenant, key: string): Promise<string> {
 
 /** Every policy at once, for the screen that shows them. */
 export async function policies(t: Tenant): Promise<{ policy: Policy; value: string; set: boolean }[]> {
-  const chosen = await answers(t);
+  return policiesFrom(await answers(t));
+}
+
+/** Every policy, read from a set of answers: a project's, or the organization's defaults for new projects. */
+export function policiesFrom(chosen: Map<string, string>): { policy: Policy; value: string; set: boolean }[] {
   return POLICIES.map((one) => {
     const value = chosen.get(one.key);
     const allowed = one.options.map((option) => option.value);
@@ -367,16 +372,27 @@ export async function policies(t: Tenant): Promise<{ policy: Policy; value: stri
   });
 }
 
-/** Every answer at once, for the screen that shows them. */
-export async function controlSettings(t: Tenant): Promise<{
+/** Who carries out each act, as the screen shows it. */
+export type ControlReading = {
   /** The project has a control function, which is the answer until one is set. */
   follows: boolean;
   /** What the project answers for all of its acts, and whether that was set. */
   projectMode: ProjectMode;
   set: boolean;
   rows: { activity: ControlActivity; mode: ControlMode; controlDoes: boolean; off: boolean; confirm: boolean }[];
-}> {
+};
+
+/** Every answer at once, for the screen that shows them. */
+export async function controlSettings(t: Tenant): Promise<ControlReading> {
   const [byKey, follows] = await Promise.all([answers(t), hasControlFunction(t)]);
+  return controlFrom(byKey, follows);
+}
+
+/**
+ * Who carries out each act, read from a set of answers: a project's, or the organization's defaults for new projects
+ * (read as for a project with a control function, the usual case).
+ */
+export function controlFrom(byKey: Map<string, string>, follows: boolean): ControlReading {
   const all = byKey.get(PROJECT_KEY);
   const set = all === "CONTROL" || all === "SELF" || all === "CUSTOM";
   const projectMode: ProjectMode = set ? (all as ProjectMode) : follows ? "CONTROL" : "SELF";
@@ -398,4 +414,18 @@ export async function controlSettings(t: Tenant): Promise<{
       };
     }),
   };
+}
+
+/**
+ * What one stored answer amounts to, the app's own default standing in for no answer: so a project's answer and the
+ * defaults it is compared with read the same when they mean the same.
+ */
+export function effectiveAnswer(key: string, value: string | null | undefined): string {
+  if (value) return value;
+  const declared = POLICIES.find((one) => one.key === key);
+  if (declared) return declared.options[0].value;
+  if (key === ESCALATE_AFTER_KEY) return String(DEFAULT_ESCALATE_AFTER);
+  if (key.startsWith("CONFIRM:")) return "OFF";
+  if (key.startsWith("SKIP:")) return "ON";
+  return "FOLLOW";
 }

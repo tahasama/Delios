@@ -66,8 +66,11 @@ People            everyone in our organization, which projects each is on (ours 
 Companies         the organizations we work with: collaborators (linked), guests, not on DELIOS.
                   Invitations we sent, invitations we received (accept or refuse).
 Defaults          the configuration a new project of ours starts with: who does what, how the project
-                  works. Copied when the project is opened; the project then changes it freely.
-                  Changing the defaults later changes only projects opened afterwards.
+                  works (/organization/defaults). Changed there directly, each answer marked the app's
+                  or ours; can start from one project's choices; "Reset to the app's defaults".
+                  Copied when the project is opened; the project then changes it freely, each answer
+                  marked "as the defaults" or "changed here", and "Reset to the organization's defaults"
+                  puts it back. Changing the defaults later changes only projects opened afterwards.
                   A project we join follows its owner's configuration.
 Security, audit   sign-in rules for the whole organization; the audit trail of all its projects.
 ```
@@ -75,8 +78,24 @@ Security, audit   sign-in rules for the whole organization; the audit trail of a
 ## Our role in a project
 
 Optional, said when the project is opened (ours) or when we take part (theirs). The list of roles is the
-organization's published list, CONTRACT_ROLES. Codes never change once used: new roles are added only
-with the owner's approval.
+organization's published list, CONTRACT_ROLES; until it is published, the app's own stand in:
+
+```
+GENERIC        Not stated
+EPC            EPC — engineer, procure, construct
+EPCM           EPCM — engineer, procure, construction management
+PMC            PMC — project management consultancy
+DESIGN         Design office / architect
+OWNER          Owner / operator
+CM             Construction management
+CONTRACTOR     Main contractor (builds only)
+SUBCONTRACTOR  Subcontractor
+SUPPLIER       Supplier / manufacturer / vendor
+INSPECTOR      Third-party inspector / certifier
+```
+
+Codes never change once used: new roles are added only with the owner's approval (frontend
+`lib/settings/profiles/roles.ts`, each with its starting matrix, and backend `BuiltInRoles`).
 
 ## Steps
 

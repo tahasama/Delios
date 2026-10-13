@@ -191,7 +191,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
             const here = u.memberships.find((m) => m.projectId === projectId);
             const elsewhere = u.memberships.filter((m) => m.projectId !== projectId);
             return (
-              <tr key={u.id} className={u.active ? "align-top" : "align-top opacity-50"}>
+              <tr key={u.id} id={`person-${u.id}`} className={u.active ? "scroll-mt-20 align-top target:bg-tint-soft" : "scroll-mt-20 align-top opacity-50 target:bg-tint-soft"}>
                 <Td>
                   <span className="font-medium text-slate-800">{u.name}</span>{u.id === me.id ? <span className="ml-1 text-xs text-slate-400">(you)</span> : null}
                   <span className="block text-[11px] text-slate-400">{u.email}{u.active ? "" : " · switched off"}</span>

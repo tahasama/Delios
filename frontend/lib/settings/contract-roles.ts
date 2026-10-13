@@ -4,9 +4,9 @@ import { CONTRACT_ROLES } from "@/lib/settings/profiles/roles";
 /**
  * The contract roles this organization offers.
  *
- * The seven the app ships are published as a value set like everything else, so
+ * The roles the app ships are published as a value set like everything else, so
  * an administrator adds a role the same way they add a discipline — with its own
- * definition, and with its rows written in the matrix afterwards. Only the seven
+ * definition, and with its rows written in the matrix afterwards. Only those
  * carry a starting matrix; anything added starts empty, which is honest: the app
  * has no opinion about a role it has never heard of.
  *

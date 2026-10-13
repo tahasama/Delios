@@ -136,6 +136,7 @@ export async function makeDefaultsAction(_prev: Result | undefined, formData: Fo
     return failed(e);
   }
   revalidatePath("/organization");
+  revalidatePath("/organization/defaults");
   return { ok: `New projects now start with ${project.code}'s choices. Projects already open keep theirs.` };
 }
 
@@ -148,4 +149,20 @@ export async function bringOverAction(_prev: Result | undefined, formData: FormD
   }
   revalidatePath("/organization");
   return { ok: "Brought over. They sign in here from now on, with the same password, and keep their projects there." };
+}
+
+/** The defaults for new projects are forgotten: a project opened afterwards starts with the app's own. */
+export async function resetDefaultsAction(_prev: Result | undefined, _formData: FormData): Promise<Result> {
+  const { requireOrgAdmin } = await import("@/lib/core/org-scope");
+  const { DEFAULTS_KEY } = await import("@/lib/organization/defaults");
+  const { setOrgSetting } = await import("@/lib/settings/api");
+  await requireOrgAdmin();
+  try {
+    await setOrgSetting(DEFAULTS_KEY, null);
+  } catch (e) {
+    return failed(e);
+  }
+  revalidatePath("/organization");
+  revalidatePath("/organization/defaults");
+  return { ok: "Back on the app's own defaults. Projects already open keep theirs." };
 }

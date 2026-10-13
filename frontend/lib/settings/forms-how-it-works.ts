@@ -20,6 +20,7 @@ import {
   CONFIRMABLE,
   CONFIRM_KEY,
   actIsOff,
+  effectiveAnswer,
   MODE_LABEL,
   POLICIES,
   PROJECT_KEY,
@@ -50,28 +51,74 @@ async function put(key: string, mode: string, _label: string): Promise<boolean> 
 }
 
 /**
+ * The same form answers for a project, or for the organization's defaults for new projects (`target=defaults`,
+ * administrators of the organization). The answers are saved where the form came from; null forgets one.
+ */
+async function save(formData: FormData, wanted: [key: string, value: string | null][]): Promise<number> {
+  if (String(formData.get("target") ?? "") !== "defaults") {
+    const ctx = await requireAdminScope();
+    let changed = 0;
+    for (const [key, value] of wanted) {
+      if (((await projectSettings(ctx.projectId)).get(key) ?? null) === value) continue;
+      await setProjectSetting(ctx.projectId, key, value);
+      changed++;
+    }
+    return changed;
+  }
+  const { requireOrgAdmin } = await import("@/lib/core/org-scope");
+  const { projectDefaults, DEFAULTS_KEY } = await import("@/lib/organization/defaults");
+  const scope = await requireOrgAdmin();
+  const before = await projectDefaults();
+  const values = { ...(before?.values ?? {}) };
+  let changed = 0;
+  for (const [key, asked] of wanted) {
+    // The app's own answer is not kept: the defaults hold only what differs from it.
+    const value = asked !== null && asked === effectiveAnswer(key, null) ? null : asked;
+    if ((values[key] ?? null) === value) continue;
+    if (value === null) delete values[key]; else values[key] = value;
+    changed++;
+  }
+  if (changed) {
+    await setOrgSetting(DEFAULTS_KEY, JSON.stringify({ fromProject: before?.fromProject ?? null, edited: true, at: new Date().toISOString(), by: scope.user.name, values }));
+  }
+  return changed;
+}
+
+function revalidateHowItWorks() {
+  revalidatePath("/settings/control");
+  revalidatePath("/settings/flow");
+  revalidatePath("/organization");
+  revalidatePath("/organization/defaults");
+}
+
+/**
  * The screen, saved in one go: the project's answer, and — when that answer is
- * "it depends" — each act's own.
+ * "it depends" — each act's own. For the defaults, "as each project is set up"
+ * (FOLLOW) forgets the answer.
  */
 export async function setControlActivitiesAction(_prev: State | undefined, formData: FormData): Promise<State> {
-  const asked = String(formData.get("projectMode") ?? "") as ProjectMode;
-  if (!PROJECT_MODES.includes(asked)) return { error: "Choose who carries these acts out." };
+  const asked = String(formData.get("projectMode") ?? "") as ProjectMode | "FOLLOW";
+  const defaults = String(formData.get("target") ?? "") === "defaults";
+  if (!PROJECT_MODES.includes(asked as ProjectMode) && !(defaults && asked === "FOLLOW")) return { error: "Choose who carries these acts out." };
 
-  let changed = await put(PROJECT_KEY, asked, "Who carries out the acts of document control");
+  const wanted: [string, string | null][] = [[PROJECT_KEY, asked === "FOLLOW" ? null : asked]];
   if (asked === "CUSTOM") {
     for (const activity of CONTROL_ACTIVITIES) {
       const value = String(formData.get(`mode:${activity.key}`) ?? "") as ControlMode;
-      if (!ACT_MODES.includes(value)) continue;
-      if (await put(activity.key, value, activity.title)) changed = true;
+      if (ACT_MODES.includes(value)) wanted.push([activity.key, value]);
     }
   }
   // Management's confirmation is its own answer, kept whichever way the acts are carried out.
-  for (const key of Object.keys(CONFIRMABLE)) {
-    if (await put(CONFIRM_KEY(key), formData.get(`confirm:${key}`) === "on" ? "ON" : "OFF", `${key} — management confirms`)) changed = true;
+  for (const key of Object.keys(CONFIRMABLE)) wanted.push([CONFIRM_KEY(key), formData.get(`confirm:${key}`) === "on" ? "ON" : "OFF"]);
+  let changed: number;
+  try {
+    changed = await save(formData, wanted);
+  } catch (e) {
+    return { error: refusal(e).message };
   }
-  revalidatePath("/settings/control");
-  revalidatePath("/settings/flow");
+  revalidateHowItWorks();
   if (!changed) return { ok: "Nothing changed." };
+  if (asked === "FOLLOW") return { ok: "Saved — each new project follows whether it has Document Control." };
   return {
     ok: asked === "CUSTOM"
       ? `Saved — act by act. ${CONTROL_ACTIVITIES.length} acts, each with its own answer.`
@@ -85,24 +132,61 @@ export async function setControlActivitiesAction(_prev: State | undefined, formD
  * Both are genuine choices, and the app holds an opinion rather than a rule.
  */
 export async function setPolicyAction(_prev: State | undefined, formData: FormData): Promise<State> {
-  const changed: string[] = [];
+  const wanted: [string, string | null][] = [];
+  const said: string[] = [];
   for (const one of POLICIES) {
     const asked = String(formData.get(one.key) ?? "");
     if (!one.options.some((option) => option.value === asked)) continue;
-    if (await put(one.key, asked, one.title)) {
-      changed.push(one.options.find((option) => option.value === asked)!.label.toLowerCase());
-    }
+    wanted.push([one.key, asked]);
+    said.push(one.options.find((option) => option.value === asked)!.label.toLowerCase());
   }
   const escalate = String(formData.get(ESCALATE_AFTER_KEY) ?? "").trim();
   if (escalate) {
     const days = Number(escalate);
     if (!Number.isInteger(days) || days < 1 || days > 60) return { error: "Escalate after 1 to 60 working days." };
-    if (await put(ESCALATE_AFTER_KEY, String(days), "Escalating a discipline that has not answered")) changed.push(`escalate after ${days} working days`);
+    wanted.push([ESCALATE_AFTER_KEY, String(days)]);
+    said.push(`escalate after ${days} working days`);
   }
-  revalidatePath("/settings/control");
-  revalidatePath("/settings/flow");
-  if (!changed.length) return { ok: "Nothing changed." };
-  return { ok: `Saved: ${changed.join("; ")}.` };
+  let changed: number;
+  try {
+    changed = await save(formData, wanted);
+  } catch (e) {
+    return { error: refusal(e).message };
+  }
+  revalidateHowItWorks();
+  if (!changed) return { ok: "Nothing changed." };
+  return { ok: `Saved: ${said.join("; ")}.` };
+}
+
+/**
+ * Puts the project back on the organization's defaults for new projects (or, where it has none, on the app's own):
+ * every answer about how the project works is set to the default's, and an answer the defaults do not give is
+ * forgotten. What the project is, and checks ticked off on it, stay.
+ */
+export async function resetProjectToDefaultsAction(_prev: State | undefined, _formData: FormData): Promise<State> {
+  const ctx = await requireAdminScope();
+  const { projectDefaults, isProjectOwn } = await import("@/lib/organization/defaults");
+  const defaults = await projectDefaults();
+  const values = defaults?.values ?? {};
+  let changed = 0;
+  try {
+    for (const [key, value] of await projectSettings(ctx.projectId)) {
+      if (isProjectOwn(key) || key in values || !value) continue;
+      await setProjectSetting(ctx.projectId, key, null);
+      changed++;
+    }
+    const now = await projectSettings(ctx.projectId);
+    for (const [key, value] of Object.entries(values)) {
+      if (now.get(key) === value) continue;
+      await setProjectSetting(ctx.projectId, key, value);
+      changed++;
+    }
+  } catch (e) {
+    return { error: refusal(e).message };
+  }
+  revalidateHowItWorks();
+  if (!changed) return { ok: "Nothing changed: the project already works as the defaults say." };
+  return { ok: defaults ? "Back on the organization's defaults." : "Back on the app's own defaults: the organization has set none." };
 }
 
 /** One act, changed on its own while the project is on "it depends". */

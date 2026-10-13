@@ -48,7 +48,7 @@ export default async function AdminPartiesPage() {
           <Card title={`Organizations (${parties.length})`}>
             <DataTable head={<tr><Th>Code</Th><Th>Name</Th><Th>Type</Th><Th label="How they work with us">How they work with us</Th><Th>Who answers for it</Th><Th>People</Th><Th></Th></tr>}>
               {parties.map((p) => (
-                <tr key={p.id} className={p.active ? "align-top" : "align-top opacity-60"}>
+                <tr key={p.id} id={`party-${p.id}`} className={p.active ? "scroll-mt-20 align-top target:bg-tint-soft" : "scroll-mt-20 align-top opacity-60 target:bg-tint-soft"}>
                   <Td className="font-mono text-xs font-semibold">{p.code}</Td>
                   <Td>{p.name}</Td>
                   <Td><Chip className={p.isInternal ? "bg-sky-100 text-sky-800 ring-sky-300" : "bg-violet-100 text-violet-800 ring-violet-300"}>{p.isInternal ? "our organization" : "external"}</Chip></Td>

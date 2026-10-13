@@ -1,13 +1,14 @@
 import Link from "next/link";
 import { requireOrgAdmin } from "@/lib/core/org-scope";
-import { logoutAction } from "@/lib/account/forms-sign-in";
 import { ActionForm } from "@/components/form";
-import { Card, DataTable, Th, Td, Chip, Field, inputCls, btn } from "@/components/ui";
-import { ArrowLeft, LogOut } from "lucide-react";
+import { Card, DataTable, Th, Td, Chip, Field, inputCls } from "@/components/ui";
 import { adminParties, adminProjects, adminUsers } from "@/lib/settings/api-admin";
 import { organizationLinks, joinedProjects, guestAccounts } from "@/lib/organization/api";
 import { projectDefaults } from "@/lib/organization/defaults";
-import { acceptLinkAction, refuseLinkAction, endLinkAction, joinPersonAction, makeDefaultsAction, bringOverAction } from "@/lib/organization/forms";
+import { acceptLinkAction, refuseLinkAction, endLinkAction, joinPersonAction, bringOverAction, switchOrganizationAction } from "@/lib/organization/forms";
+import { switchProjectAction } from "@/lib/settings/forms-project-switch";
+import { POLICIES, effectiveAnswer } from "@/lib/settings/control-activities";
+import { OrgHeader } from "./org-header";
 import { PARTY_KINDS } from "@/lib/settings/party-kinds";
 import { contractRoleOptions } from "@/lib/settings/contract-roles";
 import { fmtDate } from "@/lib/core/utils";
@@ -40,6 +41,9 @@ export default async function OrganizationPage() {
     PARTY_KINDS.find((k) => k.value === (kind === "NOT_ON_DELIOS" ? "OFFLINE" : kind))?.label ?? "—";
   /** Where each of our people works elsewhere: the projects of other organizations' they are on. */
   const elsewhereOf = (userId: string) => joined.filter((p) => p.ourPeople.some((one) => one.userId === userId && one.active));
+  /** I am on this project of ours: opening it is one click. */
+  const onIt = (projectId: string) => users.some((one) => one.id === scope.user.id && one.memberships.some((m) => m.active && m.projectId === projectId));
+  const changedCount = Object.entries(defaults?.values ?? {}).filter(([key, value]) => value !== effectiveAnswer(key, null)).length;
   const history = links.filter((one) => one.state === "REFUSED" || one.state === "ENDED");
   // Guest accounts other organizations made for our people before we linked: brought over, they sign in here.
   const linkedAsGuest = links.filter((one) => one.side === "GUEST" && one.state === "LINKED");
@@ -47,19 +51,7 @@ export default async function OrganizationPage() {
 
   return (
     <div className="min-h-screen bg-canvas">
-      <header className="border-b border-line bg-surface">
-        <div className="mx-auto flex max-w-6xl items-center gap-3 px-6 py-4">
-          <span className="grid h-10 w-10 place-items-center rounded-xl bg-brand text-sm font-black text-white">D</span>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-bold text-slate-900">{scope.organization.name}</p>
-            <p className="text-[11px] text-slate-400">Organization · {scope.user.name}</p>
-          </div>
-          {scope.projectCount ? (
-            <Link href="/" className={btn("ghost", "sm")}><ArrowLeft className="h-4 w-4" /> Back to projects</Link>
-          ) : <Link href="/setup" className={btn("ghost", "sm")}><ArrowLeft className="h-4 w-4" /> Set up</Link>}
-          <form action={logoutAction}><button type="submit" className={btn("ghost", "sm")}><LogOut className="h-4 w-4" /> Sign out</button></form>
-        </div>
-      </header>
+      <OrgHeader scope={scope} />
 
       <main className="mx-auto max-w-6xl space-y-5 px-6 py-6">
         {received.length ? (
@@ -89,17 +81,42 @@ export default async function OrganizationPage() {
           <p className="mb-3 text-xs text-slate-500">Ours, opened by us, and those of other organizations we take part in.</p>
           <DataTable head={<tr><Th>Project</Th><Th>Whose</Th><Th>Our role</Th><Th>Status</Th><Th>Our people on it</Th></tr>}>
             {projects.map((p) => (
-              <tr key={p.id}>
-                <Td><span className="font-mono text-xs font-semibold">{p.code}</span> <span className="text-xs text-slate-600">{p.name}</span></Td>
+              <tr key={p.id} id={`project-${p.id}`} className="scroll-mt-4 target:bg-tint-soft">
+                <Td>
+                  {onIt(p.id) ? (
+                    <form action={switchProjectAction}>
+                      <input type="hidden" name="projectId" value={p.id} />
+                      <button type="submit" className="text-left hover:underline" title={`Open ${p.code}`}>
+                        <span className="font-mono text-xs font-semibold text-link">{p.code}</span> <span className="text-xs text-slate-600">{p.name}</span>
+                      </button>
+                    </form>
+                  ) : (
+                    <><span className="font-mono text-xs font-semibold">{p.code}</span> <span className="text-xs text-slate-600">{p.name}</span>
+                      <span className="block text-[11px] text-slate-400">you are not on it</span></>
+                  )}
+                </Td>
                 <Td className="text-xs">ours</Td>
                 <Td className="text-xs">{roleLabel(p.contractRole === "GENERIC" ? null : p.contractRole) ?? <span className="text-slate-400">not stated</span>}</Td>
                 <Td className="text-xs">{p.status.toLowerCase()}</Td>
-                <Td className="tabular-nums text-xs">{p.members}</Td>
+                <Td className="tabular-nums text-xs">{scope.projectCount ? <Link href={`/settings/users?project=${p.id}`} className="text-link hover:underline">{p.members}</Link> : p.members}</Td>
               </tr>
             ))}
             {joined.map((p) => (
-              <tr key={`${p.linkId}-${p.projectId}`} className="align-top">
-                <Td><span className="font-mono text-xs font-semibold">{p.code}</span> <span className="text-xs text-slate-600">{p.name}</span></Td>
+              <tr key={`${p.linkId}-${p.projectId}`} id={`project-${p.projectId}`} className="scroll-mt-4 align-top target:bg-tint-soft">
+                <Td>
+                  {p.ourPeople.some((one) => one.userId === scope.user.id && one.active) ? (
+                    <form action={switchOrganizationAction}>
+                      <input type="hidden" name="tenantId" value={p.hostTenantId} />
+                      <input type="hidden" name="projectId" value={p.projectId} />
+                      <button type="submit" className="text-left hover:underline" title={`Open ${p.code} at ${p.hostOrganization}`}>
+                        <span className="font-mono text-xs font-semibold text-link">{p.code}</span> <span className="text-xs text-slate-600">{p.name}</span>
+                      </button>
+                    </form>
+                  ) : (
+                    <><span className="font-mono text-xs font-semibold">{p.code}</span> <span className="text-xs text-slate-600">{p.name}</span>
+                      <span className="block text-[11px] text-slate-400">you are not on it</span></>
+                  )}
+                </Td>
                 <Td className="text-xs">{p.hostOrganization}</Td>
                 <Td className="text-xs">{roleLabel(p.role) ?? <span className="text-slate-400">not stated</span>}</Td>
                 <Td className="text-xs">{p.status.toLowerCase()}</Td>
@@ -108,7 +125,7 @@ export default async function OrganizationPage() {
                     <ul className="space-y-1">
                       {p.ourPeople.map((person) => (
                         <li key={person.userId} className="flex flex-wrap items-center gap-2">
-                          <span className={person.active ? "text-slate-700" : "text-slate-400 line-through"}>{person.name}</span>
+                          <a href={`#person-${person.userId}`} className={person.active ? "text-slate-700 hover:underline" : "text-slate-400 line-through"}>{person.name}</a>
                           <span className="text-[11px] text-slate-400">{person.function}</span>
                           {person.active ? (
                             <ActionForm action={joinPersonAction} hideSubmit hidden={{ linkId: p.linkId, projectId: p.projectId, userId: person.userId, active: "off" }} className="space-y-0">
@@ -145,11 +162,16 @@ export default async function OrganizationPage() {
         <Card title={`People (${ours.filter((one) => one.active).length})`}>
           <DataTable head={<tr><Th>Name</Th><Th>Email</Th><Th>Our projects</Th><Th>Other organizations&rsquo; projects</Th><Th>Two-step sign-in</Th><Th>Access</Th></tr>}>
             {ours.map((u) => (
-              <tr key={u.id} className={u.active ? "align-top" : "align-top opacity-60"}>
-                <Td className="text-xs font-semibold text-slate-800">{u.name}{u.isAdmin ? <span className="ml-1 font-normal text-slate-400">· administrator</span> : null}</Td>
+              <tr key={u.id} id={`person-${u.id}`} className={u.active ? "scroll-mt-4 align-top target:bg-tint-soft" : "scroll-mt-4 align-top opacity-60 target:bg-tint-soft"}>
+                <Td className="text-xs font-semibold text-slate-800">
+                  {scope.projectCount ? <Link href={`/settings/users#person-${u.id}`} className="text-link hover:underline">{u.name}</Link> : u.name}{u.isAdmin ? <span className="ml-1 font-normal text-slate-400">· administrator</span> : null}</Td>
                 <Td className="text-xs text-slate-500">{u.email}</Td>
-                <Td className="text-xs">{u.memberships.filter((m) => m.active).map((m) => `${m.projectCode} (${m.functionName})`).join(", ") || <span className="text-slate-400">—</span>}</Td>
-                <Td className="text-xs">{elsewhereOf(u.id).map((p) => `${p.code} at ${p.hostOrganization}`).join(", ") || <span className="text-slate-400">—</span>}</Td>
+                <Td className="text-xs">{u.memberships.filter((m) => m.active).map((m, i) => (
+                  <span key={m.projectId}>{i ? ", " : ""}<a href={`#project-${m.projectId}`} className="hover:underline">{m.projectCode}</a> ({m.functionName})</span>
+                ))}{u.memberships.some((m) => m.active) ? null : <span className="text-slate-400">—</span>}</Td>
+                <Td className="text-xs">{elsewhereOf(u.id).map((p, i) => (
+                  <span key={`${p.linkId}-${p.projectId}`}>{i ? ", " : ""}<a href={`#project-${p.projectId}`} className="hover:underline">{p.code}</a> at {p.hostOrganization}</span>
+                ))}{elsewhereOf(u.id).length ? null : <span className="text-slate-400">—</span>}</Td>
                 <Td className="text-xs">{u.mfa ? "on" : <span className="text-slate-400">off</span>}</Td>
                 <Td className="text-xs">{u.active ? (u.lockedUntil ? <span className="text-amber-700">locked</span> : "active") : "switched off"}</Td>
               </tr>
@@ -162,7 +184,14 @@ export default async function OrganizationPage() {
           <DataTable head={<tr><Th>Organization</Th><Th>How they work with us</Th><Th>Their DELIOS</Th></tr>}>
             {outside.map((p) => (
               <tr key={p.id} className={p.active ? "" : "opacity-60"}>
-                <Td><span className="font-mono text-xs font-semibold">{p.code}</span> <span className="text-xs text-slate-600">{p.name}</span></Td>
+                <Td>
+                  {scope.projectCount ? (
+                    <Link href={`/settings/parties#party-${p.id}`} className="hover:underline">
+                      <span className="font-mono text-xs font-semibold text-link">{p.code}</span> <span className="text-xs text-slate-600">{p.name}</span>
+                    </Link>
+                  ) : <><span className="font-mono text-xs font-semibold">{p.code}</span> <span className="text-xs text-slate-600">{p.name}</span></>}
+                  {scope.projectCount ? <Link href={`/settings/users?org=${p.id}`} className="ml-2 text-[11px] text-slate-400 hover:underline">their people</Link> : null}
+                </Td>
                 <Td className="text-xs">{kindLabel(p.kind)}</Td>
                 <Td className="text-xs">{p.link ? (p.link.state === "LINKED" ? `linked to ${p.link.organization}` : `invited; ${p.link.organization} has not answered`) : <span className="text-slate-400">not linked</span>}</Td>
               </tr>
@@ -218,25 +247,19 @@ export default async function OrganizationPage() {
           {scope.projectCount ? <p className="mt-2 text-[11px] text-slate-400">Add organizations, invite them to link, and say which take part in each project in <Link href="/settings/parties" className="font-semibold text-link hover:underline">Organizations</Link>.</p> : null}
         </Card>
 
-        <Card title="Defaults for new projects">
+        <Card title="Defaults for new projects" actions={<Link href="/organization/defaults" className="text-xs font-semibold text-link hover:underline">See and change them</Link>}>
           <p className="text-xs text-slate-600">
             {defaults
-              ? <>New projects start with {defaults.fromProject}&rsquo;s choices (who does what, how the project works), set {fmtDate(defaults.at)} by {defaults.by}: {Object.keys(defaults.values).length} answers.</>
-              : "No defaults yet: a new project starts with the app's own."}
-            {" "}Each project then changes them freely; changing the defaults never changes a project already open. A project of another organization&rsquo;s follows its owner.
+              ? <>{defaults.fromProject ? <>Taken from {defaults.fromProject}{defaults.edited ? ", then changed" : ""}</> : "Set here"}; last changed {fmtDate(defaults.at)} by {defaults.by}. {changedCount} answer{changedCount === 1 ? "" : "s"} differ from the app&rsquo;s own.</>
+              : "None set: a new project starts with the app's own."}
+            {" "}Each project then changes them freely, and can go back to them; changing the defaults never changes a project already open. A project of another organization&rsquo;s follows its owner.
           </p>
-          {projects.length ? (
-            <div className="mt-3 max-w-md">
-              <ActionForm action={makeDefaultsAction} submitLabel="Make its choices the defaults" size="sm">
-                <Field label="Project" required>
-                  <select name="projectId" required defaultValue="" className={inputCls}>
-                    <option value="" disabled>Choose…</option>
-                    {projects.filter((p) => p.status === "ACTIVE").map((p) => <option key={p.id} value={p.id}>{p.code} — {p.name}</option>)}
-                  </select>
-                </Field>
-              </ActionForm>
-            </div>
-          ) : null}
+          <ul className="mt-2 space-y-0.5 text-xs text-slate-600">
+            {POLICIES.map((one) => {
+              const value = defaults?.values[one.key] ?? one.options[0].value;
+              return <li key={one.key}><span className="text-slate-500">{one.title}:</span> {one.options.find((o) => o.value === value)?.label ?? value}</li>;
+            })}
+          </ul>
         </Card>
 
         {scope.projectCount ? (

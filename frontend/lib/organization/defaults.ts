@@ -9,10 +9,11 @@ import { orgSettings, projectSettings, setProjectSetting } from "@/lib/settings/
  */
 export const DEFAULTS_KEY = "PROJECT_DEFAULTS";
 
-export type ProjectDefaults = { fromProject: string; at: string; by: string; values: Record<string, string> };
+/** Taken from one project (`fromProject`), and possibly changed by hand since (`edited`). */
+export type ProjectDefaults = { fromProject: string | null; edited?: boolean; at: string; by: string; values: Record<string, string> };
 
 /** What belongs to one project only, never a default: what it is, and checks ticked off on it. */
-const OWN = (key: string) => key === "PROJECT_INFO" || key.startsWith("CHECK_OFF:");
+export const isProjectOwn = (key: string) => key === "PROJECT_INFO" || key.startsWith("CHECK_OFF:");
 
 export async function projectDefaults(): Promise<ProjectDefaults | null> {
   const raw = (await orgSettings()).get(DEFAULTS_KEY);
@@ -23,7 +24,7 @@ export async function projectDefaults(): Promise<ProjectDefaults | null> {
 /** A project's own choices, as defaults would hold them. */
 export async function defaultsFrom(projectId: string): Promise<Record<string, string>> {
   const values: Record<string, string> = {};
-  for (const [key, value] of await projectSettings(projectId)) if (!OWN(key) && value) values[key] = value;
+  for (const [key, value] of await projectSettings(projectId)) if (!isProjectOwn(key) && value) values[key] = value;
   return values;
 }
 

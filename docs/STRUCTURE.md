@@ -84,7 +84,7 @@ frontend/
 │   │   ├── setup/        after registering an organization: add people, open the first project
 │   │   ├── no-project/   on no project yet (lists other organizations' projects they work on)
 │   │   └── organization/ the organization's admin page: projects (ours and joined), people,
-│   │                     organizations we work with, invitations, defaults for new projects
+│   │                     organizations we work with, invitations; + defaults/ (defaults for new projects)
 │   ├── (app)/            inside a project
 │   │   ├── layout.tsx    the frame: menu, project switcher, theme
 │   │   ├── page.tsx      Home (with home-parts.tsx, tally.tsx)
@@ -118,7 +118,8 @@ frontend/
 │
 ├── components/           only the pieces several areas use
 │                         (ui.tsx: buttons and fields; form, data-table, timeline, search-pick,
-│                          send-for-review, notify-panel, preflight…)
+│                          send-for-review, notify-panel, preflight, how-it-works: the form a project's
+                         Control room and the organization's defaults share)
 ├── public/               files served as they are (sw.js, for pop-up notifications)
 ├── scripts/              demo-schedule.mjs (fills a demo), gen-theme.mjs
 └── Dockerfile            builds the screens into an image

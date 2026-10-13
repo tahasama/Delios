@@ -144,6 +144,9 @@ a screen only words it. A new rule goes in the backend, never in a page.
   "for information" → we hold it; "accepted with comments" or "rejected" →
   they hold it (read from the verdict's meaning, never its code). What it is
   issued for is set automatically from the request.
+  Whenever it passes to them (our check returns it, a review rejects it or releases
+  it with comments), the supplier's people on the project are told, and it is on
+  their Home (returned / next revision due).
 - Every document registered with an outside organization as its originator is
   filed in that supplier's package, one per supplier and purchase order, made
   by itself with the first document (`SupplyFiling`) only when that supplier has
@@ -234,7 +237,7 @@ a screen only words it. A new rule goes in the backend, never in a page.
   ready (released), submitted (received, accepted, in review), overdue · N
   days, due today, at risk · N days left (inside the risk window), in N days.
 - A supplier sees, of our schedule, only "Where your documents are needed"
-  (`/needed`, in its menu as Schedule; `/supplier-schedule`): the actions that
+  (`/needed`, in its menu as "Schedule & actions" like ours; `/supplier-schedule`): the actions that
   need its documents, and in each only its own documents, with their stamps
   in its words and the planned-date state. Never other documents,
   disciplines, confirmations, notices, or why an action moved; a postponed one
@@ -313,8 +316,16 @@ a screen only words it. A new rule goes in the backend, never in a page.
   at home and switch in and back (`POST /api/auth/switch`; the 7 days run from the sign-in). Switched off
   at home, or the link ended: those accounts stop.
 - The organization's page (`/organization`, administrators): projects ours and joined, people, organizations
-  we work with, invitations (also on Home), defaults for new projects (one project's choices, copied
-  when a project opens, never changing one already open; a joined project follows its owner).
+  we work with, invitations (also on Home), defaults for new projects. Its projects, people and organizations
+  are links (open or switch into a project; People & access; Organizations).
+- Defaults for new projects (`/organization/defaults`, `PROJECT_DEFAULTS`): edited directly with the same form
+  as a project's Control room (`components/how-it-works.tsx`), or taken from one project; they keep only what
+  differs from the app's own; "Reset to the app's defaults". Copied when a project opens, never changing one
+  already open; a joined project follows its owner. A project marks each answer "as the defaults" / "the
+  app's" / "changed here" and has "Reset to the organization's defaults" (what the project is, and checks
+  ticked off, stay).
+- Roles on a project (CONTRACT_ROLES): GENERIC, EPC, EPCM, PMC, DESIGN, OWNER, CM, CONTRACTOR, SUBCONTRACTOR,
+  SUPPLIER, INSPECTOR (docs/ORGANIZATIONS.md). New ones only with the owner's approval.
 
 ### Home
 - Home's to-do lists everything the signed-in person has to do, whatever it

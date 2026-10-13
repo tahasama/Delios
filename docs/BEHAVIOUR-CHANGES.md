@@ -412,6 +412,21 @@ the installation sets its keys.
 - **Working on another organization's project:** the project picker lists, under that organization's name, the
   projects you were put on; choosing one switches you there with your own sign-in, and "Back to …" returns.
   Someone with no project of their own sees them on their first page.
+- **Roles on a project:** four more, Main contractor (builds only) `CONTRACTOR`, Subcontractor `SUBCONTRACTOR`,
+  Supplier / manufacturer / vendor `SUPPLIER`, Third-party inspector / certifier `INSPECTOR`, each with its own
+  starting matrix.
+- **Defaults for new projects** are seen and changed directly on the organization's page ("See and change them"):
+  the same questions as a project's Control room, each marked "the app's" or "ours", the app's own listed, and
+  "Reset to the app's defaults". Taking one project's choices as the defaults is still there.
+- **A project's Control room** marks each answer "as the defaults", "the app's" or "changed here", and has
+  "Reset to the organization's defaults" (or to the app's, when the organization set none). What the project
+  is, and checks ticked off on it, are not touched.
+- **The organization's page is clickable:** a project opens (ours, or switches into another organization's), a
+  person goes to People & access, an organization to Organizations, "their people" to its people.
+- **Supplier fixes:** a supplier's schedule ("Where your documents are needed") was always empty: it now shows the
+  actions needing its documents. Its document page no longer fails. A review handing its document back
+  (rejected, or released with comments) tells the supplier's people and is on their Home. The menu reads
+  "Schedule & actions" for everyone.
 
 ## 7. Notifications and email
 

@@ -82,7 +82,7 @@ public sealed partial class OrganizationService
     }
 
     /// <summary>The roles the app knows before an organization publishes its own list (frontend lib/settings/profiles/roles.ts).</summary>
-    private static readonly HashSet<string> BuiltInRoles = ["GENERIC", "EPC", "EPCM", "PMC", "DESIGN", "OWNER", "CM"];
+    private static readonly HashSet<string> BuiltInRoles = ["GENERIC", "EPC", "EPCM", "PMC", "DESIGN", "OWNER", "CM", "CONTRACTOR", "SUBCONTRACTOR", "SUPPLIER", "INSPECTOR"];
 
     // ── Projects of other organizations' that we take part in ─────────────────
 

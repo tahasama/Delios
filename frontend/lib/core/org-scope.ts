@@ -3,7 +3,7 @@ import { cache } from "react";
 import { redirect } from "next/navigation";
 import { getCurrentUser, isAdmin, type SessionUser } from "@/lib/core/auth";
 import { getMe } from "@/lib/account/api";
-type OrgScope = {
+export type OrgScope = {
   user: SessionUser;
   orgId: string;
   organization: { id: string; slug: string; name: string };
