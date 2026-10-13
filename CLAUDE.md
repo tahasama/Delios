@@ -15,8 +15,28 @@ conversation, write it into the right one in the same commit as the code.
 | `docs/gaps/*.md` | Known gaps per area |
 | `PRODUCT.md` | Product context and users |
 
-The repository: `backend/` (API and worker), `frontend/` (the Next.js screens; run `npm` there),
-`deploy/` (Docker and servers), `docs/`.
+## Where things go
+
+- Root: `compose.yaml` and `.env` (from `.env.example`; `docker compose up`, the screens with
+  `--profile app` on localhost:3080), `CLAUDE.md`, `PRODUCT.md`, `README.md`.
+- `backend/src/Delios.Host/` (API and worker, one program): one folder per area (`Documents`, `Reviews`,
+  `Transmittals`, `Packages`, `Schedules`, `Records`, `Identity`, `Notifications`…), each with its
+  `Entities.cs`, `Configurations.cs`, `*Endpoints.cs` and `*Service.cs`; a big service is split into
+  partial files named for what they do (`ReviewService.Start.cs`). `Platform/` holds the database context and
+  `Migrations/`. Tests in `backend/tests/`.
+- `frontend/` (Next.js; run `npm` there): `app/` pages (helpers a page alone uses sit beside it),
+  `components/` shared pieces, `lib/` by area:
+  - `lib/api/` — the only place that calls the backend (`client.ts`), one file per area, types in `types.ts`;
+  - `lib/forms/` — the server actions forms post to;
+  - `lib/core/` — sign-in, scope, permissions, preferences, words for states;
+  - `lib/documents`, `reviews`, `transmittals`, `schedule`, `packages`, `settings`, `conformance` —
+    what each area's screens need beyond the API.
+- `deploy/` — Caddy, Postgres image, monitoring, file backup, Kubernetes, `init-env` scripts.
+- `docs/` — the files in the table above, and the runbooks.
+
+**Rules live in the backend, once.** Where something stands (an action's state, a revision waiting for the
+check, a transmittal's status, a package's readiness) is worked out by the backend and read by every screen;
+a screen only words it. A new rule goes in the backend, never in a page.
 
 ## How to work with the owner
 
