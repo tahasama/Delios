@@ -1,6 +1,6 @@
 # Packages: what the screens need that the backend lacks
 
-Screens: `/packages` (list, both tabs, and the two "New … package" forms), `/packages/add`, `/packages/[number]` (delivery package and supplier package views). Actions: `src/lib/actions/planning.ts` (package part), `src/lib/actions/supplier.ts`.
+Screens: `/packages` (list, both tabs, and the two "New … package" forms), `/packages/add`, `/packages/[number]` (delivery package and supplier package views). Actions: `frontend/lib/actions/planning.ts` (package part), `frontend/lib/actions/supplier.ts`.
 
 1. **Our own organization as a recipient (internal handover).** The "Delivered to" picker offers "us" for an internal handover. `GET /addressees` and `GET /api/parties` list only outside parties, and `/api/parties` gives no ids at all. Today the picker has no "(us)" option.
    Want: the internal party's id, e.g. `GET /addressees` → `parties[]` including `{ id, code, name, participation, isInternal: true }` (or `GET /api/parties` returning `id` and `isInternal`, internal one included).

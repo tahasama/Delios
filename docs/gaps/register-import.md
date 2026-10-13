@@ -1,9 +1,9 @@
 # Registering documents, import and exports: what the screens need that the backend lacks
 
 Screens and handlers: `/documents/new` (create or receive a document), `/import` (bulk import and the export list),
-`/api/export/{kind}`, `/api/register/export`, `/no-project`; actions `importBulkAction` (`src/lib/actions/bulk.ts`),
+`/api/export/{kind}`, `/api/register/export`, `/no-project`; actions `importBulkAction` (`frontend/lib/actions/bulk.ts`),
 `saveRegisterView`/`deleteRegisterView`, `addDocumentReaderAction`/`removeDocumentReaderAction`,
-`linkControlledSourceAction`; helpers `src/lib/register.ts`, `numbering.ts`, `numbering-records.ts`,
+`linkControlledSourceAction`; helpers `frontend/lib/register.ts`, `numbering.ts`, `numbering-records.ts`,
 `matrix-sheet.ts`, `deliverable-workbook.ts`, `sets-workbook.ts`.
 
 ## Creating a document (`/documents/new`)
@@ -44,7 +44,7 @@ Screens and handlers: `/documents/new` (create or receive a document), `/import`
    version live in the organization settings (`SET:{key}`), which the backend does not bump when values change. The
    workbook import does not bump the version. Want: `GET /api/values/sets` (key, title, description, version) readable
    by everyone, and the version kept by the backend.
-9. **Distribution matrix import.** Goes through `src/lib/matrix-read.ts` (not in this area), which still reads the old
+9. **Distribution matrix import.** Goes through `frontend/lib/matrix-read.ts` (not in this area), which still reads the old
    database; it fails until that file is ported onto `GET/PUT /api/admin/functions`.
 
 ## Exports (`/api/export/{kind}`, `/api/register/export`)
@@ -96,7 +96,7 @@ Passed through from the backend: `documents` (`GET /register/export?view=all&sor
 20. **No project yet (`/no-project`).** The page names the administrators and Document Control who can add the person;
     someone with no project cannot read `GET /api/admin/users`, so nobody is named. Want: `GET /api/me/admins` →
     `{ name, email }[]` (up to five active administrators / Document Control of the person's organization).
-21. **Numbering on its own.** `allocateNumber` (used by `src/lib/controlled/requirements.ts` and the seed scripts) and
+21. **Numbering on its own.** `allocateNumber` (used by `frontend/lib/controlled/requirements.ts` and the seed scripts) and
     `nextRecordNumber` cannot allocate a number apart from registering: the backend allocates as it registers or
     raises a record. Both now throw "not supported yet". Want, if still needed: `POST /numbering/next
     { deliverableType, fields }` → `{ number }` (reserving the number).

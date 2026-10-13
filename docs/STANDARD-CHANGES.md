@@ -5,8 +5,8 @@ Standard v2** does not yet say, or says differently. None of these are screen
 design; each is a rule about how information is controlled, so the published
 document has to change before the application can claim conformance to it.
 
-Read with `docs/ROLLOUT.md` §6 — *When the Standard changes*. The catalogue is
-no longer generated from the document: `src/lib/checks/catalog.ts` is the
+The check catalogue is
+not generated from the document: `frontend/lib/checks/catalog.ts` is the
 application's own list of what it can answer (see §21 below), so a change here
 is a change to the published document, and only then — if it names something
 the register can settle — a change to the catalogue.
@@ -45,7 +45,7 @@ breach. Where they are one act, such a revision breaks the rule and is stamped
 NOT ISSUED; `scripts/issue-released.ts` issues the ones seeded that way on demo
 data.
 
-**Depends on it:** `releaseRevision` in `src/lib/lifecycle.ts`, the issue-request
+**Depends on it:** `releaseRevision` in `frontend/lib/lifecycle.ts`, the issue-request
 gate, 19 checks in `scripts/verify-release.ts`.
 
 ---
@@ -64,8 +64,8 @@ returns it to review. The days it takes are inside the review time, not added
 to it.
 
 **Depends on it:** `openApprovalStep` / `settleApproval` in
-`src/lib/issue-requests.ts`; the *External approval* checkpoint in
-`src/lib/action-lateness.ts`.
+`frontend/lib/issue-requests.ts`; the *External approval* checkpoint in
+`frontend/lib/action-lateness.ts`.
 
 ---
 
@@ -85,7 +85,7 @@ must be able to. A function may carry a clearance (§46).
 people who may read a closed document are chosen deliberately, one by one.
 
 **Depends on it:** `closedDocumentFilter` and `CLOSED_MODELS` in
-`src/lib/tenant.ts`; the access list on the document page.
+`frontend/lib/tenant.ts`; the access list on the document page.
 
 **Amended by §46:** a function may carry a clearance, confirmed by the owner.
 
@@ -101,7 +101,7 @@ administrator is an emergency power, not a qualification to answer in
 somebody's place; those holders are refused as ordinary targets, and the refusal
 says so.
 
-**Depends on it:** `src/lib/delegation.ts` — `delegateCandidates`,
+**Depends on it:** `frontend/lib/delegation.ts` — `delegateCandidates`,
 `delegationRefusal`, `byPrivilege`.
 
 ---
@@ -119,7 +119,7 @@ produced outside, where release is not ours to give, the required status alone
 counts — and which of the two readings applies is the project's published
 answer, not the reader's assumption (`POLICY_READY`: ISSUED | STATUS).
 
-**Depends on it:** `src/lib/readiness.ts`, the denormalised counters on
+**Depends on it:** `frontend/lib/readiness.ts`, the denormalised counters on
 `Action` (`needCount`, `metIssuedCount`, `metStatusCount`).
 
 ---
@@ -156,7 +156,7 @@ after it inherit the delay rather than own it.
 **Why:** so nobody argues about it afterwards, and so a step never carries a
 delay that began before it.
 
-**Depends on it:** `src/lib/action-lateness.ts`; the delay columns on the action
+**Depends on it:** `frontend/lib/action-lateness.ts`; the delay columns on the action
 page; the baseline export.
 
 ---
@@ -192,7 +192,7 @@ carries no such note**. An action that carries one has answered the clause,
 whatever the note says.
 
 **Depends on it:** the `ActionNote` record; `DB-13` in
-`src/lib/checks/runners.ts`; audit acts `ACTION_CARRIED` / `ACTION_STOPPED`.
+`frontend/lib/checks/runners.ts`; audit acts `ACTION_CARRIED` / `ACTION_STOPPED`.
 
 ---
 
@@ -468,7 +468,7 @@ ignore the page. Coverage rose from 51% to 100% by removing questions nobody
 could answer, and the measured figure now means *of what can go wrong here, how
 much is watched*.
 
-**Depends on it:** `src/lib/checks/catalog.ts`, the Assurance section.
+**Depends on it:** `frontend/lib/checks/catalog.ts`, the Assurance section.
 
 ---
 
@@ -486,7 +486,7 @@ hold cannot be destroyed. Twenty such rules are published beside the checks.
 lower it, which makes the figure unfalsifiable — the one thing a conformance
 number must not be.
 
-**Depends on it:** `src/lib/checks/prevented.ts`, *Assurance → Default rules*.
+**Depends on it:** `frontend/lib/checks/prevented.ts`, *Assurance → Default rules*.
 
 ---
 
@@ -528,7 +528,7 @@ Two things override the organization's answer, and only ever to make a field
 stricter: a numbering scheme that draws on a field, and the type-to-field
 matrix.
 
-**Depends on it:** `src/lib/field-policy.ts`, `FieldPolicy`, `CustomField`,
+**Depends on it:** `frontend/lib/field-policy.ts`, `FieldPolicy`, `CustomField`,
 *Settings → Forms & fields*; ten forms wired to it.
 
 ---
@@ -543,7 +543,7 @@ rule buried in the code that raises them. A scheme for a record reads the record
 itself (project, sub-project, sender, receiver, reason, counter). Until one is
 routed, the short form (`TR-0001`) stands, and numbers already raised keep it.
 
-**Depends on it:** `src/lib/numbering-records.ts`, *Settings → Numbering*.
+**Depends on it:** `frontend/lib/numbering-records.ts`, *Settings → Numbering*.
 
 ---
 
@@ -574,7 +574,7 @@ drift. What the application does not hold (cover page, client clauses, local
 conventions) stays in a document the organization registers and names as its
 plan.
 
-**Depends on it:** `src/app/(app)/settings/dmp/plan.tsx`,
+**Depends on it:** `frontend/app/(app)/settings/dmp/plan.tsx`,
 `ScopeConfig.dmpDocumentId`.
 
 ## 28 · Advice is chosen from a published list, with its comments
@@ -928,7 +928,7 @@ its state — placeholder, in review, released, released and issued — with tha
 state shown in the organization's own words. It counts as ready only as §5
 says; showing it tells people it exists, not that it may be used.
 
-**Depends on it:** `src/lib/api/schedule.ts` (`latest`), the action page.
+**Depends on it:** `frontend/lib/api/schedule.ts` (`latest`), the action page.
 
 ---
 

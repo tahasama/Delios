@@ -1,13 +1,13 @@
 # dependencies
-/node_modules
+node_modules/
 
 # next.js
-/.next/
-/out/
+/frontend/.next/
+/frontend/out/
 next-env.d.ts
 
 # production
-/build
+/frontend/build
 
 # misc
 .DS_Store
@@ -31,8 +31,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 
-# legacy frontend (kept only in git history)
-/frontend
 
 # impeccable engine binary: platform-specific (20 MB); `npx impeccable install` fetches the right one per machine
 .claude/skills/impeccable/scripts/bin/

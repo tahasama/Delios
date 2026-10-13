@@ -15,6 +15,9 @@ conversation, write it into the right one in the same commit as the code.
 | `docs/gaps/*.md` | Known gaps per area |
 | `PRODUCT.md` | Product context and users |
 
+The repository: `backend/` (API and worker), `frontend/` (the Next.js screens; run `npm` there),
+`deploy/` (Docker and servers), `docs/`.
+
 ## How to work with the owner
 
 - Short, plain replies. No jargon. PowerShell commands one per block.
@@ -32,7 +35,7 @@ conversation, write it into the right one in the same commit as the code.
   that person an administrator, unlocks them, and puts them on every project
   with Document Control, which is given every verb.
 - No model names in commits. Commit and push to the working branch.
-- Do not run the tests unless asked; do compile (`dotnet build`, `npx tsc --noEmit`).
+- Do not run the tests unless asked; do compile (`dotnet build` in `backend/`, `npx tsc --noEmit` in `frontend/`).
 - Think about the whole flow, not a patch. When the owner reports something
   wrong, revisit the whole flow it belongs to (start → withdraw → send again →
   advise → decide → release → issue), not only the line reported.
@@ -47,10 +50,10 @@ conversation, write it into the right one in the same commit as the code.
   details). It is written down, with the exact classes, in
   `docs/DETAIL-STYLE.md`. When the owner says "apply the same", follow that
   file to the letter; do not restyle the reference pages.
-- One control size everywhere, set once in `src/app/globals.css` on `:root`:
+- One control size everywhere, set once in `frontend/app/globals.css` on `:root`:
   `--control-h` (2rem), `--control-text` (13px), `--control-radius`. Every
   field, dropdown, button and file field stands that height with that text.
-- Use the shared pieces only: `btn()` and `inputCls` (`src/components/ui.tsx`),
+- Use the shared pieces only: `btn()` and `inputCls` (`frontend/components/ui.tsx`),
   `.ask`, `.plain`, `ActionForm`. Never give a field or button its own height,
   padding or text size on a page; never restyle the file button locally.
 
@@ -465,7 +468,7 @@ conversation, write it into the right one in the same commit as the code.
 - An action whose dates the latest schedule read moved carries a "moved" stamp
   in the table and on the plan; its page says "Moved by rev C: was … , now …".
   The stamp goes when a later read leaves its dates where they are.
-- Who may upload the lists is one rule, `mayUploadLists` (`src/lib/permissions.ts`):
+- Who may upload the lists is one rule, `mayUploadLists` (`frontend/lib/permissions.ts`):
   Control or Plan held outright, as the backend checks. Configure does not count.
 - "Documents ready" counts only the actions in a window: a month either side
   of today, or the dates the user filtered on. Never the whole schedule.

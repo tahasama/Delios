@@ -210,7 +210,7 @@ function matches(rule: Rule, target: DocumentClass): boolean {
  *
  * Confidentiality is not asked here. A document above the open levels is read
  * by the people named on it — see `DocumentAccess` and the reader filter in
- * `src/lib/tenant.ts` — so a closed document never reaches this question.
+ * `frontend/lib/tenant.ts` — so a closed document never reaches this question.
  *
  * Grants accumulate: a function's rules are a union, never a precedence chain.
  * There is deliberately no deny rule — a permission someone does not hold is

@@ -1,8 +1,8 @@
 ---
 version: 1
 slug: "src-app-app-actions"
-primary_target: "src/app/(app)/actions"
-related_targets: ["src/app/(app)/actions/[code]"]
+primary_target: "frontend/app/(app)/actions"
+related_targets: ["frontend/app/(app)/actions/[code]"]
 ---
 
 # Schedule & actions — surface brief

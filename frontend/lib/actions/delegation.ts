@@ -10,7 +10,7 @@ import { api, projectPath, refusal } from "@/lib/api/client";
  * Where Document Control carries this act out, the reviewer asks and the request
  * waits; where the people doing the work carry it out themselves, the same form
  * puts the delegation in force at once. The backend reads which of the two is in
- * use from the project — see `src/lib/control-activities.ts` — and applies the
+ * use from the project — see `frontend/lib/control-activities.ts` — and applies the
  * matrix's rule; its refusal is shown word for word.
  */
 

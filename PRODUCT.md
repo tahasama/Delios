@@ -49,7 +49,7 @@ The system is the Standard: the rules a system can enforce are enforced, the rou
 
 ## Evidence on Hand
 
-- The Standard and blueprint: `docs/DELIOS_EDMS_Functional_Product_Blueprint_v0.1.docx`, `docs/REVIEW-MODEL.md`, `docs/WALKTHROUGH.md`, `docs/ROLLOUT.md`.
+- The Standard and blueprint: `docs/DELIOS_EDMS_Functional_Product_Blueprint_v0.1.docx`, `docs/REVIEW-MODEL.md`, `docs/STANDARD-CHANGES.md`.
 - Demo project P1001 (`npm run demo`) with seeded walkthrough data.
 - No customers, testimonials or benchmarks yet; do not invent them.
 

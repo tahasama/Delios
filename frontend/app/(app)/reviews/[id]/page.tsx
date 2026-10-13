@@ -162,7 +162,7 @@ export default async function ReviewCyclePage({ params }: { params: Promise<{ id
   // the route is told. A review the control function ran on its own still ends
   // by handing the outcome to the author.
   // Who carries these two out is the project's answer, and the buttons follow
-  // it: see `src/lib/control-activities.ts` and Settings → Who does what.
+  // it: see `frontend/lib/control-activities.ts` and Settings → Who does what.
   const [returnIsControl, issueIsControl] = await Promise.all([
     controlDoes(ctx, "RETURN_OUTCOME"),
     controlDoes(ctx, "REVIEW_ISSUE"),

@@ -1,7 +1,7 @@
 # The reference style — locked in by the owner
 
-Schedule & actions (`src/app/(app)/actions/page.tsx`) and the action page
-(`src/app/(app)/actions/[code]/page.tsx`) are the reference for every page,
+Schedule & actions (`frontend/app/(app)/actions/page.tsx`) and the action page
+(`frontend/app/(app)/actions/[code]/page.tsx`) are the reference for every page,
 card, form and hidden panel in DELIOS. The owner judged that they cannot be
 made better. **When the owner says "apply the same", it means this file:**
 build from these parts, in this order, with these exact classes, and change
@@ -21,7 +21,7 @@ Reference files, read them before styling anything:
 
 ## One size for every control
 
-Set once on `:root` in `src/app/globals.css`: `--control-h` (2rem),
+Set once on `:root` in `frontend/app/globals.css`: `--control-h` (2rem),
 `--control-text` (13px), `--control-radius`. Every field, dropdown, button and
 file field stands that height with that text. Never give a field or a button
 its own height, padding or text size on a page; never restyle the file button.

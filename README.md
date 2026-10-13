@@ -1,7 +1,7 @@
 # DELIOS · EDMS
 
 An internal **Electronic Document Management System** built directly on the
-**Document Management Standard v1** — *Rules · Routes · Checks* — by Taha Maatof.
+**Document Management Standard v2** — *Rules · Routes · Checks* — by Taha Maatof.
 
 The Standard is where the rules came from; the application is what enforces
 them, in its own words:
@@ -10,57 +10,57 @@ them, in its own words:
 |---|---|
 | **Rules** | The enforced data model, configuration and permissions. A document number cannot be typed, a revision cannot be released without its approval, description and fixed copy, information under a legal hold cannot be destroyed. 20 such conditions are listed on **Default rules**, each naming the act that refuses it. |
 | **Routes** | Execution checklists rendered live beside the workflows they govern (creating a document, revising, issuing, receiving, taking out of use, closing a package). Steps tick themselves as the system records the evidence. |
-| **Checks** | 97 questions the application can answer from its own records, run against the register. Each finding carries its severity, its owner and the document it is on; the result is the share of documents carrying nothing critical or major, measured against the project's own target. |
+| **Checks** | 35 questions the application can answer from its own records, run against the register. Each finding carries its severity, its owner and the document it is on; the result is the share of documents carrying nothing critical or major, measured against the project's own target. |
 
 Nothing is checked that the application prevents, and nothing is listed that no
 record could settle: a check that cannot fail, and a check that can only fail,
 both teach people to ignore the page.
 
-## Stack
+## Layout
 
-- **Next.js 15** (App Router, TypeScript, server components + server actions) — no separate backend
-- **SQLite via Prisma** — portable schema; switching to Postgres later is a provider change + `prisma migrate`
-- **Tailwind CSS v4** + hand-rolled shadcn-style UI, recharts
-- **Credentials auth** (bcrypt + signed JWT session cookie), six roles
-- **pdf-lib** — releases are stamped with number / revision / status / date (§10.2); superseded renditions are watermarked (§12.5)
-- Files stored under `./uploads`, served only through an authenticated, confidentiality-checked route handler with download logging
+```
+backend/    ASP.NET Core 10 API and worker (PostgreSQL, RabbitMQ, S3 storage, ClamAV)
+frontend/   Next.js 16 screens; they read and write only through the backend
+deploy/     Docker Compose, Kubernetes, monitoring, backups
+docs/       what was agreed: start with CLAUDE.md, then docs/STANDARD-CHANGES.md
+```
 
-## Backend (in progress)
+## Running it
 
-The production backend is being built in `backend/` (ASP.NET Core 10, PostgreSQL,
-Redis, RabbitMQ, S3-compatible storage, ClamAV). The decisions and the build
-plan are in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). The Next.js app below
-moves onto its API area by area.
+Everything but the screens runs in Docker; the .NET 10 SDK is needed only to work on the backend code.
 
-Everything runs in Docker; the .NET 10 SDK is needed only to work on the code.
-
-On Windows (PowerShell):
+On Windows (PowerShell), from the repository folder:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File deploy\init-env.ps1                 # once: random passwords into deploy\.env (never committed)
-docker compose -f deploy/compose.yaml --profile app --profile monitoring up -d --build
+docker compose -f deploy/compose.yaml --profile app up -d --build
 docker compose -f deploy/compose.yaml --profile app run --rm migrate seed-demo
-powershell -ExecutionPolicy Bypass -File deploy\demo.ps1                      # sign in, register, upload, scan, download
+cd frontend
+Copy-Item .env.example .env                                                  # once
+npm install
+npm run dev                                                                  # http://localhost:3000
 ```
 
-On macOS or Linux:
+On macOS or Linux the same, with `sh deploy/init-env.sh` and `cp .env.example .env`.
+
+Demo passwords are all `demo1234`:
+
+| Account | Role |
+|---|---|
+| `admin@demo.local` | Administrator |
+| `controller@demo.local` | Document Control |
+| `engineer@demo.local` | Engineer |
+| `approver@demo.local` | Approver |
+| `viewer@demo.local` | Viewer |
+| `supplier@acme.local` | Supplier (Acme Pumps) |
+
+`npm run demo:schedule` (in `frontend/`) fills a fresh demo through the API. The API
+endpoints are listed at http://localhost:8080/api/openapi/v1.json.
+
+To work on the backend, run only the dependencies in Docker and the API from the SDK
+(`init-env` also stored the credentials as .NET user-secrets, outside the repository):
 
 ```bash
-sh deploy/init-env.sh                                                         # once: random passwords into deploy/.env (never committed)
-docker compose -f deploy/compose.yaml --profile app up -d --build             # whole stack, API on :8080
-docker compose -f deploy/compose.yaml --profile app run --rm migrate seed-demo # demo tenant "demo", password demo1234
-```
-
-Sign in with `POST /api/auth/sign-in` and `{"email":"engineer@demo.local","password":"demo1234"}` (the email says which organization: a person belongs to one).
-The demo people are admin, controller, engineer, approver, viewer (`@demo.local`)
-and `supplier@acme.local`. The endpoints are listed at
-http://localhost:8080/api/openapi/v1.json.
-
-To work on the code, run only the dependencies in Docker and the API from the SDK
-(`init-env.sh` also stored the credentials as .NET user-secrets, outside the repository):
-
-```bash
-sh deploy/init-env.sh
 docker compose -f deploy/compose.yaml up -d
 dotnet run --project backend/src/Delios.Host -- migrate
 dotnet run --project backend/src/Delios.Host -- seed-demo
@@ -81,70 +81,6 @@ nodes, alert notifications) is in [docs/ACTIVATION.md](docs/ACTIVATION.md).
 
 Health: `/health/live` and `/health/ready` on each node (internal). Metrics: port 9091.
 Set `Delios__Role=worker` to run the same build as a queue worker.
-
-## Running it
-
-The same commands work in PowerShell, cmd and bash.
-
-```bash
-npm install                   # also generates the Prisma client
-```
-
-Copy the settings file once — `.env` is not in git:
-
-```bash
-cp .env.example .env          # PowerShell: Copy-Item .env.example .env
-```
-
-```bash
-npx prisma migrate deploy     # create or update the database
-npm run db:seed               # the neutral Annex C starter configuration
-npm run demo                  # optional: the full P1001 demo project, upgraded, with the checks run
-npm run dev                   # http://localhost:3000 (add -- -p 4173 for another port)
-```
-
-After pulling new changes, run `npx prisma migrate deploy` and `npm run upgrade`.
-If the app reports "@prisma/client did not initialize yet", run `npx prisma generate`
-with the dev server stopped.
-
-Demo passwords are all `demo1234`:
-
-| Account | Role |
-|---|---|
-| `admin@delios.local` | Administrator |
-| `controller@delios.local` | Document Controller (the designated control function) |
-| `approver@delios.local` | Approver |
-| `reviewer@delios.local` | Reviewer |
-| `author@delios.local`, `author2@delios.local` | Author / originator |
-| `viewer@delios.local` | Viewer |
-| `vendor@delios.local` | External party (Acme Pumps) |
-
-Other scripts:
-
-```bash
-npm run checks                # run the checks from the CLI, per project
-npm run defects-report        # open-finding summary by check
-npm run db:studio             # browse the database
-npx tsx scripts/restate-actions.ts   # rewrite what each activity is waiting for
-```
-
-## The demo project
-
-The seed creates a worked example on project **P1001** (numbering exactly per
-`Standard-Numbering-Config.xlsx`): 20 documents across every state — released,
-superseded, in review, in preparation, planned placeholders, a void, a withdrawal —
-plus live review cycles, transmittals TR-0001…0005 (incoming awaiting acceptance
-check included), authenticated receipt evidence, registered copies, actions
-A0007/A0031/A0044, two controlled corporate-schedule versions, and package PK-001.
-
-It also plants **deliberate defects** (released without approval, blocking comment
-on a released revision, void without reassessment, withdrawn item still required by
-an action, unnotified supersession, stale registered copy, placeholder holding a
-revision, generic title, a bad execution issue…). Run **Conformance → Run the
-checks** to watch the engine find them, then use the defect workflow — correct and
-re-run, or accept with reason/authority/review date — and watch the integrity
-figure respond. The warrant banner appears while integrity is below the published
-threshold (95%) or a Critical defect is open.
 
 ## Configuration
 
@@ -172,9 +108,8 @@ asked at all — and lets an organization add fields of its own, in the shape it
 likes. What the application computes with (the number is built from the type,
 the matrix answers by discipline, retention follows criticality) says so and
 stays as it is.
-Starting configuration is data, not code: `src/lib/profiles/reference.json` plus a
-starter profile per project type (industrial, energy, construction). See
-[docs/ROLLOUT.md](docs/ROLLOUT.md) for upgrading an installation and adding profiles.
+Starting configuration is data, not code: `frontend/lib/profiles/reference.json` plus a
+starter profile per project type (industrial, energy, construction).
 Configuration covers:
 value sets (document types, disciplines, statuses with execution flags, review
 outcomes with proceed/resubmission consequences, criticality, confidentiality,
@@ -209,27 +144,3 @@ unused-value deletion, and CSV export/import with dry-run validation.
 - **Assessment statement** (§1.6): a printable conformance statement with integrity, severity counts, coverage (qualified when below 100%) and the exceptions register.
 - **Distribution rules** (§11.8): recipients defined by classification before issue; off-distribution issues are detectable.
 - **Containment** (§17.3): release is blocked while a progression-preventing comment or missing approval affects the item; the engine refuses defect closure the check still returns.
-
-## Switching to Postgres
-
-1. `provider = "postgresql"` in `prisma/schema.prisma`, set `DATABASE_URL`
-2. `npx prisma migrate dev`
-No application code changes.
-
-## Layout
-
-```
-prisma/schema.prisma        the register — seven linked record types (§16.3) + configuration + conformance
-src/lib/standard.ts         fixed sets from the Standard (states, reasons, outcomes, exposures…)
-src/lib/lifecycle.ts        state machine: review custody points, approval, release, supersession, void
-src/lib/numbering.ts        scheme routing, validation, system allocation (§3.7)
-src/lib/checks/catalog.ts   the 97 checks: condition, how it is detected, severity, owner, moment
-src/lib/checks/runners.ts   one query per check, returning the items that fail
-src/lib/checks/engine.ts    runs the catalogue, maintains the findings, computes the result
-src/lib/checks/prevented.ts the 20 conditions the application refuses outright
-src/lib/field-policy.ts     what every form asks for, insists on, and calls it
-src/lib/action-readiness.ts what each activity is waiting for, written on the activity
-src/lib/routes.tsx          the execution checklists, live in the UI
-src/app/(app)/…             home, register, documents, reviews, transmittals, actions,
-                            packages, assets, distribution, conformance, reports, settings
-```

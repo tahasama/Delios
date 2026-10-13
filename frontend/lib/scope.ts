@@ -31,7 +31,7 @@ export type ProjectSummary = {
 
 /**
  * The data used to come from a Prisma client narrowed to the scope. It comes
- * from the backend now, through `api()` in `src/lib/api/client.ts`; this marks
+ * from the backend now, through `api()` in `frontend/lib/api/client.ts`; this marks
  * every place that still reaches for the old client.
  */
 export type RemovedDb = { readonly movedToBackend: true };

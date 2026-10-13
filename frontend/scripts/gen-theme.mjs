@@ -1,5 +1,5 @@
-// Run from the repo root: node scripts/gen-theme.mjs
-// Generates src/app/theme.css: light tokens, a dark override of the Tailwind
+// Run from frontend/: node scripts/gen-theme.mjs
+// Generates app/theme.css: light tokens, a dark override of the Tailwind
 // palettes in use, and a "palette-light" scope that restores light values
 // (for the always-dark sidebar).
 import fs from "node:fs";
@@ -56,5 +56,5 @@ const light = [];
 for (const [k, v] of Object.entries(brandLight)) light.push(`  --color-${k}: ${v};`);
 for (const n of [...NEUTRALS, ...HUES]) for (const s of SHADES) light.push(`  --color-${n}-${s}: ${val[n][s]};`);
 out += `/* Always-dark chrome (the sidebar) keeps the light palette in both themes. */\n:root.dark .palette-light {\n  color-scheme: light;\n${light.join("\n")}\n}\n`;
-fs.writeFileSync(`${root}/src/app/theme.css`, out);
+fs.writeFileSync(`${root}/app/theme.css`, out);
 console.log("ok", out.length);
