@@ -15,9 +15,9 @@ import { ArrowLeft } from "lucide-react";
 import { getActiveSet } from "@/lib/settings/config";
 import { api } from "@/lib/api/client";
 import { holders } from "@/lib/api/settings";
-import { planActionByCode, planVersion, scheduleSource, noticesAbout, noticeHistory } from "@/lib/api/schedule";
+import { planActionByCode, planVersion, noticesAbout, noticeHistory } from "@/lib/api/schedule";
 import { movedPhrase } from "../moved";
-import { actionState, stateLabel, dayHasPassed, riskFrom, isPostponed, DEFAULT_RISK_DAYS, type ActionState } from "@/lib/schedule/action-state";
+import { stateLabel, isPostponed, type ActionState } from "@/lib/schedule/action-state";
 import { mayUploadLists } from "@/lib/core/permissions";
 import { NotifyPanel } from "@/components/notify-panel";
 import { LinksCard, proposalText, type Ask } from "./links-card";
@@ -65,8 +65,7 @@ export default async function ActionDetailPage({ params, searchParams }: { param
   // The same states the schedule uses, by the same rule, so the two pages never
   // disagree about one action.
   const everything = action.needs.length > 0 && readyCount === action.needs.length;
-  const riskDays = (await scheduleSource(ctx)).source?.riskWindowDays ?? DEFAULT_RISK_DAYS;
-  const readiness = actionState(action, riskDays);
+  const readiness = action.state;
   // A department is a discipline: the people whose membership names one of them.
   const people = await holders(ctx.projectId, "READ").catch(() => []);
   // Manual notices: Document Control, or whoever plans the project. Each discipline's panel counts every notice
@@ -132,7 +131,7 @@ export default async function ActionDetailPage({ params, searchParams }: { param
   const confirmedDepts = depts.filter((d) => {
     const own = action.needs.filter((e) => e.department === d || !e.department);
     const ready = own.length > 0 && own.every((e) => e.state === "MET");
-    return action.confirmations.some((x) => x.department === d && !x.revokedAt) || (!dayHasPassed(action) && ready);
+    return action.confirmations.some((x) => x.department === d && !x.revokedAt) || (!action.passed && ready);
   });
   const confirmedAt = action.confirmations.filter((x) => !x.revokedAt).map((x) => x.confirmedAt).filter((x): x is Date => !!x)
     .sort((x, y) => y.getTime() - x.getTime())[0] ?? action.lastMetAt ?? null;
@@ -144,10 +143,10 @@ export default async function ActionDetailPage({ params, searchParams }: { param
   const postponed = isPostponed(action, postponeCodes)
     ? action.decisions.find((note) => postponeCodes.includes(note.decision) && !note.reversedAt) ?? null
     : null;
-  const happened = !postponed && dayHasPassed(action);
+  const happened = !postponed && action.passed;
   // Went ahead? Not yet before the day; after it, read from the documents unless postponed.
   const missingCount = action.needs.length - readyCount;
-  const wentAhead: WentAhead = postponed ? "POSTPONED" : !dayHasPassed(action) ? "NOT_YET" : missingCount > 0 ? "MISSING_DOCUMENTS" : "WITH_DOCUMENTS";
+  const wentAhead: WentAhead = postponed ? "POSTPONED" : !action.passed ? "NOT_YET" : missingCount > 0 ? "MISSING_DOCUMENTS" : "WITH_DOCUMENTS";
 
   // One row per required document: what it is, whether it is there, and the
   // step where its time went. Dates are written here so the table stays a
@@ -311,8 +310,8 @@ export default async function ActionDetailPage({ params, searchParams }: { param
                 const missing = deptEntries.filter((e) => e.state !== "MET");
                 const c = action.confirmations.find((x) => x.department === d && !x.revokedAt) ?? null;
                 const taken = c ? null : action.confirmations.find((x) => x.department === d && x.revokedAt) ?? null;
-                const opens = riskFrom(action, riskDays, of);
-                const passed = dayHasPassed(action);
+                const opens = action.disciplineRiskFrom[d] ?? null;
+                const passed = action.passed;
                 // Before the day, every document released at its status: confirmed by the documents themselves.
                 const automatic = !c && !passed && deptEntries.length > 0 && missing.length === 0;
                 const open = missing.length > 0 && (passed || (!!opens && opens.getTime() <= Date.now()));

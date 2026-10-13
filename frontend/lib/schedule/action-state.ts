@@ -1,7 +1,7 @@
 /**
- * Where an action stands, said once for every page that shows it. The schedule
- * and the action's own page used to work it out each in their own way, and an
- * action could read "Still ahead" on one and "At risk" on the other.
+ * Where an action stands, said once for every page that shows it. The backend
+ * works it out (PlanAction.state, Schedules/ScheduleEndpoints.Plan.cs); these are
+ * its words on screen.
  *
  * Seven states, and they are not degrees of the same thing:
  * - nothing listed — no document is asked for;
@@ -29,57 +29,6 @@ export const stateLabel = (state: ActionState) => ACTION_STATES.find((one) => on
 
 /** Days before an action's day that a missing document puts it at risk, unless the project or the document says otherwise. */
 export const DEFAULT_RISK_DAYS = 7;
-
-const DAY = 86_400_000;
-
-type Stateful = {
-  start: Date | null;
-  lastMetAt: Date | null;
-  needs: { neededBy: Date; state: string; riskDays?: number | null }[];
-};
-
-/** The start of the day `now` falls in: a day passes at midnight, not 24 hours after it began. */
-function startOfDay(now: Date): Date {
-  const day = new Date(now);
-  day.setHours(0, 0, 0, 0);
-  return day;
-}
-
-/** Whether the action's day is over: before today, not merely earlier than this minute. */
-export function dayHasPassed(action: { start: Date | null }, now = new Date()): boolean {
-  return !!action.start && action.start < startOfDay(now);
-}
-
-export function actionState(action: Stateful, riskDays = DEFAULT_RISK_DAYS, now = new Date()): ActionState {
-  const total = action.needs.length;
-  if (!total) return "UNKNOWN";
-  const missing = action.needs.filter((entry) => entry.state !== "MET");
-  const passed = dayHasPassed(action, now);
-  if (!missing.length) {
-    if (!passed) return "READY";
-    const afterwards = !!action.lastMetAt && !!action.start && action.lastMetAt > action.start;
-    return afterwards ? "LATE_RECEIPT" : "DONE";
-  }
-  if (passed) return "NOT_READY";
-  const from = riskFrom(action, riskDays);
-  return from && from.getTime() <= now.getTime() ? "AT_RISK" : "UPCOMING";
-}
-
-/**
- * The day an action is at risk from, and its departments confirm by hand: its
- * day less the longest-reaching risk window of a document still missing. The
- * backend writes the same day (Activity.RiskFrom). Null when nothing is missing
- * or there is no day.
- */
-export function riskFrom<E extends Stateful["needs"][number]>(
-  action: { start: Date | null; needs: E[] }, riskDays = DEFAULT_RISK_DAYS, only?: (entry: E) => boolean,
-): Date | null {
-  if (!action.start) return null;
-  const missing = action.needs.filter((entry) => (!only || only(entry)) && entry.state !== "MET");
-  if (!missing.length) return null;
-  const day = startOfDay(action.start).getTime();
-  return new Date(Math.min(...missing.map((entry) => day - (entry.riskDays ?? riskDays) * DAY)));
-}
 
 /**
  * Whether an action was postponed: a decision from the organization's list that

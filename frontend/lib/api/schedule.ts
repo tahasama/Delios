@@ -1,4 +1,5 @@
 import "server-only";
+import type { ActionState } from "@/lib/schedule/action-state";
 import { cache } from "react";
 import { api, ApiProblem, projectPath } from "./client";
 import type { ActivitySummary } from "./types";
@@ -134,6 +135,13 @@ export type PlanAction = {
   }[];
   /** Newest first. */
   decisions: PlanDecision[];
+  /** The backend's answers, the same on every screen: its day is over (in the project's time zone)… */
+  passed: boolean;
+  /** …where it stands… */
+  state: ActionState;
+  /** …and the day it is at risk from: overall, and for each discipline (null when nothing is missing or there is no day). */
+  riskFrom: Date | null;
+  disciplineRiskFrom: Record<string, Date | null>;
 };
 
 type Plan = { versionInForce: string | null; actions: PlanAction[] };
@@ -150,6 +158,8 @@ function datesOf(raw: Plan): Plan {
       return {
         ...r,
         start: day(r.start as unknown as string), finish: day(r.finish as unknown as string), lastMetAt: at(r.lastMetAt as unknown as string),
+        riskFrom: day(r.riskFrom as unknown as string),
+        disciplineRiskFrom: Object.fromEntries(Object.entries(r.disciplineRiskFrom).map(([k, v]) => [k, day(v as unknown as string)])),
         moved: r.moved ? { ...r.moved, wasStart: day(r.moved.wasStart as unknown as string), wasFinish: day(r.moved.wasFinish as unknown as string) } : null,
         needs: r.needs.map((n) => ({ ...n, neededBy: day(n.neededBy as unknown as string)! })),
         confirmations: r.confirmations.map((c) => ({ ...c, confirmedAt: at(c.confirmedAt as unknown as string), revokedAt: at(c.revokedAt as unknown as string) })),

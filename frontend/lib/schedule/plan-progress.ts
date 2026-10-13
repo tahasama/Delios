@@ -1,7 +1,7 @@
 import "server-only";
 import { departmentsOf } from "@/lib/schedule/schedule";
 import { planActions, scheduleSource } from "@/lib/api/schedule";
-import { actionState, DEFAULT_RISK_DAYS, type ActionState } from "@/lib/schedule/action-state";
+import { type ActionState } from "@/lib/schedule/action-state";
 
 export const PLAN_STAGES = ["Schedule", "Disciplines", "Requirements", "Documents ready"];
 
@@ -13,7 +13,6 @@ const HAS_EVERYTHING: ActionState[] = ["READY", "DONE", "LATE_RECEIPT"];
  */
 export async function planProgress(scope: { projectId: string }, window?: { from: Date | null; to: Date | null }) {
   const [actions, { source, imports }] = await Promise.all([planActions(scope), scheduleSource(scope)]);
-  const riskDays = source?.riskWindowDays ?? DEFAULT_RISK_DAYS;
   const inForce = imports.find((one) => one.status === "DONE") ?? null;
   const untagged = actions.filter((one) => !departmentsOf(one).length).map((one) => one.code);
   const pairs = actions.flatMap((one) => departmentsOf(one).map((department) => ({ action: one, department })));
@@ -25,7 +24,7 @@ export async function planProgress(scope: { projectId: string }, window?: { from
   const to = window?.to ?? new Date(Date.now() + 30 * day);
   const inWindow = actions.filter((one) => one.start && one.start >= from && one.start <= to);
   const listed = inWindow.filter((one) => one.needs.length);
-  const complete = listed.filter((one) => HAS_EVERYTHING.includes(actionState(one, riskDays))).length;
+  const complete = listed.filter((one) => HAS_EVERYTHING.includes(one.state)).length;
   const at = !actions.length ? 0
     : untagged.length ? 1
       : answered < pairs.length || !listed.length ? 2

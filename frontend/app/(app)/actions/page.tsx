@@ -6,7 +6,7 @@ import { mayUploadLists } from "@/lib/core/permissions";
 import { clearance } from "@/lib/schedule/requirements-process";
 import { readSearch, readDay } from "@/lib/documents/register-query";
 import { PLAN_CARD_HEIGHT, PLAN_FIRST } from "@/lib/schedule/plan-card";
-import { ACTION_STATES, DEFAULT_RISK_DAYS, actionState, dayHasPassed, isPostponed } from "@/lib/schedule/action-state";
+import { ACTION_STATES, isPostponed } from "@/lib/schedule/action-state";
 import { fmtDate } from "@/lib/core/utils";
 import { getSet } from "@/lib/settings/config";
 import { api } from "@/lib/api/client";
@@ -117,14 +117,14 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
   // The work happened without everything it needed: its day has passed and, on
   // that day, either something was still missing or the last of it had not yet
   // arrived. Both readings of "short on the day", in one clause.
-  const shortOnTheDay = (a: PlanAction) => a.needs.length > 0 && dayHasPassed(a) && (shortOfWhatItNeeds(a) || afterTheDay(a));
+  const shortOnTheDay = (a: PlanAction) => a.needs.length > 0 && a.passed && (shortOfWhatItNeeds(a) || afterTheDay(a));
   // Postponed: a decision of the organization's that does not proceed, not taken back.
   const postponeCodes = (await getActiveSet("ACTIVITY_DECISIONS")).filter((one) => one.props.proceeds !== true).map((one) => one.code);
   const postponed = (a: PlanAction) => isPostponed(a, postponeCodes);
   // Went ahead? Once its day has passed: with its documents, with documents
   // missing, or not at all because Document Control postponed it.
   const HAPPENED_WHERE: Record<string, (action: PlanAction) => boolean> = {
-    WITH: (a) => a.needs.length > 0 && dayHasPassed(a) && !shortOnTheDay(a) && !postponed(a),
+    WITH: (a) => a.needs.length > 0 && a.passed && !shortOnTheDay(a) && !postponed(a),
     WITHOUT: (a) => shortOnTheDay(a) && !postponed(a),
     STOPPED: (a) => postponed(a),
   };
@@ -134,7 +134,7 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
     !(planFrom || planTo) || (!!a.start && (!planFrom || a.start >= planFrom) && (!planTo || a.start <= planTo));
   const outsideWindow = (a: PlanAction) =>
     (!code || a.code === code)
-    && (!state || actionState(a, riskDays) === state)
+    && (!state || a.state === state)
     && (!happened || HAPPENED_WHERE[happened](a))
     && (sp.nodate !== "1" || !a.start)
     && (sp.untagged !== "1" || departmentsOf(a).length === 0)
@@ -163,7 +163,6 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
   ]);
   // How near a missing document's date must be to put its action at risk is the
   // project's setting, the same one the late warnings use.
-  const riskDays = source.source?.riskWindowDays ?? DEFAULT_RISK_DAYS;
   const found = schedule.filter(where).sort(orderBy);
   const matching = found.length;
   // Undated actions have no place in a window of days: they are counted on
@@ -192,11 +191,11 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
     const firstNeeded = action.needs.map((one) => one.neededBy).filter(Boolean).sort((a, b) => a!.getTime() - b!.getTime())[0] ?? null;
     // The next document still owed — what a controller chases first.
     const nextNeeded = missing.map((one) => one.neededBy).filter(Boolean).sort((a, b) => a!.getTime() - b!.getTime())[0] ?? null;
-    const readiness: Readiness = actionState(action, riskDays);
+    const readiness: Readiness = action.state;
     // What became of the work, which is not the same question as whether its
     // documents arrived. The day passing is the work happening; only Document
     // Control saying it was postponed takes that back.
-    const passed = dayHasPassed(action);
+    const passed = action.passed;
     const shortOnTheDay = missing.length > 0
       || (!!action.lastMetAt && !!action.start && action.lastMetAt > action.start);
     const happened: Happened = postponed(action)
