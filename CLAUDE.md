@@ -382,7 +382,10 @@ The repository: `backend/` (API and worker), `frontend/` (the Next.js screens; r
   Request a document), an opened form taking the width under them.
 - Automatic notices (worker job, once each): at risk → each discipline still
   short and not confirmed; day passed → the same. Confirmed disciplines and
-  postponed actions are not notified. A discipline that never answers stays open.
+  postponed actions are not notified. A discipline still silent some working days
+  after the day (Settings → How this project works, `ESCALATE_AFTER_DAYS`, 3 by
+  default) is escalated once: its people, Manage holders and Document Control
+  are all notified. Nothing marks the action "escalated"; the notice is the record.
 - Postponed: written with who decided and why; everyone concerned and whoever
   holds Plan are told; a Plan holder confirms it with what changes (a new
   schedule revision to follow); Document Control can take it back with a

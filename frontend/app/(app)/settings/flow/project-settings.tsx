@@ -14,6 +14,8 @@ import {
 } from "@/lib/control-activities";
 import { setControlActivitiesAction, setPolicyAction, setStateNamesAction } from "@/lib/actions/control-activities";
 import { STATE_NAMES, STATE_NAME_MAX, stateNames } from "@/lib/state-names";
+import { projectSettings } from "@/lib/api/settings";
+import { ESCALATE_AFTER_KEY, DEFAULT_ESCALATE_AFTER } from "@/lib/escalation";
 
 /**
  * What the project has settled: who carries each act out, what releasing and
@@ -25,11 +27,13 @@ import { STATE_NAMES, STATE_NAME_MAX, stateNames } from "@/lib/state-names";
  */
 export async function ProjectSettings() {
   const ctx = await requireScope();
-  const [{ follows, projectMode, set, rows }, chosen, names] = await Promise.all([
+  const [{ follows, projectMode, set, rows }, chosen, names, settings] = await Promise.all([
     controlSettings(ctx),
     policies(ctx),
     stateNames(ctx),
+    projectSettings(ctx.projectId).catch(() => new Map<string, string>()),
   ]);
+  const escalateAfter = settings.get(ESCALATE_AFTER_KEY);
 
   return (
     <div className="space-y-4">
@@ -143,6 +147,19 @@ export async function ProjectSettings() {
                 </div>
               </fieldset>
             ))}
+            <fieldset>
+              <legend className="text-sm font-semibold text-slate-900">When a discipline does not answer</legend>
+              <p className="mt-0.5 mb-2 text-xs leading-5 text-slate-600">
+                An action's day passed with a discipline's documents missing, and nobody of that discipline confirmed whether the work went ahead.
+                After this many working days, its people, management and Document Control are all notified, once.
+                {escalateAfter ? null : <span className="ml-1 text-slate-400">Nobody has answered this yet, so {DEFAULT_ESCALATE_AFTER} is in force.</span>}
+              </p>
+              <label className="flex items-center gap-2 text-xs text-slate-700">
+                Notify after
+                <input type="number" name={ESCALATE_AFTER_KEY} min={1} max={60} defaultValue={escalateAfter ?? DEFAULT_ESCALATE_AFTER} className={`${inputCls} w-20`} />
+                working days
+              </label>
+            </fieldset>
           </div>
         </ActionForm>
       </Card>

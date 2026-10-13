@@ -11,6 +11,7 @@ import {
 import { STATE_NAMES, STATE_NAME_MAX } from "@/lib/state-names";
 import { orgSettings, projectSettings, setOrgSetting, setProjectSetting } from "@/lib/api/settings";
 import { refusal } from "@/lib/api/client";
+import { ESCALATE_AFTER_KEY } from "@/lib/escalation";
 import {
   CONTROL_ACTIVITIES,
   controlSettings,
@@ -91,6 +92,12 @@ export async function setPolicyAction(_prev: State | undefined, formData: FormDa
     if (await put(one.key, asked, one.title)) {
       changed.push(one.options.find((option) => option.value === asked)!.label.toLowerCase());
     }
+  }
+  const escalate = String(formData.get(ESCALATE_AFTER_KEY) ?? "").trim();
+  if (escalate) {
+    const days = Number(escalate);
+    if (!Number.isInteger(days) || days < 1 || days > 60) return { error: "Escalate after 1 to 60 working days." };
+    if (await put(ESCALATE_AFTER_KEY, String(days), "Escalating a discipline that has not answered")) changed.push(`escalate after ${days} working days`);
   }
   revalidatePath("/settings/control");
   revalidatePath("/settings/flow");

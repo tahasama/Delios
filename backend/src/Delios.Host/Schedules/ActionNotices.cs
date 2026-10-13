@@ -157,6 +157,8 @@ public sealed class ActionNotices(IServiceScopeFactory scopes, ILogger<ActionNot
         var postponed = (await db.ActivityDecisions.AsNoTracking().Where(d => d.ProjectId == projectId && d.ReversedAt == null)
             .Select(d => new { d.ActivityId, d.Decision }).ToListAsync(cancellationToken))
             .Where(d => !Proceeds(catalog, d.Decision)).Select(d => d.ActivityId).ToHashSet();
+        var escalateAfter = int.TryParse(await Settings.ProjectAnswers.PolicyAsync(db, projectId, EscalateAfterKey, cancellationToken), out var days) && days > 0
+            ? days : DefaultEscalateAfter;
         var told = 0;
         foreach (var activity in activities)
         {
@@ -195,7 +197,14 @@ public sealed class ActionNotices(IServiceScopeFactory scopes, ILogger<ActionNot
             foreach (var department in activity.Departments.Where(d => missing[d] > 0 && !Confirmed(d)))
             {
                 var subject = $"activity:{activity.Id}:{(passed ? "passed" : "risk")}:{department}";
-                if (await NoticeLog.SentAsync(db, projectId, subject, cancellationToken)) continue;
+                if (await NoticeLog.SentAsync(db, projectId, subject, cancellationToken))
+                {
+                    // Told when the day passed, and still no answer some working days later: the discipline, management
+                    // and Document Control are all told, once.
+                    if (passed && WorkingCalendar.AddWorkingDays(day, escalateAfter, project.WeekendDays) <= today)
+                        told += await EscalateAsync(db, notifier, clock, project, activity, department, missing[department], escalateAfter, cancellationToken);
+                    continue;
+                }
                 var people = await NoticeLog.DepartmentMembersAsync(db, projectId, department, cancellationToken);
                 var title = passed
                     ? $"{activity.Code}: its day ({day:yyyy-MM-dd}) passed with {missing[department]} of {department}'s documents missing"
@@ -211,6 +220,32 @@ public sealed class ActionNotices(IServiceScopeFactory scopes, ILogger<ActionNot
         await db.SaveChangesAsync(cancellationToken);
         await tx.CommitAsync(cancellationToken);
         return told;
+    }
+
+    /// <summary>The project setting: working days after an action's day before an unanswered discipline is escalated.</summary>
+    public const string EscalateAfterKey = "ESCALATE_AFTER_DAYS";
+    /// <summary>Unless the project says otherwise: three working days.</summary>
+    public const int DefaultEscalateAfter = 3;
+
+    /// <summary>
+    /// A discipline still short of its documents and silent some working days after the action's day: its people,
+    /// whoever holds Manage, and Document Control are told, once. Nothing on the action is marked; the notice is the record.
+    /// </summary>
+    private static async Task<int> EscalateAsync(DeliosDbContext db, Notifications.Notifier notifier, IClock clock, Identity.Project project,
+        Activity activity, string department, int missing, int after, CancellationToken cancellationToken)
+    {
+        var subject = $"activity:{activity.Id}:escalated:{department}";
+        if (await NoticeLog.SentAsync(db, project.Id, subject, cancellationToken)) return 0;
+        var people = await NoticeLog.DepartmentMembersAsync(db, project.Id, department, cancellationToken);
+        people.AddRange(await NoticeLog.HoldersAsync(db, project.Id, Identity.Verbs.Manage, cancellationToken));
+        people.AddRange(await NoticeLog.HoldersAsync(db, project.Id, Identity.Verbs.Control, cancellationToken));
+        if (people.Count == 0) return 0;
+        await NoticeLog.SendAsync(db, notifier, clock, project.TenantId, project.Id, subject, true, "Automatic",
+            $"{activity.Code}: {department} has not answered, {after} working days after its day ({activity.Start:yyyy-MM-dd})",
+            $"{activity.Name}. {missing} of {department}'s documents are still missing and nobody of {department} has confirmed whether the work went ahead without them. "
+            + "Confirm it on the action's page and say why, or record that it was postponed.",
+            $"/actions/{activity.Code}", people, cancellationToken);
+        return 1;
     }
 
     /// <summary>Whether a decision means the work went ahead (the published value's "proceeds"); otherwise it was postponed.</summary>

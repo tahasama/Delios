@@ -312,6 +312,11 @@ row. If a type is added to the family later, re-import the row to cover it. Rule
     saying so.
 - The order of the levels is the confidentiality list's own order, or its `level` property where one is set.
 
+**A discipline that does not answer is escalated.** When an action's day has passed with a discipline's documents
+missing and nobody of that discipline confirmed, everyone of that discipline, management (Manage) and Document
+Control are notified once, 3 working days after the day. The number is changed in Settings → How this project works.
+The action is not marked; the notice is in the notice log.
+
 **Sessions end after 7 days.** A session still renews while in use, but never beyond 7 days from signing in;
 then the person signs in again.
 

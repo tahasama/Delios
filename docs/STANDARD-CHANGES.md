@@ -972,6 +972,22 @@ project without being on it.
 
 ---
 
+## 53 · A discipline that does not answer is escalated
+
+**Clause:** §14.8 *Verification*.
+
+**Must say:** when an action's day has passed with a discipline's documents
+missing and nobody of that discipline has confirmed whether the work went
+ahead without them, the discipline's people, management and the control
+function are all told, once, a number of working days after the day. The
+number is the project's (three unless it says otherwise). Nothing is marked on
+the action; the notice is the record.
+
+**Depends on it:** `ActionNotices.EscalateAsync`, project setting
+`ESCALATE_AFTER_DAYS`.
+
+---
+
 ## Still open — decided in conversation, not yet built
 
 - **Transmittals as the one channel, in two families.** Transmittals will work
@@ -992,6 +1008,3 @@ project without being on it.
   with nobody on the system receiving it by email directly (today one of ours
   sends it, and the dispatch is recorded).
 
-- **Escalation** where somebody refuses to acknowledge carrying an action
-  without its documents. Agreed to be the Standard's and the DMP's business
-  rather than the application's; the Standard should say what happens.
