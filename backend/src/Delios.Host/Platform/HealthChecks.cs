@@ -1,8 +1,6 @@
 using System.Net.Sockets;
 using System.Text;
 using System.Text.Json;
-using Amazon.S3;
-using Amazon.S3.Util;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
 using RabbitMQ.Client;

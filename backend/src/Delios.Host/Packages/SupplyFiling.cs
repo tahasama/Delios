@@ -3,7 +3,6 @@ using Delios.Host.Documents;
 using Delios.Host.Identity;
 using Delios.Host.Platform;
 using Delios.Host.Reviews;
-using Delios.Host.Tenancy;
 using Delios.Host.Transmittals;
 using Microsoft.EntityFrameworkCore;
 using NodaTime;

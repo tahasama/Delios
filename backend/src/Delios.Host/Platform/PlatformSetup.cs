@@ -1,4 +1,3 @@
-using System.Net;
 using System.Threading.RateLimiting;
 using Amazon.Runtime;
 using Amazon.S3;
@@ -7,7 +6,6 @@ using Delios.Host.Identity;
 using Delios.Host.Tenancy;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.DataProtection;

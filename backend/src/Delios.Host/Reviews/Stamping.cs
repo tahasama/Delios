@@ -9,7 +9,6 @@ using NodaTime;
 using NodaTime.Text;
 using PdfSharp.Drawing;
 using PdfSharp.Fonts;
-using PdfSharp.Pdf;
 using PdfSharp.Pdf.IO;
 
 namespace Delios.Host.Reviews;

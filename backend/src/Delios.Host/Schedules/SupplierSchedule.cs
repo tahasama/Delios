@@ -2,7 +2,6 @@ using System.Text.Json;
 using Delios.Host.Documents;
 using Delios.Host.Identity;
 using Delios.Host.Platform;
-using Delios.Host.Tenancy;
 using Delios.Host.Transmittals;
 using Microsoft.EntityFrameworkCore;
 
