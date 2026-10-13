@@ -9,7 +9,7 @@ namespace Delios.Host.Seeding;
 /// <summary>Body of an organization registering itself. The project is optional: an organization exists before its projects do.</summary>
 public sealed record SignUpRequest(
     string? OrganizationName, string? Name, string? Email, string? Password, string? ProjectCode = null, string? ProjectName = null,
-    string? ContractRole = null, string? ProjectKind = null);
+    string? ContractRole = null, string? ProjectKind = null, string? Turnstile = null);
 
 /// <summary>
 /// The one self-service way in: an organization registers itself, with its first administrator and the recommended
@@ -27,9 +27,11 @@ public static class SignUpEndpoints
     private static async Task<IResult> SignUpAsync(
         SignUpRequest request, HttpContext http, IConfiguration configuration, DeliosDbContext db, DemoSeed starter, SessionStore sessions,
         AuditLog audit, IOptions<SessionCookieOptions> cookie, PasswordPolicy passwords, IOptions<Notifications.EmailOptions> mail,
-        Notifications.Notifier notifier, Microsoft.AspNetCore.DataProtection.IDataProtectionProvider protection, CancellationToken cancellationToken)
+        Notifications.Notifier notifier, Microsoft.AspNetCore.DataProtection.IDataProtectionProvider protection, BotCheck bots,
+        CancellationToken cancellationToken)
     {
         if (!configuration.GetValue("SignUp:Enabled", false)) return Results.NotFound();
+        if (await bots.RefusalAsync(request.Turnstile, http, cancellationToken) is { } robot) return robot;
         var organization = request.OrganizationName?.Trim() ?? "";
         var name = request.Name?.Trim() ?? "";
         var email = request.Email?.Trim().ToLowerInvariant() ?? "";

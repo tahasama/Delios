@@ -29,6 +29,8 @@ setting in `deploy/.env`, nothing in code.
    (`GET, HEAD, PUT`). If test files must be kept: `rclone copy` from SeaweedFS first.
 4. **Domain and HTTPS:** `SITE_ADDRESS=app.example.com`, `PUBLIC_URL=https://app.example.com`,
    `SECURE_COOKIE=true`, ports 80 and 443 open ("Domain and HTTPS").
+   **Bot check:** create a Turnstile widget in Cloudflare for the domain and set `TURNSTILE_SITE_KEY` and
+   `TURNSTILE_SECRET_KEY`; rebuild the `web` image (the site key is read when the screens are built).
 5. **Database backups** off the server: `BACKUP_REPO_TYPE=s3` with `BACKUP_S3_*`
    (another bucket, ideally another region) and a `BACKUP_CIPHER_PASS` kept off the server ("Backups").
 6. **Second copy of files:** `FILE_BACKUP_TARGET_TYPE=s3` and its target, another region or provider.

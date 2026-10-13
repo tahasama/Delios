@@ -4,7 +4,9 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
-ENV NEXT_TELEMETRY_DISABLED=1
+# Read when the screens are built: the bot check's public site key (empty: no check).
+ARG NEXT_PUBLIC_TURNSTILE_SITE_KEY=""
+ENV NEXT_TELEMETRY_DISABLED=1 NEXT_PUBLIC_TURNSTILE_SITE_KEY=$NEXT_PUBLIC_TURNSTILE_SITE_KEY
 RUN npm run build
 
 # Only what `next start` needs (the standalone output), run as a non-root user.

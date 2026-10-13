@@ -117,6 +117,9 @@ public static class PlatformSetup
         services.Configure<NewPasswordOptions>(config.GetSection(NewPasswordOptions.Section));
         services.AddHttpClient(PasswordPolicy.HttpClientName, c => c.Timeout = TimeSpan.FromSeconds(3));
         services.AddScoped<PasswordPolicy>();
+        services.Configure<TurnstileOptions>(config.GetSection(TurnstileOptions.Section));
+        services.AddHttpClient(BotCheck.HttpClientName, c => c.Timeout = TimeSpan.FromSeconds(5));
+        services.AddScoped<BotCheck>();
         services.AddSingleton<OidcClient>();
         services.AddScoped<ProjectAccessLoader>();
         services.AddScoped<Documents.Numbering>();

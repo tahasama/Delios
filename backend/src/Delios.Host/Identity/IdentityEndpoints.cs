@@ -10,7 +10,7 @@ using NodaTime;
 namespace Delios.Host.Identity;
 
 /// <summary>Body of a sign-in: the email says which organization (a person belongs to one), the password proves it is them.</summary>
-public sealed record SignInRequest([Required] string Email, [Required] string Password);
+public sealed record SignInRequest([Required] string Email, [Required] string Password, string? Turnstile = null);
 /// <summary>
 /// Body of the second sign-in step (<c>/api/auth/mfa</c>, <c>/mfa/setup</c>, <c>/mfa/confirm</c>): the challenge from <c>SignInStep</c> and, where needed, the six-digit or recovery code.
 /// </summary>
@@ -79,8 +79,9 @@ public static class IdentityEndpoints
     private static async Task<IResult> SignInAsync(
         SignInRequest request, HttpContext http, DeliosDbContext db, TenantContext tenant,
         SessionStore sessions, AuditLog audit, IClock clock, IPasswordHasher<User> hasher, Mfa mfa,
-        IOptions<SessionCookieOptions> cookie, CancellationToken cancellationToken)
+        IOptions<SessionCookieOptions> cookie, BotCheck bots, CancellationToken cancellationToken)
     {
+        if (await bots.RefusalAsync(request.Turnstile, http, cancellationToken) is { } robot) return robot;
         var failed = Problems.Problem(StatusCodes.Status401Unauthorized, "SIGN_IN_FAILED",
             "The email or password is not right.", null);
 

@@ -10,7 +10,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Delios.Host.Identity;
 
 /// <summary>Body of "forgot password": the email of the account.</summary>
-public sealed record ForgotPasswordRequest(string? Email);
+public sealed record ForgotPasswordRequest(string? Email, string? Turnstile = null);
 /// <summary>Body of the reset itself: the link's token and the new password.</summary>
 public sealed record ResetPasswordRequest(string? Token, string? Password);
 
@@ -45,9 +45,10 @@ public static class PasswordReset
     /// may sign in with a password. Always answers 204, so it cannot be used to find out who has an account.
     /// </summary>
     private static async Task<IResult> ForgotAsync(
-        ForgotPasswordRequest request, DeliosDbContext db, TenantContext tenant, Notifier notifier, AuditLog audit,
-        IDataProtectionProvider protection, CancellationToken cancellationToken)
+        ForgotPasswordRequest request, HttpContext http, DeliosDbContext db, TenantContext tenant, Notifier notifier, AuditLog audit,
+        IDataProtectionProvider protection, BotCheck bots, CancellationToken cancellationToken)
     {
+        if (await bots.RefusalAsync(request.Turnstile, http, cancellationToken) is { } robot) return robot;
         var normalized = (request.Email ?? "").Trim().ToUpperInvariant();
         if (normalized.Length == 0) return Results.NoContent();
         var organization = await db.Tenants.AsNoTracking()

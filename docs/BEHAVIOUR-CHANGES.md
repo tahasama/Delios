@@ -334,6 +334,17 @@ then the person signs in again.
 **Refused requests are recorded.** When someone signed in is refused (403), the audit trail records
 `ACCESS_REFUSED` with what was asked and why, once an hour per person and address.
 
+**New passwords are stronger.** At least 12 characters (was 8), and never one published in a data breach. Passwords
+already set keep working. The team import's first passwords are random.
+
+**Sign-up confirms the email** while email is on: the first administrator signs in after opening the emailed link;
+the sign-in page offers to send it again.
+
+**A sign-in from a new browser is emailed** to the person, with what to do if it was not them.
+
+**The bot check** (Cloudflare Turnstile) appears on sign-in, sign-up, forgot password and "send the link again" once
+the installation sets its keys.
+
 **Forgot password.**
 - "Forgot your password?" on the sign-in page asks for the email and sends a link to choose a new password.
 - The link works once, within 30 minutes, and stops working as soon as the password changes any other way.

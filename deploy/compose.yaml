@@ -50,6 +50,8 @@ x-backend: &backend
     Email__Smtp__Port: ${SMTP_PORT:-587}
     Email__Smtp__User: ${SMTP_USER:-}
     Email__Smtp__Password: ${SMTP_PASSWORD:-}
+    # The bot check on sign-in, sign-up and forgot password (Cloudflare Turnstile); empty: off.
+    Turnstile__SecretKey: ${TURNSTILE_SECRET_KEY:-}
     # The address people reach the system at, for single sign-on to send them back to.
     Sso__PublicUrl: ${PUBLIC_URL:-}
     # postgres until RegisterSearchSlow says otherwise; then opensearch (with the search profile).
@@ -209,7 +211,10 @@ services:
   # The screens, behind Caddy at SITE_ADDRESS (http://localhost:3080 here).
   # Not needed while working on them with `npm run dev`.
   web:
-    build: ../frontend
+    build:
+      context: ../frontend
+      args:
+        NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${TURNSTILE_SITE_KEY:-}
     image: delios-web
     profiles: [web]
     restart: unless-stopped

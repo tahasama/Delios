@@ -11,7 +11,7 @@ namespace Delios.Host.Identity;
 /// <summary>Body of confirming an email: the link's token.</summary>
 public sealed record ConfirmEmailRequest(string? Token);
 /// <summary>Body of asking for the confirmation link again.</summary>
-public sealed record ResendConfirmationRequest(string? Email);
+public sealed record ResendConfirmationRequest(string? Email, string? Turnstile = null);
 
 /// <summary>
 /// An organization registering itself proves its email: while email is on, sign-up sends a link (good for two days)
@@ -78,9 +78,10 @@ public static class EmailConfirmation
     /// <c>POST /api/auth/confirm-email/resend</c>: sends the link again to an account still waiting for it. Always 204, so
     /// it says nothing about who has an account.
     /// </summary>
-    private static async Task<IResult> ResendAsync(ResendConfirmationRequest request, DeliosDbContext db, TenantContext tenant,
-        Notifier notifier, IDataProtectionProvider protection, CancellationToken cancellationToken)
+    private static async Task<IResult> ResendAsync(ResendConfirmationRequest request, HttpContext http, DeliosDbContext db, TenantContext tenant,
+        Notifier notifier, IDataProtectionProvider protection, BotCheck bots, CancellationToken cancellationToken)
     {
+        if (await bots.RefusalAsync(request.Turnstile, http, cancellationToken) is { } robot) return robot;
         var normalized = (request.Email ?? "").Trim().ToUpperInvariant();
         if (normalized.Length == 0) return Results.NoContent();
         var organization = await db.Tenants.AsNoTracking()

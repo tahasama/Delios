@@ -5,6 +5,7 @@ import { useActionState } from "react";
 import { forgotPasswordAction } from "@/lib/actions/auth";
 import { inputCls, btn } from "@/components/ui";
 import { AuthShell } from "../login/shell";
+import { BotCheck } from "@/components/bot-check";
 
 export default function ForgotPasswordPage() {
   const [state, formAction, pending] = useActionState(forgotPasswordAction, undefined);
@@ -26,6 +27,7 @@ export default function ForgotPasswordPage() {
               <label htmlFor="email" className="mb-1 block text-xs font-medium text-slate-700">Email</label>
               <input id="email" name="email" type="email" autoComplete="email" required autoFocus className={inputCls} placeholder="you@company.com" />
             </div>
+            <BotCheck renew={state} />
             {state?.error ? <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{state.error}</p> : null}
             <button type="submit" disabled={pending} className={`${btn("primary")} w-full`}>
               {pending ? "Sending…" : "Send the link"}

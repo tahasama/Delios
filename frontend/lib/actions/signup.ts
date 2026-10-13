@@ -58,7 +58,7 @@ export async function signupAction(_prev: SignupState | undefined, formData: For
       method: "POST",
       device: await deviceId(),
       body: {
-        organizationName, name, email, password,
+        organizationName, name, email, password, turnstile: String(formData.get("cf-turnstile-response") ?? "") || undefined,
         projectCode: wantsProject ? projectCode : null, projectName: wantsProject ? projectName : null, contractRole: wantsProject ? projectRole : null,
         projectKind: wantsProject ? projectKind : null,
       },

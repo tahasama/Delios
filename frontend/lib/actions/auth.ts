@@ -18,6 +18,11 @@ type LoginState = {
   next?: string;
 };
 
+/** The bot check's token, when the page showed it (Cloudflare Turnstile). */
+function botToken(formData: FormData): string | undefined {
+  return String(formData.get("cf-turnstile-response") ?? "") || undefined;
+}
+
 /** The session the backend started, from its cookie. */
 function sessionOf(response: Response): string | undefined {
   return response.headers.getSetCookie().find((c) => c.startsWith("delios_session="))?.slice("delios_session=".length).split(";")[0];
@@ -80,7 +85,9 @@ export async function loginAction(_prev: LoginState | undefined, formData: FormD
   // the sign-in. A person belongs to one organization, so the email says which.
   let response: Response;
   try {
-    response = await apiFetch("/api/auth/sign-in", { method: "POST", body: { email, password }, device: await deviceId() });
+    response = await apiFetch("/api/auth/sign-in", {
+      method: "POST", body: { email, password, turnstile: botToken(formData) }, device: await deviceId(),
+    });
   } catch {
     return { error: "The server does not answer. Try again in a moment.", email };
   }
@@ -119,7 +126,7 @@ type PasswordState = { error?: string; done?: boolean };
 export async function forgotPasswordAction(_prev: PasswordState | undefined, formData: FormData): Promise<PasswordState> {
   const email = String(formData.get("email") ?? "").trim();
   if (!email) return { error: "Type the email you sign in with." };
-  const response = await apiFetch("/api/auth/password/forgot", { method: "POST", body: { email } }).catch(() => null);
+  const response = await apiFetch("/api/auth/password/forgot", { method: "POST", body: { email, turnstile: botToken(formData) } }).catch(() => null);
   if (!response) return { error: "The server cannot be reached. Try again in a moment." };
   if (response.status === 429) return { error: "Too many attempts. Wait a minute and try again." };
   return { done: true };
@@ -141,7 +148,7 @@ export async function resetPasswordAction(_prev: PasswordState | undefined, form
 export async function resendConfirmationAction(_prev: PasswordState | undefined, formData: FormData): Promise<PasswordState> {
   const email = String(formData.get("email") ?? "").trim();
   if (!email) return { error: "Type the email you registered with." };
-  const response = await apiFetch("/api/auth/confirm-email/resend", { method: "POST", body: { email } }).catch(() => null);
+  const response = await apiFetch("/api/auth/confirm-email/resend", { method: "POST", body: { email, turnstile: botToken(formData) } }).catch(() => null);
   if (!response) return { error: "The server cannot be reached. Try again in a moment." };
   if (response.status === 429) return { error: "Too many attempts. Wait a minute and try again." };
   return { done: true };

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useActionState, useState } from "react";
 import { AuthShell } from "../login/shell";
+import { BotCheck } from "@/components/bot-check";
 import { signupAction } from "@/lib/actions/signup";
 import { APP_NAME } from "@/lib/standard";
 import { inputCls, btn } from "@/components/ui";
@@ -144,6 +145,7 @@ export default function SignupPage() {
             </fieldset>
 
             <MissingSummary missing={missing} />
+            <BotCheck renew={state} />
             {state?.error ? <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{state.error}</p> : null}
 
             <button type="submit" disabled={pending} className={`${btn("primary")} w-full`}>

@@ -5,6 +5,7 @@ import { Suspense, useActionState, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { loginAction, resendConfirmationAction } from "@/lib/actions/auth";
 import { AuthShell } from "./shell";
+import { BotCheck } from "@/components/bot-check";
 import { inputCls, btn } from "@/components/ui";
 import { MissingSummary } from "@/components/form";
 import { collectInvalid, type MissingField } from "@/components/form-validation";
@@ -92,6 +93,7 @@ function LoginForm() {
               ) : null}
               </>
             )}
+            {state?.mfa || state?.recoveryCodes ? null : <BotCheck renew={state} />}
             <MissingSummary missing={missing} />
             {state?.error ? <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{state.error}</p> : null}
             {state?.mfa || state?.recoveryCodes ? null : (
@@ -130,6 +132,7 @@ function ResendLink({ email }: { email: string }) {
   return (
     <form action={formAction} className="mt-3">
       <input type="hidden" name="email" value={email} />
+      <BotCheck renew={state} />
       {state?.error ? <p role="alert" className="mb-2 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{state.error}</p> : null}
       <button type="submit" disabled={pending} className={`${btn("secondary")} w-full`}>{pending ? "Sending…" : "Send the link again"}</button>
     </form>
