@@ -26,7 +26,7 @@ public static class SignUpEndpoints
 
     private static async Task<IResult> SignUpAsync(
         SignUpRequest request, HttpContext http, IConfiguration configuration, DeliosDbContext db, DemoSeed starter, SessionStore sessions,
-        AuditLog audit, IOptions<SessionCookieOptions> cookie, CancellationToken cancellationToken)
+        AuditLog audit, IOptions<SessionCookieOptions> cookie, PasswordPolicy passwords, CancellationToken cancellationToken)
     {
         if (!configuration.GetValue("SignUp:Enabled", false)) return Results.NotFound();
         var organization = request.OrganizationName?.Trim() ?? "";
@@ -35,7 +35,7 @@ public static class SignUpEndpoints
         var password = request.Password ?? "";
         if (organization.Length == 0) return Problems.Invalid("ORGANIZATION_REQUIRED", "Your organization needs a name.");
         if (name.Length == 0 || !email.Contains('@')) return Problems.Invalid("NAME_AND_EMAIL_REQUIRED", "Your name and email are required.");
-        if (password.Length < 8) return Problems.Invalid("PASSWORD_TOO_SHORT", "The password must be at least 8 characters.");
+        if (await passwords.RefusalAsync(password, cancellationToken) is { } weak) return weak;
         var wantsProject = !string.IsNullOrWhiteSpace(request.ProjectCode) || !string.IsNullOrWhiteSpace(request.ProjectName);
         if (wantsProject && (string.IsNullOrWhiteSpace(request.ProjectCode) || string.IsNullOrWhiteSpace(request.ProjectName)))
             return Problems.Invalid("PROJECT_INCOMPLETE", "Name the project and give it a code, or leave both empty to open it later.");

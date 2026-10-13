@@ -139,13 +139,13 @@ public static class DirectoryEndpoints
     /// <summary><c>POST /api/admin/users</c>: a new person. Their email signs them in to this organization alone.</summary>
     private static async Task<IResult> CreateUserAsync(
         CreateUserRequest request, HttpContext http, DeliosDbContext db, AuditLog audit, IPasswordHasher<User> hasher,
-        CancellationToken cancellationToken)
+        PasswordPolicy passwords, CancellationToken cancellationToken)
     {
         var name = Blank(request.Name);
         var email = Blank(request.Email)?.ToLowerInvariant();
         if (name is null || email is null) return Problems.Invalid("NAME_AND_EMAIL_REQUIRED", "Name and email are required.");
         if (!email.Contains('@') || email.Length > 254) return Problems.Invalid("EMAIL_INVALID", "Give a valid email address.");
-        if ((request.Password ?? "").Length < 8) return Problems.Invalid("PASSWORD_TOO_SHORT", "A password has at least 8 characters.");
+        if (await passwords.RefusalAsync(request.Password, cancellationToken) is { } weak) return weak;
         if (request.IsAdmin && !await Keepers.ConfiguresAsync(http)) return Problems.Forbidden("ADMIN_ONLY", "Only an administrator makes somebody an administrator.");
         var normalized = email.ToUpperInvariant();
         if (await db.SignInNames.AnyAsync(n => n.NormalizedEmail == normalized, cancellationToken))
@@ -210,7 +210,7 @@ public static class DirectoryEndpoints
         if (request.IsAdmin is { } isAdmin && isAdmin != user.IsAdmin) { changes.Add(isAdmin ? "administrator" : "not an administrator"); user.IsAdmin = isAdmin; }
         if (!string.IsNullOrEmpty(request.Password))
         {
-            if (request.Password.Length < 8) return Problems.Invalid("PASSWORD_TOO_SHORT", "A password has at least 8 characters.");
+            if (await http.RequestServices.GetRequiredService<PasswordPolicy>().RefusalAsync(request.Password, cancellationToken) is { } weak) return weak;
             user.PasswordHash = hasher.HashPassword(user, request.Password);
             user.FailedSignIns = 0;
             user.LockedUntil = null;

@@ -70,7 +70,7 @@ export async function addPersonAction(_prev: SetupState | undefined, formData: F
   const functionId = String(formData.get("functionId") ?? "").trim();
   const password = String(formData.get("password") ?? "");
   if (!name || !email) return { error: "Name and email are required." };
-  if (password.length < 8) return { error: "The password must be at least 8 characters." };
+  if (password.length < 12) return { error: "A password has at least 12 characters." };
   const fn = (await adminFunctions()).find((one) => one.id === functionId && one.active);
   if (!fn) return { error: "Choose the function this person will hold." };
   const ours = (await adminParties()).find((one) => one.isInternal);

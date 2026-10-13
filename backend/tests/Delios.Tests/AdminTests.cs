@@ -23,14 +23,14 @@ public sealed class AdminTests(Infrastructure infrastructure) : IClassFixture<In
         var project = await Api.ProjectIdAsync(engineer);
 
         // Only an administrator keeps the directory.
-        var (refused, refusal) = await Flow.PostAsync(engineer, "/api/admin/users", new { name = "Nobody", email = "nobody@demo.local", password = "secret-123" });
+        var (refused, refusal) = await Flow.PostAsync(engineer, "/api/admin/users", new { name = "Nobody", email = "nobody@demo.local", password = "secret-12345" });
         Assert.Equal((HttpStatusCode.Forbidden, "ADMIN_OR_CONTROL"), (refused, Flow.Code(refusal)));
 
         // An email signs one person in to one organization.
-        var (taken, takenBody) = await Flow.PostAsync(admin, "/api/admin/users", new { name = "Twin", email = "Engineer@demo.local", password = "secret-123" });
+        var (taken, takenBody) = await Flow.PostAsync(admin, "/api/admin/users", new { name = "Twin", email = "Engineer@demo.local", password = "secret-12345" });
         Assert.Equal((HttpStatusCode.Conflict, "EMAIL_TAKEN"), (taken, Flow.Code(takenBody)));
 
-        var (created, body) = await Flow.PostAsync(admin, "/api/admin/users", new { name = "Nora New", email = "nora@demo.local", password = "secret-123" });
+        var (created, body) = await Flow.PostAsync(admin, "/api/admin/users", new { name = "Nora New", email = "nora@demo.local", password = "secret-12345" });
         Assert.True(created == HttpStatusCode.Created, body.ToString());
         var nora = body.GetProperty("id").GetGuid();
 
@@ -40,7 +40,7 @@ public sealed class AdminTests(Infrastructure infrastructure) : IClassFixture<In
         var (placed, placedBody) = await PutAsync(admin, $"/api/admin/projects/{project}/members", new { userId = nora, functionId = reviewer, department = "CI" });
         Assert.True(placed == HttpStatusCode.NoContent, placedBody.ToString());
 
-        var noraClient = await app.SignedInAsync("nora@demo.local", "secret-123");
+        var noraClient = await app.SignedInAsync("nora@demo.local", "secret-12345");
         var me = await noraClient.GetFromJsonAsync<JsonElement>("/api/me");
         Assert.Contains(me.GetProperty("projects").EnumerateArray(), p => p.GetProperty("id").GetGuid() == project);
 
@@ -186,7 +186,7 @@ public sealed class AdminTests(Infrastructure infrastructure) : IClassFixture<In
     public async Task An_organization_registers_itself_and_can_register_a_document_at_once()
     {
         await using var off = await TestApp.StartAsync(infrastructure);
-        var (closed, _) = await Flow.PostAsync(off.Factory.CreateClient(), "/api/auth/sign-up", new { organizationName = "Nope", name = "N", email = "n@nope.test", password = "secret-123" });
+        var (closed, _) = await Flow.PostAsync(off.Factory.CreateClient(), "/api/auth/sign-up", new { organizationName = "Nope", name = "N", email = "n@nope.test", password = "secret-12345" });
         Assert.Equal(HttpStatusCode.NotFound, closed);
 
         await using var app = await TestApp.StartAsync(infrastructure, settings => settings["SignUp:Enabled"] = "true");
@@ -195,7 +195,7 @@ public sealed class AdminTests(Infrastructure infrastructure) : IClassFixture<In
             organizationName = "Twin Ltd",
             name = "Twin",
             email = "engineer@demo.local",
-            password = "secret-123",
+            password = "secret-12345",
         });
         Assert.Equal((HttpStatusCode.Conflict, "EMAIL_TAKEN"), (taken, Flow.Code(takenBody)));
 
@@ -204,12 +204,12 @@ public sealed class AdminTests(Infrastructure infrastructure) : IClassFixture<In
             organizationName = "Riverside Water",
             name = "Rita River",
             email = "rita@riverside.test",
-            password = "secret-123",
+            password = "secret-12345",
             projectCode = "RW1",
             projectName = "Riverside intake",
         });
         Assert.True(made == HttpStatusCode.NoContent, madeBody.ToString());
-        var rita = await app.SignedInAsync("rita@riverside.test", "secret-123");
+        var rita = await app.SignedInAsync("rita@riverside.test", "secret-12345");
         var me = await rita.GetFromJsonAsync<JsonElement>("/api/me");
         Assert.Equal("Riverside Water", me.GetProperty("tenant").GetProperty("name").GetString());
         Assert.True(me.GetProperty("user").GetProperty("isAdmin").GetBoolean());

@@ -1,5 +1,7 @@
 "use server";
 
+import { randomBytes } from "crypto";
+
 import { requireScope } from "@/lib/scope";
 import { parseCsv, toObjects } from "@/lib/csv";
 import { getActiveSet, getSet, getSets } from "@/lib/config";
@@ -254,7 +256,7 @@ export async function importBulkAction(_prev: BulkResult | undefined, formData: 
           : null;
         // A one-time password, written into the report so whoever imported can
         // hand it over; the person changes it when they first sign in.
-        const password = `delios-${Math.random().toString(36).slice(2, 8)}`;
+        const password = randomBytes(12).toString("base64url");
         let created: { id: string; name: string; email: string };
         try {
           created = await api<{ id: string; name: string; email: string }>("/api/admin/users", {

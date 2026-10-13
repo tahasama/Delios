@@ -104,7 +104,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
                     </select>
                   )}
                 </Asked>
-                <Field label="Password" required><input name="password" required minLength={8} className={inputCls} placeholder="at least 8 characters" /></Field>
+                <Field label="Password" required><input name="password" required minLength={12} className={inputCls} placeholder="at least 12 characters" /></Field>
                 {projectPicker}
                 <Added fields={policy.own} />
               </div>
@@ -142,7 +142,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
                     </select>
                   </Field>
                   <Field label="Function" required><select name="functionId" required className={inputCls} defaultValue=""><option value="" disabled>Choose…</option>{functionOptions}</select></Field>
-                  <Field label="Password" required><input name="password" required minLength={8} className={inputCls} placeholder="at least 8 characters" /></Field>
+                  <Field label="Password" required><input name="password" required minLength={12} className={inputCls} placeholder="at least 12 characters" /></Field>
                   {projectPicker}
                 </div>
               </ActionForm>

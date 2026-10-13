@@ -24,8 +24,6 @@ public static class PasswordReset
 {
     /// <summary>How long a reset link works.</summary>
     public static readonly TimeSpan Lifetime = TimeSpan.FromMinutes(30);
-    /// <summary>The shortest password accepted, as everywhere else.</summary>
-    public const int MinLength = 8;
 
     /// <summary>Registers <c>POST /api/auth/password/forgot</c> and <c>/reset</c>: open to anyone, rate limited like sign-in.</summary>
     public static void MapPasswordResetEndpoints(this IEndpointRouteBuilder app)
@@ -85,12 +83,11 @@ public static class PasswordReset
     /// </summary>
     private static async Task<IResult> ResetAsync(
         ResetPasswordRequest request, DeliosDbContext db, TenantContext tenant, SessionStore sessions, AuditLog audit,
-        IPasswordHasher<User> hasher, IDataProtectionProvider protection, CancellationToken cancellationToken)
+        IPasswordHasher<User> hasher, IDataProtectionProvider protection, PasswordPolicy passwords, CancellationToken cancellationToken)
     {
         var invalid = Problems.Problem(StatusCodes.Status400BadRequest, "RESET_LINK_INVALID",
             "This link has expired or was already used. Ask for a new one.", null);
-        if ((request.Password ?? "").Length < MinLength)
-            return Problems.Invalid("PASSWORD_TOO_SHORT", $"A password has at least {MinLength} characters.");
+        if (await passwords.RefusalAsync(request.Password, cancellationToken) is { } weak) return weak;
 
         string[] parts;
         try

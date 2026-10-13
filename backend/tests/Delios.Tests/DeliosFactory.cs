@@ -29,6 +29,8 @@ public sealed class DeliosFactory(IDictionary<string, string?> overrides, Action
         ["Storage:SecretKey"] = "x",
         ["ClamAv:Host"] = "127.0.0.1",
         ["ClamAv:Port"] = "1",
+        // Tests never reach the breached-password list on the internet.
+        ["Passwords:CheckBreached"] = "false",
     };
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)

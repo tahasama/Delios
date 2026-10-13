@@ -41,7 +41,7 @@ export async function createUserAction(_prev: Result | undefined, formData: Form
   const partyId = text(formData, "partyId") || null;
   const password = String(formData.get("password") ?? "");
   if (!email || !name) return { error: "Name and email are required." };
-  if (password.length < 8) return { error: "Password must be at least 8 characters." };
+  if (password.length < 12) return { error: "A password has at least 12 characters." };
   if (!functionId) return { error: "Choose the function this person will hold." };
   const projectIds = formData.getAll("projectIds").map(String).filter(Boolean);
   if (!projectIds.length) return { error: "Choose at least one project — access is granted per project." };

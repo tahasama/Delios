@@ -31,7 +31,7 @@ export async function signupAction(_prev: SignupState | undefined, formData: For
 
   if (!organizationName) return { error: "Your organization needs a name.", values };
   if (!name || !email) return { error: "Your name and email are required.", values };
-  if (password.length < 8) return { error: "The password must be at least 8 characters.", values };
+  if (password.length < 12) return { error: "A password has at least 12 characters.", values };
   if (password !== confirm) return { error: "The two passwords do not match.", values };
   // The project is optional. An organization exists before its projects do,
   // and forcing a name for one at registration invents a project nobody has

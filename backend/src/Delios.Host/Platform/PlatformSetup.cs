@@ -114,6 +114,9 @@ public static class PlatformSetup
         services.AddScoped<Mfa>();
         services.AddOptions<SsoOptions>().BindConfiguration("Sso");
         services.AddHttpClient(OidcClient.HttpClientName, c => c.Timeout = TimeSpan.FromSeconds(15));
+        services.Configure<NewPasswordOptions>(config.GetSection(NewPasswordOptions.Section));
+        services.AddHttpClient(PasswordPolicy.HttpClientName, c => c.Timeout = TimeSpan.FromSeconds(3));
+        services.AddScoped<PasswordPolicy>();
         services.AddSingleton<OidcClient>();
         services.AddScoped<ProjectAccessLoader>();
         services.AddScoped<Documents.Numbering>();

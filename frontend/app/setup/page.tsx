@@ -114,7 +114,7 @@ export default async function SetupPage() {
                   </select>
                 </Field>
                 <Field label="Initial password" required hint="You hand this over yourself — nothing is emailed">
-                  <input name="password" required minLength={8} className={inputCls} placeholder="min 8 characters" />
+                  <input name="password" required minLength={12} className={inputCls} placeholder="at least 12 characters" />
                 </Field>
               </ActionForm>
             </div>
