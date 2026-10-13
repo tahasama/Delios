@@ -115,6 +115,11 @@ public sealed class User
     public required string PasswordHash { get; set; }
     /// <summary>The party this person represents. Null means our own organization.</summary>
     public Guid? PartyId { get; set; }
+    /// <summary>
+    /// A linked account: the person's own account lives in that organization, where they sign in; this one stands for
+    /// them on our projects (see <c>Organizations.AccountLink</c>). It has no password of its own and no sign-in name.
+    /// </summary>
+    public Guid? HomeTenantId { get; set; }
     public Party? Party { get; set; }
     /// <summary>False stops the person signing in and ends their sessions, without deleting anything.</summary>
     public bool Active { get; set; } = true;

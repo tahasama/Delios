@@ -37,18 +37,21 @@ public sealed class SessionStore(DeliosDbContext db, TenantContext tenant, Hybri
     /// Starts a new session for a user who has just signed in: makes a random token, stores only its SHA-256 hash in the database and returns the token so the caller can put it in the session cookie.
     /// Called by the sign-in endpoints (password, MFA and single sign-on).
     /// </summary>
-    public async Task<(string Token, Instant ExpiresAt)> CreateAsync(User user, CancellationToken cancellationToken)
+    public async Task<(string Token, Instant ExpiresAt)> CreateAsync(User user, CancellationToken cancellationToken, Instant? startedAt = null)
     {
         var token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32))
             .TrimEnd('=').Replace('+', '-').Replace('/', '_');
         var expires = clock.GetCurrentInstant() + Lifetime;
-        db.Sessions.Add(new Session
+        var session = new Session
         {
             TokenHash = Hash(token),
             TenantId = user.TenantId,
             UserId = user.Id,
             ExpiresAt = expires,
-        });
+        };
+        // Switching organization carries the sign-in's start: the 7 days count from the sign-in itself.
+        if (startedAt is { } started) session.CreatedAt = started;
+        db.Sessions.Add(session);
         await db.SaveChangesAsync(cancellationToken);
         return (token, expires);
     }
@@ -129,15 +132,30 @@ public sealed class SessionStore(DeliosDbContext db, TenantContext tenant, Hybri
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         var person = await db.Users.AsNoTracking()
             .Where(u => u.Id == session.UserId && u.Active && (u.Party == null || u.Party.Active))
-            .Select(u => new { u.Name, u.IsAdmin })
+            .Select(u => new { u.Name, u.IsAdmin, u.HomeTenantId })
             .SingleOrDefaultAsync(cancellationToken);
         var tenantActive = await db.Tenants.AnyAsync(t => t.Id == session.TenantId && t.Active, cancellationToken);
+        // An account standing for someone of another organization holds only while the link between the two does.
+        if (person?.HomeTenantId is not null && !await (from a in db.AccountLinks
+                                                        join l in db.OrganizationLinks on a.LinkId equals l.Id
+                                                        where a.HostUserId == session.UserId && a.EndedAt == null
+                                                            && l.State == Organizations.LinkStates.Linked
+                                                        select a.Id).AnyAsync(cancellationToken))
+            person = null;
         await transaction.CommitAsync(cancellationToken);
 
         return person is null || !tenantActive
             ? null
             : new SessionInfo(session.Id, session.TenantId, session.UserId, person.Name, person.IsAdmin, session.ExpiresAt.ToDateTimeOffset(),
                 session.CreatedAt.ToDateTimeOffset());
+    }
+
+    /// <summary>When the sign-in behind this session's token started; null when the token is not a live session.</summary>
+    public async Task<Instant?> StartedAtAsync(string token, CancellationToken cancellationToken)
+    {
+        var hash = Hash(token);
+        return await db.Sessions.AsNoTracking().Where(s => s.TokenHash == hash && s.RevokedAt == null).Select(s => (Instant?)s.CreatedAt)
+            .SingleOrDefaultAsync(cancellationToken);
     }
 
     /// <summary>

@@ -174,10 +174,15 @@ public static class DirectoryEndpoints
     /// <summary><c>PUT /api/admin/users/{id}</c>: name, email, organization, sign-in, administration rights, a new password.</summary>
     private static async Task<IResult> UpdateUserAsync(
         Guid userId, UpdateUserRequest request, HttpContext http, DeliosDbContext db, AuditLog audit, IPasswordHasher<User> hasher,
-        SessionStore sessions, CancellationToken cancellationToken)
+        SessionStore sessions, Organizations.OrganizationService organizations, CancellationToken cancellationToken)
     {
         var user = await db.Users.SingleOrDefaultAsync(u => u.Id == userId, cancellationToken);
         if (user is null) return Problems.NotFound("USER_NOT_FOUND", "No such person.");
+        // Someone of another organization working here with their own account: their organization keeps their sign-in.
+        if (user.HomeTenantId is not null && (request.Password is not null || (request.Email is not null && request.Email != user.Email)
+                || request.IsAdmin == true))
+            return Problems.Conflict("LINKED_ACCOUNT", $"{user.Name} signs in with their own organization's account: it keeps their email and password.");
+        var wasActive = user.Active;
         if (!await Keepers.ConfiguresAsync(http) && (user.IsAdmin || request.IsAdmin is not null))
             return Problems.Forbidden("ADMIN_ONLY", "Only an administrator changes an administrator, or makes one.");
         var self = userId == http.User.UserId();
@@ -223,6 +228,9 @@ public static class DirectoryEndpoints
         await sessions.ForgetAllAsync(user.Id, revoke: !user.Active, cancellationToken);
         await audit.WriteAsync(await ActorAsync(http, db, cancellationToken), "USER_UPDATED", "User", user.Id, user.Name,
             string.Join("; ", changes), cancellationToken: cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
+        // Switched off (or back on) here: the accounts standing for them in our partners' organizations follow.
+        if (user.Active != wasActive && user.HomeTenantId is null) await organizations.FollowPersonAsync(user.Id, user.Active, cancellationToken);
         return Results.NoContent();
     }
 
@@ -577,8 +585,10 @@ public static class DirectoryEndpoints
     // ── Organizations taking part ───────────────────────────────────────────
 
     /// <summary><c>GET /api/admin/parties</c>: every organization, with how many of its people hold accounts.</summary>
-    private static async Task<IResult> PartiesAsync(DeliosDbContext db, CancellationToken cancellationToken)
+    private static async Task<IResult> PartiesAsync(DeliosDbContext db, Organizations.OrganizationService organizations,
+        CancellationToken cancellationToken)
     {
+        var links = await organizations.PartyLinksAsync(cancellationToken);
         var parties = await db.Parties.AsNoTracking().OrderBy(p => p.Name).ToListAsync(cancellationToken);
         var people = await db.Users.AsNoTracking().Where(u => u.PartyId != null && u.Active).GroupBy(u => u.PartyId)
             .Select(g => new { g.Key, Count = g.Count() }).ToListAsync(cancellationToken);
@@ -594,6 +604,9 @@ public static class DirectoryEndpoints
             p.ExternalSystem,
             p.EvidenceRequired,
             People = people.FirstOrDefault(c => c.Key == p.Id)?.Count ?? 0,
+            // Collaborator (linked to its own organization), guest, or not on DELIOS (docs/ORGANIZATIONS.md).
+            Kind = p.IsInternal ? null : Organizations.OrganizationService.KindOf(p, links.TryGetValue(p.Id, out var l) && l.State == Organizations.LinkStates.Linked),
+            Link = links.TryGetValue(p.Id, out var link) ? new { link.Id, link.State, link.Organization } : null,
         }));
     }
 

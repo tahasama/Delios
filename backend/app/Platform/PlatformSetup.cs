@@ -124,6 +124,7 @@ public static class PlatformSetup
         services.AddScoped<ProjectAccessLoader>();
         services.AddScoped<Documents.Numbering>();
         services.AddScoped<Documents.DocumentService>();
+        services.AddScoped<Organizations.OrganizationService>();
         services.AddScoped<Documents.FileStorage>();
         if (config.GetSection(StorageOptions.Section).Get<StorageOptions>()?.UsesAzure == true)
         {
@@ -327,6 +328,7 @@ public static class PlatformSetup
             app.MapEmailConfirmationEndpoints();
             app.MapAdminEndpoints();
             app.MapDirectoryEndpoints();
+            Organizations.OrganizationEndpoints.MapOrganizationEndpoints(app);
             Seeding.SignUpEndpoints.MapSignUpEndpoints(app);
             Notifications.NotificationEndpoints.MapNotificationEndpoints(app);
             Notifications.PushEndpoints.MapPushEndpoints(app);
