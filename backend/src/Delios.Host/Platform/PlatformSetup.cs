@@ -317,6 +317,7 @@ public static class PlatformSetup
         {
             app.MapIdentityEndpoints();
             app.MapSsoEndpoints();
+            app.MapPasswordResetEndpoints();
             app.MapAdminEndpoints();
             app.MapDirectoryEndpoints();
             Seeding.SignUpEndpoints.MapSignUpEndpoints(app);

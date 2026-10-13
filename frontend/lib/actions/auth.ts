@@ -109,3 +109,27 @@ export async function logoutAction() {
   await destroySession();
   redirect("/login");
 }
+
+type PasswordState = { error?: string; done?: boolean };
+
+/** "Forgot password": asks the backend to email a reset link. The answer is the same whether or not the account exists. */
+export async function forgotPasswordAction(_prev: PasswordState | undefined, formData: FormData): Promise<PasswordState> {
+  const email = String(formData.get("email") ?? "").trim();
+  if (!email) return { error: "Type the email you sign in with." };
+  const response = await apiFetch("/api/auth/password/forgot", { method: "POST", body: { email } }).catch(() => null);
+  if (!response) return { error: "The server cannot be reached. Try again in a moment." };
+  if (response.status === 429) return { error: "Too many attempts. Wait a minute and try again." };
+  return { done: true };
+}
+
+/** Sets the new password from the emailed link. */
+export async function resetPasswordAction(_prev: PasswordState | undefined, formData: FormData): Promise<PasswordState> {
+  const token = String(formData.get("token") ?? "");
+  const password = String(formData.get("password") ?? "");
+  if (password !== String(formData.get("confirm") ?? "")) return { error: "The two passwords are not the same." };
+  const response = await apiFetch("/api/auth/password/reset", { method: "POST", body: { token, password } }).catch(() => null);
+  if (!response) return { error: "The server cannot be reached. Try again in a moment." };
+  if (response.status === 429) return { error: "Too many attempts. Wait a minute and try again." };
+  if (!response.ok) return { error: (await problemOf(response)).message };
+  return { done: true };
+}

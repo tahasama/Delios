@@ -8,8 +8,7 @@ Short version:
 - **Fixed now:** uploaded files could run script when opened. See section 6.
 - **Done:** security headers on every page (section 6); internal service ports reachable from the machine
   itself only (section 8); the screens run in a container behind Caddy (`--profile web`).
-- **Add before launch:** Cloudflare in front (section 3), and a password-reset flow (section 5). Also have the
-  legal documents written (section 1).
+- **Add before launch:** Cloudflare in front (section 3). Also have the legal documents written (section 1).
 - **Already in place:** sign-in limits, ownership checks on every request, IDs that cannot be guessed, an
   organization wall inside the database, and an audit trail.
 
@@ -114,7 +113,7 @@ first email goes out.
 | **Custom WAF rules (SQL injection, XSS, query strings, form fields, path traversal)** | In the app: every database query takes its values as parameters; the screens escape everything they show; stored file names are random IDs, never a path someone typed. | The Cloudflare managed rules (Pro) as the outer layer. Add a custom rule that blocks `/api/admin/*` from countries you never work in. |
 | **Leaked passwords** | Not checked. | Refuse passwords found in known breaches when one is set (Have I Been Pwned, which never sees the password itself). |
 | **Two-step sign-in** | The backend already had it. **The sign-in page now asks for the code**, and walks people through first-time setup with recovery codes. | Encourage administrators to require it for their organization (the setting exists). |
-| **Password reset** | **There is none.** An administrator has to set a new password. | A "forgot password" email with a single-use link that expires in about 30 minutes. Needed before self-service sign-up. |
+| **Password reset** | **Done.** "Forgot your password?" on the sign-in page emails a link that works once, within 30 minutes. The answer is the same whether or not the account exists. The reset unlocks the account and signs it out everywhere; two-step sign-in still applies. | Needs email switched on (Amazon SES). |
 | **Verify ownership on every API request** | Yes. Every project address loads your place on that project first, and answers "not found" if you have none. Documents are filtered to what you may read (function, clearance, named readers). Below that, the database itself refuses rows from another organization (row-level security). | An automated test that tries every address with a person from another project and another organization. |
 | **No sequential IDs in URLs** | Yes. Every ID is a random UUID (version 7): time-ordered, but with 74 random bits, so it cannot be guessed. Document numbers are shown on screen but never used to look something up. | Nothing. |
 | **Audit of addresses that take an ID** | Every act and every download is written to the audit trail with the ID. The trail is readable by administrators only. | Also record **refused** attempts (someone opening many IDs they may not see) and raise an alert when one person does it repeatedly. |

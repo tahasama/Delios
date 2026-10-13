@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Suspense, useActionState, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { loginAction } from "@/lib/actions/auth";
-import { APP_NAME } from "@/lib/standard";
+import { AuthShell } from "./shell";
 import { inputCls, btn } from "@/components/ui";
 import { MissingSummary } from "@/components/form";
 import { collectInvalid, type MissingField } from "@/components/form-validation";
@@ -18,39 +18,7 @@ function LoginForm() {
   const next = raw.startsWith("/") && !raw.startsWith("//") ? raw : "/";
 
   return (
-    <div className="flex min-h-screen">
-      {/* Brand panel */}
-      <div className="relative hidden flex-1 flex-col justify-between bg-brand p-10 text-white lg:flex">
-        <div>
-          <div className="flex items-center gap-2 text-lg font-semibold tracking-wide">
-            <span className="grid h-9 w-9 place-items-center rounded-lg bg-white/10 font-bold">D</span>
-            DELIOS
-          </div>
-          <p className="mt-2 text-sm text-white/60">Controlled Project Information</p>
-        </div>
-        <div className="max-w-md">
-          <h1 className="text-3xl font-semibold leading-tight">Electronic Document Management System</h1>
-          <p className="mt-4 text-sm leading-relaxed text-white/70">
-            One controlled register: identity, description, revisions, states, approval, review, issue, obsolescence and retention — each one checked against the records it leaves.
-          </p>
-          <div className="mt-6 flex gap-2 text-[11px] font-medium uppercase tracking-widest text-white/50">
-            <span className="rounded-full bg-white/10 px-3 py-1">Layer I · Rules</span>
-            <span className="rounded-full bg-emerald-400/20 px-3 py-1 text-emerald-200">Layer II · Routes</span>
-            <span className="rounded-full bg-orange-400/20 px-3 py-1 text-orange-200">Layer III · Checks</span>
-          </div>
-        </div>
-        <p className="text-xs text-white/40">{APP_NAME} — internal use only</p>
-      </div>
-
-      {/* Form panel */}
-      <div className="flex flex-1 items-center justify-center bg-slate-50 px-6">
-        <div className="w-full max-w-sm">
-          <div className="mb-8 lg:hidden">
-            <div className="flex items-center gap-2 text-lg font-semibold text-brand-ink">
-              <span className="grid h-9 w-9 place-items-center rounded-lg bg-brand font-bold text-white">D</span>
-              DELIOS · EDMS
-            </div>
-          </div>
+    <AuthShell>
           <h2 className="text-xl font-semibold text-slate-900">Sign in</h2>
           <p className="mt-1 text-sm text-slate-500">Use the account your administrator created for you.</p>
           <form
@@ -126,6 +94,11 @@ function LoginForm() {
             )}
             <MissingSummary missing={missing} />
             {state?.error ? <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{state.error}</p> : null}
+            {state?.mfa || state?.recoveryCodes ? null : (
+              <p className="text-right text-xs">
+                <Link href="/forgot-password" className="font-semibold text-brand-ink hover:underline">Forgot your password?</Link>
+              </p>
+            )}
             {state?.recoveryCodes ? null : (
               <button type="submit" disabled={pending} className={`${btn("primary")} w-full`}>
                 {pending ? "Signing in…" : state?.mfa ? "Verify" : "Sign in"}
@@ -137,30 +110,15 @@ function LoginForm() {
             <Link href="/signup" className="font-semibold text-brand-ink hover:underline">Register one</Link>
           </p>
 
-          <div className="mt-8 rounded-xl border border-line bg-surface p-4 text-xs text-slate-500 shadow-sm">
-            <p className="font-medium text-slate-700">Seeded organizations</p>
-            <p className="mt-1 text-[11px] leading-relaxed">
-              The same address exists in all three — the password decides which one you enter.
-            </p>
-            <ul className="mt-2 space-y-2">
-              <li>
-                <p className="font-medium text-slate-600">Our organization · P1, P2 · 20 documents</p>
-                <p className="font-mono text-[11px]">admin@delios.local · demo1234</p>
-                <p className="text-[11px]">controller@ · approver@ · reviewer@ · author@ · viewer@delios.local — all demo1234</p>
-              </li>
-              <li>
-                <p className="font-medium text-slate-600">Northwind Engineering · NW-1, NW-2 · empty</p>
-                <p className="font-mono text-[11px]">admin@delios.local · northwind1234</p>
-              </li>
-              <li>
-                <p className="font-medium text-slate-600">Acme Refining · CR1 · empty</p>
-                <p className="font-mono text-[11px]">admin@delios.local · acme12345</p>
-              </li>
-            </ul>
-          </div>
-        </div>
-      </div>
-    </div>
+          {/* Demo accounts, on a developer's machine only: a server never advertises passwords. */}
+          {process.env.NODE_ENV !== "production" ? (
+            <div className="mt-8 rounded-xl border border-line bg-surface p-4 text-xs text-slate-500 shadow-sm">
+              <p className="font-medium text-slate-700">Demo accounts (seed-demo)</p>
+              <p className="mt-1 font-mono text-[11px]">admin@demo.local · demo1234</p>
+              <p className="mt-1 text-[11px]">controller@ · engineer@ · approver@ · viewer@demo.local, supplier@acme.local — all demo1234</p>
+            </div>
+          ) : null}
+    </AuthShell>
   );
 }
 

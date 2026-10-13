@@ -51,7 +51,7 @@ public sealed class EmailMessage
     public Guid Id { get; set; } = Guid.CreateVersion7();
     public Guid TenantId { get; set; }
     public Guid? ProjectId { get; set; }
-    /// <summary>TRANSMITTAL, REVIEW or NOTIFICATION: which switch governs it.</summary>
+    /// <summary>TRANSMITTAL, REVIEW, NOTIFICATION or ACCOUNT: which switch governs it.</summary>
     public required string Kind { get; set; }
     public required string ToAddress { get; set; }
     public string? ToName { get; set; }
@@ -86,6 +86,8 @@ public static class EmailKinds
     public const string Transmittal = "TRANSMITTAL";
     public const string Review = "REVIEW";
     public const string Notification = "NOTIFICATION";
+    /// <summary>About the person's own account (a password reset link): sent whenever email is on.</summary>
+    public const string Account = "ACCOUNT";
 }
 
 /// <summary>
@@ -111,6 +113,7 @@ public sealed class EmailOptions
     {
         EmailKinds.Transmittal => Transmittals,
         EmailKinds.Review => Reviews,
+        EmailKinds.Account => true,
         _ => Notifications,
     };
 }

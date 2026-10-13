@@ -312,6 +312,15 @@ row. If a type is added to the family later, re-import the row to cover it. Rule
     saying so.
 - The order of the levels is the confidentiality list's own order, or its `level` property where one is set.
 
+**Forgot password.**
+- "Forgot your password?" on the sign-in page asks for the email and sends a link to choose a new password.
+- The link works once, within 30 minutes, and stops working as soon as the password changes any other way.
+- The page answers the same whether or not the account exists, so nobody can use it to find out who has one.
+- Choosing the new password unlocks the account and signs it out everywhere. Two-step sign-in still applies.
+- The email goes whenever email is on (it does not follow the per-kind switches). With email off it is kept in
+  the outbox, so on a developer's machine the link can be read there.
+- An organization that signs in through its own provider gets no link, except for its administrators.
+
 **Two-step sign-in.**
 - After the password, the sign-in page asks for the code from the authenticator app; a recovery code also works.
 - Where the organization requires two-step sign-in and the person has not set it up, the page shows the key to
