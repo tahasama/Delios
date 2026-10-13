@@ -5354,6 +5354,14 @@ namespace Delios.Host.Platform.Migrations
                             b1.Property<int>("__synthesizedOrdinal")
                                 .ValueGeneratedOnAdd();
 
+                            b1.Property<string>("Check");
+
+                            b1.Property<string>("CheckNote");
+
+                            b1.Property<Instant?>("CheckedAt");
+
+                            b1.Property<string>("CheckedByName");
+
                             b1.Property<Instant?>("DecidedAt");
 
                             b1.Property<string>("DecidedByName");

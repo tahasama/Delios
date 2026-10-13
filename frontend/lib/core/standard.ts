@@ -114,15 +114,6 @@ export const EXPOSURES = [
   { key: "UNRESOLVED_VOID", label: "Declared void — nobody has said what was done from it", detail: "A revision was declared void: it should never have been used at all, unlike a superseded one that was right in its day. Whatever was built, ordered or decided from it has to be found and reassessed, and no such record exists.", who: "The party that performed the work" },
 ] as const;
 
-// §11.9 — transmittal acceptance conditions (minimum set)
-export const ACCEPTANCE_CONDITIONS = [
-  { key: "a", label: "Items listed are present and no unlisted items are enclosed" },
-  { key: "b", label: "Revisions enclosed match those listed" },
-  { key: "c", label: "A reason for issue is stated and corresponds to the items issued" },
-  { key: "d", label: "Files are readable, complete, and in the required format" },
-  { key: "e", label: "The transmittal is addressed to a party and contract to which the items relate" },
-] as const;
-
 /**
  * What an advisory step's comments amount to, recorded as the step's answer.
  * It is not a list an organization publishes, because nobody chooses it: it is

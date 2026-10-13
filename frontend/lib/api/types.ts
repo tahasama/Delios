@@ -223,7 +223,30 @@ export type TransmittalItem = {
   id: string; kind: "REVISION" | "PLACEHOLDER" | "SUBMISSION" | "UNPLANNED" | "ATTACHMENT";
   documentId: string | null; revisionId: string | null; documentNumber: string; title: string; revision: string; status: string | null;
   dueDate: string | null; submission: number | null; docType: string | null; registeredAt: string | null; registeredBy: string | null;
-  files: { id: string; name: string; size: number; sha256: string; status: string }[];
+  files: { id: string; name: string; size: number; sha256: string; status: string; kind: string | null }[];
+};
+
+/**
+ * A transmittal as its page shows it (Transmittals/TransmittalService.Page.cs): where it stands, who checked what
+ * came in, each document it carried as it stands now, the files that came with it, the request it carried out.
+ */
+export type TransmittalPage = {
+  transmittal: TransmittalView;
+  status: "DRAFT" | "ISSUED" | "REJECTED" | "ACCEPTED";
+  issuingParty: string; checkedBy: string | null; checkedAt: string | null; returnedReason: string | null;
+  carried: CarriedItem[];
+  files: { id: string; name: string; size: number; sha256: string; keptBy: string; keptAt: string }[];
+  issueRequests: { id: string; reason: string; note: string | null }[];
+  /** How each organization it went to takes things outside the system, by its id. */
+  parties: Record<string, { externalSystem: string | null; evidenceRequired: boolean }>;
+};
+
+export type CarriedItem = {
+  id: string; kind: TransmittalItem["kind"]; documentId: string; revisionId: string | null; number: string; title: string; revision: string;
+  status: string | null; revisionState: string; currentRevision: string | null; neededFor: { code: string; name: string }[]; sentBefore: number;
+  arrival: { state: "TO_CHECK" | "RETURNED" | "ACCEPTED"; by: string | null; at: string | null; note: string | null } | null;
+  review: { id: string; startedAt: string; open: boolean } | null;
+  files: TransmittalItem["files"];
 };
 
 /** GET /addressees: who a transmittal can go to. */

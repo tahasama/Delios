@@ -362,6 +362,14 @@ public sealed class SubmissionRecord
     public string? Note { get; set; }
     public string? DecidedByName { get; set; }
     public Instant? DecidedAt { get; set; }
+    /// <summary>
+    /// Document Control's check on arrival, kept apart from the outcome above, which a later release or return
+    /// overwrites: ACCEPTED or RETURNED (<see cref="Transmittals.Arrivals"/>), who, when, and why when returned.
+    /// </summary>
+    public string? Check { get; set; }
+    public string? CheckedByName { get; set; }
+    public Instant? CheckedAt { get; set; }
+    public string? CheckNote { get; set; }
 }
 
 /// <summary>The states a <see cref="Revision"/> can be in.</summary>

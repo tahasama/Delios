@@ -120,6 +120,11 @@ public sealed class ControlService(DeliosDbContext db, AuditLog audit, IClock cl
             revision.ReturnedReason = note;
         }
         Record(revision, outcome, note, access.UserName);
+        var judged = revision.Submissions.Single(s => s.Number == revision.Submission);
+        judged.Check = act == Accept ? Transmittals.Arrivals.Accepted : Transmittals.Arrivals.Returned;
+        judged.CheckedByName = access.UserName;
+        judged.CheckedAt = now;
+        judged.CheckNote = act == Return ? note : null;
         // Returned by the check: back with the supplier, who corrects it.
         if (act == Return && document.WithSupplier is not null) document.WithSupplier = true;
         document.LatestRevisionState = revision.State;

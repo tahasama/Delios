@@ -185,26 +185,15 @@ public static class TransmittalLogEndpoints
         var stepIds = list.Values.Where(t => t.ReviewStepId != null).Select(t => t.ReviewStepId!.Value).ToList();
         var answered = (await db.ReviewSteps.AsNoTracking().Where(s => stepIds.Contains(s.Id) && s.CompletedAt != null).Select(s => s.Id)
             .ToListAsync(cancellationToken)).ToHashSet();
-        // What Document Control's check said of what came in, read from each document it carried: this submission still
-        // waiting (RECEIVED), sent back (a later submission exists, or it is back with them), or accepted.
+        // What Document Control's check said of what came in, read from each submission it carried (Arrivals).
         var sentIn = list.Values.Where(t => t.Direction == TransmittalDirections.Incoming)
             .SelectMany(t => t.Items).Where(i => i.Kind == TransmittalItemKinds.Submission && i.RevisionId != null)
             .Select(i => i.RevisionId!.Value).Distinct().ToList();
-        var revisions = await db.Revisions.AsNoTracking().Where(r => sentIn.Contains(r.Id))
-            .Select(r => new { r.Id, r.State, r.Submission }).ToDictionaryAsync(r => r.Id, cancellationToken);
-        string? CheckOf(Transmittal t)
-        {
-            var mine = t.Items.Where(i => i.Kind == TransmittalItemKinds.Submission && i.RevisionId is { } r && revisions.ContainsKey(r)).ToList();
-            if (t.Direction != TransmittalDirections.Incoming || mine.Count == 0) return null;
-            var answers = mine.Select(i =>
-            {
-                var r = revisions[i.RevisionId!.Value];
-                if (i.Submission is { } sub && r.Submission > sub) return "RETURNED";
-                return r.State == RevisionStates.Received ? "TO_CHECK" : r.State == RevisionStates.Correcting ? "RETURNED" : "ACCEPTED";
-            }).ToList();
-            return answers.Contains("TO_CHECK") ? "TO_CHECK" : answers.All(a => a == "RETURNED") ? "RETURNED"
-                : answers.Contains("RETURNED") ? "PARTLY_RETURNED" : "ACCEPTED";
-        }
+        var revisions = await db.Revisions.AsNoTracking().Where(r => sentIn.Contains(r.Id)).ToDictionaryAsync(r => r.Id, cancellationToken);
+        var catalog = await Catalog.LoadAsync(db, cancellationToken);
+        string? CheckOf(Transmittal t) => t.Direction != TransmittalDirections.Incoming ? null
+            : Arrivals.Overall(t.Items.Where(i => i.RevisionId is { } r && revisions.ContainsKey(r))
+                .Select(i => Arrivals.Of(i.Kind, i.Submission, revisions[i.RevisionId!.Value], catalog)).OfType<ArrivalView>());
         return ids.Where(list.ContainsKey).Select(id =>
         {
             var t = list[id];

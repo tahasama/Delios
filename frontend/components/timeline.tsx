@@ -4,7 +4,7 @@ type TimelinePoint = {
   /** What happened, in the fewest words that stay true. */
   label: string;
   /** When it happened; null means it has not happened yet. */
-  at?: Date | null;
+  at?: Date | string | null;
   /** Who did it, or who it waits on. */
   holder?: string | null;
   /** Anything worth reading under the point — a reason, a figure, a list. */

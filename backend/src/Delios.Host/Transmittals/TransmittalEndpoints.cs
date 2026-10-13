@@ -51,7 +51,7 @@ public sealed record TransmittalItemView(Guid Id, string Kind, Guid? DocumentId,
     string? RegisteredBy, IReadOnlyList<ItemFileView> Files);
 
 /// <summary>A file a transmittal item carried.</summary>
-public sealed record ItemFileView(Guid Id, string Name, long Size, string Sha256, string Status);
+public sealed record ItemFileView(Guid Id, string Name, long Size, string Sha256, string Status, string? Kind = null);
 
 /// <summary>
 /// One recipient of a transmittal as returned to the browser. <c>Person</c> is false for an organization that receives
@@ -118,6 +118,7 @@ public static class TransmittalEndpoints
         project.MapPost("/transmittals", ComposeAsync).AddEndpointFilter<IdempotencyFilter>();
         project.MapGet("/addressees", AddresseesAsync);
         project.MapGet("/transmittals/{transmittalId:guid}", GetAsync);
+        project.MapGet("/transmittals/{transmittalId:guid}/page", PageAsync);
         project.MapPost("/transmittals/{transmittalId:guid}/acknowledge", AcknowledgeAsync);
         project.MapGet("/transmittals/drafts", async (HttpContext h, TransmittalService s, CancellationToken c) =>
             Results.Ok((await s.DraftsAsync(ProjectAccessFilter.Of(h), c)).Select(d =>
@@ -306,6 +307,21 @@ public static class TransmittalEndpoints
             : Problems.NotFound("TRANSMITTAL_NOT_FOUND", "No such transmittal.");
     }
 
+    /// <summary>GET one transmittal as its page shows it (<see cref="TransmittalPage"/>). Reading it records an opening, as GET does.</summary>
+    private static async Task<IResult> PageAsync(
+        Guid transmittalId, HttpContext http, TransmittalService transmittals, CancellationToken cancellationToken)
+    {
+        var access = ProjectAccessFilter.Of(http);
+        TransmittalView? view = null;
+        if (await transmittals.ReadAsync(access, transmittalId, cancellationToken) is { } t)
+            view = View(t, await transmittals.ItemFilesAsync(t, cancellationToken), await transmittals.ThreadAsync(access, t, cancellationToken));
+        else if (await transmittals.DraftAsync(access, transmittalId, cancellationToken) is { IssuedAt: null } draft)
+            view = await transmittals.DraftViewAsync(access, draft, cancellationToken);
+        return view is null
+            ? Problems.NotFound("TRANSMITTAL_NOT_FOUND", "No such transmittal.")
+            : Results.Ok(await transmittals.PageAsync(access, view, cancellationToken));
+    }
+
     /// <summary>POST acknowledge: a recipient confirms they received the transmittal.</summary>
     private static async Task<IResult> AcknowledgeAsync(
         Guid transmittalId, HttpContext http, TransmittalService transmittals, CancellationToken cancellationToken)
@@ -356,12 +372,14 @@ public static class TransmittalEndpoints
         t.Items.OrderBy(i => i.DocumentNumber).ThenBy(i => i.Title).Select(i => new TransmittalItemView(i.Id, i.Kind, i.DocumentId,
             i.RevisionId, i.DocumentNumber, i.Title, i.RevisionValue, i.StatusCode, i.DueDate?.ToDateOnly(), i.Submission, i.DocType,
             i.RegisteredAt?.ToDateTimeOffset(), i.RegisteredByName,
-            TransmittalService.FilesOf(i, files ?? []).Select(f => new ItemFileView(f.Id, f.Name, f.Size, f.Sha256, f.Status)).ToList()))
+            TransmittalService.FilesOf(i, files ?? []).Select(f => new ItemFileView(f.Id, f.Name, f.Size, f.Sha256, f.Status, f.Kind)).ToList()))
             .ToList(),
+        // A person was told when it was issued unless told later; one opened before openings were counted opened it once.
         t.Recipients.OrderBy(r => r.Name).Select(r => new RecipientView(r.Id, r.Name, r.Organization, r.UserId is not null,
             r.OpenedAt?.ToDateTimeOffset(), r.AcknowledgedAt?.ToDateTimeOffset(), r.DispatchedAt?.ToDateTimeOffset(),
-            r.DispatchChannel, r.DispatchRef, r.DispatchedByName, r.ProofFileId, r.Kind, r.UserId, r.PartyId, r.NotifiedAt?.ToDateTimeOffset(),
-            r.ViewCount, r.LastViewedAt?.ToDateTimeOffset())).ToList(),
+            r.DispatchChannel, r.DispatchRef, r.DispatchedByName, r.ProofFileId, r.Kind, r.UserId, r.PartyId,
+            (r.NotifiedAt ?? (r.UserId is not null ? t.IssuedAt : null))?.ToDateTimeOffset(),
+            Math.Max(r.ViewCount, r.OpenedAt is null ? 0 : 1), (r.LastViewedAt ?? r.AcknowledgedAt ?? r.OpenedAt)?.ToDateTimeOffset())).ToList(),
         t.FromName, t.TheirReference, t.ProofFileId, t.PackageId, "ISSUED", t.IssuedById, thread?.InReplyTo, thread?.Answers ?? [],
         thread?.Follows, thread?.FollowedBy ?? [], t.ReceiptNote,
         t.Extras is null ? null : System.Text.Json.JsonDocument.Parse(t.Extras).RootElement.Clone(), t.FollowKind,

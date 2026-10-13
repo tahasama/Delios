@@ -7,7 +7,7 @@ import { formPolicy, checkForm } from "@/lib/settings/field-policy";
 import { getActiveSet } from "@/lib/settings/config";
 import { api, projectPath, refusal } from "@/lib/api/client";
 import { filesOf, upload } from "@/lib/api/uploads";
-import { addressees, dispatchOf, legacyTransmittal } from "@/lib/api/transmittals";
+import { addressees, dispatchOf, transmittalPage } from "@/lib/api/transmittals";
 import type { TransmittalView } from "@/lib/api/types";
 
 /** A day the form says, as the backend takes it: empty when today's, which the backend stamps itself. */
@@ -149,11 +149,11 @@ export async function acceptTransmittalAction(_prev: { error?: string } | undefi
   const reject = formData.get("decision") === "reject";
   const notes = String(formData.get("notes") ?? "").trim();
   if (reject && !notes) return { error: "Say why it is rejected — the sender reads this." };
-  const t = await legacyTransmittal(ctx, id);
-  if (!t) return { error: "That transmittal no longer exists." };
-  const waiting = t.items.filter((one) => one.arrival?.state === "TO_CHECK");
+  const page = await transmittalPage(ctx, id);
+  if (!page) return { error: "That transmittal no longer exists." };
+  const waiting = page.carried.filter((one) => one.arrival?.state === "TO_CHECK");
   if (!waiting.length) {
-    return t.files.length && t.status === "ISSUED"
+    return page.files.length && page.status === "ISSUED"
       ? { error: "What is left on it came unplanned: make each file a document to register it." }
       : { error: "Only a transmittal waiting to be checked can be accepted or rejected." };
   }

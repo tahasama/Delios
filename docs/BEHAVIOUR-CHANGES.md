@@ -226,6 +226,21 @@ first.
 recorded (the covering email, a letter). What arrived is not changed: the files are kept beside it,
 shown as "kept by <name>, <date>", and the audit trail says they were added later.
 
+**The check on arrival is kept for good.** Accepting or returning what arrived is now kept on that
+submission itself, apart from the outcome a later release or return records. Before, a release wrote over
+it, so the transmittal said "accepted by" whoever released the revision. The transmittal list and the
+transmittal page read the check the same way now (`Arrivals`). Checks made before this update are read as
+before.
+
+**The transmittal page is worked out in one place** (the backend, `GET /transmittals/{id}/page`). What you
+may notice:
+- "How it went" offers the organization's own system, and the proof is asked for, as set on that
+  organization in Settings ("their system", "proof required"). Before, both settings were ignored here.
+- A review that was withdrawn no longer counts as open beside the document it carried.
+- "Sent before" counts transmittals, not lines, and never a draft.
+- The condition-by-condition acceptance check was removed from the page: nothing ever recorded one, so
+  it never showed.
+
 **Returning what arrived when no "return" outcome is published.** It is returned all the same: back to
 the sender, to correct under the same revision, with your reason.
 
