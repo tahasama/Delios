@@ -1,7 +1,6 @@
 import "server-only";
 import type { Tenant } from "@/lib/core/tenant";
-import { api, projectPath } from "@/lib/api/client";
-import type { Addressees } from "@/lib/api/types";
+import { addressees } from "@/lib/api/transmittals";
 
 type RecipientCompany = { key: string; name: string; people: { id: string; name: string; job: string | null }[]; offline?: string };
 
@@ -16,7 +15,8 @@ type RecipientCompany = { key: string; name: string; people: { id: string; name:
  */
 export async function recipientCompanies(ctx: Tenant & { project: { name: string } }, { withOffline = true }: { withOffline?: boolean } = {}): Promise<RecipientCompany[]> {
   // The project's people, by the organization they work for, and each organization that has no accounts here.
-  const found = await api<Addressees>(projectPath(ctx, "/addressees"));
+  // Someone of another organization may not read our address book: they send to us, and choose nobody.
+  const found = await addressees(ctx);
   const companies = new Map<string, RecipientCompany>();
   for (const person of found.people) {
     const key = person.organization ?? "US";

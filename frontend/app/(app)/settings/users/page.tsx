@@ -1,3 +1,4 @@
+import { controlDoes } from "@/lib/settings/control-activities";
 import Link from "next/link";
 import { SETUP_PAGES, maySetup } from "../setup-pages";
 import { requireScope } from "@/lib/core/scope";
@@ -19,7 +20,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
   const { user: me, projectId, project } = ctx;
   const policy = await formPolicy(ctx, "PERSON");
   const sp = await searchParams;
-  if (!maySetup(me, SETUP_PAGES.find((p) => p.href === "/settings/users")!)) {
+  if (!maySetup(me, SETUP_PAGES.find((p) => p.href === "/settings/users")!, !(await controlDoes(ctx, "PROJECT_PEOPLE")))) {
     return <PageHeader title="People & access" subtitle="Administrators and the control function." />;
   }
   // Scoped to this administrator's organization: they can see and add people

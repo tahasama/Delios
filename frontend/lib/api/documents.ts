@@ -82,6 +82,8 @@ export type PageDocument = {
 type ContextTransmittal = {
   id: string; number: string; reason: string; toName: string; issuedAt: string; revision: string; forReview: boolean; direction: string;
   revisionId: string | null; fromName: string | null; itemKind: string;
+  /** Whether the reader may open it: one they may not see is listed, not linked. */
+  mayOpen: boolean;
   recipients: { name: string; organization: string | null; person: boolean; openedAt: string | null; acknowledgedAt: string | null; dispatchedAt: string | null }[];
 };
 

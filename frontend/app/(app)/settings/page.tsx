@@ -1,3 +1,4 @@
+import { controlDoes } from "@/lib/settings/control-activities";
 import Link from "next/link";
 import { requireScope } from "@/lib/core/scope";
 import { PageHeader, Banner, Chip } from "@/components/ui";
@@ -44,7 +45,8 @@ export default async function AdminPage() {
   const ctx = await requireScope();
   const { user } = ctx;
   // Administrators see every page; someone granted a single verb sees the page it opens.
-  const open = SETUP_PAGES.filter((p) => maySetup(user, p));
+  const managementAddsPeople = !(await controlDoes(ctx, "PROJECT_PEOPLE"));
+  const open = SETUP_PAGES.filter((p) => maySetup(user, p, managementAddsPeople));
   if (!open.length) {
     return (
       <div>

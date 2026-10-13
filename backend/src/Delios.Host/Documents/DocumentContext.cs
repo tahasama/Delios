@@ -23,7 +23,8 @@ public static class DocumentContextEndpoints
 
     /// <summary><c>GET /documents/{id}/context</c>: reviews, transmittals, packages, activities and history, for a document the caller may read.</summary>
     private static async Task<IResult> ContextAsync(
-        Guid documentId, HttpContext http, DeliosDbContext db, DocumentService documents, CancellationToken cancellationToken)
+        Guid documentId, HttpContext http, DeliosDbContext db, DocumentService documents, Transmittals.TransmittalService sending,
+        CancellationToken cancellationToken)
     {
         var access = ProjectAccessFilter.Of(http);
         if (!access.Holds(Verbs.Read)) return Problems.Forbidden("READ_NOT_ALLOWED", "Your function cannot read this register.");
@@ -74,6 +75,8 @@ public static class DocumentContextEndpoints
                               }).AsNoTracking().ToListAsync(cancellationToken);
         var partyNames = await db.Parties.AsNoTracking().ToDictionaryAsync(p => p.Id, p => p.Name, cancellationToken);
         var transmittalIds = transmittals.Select(t => t.Id).Distinct().ToList();
+        // The reader opens only the transmittals they may see; the others are listed, not linked.
+        var mayOpen = (await sending.Visible(access).Where(t => transmittalIds.Contains(t.Id)).Select(t => t.Id).ToListAsync(cancellationToken)).ToHashSet();
         var recipients = (await db.TransmittalRecipients.AsNoTracking().Where(r => transmittalIds.Contains(r.TransmittalId))
             .Select(r => new { r.TransmittalId, r.Name, r.Organization, Person = r.UserId != null, r.OpenedAt, r.AcknowledgedAt, r.DispatchedAt })
             .ToListAsync(cancellationToken)).ToLookup(r => r.TransmittalId);
@@ -117,6 +120,7 @@ public static class DocumentContextEndpoints
                 t.RevisionId,
                 t.FromName,
                 t.ItemKind,
+                MayOpen = mayOpen.Contains(t.Id),
                 Recipients = recipients[t.Id].Select(r => new
                 {
                     r.Name,

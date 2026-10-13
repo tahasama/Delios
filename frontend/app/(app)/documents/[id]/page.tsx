@@ -87,7 +87,7 @@ export default async function DocumentDetailPage({
     Promise.resolve(context.transmittals.map((t) => ({
       id: `${t.id}-${t.revisionId}`, revisionId: t.revisionId, revision: { value: t.revision },
       transmittal: {
-        id: t.id, number: t.number, direction: t.direction, reasonForIssue: t.reason, dateOfIssue: new Date(t.issuedAt),
+        id: t.id, number: t.number, direction: t.direction, reasonForIssue: t.reason, dateOfIssue: new Date(t.issuedAt), mayOpen: t.mayOpen,
         recipients: t.recipients.map((r) => ({ name: r.name, openedAt: r.openedAt ? new Date(r.openedAt) : null })),
       },
     }))),
@@ -927,12 +927,18 @@ export default async function DocumentDetailPage({
                       const seen = t.recipients.filter((r) => r.openedAt).length;
                       return (
                         <li key={item.id}>
-                          <Link href={`/transmittals/${t.id}`} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-5 py-3 hover:bg-slate-50">
-                            <span className="font-mono text-xs font-bold text-link">{t.number}</span>
-                            <span className="text-xs text-slate-500">rev {item.revision.value} · {prettyState(t.reasonForIssue)} · {fmtDate(t.dateOfIssue)}</span>
-                            <span className="min-w-0 flex-1 truncate text-xs text-slate-700">{t.recipients.map((r) => r.name).join(", ") || "—"}</span>
-                            <span className={`text-[11px] font-semibold ${seen === t.recipients.length && seen ? "text-emerald-700" : "text-slate-500"}`}>{seen}/{t.recipients.length} have seen it</span>
-                          </Link>
+                          {(() => {
+                            const row = <>
+                              <span className={`font-mono text-xs font-bold ${t.mayOpen ? "text-link" : "text-slate-600"}`}>{t.number}</span>
+                              <span className="text-xs text-slate-500">rev {item.revision.value} · {prettyState(t.reasonForIssue)} · {fmtDate(t.dateOfIssue)}</span>
+                              <span className="min-w-0 flex-1 truncate text-xs text-slate-700">{t.recipients.map((r) => r.name).join(", ") || "—"}</span>
+                              <span className={`text-[11px] font-semibold ${seen === t.recipients.length && seen ? "text-emerald-700" : "text-slate-500"}`}>{seen}/{t.recipients.length} have seen it</span>
+                            </>;
+                            // One the reader may not open is listed, not linked.
+                            return t.mayOpen
+                              ? <Link href={`/transmittals/${t.id}`} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-5 py-3 hover:bg-slate-50">{row}</Link>
+                              : <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-5 py-3">{row}</div>;
+                          })()}
                         </li>
                       );
                     })}

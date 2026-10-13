@@ -241,6 +241,16 @@ may notice:
 - The condition-by-condition acceptance check was removed from the page: nothing ever recorded one, so
   it never showed.
 
+**Transmittals you may not open.** A document's "Sent out" tab lists every transmittal that carried it, but
+links only those you may open; the others are listed without a link (before, the link led to "not found").
+
+**A supplier's "New transmittal"** opens again (it failed for people of another organization).
+
+**People & access for management.** Management (Manage) reaches People & access only on a project where
+management adds people (Settings → Who does what, people added without Document Control). There it can now read
+the functions and organizations the page chooses from. Where Document Control adds people, the page is not
+offered to management.
+
 **Returning what arrived when no "return" outcome is published.** It is returned all the same: back to
 the sender, to correct under the same revision, with your reason.
 

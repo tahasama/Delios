@@ -75,10 +75,11 @@ public static class DirectoryEndpoints
         people.MapPost("/users", CreateUserAsync);
         people.MapPut("/users/{userId:guid}", UpdateUserAsync);
         people.MapPut("/projects/{projectId:guid}/members", MemberAsync);
-        keepers.MapGet("/functions", FunctionsAsync);
+        // Reading the functions and organizations is also management's: People & access chooses from them.
+        people.MapGet("/functions", FunctionsAsync);
         keepers.MapPost("/functions", CreateFunctionAsync);
         keepers.MapPut("/functions/{functionId:guid}", UpdateFunctionAsync);
-        keepers.MapGet("/parties", PartiesAsync);
+        people.MapGet("/parties", PartiesAsync);
         keepers.MapPost("/parties", CreatePartyAsync);
         keepers.MapPut("/parties/{partyId:guid}", UpdatePartyAsync);
     }

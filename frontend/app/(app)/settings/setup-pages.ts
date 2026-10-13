@@ -28,13 +28,14 @@ export type SetupPage = {
 };
 
 /** Does this person reach this setup page? */
-export function maySetup(user: { verbs?: string[]; role?: string } | null, page: SetupPage): boolean {
+export function maySetup(user: { verbs?: string[]; role?: string } | null, page: SetupPage, managementAddsPeople = false): boolean {
   if (!user) return false;
   const held = heldVerbs(user);
   const holds = (verb: string) => held.includes(verb);
   if (holds(page.verb ?? "CONFIGURE")) return true;
-  // Management adds people where the project has no Document Control, so it reaches People & access.
-  return (page.control === true && holds("CONTROL")) || (page.manage === true && holds("MANAGE"));
+  // Management adds people where the project has no Document Control for it (Who does what, PROJECT_PEOPLE), so
+  // there it reaches People & access.
+  return (page.control === true && holds("CONTROL")) || (page.manage === true && managementAddsPeople && holds("MANAGE"));
 }
 
 export const SETUP_PAGES: SetupPage[] = [
