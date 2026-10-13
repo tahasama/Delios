@@ -10,6 +10,7 @@ import { PROJECT_KINDS } from "@/lib/settings/profiles/kinds";
 import { contractRoleOptions } from "@/lib/settings/contract-roles";
 import { adminFunctions, adminUsers } from "@/lib/settings/api-admin";
 import { getSets } from "@/lib/settings/config";
+import { ElsewhereCard } from "../elsewhere-card";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Set up your organization" };
@@ -52,6 +53,7 @@ export default async function SetupPage() {
             <p className="truncate text-sm font-bold text-slate-900">{organization.name}</p>
             <p className="text-[11px] text-slate-400">Setting up · {user.name}</p>
           </div>
+          <Link href="/organization" className={btn("ghost", "sm")}>Organization</Link>
           <form action={logoutAction}>
             <button type="submit" className={btn("ghost", "sm")}>
               <LogOut className="h-4 w-4" /> Sign out
@@ -71,6 +73,8 @@ export default async function SetupPage() {
             <Check className="h-4 w-4" /> Configuration published — nothing else needed before you start
           </p>
         </div>
+
+        <ElsewhereCard admin />
 
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
           {/* People first: they join the project automatically when it opens. */}

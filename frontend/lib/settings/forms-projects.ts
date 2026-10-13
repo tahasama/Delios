@@ -1,5 +1,7 @@
 "use server";
 
+import { applyDefaults } from "@/lib/organization/defaults";
+
 import { revalidatePath } from "next/cache";
 import { formPolicy, checkForm } from "@/lib/settings/field-policy";
 import { requireAdminScope, setActiveProject } from "@/lib/core/scope";
@@ -53,6 +55,8 @@ export async function createProjectAction(_prev: ProjectState | undefined, formD
       kind, startDate: startDate || new Date().toISOString().slice(0, 10), endDate: endDate || null,
       scopeStatement: scopeStatement || `All controlled information produced or received for ${name}, in any medium.`,
     }));
+    // The organization's defaults: who does what and how a project works, until the project changes them.
+    await applyDefaults(project.id);
     if (copyPeople) {
       // Same people, same functions, on the new project. Far quicker than adding
       // a project team one row at a time, and easy to prune afterwards.

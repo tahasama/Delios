@@ -5,7 +5,8 @@ in a folder called `transmittals` (or `Transmittals`) in every part of the app. 
 that area's folder in each part, and nowhere else.
 
 The areas: documents, reviews, transmittals, packages, actions (the schedule and its actions), records (assets,
-exceptions), conformance (checks and reports), notifications, account (your sign-in), settings.
+exceptions), conformance (checks and reports), notifications, account (your sign-in), organization (working with
+other organizations, the organization's admin page), settings.
 
 ## The whole repository
 
@@ -40,6 +41,7 @@ backend/
 │   ├── Reports/          reports
 │   ├── Search/           full-text search
 │   ├── Identity/         people, sign-in, functions, organizations, who may do what
+│   ├── Organizations/    organizations working together: links, linked accounts, switching
 │   ├── Settings/         the organization's and the project's settings and lists
 │   ├── Notifications/    notifications, email, pop-ups
 │   ├── Audit/            the audit trail
@@ -78,9 +80,11 @@ frontend/
 │   ├── (public)/         pages for someone not signed in
 │   │   ├── login/  signup/  confirm-email/  forgot-password/  reset-password/
 │   │   └── bot-check.tsx, form-validation.ts   pieces only these pages use
-│   ├── (start)/          signed in, not inside a project yet
+│   ├── (start)/          signed in, outside any project
 │   │   ├── setup/        after registering an organization: add people, open the first project
-│   │   └── no-project/   on no project yet
+│   │   ├── no-project/   on no project yet (lists other organizations' projects they work on)
+│   │   └── organization/ the organization's admin page: projects (ours and joined), people,
+│   │                     organizations we work with, invitations, defaults for new projects
 │   ├── (app)/            inside a project
 │   │   ├── layout.tsx    the frame: menu, project switcher, theme
 │   │   ├── page.tsx      Home (with home-parts.tsx, tally.tsx)
@@ -109,6 +113,7 @@ frontend/
 │   ├── records/
 │   ├── conformance/
 │   ├── account/
+│   ├── organization/      organizations working together, the admin page, defaults for new projects
 │   └── settings/
 │
 ├── components/           only the pieces several areas use

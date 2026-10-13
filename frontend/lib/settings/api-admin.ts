@@ -38,6 +38,10 @@ export type AdminFunction = { id: string; code: string; name: string; active: bo
 type AdminParty = {
   id: string; code: string; name: string; isInternal: boolean; active: boolean; participation: string; custodianFunction: string | null;
   externalSystem: string | null; evidenceRequired: boolean; people: number;
+  /** Collaborator (linked to its own DELIOS organization), guest, or not on DELIOS (docs/ORGANIZATIONS.md); null for ours. */
+  kind?: "COLLABORATOR" | "GUEST" | "NOT_ON_DELIOS" | null;
+  /** Its open link with its own DELIOS organization: invited, or linked. */
+  link?: { id: string; state: "INVITED" | "LINKED"; organization: string } | null;
 };
 
 type SchemeField = { label: string; source: string; value: string | null; digits: number | null };
@@ -187,12 +191,12 @@ export function asMatrixRules(rules: AdminRule[]) {
 }
 
 // ── Organizations, as the organizations screen reads them ─────────────────────
-// Who answers for an organization (its contact and backup), and whether it is
-// a collaborator or a guest, are the organization's own answers: kept in its
-// settings under PARTY:<id>. How it takes part is the backend's.
+// Who answers for an organization (its contact and backup) are the organization's
+// own answers: kept in its settings under PARTY:<id>. Its kind (collaborator,
+// guest, not on DELIOS) is the backend's.
 
 export const PARTY_KEY = "PARTY:";
-type PartyAnswers = { kind?: string; contactId?: string | null; backupId?: string | null };
+type PartyAnswers = { contactId?: string | null; backupId?: string | null };
 
 export async function partiesWithAnswers() {
   const { orgSettings } = await import("@/lib/settings/api");
@@ -209,7 +213,8 @@ export async function partiesWithAnswers() {
       const contact = person(said.contactId);
       const backup = person(said.backupId);
       return {
-        ...p, kind: p.participation === "BY_PROXY" ? "OFFLINE" : said.kind ?? "COLLABORATOR", liaisonFunction: p.custodianFunction,
+        ...p, kind: p.kind === "COLLABORATOR" ? "COLLABORATOR" : p.kind === "NOT_ON_DELIOS" || p.participation === "BY_PROXY" ? "OFFLINE" : "GUEST",
+        liaisonFunction: p.custodianFunction,
         contactId: contact?.id ?? null, backupId: backup?.id ?? null, contact, backup: backup ? { id: backup.id, name: backup.name } : null,
         _count: { users: p.people },
       };

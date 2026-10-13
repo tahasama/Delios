@@ -1,4 +1,6 @@
-import { requireUser } from "@/lib/core/auth";
+import { requireUser, isAdmin } from "@/lib/core/auth";
+import { redirect } from "next/navigation";
+import { ElsewhereCard } from "../elsewhere-card";
 import { logoutAction } from "@/lib/account/forms-sign-in";
 import { btn } from "@/components/ui";
 import { FolderOpen, LogOut } from "lucide-react";
@@ -13,6 +15,8 @@ export const metadata = { title: "No project" };
  */
 export default async function NoProjectPage() {
   const user = await requireUser();
+  // An administrator with no project of the organization's own sets one up (or opens one of a partner's from there).
+  if (isAdmin(user)) redirect("/setup");
 
   // Naming the administrators is the whole point of this page, but the backend
   // names them only to administrators and Document Control, so none are listed.
@@ -42,6 +46,8 @@ export default async function NoProjectPage() {
             </ul>
           </div>
         ) : null}
+
+        <div className="mt-6"><ElsewhereCard admin={false} /></div>
 
         <form action={logoutAction} className="mt-6">
           <button type="submit" className={btn("secondary", "sm")}>

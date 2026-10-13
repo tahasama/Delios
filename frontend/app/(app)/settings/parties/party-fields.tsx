@@ -31,11 +31,19 @@ export function PartyKindFields({ kind, contactId, backupId, liaisonFunction, pe
 
   return (
     <>
-      <Field label="How they work with us" required>
-        <select name="kind" value={chosen} onChange={(event) => setChosen(event.target.value)} className={inputCls}>
-          {PARTY_KINDS.map((item) => <option key={item.value} value={item.value}>{item.label} — {item.hint}</option>)}
-        </select>
-      </Field>
+      {/* A collaborator is linked to its own DELIOS, never chosen here: guest or not on DELIOS until it links. */}
+      {chosen === "COLLABORATOR" ? (
+        <>
+          <input type="hidden" name="kind" value="COLLABORATOR" />
+          <p className="text-xs text-slate-600">{PARTY_KINDS[0].label}: {PARTY_KINDS[0].hint}.</p>
+        </>
+      ) : (
+        <Field label="How they work with us" required>
+          <select name="kind" value={chosen} onChange={(event) => setChosen(event.target.value)} className={inputCls}>
+            {PARTY_KINDS.filter((item) => item.value !== "COLLABORATOR").map((item) => <option key={item.value} value={item.value}>{item.label} — {item.hint}</option>)}
+          </select>
+        </Field>
+      )}
 
       {offline ? (
         <Field label="Who carries it" hint="our function that sends it to them, and fills in their review, comments and answer — with proof each time">

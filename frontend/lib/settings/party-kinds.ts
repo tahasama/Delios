@@ -3,7 +3,7 @@
  * parties and the client control that edits one, so both say it the same way.
  */
 export const PARTY_KINDS: { value: string; label: string; hint: string }[] = [
-  { value: "COLLABORATOR", label: "Collaborator", hint: "they run this EDMS with us, and answer here" },
-  { value: "GUEST", label: "Guest", hint: "an account here, only to do a task on this project" },
-  { value: "OFFLINE", label: "Not on the EDMS", hint: "no account — our people fill in for them, with proof" },
+  { value: "COLLABORATOR", label: "Collaborator", hint: "they have their own DELIOS: their people work here with their own accounts" },
+  { value: "GUEST", label: "Guest", hint: "accounts we make for their people, for the work" },
+  { value: "OFFLINE", label: "Not on DELIOS", hint: "nobody of theirs signs in: one of ours records for them, with proof" },
 ];

@@ -1015,6 +1015,37 @@ automatic notices about an action stay notices (§53).
 
 ---
 
+## 55 · Organizations working together, each with its own DELIOS
+
+**Before:** another organization took part as a party of ours: its people held accounts we made inside our
+organization, or nobody of theirs signed in and one of ours recorded for them.
+
+**Now:** three ways, and a company can move from one to the next without losing anything
+(docs/ORGANIZATIONS.md):
+
+- **Collaborator.** It has its own DELIOS organization. We invite it through someone we know there; its
+  administrator accepts or refuses, saying why. Its people then work on our projects with their own sign-in:
+  each gets an account here standing for them, holding the function we chose for their organization on that
+  project, linked to their own. Their administrator chooses who works on our project; we may change the
+  function or take them off. Switching someone off at home, or ending the link (either side, with why), stops
+  their accounts here at once. What they did stays, under the party we know them by.
+- **Guest.** It has no DELIOS. We make accounts for its people inside ours, and close them when the work is done.
+- **Not on DELIOS.** Nobody of theirs signs in. It has a code (in document numbers), and one of ours records
+  for them, with proof. If it registers later, our party is linked to it, and its people see everything recorded
+  for them, under the same code and numbers.
+
+A project belongs to the organization that opened it, and its data stays there. Each project says which
+organizations take part, the role each plays, and the function a collaborator's people start with. An
+organization that asks for two-step sign-in is entered from elsewhere only by someone who has it turned on at
+home. Each organization's administrators see, on its own page, the projects it opened and those it joined, its
+people on each, the organizations it works with, and the invitations between them; every invitation, answer and
+end is on both organizations' audit trails.
+
+**Depends on it:** `Organizations/` (`OrganizationLink`, `AccountLink`, `ProjectParty`), `User.HomeTenantId`,
+`POST /api/auth/switch`.
+
+---
+
 ## Still open — decided in conversation, not yet built
 
 - **Every transmittal and every notification also goes by email**, showing what

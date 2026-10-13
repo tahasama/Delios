@@ -1,5 +1,7 @@
 import { FolderOpen, Check, ChevronDown } from "lucide-react";
 import { switchProjectAction } from "@/lib/settings/forms-project-switch";
+import { switchOrganizationAction } from "@/lib/organization/forms";
+import type { Elsewhere } from "@/lib/organization/api";
 import type { ProjectSummary } from "@/lib/core/scope";
 import { ROLE_LABEL } from "@/lib/core/standard";
 import { roleFor } from "@/lib/settings/profiles/roles";
@@ -16,6 +18,7 @@ export function ProjectSwitcher({
   role,
   functionName,
   organizationName,
+  elsewhere = [],
 }: {
   current: ProjectSummary;
   available: ProjectSummary[];
@@ -23,8 +26,10 @@ export function ProjectSwitcher({
   /** The job held on this project; the old role name only when there is none. */
   functionName?: string | null;
   organizationName: string;
+  /** Other organizations' projects this person is on (with their own sign-in), or the way back home. */
+  elsewhere?: Elsewhere[];
 }) {
-  const single = available.length <= 1;
+  const single = available.length <= 1 && elsewhere.length === 0;
 
   if (single) {
     return (
@@ -85,6 +90,34 @@ export function ProjectSwitcher({
             </form>
           );
         })}
+        {/* Projects of other organizations' this person works on with their own sign-in, and the way back home. */}
+        {elsewhere.map((other) => (
+          <div key={other.tenantId} className="mt-1 border-t border-line pt-1">
+            <p className="px-3 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-widest text-slate-400">
+              {other.home ? `Back to ${other.organization}` : other.organization}
+            </p>
+            {other.home && !other.projects.length ? (
+              <form action={switchOrganizationAction}>
+                <input type="hidden" name="tenantId" value={other.tenantId} />
+                <button type="submit" className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs font-semibold text-slate-800 transition hover:bg-slate-50">
+                  {other.organization}
+                </button>
+              </form>
+            ) : null}
+            {other.projects.map((project) => (
+              <form key={project.id} action={switchOrganizationAction}>
+                <input type="hidden" name="tenantId" value={other.tenantId} />
+                <input type="hidden" name="projectId" value={project.id} />
+                <button type="submit" className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition hover:bg-slate-50">
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-xs font-semibold text-slate-800">{project.name}</span>
+                    <span className="block truncate text-[11px] text-slate-400">{project.code}</span>
+                  </span>
+                </button>
+              </form>
+            ))}
+          </div>
+        ))}
       </div>
     </details>
   );

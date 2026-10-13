@@ -163,7 +163,7 @@ export async function savePartyAction(_prev: { error?: string } | undefined, for
   const contactId = text(formData, "contactId") || null;
   const backupId = text(formData, "backupId") || null;
   // How this party takes part in a review route, and who carries it when they do not answer here.
-  const kind = ["COLLABORATOR", "GUEST", "OFFLINE"].includes(text(formData, "kind")) ? text(formData, "kind") : "COLLABORATOR";
+  const kind = ["COLLABORATOR", "GUEST", "OFFLINE"].includes(text(formData, "kind")) ? text(formData, "kind") : "GUEST";
   const participation = kind === "OFFLINE" ? "BY_PROXY" : "IN_APP";
   const custodianFunction = text(formData, "liaisonFunction");
   if (contactId && backupId && contactId === backupId) return { error: "The backup has to be someone other than the contact." };
@@ -194,7 +194,7 @@ export async function savePartyAction(_prev: { error?: string } | undefined, for
       });
       partyId = created.id;
     }
-    await setOrgSetting(PARTY_KEY + partyId, JSON.stringify({ kind, contactId, backupId }));
+    await setOrgSetting(PARTY_KEY + partyId, JSON.stringify({ contactId, backupId }));
   } catch (e) {
     return failed(e);
   }

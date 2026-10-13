@@ -182,6 +182,12 @@ async function configures(me: NonNullable<Awaited<ReturnType<typeof getMe>>>): P
 const organizationProjects = cache(async () =>
   api<{ id: string; code: string; name: string; contractRole: string; kind?: string; status: string }[]>("/api/admin/projects").catch(() => []));
 
+/** Remembers the project to open next, one the backend already put this person on (after switching organization). */
+export async function rememberProject(projectId: string) {
+  const jar = await cookies();
+  jar.set(PROJECT_COOKIE, projectId, { httpOnly: true, sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 365 });
+}
+
 export async function setActiveProject(projectId: string, _userId: string) {
   // Only a project the backend says this person is on; an administrator joins one they are not on.
   const me = await getMe();

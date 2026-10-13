@@ -3,6 +3,8 @@ import { api, projectPath } from "@/lib/client";
 import { actionWork } from "@/lib/actions/api";
 import type { ActivityRow, ActivitySummary, Work } from "@/lib/types";
 import { requireScope } from "@/lib/core/scope";
+import { isAdmin } from "@/lib/core/auth";
+import { organizationLinks } from "@/lib/organization/api";
 import { fmtDate, fmtDateTime } from "@/lib/core/utils";
 import { DateWindow } from "@/components/date-window";
 import { Search } from "lucide-react";
@@ -30,6 +32,8 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const session = ctx;
   const { user } = ctx;
   const controller = ctx.can("CONTROL") || ctx.can("CONFIGURE");
+  // Another organization invites ours to work on its projects: its administrators answer.
+  const invitations = isAdmin(ctx.user) ? (await organizationLinks()).filter((one) => one.side === "GUEST" && one.state === "INVITED") : [];
   // The whole log is Document Control's and the administrator's: they answer
   // for what the record says. Anybody else asking for it gets their own page.
   const view = sp.view === "log" && !controller ? undefined : sp.view;
@@ -188,6 +192,10 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
       tag: "advice", tone: "sky", at: at(w.since), cta: "Review",
     })),
     incoming: [
+      ...invitations.map<Row>((one) => ({
+        href: "/organization", code: one.partyCode, title: `${one.organization} invites us to work on its projects, with our own accounts`,
+        tag: "invitation", tone: "sky", at: at(one.invitedAt), cta: "Answer",
+      })),
       ...revisionsOf(["ACCEPT_SUBMISSION"]).map<Row>((w) => ({
         href: `/documents/${w.documentId}`, code: w.documentNumber, rev: w.revision, title: w.title,
         tag: "received", tone: "sky", at: at(w.since), cta: "Check",

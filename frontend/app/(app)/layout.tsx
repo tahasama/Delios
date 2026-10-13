@@ -1,10 +1,11 @@
-import { mayCreateDocument } from "@/lib/core/auth";
+import { mayCreateDocument, isAdmin } from "@/lib/core/auth";
 import { requireScope } from "@/lib/core/scope";
 import { unreadNotifications } from "@/lib/account/api";
 import { Sidebar, MobileNav, SearchBox } from "@/app/(app)/navigation";
 import { ProjectSwitcher } from "@/app/(app)/project-switcher";
+import { elsewhere } from "@/lib/organization/api";
 import { logoutAction } from "@/lib/account/forms-sign-in";
-import { Bell, BookOpen, ChevronDown, LogOut, UserRound, KeyRound } from "lucide-react";
+import { Bell, BookOpen, Building2, ChevronDown, LogOut, UserRound, KeyRound } from "lucide-react";
 import Link from "next/link";
 import { ThemeToggle } from "@/app/(app)/theme-toggle";
 import { ROLE_LABEL } from "@/lib/core/standard";
@@ -14,7 +15,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const ctx = await requireScope();
   const { user, project, available, role } = ctx;
   // The organization's name is the account's.
-  const unread = await unreadNotifications();
+  const [unread, others] = await Promise.all([unreadNotifications(), elsewhere()]);
   const scope = { organizationName: user.organization };
 
   // The navigation is built from what this person may actually do, so nobody
@@ -45,6 +46,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             role={role}
             functionName={user.functionName ?? null}
             organizationName={scope?.organizationName ?? user.organization ?? "Organization"}
+            elsewhere={others}
           />
           <SearchBox className="hidden max-w-xl flex-1 md:block" />
           <div className="ml-auto flex items-center gap-2">
@@ -69,6 +71,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               <div className="absolute right-0 top-12 z-30 w-64 rounded-2xl border border-line bg-surface p-2 shadow-xl">
                 <div className="flex items-center gap-3 border-b border-line px-3 py-3"><span className="grid h-9 w-9 place-items-center rounded-xl bg-slate-100 text-slate-600"><UserRound className="h-4 w-4"/></span><div><p className="text-xs font-semibold text-slate-800">{user.name}</p><p className="text-[11px] text-slate-400">{user.organization}</p></div></div>
                 <Link href="/account" className="mt-1 flex items-center gap-2 rounded-xl px-3 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"><KeyRound className="h-4 w-4"/> Your sign-in</Link>
+                {isAdmin(user) ? <Link href="/organization" className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"><Building2 className="h-4 w-4"/> {user.organization}</Link> : null}
                 <Link href="/guide" className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"><BookOpen className="h-4 w-4"/> Help & orientation</Link>
                 <form action={logoutAction}><button type="submit" className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 hover:text-red-700"><LogOut className="h-4 w-4"/> Sign out</button></form>
               </div>

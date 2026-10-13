@@ -398,6 +398,21 @@ the installation sets its keys.
 - Anything else downloads, and is never shown inside the app's own address, so an uploaded web page or script
   cannot run.
 
+## 6c. Organizations working together
+
+- **Signing up** asks only for the organization and its administrator. Projects are opened afterwards.
+- **Collaborator, guest, not on DELIOS** now behave differently (before, collaborator and guest were the same
+  thing under two names). A collaborator is an organization linked to its own DELIOS: on Settings →
+  Organizations, "Invite them to link" with the email of someone there. Guest or not on DELIOS is still chosen
+  by hand. Organizations marked collaborator before this update, with no link, now read as guests.
+- **Which organizations take part in a project**, their role and the function their people start with: on
+  Settings → Organizations, "On <project>".
+- **The organization's page** (account menu → the organization's name; also from the setup page): projects ours
+  and joined, people, organizations we work with, invitations, defaults for new projects.
+- **Working on another organization's project:** the project picker lists, under that organization's name, the
+  projects you were put on; choosing one switches you there with your own sign-in, and "Back to …" returns.
+  Someone with no project of their own sees them on their first page.
+
 ## 7. Notifications and email
 
 - Notifications are kept and shown in the bell and on the Notifications page; opening the page reads

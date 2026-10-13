@@ -299,6 +299,23 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - A new transmittal lets Document Control ask placeholders not asked yet, one
   supplier's at a time ("Ask placeholders of a supplier").
 
+### Organizations working together (docs/ORGANIZATIONS.md, Standard §55)
+- Another organization works on our project in one of three ways: **collaborator** (its own DELIOS,
+  linked; its people use their own sign-in), **guest** (accounts we make), **not on DELIOS** (a code; one of
+  ours records for them). Nobody is forced to register. A collaborator is never chosen by hand: it is a party
+  linked to its organization (invite by an email known there; their administrator accepts or refuses, with
+  why; either side ends it, with why).
+- A project belongs to the organization that opened it; its data stays there (`TenantScope` is the only
+  way across). Each project says which organizations take part, their role, and the function a
+  collaborator's people start with (`ProjectParty`).
+- A collaborator's administrator puts their own people on our project: we get an account standing for
+  them (`User.HomeTenantId`, no password, no sign-in name), linked to theirs (`AccountLink`). They sign in
+  at home and switch in and back (`POST /api/auth/switch`; the 7 days run from the sign-in). Switched off
+  at home, or the link ended: those accounts stop.
+- The organization's page (`/organization`, administrators): projects ours and joined, people, organizations
+  we work with, invitations (also on Home), defaults for new projects (one project's choices, copied
+  when a project opens, never changing one already open; a joined project follows its owner).
+
 ### Home
 - Home's to-do lists everything the signed-in person has to do, whatever it
   is: reviews to decide or advise, releases, documents returned, things to send
