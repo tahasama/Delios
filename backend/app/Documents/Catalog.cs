@@ -32,9 +32,13 @@ public sealed class Catalog
     /// <summary>One property of a value's <c>Props</c> JSON, or null when the value or the property does not exist.</summary>
     public JsonElement? Prop(string setKey, string code, string prop) =>
         _sets.TryGetValue(setKey, out var set) && set.TryGetValue(code, out var v)
-            && v.Props?.RootElement.TryGetProperty(prop, out var value) == true
+            && (v.Props?.RootElement.TryGetProperty(prop, out var value) == true
+                || (OldNames.TryGetValue(prop, out var old) && v.Props?.RootElement.TryGetProperty(old, out value) == true))
             ? value
             : null;
+
+    /// <summary>The names Settings once saved two properties under, still read where a value was saved so.</summary>
+    private static readonly Dictionary<string, string> OldNames = new() { ["executes"] = "executionFlag", ["responseDays"] = "responsePeriodDays" };
 
     /// <summary>
     /// The active value a person or a file names, by its code or its label, ignoring

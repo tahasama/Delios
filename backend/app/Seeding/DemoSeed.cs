@@ -44,6 +44,7 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
             issuing |= await EnsureInformationReasonsAsync(existing.Id, cancellationToken);
             await db.SaveChangesAsync(cancellationToken);
             issuing |= await EnsureUpdateStatusAsync(existing.Id, cancellationToken);
+            issuing |= await EnsurePropNamesAsync(cancellationToken);
             await db.SaveChangesAsync(cancellationToken);
             await upgrade.CommitAsync(cancellationToken);
             logger.LogInformation(reviews || issuing ? "The demo tenant exists; what it lacked was added" : "The demo tenant already exists; nothing to do");
@@ -615,6 +616,26 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
             added = true;
         }
         return added;
+    }
+
+    /// <summary>
+    /// Values saved by Settings before its property names matched the backend's: "executionFlag" is "executes" (a
+    /// status lets work go ahead), "responsePeriodDays" is "responseDays" (a reason's answer period). Renamed in place.
+    /// </summary>
+    private async Task<bool> EnsurePropNamesAsync(CancellationToken cancellationToken)
+    {
+        var renames = new Dictionary<string, string> { ["executionFlag"] = "executes", ["responsePeriodDays"] = "responseDays" };
+        var changed = false;
+        foreach (var entry in await db.ValueEntries.Where(v => v.Props != null).ToListAsync(cancellationToken))
+        {
+            var props = entry.Props!.RootElement;
+            if (props.ValueKind != JsonValueKind.Object || !renames.Keys.Any(k => props.TryGetProperty(k, out _))) continue;
+            var copy = new Dictionary<string, JsonElement>();
+            foreach (var p in props.EnumerateObject()) copy[renames.GetValueOrDefault(p.Name, p.Name)] = p.Value.Clone();
+            entry.Props = JsonSerializer.SerializeToDocument(copy);
+            changed = true;
+        }
+        return changed;
     }
 
     /// <summary>

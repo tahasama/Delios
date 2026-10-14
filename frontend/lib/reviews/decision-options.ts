@@ -43,7 +43,7 @@ export function statusOptions(values: SetValue[], only?: string[] | null): Statu
     return {
       code: v.code,
       label: v.label,
-      allowsWork: v.props.executionFlag === true,
+      allowsWork: v.props.executes === true,
       may: typeof v.props.may === "string" ? v.props.may : null,
     };
   });

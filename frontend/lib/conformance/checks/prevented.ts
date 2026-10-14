@@ -1,126 +1,88 @@
 /**
- * Conditions this application does not let happen.
+ * What this application refuses at the moment somebody tries, on every project.
  *
- * These are not checks. A check asks a question of the register and can come
- * back with an answer nobody likes; a rule here is enforced at the moment
- * somebody tries, so the condition never reaches the register to be found. They
- * are listed because an auditor asking "how do you know numbers are not made
- * up" deserves an answer better than a check that has never once failed.
- *
- * Every entry names the act that refuses, so the claim can be read in the code
- * and tested. Nothing here is counted in the measured result: a condition that
- * cannot arise has no documents to carry it, and folding it into a percentage
- * would flatter the number instead of informing it.
+ * These are not checks: the act that would create the condition does not complete, so there is nothing in the
+ * register to find. Each entry names the refusal the backend answers with, so the claim can be read in the code and
+ * tried. Keep this list to what the backend really refuses; nothing aspirational belongs here.
  */
 
 type PreventedRule = {
-  /** What would be wrong, in the same words a check would use. */
+  /** What would be wrong, in the app's own words. */
   condition: string;
-  /** What refuses it, and when. */
+  /** What happens instead. */
   prevented: string;
-  /** Where in the application the refusal lives. */
+  /** The act that refuses it. */
   where: string;
+  /** The refusal the backend answers with, when it has one of its own. */
+  code?: string;
 };
 
 export const PREVENTED: PreventedRule[] = [
-  {
-    condition: "A document number typed by hand, or invented outside the register",
-    prevented: "No screen accepts a document number. Registering a document allocates one from the scheme routed to its deliverable type, taking the next counter, so no two documents can hold the same number and none can fall outside the published range.",
-    where: "Registering a document",
-  },
-  {
-    condition: "A document registered with no entry in the audit trail",
-    prevented: "Registering writes the register entry and its audit record in the same act. There is no path that creates one without the other.",
-    where: "Registering a document",
-  },
-  {
-    condition: "A revision started that nobody authorised",
-    prevented: "Starting a revision records who authorised it and why, and moves the document into use. A revision cannot exist without that record.",
-    where: "Starting a revision",
-  },
-  {
-    condition: "A revision released with no reason for revision, or no description of what changed",
-    prevented: "Release is refused until both are recorded. The description may not simply repeat the reason.",
-    where: "Releasing a revision",
-  },
-  {
-    condition: "A revision released with no approval recorded",
-    prevented: "Release is refused unless an approval exists — except for document types the organization has published as not reviewed, which have no approval to record.",
-    where: "Releasing a revision",
-  },
-  {
-    condition: "A revision released with no fixed, viewable copy",
-    prevented: "Release is refused without a rendition, and the rendition is stamped with the number, revision, status and date as it is released.",
-    where: "Releasing a revision",
-  },
-  {
-    condition: "A revision released while its document is still only planned",
-    prevented: "The document moves into use when its first revision is started, so a released revision cannot sit under a document that is not in use.",
-    where: "Starting a revision",
-  },
-  {
-    condition: "A revision released with core description missing",
-    prevented: "Release is refused until the title, document type, discipline, retention class, criticality and confidentiality are all recorded.",
-    where: "Releasing a revision",
-  },
-  {
-    condition: "A document received from outside with no supplier, order or date of receipt",
-    prevented: "Registering an external deliverable type is refused until the fields its type requires are filled.",
-    where: "Registering a document",
-  },
-  {
-    condition: "An approval given by somebody who holds no authority for that class",
-    prevented: "Approval is refused unless the distribution matrix grants Approve for that document, or a hand-over that has started lets somebody act in another's place.",
-    where: "Recording an approval",
-  },
-  {
-    condition: "Information destroyed with no authority or no stated basis",
-    prevented: "Disposal is refused without a retention basis, and records who authorised it. The register entry is kept and marked disposed.",
-    where: "Disposing of a document",
-  },
-  {
-    condition: "Information destroyed while a legal hold is on it",
-    prevented: "Disposal is refused outright while the hold stands.",
-    where: "Disposing of a document",
-  },
-  {
-    condition: "A review step answered by somebody the project never put on it",
-    prevented: "A step is answered by the person it was given to. Handing one over is its own act, recorded with who took it and until when.",
-    where: "Reviewing",
-  },
-  {
-    condition: "A verdict given by somebody who holds no say over that kind of document",
-    prevented: "Who may be put on a review, and who may give the binding verdict, is read from the distribution matrix for that discipline and document type.",
-    where: "Reviewing",
-  },
-  {
-    condition: "A revision released while a progression-preventing comment is unanswered",
-    prevented: "A comment that stops the work holds the revision until it is answered, whatever the verdict said.",
-    where: "Releasing a revision",
-  },
-  {
-    condition: "A transmittal that says it carries a revision it does not",
-    prevented: "A transmittal is raised from released revisions; its contents are recorded as it is issued, and nothing is added to it afterwards.",
-    where: "Issuing",
-  },
-  {
-    condition: "A document issued at a status the organization has not published",
-    prevented: "The status comes from the published list; there is no free-text status field anywhere.",
-    where: "Releasing a revision",
-  },
-  {
-    condition: "A classification invented on the spot",
-    prevented: "Discipline, document type, criticality, confidentiality and retention are chosen from the published lists. Adding a value is a change to the list, which is itself controlled.",
-    where: "Registering a document",
-  },
-  {
-    condition: "A superseded revision left as the current one",
-    prevented: "Releasing a new revision supersedes the one it replaces in the same act, and the register's copy of what is current is rewritten with it.",
-    where: "Releasing a revision",
-  },
-  {
-    condition: "Another organization reading what does not concern it",
-    prevented: "Every query is bound to the project and, for an outside party, to what was issued to them. There is no screen that can return another organization's rows.",
-    where: "Every page",
-  },
+  // Registering
+  { where: "Registering a document", condition: "A document number typed by hand, or used twice",
+    prevented: "No screen takes a number: registering allocates the next one from the scheme its deliverable type uses.", code: "NO_NUMBERING_SCHEME" },
+  { where: "Registering a document", condition: "A discipline, type, criticality or other value made up on the spot",
+    prevented: "Every such field is chosen from the published lists; anything else is refused.", code: "VALUE_NOT_PUBLISHED" },
+  { where: "Registering a document", condition: "A title that only repeats the document type",
+    prevented: "Refused on create and on edit: the title has to say which one it is.", code: "TITLE_GENERIC" },
+
+  // Revisions
+  { where: "Revisions", condition: "Two revisions of one document being worked on at once",
+    prevented: "A new revision is refused while another of the same document is being prepared, reviewed or checked.", code: "REVISION_IN_MOTION" },
+  { where: "Revisions", condition: "A document's details changed outside a revision",
+    prevented: "Once out of preparation, a change of details takes a new revision.", },
+  { where: "Revisions", condition: "A revision voided, or a document retired, while on legal hold",
+    prevented: "Refused while the hold stands; new revisions and reviews go on.", code: "ON_LEGAL_HOLD" },
+
+  // Reviews
+  { where: "Reviews", condition: "A revision in two reviews at once",
+    prevented: "A review is only started for a revision being prepared; one already in review is not.", code: "REVISION_NOT_IN_PREPARATION" },
+  { where: "Reviews", condition: "A route step nobody answers",
+    prevented: "Every step names who answers it: people, a function or an outside organization.", code: "STEP_HAS_NO_HOLDER" },
+  { where: "Reviews", condition: "A review withdrawn by somebody with no say over it",
+    prevented: "Only whoever started it, or Document Control (and above), withdraws it, with a reason; the author alone does not.", code: "STARTER_OR_CONTROL" },
+  { where: "Reviews", condition: "A decision with no status",
+    prevented: "The decider grants the status the revision is released at; a decision without it is refused.", code: "STATUS_REQUIRED" },
+  { where: "Reviews", condition: "Advice with comments that says no comment",
+    prevented: "Advice that carries comments is refused without them; advice below what the comments say is refused too.", code: "COMMENT_REQUIRED / ADVICE_BELOW_COMMENTS" },
+
+  // Releasing
+  { where: "Releasing a revision", condition: "Released at a status the decider did not grant",
+    prevented: "The release carries the status of the decision, not one chosen at release.", code: "STATUS_NOT_GRANTED" },
+  { where: "Releasing a revision", condition: "Released with nobody's decision",
+    prevented: "Every release comes from a review, the \"not reviewed\" one included; Document Control approves nothing." },
+  { where: "Releasing a revision", condition: "Released while a blocking comment is unanswered",
+    prevented: "A blocking comment holds the release until it is settled.", code: "BLOCKING_COMMENTS_OPEN" },
+  { where: "Releasing a revision", condition: "Two released revisions of one document",
+    prevented: "Releasing a revision supersedes the one before it in the same act." },
+  { where: "Releasing a revision", condition: "Released and issued to nobody",
+    prevented: "Where releasing and issuing are one act, a release needs someone to send to.", code: "ISSUE_REQUIRED" },
+
+  // Transmittals
+  { where: "Transmittals", condition: "An answer asked for with no day",
+    prevented: "A transmittal asking for an answer says by when, so a late answer can be seen.", code: "ANSWER_DATE_REQUIRED" },
+  { where: "Transmittals", condition: "A data transmittal recorded as received, carrying nothing",
+    prevented: "Recorded from outside the system, it carries a document of the register or the file that came.", code: "FILE_REQUIRED" },
+  { where: "Transmittals", condition: "A transmittal changed after it was issued",
+    prevented: "What it carries and who it went to are recorded as it is issued; a correction is a new transmittal following it." },
+
+  // Suppliers
+  { where: "Suppliers", condition: "A placeholder asked of its supplier twice",
+    prevented: "Each is asked once; after that it is handed back and forth.", code: "ALREADY_REQUESTED" },
+  { where: "Suppliers", condition: "A supplier's document changed by the side that does not hold it",
+    prevented: "Only the holder changes it; the other side asks for it back.", code: "HELD_BY_US / ASKED_OF_SUPPLIER" },
+  { where: "Suppliers", condition: "A document sent to the supplier taken out of its package",
+    prevented: "Once sent on a transmittal it stays in the package.", code: "SENT_TO_SUPPLIER" },
+  { where: "Suppliers", condition: "A package renumbered, or renamed once shared",
+    prevented: "Its number never changes; once shared with its supplier, its name and rule are fixed.", code: "NUMBER_FIXED / PACKAGE_SHARED" },
+
+  // Schedule
+  { where: "Schedule", condition: "A discipline going ahead without a document and saying nothing",
+    prevented: "Confirming with any of the discipline's documents missing needs why.", code: "NOTE_REQUIRED" },
+
+  // Access
+  { where: "Who sees what", condition: "Another organization reading what does not concern it",
+    prevented: "Every read is bound to the project and, for another organization, to what is theirs or was shared with them." },
+  { where: "Who sees what", condition: "A document read above someone's clearance",
+    prevented: "\"Who may see it\" and the function's clearance decide what each person reads." },
 ];

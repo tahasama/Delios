@@ -16,7 +16,7 @@ type Coded = { code: string; props: Record<string, unknown> };
 export function needDefaults(reasons: Coded[], statuses: Coded[]): { purpose: string; status: string } {
   return {
     purpose: (reasons.find((r) => r.code === "EXECUTION") ?? reasons.find((r) => r.code === "CONSTRUCTION") ?? reasons[0])?.code ?? "EXECUTION",
-    status: (statuses.find((v) => v.props.executionFlag === true || v.props.executes === true) ?? statuses[0])?.code ?? "",
+    status: (statuses.find((v) => v.props.executes === true) ?? statuses[0])?.code ?? "",
   };
 }
 

@@ -141,7 +141,7 @@ export default async function CodesPage() {
             <tr key={s.code}>
               <Td className="font-mono text-sm font-bold text-slate-900">{s.code}</Td>
               <Td className="whitespace-nowrap font-medium text-slate-800">{s.label}</Td>
-              <Td>{s.props.executionFlag ? <Chip className="bg-emerald-100 text-emerald-800 ring-emerald-300">yes</Chip> : <Chip className="bg-slate-100 text-slate-500 ring-slate-200">no</Chip>}</Td>
+              <Td>{s.props.executes ? <Chip className="bg-emerald-100 text-emerald-800 ring-emerald-300">yes</Chip> : <Chip className="bg-slate-100 text-slate-500 ring-slate-200">no</Chip>}</Td>
               <Td className="text-xs">{text(s.props.may) ?? <span className="text-slate-300">—</span>}</Td>
               <Td className="text-xs">{text(s.props.mayNot) ?? <span className="text-slate-300">—</span>}</Td>
             </tr>

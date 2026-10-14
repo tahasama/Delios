@@ -1,5 +1,5 @@
 import { requireScope } from "@/lib/core/scope";
-import { PageHeader, Card, Chip } from "@/components/ui";
+import { PageHeader, DataTable, Th, Td } from "@/components/ui";
 import { AssuranceTabs } from "@/app/(app)/conformance/tabs";
 import { PREVENTED } from "@/lib/conformance/checks/prevented";
 import { CATALOG } from "@/lib/conformance/checks/catalog";
@@ -38,8 +38,6 @@ export default async function DefaultRulesPage() {
     })
     .filter((s) => s.off);
 
-  const byWhere = [...new Set(PREVENTED.map((r) => r.where))];
-
   return (
     <div className="space-y-4">
       <PageHeader
@@ -48,56 +46,48 @@ export default async function DefaultRulesPage() {
       />
       <AssuranceTabs current="/conformance/rules" />
 
-      <div className="max-w-4xl space-y-4">
-        <Card title="Settled on this project" description="Each one is a real choice between two honest ways of working. This is the answer used here.">
+      <div className="space-y-4">
+        <section className="register register-sheet register-sheet-open">
+          <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
+            <span className="stencil mr-1 text-slate-500">Settled on this project</span>
+            <span className="text-[11px] text-slate-500">where there is a real choice, the answer used here (Settings → How this project works)</span>
+          </div>
           <ul className="divide-y divide-line">
             {settled.map((s) => (
-              <li key={s.key} className="py-2.5 first:pt-0 last:pb-0">
-                <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                  <p className="text-[13px] leading-5 text-slate-800">{s.title}</p>
-                  {s.isDefault ? <Chip className="bg-slate-100 text-slate-500 ring-slate-300">as it comes</Chip> : null}
-                </div>
-                <p className="mt-0.5 text-[11.5px] leading-[1.45] text-slate-500">
-                  <span className="font-semibold text-slate-700">{s.chosen.label.replace(" (recommended)", "").replace(" — recommended", "")}.</span>{" "}
-                  {s.chosen.text}
-                </p>
+              <li key={s.key} className="grid grid-cols-1 gap-x-6 gap-y-1 px-5 py-2.5 text-xs sm:grid-cols-[18rem_minmax(0,1fr)] sm:px-6">
+                <span className="font-semibold text-slate-800">{s.title}{s.isDefault ? <span className="ml-2 font-normal text-slate-400">as it comes</span> : null}</span>
+                <span className="leading-5 text-slate-600"><span className="font-semibold text-slate-700">{s.chosen.label.replace(" (recommended)", "").replace(" — recommended", "")}.</span> {s.chosen.text}</span>
+              </li>
+            ))}
+            {switchedOff.map((s) => (
+              <li key={s.key} className="grid grid-cols-1 gap-x-6 gap-y-1 px-5 py-2.5 text-xs sm:grid-cols-[18rem_minmax(0,1fr)] sm:px-6">
+                <span className="font-semibold text-slate-800">{s.title}<span className="ml-2 font-normal text-amber-700">left out here</span></span>
+                <span className="leading-5 text-slate-600">{s.off}</span>
               </li>
             ))}
           </ul>
-        </Card>
+        </section>
 
-        {switchedOff.length ? (
-          <Card title="Left out here" description="Acts this organization has switched off, on its own responsibility. Nothing below is enforced.">
-            <ul className="divide-y divide-line">
-              {switchedOff.map((s) => (
-                <li key={s.key} className="py-2.5 first:pt-0 last:pb-0">
-                  <p className="text-[13px] leading-5 text-slate-800">{s.title}</p>
-                  <p className="mt-0.5 text-[11.5px] leading-[1.45] text-slate-500">{s.off}</p>
-                </li>
-              ))}
-            </ul>
-          </Card>
-        ) : null}
-
-        {byWhere.map((where) => (
-          <Card key={where} title={where} description="Refused on every project; not a setting.">
-            <ul className="divide-y divide-line">
-              {PREVENTED.filter((r) => r.where === where).map((r) => (
-                <li key={r.condition} className="flex items-start gap-3 py-2.5 first:pt-0 last:pb-0">
-                  <span aria-hidden="true" className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-slate-300" />
-                  <div className="min-w-0">
-                    <p className="text-[13px] leading-5 text-slate-800">{r.condition}</p>
-                    <p className="mt-0.5 text-[11.5px] leading-[1.45] text-slate-500">{r.prevented}</p>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </Card>
-        ))}
+        <section data-dt-frame className="register register-sheet">
+          <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
+            <span className="stencil mr-1 text-slate-500">Refused on every project</span>
+            <span className="text-[11px] text-slate-500">not a setting: the act that would cause it does not go through, with the answer it gets</span>
+          </div>
+          <DataTable className="rounded-none border-0 shadow-none" id="default-rules" exportName="default-rules"
+            head={<tr><Th>Where</Th><Th>What cannot happen</Th><Th>What happens instead</Th><Th>Refused with</Th></tr>}>
+            {PREVENTED.map((r) => (
+              <tr key={r.condition}>
+                <Td className="whitespace-nowrap text-xs font-semibold text-slate-700">{r.where}</Td>
+                <Td className="max-w-80 text-[13px] text-slate-800">{r.condition}</Td>
+                <Td className="max-w-md text-xs leading-5 text-slate-600">{r.prevented}</Td>
+                <Td className="font-mono text-[11px] text-slate-500">{r.code ?? <span className="text-slate-300">—</span>}</Td>
+              </tr>
+            ))}
+          </DataTable>
+        </section>
 
         <p className="max-w-prose text-[11px] leading-4 text-slate-400">
-          None of this is counted in the measured result. A condition that cannot arise has no documents carrying it, so
-          folding it into the percentage would raise the number without telling you anything about the register.
+          None of this is counted in the measured result: a condition that cannot arise has no documents carrying it.
         </p>
       </div>
     </div>

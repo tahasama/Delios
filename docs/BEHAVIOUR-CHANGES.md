@@ -513,6 +513,12 @@ the installation sets its keys.
   released; "where it stands" says who has to act. "Received" reads "received, to check".
 - **Assets & tags** is a table with search and filters; a tag's page lists its documents and links or unlinks them
   through the register, as for an action (until now, only from each document's Details).
+- **Assurance:** checks the app makes impossible are gone (two revisions at once, two released, released with no
+  status or with nobody's decision, no revision scheme, waived documents, criticality missing — it is optional);
+  the others are reworded to what the app does, and "an action past its day" now reads the disciplines'
+  confirmations. "Default rules" lists only what the backend really refuses, each with the answer it gets.
+- **Settings bug fixed:** a status's "Allows work" and a reason's "Response period" were saved under names the
+  backend never read; they are read now (old saved values too) and saved under the right names.
 - **File fields** look the same everywhere (the new-document one).
 - **New delivery package:** "Needed at" sits under "Due", beside a narrower description.
 - **Action page:** "Request a document" moved from each discipline's buttons to the line under them, with its question,

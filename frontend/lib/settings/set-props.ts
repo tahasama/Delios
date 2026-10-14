@@ -61,7 +61,7 @@ export const SET_PROP_FIELDS: Record<string, PropField[]> = {
     { key: "criticality", label: "Recommended criticality", type: "set", setKey: "CRITICALITY", hint: "filled in when a document of this type is created; whoever creates it may choose another" },
   ],
   STATUSES: [
- { key: "executionFlag", label: "Allows work on site or in the shop", type: "bool", hint: "building, fabricating, installing or ordering from it" },
+ { key: "executes", label: "Allows work on site or in the shop", type: "bool", hint: "building, fabricating, installing or ordering from it" },
     { key: "may", label: "May be used for", type: "text" },
     { key: "mayNot", label: "May NOT be used for", type: "text" },
   ],
@@ -89,7 +89,7 @@ export const SET_PROP_FIELDS: Record<string, PropField[]> = {
  { key: "reviewCycle", label: "Needs a review", type: "bool", hint: "received documents go down a review route once accepted" },
     { key: "response", label: "Needs a reply", type: "bool", hint: "the recipient must answer within the reply period" },
  { key: "acceptancePeriodDays", label: "Acceptance period (days)", type: "int", hint: "" },
- { key: "responsePeriodDays", label: "Response period (days)", type: "int", hint: "runs from acceptance" },
+ { key: "responseDays", label: "Response period (days)", type: "int", hint: "runs from acceptance" },
   ],
   COMMENT_CLASSES: [
  { key: "progressionPreventing", label: "Blocks the work until it is closed", type: "bool", hint: "" },
