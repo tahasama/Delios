@@ -101,6 +101,13 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - Progress shows "you are here" on where things really stand: the open step
   while in review, "Not released" once decided.
 - "Leave it to…" (who receives it) goes to whoever started the review.
+- Accepted with comments is in force and back with its author at once: released, the
+  author (or the supplier's people) is told its comments go into the next revision,
+  which needs nobody's leave, and it is on their Home ("next revision due").
+- Sending back after a verdict that asked for changes asks nothing more: the verdict
+  and the comments written with it are the reason ("Anything to add" is optional).
+- A decision is told to whoever started the review and Document Control; the author
+  hears once, when it is released or sent back to them.
 
 ### Revisions
 - Until released, everything is editable in one "Edit rev X" step: PDF, native

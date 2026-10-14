@@ -148,6 +148,13 @@ public sealed partial class ReviewService
             return (null, Problems.Conflict("REVIEW_CLOSED", "The review is closed.", new { state = review.State }));
         }
         var note = request.Note?.Trim() ?? "";
+        // A verdict that asked for changes already says why, with the comments written under it: nothing to add.
+        if (note.Length == 0 && request.ToStep is null && review.State == ReviewStates.Decided && review.Verdict is { } said
+            && !Proceeds(await Catalog.LoadAsync(db, cancellationToken), review.VerdictSet, said))
+        {
+            var written = review.Comments.Where(c => c.Status != CommentStatuses.Withdrawn).OrderBy(c => c.CreatedAt).Select(c => c.Text.Trim()).ToList();
+            note = written.Count > 0 ? $"Verdict {said}: {string.Join(" / ", written)}" : $"Verdict {said}.";
+        }
         if (note.Length == 0) return (null, Problems.Invalid("NOTE_REQUIRED", "Say why it goes back."));
 
         if (request.ToStep is null)

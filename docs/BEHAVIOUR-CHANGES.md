@@ -441,6 +441,13 @@ the installation sets its keys.
   documents' day (e.g. 13 Sep for works on 20 Sep); released & issued on the action's day. Before, the app guessed
   a route and counted its days back from the documents' day (giving e.g. 24 Aug).
 
+- **Accepted with comments:** the author is told it is in force and that its comments go into the next revision
+  (started without asking); it is on their Home as "next revision due".
+- **Sending back after C3 (or any verdict asking for changes)** no longer asks why: the verdict and its comments go
+  with it; "Anything to add" is optional.
+- **One notice for the author:** the decision itself is told to whoever started the review and Document Control;
+  the author is told once, at the release or the send-back (before, they got both).
+
 ## 7. Notifications and email
 
 - Notifications are kept and shown in the bell and on the Notifications page; opening the page reads

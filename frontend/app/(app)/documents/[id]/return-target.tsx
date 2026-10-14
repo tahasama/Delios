@@ -22,10 +22,17 @@ type ReturnReason = { code: string; label: string; meaning?: string | null };
  * which is only honest when the revision was never the problem. So it asks for
  * a reason from the published list, and the list is the organization's to keep.
  */
-export function ReturnTarget({ steps, reasons }: { steps: ReturnStep[]; reasons: ReturnReason[] }) {
+export function ReturnTarget({ steps, reasons, verdict }: {
+  steps: ReturnStep[];
+  reasons: ReturnReason[];
+  /** The verdict that asked for changes: it already says why, with the comments written under it. */
+  verdict?: string | null;
+}) {
   const [toStep, setToStep] = useState("");
   const [code, setCode] = useState("");
   const rewinding = toStep !== "";
+  // Back to its author after a verdict that asked for changes: the verdict and its comments are the reason.
+  const said = !rewinding && !!verdict;
   const chosen = reasons.find((one) => one.code === code);
 
   return (
@@ -48,11 +55,11 @@ export function ReturnTarget({ steps, reasons }: { steps: ReturnStep[]; reasons:
       ) : null}
 
       <Field
-        label={rewinding ? "Anything to add" : "Why"}
-        required={!rewinding}
-        hint="whoever gets it is told, and so is everyone else who was on the route"
+        label={rewinding || said ? "Anything to add" : "Why"}
+        required={!rewinding && !said}
+        hint={said ? `verdict ${verdict} and the comments written with it go with it; whoever gets it is told, and so is everyone on the route` : "whoever gets it is told, and so is everyone else who was on the route"}
       >
-        <textarea name="reason" rows={3} required={!rewinding} className={inputCls} placeholder={rewinding ? "optional — the detail, if the reason above does not say it all" : "what is wrong, so the next revision answers it"} />
+        <textarea name="reason" rows={3} required={!rewinding && !said} className={inputCls} placeholder={rewinding || said ? "optional — the detail, if the reason above does not say it all" : "what is wrong, so the next revision answers it"} />
       </Field>
     </>
   );

@@ -121,9 +121,11 @@ public sealed partial class ReviewService
             $"Released at {status} on review {review.Number}.", review.ProjectId, cancellationToken);
         // Handed back to its supplier with comments for the next revision: their people are told too.
         var supplier = document.WithSupplier == true ? await SupplierHold.PeopleAsync(db, document, revision, cancellationToken) : [];
+        // Accepted with comments: in force, and back with its author (or supplier) for the next revision, which needs nobody's leave.
+        var commentsNext = review.Verdict is { } given && SupplierHold.HandsToSupplier(await Catalog.LoadAsync(db, cancellationToken), review.VerdictSet, given);
         await TellAsync(review, [review.StartedById, revision.AuthoredById, .. supplier], Notifications.NotificationKinds.Released,
-            $"{TransmittalService.Label(document, revision)} released at {status}",
-            document.WithSupplier == true ? $"Review {review.Number}. Its comments go into your next revision." : $"Review {review.Number}.",
+            $"{TransmittalService.Label(document, revision)} released at {status}" + (commentsNext ? ", with comments for the next revision" : ""),
+            commentsNext ? $"Review {review.Number}. It is in force; its comments go into your next revision, which you start without asking." : $"Review {review.Number}.",
             cancellationToken, $"/documents/{document.Id}");
         foreach (var old in earlier)
         {

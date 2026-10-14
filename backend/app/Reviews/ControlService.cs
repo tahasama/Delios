@@ -171,6 +171,13 @@ public sealed class ControlService(DeliosDbContext db, AuditLog audit, IClock cl
         var me = access.UserId;
         var control = access.Holds(Verbs.Control);
         var party = access.IsInternal ? null : access.PartyCode;
+        // The verdicts that release a revision with comments for the next one ("accepted with comments"), by meaning.
+        var catalog = await Catalog.LoadAsync(db, cancellationToken);
+        var verdictSets = await db.Reviews.Where(v => v.ProjectId == projectId).Select(v => v.VerdictSet).Distinct().ToListAsync(cancellationToken);
+        var withComments = (await db.ValueEntries.Where(v => verdictSets.Contains(v.SetKey)).Select(v => new { v.SetKey, v.Code }).ToListAsync(cancellationToken))
+            .Where(v => catalog.Prop(v.SetKey, v.Code, "proceed") is { ValueKind: System.Text.Json.JsonValueKind.True }
+                && catalog.Prop(v.SetKey, v.Code, "resubmit") is { ValueKind: System.Text.Json.JsonValueKind.True })
+            .Select(v => v.Code).Distinct().ToList();
         var rows = await (
             from r in db.Revisions
             join d in db.Documents on r.DocumentId equals d.Id
@@ -182,6 +189,10 @@ public sealed class ControlService(DeliosDbContext db, AuditLog audit, IClock cl
                     // Released with comments for their next revision: theirs to send again.
                     || (r.State == RevisionStates.Released && d.LatestRevisionId == r.Id && d.WithSupplier == true
                         && party != null && (r.AuthoredByParty == party || d.Originator == party))
+                    // Ours, released with comments: its author takes them into the next revision, asking nobody.
+                    || (r.State == RevisionStates.Released && d.LatestRevisionId == r.Id && d.WithSupplier == null && party == null
+                        && r.AuthoredById == me && db.Reviews.Any(v => v.RevisionId == r.Id && v.State == ReviewStates.Released
+                            && v.Verdict != null && withComments.Contains(v.Verdict)))
                     || (r.State == RevisionStates.InPreparation && control && r.AuthoredByParty != null
                         && db.Parties.Any(p => p.Code == r.AuthoredByParty && !p.IsInternal))
                     || (r.State == RevisionStates.InPreparation && r.AuthoredById == me && party == null))
@@ -226,7 +237,7 @@ public sealed class ControlService(DeliosDbContext db, AuditLog audit, IClock cl
                 // Sent to them again after Document Control took it back: what they were told; else why it was returned.
                 "CORRECT_AND_RESUBMIT" => resent ? x.ResentNote : x.ReturnedReason,
                 "RETURNED_BY_REVIEW" => x.ReturnedReason ?? x.ControlOutcome,
-                "NEXT_REVISION_DUE" => x.ControlOutcome,
+                "NEXT_REVISION_DUE" => x.ControlOutcome ?? "Accepted with comments: take them into the next revision.",
                 "DRAFT" => x.FilesState,
                 _ => null,
             };

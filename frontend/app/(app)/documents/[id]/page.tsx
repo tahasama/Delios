@@ -476,7 +476,7 @@ export default async function DocumentDetailPage({
                 <summary className="cursor-pointer text-xs font-semibold text-slate-600">{decisionFinal ? "Send it back instead" : "Send it back"}</summary>
                 <div className="mt-2">
                   <ActionForm action={returnAtGateAction} submitLabel="Send it back" size="sm" hidden={{ revisionId: working.id }}>
-                    <ReturnTarget steps={routeSteps} reasons={returnReasons.map((one) => ({ code: one.code, label: one.label, meaning: typeof one.props.meaning === "string" ? one.props.meaning : null }))} />
+                    <ReturnTarget steps={routeSteps} verdict={decisionFinal ? null : decidedVerdict} reasons={returnReasons.map((one) => ({ code: one.code, label: one.label, meaning: typeof one.props.meaning === "string" ? one.props.meaning : null }))} />
                     <CopyPicker companies={people} backTo={`${backTo.names} — when it goes back to its author`} preselected={[...new Set(routePeople.map((one) => one.userId))]} />
                   </ActionForm>
                 </div>
