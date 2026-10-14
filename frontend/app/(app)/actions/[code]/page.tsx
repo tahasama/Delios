@@ -559,7 +559,7 @@ export default async function ActionDetailPage({ params, searchParams }: { param
 /** The schedule's own chip colours, so a state reads the same on both pages. */
 const TONE: Record<ActionState, string> = {
   DONE: "bg-emerald-600/10 text-emerald-900 ring-emerald-300",
-  LATE_RECEIPT: "bg-red-50 text-red-800 ring-red-200",
+  LATE_RECEIPT: "bg-fuchsia-50 text-fuchsia-800 ring-fuchsia-200",
   READY: "bg-emerald-100 text-emerald-800 ring-emerald-200",
   UPCOMING: "bg-sky-100 text-sky-800 ring-sky-200",
   AT_RISK: "bg-amber-100 text-amber-800 ring-amber-200",

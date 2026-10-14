@@ -505,9 +505,8 @@ the installation sets its keys.
 - **Review page:** "Withdraw?" and "Notify?" sit on the right under the review's chip; Notify opens straight
   on its form (no second button). Notice messages open at the height of their text.
 - **Delivery package readiness** reads in the schedule's colours: all ready green, none red, between amber.
-- **Side colours** mean one thing each everywhere (key on Help): green done, blue under way, amber someone has to act,
-  red stopped or late, grey not yet / no longer counts. Superseded and withdrawn reviews read grey (were violet / red),
-  a late receipt reads red (was violet), every to-do card on Home reads amber (each had its own colour).
+- **Side colours**: one colour per state (key on Help, listed by area); close states in close colours. Superseded is
+  violet again; transmittals to check, sent, received, accepted and returned each have their own.
 - **New delivery package:** "Needed at" sits under "Due", beside a narrower description.
 - **Action page:** "Request a document" moved from each discipline's buttons to the line under them, with its question,
   beside "Request a discipline".

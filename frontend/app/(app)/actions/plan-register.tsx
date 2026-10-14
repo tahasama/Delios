@@ -676,18 +676,18 @@ type Column = {
  * register and the dispatch log carry.
  */
 const RAIL: Record<PlanTableRow["readiness"], string> = {
-  DONE: "rail-good",
-  LATE_RECEIPT: "rail-stop",
-  READY: "rail-good",
-  UPCOMING: "rail-moving",
-  AT_RISK: "rail-act",
-  NOT_READY: "rail-stop",
-  UNKNOWN: "rail-idle",
+  DONE: "rail-done",
+  LATE_RECEIPT: "rail-late",
+  READY: "rail-ready",
+  UPCOMING: "rail-ahead",
+  AT_RISK: "rail-risk",
+  NOT_READY: "rail-overdue",
+  UNKNOWN: "rail-none",
 };
 
 const READINESS: Record<PlanTableRow["readiness"], { label: string; chip: string }> = {
   DONE: { label: "Done", chip: "bg-emerald-600/10 text-emerald-900 ring-emerald-300" },
-  LATE_RECEIPT: { label: "Late receipt", chip: "bg-red-50 text-red-800 ring-red-200" },
+  LATE_RECEIPT: { label: "Late receipt", chip: "bg-fuchsia-50 text-fuchsia-800 ring-fuchsia-200" },
   READY: { label: "Ready", chip: "bg-emerald-100 text-emerald-800 ring-emerald-200" },
   UPCOMING: { label: "Still ahead", chip: "bg-sky-100 text-sky-800 ring-sky-200" },
   AT_RISK: { label: "At risk", chip: "bg-amber-100 text-amber-800 ring-amber-200" },

@@ -206,9 +206,10 @@ a screen only words it. A new rule goes in the backend, never in a page.
   control height, so fields side by side stay exactly level; forms are laid out in rows, field beside field
   (new document, step 2: project · criticality · PDF / sub-project · what the criticality means / who may see it ·
   retention period · native file). A search picker's line starts where every field's does (magnifier inside).
-- The side colours (rails, Home's edges, the history's marks) say one of five things, everywhere (`.rail-good`,
-  `-moving`, `-act`, `-stop`, `-idle`; key on Help, "What the colours say"): green done, blue under way, amber someone
-  has to act, red stopped or late, grey not yet or no longer counts. No colour stands for a kind of thing.
+- The side colours (rails, Home's edges, the history's marks): one colour per state, never one colour for things
+  that mean different things; close states take close colours (released emerald / accepted green, done / ready,
+  superseded violet). The states and their classes are listed once in `lib/core/rails.ts` (CSS `.rail-*`), which is
+  the key on Help, "What the colours say".
 - `unshare-package <email> <package-number>` (backend command) puts a supplier's
   package back to not shared, for testing; logged.
 - A supplier package has two pages. Ours (Document Control and above): plate,

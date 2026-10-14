@@ -254,13 +254,30 @@ summary::-webkit-details-marker {
     transition: width 120ms ease-out;
   }
   .register tbody > tr:hover .rail::before { width: 5px; }
-  /* The side colours mean one thing each, everywhere (the key is on Help & orientation, "What the colours say"):
-     done well · under way · someone has to act · stopped or late · not yet, or no longer counts. */
-  .rail-good { --rail: var(--color-emerald-500); }
-  .rail-moving { --rail: var(--color-sky-400); }
-  .rail-act { --rail: var(--color-amber-400); }
-  .rail-stop { --rail: var(--color-red-400); }
-  .rail-idle { --rail: var(--color-slate-300); }
+  /* The side colours: one per state, close states in close colours (lib/core/rails.ts is the key, on Help). */
+  .rail-none { --rail: var(--color-slate-200); }
+  .rail-draft { --rail: var(--color-slate-300); }
+  .rail-prep { --rail: var(--color-amber-400); }
+  .rail-review { --rail: var(--color-sky-400); }
+  .rail-released { --rail: var(--color-emerald-500); }
+  .rail-accepted { --rail: var(--color-green-500); }
+  .rail-superseded { --rail: var(--color-violet-400); }
+  .rail-void { --rail: var(--color-red-500); }
+  .rail-rejected { --rail: var(--color-red-600); }
+  .rail-returned { --rail: var(--color-orange-500); }
+  .rail-withdrawn { --rail: var(--color-stone-400); }
+  .rail-overdue { --rail: var(--color-red-400); }
+  .rail-risk { --rail: var(--color-amber-500); }
+  .rail-late { --rail: var(--color-fuchsia-400); }
+  .rail-done { --rail: var(--color-emerald-700); }
+  .rail-ready { --rail: var(--color-emerald-400); }
+  .rail-ahead { --rail: var(--color-sky-300); }
+  .rail-sent { --rail: var(--color-blue-400); }
+  .rail-received { --rail: var(--color-cyan-400); }
+  .rail-delivered { --rail: var(--color-blue-500); }
+  .rail-shortfall { --rail: var(--color-orange-400); }
+  .rail-check { --rail: var(--color-yellow-500); }
+  .rail-issue { --rail: var(--color-indigo-400); }
 
   /* Denser rows than the rest of the app: this table is read for hours. */
   .register .dt-td { padding-block: 0.55rem; font-size: 0.8125rem; vertical-align: middle; overflow: visible; border-bottom: 1px solid var(--hair); }
@@ -488,8 +505,6 @@ summary::-webkit-details-marker {
   .edge-steel { background: color-mix(in oklab, var(--color-violet-600) 45%, transparent); }
   .edge-ocean { background: color-mix(in oklab, var(--color-cyan-800) 45%, transparent); }
   .edge-slate { background: color-mix(in oklab, var(--color-slate-400) 45%, transparent); }
-  /* Every to-do on Home asks something of you: one colour for all, the side colours' "someone has to act". */
-  .edge-act { background: var(--color-amber-400); }
 
   /* ── The segmented control ────────────────────────────────────────────────
      Choosing one of a set: which aspect on the home page, whose problems on
@@ -758,11 +773,11 @@ summary::-webkit-details-marker {
     --seal: var(--color-amber-700);
     --keep: var(--color-violet-700);
   }
-  .edge-move { --edge: var(--color-sky-400); }
-  .edge-settle { --edge: var(--color-emerald-500); }
-  .edge-back { --edge: var(--color-red-400); }
-  .edge-send { --edge: var(--color-sky-400); }
-  .edge-keep { --edge: var(--color-slate-300); }
+  .edge-move { --edge: var(--color-brand-line); }
+  .edge-settle { --edge: var(--color-emerald-700); }
+  .edge-back { --edge: var(--color-amber-700); }
+  .edge-send { --edge: var(--color-violet-700); }
+  .edge-keep { --edge: var(--color-slate-400); }
 
   .dark .dispatch {
     --paper: #0f1218;

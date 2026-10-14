@@ -156,7 +156,7 @@ export function CarriedTable({ plate, rows, exportHref }: {
           >
             {shown.map((row) => (
               <tr key={row.id}>
-                <Td className={`rail ${row.supersededSince ? "rail-idle" : row.reviewId ? "rail-moving" : "rail-good"}`}>
+                <Td className={`rail ${row.supersededSince ? "rail-superseded" : row.reviewId ? "rail-review" : "rail-released"}`}>
                   <Link href={`/documents/${row.documentId}`} className="doc-number">{row.docNumber}</Link>
                   <span className="doc-title block max-w-72 truncate" title={row.title}>{row.title}</span>
                 </Td>

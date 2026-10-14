@@ -18,7 +18,7 @@ type PlanRow = {
 
 /**
  * What the colour says, and only that (the bar also says it in words, for a
- * screen reader): dark green is done, light red is done but
+ * screen reader): dark green is done, fuchsia is done but
  * the documents came after the work, green is ready, blue is work still
  * ahead with nothing owed yet, amber is a document owed within the week, red is
  * a day that has passed with something still missing, grey is nothing listed.
@@ -27,7 +27,7 @@ type PlanRow = {
 // little of the sheet through. The key above the plan reads this same map.
 export const TONE: Record<PlanRow["readiness"], string> = {
   DONE: "bg-emerald-700/70",
-  LATE_RECEIPT: "bg-red-300/70",
+  LATE_RECEIPT: "bg-fuchsia-400/70",
   READY: "bg-emerald-400/70",
   UPCOMING: "bg-sky-500/65",
   AT_RISK: "bg-amber-500/70",

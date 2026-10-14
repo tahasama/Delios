@@ -144,7 +144,7 @@ to fill.
 A label and its hint sit on one line of fixed height (`mb-1.5 flex h-4 min-w-0 items-baseline gap-2 leading-4
 overflow-hidden`, the hint `truncate` with the whole of it in `title`), every control is `--control-h` tall, and a
 form is laid out in rows (a grid, field beside field, an empty cell where a row has nothing): fields side by side are
-exactly level, never a mosaic. Side colours: `.rail-good / -moving / -act / -stop / -idle`, one meaning each. Documents are never picked from a list
+exactly level, never a mosaic. Side colours: one `.rail-*` class per state, listed in `lib/core/rails.ts`. Documents are never picked from a list
 inside a form: "Add documents" opens the register for it, as for an action. A request that is not the
 card's purpose ("Request a document", "Request a discipline") is a plain link (`text-link`), not a button;
 an edit on a line is a pencil icon on its right.

@@ -46,7 +46,7 @@ const ORDER_KEY = "transmittals:columns";
 const FREEZE_KEY = "transmittals:frozen";
 
 const RAIL: Record<string, string> = {
-  DRAFT: "rail-idle", ISSUED: "rail-moving", ACCEPTED: "rail-good", REJECTED: "rail-stop", CLOSED: "rail-idle",
+  DRAFT: "rail-draft", ISSUED: "rail-sent", ACCEPTED: "rail-accepted", REJECTED: "rail-returned", CLOSED: "rail-received",
 };
 const STATUS_INK: Record<string, string> = {
   DRAFT: "text-slate-500", ISSUED: "text-sky-700", ACCEPTED: "text-emerald-700", REJECTED: "text-red-700",
@@ -326,7 +326,7 @@ export function TransmittalRegister({ rows, total, filters, filterOptions, expor
               const on = selected.includes(row.id);
               return (
               <tr key={row.id} className={on ? "[&>td]:bg-tint" : undefined}>
-                <Td className={`rail ${RAIL[row.status] ?? "rail-idle"} ${frozen ? "sticky left-0 z-1" : ""} ${on ? "bg-tint" : "bg-surface"}`}>
+                <Td className={`rail ${(!row.outgoing && row.status === "ISSUED" ? "rail-check" : RAIL[row.status] ?? "rail-none")} ${frozen ? "sticky left-0 z-1" : ""} ${on ? "bg-tint" : "bg-surface"}`}>
                   <input
                     aria-label={`Select ${row.number}`}
                     type="checkbox"
