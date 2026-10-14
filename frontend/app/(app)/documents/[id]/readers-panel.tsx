@@ -27,7 +27,7 @@ export function ReadersPanel({
   answerable: string[];
 }) {
   return (
-    <section className="mt-5 rounded-xl border border-amber-200 bg-amber-50/60 px-4 py-3.5">
+    <section className="mt-5 rounded-md bg-amber-50 px-3 py-2.5 ring-1 ring-amber-200">
       <h3 className="text-[13px] font-semibold text-amber-950">Who may read this</h3>
       <p className="mt-1 text-xs leading-5 text-amber-950/80">
         It is {confidentiality.toLowerCase()}, so it is not in anybody else&apos;s register, counts or searches.
@@ -38,7 +38,7 @@ export function ReadersPanel({
         {readers.length === 0 ? (
           <li className="text-xs text-amber-950/70">Nobody else has been named yet.</li>
         ) : readers.map((reader) => (
-          <li key={reader.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-surface px-3 py-2 text-xs">
+          <li key={reader.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-surface px-3 py-2 text-xs ring-1 ring-line">
             <span>
               <strong className="font-semibold text-slate-900">{reader.name}</strong>
               <span className="ml-1.5 text-slate-500">named by {reader.addedByName} on {fmtDate(reader.at)}{reader.reason ? ` — ${reader.reason}` : ""}</span>

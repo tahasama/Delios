@@ -48,7 +48,7 @@ export function DelegatePanel({ rows, controller, off = false }: {
       {active.length ? (
         <ul className="mb-3 space-y-2">
           {active.map((row) => (
-            <li key={row.id} className="rounded-lg bg-tint-soft px-3 py-2 text-xs text-slate-700">
+            <li key={row.id} className="rounded-md bg-tint-soft px-3 py-2 text-xs text-slate-700 ring-1 ring-line">
               <p>{row.fromName} delegated it to <strong className="font-semibold text-slate-900">{row.toName}</strong>, until {fmtDate(row.endDate)}.</p>
               {row.flag ? <p className="mt-0.5 text-[11px] font-semibold text-amber-700">Flagged: {row.flag}</p> : null}
               {row.reason ? <p className="mt-0.5 text-[11px] text-slate-500">{row.reason}</p> : null}
@@ -63,7 +63,7 @@ export function DelegatePanel({ rows, controller, off = false }: {
       {open.length ? (
         <ul className="mb-3 space-y-2">
           {open.map((row) => (
-            <li key={row.id} className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-950 ring-1 ring-amber-200">
+            <li key={row.id} className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-900 ring-1 ring-amber-200">
               <p><strong className="font-semibold">{row.askedByName ?? row.fromName}</strong> asks that {row.toName} answer in {row.fromName}&apos;s place, until {fmtDate(row.endDate)}.</p>
               {row.flag ? <p className="mt-0.5 text-[11px] font-semibold text-amber-700">Flagged: {row.flag}</p> : null}
               {row.reason ? <p className="mt-0.5 text-[11px] opacity-80">{row.reason}</p> : null}

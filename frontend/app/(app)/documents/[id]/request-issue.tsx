@@ -63,7 +63,7 @@ export function RequestIssue({ reasons, proposed, others, parties, author, onDec
   return (
     <div className={onDecision ? "space-y-3 border-t border-line pt-3" : "space-y-3"}>
       {offerOutside ? (
-        <div className="rounded-lg bg-amber-50 px-3 py-2.5 ring-1 ring-amber-200">
+        <div className="rounded-md bg-amber-50 px-3 py-2.5 ring-1 ring-amber-200">
           <label className="flex items-start gap-2 text-xs text-amber-950">
             <input type="checkbox" name="needsApproval" checked={outside} onChange={(event) => setOutside(event.target.checked)} className="mt-0.5" />
             <span>

@@ -329,7 +329,7 @@ export default async function ReviewCyclePage({ params }: { params: Promise<{ id
               {cycle.comments.length ? (
                 <ul className="space-y-2">
                   {cycle.comments.map((comment) => (
-                    <li key={comment.id} className={`rounded-lg px-3 py-2 text-xs ${comment.progressionPreventing && comment.status === "OPEN" ? "bg-red-50 text-red-900 ring-1 ring-red-200" : "bg-canvas text-slate-700"}`}>
+                    <li key={comment.id} className={`rounded-md px-3 py-2 text-xs ${comment.progressionPreventing && comment.status === "OPEN" ? "bg-red-50 text-red-900 ring-1 ring-red-200" : "bg-canvas text-slate-700"}`}>
                       <p className="leading-5">{comment.text}</p>
                       <p className="mt-1 text-[11px] text-slate-400">
                         {comment.authorName} · {fmtDateTime(comment.createdAt)}
@@ -434,7 +434,7 @@ export default async function ReviewCyclePage({ params }: { params: Promise<{ id
               {cycle.answerNotes.length ? (
                 <ul className="mt-3 space-y-2 border-t border-line pt-3">
                   {cycle.answerNotes.map((note, index) => (
-                    <li key={index} className="rounded-lg bg-canvas px-3 py-2 text-xs text-slate-700">
+                    <li key={index} className="rounded-md bg-tint-soft px-3 py-2 text-xs text-slate-700 ring-1 ring-line">
                       <p className="leading-5">{note.text}</p>
                       <p className="mt-1 text-[11px] text-slate-400">{note.by}{note.at ? ` · ${fmtDateTime(note.at)}` : ""}</p>
                     </li>
@@ -444,7 +444,7 @@ export default async function ReviewCyclePage({ params }: { params: Promise<{ id
               {cycle.comments.length ? (
                 <ul className="mt-3 space-y-2 border-t border-line pt-3">
                   {cycle.comments.map((comment) => (
-                    <li key={comment.id} className={`rounded-lg px-3 py-2 text-xs ${comment.progressionPreventing && comment.status === "OPEN" ? "bg-red-50 text-red-900 ring-1 ring-red-200" : "bg-canvas text-slate-700"}`}>
+                    <li key={comment.id} className={`rounded-md px-3 py-2 text-xs ${comment.progressionPreventing && comment.status === "OPEN" ? "bg-red-50 text-red-900 ring-1 ring-red-200" : "bg-canvas text-slate-700"}`}>
                       <p className="leading-5">{comment.text}</p>
                       <p className="mt-1 text-[11px] text-slate-400">
                         {comment.authorName} · {fmtDateTime(comment.createdAt)}
@@ -492,7 +492,7 @@ export default async function ReviewCyclePage({ params }: { params: Promise<{ id
                     {one.comments.length ? (
                       <ul className="mt-2 space-y-1.5">
                         {one.comments.map((comment) => (
-                          <li key={comment.id} className={`rounded-lg px-2.5 py-1.5 text-xs ${comment.progressionPreventing && comment.status === "OPEN" ? "bg-red-50 text-red-900 ring-1 ring-red-200" : "bg-canvas text-slate-700"}`}>
+                          <li key={comment.id} className={`rounded-md px-2.5 py-1.5 text-xs ${comment.progressionPreventing && comment.status === "OPEN" ? "bg-red-50 text-red-900 ring-1 ring-red-200" : "bg-canvas text-slate-700"}`}>
                             {comment.text}
                             <span className="ml-1 text-[11px] text-slate-400">— {comment.authorName}{comment.progressionPreventing
                               ? comment.status === "OPEN"

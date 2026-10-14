@@ -156,7 +156,7 @@ export function VerdictDecision({ verdicts, statuses, deciding, carrying, laterS
           {deciding && verdict && proceeds ? request : null}
 
           {deciding ? (
-            <p className="rounded-lg bg-orange-50 px-3 py-2 text-[11px] leading-5 text-orange-900 ring-1 ring-orange-200">
+            <p className="rounded-md bg-amber-50 px-3 py-2.5 text-[11px] leading-5 text-amber-900 ring-1 ring-amber-200">
               This is the last step. Once you answer, the revision reads <strong>Not released</strong> until Document Control publishes it — nobody may work from it before that.
             </p>
           ) : null}

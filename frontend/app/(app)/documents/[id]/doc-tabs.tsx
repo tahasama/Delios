@@ -29,7 +29,7 @@ export function DocTabs({ tabs }: { tabs: DocTab[] }) {
   };
 
   return (
-    <section className="overflow-hidden rounded-2xl border border-line bg-surface shadow-sm">
+    <section className="register register-sheet register-sheet-open overflow-hidden">
       <nav role="tablist" aria-label="Document" className="scroll-thin flex gap-1 overflow-x-auto overflow-y-hidden border-b border-line px-3">
         {tabs.map((t) => (
           <button

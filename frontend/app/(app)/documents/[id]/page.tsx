@@ -192,7 +192,7 @@ export default async function DocumentDetailPage({
   const reasonLabel = new Map(releaseReasons.map((one) => [one.code, one.label] as const));
   const openAsks = requests.filter((one) => one.status === "OPEN");
   const whoReceives = releaseChoices ? (
-    <div className="mb-3 rounded-lg border border-line px-3.5 py-3">
+    <div className="mb-3 rounded-md px-3 py-2.5 ring-1 ring-line">
       <ReleaseRecipients
         asked={openAsks.filter((one) => !one.delegated).map((one) => {
           const to = parseRecipients(one.recipients);
@@ -350,7 +350,7 @@ export default async function DocumentDetailPage({
               {requests.map((one) => {
                 const to = parseRecipients(one.recipients);
                 return (
-                  <li key={one.id} className="rounded-xl border border-line bg-slate-50 px-3.5 py-3 text-xs">
+                  <li key={one.id} className="rounded-md bg-tint-soft px-3 py-2.5 text-xs ring-1 ring-line">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-semibold text-slate-800">{one.reason}</span>
                       <ToneChip tone={one.status === "DONE" ? "done" : one.status === "CANCELLED" ? "idle" : "waiting"}>
@@ -459,7 +459,7 @@ export default async function DocumentDetailPage({
                   releasing it would supersede the revision people are working
                   from, and replace it with the one just rejected. It goes back
                   to a step of its route, or to its author. */}
-              <p className={`mb-3 rounded-xl px-3.5 py-2.5 text-xs ${decisionFinal ? "bg-tint text-brand-ink" : "bg-orange-50 text-orange-900 ring-1 ring-orange-200"}`}>
+              <p className={`mb-3 rounded-md px-3 py-2.5 text-xs ${decisionFinal ? "bg-tint-soft text-brand-ink ring-1 ring-line" : "bg-amber-50 text-amber-900 ring-1 ring-amber-200"}`}>
                 The route settled on <strong>{working.statusCode} — {label(statuses, working.statusCode)}</strong>
                 {decidedVerdict ? <> with <strong>{decidedVerdict}</strong></> : null}.
                 {decisionFinal
@@ -569,7 +569,7 @@ export default async function DocumentDetailPage({
                 <input type="hidden" name="reasonForRevision" value="First issue" />
               ) : ground.kind === "ASKED" ? (
                 // The verdict is the reason; nobody writes it again.
-                <div className="rounded-lg bg-tint-soft px-3 py-2 text-xs text-slate-700 sm:col-span-2">
+                <div className="rounded-md bg-tint-soft px-3 py-2.5 text-xs text-slate-700 ring-1 ring-line sm:col-span-2">
                   <span className="stencil mr-2 text-slate-500">Why</span>{ground.why}
                   {ground.comments ? <span className="text-slate-500"> · {ground.comments} comment{ground.comments === 1 ? "" : "s"} to address</span> : null}
                 </div>

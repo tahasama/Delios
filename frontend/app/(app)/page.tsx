@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { btn } from "@/components/ui";
 import { api, projectPath } from "@/lib/client";
 import { actionWork } from "@/lib/actions/api";
 import type { ActivityRow, ActivitySummary, Work } from "@/lib/types";
@@ -313,7 +314,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
             </p>
           </div>
           {user.isInternal ? (
-            <Link href="/documents/new" className="inline-flex items-center mt-0.5 gap-2 rounded-lg bg-white px-4 py-2.5 text-[13px] font-semibold whitespace-nowrap text-brand-strong transition hover:-translate-y-px hover:shadow-lg">
+            <Link href="/documents/new" className={`${btn("secondary")} mt-0.5 whitespace-nowrap`}>
               <Plus className="h-4 w-4" /> Create document
             </Link>
 
@@ -384,7 +385,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
                   disappears behind the bar rather than showing through its
                   corners, and there is air above and below. */}
               <div className="sticky top-18 z-10 bg-canvas pt-2 pb-3">
-              <form className="register rounded-xl border border-line bg-surface px-4 py-2.5">
+              <form className="register register-sheet register-sheet-open px-4 py-2.5">
                 <input type="hidden" name="view" value="log" />
                 <div className="flex flex-wrap items-end gap-x-4 gap-y-2.5 lg:flex-nowrap">
                   <label className="relative min-w-48 flex-1">
@@ -474,7 +475,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
               ))}
             </div>
           ) : (
-            <section className="home-rise rounded-xl border border-line bg-surface px-5 py-8 text-sm text-slate-500" style={rise()}>
+            <section className="home-rise register register-sheet register-sheet-open px-5 py-8 text-sm text-slate-500" style={rise()}>
               You are clear. Reviews to answer, verdicts to give and work sent back to you appear here.
             </section>
           )}
@@ -482,7 +483,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
 
         <aside className="grid min-w-0 gap-3 xl:sticky xl:top-22">
           {journal.length && view !== "log" ? (
-            <section className="home-rise rounded-xl border border-line bg-surface px-4 py-3" style={rise()}>
+            <section className="home-rise register register-sheet register-sheet-open px-4 py-3" style={rise()}>
               <h2 className="mb-2.5 text-[11px] font-semibold tracking-[0.09em] text-slate-400 uppercase">{older.length ? "Lately" : `Since ${weekday(since)}`}</h2>
               <ul>
                 {journal.map((e, i) => {
@@ -516,7 +517,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           ) : null}
 
           {user.isInternal && atRisk.length ? (
-            <section className="home-rise rounded-xl border border-line bg-surface px-4 py-3" style={rise()}>
+            <section className="home-rise register register-sheet register-sheet-open px-4 py-3" style={rise()}>
               <h2 className="mb-1 text-[11px] font-semibold tracking-[0.09em] text-slate-400 uppercase">Schedule</h2>
               {atRisk.slice(0, 3).map((a) => {
                 // An activity's name carries where it is after a dash — "Foundation

@@ -36,18 +36,18 @@ export const ACTIVITY: Record<string, { kind: string; said: string; mark: string
   TRANSMITTAL_RECEIVED: { kind: "Transmittal", said: "was received", mark: "border-violet-600" },
   TRANSMITTAL_ACCEPTED: { kind: "Transmittal", said: "was accepted on arrival", mark: "border-emerald-600" },
   TRANSMITTAL_REJECTED: { kind: "Transmittal", said: "was returned to its sender", mark: "border-red-600" },
-  TRANSMITTAL_FILES_ATTACHED: { kind: "Transmittal", said: "had what came with it kept", mark: "border-slate-400" },
+  TRANSMITTAL_FILES_ATTACHED: { kind: "Transmittal", said: "had what came with it kept", mark: "border-line-strong" },
   TRANSMITTAL_FILE_REGISTERED: { kind: "Transmittal", said: "had a file it brought made a register document", mark: "border-emerald-600" },
   TRANSMITTAL_CHASED: { kind: "Transmittal", said: "was notified again to whoever had not opened it", mark: "border-amber-600" },
   TRANSMITTAL_SENT_ON: { kind: "Transmittal", said: "was sent on to an organization outside the system", mark: "border-emerald-600" },
-  TRANSMITTAL_CLOSED: { kind: "Transmittal", said: "was closed", mark: "border-slate-400" },
+  TRANSMITTAL_CLOSED: { kind: "Transmittal", said: "was closed", mark: "border-line-strong" },
   ACTION_CARRIED: { kind: "Schedule", said: "went ahead without all of its documents", mark: "border-amber-600" },
-  ACTION_STOPPED: { kind: "Schedule", said: "was postponed", mark: "border-slate-400" },
+  ACTION_STOPPED: { kind: "Schedule", said: "was postponed", mark: "border-line-strong" },
   CUSTODY: { kind: "Transmittal", said: "was handed over", mark: "border-violet-600" },
   ISSUE_REQUESTED: { kind: "Issue", said: "was requested for issue", mark: "border-violet-600" },
   ISSUE: { kind: "Issue", said: "was issued", mark: "border-violet-600" },
   ISSUED: { kind: "Issue", said: "was issued", mark: "border-violet-600" },
-  ISSUE_REQUEST_CANCELLED: { kind: "Issue", said: "issue request cancelled", mark: "border-slate-400" },
+  ISSUE_REQUEST_CANCELLED: { kind: "Issue", said: "issue request cancelled", mark: "border-line-strong" },
   RELEASE: { kind: "Release", said: "was released", mark: "border-emerald-600" },
   WORKFLOW_STARTED: { kind: "Review", said: "was sent for review", mark: "border-brand-line" },
   STEP_DISPATCHED: { kind: "Review", said: "moved to the next step", mark: "border-brand-line" },
@@ -60,17 +60,17 @@ export const ACTIVITY: Record<string, { kind: string; said: string; mark: string
   OUTSIDE_REFUSED: { kind: "Return", said: "was not approved by the outside party — with Document Control", mark: "border-red-600" },
   REVISION_HELD: { kind: "Return", said: "was put on hold, not for use", mark: "border-red-600" },
   REVISION_HOLD_LIFTED: { kind: "Release", said: "had its hold lifted and is in use again", mark: "border-emerald-600" },
-  REVISION_ESTABLISHED: { kind: "Revision", said: "was opened", mark: "border-slate-400" },
-  REGISTER_ENTRY: { kind: "Register", said: "was added to the register", mark: "border-slate-400" },
-  REQUIREMENTS_ISSUED: { kind: "Requirements", said: "were issued", mark: "border-slate-400" },
+  REVISION_ESTABLISHED: { kind: "Revision", said: "was opened", mark: "border-line-strong" },
+  REGISTER_ENTRY: { kind: "Register", said: "was added to the register", mark: "border-line-strong" },
+  REQUIREMENTS_ISSUED: { kind: "Requirements", said: "were issued", mark: "border-line-strong" },
   REQUIREMENTS_REMINDER: { kind: "Requirements", said: "were reminded", mark: "border-amber-600" },
   SHORTFALL_ISSUED: { kind: "Schedule", said: "was reported short", mark: "border-amber-600" },
-  SHORTFALL_ACCEPTED: { kind: "Schedule", said: "shortfall was accepted", mark: "border-slate-400" },
+  SHORTFALL_ACCEPTED: { kind: "Schedule", said: "shortfall was accepted", mark: "border-line-strong" },
   DELEGATION_REQUESTED: { kind: "Review", said: "was asked to be handed over", mark: "border-amber-600" },
   DELEGATION_GRANTED: { kind: "Review", said: "was handed to somebody else", mark: "border-brand-line" },
-  DELEGATION_REFUSED: { kind: "Review", said: "stayed with its reviewer", mark: "border-slate-400" },
-  DELEGATION_WITHDRAWN: { kind: "Review", said: "came back to its reviewer", mark: "border-slate-400" },
-  CHECK_RUN: { kind: "Register", said: "was checked", mark: "border-slate-400" },
+  DELEGATION_REFUSED: { kind: "Review", said: "stayed with its reviewer", mark: "border-line-strong" },
+  DELEGATION_WITHDRAWN: { kind: "Review", said: "came back to its reviewer", mark: "border-line-strong" },
+  CHECK_RUN: { kind: "Register", said: "was checked", mark: "border-line-strong" },
 };
 
 export const NEWS = Object.keys(ACTIVITY);
@@ -273,7 +273,7 @@ export function Card({ aspect, rows, style }: { aspect: Aspect; rows: Row[]; sty
       href={`/?view=${aspect.id}`}
       scroll={false}
       style={style}
-      className="home-rise group relative flex min-w-0 flex-col overflow-hidden rounded-xl border border-line bg-surface px-4 pt-3.5 pb-3 transition hover:-translate-y-px hover:border-line-strong hover:shadow-md"
+      className="home-rise group register register-sheet register-sheet-open relative flex min-w-0 flex-col overflow-hidden px-4 pt-3.5 pb-3 transition hover:border-line-strong"
     >
       <span className={`absolute inset-y-0 left-0 w-0.75 ${EDGE[aspect.accent]}`} aria-hidden="true" />
 
@@ -325,7 +325,7 @@ export function Card({ aspect, rows, style }: { aspect: Aspect; rows: Row[]; sty
 /** One aspect, opened: every row in it, in the same places every time. */
 export function Queue({ aspect, rows, style }: { aspect: Aspect; rows: Row[]; style?: React.CSSProperties }) {
   return (
-    <section className="home-rise mb-3.5 min-w-0 overflow-hidden rounded-xl border border-line bg-surface" style={style}>
+    <section className="home-rise register register-sheet register-sheet-open mb-3.5 min-w-0 overflow-hidden" style={style}>
       <header className="flex items-center gap-2.5 border-b border-line px-4 py-3">
         <span className="grid h-5.5 w-5.5 place-items-center rounded-md bg-canvas-deep text-slate-500 [&_svg]:h-3.25 [&_svg]:w-3.25">{aspect.icon}</span>
         <h2 className="text-[13.5px] font-semibold">{aspect.title}</h2>

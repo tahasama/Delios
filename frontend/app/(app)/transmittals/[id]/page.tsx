@@ -3,6 +3,7 @@ import { requireScope } from "@/lib/core/scope";
 import { notFound } from "next/navigation";
 import { isController, isAdmin } from "@/lib/core/auth";
 import { Card, Chip, Banner } from "@/components/ui";
+import { TONE } from "@/lib/core/tones";
 import { ActionForm } from "@/components/form";
 import { REASON_LABEL, type ReasonForIssue } from "@/lib/core/standard";
 import { fmtDate, fmtDateTime } from "@/lib/core/utils";
@@ -92,12 +93,8 @@ export default async function TransmittalDetailPage({ params, searchParams }: { 
   const followHref = `/transmittals/new?follows=${t.id}`;
 
   const reason = (REASON_LABEL[t.reason as ReasonForIssue] ?? t.reason).toLowerCase();
-  const statusColors: Record<string, string> = {
-    DRAFT: "bg-slate-100 text-slate-600 ring-slate-300",
-    ISSUED: "bg-amber-100 text-amber-800 ring-amber-300",
-    ACCEPTED: "bg-emerald-100 text-emerald-800 ring-emerald-300",
-    REJECTED: "bg-red-100 text-red-800 ring-red-300",
-  };
+  // The reference tones: a draft not yet out, sent and waiting, accepted, rejected.
+  const statusColors: Record<string, string> = { DRAFT: TONE.idle, ISSUED: TONE.waiting, ACCEPTED: TONE.done, REJECTED: TONE.refused };
 
   // How often each document went out before this transmittal: the third issue of a drawing is a fact about the drawing.
   const carried: CarriedRow[] = page.carried.map((item) => ({

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { TONE } from "@/lib/core/tones";
 import { cn } from "@/lib/core/utils";
 import { AlertTriangle, CheckCircle2, Info as InfoIcon } from "lucide-react";
 
@@ -79,9 +80,9 @@ export function Card({
   return (
     <section id={id} className={cn("register register-sheet", className)}>
       {title ? (
-        <header className="flex flex-wrap items-center gap-x-2.5 gap-y-1 border-b border-line bg-tint-soft px-5 py-2 sm:px-6">
-          <h2 className="stencil shrink-0 text-slate-500">{title}</h2>
-          {description ? <p className="min-w-0 text-[11px] leading-4 text-slate-400">{description}</p> : null}
+        <header className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
+          <h2 className="stencil mr-1 shrink-0 text-slate-500">{title}</h2>
+          {description ? <p className="min-w-0 text-[11px] leading-4 text-slate-500">{description}</p> : null}
           {actions ? <div className="ml-auto flex shrink-0 items-center gap-2">{actions}</div> : null}
         </header>
       ) : null}
@@ -96,13 +97,7 @@ export function Card({
  * pill is the one shape that says "web app" out loud.
  */
 /** The reference status chip (Schedule & actions): one word, one of four tones. */
-export const TONE = {
-  done: "bg-emerald-50 text-emerald-800 ring-emerald-200",
-  waiting: "bg-amber-50 text-amber-900 ring-amber-200",
-  refused: "bg-red-50 text-red-800 ring-red-200",
-  idle: "bg-slate-100 text-slate-600 ring-slate-200",
-  moving: "bg-sky-50 text-sky-800 ring-sky-200",
-} as const;
+export { TONE };
 
 export function ToneChip({ tone, children, title }: { tone: keyof typeof TONE; children: React.ReactNode; title?: string }) {
   return <span title={title} className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap ring-1", TONE[tone])}>{children}</span>;

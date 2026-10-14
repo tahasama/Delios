@@ -171,7 +171,7 @@ export default async function PackagesPage({ searchParams }: { searchParams: Pro
               <SearchPick name="compositionOwnerId" required label="Put together by" hint="one or several" items={users.map((person) => ({ id: person.id, name: person.name, detail: person.functionName }))} />
               <SearchPick name="acceptanceAuthorityId" required label="Accepted by" hint="one or several, not those putting it together — any one of them accepts at the end and decides on anything missing" items={users.map((person) => ({ id: person.id, name: person.name, detail: person.functionName }))} />
             </div>
-            <div className="rounded-lg bg-tint-soft px-4 py-3">
+            <div className="rounded-md bg-tint-soft px-3 py-2.5 ring-1 ring-line">
               <p className="mb-3 flex flex-wrap items-baseline gap-x-2"><span className="stencil text-slate-500">Fills itself with</span><span className="text-[11px] text-slate-400">optional — every document matching all you choose joins, new ones too; you can still add or take out by hand</span></p>
               <RuleFields />
             </div>

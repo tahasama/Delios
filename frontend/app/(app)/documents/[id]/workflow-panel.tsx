@@ -73,7 +73,7 @@ export async function WorkflowPanel({ doc, user, lead = [], extra: after = [] }:
       <Card
         title={`Rev ${revs[0].value} is decided`}
         description={`Route: ${run.templateName}.`}
-        className={letsItOut ? "border-emerald-300 bg-emerald-50" : "border-orange-300 bg-orange-50"}
+        className={letsItOut ? "border-emerald-300 bg-emerald-50" : "border-amber-200 bg-amber-50"}
         items={extra}
         status={
           <StagePath
@@ -95,7 +95,7 @@ export async function WorkflowPanel({ doc, user, lead = [], extra: after = [] }:
       <Card
         title="Next step: revise"
         description={`${run.templateName} returned it with changes.`}
-        className="border-orange-300/50 bg-orange-50/40"
+        className="border-amber-200 bg-amber-50"
         items={extra}
         status={<StagePath stages={REVIEWED} at={0} note="Returned with changes: the next revision carries them, then goes through review again. The returned revision keeps its outcome." />}
       />
@@ -277,7 +277,7 @@ async function RunActivePanel({ run, user, extra }: { run: { id: string; templat
   const outcomeLabel = new Map(outcomes.map((o) => [o.code, o.label]));
   const said = (code: string) => adviceLabels.get(code) ?? outcomeLabel.get(code) ?? code;
   const earlier = advice.some((a) => a.outcome || a.comments.length) ? (
-    <div className="rounded-lg bg-surface p-2.5 text-xs ring-1 ring-slate-200">
+    <div className="rounded-md bg-surface p-2.5 text-xs ring-1 ring-line">
       <p className="mb-1 font-semibold text-slate-700">What the earlier steps said</p>
       <ul className="space-y-1.5 text-slate-600">
         {advice.map((a) => (
@@ -435,7 +435,7 @@ function RecordPanel({ doc, extra }: { doc: DocLite; extra: StepItem[] }) {
  */
 function Card({ title, description, className, status, items }: { title: string; description?: string; className?: string; status: React.ReactNode; items: StepItem[] }) {
   const tone = className ?? "";
-  const rail = tone.includes("orange") ? "rail-prep"
+  const rail = tone.includes("amber") ? "rail-prep"
     : tone.includes("emerald") ? "rail-released"
     : tone.includes("violet") ? "rail-superseded"
     : tone.includes("brand") ? "rail-review"

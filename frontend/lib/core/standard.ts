@@ -1,3 +1,4 @@
+import { TONE } from "@/lib/core/tones";
 // Domain constants from the Document Management Standard v1.
 
 export const ROLES = ["ADMIN", "CONTROLLER", "APPROVER", "REVIEWER", "AUTHOR", "VIEWER"] as const;
@@ -42,14 +43,15 @@ export function revStateColor(state: string): string {
   return REV_STATE_COLOR[state as RevState] ?? "";
 }
 
+/** In the reference tones: under way, waiting on someone, done, sent back, out of play. */
 export const REV_STATE_COLOR: Record<RevState, string> = {
-  IN_PREPARATION: "bg-slate-100 text-slate-700 ring-slate-300",
-  IN_REVIEW: "bg-amber-100 text-amber-800 ring-amber-300",
-  NOT_RELEASED: "bg-orange-100 text-orange-900 ring-orange-400",
-  RETURNED: "bg-rose-100 text-rose-800 ring-rose-300",
-  RELEASED: "bg-emerald-100 text-emerald-800 ring-emerald-300",
-  SUPERSEDED: "bg-violet-100 text-violet-800 ring-violet-300",
-  VOID: "bg-red-100 text-red-800 ring-red-300",
+  IN_PREPARATION: TONE.idle,
+  IN_REVIEW: TONE.moving,
+  NOT_RELEASED: TONE.waiting,
+  RETURNED: TONE.refused,
+  RELEASED: TONE.done,
+  SUPERSEDED: TONE.idle,
+  VOID: TONE.refused,
 };
 
 // §7.3 — document states (fixed set)
@@ -81,11 +83,11 @@ export const REV_MEANING: Record<RevState, { means: string; how: string }> = {
 };
 
 export const DOC_STATE_COLOR: Record<DocState, string> = {
-  PLANNED: "bg-sky-100 text-sky-800 ring-sky-300",
-  ACTIVE: "bg-emerald-100 text-emerald-800 ring-emerald-300",
-  WITHDRAWN: "bg-red-100 text-red-800 ring-red-300",
-  CANCELLED: "bg-slate-200 text-slate-700 ring-slate-300",
-  ARCHIVED: "bg-zinc-100 text-zinc-700 ring-zinc-300",
+  PLANNED: TONE.idle,
+  ACTIVE: TONE.done,
+  WITHDRAWN: TONE.refused,
+  CANCELLED: TONE.idle,
+  ARCHIVED: TONE.idle,
 };
 
 // §2.6 — reasons for issue (fixed set; issue codes are mapped to these per C.5.6)

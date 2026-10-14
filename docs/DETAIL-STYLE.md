@@ -110,6 +110,13 @@ Top to bottom, every row that asks something of the reader:
    - not yet open `bg-slate-100 text-slate-600 ring-slate-200`
 
    Built once as `ToneChip` (`components/ui.tsx`); use it rather than writing the classes again.
+   The tones live once in `lib/core/tones.ts` (`TONE`); every state colour in the app (documents,
+   revisions, transmittals) reads from it: under way = moving, waiting on someone = waiting, finished =
+   done, sent back or refused = refused, not yet or out of play = idle. No other colours for states
+   (no orange, rose, violet).
+   Boxes inside a sheet: `rounded-md` with `ring-1 ring-line` (amber ring for a warning); never
+   `rounded-xl`/`rounded-lg`, never a slate border. A page's own boxes are sheets
+   (`register register-sheet register-sheet-open`).
 2. **Who did it, when and why** (`whitespace-pre-line text-xs leading-5
    text-slate-600`), the reason on its own line. A take-back is kept under it in
    `text-[11px] text-slate-500`.
