@@ -54,6 +54,10 @@ export default async function ActionDetailPage({ params, searchParams }: { param
   const inside = ctx.user.isInternal;
   // Only administrators read the audit trail, so only they are sent to it.
   const me = { department: ctx.user.department ?? null };
+  // A document missing from the action is asked of Document Control by a concerned discipline (for itself), or by
+  // Document Control (naming the discipline in the message).
+  const ownConcerned = !!me.department && depts.includes(me.department);
+  const mayRequestDocument = control || ownConcerned;
   const entries = dept ? action.needs.filter((e) => e.department === dept) : action.needs;
   // Which of the three moments slipped, for each document, and who writes the
   // note about what was decided.
@@ -87,14 +91,15 @@ export default async function ActionDetailPage({ params, searchParams }: { param
     }));
   // Asking for a document the list missed: a transmittal to Document Control, the file attached there.
   const controllers = inside ? await holders(ctx.projectId, "CONTROL").catch(() => []) : [];
-  const requestHref = (department: string) => `/transmittals/new?${new URLSearchParams({
+  // Asked by a concerned discipline for itself; by Document Control for whichever discipline it names in the message.
+  const requestHref = (department: string | null) => `/transmittals/new?${new URLSearchParams({
     reason: "INFORMATION",
     activity: action.id,
     ask: "DOCUMENT",
     users: controllers.map((one) => one.id).join(","),
-    subject: `Add a document to ${action.code} (${deptLabel(department)})`,
+    subject: `Add a document to ${action.code}${department ? ` (${deptLabel(department)})` : ""}`,
     message: [
-      `Please add the attached document to ${action.code}, ${action.name}, on ${fmtDate(action.start)}, for ${deptLabel(department)}.`,
+      `Please add the attached document to ${action.code}, ${action.name}, on ${fmtDate(action.start)}, for ${department ? deptLabel(department) : "the discipline …"}.`,
       "It was not on the requirements list.",
     ].join("\n\n"),
   })}`;
@@ -442,8 +447,6 @@ export default async function ActionDetailPage({ params, searchParams }: { param
                       {/* Without Document Control, the discipline chooses its own documents; otherwise it asks. */}
                       {selfLinks && me.department === d ? (
                         <Link href={`/documents?pick=${encodeURIComponent(action.code)}`} className="ask">Add or take off documents</Link>
-                      ) : !selfLinks && mine ? (
-                        <Link href={requestHref(d)} className="text-xs font-semibold text-link hover:underline">Request a document</Link>
                       ) : null}
                       {c && !c.automatic && control ? (
                         <details className="text-xs open:basis-full">
@@ -473,9 +476,16 @@ export default async function ActionDetailPage({ params, searchParams }: { param
             </div>
           ) : !selfLinks && ctx.user.isInternal ? (
             // A discipline missing, or one that does not belong: asked of Document Control, whose answer is the record.
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-line bg-tint-soft px-5 py-3 sm:px-6">
-              <span className="text-xs text-slate-600">Is a discipline missing, or one that should not be here?</span>
-              <Link href={disciplineRequestHref} className="text-xs font-semibold text-link hover:underline">Request a discipline</Link>
+            // The two asks side by side, each its question then its link, the links in one column.
+            <div className="grid grid-cols-[auto_auto] items-baseline justify-start gap-x-3 gap-y-1.5 border-t border-line bg-tint-soft px-5 py-3 text-xs sm:px-6">
+              <span className="text-slate-600">Is a discipline missing, or one that should not be here?</span>
+              <Link href={disciplineRequestHref} className="font-semibold text-link hover:underline">Request a discipline</Link>
+              {mayRequestDocument ? (
+                <>
+                  <span className="text-slate-600">Is a document missing from this action?</span>
+                  <Link href={requestHref(ownConcerned ? me.department : null)} className="font-semibold text-link hover:underline">Request a document</Link>
+                </>
+              ) : null}
             </div>
           ) : null}
         </section>
@@ -549,7 +559,7 @@ export default async function ActionDetailPage({ params, searchParams }: { param
 /** The schedule's own chip colours, so a state reads the same on both pages. */
 const TONE: Record<ActionState, string> = {
   DONE: "bg-emerald-600/10 text-emerald-900 ring-emerald-300",
-  LATE_RECEIPT: "bg-violet-100 text-violet-800 ring-violet-300",
+  LATE_RECEIPT: "bg-red-50 text-red-800 ring-red-200",
   READY: "bg-emerald-100 text-emerald-800 ring-emerald-200",
   UPCOMING: "bg-sky-100 text-sky-800 ring-sky-200",
   AT_RISK: "bg-amber-100 text-amber-800 ring-amber-200",

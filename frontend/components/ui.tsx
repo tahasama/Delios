@@ -178,7 +178,7 @@ export function Field({
     <label className={cn("block min-w-0", className)}>
       {/* One line, whatever the hint: fields side by side keep their labels level, never a mosaic. The whole hint
           shows on hover. */}
-      <span className="mb-1 flex min-w-0 items-baseline gap-2">
+      <span className="mb-1.5 flex h-4 min-w-0 items-baseline gap-2 leading-4 overflow-hidden">
         <span className="stencil shrink-0 text-slate-500">
           {label}
           {required ? <span className="ml-0.5 text-red-500">*</span> : null}

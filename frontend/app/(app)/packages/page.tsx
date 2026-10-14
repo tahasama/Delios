@@ -170,14 +170,15 @@ export default async function PackagesPage({ searchParams }: { searchParams: Pro
               <Asked policy={packagePolicy} field="completionDate">
                 {({ required }) => <input type="date" name="completionDate" required={required} className={inputCls} />}
               </Asked>
-              <Asked policy={packagePolicy} field="description" hint="what it is for, anything the recipient should know" className="md:col-span-3">
+              <Asked policy={packagePolicy} field="description" hint="what it is for, anything the recipient should know" className="md:col-span-2">
                 {({ required }) => <textarea name="description" required={required} rows={2} className={inputCls} />}
               </Asked>
-              <Added fields={packagePolicy.own} />
+              {/* Under "Due": what it needs, beside the description. */}
+              <SearchPick browse name="requiredStatus" required label="Needed at" hint="ready at any of them; it also says why they get it" items={statuses.map((item) => ({ id: item.code, name: item.code, detail: item.label }))} />
               <SearchPick browse name="recipientPartyIds" required label="Delivered to" hint="one or several — us too, for an internal handover" items={parties.map((p) => ({ id: p.id, name: p.isInternal ? `${p.name} (us)` : p.name }))} />
-              <SearchPick browse name="requiredStatus" required label="Needed at" hint="one or several — ready at any of them; it also says why they get it on the transmittal" items={statuses.map((item) => ({ id: item.code, name: item.code, detail: item.label }))} />
               <SearchPick name="compositionOwnerId" required label="Put together by" hint="one or several — they add and take out its documents; Document Control does the rest" items={users.map((person) => ({ id: person.id, name: person.name, detail: person.functionName }))} />
               <SearchPick name="acceptanceAuthorityId" required label="Accepted by" hint="one or several, not those putting it together — any one of them accepts at the end and decides on anything missing" items={users.map((person) => ({ id: person.id, name: person.name, detail: person.functionName }))} />
+              <Added fields={packagePolicy.own} />
             </div>
             <div className="rounded-md bg-tint-soft px-3 py-2.5 ring-1 ring-line">
               <p className="mb-3 flex flex-wrap items-baseline gap-x-2"><span className="stencil text-slate-500">Fills itself with</span><span className="text-[11px] text-slate-400">optional — every document matching all you choose joins, new ones too; you can still add or take out by hand</span></p>

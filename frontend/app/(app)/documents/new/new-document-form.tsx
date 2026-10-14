@@ -22,7 +22,7 @@ function Ask({ label, hint, required, children, className }: { label: string; hi
   return (
     <label className={cn("block min-w-0", className)}>
       {/* One line, whatever the hint: questions side by side keep level. The whole hint shows on hover. */}
-      <span className="mb-1.5 flex min-w-0 items-baseline gap-2">
+      <span className="mb-1.5 flex h-4 min-w-0 items-baseline gap-2 leading-4 overflow-hidden">
         <span className="stencil shrink-0 text-slate-500">{label}{required ? <span className="ml-0.5 text-red-500">*</span> : null}</span>
         {hint ? <span className="min-w-0 truncate text-[11px] text-slate-400" title={hint}>{hint}</span> : null}
       </span>
@@ -165,7 +165,7 @@ export function NewDocumentForm({
                     </div>
                   ) : (
                     <Ask label="The file you received" required hint="a PDF opens in the viewer; any other format is kept as the source file" className="sm:col-span-2">
-                      <input type="file" name="nativeFile" required className={cn(field, "text-slate-500")} onChange={(e) => setHasFile(!!e.target.files?.length)} />
+                  <input type="file" name="nativeFile" required className={cn(field, "text-slate-500")} onChange={(e) => setHasFile(!!e.target.files?.length)} />
                     </Ask>
                   )}
                 </>
@@ -225,7 +225,7 @@ export function NewDocumentForm({
         <section className={cn("register register-sheet register-sheet-open", !received && step !== 2 && "hidden")}>
           {received ? null : band(2, `${docTypeLabel || "the document"} · ${disciplineLabel || "—"} — its title, where it sits, and how it is kept`)}
           {/* Three columns on a wide screen, so the whole step sits on the page with its way on at the bottom. */}
-          <div className="asking grid grid-cols-1 gap-x-6 gap-y-3 px-5 py-4 sm:grid-cols-2 sm:px-6 xl:grid-cols-3">
+          <div className="asking grid grid-cols-1 gap-x-6 gap-y-4 px-5 py-4 sm:px-6 xl:grid-cols-3">
             <Ask label={labels["title"]} required hint="what it is about, in the words someone searching would use" className="sm:col-span-2 xl:col-span-3">
               <input name="title" required maxLength={200} value={title} onChange={(e) => setTitle(e.target.value)} className={field} aria-invalid={emptyTitle} placeholder="e.g. Feed pump P-101 general arrangement and dimensions" />
               {emptyTitle ? (
@@ -239,104 +239,102 @@ export function NewDocumentForm({
               ) : null}
             </Ask>
 
-            {/* Three columns: where it sits and who sees it; how serious it is and how long it is kept; its files,
-                with all the room a file name needs. */}
-            <div className="min-w-0 space-y-3">
-              <div className="min-w-0">
-                <span className="stencil mb-1.5 block text-slate-500">Project</span>
-                <input type="hidden" name="projectCode" value={currentProject.code} />
-                <p className="py-1.5 text-[13px] font-medium text-slate-700">{currentProject.code} — {currentProject.name}</p>
-                <span className="block text-[11px] text-slate-400">Switch project in the header to register somewhere else.</span>
-              </div>
-              {asks("subProject") || needs("SUBPROJECTS") ? (
-                <Ask label={labels["subProject"]} required={must("subProject", needs("SUBPROJECTS"))} hint={subprojects.length ? undefined : "none defined for this project"}>
-                  <select name="subProject" required={must("subProject", needs("SUBPROJECTS"))} className={field} defaultValue="">
-                    <option value="" disabled={must("subProject", needs("SUBPROJECTS"))}>{must("subProject", needs("SUBPROJECTS")) ? "Choose…" : "—"}</option>
-                    {subprojects.map((o) => <option key={o.code} value={o.code}>{o.code} — {o.label}</option>)}
-                  </select>
-                </Ask>
-              ) : null}
-              {external ? (
-                <>
-                  {/* Whose document it is: always asked of a document from another organization. */}
-                  <Ask label={labels["originator"]} required hint="the organization it comes from">
-                    <select name="originator" required className={field} value={originator} onChange={(e) => setOriginator(e.target.value)}>
-                      <option value="" disabled>Choose…</option>
-                      {suppliers.map((o) => <option key={o.code} value={o.code}>{o.label} ({o.code})</option>)}
-                    </select>
-                  </Ask>
-                  {asks("contractRef") || needs("PURCHASE_ORDERS") || producerRequires.includes("contractRef") ? (
-                    <Ask label={labels["contractRef"]} required={must("contractRef", needs("PURCHASE_ORDERS") || producerRequires.includes("contractRef"))}>
-                      <select name="contractRef" required={must("contractRef", needs("PURCHASE_ORDERS") || producerRequires.includes("contractRef"))} className={field} defaultValue="">
-                        <option value="" disabled={must("contractRef", needs("PURCHASE_ORDERS") || producerRequires.includes("contractRef"))}>{must("contractRef", needs("PURCHASE_ORDERS") || producerRequires.includes("contractRef")) ? "Choose…" : "—"}</option>
-                        {pos.map((o) => <option key={o.code} value={o.code}>{o.code} — {o.label}</option>)}
-                      </select>
-                    </Ask>
-                  ) : null}
-                  {/* When it was received is asked only of what has arrived; otherwise it is filled when it comes in. */}
-                  {received && asks("receivedDate") ? (
-                    <Ask label={labels["receivedDate"]} required={must("receivedDate")}>
-                      <input type="date" name="receivedDate" required={must("receivedDate")} className={field} defaultValue={received ? new Date().toISOString().slice(0, 10) : undefined} />
-                    </Ask>
-                  ) : null}
-                </>
-              ) : null}
-              {asks("confidentiality") ? (
-              <Ask label={labels["confidentiality"]} required={must("confidentiality")}>
-                <select name="confidentiality" className={field} value={shownLevel} onChange={(e) => { setConfidentiality(e.target.value); setOwnLevel(true); }}>
-                  {confidentialities.map((o) => <option key={o.code} value={o.code}>{o.label}</option>)}
-                </select>
-                {meaningOf(confidentialities, shownLevel) ? <span className="mt-1 block text-[11px] text-slate-500">{meaningOf(confidentialities, shownLevel)}</span> : null}
-                {external ? <span className="mt-1 block text-[11px] text-slate-500">Shared with {originatorLabel ?? "the organization it comes from"} once it is sent to them or comes from them.</span> : null}
-              </Ask>
-              ) : null}
+            {/* Three rows across three columns, each field level with the one beside it:
+                project · criticality · PDF / sub-project · what the criticality means / who may see it · retention · native file. */}
+            <div className="min-w-0">
+              <span className="mb-1.5 flex h-4 min-w-0 items-baseline gap-2 leading-4 overflow-hidden">
+                <span className="stencil shrink-0 text-slate-500">Project</span>
+                <span className="min-w-0 truncate text-[11px] text-slate-400" title="Switch project in the header to register somewhere else.">switch it in the header</span>
+              </span>
+              <input type="hidden" name="projectCode" value={currentProject.code} />
+              <p className="flex h-(--control-h) items-center text-[13px] font-medium text-slate-700">{currentProject.code} — {currentProject.name}</p>
             </div>
-            <div className="min-w-0 space-y-3">
-              {/* Filled in from the type's recommendation; optional, and the person may choose another. */}
-              <Ask label={labels["criticality"]} hint="how serious an error in it would be — optional">
-                <select name="criticality" className={field} value={shownCriticality} onChange={(e) => { setCriticality(e.target.value); setOwnCriticality(true); }}>
-                  <option value="">—</option>
-                  {criticalities.map((o) => <option key={o.code} value={o.code}>{o.label}{o.code === recommended?.code ? " (recommended)" : ""}</option>)}
+            <Ask label={labels["criticality"]} hint="how serious an error in it would be — optional">
+              <select name="criticality" className={field} value={shownCriticality} onChange={(e) => { setCriticality(e.target.value); setOwnCriticality(true); }}>
+                <option value="">—</option>
+                {criticalities.map((o) => <option key={o.code} value={o.code}>{o.label}{o.code === recommended?.code ? " (recommended)" : ""}</option>)}
+              </select>
+            </Ask>
+            {received || !asks("file") ? <div aria-hidden className="hidden xl:block" /> : (
+              <Ask label="PDF" required={must("file")} hint={must("file") ? "this project registers nothing without its file — the PDF or the native file" : "optional — what people will read; needed before it is sent"}>
+                <input type="file" name="renditionFile" accept=".pdf" className={cn(field, "text-slate-500")} onChange={(e) => setPdf(!!e.target.files?.length)} />
+              </Ask>
+            )}
+            {asks("subProject") || needs("SUBPROJECTS") ? (
+              <Ask label={labels["subProject"]} required={must("subProject", needs("SUBPROJECTS"))} hint={subprojects.length ? undefined : "none defined for this project"}>
+                <select name="subProject" required={must("subProject", needs("SUBPROJECTS"))} className={field} defaultValue="">
+                  <option value="" disabled={must("subProject", needs("SUBPROJECTS"))}>{must("subProject", needs("SUBPROJECTS")) ? "Choose…" : "—"}</option>
+                  {subprojects.map((o) => <option key={o.code} value={o.code}>{o.code} — {o.label}</option>)}
                 </select>
-                {recommended ? (
-                  <span className="mt-1 block text-[11px] text-slate-500">
-                    {shownCriticality === recommended.code
+              </Ask>
+            ) : <div aria-hidden className="hidden xl:block" />}
+            {/* What the criticality means, and the type's recommendation: beside the sub-project, under the criticality. */}
+            <div className="min-w-0 space-y-1 pt-0.5">
+              {recommended ? (
+                <span className="block text-[11px] text-slate-500">
+                  {shownCriticality === recommended.code
                       ? <>Recommended for {docTypeLabel.toLowerCase()}. Choose another if you see it differently.</>
                       : <>{docTypeLabel} is usually {recommended.label.toLowerCase()}.{" "}
                           <button type="button" className="font-semibold text-link hover:underline" onClick={() => { setCriticality(recommended.code); setOwnCriticality(false); }}>Use {recommended.label.toLowerCase()}</button></>}
                   </span>
                 ) : null}
-                {level && (level.meaning || level.decides) ? (
-                  <span className="mt-1 block text-[11px] text-slate-500">
-                    {[level.meaning && !level.decides?.includes(level.meaning) ? level.meaning : null, level.decides].filter(Boolean).join(" — ")}
+              {level && (level.meaning || level.decides) ? (
+                  <span className="block text-[11px] text-slate-500">
+                  {[level.meaning && !level.decides?.includes(level.meaning) ? level.meaning : null, level.decides].filter(Boolean).join(" — ")}
                   </span>
                 ) : null}
+            </div>
+            <div aria-hidden className="hidden xl:block" />
+            {asks("confidentiality") ? (
+            <Ask label={labels["confidentiality"]} required={must("confidentiality")}>
+              <select name="confidentiality" className={field} value={shownLevel} onChange={(e) => { setConfidentiality(e.target.value); setOwnLevel(true); }}>
+                {confidentialities.map((o) => <option key={o.code} value={o.code}>{o.label}</option>)}
+              </select>
+              {meaningOf(confidentialities, shownLevel) ? <span className="mt-1 block text-[11px] text-slate-500">{meaningOf(confidentialities, shownLevel)}</span> : null}
+              {external ? <span className="mt-1 block text-[11px] text-slate-500">Shared with {originatorLabel ?? "the organization it comes from"} once it is sent to them or comes from them.</span> : null}
+            </Ask>
+            ) : <div aria-hidden className="hidden xl:block" />}
+            {asks("retentionClass") ? (
+              <Ask label={labels["retentionClass"]} required={must("retentionClass")}
+                hint={level?.retention
+                  ? `automatic: ${(retentionClasses.find((o) => o.code === level.retention)?.label ?? level.retention.replaceAll("_", " ")).toLowerCase()}, from the criticality`
+                  : "automatic: follows the criticality"}>
+                <select name="retentionClass" required={must("retentionClass")} className={field} defaultValue="">
+                  <option value="">Automatic</option>
+                  {retentionClasses.map((o) => <option key={o.code} value={o.code}>{o.label}</option>)}
+                </select>
               </Ask>
-              {asks("retentionClass") ? (
-                <Ask label={labels["retentionClass"]} required={must("retentionClass")}
-                  hint={level?.retention
-                    ? `automatic: ${(retentionClasses.find((o) => o.code === level.retention)?.label ?? level.retention.replaceAll("_", " ")).toLowerCase()}, from the criticality`
-                    : "automatic: follows the criticality"}>
-                  <select name="retentionClass" required={must("retentionClass")} className={field} defaultValue="">
-                    <option value="">Automatic</option>
-                    {retentionClasses.map((o) => <option key={o.code} value={o.code}>{o.label}</option>)}
+            ) : <div aria-hidden className="hidden xl:block" />}
+            {received || !asks("file") ? <div aria-hidden className="hidden xl:block" /> : (
+              <Ask label="Native file" hint="optional — the editable original (.docx, .dwg, .xlsx…)">
+                <input type="file" name="nativeFile" className={cn(field, "text-slate-500")} onChange={(e) => setNative(!!e.target.files?.length)} />
+              </Ask>
+            )}
+            {external ? (
+              <>
+                {/* Whose document it is: always asked of a document from another organization. */}
+                <Ask label={labels["originator"]} required hint="the organization it comes from">
+                  <select name="originator" required className={field} value={originator} onChange={(e) => setOriginator(e.target.value)}>
+                    <option value="" disabled>Choose…</option>
+                    {suppliers.map((o) => <option key={o.code} value={o.code}>{o.label} ({o.code})</option>)}
                   </select>
                 </Ask>
-              ) : null}
-            </div>
-            <div className="min-w-0 space-y-3">
-              {received || !asks("file") ? null : (
-                <>
-                  {/* The same two files a new revision takes: what people read, and the editable original. */}
-                  <Ask label="PDF" required={must("file")} hint={must("file") ? "this project registers nothing without its file — the PDF or the native file" : "optional — what people will read; needed before it is sent"}>
-                    <input type="file" name="renditionFile" accept=".pdf" className={cn(field, "text-slate-500")} onChange={(e) => setPdf(!!e.target.files?.length)} />
+                {asks("contractRef") || needs("PURCHASE_ORDERS") || producerRequires.includes("contractRef") ? (
+                  <Ask label={labels["contractRef"]} required={must("contractRef", needs("PURCHASE_ORDERS") || producerRequires.includes("contractRef"))}>
+                    <select name="contractRef" required={must("contractRef", needs("PURCHASE_ORDERS") || producerRequires.includes("contractRef"))} className={field} defaultValue="">
+                      <option value="" disabled={must("contractRef", needs("PURCHASE_ORDERS") || producerRequires.includes("contractRef"))}>{must("contractRef", needs("PURCHASE_ORDERS") || producerRequires.includes("contractRef")) ? "Choose…" : "—"}</option>
+                      {pos.map((o) => <option key={o.code} value={o.code}>{o.code} — {o.label}</option>)}
+                    </select>
                   </Ask>
-                  <Ask label="Native file" hint="optional — the editable original (.docx, .dwg, .xlsx…)">
-                    <input type="file" name="nativeFile" className={cn(field, "text-slate-500")} onChange={(e) => setNative(!!e.target.files?.length)} />
+                ) : <div aria-hidden className="hidden xl:block" />}
+                {/* When it was received is asked only of what has arrived; otherwise it is filled when it comes in. */}
+                {received && asks("receivedDate") ? (
+                  <Ask label={labels["receivedDate"]} required={must("receivedDate")}>
+                    <input type="date" name="receivedDate" required={must("receivedDate")} className={field} defaultValue={new Date().toISOString().slice(0, 10)} />
                   </Ask>
-                </>
-              )}
-            </div>
+                ) : null}
+              </>
+            ) : null}
             <OwnFields fields={ownFields} />
 
           </div>

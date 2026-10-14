@@ -66,10 +66,10 @@ export type NeededRow = {
 
 /** What a row's left edge says: ready, late, still owed, or on its way. */
 function railFor(row: NeededRow): string {
-  if (row.ready) return "rail-released";
-  if (row.late) return "rail-void";
-  if (row.outstanding) return "rail-prep";
-  return "rail-review";
+  if (row.ready) return "rail-good";
+  if (row.late) return "rail-stop";
+  if (row.outstanding) return "rail-act";
+  return "rail-moving";
 }
 
 /** Where this browser keeps the order its reader dragged the columns into. */

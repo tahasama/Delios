@@ -390,10 +390,10 @@ function PageStep({ onClick, disabled, label, children }: { onClick: () => void;
  * the same way on all three.
  */
 function railFor(row: ReviewRow): string {
-  if (row.withdrawn) return "rail-void";
-  if (row.open) return row.dueState === "overdue" ? "rail-void" : row.dueState === "at risk" ? "rail-prep" : "rail-review";
-  if (row.verdictProceeds === false) return "rail-void";
-  return "rail-released";
+  if (row.withdrawn) return "rail-idle";
+  if (row.open) return row.dueState === "overdue" ? "rail-stop" : row.dueState === "at risk" ? "rail-act" : "rail-moving";
+  if (row.verdictProceeds === false) return "rail-stop";
+  return "rail-good";
 }
 
 /** Where this browser keeps the order its reader dragged the columns into. */

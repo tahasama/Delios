@@ -91,6 +91,23 @@ export default async function GuidePage() {
         </div>
       </section>
 
+      {/* The key to the side colours: one meaning each, on every list, card and plan (globals.css .rail-*). */}
+      <section id="colours" className="register register-sheet register-sheet-open">
+        <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
+          <span className="stencil mr-1 text-slate-500">What the colours say</span>
+          <span className="text-[11px] text-slate-500">the line down the side of a row or a card means the same everywhere</span>
+        </div>
+        <ul className="divide-y divide-line">
+          {COLOURS.map((one) => (
+            <li key={one.rail} className={`${one.rail} relative grid grid-cols-1 gap-x-6 gap-y-1 px-5 py-2.5 pl-7 text-xs sm:grid-cols-[15rem_minmax(0,1fr)] sm:px-6 sm:pl-8`}>
+              <span className="absolute inset-y-0 left-0 w-1 bg-(--rail)" aria-hidden />
+              <span className="font-semibold text-slate-800">{one.name}</span>
+              <span className="leading-5 text-slate-600">{one.examples}</span>
+            </li>
+          ))}
+        </ul>
+      </section>
+
       <section>
         <div className="mb-4">
           <h2 className="mt-1 text-xl font-semibold text-slate-900">What we are contracted to do</h2>
@@ -139,3 +156,12 @@ function CapabilityCard({ href, title, text, icon: Icon, action }: { href: strin
 function Metric({ label, value }: { label: string; value: number }) {
   return <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-3"><p className="text-xl font-semibold tabular-nums">{value}</p><p className="mt-0.5 text-[10px] uppercase tracking-wide text-[#91acc2]">{label}</p></div>;
 }
+
+/** The five side colours and what each covers, in the app's own words. */
+const COLOURS = [
+  { rail: "rail-good", name: "Green — done", examples: "Released, accepted, delivered and accepted; an action's documents all ready; an answer that came in time." },
+  { rail: "rail-moving", name: "Blue — under way", examples: "In review, sent and waiting for its answer (not late), an action still ahead, a package delivered and waiting to be accepted." },
+  { rail: "rail-act", name: "Amber — someone has to act", examples: "Being prepared, received and waiting for Document Control's check, at risk, something missing that is still to come; every to-do on Home." },
+  { rail: "rail-stop", name: "Red — stopped or late", examples: "Rejected, returned, sent back, void, not approved, overdue, documents that came after the work." },
+  { rail: "rail-idle", name: "Grey — not yet, or no longer counts", examples: "No revision yet, a draft, superseded, a review withdrawn, words alone received, nothing listed." },
+] as const;

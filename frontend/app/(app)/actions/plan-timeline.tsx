@@ -18,7 +18,7 @@ type PlanRow = {
 
 /**
  * What the colour says, and only that (the bar also says it in words, for a
- * screen reader): dark green is done, violet is done but
+ * screen reader): dark green is done, light red is done but
  * the documents came after the work, green is ready, blue is work still
  * ahead with nothing owed yet, amber is a document owed within the week, red is
  * a day that has passed with something still missing, grey is nothing listed.
@@ -27,7 +27,7 @@ type PlanRow = {
 // little of the sheet through. The key above the plan reads this same map.
 export const TONE: Record<PlanRow["readiness"], string> = {
   DONE: "bg-emerald-700/70",
-  LATE_RECEIPT: "bg-violet-400/70",
+  LATE_RECEIPT: "bg-red-300/70",
   READY: "bg-emerald-400/70",
   UPCOMING: "bg-sky-500/65",
   AT_RISK: "bg-amber-500/70",
@@ -158,7 +158,7 @@ export function PlanTimeline({ rows, window, fit }: {
                     aria-label={`${STATE_WORD[r.readiness]}: ${r.firstNeeded ? `documents needed from ${fmtDate(r.firstNeeded)}, ` : ""}work on ${fmtDate(r.start)}, ${r.ready} of ${r.total} ready`}
                     title={`${r.code}: documents needed from ${fmtDate(r.firstNeeded)} · work on ${fmtDate(r.start)} · ${r.ready} of ${r.total} ready`}
                   />
-                  {/* The work itself, start to finish, as an outlined block on the end of the bar;
+                  {/* The work itself, start to finish, as a dark block on the end of the bar;
                       with no finish date, a tick on its day. */}
                   {(() => {
                     const finish = r.finish && r.finish.getTime() > end ? r.finish.getTime() : end;
@@ -167,7 +167,7 @@ export function PlanTimeline({ rows, window, fit }: {
                     if (to < 0 || from > 100) return null;
                     return (
                       <span
-                        className="absolute top-1/2 h-3.5 -translate-y-1/2 rounded border border-slate-600 bg-slate-400/15"
+                        className="absolute top-1/2 h-3.5 -translate-y-1/2 rounded bg-slate-700"
                         style={{ left: `${from}%`, width: `max(4px, ${Math.max(to - from, 0)}%)` }}
                         role="img"
                         aria-label={r.finish ? `Work from ${fmtDate(r.start)} to ${fmtDate(r.finish)}` : `Work on ${fmtDate(r.start)}`}

@@ -79,15 +79,16 @@ export function SearchPick({
     <div ref={box}>
       {chosen.map((id) => <input key={id} type="hidden" name={name} value={id} />)}
       {label ? (
-        <p className="mb-1 flex min-w-0 items-baseline gap-2">
+        <p className="mb-1.5 flex h-4 min-w-0 items-baseline gap-2 leading-4 overflow-hidden">
           <span className="stencil shrink-0 text-slate-500">{label}{required ? <span className="ml-0.5 text-red-500">*</span> : null}</span>
           {hint ? <span className="min-w-0 truncate text-[11px] leading-4 text-slate-400" title={hint}>{hint}</span> : null}
         </p>
       ) : null}
 
       <div className="relative">
-        <div className="flex items-center gap-2">
-          <Search className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+        {/* The magnifier sits inside the field, so its line starts where every other field's does. */}
+        <div className="relative">
+          <Search className="pointer-events-none absolute top-1/2 left-2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
           <input
             value={query}
             onChange={(e) => { setQuery(e.target.value); setOpen(true); setHi(0); }}
@@ -105,7 +106,7 @@ export function SearchPick({
             role="combobox"
             aria-expanded={open && (!!query || !!browse)}
             autoComplete="off"
-            className={cn("plain w-full", compact ? "py-1 text-xs" : "py-1.5 text-[13px]")}
+            className={cn("plain w-full !pl-7", compact ? "py-1 text-xs" : "py-1.5 text-[13px]")}
           />
         </div>
 

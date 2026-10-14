@@ -202,7 +202,13 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - A transmittal asking for an answer asks it by a day (backend ANSWER_DATE_REQUIRED). The answer stands, in
   the list and on its page (`AnswerStates`): awaited, overdue (none, past its day), answered on time, answered
   late. Answered by a transmittal answering it (or following it, by someone else), or a review step's answer.
-- Form labels and hints sit on one line (the hint cut, whole on hover), so fields side by side stay level.
+- Form labels and hints sit on one line of fixed height (the hint cut, whole on hover), and every control is the
+  control height, so fields side by side stay exactly level; forms are laid out in rows, field beside field
+  (new document, step 2: project · criticality · PDF / sub-project · what the criticality means / who may see it ·
+  retention period · native file). A search picker's line starts where every field's does (magnifier inside).
+- The side colours (rails, Home's edges, the history's marks) say one of five things, everywhere (`.rail-good`,
+  `-moving`, `-act`, `-stop`, `-idle`; key on Help, "What the colours say"): green done, blue under way, amber someone
+  has to act, red stopped or late, grey not yet or no longer counts. No colour stands for a kind of thing.
 - `unshare-package <email> <package-number>` (backend command) puts a supplier's
   package back to not shared, for testing; logged.
 - A supplier package has two pages. Ours (Document Control and above): plate,
@@ -497,8 +503,8 @@ a screen only words it. A new rule goes in the backend, never in a page.
   transmittal to Document Control with the file attached; Document Control
   adds the number to the action. No status or date is asked.
 - Under "Disciplines concerned", anyone of ours sees "Is a discipline missing, or
-  one that should not be here?" with a plain link "Request a discipline" (as "Request a
-  document" is a link, not a button): a transmittal to Document Control; their answer
+  one that should not be here?" with a plain link "Request a discipline", and under it "Is a document missing from
+  this action?" with "Request a document" (a concerned discipline, or Document Control), the links in one column: a transmittal to Document Control; their answer
   (the disciplines saved) is the record. "Disciplines and documents" shows both as a
   list with one edit icon each, on the right.
 - A discipline whose documents are all released at their status, on an action

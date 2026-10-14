@@ -77,8 +77,8 @@ const GUIDE: Record<string, string> = {
 
 /** The rail colour per revision state: the row's state, read before any word. */
 const RAIL: Record<string, string> = {
-  NONE: "rail-none", IN_PREPARATION: "rail-prep", IN_REVIEW: "rail-review",
-  RELEASED: "rail-released", SUPERSEDED: "rail-superseded", VOID: "rail-void",
+  NONE: "rail-idle", IN_PREPARATION: "rail-act", IN_REVIEW: "rail-moving",
+  RELEASED: "rail-good", SUPERSEDED: "rail-idle", VOID: "rail-stop",
 };
 const REV_INK: Record<string, string> = {
   IN_PREPARATION: "text-amber-700", IN_REVIEW: "text-sky-700", RELEASED: "text-emerald-700",
@@ -582,7 +582,7 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
           const on = selected.includes(row.id);
           const pin = on ? "bg-tint" : "bg-surface";
           return <tr key={row.id} className={on ? "[&>td]:bg-tint" : undefined}>
-            <Td className={`rail ${RAIL[row.revState ?? "NONE"] ?? "rail-none"} ${frozen ? "sticky left-0 z-1" : ""} ${pin}`}>
+            <Td className={`rail ${RAIL[row.revState ?? "NONE"] ?? "rail-idle"} ${frozen ? "sticky left-0 z-1" : ""} ${pin}`}>
               <input aria-label={`Select ${row.docNumber}`} type="checkbox" checked={on} onChange={() => toggle(row.id)}
                 disabled={!!picking?.locked?.includes(row.id)} title={picking?.locked?.includes(row.id) ? "Sent to the supplier: it stays in the package" : undefined} />
             </Td>

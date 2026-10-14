@@ -49,7 +49,7 @@ function Ask({ label, hint, required, children, className }: { label: string; hi
   return (
     <label className={cn("block min-w-0", className)}>
       {/* One line, whatever the hint: questions side by side keep level. The whole hint shows on hover. */}
-      <span className="mb-1.5 flex min-w-0 items-baseline gap-2">
+      <span className="mb-1.5 flex h-4 min-w-0 items-baseline gap-2 leading-4 overflow-hidden">
         <span className="stencil shrink-0 text-slate-500">{label}{required ? <span className="ml-0.5 text-red-500">*</span> : null}</span>
         {hint ? <span className="min-w-0 truncate text-[11px] text-slate-400" title={hint}>{hint}</span> : null}
       </span>
@@ -324,7 +324,7 @@ export function NewTransmittalForm({
                   came in time. One row, level with the reason beside it. */}
               {outgoing ? (
                 <div className="min-w-0 lg:col-span-2">
-                  <span className="mb-1.5 flex min-w-0 items-baseline gap-2">
+                  <span className="mb-1.5 flex h-4 min-w-0 items-baseline gap-2 leading-4 overflow-hidden">
                     <span className="stencil shrink-0 text-slate-500">Answer by{answerRequired ? <span className="ml-0.5 text-red-500">*</span> : null}</span>
                     <span className="min-w-0 truncate text-[11px] text-slate-400">{answerRequired ? (suggestedDays ? `the reason usually allows ${suggestedDays} working days` : "a late answer is flagged") : "no answer asked"}</span>
                   </span>

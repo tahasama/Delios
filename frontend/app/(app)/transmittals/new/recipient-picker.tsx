@@ -139,9 +139,9 @@ function Block({ label, hint, required, copy, everyone, companies, chosen, onAdd
       </p>
 
       <div className="relative">
-        <div className="flex items-center gap-2">
-          <Search className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-          <label className="min-w-0 flex-1">
+        <div className="relative">
+          <Search className="pointer-events-none absolute top-1/2 left-2 z-10 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+          <label className="block min-w-0">
             <span className="sr-only">{copy ? "Find somebody to copy in" : "Find a person"}</span>
             <input
               value={query}
@@ -155,7 +155,7 @@ function Block({ label, hint, required, copy, everyone, companies, chosen, onAdd
                 else if (e.key === "Backspace" && !query && mine.length) onRemove(mine[mine.length - 1].id);
               }}
               placeholder={mine.length ? "Add another…" : copy ? "Nobody copied in" : "e.g. ou, electrical, Ferrand…"}
-              className="plain w-full py-1.5 text-[13px]"
+              className="plain w-full !pl-7 py-1.5 text-[13px]"
               role="combobox"
               aria-expanded={open}
               aria-controls={listId}

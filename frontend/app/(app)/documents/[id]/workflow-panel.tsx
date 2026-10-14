@@ -435,11 +435,11 @@ function RecordPanel({ doc, extra }: { doc: DocLite; extra: StepItem[] }) {
  */
 function Card({ title, description, className, status, items }: { title: string; description?: string; className?: string; status: React.ReactNode; items: StepItem[] }) {
   const tone = className ?? "";
-  const rail = tone.includes("amber") ? "rail-prep"
-    : tone.includes("emerald") ? "rail-released"
-    : tone.includes("violet") ? "rail-superseded"
-    : tone.includes("brand") ? "rail-review"
-    : "rail-none";
+  const rail = tone.includes("amber") ? "rail-act"
+    : tone.includes("red") ? "rail-stop"
+    : tone.includes("emerald") ? "rail-good"
+    : tone.includes("brand") || tone.includes("sky") ? "rail-moving"
+    : "rail-idle";
   return (
     <section className={cn("register register-sheet register-sheet-open relative", rail)}>
       <span className="absolute inset-y-0 left-0 w-0.75 rounded-l-[0.875rem] bg-(--rail)" aria-hidden />
