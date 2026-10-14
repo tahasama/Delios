@@ -19,8 +19,13 @@ public sealed record CreatePackageRequest(
     string? Kind = null, Guid? SupplierPartyId = null, string? PurchaseOrder = null, string[]? Reasons = null,
     Dictionary<string, string?>? Extras = null);
 
-/// <summary>Body of renaming a package.</summary>
-public sealed record RenameRequest(string? Title, string? Description = null, string? Number = null);
+/// <summary>
+/// Body of changing a package. Title and description always; the rest, left out, stay as they are (a delivery package
+/// only): the date, the statuses it needs, who it goes to, who puts it together and who accepts it.
+/// </summary>
+public sealed record RenameRequest(string? Title, string? Description = null, string? Number = null,
+    DateOnly? CompletionDate = null, bool ClearCompletionDate = false, string[]? RequiredStatuses = null,
+    Guid[]? RecipientPartyIds = null, Guid[]? OwnerIds = null, Guid[]? AcceptorIds = null);
 
 /// <summary>Body of asking a supplier for the placeholders of a supply package not asked for yet.</summary>
 public sealed record SupplyRequest(string? Message = null, Guid[]? DocumentIds = null);
@@ -62,19 +67,31 @@ public sealed class PackageService(
         if (title.Length == 0) return Fail(Problems.Invalid("TITLE_REQUIRED", "Give the package a title."));
 
         var catalog = await Catalog.LoadAsync(db, cancellationToken);
-        // One reason or several: the first leads its transmittals, the others are named on them.
-        var reasons = (request.Reasons is { Length: > 0 } many ? many : [request.Reason ?? ""]).Select(r => r.Trim()).Distinct().ToArray();
+        var kind = request.Kind ?? PackageKinds.Delivery;
+        if (kind is not (PackageKinds.Delivery or PackageKinds.Supply))
+            return Fail(Problems.Invalid("KIND_UNKNOWN", "A package is a delivery or a supply.", new { kind }));
+        var supply = kind == PackageKinds.Supply;
+        // What a supplier owes needs no status: each document goes as it is asked. A delivery says what it needs.
+        if (StatusesProblem(catalog, request.RequiredStatuses, required: !supply) is { } badStatus) return Fail(badStatus);
+        var statuses = request.RequiredStatuses?.Distinct().ToArray() ?? [];
+        // One reason or several: the first leads its transmittals, the others are named on them. None given: the
+        // statuses it needs say why they get it.
+        var given = (request.Reasons is { Length: > 0 } many ? many : [request.Reason ?? ""]).Select(r => r.Trim()).Where(r => r.Length > 0).Distinct().ToArray();
+        var reasons = given.Length > 0 ? given : ReasonFor(catalog, statuses) is { } derived ? [derived] : [];
+        if (reasons.Length == 0)
+            return Fail(Problems.Invalid("REASON_REQUIRED", "No published reason for issue matches the status it needs: publish one, or name the reason."));
         var reason = reasons[0];
         if (reasons.FirstOrDefault(r => !catalog.IsActive(TransmittalSets.Reasons, r)) is { } badReason)
         {
             return Fail(Problems.Invalid("VALUE_NOT_PUBLISHED", $"{badReason} is not a published reason for issue.",
                 new { field = "reason", value = badReason }));
         }
-        if (StatusesProblem(catalog, request.RequiredStatuses, required: true) is { } badStatus) return Fail(badStatus);
 
         var owners = request.OwnerIds?.Distinct().ToArray() ?? [];
         var acceptors = request.AcceptorIds?.Distinct().ToArray() ?? [];
-        if (owners.Length == 0 || acceptors.Length == 0)
+        // A supplier's package is Document Control's: nobody accepts it, it is never delivered.
+        if (supply && owners.Length == 0) owners = [access.UserId];
+        if (owners.Length == 0 || (!supply && acceptors.Length == 0))
             return Fail(Problems.Invalid("ROLES_REQUIRED", "Name who puts it together and who accepts it."));
         // Nobody accepts their own work.
         if (owners.Intersect(acceptors).Any())
@@ -85,9 +102,6 @@ public sealed class PackageService(
         if (strangers.Count > 0)
             return Fail(Problems.Invalid("PERSON_NOT_ON_PROJECT", "Some people named are not ours on this project.", new { userIds = strangers }));
 
-        var kind = request.Kind ?? PackageKinds.Delivery;
-        if (kind is not (PackageKinds.Delivery or PackageKinds.Supply))
-            return Fail(Problems.Invalid("KIND_UNKNOWN", "A package is a delivery or a supply.", new { kind }));
         Party? supplier = null;
         var rule = request.Rule;
         var recipients = request.RecipientPartyIds?.Distinct().ToArray() ?? [];
@@ -126,7 +140,7 @@ public sealed class PackageService(
             Reason = reason,
             OtherReasons = reasons[1..],
             Extras = Documents.OwnFields.Write(null, request.Extras),
-            RequiredStatuses = request.RequiredStatuses!.Distinct().ToArray(),
+            RequiredStatuses = statuses,
             CompletionDate = request.CompletionDate is { } d ? LocalDate.FromDateOnly(d) : null,
             Rule = ToRule(rule),
             RecipientPartyIds = recipients,
@@ -152,7 +166,7 @@ public sealed class PackageService(
     public async Task<(Package? Package, IResult? Problem)> AddAsync(
         ProjectAccess access, Guid id, MembersRequest request, CancellationToken cancellationToken)
     {
-        var (package, problem) = await ComposableAsync(access, id, cancellationToken);
+        var (package, problem) = await ComposableAsync(access, id, cancellationToken, members: true);
         if (problem is not null) return Fail(problem);
         var catalog = await Catalog.LoadAsync(db, cancellationToken);
         if (StatusesProblem(catalog, request.RequiredStatuses, required: false) is { } badStatus) return Fail(badStatus);
@@ -188,7 +202,7 @@ public sealed class PackageService(
     public async Task<(Package? Package, IResult? Problem)> RemoveAsync(
         ProjectAccess access, Guid id, MembersRequest request, CancellationToken cancellationToken)
     {
-        var (package, problem) = await ComposableAsync(access, id, cancellationToken);
+        var (package, problem) = await ComposableAsync(access, id, cancellationToken, members: true);
         if (problem is not null) return Fail(problem);
         var ids = request.DocumentIds?.ToHashSet() ?? [];
         var going = package!.Members.Where(m => ids.Contains(m.DocumentId)).ToList();
@@ -301,29 +315,86 @@ public sealed class PackageService(
 
     // ── Name, and deleting an empty one ───────────────────────────────────────
 
-    /// <summary>Renames a package and changes its description. Its owners or Document Control do this, at any time.</summary>
+    /// <summary>
+    /// Changes a package while it is open: its name and description, and for a delivery package its date, the statuses
+    /// it needs, who it goes to, who puts it together and who accepts it. Document Control (and above) does this; those
+    /// putting it together only add and take out its documents. A change to what it needs or who accepts it makes the
+    /// last readiness check, and anything agreed on it, stale.
+    /// </summary>
     public async Task<(Package? Package, IResult? Problem)> RenameAsync(
         ProjectAccess access, Guid id, RenameRequest request, CancellationToken cancellationToken)
     {
-        var package = await LoadAsync(access, id, cancellationToken);
-        if (package is null) return Fail(NotFound());
-        if (!access.IsInternal || (!package.OwnerIds.Contains(access.UserId) && !access.Holds(Verbs.Control)))
-            return Fail(Problems.Forbidden("OWNER_ONLY", "Its owners or Document Control rename a package."));
-        if (package.Kind == PackageKinds.Supply && !access.Holds(Verbs.Control))
-            return Fail(Problems.Forbidden("CONTROL_ONLY", "Document Control looks after a supplier's package."));
+        var (package, problem) = await ComposableAsync(access, id, cancellationToken);
+        if (problem is not null) return Fail(problem);
         // What its supplier sees stays as it saw it: once shared, a supplier's package keeps its name and number.
-        if (package.Kind == PackageKinds.Supply && package.SharedAt is not null)
+        if (package!.Kind == PackageKinds.Supply && package.SharedAt is not null)
             return Fail(Problems.Conflict("PACKAGE_SHARED", "It is shared with its supplier: its name, number and description no longer change."));
         var title = request.Title?.Trim() ?? "";
         if (title.Length == 0) return Fail(Problems.Invalid("TITLE_REQUIRED", "Give the package a title."));
         // A package's number comes from its numbering scheme and never changes once made.
         if (request.Number?.Trim() is { Length: > 0 } asked && !string.Equals(asked, package.Number, StringComparison.OrdinalIgnoreCase))
             return Fail(Problems.Conflict("NUMBER_FIXED", "A package's number comes from its numbering scheme and never changes."));
-        var was = package.Title;
+
+        var changed = new List<string>();
+        var stale = false;
+        if (package.Title != title) changed.Add($"renamed from \"{package.Title}\"");
+        if (package.Description != Blank(request.Description)) changed.Add("description");
         package.Title = title;
         package.Description = Blank(request.Description);
-        await audit.WriteAsync(Actor(access), "PACKAGE_RENAMED", "Package", package.Id, package.Number,
-            was == title ? "Description changed." : $"Renamed from \"{was}\".", package.ProjectId, cancellationToken);
+        if (package.Kind == PackageKinds.Delivery)
+        {
+            var catalog = await Catalog.LoadAsync(db, cancellationToken);
+            if (request.ClearCompletionDate || request.CompletionDate is not null)
+            {
+                var date = request.ClearCompletionDate ? (LocalDate?)null : LocalDate.FromDateOnly(request.CompletionDate!.Value);
+                if (date != package.CompletionDate) changed.Add($"date {(date is null ? "cleared" : date.Value.ToString("yyyy-MM-dd", null))}");
+                package.CompletionDate = date;
+            }
+            if (request.RequiredStatuses is { } statuses)
+            {
+                if (StatusesProblem(catalog, statuses, required: true) is { } bad) return Fail(bad);
+                var now = statuses.Distinct().ToArray();
+                if (!now.SequenceEqual(package.RequiredStatuses))
+                {
+                    changed.Add($"needed at {string.Join(" or ", now)}");
+                    package.RequiredStatuses = now;
+                    // Why they get it follows what it needs.
+                    if (ReasonFor(catalog, now) is { } reason) package.Reason = reason;
+                    stale = true;
+                }
+            }
+            var owners = request.OwnerIds?.Distinct().ToArray() ?? package.OwnerIds;
+            var acceptors = request.AcceptorIds?.Distinct().ToArray() ?? package.AcceptorIds;
+            if (owners.Length == 0 || acceptors.Length == 0)
+                return Fail(Problems.Invalid("ROLES_REQUIRED", "Name who puts it together and who accepts it."));
+            if (owners.Intersect(acceptors).Any())
+                return Fail(Problems.Invalid("ACCEPTOR_IS_OWNER", "Whoever accepts a package is never one of the people who put it together."));
+            var members = (await transmittals.MembersAsync(access.Project, cancellationToken)).Where(m => m.Internal).Select(m => m.UserId).ToHashSet();
+            var strangers = owners.Concat(acceptors).Where(one => !members.Contains(one)).Except(package.OwnerIds.Concat(package.AcceptorIds)).ToList();
+            if (strangers.Count > 0)
+                return Fail(Problems.Invalid("PERSON_NOT_ON_PROJECT", "Some people named are not ours on this project.", new { userIds = strangers }));
+            if (!owners.ToHashSet().SetEquals(package.OwnerIds)) changed.Add("who puts it together");
+            if (!acceptors.ToHashSet().SetEquals(package.AcceptorIds))
+            {
+                changed.Add("who accepts it");
+                stale = true;
+            }
+            package.OwnerIds = owners;
+            package.AcceptorIds = acceptors;
+            if (request.RecipientPartyIds is { } recipients)
+            {
+                var to = recipients.Distinct().ToArray();
+                if (to.Length == 0) return Fail(Problems.Invalid("RECIPIENT_REQUIRED", "Say who it is delivered to."));
+                var known = await db.Parties.AsNoTracking().Where(p => to.Contains(p.Id) && p.Active).CountAsync(cancellationToken);
+                if (known != to.Length) return Fail(Problems.Invalid("PARTY_UNKNOWN", "Some organizations named are not active parties."));
+                if (!to.ToHashSet().SetEquals(package.RecipientPartyIds)) changed.Add("who it goes to");
+                package.RecipientPartyIds = to;
+            }
+        }
+        if (changed.Count == 0) return (package, null);
+        if (stale) ResetAssessment(package);
+        await audit.WriteAsync(Actor(access), "PACKAGE_CHANGED", "Package", package.Id, package.Number,
+            $"Changed: {string.Join("; ", changed)}.", package.ProjectId, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         return (package, null);
     }
@@ -334,7 +405,8 @@ public sealed class PackageService(
     /// </summary>
     public async Task<IResult?> DeleteAsync(ProjectAccess access, Guid id, CancellationToken cancellationToken, string? reason = null)
     {
-        var (package, problem) = await ComposableAsync(access, id, cancellationToken);
+        // An empty package that never went out may be deleted by whoever puts it together (CLAUDE.md).
+        var (package, problem) = await ComposableAsync(access, id, cancellationToken, members: true);
         if (problem is not null) return problem;
         // A supplier's package, made by hand or by itself, is deleted while it is not shared and none of its documents
         // was sent to the supplier: its documents leave it (they stay in the register) and are filed again, into
@@ -420,7 +492,8 @@ public sealed class PackageService(
     }
 
     /// <summary>
-    /// Sends the shortfall found by the last assessment to the acceptance authority for their decision.
+    /// Sends the shortfall found by the last assessment to the acceptance authority, on a transmittal asking whether it
+    /// may go without what is missing (a request; those putting it together copied in).
     /// </summary>
     public async Task<(Package? Package, IResult? Problem)> IssueShortfallAsync(ProjectAccess access, Guid id, CancellationToken cancellationToken)
     {
@@ -428,14 +501,27 @@ public sealed class PackageService(
         if (problem is not null) return Fail(problem);
         if (package!.AssessedAt is null || package.Shortfall.Count == 0)
             return Fail(Problems.Conflict("NO_SHORTFALL", "Assess it first; a shortfall is what the assessment found missing."));
+        var lines = package.Shortfall.Select(s => $"- {s.DocumentNumber}: {(s.Current is null ? "not released" : $"at {s.Current}")}, needs {string.Join(" or ", s.Required)}");
+        var total = package.Members.Count;
+        var asked = await Actions.ActionLetters.SendAsync(db, transmittals, clock, access.Project, Actor(access), Actions.ActionLetters.Request,
+            $"{package.Number} — {package.Shortfall.Count} of {total} document{(total == 1 ? "" : "s")} not ready: may it go without them?",
+            $"{package.Title} is due{(package.CompletionDate is { } due ? $" {due:yyyy-MM-dd}" : "")}. These are not at the status it needs:\n{string.Join("\n", lines)}\n\n"
+                + "Confirm on the package to deliver it as it stands, on your responsibility; or wait for them.",
+            package.AcceptorIds, package.OwnerIds, null, cancellationToken, packageId: package.Id);
+        if (asked is null)
+            return Fail(Problems.Conflict("NOBODY_TO_ASK", "Nobody who accepts this package is active on the project. Change who accepts it first."));
         package.ShortfallIssuedAt = clock.GetCurrentInstant();
         await audit.WriteAsync(Actor(access), "SHORTFALL_ISSUED", "Package", package.Id, package.Number,
-            $"{package.Shortfall.Count} document(s) not ready, sent to the acceptance authority.", package.ProjectId, cancellationToken);
+            $"{package.Shortfall.Count} document(s) not ready, sent to the acceptance authority on {asked.Number}.", package.ProjectId, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         return (package, null);
     }
 
-    /// <summary>The acceptance authority agrees it may go without what is missing. Recorded with their name.</summary>
+    /// <summary>
+    /// The acceptance authority agrees it goes without what is missing, on their responsibility: their confirmation
+    /// answers the request on a transmittal, and the package is delivered at once, the documents not ready going as
+    /// they stand (their released revision, else their newest). Recorded with their name.
+    /// </summary>
     public async Task<(Package? Package, IResult? Problem)> AcceptShortfallAsync(
         ProjectAccess access, Guid id, NoteRequest request, CancellationToken cancellationToken)
     {
@@ -446,12 +532,31 @@ public sealed class PackageService(
         if (package.State != PackageStates.Open) return Fail(Closed(package));
         if (package.ShortfallIssuedAt is null)
             return Fail(Problems.Conflict("SHORTFALL_NOT_ISSUED", "No shortfall has been sent to you."));
+        await SyncAsync(package, cancellationToken);
+        var readiness = await ReadinessAsync(package, cancellationToken);
+        var recorded = package.Shortfall.Select(s => s.DocumentId).ToHashSet();
+        if (readiness.Any(r => !r.Ready && !recorded.Contains(r.Member.DocumentId)))
+        {
+            return Fail(Problems.Conflict("SHORTFALL_CHANGED",
+                "Something else is missing since you were asked. It is checked and asked again before it goes."));
+        }
+        var note = Blank(request.Note);
+        var actor = Actor(access);
         package.ShortfallAcceptedAt = clock.GetCurrentInstant();
         package.ShortfallAcceptedByName = access.UserName;
-        await audit.WriteAsync(Actor(access), "SHORTFALL_ACCEPTED", "Package", package.Id, package.Number,
-            $"May go without {string.Join(", ", package.Shortfall.Select(s => s.DocumentNumber))}. {request.Note}".Trim(),
+        await audit.WriteAsync(actor, "SHORTFALL_ACCEPTED", "Package", package.Id, package.Number,
+            $"Goes without {string.Join(", ", package.Shortfall.Select(s => s.DocumentNumber))} ready, on the responsibility of {access.UserName}. {note}".Trim(),
             package.ProjectId, cancellationToken);
-        await db.SaveChangesAsync(cancellationToken);
+        // The confirmation answers the request it was asked on.
+        var question = await db.Transmittals.AsNoTracking()
+            .Where(t => t.PackageId == package.Id && t.Reason == Actions.ActionLetters.Request && t.Items.Count == 0)
+            .OrderByDescending(t => t.IssuedAt).Select(t => new { t.Id, t.IssuedById }).FirstOrDefaultAsync(cancellationToken);
+        await Actions.ActionLetters.SendAsync(db, transmittals, clock, access.Project, actor, Actions.ActionLetters.Confirmation,
+            $"{package.Number} — goes without what is missing, on my responsibility",
+            $"{package.Title} is delivered as it stands: {package.Shortfall.Count} document(s) not at the status it needs ({string.Join(", ", package.Shortfall.Select(s => s.DocumentNumber))}).{(note is null ? "" : $"\n\n{note}")}",
+            question?.IssuedById is { } asker ? new[] { asker } : package.OwnerIds, package.OwnerIds, question?.Id, cancellationToken, packageId: package.Id);
+        var (_, problem) = await DeliverNowAsync(access, package, readiness, note, access.UserName, cancellationToken);
+        if (problem is not null) return Fail(problem);
         return (package, null);
     }
 
@@ -460,7 +565,7 @@ public sealed class PackageService(
     /// <summary>
     /// Deliver: one transmittal per organization, carrying every member that is
     /// ready. Not while anything is missing that the acceptance authority has not
-    /// accepted, and not while a rule is still admitting. Its contents are then fixed.
+    /// accepted (accepting it delivers it), and not while a rule is still admitting. Its contents are then fixed.
     /// </summary>
     public async Task<(Package? Package, IReadOnlyList<Transmittal> Sent, IResult? Problem)> DeliverAsync(
         ProjectAccess access, Guid id, DeliverRequest request, CancellationToken cancellationToken)
@@ -482,7 +587,7 @@ public sealed class PackageService(
         if (missing.Count > 0 && package.ShortfallAcceptedAt is null)
         {
             return (null, [], package.ShortfallIssuedAt is null
-                ? Problems.Conflict("SHORTFALL_NOT_ISSUED", "Some documents are not ready. Send the shortfall to the acceptance authority first.")
+                ? Problems.Conflict("SHORTFALL_NOT_ISSUED", "Some documents are not ready. Send what is missing to the acceptance authority first.")
                 : Problems.Conflict("SHORTFALL_NOT_ACCEPTED", "Delivery waits for the acceptance authority to accept what is missing."));
         }
         if (package.Rule is not null && !request.RuleCeased)
@@ -490,20 +595,51 @@ public sealed class PackageService(
             return (null, [], Problems.Conflict("RULE_STILL_ADMITTING",
                 "The package fills itself by a rule. Say that nothing more will join before it goes."));
         }
+        var (sent, failed) = await DeliverNowAsync(access, package, readiness, Blank(request.Note), null, cancellationToken);
+        return failed is null ? (package, sent, null) : (null, [], failed);
+    }
+
+    /// <summary>
+    /// Sends the package: one transmittal per organization it goes to, with every ready document at its released
+    /// revision; with <paramref name="onResponsibilityOf"/>, the documents not ready go too as they stand (their released
+    /// revision, else their newest), said on the transmittal. A document with no revision at all cannot go and is named.
+    /// Then the package is delivered (closed when it names nobody) and its contents are fixed.
+    /// </summary>
+    private async Task<(IReadOnlyList<Transmittal> Sent, IResult? Problem)> DeliverNowAsync(ProjectAccess access, Package package,
+        List<Readiness> readiness, string? note, string? onResponsibilityOf, CancellationToken cancellationToken)
+    {
         var ready = readiness.Where(r => r.Ready).ToList();
-        if (package.RecipientPartyIds.Length > 0 && ready.Count == 0)
-            return (null, [], Problems.Conflict("NOTHING_READY", "Nothing is ready to deliver."));
+        var notReady = onResponsibilityOf is null ? [] : readiness.Where(r => !r.Ready).ToList();
+        var ids = ready.Concat(notReady).Select(r => r.Member.DocumentId).ToList();
+        var documents = await db.Documents.Where(d => ids.Contains(d.Id)).ToDictionaryAsync(d => d.Id, cancellationToken);
+        var candidates = await db.Revisions.Where(r => ids.Contains(r.DocumentId) && r.VoidedAt == null).ToListAsync(cancellationToken);
+        // The released revision when there is one; else, on the acceptor's responsibility, the newest.
+        Revision? Going(Readiness r) =>
+            (r.RevisionId is { } released ? candidates.FirstOrDefault(c => c.Id == released) : null)
+            ?? (onResponsibilityOf is null ? null
+                : candidates.Where(c => c.DocumentId == r.Member.DocumentId).OrderByDescending(c => c.CreatedAt).FirstOrDefault());
+        var going = ready.Concat(notReady).Select(r => (Line: r, Revision: Going(r))).ToList();
+        var items = going.Where(g => g.Revision is not null).Select(g => (documents[g.Line.Member.DocumentId], g.Revision!)).ToList();
+        var left = going.Where(g => g.Revision is null).Select(g => g.Line.DocumentNumber).ToList();
+        if (package.RecipientPartyIds.Length > 0 && items.Count == 0)
+        {
+            return ([], onResponsibilityOf is null
+                ? Problems.Conflict("NOTHING_READY", "Nothing is ready to deliver.")
+                : Problems.Conflict("NOTHING_TO_SEND", "None of its documents has a revision to send yet: there is nothing to deliver."));
+        }
+        var message = AlsoFor(package, note);
+        if (onResponsibilityOf is not null && notReady.Count > 0)
+        {
+            var said = $"Delivered with {notReady.Count} document(s) not at the status asked ({string.Join(", ", notReady.Select(r => r.DocumentNumber))}), on the responsibility of {onResponsibilityOf}."
+                + (left.Count > 0 ? $" Not sent, no revision yet: {string.Join(", ", left)}." : "");
+            message = message is null ? said : $"{said}\n\n{message}";
+        }
 
         var now = clock.GetCurrentInstant();
         var actor = Actor(access);
         var sent = new List<Transmittal>();
         if (package.RecipientPartyIds.Length > 0)
         {
-            var documentIds = ready.Select(r => r.Member.DocumentId).ToList();
-            var documents = await db.Documents.Where(d => documentIds.Contains(d.Id)).ToDictionaryAsync(d => d.Id, cancellationToken);
-            var revisionIds = ready.Select(r => r.RevisionId!.Value).ToList();
-            var revisions = await db.Revisions.Where(r => revisionIds.Contains(r.Id)).ToDictionaryAsync(r => r.DocumentId, cancellationToken);
-            var items = ready.Select(r => (documents[r.Member.DocumentId], revisions[r.Member.DocumentId])).ToList();
             var members = await transmittals.MembersAsync(access.Project, cancellationToken);
             var parties = await db.Parties.AsNoTracking().Where(p => package.RecipientPartyIds.Contains(p.Id)).OrderBy(p => p.Name)
                 .ToListAsync(cancellationToken);
@@ -515,7 +651,7 @@ public sealed class PackageService(
                         .Select(m => new TransmittalService.Addressee(m.UserId, null, m.Name, party.Name)).ToList()
                     : TransmittalService.AddresseesOf(party, members);
                 sent.Add(await transmittals.RaiseAsync(new TransmittalService.Raise(access.Project, actor, package.Reason,
-                    $"{package.Number} {package.Title}: {ready.Count} document(s)", AlsoFor(package, Blank(request.Note)), party, party.Name,
+                    $"{package.Number} {package.Title}: {items.Count} document(s)", message, party, party.Name,
                     items, addressees, PackageId: package.Id), cancellationToken));
             }
         }
@@ -523,14 +659,14 @@ public sealed class PackageService(
         package.State = sent.Count > 0 ? PackageStates.Delivered : PackageStates.Closed;
         package.ClosedAt = now;
         package.ClosedByName = access.UserName;
-        package.ClosureNote = Blank(request.Note);
+        package.ClosureNote = note;
         if (package.Rule is not null) package.RuleCeasedAt = now;
         await audit.WriteAsync(actor, sent.Count > 0 ? "PACKAGE_DELIVERED" : "PACKAGE_CLOSED", "Package", package.Id, package.Number,
-            sent.Count > 0 ? $"{ready.Count} of {readiness.Count} document(s) on {string.Join(", ", sent.Select(t => t.Number))}."
+            sent.Count > 0 ? $"{items.Count} of {readiness.Count} document(s) on {string.Join(", ", sent.Select(t => t.Number))}{(onResponsibilityOf is null ? "" : $", on the responsibility of {onResponsibilityOf}")}."
                 : $"Closed with {ready.Count} of {readiness.Count} document(s) ready; nobody to deliver it to.",
             package.ProjectId, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
-        return (package, sent, null);
+        return (sent, null);
     }
 
     /// <summary>The acceptance authority accepts a delivered or closed package. Never one of its owners.</summary>
@@ -713,15 +849,19 @@ public sealed class PackageService(
     }
 
     /// <summary>
-    /// Loads a package the caller may change: they must be an owner or hold Control, and it must still be open.
+    /// Loads a package the caller may change: they must hold Control (or, for its documents only, be putting it
+    /// together), and it must still be open.
     /// Otherwise returns the problem to answer with.
     /// </summary>
-    private async Task<(Package?, IResult?)> ComposableAsync(ProjectAccess access, Guid id, CancellationToken cancellationToken)
+    private async Task<(Package?, IResult?)> ComposableAsync(ProjectAccess access, Guid id, CancellationToken cancellationToken, bool members = false)
     {
         var package = await LoadAsync(access, id, cancellationToken);
         if (package is null) return (null, NotFound());
-        if (!access.IsInternal || (!package.OwnerIds.Contains(access.UserId) && !access.Holds(Verbs.Control)))
-            return (null, Problems.Forbidden("OWNER_ONLY", "Its owners or Document Control change and deliver a package."));
+        // Those putting it together add and take out its documents; everything else is Document Control's (and above).
+        if (!access.IsInternal || !(access.Holds(Verbs.Control) || (members && package.OwnerIds.Contains(access.UserId))))
+            return (null, members
+                ? Problems.Forbidden("OWNER_ONLY", "Those putting it together, or Document Control, add and take out its documents.")
+                : Problems.Forbidden("CONTROL_ONLY", "Document Control looks after a package; those putting it together add and take out its documents."));
         // A supplier's package is Document Control's alone.
         if (package.Kind == PackageKinds.Supply && !access.Holds(Verbs.Control))
             return (null, Problems.Forbidden("CONTROL_ONLY", "Document Control looks after a supplier's package."));
@@ -812,6 +952,34 @@ public sealed class PackageService(
             AssetIds = request.AssetIds?.Distinct().ToArray() ?? [],
         };
         return rule.IsEmpty ? null : rule;
+    }
+
+    /// <summary>
+    /// Why they get it, read from the status it needs (the first of them): the published reason for issue saying the
+    /// same purpose ("Issued for review" → "For review"), else one for execution when the status lets work go ahead,
+    /// else the first reason that carries documents. Null when nothing is published.
+    /// </summary>
+    private static string? ReasonFor(Catalog catalog, IReadOnlyList<string> statuses)
+    {
+        var reasons = catalog.Active(TransmittalSets.Reasons)
+            .Where(r => catalog.Prop(TransmittalSets.Reasons, r.Code, "family") is not { ValueKind: System.Text.Json.JsonValueKind.String } f || f.GetString() == "Data")
+            .ToList();
+        if (reasons.Count == 0) return null;
+        static string Purpose(string label)
+        {
+            var at = label.IndexOf(" for ", StringComparison.OrdinalIgnoreCase);
+            var rest = at >= 0 ? label[(at + 5)..] : label.StartsWith("For ", StringComparison.OrdinalIgnoreCase) ? label[4..] : label;
+            return rest.Trim().ToLowerInvariant();
+        }
+        foreach (var status in statuses)
+        {
+            var purpose = Purpose(catalog.Label(Reviews.ReviewSets.Statuses, status));
+            if (reasons.FirstOrDefault(r => Purpose(r.Label) == purpose) is { Code: { Length: > 0 } same }) return same;
+            if (catalog.Prop(Reviews.ReviewSets.Statuses, status, "executes") is { ValueKind: System.Text.Json.JsonValueKind.True }
+                && reasons.FirstOrDefault(r => catalog.Prop(TransmittalSets.Reasons, r.Code, "executes") is { ValueKind: System.Text.Json.JsonValueKind.True }) is { Code: { Length: > 0 } go })
+                return go;
+        }
+        return reasons[0].Code;
     }
 
     /// <summary>The note on a package's transmittal, naming the further reasons it goes for.</summary>

@@ -143,7 +143,12 @@ async function extract(req: Request, { params }: { params: Promise<{ kind: strin
     }
     name = "actions-baseline";
   } else if (kind === "packages") {
-    const pkgs = [...(await packagesOf(ctx, "DELIVERY")), ...(await packagesOf(ctx, "SUPPLY"))].sort((a, b) => a.number.localeCompare(b.number));
+    // One package at a time: the one ticked in the list.
+    const wanted = new URL(req.url).searchParams.get("number");
+    if (!wanted) return NextResponse.json({ error: "Tick the package to export." }, { status: 400 });
+    const pkgs = [...(await packagesOf(ctx, "DELIVERY")), ...(await packagesOf(ctx, "SUPPLY"))].filter((p) => p.number === wanted);
+    if (!pkgs.length) return NextResponse.json({ error: "No such package." }, { status: 404 });
+    name = `package-${wanted}`;
     rows = [["Package", "Title", "Type", "Purpose", "Recipient", "Completion date", "Required status", "Composition owner", "Acceptance authority", "Closed at", "Member document", "Member required status", "Member current status"]];
     for (const p of pkgs) {
       const head = [p.number, p.title ?? "", p.rule ? "ACCUMULATED" : "DEFINED", reasonsOf(p).join(","), p.names.to, p.completionDate ?? "",

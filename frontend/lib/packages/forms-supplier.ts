@@ -23,13 +23,9 @@ export async function createSupplierPackageAction(_prev: { error?: string } | un
   if (!isController(user) && !isAdmin(user)) return { error: "Document Control sets up supplier packages." };
   const partyCode = String(formData.get("partyCode") ?? "");
   const po = String(formData.get("po") ?? "").trim() || null;
-  const dueDate = String(formData.get("dueDate") ?? "");
+  // Optional: each document goes as it is asked, and is due on its own planned date.
   const requiredStatus = String(formData.get("requiredStatus") ?? "");
-  const acceptorList = formData.getAll("acceptanceAuthorityId").map(String).filter(Boolean);
   if (!partyCode) return { error: "Choose the supplier." };
-  if (!dueDate) return { error: "Give the date everything is due." };
-  if (!requiredStatus) return { error: "Choose the status the documents must reach." };
-  if (!acceptorList.length || acceptorList.includes(user.id)) return { error: "Choose who accepts the package — someone other than you." };
   const party = (await addressees(ctx)).parties.find((one) => one.code === partyCode);
   if (!party) return { error: "Unknown supplier." };
   // The backend numbers it like every package; the rule naming the supplier (and the PO) fills it.
@@ -38,8 +34,8 @@ export async function createSupplierPackageAction(_prev: { error?: string } | un
     const created = await api<PackageView>(projectPath(ctx, "/packages"), {
       body: {
         title: `${party.name}${po ? ` — ${po}` : ""}`, kind: "SUPPLY", supplierPartyId: party.id, purchaseOrder: po,
-        reason: (await supplyReason()).code, requiredStatuses: [requiredStatus], completionDate: dueDate,
-        ownerIds: [user.id], acceptorIds: acceptorList,
+        reason: (await supplyReason()).code, requiredStatuses: requiredStatus ? [requiredStatus] : [],
+        ownerIds: [user.id], acceptorIds: [],
       },
       idempotencyKey: randomUUID(),
     });

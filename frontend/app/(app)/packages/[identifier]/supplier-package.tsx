@@ -116,7 +116,7 @@ export async function SupplierPackage({ pkg }: { pkg: PackageView }) {
             <div className="min-w-0 flex-1">
               {plateCode}
               <h1 className="plate-name mt-1 min-w-0">What {org} expects from you</h1>
-              <p className="plate-meta mt-2">{mine.length} document{mine.length === 1 ? "" : "s"} &middot; everything by {fmtDate(pkg.completionDate)}</p>
+              <p className="plate-meta mt-2">{mine.length} document{mine.length === 1 ? "" : "s"}{pkg.completionDate ? <> &middot; everything by {fmtDate(pkg.completionDate)}</> : <> &middot; each by its own date</>}</p>
               <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">
                 Attach the file next to each document you send, then press Send to {org}. {org} checks it, then accepts it for review or returns it with why.
               </p>
@@ -200,7 +200,7 @@ export async function SupplierPackage({ pkg }: { pkg: PackageView }) {
             {plateCode}
             <h1 className="plate-name mt-1 min-w-0">{pkg.title ?? `From ${supplierName}`}</h1>
             <p className="plate-meta mt-2">
-              {supplierName}{pkg.purchaseOrder ? ` · order ${pkg.purchaseOrder}` : ""} &middot; {f.planned} document{f.planned === 1 ? "" : "s"} &middot; everything by {fmtDate(pkg.completionDate)} &middot; needed at <span className="font-mono font-semibold text-slate-700">{pkg.requiredStatuses.join(",")}</span>
+              {supplierName}{pkg.purchaseOrder ? ` · order ${pkg.purchaseOrder}` : ""} &middot; {f.planned} document{f.planned === 1 ? "" : "s"} {pkg.completionDate ? <> &middot; everything by {fmtDate(pkg.completionDate)}</> : <> &middot; each by its own planned date</>}{pkg.requiredStatuses.length ? <> &middot; needed at <span className="font-mono font-semibold text-slate-700">{pkg.requiredStatuses.join(",")}</span></> : null}
             </p>
             <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">
               Every document from {supplierName}{narrowed ? ` ${narrowed.replace(/^every document /, "")}` : ""} is filed here{excluded.length ? `, less ${excluded.length} taken out` : ""}. A document reaches {supplierName} only when it is sent on a transmittal; {supplierName} sends its files back from its side of this package.

@@ -480,6 +480,19 @@ the installation sets its keys.
 - **Start a review:** step tabs like the other forms, one step at a time; the documents list has a "tick all" box
   and column heads; Continue says "Tick at least one document" instead of reloading empty.
 - **Plain words:** "in force" is gone from the screens: "released", "the revision people work from", "now used".
+- **New supplier package:** no "Everything due by" (each document is due on its own planned date; the list shows
+  the next one due) and no "Accepted by" (nobody accepts a supplier's package); the status is optional.
+- **Delivery packages:** "Why they get it" is gone: the status it needs says it (the published reason with the same
+  purpose — "Issued for review" → "For review" — else one for execution when work may go ahead on that status).
+  Those putting it together only add and take out its documents (and may delete it while empty and never sent);
+  Document Control (and above) edits every field while it is open, checks readiness, asks about what is missing and
+  delivers. Documents are ticked in the list and taken out from the bar under it (the "Take documents out" step is
+  gone, replaced by the bar). The ready count stands out.
+- **What is missing from a delivery package** is asked on a transmittal (Request) to whoever accepts it. Their
+  confirmation answers it on a transmittal (Confirmation) and delivers the package at once, on their responsibility,
+  after a warning: the documents not ready go as they stand (released revision, else the newest; one with no
+  revision cannot go), and the delivery transmittal says so with their name.
+- **Packages "Export CSV"** exports the one package ticked in the list, never all of them.
 
 ## 7. Notifications and email
 

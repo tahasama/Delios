@@ -229,8 +229,18 @@ a screen only words it. A new rule goes in the backend, never in a page.
   transmitted, partly received / partly transmitted, received / transmitted,
   complete; with how many are not sent to the supplier yet. The list and the
   package page count the same way (`packageCounts`).
-- Document Control (and above) only, on supplier packages; delivery packages
-  keep their owners.
+- Document Control (and above) only, on supplier packages. A new supplier package asks the supplier and
+  its order, and a status only if wanted: no single due date (each document is due on its own planned date)
+  and nobody accepts it.
+- Delivery packages: "Needed at" (statuses) also says why they get it (`ReasonFor`, backend: the reason with
+  the same purpose, else one for execution); no separate reason is asked. Those putting it together only add
+  and take out its documents (and delete it while empty and never sent); Document Control (and above) does
+  everything else and edits every field while it is open (backend CONTROL_ONLY / OWNER_ONLY). Ticked
+  documents are taken out from the bar under the list. What is missing is asked on a transmittal (Request) to
+  whoever accepts it; their confirmation (a warning first) answers it on a transmittal (Confirmation) and
+  delivers it at once on their responsibility, the documents not ready going as they stand (released
+  revision, else the newest), said on the delivery transmittal. "Export CSV" on Packages exports the one
+  package ticked.
 - The side that does not hold it asks the holder to hand it back for an update
   (RETURN_FOR_UPDATE, with why): Document Control on our side, whoever of the
   supplier may upload on theirs. The holder accepts or refuses with why; the

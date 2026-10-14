@@ -24,9 +24,8 @@ export async function createPackageAction(_prev: { error?: string } | undefined,
   if (isReadOnly(user)) return { error: "Viewers cannot create packages." };
   const title = String(formData.get("title") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim() || null;
-  // One reason or several; the first leads its transmittals, the others are named on them.
+  // Why they get it follows the status it needs (the backend reads it); an older form may still name reasons.
   const purposes = formData.getAll("purpose").map(String).filter(Boolean);
-  const purpose = purposes[0] ?? "";
 
   // A package filled by a rule states it as a filter.
   const filter = filterFromForm(formData);
@@ -39,7 +38,6 @@ export async function createPackageAction(_prev: { error?: string } | undefined,
   const ownerList = formData.getAll("compositionOwnerId").map(String).filter(Boolean);
   const acceptorList = formData.getAll("acceptanceAuthorityId").map(String).filter(Boolean);
  if (!title) return { error: "Give the package a title." };
- if (!purpose) return { error: "Every package states a reason for issue." };
  if (!partyIds.length) return { error: "Choose who it is delivered to — another organization, or us." };
  if (!completionDate) return { error: "The completion date is required — it triggers assessment." };
  if (!requiredStatuses.length) return { error: "State the status members shall have reached." };
@@ -61,7 +59,7 @@ export async function createPackageAction(_prev: { error?: string } | undefined,
   try {
     const created = await api<PackageView>(projectPath(ctx, "/packages"), {
       body: {
-        title, description, reason: purpose, reasons: purposes, requiredStatuses, ownerIds: ownerList, acceptorIds: acceptorList, recipientPartyIds: partyIds,
+        title, description, reasons: purposes.length ? purposes : null, requiredStatuses, ownerIds: ownerList, acceptorIds: acceptorList, recipientPartyIds: partyIds,
         completionDate, kind: "DELIVERY", extras: Object.keys(extras).length ? extras : null,
         rule: isEmpty(filter) ? null : { disciplines: filter.disciplines ?? [], docTypes: filter.docTypes ?? [], originators: filter.originators ?? [], assetIds: filter.assetIds ?? [] },
       },
@@ -165,7 +163,10 @@ export async function setPackageRuleAction(_prev: { error?: string } | undefined
   return error ? { error } : {};
 }
 
-/** Rename a package, or change its description. */
+/**
+ * Change a package while it is open: name and description; for a delivery package also its date, the statuses it
+ * needs, who it goes to, who puts it together and who accepts it. Document Control (and above); the backend checks.
+ */
 export async function updatePackageAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
   const title = String(formData.get("title") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim() || null;
@@ -173,7 +174,21 @@ export async function updatePackageAction(_prev: { error?: string } | undefined,
   const number = String(formData.get("number") ?? "").trim() || null;
   const was = String(formData.get("was") ?? "");
   if (!title) return { error: "Give the package a name." };
-  const { error, number: now } = await onPackage(String(formData.get("packageId") ?? ""), "", { title, description, number }, "PUT");
+  const full = formData.get("delivery") === "1";
+  const list = (name: string) => formData.getAll(name).map(String).filter(Boolean);
+  const date = String(formData.get("completionDate") ?? "");
+  const body = full
+    ? {
+        title, description, number,
+        completionDate: date || null, clearCompletionDate: !date,
+        requiredStatuses: list("requiredStatus"), recipientPartyIds: list("recipientPartyIds"),
+        ownerIds: list("compositionOwnerId"), acceptorIds: list("acceptanceAuthorityId"),
+      }
+    : { title, description, number };
+  if (full && !body.requiredStatuses?.length) return { error: "Say the status its documents need." };
+  if (full && !body.recipientPartyIds?.length) return { error: "Say who it is delivered to." };
+  if (full && (!body.ownerIds?.length || !body.acceptorIds?.length)) return { error: "Say who puts it together and who accepts it." };
+  const { error, number: now } = await onPackage(String(formData.get("packageId") ?? ""), "", body, "PUT");
   if (error) return { error };
   if (now && was && now !== was) redirect(`/packages/${now}`);
   return {};

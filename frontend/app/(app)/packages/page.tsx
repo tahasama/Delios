@@ -32,9 +32,9 @@ export default async function PackagesPage({ searchParams }: { searchParams: Pro
   // Outside readers see the packages that concern them — theirs to deliver, or
   // addressed to them — and nothing else; the tenant client sees to that.
   const category = requested === "DELIVERY" ? "DELIVERY" : "SUPPLIER";
-  const [pkgs, reasons, statuses, users] = await Promise.all([
+  const [pkgs, statuses, users] = await Promise.all([
     packagesOf(ctx, category === "SUPPLIER" ? "SUPPLY" : "DELIVERY"),
-    getActiveSet("REASONS_FOR_ISSUE"), getActiveSet("STATUSES"),
+    getActiveSet("STATUSES"),
     // Anyone on the project may put a package together or accept it.
     ourPeople(ctx),
   ]);
@@ -45,8 +45,11 @@ export default async function PackagesPage({ searchParams }: { searchParams: Pro
   const supplierStats = new Map<string, ReturnType<typeof packageCounts>>();
   // Where each supplier's package stands as a whole, in the reader's words.
   const supplierStages = new Map<string, ReturnType<typeof packageStage>>();
+  // Each document is due on its own date: the package shows the soonest still not sent in.
+  const nextDue = new Map<string, Date | null>();
   if (category === "SUPPLIER") for (const p of pkgs) {
     const lines = await supplierRows(ctx, p);
+    nextDue.set(p.id, lines.filter((one) => one.state === "NOT_SENT" && one.due).map((one) => one.due!).sort((a, b) => a.getTime() - b.getTime())[0] ?? null);
     supplierStats.set(p.id, packageCounts(p, lines));
     supplierStages.set(p.id, packageStage(p, lines, supplierOnly ? "theirs" : "ours"));
   }
@@ -70,7 +73,13 @@ export default async function PackagesPage({ searchParams }: { searchParams: Pro
       <div className="border-b border-line px-5 pt-5 pb-2.5 sm:px-6">
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
           <h1 className="plate-title min-w-0 text-slate-950">Packages</h1>
-          <a href="/api/export/packages" className="ask inline-flex items-center gap-1.5"><Download className="h-3.5 w-3.5"/> Export CSV</a>
+          {/* One package at a time: the one ticked in the list. */}
+          {rows.length ? (
+            <form id="package-export" action="/api/export/packages" method="get" className="flex items-center gap-2">
+              <span className="text-[11px] text-slate-500">tick a package, then</span>
+              <button type="submit" className="ask inline-flex items-center gap-1.5"><Download className="h-3.5 w-3.5"/> Export CSV</button>
+            </form>
+          ) : null}
         </div>
         <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">{supplierOnly ? "What your company is asked to send, and where each document stands." : here.says.charAt(0).toUpperCase() + here.says.slice(1) + "."}</p>
         {(
@@ -85,13 +94,14 @@ export default async function PackagesPage({ searchParams }: { searchParams: Pro
       {category === "SUPPLIER" ? (
         rows.length ? (
           <DataTable className="rounded-none border-0 shadow-none" id="supplier-packages" exportName="supplier-packages" head={supplierOnly
-            ? <tr><Th>Package</Th><Th>Where it stands</Th><Th>Transmitted</Th><Th>Overdue</Th><Th>With you</Th><Th>Due</Th></tr>
-            : <tr><Th>Supplier</Th><Th>Where it stands</Th><Th>Sent to supplier</Th><Th>Received</Th><Th>Overdue</Th><Th>Held</Th><Th>Due</Th></tr>}>
+            ? <tr><Th className="w-10"><span className="sr-only">Tick</span></Th><Th>Package</Th><Th>Where it stands</Th><Th>Transmitted</Th><Th>Overdue</Th><Th>With you</Th><Th>Due</Th></tr>
+            : <tr><Th className="w-10"><span className="sr-only">Tick</span></Th><Th>Supplier</Th><Th>Where it stands</Th><Th>Sent to supplier</Th><Th>Received</Th><Th>Overdue</Th><Th>Held</Th><Th>Due</Th></tr>}>
                 {rows.map((pkg) => {
                   const f = supplierStats.get(pkg.id)!;
                   const where = supplierStages.get(pkg.id)!;
                   return (
                     <tr key={pkg.id}>
+                      <Td className="w-10"><input type="radio" name="number" value={pkg.number} form="package-export" required aria-label={`Tick ${pkg.number} to export it`} /></Td>
                       <Td><Link href={`/packages/${pkg.number}`} className="font-semibold text-brand-ink hover:underline">{pkg.title ?? pkg.names.to}</Link><span className="block font-mono text-[11px] text-slate-400">{pkg.number}</span></Td>
                       <Td className={`text-xs`}>
                         <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap ring-1 ${where.tone}`}>{where.word}</span>
@@ -101,18 +111,19 @@ export default async function PackagesPage({ searchParams }: { searchParams: Pro
                       <Td className="text-xs">{f.received} of {supplierOnly ? f.sent : f.total}</Td>
                       <Td className={`text-xs ${f.late ? "font-semibold text-red-700" : "text-slate-400"}`}>{f.late || "—"}</Td>
                       <Td className="text-xs">{supplierOnly ? f.withThem : `${f.withThem} by them · ${f.withUs} by us`}</Td>
-                      <Td className={`whitespace-nowrap text-xs`}>{fmtDate(pkg.completionDate)}</Td>
+                      <Td className={`whitespace-nowrap text-xs`}>{nextDue.get(pkg.id) ? <>next {fmtDate(nextDue.get(pkg.id)!)}</> : <span className="text-slate-400">—</span>}</Td>
                     </tr>
                   );
                 })}
           </DataTable>
         ) : <p className="px-5 py-8 text-center text-sm text-slate-400 sm:px-6">{supplierOnly ? "Nothing is expected from you yet. When documents are requested from your company they appear here." : "No supplier packages yet. One lists every document you expect from one supplier; they send from it."}</p>
       ) : rows.length ? (
-        <DataTable className="rounded-none border-0 shadow-none" id="delivery-packages" exportName="delivery-packages" head={<tr><Th>Package</Th><Th>State</Th><Th title="Ready: the document's current released revision carries the status the package asks for.">Ready</Th><Th>Due</Th><Th>Accepted by</Th></tr>}>
+        <DataTable className="rounded-none border-0 shadow-none" id="delivery-packages" exportName="delivery-packages" head={<tr><Th className="w-10"><span className="sr-only">Tick</span></Th><Th>Package</Th><Th>State</Th><Th title="Ready: the document's current released revision carries the status the package asks for.">Ready</Th><Th>Due</Th><Th>Accepted by</Th></tr>}>
               {rows.map((pkg) => {
                 const percent = pkg.total ? Math.round(pkg.ready / pkg.total * 100) : 0;
                 return (
                   <tr key={pkg.id}>
+                    <Td className="w-10"><input type="radio" name="number" value={pkg.number} form="package-export" required aria-label={`Tick ${pkg.number} to export it`} /></Td>
                     <Td><Link href={`/packages/${pkg.number}`} className="font-mono text-[13px] font-semibold text-brand-ink hover:underline">{pkg.number}</Link><span className="block max-w-80 truncate text-[13px] text-slate-800">{pkg.title ?? `Delivery to ${pkg.names.to}`}</span><span className="block max-w-80 truncate text-xs text-slate-500">to {pkg.names.to}</span></Td>
                     <Td><Status state={pkg.state}/></Td>
                     <Td><div className="flex items-center gap-2"><div className="h-1.5 w-20 overflow-hidden rounded-full bg-canvas-deep"><div className={`h-full rounded-full ${percent === 100 ? "bg-emerald-500" : "bg-[#d9a441]"}`} style={{ width: `${percent}%` }}/></div><span className="text-xs text-slate-600">{pkg.ready} of {pkg.total} at {pkg.requiredStatuses.join(" or ")}<Info>{pkg.requiredStatuses.map((code) => `${code} — ${statusMeaning.get(code) ?? code}`).join("\n")}</Info></span></div></Td>
@@ -136,11 +147,9 @@ export default async function PackagesPage({ searchParams }: { searchParams: Pro
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Field label="Supplier" required><select name="partyCode" required className={inputCls} defaultValue=""><option value="" disabled>Choose…</option>{parties.filter((p) => !p.isInternal).map((p) => <option key={p.id} value={p.code}>{p.name}</option>)}</select></Field>
               <Field label="PO" hint="optional — one package per PO"><input name="po" className={inputCls} /></Field>
-              <Field label="Everything due by" required><input type="date" name="dueDate" required className={inputCls} /></Field>
-              <Field label="Needed at status" required><select name="requiredStatus" required className={inputCls} defaultValue=""><option value="" disabled>Choose…</option>{statuses.map((item) => <option key={item.code} value={item.code}>{item.code} · {item.label}</option>)}</select></Field>
-              <SearchPick name="acceptanceAuthorityId" required label="Accepted by" hint="one or several, not you — any one of them accepts" items={users.filter((u) => u.id !== user.id).map((person) => ({ id: person.id, name: person.name }))} />
+              <Field label="Needed at status" hint="optional — each document goes as it is asked"><select name="requiredStatus" className={inputCls} defaultValue=""><option value="">None</option>{statuses.map((item) => <option key={item.code} value={item.code}>{item.code} · {item.label}</option>)}</select></Field>
             </div>
-            <p className="text-[11px] text-slate-500">Every placeholder whose supplier is this company is in the package automatically.</p>
+            <p className="text-[11px] text-slate-500">Every placeholder whose supplier is this company is in the package automatically. Each document is due on its own planned date.</p>
           </ActionForm>
         </div>
       </details>
@@ -166,9 +175,8 @@ export default async function PackagesPage({ searchParams }: { searchParams: Pro
               </Asked>
               <Added fields={packagePolicy.own} />
               <SearchPick browse name="recipientPartyIds" required label="Delivered to" hint="one or several — us too, for an internal handover" items={parties.map((p) => ({ id: p.id, name: p.isInternal ? `${p.name} (us)` : p.name }))} />
-              <SearchPick browse name="purpose" required label="Why they get it" hint="one or several" items={reasons.map((item) => ({ id: item.code, name: item.label, detail: item.code }))} />
-              <SearchPick browse name="requiredStatus" required label="Needed at" hint="one or several — ready at any of them" items={statuses.map((item) => ({ id: item.code, name: item.code, detail: item.label }))} />
-              <SearchPick name="compositionOwnerId" required label="Put together by" hint="one or several" items={users.map((person) => ({ id: person.id, name: person.name, detail: person.functionName }))} />
+              <SearchPick browse name="requiredStatus" required label="Needed at" hint="one or several — ready at any of them; it also says why they get it on the transmittal" items={statuses.map((item) => ({ id: item.code, name: item.code, detail: item.label }))} />
+              <SearchPick name="compositionOwnerId" required label="Put together by" hint="one or several — they add and take out its documents; Document Control does the rest" items={users.map((person) => ({ id: person.id, name: person.name, detail: person.functionName }))} />
               <SearchPick name="acceptanceAuthorityId" required label="Accepted by" hint="one or several, not those putting it together — any one of them accepts at the end and decides on anything missing" items={users.map((person) => ({ id: person.id, name: person.name, detail: person.functionName }))} />
             </div>
             <div className="rounded-md bg-tint-soft px-3 py-2.5 ring-1 ring-line">

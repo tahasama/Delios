@@ -28,7 +28,7 @@ public static class ActionLetters
     /// </summary>
     public static async Task<Transmittal?> SendAsync(DeliosDbContext db, TransmittalService transmittals, IClock clock, Project project, Actor actor,
         string reason, string subject, string message, IEnumerable<Guid> to, IEnumerable<Guid> copies, Guid? inReplyToId,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, Guid? packageId = null)
     {
         var addressed = to.Where(id => id != Guid.Empty && id != actor.Id).Distinct().ToList();
         var copied = copies.Where(id => id != Guid.Empty && id != actor.Id && !addressed.Contains(id)).Distinct().ToList();
@@ -60,6 +60,6 @@ public static class ActionLetters
             }
         }
         return await transmittals.RaiseAsync(new TransmittalService.Raise(project, actor, reason, subject, message, null,
-            "Internal distribution", [], recipients, InReplyToId: inReplyToId), cancellationToken);
+            "Internal distribution", [], recipients, InReplyToId: inReplyToId, PackageId: packageId), cancellationToken);
     }
 }
