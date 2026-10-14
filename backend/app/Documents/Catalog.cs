@@ -85,6 +85,10 @@ public sealed class Catalog
                     && d.ValueKind == JsonValueKind.True)?.Code
             : null;
 
+    /// <summary>The first active value in the published order: for confidentiality, the lowest level (ranks follow that order).</summary>
+    public string? LowestOf(string setKey) =>
+        _sets.TryGetValue(setKey, out var set) ? set.Values.Where(v => v.Status == ValueStatus.Active).OrderBy(v => v.Sort).FirstOrDefault()?.Code : null;
+
     /// <summary>The organization's words that, alone, make a title generic.</summary>
     public IReadOnlySet<string> GenericTitleWords() =>
         _sets.TryGetValue(ValueSets.GenericTitleWords, out var set)

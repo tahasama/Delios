@@ -49,6 +49,9 @@ export default async function ActionDetailPage({ params, searchParams }: { param
 
   const depts = departmentsOf(action);
   const control = ctx.can("CONTROL");
+  // Another organization's people read the same page, narrowed by the backend to their own documents; the
+  // disciplines, confirmations and notes about the action are ours.
+  const inside = ctx.user.isInternal;
   // Only administrators read the audit trail, so only they are sent to it.
   const me = { department: ctx.user.department ?? null };
   const entries = dept ? action.needs.filter((e) => e.department === dept) : action.needs;
@@ -56,7 +59,7 @@ export default async function ActionDetailPage({ params, searchParams }: { param
   // note about what was decided.
   const lateness = await latenessOf(ctx, action.id);
   // Left out by the organization: the notes already written are still read.
-  const mayNote = !(await actIsOff(ctx, "ACTION_NOTE")) && !(await carrierRefusal(ctx, "ACTION_NOTE", { control, standing: true }));
+  const mayNote = inside && !(await actIsOff(ctx, "ACTION_NOTE")) && !(await carrierRefusal(ctx, "ACTION_NOTE", { control, standing: true }));
   // The latest schedule read moved its dates: said once, under the date.
   const moved = movedPhrase(action.moved, action.start, action.finish);
   const readyCount = action.needs.filter((e) => e.state === "MET").length;
@@ -67,11 +70,11 @@ export default async function ActionDetailPage({ params, searchParams }: { param
   const everything = action.needs.length > 0 && readyCount === action.needs.length;
   const readiness = action.state;
   // A department is a discipline: the people whose membership names one of them.
-  const people = await holders(ctx.projectId, "READ").catch(() => []);
+  const people = inside ? await holders(ctx.projectId, "READ").catch(() => []) : [];
   // Manual notices: Document Control, or whoever plans the project. Each discipline's panel counts every notice
   // sent about this action to that discipline, the automatic ones included.
-  const mayNotify = mayUploadLists(ctx.user.verbs);
-  const notices = await noticesAbout(ctx, `activity:${action.id}:`);
+  const mayNotify = inside && mayUploadLists(ctx.user.verbs);
+  const notices = inside ? await noticesAbout(ctx, `activity:${action.id}:`) : [];
   const pickPeople = people.map((one) => ({ id: one.id, name: one.name, detail: one.department ? deptLabel(one.department) : one.functionName }));
   // A document a supplier owes: that supplier's people are recommended for the notice, and chosen.
   const book = await addressees(ctx);
@@ -83,7 +86,7 @@ export default async function ActionDetailPage({ params, searchParams }: { param
       people: book.people.filter((one) => one.organization === p.name),
     }));
   // Asking for a document the list missed: a transmittal to Document Control, the file attached there.
-  const controllers = await holders(ctx.projectId, "CONTROL").catch(() => []);
+  const controllers = inside ? await holders(ctx.projectId, "CONTROL").catch(() => []) : [];
   const requestHref = (department: string) => `/transmittals/new?${new URLSearchParams({
     reason: "INFORMATION",
     activity: action.id,
@@ -113,11 +116,11 @@ export default async function ActionDetailPage({ params, searchParams }: { param
 
   // The requests about this action not yet answered: Document Control sees them all; whoever is asked to
   // confirm one sees that one, at the top of the page.
-  const requests = await activityRequests(ctx, action.id);
+  const requests = inside ? await activityRequests(ctx, action.id) : [];
   const asks: Ask[] = control ? requests : [];
   const mine = requests.filter((one) => one.checkedAt && one.confirmerId === ctx.user.id);
   // Who may be asked to confirm: everyone on the project, those holding Manage first and marked so.
-  const managers = new Set((await holders(ctx.projectId, "MANAGE").catch(() => [])).map((one) => one.id));
+  const managers = new Set((inside ? await holders(ctx.projectId, "MANAGE").catch(() => []) : []).map((one) => one.id));
   const confirmers = book.people
     .map((one) => ({ id: one.id, name: one.name, detail: [managers.has(one.id) ? "Manage · recommended" : null, one.organization, one.function].filter(Boolean).join(" · ") }))
     .sort((a, b) => Number(managers.has(b.id)) - Number(managers.has(a.id)) || a.name.localeCompare(b.name));
@@ -211,7 +214,7 @@ export default async function ActionDetailPage({ params, searchParams }: { param
         rows={needed}
         together={together}
         exportHref={`/api/export/baseline?ids=${action.id}`}
-        empty={depts.length ? undefined : "Tag the disciplines first, under Disciplines and documents."}
+        empty={depts.length || !inside ? undefined : "Tag the disciplines first, under Disciplines and documents."}
         chips={depts.length > 1 ? (
           <>
             <Link href={`/actions/${action.code}`} className={`facet ${!dept ? "font-semibold text-brand-ink" : ""}`}>All</Link>
@@ -292,6 +295,7 @@ export default async function ActionDetailPage({ params, searchParams }: { param
       {/* Who is concerned and what was decided, with the progress beside them. */}
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_280px]">
         <div className="space-y-4">
+        {inside ? (
         <section id="confirm" className="register register-sheet register-sheet-open">
           <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
             <span className="stencil mr-1 text-slate-500">Disciplines concerned</span>
@@ -454,6 +458,7 @@ export default async function ActionDetailPage({ params, searchParams }: { param
             </p>
           ) : null}
         </section>
+        ) : null}
 
           {control ? (
             <LinksCard
@@ -468,6 +473,8 @@ export default async function ActionDetailPage({ params, searchParams }: { param
             />
           ) : null}
 
+          {/* Went ahead, and the notes about it, are ours; Progress says whether the work happened or was postponed. */}
+          {inside ? (
           <ActionNotes
             notes={action.decisions}
             actionId={action.id}
@@ -481,13 +488,14 @@ export default async function ActionDetailPage({ params, searchParams }: { param
             postponeCodes={postponeCodes}
             people={(await addressees(ctx)).people.map((one) => ({ id: one.id, name: one.name, detail: [one.organization, one.function].filter(Boolean).join(" · ") }))}
           />
+          ) : null}
         </div>
 
         <aside>
         <Card title="Progress">
           <Timeline
             points={[
-              { label: "Disciplines tagged", done: depts.length > 0, at: null, holder: depts.length ? depts.map(deptLabel).join(", ") : "nobody yet" },
+              ...(inside ? [{ label: "Disciplines tagged", done: depts.length > 0, at: null, holder: depts.length ? depts.map(deptLabel).join(", ") : "nobody yet" }] : []),
               { label: "Documents listed", done: action.needs.length > 0, at: null, holder: action.needs.length ? `${action.needs.length} document${action.needs.length === 1 ? "" : "s"}` : "none listed" },
               // Ready, or when the first one is due: the due date is not a step of its own,
               // so a point never shows open between two that are done.
@@ -496,9 +504,9 @@ export default async function ActionDetailPage({ params, searchParams }: { param
                 : { label: "Every document ready", at: firstDue, planned: !!firstDue && firstDue > new Date(),
                     holder: `${readyCount} of ${action.needs.length} ready${firstDue && firstDue < new Date() ? ` · the first was due ${fmtDate(firstDue)}` : ""}` },
               // Confirmed as the card says: by hand, or automatically when every document is released at its status.
-              { label: "Disciplines confirmed", done: depts.length > 0 && confirmedDepts.length === depts.length,
+              ...(inside ? [{ label: "Disciplines confirmed", done: depts.length > 0 && confirmedDepts.length === depts.length,
                 at: depts.length > 0 && confirmedDepts.length === depts.length ? confirmedAt : null,
-                holder: `${confirmedDepts.length} of ${depts.length}` },
+                holder: `${confirmedDepts.length} of ${depts.length}` }] : []),
               // A schedule's date passing is the work happening. Only Document
               // Control saying otherwise — a note that the work was postponed —
               // takes that back.
@@ -506,7 +514,7 @@ export default async function ActionDetailPage({ params, searchParams }: { param
                 label: postponed ? "The work was postponed" : happened ? "The work happened" : "The work happens",
                 at: action.start,
                 planned: !happened && !postponed,
-                holder: postponed ? `${postponed.responsibleName}: ${postponed.reason}` : null,
+                holder: postponed && inside ? `${postponed.responsibleName}: ${postponed.reason}` : null,
               },
             ]}
           />

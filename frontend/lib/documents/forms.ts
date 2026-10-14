@@ -5,7 +5,7 @@ import { requireScope } from "@/lib/core/scope";
 import { isEmptyTitle } from "@/lib/core/standard";
 import { revalidatePath } from "next/cache";
 import { mayCreateDocument } from "@/lib/core/auth";
-import { getActiveSet, getSet } from "@/lib/settings/config";
+import { getActiveSet } from "@/lib/settings/config";
 import { fieldRules, missingRequired, ownFields, takeExtras } from "@/lib/settings/field-policy";
 import { api, projectPath, refusal } from "@/lib/client";
 import { backendDocument } from "@/lib/documents/api";
@@ -41,14 +41,12 @@ export async function createDocumentAction(_prev: { error?: string } | undefined
 
   const schemeSets: Record<string, string> = {
     Subproject: "SUBPROJECTS",
-    "Supplier code": "SUPPLIER_CODES",
     "Purchase order": "PURCHASE_ORDERS",
     Discipline: "DISCIPLINES",
     "Document type": "DOCUMENT_TYPES",
   };
   const fieldValues: Record<string, string> = {
     Subproject: subProject ?? "",
-    "Supplier code": originator ?? "",
     "Purchase order": contractRef ?? "",
     Discipline: discipline,
     "Document type": docType,
@@ -63,24 +61,7 @@ export async function createDocumentAction(_prev: { error?: string } | undefined
   }
 
 
-  // C.3.3 — the published type-to-field matrix decides which conditional fields this type requires
-  const matrixRows = await getSet("DELIVERABLE_TYPE_FIELDS");
-  const matrix = matrixRows.find((m) => m.code === deliverableType);
-  const req = (f: string): "required" | "optional" | "na" => {
-    if (!matrix) return externalList().includes(deliverableType) ? (f === "originator" || f === "receivedDate" ? "required" : "optional") : "optional";
-    return (matrix.props[f] as "required" | "optional" | "na") ?? "optional";
-  };
-  function externalList() {
-    return ["CTR", "VND", "TPY", "CLT"];
-  }
-  const missingConditional: string[] = [];
- const enforceNow = externalList().includes(deliverableType); // supplier metadata complete at submission; internal placeholders may stay empty
-  if (enforceNow && req("originator") === "required" && !originator) missingConditional.push("supplier / originator");
-  if (enforceNow && req("po") === "required" && !contractRef) missingConditional.push("contract / PO");
-  if (enforceNow && req("receivedDate") === "required" && !receivedDate) missingConditional.push("date received");
-  if (missingConditional.length) {
- return { error: `A document from another party needs ${missingConditional.join(" and ")} before it can be registered.` };
-  }
+  // What the deliverable type insists on (who it comes from, under which order) is checked by the backend, once.
 
   // What this organization has said its own form insists on. The screen asks
   // for exactly these, but the screen is not the gate: an importer, a script or

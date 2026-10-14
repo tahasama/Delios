@@ -428,6 +428,15 @@ the installation sets its keys.
   (rejected, or released with comments) tells the supplier's people and is on their Home. The menu reads
   "Schedule & actions" for everyone.
 
+- **Schedule & actions is the same page for everyone.** Another organization's people open it from the same
+  menu entry and see the actions that need their documents (their own, and those shared with them), each
+  with only those documents; not our disciplines, confirmations, notices or notes. The separate supplier page
+  ("Where your documents are needed") is gone: its address opens Schedule & actions.
+- **Creating a document from another organization** (deliverable types that require the originator, e.g.
+  Supplier document) asks whose it is and its order. It no longer asks when it was received: that is filled
+  when its first submission comes in. "Who may see it" starts at the lowest level. The new demo calls the
+  type "Supplier document" (an existing organization renames it in Settings → Deliverable types).
+
 ## 7. Notifications and email
 
 - Notifications are kept and shown in the bell and on the Notifications page; opening the page reads

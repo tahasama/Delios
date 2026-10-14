@@ -63,8 +63,7 @@ public static partial class ScheduleEndpoints
         var activities = await db.Activities.AsNoTracking().Include(a => a.Requirements)
             .Where(a => a.ProjectId == access.Project.Id && a.State == ActivityStates.Active)
             .OrderBy(a => a.Start).ThenBy(a => a.Code).Take(2000).ToListAsync(cancellationToken);
-        return Results.Ok(new PlanView(await VersionInForceAsync(db, access.Project.Id, cancellationToken),
-            await PlanActionsAsync(db, clock, access.Project, activities, cancellationToken)));
+        return Results.Ok(await ViewAsync(db, clock, access, activities, cancellationToken));
     }
 
     /// <summary>GET /plan/{code}: one action by its code, also one the schedule has since dropped.</summary>
@@ -75,8 +74,19 @@ public static partial class ScheduleEndpoints
             .Where(a => a.ProjectId == access.Project.Id && a.Code == code)
             .OrderBy(a => a.State == ActivityStates.Active ? 0 : 1).FirstOrDefaultAsync(cancellationToken);
         if (activity is null) return NotFound();
-        return Results.Ok(new PlanView(await VersionInForceAsync(db, access.Project.Id, cancellationToken),
-            await PlanActionsAsync(db, clock, access.Project, [activity], cancellationToken)));
+        var view = await ViewAsync(db, clock, access, [activity], cancellationToken);
+        return view.Actions.Count == 0 ? NotFound() : Results.Ok(view);
+    }
+
+    /// <summary>The plan as this reader sees it: whole for our people, narrowed for another organization's.</summary>
+    private static async Task<PlanView> ViewAsync(DeliosDbContext db, IClock clock, ProjectAccess access, List<Activity> activities,
+        CancellationToken cancellationToken)
+    {
+        var visible = await OutsideViewAsync(db, access, cancellationToken);
+        if (visible is not null) activities = Narrow(activities, visible);
+        var actions = await PlanActionsAsync(db, clock, access.Project, activities, cancellationToken);
+        return new PlanView(await VersionInForceAsync(db, access.Project.Id, cancellationToken),
+            visible is null ? actions : actions.Select(ForOutside).ToList());
     }
 
     /// <summary>The label of the schedule read in force ("rev B"), or null when none was read.</summary>

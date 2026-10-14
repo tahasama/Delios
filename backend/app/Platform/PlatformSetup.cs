@@ -346,7 +346,6 @@ public static class PlatformSetup
             Extraction.ExtractionEndpoints.MapExtractionEndpoints(app);
             Checks.CheckEndpoints.MapCheckEndpoints(app);
             Actions.ScheduleEndpoints.MapScheduleEndpoints(app);
-            Actions.SupplierSchedule.MapSupplierSchedule(app);
             Actions.ListUploadEndpoints.MapListUploadEndpoints(app);
             Audit.ActivityEndpoints.MapActivityEndpoints(app);
             Settings.SettingEndpoints.MapSettingEndpoints(app);

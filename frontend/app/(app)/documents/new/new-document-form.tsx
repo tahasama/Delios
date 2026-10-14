@@ -11,7 +11,7 @@ import { isEmptyTitle } from "@/lib/core/standard";
 import type { OwnField } from "@/lib/settings/field-policy";
 import { OwnFields } from "./own-fields";
 
-type Opt = { code: string; label: string; meaning?: string | null; appliesTo?: string | null; deliverables?: string[] | null; criticality?: string | null; decides?: string | null; record?: boolean };
+type Opt = { code: string; label: string; meaning?: string | null; appliesTo?: string | null; deliverables?: string[] | null; criticality?: string | null; decides?: string | null; record?: boolean; required?: string[] | null };
 
 
 const STEPS = ["What it is", "How it is described"];
@@ -78,7 +78,14 @@ export function NewDocumentForm({
    */
   const asks = (key: string) => fields[key] !== "OFF";
   const must = (key: string, byNumber = false) => byNumber || fields[key] === "REQUIRED";
-  const external = producer === "CTR" || producer === "VND" || producer === "TPY" || producer === "CLT";
+  // From another organization: the deliverable type says it insists on who it comes from (Settings, on the type).
+  const producerRequires = deliverableTypes.find((o) => o.code === producer)?.required ?? [];
+  const external = producer === "CTR" || producer === "VND" || producer === "TPY" || producer === "CLT" || producerRequires.includes("originator");
+  const [originator, setOriginator] = useState("");
+  // Who may see it starts at the lowest level for a document another organization shares with us, unless chosen.
+  const [ownLevel, setOwnLevel] = useState(false);
+  const shownLevel = ownLevel || !external ? confidentiality : confidentialities[0]?.code ?? confidentiality;
+  const originatorLabel = suppliers.find((o) => o.code === originator)?.label ?? null;
   const docTypeLabel = docTypes.find((t) => t.code === docType)?.label ?? docType;
   // The type recommends a criticality; it is filled in until the person chooses one themselves.
   const recommended = criticalities.find((o) => o.code === docTypes.find((t) => t.code === docType)?.criticality) ?? null;
@@ -246,23 +253,23 @@ export function NewDocumentForm({
             ) : null}
             {external ? (
               <>
-                {asks("originator") || needs("SUPPLIER_CODES") ? (
-                  <Ask label={labels["originator"]} required={must("originator", needs("SUPPLIER_CODES"))}>
-                    <select name="originator" required={must("originator", needs("SUPPLIER_CODES"))} className={field} defaultValue="">
-                      <option value="" disabled={must("originator", needs("SUPPLIER_CODES"))}>{must("originator", needs("SUPPLIER_CODES")) ? "Choose…" : "—"}</option>
-                      {suppliers.map((o) => <option key={o.code} value={o.code}>{o.label}</option>)}
-                    </select>
-                  </Ask>
-                ) : null}
-                {asks("contractRef") || needs("PURCHASE_ORDERS") ? (
-                  <Ask label={labels["contractRef"]} required={must("contractRef", needs("PURCHASE_ORDERS"))}>
-                    <select name="contractRef" required={must("contractRef", needs("PURCHASE_ORDERS"))} className={field} defaultValue="">
-                      <option value="" disabled={must("contractRef", needs("PURCHASE_ORDERS"))}>{must("contractRef", needs("PURCHASE_ORDERS")) ? "Choose…" : "—"}</option>
+                {/* Whose document it is: always asked of a document from another organization. */}
+                <Ask label={labels["originator"]} required hint="the organization it comes from">
+                  <select name="originator" required className={field} value={originator} onChange={(e) => setOriginator(e.target.value)}>
+                    <option value="" disabled>Choose…</option>
+                    {suppliers.map((o) => <option key={o.code} value={o.code}>{o.label} ({o.code})</option>)}
+                  </select>
+                </Ask>
+                {asks("contractRef") || needs("PURCHASE_ORDERS") || producerRequires.includes("contractRef") ? (
+                  <Ask label={labels["contractRef"]} required={must("contractRef", needs("PURCHASE_ORDERS") || producerRequires.includes("contractRef"))}>
+                    <select name="contractRef" required={must("contractRef", needs("PURCHASE_ORDERS") || producerRequires.includes("contractRef"))} className={field} defaultValue="">
+                      <option value="" disabled={must("contractRef", needs("PURCHASE_ORDERS") || producerRequires.includes("contractRef"))}>{must("contractRef", needs("PURCHASE_ORDERS") || producerRequires.includes("contractRef")) ? "Choose…" : "—"}</option>
                       {pos.map((o) => <option key={o.code} value={o.code}>{o.code} — {o.label}</option>)}
                     </select>
                   </Ask>
                 ) : null}
-                {asks("receivedDate") ? (
+                {/* When it was received is asked only of what has arrived; otherwise it is filled when it comes in. */}
+                {received && asks("receivedDate") ? (
                   <Ask label={labels["receivedDate"]} required={must("receivedDate")}>
                     <input type="date" name="receivedDate" required={must("receivedDate")} className={field} defaultValue={received ? new Date().toISOString().slice(0, 10) : undefined} />
                   </Ask>
@@ -291,10 +298,11 @@ export function NewDocumentForm({
             </Ask>
             {asks("confidentiality") ? (
             <Ask label={labels["confidentiality"]} required={must("confidentiality")}>
-              <select name="confidentiality" className={field} value={confidentiality} onChange={(e) => setConfidentiality(e.target.value)}>
+              <select name="confidentiality" className={field} value={shownLevel} onChange={(e) => { setConfidentiality(e.target.value); setOwnLevel(true); }}>
                 {confidentialities.map((o) => <option key={o.code} value={o.code}>{o.label}</option>)}
               </select>
-              {meaningOf(confidentialities, confidentiality) ? <span className="mt-1 block text-[11px] text-slate-500">{meaningOf(confidentialities, confidentiality)}</span> : null}
+              {meaningOf(confidentialities, shownLevel) ? <span className="mt-1 block text-[11px] text-slate-500">{meaningOf(confidentialities, shownLevel)}</span> : null}
+              {external ? <span className="mt-1 block text-[11px] text-slate-500">Shared with {originatorLabel ?? "the organization it comes from"} once it is sent to them or comes from them.</span> : null}
             </Ask>
             ) : null}
             {asks("retentionClass") ? (

@@ -24,6 +24,8 @@ export async function PlanCards({ from = null, to = null }: { from?: Date | null
   // Under each list stage: the revision in force, linked to its document, that it was uploaded
   // directly, or that there is none.
   const inForce = (kind: string) => {
+    // The lists are ours: another organization's people see only what they need, under the last stage.
+    if (!ctx.user.isInternal) return null;
     const list = lists.find((one) => one.kind === kind);
     // Uploaded here without a document, after any document's read: that is what is in force.
     if (list?.direct) {

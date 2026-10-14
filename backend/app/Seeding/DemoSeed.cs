@@ -190,7 +190,7 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
             ("PRO", "Procedure", new { criticality = "B" }), ("REP", "Report", new { criticality = "C" }), ("LST", "List", new { criticality = "C" }));
         Set(ValueSets.DeliverableTypes,
             ("ENG", "Engineering Document", null),
-            ("SUP", "Supplier Data", new { required = new[] { "originator", "contractRef", "receivedDate" } }));
+            ("SUP", "Supplier document", new { required = new[] { "originator", "contractRef" } }));
         if (demo)
         {
             Set(ValueSets.Subprojects, ("00", "Project-wide", null), ("10", "General", null), ("20", "Inlet works", null));

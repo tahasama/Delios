@@ -16,6 +16,43 @@ public static partial class ScheduleEndpoints
 {
     // ── Helpers ───────────────────────────────────────────────────────────────
 
+    /// <summary>
+    /// Everyone reads the same schedule, narrowed to what is theirs. Our own people: every action. Another
+    /// organization's people: the documents they may see (their own, and those shared with them), or null for ours.
+    /// </summary>
+    private static async Task<HashSet<Guid>?> OutsideViewAsync(DeliosDbContext db, ProjectAccess access, CancellationToken cancellationToken)
+    {
+        if (access.IsInternal) return null;
+        var catalog = await Catalog.LoadAsync(db, cancellationToken);
+        return (await DocumentQueries.Visible(db, access, catalog.RestrictedLevels()).Select(d => d.Id).ToListAsync(cancellationToken)).ToHashSet();
+    }
+
+    /// <summary>
+    /// The actions another organization is involved in: those needing a document it may see, each with only those
+    /// documents. Our disciplines are ours, so none is shown. The activities are read untracked: nothing is saved.
+    /// </summary>
+    private static List<Activity> Narrow(List<Activity> activities, HashSet<Guid> visible)
+    {
+        foreach (var activity in activities)
+        {
+            activity.Requirements = activity.Requirements.Where(r => visible.Contains(r.DocumentId)).ToList();
+            activity.NeedCount = activity.Requirements.Count;
+            activity.Departments = [];
+        }
+        return activities.Where(a => a.Requirements.Count > 0).ToList();
+    }
+
+    /// <summary>What another organization reads of an action: its decisions without who decided or why, and no confirmations of ours.</summary>
+    private static PlanAction ForOutside(PlanAction action) => action with
+    {
+        Confirmations = [],
+        Decisions = action.Decisions.Select(d => d with
+        {
+            ResponsibleName = "", Reason = "", DelayOwedBy = null, DelayReason = null, RecordedBy = "",
+            ConfirmedBy = null, ConfirmNote = null, ReversedBy = null, ReversedReason = null,
+        }).ToList(),
+    };
+
     /// <summary>True when the caller may waive or un-waive this need: Document Control, or an active member of the department that owns the need.</summary>
     private static async Task<bool> MayWaiveAsync(DeliosDbContext db, ProjectAccess access, Requirement need, CancellationToken cancellationToken) =>
         access.Holds(Verbs.Control)

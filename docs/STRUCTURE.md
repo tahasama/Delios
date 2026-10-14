@@ -92,7 +92,7 @@ frontend/
 │   │   ├── reviews/
 │   │   ├── transmittals/ + exposures/
 │   │   ├── packages/
-│   │   ├── actions/      + needed/ (the supplier's view of the schedule)
+│   │   ├── actions/      the schedule, the same page for everyone (+ needed/: an old address, redirects)
 │   │   ├── assets/
 │   │   ├── conformance/  + reports/
 │   │   ├── notifications/

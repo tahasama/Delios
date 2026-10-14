@@ -120,6 +120,11 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - A withdrawn review is closed: no advice, verdict or comment can be given on
   it. Its progress ends at "Withdrawn"; a release comes from a later review.
 
+- A document from another organization (its deliverable type names "originator" among
+  what it requires, Settings, on the type) asks whose it is (the outside organizations,
+  as the backend checks) and its order; never its received date, which is filled when
+  its first submission comes in (asked only when registering what arrived). "Who may see
+  it" starts at the lowest level for it, unless chosen.
 - Creating a document takes the same two optional files as a revision: a PDF
   and a native file. The project code comes from the project the user is in
   and is always in the Settings list of project codes (added there automatically);
@@ -236,12 +241,12 @@ a screen only words it. A new rule goes in the backend, never in a page.
   document Details, package lines, the supplier's schedule; `plannedState`):
   ready (released), submitted (received, accepted, in review), overdue · N
   days, due today, at risk · N days left (inside the risk window), in N days.
-- A supplier sees, of our schedule, only "Where your documents are needed"
-  (`/needed`, in its menu as "Schedule & actions" like ours; `/supplier-schedule`): the actions that
-  need its documents, and in each only its own documents, with their stamps
-  in its words and the planned-date state. Never other documents,
-  disciplines, confirmations, notices, or why an action moved; a postponed one
-  reads "date to be confirmed". Our schedule pages stay ours.
+- Schedule & actions is one page for everyone, narrowed by the backend to what is
+  theirs (`OutsideViewAsync` / `Narrow` in `ScheduleEndpoints`): our people see every
+  action; another organization's people see the actions needing a document they may
+  see (their own, and those shared with them), and in each only those documents. Our
+  disciplines, confirmations, notices and notes are ours: not shown to them; a
+  decision reads without who or why. `/needed` only redirects to `/actions`.
 - A notice about a supplier's missing document proposes that supplier's
   people (chosen, marked recommended); they are sent to the document, since
   the schedule is ours only.

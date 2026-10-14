@@ -179,8 +179,12 @@ public sealed class IncomingService(
             if (problem is not null) return (null, problem);
             // Sent to us: ours to check and review; they change it again only once it is handed back.
             // Changed on the document as loaded (the one the revision just updated), saved with the rest.
-            if (document.WithSupplier is not null && await db.Documents.FindAsync([document.Id], cancellationToken) is { } held)
-                held.WithSupplier = false;
+            if (await db.Documents.FindAsync([document.Id], cancellationToken) is { } held)
+            {
+                if (held.WithSupplier is not null) held.WithSupplier = false;
+                // When it was received is known only now: the day its first submission came in.
+                held.ReceivedDate ??= transmittal.IssuedAt.InZone(DateTimeZoneProviders.Tzdb[access.Project.TimeZone]).Date;
+            }
             transmittal.Items.Add(Item(transmittal, TransmittalItemKinds.Submission, document, revision!, status, revision!.Submission));
         }
 

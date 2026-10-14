@@ -297,6 +297,7 @@ public static partial class ScheduleEndpoints
         var activity = await db.Activities.AsNoTracking().Include(a => a.Requirements)
             .SingleOrDefaultAsync(a => a.Id == activityId && a.ProjectId == access.Project.Id, cancellationToken);
         if (activity is null) return NotFound();
+        if (await OutsideViewAsync(db, access, cancellationToken) is { } visible && Narrow([activity], visible).Count == 0) return NotFound();
         var result = new List<NeedLateness>();
         // Before a review starts, the route it will take is the one that serves the document: its days are what
         // sending for review has to leave before the day the document is needed.

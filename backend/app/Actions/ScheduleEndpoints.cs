@@ -111,11 +111,20 @@ public static partial class ScheduleEndpoints
                 && access.Holds(Verbs.Read)
                 ? await next(context)
                 : Problems.Forbidden("SCHEDULE_NOT_ALLOWED", "The schedule is read by the project's own people."));
+        // The plan and an action's page are read by everyone on the project, each narrowed to what is theirs.
+        var everyone = app.MapGroup("/api/projects/{projectId:guid}").WithTags("Schedule")
+            .AddEndpointFilter<TransactionFilter>()
+            .AddEndpointFilter<ProjectAccessFilter>()
+            .AddEndpointFilter(async (context, next) => ProjectAccessFilter.Of(context.HttpContext) is { } access
+                && (!access.IsInternal || access.Holds(Verbs.Read))
+                ? await next(context)
+                : Problems.Forbidden("SCHEDULE_NOT_ALLOWED", "You do not read the schedule on this project."));
+        everyone.MapGet("/plan", PlanAsync);
+        everyone.MapGet("/plan/{code}", PlanActionAsync);
+        everyone.MapGet("/activities/{activityId:guid}/lateness", LatenessAsync);
         project.MapGet("/schedule", SourceAsync);
         project.MapPut("/schedule", SetSourceAsync);
         project.MapPost("/schedule/import", ImportAsync);
-        project.MapGet("/plan", PlanAsync);
-        project.MapGet("/plan/{code}", PlanActionAsync);
         project.MapGet("/activities", ActivitiesAsync);
         project.MapGet("/activities/{activityId:guid}", ActivityAsync);
         project.MapPost("/activities/{activityId:guid}/needs", AddNeedAsync);
@@ -128,7 +137,6 @@ public static partial class ScheduleEndpoints
         project.MapPost("/notices", SendNoticeAsync);
         project.MapPost("/activities/{activityId:guid}/decisions/{decisionId:guid}/confirm", ConfirmPostponementAsync);
         project.MapPost("/activities/{activityId:guid}/decisions/{decisionId:guid}/reverse", ReverseDecisionAsync);
-        project.MapGet("/activities/{activityId:guid}/lateness", LatenessAsync);
         project.MapPost("/transmittals/{transmittalId:guid}/activity-answer", AnswerActivityAskAsync);
         project.MapGet("/activities/{activityId:guid}/requests", ActivityRequestsAsync);
         project.MapPost("/activities/{activityId:guid}/departments/own", AddOwnDepartmentAsync);

@@ -41,7 +41,11 @@ public sealed class DocumentService(
         if (Titles.IsGeneric(title, catalog.GenericTitleWords()))
             return Fail(Problems.Invalid("TITLE_GENERIC",
                 "The title only repeats the document type. Say what it shows, and of what.", new { title }));
-        var confidentiality = Blank(request.Confidentiality) ?? catalog.DefaultOf(ValueSets.Confidentiality);
+        // A document of another organization's is shared with it: unless a level is chosen, it starts at the lowest.
+        var confidentiality = Blank(request.Confidentiality)
+            ?? (Blank(request.Originator) is { } from && await db.Parties.AnyAsync(p => p.Code == from && !p.IsInternal, cancellationToken)
+                ? catalog.LowestOf(ValueSets.Confidentiality) : null)
+            ?? catalog.DefaultOf(ValueSets.Confidentiality);
         var facts = new DocumentFacts(request.DeliverableType, request.DocType, request.Discipline,
             Blank(request.Criticality), confidentiality);
         if (!access.IsInternal || !access.Allows(Verbs.Create, facts))
@@ -91,8 +95,10 @@ public sealed class DocumentService(
             ["criticality"] = Blank(request.Criticality) is not null,
             ["plannedDate"] = request.PlannedDate is not null,
         };
+        // The day it was received is not known when we register it ahead of it: it is filled when its first submission
+        // arrives, so it is not asked here unless it already came (registered from what arrived).
         var missing = catalog.RequiredFieldsOf(request.DeliverableType)
-            .Where(f => !given.GetValueOrDefault(f)).ToList();
+            .Where(f => f != "receivedDate" && !given.GetValueOrDefault(f)).ToList();
         if (missing.Count > 0)
         {
             return Fail(Problems.Invalid("FIELDS_REQUIRED",

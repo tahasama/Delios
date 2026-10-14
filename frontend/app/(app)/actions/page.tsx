@@ -1,4 +1,3 @@
-import { redirect } from "next/navigation";
 import { requireScope } from "@/lib/core/scope";
 import { departmentsOf, daysBefore } from "@/lib/actions/schedule";
 import { getActiveSet } from "@/lib/settings/config";
@@ -74,8 +73,7 @@ const DEFAULT_STEP = 25;
 
 export default async function ActionsPage({ searchParams }: { searchParams: Promise<Search> }) {
   const ctx = await requireScope();
-  // Another organization sees only the actions that need its documents, on a page of its own.
-  if (!ctx.user.isInternal) redirect("/needed");
+  // Everyone reads this page; the backend narrows another organization's to the actions needing its documents.
   const sp = await searchParams;
   const view = sp.view === "table" ? "table" : "plan";
 

@@ -5,6 +5,7 @@ import { mayCreateDocument } from "@/lib/core/auth";
 import { numberingForEditor } from "@/lib/settings/api-admin";
 import { Banner, PageHeader } from "@/components/ui";
 import { NewDocumentForm } from "./new-document-form";
+import { api } from "@/lib/client";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Create document" };
@@ -26,7 +27,8 @@ export default async function NewDocumentPage({ searchParams }: { searchParams: 
     getActiveSet("DOCUMENT_TYPES"),
     getActiveSet("DISCIPLINES"),
     getActiveSet("SUBPROJECTS"),
-    getActiveSet("SUPPLIER_CODES"),
+    // Whose a document is: the outside organizations, as the register checks it.
+    api<{ code: string; name: string }[]>("/api/parties").then((rows) => rows.map((one) => ({ code: one.code, label: one.name, props: {} }))).catch(() => []),
     getActiveSet("PURCHASE_ORDERS"),
     getActiveSet("CRITICALITY"),
     getActiveSet("CONFIDENTIALITY"),
@@ -59,6 +61,8 @@ export default async function NewDocumentPage({ searchParams }: { searchParams: 
     criticality: typeof r.props?.criticality === "string" ? r.props.criticality : null,
     // A type that is a record (minutes, a test result) is fixed once confirmed: nobody is asked whether it is revised.
     record: r.props?.record === true,
+    // What a deliverable type insists on (Settings, on the type): one naming the originator comes from another organization.
+    required: Array.isArray(r.props?.required) ? (r.props.required as unknown[]).map(String) : null,
     // What a criticality level decides: who approves it and how long it is kept.
     decides: [
       r.props?.approval ? `approved by ${String(r.props.approval).toLowerCase()}` : null,
@@ -91,7 +95,7 @@ export default async function NewDocumentPage({ searchParams }: { searchParams: 
           const owner = sp.props.project ?? sp.props.projectCode;
           return typeof owner === "string" ? owner === project.code : true;
         }))}
-        suppliers={toOpt(suppliers)}
+        suppliers={suppliers.map((one) => ({ code: one.code, label: one.label }))}
         pos={toOpt(pos)}
         criticalities={toOpt(criticalities)}
         confidentialities={toOpt(confidentialities)}
