@@ -58,7 +58,7 @@ const SEE_ALSO: Partial<Record<ReportId, { label: string; href: string }>> = {
   register: { label: "Open the register, where the same documents can be filtered and exported", href: "/documents?view=all" },
   reviews: { label: "Open the reviews list, where every review ever made is kept", href: "/reviews?status=OPEN" },
   transmittals: { label: "Open transmittals", href: "/transmittals?view=all" },
-  readiness: { label: "Open Schedule & actions, where the same activities are worked on", href: "/actions" },
+  readiness: { label: "Open the Schedule, where the same activities are worked on", href: "/actions" },
 };
 
 /** Where a cell opens, on these screens. */

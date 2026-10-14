@@ -57,7 +57,7 @@ export default async function ControlledPage() {
     <div className="space-y-5">
       <PageHeader
         title="Uploaded lists to decide"
-        subtitle="The schedule, the departments per activity and the document requirements are uploaded from Schedule & actions. Here they are compared with what is in use now and decided."
+        subtitle="The schedule, the departments per activity and the document requirements are uploaded from the Schedule. Here they are compared with what is in use now and decided."
       />
 
       {waiting > 0 ? (

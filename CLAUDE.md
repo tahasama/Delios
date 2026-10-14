@@ -258,6 +258,8 @@ a screen only words it. A new rule goes in the backend, never in a page.
   document Details, package lines, the supplier's schedule; `plannedState`):
   ready (released), submitted (received, accepted, in review), overdue · N
   days, due today, at risk · N days left (inside the risk window), in N days.
+- The menu and page are named **Schedule** (each action opens its own page); the rules below still say
+  "Schedule & actions" for the same page.
 - Schedule & actions is one page for everyone, narrowed by the backend to what is
   theirs (`OutsideViewAsync` / `Narrow` in `ScheduleEndpoints`): our people see every
   action; another organization's people see the actions needing a document they may

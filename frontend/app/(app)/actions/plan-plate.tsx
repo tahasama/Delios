@@ -15,7 +15,7 @@ export function PlanPlate({ inForce, plans, failed }: {
 }) {
   return (
     <div className="border-b border-line px-5 pt-5 pb-2.5 sm:px-6">
-      <h1 className="plate-title min-w-0 text-slate-950">Schedule &amp; actions</h1>
+      <h1 className="plate-title min-w-0 text-slate-950">Schedule</h1>
       <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">
         {inForce
           ? <>{inForce.since ? `Dates from the schedule released on ${inForce.since}.` : "Dates from the released schedule."}</>

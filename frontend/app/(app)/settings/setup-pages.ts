@@ -125,7 +125,7 @@ export const SETUP_PAGES: SetupPage[] = [
   {
     href: "/settings/controlled",
     title: "Uploaded lists to decide",
-    text: "The schedule, the departments per activity and the document requirements are uploaded from Schedule & actions. Approve or reject them here; every past version is kept.",
+    text: "The schedule, the departments per activity and the document requirements are uploaded from the Schedule. Approve or reject them here; every past version is kept.",
     group: "Change & evidence",
   },
   {

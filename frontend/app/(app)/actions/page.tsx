@@ -18,7 +18,7 @@ import { movedPhrase } from "./moved";
 import { PlanRegister, type PlanTableRow } from "./plan-register";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Schedule & actions" };
+export const metadata = { title: "Schedule" };
 
 type Readiness = PlanTableRow["readiness"];
 
