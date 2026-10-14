@@ -104,13 +104,14 @@ frontend/
 ├── lib/                  the code behind the pages, by area
 │   ├── client.ts         the one door to the backend: every call goes through it
 │   ├── types.ts          the shapes the backend answers with
-│   ├── core/             shared by every area: sign-in, scope, permissions, preferences, words for states
+│   ├── core/             shared by every area: sign-in, scope, permissions, preferences, words for states,
+│   │                     tones.ts (state chips), rails.ts (the side colour of each state: the key on Help)
 │   ├── documents/
 │   ├── reviews/
 │   ├── transmittals/
 │   ├── packages/
 │   ├── actions/
-│   ├── records/
+│   ├── records/          assets & tags (api.ts reads; forms.ts links a tag's documents)
 │   ├── conformance/
 │   ├── account/
 │   ├── organization/      organizations working together, the admin page, defaults for new projects
