@@ -25,6 +25,7 @@ export async function createDocumentAction(_prev: { error?: string } | undefined
   const discipline = String(formData.get("discipline") ?? "");
   const originator = String(formData.get("originator") ?? "") || null;
   const subProject = String(formData.get("subProject") ?? "") || null;
+  const phase = String(formData.get("phase") ?? "") || null;
   const contractRef = String(formData.get("contractRef") ?? "") || null;
   const criticality = String(formData.get("criticality") ?? "") || null;
   const confidentiality = String(formData.get("confidentiality") ?? "") || null;
@@ -68,7 +69,7 @@ export async function createDocumentAction(_prev: { error?: string } | undefined
   // a stale tab arrives here too.
   const asked = await fieldRules(ctx, "DOCUMENT");
   const shortOf = missingRequired(asked, "DOCUMENT", {
-    subProject, originator, contractRef, receivedDate, criticality, confidentiality,
+    subProject, phase, originator, contractRef, receivedDate, criticality, confidentiality,
     retentionClass: chosenRetention,
     plannedDate: String(formData.get("plannedDate") ?? ""),
     assetCode: String(formData.get("assetCode") ?? ""),
@@ -92,7 +93,7 @@ export async function createDocumentAction(_prev: { error?: string } | undefined
   try {
     doc = await api<{ id: string; number: string }>(projectPath(ctx, "/documents"), {
       body: {
-        title, deliverableType, docType, discipline, originator, subproject: subProject, contractRef, criticality,
+        title, deliverableType, docType, discipline, originator, subproject: subProject, phase, contractRef, criticality,
         confidentiality, retentionClass: chosenRetention, receivedDate, plannedDate: String(formData.get("plannedDate") ?? "") || null, kind,
         previousNumber: String(formData.get("previousId") ?? "").trim() || null,
         legacyScheme: String(formData.get("legacyScheme") ?? "").trim() || null,
@@ -121,7 +122,7 @@ export async function createDocumentAction(_prev: { error?: string } | undefined
 }
 
 const EDITABLE_FIELDS = [
-  "title", "docType", "discipline", "originator", "subProject", "contractRef",
+  "title", "docType", "discipline", "originator", "subProject", "phase", "contractRef",
   // Not the received date: it is filled when what was sent arrives, never typed.
   "criticality", "confidentiality", "retentionClass", "appVersion", "previousId", "legacyScheme",
 ] as const;
@@ -141,7 +142,7 @@ export async function updateDocumentAction(_prev: { error?: string; ok?: string 
     const before = await backendDocument(ctx, id);
     if (!before) return { error: "Document not found." };
     const current: Record<string, string | null> = {
-      title: before.title, docType: before.docType, discipline: before.discipline, originator: before.originator, subproject: before.subproject,
+      title: before.title, docType: before.docType, discipline: before.discipline, originator: before.originator, subproject: before.subproject, phase: before.phase ?? null,
       contractRef: before.contractRef, criticality: before.criticality, confidentiality: before.confidentiality, retentionClass: before.retentionClass,
       receivedDate: before.receivedDate, previousNumber: before.previousNumber, legacyScheme: before.legacyScheme, appVersion: before.appVersion,
     };

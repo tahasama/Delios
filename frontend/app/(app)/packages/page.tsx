@@ -20,14 +20,18 @@ import { packagesOf, ourPeople, packageParties } from "@/lib/packages/api";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Packages" };
 
-export default async function PackagesPage({ searchParams }: { searchParams: Promise<{ category?: string }> }) {
+export default async function PackagesPage({ searchParams }: { searchParams: Promise<{ category?: string; from?: string; docs?: string }> }) {
   const ctx = await requireScope();
   const packagePolicy = await formPolicy(ctx, "PACKAGE");
   const { user } = ctx;
   const staff = isController(user) || isAdmin(user);
   // A supplier only ever sees its own package.
   const supplierOnly = !user.isInternal;
-  const requested = (await searchParams).category;
+  const sp = await searchParams;
+  const requested = sp.category;
+  // A supplier package delivered: a new delivery package starts with its documents.
+  const fromPackage = sp.from ?? null;
+  const carried = (sp.docs ?? "").split(",").map((one) => one.trim()).filter(Boolean);
   // Activities live in Schedule & actions now; a package is what we receive from a supplier, or what we hand over.
   // Outside readers see the packages that concern them — theirs to deliver, or
   // addressed to them — and nothing else; the tenant client sees to that.
@@ -156,16 +160,24 @@ export default async function PackagesPage({ searchParams }: { searchParams: Pro
     ) : null}
 
     {!isReadOnly(user) && category === "DELIVERY" ? (
-      <details className="register register-sheet register-sheet-open">
+      <details id="new" className="register register-sheet register-sheet-open" open={carried.length > 0}>
         <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-3 sm:px-6">
-          <span className="text-[13px] text-slate-600">Documents to hand over together?</span>
+          <span className="text-[13px] text-slate-600">{fromPackage ? `Deliver ${fromPackage}: its ${carried.length} document${carried.length === 1 ? "" : "s"} go in this delivery package.` : "Documents to hand over together?"}</span>
           <span className="ask">New delivery package</span>
         </summary>
         <div className="border-t border-line px-5 py-4 sm:px-6">
-          <ActionForm action={createPackageAction} submitLabel="Create package">
+          {fromPackage ? (
+            <p className="mb-3 text-[12px] text-slate-600">
+              Or add them to a delivery package already open:{" "}
+              <Link href={`/packages/add?${new URLSearchParams({ docs: carried.join(",") })}`} className="font-semibold text-link hover:underline">choose it</Link>.
+              Each is delivered at the status the package needs, checked as any delivery is.
+            </p>
+          ) : null}
+          <ActionForm action={createPackageAction} submitLabel="Create package" hidden={fromPackage ? { from: fromPackage } : undefined}>
+            {carried.map((id) => <input key={id} type="hidden" name="documentId" value={id} />)}
             <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
               <Asked policy={packagePolicy} field="title" hint="numbered PK-… when created" className="md:col-span-2">
-                {({ required }) => <input name="title" required={required} className={inputCls} placeholder="Operations handover — pump house" />}
+                {({ required }) => <input name="title" required={required} className={inputCls} defaultValue={fromPackage ? `${fromPackage} — handover` : undefined} placeholder="Operations handover — pump house" />}
               </Asked>
               <Asked policy={packagePolicy} field="completionDate">
                 {({ required }) => <input type="date" name="completionDate" required={required} className={inputCls} />}

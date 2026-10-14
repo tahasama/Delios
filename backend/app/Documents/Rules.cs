@@ -70,6 +70,11 @@ public static class RevisionValues
         }
     }
 
+    /// <summary>The line naming revisions in a phase: that phase's own, else the default line (no phase), else the first.</summary>
+    public static RevisionSeriesRule LineFor(RevisionScheme scheme, string? phase) =>
+        (phase is null ? null : scheme.Series.FirstOrDefault(s => s.Phase == phase))
+        ?? scheme.Series.FirstOrDefault(s => s.Phase is null) ?? scheme.Series[0];
+
     /// <summary>Checks a series can produce values at all; null when it can.</summary>
     public static string? Problem(RevisionSeriesRule rule)
     {

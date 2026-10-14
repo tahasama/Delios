@@ -120,6 +120,10 @@ export default async function AdminConfigPage({ searchParams }: { searchParams: 
               <div className="min-w-0 flex-1">
                 <h2 className="text-lg font-semibold text-slate-900">{set.title}</h2>
                 {set.description ? <p className="mt-1 text-xs leading-5 text-slate-500">{set.description}</p> : null}
+                {isVerdictSet(set.key, set.kind) ? (
+                  <p className="mt-1 text-xs text-slate-600">A verdict list: its verdicts and what each means are kept in{" "}
+                    <Link href="/settings/verdicts" className="font-semibold text-link hover:underline">Verdict lists</Link>.</p>
+                ) : null}
                 <p className="mt-1 text-[11px] text-slate-400">{countOf(set.key)} active{retiredCount ? ` · ${retiredCount} retired` : ""} · version {set.version}</p>
               </div>
               <div className="flex shrink-0 items-center gap-5">
@@ -146,19 +150,13 @@ export default async function AdminConfigPage({ searchParams }: { searchParams: 
             {sp.panel === "new" ? (
               <Card title="New set" description="A list your organization needs that the starter sets do not cover — areas, systems, anything." actions={<Link href={here({ panel: undefined })} aria-label="Close" className="text-slate-400 hover:text-slate-700"><X className="h-4 w-4" /></Link>}>
                 <ActionForm action={createConfigSetAction} submitLabel="Create set" size="sm">
-                  <div className="grid grid-cols-1 items-end gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-5">
+                  <div className="grid grid-cols-1 items-end gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
                     <Field label="Title" required><input name="title" required className={inputCls} placeholder="Areas" /></Field>
                     <Field label="Key" required hint="UPPER_SNAKE"><input name="key" required className={inputCls} placeholder="AREAS" /></Field>
                     <Field label="Category">
                       <select name="group" className={inputCls} defaultValue="">
                         <option value="">Other</option>
                         {[...new Set([...GROUPS.map((g) => g.title), ...sets.map((one) => one.group).filter((one): one is string => !!one)])].map((title) => <option key={title} value={title}>{title}</option>)}
-                      </select>
-                    </Field>
-                    <Field label="What it is" hint="verdicts are offered on review routes">
-                      <select name="kind" className={inputCls} defaultValue="">
-                        <option value="">A list of values</option>
-                        <option value="VERDICTS">Verdicts a review decides with</option>
                       </select>
                     </Field>
                     <Field label="Description"><input name="description" className={inputCls} placeholder="What the set is for" /></Field>
@@ -176,12 +174,6 @@ export default async function AdminConfigPage({ searchParams }: { searchParams: 
                       <select name="group" defaultValue={set.group ?? ""} className={inputCls}>
                         <option value="">Other</option>
                         {[...new Set([...GROUPS.map((g) => g.title), ...(set.group ? [set.group] : [])])].map((title) => <option key={title} value={title}>{title}</option>)}
-                      </select>
-                    </Field>
-                    <Field label="What it is" hint="verdicts are offered on review routes">
-                      <select name="kind" className={inputCls} defaultValue={set.kind ?? (isVerdictSet(set.key) ? "VERDICTS" : "")}>
-                        <option value="">A list of values</option>
-                        <option value="VERDICTS">Verdicts a review decides with</option>
                       </select>
                     </Field>
                     <Field label="Description"><input name="description" defaultValue={set.description ?? ""} className={inputCls} /></Field>

@@ -131,6 +131,7 @@ internal sealed class DocumentConfiguration : IEntityTypeConfiguration<Document>
         b.Property(x => x.Discipline).HasMaxLength(64);
         b.Property(x => x.Originator).HasMaxLength(32);
         b.Property(x => x.Subproject).HasMaxLength(64);
+        b.Property(x => x.Phase).HasMaxLength(64);
         b.Property(x => x.ContractRef).HasMaxLength(64);
         b.Property(x => x.Criticality).HasMaxLength(64);
         b.Property(x => x.Confidentiality).HasMaxLength(64);
@@ -169,6 +170,7 @@ internal sealed class RevisionConfiguration : IEntityTypeConfiguration<Revision>
         b.HasIndex(x => new { x.DocumentId, x.Value }).IsUnique();
         b.Property(x => x.Value).HasMaxLength(16);
         b.Property(x => x.Series).HasMaxLength(16);
+        b.Property(x => x.Phase).HasMaxLength(64);
         b.Property(x => x.State).HasMaxLength(16);
         b.Property(x => x.FilesState).HasMaxLength(16);
         b.Property(x => x.AuthoredByName).HasMaxLength(200);

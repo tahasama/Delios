@@ -126,7 +126,7 @@ const FIELDS: FieldDef[] = [
   { control: "LONG_TEXT", kind: "REVISION", key: "changeDescription", label: "What changed, and why", text: "What is different from the last revision, and why it is made.", fallback: "REQUIRED" },
   { control: "CHOICE", setKey: "STATUSES", computedBy: "What may be built from it, and whether work may proceed, follow from the status.", kind: "REVISION", key: "statusCode", label: "Released as", text: "The status it carries once released. Asked at release, not when it is started.", fallback: "REQUIRED" },
   { control: "DATE", kind: "REVISION", key: "plannedSubmissionDate", label: "Due for submission", text: "When it is promised.", fallback: "OPTIONAL" },
-  { control: "CHOICE", setKey: "PHASES", kind: "REVISION", key: "phase", label: "Phase", text: "The stage of the project it belongs to.", fallback: "OPTIONAL" },
+  { control: "CHOICE", setKey: "PHASES", kind: "DOCUMENT", key: "phase", label: "Phase", text: "The stage of the project it is in now. Its revisions are named by that phase (Settings, Revisions).", fallback: "OPTIONAL" },
 
   // ── Raising a transmittal ──
   { control: "PEOPLE", kind: "TRANSMITTAL", key: "recipients", label: "Recipients", text: "Who it goes to, by name.", fallback: "REQUIRED", fixed: "An issue nobody received is not an issue." },

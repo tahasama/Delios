@@ -6,7 +6,7 @@ import { WorkflowTemplateBuilder, type WorkflowBuilderStep } from "./workflow-te
 import { hasVerb } from "@/lib/core/auth";
 import { ArrowRight } from "lucide-react";
 import { verdictSets } from "@/lib/reviews/verdict-sets";
-import { isVerdictSet } from "@/lib/settings/set-props";
+import { api } from "@/lib/client";
 import { adminFunctions, adminParties, adminUsers, routesForEditor } from "@/lib/settings/api-admin";
 
 export const dynamic = "force-dynamic";
@@ -31,9 +31,8 @@ export default async function WorkflowTemplatesPage() {
     // supplier. How each of them answers is set in Parties & people.
     adminParties().then((all) => all.filter((p) => !p.isInternal && p.active).map((p) => ({ id: p.id, name: p.name, participation: p.participation }))),
   ]);
-  // A route may answer from any verdict list the organization publishes — its
-  // own list for engineering, say — so this is not a fixed pair.
-  const outcomeSets = sets.filter((s) => isVerdictSet(s.key, s.kind));
+  // A route answers from one of the organization's verdict lists (Settings, Verdict lists), each verdict with its meaning.
+  const outcomeSets = await api<{ key: string; title: string }[]>("/api/admin/verdict-lists").catch(() => [{ key: "REVIEW_OUTCOMES", title: "Review outcomes" }]);
   // What each status lets a step do. The rules live in the status list, so a
   // route can only offer what the organization published.
   const statusChoices = (await getActiveSet("STATUSES")).map((value) => {
@@ -113,7 +112,7 @@ export default async function WorkflowTemplatesPage() {
                   <details className="mt-3 rounded-lg border border-line">
                     <summary className="cursor-pointer px-3 py-2 text-xs font-medium text-slate-600">Edit</summary>
                     <div className="border-t border-line p-3">
-                      <WorkflowTemplateBuilder outsideParties={outsideParties} functions={functions} id={t.id} name={t.name} description={t.description ?? ""} classes={t.classes} outcomeSetKey={t.outcomeSetKey ?? "REVIEW_OUTCOMES"} isDefault={t.isDefault} initialSteps={steps} users={users} outcomeSets={outcomeSets.map((s) => s.key)} classOptions={classOptions} statuses={statusChoices} />
+                      <WorkflowTemplateBuilder outsideParties={outsideParties} functions={functions} id={t.id} name={t.name} description={t.description ?? ""} classes={t.classes} outcomeSetKey={t.outcomeSetKey ?? "REVIEW_OUTCOMES"} isDefault={t.isDefault} initialSteps={steps} users={users} outcomeSets={outcomeSets.map((s) => ({ key: s.key, title: s.title }))} classOptions={classOptions} statuses={statusChoices} />
                     </div>
                   </details>
                 ) : null}
@@ -126,7 +125,7 @@ export default async function WorkflowTemplatesPage() {
       {admin ? (
         <details className="rounded-2xl border border-line bg-surface px-5 py-3 shadow-sm">
           <summary className="cursor-pointer text-sm font-semibold text-brand-ink">+ New review route</summary>
-          <div className="mt-3"><WorkflowTemplateBuilder outsideParties={outsideParties} functions={functions} users={users} outcomeSets={outcomeSets.map((s) => s.key)} classOptions={classOptions} statuses={statusChoices} /></div>
+          <div className="mt-3"><WorkflowTemplateBuilder outsideParties={outsideParties} functions={functions} users={users} outcomeSets={outcomeSets.map((s) => ({ key: s.key, title: s.title }))} classOptions={classOptions} statuses={statusChoices} /></div>
         </details>
       ) : null}
     </div>

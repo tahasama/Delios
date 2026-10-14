@@ -14,15 +14,12 @@ type Result = { error?: string; ok?: string };
 const failed = (e: unknown): Result => ({ error: refusal(e).message });
 const text = (formData: FormData, name: string) => String(formData.get(name) ?? "").trim();
 
-/** The series rows of the form, in order; a row with neither code nor name is left out. */
+/** The lines of the form, in order: each for a phase, or the default line (no phase). */
 function seriesOf(formData: FormData): RevisionSeries[] {
   const rows: RevisionSeries[] = [];
-  for (let i = 0; formData.has(`code_${i}`); i++) {
-    const code = text(formData, `code_${i}`).toUpperCase();
-    const label = text(formData, `label_${i}`);
-    if (!code && !label) continue;
+  for (let i = 0; formData.has(`kind_${i}`); i++) {
     rows.push({
-      code, label,
+      code: text(formData, `code_${i}`).toUpperCase(), label: text(formData, `label_${i}`), phase: text(formData, `phase_${i}`) || null,
       kind: text(formData, `kind_${i}`) || "LETTERS",
       prefix: text(formData, `prefix_${i}`),
       start: text(formData, `start_${i}`),

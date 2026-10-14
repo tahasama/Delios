@@ -1077,3 +1077,13 @@ end is on both organizations' audit trails.
 - **A verdict list may be the organization's own** (for example for supplier
   documents): a list says it is verdicts, each value says what it means, and a
   route serving supplier documents decides from it.
+- **Phase is document metadata**, and revisions are named per phase: one line
+  per phase (letters, numbers, prefix, start) and one default line for a
+  phase without its own; each revision keeps the phase it was made in.
+- **Verdict lists are made as lists of verdicts**: each verdict states its
+  meaning when it is written; a list with no accepting verdict cannot be
+  published.
+- **Checks are numbered by the system** by what they look at (settings,
+  document details, revisions, reviews, storage, schedule, packages), not by
+  the standard's clauses.
+- **A supplier package can be delivered** like any delivery package.

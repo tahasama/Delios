@@ -64,7 +64,7 @@ export type PageRevision = {
 
 export type PageDocument = {
   id: string; extras: string | null; projectId: string; docNumber: string; title: string; deliverableType: string; docType: string; discipline: string;
-  originator: string | null; subProject: string | null; contractRef: string | null; criticality: string | null; confidentiality: string | null;
+  originator: string | null; subProject: string | null; phase: string | null; contractRef: string | null; criticality: string | null; confidentiality: string | null;
   retentionClass: string | null; state: string; kind: string; confirmedAt: Date | null; confirmedByName: string | null; disposedAt: Date | null;
   disposedBy: string | null; disposalBasis: string | null; legalHold: boolean;
   legalHoldReason: string | null; legalHoldAt: Date | null; legalHoldBy: string | null; isPlaceholder: boolean; previousId: string | null;
@@ -167,7 +167,7 @@ function revisionOf(documentId: string, r: RevisionView, reviews: ReviewView[]):
     state: reading.decided ? "NOT_RELEASED" : r.state,
     // Decided and waiting for release: what the decider granted is what it carries.
     statusCode: (reading.decided ? reading.granted : null) ?? r.statusCode ?? null, statusSetAt: date(decided[0]?.decidedAt), statusSetByName: null, returnedAt: date(r.returnedAt), returnedReason: r.returnedReason,
-    heldAt: date(r.heldAt), heldReason: r.heldReason, heldByName: r.heldByName, phase: null, reasonForRevision: r.reasonForRevision, changeDescription: r.changeDescription,
+    heldAt: date(r.heldAt), heldReason: r.heldReason, heldByName: r.heldByName, phase: r.phase ?? null, reasonForRevision: r.reasonForRevision, changeDescription: r.changeDescription,
     plannedSubmissionDate: null, issueDate: date(reading.issuedAt), nativeFileId: current.find((f) => f.kind === "NATIVE")?.id ?? null,
     renditionFileId: current.find((f) => f.kind === "RENDITION")?.id ?? null, appVersion: null, authorizationReason: null, authorizedById: null,
     authorizedByName: null, authorizedAt: null, releasedAt: date(r.releasedAt), releasedById: null, releasedByName: r.releasedByName,
@@ -196,7 +196,7 @@ export const documentPage = cache(async (scope: Scope, id: string): Promise<Page
   const reviews = await Promise.all(context.reviews.map((one) => backendReview(scope, one.id)));
   return {
     id: doc.id, extras: doc.extras ? JSON.stringify(doc.extras) : null, projectId: scope.projectId, docNumber: doc.number, title: doc.title, deliverableType: doc.deliverableType,
-    docType: doc.docType, discipline: doc.discipline, originator: doc.originator, subProject: doc.subproject, contractRef: doc.contractRef,
+    docType: doc.docType, discipline: doc.discipline, originator: doc.originator, subProject: doc.subproject, phase: doc.phase ?? null, contractRef: doc.contractRef,
     criticality: doc.criticality, confidentiality: doc.confidentiality, retentionClass: doc.retentionClass, state: doc.state, kind: doc.kind,
     confirmedAt: date(doc.confirmedAt ?? null), confirmedByName: doc.confirmedByName ?? null, disposedAt: null, disposedBy: null, disposalBasis: null, legalHold: doc.legalHold,
     legalHoldReason: doc.legalHoldReason ?? null, legalHoldAt: date(doc.legalHoldAt ?? null), legalHoldBy: doc.legalHoldBy ?? null,

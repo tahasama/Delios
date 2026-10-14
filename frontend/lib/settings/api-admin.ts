@@ -79,6 +79,8 @@ export const adminParties = cache(async () => api<AdminParty[]>("/api/admin/part
 /** One series of a revision scheme (backend RevisionSeriesRule). */
 export type RevisionSeries = {
   code: string; label: string; kind: string; prefix: string; start: string; width: number; lowercase: boolean; excludedLetters: string[];
+  /** The phase it names revisions in; none: the default line. */
+  phase?: string | null;
 };
 
 export const adminNumbering = cache(async () => api<AdminNumbering>("/api/admin/numbering"));

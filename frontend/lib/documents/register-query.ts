@@ -31,7 +31,7 @@ export const REGISTER_SORTS: Record<string, string> = {
   verdict: "latestVerdict", discipline: "discipline", docType: "docType", originator: "originator",
   subProject: "subProject", contract: "contractRef", criticality: "criticality",
   confidentiality: "confidentiality", retention: "retentionClass", deliverable: "deliverableType",
-  phase: "latestPhase",
+  phase: "phase",
   planned: "latestPlannedAt", issued: "latestIssueAt", released: "latestReleasedAt",
   updated: "updatedAt", created: "createdDate",
 };

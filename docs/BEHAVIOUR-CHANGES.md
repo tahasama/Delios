@@ -538,6 +538,17 @@ the installation sets its keys.
   offered as a route's verdict list (it never was one).
 - **Package document lists** carry the side colour of each line's state; the "Next step" card no longer does.
 
+- **Phase** is a document's detail now (it was shown but never kept): asked on create, in Details, and when a
+  revision starts; the register filters by it. Revisions are named per phase (Settings → Revisions): one line per
+  phase, plus one default line. New demos start with one default line, not two; an existing scheme's second line
+  with no phase, never used, is dropped by `seed-demo`.
+- **Verdict lists** have their own page (Settings → Verdict lists): a list is made with its verdicts and each one's
+  meaning. "What it is" on a value list is gone.
+- **Checks** are numbered by the app (SET, DOC, REV, RVW, STO, SCH, PKG); findings keep their history.
+- **New transmittal:** the kind is a dropdown, then its type; data with nothing attached offers to become
+  information instead of only blocking.
+- **Supplier packages** can be delivered ("Deliver": a delivery package with its documents).
+
 ## 7. Notifications and email
 
 - Notifications are kept and shown in the bell and on the Notifications page; opening the page reads

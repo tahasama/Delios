@@ -1,5 +1,6 @@
 "use client";
 
+import { TRANSMITTAL_KINDS, kind, kindOf, type TransmittalKind } from "@/lib/transmittals/kinds";
 import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -39,11 +40,7 @@ const STEPS = ["Which way, and why", "What goes with it", "Who gets it"];
  * approval, for execution…); information carries a request, an answer, a confirmation sought, an RFI. A reason says
  * its kind on its published value (Settings: "Kind of transmittal"); one that says nothing is data.
  */
-const FAMILIES = [
-  { code: "DATA", label: "Data transmittal", says: "documents: for review, for approval, for execution…" },
-  { code: "INFO", label: "Information transmittal", says: "a request, an answer, a confirmation, an RFI" },
-] as const;
-const familyOf = (props: Record<string, unknown>) => (props.family === "Information" ? "INFO" : "DATA");
+const familyOf = kindOf;
 
 /** A field in this form: its name in stencil above it, and a short hint beside the name. */
 function Ask({ label, hint, required, children, className }: { label: string; hint?: string; required?: boolean; children: React.ReactNode; className?: string }) {
@@ -111,7 +108,7 @@ export function NewTransmittalForm({
   const [direction, setDirection] = useState(defaultDirection);
   const [reasonCode, setReasonCode] = useState(prefill?.reason && reasons.some((r) => r.code === prefill.reason) ? prefill.reason : "");
   // Data or information, chosen first; the reasons listed are that kind's.
-  const [family, setFamily] = useState<"DATA" | "INFO">(() => {
+  const [family, setFamily] = useState<TransmittalKind>(() => {
     const given = reasons.find((r) => r.code === prefill?.reason);
     return given ? familyOf(given.props) : "DATA";
   });
@@ -156,6 +153,17 @@ export function NewTransmittalForm({
   const carries = chosen.length > 0 || (outgoing ? !!placeholders && !placeholders.mixed : files > 0);
   const saysSomething = mustCarry ? carries
     : chosen.length > 0 || (!outgoing && files > 0) || (outgoing ? subject.trim().length > 0 : message.trim().length > 0);
+  // Data with nothing in it: rather than refuse, ask whether it is a letter (an information transmittal).
+  const [offerInfo, setOfferInfo] = useState(false);
+  const infoReasons = reasons.filter((r) => kindOf(r.props) === "INFO");
+  const [infoType, setInfoType] = useState("");
+  const makeItInformation = () => {
+    setFamily("INFO");
+    setReasonCode(infoType);
+    setOfferInfo(false);
+    // A letter says something: on to who gets it when it does, else it stays here for its words.
+    if (outgoing ? subject.trim() : message.trim()) setStep(3);
+  };
   const may = (n: number) => n === 1 || (askedFirst && (n === 2 || saysSomething));
   const toggle = (id: string) => setChosen((ids) => (ids.includes(id) ? ids.filter((one) => one !== id) : [...ids, id]));
   // The register, opened for this form: what is enclosed starts ticked, and "Continue" comes back here, on this step,
@@ -296,18 +304,15 @@ export function NewTransmittalForm({
               </label>
             ) : null}
 
-            {/* Placeholders are issued for use: data, by itself. */}
-            {fixedForPlaceholders ? null : <fieldset className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs font-medium text-slate-700">
-              <legend className="sr-only">What kind of transmittal</legend>
-              {FAMILIES.map((one) => (
-                <label key={one.code} className="flex items-center gap-1.5">
-                  <input type="radio" name="family" value={one.code} checked={family === one.code} onChange={() => { setFamily(one.code); setReasonCode(""); }} />
-                  {one.label} <span className="font-normal text-slate-500">— {one.says}</span>
-                </label>
-              ))}
-            </fieldset>}
-
             <div className="asking grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-4">
+              {/* The kind first, then its own types (Settings, Reasons for issue). Placeholders are data, by themselves. */}
+              {fixedForPlaceholders ? null : (
+                <Ask label="Kind" required hint={kind(family).says}>
+                  <select name="family" className={field} value={family} onChange={(e) => { setFamily(e.target.value as TransmittalKind); setReasonCode(""); }}>
+                    {TRANSMITTAL_KINDS.map((one) => <option key={one.code} value={one.code}>{one.label}</option>)}
+                  </select>
+                </Ask>
+              )}
               {!recording ? null : (
                 // One of the organizations set up on the project, with its code: what came is numbered in its series.
                 <div className="min-w-0">
@@ -317,7 +322,7 @@ export function NewTransmittalForm({
                     onChange={(ids) => setParty(ids[0] ?? "")} />
                 </div>
               )}
-              <Ask label={says("reason", "Why")} required hint={outgoing ? "what they should do with it" : "what they sent it for"} className="lg:col-span-2">
+              <Ask label={fixedForPlaceholders ? says("reason", "Why") : kind(family).typeLabel} required hint={outgoing ? kind(family).typeHint : "what they sent it for"}>
                 {/* Placeholders go for use: the reason is set by itself, never chosen. */}
                 {outgoing && fixedForPlaceholders ? (
                   <>
@@ -326,7 +331,7 @@ export function NewTransmittalForm({
                   </>
                 ) : (
                   <select name="reasonForIssue" required className={field} value={reasonCode} onChange={(e) => setReasonCode(e.target.value)}>
-                    <option value="" disabled>{familyReasons.length ? "Choose…" : "None published for this kind"}</option>
+                    <option value="" disabled>{familyReasons.length ? "Choose…" : "None published for this kind (Settings, Reasons for issue)"}</option>
                     {familyReasons.map((r) => <option key={r.code} value={r.code}>{r.label}</option>)}
                   </select>
                 )}
@@ -477,9 +482,32 @@ export function NewTransmittalForm({
               </>
             )}
           </div>
+          {offerInfo && mustCarry && !carries ? (
+            <div role="alert" className="flex flex-wrap items-end gap-x-4 gap-y-3 border-t border-amber-200 bg-amber-50 px-5 py-3 sm:px-6">
+              <p className="min-w-60 flex-1 text-[13px] text-amber-900">
+                <strong>Nothing is attached.</strong> A data transmittal carries a document.
+                Do you want this to be an information transmittal (a letter) instead?
+              </p>
+              {infoReasons.length ? (
+                <>
+                  <label className="min-w-52">
+                    <span className="sr-only">Type of information</span>
+                    <select value={infoType} onChange={(e) => setInfoType(e.target.value)} className={field}>
+                      <option value="" disabled>Type of information…</option>
+                      {infoReasons.map((r) => <option key={r.code} value={r.code}>{r.label}</option>)}
+                    </select>
+                  </label>
+                  <button type="button" onClick={makeItInformation} disabled={!infoType} data-on={infoType ? "true" : undefined} className="ask disabled:cursor-not-allowed disabled:opacity-50">Make it information</button>
+                </>
+              ) : <span className="text-[11px] text-amber-800">No information type is published (Settings, Reasons for issue).</span>}
+              {outgoing ? <Link href={pickHref()} className="ask">Attach a document</Link>
+                : <button type="button" onClick={() => setOfferInfo(false)} className="ask">Attach the file</button>}
+            </div>
+          ) : null}
           {foot(1,
-            <button type="button" onClick={() => setStep(3)} disabled={!saysSomething} data-on={saysSomething ? "true" : undefined} className="ask disabled:cursor-not-allowed disabled:opacity-50">Continue</button>,
-            saysSomething ? null : mustCarry ? (outgoing ? "A data transmittal carries a document: enclose one from the register, or go back and choose an information reason." : recording ? "A data transmittal received carries a document: choose it in the register, or add the file that came." : "A data transmittal carries a document: add its file, or go back and choose an information reason.") : outgoing ? "Enclose a document, or write a subject." : "Tick a document, keep a file, or write a message.",
+            <button type="button" onClick={() => (mustCarry && !carries ? setOfferInfo(true) : setStep(3))} disabled={!saysSomething && !mustCarry}
+              data-on={saysSomething ? "true" : undefined} className="ask disabled:cursor-not-allowed disabled:opacity-50">Continue</button>,
+            saysSomething ? null : mustCarry ? null : outgoing ? "Enclose a document, or write a subject." : "Tick a document, keep a file, or write a message.",
           )}
         </section>
 

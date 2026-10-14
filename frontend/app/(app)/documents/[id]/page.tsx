@@ -259,6 +259,7 @@ export default async function DocumentDetailPage({
     ["Deliverable", deliverable?.label ?? doc.deliverableType],
     ["Originator", label(suppliers, doc.originator)],
     ["Sub-project", label(subprojects, doc.subProject)],
+    ["Phase", label(phases, doc.phase)],
     ["Contract / PO", label(pos, doc.contractRef)],
     ["Criticality", label(criticalities, doc.criticality)],
     ["Confidentiality", label(confidentialities, doc.confidentiality)],
@@ -295,6 +296,7 @@ export default async function DocumentDetailPage({
       <Field label="Criticality"><select name="criticality" defaultValue={doc.criticality ?? ""} className={inputCls}><option value="">—</option>{criticalities.map((c) => <option key={c.code} value={c.code}>{c.label}{c.code === types.find((t) => t.code === doc.docType)?.props.criticality ? " (recommended)" : ""}</option>)}</select></Field>
       <Field label="Confidentiality"><select name="confidentiality" defaultValue={doc.confidentiality ?? ""} className={inputCls}>{confidentialities.map((c) => <option key={c.code} value={c.code}>{c.label}</option>)}</select></Field>
       <Field label="Retention"><select name="retentionClass" defaultValue={doc.retentionClass ?? ""} className={inputCls}><option value="">—</option>{retentions.map((r) => <option key={r.code} value={r.code}>{r.label}</option>)}</select></Field>
+      <Field label="Phase" hint="names its next revision"><select name="phase" defaultValue={doc.phase ?? ""} className={inputCls}><option value="">—</option>{phases.map((p) => <option key={p.code} value={p.code}>{p.label}</option>)}</select></Field>
       <Field label="Previous number"><input name="previousId" defaultValue={doc.previousId ?? ""} className={inputCls} /></Field>
     </div>
     <input type="hidden" name="appVersion" value={doc.appVersion ?? ""} />
@@ -580,14 +582,15 @@ export default async function DocumentDetailPage({
               <Asked policy={revisionPolicy} field="plannedSubmissionDate">
                 {({ required }) => <input type="date" name="plannedSubmissionDate" required={required} className={inputCls} />}
               </Asked>
-              <Asked policy={revisionPolicy} field="phase">
-                {({ required }) => (
-                  <select name="phase" required={required} className={inputCls} defaultValue="">
-                    <option value="" disabled={required}>—</option>
+              {/* The phase it is in, or the one it moves to: the new revision is named by that phase's line. */}
+              {phases.length ? (
+                <Field label="Phase" hint="names this revision (Settings, Revisions)">
+                  <select name="phase" className={inputCls} defaultValue={doc.phase ?? ""}>
+                    {doc.phase ? null : <option value="">—</option>}
                     {phases.map((p) => <option key={p.code} value={p.code}>{p.label}</option>)}
                   </select>
-                )}
-              </Asked>
+                </Field>
+              ) : null}
               <Added fields={revisionPolicy.own} className="sm:col-span-2" />
               <Field label="PDF" hint="optional now — what people will read; needed before it is sent"><input type="file" name="renditionFile" accept=".pdf" className="w-full" /></Field>
               <Field label="Native file" hint="optional — the editable original (.docx, .dwg, .xlsx…)"><input type="file" name="nativeFile" className="w-full" />{listTemplate}</Field>

@@ -66,6 +66,11 @@ export async function createPackageAction(_prev: { error?: string } | undefined,
       idempotencyKey: randomUUID(),
     });
     number = created.number;
+    // Started from a supplier package (Deliver): it holds that package's documents.
+    const documentIds = formData.getAll("documentId").map(String).filter(Boolean);
+    if (documentIds.length) {
+      await api(projectPath(ctx, `/packages/${created.id}/members`), { body: { documentIds, requiredStatuses } });
+    }
   } catch (e) {
     return { error: refusal(e).message };
   }

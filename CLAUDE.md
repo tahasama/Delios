@@ -215,7 +215,9 @@ a screen only words it. A new rule goes in the backend, never in a page.
   takes none.
 - Assurance: each finding points to the exact spot where it is put right: a document's tab, or else the thing
   itself (a setting's list with that value opened for editing, the numbering row, the action, the package, the
-  review), never a page to search. Check ids (IS-09…) are the app's own, kept from the Standard's numbering.
+  review), never a page to search. Check ids are the app's own, by what they look at: SET (settings), DOC (document
+  details), REV (revisions), RVW (reviews), STO (what is kept in storage), SCH (schedule), PKG (packages); none
+  refers to the original standard. Renumbering moves what was found and switched off with it (migration AppCheckNumbers).
 - `unshare-package <email> <package-number>` (backend command) puts a supplier's
   package back to not shared, for testing; logged.
 - A supplier package has two pages. Ours (Document Control and above): plate,
@@ -226,6 +228,8 @@ a screen only words it. A new rule goes in the backend, never in a page.
   a transmittal, "Received from outside the system"). The supplier's page: only
   what was sent to it, in its words, the comments to take in, a file field
   beside each document it holds, and "Send to <us>".
+- A supplier package is delivered by "Deliver" (The package): a new delivery package opens with its documents
+  in it (or they are added to one already open), then goes the delivery way (check, deliver, accept).
 - "Delivery list" downloads the package's own lines (`/api/packages/<n>/list`),
   never the schedule's requirements list.
 - "Share with <supplier>" is pressed once, for good: until then the supplier
@@ -275,14 +279,21 @@ a screen only words it. A new rule goes in the backend, never in a page.
   says one of four meanings: accepted, accepted with comments (fix next
   time), rejected (back to the author), for information. The app reads the
   meaning (`verdictEffect`, props proceed/resubmit/information), never C1–C4.
-  A list says itself it is verdicts ("What it is" on the set: `kind` VERDICTS; the starter lists by their key):
-  only then does each value ask its meaning (never chosen for the person: a value with none reads "not chosen
-  yet" until it is), and only then is it offered as a route's verdict list. A route serves
-  supplier documents only by "Produced by" (the supplier deliverable type) or "From which organization".
-- How revisions are named is Settings → Revisions (`RevisionSchemeEndpoints`): schemes of series (letters or
-  numbers, prefix, start — empty starts at A or 0 —, letters skipped), one the default, and which deliverable type follows which. A scheme
-  chosen for a type names its documents not revised yet; a document already started keeps counting the way it
-  began. A series revisions carry stays in its scheme, never recounted (backend SERIES_IN_USE).
+  Verdict lists are made and kept in Settings → Verdict lists (`VerdictListEndpoints`), as one: a name and its
+  verdicts, each with its code, label and meaning, chosen by the person (never filled in for them); at least one
+  lets a revision be released (backend MEANING_REQUIRED, NO_VERDICT_ACCEPTS). A route chooses its list from these
+  (Review routes); a route for supplier documents serves "Produced by" the supplier deliverable type, or "From
+  which organization". A value with no meaning reads "not chosen yet" until it is given one.
+- Phase is a document's metadata (PHASES, published like any list): asked on the new-document form (row 2,
+  column 3), in Details and Edit rev, and when a revision is started (it may move the document to its next
+  phase). Each revision keeps the phase it was made in. The register shows, filters and sorts by it.
+- How revisions are named is Settings → Revisions (`RevisionSchemeEndpoints`): schemes of lines, one line per
+  phase, as many as wanted, plus one default line for any phase without its own (no phase published: that one
+  line names every revision). A line counts in letters or numbers, with a prefix, a start (empty: A or 0) and
+  letters skipped. One scheme is the default; any deliverable type may follow another. A revision is named by
+  the line of the phase its document is in. A scheme chosen for a type names its documents not revised yet; a
+  document already started keeps counting the way it began. A line revisions carry stays, never recounted
+  (backend SERIES_IN_USE).
 - A supplier's document reads in its own states (register, document page,
   package, the supplier's panel): Sent, Received, Accepted, Returned (by
   Document Control's check, with why), In review, Released & issued, Returned
@@ -336,8 +347,11 @@ a screen only words it. A new rule goes in the backend, never in a page.
   that came); a letter is an information transmittal.
 - One file field everywhere (globals.css `input[type=file]`): dashed line, light flat button at the control height;
   a page sets only its width.
-- The form asks the family (data or information), then a reason of that family
-  (`REASONS_FOR_ISSUE` prop `family`). No "sent by" and no date: it is the
+- The form asks the kind (a dropdown: data or information transmittal, `lib/transmittals/kinds.ts`), then its
+  type in that kind's words ("Issued for" / "Type of information"), from the reasons of that kind
+  (`REASONS_FOR_ISSUE` prop `family`). A data transmittal with nothing attached is not refused on the spot:
+  Continue asks "Nothing is attached… make it an information transmittal?" (choose its type) or "Attach a
+  document". No "sent by" and no date: it is the
   person signed in, today. "Received from outside the system" (Document Control)
   is a tick, and only then are who sent it and when asked.
 - A supplier's submission is issued for review (IFR) where IFR is published;

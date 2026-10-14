@@ -769,7 +769,7 @@ The revision is not released, so nobody works from this status yet.`} href={GUID
   { key: "discipline", sort: "discipline", label: "Discipline", cellClass: "whitespace-nowrap text-xs text-slate-600", cell: (row) => row.disciplineLabel },
   {
     key: "phase", sort: "phase", label: "Phase",
-    note: "Which phase the newest revision serves. A document spans several — issued for detail design, later as-built — so the phase belongs to the revision, not to the document.",
+    note: "The phase the document is in now. Each revision keeps the phase it was made in (its row on the document page), and is named by that phase's line (Settings, Revisions).",
     cellClass: "whitespace-nowrap text-xs text-slate-600",
     cell: (row) => row.phaseLabel ?? <span className="text-slate-300">—</span>,
   },

@@ -62,6 +62,7 @@ public sealed class DocumentService(
             ("docType", ValueSets.DocumentTypes, request.DocType),
             ("discipline", ValueSets.Disciplines, request.Discipline),
             ("subproject", ValueSets.Subprojects, Blank(request.Subproject)),
+            ("phase", ValueSets.Phases, Blank(request.Phase)),
             ("contractRef", ValueSets.PurchaseOrders, Blank(request.ContractRef)),
             ("criticality", ValueSets.Criticality, Blank(request.Criticality)),
             ("confidentiality", ValueSets.Confidentiality, confidentiality),
@@ -92,6 +93,7 @@ public sealed class DocumentService(
             ["contractRef"] = Blank(request.ContractRef) is not null,
             ["receivedDate"] = request.ReceivedDate is not null,
             ["subproject"] = Blank(request.Subproject) is not null,
+            ["phase"] = Blank(request.Phase) is not null,
             ["criticality"] = Blank(request.Criticality) is not null,
             ["plannedDate"] = request.PlannedDate is not null,
         };
@@ -139,6 +141,7 @@ public sealed class DocumentService(
             Discipline = request.Discipline,
             Originator = originator,
             Subproject = Blank(request.Subproject),
+            Phase = Blank(request.Phase),
             ContractRef = Blank(request.ContractRef),
             Criticality = Blank(request.Criticality),
             Confidentiality = confidentiality,
@@ -196,6 +199,7 @@ public sealed class DocumentService(
             ["docType"] = ValueSets.DocumentTypes,
             ["discipline"] = ValueSets.Disciplines,
             ["subproject"] = ValueSets.Subprojects,
+            ["phase"] = ValueSets.Phases,
             ["contractRef"] = ValueSets.PurchaseOrders,
             ["criticality"] = ValueSets.Criticality,
             ["confidentiality"] = ValueSets.Confidentiality,
@@ -220,12 +224,13 @@ public sealed class DocumentService(
                     if (field == "docType") { before = document.DocType; document.DocType = value; }
                     else { before = document.Discipline; document.Discipline = value; }
                     break;
-                case "subproject" or "contractRef" or "criticality" or "confidentiality" or "retentionClass":
+                case "subproject" or "phase" or "contractRef" or "criticality" or "confidentiality" or "retentionClass":
                     if (value is not null && !catalog.IsActive(sets[field], value))
                         return Fail(Problems.Invalid("VALUE_NOT_PUBLISHED", $"{value} is not a published {field}.", new { field, value }));
                     (before, value) = field switch
                     {
                         "subproject" => (document.Subproject, document.Subproject = value),
+                        "phase" => (document.Phase, document.Phase = value),
                         "contractRef" => (document.ContractRef, document.ContractRef = value),
                         "criticality" => (document.Criticality, document.Criticality = value),
                         "confidentiality" => (document.Confidentiality, document.Confidentiality = value ?? catalog.DefaultOf(ValueSets.Confidentiality)),
@@ -436,7 +441,15 @@ public sealed class DocumentService(
                 "No revision scheme applies to this deliverable type. An administrator sets one up.",
                 new { deliverableType = document.DeliverableType }));
         }
-        var next = RevisionValues.Next(scheme, existing.Select(r => (r.Series, r.Value)).ToList(), Blank(request.Series));
+        // The phase it moves to with this revision, if one is given; then the line for that phase, else the default line.
+        if (Blank(request.Phase) is { } phase && phase != document.Phase)
+        {
+            if (!(await Catalog.LoadAsync(db, cancellationToken)).IsActive(ValueSets.Phases, phase))
+                return (null, Problems.Invalid("VALUE_NOT_PUBLISHED", $"{phase} is not a published phase.", new { field = "phase", value = phase }));
+            document.Phase = phase;
+        }
+        var series = Blank(request.Series) ?? RevisionValues.LineFor(scheme, document.Phase).Code;
+        var next = RevisionValues.Next(scheme, existing.Select(r => (r.Series, r.Value)).ToList(), series);
         switch (next)
         {
             case NextValue.UnknownSeries(var unknown):
@@ -461,7 +474,8 @@ public sealed class DocumentService(
             ProjectId = document.ProjectId,
             DocumentId = document.Id,
             Value = value,
-            Series = Blank(request.Series) ?? existing.LastOrDefault()?.Series ?? scheme.Series[0].Code,
+            Series = series,
+            Phase = document.Phase,
             ReasonForRevision = Blank(request.ReasonForRevision) ?? (existing.Count == 0 ? "First issue" : null),
             ChangeDescription = Blank(request.ChangeDescription) ?? (existing.Count == 0 ? "Initial content" : null),
             AuthoredById = access.UserId,
@@ -599,14 +613,16 @@ public sealed class DocumentService(
                 "No revision scheme applies to this deliverable type. An administrator sets one up.",
                 new { deliverableType = document.DeliverableType }));
         }
-        var value = ((NextValue.Value)RevisionValues.Next(scheme, [], null)).Text;
+        var line = RevisionValues.LineFor(scheme, document.Phase).Code;
+        var value = ((NextValue.Value)RevisionValues.Next(scheme, [], line)).Text;
         var revision = new Revision
         {
             TenantId = document.TenantId,
             ProjectId = document.ProjectId,
             DocumentId = document.Id,
             Value = value,
-            Series = scheme.Series[0].Code,
+            Series = line,
+            Phase = document.Phase,
             ReasonForRevision = "First issue",
             ChangeDescription = "Received unplanned on a transmittal",
             AuthoredById = access.UserId,

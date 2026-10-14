@@ -38,7 +38,7 @@ function Ask({ label, hint, required, children, className }: { label: string; hi
  * it is comes with the file.
  */
 export function NewDocumentForm({
-  received, start, fromFile, numberingSets, deliverableTypes, docTypes, disciplines, currentProject, subprojects, suppliers, pos, criticalities, confidentialities, retentionClasses, defaultConfidentiality, fields, ownFields, labels,
+  received, start, fromFile, numberingSets, deliverableTypes, docTypes, disciplines, currentProject, subprojects, phases, suppliers, pos, criticalities, confidentialities, retentionClasses, defaultConfidentiality, fields, ownFields, labels,
 }: {
   received: boolean;
   /** Where another page sent the reader to register a document of a known type: our own, with its title. */
@@ -48,7 +48,7 @@ export function NewDocumentForm({
   numberingSets: Record<string, string[]>;
   /** The project being worked in. A document is registered here, so it is not a choice. */
   currentProject: { code: string; name: string };
-  deliverableTypes: Opt[]; docTypes: Opt[]; disciplines: Opt[]; subprojects: Opt[]; suppliers: Opt[]; pos: Opt[]; criticalities: Opt[]; confidentialities: Opt[]; retentionClasses: Opt[];
+  deliverableTypes: Opt[]; docTypes: Opt[]; disciplines: Opt[]; subprojects: Opt[]; phases: Opt[]; suppliers: Opt[]; pos: Opt[]; criticalities: Opt[]; confidentialities: Opt[]; retentionClasses: Opt[];
   defaultConfidentiality: string | null;
   /** What this organization asks for: must be filled, may be left, or not asked. */
   fields: Record<string, "REQUIRED" | "OPTIONAL" | "OFF">;
@@ -284,7 +284,15 @@ export function NewDocumentForm({
                   </span>
                 ) : null}
             </div>
-            <div aria-hidden className="hidden xl:block" />
+            {/* The phase it is in: its revisions are named by that phase's line (Settings, Revisions). */}
+            {asks("phase") ? (
+              <Ask label={labels["phase"] ?? "Phase"} required={must("phase")} hint={phases.length ? "names its revisions" : "no phase published"}>
+                <select name="phase" required={must("phase")} className={field} defaultValue="">
+                  <option value="" disabled={must("phase")}>{must("phase") ? "Choose…" : "—"}</option>
+                  {phases.map((o) => <option key={o.code} value={o.code}>{o.label}</option>)}
+                </select>
+              </Ask>
+            ) : <div aria-hidden className="hidden xl:block" />}
             {asks("confidentiality") ? (
             <Ask label={labels["confidentiality"]} required={must("confidentiality")}>
               <select name="confidentiality" className={field} value={shownLevel} onChange={(e) => { setConfidentiality(e.target.value); setOwnLevel(true); }}>

@@ -55,7 +55,8 @@ export function WorkflowTemplateBuilder({ id, name = "", description = "", class
   functions?: { id: string; name: string }[];
   /** Parties that can hold a step: a client, a control office, a supplier. */
   outsideParties?: { id: string; name: string; participation: string }[];
-  outcomeSets: string[];
+  /** The verdict lists (Settings, Verdict lists): key and name. */
+  outcomeSets: { key: string; title: string }[];
   classOptions: ClassOptions;
   /** The published statuses, with what each one lets a step do. */
   statuses: StatusChoice[];
@@ -121,9 +122,9 @@ export function WorkflowTemplateBuilder({ id, name = "", description = "", class
           <input name="name" required defaultValue={name} className={inputCls} placeholder="Engineering drawings — lead engineer decides" />
         </Field>
         <Field label="When to use it"><input name="description" defaultValue={description} className={inputCls} placeholder="Tell the sender when this route is the right one" /></Field>
-        <Field label="Verdict list" hint="what the deciding step answers with; the steps before it always answer from the advice list. Publish a list named for outcomes or verdicts and it appears here — one set of verdicts for engineering, another elsewhere.">
+        <Field label="Verdict list" hint="what the deciding step answers with (Settings, Verdict lists); the steps before it advise">
           <select name="outcomeSetKey" defaultValue={outcomeSetKey} className={inputCls}>
-            {(outcomeSets.length ? outcomeSets : ["REVIEW_OUTCOMES"]).map((key) => <option key={key} value={key}>{key.replaceAll("_", " ").toLowerCase()}</option>)}
+            {(outcomeSets.length ? outcomeSets : [{ key: "REVIEW_OUTCOMES", title: "Review outcomes" }]).map((one) => <option key={one.key} value={one.key}>{one.title}</option>)}
           </select>
         </Field>
         <label className="flex items-center gap-2 self-end pb-2 text-xs font-medium text-slate-700"><input type="checkbox" name="isDefault" defaultChecked={isDefault} /> Offer this route first</label>

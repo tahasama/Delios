@@ -104,45 +104,45 @@ public static class CheckCatalog
     public static readonly IReadOnlyList<CheckDef> All =
     [
         // ── Setting the project up ────────────────────────────────────────────
-        new("ID-05", Phases.Setup, "A deliverable type no numbering scheme serves",
+        new("SET-01", Phases.Setup, "A deliverable type no numbering scheme serves",
             "Each published deliverable type is routed to a numbering scheme (Settings → Numbering); otherwise nothing of that type can be registered", Severities.Critical, "OG", async ctx =>
             {
                 var routed = await ctx.Db.SchemeRoutings.Where(r => r.Active).Select(r => r.DeliverableType).ToListAsync(ctx.CancellationToken);
                 return Fail(Active(ctx, ValueSets.DeliverableTypes).Where(t => !routed.Contains(t.Code))
                     .Select(t => Setting("NUMBERING", t.Code, $"{t.Label} cannot be registered: no numbering scheme serves it.")));
             }),
-        new("ST-04", Phases.Setup, "No status is published",
+        new("SET-02", Phases.Setup, "No status is published",
             "The statuses a revision is released at are published (Settings → Published lists); a status retired there leaves none", Severities.Critical, "OG", ctx =>
                 Task.FromResult(Active(ctx, ReviewSets.Statuses).Count == 0 ? Fail([Setting(ReviewSets.Statuses, "Statuses")]) : Pass)),
-        new("ST-06", Phases.Setup, "A status that does not say whether work may go ahead on it",
+        new("SET-03", Phases.Setup, "A status that does not say whether work may go ahead on it",
             "Every published status says whether work may go ahead on it (Settings → Published lists, Statuses: \"Allows work on site or in the shop\")", Severities.Critical, "OG", ctx =>
                 Task.FromResult(Fail(Active(ctx, ReviewSets.Statuses).Where(s => !Has(ctx.Values, ReviewSets.Statuses, s.Code, "executes"))
                     .Select(s => Setting(ReviewSets.Statuses, s.Code))))),
-        new("RO-01", Phases.Setup, "No verdict is published",
+        new("SET-04", Phases.Setup, "No verdict is published",
             "The verdicts the decider chooses from are published; a list emptied by retiring its verdicts leaves the decider nothing", Severities.Critical, "OG", ctx =>
                 Task.FromResult(Active(ctx, ReviewSets.Verdicts).Count == 0 ? Fail([Setting(ReviewSets.Verdicts, "Verdicts")]) : Pass)),
-        new("RO-03", Phases.Setup, "A verdict that does not say which of the four meanings it has",
+        new("SET-05", Phases.Setup, "A verdict that does not say which of the four meanings it has",
             "Every published verdict says accepted, accepted with comments, rejected or for information (a list uploaded from a spreadsheet may leave it out)", Severities.Critical, "OG", ctx =>
                 Task.FromResult(Fail(Active(ctx, ReviewSets.Verdicts).Where(v => !Has(ctx.Values, ReviewSets.Verdicts, v.Code, "proceed"))
                     .Select(v => Setting(ReviewSets.Verdicts, v.Code))))),
-        new("CL-06", Phases.Setup, "A criticality level with no meaning",
+        new("SET-06", Phases.Setup, "A criticality level with no meaning",
             "Each criticality level says what it means and decides (its retention period, at least); a list uploaded from a spreadsheet may leave it out", Severities.Critical, "OG", ctx =>
                 Task.FromResult(Fail(Active(ctx, ValueSets.Criticality).Where(c => c.Props is null)
                     .Select(c => Setting(ValueSets.Criticality, c.Code, $"{c.Label} changes nothing about the documents that carry it."))))),
-        new("CL-07", Phases.Setup, "\"Who may see it\" has no level used when none is chosen",
+        new("SET-07", Phases.Setup, "\"Who may see it\" has no level used when none is chosen",
             "One level of \"Who may see it\" is the default; unticked or retired, a new document starts with none", Severities.Major, "OG", ctx =>
                 Task.FromResult(Active(ctx, ValueSets.Confidentiality).Count > 0 && ctx.Values.DefaultOf(ValueSets.Confidentiality) is null
                     ? Fail([Setting(ValueSets.Confidentiality, "Default level")]) : Pass)),
-        new("RT-01", Phases.Setup, "No retention period used by default",
+        new("SET-08", Phases.Setup, "No retention period used by default",
             "One retention period is the default, for a document whose criticality says none; retired, documents are left without one", Severities.Critical, "OG", ctx =>
                 Task.FromResult(ctx.Values.DefaultOf(ValueSets.RetentionClasses) is null
                     ? Fail([Setting(ValueSets.RetentionClasses, "Default retention class")]) : Pass)),
-        new("IS-06", Phases.Setup, "Nobody on the project receives documents",
+        new("SET-09", Phases.Setup, "Nobody on the project receives documents",
             "At least one function on the project holds Receive in the distribution matrix; otherwise a release proposes nobody", Severities.Major, "OG", async ctx =>
                 await ctx.Db.Memberships.AnyAsync(m => m.ProjectId == ctx.Project.Id && m.Active && m.Function!.Active
                     && m.Function.Rules.Any(r => r.Verbs.Contains(Verbs.Receive)), ctx.CancellationToken)
                     ? Pass : Fail([Setting("MATRIX", "Distribution", "The matrix proposes nobody when a document is issued.")])),
-        new("IS-09", Phases.Setup, "A reason for issue that asks an answer but sets no period",
+        new("SET-10", Phases.Setup, "A reason for issue that asks an answer but sets no period",
             "A reason that asks an answer gives its period in working days (Settings → Published lists, Reasons for issue), so a transmittal asking it is given a day", Severities.Major, "OG", ctx =>
                 Task.FromResult(Fail(Active(ctx, TransmittalSets.Reasons)
                     .Where(r => ctx.Values.Prop(TransmittalSets.Reasons, r.Code, "response") is { ValueKind: JsonValueKind.True }
@@ -150,19 +150,19 @@ public static class CheckCatalog
                     .Select(r => Setting(TransmittalSets.Reasons, r.Code))))),
 
         // ── While the work runs ───────────────────────────────────────────────
-        new("MD-02", Phases.Running, "A title that became generic",
+        new("DOC-01", Phases.Running, "A title that became generic",
             "Titles made only of words added to the organization's generic list after the document was registered (new titles of that kind are refused)", Severities.Minor, "OR", ctx =>
             {
                 var words = ctx.Values.GenericTitleWords();
                 return Task.FromResult(Fail(ctx.Documents.Where(d => Titles.IsGeneric(d.Title, words)).Select(d => Doc(d))));
             }),
-        new("MD-03", Phases.Running, "A field its deliverable type requires is empty",
+        new("DOC-02", Phases.Running, "A field its deliverable type requires is empty",
             "Each document against the fields its deliverable type requires now (the type may have been given more since, or a field cleared on a revision)", Severities.Major, "OR", ctx =>
                 Task.FromResult(Fail(ctx.Documents.SelectMany(d => ctx.Values.RequiredFieldsOf(d.DeliverableType)
                     // The date received is filled when something comes in: a placeholder still waiting has none, rightly.
                     .Where(field => Empty(d, field) && !(field == "receivedDate" && ctx.Revisions.All(r => r.DocumentId != d.Id))).Select(field => Doc(d, $"{field} is required for {d.DeliverableType} and is empty."))
                     .Take(1))))),
-        new("MD-05", Phases.Running, "Received from another organization with no date received",
+        new("DOC-03", Phases.Running, "Received from another organization with no date received",
             "Documents of an outside organization of which something came in, with no date received (a placeholder not received yet is not counted)", Severities.Major, "CF", async ctx =>
             {
                 var outside = await ctx.Db.Parties.Where(p => !p.IsInternal).Select(p => p.Code).ToListAsync(ctx.CancellationToken);
@@ -170,24 +170,24 @@ public static class CheckCatalog
                 return Fail(ctx.Documents.Where(d => d.Originator is not null && outside.Contains(d.Originator) && d.ReceivedDate is null && came.Contains(d.Id))
                     .Select(d => Doc(d)));
             }),
-        new("MD-06", Phases.Running, "A field holds a value since retired",
+        new("DOC-04", Phases.Running, "A field holds a value since retired",
             "Each document's discipline, type, criticality, \"who may see it\" and retention against the lists as published now (a value retired after use)", Severities.Major, "CF", ctx =>
                 Task.FromResult(Fail(ctx.Documents.SelectMany(d => Controlled(d)
                     .Where(f => f.Value is not null && !ctx.Values.IsActive(f.Set, f.Value))
                     .Select(f => Doc(d, $"{f.Name} '{f.Value}' is not a published value.")).Take(1))))),
-        new("RT-03", Phases.Running, "No retention period on the document",
+        new("DOC-05", Phases.Running, "No retention period on the document",
             "Documents with no retention period: none chosen, and neither its criticality nor a default gives one", Severities.Major, "OR", ctx =>
                 Task.FromResult(Fail(ctx.Documents.Where(d => d.RetentionClass is null).Select(d => Doc(d))))),
-        new("RV-09", Phases.Running, "A void left the document with no released revision",
+        new("REV-01", Phases.Running, "A void left the document with no released revision",
             "Documents with a superseded revision and none released: the newest released one was voided and nothing replaced it", Severities.Critical, "CF", ctx =>
                 Task.FromResult(Fail(ctx.Revisions.GroupBy(r => r.DocumentId)
                     .Where(g => g.Any(r => r.State == RevisionStates.Superseded) && g.All(r => r.State != RevisionStates.Released))
                     .Select(g => Doc(ctx.Documents.First(d => d.Id == g.Key)))))),
-        new("ST-05", Phases.Running, "Released at a status since retired",
+        new("REV-02", Phases.Running, "Released at a status since retired",
             "The status of each released revision against the statuses as published now", Severities.Major, "CF", ctx =>
                 Task.FromResult(Fail(ctx.Released.Where(r => r.StatusCode is not null && !ctx.Values.IsActive(ReviewSets.Statuses, r.StatusCode))
                     .Select(r => Rev(ctx.DocumentOf(r), r, $"{r.StatusCode} is not a published status."))))),
-        new("RO-02", Phases.Running, "Decided with a verdict since retired",
+        new("RVW-01", Phases.Running, "Decided with a verdict since retired",
             "Reviews decided and not yet released, whose verdict was retired since", Severities.Major, "CF", async ctx =>
             {
                 var given = await ctx.Db.Reviews.Where(r => r.ProjectId == ctx.Project.Id && r.Verdict != null && r.State == ReviewStates.Decided)
@@ -195,7 +195,7 @@ public static class CheckCatalog
                 return Fail(given.Where(g => !ctx.Values.IsActive(g.VerdictSet, g.Verdict!))
                     .Select(g => new Failure($"review:{g.Id}", "Review", g.Id, g.DocumentId, g.Number, $"{g.Verdict} is not a published verdict.")));
             }),
-        new("RO-06", Phases.Running, "An open comment whose weight was retired",
+        new("RVW-02", Phases.Running, "An open comment whose weight was retired",
             "Open comments whose weight (comment, blocking comment…) is no longer published", Severities.Major, "RV", async ctx =>
             {
                 var open = await (from c in ctx.Db.ReviewComments
@@ -205,7 +205,7 @@ public static class CheckCatalog
                 return Fail(open.Where(c => !ctx.Values.IsActive(ReviewSets.CommentClasses, c.Class))
                     .Select(c => new Failure($"comment:{c.Id}", "Comment", c.Id, c.DocumentId, c.Number, $"Its weight {c.Class} is no longer published.")));
             }),
-        new("FM-01", Phases.Running, "Released with no native file",
+        new("REV-03", Phases.Running, "Released with no native file",
             "Released revisions with no native file beside the PDF (it is optional; the editable original helps the next revision)", Severities.Advisory, "OR", async ctx =>
             {
                 var released = ctx.Released.Select(r => r.Id).ToList();
@@ -213,7 +213,7 @@ public static class CheckCatalog
                     && f.Kind == FileKinds.Native).Select(f => f.RevisionId!.Value).Distinct().ToListAsync(ctx.CancellationToken)).ToHashSet();
                 return Fail(ctx.Released.Where(r => !withNative.Contains(r.Id)).Select(r => Rev(ctx.DocumentOf(r), r)));
             }),
-        new("FM-06", Phases.Running, "A file the register lists is missing from storage (outside the app)",
+        new("STO-01", Phases.Running, "A file the register lists is missing from storage (outside the app)",
             "Asks storage for a sample of current files, 25 a run", Severities.Critical, "CF", async ctx =>
             {
                 var failures = new List<Failure>();
@@ -224,7 +224,7 @@ public static class CheckCatalog
                 }
                 return Fail(failures);
             }),
-        new("FM-07", Phases.Running, "A file changed in storage after it was kept (outside the app)",
+        new("STO-02", Phases.Running, "A file changed in storage after it was kept (outside the app)",
             "Re-reads a sample of current files, 5 a run, against the fingerprint taken on arrival", Severities.Critical, "CF", async ctx =>
             {
                 var failures = new List<Failure>();
@@ -243,7 +243,7 @@ public static class CheckCatalog
                 }
                 return Fail(failures);
             }),
-        new("IS-11", Phases.Running, "Released and never sent",
+        new("REV-04", Phases.Running, "Released and never sent",
             "Released revisions no transmittal carried (other than for review): only when the project releases and issues separately, or a type released with no review", Severities.Advisory, "CF", async ctx =>
             {
                 var released = ctx.Released.Select(r => r.Id).ToList();
@@ -253,14 +253,14 @@ public static class CheckCatalog
                                    select i.RevisionId!.Value).Distinct().ToListAsync(ctx.CancellationToken)).ToHashSet();
                 return Fail(ctx.Released.Where(r => !sent.Contains(r.Id)).Select(r => Rev(ctx.DocumentOf(r), r)));
             }),
-        new("RG-01", Phases.Running, "The history has a broken link (outside the app)",
+        new("STO-03", Phases.Running, "The history has a broken link (outside the app)",
             "Recomputes the hash chain of the organization's audit trail", Severities.Critical, "CF", async ctx =>
                 await ctx.Audit.FirstBrokenLinkAsync(ctx.CancellationToken) is { } at
                     ? Fail([new Failure("audit:chain", "Audit", null, null, "Audit trail", $"The chain breaks at entry {at}: something was altered.")])
                     : Pass),
 
         // ── The schedule ──────────────────────────────────────────────────────
-        new("SC-04", Phases.Setup, "A schedule is followed but no \"Went ahead?\" answers are published",
+        new("SET-11", Phases.Setup, "A schedule is followed but no \"Went ahead?\" answers are published",
             "With a schedule, the answers to \"Went ahead?\" (went ahead, postponed…) are published, each saying whether the action went ahead", Severities.Major, "OG", async ctx =>
             {
                 if (!await ctx.Db.ScheduleSources.AnyAsync(s => s.ProjectId == ctx.Project.Id, ctx.CancellationToken)) return Pass;
@@ -270,7 +270,7 @@ public static class CheckCatalog
                 return Fail(decisions.Where(d => !Has(ctx.Values, Actions.ScheduleSets.Decisions, d.Code, "proceeds"))
                     .Select(d => Setting(Actions.ScheduleSets.Decisions, d.Code, $"{d.Label} does not say whether the action went ahead.")));
             }),
-        new("SC-01", Phases.Running, "The released schedule could not be read",
+        new("SCH-01", Phases.Running, "The released schedule could not be read",
             "The schedule document's released revision against what was read from it (also on Home)", Severities.Major, "CF", async ctx =>
             {
                 var source = await ctx.Db.ScheduleSources.AsNoTracking().SingleOrDefaultAsync(s => s.ProjectId == ctx.Project.Id, ctx.CancellationToken);
@@ -282,7 +282,7 @@ public static class CheckCatalog
                     ? Fail([Rev(ctx.DocumentOf(current), current, $"Its actions were not read: {read.Error}")])
                     : Pass;
             }),
-        new("SC-02", Phases.Running, "An action past its day that a concerned discipline has not confirmed",
+        new("SCH-02", Phases.Running, "An action past its day that a concerned discipline has not confirmed",
             "Actions past their day, not postponed, with a document still missing, where a concerned discipline has not confirmed going ahead (by hand or automatically)", Severities.Major, "CF", async ctx =>
             {
                 var today = ctx.Now.InZone(DateTimeZoneProviders.Tzdb.GetZoneOrNull(ctx.Project.TimeZone) ?? DateTimeZone.Utc).Date;
@@ -302,7 +302,7 @@ public static class CheckCatalog
             }),
 
         // ── Closing and handing over ──────────────────────────────────────────
-        new("PK-06", Phases.Handover, "A delivery package not checked for readiness by its date",
+        new("PKG-01", Phases.Handover, "A delivery package not checked for readiness by its date",
             "Open delivery packages past their date whose readiness was never checked (a supplier's package has no single date)", Severities.Major, "CF", async ctx =>
             {
                 var today = ctx.Now.InZone(DateTimeZoneProviders.Tzdb.GetZoneOrNull(ctx.Project.TimeZone) ?? DateTimeZone.Utc).Date;

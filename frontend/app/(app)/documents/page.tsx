@@ -120,7 +120,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
       api<RegisterPage>(projectPath(scope, "/register"), {
         query: {
           q, state, rev: revState, status: statusCode, verdict: verdictCode, supplier, po, discipline, docType, criticality, confidentiality,
-          deliverable, action: sp.action ?? "", on: dateOn, from: sp.from ?? "", to: sp.to ?? "", view, sort, dir, page, per: perPage,
+          deliverable, phase: sp.phase ?? "", action: sp.action ?? "", on: dateOn, from: sp.from ?? "", to: sp.to ?? "", view, sort, dir, page, per: perPage,
         },
       }),
       getSet("DISCIPLINES"), getSet("DOCUMENT_TYPES"), getSet("STATUSES"), getSet("REVIEW_OUTCOMES"), getSet("SUPPLIER_CODES"), getSet("PURCHASE_ORDERS"),
@@ -143,6 +143,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
   const typeLabel = new Map(types.map((t) => [t.code, t.label]));
   const retentionLabel = new Map(retentions.map((item) => [item.code, item.label]));
   const deliverableLabel = new Map(deliverableTypes.map((item) => [item.code, item.label]));
+  const phaseLabel = new Map(phases.map((item) => [item.code, item.label]));
   const statusLabel = new Map(statuses.map((item) => [item.code, item.label]));
   const publishedVerdicts = new Set(verdictSet.map((item) => item.code));
   const verdictLabel = new Map<string, string>([...Object.entries(OUTCOME_CONSEQUENCES).map(([k, v]) => [k, v.label] as [string, string]), ...verdictSet.map((item) => [item.code, item.label] as [string, string])]);
@@ -164,8 +165,8 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
     return {
       id: doc.id, docNumber: doc.number, title: doc.title, deliverableType: doc.deliverableType,
       docType: doc.docType, discipline: doc.discipline,
-      phase: null as string | null,
-      phaseLabel: null as string | null,
+      phase: doc.phase ?? null,
+      phaseLabel: doc.phase ? phaseLabel.get(doc.phase) ?? doc.phase : null,
       actions: doc.activities.map((entry) => ({ code: entry.code, name: entry.name })),
       deliverableLabel: deliverableLabel.get(doc.deliverableType) ?? pretty(doc.deliverableType), docTypeLabel: typeLabel.get(doc.docType) ?? doc.docType, disciplineLabel: disciplineLabel.get(doc.discipline) ?? doc.discipline, originator: doc.originator, subProject: doc.subproject,
       contractRef: doc.contractRef, criticality: doc.criticality, confidentiality: doc.confidentiality,
@@ -240,7 +241,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
   for (const code of REV_STATES) codes[`REV_STATE|${code}`] = `${stateName(names, code)} — ${REV_MEANING[code].means}`;
 
   const query = new URLSearchParams();
-  if (q) query.set("q", q); if (state) query.set("state", state); if (discipline) query.set("discipline", discipline); if (docType) query.set("docType", docType); if (revState) query.set("rev", revState); if (statusCode) query.set("status", statusCode); if (verdictCode) query.set("verdict", verdictCode); if (supplier) query.set("supplier", supplier); if (po) query.set("po", po); if (view === "all") query.set("view", "all"); if (criticality) query.set("criticality", criticality); if (confidentiality) query.set("confidentiality", confidentiality); if (deliverable) query.set("deliverable", deliverable);
+  if (q) query.set("q", q); if (state) query.set("state", state); if (discipline) query.set("discipline", discipline); if (docType) query.set("docType", docType); if (revState) query.set("rev", revState); if (statusCode) query.set("status", statusCode); if (verdictCode) query.set("verdict", verdictCode); if (supplier) query.set("supplier", supplier); if (po) query.set("po", po); if (view === "all") query.set("view", "all"); if (criticality) query.set("criticality", criticality); if (confidentiality) query.set("confidentiality", confidentiality); if (deliverable) query.set("deliverable", deliverable); if (sp.phase) query.set("phase", sp.phase);
   if (dateOn) query.set("on", dateOn); if (sp.from) query.set("from", sp.from); if (sp.to) query.set("to", sp.to);
   if (sort) { query.set("sort", sort); query.set("dir", dir); }
   // Opened for an action, by Document Control: what it needs now starts ticked.

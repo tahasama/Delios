@@ -29,19 +29,15 @@ function fixFor(d: DefectView): { label: string; href: string } {
   if (d.entityType === "Audit") return { label: "Audit trail", href: "/settings/audit" };
   const documentId = d.documentId;
   if (!documentId) {
-    if (family === "SC") return { label: "Schedule", href: "/actions" };
-    if (family === "CF") return { label: "The plan", href: "/settings/dmp" };
+    if (family === "SCH") return { label: "Schedule", href: "/actions" };
     return { label: "Settings", href: "/settings" };
   }
   const doc = `/documents/${documentId}`;
   switch (family) {
-    case "ID": case "MD": case "CL": case "RT": case "IO": return { label: "Edit details", href: `${doc}#metadata` };
-    case "RV": case "ST": case "FM": return { label: "Revisions", href: `${doc}#revisions` };
-    case "AP": case "RO": return { label: "Reviews & approval", href: `${doc}#reviews` };
-    case "IS": return { label: "Sent out", href: `${doc}#distribution` };
-    case "OB": return { label: "Out-of-date risks", href: "/exposures" };
-    case "DB": return { label: "Schedule needs", href: `${doc}#relationships` };
-    case "PK": return { label: "Packages", href: `${doc}#relationships` };
+    case "DOC": return { label: "Edit details", href: `${doc}#metadata` };
+    case "REV": case "STO": return { label: "Revisions", href: `${doc}#revisions` };
+    case "RVW": return { label: "Reviews & approval", href: `${doc}#reviews` };
+    case "PKG": return { label: "Packages", href: `${doc}#relationships` };
     default: return { label: "Open document", href: doc };
   }
 }
@@ -54,22 +50,13 @@ function fixFor(d: DefectView): { label: string; href: string } {
  * 274 separate sentences would go stale the first time a check changed.
  */
 const TODO: Record<string, string> = {
-  ID: "Open the document and correct how it is identified — its number, its type, or what it is about.",
-  MD: "Open the document and fill in what is missing from its description.",
-  CL: "Open the document and set the classification it should carry.",
-  RT: "Open the document and give it the retention it should be kept under.",
-  IO: "Decide what this is — a document that gets revised, or a record that does not — and register it as that.",
-  RV: "Open the revisions and put right what was recorded about this one.",
-  ST: "Open the revisions: the state it is in does not match what was done to it.",
-  FM: "Open the revisions and attach the file that is missing, in the form it should be kept.",
-  AP: "Open the reviews: it was released without the approval the rules require.",
-  RO: "Open the reviews and finish the route properly — the verdict, who gave it, or an open comment.",
-  IS: "Open what was sent out and correct the issue record.",
-  OB: "Somebody is holding a copy that is no longer current — tell them, or record that you did.",
-  DB: "The schedule still expects this document; settle whether it is owed or withdraw the need.",
-  PK: "Open the package and settle what belongs in it.",
-  SC: "Open the schedule and settle the activity: record a decision, or chase the document it is waiting for.",
-  CF: "An administrator has to publish or correct a setting before this can be right.",
+  SET: "An administrator has to publish or correct a setting before this can be right.",
+  DOC: "Open the document and put right what its details say or leave out.",
+  REV: "Open the revisions and put right what was recorded about this one.",
+  RVW: "Open the review and settle the verdict or the comment it names.",
+  STO: "A file or the history changed outside the app: tell whoever looks after the storage, and restore it from the backup.",
+  SCH: "Open the schedule and settle the action: a confirmation, a postponement, or the document it is waiting for.",
+  PKG: "Open the package and settle what belongs in it.",
 };
 
 /**
@@ -85,7 +72,7 @@ export function todoOf(checkId: string): string {
 
 /** The finding's own sentence, without clause references and Standard jargon. */
 function plainProblem(text: string): string {
-  return plain(text).replace(/\s*—\s*structural contradiction/gi, "").replace(/\s*▲/g, "").replace(/\s*\/\s*[A-Z]{2}-\d{2}/g, "").replace(/\.$/, "") ;
+  return plain(text).replace(/\s*—\s*structural contradiction/gi, "").replace(/\s*▲/g, "").replace(/\s*\/\s*[A-Z]{2,3}-\d{2}/g, "").replace(/\.$/, "") ;
 }
 
 /**

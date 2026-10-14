@@ -272,9 +272,10 @@ public static class CatalogAdminEndpoints
         if (set is null || set == ReviewSets.Verdicts) return (null, null);
         var catalog = await Catalog.LoadAsync(db, cancellationToken);
         var codes = await db.ValueEntries.AsNoTracking().Where(v => v.SetKey == set && v.Status == ValueStatus.Active).Select(v => v.Code).ToListAsync(cancellationToken);
-        if (codes.Count == 0) return (null, Problems.Invalid("VERDICT_SET_EMPTY", $"{set} has no published values to decide from."));
+        if (codes.Count == 0) return (null, Problems.Invalid("VERDICT_SET_EMPTY", "That verdict list has no verdicts yet: add them in Settings, Verdict lists."));
         if (!codes.Any(c => ReviewSets.Proceeds(catalog, set, c)))
-            return (null, Problems.Invalid("VERDICT_SET_NEVER_PROCEEDS", $"No verdict of {set} lets a revision go on to release (proceed)."));
+            return (null, Problems.Invalid("VERDICT_SET_NEVER_PROCEEDS",
+                "None of that list's verdicts means accepted yet, so no revision could be released from it: give each its meaning in Settings, Verdict lists."));
         return (set, null);
     }
 

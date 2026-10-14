@@ -86,6 +86,8 @@ export type RegisterRow = {
   supplier?: string | null;
   /** Exchanged with a supplier: true while they hold it, false while we do. */
   withSupplier?: boolean | null;
+  /** The phase it is in now (PHASES). */
+  phase?: string | null;
 };
 
 /** An ask to hand a supplier's document back for an update (RETURN_FOR_UPDATE), with its answer. */
@@ -109,6 +111,8 @@ export type DocumentView = {
   holdLifted?: Written | null; ended?: Written | null; reinstated?: Written | null;
   /** Exchanged with a supplier: who holds it, the only side that may change it (true the supplier, false us); null otherwise. */
   withSupplier?: boolean | null;
+  /** The phase it is in now (PHASES): its next revision is named by that phase's line. */
+  phase?: string | null;
 };
 
 /** Something a person decided and wrote down: when, who, and why, in their words. */
@@ -134,6 +138,8 @@ export type RevisionView = {
    * with what was granted; when it first went out. Present on GET /documents/{id}.
    */
   reading?: { awaitingCheck: boolean; keptSubmission: number; decided: boolean; granted: string | null; issuedAt: string | null } | null;
+  /** The phase the document was in when this revision was started. */
+  phase?: string | null;
 };
 /** GET /documents/{id}/routes (ReviewEndpoints RouteView). */
 export type RouteView = { id: string; name: string; description: string | null; isDefault: boolean; verdictSet?: string; steps: { title: string; functionCode: string | null; partyCode: string | null; mode: string; reason: string | null; userIds?: string[] }[] };

@@ -9,7 +9,8 @@ public sealed record RegisterDocumentRequest(
     string? Originator = null, string? Subproject = null, string? ContractRef = null,
     string? Criticality = null, string? Confidentiality = null, string? RetentionClass = null,
     DateOnly? ReceivedDate = null, DateOnly? PlannedDate = null, string? Kind = null,
-    string? PreviousNumber = null, string? LegacyScheme = null, string? AppVersion = null, Dictionary<string, string?>? Extras = null);
+    string? PreviousNumber = null, string? LegacyScheme = null, string? AppVersion = null, Dictionary<string, string?>? Extras = null,
+    string? Phase = null);
 
 /// <summary>
 /// The JSON body that changes a document's metadata (PUT /documents/{id}): only the fields named in
@@ -28,10 +29,11 @@ public sealed record UploadRequest(string? FileName, long Size, string? ContentT
 /// and, optionally, why the revision was made and what changed.
 /// </summary>
 /// <param name="Series">A series of the document's revision scheme; empty continues the latest one.</param>
+/// <param name="Phase">The phase the document moves to with this revision (PHASES); empty keeps the one it is in.</param>
 /// <param name="FilesLater">Start the revision now and attach its files afterwards (POST .../revisions/{id}/files).</param>
 public sealed record StartRevisionRequest(
     Guid[]? FileIds, string? ReasonForRevision = null, string? ChangeDescription = null, string? Series = null,
-    bool FilesLater = false, string? Purpose = null);
+    bool FilesLater = false, string? Purpose = null, string? Phase = null);
 
 /// <summary>One row of the document register list, as returned by GET /documents.</summary>
 public sealed record DocumentSummary(
@@ -56,7 +58,7 @@ public sealed record RevisionView(
     IReadOnlyList<SubmissionView> Submissions, IReadOnlyList<FileView> Files, Guid AuthoredById, string? AuthoredByParty,
     string? ReleasedByName, DateTimeOffset? ReturnedAt, DateTimeOffset? HeldAt = null, string? HeldReason = null, string? HeldByName = null,
     DateTimeOffset? VoidedAt = null, string? VoidReason = null, string? VoidAuthority = null, string? VoidReassessment = null,
-    Written? Unvoided = null, Written? Resent = null, RevisionReading? Reading = null);
+    Written? Unvoided = null, Written? Resent = null, RevisionReading? Reading = null, string? Phase = null);
 
 /// <summary>
 /// What a revision amounts to, said once for every screen. <c>AwaitingCheck</c>: sent in by another organization and
@@ -95,7 +97,7 @@ public sealed record DocumentView(
     bool LegalHold = false, string? LegalHoldReason = null, string? PreviousNumber = null, string? LegacyScheme = null, string? AppVersion = null,
     System.Text.Json.JsonElement? Extras = null, DateTimeOffset? ConfirmedAt = null, string? ConfirmedByName = null, Guid? CorrectsId = null,
     DateTimeOffset? LegalHoldAt = null, string? LegalHoldBy = null, Written? HoldLifted = null, Written? Ended = null, Written? Reinstated = null,
-    bool? WithSupplier = null);
+    bool? WithSupplier = null, string? Phase = null);
 
 /// <summary>One page of the register. <c>Next</c> is the value to pass as <c>after</c> for the next page; null on the last page.</summary>
 public sealed record DocumentPage(IReadOnlyList<DocumentSummary> Items, string? Next);

@@ -37,6 +37,8 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
             await db.SaveChangesAsync(cancellationToken);
             issuing |= await EnsureAssetSetupAsync(existing.Id, cancellationToken);
             await db.SaveChangesAsync(cancellationToken);
+            issuing |= await EnsureRevisionLinesAsync(cancellationToken);
+            await db.SaveChangesAsync(cancellationToken);
             issuing |= await EnsureControlSetupAsync(existing.Id, cancellationToken);
             await db.SaveChangesAsync(cancellationToken);
             issuing |= await EnsureScheduleSetupAsync(existing.Id, cancellationToken);
@@ -232,12 +234,12 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
             IsDefault = true,
             Series =
             [
+                // One line for any phase; a phase that names its revisions otherwise gets its own (Settings, Revisions).
                 new()
                 {
-                    Code = "DESIGN", Label = "Design", Kind = SeriesKinds.Letters, Start = "A",
+                    Code = "DESIGN", Label = "Any phase", Kind = SeriesKinds.Letters, Start = "A",
                     ExcludedLetters = ["I", "O", "Q", "S", "X", "Z"],
                 },
-                new() { Code = "EXECUTION", Label = "Execution", Kind = SeriesKinds.Numbers, Start = "0" },
             ],
         });
 
@@ -431,6 +433,26 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
         db.NumberingSchemes.Add(scheme);
         db.SchemeRoutings.Add(new SchemeRouting { TenantId = t, DeliverableType = RecordKinds.Package, SchemeId = scheme.Id });
         return true;
+    }
+
+    /// <summary>
+    /// Revision schemes have one line for any phase (the others name a phase). A scheme seeded with two lines and no
+    /// phase keeps the first; a second no revision carries is dropped, one carried stays.
+    /// </summary>
+    private async Task<bool> EnsureRevisionLinesAsync(CancellationToken cancellationToken)
+    {
+        var changed = false;
+        var carried = await db.Revisions.Select(r => r.Series).Distinct().ToListAsync(cancellationToken);
+        foreach (var scheme in await db.RevisionSchemes.ToListAsync(cancellationToken))
+        {
+            var defaults = scheme.Series.Where(l => l.Phase is null).ToList();
+            var drop = defaults.Skip(1).Where(l => !carried.Contains(l.Code)).ToList();
+            if (drop.Count == 0) continue;
+            scheme.Series = [.. scheme.Series.Except(drop)];
+            if (scheme.Series.FirstOrDefault(l => l.Phase is null) is { Label: "Design" } line) line.Label = "Any phase";
+            changed = true;
+        }
+        return changed;
     }
 
     /// <summary>Asset tags: P1001-TAG-0001, given by itself as a package number is. The recommendation, as data.</summary>

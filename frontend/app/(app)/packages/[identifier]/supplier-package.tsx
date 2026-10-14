@@ -13,7 +13,7 @@ import { submitSupplierPackageAction } from "@/lib/packages/forms-supplier";
 import { supplierRows, supplierFigures, packageStage, packageCounts, lineStage, WITH_SUPPLIER, type SupplierRow } from "@/lib/packages/supplier";
 import { fmtDate } from "@/lib/core/utils";
 import { plannedState } from "@/lib/actions/planned-state";
-import { ArrowLeft, Download, Filter, Pencil, Send, Share2, Trash2 } from "lucide-react";
+import { ArrowLeft, Download, Filter, PackageCheck, Pencil, Send, Share2, Trash2 } from "lucide-react";
 import { getMe } from "@/lib/account/api";
 import type { PackageView } from "@/lib/types";
 
@@ -271,6 +271,11 @@ export async function SupplierPackage({ pkg }: { pkg: PackageView }) {
                 </Act>
               ) : null}
               {listLink}
+              {/* Handed over to whoever gets them (the client, operations): a delivery package holding its documents. */}
+              {rows.length ? (
+                <Link href={`/packages?${new URLSearchParams({ category: "DELIVERY", from: pkg.number, docs: rows.map((r) => r.doc.id).join(",") })}#new`}
+                  className="ask inline-flex items-center gap-1.5"><PackageCheck className="h-3.5 w-3.5" /> Deliver</Link>
+              ) : null}
             </div>
             {shared ? <p className="text-[11px] text-slate-500">Shared: it can no longer be renamed, have its rule changed or be deleted.</p> : null}
           </div>

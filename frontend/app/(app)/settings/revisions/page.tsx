@@ -6,6 +6,7 @@ import { getActiveSet } from "@/lib/settings/config";
 import { adminNumbering, type RevisionSeries } from "@/lib/settings/api-admin";
 import { createRevisionSchemeAction, updateRevisionSchemeAction, routeRevisionSchemeAction } from "@/lib/settings/forms-revisions";
 import { Pencil, Plus } from "lucide-react";
+import { SeriesRows } from "./series-rows";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Revisions" };
@@ -26,33 +27,6 @@ function sample(s: RevisionSeries, count = 4): string {
   return `${out.join(", ")}…`;
 }
 
-/** The rows of series a scheme is written with: the ones it has, and one more left blank to add a series. */
-function SeriesRows({ series }: { series: RevisionSeries[] }) {
-  const rows: (RevisionSeries | null)[] = series.length ? [...series, null] : [null, null];
-  return (
-    <div className="space-y-3">
-      {rows.map((s, i) => (
-        <div key={i} className="grid grid-cols-2 gap-x-4 gap-y-3 md:grid-cols-7">
-          <Field label="Code" hint={s ? "stays once used" : "another series? else leave empty"}><input name={`code_${i}`} defaultValue={s?.code ?? ""} className={`${inputCls} uppercase`} /></Field>
-          <Field label="Name" className="md:col-span-2"><input name={`label_${i}`} defaultValue={s?.label ?? ""} className={inputCls} /></Field>
-          <Field label="Counts in">
-            <select name={`kind_${i}`} defaultValue={s?.kind ?? "LETTERS"} className={inputCls}>
-              <option value="LETTERS">Letters</option>
-              <option value="NUMBERS">Numbers</option>
-            </select>
-          </Field>
-          <Field label="Prefix" hint="before each value, e.g. P"><input name={`prefix_${i}`} defaultValue={s?.prefix ?? ""} className={inputCls} /></Field>
-          <Field label="Starts at" hint="empty: A, or 0"><input name={`start_${i}`} defaultValue={s?.start ?? ""} className={inputCls} /></Field>
-          <Field label="Letters skipped" hint="read as digits or as each other">
-            <input name={`excluded_${i}`} defaultValue={s?.excludedLetters.join(" ") ?? ""} className={inputCls} />
-            <input type="hidden" name={`width_${i}`} value={s?.width ?? 0} />
-          </Field>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 /**
  * How revisions are named: A, B, C… then 0, 1, 2… is the recommendation; an organization may have its own (P1, P2;
  * CA, CB), and say which deliverable types follow which. A value is never used twice on one document, and a series
@@ -63,9 +37,11 @@ export default async function RevisionsPage() {
   if (!maySetup(me, SETUP_PAGES.find((p) => p.href === "/settings/revisions")!)) {
     return <PageHeader title="Revisions" subtitle="Administrators and the control function." />;
   }
-  const [{ revisionSchemes: schemes, revisionRouting: routing }, deliverables] = await Promise.all([adminNumbering(), getActiveSet("DELIVERABLE_TYPES")]);
+  const [{ revisionSchemes: schemes, revisionRouting: routing }, deliverables, phaseValues] = await Promise.all([adminNumbering(), getActiveSet("DELIVERABLE_TYPES"), getActiveSet("PHASES")]);
+  const phases = phaseValues.map((p) => ({ code: p.code, label: p.label }));
+  const phaseName = (code: string | null | undefined) => (code ? phases.find((p) => p.code === code)?.label ?? code : "Any phase");
   const fallback = schemes.find((s) => s.isDefault) ?? null;
-  const looks = (s: { series: RevisionSeries[] }) => s.series.map((one) => sample(one, 3)).join(" then ");
+  const looks = (s: { series: RevisionSeries[] }) => s.series.map((one) => `${sample(one, 3)}${one.phase ? ` in ${phaseName(one.phase)}` : ""}`).join("; ");
 
   return (
     <div className="space-y-4">
@@ -113,11 +89,11 @@ export default async function RevisionsPage() {
             </span>
           </div>
           <DataTable className="rounded-none border-0 shadow-none" id={`scheme-${s.id}`}
-            head={<tr><Th>Series</Th><Th>Code</Th><Th>Counts in</Th><Th>Looks like</Th><Th>Letters skipped</Th></tr>}>
+            head={<tr><Th>Phase</Th><Th>Name</Th><Th>Counts in</Th><Th>Looks like</Th><Th>Letters skipped</Th></tr>}>
             {s.series.map((one) => (
               <tr key={one.code}>
-                <Td className="text-[13px] text-slate-800">{one.label}</Td>
-                <Td className="font-mono text-xs">{one.code}</Td>
+                <Td className="text-[13px] text-slate-800">{phaseName(one.phase)}{one.phase ? null : <span className="ml-1.5 text-[11px] text-slate-400">the default</span>}</Td>
+                <Td className="text-xs text-slate-600">{one.label}</Td>
                 <Td className="text-xs text-slate-600">{one.kind === "NUMBERS" ? "numbers" : "letters"}</Td>
                 <Td className="font-mono text-xs text-slate-700">{sample(one)}</Td>
                 <Td className="text-xs text-slate-500">{one.excludedLetters.join(" ") || "—"}</Td>
@@ -126,7 +102,7 @@ export default async function RevisionsPage() {
           </DataTable>
           <details>
             <summary className="flex cursor-pointer list-none items-center justify-between gap-3 border-t border-line px-5 py-3 sm:px-6 [&::-webkit-details-marker]:hidden">
-              <span className="text-[13px] text-slate-600">Its name or series to change? A series revisions already carry stays, counted as it is.</span>
+              <span className="text-[13px] text-slate-600">Its name or its lines to change? A line revisions already carry stays, counted as it is.</span>
               <span className="ask inline-flex items-center gap-1.5"><Pencil className="h-3.5 w-3.5" /> Edit</span>
             </summary>
             <div className="border-t border-line px-5 py-4 sm:px-6">
@@ -136,7 +112,7 @@ export default async function RevisionsPage() {
                   <label className="flex items-center gap-2 self-end text-[13px] text-slate-700"><input type="checkbox" name="forwardOnly" defaultChecked={s.forwardOnly} /> Only moves forward</label>
                   {s.isDefault ? null : <label className="flex items-center gap-2 self-end text-[13px] text-slate-700"><input type="checkbox" name="isDefault" /> Make it the default</label>}
                 </div>
-                <SeriesRows series={s.series} />
+                <SeriesRows series={s.series} phases={phases} />
               </ActionForm>
             </div>
           </details>
@@ -145,7 +121,7 @@ export default async function RevisionsPage() {
 
       <details className="register register-sheet register-sheet-open" open={!schemes.length}>
         <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-3 sm:px-6 [&::-webkit-details-marker]:hidden">
-          <span className="text-[13px] text-slate-600">Some documents named differently (P1, P2; CA, CB)?</span>
+          <span className="text-[13px] text-slate-600">Some documents named differently (P1, P2 for a supplier; another line per phase)?</span>
           <span className="ask inline-flex items-center gap-1.5"><Plus className="h-3.5 w-3.5" /> New scheme</span>
         </summary>
         <div className="border-t border-line px-5 py-4 sm:px-6">
@@ -154,7 +130,7 @@ export default async function RevisionsPage() {
               <Field label="Name" required><input name="name" required className={inputCls} /></Field>
               <label className="flex items-center gap-2 self-end text-[13px] text-slate-700"><input type="checkbox" name="forwardOnly" defaultChecked /> Only moves forward</label>
             </div>
-            <SeriesRows series={[]} />
+            <SeriesRows series={[]} phases={phases} />
           </ActionForm>
         </div>
       </details>

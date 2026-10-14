@@ -94,7 +94,7 @@ export async function createConfigSetAction(_prev: Result | undefined, formData:
   if (key.length > 40) return { error: "Keep the key under 40 characters." };
   if ((await getSets()).some((one) => one.key === key)) return { error: "A set with that key already exists." };
   try {
-    await setOrgSetting(SET_KEY + key, JSON.stringify({ title, description: text(formData, "description") || null, group: text(formData, "group") || null, version: 1, kind: text(formData, "kind") || null }));
+    await setOrgSetting(SET_KEY + key, JSON.stringify({ title, description: text(formData, "description") || null, group: text(formData, "group") || null, version: 1 }));
   } catch (e) {
     return failed(e);
   }
@@ -240,7 +240,8 @@ export async function updateConfigSetAction(_prev: Result | undefined, formData:
     await setOrgSetting(SET_KEY + key, JSON.stringify({
       title, description: text(formData, "description") || null,
       group: formData.has("group") ? text(formData, "group") || null : current?.group ?? null, version: (current?.version ?? 1) + 1,
-      kind: formData.has("kind") ? text(formData, "kind") || null : current?.kind ?? null,
+      // A verdict list stays one (Settings, Verdict lists, makes it so).
+      kind: current?.kind ?? null,
     }));
   } catch (e) {
     return failed(e);

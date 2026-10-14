@@ -106,6 +106,12 @@ export const SETUP_PAGES: SetupPage[] = [
     verb: "ROUTES",
     control: true,
   },
+  {
+    href: "/settings/verdicts",
+    title: "Verdict lists",
+    text: "What a review decides with: each verdict and what it means. One for our documents, another for suppliers', as many as needed.",
+    group: "How work flows",
+  },
 
   {
     href: "/settings/functions",

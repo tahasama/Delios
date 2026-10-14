@@ -31,7 +31,7 @@ export async function prepareRevisionAction(_prev: Result | undefined, formData:
     const files = filesOf(formData, "renditionFile", "nativeFile");
     const fileIds = await Promise.all(files.map((file) => upload(ctx, { documentId }, file)));
     await api(projectPath(ctx, `/documents/${documentId}/revisions`), {
-      body: { fileIds, reasonForRevision: text(formData, "reasonForRevision") || changeDescription, changeDescription, filesLater: fileIds.length === 0, purpose: text(formData, "purpose") || null },
+      body: { fileIds, reasonForRevision: text(formData, "reasonForRevision") || changeDescription, changeDescription, filesLater: fileIds.length === 0, purpose: text(formData, "purpose") || null, phase: text(formData, "phase") || null },
     });
     // Sent for review from the document's page, where the route and its people are chosen.
   } catch (e) {

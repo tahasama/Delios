@@ -36,6 +36,8 @@ public static class ValueSets
     public const string DocumentTypes = "DOCUMENT_TYPES";
     public const string DeliverableTypes = "DELIVERABLE_TYPES";
     public const string Subprojects = "SUBPROJECTS";
+    /// <summary>The project's phases (design, construction…): what a document is in, and how its revisions are named there.</summary>
+    public const string Phases = "PHASES";
     public const string PurchaseOrders = "PURCHASE_ORDERS";
     public const string Criticality = "CRITICALITY";
     public const string Confidentiality = "CONFIDENTIALITY";
@@ -138,6 +140,8 @@ public sealed class Document
     /// <summary>The party that produces it, when that is not us.</summary>
     public string? Originator { get; set; }
     public string? Subproject { get; set; }
+    /// <summary>The phase it is in now (PHASES): the next revision is named by that phase's line of the revision scheme.</summary>
+    public string? Phase { get; set; }
     public string? ContractRef { get; set; }
     public string? Criticality { get; set; }
     public string? Confidentiality { get; set; }
@@ -234,6 +238,8 @@ public sealed class Revision
     public required string Value { get; set; }
     /// <summary>The code of the series in the document's revision scheme this value belongs to.</summary>
     public required string Series { get; set; }
+    /// <summary>The phase the document was in when this revision was started (PHASES); none when no phase was given.</summary>
+    public string? Phase { get; set; }
     /// <summary>Where the revision is in its life; see <see cref="RevisionStates"/>.</summary>
     public string State { get; set; } = RevisionStates.InPreparation;
     /// <summary>Whether every file has passed scanning: PROCESSING, READY or REJECTED.</summary>
@@ -331,6 +337,8 @@ public sealed class RevisionSeriesRule
     public int Width { get; set; }
     /// <summary>LETTERS only: a, b, c rather than A, B, C.</summary>
     public bool Lowercase { get; set; }
+    /// <summary>The phase (PHASES) this line names revisions in; none: the default line, for any phase without its own.</summary>
+    public string? Phase { get; set; }
     /// <summary>LETTERS only: letters never used, because they read as digits or as each other.</summary>
     public string[] ExcludedLetters { get; set; } = [];
 }

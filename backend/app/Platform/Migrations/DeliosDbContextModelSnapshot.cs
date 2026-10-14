@@ -1046,6 +1046,11 @@ namespace Delios.Host.Platform.Migrations
                         .HasColumnType("character varying(32)")
                         .HasColumnName("originator");
 
+                    b.Property<string>("Phase")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("phase");
+
                     b.Property<LocalDate?>("PlannedDate")
                         .HasColumnType("date")
                         .HasColumnName("planned_date");
@@ -1510,6 +1515,11 @@ namespace Delios.Host.Platform.Migrations
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)")
                         .HasColumnName("held_reason");
+
+                    b.Property<string>("Phase")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("phase");
 
                     b.Property<Guid>("ProjectId")
                         .HasColumnType("uuid")
@@ -5987,6 +5997,8 @@ namespace Delios.Host.Platform.Migrations
                                 .IsRequired();
 
                             b1.Property<bool>("Lowercase");
+
+                            b1.Property<string>("Phase");
 
                             b1.Property<string>("Prefix")
                                 .IsRequired();

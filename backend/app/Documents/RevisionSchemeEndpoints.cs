@@ -7,7 +7,12 @@ using Microsoft.EntityFrameworkCore;
 namespace Delios.Host.Documents;
 
 /// <summary>Body of creating or changing a revision scheme: its series in order. A null field is left as it is.</summary>
-public sealed record RevisionSchemeRequest(string? Name = null, bool? IsDefault = null, bool? ForwardOnly = null, RevisionSeriesRule[]? Series = null);
+public sealed record RevisionSchemeRequest(string? Name = null, bool? IsDefault = null, bool? ForwardOnly = null, RevisionLineRequest[]? Series = null);
+
+/// <summary>One line of a revision scheme as written: its phase (none: the default line), how it counts, and its code once it has one.</summary>
+public sealed record RevisionLineRequest(
+    string? Code = null, string? Label = null, string? Phase = null, string? Kind = null, string? Prefix = null, string? Start = null,
+    int Width = 0, bool Lowercase = false, string[]? ExcludedLetters = null);
 
 /// <summary>Body of saying which revision scheme a deliverable type follows. No scheme: the default one.</summary>
 public sealed record RevisionRoutingRequest(string? DeliverableType, Guid? SchemeId);
@@ -39,17 +44,27 @@ public static class RevisionSchemeEndpoints
         return new Actor(id, await db.Users.Where(u => u.Id == id).Select(u => u.Name).SingleAsync(cancellationToken));
     }
 
-    /// <summary>The series as given, tidied, or why they cannot produce values.</summary>
-    private static (List<RevisionSeriesRule>? Series, IResult? Problem) Check(RevisionSeriesRule[] given)
+    /// <summary>
+    /// The lines as given, tidied, or why they cannot name revisions. Each line names revisions in one phase (PHASES), or
+    /// is the default line for any phase without its own: one default at most, one line per phase. A line's code is
+    /// its phase's (DEFAULT for the default line) unless it already had one: revisions carry it.
+    /// </summary>
+    private static async Task<(List<RevisionSeriesRule>? Series, IResult? Problem)> CheckAsync(DeliosDbContext db, RevisionLineRequest[] given,
+        CancellationToken cancellationToken)
     {
-        if (given.Length == 0) return (null, Problems.Invalid("SERIES_REQUIRED", "A scheme has at least one series."));
+        if (given.Length == 0) return (null, Problems.Invalid("SERIES_REQUIRED", "A scheme has at least one line."));
+        var catalog = await Catalog.LoadAsync(db, cancellationToken);
         var series = new List<RevisionSeriesRule>();
         foreach (var one in given)
         {
-            var code = (one.Code ?? "").Trim().ToUpperInvariant();
-            var label = (one.Label ?? "").Trim();
-            if (code.Length == 0 || label.Length == 0 || code.Length > 20 || !code.All(c => char.IsAsciiLetterOrDigit(c) || c == '_'))
-                return (null, Problems.Invalid("SERIES_CODE_REQUIRED", "Each series has a code (letters, digits, _) and a name."));
+            var phase = Blank(one.Phase);
+            if (phase is not null && !catalog.IsActive(ValueSets.Phases, phase))
+                return (null, Problems.Invalid("VALUE_NOT_PUBLISHED", $"{phase} is not a published phase.", new { field = "phase", value = phase }));
+            var code = (Blank(one.Code) ?? phase ?? "DEFAULT").ToUpperInvariant();
+            if (code.Length > 16) code = code[..16];
+            var label = Blank(one.Label) ?? (phase is null ? "Any phase" : catalog.Label(ValueSets.Phases, phase) ?? phase);
+            if (!code.All(c => char.IsAsciiLetterOrDigit(c) || c is '_' or '-'))
+                return (null, Problems.Invalid("SERIES_CODE_INVALID", $"{label}: its code is letters, digits, - or _."));
             var kind = (one.Kind ?? "").Trim().ToUpperInvariant();
             // Nothing said: letters start at A, numbers at 0.
             var start = Blank(one.Start) ?? (kind == SeriesKinds.Numbers ? "0" : "A");
@@ -57,6 +72,7 @@ public static class RevisionSchemeEndpoints
             {
                 Code = code,
                 Label = label,
+                Phase = phase,
                 Kind = kind,
                 Prefix = (one.Prefix ?? "").Trim(),
                 Start = start,
@@ -72,8 +88,12 @@ public static class RevisionSchemeEndpoints
                     : $"{label}: it counts in letters, so it starts at a letter (A, B…), written after the prefix."));
             series.Add(rule);
         }
+        if (series.Count(s => s.Phase is null) > 1)
+            return (null, Problems.Invalid("SERIES_DEFAULT_TWICE", "Only one line is for any phase; give the others their phase."));
+        if (series.Where(s => s.Phase is not null).GroupBy(s => s.Phase).FirstOrDefault(g => g.Count() > 1) is { } phaseTwice)
+            return (null, Problems.Invalid("SERIES_PHASE_TWICE", $"{phaseTwice.First().Label} has two lines; keep one."));
         if (series.GroupBy(s => s.Code).FirstOrDefault(g => g.Count() > 1) is { } twice)
-            return (null, Problems.Invalid("SERIES_CODE_TWICE", $"{twice.Key} is used by two series of the scheme."));
+            return (null, Problems.Invalid("SERIES_CODE_TWICE", $"{twice.Key} is used by two lines of the scheme."));
         return (series, null);
     }
 
@@ -97,7 +117,7 @@ public static class RevisionSchemeEndpoints
     private static string? Recounted(RevisionSeriesRule was, RevisionSeriesRule now) =>
         was.Kind != now.Kind || !string.Equals(was.Prefix, now.Prefix, StringComparison.OrdinalIgnoreCase)
             || !string.Equals(was.Start, now.Start, StringComparison.OrdinalIgnoreCase)
-            ? $"{was.Code} is carried by revisions already: its kind, prefix and start stay; its name, excluded letters and width may change."
+            ? $"{was.Label} is carried by revisions already: how it counts, its prefix and its start stay; its name and the letters skipped may change."
             : null;
 
     /// <summary><c>POST /api/admin/revisions/schemes</c>: a new revision scheme.</summary>
@@ -107,7 +127,7 @@ public static class RevisionSchemeEndpoints
         if (name is null) return Problems.Invalid("NAME_REQUIRED", "A scheme has a name.");
         if (await db.RevisionSchemes.AnyAsync(s => s.Name == name, cancellationToken))
             return Problems.Conflict("NAME_TAKEN", $"A revision scheme is already called {name}.");
-        var (series, problem) = Check(request.Series ?? []);
+        var (series, problem) = await CheckAsync(db, request.Series ?? [], cancellationToken);
         if (problem is not null) return problem;
         var scheme = new RevisionScheme
         {
@@ -147,14 +167,14 @@ public static class RevisionSchemeEndpoints
         }
         if (request.Series is { } given)
         {
-            var (series, problem) = Check(given);
+            var (series, problem) = await CheckAsync(db, given, cancellationToken);
             if (problem is not null) return problem;
             var used = await SeriesUsedAsync(db, await ServedAsync(db, scheme, cancellationToken), cancellationToken);
             foreach (var was in scheme.Series.Where(s => used.Contains(s.Code)))
             {
                 var now = series!.FirstOrDefault(s => s.Code == was.Code);
                 if (now is null)
-                    return Problems.Conflict("SERIES_IN_USE", $"{was.Code} is carried by revisions already: it stays in the scheme.");
+                    return Problems.Conflict("SERIES_IN_USE", $"{was.Label} is carried by revisions already: it stays in the scheme.");
                 if (Recounted(was, now) is { } why) return Problems.Conflict("SERIES_IN_USE", why);
             }
             scheme.Series = series!;

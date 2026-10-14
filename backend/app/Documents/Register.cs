@@ -48,7 +48,7 @@ public sealed record RegisterFilter(
     string? Q = null, string? State = null, string? Rev = null, string? Status = null, string? Verdict = null, string? Supplier = null,
     string? Discipline = null, string? DocType = null, string? Criticality = null, string? Confidentiality = null, string? Deliverable = null,
     string? Action = null, string? On = null, DateOnly? From = null, DateOnly? To = null, string? View = null, string? Sort = null, string? Dir = null,
-    string? Ids = null, bool? Released = null, string? Po = null);
+    string? Ids = null, bool? Released = null, string? Po = null, string? Phase = null);
 
 /// <summary>One row of the register: the document and the facts about its newest and its current revision.</summary>
 public sealed record RegisterRow(
@@ -58,7 +58,7 @@ public sealed record RegisterRow(
     string? ProposedStatus, string? ReleasedStatus, DateTimeOffset? ReleasedAt,
     string? Verdict, string? DecidedBy, DateOnly? PlannedDate, DateTimeOffset? IssuedAt, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt,
     DateTimeOffset? RevisionStartedAt, DateTimeOffset? FileAddedAt, int Packages, IReadOnlyList<RegisterActivity> Activities,
-    string? Supplier = null, bool? WithSupplier = null);
+    string? Supplier = null, bool? WithSupplier = null, string? Phase = null);
 
 public sealed record RegisterActivity(string Code, string Name);
 
@@ -135,10 +135,10 @@ public static class RegisterEndpoints
         }, cancellationToken);
         static string Day(DateTimeOffset? at) => at?.ToString("yyyy-MM-dd") ?? "";
         var report = new Report("register", "Document register", "", "", [], new Chart("", [], []),
-            ["Document", "Title", "Deliverable type", "Type", "Discipline", "Originator", "Subproject", "Criticality", "Confidentiality",
+            ["Document", "Title", "Deliverable type", "Type", "Discipline", "Originator", "Subproject", "Phase", "Criticality", "Confidentiality",
              "State", "Revision", "Revision state", "Status", "Verdict", "Decided by", "Planned", "Released", "Issued", "Created", "Changed"],
             [.. rows.Select(r => (IReadOnlyList<Cell>)[
-                r.Number, r.Title, r.DeliverableType, r.DocType, r.Discipline, r.Originator ?? "", r.Subproject ?? "", r.Criticality ?? "",
+                r.Number, r.Title, r.DeliverableType, r.DocType, r.Discipline, r.Originator ?? "", r.Subproject ?? "", r.Phase ?? "", r.Criticality ?? "",
                 r.Confidentiality ?? "", r.State, r.Revision ?? "", r.RevisionState ?? "", r.ReleasedStatus ?? r.ProposedStatus ?? "",
                 r.Verdict ?? "", r.DecidedBy ?? "", r.PlannedDate?.ToString("yyyy-MM-dd") ?? "", Day(r.ReleasedAt), Day(r.IssuedAt),
                 Day(r.CreatedAt), Day(r.UpdatedAt)])],
@@ -256,6 +256,7 @@ public static class RegisterEndpoints
         if (Has(f.Criticality)) query = query.Where(d => d.Criticality == f.Criticality);
         if (Has(f.Confidentiality)) query = query.Where(d => d.Confidentiality == f.Confidentiality);
         if (Has(f.Deliverable)) query = query.Where(d => d.DeliverableType == f.Deliverable);
+        if (Has(f.Phase)) query = query.Where(d => d.Phase == f.Phase);
         if (Has(f.Action))
             query = query.Where(d => db.Requirements.Any(n => n.DocumentId == d.Id
                 && db.Activities.Any(a => a.Id == n.ActivityId && a.Code == f.Action && a.State == ActivityStates.Active)));
@@ -298,6 +299,7 @@ public static class RegisterEndpoints
             "docType" => By(d => d.DocType),
             "originator" => By(d => d.Originator),
             "subProject" => By(d => d.Subproject),
+            "phase" => By(d => d.Phase),
             "contract" => By(d => d.ContractRef),
             "criticality" => By(d => d.Criticality),
             "confidentiality" => By(d => d.Confidentiality),
@@ -396,7 +398,7 @@ public static class RegisterEndpoints
                 verdict?.Verdict, decider, d.PlannedDate?.ToDateOnly(), issued.TryGetValue(id, out var at) ? at.ToDateTimeOffset() : null,
                 d.CreatedAt.ToDateTimeOffset(), d.UpdatedAt.ToDateTimeOffset(), latest?.CreatedAt.ToDateTimeOffset(),
                 files.TryGetValue(id, out var added) ? added.ToDateTimeOffset() : null, packages.GetValueOrDefault(id),
-                activities.GetValueOrDefault(id) ?? [], SupplierStage(asked.Contains(id), latest?.State, latest?.ResentAt, latest?.ReturnedAt), d.WithSupplier);
+                activities.GetValueOrDefault(id) ?? [], SupplierStage(asked.Contains(id), latest?.State, latest?.ResentAt, latest?.ReturnedAt), d.WithSupplier, d.Phase);
         }).ToList();
     }
 

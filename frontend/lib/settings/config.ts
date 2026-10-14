@@ -44,6 +44,8 @@ export const getValue = cache(async (setKey: string, code: string | null | undef
 });
 /** Where a set's title, description and group are kept: the organization's settings, one key per set. */
 export const SET_KEY = "SET:";
+/** Lists the app reads by their key, shown in Settings even while empty. */
+const READ_BY_THE_APP = ["PHASES"];
 type SetInfo = { key: string; title: string; description: string | null; group: string | null; version: number;
   /** What the list is, when it says: VERDICTS (a review decides with it). */
   kind: string | null };
@@ -59,7 +61,8 @@ export const getSets = cache(async (): Promise<SetInfo[]> => {
     api<{ key: string; active: number; retired: number }[]>("/api/admin/value-sets").catch(() => []),
     orgSettings().catch(() => new Map<string, string>()),
   ]);
-  const keys = new Set([...counted.map((one) => one.key), ...[...named.keys()].filter((k) => k.startsWith(SET_KEY)).map((k) => k.slice(SET_KEY.length))]);
+  // Lists the app reads by name are offered even before they hold a value, so they can be filled.
+  const keys = new Set([...READ_BY_THE_APP, ...counted.map((one) => one.key), ...[...named.keys()].filter((k) => k.startsWith(SET_KEY)).map((k) => k.slice(SET_KEY.length))]);
   return [...keys].sort().map((key) => {
     let info: { title?: string; description?: string | null; group?: string | null; version?: number; kind?: string | null } = {};
     try { info = JSON.parse(named.get(SET_KEY + key) ?? "{}"); } catch { info = {}; }
