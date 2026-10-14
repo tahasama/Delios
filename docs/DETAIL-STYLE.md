@@ -141,6 +141,12 @@ asking something optional sits folded behind a plain question
 ("Will it not go ahead? Record a postponement"), so nobody takes it for a form
 to fill.
 
+A label and its hint sit on one line (`flex min-w-0 items-baseline gap-2`, the hint `truncate` with the whole
+of it in `title`): fields side by side keep level, never a mosaic. Documents are never picked from a list
+inside a form: "Add documents" opens the register for it, as for an action. A request that is not the
+card's purpose ("Request a document", "Request a discipline") is a plain link (`text-link`), not a button;
+an edit on a line is a pencil icon on its right.
+
 People are always picked with `SearchPick` (the transmittal picker): name,
 organization, function; recommended ones first and marked.
 

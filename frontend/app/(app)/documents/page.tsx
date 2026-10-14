@@ -246,14 +246,27 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
   // Without Document Control, the people of a discipline open it for their own discipline's documents only.
   const own = !scope.can("CONTROL") && !(await controlDoes(scope, "ACTION_LINKS")) ? user.department ?? null : null;
   // Opened for a supplier's package ("pkg:<number>"), by Document Control: its documents start ticked; tick to add.
-  const packagePick = sp.pick?.startsWith("pkg:") && scope.can("CONTROL")
-    ? await packageByNumber(scope, sp.pick.slice(4)).then((pkg) => pkg ? {
+  // Opened for a form being filled ("tr:<form address>", "rv:<form address>"): what it holds starts ticked, and
+  // "Continue" takes the ticks back to it. Only our own forms are gone back to.
+  const formPick = sp.pick && /^(tr|rv):\/(transmittals\/new|reviews\/send)(\?|$)/.test(sp.pick) ? (() => {
+    const back = sp.pick!.slice(3);
+    const docs = new URLSearchParams(back.split("?")[1] ?? "").get("docs") ?? "";
+    const review = sp.pick!.startsWith("rv:");
+    return {
+      kind: review ? "review" as const : "transmittal" as const, back, actionId: "", packageId: "", code: "",
+      name: review ? "Documents for a new review" : "Documents for a new transmittal",
+      linked: docs.split(",").map((one) => one.trim()).filter(Boolean), disciplines: [] as { code: string; label: string }[], locked: [] as string[],
+    };
+  })() : null;
+  // A delivery package is filled by those putting it together too; a supplier's, by Document Control.
+  const packagePick = sp.pick?.startsWith("pkg:")
+    ? await packageByNumber(scope, sp.pick.slice(4)).then((pkg) => pkg && !pkg.closedAt && (scope.can("CONTROL") || (pkg.kind === "DELIVERY" && pkg.ownerIds.includes(user.id))) ? {
         kind: "package" as const, packageId: pkg.id, actionId: "", code: pkg.number, name: pkg.title ?? pkg.names.to,
         linked: pkg.members.map((m) => m.documentId), disciplines: [] as { code: string; label: string }[],
         locked: pkg.members.filter((m) => m.requestedAt).map((m) => m.documentId),
       } : null).catch(() => null)
     : null;
-  const picking = packagePick ?? (sp.pick && !sp.pick.startsWith("pkg:") && (scope.can("CONTROL") || own)
+  const picking = formPick ?? packagePick ?? (sp.pick && !formPick && !sp.pick.startsWith("pkg:") && (scope.can("CONTROL") || own)
     ? await (async () => {
         const one = activities.find((a) => a.code === sp.pick);
         const detail = one ? await activityDetail(scope, one.id) : null;
@@ -266,7 +279,8 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
         };
       })()
     : null);
-  if (picking) query.set("pick", picking.kind === "package" ? `pkg:${picking.code}` : picking.code);
+  const pickKey = !picking ? "" : picking.kind === "package" ? `pkg:${picking.code}` : picking.kind === "transmittal" || picking.kind === "review" ? sp.pick! : picking.code;
+  if (picking) query.set("pick", pickKey);
 
 
   return <div className="space-y-4">
@@ -283,7 +297,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
       sort={{ key: sort, dir }}
       picking={picking}
       mayAddToAction={scope.can("CONTROL")}
-      userCanAct={!isReadOnly(user)} filters={{ pick: picking ? (picking.kind === "package" ? `pkg:${picking.code}` : picking.code) : "", q, terms, state, rev: revState, status: statusCode, verdict: verdictCode, supplier, po, discipline, docType, view, criticality, confidentiality, deliverable, phase: sp.phase ?? "", action: sp.action ?? "", on: dateOn, from: sp.from ?? "", to: sp.to ?? "" }} filterOptions={{ states: DOC_STATES.map((code) => ({ code, label: DOC_STATE_LABEL[code] ?? code })), revStates: [
+      userCanAct={!isReadOnly(user)} filters={{ pick: pickKey, q, terms, state, rev: revState, status: statusCode, verdict: verdictCode, supplier, po, discipline, docType, view, criticality, confidentiality, deliverable, phase: sp.phase ?? "", action: sp.action ?? "", on: dateOn, from: sp.from ?? "", to: sp.to ?? "" }} filterOptions={{ states: DOC_STATES.map((code) => ({ code, label: DOC_STATE_LABEL[code] ?? code })), revStates: [
       { code: "NONE", label: "No revision yet" },
       { code: "IN_PREPARATION", label: names.IN_PREPARATION },
       { code: "IN_REVIEW", label: names.IN_REVIEW },

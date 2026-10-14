@@ -183,6 +183,7 @@ export default async function TransmittalsPage({ searchParams }: { searchParams:
       recipients: item.recipients.filter((person) => person.kind !== "CC").map((person) => ({ id: person.id, name: person.name, seen: person.seen })),
       copies: item.recipients.filter((person) => person.kind === "CC").length,
       dueAt: due?.toISOString() ?? null,
+      answer: item.answer ?? null,
       dueIn: due ? Math.round((midnight(due) - today) / 86_400_000) : null,
       receivedAt: outgoing ? null : item.issuedAt,
       checkedBy: null,
@@ -196,7 +197,7 @@ export default async function TransmittalsPage({ searchParams }: { searchParams:
     to: draft.parties ? `${draft.parties} organization${draft.parties === 1 ? "" : "s"}` : draft.people ? "Internal distribution" : "nobody yet",
     reason: draft.reason ?? "", reasonLabel: reasonLabel.get(draft.reason ?? "") ?? draft.reason ?? "", issuedAt: draft.createdAt,
     documents: draft.documents, status: "DRAFT", statusLabel: STATUS_LABEL.DRAFT ?? "Draft", recipients: [], copies: draft.copies,
-    dueAt: null, dueIn: null, receivedAt: null, checkedBy: null, replyNeeded: false, replyDays: null,
+    dueAt: null, dueIn: null, answer: null, receivedAt: null, checkedBy: null, replyNeeded: false, replyDays: null,
   })));
 
   const query = new URLSearchParams();

@@ -239,11 +239,19 @@ export async function preparingRevisions(scope: Scope, ids: string[]): Promise<S
   return found.filter((one): one is SendableRevision => !!one);
 }
 
-/** Every revision being prepared on the project, newest first (up to 250, as the register gives them). */
-export async function revisionsInPreparation(scope: Scope): Promise<SendableRevision[]> {
-  const register = await api<RegisterPage>(projectPath(scope, "/register"), {
-    query: { rev: "IN_PREPARATION", view: "all", sort: "revStarted", dir: "desc", per: 250 },
-  });
-  const found = await Promise.all(register.rows.filter((row) => row.latestRevisionId).map((row) => sendable(scope, row.id, row.latestRevisionId!)));
-  return found.filter((one): one is SendableRevision => !!one);
+/**
+ * The documents ticked in the register, each at its revision being prepared: what can go down a route. The rest
+ * (nothing being prepared) are named, by number.
+ */
+export async function preparingOf(scope: Scope, documentIds: string[]): Promise<{ ready: SendableRevision[]; not: string[] }> {
+  const found = await Promise.all(documentIds.map(async (id) => {
+    const doc = await backendDocument(scope, id).catch(() => null);
+    const preparing = doc?.revisions.find((one) => one.state === "IN_PREPARATION");
+    return { number: doc?.number ?? null, revision: doc && preparing ? await sendable(scope, doc.id, preparing.id) : null };
+  }));
+  return {
+    ready: found.flatMap((one) => (one.revision ? [one.revision] : [])),
+    not: found.filter((one) => one.number && !one.revision).map((one) => one.number!),
+  };
 }
+

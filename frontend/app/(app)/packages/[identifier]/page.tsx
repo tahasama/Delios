@@ -5,11 +5,10 @@ import { Timeline } from "@/components/timeline";
 import { Card, Info, ToneChip, type TONE, Field, inputCls, Banner } from "@/components/ui";
 import { DeliveryLines } from "./delivery-lines";
 import { ActionForm } from "@/components/form";
-import { addPackageMemberAction, setPackageRuleAction, assessPackageAction, issueShortfallAction, closePackageAction, acceptShortfallAction, acceptPackageAction } from "@/lib/packages/forms";
+import { setPackageRuleAction, assessPackageAction, issueShortfallAction, closePackageAction, acceptShortfallAction, acceptPackageAction } from "@/lib/packages/forms";
 import { ruleFilter, ruleWords, statusList, reasonsOf, shortfallOf } from "@/lib/packages/package-rule";
-import { packageByNumber, deliveryCandidates, ourPeople, packageParties } from "@/lib/packages/api";
+import { packageByNumber, ourPeople, packageParties } from "@/lib/packages/api";
 import { documentPage } from "@/lib/documents/api";
-import { SearchPick } from "@/components/search-pick";
 import { isAdmin } from "@/lib/core/auth";
 import { RuleFields } from "../rule-fields";
 import { manageItems } from "../manage-items";
@@ -20,7 +19,6 @@ import { ArrowLeft } from "lucide-react";
 import { SupplierPackage } from "./supplier-package";
 import { isReadOnly } from "@/lib/core/auth";
 import { NextStepBody, StagePath, type StepItem } from "@/app/(app)/documents/[id]/next-step";
-import { RevisionChecklist } from "@/components/revision-checklist";
 
 export const dynamic = "force-dynamic";
 
@@ -39,10 +37,9 @@ export default async function PackageDetailPage({ params, searchParams }: { para
   if (!pkg) notFound();
   if (pkg.kind === "SUPPLY") return <SupplierPackage pkg={pkg} />;
   const staff = isController(user) || isAdmin(user);
-  const [statuses, reasons, candidates, people, parties] = await Promise.all([
+  const [statuses, reasons, people, parties] = await Promise.all([
     getActiveSet("STATUSES"),
     getActiveSet("REASONS_FOR_ISSUE"),
-    deliveryCandidates(ctx, pkg.members.map((m) => m.documentId)),
     ourPeople(ctx),
     packageParties(ctx),
   ]);
@@ -81,7 +78,9 @@ export default async function PackageDetailPage({ params, searchParams }: { para
   const state = pkg.acceptedAt ? "accepted" : pkg.closedAt ? "delivered" : shortfall ? "shortfall" : pkg.assessedAt ? "ready" : overdue ? "overdue" : "open";
   const stateTone: Record<string, keyof typeof TONE> = { accepted: "done", delivered: "moving", ready: "done", shortfall: "waiting", overdue: "refused", open: "idle" };
 
-  const count = <strong className="font-mono text-[15px] font-bold tabular-nums text-slate-900">{readyCount} of {total} ready</strong>;
+  // How ready it is, in the schedule's colours: all there green, none red, anything between at risk.
+  const readyTone = total && readyCount === total ? "text-emerald-700" : readyCount === 0 ? "text-red-700" : "text-amber-700";
+  const count = <span className={readyTone}>{readyCount} of {total} ready</span>;
   const asked = letters.length ? <> (asked on {letters.map((one, i) => <span key={one.id}>{i ? ", " : ""}<Link href={`/transmittals/${one.id}`} className="font-mono font-semibold text-link hover:underline">{one.number}</Link></span>)})</> : null;
   const sentOn = delivery.length ? <> on {delivery.map((one, i) => <span key={one.id}>{i ? ", " : ""}<Link href={`/transmittals/${one.id}`} className="font-mono font-semibold text-link hover:underline">{one.number}</Link></span>)}</> : null;
   const note = pkg.acceptedAt
@@ -153,19 +152,6 @@ export default async function PackageDetailPage({ params, searchParams }: { para
     items.push(...manageItems(pkg, { mayEdit: true, mayDelete: false, delivery: { statuses: statuses.map((one) => ({ code: one.code, label: one.label })), parties, people } }));
   }
   if (mayCompose) {
-    items.push({
-      key: "add",
-      open: !!sp.added || (!total && !pkg.assessedAt),
-      label: "Add documents",
-      body: candidates.length ? (
-        <ActionForm action={addPackageMemberAction} submitLabel="Add the ticked documents" size="sm" hidden={{ packageId: pkg.id }}>
-          <div className="-mx-5 border-y border-line sm:-mx-6">
-            <RevisionChecklist name="documentId" rows={candidates.map((d) => ({ id: d.id, number: d.docNumber, rev: d.revisions[0]?.value ?? "—", status: d.revisions[0]?.statusCode ?? null, title: d.title }))} />
-          </div>
-          <SearchPick browse name="requiredStatus" required label="Needed at" hint="one or several — ready at any of them" initial={needs} items={statuses.map((one) => ({ id: one.code, name: one.code, detail: one.label }))} />
-        </ActionForm>
-      ) : <p className="text-xs text-slate-500">Every active document is already in this package.</p>,
-    });
     // Only an empty package that never went out is deleted: it holds no content.
     items.push(...manageItems(pkg, { mayEdit: false, mayDelete: total === 0 && !pkg.transmittals.length }));
   }
@@ -212,8 +198,9 @@ export default async function PackageDetailPage({ params, searchParams }: { para
             packageId={pkg.id}
             packageNumber={pkg.number}
             mayTakeOut={mayCompose}
+            pickHref={mayCompose ? `/documents?pick=${encodeURIComponent(`pkg:${pkg.number}`)}` : null}
             ruled={!!rule}
-            counts={<><strong className="font-mono text-[13px] font-bold tabular-nums text-slate-900">{readyCount} of {total}</strong> released at the status they need{rule && !pkg.closedAt ? ` · ${rule} joins by itself` : ""}</>}
+            counts={<><span className={readyTone}>{readyCount} of {total}</span> released at the status they need{rule && !pkg.closedAt ? ` · ${rule} joins by itself` : ""}</>}
             lines={pkg.members.map((m) => {
               const said = latestComments.get(m.documentId);
               return {

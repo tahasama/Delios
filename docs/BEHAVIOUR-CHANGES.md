@@ -467,7 +467,7 @@ the installation sets its keys.
 - **New document:** "Keep it for" is now "Retention period"; its hint says what it will be from the criticality.
   The criticality explains only itself (what an error means, who approves it). The details step fits on the page.
 - **File fields** are a dashed line with a light button, not a button inside a grey box.
-- **Status chips** are outlined, with only a light wash of their colour.
+- **The plan (Schedule):** the block for the work itself is outlined with a light wash, not filled.
 - **The reason IFU reads "For update"**; the status IFU still reads "Issued for update".
 - **New transmittal:** "An answer is required" is a tick (ticked when the reason expects an answer); ticked, it
   asks the day (left empty, the reason's own number of days).
@@ -493,6 +493,19 @@ the installation sets its keys.
   after a warning: the documents not ready go as they stand (released revision, else the newest; one with no
   revision cannot go), and the delivery transmittal says so with their name.
 - **Packages "Export CSV"** exports the one package ticked in the list, never all of them.
+- **Choosing documents** for a new transmittal, Start a review and packages is the register itself, opened for
+  the form as for an action; "Continue" goes back to the form with the ticks. The short lists inside those forms
+  (and the package's "Add documents" step with its own "Needed at") are gone: documents added to a delivery
+  package need the package's statuses.
+- **Answer required** on a new transmittal asks the day, always; the list and the transmittal say whether the
+  answer is awaited, overdue, on time or late (until now only review-step transmittals were flagged).
+- **Forms:** labels and hints keep to one line, so side-by-side fields stay level. New document, step 2: three
+  columns (where it sits and who sees it · criticality and retention · PDF and native file).
+- **Action page:** "Request a discipline" and "Request a document" are plain links; "Disciplines and documents"
+  has an edit icon on the right of each line.
+- **Review page:** "Withdraw?" and "Notify?" sit on the right under the review's chip; Notify opens straight
+  on its form (no second button). Notice messages open at the height of their text.
+- **Delivery package readiness** reads in the schedule's colours: all ready green, none red, between amber.
 
 ## 7. Notifications and email
 

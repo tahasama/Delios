@@ -5,8 +5,6 @@ import { DataTable, Th, Td, Field, inputCls, ToneChip, btn } from "@/components/
 import { FileTally } from "./file-tally";
 import { setPackageRuleAction, sharePackageAction, deletePackageAction } from "@/lib/packages/forms";
 import { PackageLines, type PackageLine } from "./package-lines";
-import { api, projectPath } from "@/lib/client";
-import type { RegisterPage } from "@/lib/types";
 import { ruleFilter, ruleWords } from "@/lib/packages/package-rule";
 import { RuleFields } from "../rule-fields";
 import { manageItems } from "../manage-items";
@@ -165,11 +163,8 @@ export async function SupplierPackage({ pkg }: { pkg: PackageView }) {
   // was sent to the supplier). Once shared, all of that is fixed.
   const sentAny = pkg.members.some((m) => m.requestedAt) || pkg.transmittals.length > 0;
   const edit = !shared ? manageItems(pkg, { mayEdit: true, mayDelete: false }).find((one) => one.key === "edit") ?? null : null;
-  // The supplier's documents not in the package, for "Add documents".
-  const others = pkg.names.supplierCode
-    ? (await api<RegisterPage>(projectPath(ctx, "/register"), { query: { supplier: pkg.names.supplierCode, per: 500 } }).catch(() => null))?.rows ?? []
-    : [];
-  const members = new Set(rows.map((r) => r.doc.id));
+  // "Add or take out" opens the register, as for an action: on this supplier's documents, the package's ticked.
+  const pickHref = `/documents?${new URLSearchParams({ pick: `pkg:${pkg.number}`, ...(pkg.names.supplierCode ? { supplier: pkg.names.supplierCode } : {}) })}`;
   const requestedAt = new Map(pkg.members.map((m) => [m.documentId, m.requestedAt] as const));
   const lines: PackageLine[] = rows.map((r) => {
     const isSent = asked.has(r.doc.id);
@@ -287,10 +282,7 @@ export async function SupplierPackage({ pkg }: { pkg: PackageView }) {
         supplier={supplierName}
         shared={!!shared}
         lines={lines}
-        candidates={others.filter((d) => !members.has(d.id) && d.state !== "CANCELLED" && d.state !== "WITHDRAWN").map((d) => ({
-          id: d.id, number: d.number, title: d.title,
-          where: d.releasedRevision ? `rev ${d.releasedRevision} released` : d.revision ? `rev ${d.revision}` : "no revision yet",
-        }))}
+        pickHref={pickHref}
         counts={`${withThem} with ${supplierName} · ${withUs} with us${notSent.length ? ` · ${notSent.length} not sent to them yet` : ""}`}
       />
     </div>

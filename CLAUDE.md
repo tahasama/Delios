@@ -180,8 +180,9 @@ a screen only words it. A new rule goes in the backend, never in a page.
   none of its documents was sent to the supplier; its documents stay in the
   register and are filed again. Once shared, name and rule are fixed (backend
   PACKAGE_SHARED) and it is kept.
-- On our package page, "Add documents" opens, in place, a short register of
-  the supplier's documents not in the package: search, tick, add. The list of
+- On our package page (supplier's or delivery), "Add or take out" opens the register for the package, as
+  for an action (`/documents?pick=pkg:<n>`, on the supplier's documents for a supplier's package): its
+  documents ticked, tick to add, untick to take out, then save. The list of
   the package's documents has ticks; ticking opens a bar under it: "Send to
   <supplier>" (not sent yet; starts a transmittal, `?placeholders=`), "Ask back
   for an update" (held by the supplier; starts a transmittal, `?askBack=`, the
@@ -193,8 +194,15 @@ a screen only words it. A new rule goes in the backend, never in a page.
   planned (the document's planned day, else the package's; with ready / submitted / overdue / at risk / in
   N days; none reads "on no action" in red), and what is next for us. The
   supplier's page shows the same released & issued day.
-- A new transmittal's documents open with "Add documents"; what is enclosed is
-  listed above it, each removable.
+- Choosing documents for a form (a new transmittal, Start a review, a package) is always the register,
+  opened for it as for an action (`pick=tr:<form>` / `rv:<form>`): what it holds starts ticked; "Continue"
+  goes back to the form, on the step it was on, with everything written so far. What is enclosed is listed
+  on the form, each removable. A ticked document with nothing that can go (nothing released; for a review,
+  nothing being prepared) is named, not enclosed.
+- A transmittal asking for an answer asks it by a day (backend ANSWER_DATE_REQUIRED). The answer stands, in
+  the list and on its page (`AnswerStates`): awaited, overdue (none, past its day), answered on time, answered
+  late. Answered by a transmittal answering it (or following it, by someone else), or a review step's answer.
+- Form labels and hints sit on one line (the hint cut, whole on hover), so fields side by side stay level.
 - `unshare-package <email> <package-number>` (backend command) puts a supplier's
   package back to not shared, for testing; logged.
 - A supplier package has two pages. Ours (Document Control and above): plate,
@@ -489,10 +497,10 @@ a screen only words it. A new rule goes in the backend, never in a page.
   transmittal to Document Control with the file attached; Document Control
   adds the number to the action. No status or date is asked.
 - Under "Disciplines concerned", anyone of ours sees "Is a discipline missing, or
-  one that should not be here?" with "Ask to add one" and "Ask to take one off":
-  a transmittal to Document Control; their answer (the disciplines saved) is the
-  record. "Disciplines and documents" shows both as a list with one "Add or take
-  off" button each.
+  one that should not be here?" with a plain link "Request a discipline" (as "Request a
+  document" is a link, not a button): a transmittal to Document Control; their answer
+  (the disciplines saved) is the record. "Disciplines and documents" shows both as a
+  list with one edit icon each, on the right.
 - A discipline whose documents are all released at their status, on an action
   still ahead, is told so once, automatically ("nothing is asked of you").
   A notice by hand says where the discipline stands: confirmed automatically, by

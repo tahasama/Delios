@@ -79,9 +79,9 @@ export function SearchPick({
     <div ref={box}>
       {chosen.map((id) => <input key={id} type="hidden" name={name} value={id} />)}
       {label ? (
-        <p className="mb-1.5 flex flex-wrap items-baseline gap-x-2">
-          <span className="stencil text-slate-500">{label}{required ? <span className="ml-0.5 text-red-500">*</span> : null}</span>
-          {hint ? <span className="text-[11px] text-slate-400">{hint}</span> : null}
+        <p className="mb-1 flex min-w-0 items-baseline gap-2">
+          <span className="stencil shrink-0 text-slate-500">{label}{required ? <span className="ml-0.5 text-red-500">*</span> : null}</span>
+          {hint ? <span className="min-w-0 truncate text-[11px] leading-4 text-slate-400" title={hint}>{hint}</span> : null}
         </p>
       ) : null}
 

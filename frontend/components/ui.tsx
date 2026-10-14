@@ -176,12 +176,14 @@ export function Field({
     // The register's question: a stencil label with its hint beside it, and an
     // underlined field — the same everywhere a form asks something.
     <label className={cn("block min-w-0", className)}>
-      <span className="mb-1 block">
-        <span className="stencil text-slate-500">
+      {/* One line, whatever the hint: fields side by side keep their labels level, never a mosaic. The whole hint
+          shows on hover. */}
+      <span className="mb-1 flex min-w-0 items-baseline gap-2">
+        <span className="stencil shrink-0 text-slate-500">
           {label}
           {required ? <span className="ml-0.5 text-red-500">*</span> : null}
         </span>
-        {hint ? <span className="ml-2 text-[11px] leading-4 text-slate-400">{hint}</span> : null}
+        {hint ? <span className="min-w-0 truncate text-[11px] leading-4 text-slate-400" title={hint}>{hint}</span> : null}
       </span>
       {children}
     </label>

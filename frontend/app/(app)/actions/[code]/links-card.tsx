@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Pencil } from "lucide-react";
 import { ActionForm } from "@/components/form";
 import { SearchPick, type PickItem } from "@/components/search-pick";
 import { Field, inputCls } from "@/components/ui";
@@ -119,7 +120,7 @@ export function LinksCard({ actionId, code, departments, disciplines, documents,
             <span className="text-xs text-slate-700">
               <span className="font-semibold">Disciplines</span> <span className="text-slate-500">· {tagged.length ? tagged.map((d) => d.label).join(", ") : "none yet"}</span>
             </span>
-            <span className="ask">Add or take off</span>
+            <span className="rounded-sm p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800" title="Add or take off disciplines"><Pencil aria-label="Add or take off disciplines" className="h-4 w-4" /></span>
           </summary>
           <ActionForm action={setDisciplinesAction} submitLabel="Save disciplines" hidden={{ actionId, code }} className="mt-3 space-y-3">
             <SearchPick browse items={disciplineItems} name="departments" initial={departments} label="Disciplines" placeholder="Type a discipline" empty="None: the action concerns nobody yet." />
@@ -131,7 +132,7 @@ export function LinksCard({ actionId, code, departments, disciplines, documents,
             <span className="font-semibold">Documents</span> <span className="text-slate-500">· {count === 0 ? "none on its list yet" : `${count} on its list`}</span>
           </p>
           {tagged.length ? (
-            <Link href={`/documents?pick=${encodeURIComponent(code)}`} className="ask">Add or take off, in the register</Link>
+            <Link href={`/documents?pick=${encodeURIComponent(code)}`} className="rounded-sm p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800" title="Add or take off documents, in the register"><Pencil aria-label="Add or take off documents" className="h-4 w-4" /></Link>
           ) : <span className="text-xs text-amber-800">Tag the disciplines first.</span>}
         </div>
       </div>

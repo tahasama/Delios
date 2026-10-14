@@ -1,15 +1,14 @@
 import Link from "next/link";
 import { requireScope } from "@/lib/core/scope";
-import { preparingRevisions, revisionsInPreparation } from "@/lib/reviews/api";
+import { preparingRevisions, preparingOf } from "@/lib/reviews/api";
 import { PageHeader } from "@/components/ui";
 import { SendForReview } from "@/components/send-for-review-panel";
-import { ChooseDocuments } from "./choose-documents";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Plus } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Start a review" };
 
-type Search = { revisions?: string; revision?: string | string[] };
+type Search = { revisions?: string; revision?: string | string[]; docs?: string };
 
 /**
  * Starting a review: which documents, then the route and its people. One
@@ -24,13 +23,12 @@ export default async function StartReviewPage({ searchParams }: { searchParams: 
     ...(sp.revisions ?? "").split(","),
     ...(Array.isArray(sp.revision) ? sp.revision : sp.revision ? [sp.revision] : []),
   ].map((v) => v.trim()).filter(Boolean);
-  const chosen = ids.length ? await preparingRevisions(scope, ids) : [];
-
-  // What may be sent: a revision being prepared, with its file, and nothing
-  // already running. One with no file cannot be reviewed, so it is not offered.
-  const preparing = chosen.length ? [] : await revisionsInPreparation(scope);
-  const ready = preparing.filter((r) => r.renditionFileId || r.nativeFileId);
-  const waitingForFile = preparing.length - ready.length;
+  // Ticked in the register (opened for this form, as for an action): each document at its revision being prepared.
+  const docIds = (sp.docs ?? "").split(",").map((v) => v.trim()).filter(Boolean);
+  const fromRegister = docIds.length ? await preparingOf(scope, docIds) : { ready: [], not: [] };
+  const chosen = ids.length ? await preparingRevisions(scope, ids) : fromRegister.ready;
+  // The register, opened for this form: what is chosen starts ticked; "Continue" comes back here with the ticks.
+  const pickHref = (docs: string[]) => `/documents?${new URLSearchParams({ pick: `rv:/reviews/send${docs.length ? `?docs=${docs.join(",")}` : ""}`, rev: "IN_PREPARATION" })}`;
 
   const band = (n: number, title: string, says: string) => (
     <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
@@ -56,17 +54,16 @@ export default async function StartReviewPage({ searchParams }: { searchParams: 
 
       <section className={`register register-sheet register-sheet-open ${chosen.length ? "hidden" : ""}`}>
         {band(1, "Which documents", "tick what goes down the same route — a revision being prepared, with its file attached")}
-        {chosen.length ? null : ready.length ? (
-          <ChooseDocuments
-            rows={ready.map((r) => ({ id: r.id, number: r.document.docNumber, rev: r.value, status: r.statusCode, title: r.document.title }))}
-            waitingForFile={waitingForFile}
-          />
-        ) : (
-          <p className="px-5 py-5 text-sm text-slate-500 sm:px-6">
-            {waitingForFile
-              ? `${waitingForFile} revision${waitingForFile === 1 ? " is" : "s are"} being prepared, but none has its file yet. Attach the file on the document, then send it.`
-              : "No revision is being prepared, so there is nothing to send for review. A revision is started from its document."}
-          </p>
+        {chosen.length ? null : (
+          <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 sm:px-6">
+            <p className="text-xs leading-5 text-slate-500">
+              {fromRegister.not.length
+                ? <span className="text-amber-800">Nothing of {fromRegister.not.join(", ")} is being prepared with its file: a revision is started on its document. </span>
+                : null}
+              Tick them in the register, as for an action: it opens on the revisions being prepared.
+            </p>
+            <Link href={pickHref(docIds)} className="ask inline-flex items-center gap-1.5"><Plus className="h-3.5 w-3.5" /> Choose documents</Link>
+          </div>
         )}
       </section>
 
@@ -83,7 +80,8 @@ export default async function StartReviewPage({ searchParams }: { searchParams: 
                 </li>
               ))}
             </ul>
-            <Link href="/reviews/send" className="text-[11px] font-semibold text-link hover:underline">Choose other documents</Link>
+            {fromRegister.not.length ? <p className="text-[11px] text-amber-800">Not in it, nothing being prepared: {fromRegister.not.join(", ")}.</p> : null}
+            <Link href={pickHref(chosen.map((r) => r.documentId))} className="text-[11px] font-semibold text-link hover:underline">Add or take out documents</Link>
           </div>
 
           <div className="asking px-5 py-5 sm:px-6">

@@ -104,24 +104,14 @@ export default async function ActionDetailPage({ params, searchParams }: { param
   const { controlDoes } = await import("@/lib/settings/control-activities");
   const selfLinks = !(await controlDoes(ctx, "ACTION_LINKS"));
 
-  // A discipline the action should concern and does not: anyone on the project may ask Document Control to add it.
+  // A discipline missing, or one that does not belong: anyone of ours asks Document Control, whose answer is the record.
   const disciplineRequestHref = `/transmittals/new?${new URLSearchParams({
     reason: "INFORMATION",
     activity: action.id,
     ask: "DISCIPLINE",
     users: controllers.map((one) => one.id).join(","),
-    subject: `Add a discipline to ${action.code}`,
-    message: `Please add the discipline … to ${action.code}, ${action.name}, on ${fmtDate(action.start)}.\n\nWhy it concerns us: …`,
-  })}`;
-
-  // A discipline that does not belong: asked of Document Control the same way, to be taken off.
-  const disciplineRemovalHref = `/transmittals/new?${new URLSearchParams({
-    reason: "INFORMATION",
-    activity: action.id,
-    ask: "DISCIPLINE",
-    users: controllers.map((one) => one.id).join(","),
-    subject: `Take a discipline off ${action.code}`,
-    message: `Please take the discipline … off ${action.code}, ${action.name}, on ${fmtDate(action.start)}.\n\nWhy it does not concern it: …`,
+    subject: `A discipline on ${action.code}`,
+    message: `Please add the discipline … to (or take it off) ${action.code}, ${action.name}, on ${fmtDate(action.start)}.\n\nWhy: …`,
   })}`;
 
   // The requests about this action not yet answered: Document Control sees them all; whoever is asked to
@@ -453,7 +443,7 @@ export default async function ActionDetailPage({ params, searchParams }: { param
                       {selfLinks && me.department === d ? (
                         <Link href={`/documents?pick=${encodeURIComponent(action.code)}`} className="ask">Add or take off documents</Link>
                       ) : !selfLinks && mine ? (
-                        <Link href={requestHref(d)} className="ask">Request a document</Link>
+                        <Link href={requestHref(d)} className="text-xs font-semibold text-link hover:underline">Request a document</Link>
                       ) : null}
                       {c && !c.automatic && control ? (
                         <details className="text-xs open:basis-full">
@@ -484,9 +474,8 @@ export default async function ActionDetailPage({ params, searchParams }: { param
           ) : !selfLinks && ctx.user.isInternal ? (
             // A discipline missing, or one that does not belong: asked of Document Control, whose answer is the record.
             <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-line bg-tint-soft px-5 py-3 sm:px-6">
-              <span className="text-xs font-semibold text-slate-700">Is a discipline missing, or one that should not be here?</span>
-              <Link href={disciplineRequestHref} className="ask">Ask to add one</Link>
-              <Link href={disciplineRemovalHref} className="ask">Ask to take one off</Link>
+              <span className="text-xs text-slate-600">Is a discipline missing, or one that should not be here?</span>
+              <Link href={disciplineRequestHref} className="text-xs font-semibold text-link hover:underline">Request a discipline</Link>
             </div>
           ) : null}
         </section>

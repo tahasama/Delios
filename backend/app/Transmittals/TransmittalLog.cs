@@ -24,7 +24,22 @@ public sealed record LogRecipient(Guid Id, string Name, bool Seen, string Kind =
 public sealed record LogRow(
     Guid Id, string Number, string Subject, string Reason, string ToName, string IssuedBy, DateTimeOffset IssuedAt, int Documents,
     string Status, IReadOnlyList<LogRecipient> Recipients, bool ResponseRequired, DateOnly? ResponseDue, bool ForReview,
-    string Direction, string? From, string? TheirReference, string? Check = null);
+    string Direction, string? From, string? TheirReference, string? Check = null, string? Answer = null);
+
+/// <summary>
+/// Where the answer a transmittal asks for stands: AWAITED (not due yet, or no day), OVERDUE (no answer and past its
+/// day), ON_TIME, LATE (answered after its day). Null when no answer is asked. Answered by a transmittal answering it
+/// (or following it, by someone else), or, sent for a review step, by the step's answer.
+/// </summary>
+public static class AnswerStates
+{
+    public const string Awaited = "AWAITED", Overdue = "OVERDUE", OnTime = "ON_TIME", Late = "LATE";
+
+    public static string? Of(bool required, LocalDate? due, LocalDate? answeredOn, LocalDate today) =>
+        !required ? null
+        : answeredOn is { } on ? (due is { } d && on > d ? Late : OnTime)
+        : due is { } day && day < today ? Overdue : Awaited;
+}
 
 /// <summary>
 /// The transmittal log: every transmittal the caller may see, with what each
@@ -90,8 +105,11 @@ public static class TransmittalLogEndpoints
     }
 
     /// <summary>Whether a review step's answer is still awaited for this transmittal.</summary>
+    /// <summary>Asks for an answer and has none yet: its review step unanswered, or no transmittal answering it.</summary>
     private static IQueryable<Transmittal> AnswerAwaited(DeliosDbContext db, IQueryable<Transmittal> query) =>
-        query.Where(t => t.ReviewStepId != null && t.ResponseRequired && db.ReviewSteps.Any(s => s.Id == t.ReviewStepId && s.CompletedAt == null));
+        query.Where(t => t.ResponseRequired && (t.ReviewStepId != null
+            ? db.ReviewSteps.Any(s => s.Id == t.ReviewStepId && s.CompletedAt == null)
+            : !db.Transmittals.Any(a => a.InReplyToId == t.Id || (a.FollowsId == t.Id && a.IssuedById != t.IssuedById))));
 
     /// <summary>Applies every filter given. Each narrows; none widens.</summary>
     private static IQueryable<Transmittal> Filter(DeliosDbContext db, IQueryable<Transmittal> query, TransmittalFilter f, LocalDate today)
@@ -133,7 +151,9 @@ public static class TransmittalLogEndpoints
             States.AwaitingAck => query.Where(t => t.Recipients.Any(r => r.UserId != null && r.Kind == RecipientKinds.To && r.AcknowledgedAt == null)),
             States.ToRegister => unregistered,
             States.Complete => query.Where(t => !t.Recipients.Any(r => (r.UserId == null && r.DispatchedAt == null) || (r.UserId != null && r.Kind == RecipientKinds.To && r.AcknowledgedAt == null))
-                && !(t.ReviewStepId != null && t.ResponseRequired && db.ReviewSteps.Any(s => s.Id == t.ReviewStepId && s.CompletedAt == null))
+                && !(t.ResponseRequired && (t.ReviewStepId != null
+                    ? db.ReviewSteps.Any(s => s.Id == t.ReviewStepId && s.CompletedAt == null)
+                    : !db.Transmittals.Any(a => a.InReplyToId == t.Id || (a.FollowsId == t.Id && a.IssuedById != t.IssuedById))))
                 && !t.Items.Any(i => i.Kind == TransmittalItemKinds.Unplanned && i.RegisteredAt == null)),
             _ => query,
         };
@@ -183,8 +203,17 @@ public static class TransmittalLogEndpoints
         var list = await db.Transmittals.AsNoTracking().Include(t => t.Recipients).Include(t => t.Items).AsSplitQuery()
             .Where(t => ids.Contains(t.Id)).ToDictionaryAsync(t => t.Id, cancellationToken);
         var stepIds = list.Values.Where(t => t.ReviewStepId != null).Select(t => t.ReviewStepId!.Value).ToList();
-        var answered = (await db.ReviewSteps.AsNoTracking().Where(s => stepIds.Contains(s.Id) && s.CompletedAt != null).Select(s => s.Id)
-            .ToListAsync(cancellationToken)).ToHashSet();
+        var stepDone = (await db.ReviewSteps.AsNoTracking().Where(s => stepIds.Contains(s.Id) && s.CompletedAt != null)
+            .Select(s => new { s.Id, s.CompletedAt }).ToListAsync(cancellationToken)).ToDictionary(s => s.Id, s => s.CompletedAt!.Value);
+        // The first transmittal answering each (or following it, by someone else): when its answer came.
+        var listed = list.Keys.ToList();
+        var replies = (await db.Transmittals.AsNoTracking()
+            .Where(a => (a.InReplyToId != null && listed.Contains(a.InReplyToId.Value)) || (a.FollowsId != null && listed.Contains(a.FollowsId.Value)))
+            .Select(a => new { a.InReplyToId, a.FollowsId, a.IssuedById, a.IssuedAt }).ToListAsync(cancellationToken));
+        Instant? AnsweredAt(Transmittal t) => t.ReviewStepId is { } step
+            ? (stepDone.TryGetValue(step, out var at) ? at : null)
+            : replies.Where(a => a.InReplyToId == t.Id || (a.FollowsId == t.Id && a.IssuedById != t.IssuedById))
+                .Select(a => (Instant?)a.IssuedAt).OrderBy(a => a).FirstOrDefault();
         // What Document Control's check said of what came in, read from each submission it carried (Arrivals).
         var sentIn = list.Values.Where(t => t.Direction == TransmittalDirections.Incoming)
             .SelectMany(t => t.Items).Where(i => i.Kind == TransmittalItemKinds.Submission && i.RevisionId != null)
@@ -197,7 +226,9 @@ public static class TransmittalLogEndpoints
         return ids.Where(list.ContainsKey).Select(id =>
         {
             var t = list[id];
-            var awaited = t.ReviewStepId is { } step && t.ResponseRequired && !answered.Contains(step);
+            var answeredAt = t.ResponseRequired ? AnsweredAt(t) : null;
+            var awaited = t.ResponseRequired && answeredAt is null;
+            var answer = AnswerStates.Of(t.ResponseRequired, t.ResponseDue, answeredAt?.InUtc().Date, today);
             var status = t.Items.Any(i => i.Kind == TransmittalItemKinds.Unplanned && i.RegisteredAt is null) ? States.ToRegister
                 : t.Recipients.Any(r => r.AwaitsDispatch) ? States.ToSend
                 : awaited && t.ResponseDue < today ? States.Overdue
@@ -206,7 +237,7 @@ public static class TransmittalLogEndpoints
                 : States.Complete;
             return new LogRow(t.Id, t.Number, t.Subject, t.Reason, t.ToName, t.IssuedByName, t.IssuedAt.ToDateTimeOffset(), t.Items.Count, status,
                 t.Recipients.OrderBy(r => r.Name).Select(r => new LogRecipient(r.Id, r.Name, r.UserId is null ? r.DispatchedAt is not null : r.AcknowledgedAt is not null, r.Kind, r.Organization)).ToList(),
-                t.ResponseRequired, t.ResponseDue?.ToDateOnly(), t.ReviewStepId is not null, t.Direction, t.FromName, t.TheirReference, CheckOf(t));
+                t.ResponseRequired, t.ResponseDue?.ToDateOnly(), t.ReviewStepId is not null, t.Direction, t.FromName, t.TheirReference, CheckOf(t), answer);
         }).ToList();
     }
 }

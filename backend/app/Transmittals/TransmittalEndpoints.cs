@@ -82,7 +82,7 @@ public sealed record TransmittalView(Guid Id, string Number, string Direction, s
     string? From = null, string? TheirReference = null, Guid? ProofFileId = null, Guid? PackageId = null, string State = "ISSUED",
     Guid? IssuedById = null, TransmittalRef? InReplyTo = null, IReadOnlyList<TransmittalRef>? Answers = null, TransmittalRef? Follows = null,
     IReadOnlyList<TransmittalRef>? FollowedBy = null, string? ReceiptNote = null, System.Text.Json.JsonElement? Extras = null,
-    string? FollowKind = null, ActivityAsk? Activity = null);
+    string? FollowKind = null, ActivityAsk? Activity = null, string? Answer = null);
 
 /// <summary>A transmittal's ask to add a document to a schedule action, and how Document Control answered it, if it has.</summary>
 public sealed record ActivityAsk(Guid Id, DateTimeOffset? AnsweredAt, string? AnsweredBy, string? Answer, string Kind = "DOCUMENT",
@@ -386,5 +386,11 @@ public static class TransmittalEndpoints
         t.ActivityId is { } activityId ? new ActivityAsk(activityId, t.ActivityAnsweredAt?.ToDateTimeOffset(), t.ActivityAnsweredByName, t.ActivityAnswer,
             t.ActivityAskKind ?? "DOCUMENT", t.ActivityConfirm, t.ActivityCheckedAt?.ToDateTimeOffset(), t.ActivityCheckedByName,
             t.ActivityConfirmerId, t.ActivityConfirmerName,
-            t.ActivityProposal is null ? null : System.Text.Json.JsonSerializer.Deserialize<Actions.ActivityProposal>(t.ActivityProposal)) : null);
+            t.ActivityProposal is null ? null : System.Text.Json.JsonSerializer.Deserialize<Actions.ActivityProposal>(t.ActivityProposal)) : null,
+        // Where its answer stands, from the transmittals answering it (a review step's answer is read on the review).
+        thread is null || t.ReviewStepId is not null ? null
+            : AnswerStates.Of(t.ResponseRequired, t.ResponseDue,
+                thread.Answers.Concat(thread.FollowedBy.Where(f => f.IssuedBy != t.IssuedByName)).Select(a => (DateTimeOffset?)a.IssuedAt).Min() is { } on
+                    ? NodaTime.LocalDate.FromDateTime(on.UtcDateTime) : null,
+                NodaTime.LocalDate.FromDateTime(DateTime.UtcNow)));
 }

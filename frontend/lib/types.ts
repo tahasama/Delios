@@ -190,12 +190,16 @@ export type TransmittalLogRow = {
   direction: "OUTGOING" | "INCOMING"; from: string | null; theirReference: string | null;
   /** What came in: what Document Control's check said of its documents; null for anything else. */
   check?: "TO_CHECK" | "RETURNED" | "PARTLY_RETURNED" | "ACCEPTED" | null;
+  /** Where the answer it asks stands (backend AnswerStates); null when none is asked. */
+  answer?: "AWAITED" | "OVERDUE" | "ON_TIME" | "LATE" | null;
 };
 
 /** GET /transmittals/{id} (TransmittalEndpoints TransmittalView). */
 export type TransmittalView = {
   id: string; number: string; direction: string; reason: string; subject: string; message: string | null; to: string;
   responseRequired: boolean; responseDue: string | null; issuedAt: string; issuedBy: string; issueRequestId: string | null; reviewStepId: string | null;
+  /** Where the answer it asks stands (backend AnswerStates). */
+  answer?: "AWAITED" | "OVERDUE" | "ON_TIME" | "LATE" | null;
   items: TransmittalItem[];
   recipients: {
     id: string; name: string; organization: string | null; person: boolean; openedAt: string | null; acknowledgedAt: string | null;

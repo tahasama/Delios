@@ -14,7 +14,7 @@ import type { RegisterPage } from "@/lib/types";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "New transmittal" };
 
-type Search = { doc?: string; docs?: string; direction?: string; revisions?: string; users?: string; to?: string; reason?: string; party?: string; subject?: string; message?: string; replyTo?: string; follows?: string; kind?: string; activity?: string; ask?: string; placeholders?: string; askBack?: string; pkg?: string };
+type Search = { step?: string; answer?: string; due?: string; doc?: string; docs?: string; direction?: string; revisions?: string; users?: string; to?: string; reason?: string; party?: string; subject?: string; message?: string; replyTo?: string; follows?: string; kind?: string; activity?: string; ask?: string; placeholders?: string; askBack?: string; pkg?: string };
 
 export default async function NewTransmittalPage({ searchParams }: { searchParams: Promise<Search> }) {
   const ctx = await requireScope();
@@ -31,9 +31,9 @@ export default async function NewTransmittalPage({ searchParams }: { searchParam
     holdersOf(ctx, "REVIEW"),
   ]);
   const revisionRows = register.rows.flatMap((doc) => [
-    ...(doc.releasedRevisionId ? [{ id: doc.releasedRevisionId, value: doc.releasedRevision ?? "", statusCode: doc.releasedStatus, state: "RELEASED", document: { docNumber: doc.number, title: doc.title } }] : []),
+    ...(doc.releasedRevisionId ? [{ id: doc.releasedRevisionId, value: doc.releasedRevision ?? "", statusCode: doc.releasedStatus, state: "RELEASED", document: { id: doc.id, docNumber: doc.number, title: doc.title } }] : []),
     ...(doc.latestRevisionId && doc.latestRevisionId !== doc.releasedRevisionId && (doc.revisionState === "IN_PREPARATION" || doc.revisionState === "IN_REVIEW")
-      ? [{ id: doc.latestRevisionId, value: doc.revision ?? "", statusCode: doc.proposedStatus, state: doc.revisionState, document: { docNumber: doc.number, title: doc.title } }]
+      ? [{ id: doc.latestRevisionId, value: doc.revision ?? "", statusCode: doc.proposedStatus, state: doc.revisionState, document: { id: doc.id, docNumber: doc.number, title: doc.title } }]
       : []),
   ]).slice(0, 200);
   const users = found.people.map((one) => ({ id: one.id, name: one.name, role: one.function }));
@@ -85,10 +85,20 @@ export default async function NewTransmittalPage({ searchParams }: { searchParam
   const asked = sp.activity ? await activityDetail(ctx, sp.activity).catch(() => null) : null;
   const selectedDocumentIds = [...new Set([...(sp.docs ?? "").split(","), ...(sp.doc ? [sp.doc] : [])].map((value) => value.trim()).filter(Boolean))];
   const selectedDocuments = await Promise.all(selectedDocumentIds.map((one) => backendDocument(ctx, one)));
-  const preselected = selectedDocuments.flatMap((document) => {
+  // Sent out, a document goes at its released revision; recorded as received, at its newest one.
+  const incoming = sp.direction === "INCOMING";
+  const going = selectedDocuments.map((document) => {
     const released = document?.revisions.filter((one) => one.state === "RELEASED").sort((a, b) => (b.releasedAt ?? "").localeCompare(a.releasedAt ?? ""))[0];
-    return released ? [released.id] : [];
+    const newest = incoming ? document?.revisions.find((one) => one.state !== "VOID") : undefined;
+    return { document, revision: released ?? newest ?? null };
   });
+  const preselected = going.flatMap((one) => (one.revision ? [one.revision.id] : []));
+  const unsent = going.filter((one) => one.document && !one.revision).map((one) => one.document!.number);
+  // Picked in the register, a revision may not be among the newest listed here: it is added, so it shows as enclosed.
+  for (const one of going) {
+    if (!one.document || !one.revision || revisionRows.some((r) => r.id === one.revision!.id)) continue;
+    revisionRows.push({ id: one.revision.id, value: one.revision.value, statusCode: one.revision.statusCode ?? null, state: one.revision.state, document: { id: one.document.id, docNumber: one.document.number, title: one.document.title } });
+  }
 
   // A supplier's documents with nothing released, asked of them as placeholders: the one exception to "only released
   // revisions travel". Only Document Control asks; only one supplier's at a time, sent to that supplier.
@@ -134,6 +144,7 @@ export default async function NewTransmittalPage({ searchParams }: { searchParam
         reasons={reasons.map((r) => ({ code: r.code, label: r.label, props: r.props }))}
         revisions={revisionRows.map((r) => ({
           id: r.id,
+          documentId: r.document.id,
           label: `${r.document.docNumber} rev ${r.value}${r.statusCode ? ` · ${r.statusCode}` : ""} — ${r.document.title}`,
           released: r.state === "RELEASED",
           number: r.document.docNumber,
@@ -155,8 +166,12 @@ export default async function NewTransmittalPage({ searchParams }: { searchParam
         askingBack={askingBack.length ? { to: supplier!.name, items: askingBack } : undefined}
         outsider={!ctx.user.isInternal}
         preselectedRevisionIds={preselected}
+        unsent={unsent}
         placeholders={placeholders.length ? { to: supplier!.name, items: placeholders, mixed: owners.length > 1 } : askedIds.length && owners.length > 1 ? { to: "", items: [], mixed: true } : undefined}
         prefill={{
+          step: sp.step === "2" ? 2 : undefined,
+          answer: sp.answer === "1" ? true : sp.answer === "0" ? false : undefined,
+          due: sp.due,
           revisionIds: following ? following.items.map((one) => one.revisionId) : (sp.revisions ?? "").split(",").filter(Boolean),
           userIds: following ? followTo : answering ? answerTo : supplierTo.length ? supplierTo : (sp.users ?? "").split(",").filter(Boolean),
           copyIds: following ? followCopies : answerCopies,

@@ -143,7 +143,7 @@ export default async function TransmittalDetailPage({ params, searchParams }: { 
                   ? "Nothing has been sent yet — it carries no date of issue until it is issued."
                   : t.responseRequired
                     ? t.answers.length
-                      ? `Answered ${fmtDate(t.answers[0].issuedAt)} by ${t.answers[0].number}.`
+                      ? `Answered ${fmtDate(t.answers[0].issuedAt)} by ${t.answers[0].number}${t.answer === "LATE" ? `, late: it was due ${fmtDate(t.responseDue)}` : t.answer === "ON_TIME" && t.responseDue ? ", in time" : ""}.`
                       : `An answer is due by ${fmtDate(t.responseDue)} — write it down under “The answer”.`
                     : "No answer is needed. Opening it is the receipt."}
               </p>

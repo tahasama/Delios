@@ -158,7 +158,7 @@ export function PlanTimeline({ rows, window, fit }: {
                     aria-label={`${STATE_WORD[r.readiness]}: ${r.firstNeeded ? `documents needed from ${fmtDate(r.firstNeeded)}, ` : ""}work on ${fmtDate(r.start)}, ${r.ready} of ${r.total} ready`}
                     title={`${r.code}: documents needed from ${fmtDate(r.firstNeeded)} · work on ${fmtDate(r.start)} · ${r.ready} of ${r.total} ready`}
                   />
-                  {/* The work itself, start to finish, as a dark block on the end of the bar;
+                  {/* The work itself, start to finish, as an outlined block on the end of the bar;
                       with no finish date, a tick on its day. */}
                   {(() => {
                     const finish = r.finish && r.finish.getTime() > end ? r.finish.getTime() : end;
@@ -167,7 +167,7 @@ export function PlanTimeline({ rows, window, fit }: {
                     if (to < 0 || from > 100) return null;
                     return (
                       <span
-                        className="absolute top-1/2 h-3.5 -translate-y-1/2 rounded bg-slate-700"
+                        className="absolute top-1/2 h-3.5 -translate-y-1/2 rounded border border-slate-600 bg-slate-400/15"
                         style={{ left: `${from}%`, width: `max(4px, ${Math.max(to - from, 0)}%)` }}
                         role="img"
                         aria-label={r.finish ? `Work from ${fmtDate(r.start)} to ${fmtDate(r.finish)}` : `Work on ${fmtDate(r.start)}`}

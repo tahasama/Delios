@@ -1,11 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
-import { ArrowLeftRight, Minus, Plus, Search, Send, Undo2, X } from "lucide-react";
+import { ArrowLeftRight, Plus, Send, Undo2, X } from "lucide-react";
 import { DataTable, Th, Td, ToneChip, type TONE } from "@/components/ui";
 import { ActionForm } from "@/components/form";
-import { addPackageMemberAction, setPackageMembersAction } from "@/lib/packages/forms";
+import { setPackageMembersAction } from "@/lib/packages/forms";
 
 export type PackageLine = {
   id: string; number: string; title: string; rev: string | null;
@@ -24,34 +24,26 @@ export type PackageLine = {
   comments: { by: string; text: string; blocking: boolean; settled: boolean; rev: string }[];
 };
 
-type Candidate = { id: string; number: string; title: string; where: string };
-
 /**
  * The documents of a supplier's package, ours to work on: tick lines, and the bar under the list sends them to the
- * supplier, asks them back for an update (each on a transmittal), or takes them out. "Add documents" opens the
- * supplier's other documents here, in a short register, to tick and add.
+ * supplier, asks them back for an update (each on a transmittal), or takes them out. "Add or take out" opens the
+ * register for the package, as for an action: its documents ticked, tick to add, untick to take out.
  */
-export function PackageLines({ packageId, packageNumber, supplier, shared, lines, candidates, counts }: {
+export function PackageLines({ packageId, packageNumber, supplier, shared, lines, pickHref, counts }: {
   packageId: string;
   packageNumber: string;
   supplier: string;
   shared: boolean;
   lines: PackageLine[];
-  candidates: Candidate[];
+  /** The register opened for this package: its documents ticked, tick to add, untick to take out. */
+  pickHref: string;
   counts: string;
 }) {
   const [ticked, setTicked] = useState<string[]>([]);
-  const [adding, setAdding] = useState(false);
-  const [find, setFind] = useState("");
-  const [toAdd, setToAdd] = useState<string[]>([]);
   const chosen = lines.filter((one) => ticked.includes(one.id));
   const toSend = chosen.filter((one) => !one.sent);
   const toAskBack = chosen.filter((one) => one.withThem);
   const sentChosen = chosen.filter((one) => !!one.sent);
-  const shown = useMemo(() => {
-    const words = find.trim().toLowerCase().split(/\s+/).filter(Boolean);
-    return candidates.filter((one) => words.every((w) => `${one.number} ${one.title}`.toLowerCase().includes(w)));
-  }, [candidates, find]);
   const all = lines.length > 0 && ticked.length === lines.length;
   const tick = (id: string) => setTicked((was) => (was.includes(id) ? was.filter((one) => one !== id) : [...was, id]));
   const day = (value: string | null) => (value ? new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(value)) : null);
@@ -62,47 +54,8 @@ export function PackageLines({ packageId, packageNumber, supplier, shared, lines
         <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
           <span className="stencil mr-1 text-slate-500">Documents</span>
           <span className="text-[11px] text-slate-500">{counts}</span>
-          <button type="button" onClick={() => setAdding((was) => !was)} aria-expanded={adding} data-on={adding ? "true" : undefined} className="ask ml-auto inline-flex items-center gap-1.5">
-            {adding ? <Minus className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />} Add documents
-          </button>
+          <Link href={pickHref} className="ask ml-auto inline-flex items-center gap-1.5"><Plus className="h-3.5 w-3.5" /> Add or take out</Link>
         </div>
-
-        {/* The supplier's other documents, in a short register: search, tick, add. */}
-        {adding ? (
-          <div className="border-b border-line bg-tint-soft/50">
-            <div className="asking flex items-center gap-2 border-b border-line px-5 py-2.5 sm:px-6">
-              <Search className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-              <label className="min-w-0 flex-1">
-                <span className="sr-only">Find a document of {supplier}</span>
-                <input value={find} onChange={(event) => setFind(event.target.value)} placeholder={`${supplier}'s documents not in this package — find by number or title`} className="plain w-full" />
-              </label>
-              <span className="font-mono text-[11px] tabular-nums text-slate-500">{shown.length} of {candidates.length}</span>
-            </div>
-            {candidates.length ? (
-              <ul className="max-h-60 divide-y divide-line overflow-y-auto scroll-thin">
-                {shown.map((one) => (
-                  <li key={one.id}>
-                    <label className="flex items-center gap-3 px-5 py-2 text-[12.5px] sm:px-6">
-                      <input type="checkbox" checked={toAdd.includes(one.id)} onChange={() => setToAdd((was) => (was.includes(one.id) ? was.filter((id) => id !== one.id) : [...was, one.id]))} />
-                      <span className="font-mono font-semibold text-slate-900">{one.number}</span>
-                      <span className="min-w-0 flex-1 truncate text-slate-500">{one.title}</span>
-                      <span className="text-[11px] text-slate-400">{one.where}</span>
-                    </label>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="px-5 py-4 text-xs text-slate-500 sm:px-6">Every document of {supplier} is in this package already.</p>
-            )}
-            {candidates.length ? (
-              <div className="px-5 py-2.5 sm:px-6">
-                <ActionForm action={addPackageMemberAction} submitLabel={toAdd.length ? `Add ${toAdd.length} to the package` : "Add to the package"} size="sm" hidden={{ packageId }} className="space-y-0">
-                  {toAdd.map((id) => <input key={id} type="hidden" name="documentId" value={id} />)}
-                </ActionForm>
-              </div>
-            ) : null}
-          </div>
-        ) : null}
 
         {lines.length ? (
           <DataTable className="rounded-none border-0 shadow-none" exportName="package" id="supplier-package-lines" defaultHidden={["Comments"]}
@@ -151,7 +104,7 @@ export function PackageLines({ packageId, packageNumber, supplier, shared, lines
             })}
           </DataTable>
         ) : (
-          <p className="px-5 py-8 text-center text-sm text-slate-400 sm:px-6">No documents from {supplier} yet. Add them with &ldquo;Add documents&rdquo;, or register them with {supplier} as the supplier.</p>
+          <p className="px-5 py-8 text-center text-sm text-slate-400 sm:px-6">No documents from {supplier} yet. Add them with &ldquo;Add or take out&rdquo;, or register them with {supplier} as the supplier.</p>
         )}
       </section>
 

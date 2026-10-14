@@ -20,12 +20,12 @@ export function OwnFields({ fields, values, className }: { fields: OwnField[]; v
         const required = field.rule === "REQUIRED";
         return (
           <label key={field.key} className={`block min-w-0 ${className ?? ""}`}>
-            <span className="mb-1.5 block">
-              <span className="stencil text-slate-500">
+            <span className="mb-1 flex min-w-0 items-baseline gap-2">
+              <span className="stencil shrink-0 text-slate-500">
                 {field.label}
                 {required ? <span className="ml-0.5 text-red-500">*</span> : null}
               </span>
-              {field.help ? <span className="ml-2 text-[11px] leading-4 text-slate-400">{field.help}</span> : null}
+              {field.help ? <span className="min-w-0 truncate text-[11px] leading-4 text-slate-400" title={field.help}>{field.help}</span> : null}
             </span>
 
             {field.control === "LONG_TEXT" ? (

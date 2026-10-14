@@ -54,22 +54,6 @@ export async function documentsByIds(scope: Scope, ids: string[]): Promise<{ id:
   return page.rows.map((row) => ({ id: row.id, docNumber: row.number, title: row.title })).sort((a, b) => a.docNumber.localeCompare(b.docNumber));
 }
 
-/** Planned and active documents not in the package, with their released revision: what may be added. At most 500. */
-export async function deliveryCandidates(scope: Scope, members: string[]) {
-  const pages = await Promise.all(["PLANNED", "ACTIVE"].flatMap((state) => [1, 2].map((page) =>
-    api<RegisterPage>(projectPath(scope, "/register"), { query: { state, per: 250, page } }))));
-  const have = new Set(members);
-  const seen = new Set<string>();
-  return pages.flatMap((one) => one.rows)
-    .filter((row) => !have.has(row.id) && !seen.has(row.id) && seen.add(row.id))
-    .sort((a, b) => a.number.localeCompare(b.number))
-    .slice(0, 500)
-    .map((row) => ({
-      id: row.id, docNumber: row.number, title: row.title,
-      revisions: row.releasedRevision ? [{ value: row.releasedRevision, statusCode: row.releasedStatus }] : [],
-    }));
-}
-
 /** The packages of one kind, in full, each brought up to date with its rule: soonest due first, those without a date last. */
 export const packagesOf = cache(async (scope: Scope, kind: "DELIVERY" | "SUPPLY"): Promise<PackageView[]> =>
   api<PackageView[]>(projectPath(scope, "/packages/views"), { query: { kind } }));

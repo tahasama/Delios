@@ -24,6 +24,8 @@ type Row = {
   /** How many were copied in. They are told, not asked, so they are not "seen". */
   copies: number;
   dueAt: string | null; dueIn: number | null;
+  /** Where the answer it asks stands, as the backend reads it (AnswerStates). */
+  answer?: "AWAITED" | "OVERDUE" | "ON_TIME" | "LATE" | null;
   receivedAt: string | null; checkedBy: string | null;
   replyNeeded: boolean; replyDays: number | null;
 };
@@ -447,6 +449,9 @@ const COLUMNS: Column[] = [
     cellClass: "whitespace-nowrap text-right text-xs",
     cell: (row) => {
       if (!row.dueAt) return <Muted />;
+      // Answered: in time or not, never "late" once it came in time.
+      if (row.answer === "ON_TIME") return <span className="text-emerald-700" title={date(row.dueAt)}>answered in time</span>;
+      if (row.answer === "LATE") return <span className="font-semibold text-red-700" title={date(row.dueAt)}>answered late</span>;
       const near = row.dueIn !== null && row.dueIn <= 3;
       const late = row.dueIn !== null && row.dueIn < 0;
       return (

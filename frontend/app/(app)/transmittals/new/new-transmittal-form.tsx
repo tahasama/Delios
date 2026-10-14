@@ -2,17 +2,17 @@
 
 import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ActionForm } from "@/components/form";
 import { createTransmittalAction } from "@/lib/transmittals/forms";
 import { RecipientPicker, type Company } from "./recipient-picker";
 import type { OwnField } from "@/lib/settings/field-policy";
 import { OwnFields } from "@/app/(app)/documents/new/own-fields";
 import { cn } from "@/lib/core/utils";
-import { Minus, Plus, Search, X } from "lucide-react";
+import { Plus, X } from "lucide-react";
 
 type Opt = { code: string; label: string; props: Record<string, unknown> };
-type RevOpt = { id: string; label: string; released: boolean; number: string; rev: string; status: string | null; title: string };
+type RevOpt = { id: string; documentId: string; label: string; released: boolean; number: string; rev: string; status: string | null; title: string };
 type UserOpt = { id: string; name: string; role: string };
 /** Anything the form can start filled in with — from a link such as "Send rev B to them". */
 type Prefill = {
@@ -21,6 +21,8 @@ type Prefill = {
   /** People copied in on the question, copied in on the answer. */
   copyIds?: string[];
   outsiders?: string; reason?: string; party?: string; subject?: string; message?: string;
+  /** Back from the register with documents ticked: the step it reopens on, and the answer asked as it was. */
+  step?: number; answer?: boolean; due?: string;
   /** The transmittal being answered: its id, and what to call it on screen. */
   answering?: { id: string; number: string; subject: string | null };
   /** The sent transmittal this one completes (a supplement) or corrects (it replaces one they rejected). */
@@ -46,9 +48,10 @@ const familyOf = (props: Record<string, unknown>) => (props.family === "Informat
 function Ask({ label, hint, required, children, className }: { label: string; hint?: string; required?: boolean; children: React.ReactNode; className?: string }) {
   return (
     <label className={cn("block min-w-0", className)}>
-      <span className="mb-1.5 flex flex-wrap items-baseline gap-x-2">
-        <span className="stencil text-slate-500">{label}{required ? <span className="ml-0.5 text-red-500">*</span> : null}</span>
-        {hint ? <span className="text-[11px] text-slate-400">{hint}</span> : null}
+      {/* One line, whatever the hint: questions side by side keep level. The whole hint shows on hover. */}
+      <span className="mb-1.5 flex min-w-0 items-baseline gap-2">
+        <span className="stencil shrink-0 text-slate-500">{label}{required ? <span className="ml-0.5 text-red-500">*</span> : null}</span>
+        {hint ? <span className="min-w-0 truncate text-[11px] text-slate-400" title={hint}>{hint}</span> : null}
       </span>
       {children}
     </label>
@@ -67,8 +70,10 @@ const field = "plain w-full py-1.5 text-[13px]";
  * only released revisions, and a received transmittal has no subject of ours.
  */
 export function NewTransmittalForm({
-  reasons, revisions, companies, ourOrganization, defaultDirection, preselectedRevisionIds, prefill, fields, labels, ownFields, placeholders, askable = [], askingBack, mayRecordReceived, outsider = false,
+  reasons, revisions, companies, ourOrganization, defaultDirection, preselectedRevisionIds, prefill, fields, labels, ownFields, placeholders, askable = [], askingBack, mayRecordReceived, outsider = false, unsent,
 }: {
+  /** Documents ticked in the register with nothing that can go (nothing released): named, not enclosed. */
+  unsent?: string[];
   reasons: Opt[];
   revisions: RevOpt[];
   users: UserOpt[];
@@ -99,7 +104,7 @@ export function NewTransmittalForm({
   /** The fields it added for itself. */
   ownFields: OwnField[];
 }) {
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState(prefill?.step === 2 ? 2 : 1);
   const [direction, setDirection] = useState(defaultDirection);
   const [reasonCode, setReasonCode] = useState(prefill?.reason && reasons.some((r) => r.code === prefill.reason) ? prefill.reason : "");
   // Data or information, chosen first; the reasons listed are that kind's.
@@ -111,12 +116,9 @@ export function NewTransmittalForm({
   const [party, setParty] = useState(prefill?.party ?? "");
   const [subject, setSubject] = useState(prefill?.subject ?? "");
   const [message, setMessage] = useState(prefill?.message ?? "");
-  const [find, setFind] = useState("");
   // Already about something of ours going out: chosen in the register or a package, asked back, or followed up.
   const sendingOurs = !!placeholders || !!askingBack || !!preselectedRevisionIds?.length || !!prefill?.revisionIds?.length || !!prefill?.following;
   const fixedForPlaceholders = !!placeholders && !placeholders.mixed && reasons.some((r) => r.code === "IFU");
-  // The register's revisions open only when asked: "Add documents".
-  const [addingDocs, setAddingDocs] = useState(false);
   const [chosen, setChosen] = useState<string[]>([...new Set([...(preselectedRevisionIds ?? []), ...(prefill?.revisionIds ?? [])])]);
   // Creating a transmittal sends nothing by itself. Saying so, and offering to
   // do both at once, is why people stopped finding a draft they thought they had sent.
@@ -134,13 +136,6 @@ export function NewTransmittalForm({
   // Document Control recording what reached us outside the system: who sent it, and when, are asked.
   const recording = !outgoing && !outsider;
   const needsReview = reasons.find((r) => r.code === reasonCode)?.props.reviewCycle === true;
-  const choices = useMemo(() => {
-    const pool = outgoing ? revisions.filter((r) => r.released) : revisions;
-    const words = find.trim().toLowerCase().split(/\s+/).filter(Boolean);
-    const found = words.length ? pool.filter((r) => words.every((word) => r.label.toLowerCase().includes(word))) : pool;
-    // What is already chosen stays at the top, so it is never scrolled away from.
-    return [...found.filter((r) => chosen.includes(r.id)), ...found.filter((r) => !chosen.includes(r.id))];
-  }, [outgoing, revisions, find, chosen]);
   const picked = useMemo(() => {
     const byId = new Map(revisions.map((r) => [r.id, r] as const));
     return chosen.flatMap((id) => {
@@ -150,19 +145,40 @@ export function NewTransmittalForm({
   }, [chosen, revisions]);
 
   // What each step needs answered before the next one makes sense.
-  const askedFirst = Boolean(reasonCode) && (!recording || party.trim().length > 0);
   // A transmittal may carry a message alone — a clarification, a notice, an
   // answer — so enclosures are optional, but it may not be empty of both.
   const saysSomething = chosen.length > 0 || (!outgoing && files > 0) || (outgoing ? subject.trim().length > 0 : message.trim().length > 0);
   const may = (n: number) => n === 1 || (askedFirst && (n === 2 || saysSomething));
   const toggle = (id: string) => setChosen((ids) => (ids.includes(id) ? ids.filter((one) => one !== id) : [...ids, id]));
+  // The register, opened for this form: what is enclosed starts ticked, and "Continue" comes back here, on this step,
+  // with everything written so far.
+  const searchParams = useSearchParams();
+  const pickHref = () => {
+    const q = new URLSearchParams(searchParams.toString());
+    const put = (key: string, value: string | null | undefined) => (value ? q.set(key, value) : q.delete(key));
+    put("step", "2");
+    put("direction", direction);
+    put("reason", reasonCode);
+    put("party", party);
+    put("subject", subject);
+    put("message", message);
+    put("answer", answerRequired ? "1" : "0");
+    put("due", answerRequired ? due : "");
+    q.delete("revisions");
+    q.delete("doc");
+    put("docs", [...new Set(picked.map((r) => r.documentId))].join(","));
+    return `/documents?${new URLSearchParams({ pick: `tr:/transmittals/new?${q.toString()}` })}`;
+  };
   const reasonLabel = reasons.find((r) => r.code === reasonCode)?.label;
   // Whether an answer is asked for: the reason's own answer, until the person ticks otherwise.
   const reasonAsks = reasons.find((r) => r.code === reasonCode)?.props.response === true;
   const suggestedDays = (() => { const days = reasons.find((r) => r.code === reasonCode)?.props.responseDays; return typeof days === "number" ? days : null; })();
-  const [answerOwn, setAnswerOwn] = useState<boolean | null>(null);
+  const [answerOwn, setAnswerOwn] = useState<boolean | null>(prefill?.answer ?? null);
+  const [due, setDue] = useState(prefill?.due ?? "");
   const answerRequired = answerOwn ?? reasonAsks;
   const setAnswerRequired = (on: boolean) => setAnswerOwn(on);
+  // What the first step needs answered before the next one makes sense.
+  const askedFirst = Boolean(reasonCode) && (!recording || party.trim().length > 0) && (!outgoing || !answerRequired || !!due);
 
   // The strip that closes each sheet: back on the left, what is missing and
   // the way on at the right.
@@ -304,18 +320,22 @@ export function NewTransmittalForm({
                   </select>
                 )}
               </Ask>
-              {/* An answer asked for: ticked when the reason expects one; the day appears only once it is. */}
+              {/* An answer asked for: ticked when the reason expects one, and then by a day — the day says whether it
+                  came in time. One row, level with the reason beside it. */}
               {outgoing ? (
                 <div className="min-w-0 lg:col-span-2">
-                  <label className="flex items-center gap-2 text-[13px] text-slate-700">
-                    <input type="checkbox" name="answerRequired" checked={answerRequired} onChange={(e) => setAnswerRequired(e.target.checked)} />
-                    An answer is required
-                  </label>
-                  {answerRequired ? (
-                    <Ask label="Answer by" hint={suggestedDays ? `the reason allows ${suggestedDays} working days when left empty` : "optional"} className="mt-2">
-                      <input type="date" name="responseDue" className={field} min={new Date().toISOString().slice(0, 10)} />
-                    </Ask>
-                  ) : null}
+                  <span className="mb-1.5 flex min-w-0 items-baseline gap-2">
+                    <span className="stencil shrink-0 text-slate-500">Answer by{answerRequired ? <span className="ml-0.5 text-red-500">*</span> : null}</span>
+                    <span className="min-w-0 truncate text-[11px] text-slate-400">{answerRequired ? (suggestedDays ? `the reason usually allows ${suggestedDays} working days` : "a late answer is flagged") : "no answer asked"}</span>
+                  </span>
+                  <div className="flex items-center gap-4">
+                    <label className="flex shrink-0 items-center gap-2 text-[13px] text-slate-700">
+                      <input type="checkbox" name="answerRequired" checked={answerRequired} onChange={(e) => setAnswerRequired(e.target.checked)} />
+                      An answer is required
+                    </label>
+                    <input type="date" name="responseDue" required={answerRequired} disabled={!answerRequired} value={due} onChange={(e) => setDue(e.target.value)}
+                      aria-label="Answer by" className={cn(field, "min-w-0 flex-1 disabled:opacity-40")} min={new Date().toISOString().slice(0, 10)} />
+                  </div>
                 </div>
               ) : null}
               {!recording ? null : (
@@ -336,7 +356,7 @@ export function NewTransmittalForm({
           </div>
           {foot(null,
             <button type="button" onClick={() => setStep(2)} disabled={!askedFirst} data-on={askedFirst ? "true" : undefined} className="ask disabled:cursor-not-allowed disabled:opacity-50">Continue</button>,
-            askedFirst ? null : recording ? "Say who sent it and why." : "Say why it is sent.",
+            askedFirst ? null : recording ? "Say who sent it and why." : !reasonCode ? "Say why it is sent." : "Say by when the answer is due.",
           )}
         </section>
 
@@ -387,7 +407,8 @@ export function NewTransmittalForm({
             </div>
           ) : null}
           {outgoing && !placeholders && !askingBack && askable.length ? <AskPlaceholders askable={askable} /> : null}
-          {/* What is enclosed, and "Add documents" to open the register's revisions. */}
+          {/* What is enclosed, each removable; "Add documents" opens the register, as for an action, and brings the
+              ticks back here with everything written so far. */}
           <div className="flex flex-wrap items-start gap-2 border-b border-line px-5 py-3 sm:px-6">
             {picked.length ? (
               <ul className="w-full space-y-1">
@@ -404,49 +425,11 @@ export function NewTransmittalForm({
             ) : (
               <p className="w-full text-xs text-slate-500">No document enclosed yet{outgoing ? " — a letter alone is fine too" : ""}.</p>
             )}
-            <button type="button" onClick={() => setAddingDocs((was) => !was)} aria-expanded={addingDocs} data-on={addingDocs ? "true" : undefined} className="ask inline-flex items-center gap-1.5">
-              {addingDocs ? <Minus className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />} {addingDocs ? "Done adding" : "Add documents"}
-            </button>
+            {unsent?.length ? <p className="w-full text-[11px] text-amber-800">Not enclosed, nothing of {unsent.length === 1 ? "it" : "them"} released: {unsent.join(", ")}.</p> : null}
+            <Link href={pickHref()} className="ask inline-flex items-center gap-1.5"><Plus className="h-3.5 w-3.5" /> Add documents</Link>
           </div>
-          {addingDocs ? (<>
-          <div className="asking flex items-center gap-2 border-b border-line px-5 py-2.5 sm:px-6">
-            <Search className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-            <label className="min-w-0 flex-1">
-              <span className="sr-only">Find a document</span>
-              <input value={find} onChange={(e) => setFind(e.target.value)} placeholder="Find by number, title or revision" className="plain w-full" />
-            </label>
-            {find ? <button type="button" onClick={() => setFind("")} className="text-[11px] font-semibold text-link hover:underline">Clear</button> : null}
-          </div>
-          {choices.length === 0 ? (
-            <p className="px-5 py-6 text-center text-xs text-slate-400 sm:px-6">Nothing matches that.</p>
-          ) : (
-            // Five rows, then the list scrolls inside itself: the subject and the
-            // message stay in view however many documents there are.
-            <ul className="max-h-45 divide-y divide-line overflow-y-auto scroll-thin">
-              {choices.map((r) => {
-                const on = chosen.includes(r.id);
-                return (
-                  <li key={r.id}>
-                    <label className={cn("grid h-9 cursor-pointer grid-cols-[auto_minmax(0,14rem)_2.5rem_4rem_minmax(0,1fr)] items-center gap-x-3 px-5 text-[12.5px] transition-colors sm:px-6", on ? "bg-tint-soft" : "hover:bg-tint-soft")}>
-                      <input type="checkbox" name="revisionIds" value={r.id} checked={on} onChange={() => toggle(r.id)} />
-                      <span className="truncate font-mono font-semibold text-slate-900">{r.number}</span>
-                      <span className="font-mono text-slate-600">{r.rev}</span>
-                      <span>{r.status ? <span className="code-chip">{r.status}</span> : null}</span>
-                      <span className="truncate text-slate-500">{r.title}</span>
-                    </label>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-
-
-
-          </>) : null}
-          {/* What is enclosed travels in fields of its own, whether or not the list is open or shows it. */}
-          {chosen.filter((id) => !addingDocs || !choices.some((r) => r.id === id)).map((id) => (
-            <input key={id} type="hidden" name="revisionIds" value={id} />
-          ))}
+          {/* What is enclosed travels in fields of its own. */}
+          {chosen.map((id) => <input key={id} type="hidden" name="revisionIds" value={id} />)}
 
           <div className="asking grid grid-cols-1 gap-y-4 border-t border-line px-5 py-5 sm:px-6">
             {outgoing ? (

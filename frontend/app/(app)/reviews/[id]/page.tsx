@@ -28,7 +28,7 @@ import { VerdictDecision } from "@/app/(app)/documents/[id]/verdict-status";
 import { preflight } from "@/lib/conformance/rules/preflight";
 import { Guarded } from "@/components/preflight";
 import { issueToReviewAction, withdrawRevisionAction, removeCommentAction, editCommentAction, recordOutcomeAction, returnToOriginatorAction } from "@/lib/documents/forms-revisions";
-import { ArrowLeft, ExternalLink, FileText } from "lucide-react";
+import { ArrowLeft, Bell, ExternalLink, FileText } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -266,12 +266,6 @@ export default async function ReviewCyclePage({ params, searchParams }: { params
             <p className="mt-1 max-w-2xl text-[11.5px] leading-4 text-slate-400">{claim}</p>
             {/* What this review's answer is worth, said once up here so the card
                 where it is given can be about giving it. */}
-            {mayWithdraw || notify ? (
-              <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs font-semibold">
-                {mayWithdraw ? <Link href="?open=withdraw#withdraw" className="text-red-700 hover:underline">Withdraw?</Link> : null}
-                {notify ? <Link href="?open=notify#notify" className="text-link hover:underline">Notify?</Link> : null}
-              </p>
-            ) : null}
             <p className="mt-2 max-w-3xl text-[12px] leading-5 text-slate-600">
               <span className="stencil mr-2 text-slate-500">{cycle.binding ? "Binding verdict" : "Advice"}</span>
               {cycle.binding
@@ -279,9 +273,14 @@ export default async function ReviewCyclePage({ params, searchParams }: { params
                 : "Input for the route's decider; it does not decide on its own."}
             </p>
           </div>
-          <div className="flex shrink-0 items-center gap-2">
-            <Link href={`/documents/${doc.id}`} className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 font-mono text-xs font-semibold text-slate-500 hover:bg-slate-100"><ArrowLeft className="h-4 w-4" /> {doc.docNumber}</Link>
-            <Chip className={cycle.status === "OPEN" ? TONE.waiting : TONE.idle}>Review {cycle.sequence} · {cycle.status === "OPEN" ? "open" : cycle.withdrawn ? "withdrawn" : "closed"}</Chip>
+          <div className="flex shrink-0 flex-col items-end gap-2">
+            <div className="flex items-center gap-2">
+              <Link href={`/documents/${doc.id}`} className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 font-mono text-xs font-semibold text-slate-500 hover:bg-slate-100"><ArrowLeft className="h-4 w-4" /> {doc.docNumber}</Link>
+              <Chip className={cycle.status === "OPEN" ? TONE.waiting : TONE.idle}>Review {cycle.sequence} · {cycle.status === "OPEN" ? "open" : cycle.withdrawn ? "withdrawn" : "closed"}</Chip>
+            </div>
+            {/* Each opens its folded section under the document. */}
+            {mayWithdraw ? <Link href="?open=withdraw#withdraw" className="text-xs font-semibold text-red-700 hover:underline">Withdraw?</Link> : null}
+            {notify ? <Link href="?open=notify#notify" className="text-xs font-semibold text-link hover:underline">Notify?</Link> : null}
           </div>
         </div>
       </section>
@@ -324,7 +323,7 @@ export default async function ReviewCyclePage({ params, searchParams }: { params
             <details id="notify" open={opened === "notify"} className="register register-sheet register-sheet-open scroll-mt-24">
               <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-3 sm:px-6 [&::-webkit-details-marker]:hidden">
                 <span className="text-[13px] text-slate-600">Remind the people the review still waits on</span>
-                <span className="ask">Notify</span>
+                <span className="ask"><Bell aria-hidden className="h-3.5 w-3.5" /> Notify</span>
               </summary>
               <div className="border-t border-line px-5 py-4 sm:px-6">
                 <NotifyPanel
@@ -335,6 +334,7 @@ export default async function ReviewCyclePage({ params, searchParams }: { params
                   people={notify.people}
                   chosen={notify.waiting}
                   history={notify.history}
+                  bare
                 />
               </div>
             </details>

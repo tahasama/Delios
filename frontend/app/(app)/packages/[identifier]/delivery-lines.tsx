@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { X } from "lucide-react";
+import { Plus, X } from "lucide-react";
 import { DataTable, Th, Td, ToneChip } from "@/components/ui";
 import { ActionForm } from "@/components/form";
 import { removePackageMemberAction } from "@/lib/packages/forms";
@@ -17,13 +17,15 @@ export type DeliveryLine = {
  * The documents of a delivery package. Whoever may change what is in it ticks lines, and the bar under the list takes
  * them out; a document the rule matches stays out until added back by hand.
  */
-export function DeliveryLines({ packageId, packageNumber, lines, mayTakeOut, ruled, counts }: {
+export function DeliveryLines({ packageId, packageNumber, lines, mayTakeOut, ruled, counts, pickHref }: {
   packageId: string;
   packageNumber: string;
   lines: DeliveryLine[];
   mayTakeOut: boolean;
   ruled: boolean;
   counts: React.ReactNode;
+  /** The register opened for this package, as for an action: its documents ticked, tick to add, untick to take out. */
+  pickHref: string | null;
 }) {
   const [picked, setTicked] = useState<string[]>([]);
   // Taken out, a line leaves the list and its tick with it.
@@ -37,6 +39,7 @@ export function DeliveryLines({ packageId, packageNumber, lines, mayTakeOut, rul
         <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
           <span className="stencil mr-1 text-slate-500">Documents</span>
           <span className="text-[11px] text-slate-500">{counts}</span>
+          {pickHref ? <Link href={pickHref} className="ask ml-auto inline-flex items-center gap-1.5"><Plus className="h-3.5 w-3.5" /> Add or take out</Link> : null}
         </div>
         {lines.length ? (
           <DataTable className="rounded-none border-0 shadow-none" id="delivery-package" exportName={packageNumber} defaultHidden={["Comments"]}
@@ -70,7 +73,7 @@ export function DeliveryLines({ packageId, packageNumber, lines, mayTakeOut, rul
             })}
           </DataTable>
         ) : (
-          <p className="px-5 py-6 text-center text-xs text-slate-400 sm:px-6">No documents yet. Add them from the next step above, or tick them in the document register.</p>
+          <p className="px-5 py-6 text-center text-xs text-slate-400 sm:px-6">No documents yet. Add them with &ldquo;Add or take out&rdquo;.</p>
         )}
       </section>
 

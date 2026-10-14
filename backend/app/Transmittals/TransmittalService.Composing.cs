@@ -182,6 +182,9 @@ public sealed partial class TransmittalService
             : items.Count == 0 && placeholders.Count > 0 ? $"{placeholders.Count} document{(placeholders.Count == 1 ? "" : "s")} submitted to {supplierTo!.Name}"
             : $"{items.Count + placeholders.Count} documents";
         var message = messageGiven ? request.Message!.Trim() : null;
+        // An answer asked for by the sender is asked by a day: that day is what says whether it came in time.
+        if (request.ResponseRequired == true && request.ResponseDue is null)
+            return Fail(Problems.Invalid("ANSWER_DATE_REQUIRED", "Say by when the answer is due: it is how a late answer is seen."));
         var due = request.ResponseDue is { } d ? LocalDate.FromDateOnly(d) : (LocalDate?)null;
         return (new Prepared(reason, subject, message, due, items, people, parties, copies, issuedAt!.Value, answered?.Id, followed?.Id,
             followKind, Documents.OwnFields.Write(null, request.Extras), members, request.ActivityId, ask, placeholders, supplierTo), null);
