@@ -63,6 +63,9 @@ public sealed class DeliosDbContext(DbContextOptions<DeliosDbContext> options)
     public DbSet<Transmittals.Transmittal> Transmittals => Set<Transmittals.Transmittal>();
     public DbSet<Transmittals.TransmittalItem> TransmittalItems => Set<Transmittals.TransmittalItem>();
     public DbSet<Transmittals.TransmittalRecipient> TransmittalRecipients => Set<Transmittals.TransmittalRecipient>();
+    public DbSet<Transmittals.EmailReply> EmailReplies => Set<Transmittals.EmailReply>();
+    /// <summary>No row-level security: a reply by email is routed by it before anyone knows whose it is.</summary>
+    public DbSet<Transmittals.ReplyAddress> ReplyAddresses => Set<Transmittals.ReplyAddress>();
 
     public DbSet<Packages.Package> Packages => Set<Packages.Package>();
     public DbSet<Search.SearchWatermark> SearchWatermarks => Set<Search.SearchWatermark>();

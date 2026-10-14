@@ -5,6 +5,7 @@ import type { ActivityRow, ActivitySummary, Work } from "@/lib/types";
 import { requireScope } from "@/lib/core/scope";
 import { isAdmin } from "@/lib/core/auth";
 import { organizationLinks } from "@/lib/organization/api";
+import { emailReplies } from "@/lib/transmittals/api";
 import { fmtDate, fmtDateTime } from "@/lib/core/utils";
 import { DateWindow } from "@/components/date-window";
 import { Search } from "lucide-react";
@@ -34,6 +35,8 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const controller = ctx.can("CONTROL") || ctx.can("CONFIGURE");
   // Another organization invites ours to work on its projects: its administrators answer.
   const invitations = isAdmin(ctx.user) ? (await organizationLinks()).filter((one) => one.side === "GUEST" && one.state === "INVITED") : [];
+  // Replies by email from organizations not on DELIOS, waiting for Document Control to record them.
+  const repliesByEmail = ctx.can("CONTROL") ? await emailReplies(ctx) : [];
   // The whole log is Document Control's and the administrator's: they answer
   // for what the record says. Anybody else asking for it gets their own page.
   const view = sp.view === "log" && !controller ? undefined : sp.view;
@@ -198,6 +201,10 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
       ...invitations.map<Row>((one) => ({
         href: "/organization", code: one.partyCode, title: `${one.organization} invites us to work on its projects, with our own accounts`,
         tag: "invitation", tone: "sky", at: at(one.invitedAt), cta: "Answer",
+      })),
+      ...repliesByEmail.map<Row>((one) => ({
+        href: `/transmittals/${one.transmittalId}#email-replies`, code: one.transmittalNumber, title: `${one.organization} replied by email: ${one.subject || "no subject"}`,
+        tag: "reply by email", tone: "sky", at: at(one.receivedAt), cta: "Record",
       })),
       ...revisionsOf(["ACCEPT_SUBMISSION"]).map<Row>((w) => ({
         href: `/documents/${w.documentId}`, code: w.documentNumber, rev: w.revision, title: w.title,

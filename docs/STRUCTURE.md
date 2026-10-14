@@ -33,7 +33,7 @@ backend/
 │   ├── Program.cs        start-up: what runs, in which order
 │   ├── Documents/        documents, revisions, files, the register
 │   ├── Reviews/          routes, steps, advice, verdicts, release
-│   ├── Transmittals/     sending, receiving, the check on arrival
+│   ├── Transmittals/     sending, receiving, the check on arrival, replies by email (EmailReplies.cs)
 │   ├── Packages/         delivery packages and supplier packages
 │   ├── Actions/          the schedule, its actions, what each needs, notices
 │   ├── Records/          assets, exceptions, readiness answers

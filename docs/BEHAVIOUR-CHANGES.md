@@ -455,6 +455,12 @@ the installation sets its keys.
   its author (or supplier) for the next revision. The transmittal reason IFU reads "Issued for update" too.
 - **"Make it stop the release" (reclassifying a comment) is removed:** Document Control approves nothing; the
   decider's verdict decides. Comments reclassified before keep that record.
+- **Replies by email (not on DELIOS):** an organization not on DELIOS can be given "Their email for
+  transmittals" (Settings → Organizations). Our transmittals then go to it by email, files attached, and read as
+  sent by email. Their reply to that email waits on the transmittal ("Replies by email") and on Document
+  Control's Home: "Record it as received" makes it a received transmittal following ours (its files checked as
+  usual), or "Set it aside" with why. Setup: docs/ACTIVATION.md, "Replies by email".
+- **Fixed:** saving an organization not on DELIOS no longer asks to name one of its people.
 - **Plain words:** "in force" is gone from the screens: "released", "the revision people work from", "now used".
 
 ## 7. Notifications and email

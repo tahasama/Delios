@@ -144,6 +144,7 @@ public static class PlatformSetup
         services.AddScoped<Reviews.ControlService>();
         services.AddScoped<Transmittals.TransmittalService>();
         services.AddScoped<Transmittals.IncomingService>();
+        services.AddScoped<Transmittals.EmailReplies>();
         services.AddScoped<Packages.PackageService>();
         services.AddScoped<Packages.SupplyFiling>();
         services.AddOptions<Search.SearchOptions>().BindConfiguration(Search.SearchOptions.Section);
@@ -341,6 +342,7 @@ public static class PlatformSetup
             Documents.GovernanceEndpoints.MapGovernanceEndpoints(app);
             Records.ProjectRecordEndpoints.MapProjectRecordEndpoints(app);
             Transmittals.TransmittalEndpoints.MapTransmittalEndpoints(app);
+            Transmittals.EmailReplyEndpoints.MapEmailReplyEndpoints(app);
             Packages.PackageEndpoints.MapPackageEndpoints(app);
             Search.SearchEndpoints.MapSearchEndpoints(app);
             Extraction.ExtractionEndpoints.MapExtractionEndpoints(app);

@@ -30,7 +30,7 @@ public sealed record DispatchRequest(string? Channel, string? Reference = null, 
 /// </summary>
 public sealed partial class TransmittalService(
     DeliosDbContext db, Numbering numbering, AuditLog audit, FileStorage storage, IClock clock,
-    IOptions<StorageOptions> storageOptions, Notifications.Notifier notifier)
+    IOptions<StorageOptions> storageOptions, Notifications.Notifier notifier, EmailReplies emailReplies)
 {
     /// <summary>The reason a placeholder is sent with, set by itself: issued for use.</summary>
     public const string PlaceholderReason = "IFU";

@@ -345,6 +345,13 @@ a screen only words it. A new rule goes in the backend, never in a page.
   already open; a joined project follows its owner. A project marks each answer "as the defaults" / "the
   app's" / "changed here" and has "Reset to the organization's defaults" (what the project is, and checks
   ticked off, stay).
+- Not on DELIOS, with "Their email for transmittals" (`Party.ContactEmail`): our transmittals to them go by
+  email with their files (`EmailReplies`), each with a reply address of its own (`replies+<key>@…`,
+  `ReplyAddress`, kept outside organization fencing). A reply from that address only is taken in: it waits on
+  the transmittal ("Replies by email") and on Document Control's Home; Document Control records it as received
+  (a transmittal following ours, its files checked as anything that arrives) or sets it aside with why. Nothing
+  is filed by itself; mail from anyone else is answered with how to reply; mail to no transmittal is dropped.
+  No open project mailbox.
 - Roles on a project (CONTRACT_ROLES): GENERIC, EPC, EPCM, PMC, DESIGN, OWNER, CM, CONTRACTOR, SUBCONTRACTOR,
   SUPPLIER, INSPECTOR (docs/ORGANIZATIONS.md). New ones only with the owner's approval.
 

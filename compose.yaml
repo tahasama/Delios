@@ -51,6 +51,9 @@ x-backend: &backend
     Email__Smtp__Port: ${SMTP_PORT:-587}
     Email__Smtp__User: ${SMTP_USER:-}
     Email__Smtp__Password: ${SMTP_PASSWORD:-}
+    # Replies by email to transmittals sent to organizations not on DELIOS (docs/ACTIVATION.md, "Replies by email").
+    Email__Replies__Address: ${EMAIL_REPLIES_ADDRESS:-}
+    Email__Replies__Secret: ${EMAIL_REPLIES_SECRET:-}
     # The bot check on sign-in, sign-up and forgot password (Cloudflare Turnstile); empty: off.
     Turnstile__SecretKey: ${TURNSTILE_SECRET_KEY:-}
     # The address people reach the system at, for single sign-on to send them back to.

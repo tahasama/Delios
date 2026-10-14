@@ -86,6 +86,11 @@ public sealed class Party
     public string? ExternalSystem { get; set; }
     /// <summary>Whether an answer recorded on their behalf must carry its proof.</summary>
     public bool EvidenceRequired { get; set; } = true;
+    /// <summary>
+    /// Where an organization nobody of which signs in here receives our transmittals by email (with their files), and
+    /// the only address whose replies are taken in. Empty: one of ours sends them, as the dispatch records.
+    /// </summary>
+    public string? ContactEmail { get; set; }
 }
 
 /// <summary>The allowed values of <c>Party.Participation</c>.</summary>

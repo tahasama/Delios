@@ -1017,6 +1017,11 @@ automatic notices about an action stay notices (§53).
 
 ## 55 · Organizations working together, each with its own DELIOS
 
+> Added: an organization not on DELIOS may receive our transmittals by email at one address of theirs; only a reply
+> to such an email, from that address, comes back, and only as a reply waiting for Document Control to record it
+> as received (or set aside with why). Correspondence is never opened to a free project mailbox.
+
+
 **Before:** another organization took part as a party of ours: its people held accounts we made inside our
 organization, or nobody of theirs signed in and one of ours recorded for them.
 

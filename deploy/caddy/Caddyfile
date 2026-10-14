@@ -49,6 +49,11 @@
 		import api
 	}
 
+	# Replies by email, passed on by the mail provider with the shared secret.
+	handle /api/inbound/email {
+		import api
+	}
+
 	handle /health/* {
 		respond 404
 	}

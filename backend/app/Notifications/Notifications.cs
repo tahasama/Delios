@@ -60,6 +60,10 @@ public sealed class EmailMessage
     /// <summary>What it is about, for the record: Transmittal, Review, Notification.</summary>
     public string? RelatedType { get; set; }
     public Guid? RelatedId { get; set; }
+    /// <summary>Where a reply goes: a transmittal's own reply address. Null: to the sender.</summary>
+    public string? ReplyTo { get; set; }
+    /// <summary>Stored files attached to it (a transmittal's files, for an organization not on DELIOS).</summary>
+    public Guid[] FileIds { get; set; } = [];
     /// <summary>One of <see cref="EmailStates"/>.</summary>
     public string State { get; set; } = EmailStates.Queued;
     public Instant CreatedAt { get; set; }
@@ -107,6 +111,10 @@ public sealed class EmailOptions
     /// <summary>The address of the screens, to put whole links in an email: https://edms.example.com.</summary>
     public string BaseUrl { get; set; } = "http://localhost:3000";
     public SmtpOptions Smtp { get; set; } = new();
+    /// <summary>Replies to a transmittal, by email: where they come in (docs/ACTIVATION.md, "Replies by email").</summary>
+    public ReplyOptions Replies { get; set; } = new();
+    /// <summary>The most a transmittal emailed to an organization not on DELIOS carries attached; beyond it, the files are listed.</summary>
+    public long MaxAttachmentBytes { get; set; } = 15 * 1024 * 1024;
 
     /// <summary>Whether an email of this kind is sent now.</summary>
     public bool Sends(string kind) => Enabled && kind switch
@@ -116,6 +124,25 @@ public sealed class EmailOptions
         EmailKinds.Account => true,
         _ => Notifications,
     };
+}
+
+/// <summary>
+/// Replies by email. <c>Address</c> is the mailbox replies arrive at ("replies@edms.example.com"): each transmittal
+/// emailed to an organization not on DELIOS answers to "replies+&lt;its own key&gt;@edms.example.com". <c>Secret</c> is what
+/// the mail provider sends with each reply it passes on. Empty: no reply address is given.
+/// </summary>
+public sealed class ReplyOptions
+{
+    public string Address { get; set; } = "";
+    public string Secret { get; set; } = "";
+    public bool On => Address.Contains('@') && Secret.Length >= 16;
+
+    /// <summary>The reply address of one transmittal: the mailbox with its key after a plus.</summary>
+    public string For(string token)
+    {
+        var at = Address.IndexOf('@');
+        return $"{Address[..at]}+{token}{Address[at..]}";
+    }
 }
 
 /// <summary>The mail server email goes through.</summary>
@@ -188,7 +215,7 @@ public sealed class Notifier(DeliosDbContext db, IClock clock, IOptions<EmailOpt
     /// <summary>Queues one email (or records it as not sent, when that kind of email is off).</summary>
     public EmailMessage Queue(
         Guid tenantId, Guid? projectId, string kind, string toAddress, string? toName, string subject, string body,
-        string? relatedType, Guid? relatedId)
+        string? relatedType, Guid? relatedId, string? replyTo = null, Guid[]? fileIds = null)
     {
         var sends = Email.Sends(kind);
         var message = new EmailMessage
@@ -202,6 +229,8 @@ public sealed class Notifier(DeliosDbContext db, IClock clock, IOptions<EmailOpt
             Body = Clip(body, 20000),
             RelatedType = relatedType,
             RelatedId = relatedId,
+            ReplyTo = replyTo,
+            FileIds = fileIds ?? [],
             CreatedAt = clock.GetCurrentInstant(),
             State = sends ? EmailStates.Queued : EmailStates.Off,
         };
@@ -236,7 +265,8 @@ public sealed class SmtpTransport : IMailTransport
 
 /// <summary>Sends one queued email through the mail server. Called by the worker for each <see cref="EmailRequested"/>.</summary>
 public sealed class EmailSender(
-    DeliosDbContext db, TenantContext tenant, IClock clock, IOptions<EmailOptions> options, IMailTransport transport, ILogger<EmailSender> logger)
+    DeliosDbContext db, TenantContext tenant, IClock clock, IOptions<EmailOptions> options, IMailTransport transport, ILogger<EmailSender> logger,
+    Documents.FileStorage storage)
 {
     /// <summary>
     /// Sends the email, once: an email already sent, or switched off since, is left as it is. A refusal from the mail
@@ -266,6 +296,20 @@ public sealed class EmailSender(
                 Subject = email.Subject,
                 Body = email.Body,
             };
+            if (email.ReplyTo is { } replyTo) mail.ReplyToList.Add(new System.Net.Mail.MailAddress(replyTo));
+            // Attached as stored: only files scanned clean.
+            if (email.FileIds.Length > 0)
+            {
+                var files = await db.StoredFiles.AsNoTracking()
+                    .Where(f => email.FileIds.Contains(f.Id) && f.Status == Documents.FileStatuses.Clean).ToListAsync(cancellationToken);
+                foreach (var file in files)
+                {
+                    var content = new MemoryStream();
+                    await using (var stored = await storage.OpenReadAsync(file.ObjectKey, cancellationToken)) await stored.CopyToAsync(content, cancellationToken);
+                    content.Position = 0;
+                    mail.Attachments.Add(new System.Net.Mail.Attachment(content, file.Name, file.ContentType));
+                }
+            }
             await transport.SendAsync(mail, settings, cancellationToken);
             email.State = EmailStates.Sent;
             email.SentAt = clock.GetCurrentInstant();
@@ -312,6 +356,7 @@ internal sealed class NotificationConfiguration : IEntityTypeConfiguration<Notif
         b.Property(x => x.Subject).HasMaxLength(300);
         b.Property(x => x.Body).HasMaxLength(20000);
         b.Property(x => x.RelatedType).HasMaxLength(40);
+        b.Property(x => x.ReplyTo).HasMaxLength(254);
         b.Property(x => x.State).HasMaxLength(10);
         b.Property(x => x.Error).HasMaxLength(1000);
     }

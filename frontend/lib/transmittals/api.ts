@@ -83,3 +83,15 @@ export async function transmittalDrafts(scope: Scope) {
   return api<{ id: string; subject: string; createdAt: string; createdBy: string; reason: string | null; documents: number; people: number; parties: number; copies: number }[]>(
     projectPath(scope, "/transmittals/drafts")).catch(() => []);
 }
+
+/** A reply by email to one of our transmittals, waiting for Document Control (or answered). */
+export type EmailReply = {
+  id: string; transmittalId: string; transmittalNumber: string; organization: string; fromAddress: string; fromName: string | null;
+  subject: string; text: string; receivedAt: string; files: { id: string; name: string; size: number }[];
+  state: "WAITING" | "RECORDED" | "SET_ASIDE"; recordedTransmittalId: string | null; handledByName: string | null; handledAt: string | null;
+  setAsideReason: string | null;
+};
+
+/** The replies by email on one transmittal, or (none named) those waiting on the project. Document Control's only. */
+export const emailReplies = cache(async (scope: Scope, transmittalId?: string): Promise<EmailReply[]> =>
+  api<EmailReply[]>(projectPath(scope, "/email-replies"), { query: { transmittalId } }).catch(() => [] as EmailReply[]));

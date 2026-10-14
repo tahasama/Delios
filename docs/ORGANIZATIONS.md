@@ -17,6 +17,9 @@ Guest             they have no DELIOS organization.
 Not on DELIOS     nobody of theirs signs in.
                   They have a code (it goes into document numbers), and one of our people
                   records what they send and answers for them, with proof.
+                  With an email for transmittals, ours reach them by email (files attached), and
+                  their reply to that email comes back to the transmittal for Document Control to
+                  record. Only replies: there is no open project mailbox.
 ```
 
 A company can move up later without losing anything:

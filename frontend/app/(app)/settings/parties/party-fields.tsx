@@ -12,8 +12,10 @@ import { SearchPick } from "@/components/search-pick";
  * not names the function of ours that carries it. The question changes as the
  * choice is made, rather than after saving.
  */
-export function PartyKindFields({ kind, contactId, backupId, liaisonFunction, people, functions, access }: {
+export function PartyKindFields({ kind, contactId, backupId, liaisonFunction, people, functions, access, contactEmail = "" }: {
   kind: string;
+  /** Not on DELIOS: their address for our transmittals, and the only one whose replies are taken in. */
+  contactEmail?: string;
   contactId: string;
   backupId: string;
   liaisonFunction: string;
@@ -45,6 +47,11 @@ export function PartyKindFields({ kind, contactId, backupId, liaisonFunction, pe
         </Field>
       )}
 
+      {offline ? (
+        <Field label="Their email for transmittals" hint="our transmittals go there by email, with their files; replies from it come back to the transmittal, for Document Control to record">
+          <input type="email" name="contactEmail" defaultValue={contactEmail} maxLength={254} className={inputCls} placeholder="documents@their-company.com" />
+        </Field>
+      ) : null}
       {offline ? (
         <Field label="Who carries it" hint="our function that sends it to them, and fills in their review, comments and answer — with proof each time">
           <select name="liaisonFunction" defaultValue={liaisonFunction} className={inputCls}>

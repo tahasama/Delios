@@ -94,6 +94,7 @@ export default async function AdminPartiesPage() {
                               contactId={p.contactId ?? ""}
                               backupId={p.backupId ?? ""}
                               liaisonFunction={p.liaisonFunction ?? ""}
+                              contactEmail={p.contactEmail ?? ""}
                               people={people.filter((u) => u.partyId === p.id)}
                               functions={functions}
                               access={{ active: p.active, signingIn: signingIn(p.id) }}

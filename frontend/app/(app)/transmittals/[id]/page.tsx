@@ -22,7 +22,8 @@ import { Timeline } from "@/components/timeline";
 import { SendForReview } from "@/components/send-for-review-panel";
 import { ArrowLeft } from "lucide-react";
 import { getActiveSet } from "@/lib/settings/config";
-import { carriersOf as carriersOfTransmittal, transmittalPage } from "@/lib/transmittals/api";
+import { carriersOf as carriersOfTransmittal, transmittalPage, emailReplies } from "@/lib/transmittals/api";
+import { EmailReplies } from "./email-replies";
 import { activityDetail } from "@/lib/actions/api";
 
 export const dynamic = "force-dynamic";
@@ -432,6 +433,9 @@ export default async function TransmittalDetailPage({ params, searchParams }: { 
               ) : null}
             </section>
           ) : null}
+
+          {/* Replies by email from an organization not on DELIOS: Document Control records or sets each aside. */}
+          {controller ? <EmailReplies replies={await emailReplies(ctx, t.id)} transmittalId={t.id} /> : null}
 
           {/* What came back. Each answer is correspondence in its own right, so
               this says what they are and where they are, and does not try to

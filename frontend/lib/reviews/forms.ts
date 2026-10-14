@@ -168,6 +168,8 @@ export async function savePartyAction(_prev: { error?: string } | undefined, for
   const kind = ["COLLABORATOR", "GUEST", "OFFLINE"].includes(text(formData, "kind")) ? text(formData, "kind") : "GUEST";
   const participation = kind === "OFFLINE" ? "BY_PROXY" : "IN_APP";
   const custodianFunction = text(formData, "liaisonFunction");
+  // Not on DELIOS: where our transmittals go by email (empty: one of ours sends them).
+  const contactEmail = kind === "OFFLINE" ? text(formData, "contactEmail") : undefined;
   if (contactId && backupId && contactId === backupId) return { error: "The backup has to be someone other than the contact." };
   try {
     let partyId = id;
@@ -178,13 +180,13 @@ export async function savePartyAction(_prev: { error?: string } | undefined, for
       const active = formData.get("active") === "on";
       if (!name) return { error: "A party needs a name." };
       if (party.isInternal && !active) return { error: "Your own organization cannot be switched off." };
-      // Somebody has to answer for a party we exchange documents with.
-      if (!party.isInternal && active && !contactId) return { error: `Name the person who answers for ${name}. The backup is optional.` };
+      // Somebody of theirs answers for a party that signs in; one not on DELIOS is carried by a function of ours.
+      if (!party.isInternal && active && kind !== "OFFLINE" && !contactId) return { error: `Name the person who answers for ${name}. The backup is optional.` };
       await api(`/api/admin/parties/${id}`, {
         method: "PUT",
         body: party.isInternal
           ? { name, active }
-          : { name, active, participation, custodianFunction, evidenceRequired: kind === "OFFLINE" },
+          : { name, active, participation, custodianFunction, evidenceRequired: kind === "OFFLINE", contactEmail },
       });
     } else {
       // What this organization asks of an organization it adds.
@@ -192,7 +194,7 @@ export async function savePartyAction(_prev: { error?: string } | undefined, for
       const asked = checkForm("PARTY", policy, { code, name, kind, contactId, backupId, liaisonFunction: custodianFunction || null }, (n) => String(formData.get(n) ?? ""));
       if (asked.error) return { error: asked.error };
       const created = await api<{ id: string }>("/api/admin/parties", {
-        body: { code, name, isInternal: false, participation, custodianFunction, evidenceRequired: kind === "OFFLINE" },
+        body: { code, name, isInternal: false, participation, custodianFunction, evidenceRequired: kind === "OFFLINE", contactEmail },
       });
       partyId = created.id;
     }

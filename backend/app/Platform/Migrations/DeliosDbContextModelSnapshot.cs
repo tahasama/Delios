@@ -2238,6 +2238,11 @@ namespace Delios.Host.Platform.Migrations
                         .HasColumnType("character varying(32)")
                         .HasColumnName("code");
 
+                    b.Property<string>("ContactEmail")
+                        .HasMaxLength(254)
+                        .HasColumnType("character varying(254)")
+                        .HasColumnName("contact_email");
+
                     b.Property<string>("CustodianFunction")
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)")
@@ -2702,6 +2707,11 @@ namespace Delios.Host.Platform.Migrations
                         .HasColumnType("character varying(1000)")
                         .HasColumnName("error");
 
+                    b.PrimitiveCollection<Guid[]>("FileIds")
+                        .IsRequired()
+                        .HasColumnType("uuid[]")
+                        .HasColumnName("file_ids");
+
                     b.Property<string>("Kind")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -2720,6 +2730,11 @@ namespace Delios.Host.Platform.Migrations
                         .HasMaxLength(40)
                         .HasColumnType("character varying(40)")
                         .HasColumnName("related_type");
+
+                    b.Property<string>("ReplyTo")
+                        .HasMaxLength(254)
+                        .HasColumnType("character varying(254)")
+                        .HasColumnName("reply_to");
 
                     b.Property<Instant?>("SentAt")
                         .HasColumnType("timestamp with time zone")
@@ -4704,6 +4719,99 @@ namespace Delios.Host.Platform.Migrations
                     b.ToTable("settings", (string)null);
                 });
 
+            modelBuilder.Entity("Delios.Host.Transmittals.EmailReply", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.PrimitiveCollection<Guid[]>("FileIds")
+                        .IsRequired()
+                        .HasColumnType("uuid[]")
+                        .HasColumnName("file_ids");
+
+                    b.Property<string>("FromAddress")
+                        .IsRequired()
+                        .HasMaxLength(254)
+                        .HasColumnType("character varying(254)")
+                        .HasColumnName("from_address");
+
+                    b.Property<string>("FromName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("from_name");
+
+                    b.Property<Instant?>("HandledAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("handled_at");
+
+                    b.Property<string>("HandledByName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("handled_by_name");
+
+                    b.Property<Guid>("PartyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("party_id");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("project_id");
+
+                    b.Property<Instant>("ReceivedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("received_at");
+
+                    b.Property<Guid?>("RecordedTransmittalId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("recorded_transmittal_id");
+
+                    b.Property<string>("SetAsideReason")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("set_aside_reason");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("state");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("subject");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasMaxLength(20000)
+                        .HasColumnType("character varying(20000)")
+                        .HasColumnName("text");
+
+                    b.Property<Guid>("TransmittalId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("transmittal_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_email_replies");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_email_replies_tenant_id");
+
+                    b.HasIndex("TransmittalId")
+                        .HasDatabaseName("ix_email_replies_transmittal_id");
+
+                    b.HasIndex("ProjectId", "State")
+                        .HasDatabaseName("ix_email_replies_project_id_state");
+
+                    b.ToTable("email_replies", (string)null);
+                });
+
             modelBuilder.Entity("Delios.Host.Transmittals.IssueRequest", b =>
                 {
                     b.Property<Guid>("Id")
@@ -4823,6 +4931,42 @@ namespace Delios.Host.Platform.Migrations
                         .HasDatabaseName("ix_issue_requests_revision_id_status");
 
                     b.ToTable("issue_requests", (string)null);
+                });
+
+            modelBuilder.Entity("Delios.Host.Transmittals.ReplyAddress", b =>
+                {
+                    b.Property<string>("Token")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("token");
+
+                    b.Property<Instant>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("PartyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("party_id");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("project_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("TransmittalId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("transmittal_id");
+
+                    b.HasKey("Token")
+                        .HasName("pk_reply_addresses");
+
+                    b.HasIndex("TransmittalId")
+                        .HasDatabaseName("ix_reply_addresses_transmittal_id");
+
+                    b.ToTable("reply_addresses", (string)null);
                 });
 
             modelBuilder.Entity("Delios.Host.Transmittals.Transmittal", b =>
@@ -6584,6 +6728,16 @@ namespace Delios.Host.Platform.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_settings_tenants_tenant_id");
+                });
+
+            modelBuilder.Entity("Delios.Host.Transmittals.EmailReply", b =>
+                {
+                    b.HasOne("Delios.Host.Identity.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_email_replies_tenants_tenant_id");
                 });
 
             modelBuilder.Entity("Delios.Host.Transmittals.IssueRequest", b =>

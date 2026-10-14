@@ -43,7 +43,7 @@ public sealed record UpdateFunctionRequest(string? Name = null, bool? Active = n
 /// <summary>Body of creating or changing an organization taking part in projects.</summary>
 public sealed record PartyRequest(
     string? Code = null, string? Name = null, bool? IsInternal = null, bool? Active = null, string? Participation = null,
-    string? CustodianFunction = null, string? ExternalSystem = null, bool? EvidenceRequired = null);
+    string? CustodianFunction = null, string? ExternalSystem = null, bool? EvidenceRequired = null, string? ContactEmail = null);
 
 /// <summary>
 /// The organization's directory, kept by its administrators: people, projects and who is on them with which
@@ -603,6 +603,7 @@ public static class DirectoryEndpoints
             p.CustodianFunction,
             p.ExternalSystem,
             p.EvidenceRequired,
+            p.ContactEmail,
             People = people.FirstOrDefault(c => c.Key == p.Id)?.Count ?? 0,
             // Collaborator (linked to its own organization), guest, or not on DELIOS (docs/ORGANIZATIONS.md).
             Kind = p.IsInternal ? null : Organizations.OrganizationService.KindOf(p, links.TryGetValue(p.Id, out var l) && l.State == Organizations.LinkStates.Linked),
@@ -661,6 +662,14 @@ public static class DirectoryEndpoints
         {
             party.CustodianFunction = Blank(request.CustodianFunction);
             changes.Add($"carried by {party.CustodianFunction ?? "Document Control"}");
+        }
+        if (request.ContactEmail is not null && Blank(request.ContactEmail)?.ToLowerInvariant() != party.ContactEmail)
+        {
+            var contact = Blank(request.ContactEmail)?.ToLowerInvariant();
+            if (contact is not null && (contact.Length > 254 || !System.Net.Mail.MailAddress.TryCreate(contact, out _)))
+                return Problems.Invalid("EMAIL_INVALID", "That is not an email address.", new { field = "contactEmail" });
+            party.ContactEmail = contact;
+            changes.Add($"transmittals by email to {party.ContactEmail ?? "nobody"}");
         }
         if (request.ExternalSystem is not null && Blank(request.ExternalSystem) != party.ExternalSystem)
         {

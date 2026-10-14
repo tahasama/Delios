@@ -223,6 +223,26 @@ In `.env`: `SITE_ADDRESS=app.example.com`, `HTTP_PORT=80`, `HTTPS_PORT=443`,
 Caddy obtains and renews the certificate itself. The API's own entrance (8080)
 stays on 127.0.0.1.
 
+## Replies by email
+
+An organization not on DELIOS with "Their email for transmittals" (Settings → Organizations) gets our
+transmittals by email, with their files attached (up to 15 MB in all), once email is on (`EMAIL_ENABLED=true`
+and the SMTP settings). For their replies to come back to the transmittal:
+
+1. Choose a mailbox for replies on a domain you control, e.g. `replies@app.example.com`, at a mail provider that
+   accepts plus-addressing and passes each incoming email on to a web address as JSON (Postmark inbound,
+   Mailgun routes, SendGrid inbound parse, or an equivalent).
+2. In `.env`: `EMAIL_REPLIES_ADDRESS=replies@app.example.com` and `EMAIL_REPLIES_SECRET=` a long random text
+   (at least 16 characters).
+3. At the provider: pass every email to `https://app.example.com/api/inbound/email`, with the header
+   `X-Delios-Secret: <the same secret>`. The fields read are `From`, `To`, `Subject`, `TextBody`
+   (or `StrippedTextReply`) and `Attachments` (`Name`, `ContentType`, base64 `Content`): Postmark's names,
+   or the plain `from`, `to`, `subject`, `text`, `attachments`.
+
+Each transmittal emailed then answers to `replies+<its own key>@app.example.com`. A reply from the organization's
+address waits on that transmittal and on Document Control's Home, to be recorded as received or set aside.
+Mail from any other address is not taken in; its sender is told how to answer. Mail to no transmittal is dropped.
+
 ## Two-step sign-in (MFA)
 
 Built and on for anyone who wants it; required only when the organization says so.

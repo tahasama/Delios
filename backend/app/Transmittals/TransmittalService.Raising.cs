@@ -201,6 +201,9 @@ public sealed partial class TransmittalService
             $"{raise.Reason} from {raise.Actor.Name}{(due is null ? "" : $", answer by {due:yyyy-MM-dd}")}.\n{listed}{(raise.Message is null ? "" : $"\n\n{raise.Message}")}",
             $"/transmittals/{transmittal.Id}", cancellationToken, Notifications.EmailKinds.Transmittal,
             TransmittalEmail(project, transmittal, catalog, addressed, ours, listed));
+        // An organization nobody of which signs in here gets it by email, with its files and a reply address of its own.
+        var forThem = TransmittalEmail(project, transmittal, catalog, addressed, ours, listed);
+        await emailReplies.SendToOrganizationsAsync(project, transmittal, forThem[..forThem.LastIndexOf('\n')].TrimEnd(), cancellationToken);
         return transmittal;
     }
 }

@@ -38,6 +38,8 @@ export type AdminFunction = { id: string; code: string; name: string; active: bo
 type AdminParty = {
   id: string; code: string; name: string; isInternal: boolean; active: boolean; participation: string; custodianFunction: string | null;
   externalSystem: string | null; evidenceRequired: boolean; people: number;
+  /** Not on DELIOS: where our transmittals go by email, and whose replies are taken in. */
+  contactEmail?: string | null;
   /** Collaborator (linked to its own DELIOS organization), guest, or not on DELIOS (docs/ORGANIZATIONS.md); null for ours. */
   kind?: "COLLABORATOR" | "GUEST" | "NOT_ON_DELIOS" | null;
   /** Its open link with its own DELIOS organization: invited, or linked. */
