@@ -276,10 +276,11 @@ a screen only words it. A new rule goes in the backend, never in a page.
   time), rejected (back to the author), for information. The app reads the
   meaning (`verdictEffect`, props proceed/resubmit/information), never C1–C4.
   A list says itself it is verdicts ("What it is" on the set: `kind` VERDICTS; the starter lists by their key):
-  only then does each value ask its meaning, and only then is it offered as a route's verdict list. A route serves
+  only then does each value ask its meaning (never chosen for the person: a value with none reads "not chosen
+  yet" until it is), and only then is it offered as a route's verdict list. A route serves
   supplier documents only by "Produced by" (the supplier deliverable type) or "From which organization".
 - How revisions are named is Settings → Revisions (`RevisionSchemeEndpoints`): schemes of series (letters or
-  numbers, prefix, start, letters skipped), one the default, and which deliverable type follows which. A scheme
+  numbers, prefix, start — empty starts at A or 0 —, letters skipped), one the default, and which deliverable type follows which. A scheme
   chosen for a type names its documents not revised yet; a document already started keeps counting the way it
   began. A series revisions carry stays in its scheme, never recounted (backend SERIES_IN_USE).
 - A supplier's document reads in its own states (register, document page,

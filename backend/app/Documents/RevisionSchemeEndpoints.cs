@@ -50,18 +50,26 @@ public static class RevisionSchemeEndpoints
             var label = (one.Label ?? "").Trim();
             if (code.Length == 0 || label.Length == 0 || code.Length > 20 || !code.All(c => char.IsAsciiLetterOrDigit(c) || c == '_'))
                 return (null, Problems.Invalid("SERIES_CODE_REQUIRED", "Each series has a code (letters, digits, _) and a name."));
+            var kind = (one.Kind ?? "").Trim().ToUpperInvariant();
+            // Nothing said: letters start at A, numbers at 0.
+            var start = Blank(one.Start) ?? (kind == SeriesKinds.Numbers ? "0" : "A");
             var rule = new RevisionSeriesRule
             {
                 Code = code,
                 Label = label,
-                Kind = (one.Kind ?? "").Trim().ToUpperInvariant(),
+                Kind = kind,
                 Prefix = (one.Prefix ?? "").Trim(),
-                Start = (one.Start ?? "").Trim(),
+                Start = start,
                 Width = Math.Clamp(one.Width, 0, 6),
                 Lowercase = one.Lowercase,
                 ExcludedLetters = [.. (one.ExcludedLetters ?? []).Select(l => l.Trim().ToUpperInvariant()).Where(l => l.Length == 1).Distinct()],
             };
-            if (RevisionValues.Problem(rule) is { } problem) return (null, Problems.Invalid("SERIES_INVALID", problem));
+            if (rule.Kind is not (SeriesKinds.Letters or SeriesKinds.Numbers))
+                return (null, Problems.Invalid("SERIES_INVALID", $"{label}: say whether it counts in letters or in numbers."));
+            if (RevisionValues.Problem(rule) is not null)
+                return (null, Problems.Invalid("SERIES_INVALID", rule.Kind == SeriesKinds.Numbers
+                    ? $"{label}: it counts in numbers, so it starts at a number (0, 1…), written after the prefix."
+                    : $"{label}: it counts in letters, so it starts at a letter (A, B…), written after the prefix."));
             series.Add(rule);
         }
         if (series.GroupBy(s => s.Code).FirstOrDefault(g => g.Count() > 1) is { } twice)

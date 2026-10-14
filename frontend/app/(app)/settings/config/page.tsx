@@ -32,11 +32,16 @@ async function usage(_t: unknown, _key: string): Promise<{ counts: Map<string, n
   return { counts: new Map(), unit: "" };
 }
 
+/** A plain question nobody answered yet: none of what its answers set is stored (a value made before its list asked it). */
+function unanswered(f: PropField, props: Record<string, unknown>): boolean {
+  return f.type === "choice" && !f.options.some((o) => Object.keys(o.sets).some((key) => key in props));
+}
+
 /** What a value does, in the plain words of its set's questions. */
 function doesText(fields: PropField[] | undefined, props: Record<string, unknown>): string {
   if (!fields) return "";
   return fields.map((f) => {
-    if (f.type === "choice") return f.options.find((o) => o.value === f.read(props))?.label.split(" — ")[0] ?? "";
+    if (f.type === "choice") return unanswered(f, props) ? `${f.label.toLowerCase()}: not chosen yet` : f.options.find((o) => o.value === f.read(props))?.label.split(" — ")[0] ?? "";
     if (f.type === "bool") return props[f.key] === true ? f.label.toLowerCase() : "";
     const v = props[f.key];
     if (v === undefined || v === null || v === "") return "";
@@ -133,7 +138,7 @@ export default async function AdminConfigPage({ searchParams }: { searchParams: 
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <Field label="Code" required hint="what appears in numbers and lists"><input name="code" required maxLength={24} className={inputCls} /></Field>
                     <Field label="Label" required><input name="label" required className={inputCls} /></Field>
-                    {propFields?.map((f) => <PropInput key={f.key} field={f} value={undefined} lists={lists} />)}
+                    {propFields?.map((f) => <PropInput key={f.key} field={f} value={undefined} lists={lists} unset={f.type === "choice"} />)}
                   </div>
                 </ActionForm>
               </Card>
@@ -250,7 +255,7 @@ export default async function AdminConfigPage({ searchParams }: { searchParams: 
                       </Td>
                       <Td className="whitespace-nowrap font-mono text-xs font-bold text-slate-900"><Link href={here({ edit: open ? undefined : v.id, panel: undefined })} className="hover:text-link">{v.code}</Link></Td>
                       <Td className="min-w-50 text-sm"><Link href={here({ edit: open ? undefined : v.id, panel: undefined })} className="hover:text-link">{v.label}</Link></Td>
-                      {propFields ? <Td className="text-xs text-slate-600">{doesText(propFields, props) || <span className="text-slate-300">—</span>}</Td> : null}
+                      {propFields ? <Td className={propFields.some((f) => unanswered(f, props)) ? "text-xs text-amber-700" : "text-xs text-slate-600"}>{doesText(propFields, props) || <span className="text-slate-300">—</span>}</Td> : null}
                       <Td className="whitespace-nowrap text-right text-xs tabular-nums">
                         {n ? (used.filter ? <Link href={`/documents?${used.filter}=${encodeURIComponent(v.code)}&view=all`} className="text-link hover:underline">{n} {used.unit}{n === 1 ? "" : "s"}</Link> : <span className="text-slate-600">{n} {used.unit}{n === 1 ? "" : "s"}</span>) : <span className="text-slate-300">—</span>}
                       </Td>
@@ -271,7 +276,7 @@ export default async function AdminConfigPage({ searchParams }: { searchParams: 
                                   <textarea name="propsJson" rows={2} defaultValue={v.props ?? ""} className={inputCls} />
                                 </Field>
                               )}
-                              {propFields?.map((f) => <PropInput key={f.key} field={f} value={f.type === "choice" ? f.read(props) : props[f.key]} lists={lists} />)}
+                              {propFields?.map((f) => <PropInput key={f.key} field={f} value={f.type === "choice" ? (unanswered(f, props) ? undefined : f.read(props)) : props[f.key]} lists={lists} unset={unanswered(f, props)} />)}
                             </div>
                           </ActionForm>
                           <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-line pt-3 text-xs">
@@ -312,7 +317,11 @@ export default async function AdminConfigPage({ searchParams }: { searchParams: 
   );
 }
 
-function PropInput({ field, value, lists }: { field: PropField; value: unknown; lists: Record<string, { code: string; label: string }[]> }) {
+function PropInput({ field, value, lists, unset = false }: {
+  field: PropField; value: unknown; lists: Record<string, { code: string; label: string }[]>;
+  /** A plain question not answered yet: nothing is chosen for the person, who has to choose. */
+  unset?: boolean;
+}) {
   if (field.type === "sets") {
     const ticked = Array.isArray(value) ? value.map(String) : [];
     return (
@@ -342,11 +351,11 @@ function PropInput({ field, value, lists }: { field: PropField; value: unknown; 
   if (field.type === "choice") {
     return (
       <fieldset className="sm:col-span-2">
-        <legend className="mb-1 text-xs font-semibold text-slate-700">{field.label}</legend>
+        <legend className="mb-1 text-xs font-semibold text-slate-700">{field.label}{unset ? <span className="ml-1 text-red-500">*</span> : null}{unset ? <span className="ml-2 font-normal text-amber-700">not chosen yet: choose one</span> : null}</legend>
         <div className="space-y-1.5">
           {field.options.map((o, i) => (
             <label key={o.value} className="flex items-start gap-2 rounded-lg border border-line px-3 py-2 text-sm text-slate-700 has-checked:border-brand-line has-checked:bg-tint-soft">
-              <input type="radio" name={`prop_${field.key}`} value={o.value} defaultChecked={value ? value === o.value : i === 0} className="mt-0.5" />
+              <input type="radio" name={`prop_${field.key}`} value={o.value} required={unset} defaultChecked={unset ? false : value ? value === o.value : i === 0} className="mt-0.5" />
               <span><strong className="font-semibold">{o.label.split(" — ")[0]}</strong>{o.label.includes(" — ") ? <span className="text-slate-500"> — {o.label.split(" — ").slice(1).join(" — ")}</span> : null}</span>
             </label>
           ))}

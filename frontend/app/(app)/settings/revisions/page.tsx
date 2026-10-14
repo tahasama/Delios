@@ -33,18 +33,18 @@ function SeriesRows({ series }: { series: RevisionSeries[] }) {
     <div className="space-y-3">
       {rows.map((s, i) => (
         <div key={i} className="grid grid-cols-2 gap-x-4 gap-y-3 md:grid-cols-7">
-          <Field label="Code" hint={s ? "stays once used" : "a new series"}><input name={`code_${i}`} defaultValue={s?.code ?? ""} className={`${inputCls} uppercase`} placeholder="DESIGN" /></Field>
-          <Field label="Name" className="md:col-span-2"><input name={`label_${i}`} defaultValue={s?.label ?? ""} className={inputCls} placeholder="Design" /></Field>
+          <Field label="Code" hint={s ? "stays once used" : "another series? else leave empty"}><input name={`code_${i}`} defaultValue={s?.code ?? ""} className={`${inputCls} uppercase`} /></Field>
+          <Field label="Name" className="md:col-span-2"><input name={`label_${i}`} defaultValue={s?.label ?? ""} className={inputCls} /></Field>
           <Field label="Counts in">
             <select name={`kind_${i}`} defaultValue={s?.kind ?? "LETTERS"} className={inputCls}>
               <option value="LETTERS">Letters</option>
               <option value="NUMBERS">Numbers</option>
             </select>
           </Field>
-          <Field label="Prefix" hint="before each value"><input name={`prefix_${i}`} defaultValue={s?.prefix ?? ""} className={inputCls} placeholder="P" /></Field>
-          <Field label="Starts at"><input name={`start_${i}`} defaultValue={s?.start ?? ""} className={inputCls} placeholder="A or 0" /></Field>
+          <Field label="Prefix" hint="before each value, e.g. P"><input name={`prefix_${i}`} defaultValue={s?.prefix ?? ""} className={inputCls} /></Field>
+          <Field label="Starts at" hint="empty: A, or 0"><input name={`start_${i}`} defaultValue={s?.start ?? ""} className={inputCls} /></Field>
           <Field label="Letters skipped" hint="read as digits or as each other">
-            <input name={`excluded_${i}`} defaultValue={s?.excludedLetters.join(" ") ?? ""} className={inputCls} placeholder="I O Q" />
+            <input name={`excluded_${i}`} defaultValue={s?.excludedLetters.join(" ") ?? ""} className={inputCls} />
             <input type="hidden" name={`width_${i}`} value={s?.width ?? 0} />
           </Field>
         </div>
@@ -151,7 +151,7 @@ export default async function RevisionsPage() {
         <div className="border-t border-line px-5 py-4 sm:px-6">
           <ActionForm action={createRevisionSchemeAction} submitLabel="Add the scheme" size="sm">
             <div className="grid grid-cols-1 gap-x-6 gap-y-4 md:grid-cols-3">
-              <Field label="Name" required><input name="name" required className={inputCls} placeholder="Supplier documents" /></Field>
+              <Field label="Name" required><input name="name" required className={inputCls} /></Field>
               <label className="flex items-center gap-2 self-end text-[13px] text-slate-700"><input type="checkbox" name="forwardOnly" defaultChecked /> Only moves forward</label>
             </div>
             <SeriesRows series={[]} />
