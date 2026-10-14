@@ -208,10 +208,11 @@ export async function SupplierPackage({ pkg }: { pkg: PackageView }) {
           </div>
         </div>
         <div className="grid grid-cols-2 border-t border-line sm:grid-cols-4">
-          <Figure label="Sent to supplier" value={`${counts.sent} of ${counts.total}`} hint={counts.notSent ? `${counts.notSent} not sent yet` : "all sent"} />
-          <Figure label="Received" value={`${counts.received} of ${counts.total}`} hint={`${counts.late} overdue`} />
-          <Figure label="Held" value={`${withThem} by them · ${withUs} by us`} hint="who has to act next" />
-          <Figure label="Approved first time" value={`${f.firstTime}%`} hint={`${f.approved} approved`} />
+          {/* Every document is in exactly one of these: they add up to the package. */}
+          <Figure label="Not sent yet" value={`${counts.notSent} of ${counts.total}`} hint={counts.lateNotSent ? `${counts.lateNotSent} overdue, ours to send` : "ours to send to the supplier"} />
+          <Figure label="With the supplier" value={`${counts.withThem} of ${counts.total}`} hint={counts.lateWithThem ? `${counts.lateWithThem} overdue` : "to send, correct or revise"} />
+          <Figure label="With us" value={`${counts.withUs} of ${counts.total}`} hint={counts.toCheck ? `${counts.toCheck} to check, the rest in review` : "to send for review, or in review"} />
+          <Figure label="Released" value={`${counts.released} of ${counts.total}`} hint={`${f.firstTime}% released first time`} />
         </div>
       </section>
 

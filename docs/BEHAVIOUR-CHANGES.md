@@ -509,6 +509,8 @@ the installation sets its keys.
   violet again; transmittals to check, sent, received, accepted and returned each have their own.
 - **Recording what was received from outside:** "Received from" is picked from the organizations on the project; a
   data transmittal recorded so needs a document or a file (refused otherwise).
+- **Supplier packages** count each document once: not sent yet, with the supplier, with us (to check / in review),
+  released; "where it stands" says who has to act. "Received" reads "received, to check".
 - **File fields** look the same everywhere (the new-document one).
 - **New delivery package:** "Needed at" sits under "Due", beside a narrower description.
 - **Action page:** "Request a document" moved from each discipline's buttons to the line under them, with its question,

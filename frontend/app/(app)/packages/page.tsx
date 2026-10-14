@@ -94,8 +94,8 @@ export default async function PackagesPage({ searchParams }: { searchParams: Pro
       {category === "SUPPLIER" ? (
         rows.length ? (
           <DataTable className="rounded-none border-0 shadow-none" id="supplier-packages" exportName="supplier-packages" head={supplierOnly
-            ? <tr><Th className="w-10"><span className="sr-only">Tick</span></Th><Th>Package</Th><Th>Where it stands</Th><Th>Transmitted</Th><Th>Overdue</Th><Th>With you</Th><Th>Due</Th></tr>
-            : <tr><Th className="w-10"><span className="sr-only">Tick</span></Th><Th>Supplier</Th><Th>Where it stands</Th><Th>Sent to supplier</Th><Th>Received</Th><Th>Overdue</Th><Th>Held</Th><Th>Due</Th></tr>}>
+            ? <tr><Th className="w-10"><span className="sr-only">Tick</span></Th><Th>Package</Th><Th>Where it stands</Th><Th>With you</Th><Th>With us</Th><Th>Released</Th><Th>Overdue</Th><Th>Next due</Th></tr>
+            : <tr><Th className="w-10"><span className="sr-only">Tick</span></Th><Th>Supplier</Th><Th>Where it stands</Th><Th title="Ours to send to the supplier">Not sent yet</Th><Th title="The supplier holds them: to send, correct or revise">With the supplier</Th><Th title="We hold them: to check, to send for review, or in review">With us</Th><Th>Released</Th><Th>Overdue</Th><Th>Next due</Th></tr>}>
                 {rows.map((pkg) => {
                   const f = supplierStats.get(pkg.id)!;
                   const where = supplierStages.get(pkg.id)!;
@@ -105,12 +105,12 @@ export default async function PackagesPage({ searchParams }: { searchParams: Pro
                       <Td><Link href={`/packages/${pkg.number}`} className="font-semibold text-brand-ink hover:underline">{pkg.title ?? pkg.names.to}</Link><span className="block font-mono text-[11px] text-slate-400">{pkg.number}</span></Td>
                       <Td className={`text-xs`}>
                         <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap ring-1 ${where.tone}`}>{where.word}</span>
-                        {where.notAsked ? <span className="mt-1 block text-[11px] text-slate-500">{where.notAsked} not sent to supplier yet</span> : null}
                       </Td>
-                      {supplierOnly ? null : <Td className="text-xs">{f.sent} of {f.total}</Td>}
-                      <Td className="text-xs">{f.received} of {supplierOnly ? f.sent : f.total}</Td>
+                      {supplierOnly ? null : <Td className="text-xs tabular-nums">{f.notSent ? `${f.notSent} of ${f.total}` : <span className="text-slate-400">none</span>}</Td>}
+                      <Td className="text-xs tabular-nums">{f.withThem} of {f.total}</Td>
+                      <Td className="text-xs tabular-nums">{f.withUs} of {f.total}{f.toCheck ? <span className="block text-[11px] text-slate-500">{f.toCheck} to check</span> : null}</Td>
+                      <Td className="text-xs tabular-nums">{f.released} of {f.total}</Td>
                       <Td className={`text-xs ${f.late ? "font-semibold text-red-700" : "text-slate-400"}`}>{f.late || "—"}</Td>
-                      <Td className="text-xs">{supplierOnly ? f.withThem : `${f.withThem} by them · ${f.withUs} by us`}</Td>
                       <Td className={`whitespace-nowrap text-xs`}>{nextDue.get(pkg.id) ? <>next {fmtDate(nextDue.get(pkg.id)!)}</> : <span className="text-slate-400">—</span>}</Td>
                     </tr>
                   );

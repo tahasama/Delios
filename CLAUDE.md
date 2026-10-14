@@ -213,8 +213,8 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - `unshare-package <email> <package-number>` (backend command) puts a supplier's
   package back to not shared, for testing; logged.
 - A supplier package has two pages. Ours (Document Control and above): plate,
-  counts (sent to supplier, received, held by them / by us, approved first
-  time), "The package" with one row of icon buttons (Share once; until shared:
+  counts that add up to the package (not sent yet · with the supplier · with
+  us, how many to check · released, released first time), "The package" with one row of icon buttons (Share once; until shared:
   Narrow by a rule, Edit, Delete; Delivery list), and the documents (above). Nothing is uploaded on our page: no file fields, no
   "enter and send for review" (what reaches us outside the system is recorded on
   a transmittal, "Received from outside the system"). The supplier's page: only
@@ -240,9 +240,9 @@ a screen only words it. A new rule goes in the backend, never in a page.
   in review; released (with comments to take in: next revision due / to
   revise); returned / to revise. Not sent yet: "not sent to supplier" (register
   and package; our own placeholders read "number reserved"). A supplier's package as a whole, in the packages
-  list (`packageStage`): not shared, nothing sent yet, sent to supplier / to be
-  transmitted, partly received / partly transmitted, received / transmitted,
-  complete; with how many are not sent to the supplier yet. The list and the
+  list (`packageStage`), says who has to act: not shared yet, nothing sent yet, waiting on the supplier (n),
+  waiting on us (n), waiting on both, complete; the list's columns are the same counts as the package page.
+  A line received reads "received, to check" (ours), accepted "accepted, to send for review". The list and the
   package page count the same way (`packageCounts`).
 - Document Control (and above) only, on supplier packages. A new supplier package asks the supplier and
   its order, and a status only if wanted: no single due date (each document is due on its own planned date)

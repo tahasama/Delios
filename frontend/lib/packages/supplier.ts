@@ -134,19 +134,19 @@ export function supplierFigures(rows: SupplierRow[]) {
  * (transmitted); complete, every document released. `notAsked`: lines not asked of the supplier yet.
  */
 export function packageStage(pkg: PackageView, rows: SupplierRow[], side: "ours" | "theirs"): { word: string; tone: string; notAsked: number } {
-  const asked = new Set(pkg.members.filter((m) => m.requestedAt).map((m) => m.documentId));
-  const lines = rows.filter((r) => asked.has(r.doc.id));
-  const notAsked = side === "ours" ? rows.length - lines.length : 0;
-  const back = lines.filter((r) => r.state !== "NOT_SENT").length;
-  const done = lines.filter((r) => r.state === "APPROVED").length;
-  const slate = "bg-slate-50/40 text-slate-600 ring-slate-300", amber = "bg-amber-50/40 text-amber-900 ring-amber-300";
-  const sky = "bg-sky-50/40 text-sky-800 ring-sky-300", green = "bg-emerald-50/40 text-emerald-800 ring-emerald-300";
-  if (side === "ours" && !pkg.sharedAt) return { word: "not shared", tone: slate, notAsked };
-  if (!lines.length) return { word: side === "ours" ? "nothing sent yet" : "nothing asked yet", tone: slate, notAsked };
-  if (done === lines.length && !notAsked) return { word: "complete", tone: green, notAsked };
-  if (back === 0) return { word: side === "ours" ? "sent to supplier" : "to be transmitted", tone: amber, notAsked };
-  if (back < lines.length) return { word: side === "ours" ? `partly received · ${back} of ${lines.length}` : `partly transmitted · ${back} of ${lines.length}`, tone: sky, notAsked };
-  return { word: side === "ours" ? "received" : "transmitted", tone: sky, notAsked };
+  const c = packageCounts(pkg, rows);
+  const notAsked = side === "ours" ? c.notSent : 0;
+  const slate = "bg-slate-100 text-slate-600 ring-slate-200", amber = "bg-amber-50 text-amber-900 ring-amber-200";
+  const sky = "bg-sky-50 text-sky-800 ring-sky-200", green = "bg-emerald-50 text-emerald-800 ring-emerald-200";
+  const violet = "bg-violet-50 text-violet-800 ring-violet-200";
+  if (side === "ours" && !pkg.sharedAt) return { word: "not shared yet", tone: slate, notAsked };
+  if (!c.sent) return { word: side === "ours" ? "nothing sent to the supplier yet" : "nothing asked of you yet", tone: slate, notAsked };
+  if (c.released === c.total) return { word: "complete: every document released", tone: green, notAsked };
+  // Who has to act next: the supplier on what it holds, us on what came back.
+  if (c.withThem && c.withUs) return { word: side === "ours" ? `waiting: supplier ${c.withThem} · us ${c.withUs}` : `${c.withThem} for you · ${c.withUs} with us`, tone: violet, notAsked };
+  if (c.withThem) return { word: side === "ours" ? `waiting on the supplier (${c.withThem})` : `${c.withThem} for you to send`, tone: amber, notAsked };
+  if (c.withUs) return { word: side === "ours" ? `waiting on us (${c.withUs})` : `${c.withUs} with us`, tone: sky, notAsked };
+  return { word: side === "ours" ? "released so far; the rest not sent yet" : "released so far", tone: green, notAsked };
 }
 
 /** A package line's state as the supplier's stage. */
@@ -185,11 +185,23 @@ export function packageCounts(pkg: PackageView, rows: SupplierRow[]) {
   const sent = rows.filter((r) => asked.has(r.doc.id));
   return {
     total: rows.length,
+    /** Asked of the supplier on a transmittal. */
     sent: sent.length,
+    /** Not asked of the supplier yet: ours to send. */
     notSent: rows.length - sent.length,
+    /** Ever came back from the supplier. */
     received: sent.filter((r) => r.state !== "NOT_SENT").length,
+    /** The supplier holds it: to send, to correct or to revise. */
     withThem: sent.filter((r) => WITH_SUPPLIER.includes(r.state)).length,
+    /** We hold it: to check, to send for review, or in review. */
     withUs: sent.filter((r) => !WITH_SUPPLIER.includes(r.state) && r.state !== "APPROVED").length,
+    /** Of those with us, waiting for Document Control's check. */
+    toCheck: sent.filter((r) => r.state === "AWAITING_CHECK").length,
+    released: sent.filter((r) => r.state === "APPROVED").length,
     late: rows.filter((r) => r.state === "NOT_SENT" && r.late).length,
+    /** Late and still with the supplier (asked, not back by its date). */
+    lateWithThem: sent.filter((r) => r.state === "NOT_SENT" && r.late).length,
+    /** Late and not even sent to the supplier yet. */
+    lateNotSent: rows.filter((r) => !asked.has(r.doc.id) && r.state === "NOT_SENT" && r.late).length,
   };
 }
