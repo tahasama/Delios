@@ -437,6 +437,10 @@ the installation sets its keys.
   when its first submission comes in. "Who may see it" starts at the lowest level. The new demo calls the
   type "Supplier document" (an existing organization renames it in Settings → Deliverable types).
 
+- **Where a document got late (action page):** sending for review, or the supplier sending it in, is due on the
+  documents' day (e.g. 13 Sep for works on 20 Sep); released & issued on the action's day. Before, the app guessed
+  a route and counted its days back from the documents' day (giving e.g. 24 Aug).
+
 ## 7. Notifications and email
 
 - Notifications are kept and shown in the bell and on the Notifications page; opening the page reads

@@ -299,9 +299,9 @@ public static partial class ScheduleEndpoints
         if (activity is null) return NotFound();
         if (await OutsideViewAsync(db, access, cancellationToken) is { } visible && Narrow([activity], visible).Count == 0) return NotFound();
         var result = new List<NeedLateness>();
-        // Before a review starts, the route it will take is the one that serves the document: its days are what
-        // sending for review has to leave before the day the document is needed.
-        var routes = await db.ReviewRoutes.AsNoTracking().Where(r => r.Active).ToListAsync(cancellationToken);
+        // The documents' day already leaves the review its time before the action: the document is sent in (or
+        // sent for review) by its own day, and released & issued by the action's day. No route is guessed.
+        var actionDay = activity.Start;
         // Released and issued as one act unless the project (or else the organization) separates them: then one checkpoint.
         var policy = await db.Settings.AsNoTracking().Where(s => s.Key == "POLICY_RELEASE" && (s.ProjectId == access.Project.Id || s.ProjectId == null))
             .Select(s => new { s.ProjectId, s.Value }).ToListAsync(cancellationToken);
@@ -319,9 +319,7 @@ public static partial class ScheduleEndpoints
                                                           orderby t.IssuedAt
                                                           select (Instant?)t.IssuedAt).FirstOrDefaultAsync(cancellationToken);
             var due = need.NeededBy;
-            var expected = routes.Select(r => (Route: r, Score: Reviews.ReviewService.Score(r, document))).Where(x => x.Score >= 0)
-                .OrderByDescending(x => x.Score).ThenByDescending(x => x.Route.IsDefault).Select(x => x.Route).FirstOrDefault();
-            var routeDays = review?.Steps.Sum(s => s.Days ?? 0) ?? expected?.Steps.Sum(s => s.Days ?? 0) ?? 0;
+            var released = actionDay ?? due;
             // Owed by an outside organization when its revision came from one, or, before any revision, when the document's
             // originator is an organization outside ours.
             var external = revision is not null
@@ -330,9 +328,8 @@ public static partial class ScheduleEndpoints
             // Named for the act, not as if it happened: whether it did is the checkpoint's own date.
             var checkpoints = new List<Checkpoint>
             {
-                // Step days are working days in the project's calendar, so the route is counted back the same way.
-                Point(today, zone, external ? "Sending in, by the supplier" : "Sending for review", "Submission due",
-                    due is { } needed ? WorkingCalendar.SubtractWorkingDays(needed, routeDays, access.Project.WeekendDays) : null, review?.StartedAt,
+                Point(today, zone, external ? "Sending in, by the supplier" : "Sending for review", "Documents' day",
+                    due, review?.StartedAt,
                     external ? document.Originator ?? "the supplier" : revision?.AuthoredByName ?? document.CreatedByName),
             };
             foreach (var step in review?.Steps.OrderBy(s => s.Index) ?? Enumerable.Empty<ReviewStep>())
@@ -342,11 +339,11 @@ public static partial class ScheduleEndpoints
             }
             if (together)
                 // One act: done when it went out, which is the release itself.
-                checkpoints.Add(Point(today, zone, "Release & issue", "Needed by", due, issued, "Document Control"));
+                checkpoints.Add(Point(today, zone, "Release & issue", "Action's day", released, issued, "Document Control"));
             else
             {
-                checkpoints.Add(Point(today, zone, "Release", "Needed by", due, revision?.ReleasedAt, "Document Control"));
-                checkpoints.Add(Point(today, zone, "Issue", "Needed by", due, issued, "Document Control"));
+                checkpoints.Add(Point(today, zone, "Release", "Action's day", released, revision?.ReleasedAt, "Document Control"));
+                checkpoints.Add(Point(today, zone, "Issue", "Action's day", released, issued, "Document Control"));
             }
             result.Add(new NeedLateness(need.Id, document.Number, need.State, checkpoints, checkpoints.FirstOrDefault(c => c.Late)));
         }

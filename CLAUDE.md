@@ -511,12 +511,13 @@ a screen only words it. A new rule goes in the backend, never in a page.
   3 days", "Today", "In 5 days · lasts 3 days".
 - Where a document got late: its checkpoints are named for the act (Sending
   for review, each review step, Release, Issue) and their dates say whether it
-  happened. Before a review exists, sending for review is due the route's days
-  working days before the day it is needed (the route that serves the
-  document, in the project's calendar). Route steps lists only the review's
-  own steps. Released and issued as one act (the default): one checkpoint and
-  one column "Released & issued", "Done <day>" over "Needed by <day>"; when the
-  project separates them, two columns, Released and Issued.
+  happened. The documents' day already leaves the review its time before the
+  action: sending for review (or the supplier sending it in) is due on the
+  documents' day; released & issued on the action's day. No route is guessed,
+  no days counted back. Route steps lists only the review's own steps, each with
+  its own due day. Released and issued as one act (the default): one checkpoint
+  and one column "Released & issued", "Done <day>" over "Action's day <day>";
+  when the project separates them, two columns, Released and Issued.
 - Under each stage of Schedule & actions: the revision in force, "Uploaded
   directly" (with the day) when a direct upload is newer, "Not released yet",
   or "None yet".
