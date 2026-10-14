@@ -315,10 +315,10 @@ export default async function DocumentDetailPage({
               <p className="text-xs text-slate-500">It is with {askedOf}: its files are theirs to change, until they send it or hand it back.</p>
             ) : <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Field label="PDF" hint={workingHasPdf ? "replaces the one there" : "what people will read — needed before it is sent"}>
-                <input type="file" name="renditionFile" accept=".pdf" className="block w-full" />
+                <input type="file" name="renditionFile" accept=".pdf" className="w-full" />
               </Field>
               <Field label="Source file" hint="the editable original; for a schedule or a list, its .xlsx or .csv — read on release">
-                <input type="file" name="nativeFile" className="block w-full" />
+                <input type="file" name="nativeFile" className="w-full" />
                 {listTemplate}
               </Field>
             </div>}
@@ -589,8 +589,8 @@ export default async function DocumentDetailPage({
                 )}
               </Asked>
               <Added fields={revisionPolicy.own} className="sm:col-span-2" />
-              <Field label="PDF" hint="optional now — what people will read; needed before it is sent"><input type="file" name="renditionFile" accept=".pdf" className="block w-full" /></Field>
-              <Field label="Native file" hint="optional — the editable original (.docx, .dwg, .xlsx…)"><input type="file" name="nativeFile" className="block w-full" />{listTemplate}</Field>
+              <Field label="PDF" hint="optional now — what people will read; needed before it is sent"><input type="file" name="renditionFile" accept=".pdf" className="w-full" /></Field>
+              <Field label="Native file" hint="optional — the editable original (.docx, .dwg, .xlsx…)"><input type="file" name="nativeFile" className="w-full" />{listTemplate}</Field>
             </div>
           </ActionForm>
         </>) },

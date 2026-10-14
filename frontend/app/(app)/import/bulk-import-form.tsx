@@ -108,7 +108,7 @@ export function BulkImportForm({ initialKind }: { initialKind: string }) {
                 name="file"
                 accept=".xlsx,.csv,text/csv"
                 required={!file}
-                className={inputCls}
+                className="w-full"
                 onChange={(event) => setFile(event.target.files?.[0] ?? null)}
               />
               {file ? <span className="mt-1 block text-[11px] text-slate-500">Holding <strong className="text-slate-700">{file.name}</strong> — you do not need to choose it again.</span> : null}

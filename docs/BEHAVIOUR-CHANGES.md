@@ -507,6 +507,9 @@ the installation sets its keys.
 - **Delivery package readiness** reads in the schedule's colours: all ready green, none red, between amber.
 - **Side colours**: one colour per state (key on Help, listed by area); close states in close colours. Superseded is
   violet again; transmittals to check, sent, received, accepted and returned each have their own.
+- **Recording what was received from outside:** "Received from" is picked from the organizations on the project; a
+  data transmittal recorded so needs a document or a file (refused otherwise).
+- **File fields** look the same everywhere (the new-document one).
 - **New delivery package:** "Needed at" sits under "Due", beside a narrower description.
 - **Action page:** "Request a document" moved from each discipline's buttons to the line under them, with its question,
   beside "Request a discipline".

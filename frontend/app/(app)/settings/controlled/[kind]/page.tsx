@@ -136,7 +136,7 @@ export default async function ControlledKindPage({ params }: { params: Promise<{
               </Field>
             </div>
             <Field label="CSV file" required>
-              <input type="file" name="file" accept=".csv,text/csv" required className={inputCls} />
+              <input type="file" name="file" accept=".csv,text/csv" required className="w-full" />
             </Field>
             <Field label="Note" hint="What changed and why — this is read by whoever approves it">
               <input name="notes" className={inputCls} placeholder="Added commissioning team to electrical drawings" />

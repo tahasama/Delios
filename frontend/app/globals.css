@@ -63,21 +63,35 @@ table {
     min-height: var(--control-h);
     font-size: var(--control-text);
   }
-  input[type="file"] { font-size: var(--control-text); }
-  input[type="file"]::file-selector-button {
+  /* One file field everywhere (the new-document one): a place to drop something, a dashed line under it, and the
+     button a light flat tab at the field's height. */
+  input[type="file"] {
+    width: 100%;
+    box-sizing: border-box;
     height: var(--control-h);
+    font-size: var(--control-text);
+    color: var(--color-slate-500);
+    padding: 0;
+    border: 0;
+    border-bottom: 1px dashed var(--color-line-strong);
+    border-radius: 0;
+    background: transparent;
+  }
+  input[type="file"]:hover { border-bottom-color: var(--color-brand-line); }
+  input[type="file"]::file-selector-button {
+    height: calc(var(--control-h) - 1px);
     margin-right: 0.75rem;
     padding: 0 0.85rem;
-    border: 1px solid var(--color-line-strong);
-    border-radius: var(--control-radius);
-    background: var(--color-surface);
+    border: 0;
+    border-radius: var(--control-radius) var(--control-radius) 0 0;
+    background: var(--color-tint);
     color: var(--color-brand-ink);
     font-size: var(--control-text);
     font-weight: 600;
     cursor: pointer;
-    transition: background-color 140ms, border-color 140ms;
+    transition: background-color 140ms;
   }
-  input[type="file"]::file-selector-button:hover { border-color: var(--color-brand-line); background: var(--color-tint); }
+  input[type="file"]::file-selector-button:hover { background: color-mix(in oklab, var(--color-tint) 70%, var(--color-brand-line)); }
 
   button,
   summary,
@@ -1066,24 +1080,6 @@ summary::-webkit-details-marker {
   .register .asking select.plain[data-on="true"],
   .register .asking button.plain[data-on="true"] { background-color: var(--color-tint); }
 
-  /* A file field is a place to drop something, not a box with a button inside a box: no grey behind it, a dashed
-     line under it, and the button a light flat tab at the field's height. */
-  .register input[type="file"].plain,
-  .register .asking input[type="file"].plain {
-    background: transparent;
-    padding: 0.2rem 0;
-    border-bottom: 1px dashed var(--color-line-strong);
-    border-radius: 0;
-    color: var(--color-slate-500);
-  }
-  .register input[type="file"].plain:hover,
-  .register .asking input[type="file"].plain:hover { background: transparent; border-bottom-color: var(--color-brand-line); }
-  .register input[type="file"].plain::file-selector-button {
-    border: 0;
-    background: var(--color-tint);
-    color: var(--color-brand-ink);
-  }
-  .register input[type="file"].plain::file-selector-button:hover { background: color-mix(in oklab, var(--color-tint) 70%, var(--color-brand-line)); }
 
   /* The kept views are a way back to a question, so they sit quieter than the
      question itself. */

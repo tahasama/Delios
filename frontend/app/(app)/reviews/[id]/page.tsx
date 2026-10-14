@@ -434,7 +434,7 @@ export default async function ReviewCyclePage({ params, searchParams }: { params
                       </select>
                     </Field>
                     <Field label="Date sent"><input type="date" name="sentOn" defaultValue={new Date().toISOString().slice(0, 10)} className={inputCls} /></Field>
-                    <Field label="Proof" required hint="the sent email, or the receipt their system gave you"><input type="file" name="evidence" required className={inputCls} /></Field>
+                    <Field label="Proof" required hint="the sent email, or the receipt their system gave you"><input type="file" name="evidence" required className="w-full" /></Field>
                     <Field label="Their reference" hint="optional"><input name="reference" className={inputCls} /></Field>
                   </ActionForm>
                 ) : <p className="text-xs text-slate-500">Waiting for {cycle.assignments.map((seat) => seat.userName).join(", ") || "whoever carries this exchange"} to send it.</p>
@@ -508,7 +508,7 @@ export default async function ReviewCyclePage({ params, searchParams }: { params
                     <input name="theirPerson" className={inputCls} placeholder="Name" />
                   </Field>
                   <Field label="Their own code" hint="optional — as they wrote it, e.g. Code 2"><input name="theirCode" className={inputCls} /></Field>
-                  <Field label="Proof" required hint="what they sent back"><input type="file" name="evidence" required className={inputCls} /></Field>
+                  <Field label="Proof" required hint="what they sent back"><input type="file" name="evidence" required className="w-full" /></Field>
                 </div>
               ) : null}</ActionForm></Guarded>}
             {cycle.outcome ? null : <p className="mt-2 text-xs leading-5 text-slate-500">{!cycle.issuedToReviewAt ? "Document Control sends it to the reviewers first." : ""}</p>}

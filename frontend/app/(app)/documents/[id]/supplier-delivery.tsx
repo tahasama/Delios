@@ -75,7 +75,7 @@ export async function SupplierDelivery({ documentId }: { documentId: string }) {
     label: `Send to ${org}`,
     body: (
       <ActionForm action={attachSupplierFileAction} submitLabel="Send" size="sm" hidden={{ documentId }}>
-        <input type="file" name="file" required className="block w-full" />
+        <input type="file" name="file" required className="w-full" />
         <p className="text-[11px] text-slate-500">A PDF is what people read; send the editable original as well if it was asked for. One transmittal carries it to {org}&apos;s Document Control.</p>
       </ActionForm>
     ),

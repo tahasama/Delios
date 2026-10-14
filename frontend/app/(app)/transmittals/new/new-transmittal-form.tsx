@@ -4,6 +4,7 @@ import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ActionForm } from "@/components/form";
+import { SearchPick } from "@/components/search-pick";
 import { createTransmittalAction } from "@/lib/transmittals/forms";
 import { RecipientPicker, type Company } from "./recipient-picker";
 import type { OwnField } from "@/lib/settings/field-policy";
@@ -70,8 +71,10 @@ const field = "plain w-full py-1.5 text-[13px]";
  * only released revisions, and a received transmittal has no subject of ours.
  */
 export function NewTransmittalForm({
-  reasons, revisions, companies, ourOrganization, defaultDirection, preselectedRevisionIds, prefill, fields, labels, ownFields, placeholders, askable = [], askingBack, mayRecordReceived, outsider = false, unsent,
+  reasons, revisions, companies, ourOrganization, parties = [], defaultDirection, preselectedRevisionIds, prefill, fields, labels, ownFields, placeholders, askable = [], askingBack, mayRecordReceived, outsider = false, unsent,
 }: {
+  /** The organizations set up on the project, with their codes: who something was received from. */
+  parties?: { id: string; code: string; name: string }[];
   /** Documents ticked in the register with nothing that can go (nothing released): named, not enclosed. */
   unsent?: string[];
   reasons: Opt[];
@@ -147,7 +150,10 @@ export function NewTransmittalForm({
   // What each step needs answered before the next one makes sense.
   // A transmittal may carry a message alone — a clarification, a notice, an
   // answer — so enclosures are optional, but it may not be empty of both.
-  const saysSomething = chosen.length > 0 || (!outgoing && files > 0) || (outgoing ? subject.trim().length > 0 : message.trim().length > 0);
+  // Recorded as received from outside, a data transmittal carries a document or a file; the backend checks it too.
+  const mustCarry = recording && family === "DATA";
+  const saysSomething = mustCarry ? chosen.length > 0 || files > 0
+    : chosen.length > 0 || (!outgoing && files > 0) || (outgoing ? subject.trim().length > 0 : message.trim().length > 0);
   const may = (n: number) => n === 1 || (askedFirst && (n === 2 || saysSomething));
   const toggle = (id: string) => setChosen((ids) => (ids.includes(id) ? ids.filter((one) => one !== id) : [...ids, id]));
   // The register, opened for this form: what is enclosed starts ticked, and "Continue" comes back here, on this step,
@@ -302,9 +308,13 @@ export function NewTransmittalForm({
 
             <div className="asking grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-4">
               {!recording ? null : (
-                <Ask label="Received from" required>
-                  <input name="issuingParty" required className={field} placeholder="Company name" value={party} onChange={(e) => setParty(e.target.value)} />
-                </Ask>
+                // One of the organizations set up on the project, with its code: what came is numbered in its series.
+                <div className="min-w-0">
+                  <SearchPick browse single name="issuingParty" required label="Received from" hint="an organization set up on the project" placeholder="Find the organization"
+                    initial={party ? [parties.find((p) => p.name === party || p.code === party || p.id === party)?.id ?? ""].filter(Boolean) : []}
+                    items={parties.map((p) => ({ id: p.id, name: p.name, detail: p.code }))}
+                    onChange={(ids) => setParty(ids[0] ?? "")} />
+                </div>
               )}
               <Ask label={says("reason", "Why")} required hint={outgoing ? "what they should do with it" : "what they sent it for"} className="lg:col-span-2">
                 {/* Placeholders go for use: the reason is set by itself, never chosen. */}
@@ -454,7 +464,7 @@ export function NewTransmittalForm({
                   name="attachments"
                   multiple
                   onChange={(e) => setFiles(e.target.files?.length ?? 0)}
-                  className="block w-full"
+                  className="w-full"
                 />
               </Ask>
               {asks("message") ? (
@@ -467,7 +477,7 @@ export function NewTransmittalForm({
           </div>
           {foot(1,
             <button type="button" onClick={() => setStep(3)} disabled={!saysSomething} data-on={saysSomething ? "true" : undefined} className="ask disabled:cursor-not-allowed disabled:opacity-50">Continue</button>,
-            saysSomething ? null : outgoing ? "Enclose a document, or write a subject." : "Tick a document, keep a file, or write a message.",
+            saysSomething ? null : mustCarry ? "A data transmittal received carries a document: choose it in the register, or add the file that came." : outgoing ? "Enclose a document, or write a subject." : "Tick a document, keep a file, or write a message.",
           )}
         </section>
 

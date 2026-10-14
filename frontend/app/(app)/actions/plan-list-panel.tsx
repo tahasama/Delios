@@ -14,9 +14,9 @@ const STATE: Record<string, string> = {
 const said = (state: string) => STATE[state] ?? state.replaceAll("_", " ").toLowerCase();
 
 // The file button takes the app's control size and look from the stylesheet.
-const fileInputLook = "text-slate-600";
-const fileInput = `block w-full ${fileInputLook}`;
-const fileInputInline = `block ${fileInputLook}`;
+// The file field is the app's one (globals.css): only its width is set here.
+const fileInput = "w-full";
+const fileInputInline = "w-full";
 
 /**
  * One of the schedule's lists: what it is, the document that holds it, and the

@@ -167,6 +167,7 @@ export default async function NewTransmittalPage({ searchParams }: { searchParam
         outsider={!ctx.user.isInternal}
         preselectedRevisionIds={preselected}
         unsent={unsent}
+        parties={found.parties.map((p) => ({ id: p.id, code: p.code, name: p.name }))}
         placeholders={placeholders.length ? { to: supplier!.name, items: placeholders, mixed: owners.length > 1 } : askedIds.length && owners.length > 1 ? { to: "", items: [], mixed: true } : undefined}
         prefill={{
           step: sp.step === "2" ? 2 : undefined,

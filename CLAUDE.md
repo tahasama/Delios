@@ -315,6 +315,11 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - One "Follow up" answers or completes a transmittal: a new one mentioning the
   one it follows (ours: documents and people carried over; theirs: back to
   whoever sent it). The subject is not prefixed ("RE:", "Supplement to").
+- "Received from" (recording what came outside the system) is picked from the organizations set up on the project,
+  with their codes (the number follows its series). Recorded so, a data transmittal carries a document (from the
+  register) or a file that came with it; words alone are an information transmittal (backend FILE_REQUIRED).
+- One file field everywhere (globals.css `input[type=file]`): dashed line, light flat button at the control height;
+  a page sets only its width.
 - The form asks the family (data or information), then a reason of that family
   (`REASONS_FOR_ISSUE` prop `family`). No "sent by" and no date: it is the
   person signed in, today. "Received from outside the system" (Document Control)

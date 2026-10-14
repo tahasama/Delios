@@ -165,7 +165,7 @@ export function NewDocumentForm({
                     </div>
                   ) : (
                     <Ask label="The file you received" required hint="a PDF opens in the viewer; any other format is kept as the source file" className="sm:col-span-2">
-                  <input type="file" name="nativeFile" required className={cn(field, "text-slate-500")} onChange={(e) => setHasFile(!!e.target.files?.length)} />
+                  <input type="file" name="nativeFile" required className="w-full" onChange={(e) => setHasFile(!!e.target.files?.length)} />
                     </Ask>
                   )}
                 </>
@@ -257,7 +257,7 @@ export function NewDocumentForm({
             </Ask>
             {received || !asks("file") ? <div aria-hidden className="hidden xl:block" /> : (
               <Ask label="PDF" required={must("file")} hint={must("file") ? "this project registers nothing without its file — the PDF or the native file" : "optional — what people will read; needed before it is sent"}>
-                <input type="file" name="renditionFile" accept=".pdf" className={cn(field, "text-slate-500")} onChange={(e) => setPdf(!!e.target.files?.length)} />
+                <input type="file" name="renditionFile" accept=".pdf" className="w-full" onChange={(e) => setPdf(!!e.target.files?.length)} />
               </Ask>
             )}
             {asks("subProject") || needs("SUBPROJECTS") ? (
@@ -307,7 +307,7 @@ export function NewDocumentForm({
             ) : <div aria-hidden className="hidden xl:block" />}
             {received || !asks("file") ? <div aria-hidden className="hidden xl:block" /> : (
               <Ask label="Native file" hint="optional — the editable original (.docx, .dwg, .xlsx…)">
-                <input type="file" name="nativeFile" className={cn(field, "text-slate-500")} onChange={(e) => setNative(!!e.target.files?.length)} />
+                <input type="file" name="nativeFile" className="w-full" onChange={(e) => setNative(!!e.target.files?.length)} />
               </Ask>
             )}
             {external ? (

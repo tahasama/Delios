@@ -82,7 +82,7 @@ export async function createTransmittalAction(_prev: { error?: string } | undefi
       let fromPartyId: string | undefined;
       if (user.isInternal) {
         const found = (await addressees(ctx)).parties
-          .find((one) => one.name.toLowerCase() === issuingParty.toLowerCase() || one.code.toLowerCase() === issuingParty.toLowerCase());
+          .find((one) => one.id === issuingParty || one.name.toLowerCase() === issuingParty.toLowerCase() || one.code.toLowerCase() === issuingParty.toLowerCase());
         if (!found) return { error: `${issuingParty || "That company"} is not an organization set up on this project.` };
         fromPartyId = found.id;
       }
