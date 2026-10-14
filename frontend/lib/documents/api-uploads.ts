@@ -1,6 +1,6 @@
 import "server-only";
 import { createHash } from "node:crypto";
-import { api, projectPath } from "@/lib/client";
+import { api, ApiProblem, projectPath } from "@/lib/client";
 
 /**
  * Sending a file the way the backend takes it: ask for an upload link (the
@@ -27,8 +27,11 @@ export async function upload(scope: { projectId: string }, target: UploadTarget,
     : "reviewId" in target ? `/reviews/${target.reviewId}/evidence`
     : "transmittalId" in target ? `/transmittals/${target.transmittalId}/evidence` : "/incoming/uploads";
   const ticket = await api<Ticket>(projectPath(scope, path), { body: "loose" in target ? { ...body, proof: !!target.proof } : body });
-  const put = await fetch(ticket.url, { method: ticket.method || "PUT", headers: ticket.headers, body: bytes });
-  if (!put.ok) throw new Error(`The file ${file.name} could not be stored (${put.status}).`);
+  // Said as a refusal, so the form shows it instead of the page failing.
+  const put = await fetch(ticket.url, { method: ticket.method || "PUT", headers: ticket.headers, body: bytes }).catch(() => null);
+  if (!put?.ok) {
+    throw new ApiProblem(502, "STORAGE_UNREACHABLE", `${file.name} could not be stored${put ? ` (${put.status})` : ": the file store did not answer"}. Nothing was sent; try again, or tell your administrator.`);
+  }
   return ticket.fileId;
 }
 

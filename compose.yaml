@@ -27,8 +27,10 @@ x-backend: &backend
     Storage__AzureConnectionString: ${AZURE_STORAGE_CONNECTION_STRING:-}
     Storage__Endpoint: ${STORAGE_ENDPOINT:-http://seaweedfs:8333}
     Storage__Region: ${STORAGE_REGION:-us-east-1}
-    # Presigned URLs are opened by the browser, which reaches storage on localhost.
-    Storage__PublicEndpoint: ${STORAGE_PUBLIC_ENDPOINT:-http://localhost:8333}
+    # Presigned links are opened by the screens' server (uploads and downloads pass through it, never the
+    # browser), which reaches storage by its name on the Docker network. Only a screens server run outside Docker
+    # (`npm run dev`) needs STORAGE_PUBLIC_ENDPOINT=http://localhost:8333.
+    Storage__PublicEndpoint: ${STORAGE_PUBLIC_ENDPOINT:-http://seaweedfs:8333}
     Storage__Bucket: ${STORAGE_BUCKET:-delios}
     Storage__AccessKey: ${STORAGE_ACCESS_KEY:?run sh deploy/init-env.sh}
     Storage__SecretKey: ${STORAGE_SECRET_KEY:?run sh deploy/init-env.sh}
