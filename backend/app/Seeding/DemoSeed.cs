@@ -43,6 +43,8 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
             await db.SaveChangesAsync(cancellationToken);
             issuing |= await EnsureInformationReasonsAsync(existing.Id, cancellationToken);
             await db.SaveChangesAsync(cancellationToken);
+            issuing |= await EnsureUpdateStatusAsync(existing.Id, cancellationToken);
+            await db.SaveChangesAsync(cancellationToken);
             await upgrade.CommitAsync(cancellationToken);
             logger.LogInformation(reviews || issuing ? "The demo tenant exists; what it lacked was added" : "The demo tenant already exists; nothing to do");
             return;
@@ -296,6 +298,8 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
             ("IFI", "Issued for information", new { executes = false }),
             ("IFR", "Issued for review", new { executes = false }),
             ("IFA", "Issued for approval", new { executes = false }),
+            // Work does not go ahead on it: it goes back to its author (or supplier) to update for the next revision.
+            ("IFU", "Issued for update", new { executes = false, update = true }),
             ("IFC", "Issued for construction", new { executes = true }),
             ("AFC", "Approved for construction", new { executes = true }));
         Set(ReviewSets.Verdicts,
@@ -325,7 +329,7 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
             Steps =
             [
                 new() { Title = "Discipline check", FunctionCode = "ENG", Days = 5 },
-                new() { Title = "Approval", FunctionCode = "APP", Days = 3, GrantsStatuses = ["IFI", "IFR", "IFA", "IFC", "AFC"] },
+                new() { Title = "Approval", FunctionCode = "APP", Days = 3, GrantsStatuses = ["IFI", "IFR", "IFA", "IFU", "IFC", "AFC"] },
             ],
         });
         return true;
@@ -569,7 +573,7 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
     private static readonly (string Code, string Label, object? Props)[] InformationReasons =
     [
         // A placeholder sent to a supplier carries it by itself: they fill it and send it back.
-        ("IFU", "Issued for use", new { response = true, family = "Data" }),
+        ("IFU", "Issued for update", new { response = true, family = "Data" }),
         ("REQUEST", "Request", new { response = true, responseDays = 7, family = "Information" }),
         ("RFI", "Request for information", new { response = true, responseDays = 7, family = "Information" }),
         ("ANSWER", "Answer", new { response = false, family = "Information" }),
@@ -588,6 +592,13 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
         if (have.Count == 0) return false;
         var sort = have.Max(v => v.Sort) + 1;
         var added = false;
+        // IFU reads "Issued for update": it goes to them to update, not to work from.
+        foreach (var ifu in await db.ValueEntries.Where(v => v.SetKey == Transmittals.TransmittalSets.Reasons && v.Code == "IFU" && v.Label == "Issued for use")
+            .ToListAsync(cancellationToken))
+        {
+            ifu.Label = "Issued for update";
+            added = true;
+        }
         foreach (var (code, label, props) in InformationReasons)
         {
             if (have.Any(v => v.Code == code)) continue;
@@ -603,6 +614,26 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
             added = true;
         }
         return added;
+    }
+
+    /// <summary>
+    /// A setup made before "Issued for update" gains the status, after IFA; route steps that may grant IFR may grant it
+    /// too. Nothing it has is changed.
+    /// </summary>
+    private async Task<bool> EnsureUpdateStatusAsync(Guid t, CancellationToken cancellationToken)
+    {
+        var have = await db.ValueEntries.Where(v => v.SetKey == ReviewSets.Statuses).ToListAsync(cancellationToken);
+        if (have.Count == 0 || have.Any(v => v.Code == "IFU")) return false;
+        var after = have.FirstOrDefault(v => v.Code == "IFA")?.Sort ?? have.Max(v => v.Sort);
+        foreach (var later in have.Where(v => v.Sort > after)) later.Sort++;
+        db.ValueEntries.Add(new ValueEntry
+        {
+            TenantId = t, SetKey = ReviewSets.Statuses, Code = "IFU", Label = "Issued for update", Sort = after + 1,
+            Props = JsonSerializer.SerializeToDocument(new { executes = false, update = true }),
+        });
+        foreach (var step in (await db.ReviewRoutes.ToListAsync(cancellationToken)).SelectMany(r => r.Steps).Where(s => s.GrantsStatuses.Contains("IFR")))
+            step.GrantsStatuses = [.. step.GrantsStatuses, "IFU"];
+        return true;
     }
 
     /// <summary>Adds a published list of values (for example the disciplines) with each value's code, label, sort order and optional properties stored as JSON.</summary>

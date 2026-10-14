@@ -315,7 +315,7 @@ function flowsFor({ gate, returner }: { gate: boolean; returner: string }): { ke
       key: "receive",
       title: "Documents we receive",
       from: "Another organization sends it",
-      to: "Back to them for correction — or in force here, and passed on",
+      to: "Back to them for correction — or accepted here, and passed on",
       columns: [
         [{ scene: "received" }],
         [{ scene: "theirs" }],

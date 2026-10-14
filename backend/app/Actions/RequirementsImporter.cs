@@ -177,7 +177,7 @@ public sealed class RequirementsImporter(
             failed ? $"The list was not applied: {shown}" : summary, project.Id, cancellationToken);
         await notifier.NotifyAsync(project.TenantId, project.Id, await notifier.ControlHoldersAsync(project.Id, cancellationToken),
             Notifications.NotificationKinds.General,
-            failed ? $"{label}: the requirements list was not read" : $"{label}: the requirements list is in force",
+            failed ? $"{label}: the requirements list was not read" : $"{label}: the requirements list is now used",
             failed ? $"Nothing it says was applied. Fix the list and release a new revision, or upload it under Schedule & actions.\n{shown}" : summary,
             $"/documents/{document.Id}", cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
@@ -388,7 +388,7 @@ public sealed class RequirementsImporter(
         await db.SaveChangesAsync(cancellationToken);
         await Readiness.RestateAsync(db, clock, keep.Keys.Select(k => k.Activity).Distinct().ToList(), cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
-        var parts = new List<string> { $"{rows.Count} need(s) in force" };
+        var parts = new List<string> { $"{rows.Count} need(s) now used" };
         if (created > 0) parts.Add($"{created} placeholder(s) registered");
         if (changed > 0) parts.Add($"{changed} changed");
         if (dropped > 0) parts.Add($"{dropped} no longer needed");

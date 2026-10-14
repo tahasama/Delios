@@ -187,7 +187,7 @@ export default async function ConformancePage() {
         ) : null}
 
         {exceptions.length ? (
-          <Section title="Exemptions in force">
+          <Section title="Exemptions that apply">
             <ul className="space-y-1.5">
               {exceptions.map((e) => (
                 <li key={e.id} className="text-[13px] leading-5">

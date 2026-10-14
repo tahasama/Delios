@@ -59,20 +59,3 @@ export async function withdrawApprovalAction(_prev: Result | undefined, formData
   revalidatePath(`/documents/${documentId}`);
   return {};
 }
-
-// ── §9.6 Reclassification: the executing party may force it ────────────────
-
-export async function reclassifyCommentAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
-  const ctx = await requireScope();
-  const commentId = String(formData.get("commentId") ?? "");
-  const cycleId = String(formData.get("cycleId") ?? "");
-  try {
-    await api(projectPath(ctx, `/reviews/${cycleId}/comments/${commentId}/reclassify`), {
-      body: { blocking: formData.get("prevent") === "on", note: String(formData.get("note") ?? "").trim() || null },
-    });
-  } catch (e) {
-    return failed(e);
-  }
-  revalidatePath(`/reviews/${cycleId}`);
-  return {};
-}

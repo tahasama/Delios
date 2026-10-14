@@ -68,7 +68,7 @@ public static class ListUploadEndpoints
             revision = await db.Revisions.AsNoTracking().SingleOrDefaultAsync(r => r.Id == revisionId && r.ProjectId == project.Id, cancellationToken);
             if (revision is null) return Problems.NotFound("REVISION_NOT_FOUND", "No such revision.");
             if (revision.State != RevisionStates.Released)
-                return Problems.Conflict("REVISION_NOT_RELEASED", $"Rev {revision.Value} is not the released revision. Upload the list of the revision in force.");
+                return Problems.Conflict("REVISION_NOT_RELEASED", $"Rev {revision.Value} is not the released revision. Upload the list of the released revision.");
             var document = await db.Documents.AsNoTracking().SingleAsync(d => d.Id == revision.DocumentId, cancellationToken);
             label = $"{document.Number} rev {revision.Value}";
             var source = await db.ScheduleSources.SingleOrDefaultAsync(s => s.ProjectId == project.Id, cancellationToken);

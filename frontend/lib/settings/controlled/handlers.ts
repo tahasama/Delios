@@ -132,7 +132,7 @@ const distributionMatrix: Handler = {
       }));
       await api(`/api/admin/functions/${fn.id}`, { method: "PUT", body: { rules: mine } });
     }
-    return { summary: `${rows.length} rule(s) in force.` };
+    return { summary: `${rows.length} rule(s) now used.` };
   },
 };
 

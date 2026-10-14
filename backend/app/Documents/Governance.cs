@@ -12,7 +12,6 @@ namespace Delios.Host.Documents;
 public sealed record CorrectionRequest(string? Title);
 /// <summary>Body of withdrawing an approval, or reclassifying a comment: why.</summary>
 public sealed record WithdrawApprovalRequest(string? Reason);
-public sealed record ReclassifyRequest(bool Blocking, string? Note = null);
 
 /// <summary>
 /// Acts that change what a record means without rewriting it: a record confirmed
@@ -28,7 +27,6 @@ public static class GovernanceEndpoints
         p.MapPost("/documents/{documentId:guid}/confirm", ConfirmAsync);
         p.MapPost("/documents/{documentId:guid}/correction", CorrectAsync);
         p.MapPost("/revisions/{revisionId:guid}/withdraw-approval", WithdrawApprovalAsync);
-        p.MapPost("/reviews/{reviewId:guid}/comments/{commentId:guid}/reclassify", ReclassifyAsync);
     }
 
     private static Actor Who(ProjectAccess a) => new(a.UserId, a.UserName);
@@ -116,36 +114,4 @@ public static class GovernanceEndpoints
         return Results.NoContent();
     }
 
-    /// <summary>
-    /// A comment's weight is changed after it was written: whether it stops the release. What it was is kept. The
-    /// party carrying out the work (Document Control, or the revision's author) may force it, with a note.
-    /// </summary>
-    private static async Task<IResult> ReclassifyAsync(Guid reviewId, Guid commentId, ReclassifyRequest r, HttpContext h, DeliosDbContext db,
-        AuditLog audit, IClock clock, CancellationToken c)
-    {
-        var access = ProjectAccessFilter.Of(h);
-        var review = await db.Reviews.Include(x => x.Comments).SingleOrDefaultAsync(x => x.Id == reviewId && x.ProjectId == access.Project.Id, c);
-        var comment = review?.Comments.SingleOrDefault(x => x.Id == commentId);
-        if (review is null || comment is null) return Problems.NotFound("COMMENT_NOT_FOUND", "No such comment.");
-        var revision = await db.Revisions.AsNoTracking().SingleAsync(x => x.Id == review.RevisionId, c);
-        var document = await db.Documents.AsNoTracking().SingleAsync(x => x.Id == review.DocumentId, c);
-        if (!access.Allows(Verbs.Control, document.Facts) && revision.AuthoredById != access.UserId)
-            return Problems.Forbidden("RECLASSIFY_NOT_ALLOWED", "Document Control or the revision's author reclassifies a comment.");
-        if (comment.Status != CommentStatuses.Open) return Problems.Conflict("COMMENT_CLOSED", "The comment is settled; reclassifying it changes nothing.");
-        if (comment.Blocking == r.Blocking) return Results.NoContent();
-        var catalog = await Catalog.LoadAsync(db, c);
-        var code = catalog.CodeWhere(ReviewSets.CommentClasses, "blocking", r.Blocking)
-            ?? (r.Blocking ? "BLOCKING" : "NON_BLOCKING");
-        comment.OriginalBlocking ??= comment.Blocking;
-        comment.Blocking = r.Blocking;
-        comment.Class = code;
-        comment.ReclassifiedAt = clock.GetCurrentInstant();
-        comment.ReclassifiedByName = access.UserName;
-        comment.ReclassifyNote = string.IsNullOrWhiteSpace(r.Note) ? null : r.Note.Trim();
-        await db.SaveChangesAsync(c);
-        await audit.WriteAsync(Who(access), "COMMENT_RECLASSIFIED", "Review", review.Id, review.Number,
-            $"{(r.Blocking ? "Now stops the release" : "No longer stops the release")}: \"{(comment.Text.Length > 120 ? comment.Text[..120] + "…" : comment.Text)}\""
-            + (string.IsNullOrWhiteSpace(r.Note) ? "" : $" {r.Note.Trim()}"), access.Project.Id, c);
-        return Results.NoContent();
-    }
 }

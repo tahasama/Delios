@@ -710,7 +710,7 @@ const COLUMNS: Column[] = [
   {
     key: "releasedFor", sort: "releasedFor",
     label: "Released for",
-    note: "What the revision is issued for — IFC, AFC, AB and the rest. Every step of a review route sets it or confirms it. Whether it is in force is the revision state beside it: a revision that is Not released carries its status but nobody may work from it.",
+    note: "What the revision is issued for — IFC, AFC, AB and the rest. Every step of a review route sets it or confirms it. Whether people work from it is the revision state beside it: a revision that is Not released carries its status but nobody may work from it.",
     cellClass: "whitespace-nowrap text-xs",
     cell: (row, codes) =>
       /* The status prints the same whether or not it is in force. Which it is
@@ -718,7 +718,7 @@ const COLUMNS: Column[] = [
       !row.releasedFor && row.proposedFor ? (
         <CodeRef code={row.proposedFor} note={`${codes[`STATUS|${row.proposedFor}`] ?? row.proposedFor}
 
-The revision is not released, so this status is not in force.`} href={GUIDE.STATUS} className="code-chip code-chip-held" />
+The revision is not released, so nobody works from this status yet.`} href={GUIDE.STATUS} className="code-chip code-chip-held" />
       ) : row.releasedFor ? (
         <CodeRef code={row.releasedFor} note={codes[`STATUS|${row.releasedFor}`]} href={GUIDE.STATUS} className="code-chip code-chip-live" />
       ) : <Muted />,

@@ -36,7 +36,7 @@ export async function delegateReviewAction(_prev: State | undefined, formData: F
     return { error: refusal(e).message };
   }
   revalidatePath(`/reviews/${cycleId}`);
-  return { message: row.status === "OPEN" ? "Asked. Document Control puts it in force." : `${row.toName} answers it in your place.` };
+  return { message: row.status === "OPEN" ? "Asked. It starts once Document Control lets it." : `${row.toName} answers it in your place.` };
 }
 
 /** One act on a hand-over already made, by its id. */

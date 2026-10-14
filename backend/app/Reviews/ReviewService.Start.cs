@@ -166,6 +166,10 @@ public sealed partial class ReviewService
                 };
             }).ToList(),
         };
+        // Copied in: people on the project, told now and of what comes of it.
+        var copies = (request.Copies ?? []).Distinct().ToList();
+        review.CopyUserIds = copies.Count == 0 ? [] : [.. await db.Memberships.AsNoTracking()
+            .Where(m => m.ProjectId == access.Project.Id && m.Active && copies.Contains(m.UserId)).Select(m => m.UserId).Distinct().ToListAsync(cancellationToken)];
         db.Reviews.Add(review);
         await OpenStepAsync(access, review, 0, cancellationToken);
 
@@ -177,7 +181,12 @@ public sealed partial class ReviewService
         await db.SaveChangesAsync(cancellationToken);
         await audit.WriteAsync(Actor(access), "REVIEW_STARTED", "Review", review.Id, review.Number,
             $"{document.Number} rev {revision.Value} sent for review on route {route.Name}"
-            + (chosenBySender.Count > 0 ? $", the sender choosing the people on {string.Join(", ", chosenBySender)}." : "."), access.Project.Id, cancellationToken);
+            + (chosenBySender.Count > 0 ? $", the sender choosing the people on {string.Join(", ", chosenBySender)}." : ".")
+            + (review.CopyUserIds.Length > 0 ? $" {review.CopyUserIds.Length} copied in." : ""), access.Project.Id, cancellationToken);
+        if (review.CopyUserIds.Length > 0)
+            await TellAsync(review, review.CopyUserIds, Notifications.NotificationKinds.General,
+                $"{TransmittalService.Label(document, revision)} sent for review: you are copied in",
+                $"Review {review.Number}, sent by {access.UserName}. You are kept informed; nothing is asked of you.", cancellationToken);
         return (review, null);
     }
 }

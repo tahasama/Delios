@@ -80,6 +80,8 @@ export async function sendForReviewAction(_prev: Result | undefined, formData: F
   const people: string[][] = [];
   for (let i = 0; formData.has(`stepShown_${i}`); i++) people.push(formData.getAll(`participants_${i}`).map(String).filter(Boolean));
   // One key per press of Send: a revision sent again later is a new review, not a replay of the old one.
+  // Copied in (cc): told it went out for review and of what comes of it, never asked to answer.
+  const copies = [...new Set(formData.getAll("copyUsers").map(String).filter(Boolean))];
   const attempt = text(formData, "attempt") || crypto.randomUUID();
   const sent: string[] = [];
   const opened: string[] = [];
@@ -87,7 +89,7 @@ export async function sendForReviewAction(_prev: Result | undefined, formData: F
   for (const revisionId of revisionIds) {
     try {
       const revision = await backendRevision(ctx, revisionId);
-      const started = await api<{ id: string }>(projectPath(ctx, `/revisions/${revisionId}/reviews`), { body: { routeId, people: people.length ? people : null }, idempotencyKey: `review-${revisionId}-${attempt}` });
+      const started = await api<{ id: string }>(projectPath(ctx, `/revisions/${revisionId}/reviews`), { body: { routeId, people: people.length ? people : null, copies }, idempotencyKey: `review-${revisionId}-${attempt}` });
       sent.push(`rev ${revision.value}`);
       opened.push(started.id);
       revalidatePath(`/documents/${revision.documentId}`);

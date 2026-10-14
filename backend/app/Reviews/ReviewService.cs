@@ -12,7 +12,8 @@ namespace Delios.Host.Reviews;
 
 /// <summary>Body of the start-review request. <c>RouteId</c> picks a route; null takes the best route for the document.</summary>
 /// <summary>Body of a review start. <c>People</c>, if given, holds per step the people the sender chose; a step left empty keeps the route's own.</summary>
-public sealed record StartReviewRequest(Guid? RouteId = null, Guid[][]? People = null);
+/// <summary>Body of sending for review: the route, the people per step (null keeps the route's), and those copied in.</summary>
+public sealed record StartReviewRequest(Guid? RouteId = null, Guid[][]? People = null, Guid[]? Copies = null);
 /// <summary>Body of a new comment. <c>Class</c> is a published comment class code; <c>ClosesWithStep</c> (from 1) names a later step that settles it, or null when it is settled with the revision.</summary>
 public sealed record CommentRequest(string? Text, string? Class, int? ClosesWithStep = null);
 /// <summary>Body of the close-comment request: how the comment was settled (required).</summary>

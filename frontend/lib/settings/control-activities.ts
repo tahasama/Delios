@@ -61,7 +61,7 @@ export const CONTROL_ACTIVITIES: ControlActivity[] = [
     key: "DELEGATE",
     title: "Handing a review to somebody else",
     text: "A reviewer or a decider who cannot answer in time passes their step to another person the matrix names for it.",
-    control: "The reviewer asks, and Document Control puts the delegation in force.",
+    control: "The reviewer asks, and Document Control lets the hand-over start.",
     self: "The reviewer hands it over themselves, and the record says who did it.",
   },
   {
@@ -119,7 +119,7 @@ export const CONTROL_ACTIVITIES: ControlActivity[] = [
  */
 export const SKIPPABLE: Record<string, { off: string }> = {
   DELEGATE: {
-    off: "Nobody hands a review over: each step is answered by the person it was given to. Hand-overs already in force run to their end date.",
+    off: "Nobody hands a review over: each step is answered by the person it was given to. Hand-overs already started run to their end date.",
   },
   ACTION_NOTE: {
     off: "No note is written when an action goes ahead without its documents, or is stopped for want of them: the shortfall stays on the action as it is, and an action whose day has passed is taken to have happened. Notes already written stay on the record.",
@@ -256,12 +256,12 @@ export const POLICIES: Policy[] = [
       {
         value: "TOGETHER",
         label: "Releasing sends it — released & issued in one act (recommended)",
-        text: "Whoever decides says who receives it. Releasing puts it in force and sends it to them, so there is always a record of who received what. Nothing is published to nobody.",
+        text: "Whoever decides says who receives it. Releasing makes it the revision people work from and sends it to them, so there is always a record of who received what. Nothing is published to nobody.",
       },
       {
         value: "SEPARATE",
         label: "Releasing means go ahead",
-        text: "Nobody is asked who receives it. Releasing puts it in force and people find it in the register and work from it; a transmittal can still be sent, but nothing requires one. For a team that works inside the app and needs no formal distribution.",
+        text: "Nobody is asked who receives it. Releasing makes it the revision people work from; they find it in the register and work from it; a transmittal can still be sent, but nothing requires one. For a team that works inside the app and needs no formal distribution.",
       },
     ],
   },

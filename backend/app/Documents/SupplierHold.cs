@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Delios.Host.Platform;
+using Delios.Host.Reviews;
 using Microsoft.EntityFrameworkCore;
 
 namespace Delios.Host.Documents;
@@ -15,6 +16,10 @@ public static class SupplierHold
     /// proceed), or one whose comments go into the next revision. Accepted, or taken for information, it stays with
     /// us. Every verdict list says one of those four meanings, whatever it calls them.
     /// </summary>
+    /// <summary>A status for update (IFU): released at it, the document goes back to its author or supplier to update.</summary>
+    public static bool ForUpdate(Catalog catalog, string? status) =>
+        status is not null && catalog.Prop(ReviewSets.Statuses, status, "update") is { ValueKind: JsonValueKind.True };
+
     public static bool HandsToSupplier(Catalog catalog, string verdictSet, string verdict) =>
         catalog.Prop(verdictSet, verdict, "proceed") is not { ValueKind: JsonValueKind.True }
         || catalog.Prop(verdictSet, verdict, "resubmit") is { ValueKind: JsonValueKind.True };

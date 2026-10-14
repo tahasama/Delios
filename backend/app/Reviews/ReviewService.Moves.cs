@@ -61,6 +61,26 @@ public sealed partial class ReviewService
         }
     }
 
+    /// <summary>
+    /// Everyone a review concerns, told of its decision, release or return: whoever started it, the revision's author,
+    /// everyone on its route (each step's people and whoever answered), those copied in, Document Control, and, for a
+    /// document of another organization's (its originator, or whoever sent the revision), that organization's people.
+    /// </summary>
+    private async Task<List<Guid>> InvolvedAsync(Review review, Document document, Revision revision, CancellationToken cancellationToken)
+    {
+        var steps = await db.ReviewSteps.AsNoTracking().Where(s => s.ReviewId == review.Id).Select(s => new { s.Id, s.UserIds }).ToListAsync(cancellationToken);
+        var stepIds = steps.Select(s => s.Id).ToList();
+        var answered = await db.ReviewParticipants.AsNoTracking().Where(p => stepIds.Contains(p.StepId)).Select(p => p.UserId).ToListAsync(cancellationToken);
+        var controllers = await db.Memberships.AsNoTracking()
+            .Where(m => m.ProjectId == review.ProjectId && m.Active && m.Function!.Active && m.Function.Rules.Any(r => r.Verbs.Contains(Verbs.Control)))
+            .Select(m => m.UserId).ToListAsync(cancellationToken);
+        var party = revision.AuthoredByParty ?? document.Originator;
+        var outside = party is not null && await db.Parties.AnyAsync(p => p.Code == party && !p.IsInternal, cancellationToken)
+            ? await SupplierHold.PeopleAsync(db, document, revision, cancellationToken) : [];
+        return [.. new[] { review.StartedById, revision.AuthoredById }.Concat(steps.SelectMany(s => s.UserIds)).Concat(answered)
+            .Concat(review.CopyUserIds).Concat(controllers).Concat(outside).Where(id => id != Guid.Empty).Distinct()];
+    }
+
     /// <summary>Tells these people about the review (and emails them, under the review email switch). Links to the review unless told otherwise.</summary>
     private Task TellAsync(Review review, IEnumerable<Guid> userIds, string kind, string title, string? body, CancellationToken cancellationToken,
         string? link = null) =>
@@ -106,8 +126,11 @@ public sealed partial class ReviewService
         document.LatestRevisionState = RevisionStates.Released;
         // A supplier's document: a verdict with comments for the next revision hands it to them; accepted, or for
         // information, it stays with us. Read from the verdict's meaning, whatever the organization calls it.
+        // Released at a status for update (IFU) goes back to them as well: work does not go ahead on it.
+        var releaseCatalog = await Catalog.LoadAsync(db, cancellationToken);
+        var forUpdate = SupplierHold.ForUpdate(releaseCatalog, status);
         if (document.WithSupplier is not null)
-            document.WithSupplier = review.Verdict is { } verdict && SupplierHold.HandsToSupplier(await Catalog.LoadAsync(db, cancellationToken), review.VerdictSet, verdict);
+            document.WithSupplier = forUpdate || review.Verdict is { } verdict && SupplierHold.HandsToSupplier(releaseCatalog, review.VerdictSet, verdict);
         document.UpdatedAt = now;
         review.State = ReviewStates.Released;
         review.ClosedAt = now;
@@ -120,12 +143,13 @@ public sealed partial class ReviewService
         await audit.WriteAsync(actor, "RELEASED", "Revision", revision.Id, $"{document.Number} rev {revision.Value}",
             $"Released at {status} on review {review.Number}.", review.ProjectId, cancellationToken);
         // Handed back to its supplier with comments for the next revision: their people are told too.
-        var supplier = document.WithSupplier == true ? await SupplierHold.PeopleAsync(db, document, revision, cancellationToken) : [];
-        // Accepted with comments: in force, and back with its author (or supplier) for the next revision, which needs nobody's leave.
-        var commentsNext = review.Verdict is { } given && SupplierHold.HandsToSupplier(await Catalog.LoadAsync(db, cancellationToken), review.VerdictSet, given);
-        await TellAsync(review, [review.StartedById, revision.AuthoredById, .. supplier], Notifications.NotificationKinds.Released,
-            $"{TransmittalService.Label(document, revision)} released at {status}" + (commentsNext ? ", with comments for the next revision" : ""),
-            commentsNext ? $"Review {review.Number}. It is in force; its comments go into your next revision, which you start without asking." : $"Review {review.Number}.",
+        // Accepted with comments, or released for update: released, and back with its author (or supplier) for the next revision, which needs nobody's leave.
+        var commentsNext = forUpdate || review.Verdict is { } given && SupplierHold.HandsToSupplier(releaseCatalog, review.VerdictSet, given);
+        await TellAsync(review, await InvolvedAsync(review, document, revision, cancellationToken), Notifications.NotificationKinds.Released,
+            $"{TransmittalService.Label(document, revision)} released at {status}" + (commentsNext ? ", back to its author for the next revision" : ""),
+            commentsNext
+                ? $"Review {review.Number}. People can see it and read its comments, but work does not go ahead on it alone: the comments go into the next revision, which its author starts without asking."
+                : $"Review {review.Number}.",
             cancellationToken, $"/documents/{document.Id}");
         foreach (var old in earlier)
         {
@@ -193,8 +217,7 @@ public sealed partial class ReviewService
         await CloseApprovalsAsync(revision.Id, review.Id, by, cancellationToken);
         await audit.WriteAsync(Audit.Actor.System, "RETURNED_TO_AUTHOR", "Revision", revision.Id,
             $"{document.Number} rev {revision.Value}", $"{note} The next revision replaces it.", review.ProjectId, cancellationToken);
-        var supplier = document.WithSupplier == true ? await SupplierHold.PeopleAsync(db, document, revision, cancellationToken) : [];
-        await TellAsync(review, [review.StartedById, revision.AuthoredById, .. supplier], Notifications.NotificationKinds.ReviewReturned,
+        await TellAsync(review, await InvolvedAsync(review, document, revision, cancellationToken), Notifications.NotificationKinds.ReviewReturned,
             $"{TransmittalService.Label(document, revision)} returned: a new revision is needed", note, cancellationToken, $"/documents/{document.Id}");
     }
 
@@ -226,8 +249,7 @@ public sealed partial class ReviewService
         await audit.WriteAsync(Audit.Actor.System, "RETURNED_FOR_CORRECTION", "Revision", revision.Id,
             $"{document.Number} rev {revision.Value}",
             $"Back to {to}: {note} Corrected files come back under rev {revision.Value}; no new revision.", review.ProjectId, cancellationToken);
-        var supplier = document.WithSupplier == true ? await SupplierHold.PeopleAsync(db, document, revision, cancellationToken) : [];
-        await TellAsync(review, [review.StartedById, revision.AuthoredById, .. supplier], Notifications.NotificationKinds.ReviewReturned,
+        await TellAsync(review, await InvolvedAsync(review, document, revision, cancellationToken), Notifications.NotificationKinds.ReviewReturned,
             $"{TransmittalService.Label(document, revision)} returned for correction", note, cancellationToken, $"/documents/{document.Id}");
     }
 

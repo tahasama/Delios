@@ -70,7 +70,7 @@ export const PREVENTED: PreventedRule[] = [
   },
   {
     condition: "An approval given by somebody who holds no authority for that class",
-    prevented: "Approval is refused unless the distribution matrix grants Approve for that document, or a delegation in force lets somebody act in another's place.",
+    prevented: "Approval is refused unless the distribution matrix grants Approve for that document, or a hand-over that has started lets somebody act in another's place.",
     where: "Recording an approval",
   },
   {

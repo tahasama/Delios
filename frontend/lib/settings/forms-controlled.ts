@@ -133,7 +133,7 @@ export async function decideControlledVersionAction(_prev: ControlledState | und
   }
   revalidatePath("/settings/controlled", "layout");
   revalidatePath("/actions", "layout");
-  return { ok: `${version.versionLabel} approved and in force. ${result.summary}` };
+  return { ok: `${version.versionLabel} approved and now used. ${result.summary}` };
 }
 
 /** Withdraw a draft that was uploaded in error. It is kept on record, marked so. */

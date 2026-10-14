@@ -36,7 +36,7 @@ export async function PlanCards({ from = null, to = null }: { from?: Date | null
     const released = docs.filter((one) => one.released);
     if (!docs.length) return "None yet";
     if (!released.length) return "Not released yet";
-    if (released.length > 1) return `${released.length} documents in force`;
+    if (released.length > 1) return `${released.length} documents released`;
     return <Link href={`/documents/${released[0].id}`} className="font-semibold text-link hover:underline">Rev {released[0].released!.value}</Link>;
   };
   const under: React.ReactNode[] = [

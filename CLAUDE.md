@@ -101,13 +101,22 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - Progress shows "you are here" on where things really stand: the open step
   while in review, "Not released" once decided.
 - "Leave it to…" (who receives it) goes to whoever started the review.
-- Accepted with comments is in force and back with its author at once: released, the
-  author (or the supplier's people) is told its comments go into the next revision,
-  which needs nobody's leave, and it is on their Home ("next revision due").
+- Accepted with comments, or released at a status for update (IFU, "Issued for
+  update": work does not go ahead on it; status prop `update`), is released and back
+  with its author at once: the author (or the supplier, who then holds it) is told
+  its comments go into the next revision, which needs nobody's leave, and it is on
+  their Home ("next revision due").
 - Sending back after a verdict that asked for changes asks nothing more: the verdict
   and the comments written with it are the reason ("Anything to add" is optional).
-- A decision is told to whoever started the review and Document Control; the author
-  hears once, when it is released or sent back to them.
+- A decision, a release and a send-back are told to everyone the review concerns
+  (`InvolvedAsync`): whoever started it, the author, everyone on the route (each
+  step's people and whoever answered), those copied in, Document Control, and for a
+  document of another organization (its originator, or whoever sent the revision)
+  that organization's people on the project.
+- "Copy to (cc)" on Send for review is kept on the review (`Review.CopyUserIds`):
+  told when it is sent, and of what comes of it; never asked to answer.
+- Document Control approves nothing: a comment's weight is never changed after it is
+  written (no "reclassify"); the decider's verdict decides.
 
 ### Revisions
 - Until released, everything is editable in one "Edit rev X" step: PDF, native
@@ -299,8 +308,8 @@ a screen only words it. A new rule goes in the backend, never in a page.
   before). `RevisionReading` (backend, `AwaitingCheck`).
 - "Files that came with it" shows on a received transmittal only when files
   came with it.
-- A placeholder sent to its supplier is issued for use: reason IFU ("Issued for
-  use", family Data), set by itself on the transmittal (never chosen) where it is
+- A placeholder sent to its supplier is issued for update: reason IFU ("Issued for
+  update", family Data), set by itself on the transmittal (never chosen) where it is
   published; the data / information choice is not shown then.
 - "Received from outside the system" is not offered when the transmittal is
   already about something of ours going out (documents chosen in the register

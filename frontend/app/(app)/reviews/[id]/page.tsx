@@ -27,7 +27,6 @@ import { VerdictDecision } from "@/app/(app)/documents/[id]/verdict-status";
 import { preflight } from "@/lib/conformance/rules/preflight";
 import { Guarded } from "@/components/preflight";
 import { issueToReviewAction, withdrawRevisionAction, removeCommentAction, editCommentAction, recordOutcomeAction, returnToOriginatorAction } from "@/lib/documents/forms-revisions";
-import { reclassifyCommentAction } from "@/lib/documents/forms-governance";
 import { ArrowLeft, ExternalLink, FileText } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -138,7 +137,6 @@ export default async function ReviewCyclePage({ params }: { params: Promise<{ id
   // Writing comments: whoever sits on the open step, until they answer it.
   const mayComment = cycle.status === "OPEN" && assigned && !cycle.outcome && !cycle.withdrawn && Boolean(cycle.issuedToReviewAt);
   // Whether an open comment stops the release: Document Control, or the revision's author, may change it.
-  const mayReclassify = controller || rev.authoredById === user.id;
   // A step answered by an outside party that holds no accounts here: one of our
   // people sends the pack and writes down what comes back. The verdict stays
   // theirs; the record says who entered it.
@@ -357,16 +355,6 @@ export default async function ReviewCyclePage({ params }: { params: Promise<{ id
                           </details>
                           <ActionForm action={removeCommentAction} submitLabel="Take back" variant="danger" size="sm" hidden={{ cycleId: cycle.id, commentId: comment.id }} className="space-y-0" />
                         </div>
-                      ) : null}
-                      {mayReclassify && comment.status === "OPEN" && !(mayComment && comment.authorId === user.id) ? (
-                        <details className="mt-2">
-                          <summary className="cursor-pointer text-[11px] font-semibold text-link">{comment.progressionPreventing ? "Let it no longer stop the release" : "Make it stop the release"}</summary>
-                          <div className="mt-2">
-                            <ActionForm action={reclassifyCommentAction} submitLabel="Reclassify" size="sm" hidden={{ cycleId: cycle.id, commentId: comment.id, ...(comment.progressionPreventing ? {} : { prevent: "on" }) }}>
-                              <Field label="Why" hint="optional — shown with the comment"><input name="note" className={inputCls} /></Field>
-                            </ActionForm>
-                          </div>
-                        </details>
                       ) : null}
                     </li>
                   ))}

@@ -78,7 +78,7 @@ export default async function DefaultsPage() {
                 size="sm"
                 confirmText="The organization's defaults are forgotten; new projects start with the app's own. Projects already open keep theirs. Go ahead?"
               />
-            ) : <p className="text-xs text-slate-500">These are in force now.</p>}
+            ) : <p className="text-xs text-slate-500">These are the ones used now.</p>}
           </div>
         </section>
 

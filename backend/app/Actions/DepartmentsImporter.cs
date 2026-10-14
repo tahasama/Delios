@@ -200,7 +200,7 @@ public sealed class DepartmentsImporter(
             failed ? $"The list was not applied: {shown}" : summary, project.Id, cancellationToken);
         await notifier.NotifyAsync(project.TenantId, project.Id, await notifier.ControlHoldersAsync(project.Id, cancellationToken),
             Notifications.NotificationKinds.General,
-            failed ? $"{label}: the disciplines list was not read" : $"{label}: the disciplines list is in force",
+            failed ? $"{label}: the disciplines list was not read" : $"{label}: the disciplines list is now used",
             failed ? $"Nothing it says was applied. Fix the list and release a new revision.\n{shown}" : summary,
             $"/documents/{document.Id}", cancellationToken);
         await db.SaveChangesAsync(cancellationToken);

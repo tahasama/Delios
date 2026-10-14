@@ -265,13 +265,9 @@ public sealed partial class ReviewService
         await audit.WriteAsync(Audit.Actor.System, "REVIEW_DECIDED", "Review", review.Id, review.Number,
             $"Verdict {review.Verdict}{(review.GrantedStatus is null ? "" : $", granting {review.GrantedStatus}")}.",
             review.ProjectId, cancellationToken);
-        // Whoever started it, and Document Control, who acts on the decision next. Its author hears once, when it is
-        // released or sent back to them, with why.
+        // Everyone it concerns: the route, those copied in, Document Control, its author, and another organization's people.
         var (decidedDocument, decidedRevision) = await SubjectAsync(review, cancellationToken);
-        var controllers = await db.Memberships.AsNoTracking()
-            .Where(m => m.ProjectId == review.ProjectId && m.Active && m.Function!.Active && m.Function.Rules.Any(r => r.Verbs.Contains(Verbs.Control)))
-            .Select(m => m.UserId).ToListAsync(cancellationToken);
-        await TellAsync(review, [review.StartedById, .. controllers], Notifications.NotificationKinds.ReviewDecided,
+        await TellAsync(review, await InvolvedAsync(review, decidedDocument, decidedRevision, cancellationToken), Notifications.NotificationKinds.ReviewDecided,
             $"{TransmittalService.Label(decidedDocument, decidedRevision)} decided: {review.Verdict}",
             $"Review {review.Number}{(review.GrantedStatus is null ? "" : $" grants {review.GrantedStatus}")}.", cancellationToken);
 

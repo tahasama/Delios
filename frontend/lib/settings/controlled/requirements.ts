@@ -331,7 +331,7 @@ const requirements: Handler = {
       await api(projectPath(t, `/requirement-calls/${call.id}/answer`), { body: { note: `Listed in ${versionLabel}` } });
     }
 
-    return { summary: `${upserted} requirement(s) in force${open.length ? `, ${open.length} department call(s) answered` : ""}${created ? `, ${created} placeholder(s) created` : ""}${dropped ? `, ${dropped} no longer required` : ""}.` };
+    return { summary: `${upserted} requirement(s) now used${open.length ? `, ${open.length} department call(s) answered` : ""}${created ? `, ${created} placeholder(s) created` : ""}${dropped ? `, ${dropped} no longer required` : ""}.` };
   },
 };
 

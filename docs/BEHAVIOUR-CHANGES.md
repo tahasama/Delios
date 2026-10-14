@@ -445,8 +445,17 @@ the installation sets its keys.
   (started without asking); it is on their Home as "next revision due".
 - **Sending back after C3 (or any verdict asking for changes)** no longer asks why: the verdict and its comments go
   with it; "Anything to add" is optional.
-- **One notice for the author:** the decision itself is told to whoever started the review and Document Control;
-  the author is told once, at the release or the send-back (before, they got both).
+- **Who is told of a decision, a release or a send-back:** everyone the review concerns: whoever started it, the
+  author, everyone on the route, those copied in, Document Control, and for another organization's document,
+  that organization's people.
+- **Copy to (cc) on Send for review now works:** the people chosen were dropped before; they are kept on the
+  review and told.
+- **IFU "Issued for update"** is a status a review can grant (a setup gains it with `seed-demo`, after IFA; steps
+  that may grant IFR may grant it too). Work does not go ahead on it: released at IFU, the document goes back to
+  its author (or supplier) for the next revision. The transmittal reason IFU reads "Issued for update" too.
+- **"Make it stop the release" (reclassifying a comment) is removed:** Document Control approves nothing; the
+  decider's verdict decides. Comments reclassified before keep that record.
+- **Plain words:** "in force" is gone from the screens: "released", "the revision people work from", "now used".
 
 ## 7. Notifications and email
 

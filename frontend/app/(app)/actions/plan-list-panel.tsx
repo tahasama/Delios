@@ -85,7 +85,7 @@ export function PlanListPanel({ list, control }: { list: PlanList; control: bool
               <li key={doc.id}>
                 <Link href={`/documents/${doc.id}`} className="font-mono font-semibold text-brand-ink hover:underline">{doc.number}</Link>
                 <span className="text-slate-500">
-                  {doc.released ? ` · in force: rev ${doc.released.value}${doc.read ? ", list read" : ", list not read yet"}` : " · nothing released yet"}
+                  {doc.released ? ` · released: rev ${doc.released.value}${doc.read ? ", list read" : ", list not read yet"}` : " · nothing released yet"}
                   {doc.pending ? ` · rev ${doc.pending.value} ${said(doc.pending.state)}` : ""}
                 </span>
                 {doc.differs ? (
@@ -114,16 +114,16 @@ export function PlanListPanel({ list, control }: { list: PlanList; control: bool
               <div className="flex flex-wrap items-center gap-2">
                 <input
                   type="file" name="file" required accept=".xlsx,.csv"
-                  aria-label={only ? `Excel of rev ${only.released!.value} (.xlsx or .csv)` : "Excel of the revision in force (.xlsx or .csv)"}
+                  aria-label={only ? `Excel of rev ${only.released!.value} (.xlsx or .csv)` : "Excel of the released revision (.xlsx or .csv)"}
                   className={`${fileInputInline} min-w-0 flex-1`}
                 />
               </div>
               {/* The uploader vouches for the file, or says why it differs. */}
-              <ConfirmOrWhy revision={only ? `rev ${only.released!.value}` : "the revision in force"} />
+              <ConfirmOrWhy revision={only ? `rev ${only.released!.value}` : "the released revision"} />
               <button className="ask" data-on="true">Upload and read</button>
             </ActionForm>
           ) : (
-            <p className="mt-4 text-xs text-slate-500">Document Control uploads the spreadsheet of the revision in force.</p>
+            <p className="mt-4 text-xs text-slate-500">Document Control uploads the spreadsheet of the released revision.</p>
           )}
         </>
       ) : (

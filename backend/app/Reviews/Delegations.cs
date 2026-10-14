@@ -153,7 +153,7 @@ public sealed class DelegationService(DeliosDbContext db, AuditLog audit, IClock
     /// <summary>Document Control puts an asked-for hand-over in force. The matrix is applied as it stands now.</summary>
     public async Task<(DelegationView? Delegation, IResult? Problem)> GrantAsync(ProjectAccess access, Guid id, CancellationToken cancellationToken)
     {
-        var (row, review, problem) = await AnswerableAsync(access, id, "puts a delegation in force", cancellationToken);
+        var (row, review, problem) = await AnswerableAsync(access, id, "lets a hand-over start", cancellationToken);
         if (problem is not null) return (null, problem);
         if (await ProjectAnswers.IsOffAsync(db, access.Project.Id, Act, cancellationToken))
         {
@@ -173,7 +173,7 @@ public sealed class DelegationService(DeliosDbContext db, AuditLog audit, IClock
         row.GrantedByName = access.UserName;
         row.GrantedAt = clock.GetCurrentInstant();
         await audit.WriteAsync(new Actor(access.UserId, access.UserName), "DELEGATION_GRANTED", "Review", review.Id, review.Number,
-            $"{row.FromName} → {row.ToName}: put in force by Document Control.", review.ProjectId, cancellationToken);
+            $"{row.FromName} → {row.ToName}: started, let by Document Control.", review.ProjectId, cancellationToken);
         await TellAsync(review, [row.ToUserId], $"You answer review {review.Number} for {row.FromName}", $"Until {row.EndDate:yyyy-MM-dd}.", cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         return (View(row), null);
@@ -193,7 +193,7 @@ public sealed class DelegationService(DeliosDbContext db, AuditLog audit, IClock
         row.GrantedAt = clock.GetCurrentInstant();
         await audit.WriteAsync(new Actor(access.UserId, access.UserName), "DELEGATION_REFUSED", "Review", review!.Id, review.Number,
             $"{row.FromName} → {row.ToName}: declined. {why}", review.ProjectId, cancellationToken);
-        await TellAsync(review, [row.FromUserId], "Your delegation was not put in force", why, cancellationToken);
+        await TellAsync(review, [row.FromUserId], "Your hand-over was not let start", why, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         return (View(row), null);
     }
@@ -207,7 +207,7 @@ public sealed class DelegationService(DeliosDbContext db, AuditLog audit, IClock
         {
             return (null, Problems.Forbidden("NOT_YOURS", "Only the person who handed the step over, or Document Control, ends it."));
         }
-        if (row.Status is not (DelegationStates.Open or DelegationStates.Active)) return (null, Problems.Conflict("NOT_IN_FORCE", "It is not in force."));
+        if (row.Status is not (DelegationStates.Open or DelegationStates.Active)) return (null, Problems.Conflict("NOT_IN_FORCE", "It has not started."));
         row.Status = DelegationStates.Withdrawn;
         var review = await db.Reviews.AsNoTracking().SingleAsync(r => r.Id == row.ReviewId, cancellationToken);
         await audit.WriteAsync(new Actor(access.UserId, access.UserName), "DELEGATION_WITHDRAWN", "Review", review.Id, review.Number,

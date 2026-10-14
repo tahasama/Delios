@@ -4027,6 +4027,11 @@ namespace Delios.Host.Platform.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("closed_by_name");
 
+                    b.PrimitiveCollection<Guid[]>("CopyUserIds")
+                        .IsRequired()
+                        .HasColumnType("uuid[]")
+                        .HasColumnName("copy_user_ids");
+
                     b.Property<int>("CurrentStep")
                         .HasColumnType("integer")
                         .HasColumnName("current_step");

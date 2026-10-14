@@ -134,7 +134,7 @@ export default async function CodesPage() {
       <Card
         id="status"
         title="4 · Released for — what a released revision may be used for"
-        description="What the revision is issued for. Every step of a review route sets it or confirms it, and the last step’s answer stands. It is in force only once Document Control releases the revision: until then the revision reads Not released. It is printed on the document and on the transmittal, and a transmittal sent for execution only accepts codes that allow work."
+        description="What the revision is issued for. Every step of a review route sets it or confirms it, and the last step’s answer stands. People work from it only once the revision is released: until then the revision reads Not released. It is printed on the document and on the transmittal, and a transmittal sent for execution only accepts codes that allow work."
       >
         <DataTable id="codes-statuses" toolbar={false} head={<tr><Th>Code</Th><Th>Meaning</Th><Th>Allows work</Th><Th>You may</Th><Th>You may not</Th></tr>}>
           {statuses.map((s) => (

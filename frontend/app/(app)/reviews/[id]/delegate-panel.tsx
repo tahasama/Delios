@@ -72,7 +72,7 @@ export function DelegatePanel({ rows, controller, off = false }: {
                   {off ? (
                     <p className="text-[11px] opacity-80">Hand-overs are no longer used on this project, so this can only be declined.</p>
                   ) : (
-                    <ActionForm action={grantDelegationAction} submitLabel="Put it in force" size="sm" hidden={{ delegationId: row.id }} />
+                    <ActionForm action={grantDelegationAction} submitLabel="Let it start" size="sm" hidden={{ delegationId: row.id }} />
                   )}
                   <ActionForm action={refuseDelegationAction} submitLabel="Decline" size="sm" variant="secondary" hidden={{ delegationId: row.id }}>
                     <input name="refusedReason" className={inputCls} placeholder="Why — so they know what to do next" />
@@ -141,7 +141,7 @@ export function DelegateForm({ cycleId, verb, candidates, throughControl, strict
         <input name="reason" className={inputCls} />
       </Field>
       <p className="text-[11px] leading-4 text-slate-500">
-        {throughControl ? "Document Control puts it in force; until they do, the step is still yours." : "It takes effect at once."}
+        {throughControl ? "It starts once Document Control lets it; until then, the step is still yours." : "It takes effect at once."}
         {" "}The record says you delegated it to them, and you answer for that choice.
       </p>
     </ActionForm>

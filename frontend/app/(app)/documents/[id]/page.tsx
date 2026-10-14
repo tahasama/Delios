@@ -464,7 +464,7 @@ export default async function DocumentDetailPage({
                 The route settled on <strong>{working.statusCode} — {label(statuses, working.statusCode)}</strong>
                 {decidedVerdict ? <> with <strong>{decidedVerdict}</strong></> : null}.
                 {decisionFinal
-                  ? " Releasing puts that status in force. You do not choose it."
+                  ? " Releasing makes it the revision people work from, at that status. You do not choose it."
                   : " That verdict asks for changes, so this revision is not released: releasing it would replace the revision people are working from. Send it back."}
               </p>
               {decisionFinal ? (

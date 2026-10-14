@@ -49,7 +49,7 @@ export default async function DefaultRulesPage() {
       <AssuranceTabs current="/conformance/rules" />
 
       <div className="max-w-4xl space-y-4">
-        <Card title="Settled on this project" description="Each one is a real choice between two honest ways of working. This is the answer in force.">
+        <Card title="Settled on this project" description="Each one is a real choice between two honest ways of working. This is the answer used here.">
           <ul className="divide-y divide-line">
             {settled.map((s) => (
               <li key={s.key} className="py-2.5 first:pt-0 last:pb-0">

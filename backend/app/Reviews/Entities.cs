@@ -87,6 +87,8 @@ public sealed class Review
     public string VerdictSet { get; set; } = ReviewSets.Verdicts;
     public Guid StartedById { get; set; }
     public required string StartedByName { get; set; }
+    /// <summary>Copied in when it was sent (cc): told of it and of what comes of it, never asked to answer.</summary>
+    public Guid[] CopyUserIds { get; set; } = [];
     public Instant StartedAt { get; set; }
     public Instant? DecidedAt { get; set; }
     public Instant? ClosedAt { get; set; }

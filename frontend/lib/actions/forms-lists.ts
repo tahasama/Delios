@@ -32,7 +32,7 @@ export async function uploadPlanListAction(_prev: Result | undefined, formData: 
   const list = (await planLists(ctx)).find((one) => one.kind === kind);
   if (!list) return { error: "Unknown list." };
   const document = list.documents.find((one) => one.released?.id === revisionId);
-  if (!document) return { error: `Choose the ${list.title.toLowerCase()} in force.` };
+  if (!document) return { error: `Choose the ${list.title.toLowerCase()} that is released.` };
   const rev = document.released!.value;
   if (!confirmed && !reason) return { error: `Tick that this file is the list of rev ${rev} as released, or say why it differs.` };
   const file = filesOf(formData, "file").find((one) => /\.(xlsx|csv)$/i.test(one.name)) ?? null;

@@ -100,7 +100,7 @@ export async function DocumentManagementPlan({ readiness }: { readiness: { title
         <p className="stencil text-slate-400">Document management plan</p>
         <h1 className="mt-2 text-xl font-semibold text-slate-900">{scope?.organizationName ?? "—"}</h1>
         <p className="mt-0.5 text-xs text-slate-500">
-          {project.name} ({project.code}) · in force since {scope ? fmtDate(scope.effectiveDate) : "—"} · printed {fmtDate(new Date())}
+          {project.name} ({project.code}) · used since {scope ? fmtDate(scope.effectiveDate) : "—"} · printed {fmtDate(new Date())}
         </p>
         {dmpDoc ? (
           <p className="mt-1 text-[11px] text-slate-400">
@@ -198,7 +198,7 @@ export async function DocumentManagementPlan({ readiness }: { readiness: { title
       <Section n={5} title="How a revision is released and issued">
         <Line label="States">{STATE_NAMES.map((one) => names[one.code]).join(" · ")}</Line>
         <Line label="Statuses">{values(statuses)}</Line>
-        <Line label="Releasing">{chosen.find((p) => p.policy.key === "POLICY_RELEASE")?.value === "SEPARATE" ? "Releasing puts a revision in force; issuing it is a separate act." : "Releasing sends it: whoever decides says who receives it, and the issue is recorded in the same act."}</Line>
+        <Line label="Releasing">{chosen.find((p) => p.policy.key === "POLICY_RELEASE")?.value === "SEPARATE" ? "Releasing makes a revision the one people work from; issuing it is a separate act." : "Releasing sends it: whoever decides says who receives it, and the issue is recorded in the same act."}</Line>
         <Line label="Stamping">{chosen.find((p) => p.policy.key === "POLICY_PDF_STAMP")?.value === "OFF" ? "The verdict is kept in the record; the file is not stamped." : "The verdict, who gave it and when are stamped on the PDF people open."}</Line>
         <Line label="Distribution">{distribution.length ? `${distribution.length} rule${distribution.length === 1 ? "" : "s"} published, by deliverable type.` : "No distribution rules published."}</Line>
       </Section>
