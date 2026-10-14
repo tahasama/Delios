@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireScope } from "@/lib/core/scope";
 import { notFound } from "next/navigation";
 import { isController, isAdmin } from "@/lib/core/auth";
+import { TONE } from "@/lib/core/tones";
 import { Card, Chip, Banner, Field, inputCls } from "@/components/ui";
 import { ActionForm } from "@/components/form";
 import { ADVICE_LABEL, OUTCOME_CONSEQUENCES } from "@/lib/core/standard";
@@ -31,7 +32,9 @@ import { ArrowLeft, ExternalLink, FileText } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
-export default async function ReviewCyclePage({ params }: { params: Promise<{ id: string }> }) {
+export default async function ReviewCyclePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ open?: string }> }) {
+  // A link in the title opens one of the forms below the document: ?open=withdraw or ?open=notify.
+  const opened = (await searchParams).open ?? null;
   const ctx = await requireScope();
   const { user } = ctx;
   const { id } = await params;
@@ -59,6 +62,8 @@ export default async function ReviewCyclePage({ params }: { params: Promise<{ id
   };
   const controller = isController(user) || isAdmin(user);
   // Notifying the people the review still waits on, by hand: Document Control, or whoever started it.
+  // Whoever started the review, or Document Control (and above), may take the revision back out of it.
+  const mayWithdraw = cycle.revision.state === "IN_REVIEW" && !cycle.withdrawn && (controller || (!!cycle.openedById && cycle.openedById === user.id));
   const notify = cycle.status === "OPEN" && !cycle.withdrawn && (controller || (!!cycle.openedById && cycle.openedById === user.id))
     ? await (async () => {
         const [waiting, everyone, sent] = await Promise.all([
@@ -261,6 +266,12 @@ export default async function ReviewCyclePage({ params }: { params: Promise<{ id
             <p className="mt-1 max-w-2xl text-[11.5px] leading-4 text-slate-400">{claim}</p>
             {/* What this review's answer is worth, said once up here so the card
                 where it is given can be about giving it. */}
+            {mayWithdraw || notify ? (
+              <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs font-semibold">
+                {mayWithdraw ? <Link href="?open=withdraw#withdraw" className="text-red-700 hover:underline">Withdraw?</Link> : null}
+                {notify ? <Link href="?open=notify#notify" className="text-link hover:underline">Notify?</Link> : null}
+              </p>
+            ) : null}
             <p className="mt-2 max-w-3xl text-[12px] leading-5 text-slate-600">
               <span className="stencil mr-2 text-slate-500">{cycle.binding ? "Binding verdict" : "Advice"}</span>
               {cycle.binding
@@ -270,7 +281,7 @@ export default async function ReviewCyclePage({ params }: { params: Promise<{ id
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <Link href={`/documents/${doc.id}`} className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 font-mono text-xs font-semibold text-slate-500 hover:bg-slate-100"><ArrowLeft className="h-4 w-4" /> {doc.docNumber}</Link>
-            <Chip className={cycle.status === "OPEN" ? "bg-amber-100 text-amber-800 ring-amber-200" : "bg-canvas-deep text-slate-600 ring-line"}>Review {cycle.sequence} · {cycle.status === "OPEN" ? "open" : cycle.withdrawn ? "withdrawn" : "closed"}</Chip>
+            <Chip className={cycle.status === "OPEN" ? TONE.waiting : TONE.idle}>Review {cycle.sequence} · {cycle.status === "OPEN" ? "open" : cycle.withdrawn ? "withdrawn" : "closed"}</Chip>
           </div>
         </div>
       </section>
@@ -290,6 +301,44 @@ export default async function ReviewCyclePage({ params }: { params: Promise<{ id
             </div>
             {rendition ? <iframe src={`/api/files/${rendition.id}`} title={`${doc.docNumber} revision ${rev.value}`} className="block h-160 w-full bg-canvas"/> : <div className="grid h-48 place-items-center bg-canvas/50 p-6 text-center"><div><FileText className="mx-auto h-8 w-8 text-slate-400"/><p className="mt-2 text-sm font-semibold text-slate-700">No PDF attached</p><Link href={`/documents/${doc.id}#workflow`} className="mt-2 inline-block text-xs font-semibold text-link hover:underline">Attach it on the document →</Link></div></div>}
           </section>
+
+          {/* Whoever started the review, or Document Control (and above), takes the revision back out of it to change
+              it, with why. The review stays in the register as withdrawn. Folded until asked for. */}
+          {mayWithdraw ? (
+            <details id="withdraw" open={opened === "withdraw"} className="register register-sheet register-sheet-open scroll-mt-24">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-3 sm:px-6 [&::-webkit-details-marker]:hidden">
+                <span className="text-[13px] text-slate-600">Does the revision have to change first?</span>
+                <span className="ask">Withdraw from review</span>
+              </summary>
+              <div className="border-t border-line px-5 py-4 sm:px-6">
+                <ActionForm action={withdrawRevisionAction} submitLabel="Withdraw" variant="danger" size="sm" hidden={{ revisionId: rev.id }}>
+                  <Field label="Why" required hint="everyone on the route is told; the review is kept as withdrawn">
+                    <textarea name="reason" required rows={2} className={inputCls} placeholder="what has to change" />
+                  </Field>
+                </ActionForm>
+              </div>
+            </details>
+          ) : null}
+
+          {notify ? (
+            <details id="notify" open={opened === "notify"} className="register register-sheet register-sheet-open scroll-mt-24">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-3 sm:px-6 [&::-webkit-details-marker]:hidden">
+                <span className="text-[13px] text-slate-600">Remind the people the review still waits on</span>
+                <span className="ask">Notify</span>
+              </summary>
+              <div className="border-t border-line px-5 py-4 sm:px-6">
+                <NotifyPanel
+                  subject={`review:${id}:remind`}
+                  title={`${doc.docNumber} rev ${rev.value}: your answer is awaited`}
+                  body={`${doc.docNumber} rev ${rev.value} — ${doc.title} — waits on your answer${cycle.dueAt ? `; it was due ${fmtDate(cycle.dueAt)}` : ""}. Please answer it on the review's page.`}
+                  link={`/reviews/${id}`}
+                  people={notify.people}
+                  chosen={notify.waiting}
+                  history={notify.history}
+                />
+              </div>
+            </details>
+          ) : null}
 
           {/* Each time the route was sent back: who, when, why, and what the steps it
               reset had answered. Sending back never erases an answer. */}
@@ -324,7 +373,8 @@ export default async function ReviewCyclePage({ params }: { params: Promise<{ id
               that needs them; this lists them.
               Document Control, or the revision's author, may change whether an
               open one stops the release; what it was is kept. */}
-          {cycle.comments.length ? (
+          {/* Once the step has answered, its comments are shown with its answer: listed here only until then. */}
+          {cycle.comments.length && !cycle.outcome ? (
             <Card title="Comments" description="Written with each step's answer.">
               {cycle.comments.length ? (
                 <ul className="space-y-2">
@@ -366,18 +416,6 @@ export default async function ReviewCyclePage({ params }: { params: Promise<{ id
         </div>
 
         <aside className="space-y-4">
-          {/* Whoever started the review, or Document Control (and above), takes the
-              revision back out of it to change it, with why. The review stays in
-              the register as withdrawn. */}
-          {rev.state === "IN_REVIEW" && !cycle.withdrawn && (controller || (!!cycle.openedById && cycle.openedById === user.id)) ? (
-            <Card title="Withdraw from review">
-              <ActionForm action={withdrawRevisionAction} submitLabel="Withdraw" variant="danger" size="sm" hidden={{ revisionId: rev.id }}>
-                <Field label="Why" required hint="everyone on the route is told; the review is kept as withdrawn">
-                  <textarea name="reason" required rows={2} className={inputCls} placeholder="what has to change" />
-                </Field>
-              </ActionForm>
-            </Card>
-          ) : null}
           {/* A step held by an organization that is not on this system. Our
               people do its work here, in the same screen as any other review:
               the same comments, the same verdict, with proof of what they sent
@@ -537,20 +575,6 @@ export default async function ReviewCyclePage({ params }: { params: Promise<{ id
               </ActionForm>
               </div>
             </details>
-          ) : null}
-
-          {notify ? (
-            <Card title="Notify" description="the people the review still waits on" id="notify">
-              <NotifyPanel
-                subject={`review:${id}:remind`}
-                title={`${doc.docNumber} rev ${rev.value}: your answer is awaited`}
-                body={`${doc.docNumber} rev ${rev.value} — ${doc.title} — waits on your answer${cycle.dueAt ? `; it was due ${fmtDate(cycle.dueAt)}` : ""}. Please answer it on the review's page.`}
-                link={`/reviews/${id}`}
-                people={notify.people}
-                chosen={notify.waiting}
-                history={notify.history}
-              />
-            </Card>
           ) : null}
 
           <Card title="Progress" description={run?.templateName ?? undefined}>

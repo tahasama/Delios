@@ -3,7 +3,7 @@ import { requireScope } from "@/lib/core/scope";
 import { preparingRevisions, revisionsInPreparation } from "@/lib/reviews/api";
 import { PageHeader } from "@/components/ui";
 import { SendForReview } from "@/components/send-for-review-panel";
-import { RevisionChecklist } from "@/components/revision-checklist";
+import { ChooseDocuments } from "./choose-documents";
 import { ArrowLeft } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -48,37 +48,19 @@ export default async function StartReviewPage({ searchParams }: { searchParams: 
         actions={<Link href="/reviews" className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-semibold text-slate-500 hover:bg-slate-100"><ArrowLeft className="h-4 w-4" /> Reviews</Link>}
       />
 
-      <section className="register register-sheet register-sheet-open">
+      {/* Where you are: the two steps as one instrument, as on every form that has steps. */}
+      <nav aria-label="Steps" className="seg w-fit max-w-full">
+        <Link href="/reviews/send" aria-current={chosen.length ? undefined : "page"} className="segment"><span className="segment-n">1</span> Which documents</Link>
+        <span aria-current={chosen.length ? "page" : undefined} aria-disabled={!chosen.length} className={`segment ${chosen.length ? "" : "opacity-45"}`}><span className="segment-n">2</span> Route and people</span>
+      </nav>
+
+      <section className={`register register-sheet register-sheet-open ${chosen.length ? "hidden" : ""}`}>
         {band(1, "Which documents", "tick what goes down the same route — a revision being prepared, with its file attached")}
-        {chosen.length ? (
-          <div className="asking space-y-2 px-5 py-5 sm:px-6">
-            <ul className="divide-y divide-line rounded-lg border border-line">
-              {chosen.map((r) => (
-                <li key={r.id} className="px-3 py-2 text-[13px]">
-                  <Link href={`/documents/${r.documentId}`} className="doc-number">{r.document.docNumber}</Link>
-                  <span className="text-slate-500"> rev {r.value} — {r.document.title}</span>
-                  {!r.renditionFileId && !r.nativeFileId ? <span className="ml-2 text-[11px] font-semibold text-amber-700">no file yet — attach it before sending</span> : null}
-                </li>
-              ))}
-            </ul>
-            <Link href="/reviews/send" className="text-[11px] font-semibold text-link hover:underline">Choose other documents</Link>
-          </div>
-        ) : ready.length ? (
-          // Ticking and going on reloads this page with the documents named, so
-          // the routes offered are the ones that apply to all of them.
-          <form method="get">
-            <RevisionChecklist
-              name="revision"
-              rows={ready.map((r) => ({ id: r.id, number: r.document.docNumber, rev: r.value, status: r.statusCode, title: r.document.title }))}
-            />
-            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line bg-tint-soft px-5 py-3 sm:px-6">
-              <Link href="/reviews" className="text-xs font-semibold text-slate-500 hover:text-slate-800">Cancel</Link>
-              <div className="flex items-center gap-3">
-                {waitingForFile ? <span className="text-[11px] text-slate-400">{waitingForFile} more being prepared without a file yet</span> : null}
-                <button type="submit" data-on="true" className="ask">Continue</button>
-              </div>
-            </div>
-          </form>
+        {chosen.length ? null : ready.length ? (
+          <ChooseDocuments
+            rows={ready.map((r) => ({ id: r.id, number: r.document.docNumber, rev: r.value, status: r.statusCode, title: r.document.title }))}
+            waitingForFile={waitingForFile}
+          />
         ) : (
           <p className="px-5 py-5 text-sm text-slate-500 sm:px-6">
             {waitingForFile
@@ -91,6 +73,19 @@ export default async function StartReviewPage({ searchParams }: { searchParams: 
       {chosen.length ? (
         <section className="register register-sheet register-sheet-open">
           {band(2, "Route and people", "the route the documents follow, who is on each step, and who is copied in")}
+          <div className="asking space-y-2 px-5 py-5 sm:px-6">
+            <ul className="divide-y divide-line rounded-md ring-1 ring-line">
+              {chosen.map((r) => (
+                <li key={r.id} className="px-3 py-2 text-[13px]">
+                  <Link href={`/documents/${r.documentId}`} className="doc-number">{r.document.docNumber}</Link>
+                  <span className="text-slate-500"> rev {r.value} — {r.document.title}</span>
+                  {!r.renditionFileId && !r.nativeFileId ? <span className="ml-2 text-[11px] font-semibold text-amber-700">no file yet — attach it before sending</span> : null}
+                </li>
+              ))}
+            </ul>
+            <Link href="/reviews/send" className="text-[11px] font-semibold text-link hover:underline">Choose other documents</Link>
+          </div>
+
           <div className="asking px-5 py-5 sm:px-6">
             <SendForReview revisionIds={chosen.map((r) => r.id)} />
           </div>

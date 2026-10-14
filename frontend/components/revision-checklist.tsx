@@ -41,6 +41,25 @@ export function RevisionChecklist({ rows, name, initial = [], onCount }: {
         {find ? <button type="button" onClick={() => setFind("")} className="text-[11px] font-semibold text-link hover:underline">Clear</button> : null}
         <span className="font-mono text-[11px] tabular-nums text-slate-500">{chosen.length} chosen</span>
       </div>
+      {/* The table's head, as every list of documents to pick: tick all that are shown, and what each column is. */}
+      {shown.length ? (
+        <label className="grid h-8 cursor-pointer grid-cols-[auto_minmax(0,19rem)_2.5rem_4rem_minmax(0,1fr)] items-center gap-x-3 border-b border-line bg-tint-soft px-5 text-[11px] font-semibold text-slate-500 sm:px-6">
+          <input
+            type="checkbox"
+            aria-label="Tick all shown"
+            checked={shown.length > 0 && shown.every((r) => chosen.includes(r.id))}
+            onChange={(e) => {
+              const ids = shown.map((r) => r.id);
+              setChosen((was) => {
+                const next = e.target.checked ? [...new Set([...was, ...ids])] : was.filter((id) => !ids.includes(id));
+                onCount?.(next.length);
+                return next;
+              });
+            }}
+          />
+          <span>Number</span><span>Rev</span><span>Status</span><span>Title</span>
+        </label>
+      ) : null}
       {/* What is ticked but filtered out still goes with the form. */}
       {chosen.filter((id) => !shown.some((r) => r.id === id)).map((id) => <input key={id} type="hidden" name={name} value={id} />)}
       {shown.length === 0 ? (

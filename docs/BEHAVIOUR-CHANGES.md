@@ -475,6 +475,10 @@ the installation sets its keys.
   in every state and its message says where the discipline stands. Disciplines have their own "Add or take off"
   button, like documents. "Is a discipline missing, or one that should not be here?" offers asking to add one or
   to take one off.
+- **Review page:** comments show once (with the answer, once a step has answered). "Withdraw from review" and
+  "Notify" sit folded under the document; "Withdraw?" and "Notify?" in the title open them.
+- **Start a review:** step tabs like the other forms, one step at a time; the documents list has a "tick all" box
+  and column heads; Continue says "Tick at least one document" instead of reloading empty.
 - **Plain words:** "in force" is gone from the screens: "released", "the revision people work from", "now used".
 
 ## 7. Notifications and email
