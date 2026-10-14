@@ -122,7 +122,8 @@ export async function createDocumentAction(_prev: { error?: string } | undefined
 
 const EDITABLE_FIELDS = [
   "title", "docType", "discipline", "originator", "subProject", "contractRef",
-  "criticality", "confidentiality", "retentionClass", "receivedDate", "appVersion", "previousId", "legacyScheme",
+  // Not the received date: it is filled when what was sent arrives, never typed.
+  "criticality", "confidentiality", "retentionClass", "appVersion", "previousId", "legacyScheme",
 ] as const;
 
 /** Metadata change — every change logged with field, previous value, date, person (§4.9). */

@@ -139,7 +139,8 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - A document from another organization (its deliverable type names "originator" among
   what it requires, Settings, on the type) asks whose it is (the outside organizations,
   as the backend checks) and its order; never its received date, which is filled when
-  its first submission comes in (asked only when registering what arrived). "Who may see
+  its first submission comes in, or when Document Control records what arrived from
+  outside (asked only when registering what arrived); never on Edit. "Who may see
   it" starts at the lowest level for it, unless chosen.
 - Creating a document takes the same two optional files as a revision: a PDF
   and a native file. The project code comes from the project the user is in

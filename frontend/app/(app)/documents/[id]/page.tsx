@@ -295,7 +295,6 @@ export default async function DocumentDetailPage({
       <Field label="Criticality"><select name="criticality" defaultValue={doc.criticality ?? ""} className={inputCls}><option value="">—</option>{criticalities.map((c) => <option key={c.code} value={c.code}>{c.label}{c.code === types.find((t) => t.code === doc.docType)?.props.criticality ? " (recommended)" : ""}</option>)}</select></Field>
       <Field label="Confidentiality"><select name="confidentiality" defaultValue={doc.confidentiality ?? ""} className={inputCls}>{confidentialities.map((c) => <option key={c.code} value={c.code}>{c.label}</option>)}</select></Field>
       <Field label="Retention"><select name="retentionClass" defaultValue={doc.retentionClass ?? ""} className={inputCls}><option value="">—</option>{retentions.map((r) => <option key={r.code} value={r.code}>{r.label}</option>)}</select></Field>
-      <Field label="Received"><input type="date" name="receivedDate" defaultValue={doc.receivedDate?.toISOString().slice(0, 10) ?? ""} className={inputCls} /></Field>
       <Field label="Previous number"><input name="previousId" defaultValue={doc.previousId ?? ""} className={inputCls} /></Field>
     </div>
     <input type="hidden" name="appVersion" value={doc.appVersion ?? ""} />

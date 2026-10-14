@@ -461,6 +461,9 @@ the installation sets its keys.
   Control's Home: "Record it as received" makes it a received transmittal following ours (its files checked as
   usual), or "Set it aside" with why. Setup: docs/ACTIVATION.md, "Replies by email".
 - **Fixed:** saving an organization not on DELIOS no longer asks to name one of its people.
+- **Received date is no longer on a document's Edit:** it is filled when what was sent arrives (their submission,
+  or what Document Control records from outside), and asked only when registering something that already arrived.
+  An import of old documents still carries the date they had.
 - **Plain words:** "in force" is gone from the screens: "released", "the revision people work from", "now used".
 
 ## 7. Notifications and email
