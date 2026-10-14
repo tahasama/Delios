@@ -22,7 +22,7 @@ public sealed record RunView(Guid Id, string Status, string RequestedBy, DateTim
 /// <summary>One defect (a finding a check returned) as the defects list shows it.</summary>
 public sealed record DefectView(Guid Id, string CheckId, string Severity, string Owner, string EntityType, Guid? EntityId,
     Guid? DocumentId, string Label, string Description, string Status, DateTimeOffset FirstSeenAt, DateTimeOffset LastSeenAt,
-    DateTimeOffset? ClosedAt, string? AcceptedReason, string? AcceptedBy);
+    DateTimeOffset? ClosedAt, string? AcceptedReason, string? AcceptedBy, string EntityKey);
 
 /// <summary>The checks a project answers to, their last results, and the defects they found.</summary>
 public static class CheckEndpoints
@@ -187,5 +187,5 @@ public static class CheckEndpoints
     /// <summary>Turns a stored defect into the shape sent to the browser.</summary>
     private static DefectView View(Defect d) => new(d.Id, d.CheckId, d.Severity, d.Owner, d.EntityType, d.EntityId, d.DocumentId,
         d.Label, d.Description, d.Status, d.FirstSeenAt.ToDateTimeOffset(), d.LastSeenAt.ToDateTimeOffset(), d.ClosedAt?.ToDateTimeOffset(),
-        d.AcceptedReason, d.AcceptedByName);
+        d.AcceptedReason, d.AcceptedByName, d.EntityKey);
 }

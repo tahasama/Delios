@@ -95,6 +95,7 @@ public static class RecordKinds
     public const string Review = "@REVIEW";
     public const string Transmittal = "@TRANSMITTAL";
     public const string Package = "@PACKAGE";
+    public const string Asset = "@ASSET";
 }
 
 /// <summary>Which scheme numbers which deliverable type.</summary>

@@ -524,6 +524,20 @@ the installation sets its keys.
 - **Action page:** "Request a document" moved from each discipline's buttons to the line under them, with its question,
   beside "Request a discipline".
 
+- **Asset tags are numbered by themselves** (P1001-TAG-0001, Settings → Numbering, "Asset tags"); the New tag form
+  no longer asks for one. Tags already made keep theirs; a tag the requirements list cites is still taken as written.
+- **"An answer is required"** on a new transmittal is no longer ticked by itself when the reason usually asks one.
+- **Every data transmittal carries a document**, sent as well as received (backend FILE_REQUIRED). Before, a data
+  reason with a subject and a message alone went out; that is now an information transmittal.
+- **Assurance findings link to the exact spot:** a setting finding opens its list with the value in edit; actions,
+  packages and reviews open their own page. Before, they all sent to Settings.
+- **Revisions can be named differently** (Settings → Revisions): new schemes, the default, and which deliverable type
+  follows which. Before, only the seeded scheme existed and nothing could change it.
+- **A list says it is verdicts** ("What it is", on the set). A list named otherwise (like "Supplier review outcome"
+  under a key without OUTCOME, VERDICT or REVIEW) can now be used on a route. The review advice list is no longer
+  offered as a route's verdict list (it never was one).
+- **Package document lists** carry the side colour of each line's state; the "Next step" card no longer does.
+
 ## 7. Notifications and email
 
 - Notifications are kept and shown in the bell and on the Notifications page; opening the page reads

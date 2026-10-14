@@ -9,7 +9,7 @@ import { setPackageMembersAction } from "@/lib/packages/forms";
 
 export type PackageLine = {
   id: string; number: string; title: string; rev: string | null;
-  stage: { word: string; tone: keyof typeof TONE; holder: string };
+  stage: { word: string; tone: keyof typeof TONE; holder: string; rail: string };
   reason: string | null;
   /** Sent to the supplier on a transmittal: it stays in the package for good. */
   sent: string | null;
@@ -60,14 +60,14 @@ export function PackageLines({ packageId, packageNumber, supplier, shared, lines
         {lines.length ? (
           <DataTable className="rounded-none border-0 shadow-none" exportName="package" id="supplier-package-lines" defaultHidden={["Comments"]}
             head={<tr>
-              <Th className="w-10"><input type="checkbox" aria-label="Tick every document" checked={all} onChange={() => setTicked(all ? [] : lines.map((one) => one.id))} /></Th>
+              <Th className="rail-head w-10"><input type="checkbox" aria-label="Tick every document" checked={all} onChange={() => setTicked(all ? [] : lines.map((one) => one.id))} /></Th>
               <Th>Document</Th><Th>Where it stands</Th><Th>Sent to supplier</Th><Th>Sent back</Th><Th>Released &amp; issued</Th><Th>Planned</Th><Th>Next</Th><Th>Comments</Th>
             </tr>}>
             {lines.map((one) => {
               const on = ticked.includes(one.id);
               return (
                 <tr key={one.id} className={on ? "[&>td]:bg-tint" : undefined}>
-                  <Td><input type="checkbox" aria-label={`Tick ${one.number}`} checked={on} onChange={() => tick(one.id)} /></Td>
+                  <Td className={`rail ${one.stage.rail}`}><input type="checkbox" aria-label={`Tick ${one.number}`} checked={on} onChange={() => tick(one.id)} /></Td>
                   <Td>
                     <Link href={`/documents/${one.id}`} className="doc-number">{one.number}</Link>
                     {one.rev ? <span className="ml-1.5 font-mono text-xs text-slate-400">rev {one.rev}</span> : null}

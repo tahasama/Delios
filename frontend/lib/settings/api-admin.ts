@@ -51,7 +51,7 @@ type SchemeField = { label: string; source: string; value: string | null; digits
 type AdminNumbering = {
   schemes: { id: string; name: string; delimiter: string; active: boolean; fields: SchemeField[] }[];
   routing: { id: string; deliverableType: string; schemeId: string; active: boolean }[];
-  revisionSchemes: { id: string; name: string; isDefault: boolean; forwardOnly: boolean; series: { code: string; label: string; kind: string; prefix: string; start: string }[] }[];
+  revisionSchemes: { id: string; name: string; isDefault: boolean; forwardOnly: boolean; series: RevisionSeries[] }[];
   revisionRouting: { deliverableType: string; schemeId: string }[];
 };
 
@@ -76,6 +76,11 @@ export const adminUsers = cache(async () => api<AdminUser[]>("/api/admin/users")
 export const adminProjects = cache(async () => api<AdminProject[]>("/api/admin/projects"));
 export const adminFunctions = cache(async () => api<AdminFunction[]>("/api/admin/functions"));
 export const adminParties = cache(async () => api<AdminParty[]>("/api/admin/parties"));
+/** One series of a revision scheme (backend RevisionSeriesRule). */
+export type RevisionSeries = {
+  code: string; label: string; kind: string; prefix: string; start: string; width: number; lowercase: boolean; excludedLetters: string[];
+};
+
 export const adminNumbering = cache(async () => api<AdminNumbering>("/api/admin/numbering"));
 export const adminRoutes = cache(async () => api<AdminRoute[]>("/api/admin/routes"));
 export const adminValueSets = cache(async () => api<{ key: string; active: number; retired: number }[]>("/api/admin/value-sets"));
@@ -104,7 +109,7 @@ const SOURCE_BY_SET: Record<string, string> = {
 };
 const SET_BY_SOURCE = Object.fromEntries(Object.entries(SOURCE_BY_SET).map(([set, source]) => [source, set]));
 /** What the screen calls a record kind, and the backend's name for it. */
-export const RECORD_KIND: Record<string, string> = { TRANSMITTAL: "@TRANSMITTAL", REVIEW: "@REVIEW", PACKAGE: "@PACKAGE", ACTION: "@ACTION" };
+export const RECORD_KIND: Record<string, string> = { TRANSMITTAL: "@TRANSMITTAL", REVIEW: "@REVIEW", PACKAGE: "@PACKAGE", ASSET: "@ASSET", ACTION: "@ACTION" };
 
 type EditorScheme = {
   id: string; name: string; delimiter: string; active: boolean; notes: string | null;

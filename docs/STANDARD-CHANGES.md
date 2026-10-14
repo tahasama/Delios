@@ -1064,3 +1064,16 @@ end is on both organizations' audit trails.
   with nobody on the system receiving it by email directly (today one of ours
   sends it, and the dispatch is recorded).
 
+- **A data transmittal carries a document**, sent or received (the file that came,
+  when received from outside); words alone are an information transmittal
+  (request, RFI, answer, confirmation). Whether an answer is asked is the
+  sender's choice each time, never assumed from the reason.
+- **Asset tags are numbered**, as packages are: from their scheme, by default
+  project code, TAG and a sequence (P1001-TAG-0001); a tag never changes.
+- **Revision naming is the organization's**: schemes of series (letters or
+  numbers, with a prefix and a start), a default, and per deliverable type
+  another (for example supplier documents P1, P2). A document keeps counting
+  the way it began; a series in use is never recounted.
+- **A verdict list may be the organization's own** (for example for supplier
+  documents): a list says it is verdicts, each value says what it means, and a
+  route serving supplier documents decides from it.

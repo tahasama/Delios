@@ -89,10 +89,7 @@ export default async function AssetsPage({ searchParams }: { searchParams: Promi
           <div className="border-t border-line px-5 py-4 sm:px-6">
             <ActionForm action={addAssetAction} submitLabel="Add the tag">
               <div className="grid grid-cols-1 gap-x-6 gap-y-4 md:grid-cols-3">
-                <Asked policy={policy} field="code" hint="as on the drawings; never changes">
-                  {({ required }) => <input name="code" required={required} className={`${inputCls} uppercase`} placeholder="P-101" />}
-                </Asked>
-                <Asked policy={policy} field="name" className="md:col-span-2">
+                <Asked policy={policy} field="name" className="md:col-span-3">
                   {({ required }) => <input name="name" required={required} className={inputCls} placeholder="Feed pump" />}
                 </Asked>
                 <Asked policy={policy} field="area">
@@ -106,6 +103,7 @@ export default async function AssetsPage({ searchParams }: { searchParams: Promi
                 </Asked>
                 <Added fields={policy.own} />
               </div>
+              <p className="text-[11px] text-slate-500">The tag is numbered by itself (Settings, Numbering, “Asset tags”), as a package is, and never changes.</p>
             </ActionForm>
           </div>
         </details>

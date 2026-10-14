@@ -3,9 +3,31 @@ import { CHECK_BY_ID } from "@/lib/conformance/checks/catalog";
 import { liveDefects, type DefectView } from "@/lib/conformance/api";
 export const OWNER_LABEL: Record<string, string> = { CF: "Document Control", OR: "Originator", RV: "Reviewer", OG: "Organization" };
 
-/** Where a problem of this family is fixed on the document page. */
-function fixFor(checkId: string, documentId: string | null): { label: string; href: string } {
-  const family = checkId.split("-")[0];
+/** Where a list of values is kept in Settings, by its name; the numbering and the matrix have pages of their own. */
+function settingSpot(set: string, label: string): { label: string; href: string } {
+  if (set === "NUMBERING") return { label: `Numbering: ${label}`, href: `/settings/numbering#route-${encodeURIComponent(label)}` };
+  if (set === "MATRIX") return { label: "Distribution matrix", href: "/distribution" };
+  // The value itself opened for editing when the finding names one; a finding about the whole list opens the list.
+  return { label: `${set.replaceAll("_", " ").toLowerCase().replace(/^./, (c) => c.toUpperCase())}: ${label}`,
+    href: `/settings/config?${new URLSearchParams({ set, edit: `${set}::${label}` })}` };
+}
+
+/**
+ * The exact spot where a finding is put right: the document's tab for a document, and for anything else the thing
+ * itself (the setting and its value, the action, the package, the review), never a page to search.
+ */
+function fixFor(d: DefectView): { label: string; href: string } {
+  const family = d.checkId.split("-")[0];
+  const first = d.label.split(" ")[0];
+  if (d.entityType === "Settings" && d.entityKey?.startsWith("settings:")) {
+    const [, set, ...rest] = d.entityKey.split(":");
+    return settingSpot(set, rest.join(":"));
+  }
+  if (d.entityType === "Action") return { label: `Action ${first}`, href: `/actions/${encodeURIComponent(first)}` };
+  if (d.entityType === "Package") return { label: `Package ${first}`, href: `/packages/${encodeURIComponent(first)}` };
+  if (d.entityType === "Review" && d.entityId) return { label: `Review ${first}`, href: `/reviews/${d.entityId}` };
+  if (d.entityType === "Audit") return { label: "Audit trail", href: "/settings/audit" };
+  const documentId = d.documentId;
   if (!documentId) {
     if (family === "SC") return { label: "Schedule", href: "/actions" };
     if (family === "CF") return { label: "The plan", href: "/settings/dmp" };
@@ -96,7 +118,7 @@ export async function findingsOfType(t: { projectId: string }, checkId: string, 
     text: plainProblem(d.description),
     label: d.label,
     document: documentOf(d),
-    fix: fixFor(d.checkId, d.documentId),
+    fix: fixFor(d),
     accepted: d.status === "ACCEPTED" ? { by: d.acceptedBy, why: d.acceptedReason } : null,
   }));
 }

@@ -35,6 +35,8 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
             await db.SaveChangesAsync(cancellationToken);
             issuing |= await EnsurePackageSetupAsync(existing.Id, cancellationToken);
             await db.SaveChangesAsync(cancellationToken);
+            issuing |= await EnsureAssetSetupAsync(existing.Id, cancellationToken);
+            await db.SaveChangesAsync(cancellationToken);
             issuing |= await EnsureControlSetupAsync(existing.Id, cancellationToken);
             await db.SaveChangesAsync(cancellationToken);
             issuing |= await EnsureScheduleSetupAsync(existing.Id, cancellationToken);
@@ -93,6 +95,7 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
         await EnsureIssueSetupAsync(t, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         await EnsurePackageSetupAsync(t, cancellationToken);
+        await EnsureAssetSetupAsync(t, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         await EnsureControlSetupAsync(t, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
@@ -155,6 +158,7 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
         await EnsureIssueSetupAsync(t, cancellationToken, demo: false);
         await db.SaveChangesAsync(cancellationToken);
         await EnsurePackageSetupAsync(t, cancellationToken);
+        await EnsureAssetSetupAsync(t, cancellationToken);
         await EnsureControlSetupAsync(t, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         await EnsureScheduleSetupAsync(t, cancellationToken);
@@ -426,6 +430,26 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
         };
         db.NumberingSchemes.Add(scheme);
         db.SchemeRoutings.Add(new SchemeRouting { TenantId = t, DeliverableType = RecordKinds.Package, SchemeId = scheme.Id });
+        return true;
+    }
+
+    /// <summary>Asset tags: P1001-TAG-0001, given by itself as a package number is. The recommendation, as data.</summary>
+    private async Task<bool> EnsureAssetSetupAsync(Guid t, CancellationToken cancellationToken)
+    {
+        if (await db.SchemeRoutings.AnyAsync(r => r.DeliverableType == RecordKinds.Asset, cancellationToken)) return false;
+        var scheme = new NumberingScheme
+        {
+            TenantId = t,
+            Name = "Asset tags",
+            Fields =
+            [
+                new() { Label = "Project code", Source = FieldSources.Project },
+                new() { Label = "Record", Source = FieldSources.Fixed, Value = "TAG" },
+                new() { Label = "Sequence", Source = FieldSources.Sequence, Digits = 4 },
+            ],
+        };
+        db.NumberingSchemes.Add(scheme);
+        db.SchemeRoutings.Add(new SchemeRouting { TenantId = t, DeliverableType = RecordKinds.Asset, SchemeId = scheme.Id });
         return true;
     }
 

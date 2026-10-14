@@ -181,8 +181,7 @@ export default async function PackageDetailPage({ params, searchParams }: { para
 
       {overdue ? <Banner tone="danger" title="Past its date">It was due on {fmtDate(pkg.completionDate)}.</Banner> : null}
 
-      <section className={cn("register register-sheet register-sheet-open relative", pkg.acceptedAt ? "rail-done" : pkg.closedAt ? "rail-delivered" : shortfall ? "rail-shortfall" : "rail-ahead")}>
-        <span className="absolute inset-y-0 left-0 w-0.75 rounded-l-[0.875rem] bg-(--rail)" aria-hidden />
+      <section className="register register-sheet register-sheet-open">
         <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
           <span className="stencil mr-1 text-slate-500">{pkg.acceptedAt ? "Accepted" : pkg.closedAt ? "Delivered — to accept" : "Next step"}</span>
         </div>

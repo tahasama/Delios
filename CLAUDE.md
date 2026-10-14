@@ -202,6 +202,7 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - A transmittal asking for an answer asks it by a day (backend ANSWER_DATE_REQUIRED). The answer stands, in
   the list and on its page (`AnswerStates`): awaited, overdue (none, past its day), answered on time, answered
   late. Answered by a transmittal answering it (or following it, by someone else), or a review step's answer.
+  "An answer is required" is the sender's tick, never ticked by itself (whatever the reason says).
 - Form labels and hints sit on one line of fixed height (the hint cut, whole on hover), and every control is the
   control height, so fields side by side stay exactly level; forms are laid out in rows, field beside field
   (new document, step 2: project · criticality · PDF / sub-project · what the criticality means / who may see it ·
@@ -209,7 +210,12 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - The side colours (rails, Home's edges, the history's marks): one colour per state, never one colour for things
   that mean different things; close states take close colours (released emerald / accepted green, done / ready,
   superseded violet). The states and their classes are listed once in `lib/core/rails.ts` (CSS `.rail-*`), which is
-  the key on Help, "What the colours say".
+  the key on Help, "What the colours say". Every list of documents takes them, the package lists too (a supplier's
+  line by its stage, a delivery line by ready / released short of its status / nothing released); a card (Next step)
+  takes none.
+- Assurance: each finding points to the exact spot where it is put right: a document's tab, or else the thing
+  itself (a setting's list with that value opened for editing, the numbering row, the action, the package, the
+  review), never a page to search. Check ids (IS-09…) are the app's own, kept from the Standard's numbering.
 - `unshare-package <email> <package-number>` (backend command) puts a supplier's
   package back to not shared, for testing; logged.
 - A supplier package has two pages. Ours (Document Control and above): plate,
@@ -269,6 +275,13 @@ a screen only words it. A new rule goes in the backend, never in a page.
   says one of four meanings: accepted, accepted with comments (fix next
   time), rejected (back to the author), for information. The app reads the
   meaning (`verdictEffect`, props proceed/resubmit/information), never C1–C4.
+  A list says itself it is verdicts ("What it is" on the set: `kind` VERDICTS; the starter lists by their key):
+  only then does each value ask its meaning, and only then is it offered as a route's verdict list. A route serves
+  supplier documents only by "Produced by" (the supplier deliverable type) or "From which organization".
+- How revisions are named is Settings → Revisions (`RevisionSchemeEndpoints`): schemes of series (letters or
+  numbers, prefix, start, letters skipped), one the default, and which deliverable type follows which. A scheme
+  chosen for a type names its documents not revised yet; a document already started keeps counting the way it
+  began. A series revisions carry stays in its scheme, never recounted (backend SERIES_IN_USE).
 - A supplier's document reads in its own states (register, document page,
   package, the supplier's panel): Sent, Received, Accepted, Returned (by
   Document Control's check, with why), In review, Released & issued, Returned
@@ -318,6 +331,8 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - "Received from" (recording what came outside the system) is picked from the organizations set up on the project,
   with their codes (the number follows its series). Recorded so, a data transmittal carries a document (from the
   register) or a file that came with it; words alone are an information transmittal (backend FILE_REQUIRED).
+  The same for every data transmittal, sent or received: it carries at least one document (or, received, the file
+  that came); a letter is an information transmittal.
 - One file field everywhere (globals.css `input[type=file]`): dashed line, light flat button at the control height;
   a page sets only its width.
 - The form asks the family (data or information), then a reason of that family
@@ -411,6 +426,8 @@ a screen only words it. A new rule goes in the backend, never in a page.
   something on their Home. Keep it in step whenever a flow changes.
 
 ### Assets & tags
+- A tag is numbered by itself, as a package is: its scheme (Settings → Numbering, "Asset tags", `@ASSET`), by
+  default P1001-TAG-0001; nobody types it, and it never changes. Tags made before keep theirs.
 - Assets & tags is a register, the Schedule's way: plate with counts, search and filters (area, system), the table
   (tag, name, area, system, unit, documents), "New tag" folded under it. Each tag has its own page, the action page's
   way: plate, "Documents that describe it" with "Add or take out" opening the register for it

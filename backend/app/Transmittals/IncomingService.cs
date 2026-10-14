@@ -106,12 +106,14 @@ public sealed class IncomingService(
         var count = planned.Length + unplanned.Length + attached.Count;
         if (count > 200 || (count == 0 && Blank(request.Message) is null))
             return (null, Problems.Invalid("ITEMS_REQUIRED", "Send between 1 and 200 items, or a message on its own."));
-        // Recorded by us as received from outside the system, a data transmittal carries something: a document of the
-        // register, or a file that came with it. Words alone are an information transmittal.
+        // A data transmittal carries something, whoever sends or records it: a document of the register, or a file that
+        // came with it. Words alone are an information transmittal.
         var isData = catalog.Prop(TransmittalSets.Reasons, reason, "family") is not { ValueKind: System.Text.Json.JsonValueKind.String } family
             || family.GetString() != "Information";
-        if (onBehalf && isData && count == 0)
-            return (null, Problems.Invalid("FILE_REQUIRED", "A data transmittal received from outside carries a document: choose it in the register, or add the file that came."));
+        if (isData && count == 0)
+            return (null, Problems.Invalid("FILE_REQUIRED", onBehalf
+                ? "A data transmittal received from outside carries a document: choose it in the register, or add the file that came."
+                : "A data transmittal carries a document: add its file, or choose an information reason to write a letter."));
         var (receivedAt, notYet) = WorkingCalendar.Moment(clock, access.Project.TimeZone, request.ReceivedOn);
         if (notYet is not null) return (null, Problems.Invalid("DATE_IN_FUTURE", $"The day it arrived cannot be later than today. {notYet}"));
         Transmittal? answered = null;

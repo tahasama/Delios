@@ -334,6 +334,7 @@ public static class PlatformSetup
             Notifications.NotificationEndpoints.MapNotificationEndpoints(app);
             Notifications.PushEndpoints.MapPushEndpoints(app);
             Documents.CatalogAdminEndpoints.MapCatalogAdminEndpoints(app);
+            Documents.RevisionSchemeEndpoints.MapRevisionSchemeEndpoints(app);
             Documents.DocumentEndpoints.MapDocumentEndpoints(app);
             Reviews.ReviewEndpoints.MapReviewEndpoints(app);
             Reviews.DelegationEndpoints.MapDelegationEndpoints(app);

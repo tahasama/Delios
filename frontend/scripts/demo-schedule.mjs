@@ -243,7 +243,7 @@ async function main() {
   // A300 is within its risk window with the duty pump datasheet missing: Mechanical's confirmation waits (approver's Home).
   // Civil asks for the shoring drawing to be added to A110: the list missed it. Document Control answers on the action.
   await engineer.post(`${p}/transmittals`, {
-    userIds: [idOf("controller@demo.local")].filter(Boolean), reason: "INFORMATION", activityId: byCode.A110, activityAsk: "DOCUMENT",
+    userIds: [idOf("controller@demo.local")].filter(Boolean), reason: "REQUEST", activityId: byCode.A110, activityAsk: "DOCUMENT",
     subject: `Add a document to ${(await engineer.get(`${p}/activities`)).find((one) => one.id === byCode.A110).code} (Civil)`,
     message: `Please add ${docs.excavation.number}, ${docs.excavation.title}, for Civil: the shoring stays in place while the slab is poured.\n\nIt was not on the requirements list.`,
   });

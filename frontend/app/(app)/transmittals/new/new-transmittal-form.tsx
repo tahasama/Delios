@@ -150,9 +150,11 @@ export function NewTransmittalForm({
   // What each step needs answered before the next one makes sense.
   // A transmittal may carry a message alone — a clarification, a notice, an
   // answer — so enclosures are optional, but it may not be empty of both.
-  // Recorded as received from outside, a data transmittal carries a document or a file; the backend checks it too.
-  const mustCarry = recording && family === "DATA";
-  const saysSomething = mustCarry ? chosen.length > 0 || files > 0
+  // A data transmittal carries a document (or, received, the file that came); words alone are information. The
+  // backend checks it too (FILE_REQUIRED).
+  const mustCarry = family === "DATA";
+  const carries = chosen.length > 0 || (outgoing ? !!placeholders && !placeholders.mixed : files > 0);
+  const saysSomething = mustCarry ? carries
     : chosen.length > 0 || (!outgoing && files > 0) || (outgoing ? subject.trim().length > 0 : message.trim().length > 0);
   const may = (n: number) => n === 1 || (askedFirst && (n === 2 || saysSomething));
   const toggle = (id: string) => setChosen((ids) => (ids.includes(id) ? ids.filter((one) => one !== id) : [...ids, id]));
@@ -176,12 +178,11 @@ export function NewTransmittalForm({
     return `/documents?${new URLSearchParams({ pick: `tr:/transmittals/new?${q.toString()}` })}`;
   };
   const reasonLabel = reasons.find((r) => r.code === reasonCode)?.label;
-  // Whether an answer is asked for: the reason's own answer, until the person ticks otherwise.
-  const reasonAsks = reasons.find((r) => r.code === reasonCode)?.props.response === true;
+  // Whether an answer is asked for is the sender's tick alone: never ticked by itself, whatever the reason.
   const suggestedDays = (() => { const days = reasons.find((r) => r.code === reasonCode)?.props.responseDays; return typeof days === "number" ? days : null; })();
   const [answerOwn, setAnswerOwn] = useState<boolean | null>(prefill?.answer ?? null);
   const [due, setDue] = useState(prefill?.due ?? "");
-  const answerRequired = answerOwn ?? reasonAsks;
+  const answerRequired = answerOwn ?? false;
   const setAnswerRequired = (on: boolean) => setAnswerOwn(on);
   // What the first step needs answered before the next one makes sense.
   const askedFirst = Boolean(reasonCode) && (!recording || party.trim().length > 0) && (!outgoing || !answerRequired || !!due);
@@ -330,7 +331,7 @@ export function NewTransmittalForm({
                   </select>
                 )}
               </Ask>
-              {/* An answer asked for: ticked when the reason expects one, and then by a day — the day says whether it
+              {/* An answer asked for: ticked by the sender (never by itself), and then by a day — the day says whether it
                   came in time. One row, level with the reason beside it. */}
               {outgoing ? (
                 <div className="min-w-0 lg:col-span-2">
@@ -373,7 +374,8 @@ export function NewTransmittalForm({
         {/* ── 2 · What goes with it ────────────────────────────────────────── */}
         <section className={cn("register register-sheet register-sheet-open", step !== 2 && "hidden")}>
           {band(2,
-            outgoing ? "only released revisions can be sent — tick what goes, or send a letter alone" : "tick what arrived, or record a message alone",
+            outgoing ? (mustCarry ? "only released revisions can be sent — a data transmittal carries at least one" : "only released revisions can be sent — or send a letter alone")
+              : mustCarry ? "tick what arrived, or keep the file that came" : "tick what arrived, or record a message alone",
             <span className="font-mono text-[11px] tabular-nums text-slate-500">{chosen.length} chosen</span>,
           )}
           {outgoing && placeholders ? (
@@ -433,7 +435,7 @@ export function NewTransmittalForm({
                 ))}
               </ul>
             ) : (
-              <p className="w-full text-xs text-slate-500">No document enclosed yet{outgoing ? " — a letter alone is fine too" : ""}.</p>
+              <p className="w-full text-xs text-slate-500">No document enclosed yet{outgoing ? (mustCarry ? " — a data transmittal carries at least one" : " — a letter alone is fine too") : ""}.</p>
             )}
             {unsent?.length ? <p className="w-full text-[11px] text-amber-800">Not enclosed, nothing of {unsent.length === 1 ? "it" : "them"} released: {unsent.join(", ")}.</p> : null}
             <Link href={pickHref()} className="ask inline-flex items-center gap-1.5"><Plus className="h-3.5 w-3.5" /> Add documents</Link>
@@ -477,7 +479,7 @@ export function NewTransmittalForm({
           </div>
           {foot(1,
             <button type="button" onClick={() => setStep(3)} disabled={!saysSomething} data-on={saysSomething ? "true" : undefined} className="ask disabled:cursor-not-allowed disabled:opacity-50">Continue</button>,
-            saysSomething ? null : mustCarry ? "A data transmittal received carries a document: choose it in the register, or add the file that came." : outgoing ? "Enclose a document, or write a subject." : "Tick a document, keep a file, or write a message.",
+            saysSomething ? null : mustCarry ? (outgoing ? "A data transmittal carries a document: enclose one from the register, or go back and choose an information reason." : recording ? "A data transmittal received carries a document: choose it in the register, or add the file that came." : "A data transmittal carries a document: add its file, or go back and choose an information reason.") : outgoing ? "Enclose a document, or write a subject." : "Tick a document, keep a file, or write a message.",
           )}
         </section>
 

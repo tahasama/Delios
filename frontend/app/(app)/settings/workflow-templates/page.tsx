@@ -33,7 +33,7 @@ export default async function WorkflowTemplatesPage() {
   ]);
   // A route may answer from any verdict list the organization publishes — its
   // own list for engineering, say — so this is not a fixed pair.
-  const outcomeSets = sets.filter((s) => isVerdictSet(s.key));
+  const outcomeSets = sets.filter((s) => isVerdictSet(s.key, s.kind));
   // What each status lets a step do. The rules live in the status list, so a
   // route can only offer what the organization published.
   const statusChoices = (await getActiveSet("STATUSES")).map((value) => {

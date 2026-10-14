@@ -7,7 +7,7 @@ import { addConfigValueAction, retireConfigValueAction, createConfigSetAction, u
 import { getSet, getSets } from "@/lib/settings/config";
 import { adminValueSets } from "@/lib/settings/api-admin";
 import { parseProps, type PropField } from "@/lib/settings/config-props";
-import { propFieldsFor } from "@/lib/settings/set-props";
+import { propFieldsFor, isVerdictSet } from "@/lib/settings/set-props";
 import { SelectAll } from "./select-all";
 import { DeleteSetButton } from "./delete-set";
 import { SetNav, type SetNavGroup } from "./set-nav";
@@ -62,7 +62,7 @@ export default async function AdminConfigPage({ searchParams }: { searchParams: 
     adminValueSets().then((all) => all.map((one) => ({ setKey: one.key, _count: one.active }))).catch(() => [] as { setKey: string; _count: number }[]),
     usage(ctx, currentKey),
   ]);
-  const propFields = propFieldsFor(currentKey);
+  const propFields = propFieldsFor(currentKey, sets.find((one) => one.key === currentKey)?.kind);
   // The other lists a property picks from, such as a document type's recommended criticality.
   const lists: Record<string, { code: string; label: string }[]> = Object.fromEntries(await Promise.all(
     [...new Set((propFields ?? []).flatMap((f) => (f.type === "set" || f.type === "sets" ? [f.setKey] : [])))].map(async (key) =>
@@ -141,13 +141,19 @@ export default async function AdminConfigPage({ searchParams }: { searchParams: 
             {sp.panel === "new" ? (
               <Card title="New set" description="A list your organization needs that the starter sets do not cover — areas, systems, anything." actions={<Link href={here({ panel: undefined })} aria-label="Close" className="text-slate-400 hover:text-slate-700"><X className="h-4 w-4" /></Link>}>
                 <ActionForm action={createConfigSetAction} submitLabel="Create set" size="sm">
-                  <div className="grid grid-cols-1 items-end gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
+                  <div className="grid grid-cols-1 items-end gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-5">
                     <Field label="Title" required><input name="title" required className={inputCls} placeholder="Areas" /></Field>
                     <Field label="Key" required hint="UPPER_SNAKE"><input name="key" required className={inputCls} placeholder="AREAS" /></Field>
                     <Field label="Category">
                       <select name="group" className={inputCls} defaultValue="">
                         <option value="">Other</option>
                         {[...new Set([...GROUPS.map((g) => g.title), ...sets.map((one) => one.group).filter((one): one is string => !!one)])].map((title) => <option key={title} value={title}>{title}</option>)}
+                      </select>
+                    </Field>
+                    <Field label="What it is" hint="verdicts are offered on review routes">
+                      <select name="kind" className={inputCls} defaultValue="">
+                        <option value="">A list of values</option>
+                        <option value="VERDICTS">Verdicts a review decides with</option>
                       </select>
                     </Field>
                     <Field label="Description"><input name="description" className={inputCls} placeholder="What the set is for" /></Field>
@@ -167,7 +173,13 @@ export default async function AdminConfigPage({ searchParams }: { searchParams: 
                         {[...new Set([...GROUPS.map((g) => g.title), ...(set.group ? [set.group] : [])])].map((title) => <option key={title} value={title}>{title}</option>)}
                       </select>
                     </Field>
-                    <Field label="Description" className="sm:col-span-2"><input name="description" defaultValue={set.description ?? ""} className={inputCls} /></Field>
+                    <Field label="What it is" hint="verdicts are offered on review routes">
+                      <select name="kind" className={inputCls} defaultValue={set.kind ?? (isVerdictSet(set.key) ? "VERDICTS" : "")}>
+                        <option value="">A list of values</option>
+                        <option value="VERDICTS">Verdicts a review decides with</option>
+                      </select>
+                    </Field>
+                    <Field label="Description"><input name="description" defaultValue={set.description ?? ""} className={inputCls} /></Field>
                   </div>
                 </ActionForm>
               </Card>

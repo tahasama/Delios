@@ -37,6 +37,21 @@ export const RAILS = [
     { rail: "rail-late", name: "Late receipt: the documents came after the work" },
     { rail: "rail-none", name: "Nothing listed" },
   ] },
+  { area: "Supplier documents", items: [
+    { rail: "rail-none", name: "Not sent to the supplier yet" },
+    { rail: "rail-sent", name: "Sent to the supplier" },
+    { rail: "rail-check", name: "Received, to check" },
+    { rail: "rail-accepted", name: "Accepted by the check" },
+    { rail: "rail-returned", name: "Returned by the check, to correct" },
+    { rail: "rail-review", name: "In review" },
+    { rail: "rail-released", name: "Released" },
+    { rail: "rail-rejected", name: "Returned by the review, to revise" },
+  ] },
+  { area: "Delivery package documents", items: [
+    { rail: "rail-ready", name: "Ready at the status it needs" },
+    { rail: "rail-shortfall", name: "Released, not at that status yet" },
+    { rail: "rail-none", name: "Nothing released yet" },
+  ] },
   { area: "Packages", items: [
     { rail: "rail-ahead", name: "Being put together" },
     { rail: "rail-shortfall", name: "Something missing" },

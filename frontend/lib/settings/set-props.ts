@@ -9,21 +9,22 @@
 /**
  * Whether a set is a list of review verdicts.
  *
- * An organization that wants its own verdicts for engineering publishes a
- * second list, and it has to behave like the first — same effect chooser, and
- * offered where a route picks its verdict list. The key says so: anything
- * naming outcomes, verdicts or review.
+ * An organization that wants its own verdicts (for suppliers' documents, say) publishes a second list, and it has to
+ * behave like the first: same meaning chooser, and offered where a route picks its verdict list. It says so itself
+ * ("What it is", on the set: `kind` VERDICTS); the starter lists are known by their key.
  */
-export function isVerdictSet(setKey: string): boolean {
-  return /OUTCOME|VERDICT|REVIEW/.test(setKey.toUpperCase());
+export function isVerdictSet(setKey: string, kind?: string | null): boolean {
+  if (kind === "VERDICTS") return true;
+  if (kind) return false;
+  return /OUTCOME|VERDICT|REVIEW/.test(setKey.toUpperCase()) && !/ADVICE/.test(setKey.toUpperCase());
 }
 
 /** The properties a set's values carry, including a list that behaves like one. */
-export function propFieldsFor(setKey: string): PropField[] | undefined {
+export function propFieldsFor(setKey: string, kind?: string | null): PropField[] | undefined {
   const exact = SET_PROP_FIELDS[setKey];
   if (exact) return exact;
   // A second verdict list is still a verdict list.
-  if (isVerdictSet(setKey) && !/ADVICE/.test(setKey.toUpperCase())) return SET_PROP_FIELDS.REVIEW_OUTCOMES;
+  if (isVerdictSet(setKey, kind)) return SET_PROP_FIELDS.REVIEW_OUTCOMES;
   return undefined;
 }
 

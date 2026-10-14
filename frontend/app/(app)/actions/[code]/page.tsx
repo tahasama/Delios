@@ -93,7 +93,8 @@ export default async function ActionDetailPage({ params, searchParams }: { param
   const controllers = inside ? await holders(ctx.projectId, "CONTROL").catch(() => []) : [];
   // Asked by a concerned discipline for itself; by Document Control for whichever discipline it names in the message.
   const requestHref = (department: string | null) => `/transmittals/new?${new URLSearchParams({
-    reason: "INFORMATION",
+    // A request: an information transmittal, which carries no document of its own.
+    reason: "REQUEST",
     activity: action.id,
     ask: "DOCUMENT",
     users: controllers.map((one) => one.id).join(","),
@@ -111,7 +112,8 @@ export default async function ActionDetailPage({ params, searchParams }: { param
 
   // A discipline missing, or one that does not belong: anyone of ours asks Document Control, whose answer is the record.
   const disciplineRequestHref = `/transmittals/new?${new URLSearchParams({
-    reason: "INFORMATION",
+    // A request: an information transmittal, which carries no document of its own.
+    reason: "REQUEST",
     activity: action.id,
     ask: "DISCIPLINE",
     users: controllers.map((one) => one.id).join(","),

@@ -2,6 +2,7 @@ import { SETUP_PAGES, maySetup } from "../setup-pages";
 import { requireScope } from "@/lib/core/scope";
 import { PageHeader, Card, DataTable, Th, Td, inputCls } from "@/components/ui";
 import { ActionForm } from "@/components/form";
+import { cn } from "@/lib/core/utils";
 import { removeNumberingSchemeAction, saveSchemeRoutingAction } from "@/lib/settings/forms-admin";
 import { NumberingSchemeBuilder } from "./numbering-scheme-builder";
 import { getSets, getActiveSet } from "@/lib/settings/config";
@@ -23,6 +24,7 @@ const RECORDS: { code: string; label: string; fallback: string }[] = [
   { code: "ACTION", label: "Actions — what somebody has been asked to do", fallback: "AC-0001" },
   { code: "REVIEW", label: "Reviews — one cycle of comments and a verdict", fallback: "RV-0001" },
   { code: "PACKAGE", label: "Packages — documents handed over together", fallback: "PK-001" },
+  { code: "ASSET", label: "Asset tags — equipment, systems and areas", fallback: "TAG-0001" },
 ];
 
 /** What a field prints when it reads the record itself rather than a list. */
@@ -101,7 +103,7 @@ export default async function NumberingPage() {
       >
         <DataTable head={<tr><Th>What is numbered</Th><Th>Scheme</Th><Th>Looks like</Th><Th>In use</Th><Th></Th></tr>}>
           {rows.filter((r) => r.route).map((r) => (
-            <tr key={r.code} className={r.route!.status === "ACTIVE" ? "" : "opacity-60"}>
+            <tr key={r.code} id={`route-${r.code}`} className={cn("target:[&>td]:bg-amber-50", r.route!.status === "ACTIVE" ? "" : "opacity-60")}>
               <Td>
                 <span className="font-mono text-xs font-semibold text-slate-800">{r.code}</span>
                 <span className="mt-0.5 block max-w-64 text-[11px] leading-4 text-slate-400">{r.label}</span>
@@ -131,7 +133,7 @@ export default async function NumberingPage() {
             </tr>
           ))}
           {unrouted.map((r) => (
-            <tr key={r.code} className="opacity-70">
+            <tr key={r.code} id={`route-${r.code}`} className="opacity-70 target:opacity-100 target:[&>td]:bg-amber-50">
               <Td>
                 <span className="font-mono text-xs font-semibold text-slate-800">{r.code}</span>
                 <span className="mt-0.5 block max-w-64 text-[11px] leading-4 text-slate-400">{r.label}</span>

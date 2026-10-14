@@ -31,7 +31,8 @@ delios/
 backend/
 ├── app/                  the program (API and worker)
 │   ├── Program.cs        start-up: what runs, in which order
-│   ├── Documents/        documents, revisions, files, the register
+│   ├── Documents/        documents, revisions, files, the register; the lists, numbering and revision
+│   │                     schemes (CatalogAdminEndpoints, RevisionSchemeEndpoints)
 │   ├── Reviews/          routes, steps, advice, verdicts, release
 │   ├── Transmittals/     sending, receiving, the check on arrival, replies by email (EmailReplies.cs)
 │   ├── Packages/         delivery packages and supplier packages
@@ -115,7 +116,7 @@ frontend/
 │   ├── conformance/
 │   ├── account/
 │   ├── organization/      organizations working together, the admin page, defaults for new projects
-│   └── settings/
+│   └── settings/         (forms-revisions.ts: Settings → Revisions, how revisions are named)
 │
 ├── components/           only the pieces several areas use
 │                         (ui.tsx: buttons and fields; form, data-table, timeline, search-pick,

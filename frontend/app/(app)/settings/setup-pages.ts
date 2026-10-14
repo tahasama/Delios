@@ -84,6 +84,13 @@ export const SETUP_PAGES: SetupPage[] = [
     group: "Classification",
     control: true,
   },
+  {
+    href: "/settings/revisions",
+    title: "Revisions",
+    text: "How revisions are named (A, B, C then 0, 1, 2, or your own), and which deliverable type follows which scheme.",
+    group: "Classification",
+    control: true,
+  },
 
   {
     href: "/settings/flow",

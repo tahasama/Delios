@@ -81,6 +81,11 @@ public sealed partial class TransmittalService
         var reason = request.Reason?.Trim() ?? "";
         if (!catalog.IsActive(TransmittalSets.Reasons, reason))
             return Fail(Problems.Invalid("VALUE_NOT_PUBLISHED", $"{reason} is not a published reason for issue.", new { field = "reason", value = reason }));
+        // A data transmittal carries documents: words alone are an information transmittal (a request, an answer…).
+        var isData = catalog.Prop(TransmittalSets.Reasons, reason, "family") is not { ValueKind: System.Text.Json.JsonValueKind.String } family
+            || family.GetString() != "Information";
+        if (isData && revisionIds.Count == 0 && placeholderIds.Count == 0)
+            return Fail(Problems.Invalid("FILE_REQUIRED", "A data transmittal carries a document: enclose one from the register, or choose an information reason to write a letter."));
         var revisions = await db.Revisions.Where(r => revisionIds.Contains(r.Id) && r.ProjectId == access.Project.Id).ToListAsync(cancellationToken);
         var documentIds = revisions.Select(r => r.DocumentId).ToList();
         var documents = await DocumentQueries.Visible(db, access, catalog.RestrictedLevels())

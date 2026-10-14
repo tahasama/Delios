@@ -30,6 +30,8 @@ export type DefectView = {
   id: string; checkId: string; severity: string; owner: string; entityType: string; entityId: string | null; documentId: string | null;
   label: string; description: string; status: "OPEN" | "ACCEPTED" | "CLOSED"; firstSeenAt: string; lastSeenAt: string;
   closedAt: string | null; acceptedReason: string | null; acceptedBy: string | null;
+  /** What it is about, as the check names it: `settings:<list>:<value>` for a setting. */
+  entityKey: string;
 };
 
 type ChecksAnswer = { lastRun: RunView | null; checks: CheckView[] };

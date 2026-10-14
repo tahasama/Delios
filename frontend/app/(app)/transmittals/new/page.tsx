@@ -115,6 +115,9 @@ export default async function NewTransmittalPage({ searchParams }: { searchParam
   const askingBack = supplier ? backDocs.map((d) => ({ id: d.id, number: d.number, title: d.title })) : [];
   // Asking back is an information transmittal: a request.
   const requestReason = reasons.find((r) => r.code === "REQUEST") ?? reasons.find((r) => r.props.family === "Information") ?? null;
+  // A follow-up carrying no document is a letter: it answers (information) rather than repeat a data reason it cannot carry.
+  const answerReason = reasons.find((r) => r.code === "ANSWER") ?? requestReason;
+  const isData = (code: string | null | undefined) => reasons.find((r) => r.code === code)?.props.family !== "Information";
   // Sent to that supplier: its people on this project, or the organization itself when none has an account.
   const supplierPeople = supplier ? found.people.filter((one) => one.organization === supplier.name).map((one) => one.id) : [];
   const supplierTo = supplier ? (supplierPeople.length ? supplierPeople : [`party:${supplier.id}`]) : [];
@@ -177,7 +180,7 @@ export default async function NewTransmittalPage({ searchParams }: { searchParam
           userIds: following ? followTo : answering ? answerTo : supplierTo.length ? supplierTo : (sp.users ?? "").split(",").filter(Boolean),
           copyIds: following ? followCopies : answerCopies,
           outsiders: sp.to,
-          reason: following?.reasonForIssue ?? (askingBack.length ? requestReason?.code : undefined)
+          reason: (following && !following.items.length && isData(following.reasonForIssue) ? answerReason?.code : following?.reasonForIssue) ?? (askingBack.length ? requestReason?.code : undefined)
             ?? (placeholders.length && reasons.some((r) => r.code === "IFU") ? "IFU" : undefined) ?? sp.reason,
           party: answering && answering.direction === "INCOMING" ? answering.issuingParty : sp.party,
           // One short line whatever the count: the package, how many, to whom. The documents are listed on it.

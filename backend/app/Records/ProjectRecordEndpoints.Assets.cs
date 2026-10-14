@@ -58,15 +58,15 @@ public static partial class ProjectRecordEndpoints
         return Results.Ok(new { asset = View(asset, count), documents = docs });
     }
 
-    private static async Task<IResult> AddAssetAsync(AssetRequest r, HttpContext h, DeliosDbContext db, AuditLog audit, IClock clock, CancellationToken c)
+    private static async Task<IResult> AddAssetAsync(AssetRequest r, HttpContext h, DeliosDbContext db, Numbering numbering, AuditLog audit, IClock clock, CancellationToken c)
     {
         var access = ProjectAccessFilter.Of(h);
         if (!await KeepsAsync(h, access)) return KeepersOnly("the asset list");
-        var code = r.Code?.Trim().ToUpperInvariant() ?? "";
         var name = r.Name?.Trim() ?? "";
-        if (code.Length == 0 || name.Length == 0) return Problems.Invalid("CODE_AND_NAME_REQUIRED", "A tag and a name are required.");
-        if (await db.Set<Asset>().AnyAsync(a => a.ProjectId == access.Project.Id && a.Code == code, c))
-            return Problems.Conflict("ASSET_EXISTS", $"{code} is already in the list.");
+        if (name.Length == 0) return Problems.Invalid("NAME_REQUIRED", "A tag needs a name.");
+        // The tag is numbered as a package is: from its scheme (Settings, Numbering), else P1001-TAG-0001. Never typed.
+        var code = await numbering.RecordAsync(access.Project.TenantId, access.Project.Id, RecordKinds.Asset,
+            NumberFields.ForRecord(access.Project.Code), "TAG", c);
         var asset = new Asset
         {
             TenantId = access.Project.TenantId,

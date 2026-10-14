@@ -61,8 +61,10 @@ export const PREVENTED: PreventedRule[] = [
   // Transmittals
   { where: "Transmittals", condition: "An answer asked for with no day",
     prevented: "A transmittal asking for an answer says by when, so a late answer can be seen.", code: "ANSWER_DATE_REQUIRED" },
-  { where: "Transmittals", condition: "A data transmittal recorded as received, carrying nothing",
-    prevented: "Recorded from outside the system, it carries a document of the register or the file that came.", code: "FILE_REQUIRED" },
+  { where: "Transmittals", condition: "A data transmittal carrying nothing",
+    prevented: "Sent or received, a data transmittal carries a document of the register or the file that came; words alone are an information transmittal.", code: "FILE_REQUIRED" },
+  { where: "Assets & tags", condition: "A tag typed by hand, or used twice",
+    prevented: "Each tag is numbered by itself from its scheme (P1001-TAG-0001), as a package is, and never changes." },
   { where: "Transmittals", condition: "A transmittal changed after it was issued",
     prevented: "What it carries and who it went to are recorded as it is issued; a correction is a new transmittal following it." },
 

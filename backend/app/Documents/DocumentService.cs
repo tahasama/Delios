@@ -429,7 +429,7 @@ public sealed class DocumentService(
             : await UploadedFilesAsync(access, document, request.FileIds, cancellationToken);
         if (filesProblem is not null) return (null, filesProblem);
 
-        var scheme = await RevisionSchemeForAsync(document.DeliverableType, cancellationToken);
+        var scheme = await RevisionSchemeForAsync(document.DeliverableType, existing.Count > 0 ? existing[0].Series : null, cancellationToken);
         if (scheme is null)
         {
             return (null, Problems.Invalid("NO_REVISION_SCHEME",
@@ -592,7 +592,7 @@ public sealed class DocumentService(
         ProjectAccess access, Document document, List<StoredFile> files, string? party, string? status, Instant sentAt, string sentBy,
         CancellationToken cancellationToken)
     {
-        var scheme = await RevisionSchemeForAsync(document.DeliverableType, cancellationToken);
+        var scheme = await RevisionSchemeForAsync(document.DeliverableType, null, cancellationToken);
         if (scheme is null)
         {
             return (null, Problems.Invalid("NO_REVISION_SCHEME",
@@ -773,11 +773,20 @@ public sealed class DocumentService(
               ?? originator
             : null;
 
-    /// <summary>The scheme routed to the deliverable type, else the organization's default.</summary>
-    private async Task<RevisionScheme?> RevisionSchemeForAsync(string deliverableType, CancellationToken cancellationToken) =>
-        await db.RevisionSchemeRoutings.AsNoTracking().Where(r => r.DeliverableType == deliverableType)
+    /// <summary>
+    /// The scheme routed to the deliverable type, else the organization's default. A document already started keeps
+    /// counting the way it began: when its first revision's series is not in that scheme, the scheme that has it (the
+    /// default first) names its next one. A new scheme so applies to documents not revised yet.
+    /// </summary>
+    private async Task<RevisionScheme?> RevisionSchemeForAsync(string deliverableType, string? startedIn, CancellationToken cancellationToken)
+    {
+        var scheme = await db.RevisionSchemeRoutings.AsNoTracking().Where(r => r.DeliverableType == deliverableType)
             .Select(r => r.Scheme).SingleOrDefaultAsync(cancellationToken)
-        ?? await db.RevisionSchemes.AsNoTracking().SingleOrDefaultAsync(s => s.IsDefault, cancellationToken);
+            ?? await db.RevisionSchemes.AsNoTracking().SingleOrDefaultAsync(s => s.IsDefault, cancellationToken);
+        if (startedIn is null || scheme is null || scheme.Series.Any(s => s.Code == startedIn)) return scheme;
+        var all = await db.RevisionSchemes.AsNoTracking().OrderByDescending(s => s.IsDefault).ThenBy(s => s.Name).ToListAsync(cancellationToken);
+        return all.FirstOrDefault(s => s.Series.Any(x => x.Code == startedIn)) ?? scheme;
+    }
 
     /// <summary>The confidentiality levels that restrict a document to named readers. Passed to <see cref="DocumentQueries.Visible"/>.</summary>
     public async Task<IReadOnlyList<string>> RestrictedAsync(CancellationToken cancellationToken) =>

@@ -44,15 +44,17 @@ export function DeliveryLines({ packageId, packageNumber, lines, mayTakeOut, rul
         {lines.length ? (
           <DataTable className="rounded-none border-0 shadow-none" id="delivery-package" exportName={packageNumber} defaultHidden={["Comments"]}
             head={<tr>
-              {mayTakeOut ? <Th className="w-10"><input type="checkbox" aria-label="Tick every document" checked={all} onChange={() => setTicked(all ? [] : lines.map((one) => one.id))} /></Th> : null}
+              {mayTakeOut ? <Th className="rail-head w-10"><input type="checkbox" aria-label="Tick every document" checked={all} onChange={() => setTicked(all ? [] : lines.map((one) => one.id))} /></Th> : null}
               <Th>Document</Th><Th>Title</Th><Th>Has</Th><Th>Needs</Th><Th>Ready</Th><Th>Comments</Th>
             </tr>}>
             {lines.map((m) => {
               const on = ticked.includes(m.id);
+              // Ready at the status it needs; released but not at it yet; nothing released.
+              const rail = m.ready ? "rail-ready" : m.revision ? "rail-shortfall" : "rail-none";
               return (
                 <tr key={m.id} className={on ? "[&>td]:bg-tint" : undefined}>
-                  {mayTakeOut ? <Td><input type="checkbox" aria-label={`Tick ${m.number}`} checked={on} onChange={() => tick(m.id)} /></Td> : null}
-                  <Td><Link href={`/documents/${m.id}`} className="doc-number">{m.number}</Link></Td>
+                  {mayTakeOut ? <Td className={`rail ${rail}`}><input type="checkbox" aria-label={`Tick ${m.number}`} checked={on} onChange={() => tick(m.id)} /></Td> : null}
+                  <Td className={mayTakeOut ? undefined : `rail ${rail}`}><Link href={`/documents/${m.id}`} className="doc-number">{m.number}</Link></Td>
                   <Td className="max-w-72 text-[12.5px] text-slate-500">{m.title}{m.missing && !m.ready ? <span className="block text-[11px] text-amber-700">not yet at required status</span> : null}</Td>
                   <Td className="whitespace-nowrap text-xs text-slate-600">{m.revision ? <>rev {m.revision} · {m.status}</> : "not released"}</Td>
                   <Td className="whitespace-nowrap text-xs text-slate-600" title={m.requiredMeaning ?? undefined}>{m.required.join(" or ")}</Td>

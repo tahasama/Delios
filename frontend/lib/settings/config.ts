@@ -44,7 +44,9 @@ export const getValue = cache(async (setKey: string, code: string | null | undef
 });
 /** Where a set's title, description and group are kept: the organization's settings, one key per set. */
 export const SET_KEY = "SET:";
-type SetInfo = { key: string; title: string; description: string | null; group: string | null; version: number };
+type SetInfo = { key: string; title: string; description: string | null; group: string | null; version: number;
+  /** What the list is, when it says: VERDICTS (a review decides with it). */
+  kind: string | null };
 
 /**
  * The published sets: every list that holds values, and every list an
@@ -59,9 +61,9 @@ export const getSets = cache(async (): Promise<SetInfo[]> => {
   ]);
   const keys = new Set([...counted.map((one) => one.key), ...[...named.keys()].filter((k) => k.startsWith(SET_KEY)).map((k) => k.slice(SET_KEY.length))]);
   return [...keys].sort().map((key) => {
-    let info: { title?: string; description?: string | null; group?: string | null; version?: number } = {};
+    let info: { title?: string; description?: string | null; group?: string | null; version?: number; kind?: string | null } = {};
     try { info = JSON.parse(named.get(SET_KEY + key) ?? "{}"); } catch { info = {}; }
     const humane = key.replaceAll("_", " ").toLowerCase();
-    return { key, title: info.title ?? humane.charAt(0).toUpperCase() + humane.slice(1), description: info.description ?? null, group: info.group ?? null, version: info.version ?? 1 };
+    return { key, title: info.title ?? humane.charAt(0).toUpperCase() + humane.slice(1), description: info.description ?? null, group: info.group ?? null, version: info.version ?? 1, kind: info.kind ?? null };
   });
 });

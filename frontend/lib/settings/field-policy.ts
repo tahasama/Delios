@@ -179,7 +179,6 @@ const FIELDS: FieldDef[] = [
   { control: "CHOICE", setKey: "DEPARTMENTS", kind: "PERSON", key: "department", label: "Department", text: "Which department they answer for. Departments receive requirements calls and confirm readiness.", fallback: "OPTIONAL" },
 
   // ── Adding equipment ──
-  { control: "TEXT", kind: "ASSET", key: "code", label: "Tag", text: "The tag number the plant knows it by.", fallback: "REQUIRED", fixed: "Documents are associated with equipment by tag." },
   { control: "TEXT", kind: "ASSET", key: "name", label: "Name", text: "What it is, in words.", fallback: "REQUIRED" },
   { control: "TEXT", kind: "ASSET", key: "system", label: "System", text: "The system it belongs to.", fallback: "OPTIONAL" },
   { control: "TEXT", kind: "ASSET", key: "area", label: "Area", text: "Where it sits.", fallback: "OPTIONAL" },
