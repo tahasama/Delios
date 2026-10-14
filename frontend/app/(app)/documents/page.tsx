@@ -1,4 +1,5 @@
 import { plannedState, plannedProgress } from "@/lib/actions/planned-state";
+import { projectAsset } from "@/lib/records/api";
 import { packageByNumber } from "@/lib/packages/api";
 import type { SupplierStage } from "@/lib/core/state-names";
 import { requireScope } from "@/lib/core/scope";
@@ -258,6 +259,13 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
       linked: docs.split(",").map((one) => one.trim()).filter(Boolean), disciplines: [] as { code: string; label: string }[], locked: [] as string[],
     };
   })() : null;
+  // Opened for an asset ("asset:<id>"), by whoever keeps the asset list: the documents it describes start ticked.
+  const assetPick = sp.pick?.startsWith("asset:") && (scope.can("CONTROL") || scope.can("CONFIGURE"))
+    ? await projectAsset(scope, sp.pick.slice(6)).then((found) => found ? {
+        kind: "asset" as const, actionId: "", packageId: found.asset.id, code: found.asset.code, name: found.asset.name,
+        linked: found.documents.map((d) => d.id), disciplines: [] as { code: string; label: string }[], locked: [] as string[],
+      } : null)
+    : null;
   // A delivery package is filled by those putting it together too; a supplier's, by Document Control.
   const packagePick = sp.pick?.startsWith("pkg:")
     ? await packageByNumber(scope, sp.pick.slice(4)).then((pkg) => pkg && !pkg.closedAt && (scope.can("CONTROL") || (pkg.kind === "DELIVERY" && pkg.ownerIds.includes(user.id))) ? {
@@ -266,7 +274,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
         locked: pkg.members.filter((m) => m.requestedAt).map((m) => m.documentId),
       } : null).catch(() => null)
     : null;
-  const picking = formPick ?? packagePick ?? (sp.pick && !formPick && !sp.pick.startsWith("pkg:") && (scope.can("CONTROL") || own)
+  const picking = formPick ?? assetPick ?? packagePick ?? (sp.pick && !formPick && !sp.pick.startsWith("pkg:") && !sp.pick.startsWith("asset:") && (scope.can("CONTROL") || own)
     ? await (async () => {
         const one = activities.find((a) => a.code === sp.pick);
         const detail = one ? await activityDetail(scope, one.id) : null;
@@ -279,7 +287,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
         };
       })()
     : null);
-  const pickKey = !picking ? "" : picking.kind === "package" ? `pkg:${picking.code}` : picking.kind === "transmittal" || picking.kind === "review" ? sp.pick! : picking.code;
+  const pickKey = !picking ? "" : picking.kind === "asset" ? `asset:${picking.packageId}` : picking.kind === "package" ? `pkg:${picking.code}` : picking.kind === "transmittal" || picking.kind === "review" ? sp.pick! : picking.code;
   if (picking) query.set("pick", pickKey);
 
 

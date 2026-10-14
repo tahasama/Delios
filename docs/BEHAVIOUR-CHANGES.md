@@ -511,6 +511,8 @@ the installation sets its keys.
   data transmittal recorded so needs a document or a file (refused otherwise).
 - **Supplier packages** count each document once: not sent yet, with the supplier, with us (to check / in review),
   released; "where it stands" says who has to act. "Received" reads "received, to check".
+- **Assets & tags** is a table with search and filters; a tag's page lists its documents and links or unlinks them
+  through the register, as for an action (until now, only from each document's Details).
 - **File fields** look the same everywhere (the new-document one).
 - **New delivery package:** "Needed at" sits under "Due", beside a narrower description.
 - **Action page:** "Request a document" moved from each discipline's buttons to the line under them, with its question,

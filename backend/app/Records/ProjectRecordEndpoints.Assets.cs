@@ -178,6 +178,45 @@ public static partial class ProjectRecordEndpoints
         return Results.NoContent();
     }
 
+    /// <summary>
+    /// The documents an asset describes, set from its page (the register opened for it, as for an action): what is
+    /// ticked is linked, what is unticked is unlinked. Whoever keeps the asset list does it; each change is logged on
+    /// the document.
+    /// </summary>
+    private static async Task<IResult> SetAssetDocumentsAsync(Guid assetId, AssetDocumentsRequest r, HttpContext h, DeliosDbContext db,
+        DocumentService documents, AuditLog audit, IClock clock, CancellationToken c)
+    {
+        var access = ProjectAccessFilter.Of(h);
+        if (!await KeepsAsync(h, access)) return KeepersOnly("the asset list");
+        var asset = await db.Set<Asset>().SingleOrDefaultAsync(a => a.Id == assetId && a.ProjectId == access.Project.Id && a.Active, c);
+        if (asset is null) return Problems.NotFound("ASSET_NOT_FOUND", "No such asset.");
+        var adding = r.Add?.Distinct().ToList() ?? [];
+        var removing = r.Remove?.Distinct().Except(adding).ToList() ?? [];
+        if (adding.Count == 0 && removing.Count == 0) return Problems.Invalid("NOTHING_CHANGED", "Tick a document to link it, untick one to unlink it.");
+        var visible = DocumentQueries.Visible(db, access, await documents.RestrictedAsync(c));
+        var found = await visible.Where(d => adding.Contains(d.Id) || removing.Contains(d.Id)).Select(d => new { d.Id, d.Number, d.TenantId, d.ProjectId })
+            .ToDictionaryAsync(d => d.Id, c);
+        var missing = adding.Concat(removing).Where(id => !found.ContainsKey(id)).ToList();
+        if (missing.Count > 0) return Problems.Invalid("DOCUMENT_NOT_FOUND", "Some documents are not on this project.", new { documentIds = missing });
+        var have = await db.Set<DocumentAsset>().Where(l => l.AssetId == assetId && (adding.Contains(l.DocumentId) || removing.Contains(l.DocumentId)))
+            .ToListAsync(c);
+        var now = clock.GetCurrentInstant();
+        foreach (var id in adding.Where(id => have.All(l => l.DocumentId != id)))
+        {
+            var d = found[id];
+            db.Add(new DocumentAsset { TenantId = d.TenantId, ProjectId = d.ProjectId, DocumentId = d.Id, AssetId = asset.Id, CreatedByName = access.UserName, CreatedAt = now });
+            await audit.WriteAsync(Who(access), "RELATIONSHIP", "Document", d.Id, d.Number, $"Associated with asset {asset.Code} — {asset.Name}.", access.Project.Id, c);
+        }
+        foreach (var link in have.Where(l => removing.Contains(l.DocumentId)))
+        {
+            db.Remove(link);
+            var d = found[link.DocumentId];
+            await audit.WriteAsync(Who(access), "RELATIONSHIP", "Document", d.Id, d.Number, $"No longer associated with asset {asset.Code}.", access.Project.Id, c);
+        }
+        await db.SaveChangesAsync(c);
+        return Results.NoContent();
+    }
+
     private static bool MayEdit(ProjectAccess a, Document d) => a.IsInternal
         && (a.Allows(Verbs.Create, d.Facts) || a.Allows(Verbs.Revise, d.Facts) || a.Allows(Verbs.Control, d.Facts));
 }

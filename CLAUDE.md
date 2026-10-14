@@ -410,6 +410,14 @@ a screen only words it. A new rule goes in the backend, never in a page.
   a postponement, a notice, a review waiting, a draft), leaving each demo person
   something on their Home. Keep it in step whenever a flow changes.
 
+### Assets & tags
+- Assets & tags is a register, the Schedule's way: plate with counts, search and filters (area, system), the table
+  (tag, name, area, system, unit, documents), "New tag" folded under it. Each tag has its own page, the action page's
+  way: plate, "Documents that describe it" with "Add or take out" opening the register for it
+  (`/documents?pick=asset:<id>`; ticked are linked, untick to unlink, then save; backend `POST /assets/{id}/documents`,
+  whoever keeps the asset list), and "Edit the tag" folded (the tag itself never changes; retired only when nothing is
+  linked).
+
 ### Legal hold
 - Document Control or an administrator puts a document on hold, and lifts it,
   each time with a reason. While held: it cannot be retired and no revision

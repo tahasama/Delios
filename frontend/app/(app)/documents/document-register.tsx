@@ -1,5 +1,6 @@
 "use client";
 
+import { setAssetDocumentsAction } from "@/lib/records/forms";
 import { setPackageMembersAction } from "@/lib/packages/forms";
 import Link from "next/link";
 import { saveRegisterView, deleteRegisterView } from "@/lib/documents/forms-register-views";
@@ -106,7 +107,7 @@ type Column = {
 
 /** The register opened for one action: what it needs now, ticked; its disciplines, for what is added. */
 /** The register opened for something to choose documents for: an action (tick to add, untick to take off), or a supplier's package (tick to add). */
-type Picking = { kind: "action" | "package" | "transmittal" | "review"; actionId: string; packageId: string; code: string; name: string; linked: string[]; disciplines: { code: string; label: string }[];
+type Picking = { kind: "action" | "package" | "transmittal" | "review" | "asset"; actionId: string; packageId: string; code: string; name: string; linked: string[]; disciplines: { code: string; label: string }[];
   /** For a form being filled (a transmittal, a review): where "Continue" goes back to, with the ticks as `docs`. */
   back?: string;
   /** In a supplier's package and already sent to the supplier: they stay, so they cannot be unticked. */
@@ -328,13 +329,15 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
           <p className="text-sm font-semibold text-slate-800">{picking.name}</p>
         ) : (
           <p className="text-sm font-semibold text-slate-800">
-            Documents for <Link href={picking.kind === "package" ? `/packages/${picking.code}` : `/actions/${picking.code}`} className="font-mono text-brand-ink hover:underline">{picking.code}</Link>
+            Documents for <Link href={picking.kind === "asset" ? `/assets/${picking.packageId}` : picking.kind === "package" ? `/packages/${picking.code}` : `/actions/${picking.code}`} className="font-mono text-brand-ink hover:underline">{picking.code}</Link>
             <span className="ml-2 font-normal text-slate-600">{picking.name}</span>
           </p>
         )}
         <p className="mt-1 text-xs leading-5 text-slate-500">
           {picking.back
             ? "Tick what goes with it; search and filter freely, the ticks stay. Then continue below."
+            : picking.kind === "asset"
+            ? "Ticked are the documents that describe it. Tick a document to link it, untick one to unlink it; search and filter freely, the ticks stay. Then save below."
             : picking.kind === "package"
             ? "Ticked is what the package holds. Tick a document to add it, untick one to take it out (one already sent to its supplier stays); search and filter freely, the ticks stay. Then save below."
             : "Ticked is what it needs. Tick a document to add it, untick one to take it off; search and filter freely, the ticks stay. Then save below."}
@@ -641,6 +644,19 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
         </span>
         <Link href={withDocs(picking.back, selected)} className="inline-flex items-center gap-1.5 rounded-sm bg-[#d9a441] px-3 py-2 text-xs font-semibold text-brand-ink">Continue with {selected.length}</Link>
         <Link href={withDocs(picking.back, picking.linked)} className="ml-auto rounded-sm px-3 py-2 text-xs font-semibold text-white/70 hover:bg-white/10 hover:text-white">Back without changing</Link>
+      </div>
+    ) : picking?.kind === "asset" ? (
+      <div className="dock palette-light sticky bottom-4 z-30 mx-auto w-fit max-w-full rounded-sm border border-white/10 bg-brand-strong p-2.5 text-white shadow-[0_8px_30px_rgb(0_0_0/0.18)]">
+        <ActionForm action={setAssetDocumentsAction} submitLabel="Save" size="sm" hidden={{ assetId: picking.packageId }} className="flex flex-wrap items-center gap-2 space-y-0">
+          {adding.map((id) => <input key={id} type="hidden" name="add" value={id} />)}
+          {leaving.map((id) => <input key={id} type="hidden" name="remove" value={id} />)}
+          <span className="px-2 text-xs">
+            <span className="font-mono text-sm tabular-nums">{selected.length}</span>
+            <span className="ml-1.5 text-[10px] uppercase tracking-[0.12em] text-white/60">ticked for {picking.code}</span>
+            {adding.length || leaving.length ? <span className="ml-2 text-white/80">{adding.length} to link · {leaving.length} to unlink</span> : <span className="ml-2 text-white/60">nothing changed yet</span>}
+          </span>
+          <Link href={`/assets/${picking.packageId}`} className="ml-auto rounded-sm px-3 py-2 text-xs font-semibold text-white/70 hover:bg-white/10 hover:text-white">Back without saving</Link>
+        </ActionForm>
       </div>
     ) : picking?.kind === "package" ? (
       <div className="dock palette-light sticky bottom-4 z-30 mx-auto w-fit max-w-full rounded-sm border border-white/10 bg-brand-strong p-2.5 text-white shadow-[0_8px_30px_rgb(0_0_0/0.18)]">

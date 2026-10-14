@@ -16,6 +16,8 @@ namespace Delios.Host.Records;
 public sealed record AssetRequest(string? Code, string? Name, string? Area = null, string? System = null, string? Unit = null,
     string? Description = null, Dictionary<string, string?>? Extras = null);
 public sealed record LinkAssetRequest(string? AssetCode);
+/// <summary>From an asset's page, through the register opened for it: the documents to link, and those to unlink.</summary>
+public sealed record AssetDocumentsRequest(Guid[]? Add, Guid[]? Remove);
 public sealed record ExceptionRequest(string? Item, string? Clauses, string? Reason, string? Authority, DateOnly? StartDate, DateOnly? ReviewPoint = null);
 public sealed record NumberRangeRequest(string? Prefix, int From, int To, string? IssuedTo);
 public sealed record CallsRequest(string[]? Departments, DateOnly? DueOn);
@@ -53,6 +55,7 @@ public static partial class ProjectRecordEndpoints
         p.MapGet("/documents/{documentId:guid}/assets", DocumentAssetsAsync);
         p.MapPost("/documents/{documentId:guid}/assets", LinkAssetAsync);
         p.MapDelete("/document-assets/{linkId:guid}", UnlinkAssetAsync);
+        p.MapPost("/assets/{assetId:guid}/documents", SetAssetDocumentsAsync);
 
         // Exceptions and number ranges
         p.MapGet("/exceptions", async (HttpContext h, DeliosDbContext db, CancellationToken c) =>
