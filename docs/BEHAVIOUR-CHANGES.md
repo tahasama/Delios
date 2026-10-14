@@ -464,6 +464,13 @@ the installation sets its keys.
 - **Received date is no longer on a document's Edit:** it is filled when what was sent arrives (their submission,
   or what Document Control records from outside), and asked only when registering something that already arrived.
   An import of old documents still carries the date they had.
+- **New document:** "Keep it for" is now "Retention period"; its hint says what it will be from the criticality.
+  The criticality explains only itself (what an error means, who approves it). The details step fits on the page.
+- **File fields** are a dashed line with a light button, not a button inside a grey box.
+- **Status chips** are outlined, with only a light wash of their colour.
+- **The reason IFU reads "For update"**; the status IFU still reads "Issued for update".
+- **New transmittal:** "An answer is required" is a tick (ticked when the reason expects an answer); ticked, it
+  asks the day (left empty, the reason's own number of days).
 - **Plain words:** "in force" is gone from the screens: "released", "the revision people work from", "now used".
 
 ## 7. Notifications and email

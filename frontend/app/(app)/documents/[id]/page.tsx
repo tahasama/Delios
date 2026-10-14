@@ -615,7 +615,7 @@ export default async function DocumentDetailPage({
     : shown
     ? stateName(names, shown.state, { together, held: onHold })
     : DOC_STATE_LABEL[doc.state as DocState] ?? doc.state;
-  const stateColor = onHold ? "bg-red-50 text-red-800 ring-red-200" : shown ? revStateColor(shown.state) : DOC_STATE_COLOR[doc.state as DocState] ?? "";
+  const stateColor = onHold ? "bg-red-50/40 text-red-800 ring-red-300" : shown ? revStateColor(shown.state) : DOC_STATE_COLOR[doc.state as DocState] ?? "";
 
   return (
     <div className="space-y-4">

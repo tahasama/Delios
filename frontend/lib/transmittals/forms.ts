@@ -108,6 +108,9 @@ export async function createTransmittalAction(_prev: { error?: string } | undefi
           revisionIds, userIds: recipientUsers, partyIds: partyTo, reason: reasonForIssue, subject, message, copyUserIds: chosenCc,
           draft: !issueNow, inReplyToId, followsId, followKind, issuedOn: dayOf(dateOfIssue), extras: Object.keys(extras).length ? extras : null, activityId, activityAsk,
           placeholderIds: placeholderIds.length ? placeholderIds : null,
+          // Asked for an answer: by the day given, else as the reason allows. Not ticked: none asked.
+          responseRequired: formData.get("answerRequired") === "on",
+          responseDue: formData.get("answerRequired") === "on" ? String(formData.get("responseDue") ?? "") || null : null,
         },
         idempotencyKey: crypto.randomUUID(),
       });

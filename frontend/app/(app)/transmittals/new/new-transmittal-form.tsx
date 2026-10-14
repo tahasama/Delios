@@ -157,6 +157,12 @@ export function NewTransmittalForm({
   const may = (n: number) => n === 1 || (askedFirst && (n === 2 || saysSomething));
   const toggle = (id: string) => setChosen((ids) => (ids.includes(id) ? ids.filter((one) => one !== id) : [...ids, id]));
   const reasonLabel = reasons.find((r) => r.code === reasonCode)?.label;
+  // Whether an answer is asked for: the reason's own answer, until the person ticks otherwise.
+  const reasonAsks = reasons.find((r) => r.code === reasonCode)?.props.response === true;
+  const suggestedDays = (() => { const days = reasons.find((r) => r.code === reasonCode)?.props.responseDays; return typeof days === "number" ? days : null; })();
+  const [answerOwn, setAnswerOwn] = useState<boolean | null>(null);
+  const answerRequired = answerOwn ?? reasonAsks;
+  const setAnswerRequired = (on: boolean) => setAnswerOwn(on);
 
   // The strip that closes each sheet: back on the left, what is missing and
   // the way on at the right.
@@ -298,6 +304,20 @@ export function NewTransmittalForm({
                   </select>
                 )}
               </Ask>
+              {/* An answer asked for: ticked when the reason expects one; the day appears only once it is. */}
+              {outgoing ? (
+                <div className="min-w-0 lg:col-span-2">
+                  <label className="flex items-center gap-2 text-[13px] text-slate-700">
+                    <input type="checkbox" name="answerRequired" checked={answerRequired} onChange={(e) => setAnswerRequired(e.target.checked)} />
+                    An answer is required
+                  </label>
+                  {answerRequired ? (
+                    <Ask label="Answer by" hint={suggestedDays ? `the reason allows ${suggestedDays} working days when left empty` : "optional"} className="mt-2">
+                      <input type="date" name="responseDue" className={field} min={new Date().toISOString().slice(0, 10)} />
+                    </Ask>
+                  ) : null}
+                </div>
+              ) : null}
               {!recording ? null : (
                 <Ask label="Date received" required>
                   <input type="date" name="dateOfIssue" required className={field} defaultValue={new Date().toISOString().slice(0, 10)} />

@@ -1051,6 +1051,25 @@ summary::-webkit-details-marker {
   .register .asking select.plain[data-on="true"],
   .register .asking button.plain[data-on="true"] { background-color: var(--color-tint); }
 
+  /* A file field is a place to drop something, not a box with a button inside a box: no grey behind it, a dashed
+     line under it, and the button a light flat tab at the field's height. */
+  .register input[type="file"].plain,
+  .register .asking input[type="file"].plain {
+    background: transparent;
+    padding: 0.2rem 0;
+    border-bottom: 1px dashed var(--color-line-strong);
+    border-radius: 0;
+    color: var(--color-slate-500);
+  }
+  .register input[type="file"].plain:hover,
+  .register .asking input[type="file"].plain:hover { background: transparent; border-bottom-color: var(--color-brand-line); }
+  .register input[type="file"].plain::file-selector-button {
+    border: 0;
+    background: var(--color-tint);
+    color: var(--color-brand-ink);
+  }
+  .register input[type="file"].plain::file-selector-button:hover { background: color-mix(in oklab, var(--color-tint) 70%, var(--color-brand-line)); }
+
   /* The kept views are a way back to a question, so they sit quieter than the
      question itself. */
   .register .kept-views { background: color-mix(in oklab, var(--color-canvas) 35%, var(--color-surface)); }

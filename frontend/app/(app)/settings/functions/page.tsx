@@ -172,7 +172,7 @@ export default async function FunctionsPage() {
                         <span className="min-w-0">
                           <span className="block text-xs font-medium text-slate-700">{scopeText(rule) || "All documents"}</span>
                           <span className="mt-1 flex flex-wrap gap-1">
-                            {parseVerbs(rule.verbs).map((v) => <Chip key={v} className="bg-emerald-50 text-emerald-800 ring-emerald-200">{VERB_LABEL[v]}</Chip>)}
+                            {parseVerbs(rule.verbs).map((v) => <Chip key={v} className="bg-emerald-50/40 text-emerald-800 ring-emerald-300">{VERB_LABEL[v]}</Chip>)}
                           </span>
                         </span>
                         <ActionForm action={deletePermissionRuleAction} submitLabel="Remove" variant="danger" size="sm" hidden={{ ruleId: rule.id }} className="shrink-0 space-y-0" />

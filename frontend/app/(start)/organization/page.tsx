@@ -234,7 +234,7 @@ export default async function OrganizationPage() {
               <ul className="mt-2 space-y-1.5 text-xs text-slate-600">
                 {history.map((one) => (
                   <li key={one.id}>
-                    <Chip className="bg-slate-100 text-slate-600 ring-slate-200">{one.state.toLowerCase()}</Chip>{" "}
+                    <Chip className="bg-slate-50/40 text-slate-600 ring-slate-300">{one.state.toLowerCase()}</Chip>{" "}
                     {one.side === "HOST" ? `${one.partyName} (${one.organization})` : one.organization}
                     {one.state === "REFUSED"
                       ? <> · refused {fmtDate(one.answeredAt)} by {one.answeredBy}{one.answerNote ? <>: {one.answerNote}</> : null}</>

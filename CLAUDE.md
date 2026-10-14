@@ -311,8 +311,8 @@ a screen only words it. A new rule goes in the backend, never in a page.
   before). `RevisionReading` (backend, `AwaitingCheck`).
 - "Files that came with it" shows on a received transmittal only when files
   came with it.
-- A placeholder sent to its supplier is issued for update: reason IFU ("Issued for
-  update", family Data), set by itself on the transmittal (never chosen) where it is
+- A placeholder sent to its supplier is issued for update: reason IFU ("For update",
+  family Data; the status IFU reads "Issued for update"), set by itself on the transmittal (never chosen) where it is
   published; the data / information choice is not shown then.
 - "Received from outside the system" is not offered when the transmittal is
   already about something of ours going out (documents chosen in the register

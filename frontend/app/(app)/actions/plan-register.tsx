@@ -692,14 +692,14 @@ const READINESS: Record<PlanTableRow["readiness"], { label: string; chip: string
   UPCOMING: { label: "Still ahead", chip: "bg-sky-100 text-sky-800 ring-sky-200" },
   AT_RISK: { label: "At risk", chip: "bg-amber-100 text-amber-800 ring-amber-200" },
   NOT_READY: { label: "Overdue", chip: "bg-red-100 text-red-800 ring-red-200" },
-  UNKNOWN: { label: "Nothing listed", chip: "bg-slate-100 text-slate-600 ring-slate-200" },
+  UNKNOWN: { label: "Nothing listed", chip: "bg-slate-50/40 text-slate-600 ring-slate-300" },
 };
 
 const HAPPENED: Record<PlanTableRow["happened"], { label: string; chip: string }> = {
   POSTPONED: { label: "Postponed", chip: "bg-slate-100 text-slate-700 ring-slate-300" },
   CARRIED: { label: "Missing documents", chip: "bg-amber-100 text-amber-900 ring-amber-300" },
   DONE: { label: "With documents", chip: "bg-emerald-600/10 text-emerald-900 ring-emerald-300" },
-  AHEAD: { label: "Not yet", chip: "bg-sky-50 text-sky-800 ring-sky-200" },
+  AHEAD: { label: "Not yet", chip: "bg-sky-50/40 text-sky-800 ring-sky-300" },
 };
 
 /** The columns, in the order they start in. */

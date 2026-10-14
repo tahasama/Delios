@@ -11,7 +11,7 @@ import { isEmptyTitle } from "@/lib/core/standard";
 import type { OwnField } from "@/lib/settings/field-policy";
 import { OwnFields } from "./own-fields";
 
-type Opt = { code: string; label: string; meaning?: string | null; appliesTo?: string | null; deliverables?: string[] | null; criticality?: string | null; decides?: string | null; record?: boolean; required?: string[] | null };
+type Opt = { code: string; label: string; meaning?: string | null; appliesTo?: string | null; deliverables?: string[] | null; criticality?: string | null; decides?: string | null; record?: boolean; required?: string[] | null; retention?: string | null };
 
 
 const STEPS = ["What it is", "How it is described"];
@@ -223,8 +223,9 @@ export function NewDocumentForm({
         {/* ── 2 · How it is described ─────────────────────────────────────── */}
         <section className={cn("register register-sheet register-sheet-open", !received && step !== 2 && "hidden")}>
           {received ? null : band(2, `${docTypeLabel || "the document"} · ${disciplineLabel || "—"} — its title, where it sits, and how it is kept`)}
-          <div className="asking grid grid-cols-1 gap-x-6 gap-y-4 px-5 py-5 sm:grid-cols-2 sm:px-6">
-            <Ask label={labels["title"]} required hint="what it is about, in the words someone searching would use" className="sm:col-span-2">
+          {/* Three columns on a wide screen, so the whole step sits on the page with its way on at the bottom. */}
+          <div className="asking grid grid-cols-1 gap-x-6 gap-y-3 px-5 py-4 sm:grid-cols-2 sm:px-6 xl:grid-cols-3">
+            <Ask label={labels["title"]} required hint="what it is about, in the words someone searching would use" className="sm:col-span-2 xl:col-span-3">
               <input name="title" required maxLength={200} value={title} onChange={(e) => setTitle(e.target.value)} className={field} aria-invalid={emptyTitle} placeholder="e.g. Feed pump P-101 general arrangement and dimensions" />
               {emptyTitle ? (
                 <span className="mt-1.5 flex items-start gap-1.5 rounded-lg bg-amber-50 px-2.5 py-2 text-[11px] text-amber-800 ring-1 ring-amber-200">
@@ -306,7 +307,10 @@ export function NewDocumentForm({
             </Ask>
             ) : null}
             {asks("retentionClass") ? (
-              <Ask label={labels["retentionClass"]} required={must("retentionClass")} hint="automatic follows the criticality">
+              <Ask label={labels["retentionClass"]} required={must("retentionClass")}
+                hint={level?.retention
+                  ? `automatic: ${(retentionClasses.find((o) => o.code === level.retention)?.label ?? level.retention.replaceAll("_", " ")).toLowerCase()}, from the criticality`
+                  : "automatic: follows the criticality"}>
                 <select name="retentionClass" required={must("retentionClass")} className={field} defaultValue="">
                   <option value="">Automatic</option>
                   {retentionClasses.map((o) => <option key={o.code} value={o.code}>{o.label}</option>)}

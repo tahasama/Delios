@@ -573,7 +573,7 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
     private static readonly (string Code, string Label, object? Props)[] InformationReasons =
     [
         // A placeholder sent to a supplier carries it by itself: they fill it and send it back.
-        ("IFU", "Issued for update", new { response = true, family = "Data" }),
+        ("IFU", "For update", new { response = true, family = "Data" }),
         ("REQUEST", "Request", new { response = true, responseDays = 7, family = "Information" }),
         ("RFI", "Request for information", new { response = true, responseDays = 7, family = "Information" }),
         ("ANSWER", "Answer", new { response = false, family = "Information" }),
@@ -592,11 +592,12 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
         if (have.Count == 0) return false;
         var sort = have.Max(v => v.Sort) + 1;
         var added = false;
-        // IFU reads "Issued for update": it goes to them to update, not to work from.
-        foreach (var ifu in await db.ValueEntries.Where(v => v.SetKey == Transmittals.TransmittalSets.Reasons && v.Code == "IFU" && v.Label == "Issued for use")
+        // The reason IFU reads "For update", as the other reasons read "For review": it goes to them to update.
+        foreach (var ifu in await db.ValueEntries.Where(v => v.SetKey == Transmittals.TransmittalSets.Reasons && v.Code == "IFU"
+                && (v.Label == "Issued for use" || v.Label == "Issued for update"))
             .ToListAsync(cancellationToken))
         {
-            ifu.Label = "Issued for update";
+            ifu.Label = "For update";
             added = true;
         }
         foreach (var (code, label, props) in InformationReasons)

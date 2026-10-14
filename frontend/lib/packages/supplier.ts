@@ -139,8 +139,8 @@ export function packageStage(pkg: PackageView, rows: SupplierRow[], side: "ours"
   const notAsked = side === "ours" ? rows.length - lines.length : 0;
   const back = lines.filter((r) => r.state !== "NOT_SENT").length;
   const done = lines.filter((r) => r.state === "APPROVED").length;
-  const slate = "bg-slate-100 text-slate-600 ring-slate-200", amber = "bg-amber-50 text-amber-900 ring-amber-200";
-  const sky = "bg-sky-50 text-sky-800 ring-sky-200", green = "bg-emerald-50 text-emerald-800 ring-emerald-200";
+  const slate = "bg-slate-50/40 text-slate-600 ring-slate-300", amber = "bg-amber-50/40 text-amber-900 ring-amber-300";
+  const sky = "bg-sky-50/40 text-sky-800 ring-sky-300", green = "bg-emerald-50/40 text-emerald-800 ring-emerald-300";
   if (side === "ours" && !pkg.sharedAt) return { word: "not shared", tone: slate, notAsked };
   if (!lines.length) return { word: side === "ours" ? "nothing sent yet" : "nothing asked yet", tone: slate, notAsked };
   if (done === lines.length && !notAsked) return { word: "complete", tone: green, notAsked };

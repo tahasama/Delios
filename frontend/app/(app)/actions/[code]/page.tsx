@@ -328,11 +328,11 @@ export default async function ActionDetailPage({ params, searchParams }: { param
                 const owedDocs = owing.flatMap((s) => s.docs);
                 // Where it stands, in one short chip: the line under it says how and by whom.
                 const chip = c
-                  ? c.available ? { word: c.automatic ? "Confirmed automatically" : "Confirmed", tone: "bg-emerald-50 text-emerald-800 ring-emerald-200" }
-                    : { word: "Not going ahead", tone: "bg-red-50 text-red-800 ring-red-200" }
-                  : automatic ? { word: "Confirmed automatically", tone: "bg-emerald-50 text-emerald-800 ring-emerald-200" }
-                  : missing.length && !open && opens ? { word: `Opens ${fmtDate(opens)}`, tone: "bg-slate-100 text-slate-600 ring-slate-200" }
-                  : { word: "Not confirmed", tone: "bg-amber-50 text-amber-900 ring-amber-200" };
+                  ? c.available ? { word: c.automatic ? "Confirmed automatically" : "Confirmed", tone: "bg-emerald-50/40 text-emerald-800 ring-emerald-300" }
+                    : { word: "Not going ahead", tone: "bg-red-50/40 text-red-800 ring-red-300" }
+                  : automatic ? { word: "Confirmed automatically", tone: "bg-emerald-50/40 text-emerald-800 ring-emerald-300" }
+                  : missing.length && !open && opens ? { word: `Opens ${fmtDate(opens)}`, tone: "bg-slate-50/40 text-slate-600 ring-slate-300" }
+                  : { word: "Not confirmed", tone: "bg-amber-50/40 text-amber-900 ring-amber-300" };
                 const them = missing.length === 1 ? "it" : "them";
                 return (
                   <li key={d} className="space-y-3 px-5 py-4 sm:px-6">
@@ -533,7 +533,7 @@ const TONE: Record<ActionState, string> = {
   UPCOMING: "bg-sky-100 text-sky-800 ring-sky-200",
   AT_RISK: "bg-amber-100 text-amber-800 ring-amber-200",
   NOT_READY: "bg-red-100 text-red-800 ring-red-200",
-  UNKNOWN: "bg-slate-100 text-slate-600 ring-slate-200",
+  UNKNOWN: "bg-slate-50/40 text-slate-600 ring-slate-300",
 };
 
 function ReadinessChip({ readiness }: { readiness: ActionState }) {

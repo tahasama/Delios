@@ -63,11 +63,10 @@ export default async function NewDocumentPage({ searchParams }: { searchParams: 
     record: r.props?.record === true,
     // What a deliverable type insists on (Settings, on the type): one naming the originator comes from another organization.
     required: Array.isArray(r.props?.required) ? (r.props.required as unknown[]).map(String) : null,
-    // What a criticality level decides: who approves it and how long it is kept.
-    decides: [
-      r.props?.approval ? `approved by ${String(r.props.approval).toLowerCase()}` : null,
-      r.props?.retention ? `kept for ${String(r.props.retention).replaceAll("_", " ").toLowerCase()}` : null,
-    ].filter(Boolean).join(" · ") || null,
+    // What a criticality level decides: who approves it. How long it is kept is said under the retention period.
+    decides: r.props?.approval ? `approved by ${String(r.props.approval).toLowerCase()}` : null,
+    // The retention period a criticality level brings, when none is chosen.
+    retention: typeof r.props?.retention === "string" ? r.props.retention : null,
   }));
   const byName = (rows: { code: string; label: string; props?: Record<string, unknown> }[]) => toOpt(rows).sort((x, y) => x.label.localeCompare(y.label));
 

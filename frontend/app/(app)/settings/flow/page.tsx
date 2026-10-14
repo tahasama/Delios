@@ -400,7 +400,7 @@ export default async function ControlRoomPage() {
     state === "ON_HOLD" ? names.ON_HOLD
       : state === "RELEASED" ? (together ? names.RELEASED_ISSUED : names.RELEASED)
       : stateName(names, state);
-  const stateColor = (state: Shown) => (state === "ON_HOLD" ? "bg-red-50 text-red-800 ring-red-200" : REV_STATE_COLOR[state]);
+  const stateColor = (state: Shown) => (state === "ON_HOLD" ? "bg-red-50/40 text-red-800 ring-red-300" : REV_STATE_COLOR[state]);
 
   // Release reads differently with and without somebody standing between the
   // route and the register; the gate is the control function itself.

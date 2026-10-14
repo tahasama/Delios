@@ -28,9 +28,9 @@ const STATE_STYLE: Record<string, string> = {
 };
 
 const CHANGE_STYLE: Record<DiffLine["change"], string> = {
-  ADDED: "bg-emerald-50 text-emerald-800 ring-emerald-200",
+  ADDED: "bg-emerald-50/40 text-emerald-800 ring-emerald-300",
   CHANGED: "bg-amber-50 text-amber-800 ring-amber-200",
-  REMOVED: "bg-red-50 text-red-800 ring-red-200",
+  REMOVED: "bg-red-50/40 text-red-800 ring-red-300",
   UNCHANGED: "bg-slate-50 text-slate-500 ring-slate-200",
 };
 

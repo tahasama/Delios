@@ -32,7 +32,7 @@ public sealed partial class TransmittalService
         Guid? IssueRequestId = null, Guid? ReviewStepId = null, LocalDate? ResponseDue = null, Guid? PackageId = null,
         DispatchRequest? Dispatched = null, IReadOnlyList<(Document Document, LocalDate? Due)>? Placeholders = null,
         IReadOnlyList<Addressee>? Copies = null, Instant? IssuedAt = null, Guid? InReplyToId = null, Guid? FollowsId = null,
-        string? FollowKind = null, string? Extras = null, Guid? ActivityId = null, string? ActivityAsk = null);
+        string? FollowKind = null, string? Extras = null, Guid? ActivityId = null, string? ActivityAsk = null, bool? ResponseRequired = null);
 
     /// <summary>
     /// The whole transmittal, as its page shows it, for the email each person it goes to receives: number, project,
@@ -77,8 +77,10 @@ public sealed partial class TransmittalService
             NumberFields.ForRecord(project.Code, ours, raise.To?.Code ?? ours), "TR", cancellationToken);
 
         var now = clock.GetCurrentInstant();
-        var responseRequired = catalog.Prop(TransmittalSets.Reasons, raise.Reason, "response") is { ValueKind: JsonValueKind.True };
-        var due = raise.ResponseDue;
+        // Whether an answer is asked for: as the sender ticked it, else as the reason expects.
+        var responseRequired = raise.ResponseRequired
+            ?? (raise.ResponseDue is not null || catalog.Prop(TransmittalSets.Reasons, raise.Reason, "response") is { ValueKind: JsonValueKind.True });
+        var due = responseRequired ? raise.ResponseDue : null;
         if (due is null && responseRequired
             && catalog.Prop(TransmittalSets.Reasons, raise.Reason, "responseDays") is { ValueKind: JsonValueKind.Number } days)
         {
@@ -95,7 +97,7 @@ public sealed partial class TransmittalService
             Message = raise.Message,
             ToPartyId = raise.To?.Id,
             ToName = raise.ToName,
-            ResponseRequired = responseRequired || raise.ResponseDue is not null,
+            ResponseRequired = responseRequired,
             ResponseDue = due,
             IssuedAt = raise.IssuedAt ?? now,
             InReplyToId = raise.InReplyToId,
