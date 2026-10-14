@@ -574,7 +574,7 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
     private static readonly (string Code, string Label, object? Props)[] InformationReasons =
     [
         // A placeholder sent to a supplier carries it by itself: they fill it and send it back.
-        ("IFU", "For update", new { response = true, family = "Data" }),
+        ("IFU", "For update", new { response = true, responseDays = 10, family = "Data" }),
         ("REQUEST", "Request", new { response = true, responseDays = 7, family = "Information" }),
         ("RFI", "Request for information", new { response = true, responseDays = 7, family = "Information" }),
         ("ANSWER", "Answer", new { response = false, family = "Information" }),
@@ -600,6 +600,18 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
         {
             ifu.Label = "For update";
             added = true;
+        }
+        // The reason IFU asks an answer (the supplier sends the documents back): it gives its period, 10 working days.
+        foreach (var ifu in await db.ValueEntries.Where(v => v.SetKey == Transmittals.TransmittalSets.Reasons && v.Code == "IFU").ToListAsync(cancellationToken))
+        {
+            var props = ifu.Props?.RootElement;
+            if (props is { ValueKind: JsonValueKind.Object } p && !p.TryGetProperty("responseDays", out _) && !p.TryGetProperty("responsePeriodDays", out _))
+            {
+                var copy = p.EnumerateObject().ToDictionary(x => x.Name, x => x.Value.Clone());
+                copy["responseDays"] = JsonSerializer.SerializeToElement(10);
+                ifu.Props = JsonSerializer.SerializeToDocument(copy);
+                added = true;
+            }
         }
         foreach (var (code, label, props) in InformationReasons)
         {

@@ -159,7 +159,8 @@ public static class CheckCatalog
         new("MD-03", Phases.Running, "A field its deliverable type requires is empty",
             "Each document against the fields its deliverable type requires now (the type may have been given more since, or a field cleared on a revision)", Severities.Major, "OR", ctx =>
                 Task.FromResult(Fail(ctx.Documents.SelectMany(d => ctx.Values.RequiredFieldsOf(d.DeliverableType)
-                    .Where(field => Empty(d, field)).Select(field => Doc(d, $"{field} is required for {d.DeliverableType} and is empty."))
+                    // The date received is filled when something comes in: a placeholder still waiting has none, rightly.
+                    .Where(field => Empty(d, field) && !(field == "receivedDate" && ctx.Revisions.All(r => r.DocumentId != d.Id))).Select(field => Doc(d, $"{field} is required for {d.DeliverableType} and is empty."))
                     .Take(1))))),
         new("MD-05", Phases.Running, "Received from another organization with no date received",
             "Documents of an outside organization of which something came in, with no date received (a placeholder not received yet is not counted)", Severities.Major, "CF", async ctx =>
