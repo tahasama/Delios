@@ -478,9 +478,16 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - "Request a document" (concerned discipline or Document Control) opens a
   transmittal to Document Control with the file attached; Document Control
   adds the number to the action. No status or date is asked.
-- Under "Disciplines concerned", anyone on the project sees "Is a discipline
-  missing from this action? Request it": a transmittal to Document Control
-  asking for that discipline.
+- Under "Disciplines concerned", anyone of ours sees "Is a discipline missing, or
+  one that should not be here?" with "Ask to add one" and "Ask to take one off":
+  a transmittal to Document Control; their answer (the disciplines saved) is the
+  record. "Disciplines and documents" shows both as a list with one "Add or take
+  off" button each.
+- A discipline whose documents are all released at their status, on an action
+  still ahead, is told so once, automatically ("nothing is asked of you").
+  A notice by hand says where the discipline stands: confirmed automatically, by
+  hand (going ahead or not, with why), ready, short (still to come, at risk, day
+  passed), or the action postponed.
 - The transmittal remembers the action and what it asks (a document, or a
   discipline). Until Document Control answers (adds it, or "Nothing to add"
   with why), it is on their Home and at the top of the action's "Disciplines

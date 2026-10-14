@@ -114,6 +114,16 @@ export default async function ActionDetailPage({ params, searchParams }: { param
     message: `Please add the discipline … to ${action.code}, ${action.name}, on ${fmtDate(action.start)}.\n\nWhy it concerns us: …`,
   })}`;
 
+  // A discipline that does not belong: asked of Document Control the same way, to be taken off.
+  const disciplineRemovalHref = `/transmittals/new?${new URLSearchParams({
+    reason: "INFORMATION",
+    activity: action.id,
+    ask: "DISCIPLINE",
+    users: controllers.map((one) => one.id).join(","),
+    subject: `Take a discipline off ${action.code}`,
+    message: `Please take the discipline … off ${action.code}, ${action.name}, on ${fmtDate(action.start)}.\n\nWhy it does not concern it: …`,
+  })}`;
+
   // The requests about this action not yet answered: Document Control sees them all; whoever is asked to
   // confirm one sees that one, at the top of the page.
   const requests = inside ? await activityRequests(ctx, action.id) : [];
@@ -326,6 +336,27 @@ export default async function ActionDetailPage({ params, searchParams }: { param
                 const owing = suppliersOf(missing);
                 const owingPeople = owing.flatMap((s) => s.people.map((one) => ({ id: one.id, name: one.name, detail: `${s.party.name} · recommended` })));
                 const owedDocs = owing.flatMap((s) => s.docs);
+                // What a notice about this discipline says, by where it stands: confirmed (by itself or by hand), postponed,
+                // going ahead or not without some, ready, or short (not yet, at risk, day passed).
+                const label = deptLabel(d);
+                const noticeTitle = postponed
+                  ? `${action.code}: postponed — ${label}'s documents`
+                  : c?.automatic ? `${action.code} on ${fmtDate(action.start)}: ${label} confirmed automatically`
+                  : c && c.available ? `${action.code} on ${fmtDate(action.start)}: ${label} confirmed going ahead${missing.length ? ` without ${missing.length} document${missing.length === 1 ? "" : "s"}` : ""}`
+                  : c ? `${action.code} on ${fmtDate(action.start)}: ${label} confirmed it does not go ahead without its documents`
+                  : automatic ? `${action.code} on ${fmtDate(action.start)}: all of ${label}'s documents are ready`
+                  : passed ? `${action.code}: its day (${fmtDate(action.start)}) passed with ${missing.length} of ${label}'s ${deptEntries.length} documents missing`
+                  : open ? `${action.code} on ${fmtDate(action.start)} is at risk: ${missing.length} of ${label}'s ${deptEntries.length} documents missing`
+                  : `${action.code} on ${fmtDate(action.start)}: ${missing.length} of ${label}'s ${deptEntries.length} documents still to come`;
+                const noticeLines = postponed
+                  ? ["The action is postponed; its date is to be confirmed. Nothing is asked of you until then."]
+                  : c?.automatic ? ["Every document was released at its status by the day: nothing is asked of you."]
+                  : c ? [`${c.confirmedByName} confirmed it${c.note ? `: ${c.note}` : "."}`, ...(missing.length ? [`Still missing: ${missing.map((e) => e.document.number).join(", ")}.`] : [])]
+                  : automatic ? [`Every one of the ${deptEntries.length} documents is released at its status: ${label} is confirmed automatically. Nothing is asked of you.`]
+                  : [
+                      `Still missing: ${missing.map((e) => e.document.number).join(", ")}.`,
+                      passed ? "Confirm on the action's page and say why it went ahead without them." : "Send the documents, or confirm on the action's page and say why it can go ahead without them.",
+                    ];
                 // Where it stands, in one short chip: the line under it says how and by whom.
                 const chip = c
                   ? c.available ? { word: c.automatic ? "Confirmed automatically" : "Confirmed", tone: "bg-emerald-50/40 text-emerald-800 ring-emerald-300" }
@@ -400,15 +431,14 @@ export default async function ActionDetailPage({ params, searchParams }: { param
                           </ActionForm>
                         </details>
                       ) : null}
-                      {mayNotify && missing.length ? (
+                      {mayNotify ? (
                         <div className="has-[details[open]]:basis-full">
                           <NotifyPanel
                             subject={`activity:${action.id}:manual:${d}`}
-                            title={`${action.code} on ${fmtDate(action.start)}: ${deptLabel(d)} has ${missing.length} of ${deptEntries.length} documents missing`}
+                            title={noticeTitle}
                             body={[
                               `${action.name} is planned for ${fmtDate(action.start)}.`,
-                              `Still missing: ${missing.map((e) => e.document.number).join(", ")}.`,
-                              passed ? "Confirm on the action's page and say why it went ahead without them." : "Send the documents, or confirm on the action's page and say why it can go ahead without them.",
+                              ...noticeLines,
                               ...owing.map((s) => `${s.party.name}: please send ${s.docs.map((e) => e.document.number).join(", ")} on a transmittal${s.docs.some((e) => e.neededBy) ? `, by ${fmtDate(s.docs.map((e) => e.neededBy).sort((a, b) => a.getTime() - b.getTime())[0])}` : ""}.`),
                             ].join("\n\n")}
                             link={`/actions/${action.code}`}
@@ -452,10 +482,12 @@ export default async function ActionDetailPage({ params, searchParams }: { param
               <ActionForm action={addOwnDisciplineAction} submitLabel="Add it" size="sm" variant="secondary" hidden={{ actionId: action.id, code: action.code }} className="space-y-0" />
             </div>
           ) : !selfLinks && ctx.user.isInternal ? (
-            <p className="flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-line px-5 py-2.5 text-xs text-slate-500 sm:px-6">
-              Is a discipline missing from this action?
-              <Link href={disciplineRequestHref} className="font-semibold text-link hover:underline">Request it</Link>
-            </p>
+            // A discipline missing, or one that does not belong: asked of Document Control, whose answer is the record.
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-line bg-tint-soft px-5 py-3 sm:px-6">
+              <span className="text-xs font-semibold text-slate-700">Is a discipline missing, or one that should not be here?</span>
+              <Link href={disciplineRequestHref} className="ask">Ask to add one</Link>
+              <Link href={disciplineRemovalHref} className="ask">Ask to take one off</Link>
+            </div>
           ) : null}
         </section>
         ) : null}

@@ -471,6 +471,10 @@ the installation sets its keys.
 - **The reason IFU reads "For update"**; the status IFU still reads "Issued for update".
 - **New transmittal:** "An answer is required" is a tick (ticked when the reason expects an answer); ticked, it
   asks the day (left empty, the reason's own number of days).
+- **Action page:** a discipline whose documents are all ready is told so automatically, once. Notify is offered
+  in every state and its message says where the discipline stands. Disciplines have their own "Add or take off"
+  button, like documents. "Is a discipline missing, or one that should not be here?" offers asking to add one or
+  to take one off.
 - **Plain words:** "in force" is gone from the screens: "released", "the revision people work from", "now used".
 
 ## 7. Notifications and email

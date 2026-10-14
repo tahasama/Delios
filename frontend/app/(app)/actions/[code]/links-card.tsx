@@ -58,7 +58,7 @@ export function LinksCard({ actionId, code, departments, disciplines, documents,
             <li key={ask.id} className="space-y-3 px-5 py-3.5 sm:px-6">
               <div className="space-y-1 text-xs leading-5">
                 <p className="font-semibold text-slate-800">
-                  {ask.from} asks for {ask.kind === "DISCIPLINE" ? "a missing discipline" : "a document"} to be added
+                  {ask.from} asks for {ask.kind === "DISCIPLINE" ? "a change to the disciplines (one to add or to take off)" : "a document to be added"}
                   <span className="ml-1.5 font-normal text-slate-500">
                     · <Link href={`/transmittals/${ask.id}`} className="text-link hover:underline">{ask.number}</Link>, {fmtDate(ask.at)}
                   </span>
@@ -113,9 +113,13 @@ export function LinksCard({ actionId, code, departments, disciplines, documents,
       ) : null}
 
       <div className="divide-y divide-line">
-        <details className="px-5 py-3 sm:px-6" open={!departments.length}>
-          <summary className="cursor-pointer list-none text-xs font-semibold text-slate-700 [&::-webkit-details-marker]:hidden">
-            Disciplines <span className="font-normal text-slate-500">· {tagged.length ? tagged.map((d) => d.label).join(", ") : "none yet"}</span>
+        {/* Disciplines, as the documents below: what is there, and one button to add or take off. */}
+        <details className="group px-5 py-3 sm:px-6" open={!departments.length}>
+          <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-3 [&::-webkit-details-marker]:hidden">
+            <span className="text-xs text-slate-700">
+              <span className="font-semibold">Disciplines</span> <span className="text-slate-500">· {tagged.length ? tagged.map((d) => d.label).join(", ") : "none yet"}</span>
+            </span>
+            <span className="ask">Add or take off</span>
           </summary>
           <ActionForm action={setDisciplinesAction} submitLabel="Save disciplines" hidden={{ actionId, code }} className="mt-3 space-y-3">
             <SearchPick browse items={disciplineItems} name="departments" initial={departments} label="Disciplines" placeholder="Type a discipline" empty="None: the action concerns nobody yet." />

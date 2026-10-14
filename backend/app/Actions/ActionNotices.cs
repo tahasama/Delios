@@ -194,6 +194,24 @@ public sealed class ActionNotices(IServiceScopeFactory scopes, ILogger<ActionNot
                     row.RevokedReason = null;
                 }
             }
+            // Every document of a discipline released at its status: it is confirmed by itself, and its people are told
+            // so, once: nothing is asked of them for this action.
+            // Only for an action still ahead: a day already passed is settled by the confirmation above.
+            foreach (var department in activity.Departments.Where(d => !passed && missing[d] == 0))
+            {
+                var listed = activity.Requirements.Count(r => r.Department == null || string.Equals(r.Department, department, StringComparison.OrdinalIgnoreCase));
+                if (listed == 0) continue;
+                var subject = $"activity:{activity.Id}:ready:{department}";
+                if (await NoticeLog.SentAsync(db, projectId, subject, cancellationToken)) continue;
+                var people = await NoticeLog.DepartmentMembersAsync(db, projectId, department, cancellationToken);
+                if (people.Count == 0) continue;
+                await NoticeLog.SendAsync(db, notifier, clock, project.TenantId, projectId, subject, true, "Automatic",
+                    $"{activity.Code} on {day:yyyy-MM-dd}: all of {department}'s documents are ready",
+                    $"{activity.Name}. Every one of {department}'s {listed} document{(listed == 1 ? " is" : "s are")} released at the status the action needs, "
+                    + $"so {department} is confirmed automatically. Nothing is asked of you for this action.",
+                    $"/actions/{activity.Code}", people, cancellationToken);
+                told++;
+            }
             var atRisk = !passed && activity.RiskFrom is { } from && from <= today;
             if (!passed && !atRisk) continue;
             foreach (var department in activity.Departments.Where(d => missing[d] > 0 && !Confirmed(d)))
