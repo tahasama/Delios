@@ -500,6 +500,10 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - "Register on a date" is a report of its own, worked out by the backend (`AsOfAsync`): each document registered by
   the end of that day, the revision current then (the latest released by then, not void that day), its status, and
   what is current now. A day to come is refused (DATE_TO_COME). Never a made-up answer: no day chosen, nothing counted.
+  Its chart is when the register moved on from that day, not a count of what was current (the owner: no use): each
+  document once, in the week (month, past 16 weeks) of its first change since: replaced by a new revision, released
+  for the first time, put out of use. A column narrows the lines to what changed then; the lines list the changed
+  first, in the order they changed ("Changed on"). Nothing moved: no chart, said so.
 
 ### Home
 - Home's to-do lists everything the signed-in person has to do, whatever it

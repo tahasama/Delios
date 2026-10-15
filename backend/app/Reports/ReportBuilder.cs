@@ -388,7 +388,9 @@ public sealed partial class ReportBuilder(IClock clock)
     /// <summary>
     /// The register as it stood at the end of a day (project time): each document that existed then, the revision that
     /// was current (the latest released by then, not void on that day), its status, and what is current now. For audits,
-    /// claims and "what did we build from?".
+    /// claims and "what did we build from?". The chart says when the register moved on from that day, and how: each
+    /// document counted once, in the week (or month, over 16 weeks) of its first change since: replaced by a new
+    /// revision, released for the first time, or put out of use (withdrawn, cancelled, its revision voided).
     /// </summary>
     private async Task<Report> AsOfAsync(ReportOptions options, CancellationToken cancellationToken)
     {
@@ -404,46 +406,72 @@ public sealed partial class ReportBuilder(IClock clock)
             .ToListAsync(cancellationToken);
         Segment[] segments =
         [
-            new("same", "Still current", "good"), new("since", "Replaced since", "info"),
-            new("none", "Nothing released then", "muted"), new("out", "Out of use then", "bad"),
+            new("replaced", "Replaced by a new revision", "info"), new("first", "Released for the first time", "good"),
+            new("out", "Put out of use", "bad"),
         ];
+        Segment[] stages = [.. segments, new("same", "As it was", "muted"), new("none", "Nothing released yet", "muted"), new("before", "Already out of use", "muted")];
+
+        // The periods from that day to today: weeks (starting Monday) up to 16 of them, else months.
+        var weekly = Period.Between(day, _today, PeriodUnits.Days).Days <= 16 * 7;
+        LocalDate PeriodOf(LocalDate d) => weekly
+            ? (d.DayOfWeek == IsoDayOfWeek.Monday ? d : d.Previous(IsoDayOfWeek.Monday))
+            : new LocalDate(d.Year, d.Month, 1);
+        string Said(LocalDate start) => start.ToString(weekly ? "d MMM" : "MMM yy", System.Globalization.CultureInfo.InvariantCulture);
+        var periods = new List<Bar>();
+        for (var p = PeriodOf(day); p <= _today; p = weekly ? p.PlusWeeks(1) : p.PlusMonths(1)) periods.Add(new Bar(Said(p), []));
+        var periodIndex = periods.Select((bar, i) => (bar.Label, i)).ToDictionary(x => x.Label, x => x.i);
+
         // Void on that day: voided by then and not taken back by then.
         bool VoidOn(Instant? voided, Instant? unvoided) => voided < end && (unvoided is null || unvoided >= end);
-        var bars = new SortedDictionary<string, Bar>(StringComparer.Ordinal);
-        var rows = new List<(string?, IReadOnlyList<Cell>)>();
-        var tally = segments.ToDictionary(s => s.Key, _ => 0);
+        var rows = new List<(Instant? Moved, string? Bar, IReadOnlyList<Cell> Row)>();
+        var tally = stages.ToDictionary(s => s.Key, _ => 0);
         foreach (var d in docs)
         {
             var then = d.Revisions.Where(r => r.ReleasedAt < end && !VoidOn(r.VoidedAt, r.UnvoidedAt))
                 .OrderByDescending(r => r.ReleasedAt).FirstOrDefault();
             var now = d.Revisions.Where(r => r.State != RevisionStates.Void).OrderByDescending(r => r.ReleasedAt).FirstOrDefault();
-            var ended = d.EndedAt < end && (d.ReinstatedAt is null || d.ReinstatedAt >= end);
-            var key = ended ? "out" : then is null ? "none" : now is not null && now.Value != then.Value ? "since" : "same";
+            var endedThen = d.EndedAt < end && (d.ReinstatedAt is null || d.ReinstatedAt >= end);
+            // Its first change since that day, and what it was.
+            var released = d.Revisions.Where(r => r.ReleasedAt >= end).Min(r => r.ReleasedAt);
+            var outAt = new[] { d.EndedAt >= end ? d.EndedAt : null, then?.VoidedAt >= end ? then.VoidedAt : null }.Min();
+            var (key, moved) = endedThen ? ("before", (Instant?)null)
+                : outAt is { } o && (released is null || o <= released) ? ("out", outAt)
+                : released is { } r ? (then is null ? "first" : "replaced", released)
+                : then is null ? ("none", null) : ("same", null);
             tally[key]++;
+            string? bar = null;
+            if (moved is { } at && periodIndex.TryGetValue(Said(PeriodOf(at.InZone(_zone).Date)), out var index))
+            {
+                periods[index].Add(key);
+                bar = periods[index].Label;
+            }
             var discipline = _catalog.Label(ValueSets.Disciplines, d.Discipline);
-            (bars.TryGetValue(discipline, out var bar) ? bar : bars[discipline] = new Bar(discipline, [])).Add(key);
-            rows.Add((discipline,
+            rows.Add((moved, bar,
             [
                 Doc(d.Id, d.Number), d.Title, discipline,
                 then is null ? "nothing released" : $"rev {then.Value}",
                 then?.StatusCode is { } status ? _catalog.Label(ReviewSets.Statuses, status) : "—",
                 Date(then?.ReleasedAt),
-                key == "since" ? $"rev {now!.Value}" : key == "same" ? "the same" : now is null ? "nothing released" : $"rev {now.Value}",
-                Stage(segments, key),
+                now is null ? "nothing released" : now.Value == then?.Value ? "the same" : $"rev {now.Value}",
+                Stage(stages, key), Date(moved),
             ]));
         }
         var label = day.ToString("d MMMM yyyy", System.Globalization.CultureInfo.InvariantCulture);
+        var changed = tally["replaced"] + tally["first"] + tally["out"];
         return Make(ReportIds.AsOf, "Register on a date", $"Which revision was current on {label}?",
-            "Audits, claims and \"what did we build from?\": the register as it stood at the end of that day.",
+            "Audits, claims and \"what did we build from?\": the register as it stood at the end of that day, and what moved since.",
             [
                 new("Documents then", docs.Count.ToString()),
-                new("Released by then", (tally["same"] + tally["since"]).ToString(), "good"),
-                new("Replaced since", tally["since"].ToString(), tally["since"] > 0 ? "warn" : null),
-                new("Nothing released", tally["none"].ToString()),
+                new("Released by then", docs.Count(d => d.Revisions.Any(r => r.ReleasedAt < end && !VoidOn(r.VoidedAt, r.UnvoidedAt))).ToString()),
+                new("Changed since", changed.ToString(), changed > 0 ? "warn" : "good"),
+                new("As it was", tally["same"].ToString()),
             ],
-            new Chart($"Documents by discipline, on {label}", segments, [.. bars.Values]),
-            ["Document", "Title", "Discipline", $"Current on {day:yyyy-MM-dd}", "Status then", "Released", "Current now", "Since"],
-            rows, $"No document was registered by {label}.");
+            // Nothing moved (or the day is today): no chart, the figures say so.
+            new Chart($"When the register moved on from {label}, {(weekly ? "week" : "month")} by {(weekly ? "week" : "month")}", segments,
+                changed == 0 ? [] : periods, ChartKinds.Columns),
+            ["Document", "Title", "Discipline", $"Current on {day:yyyy-MM-dd}", "Status then", "Released", "Current now", "Since then", "Changed on"],
+            // What changed first, in the order it changed; then the rest by number.
+            [.. rows.OrderBy(x => x.Moved is null).ThenBy(x => x.Moved).Select(x => (x.Bar, x.Row))], $"No document was registered by {label}.");
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

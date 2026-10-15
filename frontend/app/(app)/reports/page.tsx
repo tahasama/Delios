@@ -155,6 +155,10 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
               </div>
               <ChartView chart={report.chart} chosen={asked.bar} hrefOf={(label) => link({ bar: label === asked.bar ? undefined : label, page: undefined })} />
             </section>
+          ) : current === "asof" ? (
+            <p className="rounded-md bg-tint-soft px-3 py-2.5 text-xs leading-5 text-slate-700 ring-1 ring-line">
+              Nothing has moved since that day: no document was replaced, released for the first time or put out of use.
+            </p>
           ) : null}
 
           <section className="register register-sheet register-sheet-open" aria-labelledby="list-head">

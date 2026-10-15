@@ -586,6 +586,8 @@ the installation sets its keys.
   - Charts fit their question: the transmittal log in columns per month, reviews as the longest waits in days (or by
     reviewer), activity readiness on a calendar.
   - Every report prints (landscape, without the menus).
+  - Register on a date charts when the register moved on from that day (replaced, released for the first time, put
+    out of use, week by week), instead of counting what was current by discipline.
 - **Settings → Controlled changes is gone** (upload a matrix or a list, then approve it). Settings regulates and
   takes no uploads; the matrix and the lists come in on Import & export, checked first. Four download templates no
   page offered any more (an old deliverable CSV, a schedule template, a details correction, a review matrix) are gone.
