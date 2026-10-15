@@ -437,6 +437,14 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - Roles on a project (CONTRACT_ROLES): GENERIC, EPC, EPCM, PMC, DESIGN, OWNER, CM, CONTRACTOR, SUBCONTRACTOR,
   SUPPLIER, INSPECTOR (docs/ORGANIZATIONS.md). New ones only with the owner's approval.
 
+### Import & export
+- A file is always checked first; the check writes nothing and uses the backend's own rules (`POST /documents/check`,
+  the same as registering). Problems name the sheet and row the person sees. Writing names its count; rows with
+  problems are left out only after it is said and agreed, and they download to fix and import again.
+- A person is never given a password chosen by someone else: Team list (and `POST /api/admin/users` with `invite`)
+  emails a link to choose their own (7 days, once); with email off, the link is handed back to whoever added them.
+- Import & export follows the Schedule look; exports are grouped (the register, Assurance, the record).
+
 ### Home
 - Home's to-do lists everything the signed-in person has to do, whatever it
   is: reviews to decide or advise, releases, documents returned, things to send

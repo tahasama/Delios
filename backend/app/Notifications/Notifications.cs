@@ -169,6 +169,9 @@ public sealed class Notifier(DeliosDbContext db, IClock clock, IOptions<EmailOpt
 {
     private EmailOptions Email => options.Value;
 
+    /// <summary>Whether email of this kind leaves the installation (off: it is kept in the outbox, marked not sent).</summary>
+    public bool Sends(string kind) => Email.Sends(kind);
+
     /// <summary>
     /// Notifies each person once (repeats and empty ids are ignored), and emails those with an address when
     /// notification email is on. <paramref name="link"/> is a path on the screens. <paramref name="emailBody"/>, when

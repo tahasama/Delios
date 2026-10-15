@@ -42,13 +42,40 @@ public sealed class Numbering(DeliosDbContext db)
     public async Task<Allocation> AllocateAsync(
         Guid tenantId, Guid projectId, string deliverableType, NumberFields fields, CancellationToken cancellationToken)
     {
+        var (scheme, parts, refusal) = await PrefixAsync(deliverableType, fields, cancellationToken);
+        if (refusal is not null) return refusal;
+
+        var prefix = string.Join(scheme!.Delimiter, parts);
+        var digits = scheme.Fields.Single(f => f.Source == FieldSources.Sequence).Digits ?? 5;
+        // A range issued to a named party for this prefix is drawn down first; a number already on a document is passed over.
+        for (var tries = 0; tries < 100; tries++)
+        {
+            var number = await FromRangeAsync(projectId, prefix, scheme.Delimiter, digits, cancellationToken)
+                ?? await NextAsync(tenantId, projectId, prefix, scheme.Delimiter, digits, cancellationToken);
+            if (!await db.Documents.AnyAsync(d => d.ProjectId == projectId && d.Number == number, cancellationToken))
+                return new Allocation.Allocated(number);
+        }
+        return new Allocation.Allocated(await NextAsync(tenantId, projectId, prefix, scheme.Delimiter, digits, cancellationToken));
+    }
+
+    /// <summary>
+    /// Whether a number could be built for these fields, without reserving one: null when it could, else the reason
+    /// (no scheme, or a field the scheme is built from left empty). What a check before registering asks.
+    /// </summary>
+    public async Task<Allocation?> RefusalAsync(string deliverableType, NumberFields fields, CancellationToken cancellationToken) =>
+        (await PrefixAsync(deliverableType, fields, cancellationToken)).Refusal;
+
+    /// <summary>The scheme routed to the deliverable type and the parts of the number before its sequence.</summary>
+    private async Task<(NumberingScheme? Scheme, List<string> Parts, Allocation? Refusal)> PrefixAsync(
+        string deliverableType, NumberFields fields, CancellationToken cancellationToken)
+    {
         var scheme = await db.SchemeRoutings.AsNoTracking()
             .Where(r => r.DeliverableType == deliverableType && r.Active && r.Scheme!.Active)
             .Select(r => r.Scheme)
             .SingleOrDefaultAsync(cancellationToken);
-        if (scheme is null) return new Allocation.NoScheme(deliverableType);
-
         var parts = new List<string>();
+        if (scheme is null) return (null, parts, new Allocation.NoScheme(deliverableType));
+
         foreach (var field in scheme.Fields.Where(f => f.Source != FieldSources.Sequence))
         {
             var value = field.Source switch
@@ -64,21 +91,10 @@ public sealed class Numbering(DeliosDbContext db)
                 FieldSources.Receiver => fields.Receiver,
                 _ => null,
             };
-            if (string.IsNullOrEmpty(value)) return new Allocation.MissingField(field.Label);
+            if (string.IsNullOrEmpty(value)) return (scheme, parts, new Allocation.MissingField(field.Label));
             parts.Add(value);
         }
-
-        var prefix = string.Join(scheme.Delimiter, parts);
-        var digits = scheme.Fields.Single(f => f.Source == FieldSources.Sequence).Digits ?? 5;
-        // A range issued to a named party for this prefix is drawn down first; a number already on a document is passed over.
-        for (var tries = 0; tries < 100; tries++)
-        {
-            var number = await FromRangeAsync(projectId, prefix, scheme.Delimiter, digits, cancellationToken)
-                ?? await NextAsync(tenantId, projectId, prefix, scheme.Delimiter, digits, cancellationToken);
-            if (!await db.Documents.AnyAsync(d => d.ProjectId == projectId && d.Number == number, cancellationToken))
-                return new Allocation.Allocated(number);
-        }
-        return new Allocation.Allocated(await NextAsync(tenantId, projectId, prefix, scheme.Delimiter, digits, cancellationToken));
+        return (scheme, parts, null);
     }
 
     /// <summary>

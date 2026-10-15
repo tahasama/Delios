@@ -31,6 +31,7 @@ public static class DocumentEndpoints
         project.MapGet("/documents", ListAsync);
         project.MapGet("/documents/{documentId:guid}", GetAsync);
         project.MapPost("/documents", RegisterAsync).AddEndpointFilter<IdempotencyFilter>();
+        project.MapPost("/documents/check", CheckRegisterAsync);
         project.MapPost("/documents/{documentId:guid}/uploads", RequestUploadAsync);
         project.MapGet("/revisions/{revisionId:guid}", async (Guid revisionId, HttpContext h, DeliosDbContext db, DocumentService documents, CancellationToken c) =>
         {
@@ -146,6 +147,14 @@ public static class DocumentEndpoints
         var (document, problem) = await documents.RegisterAsync(access, request, cancellationToken);
         return problem ?? Results.Created($"/api/projects/{access.Project.Id}/documents/{document!.Id}", View(document));
     }
+
+    /// <summary>
+    /// POST /documents/check: whether this new document would be registered, with every rule registering applies, and
+    /// nothing written: 204, or the problem saying what to fix. What a deliverable list is checked with before import.
+    /// </summary>
+    private static async Task<IResult> CheckRegisterAsync(
+        RegisterDocumentRequest request, HttpContext http, DocumentService documents, CancellationToken cancellationToken) =>
+        await documents.CheckRegisterAsync(ProjectAccessFilter.Of(http), request, cancellationToken) ?? Results.NoContent();
 
     /// <summary>POST /documents/{documentId}/uploads: records a file the caller is about to upload and returns a signed upload link.</summary>
     private static async Task<IResult> RequestUploadAsync(

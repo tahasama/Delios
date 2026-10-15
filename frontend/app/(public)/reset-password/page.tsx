@@ -9,13 +9,16 @@ import { AuthShell } from "@/app/(public)/login/shell";
 
 function ResetForm() {
   const [state, formAction, pending] = useActionState(resetPasswordAction, undefined);
-  const token = useSearchParams().get("token") ?? "";
+  const params = useSearchParams();
+  const token = params.get("token") ?? "";
+  // An invitation: the person has never had a password here.
+  const first = params.get("first") === "1";
   return (
     <AuthShell>
-      <h2 className="text-xl font-semibold text-slate-900">Choose a new password</h2>
+      <h2 className="text-xl font-semibold text-slate-900">{first ? "Choose your password" : "Choose a new password"}</h2>
       {state?.done ? (
         <div className="mt-6 space-y-4">
-          <p className="text-sm text-slate-600">Your password is changed, and you are signed out everywhere. Sign in with the new one.</p>
+          <p className="text-sm text-slate-600">{first ? "Your password is set. Sign in with your email and this password." : "Your password is changed, and you are signed out everywhere. Sign in with the new one."}</p>
           <Link href="/login" className={`${btn("primary")} w-full`}>Sign in</Link>
         </div>
       ) : !token ? (
@@ -29,7 +32,7 @@ function ResetForm() {
           <form action={formAction} className="mt-6 space-y-4">
             <input type="hidden" name="token" value={token} />
             <div>
-              <label htmlFor="password" className="mb-1 block text-xs font-medium text-slate-700">New password</label>
+              <label htmlFor="password" className="mb-1 block text-xs font-medium text-slate-700">{first ? "Password" : "New password"}</label>
               <input id="password" name="password" type="password" autoComplete="new-password" required minLength={8} autoFocus className={inputCls} />
             </div>
             <div>
@@ -43,7 +46,7 @@ function ResetForm() {
               </p>
             ) : null}
             <button type="submit" disabled={pending} className={`${btn("primary")} w-full`}>
-              {pending ? "Saving…" : "Save the new password"}
+              {pending ? "Saving…" : first ? "Save my password" : "Save the new password"}
             </button>
           </form>
         </>

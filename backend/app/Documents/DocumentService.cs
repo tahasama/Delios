@@ -23,7 +23,18 @@ public sealed class DocumentService(
     /// Returns the document, or a problem response saying what to fix. Called by the POST /documents endpoint.
     /// </summary>
     public async Task<(Document? Document, IResult? Problem)> RegisterAsync(
-        ProjectAccess access, RegisterDocumentRequest request, CancellationToken cancellationToken)
+        ProjectAccess access, RegisterDocumentRequest request, CancellationToken cancellationToken) =>
+        await RegisterAsync(access, request, checkOnly: false, cancellationToken);
+
+    /// <summary>
+    /// Checks a new document as registering it would, and stops before anything is written or a number reserved:
+    /// null when it would be registered, else the problem saying what to fix. A list checked before it is imported.
+    /// </summary>
+    public async Task<IResult?> CheckRegisterAsync(ProjectAccess access, RegisterDocumentRequest request, CancellationToken cancellationToken) =>
+        (await RegisterAsync(access, request, checkOnly: true, cancellationToken)).Problem;
+
+    private async Task<(Document? Document, IResult? Problem)> RegisterAsync(
+        ProjectAccess access, RegisterDocumentRequest request, bool checkOnly, CancellationToken cancellationToken)
     {
         // Values typed or pasted with spaces around them still match the published lists.
         request = request with { DeliverableType = request.DeliverableType?.Trim(), DocType = request.DocType?.Trim(), Discipline = request.Discipline?.Trim() };
@@ -113,6 +124,21 @@ public sealed class DocumentService(
         var recordType = (await Catalog.LoadAsync(db, cancellationToken)).Prop(ValueSets.DocumentTypes, request.DocType!, "record")
             is { ValueKind: System.Text.Json.JsonValueKind.True };
         var kind = recordType || request.Kind?.ToUpperInvariant() == DocumentKinds.Record ? DocumentKinds.Record : DocumentKinds.Document;
+        if (checkOnly)
+        {
+            var refusal = await numbering.RefusalAsync(request.DeliverableType, new NumberFields(access.Project.Code, Blank(request.Subproject),
+                originator, Blank(request.ContractRef), request.Discipline, request.DocType), cancellationToken);
+            return refusal switch
+            {
+                Allocation.NoScheme => Fail(Problems.Invalid("NO_NUMBERING_SCHEME",
+                    $"No numbering scheme is routed for {request.DeliverableType}.", new { deliverableType = request.DeliverableType })),
+                Allocation.MissingField(var missingLabel) => Fail(Problems.Invalid("NUMBER_FIELD_MISSING",
+                    $"The number for this kind of document is built from {missingLabel.ToLowerInvariant()}, so it has to be chosen first.",
+                    new { field = missingLabel })),
+                _ => (null, null),
+            };
+        }
+
         // The project's own code is in Settings, whatever was published before.
         await ProjectCodes.EnsurePublishedAsync(db, access.Project.TenantId, access.Project.Code, access.Project.Name, cancellationToken);
         var allocation = await numbering.AllocateAsync(access.Project.TenantId, access.Project.Id, request.DeliverableType,

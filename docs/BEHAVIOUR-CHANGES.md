@@ -558,6 +558,17 @@ the installation sets its keys.
   <supplier>" and the register's "Create transmittal"). The supplier package now lists what is overdue above its
   documents, and ticks the overdue ones not sent yet in one click.
 
+- **Import & export is checked first, always.** The "Dry run" tick is gone: a file is checked, then one button
+  names what it writes ("Register 41 documents, leave out 3"), and asks first when rows are left out. Problems point
+  at the sheet and row as seen in the file (they were counted wrong in a workbook), the check uses the backend's own
+  rules (a row that passes registers), and the rows with problems, or the whole report, can be downloaded. After
+  writing, a link opens the register at what was written.
+- **Team list sends invitations instead of showing passwords.** Each person is emailed a link to choose their own
+  password; with email off, the link is in the report (with Copy), and leaving the page asks first. People added
+  this way wait under People to confirm where the project asks for it, as before.
+- **The Import & export page** follows the Schedule look; a file chosen is shown with Remove and is let go when the
+  kind changes; each kind says which files it takes; the matrix and the Settings lists show as an administrator's.
+  Exports are grouped (the register, Assurance, the record). "Back to register" is gone (the menu does it).
 - **Stamps follow the project's choice** (How this project works → "Stamping the PDF" and "Which stamps"): stamped
   or not; each stamp (released, returned by the review, superseded, void, on hold) on or off; and, if wanted, the
   comments of a verdict that carries them listed on a last page. Before, the setting was not read and every stamp

@@ -1,172 +1,338 @@
 "use client";
 
-import { useActionState, useRef, useState } from "react";
-import { importBulkAction } from "@/lib/documents/forms-import";
-import { Card, Chip, DataTable, Th, Td, btn, inputCls } from "@/components/ui";
-import { Download } from "lucide-react";
+import { startTransition, useActionState, useEffect, useState } from "react";
+import { importBulkAction, type ImportResult, type ImportRow } from "@/lib/documents/forms-import";
+import { ToneChip, btn } from "@/components/ui";
+import { Check, Copy, Download, FileSpreadsheet, X } from "lucide-react";
 
-// What each activity needs is agreed through Schedule & actions — the
-// departments list it, and Document Control issues it. It is not imported here.
-const KINDS = [
+type Kind = {
+  key: string;
+  name: string;
+  /** What it fills, under its name. */
+  hint: string;
+  title: string;
+  blurb: string;
+  columns: string;
+  template: string;
+  templateLabel: string;
+  /** The file it takes, for the field and its hint. */
+  accept: string;
+  formats: string;
+  /** Changes what every screen offers: an administrator's. */
+  adminOnly?: boolean;
+};
+
+// What each action needs is agreed through the Schedule (the requirements list) and
+// Document Control issues it: it is not imported here.
+const KINDS: Kind[] = [
   {
     key: "deliverables",
-    short: "Deliverable list",
-    title: "A deliverable list → the register",
-    blurb: "One row per document. A row with no document number is registered and given one; a row carrying a number corrects that document instead. What the number is built from — type, discipline, project, sub-project, supplier — cannot be corrected here, because the number would then disagree with the record.",
-    columns: "Download the workbook: one sheet per deliverable type, each carrying only the columns that type has, with every published list as a dropdown.",
+    name: "Deliverable list",
+    hint: "the register in one go",
+    title: "Register documents from a list",
+    blurb: "One row per document. A row with no Document Number is registered and given its number; a row with a number corrects that document. What the number is made of (type, discipline, project, sub-project, supplier) cannot be corrected, because the number would then disagree with the document.",
+    columns: "The workbook has a sheet per deliverable type, with only that type's columns and each Settings list as a dropdown. Shaded headings must be filled.",
     template: "/api/export/template-deliverables",
     templateLabel: "Download the workbook (.xlsx)",
+    accept: ".xlsx,.csv,text/csv",
+    formats: "the workbook (.xlsx) or a CSV, headings kept",
   },
   {
     key: "people",
-    short: "Team list",
-    title: "People \u2192 accounts on this project",
-    blurb: "A whole team at once: one row per person. Each becomes an account on this project, in the function named, with a first password shown in the report for you to hand over.",
-    columns: "Name, Email, Company (a party code or name; leave empty for our own staff), Function (as published in Functions & permissions), Department",
+    name: "Team list",
+    hint: "people on this project",
+    title: "Put a team on this project",
+    blurb: "One row per person. Each gets an account on this project in the function named, and an email asking them to choose their own password. Where management confirms who joins, they wait under People to confirm.",
+    columns: "Name, Email, Company (an organization's code or name; empty for our own people), Function (as in Settings → Functions & permissions), Department.",
     template: "/api/export/template-people",
+    templateLabel: "Download the template (.csv)",
+    accept: ".csv,text/csv",
+    formats: "a CSV, headings kept",
   },
   {
     key: "matrix",
-    short: "Distribution matrix",
-    title: "A filled-in distribution matrix → who does what",
-    blurb: "Download the matrix, change the letters, upload it back. A dry run lists every cell that differs from what the matrix says today; applying it writes the rules. Administrators only.",
-    columns: "Keep the header row and the first four columns. A approves · R reviews · C controls · T issues · I receives · · may read · - not distributed",
+    name: "Distribution matrix",
+    hint: "who does what",
+    title: "Change the distribution matrix",
+    blurb: "Download the matrix as it stands, change the letters, and bring it back. The check lists every cell that differs from today; writing it changes those cells only.",
+    columns: "Keep the headings and the first four columns. Letters: A approves, R reviews, C controls, T issues, I receives, · may read, - not sent.",
     template: "/api/export/matrix",
-    templateLabel: "Download the matrix as it stands",
+    templateLabel: "Download the matrix as it stands (.csv)",
+    accept: ".csv,text/csv",
+    formats: "the matrix as downloaded (.csv)",
+    adminOnly: true,
   },
   {
     key: "sets",
-    short: "A published list",
-    title: "A published list → the list itself",
-    blurb: "One workbook, a tab per list — disciplines, document types, statuses, all of them. Edit whichever tabs you care about and upload it once. A code that exists is updated; a new code is published. A row you delete is left alone, because retiring is a deliberate act on the list's own page.",
-    columns: "Code, Label, Status, and whatever properties that list carries.",
+    name: "Settings lists",
+    hint: "disciplines, types, statuses…",
+    title: "Update the Settings lists",
+    blurb: "One workbook, a sheet per list. Change the sheets you need and bring it back once. A code already there is updated; a new code is added. A row you delete is left as it is: a value is retired on its list's own page.",
+    columns: "Code, Label, Status, then whatever that list carries.",
     template: "/api/export/template-sets",
     templateLabel: "Download every list (.xlsx)",
+    accept: ".xlsx",
+    formats: "the workbook (.xlsx) as downloaded",
+    adminOnly: true,
   },
 ];
 
-export function BulkImportForm({ initialKind }: { initialKind: string }) {
-  const [state, formAction, pending] = useActionState(importBulkAction, undefined);
-  const form = useRef<HTMLFormElement>(null);
-  const [kind, setKind] = useState(KINDS.some((k) => k.key === initialKind) ? initialKind : KINDS[0].key);
+/** Hands the person a file made here (the report, the rows to fix). */
+function save(name: string, csv: string) {
+  const url = URL.createObjectURL(new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = name;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+/** What became of one row, as a chip. */
+function Outcome({ row, checked }: { row: ImportRow; checked: boolean }) {
+  return (
+    <ToneChip tone={!row.ok ? "refused" : checked ? "moving" : row.wrote === false ? "idle" : "done"}>
+      {!row.ok ? (checked ? "problem" : "left out") : checked ? "ready" : row.wrote === false ? "no change" : "written"}
+    </ToneChip>
+  );
+}
+
+/** A link to pass on by hand: shown whole on hover, copied in one press. */
+function PassOn({ link }: { link: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <span className="mt-1 flex min-w-0 items-center gap-2">
+      <span className="min-w-0 truncate font-mono text-[11px] text-slate-600" title={link}>{link}</span>
+      <button
+        type="button"
+        className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-link hover:underline"
+        onClick={() => navigator.clipboard.writeText(link).then(() => setCopied(true), () => setCopied(false))}
+      >
+        {copied ? <Check className="h-3.5 w-3.5" aria-hidden="true" /> : <Copy className="h-3.5 w-3.5" aria-hidden="true" />}
+        {copied ? "Copied" : "Copy"}
+      </button>
+    </span>
+  );
+}
+
+const cell = (value: string) => (/[",\n]/.test(value) ? `"${value.replaceAll('"', '""')}"` : value);
+
+export function BulkImportForm({ initialKind, admin }: { initialKind: string; admin: boolean }) {
+  const [result, run, pending] = useActionState(importBulkAction, undefined);
+  const usable = (k: Kind) => !k.adminOnly || admin;
+  const [kind, setKind] = useState(KINDS.find((k) => k.key === initialKind && usable(k))?.key ?? KINDS[0].key);
   const chosen = KINDS.find((k) => k.key === kind)!;
-  // React empties the form once a server action returns, so the file somebody
-  // chose is gone by the time they want to run it for real. It is kept here and
-  // put back on the way out.
+  // The file is held here, not in the field: the form is emptied each time the server answers, and the same file
+  // goes from the check to the writing without being chosen again.
   const [file, setFile] = useState<File | null>(null);
-  const send = (data: FormData, options?: { dryRun: boolean }) => {
-    const picked = data.get("file");
-    if ((!(picked instanceof File) || picked.size === 0) && file) data.set("file", file);
+  // The report shown belongs to the kind and file it was made for.
+  const [reportFor, setReportFor] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState(false);
+  const report: ImportResult | undefined = reportFor === `${kind}|${file?.name}` ? result : undefined;
+
+  const send = (mode: "check" | "write") => {
+    if (!file) return;
+    const data = new FormData();
     data.set("kind", kind);
-    if (options) {
-      data.delete("dryRun");
-      if (options.dryRun) data.set("dryRun", "on");
-    }
-    formAction(data);
+    data.set("mode", mode);
+    data.set("file", file);
+    setReportFor(`${kind}|${file.name}`);
+    setConfirming(false);
+    startTransition(() => run(data));
   };
 
-  return (
-    <Card title="Import a spreadsheet">
-      <form ref={form} action={(data) => send(data)} className="space-y-4">
-        <div>
-          <span className="mb-2 block text-xs font-medium text-slate-700">What are you importing?</span>
-          {/* Four short tiles rather than four paragraphs: only the one you
-              have chosen needs to explain itself, and the others stay readable
-              as a set of choices instead of a wall. */}
-          <div className="grid gap-2 sm:grid-cols-2">
-            {KINDS.map((k) => (
-              <label
-                key={k.key}
-                className={`flex cursor-pointer items-center gap-2.5 rounded-xl border px-3 py-2.5 transition ${
-                  kind === k.key ? "border-brand-line bg-tint-soft shadow-sm" : "border-line hover:border-brand-line/40 hover:bg-slate-50"
-                }`}
-              >
-                <input type="radio" name="kind" value={k.key} checked={kind === k.key} onChange={() => setKind(k.key)} className="shrink-0" />
-                <span className="min-w-0 text-sm font-medium text-slate-800">{k.short}</span>
-              </label>
-            ))}
-          </div>
+  // Links to choose a password, when email is off, exist only in this report: leaving asks first.
+  const holding = !!report?.handOver;
+  useEffect(() => {
+    if (!holding) return;
+    const stay = (event: BeforeUnloadEvent) => event.preventDefault();
+    window.addEventListener("beforeunload", stay);
+    return () => window.removeEventListener("beforeunload", stay);
+  }, [holding]);
 
-          {/* What it does, and the file it starts from, together — they were
-              paired all along and the page never said so. */}
-          <div className="mt-3 rounded-xl bg-slate-50 px-3.5 py-3">
-            <p className="text-sm font-medium text-slate-800">{chosen.title}</p>
-            <p className="mt-1 text-xs leading-relaxed text-slate-600">{chosen.blurb}</p>
-            <p className="mt-1.5 text-[11px] leading-relaxed text-slate-400">{chosen.columns}</p>
-            {chosen.template ? (
-              <a href={chosen.template} className="mt-2.5 inline-flex items-center gap-1.5 text-xs font-semibold text-link hover:underline">
-                <Download className="h-3.5 w-3.5" /> {chosen.templateLabel ?? "Download the template"}
-              </a>
-            ) : null}
+  const choose = (key: string) => {
+    if (key === kind) return;
+    setKind(key);
+    // Another kind reads another file: the one held is let go.
+    setFile(null);
+    setConfirming(false);
+  };
+
+  const rows = report?.rows ?? [];
+  const problems = report?.problems ?? 0;
+  const ready = report?.ready ?? 0;
+  const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, "");
+
+  return (
+    <section className="register register-sheet register-sheet-open min-w-0" aria-labelledby="import-head">
+      <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
+        <span id="import-head" className="stencil mr-1 text-slate-500">Bring a list in</span>
+        <span className="text-[11px] text-slate-500">checked first: nothing is written until you say so</span>
+      </div>
+
+      <ul className="divide-y divide-line">
+        <li className="space-y-3 px-5 py-4 sm:px-6">
+          <fieldset>
+            <legend className="mb-2 text-sm font-semibold text-slate-800">What are you importing?</legend>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {KINDS.map((k) => (
+                <label
+                  key={k.key}
+                  className={`flex items-start gap-2.5 rounded-md px-3 py-2.5 ring-1 ring-line ${
+                    usable(k) ? "cursor-pointer hover:bg-tint-soft has-checked:bg-tint-soft has-checked:ring-brand-line" : "cursor-not-allowed opacity-60"
+                  }`}
+                >
+                  <input type="radio" name="kind" value={k.key} checked={kind === k.key} disabled={!usable(k)} onChange={() => choose(k.key)} className="mt-0.5 shrink-0" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[13px] font-semibold text-slate-800">{k.name}</span>
+                    <span className="block text-xs text-slate-600">{usable(k) ? k.hint : "an administrator imports it"}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
+
+          {/* What it does and the file it starts from, together. */}
+          <div className="rounded-md bg-tint-soft px-3 py-2.5 text-xs leading-5 ring-1 ring-line">
+            <p className="text-[13px] font-semibold text-slate-800">{chosen.title}</p>
+            <p className="mt-1 max-w-[70ch] text-slate-600">{chosen.blurb}</p>
+            <p className="mt-1.5 max-w-[70ch] text-slate-600">{chosen.columns}</p>
+            <a href={chosen.template} className="mt-2 inline-flex items-center gap-1.5 font-semibold text-link hover:underline">
+              <Download className="h-3.5 w-3.5" aria-hidden="true" /> {chosen.templateLabel}
+            </a>
           </div>
-        </div>
-        <>
-            <label className="block">
-              <span className="mb-1 block text-xs font-medium text-slate-700">The filled-in file — a workbook (.xlsx) or a single-sheet CSV. Keep the heading row.</span>
+        </li>
+
+        <li className="space-y-3 px-5 py-4 sm:px-6">
+          <div className="max-w-xl">
+            <div className="mb-1.5 flex h-4 min-w-0 items-baseline gap-2 overflow-hidden leading-4">
+              <span className="text-xs font-medium text-slate-700">The filled-in file</span>
+              <span className="truncate text-[11px] text-slate-500" title={`Takes ${chosen.formats}`}>takes {chosen.formats}</span>
+            </div>
+            {file ? (
+              <div className="flex h-(--control-h) items-center gap-2 rounded-md px-2.5 text-[13px] ring-1 ring-line">
+                <FileSpreadsheet className="h-4 w-4 shrink-0 text-slate-500" aria-hidden="true" />
+                <span className="min-w-0 truncate font-medium text-slate-800" title={file.name}>{file.name}</span>
+                <span className="shrink-0 text-xs text-slate-500">{Math.max(1, Math.round(file.size / 1024))} KB</span>
+                <button type="button" onClick={() => { setFile(null); setConfirming(false); }} className="ml-auto inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-link hover:underline" disabled={pending}>
+                  <X className="h-3.5 w-3.5" aria-hidden="true" /> Remove
+                </button>
+              </div>
+            ) : (
               <input
                 type="file"
-                name="file"
-                accept=".xlsx,.csv,text/csv"
-                required={!file}
+                accept={chosen.accept}
+                aria-label="The filled-in file"
                 className="w-full"
                 onChange={(event) => setFile(event.target.files?.[0] ?? null)}
               />
-              {file ? <span className="mt-1 block text-[11px] text-slate-500">Holding <strong className="text-slate-700">{file.name}</strong> — you do not need to choose it again.</span> : null}
-            </label>
-            <label className="flex items-center gap-2 text-sm text-slate-700">
-              <input type="checkbox" name="dryRun" defaultChecked />
-              Dry run — check the file without writing anything (recommended first)
-            </label>
-            {state?.error ? <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{state.error}</p> : null}
-            {state?.ok ? <p className="rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-700">{state.ok}</p> : null}
-            <button type="submit" disabled={pending} className={btn("primary")}>
-              {pending ? "Working…" : "Check file"}
-            </button>
-        </>
-      </form>
-
-      {state?.rows?.length ? (
-        <div className="-mx-5 -mb-5 mt-5 border-t border-line bg-slate-50/70 px-5 py-4">
-          {/* The outcome is the point of the page, so it reads as its own
-              thing rather than as more of the form. */}
-          <div className="mb-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-            <h3 className="text-sm font-semibold text-slate-900">{state.dryRun ? "What would happen" : "What happened"}</h3>
-            <span className="text-xs text-slate-500">
-              <strong className="text-emerald-700">{state.rows.filter((r) => r.ok).length}</strong> ok
-              {state.rows.some((r) => !r.ok) ? <> · <strong className="text-red-700">{state.rows.filter((r) => !r.ok).length}</strong> with problems</> : null}
-              {" "}of {state.rows.length} line{state.rows.length === 1 ? "" : "s"}
-            </span>
+            )}
           </div>
-          <DataTable id="import-report" head={<tr><Th>Line</Th><Th>Status</Th><Th>Detail</Th></tr>}>
-            {state.rows.map((r) => (
-              <tr key={r.line} className={r.ok ? "" : "[&>td]:bg-red-50/60"}>
-                <Td className="py-1.5 text-xs tabular-nums text-slate-400">{r.line}</Td>
-                <Td className="whitespace-nowrap py-1.5">
-                  <Chip className={r.ok ? "bg-emerald-100 text-emerald-800 ring-emerald-300" : "bg-red-100 text-red-800 ring-red-300"}>
-                    {r.ok ? (state.dryRun ? "would import" : r.wrote === false ? "skipped" : "imported") : "problem"}
-                  </Chip>
-                </Td>
-                <Td className="py-1.5 text-xs text-slate-600">{r.message}</Td>
-              </tr>
-            ))}
-          </DataTable>
-          {state.dryRun && !state.failed ? (
-            <div className="mt-3 flex flex-wrap items-center gap-3 rounded-lg bg-emerald-50 px-3 py-2.5">
-              <p className="text-xs text-emerald-800">Nothing has changed yet.</p>
-              {/* The same file, the same choice, without the dry run — so the
-                  second pass is one press rather than choosing it all again. */}
-              <button
-                type="button"
-                disabled={pending}
-                onClick={() => send(new FormData(form.current ?? undefined), { dryRun: false })}
-                className={btn("primary", "sm")}
-              >
-                {pending ? "Importing…" : "Import it for real"}
-              </button>
-            </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <button type="button" disabled={!file || pending} onClick={() => send("check")} className={btn("primary")}>
+              {pending && !report?.checked ? "Checking…" : report?.checked ? "Check it again" : "Check the file"}
+            </button>
+            <span className="text-xs text-slate-500">{file ? "Checking writes nothing." : "Choose the file, then check it."}</span>
+          </div>
+          {result?.error && reportFor === `${kind}|${file?.name}` ? (
+            <p role="alert" className="rounded-md bg-red-50 px-2.5 py-1.5 text-xs text-red-800 ring-1 ring-red-200">{result.error}</p>
           ) : null}
-        </div>
-      ) : null}
-    </Card>
+        </li>
+
+        {report && !report.error ? (
+          <li className="space-y-3 px-5 py-4 sm:px-6" aria-live="polite">
+            <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+              <h2 className="text-sm font-semibold text-slate-800">{report.checked ? "What the check found" : "What was written"}</h2>
+              <span className="flex flex-wrap gap-1.5">
+                {report.checked
+                  ? <ToneChip tone={ready ? "done" : "idle"}>{ready} ready</ToneChip>
+                  : <ToneChip tone={report.done ? "done" : "idle"}>{report.done ?? 0} written</ToneChip>}
+                {problems ? <ToneChip tone="refused">{problems} with problems</ToneChip> : null}
+              </span>
+            </div>
+            <p className="text-xs leading-5 text-slate-600">{report.summary}</p>
+
+            {rows.length ? (
+              <div className="overflow-x-auto rounded-md ring-1 ring-line">
+                <table className="w-full table-fixed text-left text-xs">
+                  <thead className="bg-tint-soft text-[11px] text-slate-500">
+                    <tr>
+                      <th scope="col" className="w-24 px-3 py-2 font-semibold sm:w-40">Where in the file</th>
+                      <th scope="col" className="hidden w-24 px-3 py-2 font-semibold sm:table-cell">Result</th>
+                      <th scope="col" className="px-3 py-2 font-semibold">What it does</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-line">
+                    {rows.map((r) => (
+                      <tr key={r.line} className={r.ok ? "" : "bg-red-50/50"}>
+                        <td className="px-3 py-1.5 align-top break-words text-slate-600 tabular-nums">
+                          {r.at}
+                          <span className="mt-1 block sm:hidden"><Outcome row={r} checked={!!report.checked} /></span>
+                        </td>
+                        <td className="hidden px-3 py-1.5 align-top sm:table-cell"><Outcome row={r} checked={!!report.checked} /></td>
+                        <td className="max-w-0 px-3 py-1.5 align-top leading-5 break-words text-slate-700">
+                          {r.link ? <a href={r.link} className="text-link hover:underline">{r.message}</a> : r.message}
+                          {r.pass ? <PassOn link={r.pass} /> : null}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : null}
+
+            <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
+              {rows.length ? (
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-1.5 text-left font-semibold text-link hover:underline"
+                  onClick={() => save(`import-report-${stamp}.csv`, [["Where in the file", "Result", "What it does"], ...rows.map((r) => [r.at, r.ok ? (report.checked ? "ready" : "written") : "problem", r.pass ? `${r.message} ${r.pass}` : r.message])].map((line) => line.map(cell).join(",")).join("\n"))}
+                >
+                  <Download className="h-3.5 w-3.5" aria-hidden="true" /> Download the report
+                </button>
+              ) : null}
+              {report.problemCsv ? (
+                <button type="button" className="inline-flex items-center gap-1.5 text-left font-semibold text-link hover:underline" onClick={() => save(`rows-to-fix-${stamp}.csv`, report.problemCsv!)}>
+                  <Download className="h-3.5 w-3.5" aria-hidden="true" /> Download the {problems === 1 ? "row" : `${problems} rows`} with problems, to fix and import again
+                </button>
+              ) : null}
+              {report.registerLink ? <a href={report.registerLink} className="font-semibold text-link hover:underline">Open the register at what was just written</a> : null}
+              {!report.checked && kind === "people" && report.done ? <a href="/settings/users" className="font-semibold text-link hover:underline">Open People &amp; access</a> : null}
+            </div>
+
+            {report.handOver ? (
+              <p className="rounded-md bg-amber-50 px-2.5 py-1.5 text-xs leading-5 text-amber-900 ring-1 ring-amber-200">
+                The links to choose a password are only in this report. Download it, or pass them on, before you leave this page.
+              </p>
+            ) : null}
+
+            {/* The act, named with its count; rows with problems are left out only once that is said and agreed. */}
+            {report.checked && ready > 0 ? (
+              <div className="space-y-2 rounded-md bg-tint-soft px-3 py-2.5 text-xs leading-5 ring-1 ring-line">
+                {problems ? (
+                  <p className="text-slate-700">
+                    <strong className="font-semibold">{problems === 1 ? "1 row has" : `${problems} rows have`} problems and will be left out:</strong> nothing of {problems === 1 ? "it" : "them"} is written. Fix {problems === 1 ? "it" : "them"} in the file and import {problems === 1 ? "it" : "them"} afterwards.
+                  </p>
+                ) : (
+                  <p className="text-slate-700">Every row is ready. Nothing is written until you press it.</p>
+                )}
+                {confirming ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-semibold text-slate-800">Leave out {problems} and write the rest?</span>
+                    <button type="button" disabled={pending} onClick={() => send("write")} className={btn("primary")}>
+                      {pending ? "Writing…" : `Yes: ${report.act}`}
+                    </button>
+                    <button type="button" disabled={pending} onClick={() => setConfirming(false)} className={btn("secondary")}>Not yet</button>
+                  </div>
+                ) : (
+                  <button type="button" disabled={pending} onClick={() => (problems ? setConfirming(true) : send("write"))} className={btn("primary")}>
+                    {pending ? "Writing…" : `${report.act}${problems ? `, leave out ${problems}` : ""}`}
+                  </button>
+                )}
+              </div>
+            ) : null}
+          </li>
+        ) : null}
+      </ul>
+    </section>
   );
 }

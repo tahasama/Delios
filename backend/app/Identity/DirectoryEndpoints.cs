@@ -8,8 +8,11 @@ using NodaTime;
 
 namespace Delios.Host.Identity;
 
-/// <summary>Body of creating a person. <c>PartyId</c> empty means one of our own people.</summary>
-public sealed record CreateUserRequest(string? Name, string? Email, string? Password, Guid? PartyId = null, bool IsAdmin = false);
+/// <summary>
+/// Body of creating a person. <c>PartyId</c> empty means one of our own people. <c>Invite</c>, with no password: they
+/// are emailed a link to choose their own, and nobody else ever knows it.
+/// </summary>
+public sealed record CreateUserRequest(string? Name, string? Email, string? Password, Guid? PartyId = null, bool IsAdmin = false, bool Invite = false);
 
 /// <summary>Body of changing a person. A null field is left as it is; <c>ClearParty</c> makes them one of ours again.</summary>
 public sealed record UpdateUserRequest(
@@ -140,8 +143,12 @@ public static class DirectoryEndpoints
     /// <summary><c>POST /api/admin/users</c>: a new person. Their email signs them in to this organization alone.</summary>
     private static async Task<IResult> CreateUserAsync(
         CreateUserRequest request, HttpContext http, DeliosDbContext db, AuditLog audit, IPasswordHasher<User> hasher,
-        PasswordPolicy passwords, CancellationToken cancellationToken)
+        PasswordPolicy passwords, Microsoft.AspNetCore.DataProtection.IDataProtectionProvider protection, Notifications.Notifier notifier,
+        CancellationToken cancellationToken)
     {
+        // Invited: a password nobody knows until they choose their own from the link.
+        var invite = request.Invite && string.IsNullOrEmpty(request.Password);
+        if (invite) request = request with { Password = Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)) };
         var name = Blank(request.Name);
         var email = Blank(request.Email)?.ToLowerInvariant();
         if (name is null || email is null) return Problems.Invalid("NAME_AND_EMAIL_REQUIRED", "Name and email are required.");
@@ -166,9 +173,21 @@ public static class DirectoryEndpoints
         user.PasswordHash = hasher.HashPassword(user, request.Password!);
         db.Users.Add(user);
         await db.SaveChangesAsync(cancellationToken);
-        await audit.WriteAsync(await ActorAsync(http, db, cancellationToken), "USER_CREATED", "User", user.Id, user.Name,
-            $"{email}{(request.IsAdmin ? ", administrator" : "")}.", cancellationToken: cancellationToken);
-        return Results.Created($"/api/admin/users/{user.Id}", new { user.Id });
+        var actor = await ActorAsync(http, db, cancellationToken);
+        await audit.WriteAsync(actor, "USER_CREATED", "User", user.Id, user.Name,
+            $"{email}{(request.IsAdmin ? ", administrator" : "")}{(invite ? ", invited by email" : "")}.", cancellationToken: cancellationToken);
+        if (!invite) return Results.Created($"/api/admin/users/{user.Id}", new { user.Id });
+
+        var link = PasswordReset.InvitationLink(protection, notifier, user);
+        var organization = await db.Tenants.AsNoTracking().Where(t => t.Id == user.TenantId).Select(t => t.Name).SingleAsync(cancellationToken);
+        notifier.Queue(user.TenantId, null, Notifications.EmailKinds.Account, user.Email, user.Name, "Your DELIOS account",
+            $"{actor.Name} made you an account on DELIOS, at {organization} ({user.Email}).\n\n" +
+            $"To choose your password, open this link within {PasswordReset.InvitationLifetime.TotalDays:0} days. It works once.\n\n{link}",
+            "User", user.Id);
+        await db.SaveChangesAsync(cancellationToken);
+        // Email off on this installation: the link is handed back, for whoever made the account to pass on.
+        var sent = notifier.Sends(Notifications.EmailKinds.Account);
+        return Results.Created($"/api/admin/users/{user.Id}", new { user.Id, Invited = sent, Link = sent ? null : link });
     }
 
     /// <summary><c>PUT /api/admin/users/{id}</c>: name, email, organization, sign-in, administration rights, a new password.</summary>

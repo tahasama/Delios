@@ -33,6 +33,16 @@ public static class PasswordReset
         password.MapPost("/reset", ResetAsync).AllowAnonymous().RequireRateLimiting("sign-in");
     }
 
+    /// <summary>How long an invitation to choose a first password works.</summary>
+    public static readonly TimeSpan InvitationLifetime = TimeSpan.FromDays(7);
+
+    /// <summary>
+    /// The link a new person opens to choose their first password: the same sealed link as a reset, good for
+    /// <see cref="InvitationLifetime"/> and once (choosing the password changes the fingerprint it carries).
+    /// </summary>
+    public static string InvitationLink(IDataProtectionProvider protection, Notifier notifier, User user) =>
+        notifier.Url($"/reset-password?first=1&token={Uri.EscapeDataString(Links(protection).Protect($"{user.TenantId:N}|{user.Id:N}|{Stamp(user)}", InvitationLifetime))}");
+
     private static ITimeLimitedDataProtector Links(IDataProtectionProvider protection) =>
         protection.CreateProtector("delios.password.reset").ToTimeLimitedDataProtector();
 

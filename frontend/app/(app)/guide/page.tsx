@@ -40,7 +40,7 @@ const CONTROL: CapabilityItem[] = [
   { href: "/conformance", title: "Assurance and defects", text: "Run the checks, see how much of the register can be trusted, correct or accept what they find.", icon: ShieldCheck },
   { href: "/reports", title: "Evidence questions", text: "Answer who approved, who received, what changed, what is current and what work is exposed.", icon: ListChecks },
   { href: "/exposures", title: "Use and copy exposure", text: "Find obsolete copies, affected recipients and unresolved use consequences.", icon: Network },
-  { href: "/import", title: "Bulk import and export", text: "Load deliverable lists and controlled data through dry-run validation and downloadable templates.", icon: Import },
+  { href: "/import", title: "Import and export", text: "Bring in a deliverable list, a team, the matrix or the Settings lists from a template: each file is checked before anything is written.", icon: Import },
 ];
 
 const SETUP: CapabilityItem[] = [

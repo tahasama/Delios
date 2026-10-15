@@ -1056,6 +1056,23 @@ end is on both organizations' audit trails.
 
 ---
 
+## 56 · A list is checked before it is imported, and accounts are made by invitation
+
+**Clause:** bulk loading (deliverable lists, teams, the distribution matrix, the published lists).
+
+**Must say:** a file brought in is always checked first, and the check writes nothing: it says, row by row and at
+the row the person sees (sheet and row), what writing it would do, with the same rules as registering one by one
+(the backend's own check, `POST /documents/check`). Writing names its count ("Register 41 documents"); rows with
+problems are left out only once that is said and agreed, and they can be downloaded to fix and import again. A person
+added from a list, or by anyone, never has a password chosen for them: they are emailed a link to choose their own
+(good for 7 days, once); where email is off, the link is handed to whoever added them. Joining still waits for
+management where the project asks for it (People to confirm).
+
+**Depends on it:** `DocumentService.CheckRegisterAsync`, `Numbering.RefusalAsync`, `CreateUserRequest.Invite`,
+`PasswordReset.InvitationLink`, `lib/documents/forms-import.ts`.
+
+---
+
 ## Still open — decided in conversation, not yet built
 
 - **Every transmittal and every notification also goes by email**, showing what

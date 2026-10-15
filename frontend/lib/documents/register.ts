@@ -1,6 +1,6 @@
 import type { Tenant } from "@/lib/core/tenant";
 import type { SessionUser } from "@/lib/core/auth";
-import { api, projectPath } from "@/lib/client";
+import { api, projectPath, refusal } from "@/lib/client";
 
 /**
  * Registering a document — the act itself, once.
@@ -53,22 +53,37 @@ function day(at: Date | null | undefined): string | null {
  * organization's own fields and a back-dated registration are not kept there.
  */
 export async function registerDocument(t: Tenant, _user: SessionUser, input: RegisterInput): Promise<Registered> {
-  const doc = await api<{ id: string; number: string }>(projectPath(t, "/documents"), {
-    body: {
-      title: input.title,
-      deliverableType: input.deliverableType,
-      docType: input.docType,
-      discipline: input.discipline,
-      originator: input.originator ?? null,
-      subproject: input.subProject ?? null,
-      contractRef: input.contractRef ?? null,
-      criticality: input.criticality ?? null,
-      confidentiality: input.confidentiality ?? null,
-      retentionClass: input.retentionClass ?? null,
-      receivedDate: day(input.receivedDate),
-      plannedDate: day(input.plannedDate),
-      kind: input.kind ?? "DOCUMENT",
-    },
-  });
+  const doc = await api<{ id: string; number: string }>(projectPath(t, "/documents"), { body: bodyOf(input) });
   return { id: doc.id, docNumber: doc.number };
+}
+
+/**
+ * Would this document be registered? The backend checks it with every rule registering applies (the lists, what the
+ * deliverable type requires, what the number is built from, who may) and writes nothing: null, or what to fix.
+ */
+export async function checkRegistration(t: Tenant, input: RegisterInput): Promise<string | null> {
+  try {
+    await api(projectPath(t, "/documents/check"), { body: bodyOf(input) });
+    return null;
+  } catch (e) {
+    return refusal(e).message;
+  }
+}
+
+function bodyOf(input: RegisterInput) {
+  return {
+    title: input.title,
+    deliverableType: input.deliverableType,
+    docType: input.docType,
+    discipline: input.discipline,
+    originator: input.originator ?? null,
+    subproject: input.subProject ?? null,
+    contractRef: input.contractRef ?? null,
+    criticality: input.criticality ?? null,
+    confidentiality: input.confidentiality ?? null,
+    retentionClass: input.retentionClass ?? null,
+    receivedDate: day(input.receivedDate),
+    plannedDate: day(input.plannedDate),
+    kind: input.kind ?? "DOCUMENT",
+  };
 }
