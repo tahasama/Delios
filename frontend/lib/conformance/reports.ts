@@ -1,20 +1,15 @@
 import { api, projectPath } from "@/lib/client";
 
 /**
- * The reports a project team reads. Each one answers one question with:
- *   - a few headline figures,
- *   - one simple chart (horizontal bars, stacked by state),
- *   - the detailed list behind it — the actual documents, reviews,
- *     transmittals or activities — which is what the CSV exports.
- * Every figure is counted by the backend from the register when the report
- * is opened (backend/app/Reports); this turns its answer into the
- * page's shapes.
+ * The reports a project team reads. Each one answers one question with a few headline figures, one chart (horizontal
+ * bars, stacked by state) and the list behind it, which is what the download carries. Everything is counted by the
+ * backend when the report is opened (backend/app/Reports); this turns its answer into the page's shapes.
  */
 type Figure = { label: string; value: string | number; tone?: "good" | "warn" | "bad" };
 export type Segment = { key: string; label: string; tone: "good" | "info" | "warn" | "bad" | "muted" };
 export type Bar = { label: string; values: Record<string, number> };
 export type Cell = string | number | { text: string; href?: string; tone?: "good" | "warn" | "bad" };
-type Report = {
+export type Report = {
   id: ReportId;
   title: string;
   question: string;
@@ -25,16 +20,35 @@ type Report = {
   columns: string[];
   rows: Cell[][];
   empty: string;
-  /**
-   * Where the same rows live as a working list. A report that would only
-   * repeat the register, the reviews or the transmittals sends the reader
-   * there instead of printing them twice.
-   */
-  seeAlso?: { label: string; href: string };
+  countedAt: string;
+  /** Where the same rows are worked on, as a list with its own filters. */
+  workedOn?: { label: string; href: string };
 };
-export type ReportId = "register" | "deliveries" | "reviews" | "transmittals" | "readiness";
+export type ReportId = "register" | "deliveries" | "reviews" | "transmittals" | "readiness" | "asof";
 
-export const REPORT_IDS: ReportId[] = ["register", "deliveries", "reviews", "transmittals", "readiness"];
+export const REPORT_IDS: ReportId[] = ["register", "deliveries", "reviews", "transmittals", "readiness", "asof"];
+/** What another organization's people read: their own deliveries against plan (the backend narrows it). */
+export const OUTSIDE_REPORT_IDS: ReportId[] = ["deliveries"];
+
+/** The tab of each report: the report's own title, as the backend names it. */
+export const REPORT_TITLES: Record<ReportId, string> = {
+  register: "Register status",
+  deliveries: "Deliveries against plan",
+  reviews: "Reviews waiting",
+  transmittals: "Transmittal log",
+  readiness: "Activity readiness",
+  asof: "Register on a date",
+};
+
+/** The window a reader may change on a report, with the choices offered (the backend's defaults first). */
+export const WINDOWS: Partial<Record<ReportId, { param: string; label: string; choices: { value: string; label: string }[] }>> = {
+  readiness: { param: "horizonDays", label: "Looking ahead", choices: [["30", "30 days"], ["7", "7 days"], ["14", "14 days"], ["60", "60 days"], ["90", "90 days"]].map(([value, label]) => ({ value, label })) },
+  transmittals: { param: "months", label: "Going back", choices: [["6", "6 months"], ["1", "1 month"], ["3", "3 months"], ["12", "12 months"]].map(([value, label]) => ({ value, label })) },
+  reviews: { param: "turnaroundDays", label: "Turnaround over", choices: [["90", "90 days"], ["30", "30 days"], ["180", "180 days"], ["365", "a year"]].map(([value, label]) => ({ value, label })) },
+};
+
+/** What narrows a report: words, a bar chosen on the chart, a window, a day. */
+export type ReportQuery = { rq?: string; bar?: string; on?: string; window?: string };
 
 function cellText(c: Cell): string {
   return typeof c === "object" ? c.text : String(c);
@@ -49,16 +63,13 @@ type BackendReport = {
   columns: string[]; rows: BackendCell[][]; empty: string; countedAt: string;
 };
 
-/**
- * Where the same rows live as a working list. A report that would only repeat
- * the register, the reviews or the transmittals sends the reader there instead
- * of printing them twice.
- */
-const SEE_ALSO: Partial<Record<ReportId, { label: string; href: string }>> = {
-  register: { label: "Open the register, where the same documents can be filtered and exported", href: "/documents?view=all" },
-  reviews: { label: "Open the reviews list, where every review ever made is kept", href: "/reviews?status=OPEN" },
-  transmittals: { label: "Open transmittals", href: "/transmittals?view=all" },
-  readiness: { label: "Open the Schedule, where the same activities are worked on", href: "/actions" },
+/** Where the same rows are worked on, with their own filters. */
+const WORKED_ON: Partial<Record<ReportId, { label: string; href: string }>> = {
+  register: { label: "Work on them in the register", href: "/documents?view=all" },
+  reviews: { label: "Open the reviews still open", href: "/reviews?status=OPEN" },
+  transmittals: { label: "Open the transmittals", href: "/transmittals?view=all" },
+  readiness: { label: "Open the Schedule", href: "/actions" },
+  asof: { label: "Open the register as it is now", href: "/documents?view=all" },
 };
 
 /** Where a cell opens, on these screens. */
@@ -78,8 +89,20 @@ function cellOf(cell: BackendCell): Cell {
   return { text: cell.text, ...(href ? { href } : {}), ...(cell.tone ? { tone: cell.tone } : {}) };
 }
 
-export async function buildReport(t: { projectId: string }, id: ReportId): Promise<Report> {
-  const report = await api<BackendReport>(projectPath(t, `/reports/${id}`));
+/** The query the backend takes for a report: the narrowing and the window, by their own names. */
+export function reportQuery(id: ReportId, q: ReportQuery): Record<string, string> {
+  const query: Record<string, string> = {};
+  if (q.rq) query.q = q.rq;
+  if (q.bar) query.bar = q.bar;
+  if (id === "asof" && q.on) query.on = q.on;
+  const window = WINDOWS[id];
+  if (window && q.window && window.choices.some((c) => c.value === q.window)) query[window.param] = q.window;
+  return query;
+}
+
+/** One report, counted now and narrowed as asked (the backend narrows the rows; the chart stays whole). */
+export async function buildReport(t: { projectId: string }, id: ReportId, q: ReportQuery = {}): Promise<Report> {
+  const report = await api<BackendReport>(projectPath(t, `/reports/${id}`), { query: reportQuery(id, q) });
   return {
     id: report.id,
     title: report.title,
@@ -90,12 +113,9 @@ export async function buildReport(t: { projectId: string }, id: ReportId): Promi
     columns: report.columns,
     rows: report.rows.map((row) => row.map(cellOf)),
     empty: report.empty,
-    seeAlso: SEE_ALSO[id],
+    countedAt: report.countedAt,
+    workedOn: WORKED_ON[id],
   };
 }
 
-/** Keep the rows where any cell contains the text, ignoring case. */
-export function filterRows(rows: Cell[][], q: string): Cell[][] {
-  const needle = q.trim().toLowerCase();
-  return needle ? rows.filter((r) => r.some((c) => cellText(c).toLowerCase().includes(needle))) : rows;
-}
+export { cellText };

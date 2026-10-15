@@ -1078,6 +1078,19 @@ text. Each list can be taken out as it stands, and as an empty template.
 
 ---
 
+## 57 · The register as it stood on a day, and each party's own deliveries
+
+**Clause:** §16.4 (reports), Q8 "what was current on a date".
+
+**Must say:** the register can be read as it stood at the end of any past day: for each document registered by
+then, the revision current that day (the latest released by then, not void on that day), its status, and what is
+current now. It is worked out from the record, never kept as a copy, and never answered when it cannot be. Another
+organization taking part reads its own deliveries against plan, and nothing else of the reports.
+
+**Depends on it:** `ReportBuilder.AsOfAsync`, `ReportIds.AsOf`, `ReportIds.Outside`, `ReportOptions.Party`.
+
+---
+
 ## Still open — decided in conversation, not yet built
 
 - **Every transmittal and every notification also goes by email**, showing what

@@ -569,6 +569,16 @@ the installation sets its keys.
 - **The Import & export page** follows the Schedule look; a file chosen is shown with Remove and is let go when the
   kind changes; each kind says which files it takes; the matrix and the Settings lists show as an administrator's.
   Exports are grouped (the register, Assurance, the record). "Back to register" is gone (the menu does it).
+- **Reports reworked.**
+  - "Register on a date" works: a report of its own, which revision was current at the end of any day and what is
+    current now. Before, it always answered "nothing was current", whatever the day.
+  - Reports is in the menu for everyone of ours (before: Document Control only); a supplier sees its own deliveries
+    against plan there (before: a bare "page not found").
+  - The lines behind every report are shown (before: four reports sent you elsewhere); a bar opens its own lines;
+    the filter says what it does and has Apply and Clear; the window can be changed; Excel as well as CSV.
+  - "Export register" left this page: the register's own export is on Documents.
+  - The Schedule look; numbers beside the bars, not on them; dates from today; "Department" reads "Discipline";
+    the average turnaround says "under a day" instead of "0.0 d"; readiness bars carry the action's name.
 - **Settings → Controlled changes is gone** (upload a matrix or a list, then approve it). Settings regulates and
   takes no uploads; the matrix and the lists come in on Import & export, checked first. Four download templates no
   page offered any more (an old deliverable CSV, a schedule template, a details correction, a review matrix) are gone.

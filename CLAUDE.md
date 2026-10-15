@@ -462,6 +462,22 @@ a screen only words it. A new rule goes in the backend, never in a page.
   lead; an order that works is numbered `steps`, each a link to where it is done, the current one marked. Never a rule
   or a warning. On Import & export it sits right of the title: the setup order, each step opening its import.
 
+### Reports
+- Reports is in the menu for everyone who reads the project. Our people read every report; another organization's
+  people read Deliveries against plan, narrowed by the backend to their own documents (`ReportIds.Outside`, options
+  `Party`); asking for another report gives them that one.
+- Each report: the plate is its own title and question, who it is for and when it was counted; tabs are the report
+  titles; Download what is shown as CSV or Excel. Figures, one chart, then the lines behind it, always shown (paged
+  by 50), with a link to where the same lines are worked on.
+- A bar chosen on the chart narrows the list and the download to its own lines (`bar`, each row knows its bar,
+  `Report.RowBars`); chosen again, it lets go. Words typed narrow the list and the download ("Narrow the list and the
+  download", Apply, Clear). The windows are the reader's (looking ahead, going back, turnaround over).
+- Numbers are never printed on the bars: the legend gives each state's total, the end of each bar its count.
+  Dates in the lines read from today ("3 days ago"), the day itself on hover.
+- "Register on a date" is a report of its own, worked out by the backend (`AsOfAsync`): each document registered by
+  the end of that day, the revision current then (the latest released by then, not void that day), its status, and
+  what is current now. A day to come is refused (DATE_TO_COME). Never a made-up answer: no day chosen, nothing counted.
+
 ### Home
 - Home's to-do lists everything the signed-in person has to do, whatever it
   is: reviews to decide or advise, releases, documents returned, things to send

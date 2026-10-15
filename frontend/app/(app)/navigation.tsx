@@ -91,7 +91,7 @@ function moreNav(p: NavPermissions): NavItem[] {
       { href: "/packages", label: "Packages", icon: FolderKanban },
       { href: "/assets", label: "Assets & tags", icon: Boxes, when: !p.external },
       { href: "/distribution", label: "Distribution matrix", icon: Network, when: p.canRead && !p.external },
-      { href: "/reports", label: "Reports", icon: ListChecks, when: p.canControl && !p.external },
+      { href: "/reports", label: "Reports", icon: ListChecks, when: p.canRead },
       { href: "/conformance/checks", label: "Assurance", icon: ShieldCheck, also: ["/conformance", "/exposures"], when: p.canControl && !p.external },
       { href: "/import", label: "Import & export", icon: Import, when: (p.canControl || p.canConfigure) && !p.external },
     ] as NavItem[]

@@ -34,7 +34,7 @@ Kept in the project's settings store, because the backend has no table for them:
 
 9. **Orphaned withdrawal (out-of-date risk 3) is read from the register.** Withdrawn documents still needed by a schedule activity come from `GET /register?view=all&state=WITHDRAWN&per=250` and each row's `activities`. Beyond 250 rows are missed. Want: the same as a list endpoint, or `state` + `hasActivities` filters with no page limit.
 
-10. **The register as it stood on a past date.** `/reports` has "What was current on a date" (§16.4 Q8). Nothing answers it. Today the table is always empty.
+10. ~~**The register as it stood on a past date.**~~ Done: the report "Register on a date" (`ReportIds.AsOf`, `ReportBuilder.AsOfAsync`).
     Want: `GET /api/projects/{id}/register/as-of?date=YYYY-MM-DD` → `[{ documentId, number, title, state, revisionId, value, statusCode, releasedAt }]` (released by then, not superseded or voided by then).
 
 11. **Notifications.** `/notifications` lists the person's notifications and marks them read. The backend sends none. Today the page shows "Nothing yet".

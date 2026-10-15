@@ -40,6 +40,7 @@ public sealed class ReportBuilder(IClock clock)
             ReportIds.Reviews => await ReviewsAsync(options, cancellationToken),
             ReportIds.Transmittals => await TransmittalsAsync(options, cancellationToken),
             ReportIds.Readiness => await ReadinessAsync(options, cancellationToken),
+            ReportIds.AsOf => await AsOfAsync(options, cancellationToken),
             _ => throw new ArgumentOutOfRangeException(nameof(id), id, "No such report."),
         };
     }
@@ -73,7 +74,7 @@ public sealed class ReportBuilder(IClock clock)
             : "planned";
 
         var bars = new SortedDictionary<string, Bar>(StringComparer.Ordinal);
-        var rows = new List<IReadOnlyList<Cell>>();
+        var rows = new List<(string?, IReadOnlyList<Cell>)>();
         var tally = segments.ToDictionary(s => s.Key, _ => 0);
         foreach (var d in docs)
         {
@@ -83,11 +84,11 @@ public sealed class ReportBuilder(IClock clock)
             (bars.TryGetValue(discipline, out var bar) ? bar : bars[discipline] = new Bar(discipline, [])).Add(stage);
             var released = d.Revisions.FirstOrDefault(r => r.State == RevisionStates.Released);
             var current = released ?? d.Revisions.FirstOrDefault();
-            rows.Add(
+            rows.Add((discipline,
             [
                 Doc(d.Id, d.Number), d.Title, discipline, Stage(segments, stage), current?.Value ?? "—",
                 current?.StatusCode is { } status ? _catalog.Label(ReviewSets.Statuses, status) : "—", Date(released?.ReleasedAt),
-            ]);
+            ]));
         }
         return Make(ReportIds.Register, "Register status", "Where does every document stand?",
             "The master document register: for the project manager or the client, weekly.",
@@ -111,6 +112,8 @@ public sealed class ReportBuilder(IClock clock)
     {
         var docs = await db.Documents.AsNoTracking()
             .Where(d => d.ProjectId == _project.Id && d.State != DocumentStates.Cancelled && d.State != DocumentStates.Withdrawn)
+            // Another organization reading: its own documents only.
+            .Where(d => options.Party == null || d.Originator == options.Party)
             .Select(d => new { d.Id, d.Number, d.Title, d.Originator, d.Discipline, d.PlannedDate }).ToListAsync(cancellationToken);
         var needed = await (from n in db.Requirements
                             join a in db.Activities on n.ActivityId equals a.Id
@@ -134,7 +137,7 @@ public sealed class ReportBuilder(IClock clock)
         var order = new Dictionary<string, int> { ["overdue"] = 0, ["late"] = 1, ["coming"] = 2, ["onTime"] = 3 };
         var bars = new SortedDictionary<string, Bar>(StringComparer.Ordinal);
         var tally = segments.ToDictionary(s => s.Key, _ => 0);
-        var lines = new List<(int Order, LocalDate Due, IReadOnlyList<Cell> Row)>();
+        var lines = new List<(int Order, LocalDate Due, string Bar, IReadOnlyList<Cell> Row)>();
         foreach (var d in docs)
         {
             var due = Earliest(d.PlannedDate, needed.GetValueOrDefault(d.Id));
@@ -145,10 +148,11 @@ public sealed class ReportBuilder(IClock clock)
             tally[state]++;
             (bars.TryGetValue(sender, out var bar) ? bar : bars[sender] = new Bar(sender, [])).Add(state);
             var lateBy = Period.Between(dueDate, sent ?? _today, PeriodUnits.Days).Days;
-            lines.Add((order[state], dueDate,
+            // How late, said once: the state beside it carries the colour.
+            lines.Add((order[state], dueDate, sender,
             [
                 Doc(d.Id, d.Number), d.Title, sender, dueDate.ToString("yyyy-MM-dd", null), sent?.ToString("yyyy-MM-dd", null) ?? "",
-                state is "late" or "overdue" ? new Cell($"{lateBy} d", state == "overdue" ? "bad" : "warn") : "—", Stage(segments, state),
+                state is "late" or "overdue" ? $"{lateBy} d" : "", Stage(segments, state),
             ]));
         }
         var delivered = tally["onTime"] + tally["late"];
@@ -163,8 +167,8 @@ public sealed class ReportBuilder(IClock clock)
             ],
             new Chart("Documents by sender", segments, [.. bars.Values]),
             ["Document", "Title", "Sender", "Due", "Delivered", "Late by", "State"],
-            [.. lines.OrderBy(l => l.Order).ThenBy(l => l.Due).Select(l => l.Row)],
-            "No document has a planned date, and no activity needs one yet.");
+            [.. lines.OrderBy(l => l.Order).ThenBy(l => l.Due).Select(l => ((string?)l.Bar, l.Row))],
+            options.Party is null ? "No document has a planned date, and no activity needs one yet." : "None of your documents is planned yet.");
     }
 
     // ── Reviews waiting ───────────────────────────────────────────────────────
@@ -194,7 +198,7 @@ public sealed class ReportBuilder(IClock clock)
         ];
         string AgeKey(int age) => age < options.WarnDays ? "fresh" : age <= options.LateDays ? "week" : "old";
         var bars = new Dictionary<string, Bar>();
-        var lines = new List<(int Age, IReadOnlyList<Cell> Row)>();
+        var lines = new List<(int Age, string Bar, IReadOnlyList<Cell> Row)>();
         foreach (var x in open)
         {
             var opened = (x.Step.OpenedAt ?? clock.GetCurrentInstant()).InZone(_zone).Date;
@@ -206,7 +210,7 @@ public sealed class ReportBuilder(IClock clock)
             foreach (var who in waitingOn)
             {
                 (bars.TryGetValue(who, out var bar) ? bar : bars[who] = new Bar(who, [])).Add(AgeKey(age));
-                lines.Add((age,
+                lines.Add((age, who,
                 [
                     Doc(x.DocumentId, x.DocumentNumber), x.Title, $"rev {x.Value}", new Cell(x.Number, Kind: "review", Id: x.ReviewId), x.Step.Title, who,
                     Date(x.Step.OpenedAt), x.Step.DueDate is { } due ? new Cell(due.ToString("yyyy-MM-dd", null), due < _today ? "bad" : null) : "—",
@@ -214,7 +218,7 @@ public sealed class ReportBuilder(IClock clock)
                 ]));
             }
         }
-        var turnaround = decided.Count == 0 ? 0 : decided.Average(r => (r.DecidedAt!.Value - r.StartedAt).TotalDays);
+        var turnaround = decided.Count == 0 ? (double?)null : decided.Average(r => (r.DecidedAt!.Value - r.StartedAt).TotalDays);
         var old = lines.Count(l => l.Age > options.LateDays);
         return Make(ReportIds.Reviews, "Reviews waiting", "What is with reviewers, and for how long?",
             "Chasing reviewers: for the weekly engineering meeting.",
@@ -222,11 +226,12 @@ public sealed class ReportBuilder(IClock clock)
                 new("Waiting", lines.Count.ToString(), lines.Count > 0 ? "warn" : "good"),
                 new($"Over {options.LateDays} days", old.ToString(), old > 0 ? "bad" : "good"),
                 new($"Decided ({options.TurnaroundDays} days)", decided.Count.ToString()),
-                new("Average turnaround", $"{turnaround:0.0} d"),
+                // Under a day reads as such, not "0.0 d"; none decided reads as none.
+                new("Average turnaround", turnaround switch { null => "none decided", < 1 => "under a day", var t => $"{t:0.0} days" }),
             ],
             new Chart("Waiting, by reviewer and age", segments, [.. bars.Values.OrderByDescending(b => b.Values.Values.Sum()).ThenBy(b => b.Label)]),
             ["Document", "Title", "Revision", "Review", "Step", "Waiting on", "Since", "Due", "Waiting"],
-            [.. lines.OrderByDescending(l => l.Age).Select(l => l.Row)], "No review is waiting on anyone.");
+            [.. lines.OrderByDescending(l => l.Age).Select(l => ((string?)l.Bar, l.Row))], "No review is waiting on anyone.");
     }
 
     // ── Transmittal log ───────────────────────────────────────────────────────
@@ -255,17 +260,19 @@ public sealed class ReportBuilder(IClock clock)
         Segment[] segments = [new("out", "Sent", "info"), new("in", "Received", "good")];
         var months = Enumerable.Range(0, options.Months).Select(i => firstMonth.PlusMonths(i))
             .Select(m => new Bar(m.ToString("MMM yy", System.Globalization.CultureInfo.InvariantCulture), [])).ToList();
-        void Count(Instant at, string key)
+        string? Count(Instant at, string key)
         {
             var date = at.InZone(_zone).Date;
             var index = (date.Year - firstMonth.Year) * 12 + date.Month - firstMonth.Month;
-            if (index >= 0 && index < months.Count) months[index].Add(key);
+            if (index < 0 || index >= months.Count) return null;
+            months[index].Add(key);
+            return months[index].Label;
         }
 
-        var lines = new List<(Instant At, IReadOnlyList<Cell> Row)>();
+        var lines = new List<(Instant At, string? Bar, IReadOnlyList<Cell> Row)>();
         foreach (var t in sent)
         {
-            Count(t.IssuedAt, "out");
+            var month = Count(t.IssuedAt, "out");
             var toSend = t.Recipients.Count(r => r.AwaitsDispatch);
             var inApp = t.Recipients.Where(r => r.UserId != null).ToList();
             var unacknowledged = inApp.Count(r => r.AcknowledgedAt is null);
@@ -275,7 +282,7 @@ public sealed class ReportBuilder(IClock clock)
                     ? due < _today ? new Cell($"Their answer: overdue since {due:yyyy-MM-dd}", "bad") : new Cell($"Their answer: due {due:yyyy-MM-dd}")
                 : unacknowledged > 0 ? new Cell($"{unacknowledged} to acknowledge")
                 : "—";
-            lines.Add((t.IssuedAt,
+            lines.Add((t.IssuedAt, month,
             [
                 new Cell(t.Number, Kind: "transmittal", Id: t.Id), "Out", Date(t.IssuedAt), t.ToName, _catalog.Label(TransmittalSets.Reasons, t.Reason),
                 t.Items.Count.ToString(), inApp.Count == 0 ? "—" : $"{inApp.Count - unacknowledged}/{inApp.Count}", waiting,
@@ -283,9 +290,9 @@ public sealed class ReportBuilder(IClock clock)
         }
         foreach (var (revision, number, at) in received)
         {
-            Count(at, "in");
+            var month = Count(at, "in");
             var toCheck = number == revision.Submission && revision.State == RevisionStates.Received;
-            lines.Add((at,
+            lines.Add((at, month,
             [
                 new Cell($"{revision.Number} rev {revision.Value}" + (number > 1 ? $" ({number})" : ""), Kind: "document", Id: revision.DocumentId), "In",
                 Date(at), parties.GetValueOrDefault(revision.AuthoredByParty!, revision.AuthoredByParty!), "Submission", "1", "—",
@@ -305,7 +312,7 @@ public sealed class ReportBuilder(IClock clock)
             ],
             new Chart("Per month", segments, months),
             ["Reference", "In / out", "Date", "From / to", "Reason", "Documents", "Acknowledged", "Waiting on"],
-            [.. lines.OrderByDescending(l => l.At).Select(l => l.Row)], $"Nothing sent or received in the last {options.Months} months.");
+            [.. lines.OrderByDescending(l => l.At).Select(l => (l.Bar, l.Row))], $"Nothing sent or received in the last {options.Months} months.");
     }
 
     // ── Activity readiness ────────────────────────────────────────────────────
@@ -331,11 +338,12 @@ public sealed class ReportBuilder(IClock clock)
             new("coming", "Not yet, not late", "warn"), new("late", "Missing and late", "bad"),
         ];
         var bars = new List<Bar>();
-        var rows = new List<IReadOnlyList<Cell>>();
+        var rows = new List<(string?, IReadOnlyList<Cell>)>();
         var late = 0;
         foreach (var a in activities)
         {
-            var bar = new Bar(a.Code, []);
+            // Named, not only numbered: "A00004 · Pour the foundations".
+            var bar = new Bar(string.IsNullOrWhiteSpace(a.Name) ? a.Code : $"{a.Code} · {a.Name}", []);
             foreach (var n in a.Requirements.OrderBy(n => n.NeededBy))
             {
                 var key = n.State == RequirementStates.Met ? "met" : n.State == RequirementStates.Waived ? "waived"
@@ -343,13 +351,13 @@ public sealed class ReportBuilder(IClock clock)
                 bar.Add(key);
                 if (key == "late") late++;
                 var has = current.GetValueOrDefault(n.DocumentId);
-                rows.Add(
+                rows.Add((bar.Label,
                 [
                     new Cell(a.Code, Kind: "activity", Id: a.Id), a.Start?.ToString("yyyy-MM-dd", null) ?? "", Doc(n.DocumentId, documents.GetValueOrDefault(n.DocumentId, "?")),
                     n.Department is null ? "—" : _catalog.Label(ValueSets.Disciplines, n.Department), _catalog.Label(TransmittalSets.Reasons, n.Purpose),
                     has is null ? "nothing released" : $"rev {has.Value} · {(has.StatusCode is null ? "—" : _catalog.Label(ReviewSets.Statuses, has.StatusCode))}",
                     n.NeededBy?.ToString("yyyy-MM-dd", null) ?? "—", Stage(segments, key),
-                ]);
+                ]));
             }
             if (bar.Values.Count > 0) bars.Add(bar);
         }
@@ -363,16 +371,80 @@ public sealed class ReportBuilder(IClock clock)
                 new("Missing and late", late.ToString(), late > 0 ? "bad" : "good"),
             ],
             new Chart("Documents needed, per activity", segments, bars),
-            ["Activity", "Start", "Document", "Department", "Serves", "Has", "Needed by", "State"], rows,
+            ["Activity", "Start", "Document", "Discipline", "Serves", "Has", "Needed by", "State"], rows,
             $"No activity under way or starting in the next {options.HorizonDays} days.");
+    }
+
+    // ── Register on a date ───────────────────────────────────────────────────
+
+    /// <summary>
+    /// The register as it stood at the end of a day (project time): each document that existed then, the revision that
+    /// was current (the latest released by then, not void on that day), its status, and what is current now. For audits,
+    /// claims and "what did we build from?".
+    /// </summary>
+    private async Task<Report> AsOfAsync(ReportOptions options, CancellationToken cancellationToken)
+    {
+        var day = options.On ?? _today;
+        var end = day.PlusDays(1).AtStartOfDayInZone(_zone).ToInstant();
+        var docs = await db.Documents.AsNoTracking().Where(d => d.ProjectId == _project.Id && d.CreatedAt < end).OrderBy(d => d.Number)
+            .Select(d => new
+            {
+                d.Id, d.Number, d.Title, d.Discipline, d.EndedAt, d.ReinstatedAt,
+                Revisions = d.Revisions.Where(r => r.ReleasedAt != null)
+                    .Select(r => new { r.Value, r.StatusCode, r.ReleasedAt, r.VoidedAt, r.UnvoidedAt, r.State }).ToList(),
+            })
+            .ToListAsync(cancellationToken);
+        Segment[] segments =
+        [
+            new("same", "Still current", "good"), new("since", "Replaced since", "info"),
+            new("none", "Nothing released then", "muted"), new("out", "Out of use then", "bad"),
+        ];
+        // Void on that day: voided by then and not taken back by then.
+        bool VoidOn(Instant? voided, Instant? unvoided) => voided < end && (unvoided is null || unvoided >= end);
+        var bars = new SortedDictionary<string, Bar>(StringComparer.Ordinal);
+        var rows = new List<(string?, IReadOnlyList<Cell>)>();
+        var tally = segments.ToDictionary(s => s.Key, _ => 0);
+        foreach (var d in docs)
+        {
+            var then = d.Revisions.Where(r => r.ReleasedAt < end && !VoidOn(r.VoidedAt, r.UnvoidedAt))
+                .OrderByDescending(r => r.ReleasedAt).FirstOrDefault();
+            var now = d.Revisions.Where(r => r.State != RevisionStates.Void).OrderByDescending(r => r.ReleasedAt).FirstOrDefault();
+            var ended = d.EndedAt < end && (d.ReinstatedAt is null || d.ReinstatedAt >= end);
+            var key = ended ? "out" : then is null ? "none" : now is not null && now.Value != then.Value ? "since" : "same";
+            tally[key]++;
+            var discipline = _catalog.Label(ValueSets.Disciplines, d.Discipline);
+            (bars.TryGetValue(discipline, out var bar) ? bar : bars[discipline] = new Bar(discipline, [])).Add(key);
+            rows.Add((discipline,
+            [
+                Doc(d.Id, d.Number), d.Title, discipline,
+                then is null ? "nothing released" : $"rev {then.Value}",
+                then?.StatusCode is { } status ? _catalog.Label(ReviewSets.Statuses, status) : "—",
+                Date(then?.ReleasedAt),
+                key == "since" ? $"rev {now!.Value}" : key == "same" ? "the same" : now is null ? "nothing released" : $"rev {now.Value}",
+                Stage(segments, key),
+            ]));
+        }
+        var label = day.ToString("d MMMM yyyy", System.Globalization.CultureInfo.InvariantCulture);
+        return Make(ReportIds.AsOf, "Register on a date", $"Which revision was current on {label}?",
+            "Audits, claims and \"what did we build from?\": the register as it stood at the end of that day.",
+            [
+                new("Documents then", docs.Count.ToString()),
+                new("Released by then", (tally["same"] + tally["since"]).ToString(), "good"),
+                new("Replaced since", tally["since"].ToString(), tally["since"] > 0 ? "warn" : null),
+                new("Nothing released", tally["none"].ToString()),
+            ],
+            new Chart($"Documents by discipline, on {label}", segments, [.. bars.Values]),
+            ["Document", "Title", "Discipline", $"Current on {day:yyyy-MM-dd}", "Status then", "Released", "Current now", "Since"],
+            rows, $"No document was registered by {label}.");
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     /// <summary>Puts the parts of a report together and stamps it with the time it was counted.</summary>
     private Report Make(string id, string title, string question, string audience, IReadOnlyList<Figure> figures, Chart chart,
-        IReadOnlyList<string> columns, IReadOnlyList<IReadOnlyList<Cell>> rows, string empty) =>
-        new(id, title, question, audience, figures, chart, columns, rows, empty, clock.GetCurrentInstant().ToDateTimeOffset());
+        IReadOnlyList<string> columns, IReadOnlyList<(string? Bar, IReadOnlyList<Cell> Row)> rows, string empty) =>
+        new(id, title, question, audience, figures, chart, columns, [.. rows.Select(r => r.Row)], empty,
+            clock.GetCurrentInstant().ToDateTimeOffset(), [.. rows.Select(r => r.Bar)]);
 
     /// <summary>A cell showing a document number that links to that document.</summary>
     private static Cell Doc(Guid id, string number) => new(number, Kind: "document", Id: id);

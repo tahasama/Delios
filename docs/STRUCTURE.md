@@ -107,7 +107,8 @@ frontend/
 │   ├── client.ts         the one door to the backend: every call goes through it
 │   ├── types.ts          the shapes the backend answers with
 │   ├── core/             shared by every area: sign-in, scope, permissions, preferences, words for states,
-│   │                     tones.ts (state chips), rails.ts (the side colour of each state: the key on Help)
+│   │                     tones.ts (state chips), rails.ts (the side colour of each state: the key on Help),
+│   │                     days.ts (a day said from today: "3 days ago", "In 5 days")
 │   ├── documents/        (copies.ts: which copy of a PDF opens; sheet-check.ts: a spreadsheet checked before it is read)
 │   ├── reviews/
 │   ├── transmittals/     (kinds.ts: the kinds of transmittal and how each names its types)
