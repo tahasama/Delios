@@ -3,6 +3,7 @@ import { Download, X } from "lucide-react";
 import { requireScope } from "@/lib/core/scope";
 import { DataTable, Th, Td, ToneChip, inputCls, btn } from "@/components/ui";
 import { when } from "@/app/(app)/home-parts";
+import { FindBox } from "./find-box";
 import { fromToday } from "@/lib/core/days";
 import {
   buildReport, GROUP_BY, OUTSIDE_REPORT_IDS, REPORT_IDS, REPORT_TITLES, WINDOWS,
@@ -78,7 +79,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
           </div>
           {report ? (
             <div className="flex shrink-0 flex-wrap items-center gap-2">
-              <span className="text-xs text-slate-500">Download{narrowed ? " what is shown" : ""}:</span>
+              <span className="text-xs text-slate-500">{narrowed ? "Download the lines shown:" : "Download these lines:"}</span>
               <a href={download("csv")} className="ask inline-flex items-center gap-1.5"><Download className="h-3.5 w-3.5" aria-hidden="true" /> CSV</a>
               <a href={download("xlsx")} className="ask inline-flex items-center gap-1.5"><Download className="h-3.5 w-3.5" aria-hidden="true" /> Excel</a>
             </div>
@@ -95,45 +96,17 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
           </nav>
         ) : null}
 
-        {/* What narrows it: a day (register on a date), a window, words. Applied together. */}
-        <form className="flex flex-wrap items-end gap-x-4 gap-y-3 border-t border-line px-5 py-3 sm:px-6">
-          <input type="hidden" name="r" value={current} />
-          {/* The bar chosen stays with the words; on Deliveries the grouping may change, so it lets go. */}
-          {asked.bar && current !== "deliveries" ? <input type="hidden" name="bar" value={asked.bar} /> : null}
-          {current === "asof" ? (
+        {/* Register on a date asks its day; nothing is counted before one is chosen. */}
+        {current === "asof" ? (
+          <form className="flex flex-wrap items-end gap-3 border-t border-line px-5 py-3 sm:px-6">
+            <input type="hidden" name="r" value={current} />
             <label className="w-44">
-              <span className="mb-1.5 block h-4 text-xs font-medium leading-4 text-slate-700">On the day</span>
+              <span className="mb-1.5 block h-4 text-xs font-medium leading-4 text-slate-700">The day</span>
               <input type="date" name="on" max={today} defaultValue={asked.on ?? ""} required className={inputCls} />
             </label>
-          ) : null}
-          {current === "deliveries" && ctx.user.isInternal ? (
-            <label className="w-40">
-              <span className="mb-1.5 block h-4 text-xs font-medium leading-4 text-slate-700">One bar per</span>
-              {/* A bar chosen belongs to one grouping: changing it lets the bar go. */}
-              <select name="by" defaultValue={asked.by ?? GROUP_BY[0].value} className={inputCls}>
-                {GROUP_BY.map((g) => <option key={g.value} value={g.value}>{g.label}</option>)}
-              </select>
-            </label>
-          ) : null}
-          {window ? (
-            <label className="w-40">
-              <span className="mb-1.5 block h-4 text-xs font-medium leading-4 text-slate-700">{window.label}</span>
-              <select name="window" defaultValue={asked.window ?? window.choices[0].value} className={inputCls}>
-                {window.choices.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
-              </select>
-            </label>
-          ) : null}
-          <label className="min-w-0 flex-1 sm:max-w-sm">
-            <span className="mb-1.5 block h-4 text-xs font-medium leading-4 text-slate-700">Narrow the list and the download</span>
-            <input name="rq" defaultValue={asked.rq ?? ""} placeholder="A number, a title, a name…" className={inputCls} />
-          </label>
-          <button type="submit" className={btn("secondary")}>{current === "asof" && !asked.on ? "Show" : "Apply"}</button>
-          {narrowed ? (
-            <Link href={link({ rq: undefined, bar: undefined, page: undefined })} className="inline-flex h-(--control-h) items-center gap-1 text-xs font-semibold text-link hover:underline">
-              <X className="h-3.5 w-3.5" aria-hidden="true" /> Clear
-            </Link>
-          ) : null}
-        </form>
+            <button type="submit" className={btn("primary")}>Show the register on that day</button>
+          </form>
+        ) : null}
 
         {report ? (
           <div className="grid grid-cols-2 gap-2 border-t border-line px-5 py-4 sm:grid-cols-4 sm:px-6">
@@ -149,7 +122,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
 
       {needsDay ? (
         <p className="rounded-md bg-tint-soft px-3 py-2.5 text-xs leading-5 text-slate-700 ring-1 ring-line">
-          Choose the day above, then Show: each document that existed then, the revision that was current at the end of that day, and what is current now.
+          Choose the day above: each document that existed then, the revision that was current at the end of that day, and what is current now.
         </p>
       ) : failure ? (
         <p role="alert" className="rounded-md bg-red-50 px-2.5 py-1.5 text-xs text-red-800 ring-1 ring-red-200">{failure}</p>
@@ -157,21 +130,40 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
         <>
           {report.chart.bars.length ? (
             <section className="register register-sheet register-sheet-open" aria-labelledby="chart-head">
-              <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
-                <span id="chart-head" className="stencil mr-1 text-slate-500">{report.chart.title}</span>
-                <span className="text-[11px] text-slate-500">choose a bar to see only its lines below; choose it again to see all</span>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
+                <span id="chart-head" className="stencil text-slate-500">{report.chart.title}</span>
+                <span className="text-[11px] text-slate-500">click a name to see only its lines below</span>
+                {/* What the chart shows, chosen right here: each choice applies at once. */}
+                <span className="ml-auto flex flex-wrap items-center gap-3">
+                  {current === "deliveries" && ctx.user.isInternal ? (
+                    <Choices label="" current={asked.by ?? GROUP_BY[0].value}
+                      options={[{ value: "sender", label: "By who sends it" }, { value: "discipline", label: "By discipline" }]}
+                      hrefOf={(v) => link({ by: v, bar: undefined, page: undefined })} />
+                  ) : null}
+                  {window ? (
+                    <Choices label={window.label} current={asked.window ?? window.choices[0].value}
+                      options={[...window.choices].sort((x, y) => Number(x.value) - Number(y.value))}
+                      hrefOf={(v) => link({ window: v, bar: undefined, page: undefined })} />
+                  ) : null}
+                </span>
               </div>
               <BarChart segments={report.chart.segments} bars={report.chart.bars} chosen={asked.bar} hrefOf={(label) => link({ bar: label === asked.bar ? undefined : label, page: undefined })} />
             </section>
           ) : null}
 
           <section className="register register-sheet register-sheet-open" aria-labelledby="list-head">
-            <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
-              <span id="list-head" className="stencil mr-1 text-slate-500">Behind it</span>
-              <span className="text-[11px] text-slate-500">
-                {rows.length} line{rows.length === 1 ? "" : "s"}
-                {asked.bar ? <> · {asked.bar} only</> : null}
-                {asked.rq ? <> · holding &ldquo;{asked.rq}&rdquo;</> : null}
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
+              <span id="list-head" className="stencil text-slate-500">The lines behind it</span>
+              <span className="text-[11px] text-slate-500">{rows.length} line{rows.length === 1 ? "" : "s"}</span>
+              {asked.bar ? (
+                <Link href={link({ bar: undefined, page: undefined })} scroll={false} title="Show every line again"
+                  className="inline-flex items-center gap-1 rounded-full bg-surface px-2 py-0.5 text-[11px] font-semibold text-slate-700 ring-1 ring-line hover:ring-line-strong">
+                  only {asked.bar} <X className="h-3 w-3" aria-hidden="true" />
+                </Link>
+              ) : null}
+              <span className="ml-auto">
+                <FindBox value={asked.rq ?? ""} clearHref={link({ rq: undefined, page: undefined })}
+                  keep={Object.fromEntries(Object.entries({ r: current, bar: asked.bar, by: asked.by, window: asked.window, on: asked.on }).filter((e): e is [string, string] => !!e[1]))} />
               </span>
             </div>
             {shown.length ? (
@@ -266,5 +258,22 @@ function BarChart({ segments, bars, chosen, hrefOf }: { segments: Segment[]; bar
         })}
       </ul>
     </figure>
+  );
+}
+
+/** A few choices side by side, the current one filled; each is a link, so it applies at once. */
+function Choices({ label, current, options, hrefOf }: { label: string; current: string; options: { value: string; label: string }[]; hrefOf: (value: string) => string }) {
+  return (
+    <span className="inline-flex items-center gap-2">
+      {label ? <span className="text-[11px] text-slate-500">{label}</span> : null}
+      <span className="inline-flex overflow-hidden rounded-md ring-1 ring-line" role="group" aria-label={label || "Show"}>
+        {options.map((o) => (
+          <Link key={o.value} href={hrefOf(o.value)} scroll={false} aria-current={current === o.value ? "true" : undefined}
+            className={`border-l border-line px-2.5 py-1 text-xs first:border-l-0 ${current === o.value ? "bg-brand font-semibold text-white" : "bg-surface text-slate-700 hover:bg-tint-soft"}`}>
+            {o.label}
+          </Link>
+        ))}
+      </span>
+    </span>
   );
 }

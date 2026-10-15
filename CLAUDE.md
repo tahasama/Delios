@@ -469,9 +469,11 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - Each report: the plate is its own title and question, who it is for and when it was counted; tabs are the report
   titles; Download what is shown as CSV or Excel. Figures, one chart, then the lines behind it, always shown (paged
   by 50), with a link to where the same lines are worked on.
-- A bar chosen on the chart narrows the list and the download to its own lines (`bar`, each row knows its bar,
-  `Report.RowBars`); chosen again, it lets go. Words typed narrow the list and the download ("Narrow the list and the
-  download", Apply, Clear). The windows are the reader's (looking ahead, going back, turnaround over).
+- Every control sits beside what it changes and acts at once: how the chart is cut (Deliveries "By who sends it /
+  By discipline") and its window ("Next 7 · 14 · 30 · 60 · 90 days", "Last 1 · 3 · 6 · 12 months") are side-by-side
+  choices in the chart's head, each a link; a bar's name narrows the lines to it (`bar`, `Report.RowBars`), shown as
+  "only <bar> ×" on the lines' head; "Find in these lines" sits on the lines' head (Find lit only while new words
+  wait, Clear). The download says it carries the lines shown. No form of dropdowns waiting for an Apply.
 - Deliveries against plan has "One bar per": who sends it (each organization, and us as one) or discipline
   (`ReportOptions.By`); the lines carry both. Waiting is never shown as good: a review waiting under 7 days is blue
   (under way), not green.

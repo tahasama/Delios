@@ -42,9 +42,9 @@ export const REPORT_TITLES: Record<ReportId, string> = {
 
 /** The window a reader may change on a report, with the choices offered (the backend's defaults first). */
 export const WINDOWS: Partial<Record<ReportId, { param: string; label: string; choices: { value: string; label: string }[] }>> = {
-  readiness: { param: "horizonDays", label: "Looking ahead", choices: [["30", "30 days"], ["7", "7 days"], ["14", "14 days"], ["60", "60 days"], ["90", "90 days"]].map(([value, label]) => ({ value, label })) },
-  transmittals: { param: "months", label: "Going back", choices: [["6", "6 months"], ["1", "1 month"], ["3", "3 months"], ["12", "12 months"]].map(([value, label]) => ({ value, label })) },
-  reviews: { param: "turnaroundDays", label: "Turnaround over", choices: [["90", "90 days"], ["30", "30 days"], ["180", "180 days"], ["365", "a year"]].map(([value, label]) => ({ value, label })) },
+  readiness: { param: "horizonDays", label: "Next", choices: [["30", "30 days"], ["7", "7 days"], ["14", "14 days"], ["60", "60 days"], ["90", "90 days"]].map(([value, label]) => ({ value, label })) },
+  transmittals: { param: "months", label: "Last", choices: [["6", "6 months"], ["1", "1 month"], ["3", "3 months"], ["12", "12 months"]].map(([value, label]) => ({ value, label })) },
+  reviews: { param: "turnaroundDays", label: "Turnaround over the last", choices: [["90", "90 days"], ["30", "30 days"], ["180", "180 days"], ["365", "a year"]].map(([value, label]) => ({ value, label })) },
 };
 
 /** What narrows a report: words, a bar chosen on the chart, a window, a day. */
