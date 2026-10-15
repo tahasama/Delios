@@ -26,11 +26,32 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   const ctx = await requireScope();
   const sp = await searchParams;
   const offered = ctx.user.isInternal ? REPORT_IDS : OUTSIDE_REPORT_IDS;
+  // Our people open on the Overview: every report's figures at a glance, each opening its own tab.
+  const overview = ctx.user.isInternal && (!sp.r || sp.r === "overview");
   const current: ReportId = offered.includes(sp.r as ReportId) ? (sp.r as ReportId) : offered[0];
   const asked: ReportQuery = { rq: (sp.rq ?? "").trim() || undefined, bar: sp.bar || undefined, on: sp.on || undefined, window: sp.window || undefined, by: sp.by || undefined };
   const today = new Date().toISOString().slice(0, 10);
   // A day to come is refused by the backend; the page asks for one before it counts.
   const needsDay = current === "asof" && !asked.on;
+  const tabs: { id: string; title: string }[] = [
+    ...(ctx.user.isInternal ? [{ id: "overview", title: "Overview" }] : []),
+    ...offered.map((id) => ({ id, title: REPORT_TITLES[id] })),
+  ];
+  const tabClass = (on: boolean) =>
+    `-mb-px shrink-0 whitespace-nowrap border-b-2 px-0.5 pb-2 text-[12px] leading-4 transition ${
+      on ? "border-brand-ink font-semibold text-slate-900" : "border-transparent text-slate-500 hover:border-line-strong hover:text-slate-800"
+    }`;
+  const nav = (on: string) => tabs.length > 1 ? (
+    <nav aria-label="Reports" className="scroll-thin flex gap-x-5 overflow-x-auto border-t border-line px-5 pt-3 sm:px-6">
+      {tabs.map((t) => (
+        <Link key={t.id} href={`/reports?r=${t.id}`} scroll={false} aria-current={on === t.id ? "page" : undefined} className={tabClass(on === t.id)}>
+          {t.title}
+        </Link>
+      ))}
+    </nav>
+  ) : null;
+
+  if (overview) return <Overview ctx={ctx} nav={nav("overview")} />;
 
   let report: Awaited<ReturnType<typeof buildReport>> | null = null;
   let failure: string | null = null;
@@ -58,10 +79,6 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   const pages = Math.max(1, Math.ceil(rows.length / PER_PAGE));
   const shown = rows.slice((Math.min(page, pages) - 1) * PER_PAGE, Math.min(page, pages) * PER_PAGE);
   const window = WINDOWS[current];
-  const tab = (on: boolean) =>
-    `-mb-px shrink-0 whitespace-nowrap border-b-2 px-0.5 pb-2 text-[12px] leading-4 transition ${
-      on ? "border-brand-ink font-semibold text-slate-900" : "border-transparent text-slate-500 hover:border-line-strong hover:text-slate-800"
-    }`;
 
   return (
     <div className="space-y-4">
@@ -86,15 +103,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
           ) : null}
         </div>
 
-        {offered.length > 1 ? (
-          <nav aria-label="Reports" className="scroll-thin flex gap-x-5 overflow-x-auto border-t border-line px-5 pt-3 sm:px-6">
-            {offered.map((id) => (
-              <Link key={id} href={link({ r: id, page: undefined }, ["rq"])} scroll={false} aria-current={current === id ? "page" : undefined} className={tab(current === id)}>
-                {REPORT_TITLES[id]}
-              </Link>
-            ))}
-          </nav>
-        ) : null}
+        {nav(current)}
 
         {/* Register on a date asks its day; nothing is counted before one is chosen. */}
         {current === "asof" ? (
@@ -275,5 +284,80 @@ function Choices({ label, current, options, hrefOf }: { label: string; current: 
         ))}
       </span>
     </span>
+  );
+}
+
+/** The reports the Overview gathers, each with its figures; Register on a date asks a day, so it is only offered. */
+const AT_A_GLANCE: ReportId[] = ["register", "deliveries", "reviews", "transmittals", "readiness"];
+
+/**
+ * Overview: every report's figures side by side, what needs attention named on each (a figure the backend marks bad
+ * or warn), each card opening its own tab for the chart and the lines.
+ */
+async function Overview({ ctx, nav }: { ctx: { projectId: string }; nav: React.ReactNode }) {
+  const counted = await Promise.allSettled(AT_A_GLANCE.map((id) => buildReport(ctx, id)));
+  const at = counted.find((c) => c.status === "fulfilled");
+  return (
+    <div className="space-y-4">
+      <section className="register register-sheet register-sheet-open">
+        <div className="px-5 pt-5 pb-4 sm:px-6">
+          <h1 className="plate-title text-slate-950">Reports</h1>
+          <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-700">Where does the project stand?</p>
+          <p className="mt-0.5 max-w-2xl text-xs leading-5 text-slate-500">
+            Each report at a glance; open one for its chart and the lines behind it.
+            {at && at.status === "fulfilled" ? <> · counted {when(new Date(at.value.countedAt))}</> : null}
+          </p>
+        </div>
+        {nav}
+      </section>
+
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+        {AT_A_GLANCE.map((id, i) => {
+          const c = counted[i];
+          const href = `/reports?r=${id}`;
+          if (c.status === "rejected") {
+            return (
+              <section key={id} className="register register-sheet register-sheet-open">
+                <div className="flex items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
+                  <Link href={href} className="stencil text-slate-500 hover:underline">{REPORT_TITLES[id]}</Link>
+                </div>
+                <p role="alert" className="px-5 py-4 text-xs text-red-800 sm:px-6">This report could not be counted just now.</p>
+              </section>
+            );
+          }
+          const r = c.value;
+          const bad = r.figures.filter((f) => f.tone === "bad");
+          const warn = r.figures.filter((f) => f.tone === "warn");
+          return (
+            <section key={id} className="register register-sheet register-sheet-open flex flex-col">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
+                <Link href={href} className="stencil text-slate-500 hover:underline">{r.title}</Link>
+                <span className="text-[11px] text-slate-500">{r.question}</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2 px-5 py-4 sm:grid-cols-4 sm:px-6 xl:grid-cols-2">
+                {r.figures.map((f) => (
+                  <div key={f.label} className="rounded-md px-3 py-2 ring-1 ring-line">
+                    <p className="truncate text-xs text-slate-600" title={f.label}>{f.label}</p>
+                    <p className={`mt-0.5 text-lg font-semibold tabular-nums ${TEXT[f.tone ?? ""] ?? "text-slate-900"}`}>{f.value}</p>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-auto flex flex-wrap items-center justify-between gap-2 border-t border-line px-5 py-2.5 text-xs sm:px-6">
+                <span className="flex flex-wrap items-center gap-1.5">
+                  {bad.length || warn.length ? (
+                    <>
+                      <span className="text-slate-600">Needs attention:</span>
+                      {bad.map((f) => <ToneChip key={f.label} tone="refused">{f.label} {f.value}</ToneChip>)}
+                      {warn.map((f) => <ToneChip key={f.label} tone="waiting">{f.label} {f.value}</ToneChip>)}
+                    </>
+                  ) : <ToneChip tone="done">nothing needs attention</ToneChip>}
+                </span>
+                <Link href={href} className="font-semibold text-link hover:underline">Open the report</Link>
+              </div>
+            </section>
+          );
+        })}
+      </div>
+    </div>
   );
 }

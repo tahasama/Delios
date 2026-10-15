@@ -463,6 +463,8 @@ a screen only words it. A new rule goes in the backend, never in a page.
   or a warning. On Import & export it sits right of the title: the setup order, each step opening its import.
 
 ### Reports
+- Reports opens on **Overview** for our people (not another organization's): each report's figures at a glance,
+  "Needs attention" naming the figures the backend marks bad or warn, and "Open the report" into its tab.
 - Reports is in the menu for everyone who reads the project. Our people read every report; another organization's
   people read Deliveries against plan, narrowed by the backend to their own documents (`ReportIds.Outside`, options
   `Party`); asking for another report gives them that one.
