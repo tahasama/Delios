@@ -461,6 +461,8 @@ public static class FileKinds
     public const string Void = "VOID";
     /// <summary>The copy people were reading, marked ON HOLD while an outside approval is awaited.</summary>
     public const string Held = "HELD";
+    /// <summary>The rendition stamped RETURNED with the verdict that sent it back (rejected): a new revision follows.</summary>
+    public const string Returned = "RETURNED";
     /// <summary>Proof filed against the revision: a party's returned stamped copy, the email that carried it.</summary>
     public const string Evidence = "EVIDENCE";
 }

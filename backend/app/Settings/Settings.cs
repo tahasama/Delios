@@ -152,6 +152,10 @@ public static class ProjectAnswers
     public static async Task<bool> IsOffAsync(DeliosDbContext db, Guid projectId, string act, CancellationToken cancellationToken) =>
         (await AllAsync(db, projectId, cancellationToken)).GetValueOrDefault($"SKIP:{act}") == "OFF";
 
+    /// <summary>Every answer the project gave, by key.</summary>
+    public static Task<Dictionary<string, string>> AnswersAsync(DeliosDbContext db, Guid projectId, CancellationToken cancellationToken) =>
+        AllAsync(db, projectId, cancellationToken);
+
     /// <summary>The project's chosen option for a policy, or null when it has not chosen.</summary>
     public static async Task<string?> PolicyAsync(DeliosDbContext db, Guid projectId, string key, CancellationToken cancellationToken) =>
         (await AllAsync(db, projectId, cancellationToken)).GetValueOrDefault(key);

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { requireScope } from "@/lib/core/scope";
 import { PageHeader, DataTable, Th, Td } from "@/components/ui";
 import { AssuranceTabs } from "@/app/(app)/conformance/tabs";
@@ -17,7 +18,17 @@ export const metadata = { title: "Default rules" };
  * reads the answer in force rather than describing both. A rule nobody can see
  * the setting of is a rule nobody can rely on.
  */
-export default async function DefaultRulesPage() {
+export default async function DefaultRulesPage({ searchParams }: { searchParams: Promise<{ area?: string }> }) {
+  // What is refused, in tabs by where it happens (the order the list gives).
+  const areas = [...new Set(PREVENTED.map((r) => r.where))];
+  const askedArea = (await searchParams).area;
+  const area = askedArea && areas.includes(askedArea) ? askedArea : null;
+  const refused = area ? PREVENTED.filter((r) => r.where === area) : PREVENTED;
+  // The tabs as the checks page draws them.
+  const tab = (on: boolean) =>
+    `-mb-px shrink-0 border-b-2 px-0.5 pb-2 text-[12px] leading-4 transition ${
+      on ? "border-brand-ink font-semibold text-slate-900" : "border-transparent text-slate-500 hover:border-line-strong hover:text-slate-800"
+    }`;
   const ctx = await requireScope();
 
   const settled = await Promise.all(
@@ -73,9 +84,17 @@ export default async function DefaultRulesPage() {
             <span className="stencil mr-1 text-slate-500">Refused on every project</span>
             <span className="text-[11px] text-slate-500">not a setting: the act that would cause it does not go through, with the answer it gets</span>
           </div>
+          <nav aria-label="Where it happens" className="scroll-thin flex gap-x-5 overflow-x-auto border-b border-line px-5 pt-3 sm:px-6">
+            <Link href="/conformance/rules" scroll={false} aria-current={!area ? "page" : undefined} className={tab(!area)}>All · {PREVENTED.length}</Link>
+            {areas.map((one) => (
+              <Link key={one} href={`/conformance/rules?${new URLSearchParams({ area: one })}`} scroll={false} aria-current={area === one ? "page" : undefined} className={tab(area === one)}>
+                {one} · {PREVENTED.filter((r) => r.where === one).length}
+              </Link>
+            ))}
+          </nav>
           <DataTable className="rounded-none border-0 shadow-none" id="default-rules" exportName="default-rules"
             head={<tr><Th>Where</Th><Th>What cannot happen</Th><Th>What happens instead</Th><Th>Refused with</Th></tr>}>
-            {PREVENTED.map((r) => (
+            {refused.map((r) => (
               <tr key={r.condition}>
                 <Td className="whitespace-nowrap text-xs font-semibold text-slate-700">{r.where}</Td>
                 <Td className="max-w-80 text-[13px] text-slate-800">{r.condition}</Td>

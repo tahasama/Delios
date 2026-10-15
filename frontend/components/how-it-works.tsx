@@ -10,6 +10,8 @@ import {
   PROJECT_KEY,
   effectiveAnswer,
   PROJECT_MODE_LABEL,
+  STAMP_KINDS,
+  STAMP_COMMENTS_KEY,
   type ControlMode,
   type ProjectMode,
 } from "@/lib/settings/control-activities";
@@ -167,6 +169,34 @@ export function HowItWorks({
                 </div>
               </li>
             ))}
+            {/* Which stamps, when the PDF is stamped, and whether a verdict's comments go with its stamp. */}
+            <li className="space-y-2 px-5 py-4 sm:px-6">
+              <input type="hidden" name="stamps" value="1" />
+              <p className="text-sm font-semibold text-slate-800">Which stamps</p>
+              <p className="text-xs leading-5 text-slate-600">Used when the PDF is stamped (above). Untick a stamp to leave it off.</p>
+              <div className="grid gap-2 md:grid-cols-2">
+                {STAMP_KINDS.map((kind) => (
+                  <label key={kind.key} className="flex cursor-pointer items-start gap-2.5 rounded-md px-3 py-2 ring-1 ring-line hover:bg-tint-soft has-checked:bg-tint-soft">
+                    <input type="checkbox" name={kind.key} defaultChecked={effectiveAnswer(kind.key, answers.get(kind.key)) === "ON"} className="mt-0.5" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[13px] font-semibold text-slate-800">{kind.label}</span>
+                      <span className="block text-xs text-slate-600">{kind.text}</span>
+                    </span>
+                    {from(kind.key)}
+                  </label>
+                ))}
+                <label className="flex cursor-pointer items-start gap-2.5 rounded-md px-3 py-2 ring-1 ring-line hover:bg-tint-soft has-checked:bg-tint-soft md:col-span-2">
+                  <input type="checkbox" name={STAMP_COMMENTS_KEY} defaultChecked={effectiveAnswer(STAMP_COMMENTS_KEY, answers.get(STAMP_COMMENTS_KEY)) === "ON"} className="mt-0.5" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[13px] font-semibold text-slate-800">The comments too</span>
+                    <span className="block text-xs text-slate-600">
+                      A stamp whose verdict carries comments (accepted with comments, rejected) says so, and the comments are listed on a last page of the PDF.
+                    </span>
+                  </span>
+                  {from(STAMP_COMMENTS_KEY)}
+                </label>
+              </div>
+            </li>
             <li className="space-y-2 px-5 py-4 sm:px-6">
               <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
                 <p className="text-sm font-semibold text-slate-800">When a discipline does not answer</p>

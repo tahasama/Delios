@@ -215,6 +215,8 @@ public sealed partial class ReviewService
         foreach (var step in review.Steps.Where(s => s.State == StepStates.Open)) step.State = StepStates.Done;
         await transmittals.LapseOpenAsync(revision.Id, by, cancellationToken);
         await CloseApprovalsAsync(revision.Id, review.Id, by, cancellationToken);
+        // Its PDF is stamped RETURNED with the verdict, where the project stamps (Stamping.MarkAsync reads its choices).
+        db.Enqueue(RevisionMarked.RoutingKey, new RevisionMarked(revision.TenantId, revision.Id, FileKinds.Returned, review.Id.ToString()));
         await audit.WriteAsync(Audit.Actor.System, "RETURNED_TO_AUTHOR", "Revision", revision.Id,
             $"{document.Number} rev {revision.Value}", $"{note} The next revision replaces it.", review.ProjectId, cancellationToken);
         await TellAsync(review, await InvolvedAsync(review, document, revision, cancellationToken), Notifications.NotificationKinds.ReviewReturned,

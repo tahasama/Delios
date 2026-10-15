@@ -23,6 +23,10 @@ export const PREVENTED: PreventedRule[] = [
     prevented: "No screen takes a number: registering allocates the next one from the scheme its deliverable type uses.", code: "NO_NUMBERING_SCHEME" },
   { where: "Registering a document", condition: "A discipline, type, criticality or other value made up on the spot",
     prevented: "Every such field is chosen from the published lists; anything else is refused.", code: "VALUE_NOT_PUBLISHED" },
+  { where: "Registering a document", condition: "A field its deliverable type requires left empty",
+    prevented: "Registering is refused until it is filled; a form outlines what is missing.", code: "FIELDS_REQUIRED" },
+  { where: "Registering a document", condition: "Received from another organization with no date received",
+    prevented: "Never typed: the day is filled when its first submission comes in, or asked when Document Control records what arrived." },
   { where: "Registering a document", condition: "A title that only repeats the document type",
     prevented: "Refused on create and on edit: the title has to say which one it is.", code: "TITLE_GENERIC" },
 
@@ -60,7 +64,7 @@ export const PREVENTED: PreventedRule[] = [
 
   // Transmittals
   { where: "Transmittals", condition: "An answer asked for with no day",
-    prevented: "A transmittal asking for an answer says by when, so a late answer can be seen.", code: "ANSWER_DATE_REQUIRED" },
+    prevented: "A transmittal asking for an answer says by when, so a late answer can be seen; a reason's period only suggests the day.", code: "ANSWER_DATE_REQUIRED" },
   { where: "Transmittals", condition: "A data transmittal carrying nothing",
     prevented: "Sent or received, a data transmittal carries a document of the register or the file that came; words alone are an information transmittal.", code: "FILE_REQUIRED" },
   { where: "Assets & tags", condition: "A tag typed by hand, or used twice",

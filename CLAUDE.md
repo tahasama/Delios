@@ -220,6 +220,13 @@ a screen only words it. A new rule goes in the backend, never in a page.
   the key on Help, "What the colours say". Every list of documents takes them, the package lists too (a supplier's
   line by its stage, a delivery line by ready / released short of its status / nothing released); a card (Next step)
   takes none.
+- Stamps on the PDF are the project's choice (How this project works): `POLICY_PDF_STAMP` (stamped or not), each
+  stamp `STAMP:<kind>` (RELEASED, RETURNED, SUPERSEDED, VOID, HELD; on unless turned off) and `STAMP_COMMENTS` (off
+  unless chosen: a verdict's comments listed on a last page). Read once in the worker (`Stamping.StampChoices`). A
+  rejected revision is stamped RETURNED. The PDF opened from a document is its marked copy (`openCopy`,
+  `lib/documents/copies.ts`).
+- A check is only for what can still happen: what the app refuses or fills by itself is listed under "Refused on
+  every project" (Default rules, tabs by area, `prevented.ts`), never checked.
 - Assurance: each finding points to the exact spot where it is put right: a document's tab, or else the thing
   itself (a setting's list with that value opened for editing, the numbering row, the action, the package, the
   review), never a page to search. Check ids are the app's own, by what they look at: SET (settings), DOC (document

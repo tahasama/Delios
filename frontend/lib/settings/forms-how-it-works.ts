@@ -23,6 +23,8 @@ import {
   effectiveAnswer,
   MODE_LABEL,
   POLICIES,
+  STAMP_KINDS,
+  STAMP_COMMENTS_KEY,
   PROJECT_KEY,
   PROJECT_MODE_LABEL,
   type ControlMode,
@@ -139,6 +141,11 @@ export async function setPolicyAction(_prev: State | undefined, formData: FormDa
     if (!one.options.some((option) => option.value === asked)) continue;
     wanted.push([one.key, asked]);
     said.push(one.options.find((option) => option.value === asked)!.label.toLowerCase());
+  }
+  // Which stamps, and the comments: ticked is on, unticked off (the section says it was on the form).
+  if (formData.has("stamps")) {
+    for (const kind of STAMP_KINDS) wanted.push([kind.key, formData.get(kind.key) === "on" ? "ON" : "OFF"]);
+    wanted.push([STAMP_COMMENTS_KEY, formData.get(STAMP_COMMENTS_KEY) === "on" ? "ON" : "OFF"]);
   }
   const escalate = String(formData.get(ESCALATE_AFTER_KEY) ?? "").trim();
   if (escalate) {

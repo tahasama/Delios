@@ -38,6 +38,7 @@ import { WorkflowPanel } from "./workflow-panel";
 import type { StepItem } from "./next-step";
 import { SupplierDelivery } from "./supplier-delivery";
 import { Timeline } from "@/components/timeline";
+import { openCopy } from "@/lib/documents/copies";
 import { DocTabs } from "./doc-tabs";
 import { ArrowLeft, Download, ExternalLink, FileText, Send } from "lucide-react";
 import { activityList, scheduleSource } from "@/lib/actions/api";
@@ -153,7 +154,8 @@ export default async function DocumentDetailPage({
   const current = doc.revisions.find((r) => r.state === "RELEASED");
   const working = inPrep ?? inReview ?? notReleased ?? null;
   const shown = current ?? working ?? doc.revisions[0] ?? null;
-  const pdf = shown?.files.find((f) => f.kind === "RENDITION") ?? null;
+  // The copy that says where it stands (stamped, returned, superseded, void, on hold), else the PDF as sent.
+  const pdf = shown ? openCopy(shown.files) : null;
   const native = shown?.files.find((f) => f.kind === "NATIVE") ?? null;
   // Requests on the revision in hand: who asked for it to be sent, to whom, and
   // whether it has gone.

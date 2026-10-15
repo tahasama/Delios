@@ -268,17 +268,17 @@ export const POLICIES: Policy[] = [
   {
     key: "POLICY_PDF_STAMP",
     title: "Stamping the PDF",
-    text: "Whether a binding review verdict — and a hold — is stamped on the PDF copy people open, or kept in the record only. The file as submitted is kept either way.",
+    text: "Whether the PDF people open says where the revision stands (released, returned, superseded, void, on hold), or stays as it was sent. The file as sent is kept either way; which stamps, and the comments, are chosen below.",
     options: [
       {
         value: "ON",
-        label: "Stamp it on the document",
-        text: "The verdict, who gave it, when and why, in the top right of the first page; a revision on hold says so across every page. Whoever opens the file reads where it stands without the app.",
+        label: "Stamp the PDF people open",
+        text: "A copy is made with the stamp in the top right of every page (or across the page, for superseded, void and on hold). Whoever opens the file reads where it stands without the app.",
       },
       {
         value: "OFF",
-        label: "Keep it in the record only",
-        text: "The PDF people open stays as it was submitted, apart from the release title block. Where it stands is read in the app.",
+        label: "Keep the PDF as it was sent",
+        text: "No stamp on any PDF. Where it stands is read in the app.",
       },
     ],
   },
@@ -420,8 +420,23 @@ export function controlFrom(byKey: Map<string, string>, follows: boolean): Contr
  * What one stored answer amounts to, the app's own default standing in for no answer: so a project's answer and the
  * defaults it is compared with read the same when they mean the same.
  */
+/**
+ * Which stamps go on the PDF, each on unless switched off (`STAMP:<kind>`, read by the backend's `StampChoices`), and
+ * whether a stamp whose verdict carries comments lists them on a last page (`STAMP_COMMENTS`, off unless switched on).
+ */
+export const STAMP_KINDS = [
+  { key: "STAMP:RELEASED", label: "Released", text: "number, revision, status and day, in a green box" },
+  { key: "STAMP:RETURNED", label: "Returned by the review", text: "rejected: the verdict and the day, in a red box" },
+  { key: "STAMP:SUPERSEDED", label: "Superseded", text: "across the page, once a later revision is released" },
+  { key: "STAMP:VOID", label: "Void", text: "across the page, with why" },
+  { key: "STAMP:HELD", label: "On hold", text: "across the page, while it is not for use" },
+] as const;
+export const STAMP_COMMENTS_KEY = "STAMP_COMMENTS";
+
 export function effectiveAnswer(key: string, value: string | null | undefined): string {
   if (value) return value;
+  if (key.startsWith("STAMP:")) return "ON";
+  if (key === STAMP_COMMENTS_KEY) return "OFF";
   const declared = POLICIES.find((one) => one.key === key);
   if (declared) return declared.options[0].value;
   if (key === ESCALATE_AFTER_KEY) return String(DEFAULT_ESCALATE_AFTER);

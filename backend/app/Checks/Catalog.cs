@@ -142,33 +142,11 @@ public static class CheckCatalog
                 await ctx.Db.Memberships.AnyAsync(m => m.ProjectId == ctx.Project.Id && m.Active && m.Function!.Active
                     && m.Function.Rules.Any(r => r.Verbs.Contains(Verbs.Receive)), ctx.CancellationToken)
                     ? Pass : Fail([Setting("MATRIX", "Distribution", "The matrix proposes nobody when a document is issued.")])),
-        new("SET-10", Phases.Setup, "A reason for issue that asks an answer but sets no period",
-            "A reason that asks an answer gives its period in working days (Settings → Published lists, Reasons for issue), so a transmittal asking it is given a day", Severities.Major, "OG", ctx =>
-                Task.FromResult(Fail(Active(ctx, TransmittalSets.Reasons)
-                    .Where(r => ctx.Values.Prop(TransmittalSets.Reasons, r.Code, "response") is { ValueKind: JsonValueKind.True }
-                        && !Has(ctx.Values, TransmittalSets.Reasons, r.Code, "responseDays"))
-                    .Select(r => Setting(TransmittalSets.Reasons, r.Code))))),
-
-        // ── While the work runs ───────────────────────────────────────────────
         new("DOC-01", Phases.Running, "A title that became generic",
             "Titles made only of words added to the organization's generic list after the document was registered (new titles of that kind are refused)", Severities.Minor, "OR", ctx =>
             {
                 var words = ctx.Values.GenericTitleWords();
                 return Task.FromResult(Fail(ctx.Documents.Where(d => Titles.IsGeneric(d.Title, words)).Select(d => Doc(d))));
-            }),
-        new("DOC-02", Phases.Running, "A field its deliverable type requires is empty",
-            "Each document against the fields its deliverable type requires now (the type may have been given more since, or a field cleared on a revision)", Severities.Major, "OR", ctx =>
-                Task.FromResult(Fail(ctx.Documents.SelectMany(d => ctx.Values.RequiredFieldsOf(d.DeliverableType)
-                    // The date received is filled when something comes in: a placeholder still waiting has none, rightly.
-                    .Where(field => Empty(d, field) && !(field == "receivedDate" && ctx.Revisions.All(r => r.DocumentId != d.Id))).Select(field => Doc(d, $"{field} is required for {d.DeliverableType} and is empty."))
-                    .Take(1))))),
-        new("DOC-03", Phases.Running, "Received from another organization with no date received",
-            "Documents of an outside organization of which something came in, with no date received (a placeholder not received yet is not counted)", Severities.Major, "CF", async ctx =>
-            {
-                var outside = await ctx.Db.Parties.Where(p => !p.IsInternal).Select(p => p.Code).ToListAsync(ctx.CancellationToken);
-                var came = ctx.Revisions.Select(r => r.DocumentId).ToHashSet();
-                return Fail(ctx.Documents.Where(d => d.Originator is not null && outside.Contains(d.Originator) && d.ReceivedDate is null && came.Contains(d.Id))
-                    .Select(d => Doc(d)));
             }),
         new("DOC-04", Phases.Running, "A field holds a value since retired",
             "Each document's discipline, type, criticality, \"who may see it\" and retention against the lists as published now (a value retired after use)", Severities.Major, "CF", ctx =>

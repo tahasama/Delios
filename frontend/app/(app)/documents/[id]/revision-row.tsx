@@ -9,6 +9,7 @@ import {
 import { type PageRevision } from "@/lib/documents/api";
 import { withdrawApprovalAction } from "@/lib/documents/forms-governance";
 import { ChevronRight } from "lucide-react";
+import { openCopy } from "@/lib/documents/copies";
 
 export function Empty({ children }: { children: React.ReactNode }) {
   return <p className="px-5 py-6 text-center text-xs text-slate-400">{children}</p>;
@@ -34,7 +35,7 @@ export type RevData = PageRevision;
 /** One line per revision; its record and its per-revision controls open in place. */
 export function RevisionRow({ rev, latest, followedBy, statusLabel, stateLabel, controller, userId, userRole, voidIsControl, held = false }: { rev: RevData; latest: boolean; followedBy: { value: string; why: string | null } | null; statusLabel: string | null; stateLabel: string; controller: boolean; userId: string; userRole: string; voidIsControl: boolean; held?: boolean }) {
   const state = rev.state as RevState;
-  const pdf = rev.files.find((f) => f.kind === "RENDITION");
+  const pdf = openCopy(rev.files);
   const native = rev.files.find((f) => f.kind === "NATIVE");
   const approval = rev.approvals[0];
   const facts: [string, string | null][] = [

@@ -558,6 +558,17 @@ the installation sets its keys.
   <supplier>" and the register's "Create transmittal"). The supplier package now lists what is overdue above its
   documents, and ticks the overdue ones not sent yet in one click.
 
+- **Stamps follow the project's choice** (How this project works → "Stamping the PDF" and "Which stamps"): stamped
+  or not; each stamp (released, returned by the review, superseded, void, on hold) on or off; and, if wanted, the
+  comments of a verdict that carries them listed on a last page. Before, the setting was not read and every stamp
+  was made.
+- **A rejected revision is stamped** "RETURNED" in red, with the verdict and the day.
+- **The PDF opened from a document is the stamped copy** (void, on hold, superseded, returned, released, else the
+  clean one). Before, the clean copy was always opened, so no stamp was ever seen.
+- **Three checks are gone**: a received document with no date received, a required field left empty, and a reason
+  asking an answer with no period. The app already prevents them; they are listed under "Refused on every project",
+  now in tabs by area. Their old findings close the next time the checks run.
+
 ## 7. Notifications and email
 
 - Notifications are kept and shown in the bell and on the Notifications page; opening the page reads

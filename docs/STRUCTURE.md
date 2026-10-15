@@ -107,13 +107,13 @@ frontend/
 │   ├── types.ts          the shapes the backend answers with
 │   ├── core/             shared by every area: sign-in, scope, permissions, preferences, words for states,
 │   │                     tones.ts (state chips), rails.ts (the side colour of each state: the key on Help)
-│   ├── documents/
+│   ├── documents/        (copies.ts: which copy of a PDF opens: the stamped one, else the clean one)
 │   ├── reviews/
 │   ├── transmittals/     (kinds.ts: the kinds of transmittal and how each names its types)
 │   ├── packages/
 │   ├── actions/
 │   ├── records/          assets & tags (api.ts reads; forms.ts links a tag's documents)
-│   ├── conformance/
+│   ├── conformance/      (checks/prevented.ts: what the app refuses, listed by area under Default rules)
 │   ├── account/
 │   ├── organization/      organizations working together, the admin page, defaults for new projects
 │   └── settings/         (forms-revisions.ts: Settings → Revisions; forms-verdicts.ts: Verdict lists)

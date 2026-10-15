@@ -9,6 +9,8 @@ using NodaTime;
 using NodaTime.Text;
 using PdfSharp.Drawing;
 using PdfSharp.Fonts;
+using PdfSharp.Drawing.Layout;
+using PdfSharp.Pdf;
 using PdfSharp.Pdf.IO;
 
 namespace Delios.Host.Reviews;
@@ -42,16 +44,22 @@ public sealed class Stamping(
         var project = await db.Projects.SingleAsync(p => p.Id == revision.ProjectId, cancellationToken);
         var zone = DateTimeZoneProviders.Tzdb.GetZoneOrNull(project.TimeZone) ?? DateTimeZone.Utc;
         var released = DatePattern.Format((revision.ReleasedAt ?? clock.GetCurrentInstant()).InZone(zone).Date);
+        var choices = await StampChoices.ReadAsync(db, project.Id, cancellationToken);
+        // Released with comments to take in (accepted with comments): the comments go on a page of their own, if asked.
+        var review = await db.Reviews.AsNoTracking().Where(r => r.RevisionId == revision.Id && r.Verdict != null)
+            .OrderByDescending(r => r.ClosedAt).FirstOrDefaultAsync(cancellationToken);
+        var comments = choices.Comments && review is not null ? await CommentsAsync(review.Id, cancellationToken) : [];
 
-        foreach (var rendition in revision.Files.Where(f => f.Kind == FileKinds.Rendition && f.Status == FileStatuses.Clean
-            && f.Submission == revision.Submission).ToList())
+        foreach (var rendition in choices.Released ? revision.Files.Where(f => f.Kind == FileKinds.Rendition && f.Status == FileStatuses.Clean
+            && f.Submission == revision.Submission).ToList() : [])
         {
             if (revision.Files.Any(f => f.DerivedFromId == rendition.Id && f.Kind == FileKinds.Stamped)) continue;
             await DeriveAsync(rendition, FileKinds.Stamped, document, revision, bytes => Stamp(bytes,
-                $"{document.Number}", $"Rev {revision.Value}   {revision.StatusCode}", $"Released {released}"), cancellationToken);
+                $"{document.Number}", $"Rev {revision.Value}   {revision.StatusCode}", $"Released {released}", comments: comments,
+                commentsTitle: $"{document.Number} rev {revision.Value}: comments of review {review?.Number} ({review?.Verdict})"), cancellationToken);
         }
 
-        foreach (var oldId in message.SupersededRevisionIds)
+        foreach (var oldId in choices.Superseded ? message.SupersededRevisionIds : [])
         {
             var old = await db.Revisions.Include(r => r.Files).SingleAsync(r => r.Id == oldId, cancellationToken);
             // The copy people were reading: the stamped one where there is one.
@@ -81,8 +89,16 @@ public sealed class Stamping(
         tenant.Set(message.TenantId);
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         var revision = await db.Revisions.Include(r => r.Files).SingleOrDefaultAsync(r => r.Id == message.RevisionId, cancellationToken);
-        if (revision is null || message.Mark is not (FileKinds.Void or FileKinds.Held)) return;
+        if (revision is null || message.Mark is not (FileKinds.Void or FileKinds.Held or FileKinds.Returned)) return;
         var document = await db.Documents.SingleAsync(d => d.Id == revision.DocumentId, cancellationToken);
+        var choices = await StampChoices.ReadAsync(db, revision.ProjectId, cancellationToken);
+        if (!choices.On(message.Mark)) { await transaction.CommitAsync(cancellationToken); return; }
+        if (message.Mark == FileKinds.Returned)
+        {
+            await StampReturnedAsync(revision, document, Guid.TryParse(message.Note, out var reviewId) ? reviewId : null, choices, cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return;
+        }
         var sources = revision.Files.Where(f => f.Kind == FileKinds.Stamped && f.Status == FileStatuses.Clean && f.Submission == revision.Submission).ToList();
         if (sources.Count == 0)
             sources = revision.Files.Where(f => f.Kind == FileKinds.Rendition && f.Status == FileStatuses.Clean && f.Submission == revision.Submission).ToList();
@@ -94,6 +110,35 @@ public sealed class Stamping(
         }
         await transaction.CommitAsync(cancellationToken);
     }
+
+    /// <summary>
+    /// A revision the review sent back (rejected): its PDF is stamped RETURNED with the verdict and the day, and, if the
+    /// project asks it, the comments that sent it back on a page of their own.
+    /// </summary>
+    private async Task StampReturnedAsync(Revision revision, Document document, Guid? reviewId, StampChoices choices, CancellationToken cancellationToken)
+    {
+        var review = reviewId is { } id ? await db.Reviews.AsNoTracking().SingleOrDefaultAsync(r => r.Id == id, cancellationToken) : null;
+        var project = await db.Projects.AsNoTracking().SingleAsync(p => p.Id == revision.ProjectId, cancellationToken);
+        var zone = DateTimeZoneProviders.Tzdb.GetZoneOrNull(project.TimeZone) ?? DateTimeZone.Utc;
+        var day = DatePattern.Format((revision.ReturnedAt ?? clock.GetCurrentInstant()).InZone(zone).Date);
+        var verdict = review?.Verdict is { } code
+            ? $"{code} {await db.ValueEntries.AsNoTracking().Where(v => v.SetKey == (review.VerdictSet ?? ReviewSets.Verdicts) && v.Code == code).Select(v => v.Label).FirstOrDefaultAsync(cancellationToken)}".Trim()
+            : "returned";
+        var comments = choices.Comments && review is not null ? await CommentsAsync(review.Id, cancellationToken) : [];
+        foreach (var source in revision.Files.Where(f => f.Kind == FileKinds.Rendition && f.Status == FileStatuses.Clean && f.Submission == revision.Submission).ToList())
+        {
+            if (revision.Files.Any(f => f.DerivedFromId == source.Id && f.Kind == FileKinds.Returned)) continue;
+            await DeriveAsync(source, FileKinds.Returned, document, revision, bytes => Stamp(bytes, document.Number, $"Rev {revision.Value}   {verdict}",
+                $"Returned {day}", "RETURNED", red: true, comments: comments,
+                commentsTitle: $"{document.Number} rev {revision.Value}: comments of review {review?.Number} ({verdict})"), cancellationToken);
+        }
+    }
+
+    /// <summary>The comments written on a review, as they read (taken back ones left out): who, and what.</summary>
+    private async Task<List<string>> CommentsAsync(Guid reviewId, CancellationToken cancellationToken) =>
+        (await db.ReviewComments.AsNoTracking().Where(c => c.ReviewId == reviewId && c.Status != CommentStatuses.Withdrawn)
+            .OrderBy(c => c.StepIndex).ThenBy(c => c.CreatedAt).Select(c => new { c.AuthorName, c.Text, c.Blocking }).ToListAsync(cancellationToken))
+        .Select(c => $"{c.AuthorName}{(c.Blocking ? " (blocking)" : "")}: {c.Text}").ToList();
 
     /// <summary>
     /// Reads <paramref name="source"/> from storage, applies <paramref name="transform"/> to its bytes, and saves the result as a new file of <paramref name="kind"/> derived from it, with an audit entry.
@@ -155,29 +200,79 @@ public sealed class Stamping(
             document.ProjectId, cancellationToken);
     }
 
-    /// <summary>A box in the top right corner of every page.</summary>
-    public static byte[] Stamp(byte[] pdf, string line1, string line2, string line3)
+    /// <summary>
+    /// A box in the top right corner of every page (RELEASED in green, or another word, RETURNED in red); with comments,
+    /// a line saying so and a last page listing them.
+    /// </summary>
+    public static byte[] Stamp(byte[] pdf, string line1, string line2, string line3, string title = "RELEASED", bool red = false,
+        IReadOnlyList<string>? comments = null, string? commentsTitle = null)
     {
         using var input = new MemoryStream(pdf);
         using var document = PdfReader.Open(input, PdfDocumentOpenMode.Modify);
         var bold = new XFont(EmbeddedFonts.Family, 9, XFontStyleEx.Bold);
         var regular = new XFont(EmbeddedFonts.Family, 8, XFontStyleEx.Regular);
-        var ink = new XSolidBrush(XColor.FromArgb(255, 20, 90, 50));
-        var border = new XPen(XColor.FromArgb(255, 20, 90, 50), 1.2);
-        foreach (var page in document.Pages)
+        var colour = red ? XColor.FromArgb(255, 170, 30, 30) : XColor.FromArgb(255, 20, 90, 50);
+        var ink = new XSolidBrush(colour);
+        var border = new XPen(colour, 1.2);
+        var withComments = comments is { Count: > 0 };
+        var pages = document.Pages.Cast<PdfPage>().ToList();
+        foreach (var page in pages)
         {
             using var gfx = XGraphics.FromPdfPage(page, XGraphicsPdfPageOptions.Append);
             var width = 190.0;
-            var box = new XRect(page.Width.Point - width - 18, 18, width, 46);
+            var box = new XRect(page.Width.Point - width - 18, 18, width, withComments ? 56 : 46);
             gfx.DrawRectangle(border, XBrushes.White, box);
-            gfx.DrawString("RELEASED", bold, ink, box.X + 6, box.Y + 12);
+            gfx.DrawString(title, bold, ink, box.X + 6, box.Y + 12);
             gfx.DrawString(line1, bold, ink, box.X + 6, box.Y + 24);
             gfx.DrawString(line2, regular, ink, box.X + 6, box.Y + 34);
             gfx.DrawString(line3, regular, ink, box.X + 6, box.Y + 43);
+            if (withComments) gfx.DrawString($"{comments!.Count} comment{(comments.Count == 1 ? "" : "s")}: see the last page", regular, ink, box.X + 6, box.Y + 52);
         }
+        if (withComments) AppendComments(document, commentsTitle ?? "Comments", comments!);
         using var output = new MemoryStream();
         document.Save(output);
         return output.ToArray();
+    }
+
+    /// <summary>Pages added at the end listing the comments, one after another, wrapped to the page.</summary>
+    private static void AppendComments(PdfDocument document, string title, IReadOnlyList<string> comments)
+    {
+        var heading = new XFont(EmbeddedFonts.Family, 12, XFontStyleEx.Bold);
+        var body = new XFont(EmbeddedFonts.Family, 9, XFontStyleEx.Regular);
+        const double margin = 48, lineHeight = 12.5;
+        PdfPage NewPage() { var p = document.AddPage(); p.Size = PdfSharp.PageSize.A4; return p; }
+        var page = NewPage();
+        var gfx = XGraphics.FromPdfPage(page);
+        gfx.DrawString(title, heading, XBrushes.Black, margin, margin);
+        var y = margin + 24;
+        var width = page.Width.Point - 2 * margin;
+        foreach (var comment in comments)
+        {
+            // Words laid out by hand to the width, so a long comment wraps rather than leaving the page.
+            var lines = new List<string>();
+            var line = "";
+            foreach (var word in comment.Replace("\r", "").Split(' ', '\n'))
+            {
+                var candidate = line.Length == 0 ? word : $"{line} {word}";
+                if (gfx.MeasureString(candidate, body).Width > width && line.Length > 0) { lines.Add(line); line = word; }
+                else line = candidate;
+            }
+            if (line.Length > 0) lines.Add(line);
+            foreach (var text in lines)
+            {
+                if (y > page.Height.Point - margin)
+                {
+                    gfx.Dispose();
+                    page = NewPage();
+                    gfx = XGraphics.FromPdfPage(page);
+                    y = margin;
+                }
+                gfx.DrawString(text, body, XBrushes.Black, margin, y);
+                y += lineHeight;
+            }
+            y += lineHeight * 0.6;
+        }
+        gfx.Dispose();
     }
 
     /// <summary>SUPERSEDED (or another word) across every page, with a note under it.</summary>
@@ -222,5 +317,25 @@ public sealed class EmbeddedFonts : IFontResolver
         using var buffer = new MemoryStream();
         stream.CopyTo(buffer);
         return buffer.ToArray();
+    }
+}
+
+/// <summary>
+/// What the project asked of the stamps on its PDFs (Settings → How this project works): stamps at all
+/// (<c>POLICY_PDF_STAMP</c>), each kind (<c>STAMP:RELEASED</c>, <c>STAMP:SUPERSEDED</c>, <c>STAMP:VOID</c>,
+/// <c>STAMP:HELD</c>, <c>STAMP:RETURNED</c>; each ON unless set OFF), and whether a stamp whose verdict carries
+/// comments lists them on a last page (<c>STAMP_COMMENTS</c> = ON).
+/// </summary>
+public sealed record StampChoices(bool All, IReadOnlyDictionary<string, string> Answers)
+{
+    public bool On(string kind) => All && Answers.GetValueOrDefault($"STAMP:{kind}") != "OFF";
+    public bool Released => On("RELEASED");
+    public bool Superseded => On(FileKinds.Superseded);
+    public bool Comments => All && Answers.GetValueOrDefault("STAMP_COMMENTS") == "ON";
+
+    public static async Task<StampChoices> ReadAsync(DeliosDbContext db, Guid projectId, CancellationToken cancellationToken)
+    {
+        var answers = await Settings.ProjectAnswers.AnswersAsync(db, projectId, cancellationToken);
+        return new StampChoices(answers.GetValueOrDefault("POLICY_PDF_STAMP") != "OFF", answers);
     }
 }

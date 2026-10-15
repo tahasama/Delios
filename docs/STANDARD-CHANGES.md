@@ -365,9 +365,14 @@ transmittal. A revision on hold is stamped ON HOLD — NOT FOR USE on every page
 Each stamp makes a new copy; the copy as submitted is kept. Whether to stamp is
 the project's choice, set by its administrator; the release title block of
 §12.5 is applied either way.
+The project also chooses which stamps are made (released, returned by the
+review, superseded, void, on hold), and whether the comments of a verdict that
+carries them (accepted with comments, rejected) go with the stamp, listed on a
+last page of the copy. A rejected revision is stamped RETURNED. The copy opened
+from the document is the stamped one.
 
-**Depends on it:** policy `POLICY_PDF_STAMP`; `stampVerdict`, `stampPdf` (state
-HELD).
+**Depends on it:** policy `POLICY_PDF_STAMP`, `STAMP:<kind>`, `STAMP_COMMENTS`;
+`Stamping` (`StampChoices`), `lib/documents/copies.ts` (`openCopy`).
 
 ---
 
