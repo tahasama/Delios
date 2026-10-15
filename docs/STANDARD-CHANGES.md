@@ -1073,7 +1073,7 @@ workbook unpacks within bounds and carries no macros, and the virus check finds 
 made the file is refused, never read unchecked. Every list taken out keeps a cell that would run as a formula as
 text. Each list can be taken out as it stands, and as an empty template.
 
-**Depends on it:** `SheetGuard`, `DocumentService.CheckRegisterAsync`, `Numbering.RefusalAsync`, `CreateUserRequest.Invite`,
+**Depends on it:** `SheetGuard` (no list is uploaded in Settings), `DocumentService.CheckRegisterAsync`, `Numbering.RefusalAsync`, `CreateUserRequest.Invite`,
 `PasswordReset.InvitationLink`, `lib/documents/forms-import.ts`.
 
 ---

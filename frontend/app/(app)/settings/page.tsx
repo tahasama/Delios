@@ -5,7 +5,7 @@ import { PageHeader, Banner, Chip } from "@/components/ui";
 import { SETUP_PAGES, SETUP_GROUPS, maySetup, type SetupPage } from "./setup-pages";
 import { families } from "@/lib/settings/families";
 import {
-  FolderKanban, Building2, Gauge, Tags, FileDigit, BadgeCheck, Users, FileUp, Workflow, ScrollText, Layers, Route, ClipboardList, ArrowRight, KeyRound,
+  FolderKanban, Building2, Gauge, Tags, FileDigit, BadgeCheck, Users, Workflow, ScrollText, Layers, Route, ClipboardList, ArrowRight, KeyRound,
   type LucideIcon,
 } from "lucide-react";
 
@@ -29,7 +29,6 @@ const ICON: Record<string, LucideIcon> = {
   "/settings/functions": BadgeCheck,
   "/settings/users": Users,
   "/settings/security": KeyRound,
-  "/settings/controlled": FileUp,
   "/settings/audit": ScrollText,
 };
 
@@ -57,15 +56,13 @@ export default async function AdminPage() {
   }
 
   // One live figure per card, so the hub says what is there, not just where to go.
-  const [projects, parties, sets, schemes, functions, people, pending, routes, events, acts, fieldsSet] = await Promise.all([
+  const [projects, parties, sets, schemes, functions, people, routes, events, acts, fieldsSet] = await Promise.all([
     orEmpty(adminProjects).then((all) => all.filter((p) => p.status === "ACTIVE").length),
     orEmpty(adminParties).then((all) => all.filter((p) => p.active).length),
     getSets().then((all) => all.length),
     adminNumbering().then((n) => n.schemes.filter((s) => s.active).length).catch(() => 0),
     orEmpty(adminFunctions).then((all) => all.filter((f) => f.active).length),
     orEmpty(adminUsers).then((all) => all.filter((u) => u.memberships.some((m) => m.projectId === ctx.projectId && m.active)).length),
-    // Controlled changes to configuration are not kept by the backend.
-    Promise.resolve(0),
     orEmpty(adminRoutes).then((all) => all.filter((r) => r.active).length),
     adminAudit({ from: new Date(Date.now() - 7 * 86_400_000).toISOString().slice(0, 10), per: 10 }).then((page) => page.total).catch(() => 0),
     projectSettings(ctx.projectId).then((all) => all.size).catch(() => 0),
@@ -84,7 +81,6 @@ export default async function AdminPage() {
     "/settings/numbering": { text: plural(schemes, "scheme") },
     "/settings/functions": { text: plural(functions, "function") },
     "/settings/users": { text: `${plural(people, "person", "people")} on ${ctx.project.code}` },
-    "/settings/controlled": { text: pending ? `${plural(pending, "change")} waiting` : "nothing waiting", attention: pending > 0 },
     "/settings/workflow-templates": { text: plural(routes, "route") },
     "/settings/audit": { text: `${events} event${events === 1 ? "" : "s"} this week` },
   };

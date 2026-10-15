@@ -333,7 +333,7 @@ function flowsFor({ gate, returner }: { gate: boolean; returner: string }): { ke
 const EXTRA: Record<Stage["extras"][number], { title: string; href: string }> = {
   numbering: { title: "Numbering schemes", href: "/settings/numbering" },
   routes: { title: "Review routes", href: "/settings/workflow-templates" },
-  distribution: { title: "Distribution rules", href: "/settings/controlled" },
+  distribution: { title: "Distribution rules", href: "/distribution" },
   parties: { title: "Outside organizations", href: "/settings/parties" },
   unreviewed: { title: "Document types not reviewed", href: "/settings/config?set=DOCUMENT_TYPES" },
 };

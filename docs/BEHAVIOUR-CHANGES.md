@@ -271,7 +271,7 @@ waiver; the backend counts it as covered for readiness.
 
 **The schedule itself is not uploaded as a "list for a decision".** It is read from the **schedule
 document**: attach the export to a new revision of it and send that for review. Releasing it is the
-approval, and moves every activity date. The "Project schedule" controlled-change page says so.
+approval, and moves every activity date.
 
 **The requirements list can be a controlled document.**
 - The starter setup includes the document type **RQL — Document requirements list**, already marked. Any other
@@ -569,6 +569,11 @@ the installation sets its keys.
 - **The Import & export page** follows the Schedule look; a file chosen is shown with Remove and is let go when the
   kind changes; each kind says which files it takes; the matrix and the Settings lists show as an administrator's.
   Exports are grouped (the register, Assurance, the record). "Back to register" is gone (the menu does it).
+- **Settings → Controlled changes is gone** (upload a matrix or a list, then approve it). Settings regulates and
+  takes no uploads; the matrix and the lists come in on Import & export, checked first. Four download templates no
+  page offered any more (an old deliverable CSV, a schedule template, a details correction, a review matrix) are gone.
+- **The setup tip is steps** (1 Settings lists, 2 the team, 3 the matrix, 4 the deliverable list) right of the title on
+  Import & export; each opens its import, the one shown is marked. It follows dark mode.
 - **Two downloads for each import kind:** the list as it stands now (the register as a filled workbook, the team, the
   matrix, every Settings list) and an empty template. The register brought back corrects only what changed.
 - **Spreadsheets are checked before they are read**, on Schedule (the three lists), Import & export and Controlled

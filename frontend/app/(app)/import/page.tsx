@@ -31,6 +31,14 @@ const EXPORTS: { group: string; items: { kind: string; label: string; note?: str
   },
 ];
 
+/** Setting up a project: the lists in the order each one needs the one before. */
+const SETUP = [
+  { kind: "sets", label: "Settings lists", hint: "disciplines, types, statuses: what everything else is chosen from" },
+  { kind: "people", label: "The team", hint: "who is on the project, in which function" },
+  { kind: "matrix", label: "The distribution matrix", hint: "who does what, by function" },
+  { kind: "deliverables", label: "The deliverable list", hint: "the register, numbered as it is registered" },
+];
+
 export default async function ImportPage({ searchParams }: { searchParams: Promise<{ kind?: string }> }) {
   const ctx = await requireScope();
   const sp = await searchParams;
@@ -38,34 +46,39 @@ export default async function ImportPage({ searchParams }: { searchParams: Promi
   // Everything on this page changes the project wholesale (a register, a team, the matrix, the lists) or copies it
   // out whole: Document Control's, or whoever sets the project up.
   const allowed = ctx.can("CONTROL") || ctx.can("CONFIGURE");
+  const chosen = sp.kind ?? "deliverables";
 
   return (
     <div className="space-y-4">
       <section className="register register-sheet register-sheet-open">
-        <div className="px-5 pt-5 pb-4 sm:px-6">
-          <h1 className="plate-title text-slate-950">Import &amp; export</h1>
-          {allowed ? (
-            <>
+        <div className="flex flex-col gap-4 px-5 pt-5 pb-4 sm:px-6 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0 flex-1">
+            <h1 className="plate-title text-slate-950">Import &amp; export</h1>
+            {allowed ? (
               <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">
                 Bring a spreadsheet in, or take a copy out. A file is always checked first: you see what it would do, row by row,
                 before anything is written.
               </p>
-              <Tip lead="Setting up a project?" className="mt-3">
-                Import in this order: the Settings lists, then the team, then the distribution matrix, then the deliverable list.
-              </Tip>
-            </>
-          ) : (
-            <p className="mt-2 max-w-2xl rounded-md bg-tint-soft px-2.5 py-1.5 text-xs leading-5 text-slate-700 ring-1 ring-line">
-              Importing and exporting whole lists is for Document Control and administrators. Ask Document Control for a copy of a
-              register, or to bring a list in.
-            </p>
-          )}
+            ) : (
+              <p className="mt-2 max-w-2xl rounded-md bg-tint-soft px-2.5 py-1.5 text-xs leading-5 text-slate-700 ring-1 ring-line">
+                Importing and exporting whole lists is for Document Control and administrators. Ask Document Control for a copy of a
+                register, or to bring a list in.
+              </p>
+            )}
+          </div>
+          {/* The order that works, each step opening its import below. */}
+          {allowed ? (
+            <Tip lead="Setting up a project?" className="lg:w-80 lg:shrink-0" steps={SETUP.map((step) => ({ ...step, href: `/import?kind=${step.kind}`, current: chosen === step.kind }))}>
+              Import in this order:
+            </Tip>
+          ) : null}
         </div>
       </section>
 
       {allowed ? (
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
-          <BulkImportForm initialKind={sp.kind ?? ""} admin={isAdmin(ctx.user)} />
+          {/* A step chosen above opens its import: the form starts again on that kind. */}
+          <BulkImportForm key={chosen} initialKind={chosen} admin={isAdmin(ctx.user)} />
 
           <aside className="min-w-0">
             <section className="register register-sheet register-sheet-open" aria-labelledby="export-head">

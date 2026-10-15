@@ -171,6 +171,8 @@ person wrote is shown where it matters, in full.
 ## A tip
 
 Advice that helps (an order that works, a shortcut) is a `Tip` (`components/ui.tsx`): a dashed frame, a yellow bulb,
-"TIP", the lead in bold ("Setting up a project?"), then the advice. Never used for a rule (that is said plainly) or a
+"TIP", the lead in bold ("Setting up a project?"), then the advice; an order to follow is numbered steps (`steps`),
+each a link to where it is done, the current one filled. On the page's surface (`bg-surface`), so it follows dark mode;
+beside a masthead, on the right (`lg:w-80`). Never used for a rule (that is said plainly) or a
 warning (amber ring).
 

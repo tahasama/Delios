@@ -49,15 +49,6 @@ async function extract(req: Request, { params }: { params: Promise<{ kind: strin
     // The reviews page exports what it is showing: a selection when rows are
     // ticked, otherwise every review the filters match.
     return passOn(projectPath(ctx, "/reviews/export"), { ...Object.fromEntries(new URL(req.url).searchParams), format: "csv" });
-  } else if (kind === "review-matrix") {
-    // The register's row says where the newest revision stands and who decided;
-    // the route's run, the open comments and the approval are not in it.
-    const documents = await registerRows(ctx, { view: "all", sort: "docNumber", dir: "asc" });
-    rows = [["Document number", "Title", "Discipline", "Type", "Criticality", "Revision", "Revision state", "Workflow", "Workflow state", "Review cycle", "Review status", "Reviewers", "Review outcome", "Blocking comments", "Approved by", "Approval role", "Authority matrix version", "Planned submission"]];
-    for (const document of documents) {
-      rows.push([document.number, document.title, document.discipline, document.docType, document.criticality ?? "", document.revision ?? "", document.revisionState ?? "", "", "", "", "", "", document.verdict ?? "", "", document.decidedBy ?? "", "", "", document.plannedDate ?? ""]);
-    }
-    name = "review-approval-matrix";
   } else if (kind === "baseline") {
     // The actions somebody ticked, or all of them.
     const query = new URL(req.url).searchParams;
@@ -217,25 +208,6 @@ async function extract(req: Request, { params }: { params: Promise<{ kind: strin
         "Content-Disposition": `attachment; filename="${filled ? "deliverable-list" : "deliverable-list-template"}-${stamp.toISOString().slice(0, 10)}.xlsx"`,
       },
     });
-  } else if (kind === "template-deliverables-csv") {
-    rows = [
-      ["Document Number", "Title", "Producer", "Type", "Discipline", "Project", "SubProject", "Supplier", "PO", "Criticality", "Confidentiality", "RetentionClass", "AssetCode", "ReceivedDate", "ContractRef"],
-      // Leave the number empty and the row is registered, with its number allocated.
-      ["", "Feed pump P-103 GA drawing", "ENG", "DWG", "ME", "P1001", "50", "", "", "QUALITY", "INTERNAL", "ASSET_LIFE", "P-101", "", ""],
-      ["", "Blower BL-301 datasheet (vendor)", "VND", "DAT", "ME", "P1001", "40", "ACME", "PO101", "QUALITY", "INTERNAL", "ASSET_LIFE", "BL-301", "2026-09-01", ""],
-      // Give the number and the row corrects that document. Type, discipline,
-      // project, sub-project and supplier are built into the number, so they
-      // are left empty here.
-      ["P1001-50-ME-DWG-00001", "Feed pump P-103 — general arrangement", "", "", "", "", "", "", "", "SAFETY", "", "", "", "", "CTR-2026-11"],
-    ];
-    name = "template-deliverable-list";
-  } else if (kind === "template-schedule") {
-    rows = [
-      ["Activity ID", "Action Code", "Activity Name", "Baseline Date", "Forecast Date"],
-      ["SCH-1001", "A0042", "Foundation concrete pour - area 20", "2026-10-01", "2026-10-05"],
-      ["SCH-1015", "A0048", "Mechanical completion - unit 73", "2026-10-18", "2026-10-18"],
-    ];
-    name = "template-schedule-version";
   } else if (kind === "people") {
     // The team on this project as it stands, in the Team list's own columns.
     const [users, parties] = await Promise.all([adminUsers(), adminParties()]);
@@ -253,12 +225,6 @@ async function extract(req: Request, { params }: { params: Promise<{ kind: strin
       ["J. Doe", "j.doe@acmepumps.example", "ACME", "Supplier contact", ""],
     ];
     name = "template-people";
-  } else if (kind === "template-metadata") {
-    rows = [
-      ["Document Number", "Title", "DocType", "Discipline", "Criticality", "Confidentiality", "RetentionClass", "SubProject", "ContractRef"],
-      ["P1001-50-CI-DSW-00001", "Corrected title", "", "", "QUALITY", "", "", "60", ""],
-    ];
-    name = "template-metadata-update";
   } else if (kind === "matrix") {
     // The distribution matrix, pre-filled. Nobody should start from an empty
     // template: a blank grid invites invented codes, and the file people edit

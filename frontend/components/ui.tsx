@@ -100,21 +100,65 @@ export function Card({
 export { TONE };
 
 /**
- * A tip: advice that helps, never a rule or a warning, so it does not look like either: a dashed frame, a yellow bulb,
- * "Tip", the lead in bold ("Setting up a project?"), then the advice.
+ * A tip: advice that helps, never a rule or a warning, so it does not look like either: a dashed frame on the page's
+ * own surface (light and dark), a yellow bulb, "TIP", the lead in bold, then the advice. An order that works is given as
+ * numbered `steps`, each a link to where it is done when it has one.
  */
-export function Tip({ lead, children, className }: { lead?: React.ReactNode; children: React.ReactNode; className?: string }) {
+export function Tip({
+  lead,
+  children,
+  steps,
+  className,
+}: {
+  lead?: React.ReactNode;
+  children?: React.ReactNode;
+  steps?: { label: React.ReactNode; hint?: React.ReactNode; href?: string; current?: boolean }[];
+  className?: string;
+}) {
   return (
-    <p className={cn("flex max-w-2xl items-start gap-2.5 rounded-md border border-dashed border-line-strong bg-white px-3 py-2 text-xs leading-5 text-slate-700", className)}>
-      <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700" aria-hidden="true">
-        <Lightbulb className="h-3 w-3" />
-      </span>
-      <span className="min-w-0">
-        <span className="mr-1.5 text-[11px] font-semibold tracking-wide text-amber-800 uppercase">Tip</span>
-        {lead ? <span className="font-semibold text-slate-800">{lead} </span> : null}
-        {children}
-      </span>
-    </p>
+    <div className={cn("rounded-md border border-dashed border-line-strong bg-surface px-3 py-2.5 text-xs leading-5 text-slate-700", className)}>
+      <p className="flex items-start gap-2.5">
+        <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700" aria-hidden="true">
+          <Lightbulb className="h-3 w-3" />
+        </span>
+        <span className="min-w-0">
+          <span className="mr-1.5 text-[11px] font-semibold tracking-wide text-amber-700 uppercase">Tip</span>
+          {lead ? <span className="font-semibold text-slate-800">{lead} </span> : null}
+          {children}
+        </span>
+      </p>
+      {steps?.length ? (
+        <ol className="mt-2 space-y-1 pl-[1.875rem]">
+          {steps.map((step, index) => {
+            const body = (
+              <>
+                <span
+                  className={cn(
+                    "inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold tabular-nums ring-1",
+                    step.current ? "bg-brand text-white ring-brand" : "bg-tint-soft text-slate-700 ring-line",
+                  )}
+                >
+                  {index + 1}
+                </span>
+                <span className="min-w-0">
+                  <span className={cn("block font-semibold", step.href ? "text-link group-hover:underline" : "text-slate-800")}>{step.label}</span>
+                  {step.hint ? <span className="block text-[11px] text-slate-500">{step.hint}</span> : null}
+                </span>
+              </>
+            );
+            return (
+              <li key={index}>
+                {step.href ? (
+                  <Link href={step.href} aria-current={step.current ? "step" : undefined} className="group flex items-start gap-2 rounded-md -mx-1 px-1 py-0.5 hover:bg-tint-soft">{body}</Link>
+                ) : (
+                  <span className="flex items-start gap-2 px-0 py-0.5">{body}</span>
+                )}
+              </li>
+            );
+          })}
+        </ol>
+      ) : null}
+    </div>
   );
 }
 

@@ -31,8 +31,9 @@ a screen only words it. A new rule goes in the backend, never in a page.
 ## How to work with the owner
 
 - Short, plain replies. No jargon. PowerShell commands one per block.
-- To update the owner's copy: `git pull`, then `docker compose --profile app up -d --build` (without the profile the
-  app is not rebuilt).
+- To update the owner's copy: `git pull`, then `docker compose --profile app up -d --build`. The app's own services
+  (API, worker, screens, migrations) carry the profile `app` in `compose.yaml`; without it only the dependencies start
+  (database, storage, queue…), for running the API by hand. `COMPOSE_PROFILES=app` in `.env` makes it the default.
 - Never send screenshots or pictures.
 - Never quote a bare document number as a reference.
 - Ask before choosing any code (status, verdict, type…). A code never changes once used.
@@ -449,13 +450,17 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - Each import kind offers two downloads: the list as it stands now (the register, the team, the matrix, every Settings
   list) and an empty template. A register taken out and brought back corrects only what changed; what the number is
   built from may be carried as it is, never changed; a row that matches is counted, not listed.
-- Every spreadsheet read (Schedule lists, Import & export, Controlled changes) first passes `SheetGuard` (backend):
+- Nothing is uploaded in Settings: Settings regulates. Lists come in on Import & export or the Schedule (Settings →
+  Controlled changes, an upload with approval, is removed).
+- Every spreadsheet read (Schedule lists, Import & export) first passes `SheetGuard` (backend):
   it is what its name says (a workbook is a zip, a CSV is text), a workbook unpacks within 200 MB and 5000 parts and
   carries no macros, the virus check finds nothing (scanner down: refused, said so), a sheet spans at most 100,000
   rows and 500 columns. Screens call `POST /projects/{id}/sheets/check` (`lib/documents/sheet-check.ts`).
 - Every CSV we write keeps a cell starting with = + - @ as text (leading apostrophe; a lone "-" or a number stays):
   `csvSafe` (frontend), `ReportEndpoints.Csv` (backend).
-- A tip is `Tip` (`components/ui.tsx`): dashed frame, yellow bulb, "Tip", bold lead. Never a rule or a warning.
+- A tip is `Tip` (`components/ui.tsx`): dashed frame on the page's surface (light and dark), yellow bulb, "Tip", bold
+  lead; an order that works is numbered `steps`, each a link to where it is done, the current one marked. Never a rule
+  or a warning. On Import & export it sits right of the title: the setup order, each step opening its import.
 
 ### Home
 - Home's to-do lists everything the signed-in person has to do, whatever it
