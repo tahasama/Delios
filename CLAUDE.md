@@ -472,6 +472,10 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - A bar chosen on the chart narrows the list and the download to its own lines (`bar`, each row knows its bar,
   `Report.RowBars`); chosen again, it lets go. Words typed narrow the list and the download ("Narrow the list and the
   download", Apply, Clear). The windows are the reader's (looking ahead, going back, turnaround over).
+- Deliveries against plan has "One bar per": who sends it (each organization, and us as one) or discipline
+  (`ReportOptions.By`); the lines carry both. Waiting is never shown as good: a review waiting under 7 days is blue
+  (under way), not green.
+- Bar names start at the same point, left-aligned, with room for the action's name.
 - Numbers are never printed on the bars: the legend gives each state's total, the end of each bar its count.
   Dates in the lines read from today ("3 days ago"), the day itself on hover.
 - "Register on a date" is a report of its own, worked out by the backend (`AsOfAsync`): each document registered by

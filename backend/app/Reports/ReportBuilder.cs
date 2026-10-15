@@ -142,16 +142,18 @@ public sealed class ReportBuilder(IClock clock)
         {
             var due = Earliest(d.PlannedDate, needed.GetValueOrDefault(d.Id));
             if (due is not { } dueDate) continue;
-            var sender = d.Originator is null ? $"Us: {_catalog.Label(ValueSets.Disciplines, d.Discipline)}" : parties.GetValueOrDefault(d.Originator, d.Originator);
+            // Who sends it: an organization, or us as one. By discipline, whoever sends it.
+            var sender = d.Originator is null ? "Us" : parties.GetValueOrDefault(d.Originator, d.Originator);
+            var group = options.By == "discipline" ? _catalog.Label(ValueSets.Disciplines, d.Discipline) : sender;
             LocalDate? sent = firstSent.TryGetValue(d.Id, out var at) ? at.InZone(_zone).Date : null;
             var state = sent is { } s ? (s <= dueDate ? "onTime" : "late") : dueDate < _today ? "overdue" : "coming";
             tally[state]++;
-            (bars.TryGetValue(sender, out var bar) ? bar : bars[sender] = new Bar(sender, [])).Add(state);
+            (bars.TryGetValue(group, out var bar) ? bar : bars[group] = new Bar(group, [])).Add(state);
             var lateBy = Period.Between(dueDate, sent ?? _today, PeriodUnits.Days).Days;
             // How late, said once: the state beside it carries the colour.
-            lines.Add((order[state], dueDate, sender,
+            lines.Add((order[state], dueDate, group,
             [
-                Doc(d.Id, d.Number), d.Title, sender, dueDate.ToString("yyyy-MM-dd", null), sent?.ToString("yyyy-MM-dd", null) ?? "",
+                Doc(d.Id, d.Number), d.Title, sender, _catalog.Label(ValueSets.Disciplines, d.Discipline), dueDate.ToString("yyyy-MM-dd", null), sent?.ToString("yyyy-MM-dd", null) ?? "",
                 state is "late" or "overdue" ? $"{lateBy} d" : "", Stage(segments, state),
             ]));
         }
@@ -165,8 +167,8 @@ public sealed class ReportBuilder(IClock clock)
                 new("On time", $"{onTime}%", delivered == 0 ? null : onTime >= options.OnTimeTarget ? "good" : "warn"),
                 new("Overdue now", tally["overdue"].ToString(), tally["overdue"] > 0 ? "bad" : "good"),
             ],
-            new Chart("Documents by sender", segments, [.. bars.Values]),
-            ["Document", "Title", "Sender", "Due", "Delivered", "Late by", "State"],
+            new Chart(options.By == "discipline" ? "Documents by discipline" : "Documents by sender", segments, [.. bars.Values]),
+            ["Document", "Title", "Sender", "Discipline", "Due", "Delivered", "Late by", "State"],
             [.. lines.OrderBy(l => l.Order).ThenBy(l => l.Due).Select(l => ((string?)l.Bar, l.Row))],
             options.Party is null ? "No document has a planned date, and no activity needs one yet." : "None of your documents is planned yet.");
     }
@@ -192,7 +194,8 @@ public sealed class ReportBuilder(IClock clock)
 
         Segment[] segments =
         [
-            new("fresh", $"Under {options.WarnDays} days", "good"),
+            // Waiting is never "good": the freshest wait reads as under way, not as done.
+            new("fresh", $"Under {options.WarnDays} days", "info"),
             new("week", $"{options.WarnDays} to {options.LateDays} days", "warn"),
             new("old", $"Over {options.LateDays} days", "bad"),
         ];

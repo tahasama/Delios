@@ -16,6 +16,6 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   if (!ctx.user.isInternal && !OUTSIDE_REPORT_IDS.includes(id as ReportId)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const sp = new URL(req.url).searchParams;
   const format = sp.get("format") === "xlsx" ? "xlsx" : "csv";
-  const query = reportQuery(id as ReportId, { rq: sp.get("rq") ?? undefined, bar: sp.get("bar") ?? undefined, on: sp.get("on") ?? undefined, window: sp.get("window") ?? undefined });
+  const query = reportQuery(id as ReportId, { rq: sp.get("rq") ?? undefined, bar: sp.get("bar") ?? undefined, on: sp.get("on") ?? undefined, window: sp.get("window") ?? undefined, by: sp.get("by") ?? undefined });
   return passOnFile(projectPath(ctx, `/reports/${id}/export`), { format, ...query });
 }

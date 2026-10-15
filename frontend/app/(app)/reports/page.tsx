@@ -5,7 +5,7 @@ import { DataTable, Th, Td, ToneChip, inputCls, btn } from "@/components/ui";
 import { when } from "@/app/(app)/home-parts";
 import { fromToday } from "@/lib/core/days";
 import {
-  buildReport, OUTSIDE_REPORT_IDS, REPORT_IDS, REPORT_TITLES, WINDOWS,
+  buildReport, GROUP_BY, OUTSIDE_REPORT_IDS, REPORT_IDS, REPORT_TITLES, WINDOWS,
   type Bar, type Cell, type ReportId, type ReportQuery, type Segment,
 } from "@/lib/conformance/reports";
 
@@ -14,7 +14,7 @@ export const metadata = { title: "Reports" };
 
 const PER_PAGE = 50;
 
-type Search = { r?: string; rq?: string; bar?: string; on?: string; window?: string; page?: string };
+type Search = { r?: string; rq?: string; bar?: string; on?: string; window?: string; by?: string; page?: string };
 
 /**
  * Reports: each one answers one question, counted when it is opened, as figures, one chart and the list behind it.
@@ -26,7 +26,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   const sp = await searchParams;
   const offered = ctx.user.isInternal ? REPORT_IDS : OUTSIDE_REPORT_IDS;
   const current: ReportId = offered.includes(sp.r as ReportId) ? (sp.r as ReportId) : offered[0];
-  const asked: ReportQuery = { rq: (sp.rq ?? "").trim() || undefined, bar: sp.bar || undefined, on: sp.on || undefined, window: sp.window || undefined };
+  const asked: ReportQuery = { rq: (sp.rq ?? "").trim() || undefined, bar: sp.bar || undefined, on: sp.on || undefined, window: sp.window || undefined, by: sp.by || undefined };
   const today = new Date().toISOString().slice(0, 10);
   // A day to come is refused by the backend; the page asks for one before it counts.
   const needsDay = current === "asof" && !asked.on;
@@ -42,14 +42,14 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   }
 
   // The same narrowing everywhere: tabs keep the words, downloads and pages keep everything.
-  const link = (over: Partial<Search>, keep: (keyof Search)[] = ["r", "rq", "bar", "on", "window"]) => {
+  const link = (over: Partial<Search>, keep: (keyof Search)[] = ["r", "rq", "bar", "on", "window", "by"]) => {
     const next = new URLSearchParams();
     const base: Search = { ...sp, r: current };
     for (const key of keep) if (base[key]) next.set(key, String(base[key]));
     for (const [key, value] of Object.entries(over)) value ? next.set(key, String(value)) : next.delete(key);
     return `?${next}`;
   };
-  const download = (format: "csv" | "xlsx") => `/api/reports/${current}${link({ format } as Partial<Search>, ["rq", "bar", "on", "window"])}`;
+  const download = (format: "csv" | "xlsx") => `/api/reports/${current}${link({ format } as Partial<Search>, ["rq", "bar", "on", "window", "by"])}`;
   const narrowed = !!(asked.rq || asked.bar);
 
   const page = Math.max(1, Number(sp.page) || 1);
@@ -98,11 +98,21 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
         {/* What narrows it: a day (register on a date), a window, words. Applied together. */}
         <form className="flex flex-wrap items-end gap-x-4 gap-y-3 border-t border-line px-5 py-3 sm:px-6">
           <input type="hidden" name="r" value={current} />
-          {asked.bar ? <input type="hidden" name="bar" value={asked.bar} /> : null}
+          {/* The bar chosen stays with the words; on Deliveries the grouping may change, so it lets go. */}
+          {asked.bar && current !== "deliveries" ? <input type="hidden" name="bar" value={asked.bar} /> : null}
           {current === "asof" ? (
             <label className="w-44">
               <span className="mb-1.5 block h-4 text-xs font-medium leading-4 text-slate-700">On the day</span>
               <input type="date" name="on" max={today} defaultValue={asked.on ?? ""} required className={inputCls} />
+            </label>
+          ) : null}
+          {current === "deliveries" && ctx.user.isInternal ? (
+            <label className="w-40">
+              <span className="mb-1.5 block h-4 text-xs font-medium leading-4 text-slate-700">One bar per</span>
+              {/* A bar chosen belongs to one grouping: changing it lets the bar go. */}
+              <select name="by" defaultValue={asked.by ?? GROUP_BY[0].value} className={inputCls}>
+                {GROUP_BY.map((g) => <option key={g.value} value={g.value}>{g.label}</option>)}
+              </select>
             </label>
           ) : null}
           {window ? (
@@ -232,13 +242,13 @@ function BarChart({ segments, bars, chosen, hrefOf }: { segments: Segment[]; bar
           const on = chosen === b.label;
           const counts = segments.filter((s) => b.values[s.key]).map((s) => `${s.label}: ${b.values[s.key]}`).join(", ");
           return (
-            <li key={b.label} className={`grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-1 text-xs sm:grid-cols-[12rem_minmax(0,1fr)_auto] ${chosen && !on ? "opacity-50" : ""}`}>
+            <li key={b.label} className={`grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-1 text-xs sm:grid-cols-[minmax(10rem,18rem)_minmax(0,1fr)_auto] ${chosen && !on ? "opacity-50" : ""}`}>
               <Link
                 href={hrefOf(b.label)}
                 scroll={false}
                 aria-current={on ? "true" : undefined}
                 title={on ? "Show every line again" : `Only ${b.label} below`}
-                className={`col-span-2 truncate hover:underline sm:col-span-1 sm:text-right ${on ? "font-semibold text-slate-900" : "text-link"}`}
+                className={`col-span-2 truncate hover:underline sm:col-span-1 ${on ? "font-semibold text-slate-900" : "text-link"}`}
               >
                 {b.label}
               </Link>

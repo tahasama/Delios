@@ -48,7 +48,10 @@ export const WINDOWS: Partial<Record<ReportId, { param: string; label: string; c
 };
 
 /** What narrows a report: words, a bar chosen on the chart, a window, a day. */
-export type ReportQuery = { rq?: string; bar?: string; on?: string; window?: string };
+export type ReportQuery = { rq?: string; bar?: string; on?: string; window?: string; by?: string };
+
+/** Deliveries: one bar per sender (each organization, and us as one) or per discipline. */
+export const GROUP_BY = [{ value: "sender", label: "Who sends it" }, { value: "discipline", label: "Discipline" }];
 
 function cellText(c: Cell): string {
   return typeof c === "object" ? c.text : String(c);
@@ -95,6 +98,7 @@ export function reportQuery(id: ReportId, q: ReportQuery): Record<string, string
   if (q.rq) query.q = q.rq;
   if (q.bar) query.bar = q.bar;
   if (id === "asof" && q.on) query.on = q.on;
+  if (id === "deliveries" && q.by && GROUP_BY.some((g) => g.value === q.by)) query.by = q.by;
   const window = WINDOWS[id];
   if (window && q.window && window.choices.some((c) => c.value === q.window)) query[window.param] = q.window;
   return query;

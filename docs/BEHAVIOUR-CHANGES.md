@@ -577,6 +577,7 @@ the installation sets its keys.
   - The lines behind every report are shown (before: four reports sent you elsewhere); a bar opens its own lines;
     the filter says what it does and has Apply and Clear; the window can be changed; Excel as well as CSV.
   - "Export register" left this page: the register's own export is on Documents.
+  - Deliveries can be read by sender (us as one, each supplier) or by discipline; a fresh review wait reads blue.
   - The Schedule look; numbers beside the bars, not on them; dates from today; "Department" reads "Discipline";
     the average turnaround says "under a day" instead of "0.0 d"; readiness bars carry the action's name.
 - **Settings → Controlled changes is gone** (upload a matrix or a list, then approve it). Settings regulates and

@@ -49,9 +49,10 @@ public sealed record Report(
 /// <param name="OnTimeTarget">Deliveries: the share delivered on time that counts as good, in percent.</param>
 /// <param name="On">Register on a date: the day the register is read as it stood (end of that day, project time).</param>
 /// <param name="Party">Another organization reading: only its own documents are counted (Deliveries only).</param>
+/// <param name="By">Deliveries: one bar per sender (each organization, and us as one) or per discipline (whoever sends).</param>
 public sealed record ReportOptions(
     int HorizonDays = 30, int Months = 6, int WarnDays = 7, int LateDays = 14, int TurnaroundDays = 90, int OnTimeTarget = 80,
-    NodaTime.LocalDate? On = null, string? Party = null)
+    NodaTime.LocalDate? On = null, string? Party = null, string By = "sender")
 {
     /// <summary>Checks the options are in range. Returns a message saying what is wrong, or null when they are all valid. Called by the report endpoints before building.</summary>
     public string? Invalid() =>
@@ -60,6 +61,7 @@ public sealed record ReportOptions(
         : WarnDays < 1 || LateDays < WarnDays || LateDays > 366 ? "warnDays is at least 1 and lateDays between warnDays and 366."
         : TurnaroundDays is < 1 or > 731 ? "turnaroundDays is between 1 and 731."
         : OnTimeTarget is < 0 or > 100 ? "onTimeTarget is a percentage."
+        : By is not ("sender" or "discipline") ? "by is sender or discipline."
         : null;
 }
 
