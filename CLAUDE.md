@@ -390,8 +390,10 @@ a screen only words it. A new rule goes in the backend, never in a page.
   message.
 - Information reasons: REQUEST, RFI, ANSWER, CONFIRMATION (family Information);
   an existing demo gains them, and IFU, with `seed-demo`. A reason with no family is data.
-- A new transmittal lets Document Control ask placeholders not asked yet, one
-  supplier's at a time ("Ask placeholders of a supplier"), on a data transmittal only (never on a letter).
+- Placeholders are asked of their supplier from the supplier's package (tick, "Send to <supplier>") or the register
+  ("Create transmittal"); the new-transmittal form has no box of its own for it (removed: a third, confusing way).
+  The package shows what is overdue above its list: not sent yet (with "Tick the N to send", then the bar sends them)
+  and with the supplier, not back.
 - A letter (an information transmittal with nothing enclosed) needs its subject and its message; the form says so.
 - "Issued for": a status is shown with its code in its full words ("IFU — Issued for update", as "IFR — Issued for
   review"); a reason is shown in its plain words ("For update").

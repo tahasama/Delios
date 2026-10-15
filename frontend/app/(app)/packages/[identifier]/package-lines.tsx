@@ -20,6 +20,8 @@ export type PackageLine = {
   planned: string | null; plannedWord: string | null; plannedTone: string | null;
   /** The supplier holds it now: it can be asked back for an update. */
   withThem: boolean;
+  /** Past its planned date and not in yet. */
+  overdue: boolean;
   next: { label: string; href?: string; tone?: string };
   comments: { by: string; text: string; blocking: boolean; settled: boolean; rev: string }[];
 };
@@ -45,6 +47,8 @@ export function PackageLines({ packageId, packageNumber, supplier, shared, lines
   const toAskBack = chosen.filter((one) => one.withThem);
   const sentChosen = chosen.filter((one) => !!one.sent);
   const all = lines.length > 0 && ticked.length === lines.length;
+  const overdueNotSent = lines.filter((one) => one.overdue && !one.sent);
+  const overdueWithThem = lines.filter((one) => one.overdue && one.withThem);
   const tick = (id: string) => setTicked((was) => (was.includes(id) ? was.filter((one) => one !== id) : [...was, id]));
   const day = (value: string | null) => (value ? new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(value)) : null);
 
@@ -56,6 +60,22 @@ export function PackageLines({ packageId, packageNumber, supplier, shared, lines
           <span className="text-[11px] text-slate-500">{counts}</span>
           <Link href={pickHref} className="ask ml-auto inline-flex items-center gap-1.5"><Plus className="h-3.5 w-3.5" /> Add or take out</Link>
         </div>
+
+        {/* What is late, and the way to ask it: the overdue documents not sent yet are ticked in one go, then sent from
+            the bar (each on a transmittal, once). Those already with the supplier are waiting on them. */}
+        {overdueNotSent.length || overdueWithThem.length ? (
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-red-200 bg-red-50 px-5 py-2.5 text-[12.5px] text-red-900 sm:px-6">
+            <span className="font-semibold">Overdue:</span>
+            {overdueNotSent.length ? <span>{overdueNotSent.length} not sent to {supplier} yet</span> : null}
+            {overdueNotSent.length && overdueWithThem.length ? <span aria-hidden>·</span> : null}
+            {overdueWithThem.length ? <span>{overdueWithThem.length} with {supplier}, not back</span> : null}
+            {overdueNotSent.length ? (
+              <button type="button" onClick={() => setTicked(overdueNotSent.map((one) => one.id))} className="ask ml-auto">
+                Tick the {overdueNotSent.length} to send
+              </button>
+            ) : null}
+          </div>
+        ) : null}
 
         {lines.length ? (
           <DataTable className="rounded-none border-0 shadow-none" exportName="package" id="supplier-package-lines" defaultHidden={["Comments"]}

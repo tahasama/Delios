@@ -3,7 +3,7 @@
 import { TRANSMITTAL_KINDS, kind, kindOf, type TransmittalKind } from "@/lib/transmittals/kinds";
 import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { ActionForm } from "@/components/form";
 import { SearchPick } from "@/components/search-pick";
 import { createTransmittalAction } from "@/lib/transmittals/forms";
@@ -68,7 +68,7 @@ const field = "plain w-full py-1.5 text-[13px]";
  * only released revisions, and a received transmittal has no subject of ours.
  */
 export function NewTransmittalForm({
-  reasons, revisions, companies, ourOrganization, parties = [], defaultDirection, preselectedRevisionIds, prefill, fields, labels, ownFields, placeholders, askable = [], askingBack, mayRecordReceived, outsider = false, unsent,
+  reasons, revisions, companies, ourOrganization, parties = [], defaultDirection, preselectedRevisionIds, prefill, fields, labels, ownFields, placeholders, askingBack, mayRecordReceived, outsider = false, unsent,
 }: {
   /** The organizations set up on the project, with their codes: who something was received from. */
   parties?: { id: string; code: string; name: string }[];
@@ -95,8 +95,6 @@ export function NewTransmittalForm({
   placeholders?: { to: string; items: { id: string; number: string; title: string }[]; mixed: boolean };
   /** A supplier's documents it holds, asked back for an update on this transmittal; the asks are raised when it is sent. */
   askingBack?: { to: string; items: { id: string; number: string; title: string }[] };
-  /** Placeholders not asked yet, per supplier, that Document Control may ask on this transmittal: one supplier's at a time. */
-  askable?: { supplier: string; items: { id: string; number: string; title: string }[] }[];
   /** What this organization asks for: must be filled, may be left, or not asked. */
   fields: Record<string, "REQUIRED" | "OPTIONAL" | "OFF">;
   /** Its own words for them. */
@@ -425,8 +423,6 @@ export function NewTransmittalForm({
               </ul>
             </div>
           ) : null}
-          {/* Placeholders asked of a supplier go on a data transmittal (for update); never on a letter. */}
-          {outgoing && family === "DATA" && !placeholders && !askingBack && askable.length ? <AskPlaceholders askable={askable} /> : null}
           {/* What is enclosed, each removable; "Add documents" opens the register, as for an action, and brings the
               ticks back here with everything written so far. */}
           <div className="flex flex-wrap items-start gap-2 border-b border-line px-5 py-3 sm:px-6">
@@ -550,40 +546,3 @@ export function NewTransmittalForm({
   );
 }
 
-/**
- * A supplier's documents with nothing released yet, asked of it on this transmittal. One supplier's at a time: choosing
- * them opens the transmittal addressed to that supplier, the documents listed as asked.
- */
-function AskPlaceholders({ askable }: { askable: { supplier: string; items: { id: string; number: string; title: string }[] }[] }) {
-  const router = useRouter();
-  const [supplier, setSupplier] = useState(askable[0]?.supplier ?? "");
-  const [ticked, setTicked] = useState<string[]>([]);
-  const items = askable.find((one) => one.supplier === supplier)?.items ?? [];
-  return (
-    <details className="border-b border-line">
-      <summary className="flex cursor-pointer list-none flex-wrap items-center gap-2 px-5 py-2.5 text-xs text-slate-600 sm:px-6">
-        <span className="ask">Ask placeholders of a supplier</span>
-        <span className="text-[11px] text-slate-500">{askable.reduce((n, one) => n + one.items.length, 0)} not sent to their supplier yet</span>
-      </summary>
-      <div className="space-y-2 px-5 pb-3 sm:px-6">
-        <select value={supplier} onChange={(event) => { setSupplier(event.target.value); setTicked([]); }} className="plain">
-          {askable.map((one) => <option key={one.supplier} value={one.supplier}>{one.supplier} · {one.items.length}</option>)}
-        </select>
-        <ul className="max-h-45 divide-y divide-line overflow-y-auto scroll-thin rounded-md ring-1 ring-line">
-          {items.map((one) => (
-            <li key={one.id}>
-              <label className="flex items-center gap-2 px-3 py-1.5 text-[12.5px]">
-                <input type="checkbox" checked={ticked.includes(one.id)} onChange={(event) => setTicked((was) => event.target.checked ? [...was, one.id] : was.filter((id) => id !== one.id))} />
-                <span className="font-mono font-semibold text-slate-900">{one.number}</span>
-                <span className="truncate text-slate-500">{one.title}</span>
-              </label>
-            </li>
-          ))}
-        </ul>
-        <button type="button" disabled={!ticked.length} data-on={ticked.length ? "true" : undefined} onClick={() => router.push(`/transmittals/new?placeholders=${encodeURIComponent(ticked.join(","))}`)} className="ask disabled:cursor-not-allowed disabled:opacity-50">
-          Ask {ticked.length || ""} of {supplier}
-        </button>
-      </div>
-    </details>
-  );
-}

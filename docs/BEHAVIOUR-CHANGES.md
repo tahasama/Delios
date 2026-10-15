@@ -554,6 +554,10 @@ the installation sets its keys.
 - **Criticality** always has a recommendation; required in Forms & fields, it is required on the form.
 - **Letters** need a message as well as a subject; "Ask placeholders of a supplier" shows on data transmittals only.
 
+- **"Ask placeholders of a supplier" is gone from the new-transmittal form** (it repeated the package's "Send to
+  <supplier>" and the register's "Create transmittal"). The supplier package now lists what is overdue above its
+  documents, and ticks the overdue ones not sent yet in one click.
+
 ## 7. Notifications and email
 
 - Notifications are kept and shown in the bell and on the Notifications page; opening the page reads

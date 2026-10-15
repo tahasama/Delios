@@ -177,6 +177,7 @@ export async function SupplierPackage({ pkg }: { pkg: PackageView }) {
       issued: r.issued ? r.issued.toISOString() : null,
       planned: r.due ? r.due.toISOString() : null, plannedWord: said?.word ?? null, plannedTone: said?.tone ?? null,
       withThem: isSent && WITH_SUPPLIER.includes(r.state),
+      overdue: !!said?.word.startsWith("overdue"),
       next: !isSent ? { label: `send it to ${supplierName}` }
         : r.state === "AWAITING_CHECK" && r.transmittal ? { label: `Check ${r.transmittal.number}`, href: `/transmittals/${r.transmittal.id}` }
         : r.state === "TO_ROUTE" ? { label: "Send for review", href: `/documents/${r.doc.id}#workflow` }
