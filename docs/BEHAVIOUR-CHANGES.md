@@ -580,8 +580,12 @@ the installation sets its keys.
   - Deliveries can be read by sender (us as one, each supplier) or by discipline; a fresh review wait reads blue.
   - The Schedule look; numbers beside the bars, not on them; dates from today; "Department" reads "Discipline";
     the average turnaround says "under a day" instead of "0.0 d"; readiness bars carry the action's name.
-  - Reports opens on an Overview for our people: each report's figures side by side, what needs attention named
-    under each, and a link into its tab. A supplier still opens on its own deliveries.
+  - Two new reports: **Progress by week** (how the register, deliveries, overdue, reviews and transmittals moved week
+    by week, and since last week) and **Who owes what** (what each organization owes us and we owe it, documents and
+    answers; a supplier reads its own). An Overview tab repeating the other tabs' figures was tried and removed.
+  - Charts fit their question: the transmittal log in columns per month, reviews as the longest waits in days (or by
+    reviewer), activity readiness on a calendar.
+  - Every report prints (landscape, without the menus).
 - **Settings → Controlled changes is gone** (upload a matrix or a list, then approve it). Settings regulates and
   takes no uploads; the matrix and the lists come in on Import & export, checked first. Four download templates no
   page offered any more (an old deliverable CSV, a schedule template, a details correction, a review matrix) are gone.

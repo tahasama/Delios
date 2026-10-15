@@ -14,7 +14,7 @@ namespace Delios.Host.Reports;
 /// from the organization's own lists (disciplines, statuses, reasons); only the
 /// stages the system itself works out (in review, released, late…) are named here.
 /// </summary>
-public sealed class ReportBuilder(IClock clock)
+public sealed partial class ReportBuilder(IClock clock)
 {
     /// <summary>The database and the project being reported on, set at the start of each <see cref="BuildAsync"/> call. The builder is created once per request, so these are not shared between requests.</summary>
     private DeliosDbContext db = null!;
@@ -41,6 +41,8 @@ public sealed class ReportBuilder(IClock clock)
             ReportIds.Transmittals => await TransmittalsAsync(options, cancellationToken),
             ReportIds.Readiness => await ReadinessAsync(options, cancellationToken),
             ReportIds.AsOf => await AsOfAsync(options, cancellationToken),
+            ReportIds.Progress => await ProgressAsync(options, cancellationToken),
+            ReportIds.Exchange => await ExchangeAsync(options, cancellationToken),
             _ => throw new ArgumentOutOfRangeException(nameof(id), id, "No such report."),
         };
     }
@@ -115,18 +117,8 @@ public sealed class ReportBuilder(IClock clock)
             // Another organization reading: its own documents only.
             .Where(d => options.Party == null || d.Originator == options.Party)
             .Select(d => new { d.Id, d.Number, d.Title, d.Originator, d.Discipline, d.PlannedDate }).ToListAsync(cancellationToken);
-        var needed = await (from n in db.Requirements
-                            join a in db.Activities on n.ActivityId equals a.Id
-                            where n.ProjectId == _project.Id && a.State == ActivityStates.Active && n.NeededBy != null
-                            group n by n.DocumentId into g
-                            select new { DocumentId = g.Key, NeededBy = g.Min(n => n.NeededBy) }).ToDictionaryAsync(x => x.DocumentId, x => x.NeededBy, cancellationToken);
-        var submissions = (await db.Revisions.AsNoTracking().Where(r => r.ProjectId == _project.Id)
-                .Select(r => new { r.DocumentId, r.Submissions }).ToListAsync(cancellationToken))
-            .SelectMany(r => r.Submissions.Select(s => (r.DocumentId, s.SubmittedAt)));
-        var reviewStarts = await db.Reviews.AsNoTracking().Where(r => r.ProjectId == _project.Id)
-            .Select(r => new { r.DocumentId, r.StartedAt }).ToListAsync(cancellationToken);
-        var firstSent = submissions.Concat(reviewStarts.Select(r => (r.DocumentId, SubmittedAt: r.StartedAt)))
-            .GroupBy(x => x.DocumentId).ToDictionary(g => g.Key, g => g.Min(x => x.SubmittedAt));
+        var needed = await NeededByAsync(cancellationToken);
+        var firstSent = await FirstSentAsync(cancellationToken);
         var parties = await db.Parties.AsNoTracking().ToDictionaryAsync(p => p.Code, p => p.Name, cancellationToken);
 
         Segment[] segments =
@@ -200,6 +192,8 @@ public sealed class ReportBuilder(IClock clock)
             new("old", $"Over {options.LateDays} days", "bad"),
         ];
         string AgeKey(int age) => age < options.WarnDays ? "fresh" : age <= options.LateDays ? "week" : "old";
+        // The longest waits, one bar each, as long as the days waited; or one bar per reviewer, counting their waits.
+        var perReviewer = options.By == "reviewer";
         var bars = new Dictionary<string, Bar>();
         var lines = new List<(int Age, string Bar, IReadOnlyList<Cell> Row)>();
         foreach (var x in open)
@@ -212,8 +206,15 @@ public sealed class ReportBuilder(IClock clock)
                 : x.Step.Participants.Where(p => p.AnsweredAt is null).Select(p => p.UserName).ToList();
             foreach (var who in waitingOn)
             {
-                (bars.TryGetValue(who, out var bar) ? bar : bars[who] = new Bar(who, [])).Add(AgeKey(age));
-                lines.Add((age, who,
+                var name = who;
+                if (perReviewer) (bars.TryGetValue(who, out var bar) ? bar : bars[who] = new Bar(who, [])).Add(AgeKey(age));
+                else
+                {
+                    name = $"{x.DocumentNumber} rev {x.Value} · {who}";
+                    if (bars.ContainsKey(name)) name = $"{name} · {x.Step.Title}";
+                    bars[name] = new Bar(name, new() { [AgeKey(age)] = Math.Max(age, 0) });
+                }
+                lines.Add((age, name,
                 [
                     Doc(x.DocumentId, x.DocumentNumber), x.Title, $"rev {x.Value}", new Cell(x.Number, Kind: "review", Id: x.ReviewId), x.Step.Title, who,
                     Date(x.Step.OpenedAt), x.Step.DueDate is { } due ? new Cell(due.ToString("yyyy-MM-dd", null), due < _today ? "bad" : null) : "—",
@@ -232,7 +233,9 @@ public sealed class ReportBuilder(IClock clock)
                 // Under a day reads as such, not "0.0 d"; none decided reads as none.
                 new("Average turnaround", turnaround switch { null => "none decided", < 1 => "under a day", var t => $"{t:0.0} days" }),
             ],
-            new Chart("Waiting, by reviewer and age", segments, [.. bars.Values.OrderByDescending(b => b.Values.Values.Sum()).ThenBy(b => b.Label)]),
+            perReviewer
+                ? new Chart("Waiting, by reviewer and age", segments, [.. bars.Values.OrderByDescending(b => b.Values.Values.Sum()).ThenBy(b => b.Label)])
+                : new Chart("The longest waits, in days", segments, [.. bars.Values.OrderByDescending(b => b.Values.Values.Sum()).ThenBy(b => b.Label).Take(15)], Unit: "days"),
             ["Document", "Title", "Revision", "Review", "Step", "Waiting on", "Since", "Due", "Waiting"],
             [.. lines.OrderByDescending(l => l.Age).Select(l => ((string?)l.Bar, l.Row))], "No review is waiting on anyone.");
     }
@@ -313,7 +316,7 @@ public sealed class ReportBuilder(IClock clock)
                 new("To send or check", (waitingSend + toAccept).ToString(), waitingSend + toAccept > 0 ? "warn" : "good"),
                 new("Answers overdue", overdue.ToString(), overdue > 0 ? "bad" : "good"),
             ],
-            new Chart("Per month", segments, months),
+            new Chart("Per month", segments, months, ChartKinds.Columns),
             ["Reference", "In / out", "Date", "From / to", "Reason", "Documents", "Acknowledged", "Waiting on"],
             [.. lines.OrderByDescending(l => l.At).Select(l => (l.Bar, l.Row))], $"Nothing sent or received in the last {options.Months} months.");
     }
@@ -346,7 +349,8 @@ public sealed class ReportBuilder(IClock clock)
         foreach (var a in activities)
         {
             // Named, not only numbered: "A00004 · Pour the foundations".
-            var bar = new Bar(string.IsNullOrWhiteSpace(a.Name) ? a.Code : $"{a.Code} · {a.Name}", []);
+            var bar = new Bar(string.IsNullOrWhiteSpace(a.Name) ? a.Code : $"{a.Code} · {a.Name}", [],
+                a.Start?.ToString("yyyy-MM-dd", null), (a.Finish ?? a.Start)?.ToString("yyyy-MM-dd", null));
             foreach (var n in a.Requirements.OrderBy(n => n.NeededBy))
             {
                 var key = n.State == RequirementStates.Met ? "met" : n.State == RequirementStates.Waived ? "waived"
@@ -373,7 +377,8 @@ public sealed class ReportBuilder(IClock clock)
                 new("Documents needed", rows.Count.ToString()),
                 new("Missing and late", late.ToString(), late > 0 ? "bad" : "good"),
             ],
-            new Chart("Documents needed, per activity", segments, bars),
+            new Chart("Documents needed, per activity, on the calendar", segments, bars, ChartKinds.Timeline,
+                From: _today.ToString("yyyy-MM-dd", null), To: horizon.ToString("yyyy-MM-dd", null)),
             ["Activity", "Start", "Document", "Discipline", "Serves", "Has", "Needed by", "State"], rows,
             $"No activity under way or starting in the next {options.HorizonDays} days.");
     }
@@ -442,6 +447,26 @@ public sealed class ReportBuilder(IClock clock)
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
+
+    /// <summary>The earliest day an active activity needs each document, for the documents one needs.</summary>
+    private Task<Dictionary<Guid, LocalDate?>> NeededByAsync(CancellationToken cancellationToken) =>
+        (from n in db.Requirements
+         join a in db.Activities on n.ActivityId equals a.Id
+         where n.ProjectId == _project.Id && a.State == ActivityStates.Active && n.NeededBy != null
+         group n by n.DocumentId into g
+         select new { DocumentId = g.Key, NeededBy = g.Min(n => n.NeededBy) }).ToDictionaryAsync(x => x.DocumentId, x => x.NeededBy, cancellationToken);
+
+    /// <summary>When each document was first delivered: first sent in by another organization, or first sent for review.</summary>
+    private async Task<Dictionary<Guid, Instant>> FirstSentAsync(CancellationToken cancellationToken)
+    {
+        var submissions = (await db.Revisions.AsNoTracking().Where(r => r.ProjectId == _project.Id)
+                .Select(r => new { r.DocumentId, r.Submissions }).ToListAsync(cancellationToken))
+            .SelectMany(r => r.Submissions.Select(s => (r.DocumentId, s.SubmittedAt)));
+        var reviewStarts = await db.Reviews.AsNoTracking().Where(r => r.ProjectId == _project.Id)
+            .Select(r => new { r.DocumentId, r.StartedAt }).ToListAsync(cancellationToken);
+        return submissions.Concat(reviewStarts.Select(r => (r.DocumentId, SubmittedAt: r.StartedAt)))
+            .GroupBy(x => x.DocumentId).ToDictionary(g => g.Key, g => g.Min(x => x.SubmittedAt));
+    }
 
     /// <summary>Puts the parts of a report together and stamps it with the time it was counted.</summary>
     private Report Make(string id, string title, string question, string audience, IReadOnlyList<Figure> figures, Chart chart,

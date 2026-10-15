@@ -20,6 +20,8 @@ public static class ReportEndpoints
         [ReportIds.Reviews] = ("Reviews waiting", "What is with reviewers, and for how long?"),
         [ReportIds.Transmittals] = ("Transmittal log", "What went out and came in, and what is still waiting?"),
         [ReportIds.Readiness] = ("Activity readiness", "Are the coming activities covered by their documents?"),
+        [ReportIds.Progress] = ("Progress by week", "Is the project moving, week by week?"),
+        [ReportIds.Exchange] = ("Who owes what", "What does each side still owe the other?"),
         [ReportIds.AsOf] = ("Register on a date", "Which revision was current on a given day?"),
     };
 
@@ -51,11 +53,11 @@ public static class ReportEndpoints
     private static async Task<IResult> ReportAsync(
         string reportId, HttpContext http, ReportBuilder builder, ReadDatabase reads, CancellationToken cancellationToken, string? q = null,
         int? horizonDays = null, int? months = null, int? warnDays = null, int? lateDays = null, int? turnaroundDays = null, int? onTimeTarget = null,
-        string? on = null, string? bar = null, string? by = null)
+        string? on = null, string? bar = null, string? by = null, int? weeks = null)
     {
         if (Day(on) is { Problem: { } bad }) return bad;
         var (report, problem) = await BuildAsync(reportId, http, builder, reads, q, bar,
-            Options(http, horizonDays, months, warnDays, lateDays, turnaroundDays, onTimeTarget, Day(on).Date, by), cancellationToken);
+            Options(http, horizonDays, months, warnDays, lateDays, turnaroundDays, onTimeTarget, Day(on).Date, by, weeks), cancellationToken);
         return problem ?? Results.Ok(report);
     }
 
@@ -63,12 +65,12 @@ public static class ReportEndpoints
     private static async Task<IResult> ExportAsync(
         string reportId, HttpContext http, ReportBuilder builder, ReadDatabase reads, CancellationToken cancellationToken, string format = "csv", string? q = null,
         int? horizonDays = null, int? months = null, int? warnDays = null, int? lateDays = null, int? turnaroundDays = null, int? onTimeTarget = null,
-        string? on = null, string? bar = null, string? by = null)
+        string? on = null, string? bar = null, string? by = null, int? weeks = null)
     {
         if (format is not ("csv" or "xlsx")) return Problems.Invalid("FORMAT_INVALID", "csv or xlsx.");
         if (Day(on) is { Problem: { } bad }) return bad;
         var (report, problem) = await BuildAsync(reportId, http, builder, reads, q, bar,
-            Options(http, horizonDays, months, warnDays, lateDays, turnaroundDays, onTimeTarget, Day(on).Date, by), cancellationToken);
+            Options(http, horizonDays, months, warnDays, lateDays, turnaroundDays, onTimeTarget, Day(on).Date, by, weeks), cancellationToken);
         if (problem is not null) return problem;
         var project = ProjectAccessFilter.Of(http).Project;
         var heading = $"{report!.Title}, {project.Code}, counted {report.CountedAt:yyyy-MM-dd HH:mm} UTC";
@@ -83,13 +85,13 @@ public static class ReportEndpoints
     /// organization's reader is always narrowed to its own documents.
     /// </summary>
     private static ReportOptions Options(HttpContext http, int? horizonDays, int? months, int? warnDays, int? lateDays, int? turnaroundDays,
-        int? onTimeTarget, NodaTime.LocalDate? on, string? by)
+        int? onTimeTarget, NodaTime.LocalDate? on, string? by, int? weeks)
     {
         var d = new ReportOptions();
         var access = ProjectAccessFilter.Of(http);
         return new ReportOptions(horizonDays ?? d.HorizonDays, months ?? d.Months, warnDays ?? d.WarnDays, lateDays ?? d.LateDays,
             turnaroundDays ?? d.TurnaroundDays, onTimeTarget ?? d.OnTimeTarget, on, access.IsInternal ? null : access.PartyCode ?? "\u0000",
-            string.IsNullOrWhiteSpace(by) ? d.By : by.Trim().ToLowerInvariant());
+            string.IsNullOrWhiteSpace(by) ? d.By : by.Trim().ToLowerInvariant(), weeks ?? d.Weeks);
     }
 
     /// <summary>The day asked for (yyyy-MM-dd), or the refusal when it is not a day, or still to come.</summary>

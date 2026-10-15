@@ -1,0 +1,135 @@
+using Delios.Host.Documents;
+using Microsoft.EntityFrameworkCore;
+using NodaTime;
+
+namespace Delios.Host.Reports;
+
+public sealed partial class ReportBuilder
+{
+    // ── Progress by week ──────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Week by week (Monday to Sunday, this week so far): documents registered and released, what was delivered on time or
+    /// late, what was overdue at the end of each week, the reviews open then, what went out and came in. Each is worked
+    /// out from the dates the register keeps, so the weeks before today are there from the first day; overdue is read
+    /// against the plan as it stands now (a planned day moved since is not known). The figures say how each moved since
+    /// last week.
+    /// </summary>
+    private async Task<Report> ProgressAsync(ReportOptions options, CancellationToken cancellationToken)
+    {
+        var now = clock.GetCurrentInstant();
+        var monday = _today.Previous(IsoDayOfWeek.Monday);
+        if (_today.DayOfWeek == IsoDayOfWeek.Monday) monday = _today;
+        var weeks = Enumerable.Range(0, options.Weeks).Select(i => monday.PlusWeeks(i - options.Weeks + 1)).ToList();
+        // The last day each week counts to: its Sunday, or today for this week.
+        LocalDate LastDay(LocalDate start) => LocalDate.Min(start.PlusDays(6), _today);
+        Instant EndOf(LocalDate day) => Instant.Min(day.PlusDays(1).AtStartOfDayInZone(_zone).ToInstant(), now);
+        LocalDate DayOf(Instant at) => at.InZone(_zone).Date;
+
+        var docs = await db.Documents.AsNoTracking().Where(d => d.ProjectId == _project.Id)
+            .Select(d => new { d.Id, d.CreatedAt, d.State, d.PlannedDate }).ToListAsync(cancellationToken);
+        var releases = await db.Revisions.AsNoTracking().Where(r => r.ProjectId == _project.Id && r.ReleasedAt != null)
+            .Select(r => new { r.DocumentId, ReleasedAt = r.ReleasedAt!.Value, r.VoidedAt, r.UnvoidedAt }).ToListAsync(cancellationToken);
+        var firstRelease = releases.GroupBy(r => r.DocumentId).ToDictionary(g => g.Key, g => g.Min(r => r.ReleasedAt));
+        var reviews = await db.Reviews.AsNoTracking().Where(r => r.ProjectId == _project.Id)
+            .Select(r => new { r.StartedAt, r.DecidedAt, r.ClosedAt }).ToListAsync(cancellationToken);
+        var sentOut = await db.Transmittals.AsNoTracking().Where(t => t.ProjectId == _project.Id).Select(t => t.IssuedAt).ToListAsync(cancellationToken);
+        var cameIn = (await db.Revisions.AsNoTracking().Where(r => r.ProjectId == _project.Id && r.AuthoredByParty != null)
+            .Select(r => r.Submissions).ToListAsync(cancellationToken)).SelectMany(s => s.Select(x => x.SubmittedAt)).ToList();
+        var needed = await NeededByAsync(cancellationToken);
+        var firstSent = await FirstSentAsync(cancellationToken);
+        // Each document's due day as the plan stands now; cancelled and withdrawn documents are owed by nobody.
+        var due = docs.Where(d => d.State is not (DocumentStates.Cancelled or DocumentStates.Withdrawn))
+            .Select(d => (d.Id, d.CreatedAt, Due: Earliest(d.PlannedDate, needed.GetValueOrDefault(d.Id))))
+            .Where(x => x.Due is not null)
+            .Select(x => (x.Id, x.CreatedAt, Due: x.Due!.Value, Sent: firstSent.TryGetValue(x.Id, out var at) ? DayOf(at) : (LocalDate?)null))
+            .ToList();
+
+        // One week, as the register stood at its end.
+        Week Count(LocalDate start)
+        {
+            var last = LastDay(start);
+            var from = start.AtStartOfDayInZone(_zone).ToInstant();
+            var end = EndOf(last);
+            bool VoidThen(Instant? voided, Instant? unvoided) => voided < end && (unvoided is null || unvoided >= end);
+            var open = reviews.Where(r => r.StartedAt < end && ((r.ClosedAt ?? r.DecidedAt) is not { } shut || shut >= end))
+                .Select(r => Period.Between(DayOf(r.StartedAt), last, PeriodUnits.Days).Days).ToList();
+            var inWeek = releases.Where(r => r.ReleasedAt >= from && r.ReleasedAt < end).ToList();
+            var delivered = due.Where(x => x.Sent is { } s && s >= start && s <= last).ToList();
+            return new Week(
+                start, last,
+                Registered: docs.Count(d => d.CreatedAt < end),
+                Released: releases.Where(r => r.ReleasedAt < end && !VoidThen(r.VoidedAt, r.UnvoidedAt)).Select(r => r.DocumentId).Distinct().Count(),
+                FirstReleases: inWeek.Count(r => firstRelease[r.DocumentId] == r.ReleasedAt),
+                NewRevisions: inWeek.Count(r => firstRelease[r.DocumentId] != r.ReleasedAt),
+                OnTime: delivered.Count(x => x.Sent <= x.Due),
+                Late: delivered.Count(x => x.Sent > x.Due),
+                // Overdue then: registered by then, its day passed, not delivered by then.
+                Overdue: due.Count(x => x.CreatedAt < end && x.Due < last && (x.Sent is null || x.Sent > last)),
+                Fresh: open.Count(a => a < options.WarnDays),
+                Waiting: open.Count(a => a >= options.WarnDays && a <= options.LateDays),
+                Old: open.Count(a => a > options.LateDays),
+                Decided: reviews.Count(r => r.DecidedAt >= from && r.DecidedAt < end),
+                Sent: sentOut.Count(at => at >= from && at < end),
+                Received: cameIn.Count(at => at >= from && at < end));
+        }
+        var counted = weeks.Select(Count).ToList();
+        static string Said(LocalDate day, string pattern) => day.ToString(pattern, System.Globalization.CultureInfo.InvariantCulture);
+        var label = (Week w) => Said(w.Start, "d MMM");
+
+        var by = options.By is "delivered" or "overdue" or "reviews" or "transmittals" ? options.By : "released";
+        var (title, segments, values) = by switch
+        {
+            "delivered" => ("Delivered each week, on time or late",
+                new Segment[] { new("onTime", "On time", "good"), new("late", "Late", "warn") },
+                (Func<Week, Dictionary<string, int>>)(w => new() { ["onTime"] = w.OnTime, ["late"] = w.Late })),
+            "overdue" => ("Overdue at the end of each week (against today's plan)",
+                [new("overdue", "Overdue", "bad")], w => new() { ["overdue"] = w.Overdue }),
+            "reviews" => ("Reviews open at the end of each week, by how long they had waited",
+                [new("fresh", $"Under {options.WarnDays} days", "info"), new("week", $"{options.WarnDays} to {options.LateDays} days", "warn"), new("old", $"Over {options.LateDays} days", "bad")],
+                w => new() { ["fresh"] = w.Fresh, ["week"] = w.Waiting, ["old"] = w.Old }),
+            "transmittals" => ("Sent and received each week",
+                [new("out", "Sent", "info"), new("in", "Received", "good")], w => new() { ["out"] = w.Sent, ["in"] = w.Received }),
+            _ => ("Released each week",
+                [new("first", "Released for the first time", "good"), new("again", "A new revision released", "info")],
+                w => new() { ["first"] = w.FirstReleases, ["again"] = w.NewRevisions }),
+        };
+        var bars = counted.Select(w => new Bar(label(w), values(w).Where(v => v.Value > 0).ToDictionary(v => v.Key, v => v.Value))).ToList();
+
+        var thisWeek = counted[^1];
+        var lastWeek = counted[^2];
+        // How a figure moved since last week; whether up is good or bad is said by the figure.
+        Figure Moved(string name, int value, int before, bool upIsGood, string? tone = null)
+        {
+            var change = value - before;
+            var said = change == 0 ? "same as last week" : $"{(change > 0 ? "+" : "−")}{Math.Abs(change)} since last week";
+            return new Figure(name, value.ToString(), tone, said, change == 0 ? null : (change > 0) == upIsGood ? "good" : "bad");
+        }
+        var openNow = thisWeek.Fresh + thisWeek.Waiting + thisWeek.Old;
+        var rows = counted.AsEnumerable().Reverse().Select(w => ((string?)label(w), (IReadOnlyList<Cell>)
+        [
+            // Kept on one line: the day it starts, with its year.
+            Said(w.Start, "d MMM yyyy").Replace(' ', '\u00a0'),
+            w.Registered.ToString(), w.Released.ToString(), (w.FirstReleases + w.NewRevisions).ToString(),
+            w.OnTime.ToString(), new Cell(w.Late.ToString(), w.Late > 0 ? "warn" : null), new Cell(w.Overdue.ToString(), w.Overdue > 0 ? "bad" : null),
+            (w.Fresh + w.Waiting + w.Old).ToString(), w.Decided.ToString(), w.Sent.ToString(), w.Received.ToString(),
+        ])).ToList();
+        return Make(ReportIds.Progress, "Progress by week", "Is the project moving, week by week?",
+            "The weekly progress meeting, or the monthly report to the client: what moved, and what did not.",
+            [
+                Moved("Documents released", thisWeek.Released, lastWeek.Released, upIsGood: true),
+                Moved("Released this week", thisWeek.FirstReleases + thisWeek.NewRevisions, lastWeek.FirstReleases + lastWeek.NewRevisions, upIsGood: true),
+                Moved("Overdue now", thisWeek.Overdue, lastWeek.Overdue, upIsGood: false, thisWeek.Overdue > 0 ? "bad" : "good"),
+                Moved("Reviews open", openNow, lastWeek.Fresh + lastWeek.Waiting + lastWeek.Old, upIsGood: false),
+            ],
+            new Chart(title, segments, bars, ChartKinds.Columns),
+            ["Week starting", "Registered", "Released (documents)", "Released that week", "Delivered on time", "Delivered late", "Overdue at its end",
+                "Reviews open at its end", "Reviews decided", "Sent", "Received"],
+            rows, "Nothing is registered yet.");
+    }
+
+    /// <summary>One week as the register stood at its end (<see cref="Last"/>: its Sunday, or today).</summary>
+    private sealed record Week(
+        LocalDate Start, LocalDate Last, int Registered, int Released, int FirstReleases, int NewRevisions, int OnTime, int Late, int Overdue,
+        int Fresh, int Waiting, int Old, int Decided, int Sent, int Received);
+}

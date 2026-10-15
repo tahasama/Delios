@@ -47,3 +47,7 @@ Kept in the project's settings store, because the backend has no table for them:
 
 14. **Distribution matrix import: rows cut by document family.** A filled-in matrix may carry a family column; backend rules (`RuleRequest`) have no family. Such lines are refused ("a row cut by document family is not supported yet"). Want: `RuleRequest.Family: string?`. Rules are also written back as the function's whole list (`PUT /api/admin/functions/{id} { rules }`), so the rule note ("Read from a filled-in distribution matrix") is not kept: want `RuleRequest.Note`.
 
+- **Progress by week reads overdue against today's plan.** A planned day moved since is not kept, so a past week's
+  "overdue" uses each document's planned day as it stands now (said on the chart). Want, if it matters: the planned
+  day kept with each change (a history of `Document.PlannedDate`), then each week read against the plan of its day.
+

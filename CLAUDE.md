@@ -463,16 +463,31 @@ a screen only words it. A new rule goes in the backend, never in a page.
   or a warning. On Import & export it sits right of the title: the setup order, each step opening its import.
 
 ### Reports
-- Reports opens on **Overview** for our people (not another organization's): each report's figures at a glance,
-  "Needs attention" naming the figures the backend marks bad or warn, and "Open the report" into its tab.
+- No overview tab: a page repeating the tabs' figures was removed (the owner: no use to anyone). Every tab adds
+  something of its own.
+- Each chart is drawn as fits its question (`Chart.Kind`): bars per name; columns per period, oldest left (Transmittal
+  log per month, Progress per week); a timeline for Activity readiness (each action placed on the calendar, today to
+  the look-ahead). Reviews waiting shows the longest waits, each bar as long as the days waited (`Unit` "days"; the
+  legend then counts waits, never adds days), or "By reviewer".
+- **Progress by week** (`ProgressAsync`): each week (Monday to Sunday, this one so far) as the register stood at its end:
+  registered, released (first time / a new revision), delivered on time or late, overdue (against the plan as it
+  stands now, only documents registered by then), reviews open by age, sent and received. Worked out from the dates
+  kept, so past weeks are there from day one; no snapshot is stored. The figures say how each moved since last week
+  (`Figure.Change`, green or red by whether the move is good). The chart shows one of these at a time, chosen in its head.
+- **Who owes what** (`ExchangeAsync`): per other organization, what it owes us (asked and not sent, to correct, to
+  revise, next revision due, to update when handed back, an answer asked on a transmittal) and what we owe it (to
+  check, to send for review, in review, an answer), since when, due when, late or not; read in the supplier's own
+  stages (`SupplierStage`). Another organization reads it too, for itself only, in its words ("You owe", "Owed to you").
+- Every report prints as shown (Print, in the plate): landscape, menus and controls left off paper (`.report-print`,
+  `@page report`).
 - Reports is in the menu for everyone who reads the project. Our people read every report; another organization's
-  people read Deliveries against plan, narrowed by the backend to their own documents (`ReportIds.Outside`, options
-  `Party`); asking for another report gives them that one.
+  people read Deliveries against plan and Who owes what, narrowed by the backend to their own documents
+  (`ReportIds.Outside`, options `Party`); asking for another report gives them the first.
 - Each report: the plate is its own title and question, who it is for and when it was counted; tabs are the report
   titles; Download what is shown as CSV or Excel. Figures, one chart, then the lines behind it, always shown (paged
   by 50), with a link to where the same lines are worked on.
-- Every control sits beside what it changes and acts at once: how the chart is cut (Deliveries "By who sends it /
-  By discipline") and its window ("Next 7 · 14 · 30 · 60 · 90 days", "Last 1 · 3 · 6 · 12 months") are side-by-side
+- Every control sits beside what it changes and acts at once: how the chart is cut (`by`: Deliveries "By who sends it /
+  By discipline", Reviews "Longest waits / By reviewer", Progress what the weeks show) and its window ("Next 7 · 14 · 30 · 60 · 90 days", "Last 1 · 3 · 6 · 12 months") are side-by-side
   choices in the chart's head, each a link; a bar's name narrows the lines to it (`bar`, `Report.RowBars`), shown as
   "only <bar> ×" on the lines' head; "Find in these lines" sits on the lines' head (Find lit only while new words
   wait, Clear). The download says it carries the lines shown. No form of dropdowns waiting for an Apply.

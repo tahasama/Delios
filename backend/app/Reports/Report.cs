@@ -1,20 +1,39 @@
 namespace Delios.Host.Reports;
 
-/// <summary>A headline number. Tone: good, warn or bad, when the number says something by itself.</summary>
-public sealed record Figure(string Label, string Value, string? Tone = null);
+/// <summary>
+/// A headline number. Tone: good, warn or bad, when the number says something by itself. <see cref="Change"/> says how it
+/// moved since last week ("+2 since last week"), coloured by <see cref="ChangeTone"/> when the move is good or bad.
+/// </summary>
+public sealed record Figure(string Label, string Value, string? Tone = null, string? Change = null, string? ChangeTone = null);
 
 /// <summary>One colour of the chart's stacked bars. Tone: good, info, warn, bad or muted.</summary>
 public sealed record Segment(string Key, string Label, string Tone);
 
-/// <summary>One bar: how many items of each segment it holds.</summary>
-public sealed record Bar(string Label, Dictionary<string, int> Values)
+/// <summary>One bar: how many items of each segment it holds. On a timeline, <see cref="From"/> and <see cref="To"/> are the days it spans (yyyy-MM-dd).</summary>
+public sealed record Bar(string Label, Dictionary<string, int> Values, string? From = null, string? To = null)
 {
     /// <summary>Adds one item to the given segment of this bar. Used by the report builder while it counts.</summary>
     public void Add(string segment) => Values[segment] = Values.GetValueOrDefault(segment) + 1;
 }
 
-/// <summary>The one stacked-bar chart a report shows: its title, its colours (segments) and its bars.</summary>
-public sealed record Chart(string Title, IReadOnlyList<Segment> Segments, IReadOnlyList<Bar> Bars);
+/// <summary>
+/// The one chart a report shows: its title, its colours (segments) and its bars, drawn the way that fits the question
+/// (<see cref="ChartKinds"/>). <see cref="Unit"/> "days": a bar's length is days, not a count. A timeline spans
+/// <see cref="From"/> to <see cref="To"/>.
+/// </summary>
+public sealed record Chart(string Title, IReadOnlyList<Segment> Segments, IReadOnlyList<Bar> Bars, string Kind = ChartKinds.Bars,
+    string? Unit = null, string? From = null, string? To = null);
+
+/// <summary>How a chart is drawn.</summary>
+public static class ChartKinds
+{
+    /// <summary>Horizontal bars, one per name, stacked by state.</summary>
+    public const string Bars = "bars";
+    /// <summary>Upright columns, one per period (month, week), stacked by state, in time order.</summary>
+    public const string Columns = "columns";
+    /// <summary>Each bar placed on the calendar from its first to its last day, stacked by state.</summary>
+    public const string Timeline = "timeline";
+}
 
 /// <summary>
 /// One cell of the detail list. <see cref="Kind"/> and <see cref="Id"/> say what it
@@ -49,10 +68,15 @@ public sealed record Report(
 /// <param name="OnTimeTarget">Deliveries: the share delivered on time that counts as good, in percent.</param>
 /// <param name="On">Register on a date: the day the register is read as it stood (end of that day, project time).</param>
 /// <param name="Party">Another organization reading: only its own documents are counted (Deliveries only).</param>
-/// <param name="By">Deliveries: one bar per sender (each organization, and us as one) or per discipline (whoever sends).</param>
+/// <param name="By">
+/// How the chart is cut. Deliveries: per sender (each organization, and us as one) or per discipline. Reviews: the
+/// longest waits or per reviewer. Progress: what the weeks show (released, delivered, overdue, reviews, transmittals).
+/// Null: the report's own first choice.
+/// </param>
+/// <param name="Weeks">Progress: how many weeks back, this one included.</param>
 public sealed record ReportOptions(
     int HorizonDays = 30, int Months = 6, int WarnDays = 7, int LateDays = 14, int TurnaroundDays = 90, int OnTimeTarget = 80,
-    NodaTime.LocalDate? On = null, string? Party = null, string By = "sender")
+    NodaTime.LocalDate? On = null, string? Party = null, string? By = null, int Weeks = 12)
 {
     /// <summary>Checks the options are in range. Returns a message saying what is wrong, or null when they are all valid. Called by the report endpoints before building.</summary>
     public string? Invalid() =>
@@ -61,7 +85,9 @@ public sealed record ReportOptions(
         : WarnDays < 1 || LateDays < WarnDays || LateDays > 366 ? "warnDays is at least 1 and lateDays between warnDays and 366."
         : TurnaroundDays is < 1 or > 731 ? "turnaroundDays is between 1 and 731."
         : OnTimeTarget is < 0 or > 100 ? "onTimeTarget is a percentage."
-        : By is not ("sender" or "discipline") ? "by is sender or discipline."
+        : Weeks is < 2 or > 52 ? "weeks is between 2 and 52."
+        : By is not (null or "sender" or "discipline" or "wait" or "reviewer" or "released" or "delivered" or "overdue" or "reviews" or "transmittals")
+            ? "by is not one of the report's choices."
         : null;
 }
 
@@ -75,8 +101,12 @@ public static class ReportIds
     public const string Readiness = "readiness";
     /// <summary>The register as it stood at the end of a given day: which revision was current, and which is now.</summary>
     public const string AsOf = "asof";
+    /// <summary>Week by week: how the register, deliveries, reviews and transmittals moved, and since last week.</summary>
+    public const string Progress = "progress";
+    /// <summary>What each organization still owes us, and what we owe it (documents and answers).</summary>
+    public const string Exchange = "exchange";
 
-    public static readonly IReadOnlyList<string> All = [Register, Deliveries, Reviews, Transmittals, Readiness, AsOf];
-    /// <summary>What another organization's people may read: their own deliveries against plan.</summary>
-    public static readonly IReadOnlyList<string> Outside = [Deliveries];
+    public static readonly IReadOnlyList<string> All = [Register, Deliveries, Reviews, Transmittals, Readiness, Progress, Exchange, AsOf];
+    /// <summary>What another organization's people may read: their own deliveries against plan, and who owes what between us.</summary>
+    public static readonly IReadOnlyList<string> Outside = [Deliveries, Exchange];
 }

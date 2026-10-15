@@ -38,7 +38,7 @@ const CONTROL: CapabilityItem[] = [
   { href: "/pipeline/submission", title: "Submission pipeline", text: "Planned versus arrived documents, lateness, resubmissions and supply backlog.", icon: ChartNoAxesCombined },
   { href: "/pipeline/review", title: "Review pipeline", text: "Our queue, pending contractor work, review timeliness, outcomes and revision rate.", icon: Workflow },
   { href: "/conformance", title: "Assurance and defects", text: "Run the checks, see how much of the register can be trusted, correct or accept what they find.", icon: ShieldCheck },
-  { href: "/reports", title: "Reports", text: "Where the register stands, who delivers on time, reviews waiting, transmittals, activity readiness, and which revision was current on any day.", icon: ListChecks },
+  { href: "/reports", title: "Reports", text: "Where the register stands, who delivers on time, reviews waiting, transmittals, activity readiness, progress week by week, who owes what between organizations, and which revision was current on any day. Each prints.", icon: ListChecks },
   { href: "/exposures", title: "Use and copy exposure", text: "Find obsolete copies, affected recipients and unresolved use consequences.", icon: Network },
   { href: "/import", title: "Import and export", text: "Bring in a deliverable list, a team, the matrix or the Settings lists from a template: each file is checked before anything is written.", icon: Import },
 ];
