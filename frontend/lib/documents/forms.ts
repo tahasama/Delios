@@ -6,15 +6,15 @@ import { isEmptyTitle } from "@/lib/core/standard";
 import { revalidatePath } from "next/cache";
 import { mayCreateDocument } from "@/lib/core/auth";
 import { getActiveSet } from "@/lib/settings/config";
-import { fieldRules, missingRequired, ownFields, takeExtras } from "@/lib/settings/field-policy";
-import { api, projectPath, refusal } from "@/lib/client";
+import { fieldRules, missingRequiredFields, ownFields, takeExtras } from "@/lib/settings/field-policy";
+import { api, refusalForForm, projectPath, refusal } from "@/lib/client";
 import { backendDocument } from "@/lib/documents/api";
 import { upload, filesOf } from "@/lib/documents/api-uploads";
 
 // G.1 — Creating a new document. "No controlled information shall be produced
 // without a register entry" (§3.9). Number is system-generated (§3.7).
 
-export async function createDocumentAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
+export async function createDocumentAction(_prev: { error?: string; fields?: string[] } | undefined, formData: FormData): Promise<{ error?: string; fields?: string[] }> {
   const ctx = await requireScope();
   const { user } = ctx;
   if (!mayCreateDocument(user)) return { error: user.isInternal ? "Read-only users cannot create documents." : "External parties cannot create register entries. Document Control must issue a placeholder to your organization first." };
@@ -68,7 +68,7 @@ export async function createDocumentAction(_prev: { error?: string } | undefined
   // for exactly these, but the screen is not the gate: an importer, a script or
   // a stale tab arrives here too.
   const asked = await fieldRules(ctx, "DOCUMENT");
-  const shortOf = missingRequired(asked, "DOCUMENT", {
+  const shortFields = missingRequiredFields(asked, "DOCUMENT", {
     subProject, phase, originator, contractRef, receivedDate, criticality, confidentiality,
     retentionClass: chosenRetention,
     plannedDate: String(formData.get("plannedDate") ?? ""),
@@ -76,8 +76,9 @@ export async function createDocumentAction(_prev: { error?: string } | undefined
     file: filesOf(formData, "renditionFile", "nativeFile").length ? "yes" : "",
     title, docType, discipline,
   });
+  const shortOf = shortFields.map((f) => f.label.toLowerCase());
   if (shortOf.length) {
- return { error: `This organization registers nothing without ${shortOf.join(", ")}. Fill ${shortOf.length === 1 ? "it" : "them"} in, or change what the form asks for in Settings → Forms & fields.` };
+ return { error: `This organization registers nothing without ${shortOf.join(", ")}. Fill ${shortOf.length === 1 ? "it" : "them"} in, or change what the form asks for in Settings → Forms & fields.`, fields: shortFields.map((f) => f.key) };
   }
 
   // The fields this organization added for itself. They are kept with the
@@ -103,7 +104,7 @@ export async function createDocumentAction(_prev: { error?: string } | undefined
       idempotencyKey: String(formData.get("formKey") ?? "") || undefined,
     });
   } catch (e) {
-    return { error: refusal(e).message };
+    return refusalForForm(e);
   }
 
   // Initial files create the first revision immediately: the PDF people read

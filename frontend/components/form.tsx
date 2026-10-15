@@ -1,11 +1,13 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/core/utils";
 import { btn } from "./ui";
-import { collectInvalid, type MissingField } from "@/app/(public)/form-validation";
+import { collectInvalid, fieldsNamed, markMissing, type MissingField } from "@/app/(public)/form-validation";
 
-type State = { error?: string; ok?: string; issues?: { line: number; message: string }[]; link?: { href: string; label: string } };
+type State = { error?: string; ok?: string;
+  /** Fields the server found missing or refused, by name: outlined on the form. */
+  fields?: string[]; issues?: { line: number; message: string }[]; link?: { href: string; label: string } };
 
 /** What is missing, said out loud rather than left to a tooltip off-screen. */
 export function MissingSummary({ missing }: { missing: MissingField[] }) {
@@ -59,9 +61,15 @@ export function ActionForm({
 }) {
   const [state, formAction, pending] = useActionState(action, undefined);
   const [missing, setMissing] = useState<MissingField[]>([]);
+  const formRef = useRef<HTMLFormElement>(null);
+  // What the server named as missing is outlined, as what the screen found is.
+  useEffect(() => {
+    if (formRef.current && state?.fields?.length) markMissing(formRef.current, fieldsNamed(formRef.current, state.fields));
+  }, [state]);
 
   return (
     <form
+      ref={formRef}
       id={id}
       action={formAction}
       className={cn("space-y-3", className)}

@@ -549,6 +549,11 @@ the installation sets its keys.
   information instead of only blocking.
 - **Supplier packages** can be delivered ("Deliver": a delivery package with its documents).
 
+- **Purchase orders follow their supplier** on the new-document form, and the backend refuses another supplier's.
+- **Missing fields are outlined in red** when a form is sent, also when the backend names them.
+- **Criticality** always has a recommendation; required in Forms & fields, it is required on the form.
+- **Letters** need a message as well as a subject; "Ask placeholders of a supplier" shows on data transmittals only.
+
 ## 7. Notifications and email
 
 - Notifications are kept and shown in the bell and on the Notifications page; opening the page reads

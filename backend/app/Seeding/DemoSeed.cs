@@ -647,6 +647,13 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
             ifu.Label = "For update";
             added = true;
         }
+        // The status IFU reads as its siblings do (IFR "Issued for review"): "Issued for update". The reason stays plain.
+        foreach (var status in await db.ValueEntries.Where(v => v.SetKey == ReviewSets.Statuses && v.Code == "IFU" && v.Label != "Issued for update")
+            .ToListAsync(cancellationToken))
+        {
+            status.Label = "Issued for update";
+            added = true;
+        }
         // The reason IFU asks an answer (the supplier sends the documents back): it gives its period, 10 working days.
         foreach (var ifu in await db.ValueEntries.Where(v => v.SetKey == Transmittals.TransmittalSets.Reasons && v.Code == "IFU").ToListAsync(cancellationToken))
         {

@@ -313,14 +313,18 @@ export async function allFieldRules(t: Tenant): Promise<Record<FieldKind, Rules>
  * form did not carry comes back by its own label, ready to be said out loud.
  */
 export function missingRequired(rules: Rules, kind: FieldKind, values: Record<string, unknown>, only?: string[]): string[] {
+  return missingRequiredFields(rules, kind, values, only).map((f) => f.label.toLowerCase());
+}
+
+/** The same, as the fields themselves (their keys name the form's fields, to outline them). */
+export function missingRequiredFields(rules: Rules, kind: FieldKind, values: Record<string, unknown>, only?: string[]) {
   return fieldsOf(kind)
     .filter((f) => !only || only.includes(f.key))
     .filter((f) => rules[f.key] === "REQUIRED")
     .filter((f) => {
       const v = values[f.key];
       return v === undefined || v === null || (typeof v === "string" && !v.trim()) || (Array.isArray(v) && !v.length);
-    })
-    .map((f) => f.label.toLowerCase());
+    });
 }
 
 /**

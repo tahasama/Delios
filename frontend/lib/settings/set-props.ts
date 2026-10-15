@@ -69,6 +69,11 @@ export const SET_PROP_FIELDS: Record<string, PropField[]> = {
   REVIEW_OUTCOMES: [
  { key: "effect", label: "What this verdict does", type: "choice", options: VERDICT_EFFECT, read: verdictEffect, hint: "" },
   ],
+  // Whose order it is: a document of another supplier may not name it (backend PO_OF_ANOTHER_SUPPLIER). Unset, the
+  // supplier whose package carries the order owns it.
+  PURCHASE_ORDERS: [
+    { key: "supplier", label: "Supplier", type: "text", hint: "the supplier's code (Organizations); only its documents may name this order" },
+  ],
   SUBPROJECTS: [
     { key: "project", label: "Belongs to project", type: "text", hint: "the project code; leave it empty to offer this sub-project on every project" },
   ],

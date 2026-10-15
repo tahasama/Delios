@@ -1,3 +1,4 @@
+import { packagesOf } from "@/lib/packages/api";
 import { fieldRules, fieldLabels, ownFields } from "@/lib/settings/field-policy";
 import { getActiveSet } from "@/lib/settings/config";
 import { requireScope } from "@/lib/core/scope";
@@ -35,6 +36,18 @@ export default async function NewDocumentPage({ searchParams }: { searchParams: 
     getActiveSet("RETENTION_CLASSES"),
     getActiveSet("PHASES"),
   ]);
+  // The level recommended when a type names none: the one marked default, else the one types recommend most.
+  const counts = new Map<string, number>();
+  for (const t of docTypes) if (typeof t.props.criticality === "string") counts.set(t.props.criticality, (counts.get(t.props.criticality) ?? 0) + 1);
+  const usualCriticality = criticalities.find((c) => c.props.default === true)?.code
+    ?? [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+  // Whose each purchase order is: the supplier it names (Settings), else the one whose supply package carries it.
+  const supplyPackages = await packagesOf(ctx, "SUPPLY").catch(() => []);
+  const poOwners: Record<string, string> = Object.fromEntries(pos.flatMap((po) => {
+    const named = typeof po.props.supplier === "string" && po.props.supplier ? po.props.supplier
+      : supplyPackages.find((p) => p.purchaseOrder === po.code)?.names.supplierCode ?? null;
+    return named ? [[po.code, named]] : [];
+  }));
   // Which value sets each producer's numbering scheme needs, so the form can
   // mark exactly those fields as required instead of failing on submit.
   const [fields, labels, own] = await Promise.all([fieldRules(ctx, "DOCUMENT"), fieldLabels(ctx, "DOCUMENT"), ownFields(ctx, "DOCUMENT")]);
@@ -97,6 +110,8 @@ export default async function NewDocumentPage({ searchParams }: { searchParams: 
         }))}
         suppliers={suppliers.map((one) => ({ code: one.code, label: one.label }))}
         phases={toOpt(phases)}
+        poOwners={poOwners}
+        usualCriticality={usualCriticality}
         pos={toOpt(pos)}
         criticalities={toOpt(criticalities)}
         confidentialities={toOpt(confidentialities)}

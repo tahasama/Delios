@@ -35,6 +35,29 @@ function labelFor(el: Validatable): string {
 export type MissingField = { label: string; message: string };
 
 /**
+ * Outline the fields that are missing (CSS `[data-missing]`), until each is changed. `names` are fields the server
+ * named (any case); without them, the elements given are marked.
+ */
+export function markMissing(form: HTMLFormElement, elements: Element[]) {
+  form.querySelectorAll("[data-missing]").forEach((el) => el.removeAttribute("data-missing"));
+  for (const el of elements) {
+    // A picker keeps its value in a hidden input: outline what the person sees, next to it.
+    const shown = el instanceof HTMLInputElement && el.type === "hidden" ? el.parentElement?.querySelector("input:not([type=hidden]), select") ?? el.parentElement : el;
+    if (!shown) continue;
+    shown.setAttribute("data-missing", "true");
+    const clear = () => shown.removeAttribute("data-missing");
+    shown.addEventListener("input", clear, { once: true });
+    shown.addEventListener("change", clear, { once: true });
+  }
+}
+
+/** The form's fields the server named as missing or refused, matched by name whatever the case. */
+export function fieldsNamed(form: HTMLFormElement, names: string[]): Element[] {
+  const wanted = new Set(names.map((n) => n.toLowerCase()));
+  return Array.from(form.querySelectorAll("[name]")).filter((el) => wanted.has((el.getAttribute("name") ?? "").toLowerCase()));
+}
+
+/**
  * Check a form, and when it fails return what is wrong and put the first
  * offending field where the person can see it.
  */
@@ -45,6 +68,7 @@ export function collectInvalid(form: HTMLFormElement): MissingField[] {
     (el): el is Validatable => isValidatable(el) && !el.checkValidity(),
   );
 
+  markMissing(form, bad);
   const first = bad[0];
   if (first) {
     first.scrollIntoView({ behavior: "smooth", block: "center" });

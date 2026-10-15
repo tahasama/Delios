@@ -84,6 +84,7 @@ public sealed class DocumentService(
             return Fail(Problems.Invalid("VALUE_NOT_PUBLISHED", $"{originator} is not an active party.",
                 new { field = "originator", value = originator }));
         }
+        if (await PurchaseOrderProblemAsync(catalog, Blank(request.ContractRef), originator, cancellationToken) is { } poProblem) return Fail(poProblem);
 
         // What this deliverable type insists on: a document from another party
         // says who sent it, under which contract, and when it arrived.
@@ -271,6 +272,8 @@ public sealed class DocumentService(
             if (before != value) changes.Add($"{field}: {before ?? "—"} → {value ?? "—"}");
         }
         if (changes.Count == 0) return (document, null);
+        // An order stays the document's supplier's, whichever of the two changed.
+        if (await PurchaseOrderProblemAsync(catalog, document.ContractRef, document.Originator, cancellationToken) is { } poProblem) return Fail(poProblem);
         document.UpdatedAt = clock.GetCurrentInstant();
         await db.SaveChangesAsync(cancellationToken);
         foreach (var change in changes)
@@ -802,6 +805,28 @@ public sealed class DocumentService(
         if (startedIn is null || scheme is null || scheme.Series.Any(s => s.Code == startedIn)) return scheme;
         var all = await db.RevisionSchemes.AsNoTracking().OrderByDescending(s => s.IsDefault).ThenBy(s => s.Name).ToListAsync(cancellationToken);
         return all.FirstOrDefault(s => s.Series.Any(x => x.Code == startedIn)) ?? scheme;
+    }
+
+    /// <summary>
+    /// The supplier a purchase order belongs to: the one it names (Settings, Purchase orders, "Supplier"), else the one
+    /// whose supply package carries it; null when nothing ties it to anyone.
+    /// </summary>
+    public async Task<string?> PurchaseOrderOwnerAsync(Catalog catalog, string purchaseOrder, CancellationToken cancellationToken) =>
+        catalog.Prop(ValueSets.PurchaseOrders, purchaseOrder, "supplier") is { ValueKind: System.Text.Json.JsonValueKind.String } named
+            && named.GetString() is { Length: > 0 } code
+            ? code
+            : await db.Packages.AsNoTracking().Where(p => p.PurchaseOrder == purchaseOrder && p.SupplierPartyId != null)
+                .Join(db.Parties, p => p.SupplierPartyId, party => party.Id, (p, party) => party.Code).FirstOrDefaultAsync(cancellationToken);
+
+    /// <summary>A purchase order belonging to another supplier than the document's: refused (PO_OF_ANOTHER_SUPPLIER).</summary>
+    private async Task<IResult?> PurchaseOrderProblemAsync(Catalog catalog, string? purchaseOrder, string? originator, CancellationToken cancellationToken)
+    {
+        if (purchaseOrder is null || originator is null) return null;
+        var owner = await PurchaseOrderOwnerAsync(catalog, purchaseOrder, cancellationToken);
+        return owner is not null && owner != originator
+            ? Problems.Invalid("PO_OF_ANOTHER_SUPPLIER", $"{purchaseOrder} is an order of {owner}, not of {originator}: choose one of {originator}'s orders.",
+                new { field = "contractRef", value = purchaseOrder })
+            : null;
     }
 
     /// <summary>The confidentiality levels that restrict a document to named readers. Passed to <see cref="DocumentQueries.Visible"/>.</summary>

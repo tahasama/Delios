@@ -37,3 +37,7 @@ Screens: `/packages` (list, both tabs, and the two "New … package" forms), `/p
 13. **Packages CSV export.** The list's "Export CSV" links `/api/export/packages`; no backend export of packages. Want: `GET /packages/export` (CSV of `PackageSummary` rows).
 
 14. **Who accepts / composes, for another organization's people.** Names of owners and acceptors come from `GET /addressees`, which refuses outside people; the supplier view does not show them, so this matters only if it ever does. Want: `PackageView.owners[]`/`acceptors[]` as `{ id, name }`.
+
+15. **Download the whole package (asked by the owner, kept for later).** One button on a package page that downloads
+    every document's current file together with the delivery list, in one archive. Want: `GET /packages/{id}/archive`
+    (zip of each member's released revision, else its newest, plus the delivery list).

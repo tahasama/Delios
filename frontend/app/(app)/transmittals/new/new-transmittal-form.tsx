@@ -149,10 +149,12 @@ export function NewTransmittalForm({
   // answer — so enclosures are optional, but it may not be empty of both.
   // A data transmittal carries a document (or, received, the file that came); words alone are information. The
   // backend checks it too (FILE_REQUIRED).
+  // A letter (information, nothing enclosed) says something: its subject and its message (backend ITEMS_REQUIRED).
+  const letter = outgoing && family === "INFO" && chosen.length === 0;
   const mustCarry = family === "DATA";
   const carries = chosen.length > 0 || (outgoing ? !!placeholders && !placeholders.mixed : files > 0);
   const saysSomething = mustCarry ? carries
-    : chosen.length > 0 || (!outgoing && files > 0) || (outgoing ? subject.trim().length > 0 : message.trim().length > 0);
+    : chosen.length > 0 || (!outgoing && files > 0) || (outgoing ? subject.trim().length > 0 && message.trim().length > 0 : message.trim().length > 0);
   // Data with nothing in it: rather than refuse, ask whether it is a letter (an information transmittal).
   const [offerInfo, setOfferInfo] = useState(false);
   const infoReasons = reasons.filter((r) => kindOf(r.props) === "INFO");
@@ -327,7 +329,7 @@ export function NewTransmittalForm({
                 {outgoing && fixedForPlaceholders ? (
                   <>
                     <input type="hidden" name="reasonForIssue" value="IFU" />
-                    <p className={cn(field, "flex items-center text-slate-700")}>IFU — {reasons.find((r) => r.code === "IFU")?.label}<span className="ml-2 text-[11px] text-slate-400">set for placeholders</span></p>
+                    <p className={cn(field, "flex items-center text-slate-700")}>{reasons.find((r) => r.code === "IFU")?.label ?? "For update"}<span className="ml-2 text-[11px] text-slate-400">set for placeholders</span></p>
                   </>
                 ) : (
                   <select name="reasonForIssue" required className={field} value={reasonCode} onChange={(e) => setReasonCode(e.target.value)}>
@@ -423,7 +425,8 @@ export function NewTransmittalForm({
               </ul>
             </div>
           ) : null}
-          {outgoing && !placeholders && !askingBack && askable.length ? <AskPlaceholders askable={askable} /> : null}
+          {/* Placeholders asked of a supplier go on a data transmittal (for update); never on a letter. */}
+          {outgoing && family === "DATA" && !placeholders && !askingBack && askable.length ? <AskPlaceholders askable={askable} /> : null}
           {/* What is enclosed, each removable; "Add documents" opens the register, as for an action, and brings the
               ticks back here with everything written so far. */}
           <div className="flex flex-wrap items-start gap-2 border-b border-line px-5 py-3 sm:px-6">
@@ -457,8 +460,8 @@ export function NewTransmittalForm({
                   </Ask>
                 ) : null}
                 {asks("message") ? (
-                  <Ask label={says("message", "Message")} required={must("message")} hint={must("message") ? "what they should know about these documents" : "optional — anything they should know about these documents"}>
-                    <textarea name="message" rows={4} required={must("message")} className={field} value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Please find enclosed…" />
+                  <Ask label={says("message", "Message")} required={must("message") || letter} hint={letter ? "what the letter says: it carries no document" : must("message") ? "what they should know about these documents" : "optional — anything they should know about these documents"}>
+                    <textarea name="message" rows={4} required={must("message") || letter} className={field} value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Please find enclosed…" />
                   </Ask>
                 ) : null}
                 <OwnFields fields={ownFields} />
@@ -507,7 +510,7 @@ export function NewTransmittalForm({
           {foot(1,
             <button type="button" onClick={() => (mustCarry && !carries ? setOfferInfo(true) : setStep(3))} disabled={!saysSomething && !mustCarry}
               data-on={saysSomething ? "true" : undefined} className="ask disabled:cursor-not-allowed disabled:opacity-50">Continue</button>,
-            saysSomething ? null : mustCarry ? null : outgoing ? "Enclose a document, or write a subject." : "Tick a document, keep a file, or write a message.",
+            saysSomething ? null : mustCarry ? null : outgoing ? "Write a subject and a message: the letter says something." : "Tick a document, keep a file, or write a message.",
           )}
         </section>
 

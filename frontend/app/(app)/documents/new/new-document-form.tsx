@@ -38,7 +38,7 @@ function Ask({ label, hint, required, children, className }: { label: string; hi
  * it is comes with the file.
  */
 export function NewDocumentForm({
-  received, start, fromFile, numberingSets, deliverableTypes, docTypes, disciplines, currentProject, subprojects, phases, suppliers, pos, criticalities, confidentialities, retentionClasses, defaultConfidentiality, fields, ownFields, labels,
+  received, start, fromFile, numberingSets, deliverableTypes, docTypes, disciplines, currentProject, subprojects, phases, suppliers, pos, poOwners, usualCriticality, criticalities, confidentialities, retentionClasses, defaultConfidentiality, fields, ownFields, labels,
 }: {
   received: boolean;
   /** Where another page sent the reader to register a document of a known type: our own, with its title. */
@@ -48,7 +48,11 @@ export function NewDocumentForm({
   numberingSets: Record<string, string[]>;
   /** The project being worked in. A document is registered here, so it is not a choice. */
   currentProject: { code: string; name: string };
-  deliverableTypes: Opt[]; docTypes: Opt[]; disciplines: Opt[]; subprojects: Opt[]; phases: Opt[]; suppliers: Opt[]; pos: Opt[]; criticalities: Opt[]; confidentialities: Opt[]; retentionClasses: Opt[];
+  deliverableTypes: Opt[]; docTypes: Opt[]; disciplines: Opt[]; subprojects: Opt[]; phases: Opt[];
+  /** Whose each purchase order is (its supplier's code), where something ties it to one. */
+  poOwners: Record<string, string>;
+  /** The level recommended when the type recommends none: the list's default, else the one types recommend most. */
+  usualCriticality: string | null; suppliers: Opt[]; pos: Opt[]; criticalities: Opt[]; confidentialities: Opt[]; retentionClasses: Opt[];
   defaultConfidentiality: string | null;
   /** What this organization asks for: must be filled, may be left, or not asked. */
   fields: Record<string, "REQUIRED" | "OPTIONAL" | "OFF">;
@@ -81,7 +85,7 @@ export function NewDocumentForm({
   const must = (key: string, byNumber = false) => byNumber || fields[key] === "REQUIRED";
   // From another organization: the deliverable type says it insists on who it comes from (Settings, on the type).
   const producerRequires = deliverableTypes.find((o) => o.code === producer)?.required ?? [];
-  const external = producer === "CTR" || producer === "VND" || producer === "TPY" || producer === "CLT" || producerRequires.includes("originator");
+  const external = producerRequires.includes("originator");
   const [originator, setOriginator] = useState("");
   // Who may see it starts at the lowest level for a document another organization shares with us, unless chosen.
   const [ownLevel, setOwnLevel] = useState(false);
@@ -89,7 +93,9 @@ export function NewDocumentForm({
   const originatorLabel = suppliers.find((o) => o.code === originator)?.label ?? null;
   const docTypeLabel = docTypes.find((t) => t.code === docType)?.label ?? docType;
   // The type recommends a criticality; it is filled in until the person chooses one themselves.
-  const recommended = criticalities.find((o) => o.code === docTypes.find((t) => t.code === docType)?.criticality) ?? null;
+  // A type that recommends none takes the organization's usual level (`usualCriticality`), so one is always recommended.
+  const typeRecommends = docTypes.find((t) => t.code === docType)?.criticality;
+  const recommended = criticalities.find((o) => o.code === (typeRecommends ?? usualCriticality)) ?? null;
   const [ownCriticality, setOwnCriticality] = useState(false);
   const shownCriticality = ownCriticality ? criticality : recommended?.code ?? criticality;
   const level = criticalities.find((o) => o.code === shownCriticality) ?? null;
@@ -249,8 +255,8 @@ export function NewDocumentForm({
               <input type="hidden" name="projectCode" value={currentProject.code} />
               <p className="flex h-(--control-h) items-center text-[13px] font-medium text-slate-700">{currentProject.code} — {currentProject.name}</p>
             </div>
-            <Ask label={labels["criticality"]} hint="how serious an error in it would be — optional">
-              <select name="criticality" className={field} value={shownCriticality} onChange={(e) => { setCriticality(e.target.value); setOwnCriticality(true); }}>
+            <Ask label={labels["criticality"]} required={must("criticality")} hint={must("criticality") ? "how serious an error in it would be" : "how serious an error in it would be — optional"}>
+              <select name="criticality" required={must("criticality")} className={field} value={shownCriticality} onChange={(e) => { setCriticality(e.target.value); setOwnCriticality(true); }}>
                 <option value="">—</option>
                 {criticalities.map((o) => <option key={o.code} value={o.code}>{o.label}{o.code === recommended?.code ? " (recommended)" : ""}</option>)}
               </select>
@@ -273,7 +279,7 @@ export function NewDocumentForm({
               {recommended ? (
                 <span className="block text-[11px] text-slate-500">
                   {shownCriticality === recommended.code
-                      ? <>Recommended for {docTypeLabel.toLowerCase()}. Choose another if you see it differently.</>
+                      ? <>{typeRecommends ? `Recommended for ${docTypeLabel.toLowerCase()}.` : "Recommended: the usual level here (the type names none)."} Choose another if you see it differently.</>
                       : <>{docTypeLabel} is usually {recommended.label.toLowerCase()}.{" "}
                           <button type="button" className="font-semibold text-link hover:underline" onClick={() => { setCriticality(recommended.code); setOwnCriticality(false); }}>Use {recommended.label.toLowerCase()}</button></>}
                   </span>
@@ -331,7 +337,8 @@ export function NewDocumentForm({
                   <Ask label={labels["contractRef"]} required={must("contractRef", needs("PURCHASE_ORDERS") || producerRequires.includes("contractRef"))}>
                     <select name="contractRef" required={must("contractRef", needs("PURCHASE_ORDERS") || producerRequires.includes("contractRef"))} className={field} defaultValue="">
                       <option value="" disabled={must("contractRef", needs("PURCHASE_ORDERS") || producerRequires.includes("contractRef"))}>{must("contractRef", needs("PURCHASE_ORDERS") || producerRequires.includes("contractRef")) ? "Choose…" : "—"}</option>
-                      {pos.map((o) => <option key={o.code} value={o.code}>{o.code} — {o.label}</option>)}
+                      {/* Only the chosen organization's orders (or one tied to nobody); the backend refuses another's. */}
+                      {pos.filter((o) => !poOwners[o.code] || !originator || poOwners[o.code] === originator).map((o) => <option key={o.code} value={o.code}>{o.code} — {o.label}</option>)}
                     </select>
                   </Ask>
                 ) : <div aria-hidden className="hidden xl:block" />}

@@ -136,6 +136,17 @@ export function refusal(error: unknown): { message: string; code: string | null;
   throw error;
 }
 
+/**
+ * A refusal as a form shows it: the backend's words, and the fields it named (its `field` or `fields`), so the form
+ * outlines them.
+ */
+export function refusalForForm(error: unknown): { error: string; fields?: string[] } {
+  const { message, params } = refusal(error);
+  const p = (params ?? {}) as { field?: unknown; fields?: unknown };
+  const fields = [...(typeof p.field === "string" ? [p.field] : []), ...(Array.isArray(p.fields) ? p.fields.map(String) : [])];
+  return fields.length ? { error: message, fields } : { error: message };
+}
+
 /** A path under the project the person is working in: `/api/projects/{id}{rest}`. */
 export function projectPath(scope: { projectId: string }, rest = ""): string {
   return `/api/projects/${scope.projectId}${rest}`;

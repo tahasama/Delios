@@ -152,7 +152,14 @@ a screen only words it. A new rule goes in the backend, never in a page.
   "Who produces it" (supplier or not).
 - Criticality: the document type recommends a level (Settings, on the type);
   it is filled in on create and marked "(recommended)"; it is optional, and the
-  person may choose another.
+  person may choose another. A type naming none recommends the usual level (the list's default, else the level
+  types recommend most): one is always recommended. Required in Forms & fields, it is required on the form too.
+- A purchase order belongs to a supplier: the one it names (Settings, Purchase orders, "Supplier"), else the one
+  whose supply package carries it. A document of another organization names only its own orders (or one tied to
+  nobody); the form offers only those, the backend refuses another's (PO_OF_ANOTHER_SUPPLIER). "From another
+  organization" is read from the deliverable type (it requires an originator), never from fixed type codes.
+- A form sent with something missing outlines each missing field in red (`[data-missing]`) beside the list of
+  what is missing; a field the backend names (its `field` / `fields`, `refusalForForm`) is outlined the same way.
 - Whether a document is revised follows its type: a type marked "a record"
   (Settings, on the type) registers records, fixed once confirmed; nobody is
   asked. The form's first field is "Deliverable type" (who produces it; it
@@ -384,7 +391,10 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - Information reasons: REQUEST, RFI, ANSWER, CONFIRMATION (family Information);
   an existing demo gains them, and IFU, with `seed-demo`. A reason with no family is data.
 - A new transmittal lets Document Control ask placeholders not asked yet, one
-  supplier's at a time ("Ask placeholders of a supplier").
+  supplier's at a time ("Ask placeholders of a supplier"), on a data transmittal only (never on a letter).
+- A letter (an information transmittal with nothing enclosed) needs its subject and its message; the form says so.
+- "Issued for": a status is shown with its code in its full words ("IFU — Issued for update", as "IFR — Issued for
+  review"); a reason is shown in its plain words ("For update").
 
 ### Organizations working together (docs/ORGANIZATIONS.md, Standard §55)
 - Another organization works on our project in one of three ways: **collaborator** (its own DELIOS,
