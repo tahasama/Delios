@@ -29,9 +29,18 @@ export function parseCsv(text: string): string[][] {
   return rows;
 }
 
+/**
+ * A cell kept as text when the file is opened in a spreadsheet: one starting with = + - @ (or a tab or a return) would
+ * run as a formula, so it gets a leading apostrophe. A lone sign ("-", the matrix's "not sent") and a number stay as
+ * they are.
+ */
+export function csvSafe(value: string): string {
+  return value.length > 1 && /^[=+\-@\t\r]/.test(value) && isNaN(Number(value)) ? `'${value}` : value;
+}
+
 export function toCsv(rows: (string | number | null | undefined)[][]): string {
   return rows
-    .map((r) => r.map((c) => `"${String(c ?? "").replaceAll('"', '""')}"`).join(","))
+    .map((r) => r.map((c) => `"${csvSafe(String(c ?? "")).replaceAll('"', '""')}"`).join(","))
     .join("\r\n");
 }
 

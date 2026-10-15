@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { TONE } from "@/lib/core/tones";
 import { cn } from "@/lib/core/utils";
-import { AlertTriangle, CheckCircle2, Info as InfoIcon } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Info as InfoIcon, Lightbulb } from "lucide-react";
 
 // Shared, server-safe UI primitives. Buttons are plain <button>/<Link> so forms
 // work without client JavaScript.
@@ -98,6 +98,25 @@ export function Card({
  */
 /** The reference status chip (Schedule & actions): one word, one of four tones. */
 export { TONE };
+
+/**
+ * A tip: advice that helps, never a rule or a warning, so it does not look like either: a dashed frame, a yellow bulb,
+ * "Tip", the lead in bold ("Setting up a project?"), then the advice.
+ */
+export function Tip({ lead, children, className }: { lead?: React.ReactNode; children: React.ReactNode; className?: string }) {
+  return (
+    <p className={cn("flex max-w-2xl items-start gap-2.5 rounded-md border border-dashed border-line-strong bg-white px-3 py-2 text-xs leading-5 text-slate-700", className)}>
+      <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700" aria-hidden="true">
+        <Lightbulb className="h-3 w-3" />
+      </span>
+      <span className="min-w-0">
+        <span className="mr-1.5 text-[11px] font-semibold tracking-wide text-amber-800 uppercase">Tip</span>
+        {lead ? <span className="font-semibold text-slate-800">{lead} </span> : null}
+        {children}
+      </span>
+    </p>
+  );
+}
 
 export function ToneChip({ tone, children, title }: { tone: keyof typeof TONE; children: React.ReactNode; title?: string }) {
   return <span title={title} className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap ring-1", TONE[tone])}>{children}</span>;

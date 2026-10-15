@@ -124,6 +124,9 @@ public static class ScheduleReader
         var rows = new List<string[]>();
         var range = sheet.RangeUsed();
         if (range is null) return rows;
+        // A sheet claiming a million rows or columns is not a list: refused before it is walked.
+        if (range.RowCount() > Documents.SheetGuard.MaxRows || range.ColumnCount() > Documents.SheetGuard.MaxColumns)
+            throw new InvalidDataException($"The sheet spans {range.RowCount()} rows and {range.ColumnCount()} columns; a list holds at most {Documents.SheetGuard.MaxRows} rows and {Documents.SheetGuard.MaxColumns} columns.");
         foreach (var row in range.Rows())
         {
             rows.Add(row.Cells().Select(c => c.DataType == XLDataType.DateTime

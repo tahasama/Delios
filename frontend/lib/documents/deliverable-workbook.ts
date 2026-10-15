@@ -2,6 +2,7 @@ import ExcelJS from "exceljs";
 import type { Tenant } from "@/lib/core/tenant";
 import { getActiveSet } from "@/lib/settings/config";
 import { getMe } from "@/lib/account/api";
+import { registerRows } from "@/lib/documents/api-register";
 
 /**
  * The deliverable list, as a workbook people can actually fill in.
@@ -58,14 +59,19 @@ const REQUIRED_FILL = "FFFDF3D7";
 /** Excel refuses a sheet name carrying any of these. */
 const sheetName = (label: string) => label.replace(/[*?:\\/\[\]]/g, " ").replace(/\s{2,}/g, " ").slice(0, 31);
 
-export async function buildDeliverableWorkbook(t: Tenant): Promise<Buffer> {
+/**
+ * The workbook, empty to start from, or (`filled`) with the register as it stands: each document on its deliverable
+ * type's sheet, with its number, so a row changed and brought back corrects that document.
+ */
+export async function buildDeliverableWorkbook(t: Tenant, options: { filled?: boolean } = {}): Promise<Buffer> {
   // The backend gives each list in its published order.
   const value = (key: string) => getActiveSet(key);
 
-  const [deliverableTypes, fieldMatrix, project] = await Promise.all([
+  const [deliverableTypes, fieldMatrix, project, register] = await Promise.all([
     value("DELIVERABLE_TYPES"),
     value("DELIVERABLE_TYPE_FIELDS"),
     getMe().then((me) => me?.projects.find((one) => one.id === t.projectId) ?? null),
+    options.filled ? registerRows(t) : Promise.resolve([]),
   ]);
   const rules = new Map(fieldMatrix.map((row) => [row.code, row.props] as const));
 
@@ -108,7 +114,7 @@ export async function buildDeliverableWorkbook(t: Tenant): Promise<Buffer> {
     // One line saying what the sheet is, because a tab name is not an instruction.
     sheet.mergeCells(1, 1, 1, columns.length);
     const caption = sheet.getCell(1, 1);
-    caption.value = `${type.label} — ${project?.code ?? ""} ${project?.name ?? ""}. One row per document. Leave Document Number empty to register it; fill it to correct that document. Shaded headings are required.`;
+    caption.value = `${type.label} — ${project?.code ?? ""} ${project?.name ?? ""}. ${options.filled ? "The register as it stands: change a row to correct that document, or add a row with no number to register one." : "One row per document. Leave Document Number empty to register it; fill it to correct that document."} Shaded headings are required.`;
     caption.font = { size: 9, italic: true, color: { argb: "FF5B7183" } };
     caption.alignment = { vertical: "middle" };
     sheet.getRow(1).height = 26;
@@ -127,7 +133,7 @@ export async function buildDeliverableWorkbook(t: Tenant): Promise<Buffer> {
       // The dropdown, on enough rows that nobody runs out filling a register.
       const range = column.set ? rangeOf.get(column.set) : undefined;
       if (!range) return;
-      for (let row = 3; row <= 1000; row++) {
+      for (let row = 3; row <= 1000 + register.length; row++) {
         sheet.getCell(row, at).dataValidation = {
           type: "list",
           allowBlank: true,
@@ -138,6 +144,17 @@ export async function buildDeliverableWorkbook(t: Tenant): Promise<Buffer> {
           error: `Choose a value from ${column.set}. Anything else is refused when the file is read.`,
         };
       }
+    });
+
+    // The register as it stands, under the headings: what each column holds for each document of this type.
+    const valueOf: Record<string, (d: (typeof register)[number]) => string> = {
+      "Document Number": (d) => d.number, Title: (d) => d.title, Type: (d) => d.docType, Discipline: (d) => d.discipline,
+      Project: () => project?.code ?? "", Criticality: (d) => d.criticality ?? "", Confidentiality: (d) => d.confidentiality ?? "",
+      RetentionClass: (d) => d.retentionClass ?? "", ContractRef: (d) => d.contractRef ?? "", PlannedDate: (d) => d.plannedDate?.slice(0, 10) ?? "",
+      SubProject: (d) => d.subproject ?? "", Supplier: (d) => d.originator ?? "", PO: (d) => d.contractRef ?? "",
+    };
+    register.filter((d) => d.deliverableType === type.code).forEach((d, index) => {
+      columns.forEach((column, at) => { sheet.getCell(index + 3, at + 1).value = valueOf[column.header]?.(d) ?? ""; });
     });
 
     sheet.autoFilter = { from: { row: 2, column: 1 }, to: { row: 2, column: columns.length } };

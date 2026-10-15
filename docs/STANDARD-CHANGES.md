@@ -1068,7 +1068,12 @@ added from a list, or by anyone, never has a password chosen for them: they are 
 (good for 7 days, once); where email is off, the link is handed to whoever added them. Joining still waits for
 management where the project asks for it (People to confirm).
 
-**Depends on it:** `DocumentService.CheckRegisterAsync`, `Numbering.RefusalAsync`, `CreateUserRequest.Invite`,
+Every spreadsheet brought in is first checked as a file, before anything reads it: it is what its name says, a
+workbook unpacks within bounds and carries no macros, and the virus check finds nothing; when the check cannot be
+made the file is refused, never read unchecked. Every list taken out keeps a cell that would run as a formula as
+text. Each list can be taken out as it stands, and as an empty template.
+
+**Depends on it:** `SheetGuard`, `DocumentService.CheckRegisterAsync`, `Numbering.RefusalAsync`, `CreateUserRequest.Invite`,
 `PasswordReset.InvitationLink`, `lib/documents/forms-import.ts`.
 
 ---

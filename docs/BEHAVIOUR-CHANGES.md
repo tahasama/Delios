@@ -569,6 +569,13 @@ the installation sets its keys.
 - **The Import & export page** follows the Schedule look; a file chosen is shown with Remove and is let go when the
   kind changes; each kind says which files it takes; the matrix and the Settings lists show as an administrator's.
   Exports are grouped (the register, Assurance, the record). "Back to register" is gone (the menu does it).
+- **Two downloads for each import kind:** the list as it stands now (the register as a filled workbook, the team, the
+  matrix, every Settings list) and an empty template. The register brought back corrects only what changed.
+- **Spreadsheets are checked before they are read**, on Schedule (the three lists), Import & export and Controlled
+  changes: a renamed or damaged file, a workbook that unpacks too large or carries macros, and a file the virus check
+  flags are refused, each said plainly. Before, the Schedule lists were only checked for size and name, and the
+  screens' imports not at all. CSV downloads keep cells starting with = + - @ as text.
+- **Tips look like tips** (dashed frame, yellow bulb, "TIP").
 - **Stamps follow the project's choice** (How this project works → "Stamping the PDF" and "Which stamps"): stamped
   or not; each stamp (released, returned by the review, superseded, void, on hold) on or off; and, if wanted, the
   comments of a verdict that carries them listed on a last page. Before, the setting was not read and every stamp

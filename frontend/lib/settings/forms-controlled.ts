@@ -1,5 +1,6 @@
 "use server";
 
+import { sheetRefusal } from "@/lib/documents/sheet-check";
 import { createHash } from "crypto";
 import { revalidatePath } from "next/cache";
 import { requireScope } from "@/lib/core/scope";
@@ -46,6 +47,10 @@ export async function uploadControlledVersionAction(_prev: ControlledState | und
   if (!versionLabel) return { error: "Give this version a label — it is how the change is referred to afterwards." };
   if (!file || file.size === 0) return { error: "Choose a CSV file." };
   if (file.size > 5_000_000) return { error: "That file is over 5 MB. Filter it before uploading." };
+  if (!/\.csv$/i.test(file.name)) return { error: "Choose the file as CSV." };
+  // What it really is, and viruses: checked by the backend before anything reads it.
+  const refused = await sheetRefusal(ctx, file);
+  if (refused) return { error: refused };
 
   const text = await file.text();
   const parsed = await handler.parse(ctx, parseCsv(text), key);

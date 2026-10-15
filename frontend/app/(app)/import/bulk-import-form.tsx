@@ -3,6 +3,7 @@
 import { startTransition, useActionState, useEffect, useState } from "react";
 import { importBulkAction, type ImportResult, type ImportRow } from "@/lib/documents/forms-import";
 import { ToneChip, btn } from "@/components/ui";
+import { csvSafe } from "@/lib/core/csv";
 import { Check, Copy, Download, FileSpreadsheet, X } from "lucide-react";
 
 type Kind = {
@@ -13,8 +14,10 @@ type Kind = {
   title: string;
   blurb: string;
   columns: string;
-  template: string;
-  templateLabel: string;
+  /** The list as it stands now, to change and bring back. */
+  now: { href: string; label: string };
+  /** An empty template, to start from. */
+  template: { href: string; label: string };
   /** The file it takes, for the field and its hint. */
   accept: string;
   formats: string;
@@ -30,10 +33,10 @@ const KINDS: Kind[] = [
     name: "Deliverable list",
     hint: "the register in one go",
     title: "Register documents from a list",
-    blurb: "One row per document. A row with no Document Number is registered and given its number; a row with a number corrects that document. What the number is made of (type, discipline, project, sub-project, supplier) cannot be corrected, because the number would then disagree with the document.",
+    blurb: "One row per document. A row with no Document Number is registered and given its number; a row with a number corrects that document (taken out as the register stands, only what you change is corrected). What the number is made of (type, discipline, project, sub-project, supplier) cannot be corrected, because the number would then disagree with the document.",
     columns: "The workbook has a sheet per deliverable type, with only that type's columns and each Settings list as a dropdown. Shaded headings must be filled.",
-    template: "/api/export/template-deliverables",
-    templateLabel: "Download the workbook (.xlsx)",
+    now: { href: "/api/export/template-deliverables?filled=1", label: "The register as it stands (.xlsx)" },
+    template: { href: "/api/export/template-deliverables", label: "An empty template (.xlsx)" },
     accept: ".xlsx,.csv,text/csv",
     formats: "the workbook (.xlsx) or a CSV, headings kept",
   },
@@ -44,8 +47,8 @@ const KINDS: Kind[] = [
     title: "Put a team on this project",
     blurb: "One row per person. Each gets an account on this project in the function named, and an email asking them to choose their own password. Where management confirms who joins, they wait under People to confirm.",
     columns: "Name, Email, Company (an organization's code or name; empty for our own people), Function (as in Settings → Functions & permissions), Department.",
-    template: "/api/export/template-people",
-    templateLabel: "Download the template (.csv)",
+    now: { href: "/api/export/people", label: "The team as it stands (.csv)" },
+    template: { href: "/api/export/template-people", label: "An empty template, with an example (.csv)" },
     accept: ".csv,text/csv",
     formats: "a CSV, headings kept",
   },
@@ -54,10 +57,10 @@ const KINDS: Kind[] = [
     name: "Distribution matrix",
     hint: "who does what",
     title: "Change the distribution matrix",
-    blurb: "Download the matrix as it stands, change the letters, and bring it back. The check lists every cell that differs from today; writing it changes those cells only.",
+    blurb: "Take the matrix as it stands, change the letters, and bring it back; or fill an empty one with only the letters to change (an empty cell changes nothing). The check lists every cell that differs from today; writing it changes those cells only.",
     columns: "Keep the headings and the first four columns. Letters: A approves, R reviews, C controls, T issues, I receives, · may read, - not sent.",
-    template: "/api/export/matrix",
-    templateLabel: "Download the matrix as it stands (.csv)",
+    now: { href: "/api/export/matrix", label: "The matrix as it stands (.csv)" },
+    template: { href: "/api/export/matrix?blank=1", label: "An empty template (.csv)" },
     accept: ".csv,text/csv",
     formats: "the matrix as downloaded (.csv)",
     adminOnly: true,
@@ -69,8 +72,8 @@ const KINDS: Kind[] = [
     title: "Update the Settings lists",
     blurb: "One workbook, a sheet per list. Change the sheets you need and bring it back once. A code already there is updated; a new code is added. A row you delete is left as it is: a value is retired on its list's own page.",
     columns: "Code, Label, Status, then whatever that list carries.",
-    template: "/api/export/template-sets",
-    templateLabel: "Download every list (.xlsx)",
+    now: { href: "/api/export/template-sets", label: "Every list as it stands (.xlsx)" },
+    template: { href: "/api/export/template-sets?blank=1", label: "An empty template (.xlsx)" },
     accept: ".xlsx",
     formats: "the workbook (.xlsx) as downloaded",
     adminOnly: true,
@@ -114,7 +117,10 @@ function PassOn({ link }: { link: string }) {
   );
 }
 
-const cell = (value: string) => (/[",\n]/.test(value) ? `"${value.replaceAll('"', '""')}"` : value);
+const cell = (raw: string) => {
+  const value = csvSafe(raw);
+  return /[",\n]/.test(value) ? `"${value.replaceAll('"', '""')}"` : value;
+};
 
 export function BulkImportForm({ initialKind, admin }: { initialKind: string; admin: boolean }) {
   const [result, run, pending] = useActionState(importBulkAction, undefined);
@@ -196,9 +202,14 @@ export function BulkImportForm({ initialKind, admin }: { initialKind: string; ad
             <p className="text-[13px] font-semibold text-slate-800">{chosen.title}</p>
             <p className="mt-1 max-w-[70ch] text-slate-600">{chosen.blurb}</p>
             <p className="mt-1.5 max-w-[70ch] text-slate-600">{chosen.columns}</p>
-            <a href={chosen.template} className="mt-2 inline-flex items-center gap-1.5 font-semibold text-link hover:underline">
-              <Download className="h-3.5 w-3.5" aria-hidden="true" /> {chosen.templateLabel}
-            </a>
+            <p className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
+              <span className="text-slate-600">Download:</span>
+              {[chosen.now, chosen.template].map((one) => (
+                <a key={one.href} href={one.href} className="inline-flex items-center gap-1.5 font-semibold text-link hover:underline">
+                  <Download className="h-3.5 w-3.5" aria-hidden="true" /> {one.label}
+                </a>
+              ))}
+            </p>
           </div>
         </li>
 

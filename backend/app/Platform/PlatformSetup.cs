@@ -351,6 +351,7 @@ public static class PlatformSetup
             Checks.CheckEndpoints.MapCheckEndpoints(app);
             Actions.ScheduleEndpoints.MapScheduleEndpoints(app);
             Actions.ListUploadEndpoints.MapListUploadEndpoints(app);
+            Documents.SheetGuard.MapSheetGuardEndpoints(app);
             Audit.ActivityEndpoints.MapActivityEndpoints(app);
             Settings.SettingEndpoints.MapSettingEndpoints(app);
             Identity.HolderEndpoints.MapHolderEndpoints(app);

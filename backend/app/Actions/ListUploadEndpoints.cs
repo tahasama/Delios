@@ -29,7 +29,6 @@ public sealed record ListUploadRequest(string Kind, string FileName, string Cont
 /// </summary>
 public static class ListUploadEndpoints
 {
-    private const int MaxBytes = 20 * 1024 * 1024;
 
     private static readonly Dictionary<string, (string Kind, string Title)> Lists = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -48,7 +47,7 @@ public static class ListUploadEndpoints
     }
 
     private static async Task<IResult> UploadAsync(
-        ListUploadRequest request, HttpContext http, DeliosDbContext db, AuditLog audit, IClock clock,
+        ListUploadRequest request, HttpContext http, DeliosDbContext db, AuditLog audit, IClock clock, Documents.IVirusScanner scanner,
         ScheduleImporter schedules, DepartmentsImporter departments, RequirementsImporter requirements, CancellationToken cancellationToken)
     {
         var access = ProjectAccessFilter.Of(http);
@@ -94,10 +93,9 @@ public static class ListUploadEndpoints
         byte[] bytes;
         try { bytes = Convert.FromBase64String(request.ContentBase64 ?? ""); }
         catch (FormatException) { return Problems.Invalid("FILE_UNREADABLE", "The file did not arrive whole. Try again."); }
-        if (bytes.Length == 0) return Problems.Invalid("FILE_EMPTY", "The file is empty.");
-        if (bytes.Length > MaxBytes) return Problems.Invalid("FILE_TOO_LARGE", "The file is larger than 20 MB.");
         var fileName = Path.GetFileName(request.FileName ?? "list.csv");
-        if (!ScheduleReader.CanRead(fileName)) return Problems.Invalid("FILE_TYPE", "Upload the list as .xlsx or .csv.");
+        // What it really is, its size unpacked, macros and viruses, before anything reads it.
+        if (await Documents.SheetGuard.RefusalAsync(fileName, bytes, scanner, cancellationToken) is { } refused) return refused;
         await db.SaveChangesAsync(cancellationToken);
 
         string? summary;

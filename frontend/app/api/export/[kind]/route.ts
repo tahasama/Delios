@@ -8,7 +8,7 @@ import { buildSetsWorkbook } from "@/lib/settings/sets-workbook";
 import { roleLabel } from "@/lib/settings/profiles/roles";
 import { getSet, getSets } from "@/lib/settings/config";
 import { api, ApiProblem, projectPath } from "@/lib/client";
-import { adminAudit } from "@/lib/settings/api-admin";
+import { adminAudit, adminParties, adminUsers } from "@/lib/settings/api-admin";
 import { packagesOf } from "@/lib/packages/api";
 import { reasonsOf } from "@/lib/packages/package-rule";
 import { activityLateness, planActions } from "@/lib/actions/api";
@@ -197,21 +197,24 @@ async function extract(req: Request, { params }: { params: Promise<{ kind: strin
     name = `value-set-${set.key.toLowerCase()}`;
   } else if (kind === "template-sets") {
     // Every published list, a tab each, so one download covers the lot.
-    const book = await buildSetsWorkbook(ctx);
+    const blank = new URL(req.url).searchParams.get("blank") === "1";
+    const book = await buildSetsWorkbook(ctx, { blank });
     return new NextResponse(new Uint8Array(book), {
       headers: {
         "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        "Content-Disposition": `attachment; filename="published-lists-${stamp.toISOString().slice(0, 10)}.xlsx"`,
+        "Content-Disposition": `attachment; filename="${blank ? "settings-lists-template" : "settings-lists"}-${stamp.toISOString().slice(0, 10)}.xlsx"`,
       },
     });
   } else if (kind === "template-deliverables") {
     // A workbook, not a flat file: a sheet per deliverable type, each carrying
     // only the columns that type has, with the published lists as dropdowns.
-    const book = await buildDeliverableWorkbook(ctx);
+    // As the register stands (`filled`), every document on its type's sheet with its number, or empty to start from.
+    const filled = new URL(req.url).searchParams.get("filled") === "1";
+    const book = await buildDeliverableWorkbook(ctx, { filled });
     return new NextResponse(new Uint8Array(book), {
       headers: {
         "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        "Content-Disposition": `attachment; filename="deliverable-list-${stamp.toISOString().slice(0, 10)}.xlsx"`,
+        "Content-Disposition": `attachment; filename="${filled ? "deliverable-list" : "deliverable-list-template"}-${stamp.toISOString().slice(0, 10)}.xlsx"`,
       },
     });
   } else if (kind === "template-deliverables-csv") {
@@ -233,6 +236,16 @@ async function extract(req: Request, { params }: { params: Promise<{ kind: strin
       ["SCH-1015", "A0048", "Mechanical completion - unit 73", "2026-10-18", "2026-10-18"],
     ];
     name = "template-schedule-version";
+  } else if (kind === "people") {
+    // The team on this project as it stands, in the Team list's own columns.
+    const [users, parties] = await Promise.all([adminUsers(), adminParties()]);
+    const party = new Map(parties.map((one) => [one.id, one.code] as const));
+    rows = [["Name", "Email", "Company", "Function", "Department"]];
+    for (const u of users) {
+      const place = u.memberships.find((m) => m.projectId === ctx.projectId && m.active);
+      if (place) rows.push([u.name, u.email, u.partyId ? party.get(u.partyId) ?? "" : "", place.functionName, place.department ?? ""]);
+    }
+    name = `team-${ctx.project?.code ?? "project"}`;
   } else if (kind === "template-people") {
     rows = [
       ["Name", "Email", "Company", "Function", "Department"],
@@ -260,13 +273,15 @@ async function extract(req: Request, { params }: { params: Promise<{ kind: strin
       deliverableType: view.get("producer"),
       docType: view.get("type"),
     });
+    // An empty grid to start from: an empty cell says nothing, so only the letters filled in change the matrix.
+    if (view.get("blank") === "1") for (const row of sheet.rows) row.cells = row.cells.map(() => "");
     rows = sheetToRows(sheet, {
       projectCode: project?.code ?? "",
       projectName: project?.name ?? "",
       roleLabel: roleLabel(project?.role),
       generatedAt: stamp,
     });
-    name = `distribution-matrix-${project?.code ?? "project"}`;
+    name = `distribution-matrix${view.get("blank") === "1" ? "-template" : ""}-${project?.code ?? "project"}`;
   } else {
     return NextResponse.json({ error: "Unknown export kind" }, { status: 400 });
   }

@@ -33,6 +33,7 @@ backend/
 │   ├── Program.cs        start-up: what runs, in which order
 │   ├── Documents/        documents, revisions, files, the register; the lists, numbering and revision
 │   │                     schemes (CatalogAdminEndpoints, RevisionSchemeEndpoints); Reviews/ also VerdictListEndpoints (verdict lists)
+│   │                     SheetGuard: every spreadsheet checked before it is read (type, size unpacked, macros, viruses)
 │   ├── Reviews/          routes, steps, advice, verdicts, release
 │   ├── Transmittals/     sending, receiving, the check on arrival, replies by email (EmailReplies.cs)
 │   ├── Packages/         delivery packages and supplier packages
@@ -107,7 +108,7 @@ frontend/
 │   ├── types.ts          the shapes the backend answers with
 │   ├── core/             shared by every area: sign-in, scope, permissions, preferences, words for states,
 │   │                     tones.ts (state chips), rails.ts (the side colour of each state: the key on Help)
-│   ├── documents/        (copies.ts: which copy of a PDF opens: the stamped one, else the clean one)
+│   ├── documents/        (copies.ts: which copy of a PDF opens; sheet-check.ts: a spreadsheet checked before it is read)
 │   ├── reviews/
 │   ├── transmittals/     (kinds.ts: the kinds of transmittal and how each names its types)
 │   ├── packages/

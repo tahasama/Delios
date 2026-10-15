@@ -9,9 +9,11 @@ import { revalidatePath } from "next/cache";
 import { readSheet, applyChanges } from "@/lib/settings/matrix-read";
 import { propFieldsFor } from "@/lib/settings/set-props";
 import { checkRegistration, registerDocument } from "@/lib/documents/register";
+import { sheetRefusal } from "@/lib/documents/sheet-check";
 import { api, projectPath, refusal } from "@/lib/client";
+import type { RegisterRow } from "@/lib/types";
 import { adminFunctions, adminParties, adminUsers } from "@/lib/settings/api-admin";
-import { documentView, registerByNumber } from "@/lib/documents/api-register";
+import { documentView, registerRows } from "@/lib/documents/api-register";
 
 // Bulk in/out — document controllers live in spreadsheets. A file is always
 // checked first; the check says what writing it would do, and only then is it
@@ -149,6 +151,9 @@ export async function importBulkAction(_prev: ImportResult | undefined, formData
   const file = formData.get("file") as File | null;
   if (!file || file.size === 0) return { error: "Choose the filled-in file first." };
   if (FORMATS[kind] && !FORMATS[kind].test(file.name)) return { error: `This import takes ${FORMAT_WORDS[kind]}; ${file.name} is not one.` };
+  // What it really is, its size unpacked, macros and viruses: checked before anything reads it.
+  const refused = await sheetRefusal(ctx, file);
+  if (refused) return { error: refused };
 
   // The matrix is a grid, not a list of records: its own reader, and only an
   // administrator may apply it, because it says who approves what.
@@ -161,7 +166,7 @@ export async function importBulkAction(_prev: ImportResult | undefined, formData
   const rows: ImportRow[] = [];
   // Document numbers to ids, for the rows that correct a document.
   let known: Map<string, string> | undefined;
-  let registering = 0, correcting = 0;
+  let registering = 0, correcting = 0, unchanged = 0;
 
   if (kind === "deliverables") {
     const [deliverables, types, disciplines, projects, subs, suppliers, pos, crits, confs, retentions, lists] = await Promise.all([
@@ -174,24 +179,39 @@ export async function importBulkAction(_prev: ImportResult | undefined, formData
     // A value that is not in its list, said with the list's own name, where it is kept.
     const notIn = (key: string, column: string, given: string) =>
       given ? `${column} "${given}" is not in the list ${title.get(key) ?? key} (Settings)` : `no ${column.toLowerCase()}`;
-    const numbers = new Map([...(await registerByNumber(ctx)).values()].map((d) => [d.number, d.id]));
-    known = numbers;
+    const register = new Map((await registerRows(ctx)).map((d) => [d.number, d] as const));
+    known = new Map([...register].map(([number, d]) => [number, d.id]));
     // What the number is built from cannot be corrected here: the number would
     // then say one thing and the record another, and a number is never rewritten.
-    const INSIDE_THE_NUMBER = ["Type", "Discipline", "Project", "SubProject", "Supplier"];
-    const CORRECTABLE = ["Title", "Criticality", "Confidentiality", "RetentionClass", "ContractRef", "AssetCode", "PlannedDate", "ReceivedDate"];
+    // A file taken out as the register stands carries them as they are: only a change is refused.
+    const projectCode = ctx.project?.code ?? "";
+    const INSIDE_THE_NUMBER: [string, (d: RegisterRow) => string][] = [
+      ["Type", (d) => d.docType], ["Discipline", (d) => d.discipline], ["Project", () => projectCode],
+      ["SubProject", (d) => d.subproject ?? ""], ["Supplier", (d) => d.originator ?? ""],
+    ];
+    // What a row may correct, and what the document holds now: a value already so is no change.
+    const CORRECTABLE: [string, (d: RegisterRow) => string | null][] = [
+      ["Title", (d) => d.title], ["Criticality", (d) => d.criticality ?? ""], ["Confidentiality", (d) => d.confidentiality ?? ""],
+      ["RetentionClass", (d) => d.retentionClass ?? ""], ["ContractRef", (d) => d.contractRef ?? ""],
+      ["PlannedDate", (d) => d.plannedDate?.slice(0, 10) ?? ""], ["AssetCode", () => null], ["ReceivedDate", () => null],
+    ];
+    const same = (column: string, given: string, now: string | null) =>
+      now !== null && (column.endsWith("Date") && !isNaN(new Date(given).getTime()) ? new Date(given).toISOString().slice(0, 10) === now : given === now);
     for (const [i, { data: o, at }] of read.entries()) {
       const line = i + 1;
       const errs: string[] = [];
       const number = GET(o, "Document Number");
       if (number) {
         // A row that names a document is a correction to that document.
-        if (!numbers.has(number)) { rows.push({ line, at, ok: false, message: `${number} is not in the register. Leave Document Number empty to register it as a new document.` }); continue; }
-        const locked = INSIDE_THE_NUMBER.filter((f) => GET(o, f));
+        const doc = register.get(number);
+        if (!doc) { rows.push({ line, at, ok: false, message: `${number} is not in the register. Leave Document Number empty to register it as a new document.` }); continue; }
+        const locked = INSIDE_THE_NUMBER.filter(([column, now]) => GET(o, column) && GET(o, column) !== now(doc)).map(([column]) => column);
         if (locked.length) { rows.push({ line, at, ok: false, message: `${number}: ${locked.join(", ")} ${locked.length === 1 ? "is" : "are"} part of the number and cannot be corrected. Withdraw it and register it again under the right number.` }); continue; }
-        const fields = CORRECTABLE.filter((f) => GET(o, f));
-        if (!fields.length) rows.push({ line, at, ok: false, message: `${number}: nothing to correct. Fill one of ${CORRECTABLE.join(", ")}.` });
-        else { correcting++; rows.push({ line, at, ok: true, message: `Will correct ${number}: ${fields.join(", ")}` }); }
+        const fields = CORRECTABLE.filter(([column, now]) => GET(o, column) && !same(column, GET(o, column), now(doc))).map(([column]) => column);
+        // A row that already matches the register is no news: it is counted, not listed.
+        if (!fields.length) { unchanged++; continue; }
+        correcting++;
+        rows.push({ line, at, ok: true, message: `Will correct ${number}: ${fields.join(", ")}` });
         continue;
       }
       const producer = (GET(o, "Producer") || "ENG").toUpperCase();
@@ -272,9 +292,11 @@ export async function importBulkAction(_prev: ImportResult | undefined, formData
   if (checking) {
     return {
       checked: true, rows, ready, problems, act, problemCsv: problemFile(read, rows),
-      summary: !ready ? `Nothing can be written: ${plural(problems, "row")} with problems.`
+      summary: (!ready && !problems ? "Nothing to write: every row already matches the register."
+        : !ready ? `Nothing can be written: ${plural(problems, "row")} with problems.`
         : problems ? `${plural(ready, "row")} ready, ${plural(problems, "row")} with problems. Nothing is written yet.`
-        : `All ${plural(ready, "row")} ready. Nothing is written yet.`,
+        : `All ${plural(ready, "row")} ready. Nothing is written yet.`)
+        + (unchanged && (ready || problems) ? ` ${plural(unchanged, "row")} already ${unchanged === 1 ? "matches" : "match"} the register and ${unchanged === 1 ? "is" : "are"} left as ${unchanged === 1 ? "it is" : "they are"}.` : ""),
     };
   }
 

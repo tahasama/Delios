@@ -167,3 +167,10 @@ person wrote is shown where it matters, in full.
   a sheet says, the control is in that sheet.
 - **One rule colour:** `border-line`, `divide-line`, `border-line-strong` —
   never a slate step picked by eye.
+
+## A tip
+
+Advice that helps (an order that works, a shortcut) is a `Tip` (`components/ui.tsx`): a dashed frame, a yellow bulb,
+"TIP", the lead in bold ("Setting up a project?"), then the advice. Never used for a rule (that is said plainly) or a
+warning (amber ring).
+

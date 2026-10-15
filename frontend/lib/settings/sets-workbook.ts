@@ -41,7 +41,8 @@ function propText(field: PropField, props: Record<string, unknown>): string {
   return String(value);
 }
 
-export async function buildSetsWorkbook(_t: Tenant): Promise<Buffer> {
+/** Every list, a sheet each: as published now, or (`blank`) the headings only, to start from. */
+export async function buildSetsWorkbook(_t: Tenant, options: { blank?: boolean } = {}): Promise<Buffer> {
   // Each list in its published order, as the backend gives it.
   const sets = [...(await getSets())].sort((a, b) => a.title.localeCompare(b.title));
   const bySet = new Map(await Promise.all(sets.map(async (set) => [set.key, await getSet(set.key)] as const)));
@@ -82,7 +83,7 @@ export async function buildSetsWorkbook(_t: Tenant): Promise<Buffer> {
 
   for (const set of sets) {
     const props = propColumns(set.key);
-    const rows = bySet.get(set.key) ?? [];
+    const rows = options.blank ? [] : bySet.get(set.key) ?? [];
     // The key is the tab name: a title people reword must not change what the
     // file means when it is read back.
     const sheet = book.addWorksheet(set.key.slice(0, 31), { views: [{ state: "frozen", ySplit: 2 }] });

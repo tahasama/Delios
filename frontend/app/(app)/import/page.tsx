@@ -1,4 +1,5 @@
 import { requireScope } from "@/lib/core/scope";
+import { Tip } from "@/components/ui";
 import { isAdmin } from "@/lib/core/auth";
 import { Download } from "lucide-react";
 import { BulkImportForm } from "./bulk-import-form";
@@ -49,10 +50,9 @@ export default async function ImportPage({ searchParams }: { searchParams: Promi
                 Bring a spreadsheet in, or take a copy out. A file is always checked first: you see what it would do, row by row,
                 before anything is written.
               </p>
-              <p className="mt-2 max-w-2xl text-xs leading-5 text-slate-600">
-                <span className="font-semibold text-slate-800">Setting up a project?</span> Import in this order: the Settings lists,
-                then the team, then the distribution matrix, then the deliverable list.
-              </p>
+              <Tip lead="Setting up a project?" className="mt-3">
+                Import in this order: the Settings lists, then the team, then the distribution matrix, then the deliverable list.
+              </Tip>
             </>
           ) : (
             <p className="mt-2 max-w-2xl rounded-md bg-tint-soft px-2.5 py-1.5 text-xs leading-5 text-slate-700 ring-1 ring-line">
